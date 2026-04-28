@@ -12,11 +12,82 @@ function mkRng(seed) {
   };
 }
 
+const COMPOSITION_PRESETS = [
+  {
+    id: 'praystation',
+    categories: ['organic', 'radial', 'stamps'],
+    paletteShift: 'band',
+  },
+  {
+    id: 'dripfield',
+    categories: ['linework', 'organic', 'dots'],
+    paletteShift: 'split',
+  },
+  {
+    id: 'eyearchipelago',
+    categories: ['radial', 'organic', 'stamps'],
+    paletteShift: 'band',
+  },
+  {
+    id: 'knotgrid',
+    categories: ['geometric', 'linework', 'floral'],
+    paletteShift: 'zone',
+  },
+];
+
 function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick }) {
   const wrapRef = useRefCV(null);
   const innerRef = useRefCV(null);
 
   const activeAssets = useMemoCV(() => window.ASSETS.filter(a => enabled[a.id]), [enabled]);
+
+  const compositionPreset = useMemoCV(() => {
+    return COMPOSITION_PRESETS.find(p => p.id === params.composition) || COMPOSITION_PRESETS[0];
+  }, [params.composition]);
+
+  const weightForAsset = (asset) => {
+    const weightMap = { light: 0.8, medium: 1, heavy: 1.3 };
+    const densityMap = { sparse: 0.85, medium: 1, dense: 1.2 };
+    let base = weightMap[asset.weight] || 1;
+    base *= densityMap[asset.density] || 1;
+    if (compositionPreset.categories.includes(asset.category)) base *= 1.3;
+    return base;
+  };
+
+  const pickAsset = (rng) => {
+    const pool = activeAssets.filter(a => compositionPreset.categories.includes(a.category));
+    const source = pool.length > 0 ? pool : activeAssets;
+    const weights = source.map(weightForAsset);
+    const total = weights.reduce((sum, v) => sum + v, 0);
+    let roll = rng() * total;
+    for (let i = 0; i < source.length; i++) {
+      roll -= weights[i];
+      if (roll <= 0) return source[i];
+    }
+    return source[source.length - 1];
+  };
+
+  const colorForPlacement = (y, idx, rng) => {
+    const sw = palette.swatches;
+    if (!params.recolor) return { ink: sw[0], accent: sw[1] };
+    if (compositionPreset.paletteShift === 'band') {
+      const band = Math.min(sw.length - 1, Math.floor((y / 700) * sw.length));
+      return { ink: sw[band], accent: sw[(band + 2) % sw.length] };
+    }
+    if (compositionPreset.paletteShift === 'zone') {
+      const zone = idx % sw.length;
+      return { ink: sw[zone], accent: sw[(zone + 3) % sw.length] };
+    }
+    if (compositionPreset.paletteShift === 'split') {
+      const ink = idx % 2 === 0 ? sw[0] : sw[2] || sw[0];
+      const accent = idx % 2 === 0 ? sw[2] || sw[1] : sw[1];
+      return { ink, accent };
+    }
+    const ink = sw[Math.floor(rng() * sw.length)];
+    let accent = sw[Math.floor(rng() * sw.length)];
+    while (accent === ink && sw.length > 1) accent = sw[Math.floor(rng() * sw.length)];
+    return { ink, accent };
+  };
 
   // Compute placements when relevant inputs change
   const placements = useMemoCV(() => {
@@ -92,7 +163,7 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
       if (x < pad || x > W - pad || y < pad || y > H - pad) {
         if (!params.bleed) continue;
       }
-      const asset = activeAssets[Math.floor(rng() * activeAssets.length)];
+      const asset = pickAsset(rng);
       const sc = params.scale[0] + rng() * (params.scale[1] - params.scale[0]);
       const baseScale = asset.scale[0] + rng() * (asset.scale[1] - asset.scale[0]);
       const finalScale = sc * baseScale;
@@ -103,13 +174,8 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
       else if (asset.rotate === 'step90') rot = Math.floor(rng() * 4) * 90;
       const alpha = (params.alpha[0] + rng() * (params.alpha[1] - params.alpha[0])) / 100;
       const tier = Math.floor(rng() * params.zTiers);
-      // pick ink/accent from palette swatches if recolor on; else first two contrast colors
-      let ink = palette.swatches[0], accent = palette.swatches[1];
-      if (params.recolor) {
-        const sw = palette.swatches;
-        ink = sw[Math.floor(rng() * sw.length)];
-        do { accent = sw[Math.floor(rng() * sw.length)]; } while (accent === ink && sw.length > 1);
-      }
+      if (params.mirror && i % 2 === 0) x = W - x;
+      const { ink, accent } = colorForPlacement(y, i, rng);
       out.push({ x, y, scale: finalScale, rot, alpha, tier, ink, accent, svg: asset.svg, id: asset.id + '_' + i });
     }
     out.sort((a, b) => a.tier - b.tier);
@@ -141,6 +207,7 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
           <span className="status-pill"><span className={classNames('status-dot', running && 'live')}/>{running ? 'render' : 'idle'}</span>
           <span className="meter-pill mono">obj {placements.length}</span>
           <span className="meter-pill mono">mode {params.mode}</span>
+          <span className="meter-pill mono">preset {compositionPreset.id}</span>
         </div>
       }/>
       <div className="canvas-wrap" ref={wrapRef}>

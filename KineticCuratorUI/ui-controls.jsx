@@ -50,12 +50,71 @@ const LAYOUT_MODES = [
   { id: 'rails',     name: 'rails',     glyph: 'rail' },
 ];
 
+const COMPOSITION_PRESETS = [
+  {
+    id: 'praystation',
+    name: 'PRAYSTATION',
+    desc: 'dense bloom of glyphs and color bursts',
+    categories: ['organic', 'radial', 'stamps'],
+    paletteShift: 'band',
+    params: {
+      mode: 'fibonacci', count: 300, scale: [0.35, 1.4], rotate: [-140, 140], alpha: [24, 96],
+      zTiers: 5, jitter: 42, density: 92, bleed: false, recolor: true, mirror: false, overlap: true,
+    },
+  },
+  {
+    id: 'dripfield',
+    name: 'DRIP FIELD',
+    desc: 'linework + drops with a wild spread',
+    categories: ['linework', 'organic', 'dots'],
+    paletteShift: 'split',
+    params: {
+      mode: 'swarm', count: 340, scale: [0.28, 1.25], rotate: [-160, 160], alpha: [32, 88],
+      zTiers: 6, jitter: 66, density: 100, bleed: true, recolor: true, mirror: false, overlap: true,
+    },
+  },
+  {
+    id: 'eyearchipelago',
+    name: 'EYE ARCHIPELAGO',
+    desc: 'radial anchors with clustered organic glyphs',
+    categories: ['radial', 'organic', 'stamps'],
+    paletteShift: 'band',
+    params: {
+      mode: 'radial', count: 220, scale: [0.4, 1.5], rotate: [-90, 90], alpha: [38, 98],
+      zTiers: 5, jitter: 28, density: 82, bleed: false, recolor: true, mirror: true, overlap: true,
+    },
+  },
+  {
+    id: 'knotgrid',
+    name: 'KNOT GRID',
+    desc: 'tight grid clusters with offset traps',
+    categories: ['geometric', 'linework', 'floral'],
+    paletteShift: 'zone',
+    params: {
+      mode: 'grid', count: 260, scale: [0.3, 1.1], rotate: [-140, 140], alpha: [26, 88],
+      zTiers: 4, jitter: 48, density: 86, bleed: false, recolor: true, mirror: true, overlap: true,
+    },
+  },
+];
+
 function LayoutManager({ params, setParams }) {
   const set = (k, v) => setParams({ ...params, [k]: v });
+  const applyPreset = (preset) => setParams({ ...params, ...preset.params, composition: preset.id });
   return (
     <section className="panel panel-layout">
       <PanelHeader tag="P04" title="LAYOUT_MANAGER.pde" subtitle="distribution · transform ranges · alpha" />
       <div className="panel-body">
+        <div className="preset-row">
+          {COMPOSITION_PRESETS.map(p => (
+            <button key={p.id}
+              className={classNames('preset-btn', params.composition === p.id && 'active')}
+              onClick={() => applyPreset(p)}
+              title={p.desc}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
         <div className="mode-grid">
           {LAYOUT_MODES.map(m => (
             <button key={m.id}

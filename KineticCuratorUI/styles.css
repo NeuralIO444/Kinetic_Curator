@@ -196,6 +196,27 @@ input, select { font-family: inherit; font-size: 12px; }
 
 .panel-body { padding: 10px; overflow: auto; min-height: 0; }
 
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.preset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.preset-btn:hover { color: var(--ink); border-color: var(--line-2); }
+.preset-btn.active { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+
 /* ────────────────────────────────────────────────────────────
    Canvas preview
    ──────────────────────────────────────────────────────────── */

@@ -23,6 +23,7 @@ function App() {
 
   // ─── LayoutManager params ───
   const [layoutParams, setLayoutParams] = useStateApp({
+    composition: 'praystation',
     mode: 'fibonacci',
     count: 240,
     scale: [0.4, 1.6],
