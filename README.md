@@ -25,3 +25,6 @@ A starter Processing sketch for a native generative art engine inspired by Joshu
 - The sketch uses `P3D` for GPU acceleration.
 - The `AssetPool` is designed to scan `data` for `.svg` assets and fall back to placeholder geometry if none are found.
 - The `LayoutManager` is intentionally simple to make it easy to swap in more advanced HYPE-inspired layouts.
+
+## Repository
+This repository now includes the remote `NeuralIO444/Kinetic_Curator` history and the local KineticCurator prototype implementation.
