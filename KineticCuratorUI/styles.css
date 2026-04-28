@@ -657,6 +657,16 @@ input, select { font-family: inherit; font-size: 12px; }
 }
 .davis-hint b { color: var(--ink); font-weight: 700; }
 
+.output-hint {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px dashed var(--line-2);
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
 .favorites-list {
   margin-top: 4px;
   padding: 6px;

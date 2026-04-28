@@ -110,7 +110,9 @@ Example asset definition:
 | **BITSHIFTER CHAOS** | geometric, crystalline, fragments | CA + bitwise color mutation |
 | **CA GROWTH** | organic, geometric, biosynthetic | Conway-style emergent growth |
 | **ORBIT OF INFLUENCE** | radial, organic, stamps | 3 invisible planets, 50 painters with brush sizes (J. Davis 2023) |
-| **GHOST RECOIL ABACUS TOTEM** | geometric, fragments, stamps | Layered totem, shader-glitch recoil (NoPattern × J. Davis) |
+| **GHOST RECOIL ABACUS TOTEM** | geometric, fragments, stamps | Abacus rows + ghost-recoil duplicates (NoPattern × J. Davis) |
+| **CONAMARA CHAOS** | organic, fragments, biosynthetic | Post-terrestrial flow landscape (J. Davis × Stýblová × KØWCH) |
+| **FIRST CONTACT ON EUROPA** | organic, crystalline, radial | Dense Europa orbital field (J. Davis × Stýblová × KØWCH) |
 
 ## Adding New Assets
 

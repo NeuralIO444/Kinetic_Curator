@@ -334,14 +334,16 @@ function App() {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
-  const addSnapshot = (fmt) => {
+  const addSnapshot = (fmt, dims) => {
+    const target = dims && dims.w && dims.h ? dims : { w: 2000, h: 1400 }; // default high-res
     const id = String(snapshots.length + 1).padStart(4, '0');
     const d = new Date();
     const ts = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
     const config = buildConfig(id, fmt.toUpperCase(), ts);
+    config.exportSize = { w: target.w, h: target.h };
     setSnapshots(prev => [...prev, { id, fmt: fmt.toUpperCase(), ts, seed, config }]);
 
-    const stem = `kinetic-curator_${id}_${palette.id}_${layoutParams.composition}_${seed.toString(16).padStart(8,'0').slice(0,8)}`;
+    const stem = `kinetic-curator_${id}_${palette.id}_${layoutParams.composition}_${seed.toString(16).padStart(8,'0').slice(0,8)}_${target.w}x${target.h}`;
 
     if (fmt === 'json') {
       downloadJSON(`${stem}.json`, config);
@@ -351,19 +353,24 @@ function App() {
     if (fmt === 'png' && canvasRef.current) {
       const svg = canvasRef.current;
       const canvas = document.createElement('canvas');
-      canvas.width = 1000;
-      canvas.height = 700;
+      canvas.width = target.w;
+      canvas.height = target.h;
       const ctx = canvas.getContext('2d');
       const svgData = new XMLSerializer().serializeToString(svg);
       const img = new Image();
       img.onload = () => {
         ctx.fillStyle = palette.bg || '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
-        link.download = `${stem}.png`;
-        link.click();
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${stem}.png`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 0);
+        }, 'image/png');
       };
       const svgUtf8 = unescape(encodeURIComponent(svgData));
       img.src = 'data:image/svg+xml;base64,' + btoa(svgUtf8);

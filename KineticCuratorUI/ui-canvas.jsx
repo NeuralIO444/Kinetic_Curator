@@ -68,6 +68,16 @@ const COMPOSITION_PRESETS = [
     categories: ['geometric', 'fragments', 'stamps'],
     paletteShift: 'split',
   },
+  {
+    id: 'conamara-chaos',
+    categories: ['organic', 'fragments', 'biosynthetic'],
+    paletteShift: 'band',
+  },
+  {
+    id: 'first-contact-europa',
+    categories: ['organic', 'crystalline', 'radial'],
+    paletteShift: 'band',
+  },
 ];
 
 function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick, canvasRef, motionEnergy = 0, beatPulse = 0, slowRender = false, evolveActive = false }) {
@@ -179,6 +189,31 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
       orbitState = { planets, painters, numPainters };
     }
 
+    // ── Abacus / Ghost-Recoil-Totem layout precompute
+    let abacusState = null;
+    if (params.mode === 'abacus') {
+      const aRng = mkRng(seed ^ 0xABACA5);
+      const rows = Math.max(4, Math.min(18, Math.round(6 + aRng() * 8))); // 6–14 rows
+      const columns = Math.max(3, Math.min(20, Math.round(5 + aRng() * 10))); // 5–15 columns
+      const yMargin = H * 0.08;
+      const xMargin = W * 0.10;
+      const rowH = (H - yMargin * 2) / rows;
+      const colW = (W - xMargin * 2) / columns;
+      const beads = [];
+      for (let r = 0; r < rows; r++) {
+        const rowRng = mkRng(seed ^ ((r + 1) * 0x9E3779B1));
+        const slide = (rowRng() - 0.5) * colW * 1.4; // abacus row slide
+        const beadCount = Math.max(2, Math.floor(rowRng() * columns) + 2);
+        for (let b = 0; b < beadCount; b++) {
+          const col = b + Math.floor(rowRng() * (columns - beadCount));
+          const cx = xMargin + (col + 0.5) * colW + slide;
+          const cy = yMargin + (r + 0.5) * rowH + (rowRng() - 0.5) * rowH * 0.15;
+          beads.push({ x: cx, y: cy, row: r, scaleBias: 0.85 + rowRng() * 0.5 });
+        }
+      }
+      abacusState = { rows, columns, beads, ghostsPerBead: 2 };
+    }
+
     for (let i = 0; i < n; i++) {
       let x, y;
       let caScaleOverride = null;
@@ -187,6 +222,8 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
       let orbitBrushScale = null;
       let orbitTier = null;
       let orbitRotOverride = null;
+      let abacusGhostShift = null;
+      let abacusRowTier = null;
       switch (params.mode) {
         case 'grid': {
           const cols = Math.ceil(Math.sqrt(n * (W / H)));
@@ -255,6 +292,28 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
           }
           break;
         }
+        case 'abacus': {
+          if (abacusState && abacusState.beads.length > 0) {
+            const slot = abacusState.ghostsPerBead + 1; // original + ghosts
+            const beadIdx = Math.floor(i / slot) % abacusState.beads.length;
+            const ghostIdx = i % slot; // 0 = original, 1+ = ghost recoil
+            const bead = abacusState.beads[beadIdx];
+            x = bead.x;
+            y = bead.y;
+            if (ghostIdx > 0) {
+              // Ghost recoil: offset right + slight down, fading
+              const gShift = 14 + ghostIdx * 12 + (rng() - 0.5) * 6;
+              x += gShift;
+              y += (rng() - 0.5) * 6;
+              abacusGhostShift = ghostIdx; // used for alpha attenuation later
+            }
+            abacusRowTier = bead.row % Math.max(1, params.zTiers);
+          } else {
+            x = rng() * W;
+            y = rng() * H;
+          }
+          break;
+        }
         case 'orbit': {
           if (orbitState) {
             const painterIdx = i % orbitState.numPainters;
@@ -301,8 +360,13 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
       else if (asset.rotate === 'step45') rot = Math.floor(rng() * 8) * 45;
       else if (asset.rotate === 'step60') rot = Math.floor(rng() * 6) * 60;
       else if (asset.rotate === 'step90') rot = Math.floor(rng() * 4) * 90;
-      const alpha = (params.alpha[0] + rng() * (params.alpha[1] - params.alpha[0])) / 100;
-      const tier = orbitTier !== null ? orbitTier : Math.floor(rng() * params.zTiers);
+      let alpha = (params.alpha[0] + rng() * (params.alpha[1] - params.alpha[0])) / 100;
+      if (abacusGhostShift !== null) alpha *= Math.max(0.18, 0.65 - abacusGhostShift * 0.18);
+      const tier = orbitTier !== null
+        ? orbitTier
+        : abacusRowTier !== null
+          ? abacusRowTier
+          : Math.floor(rng() * params.zTiers);
       if (params.mirror && i % 2 === 0) x = W - x;
       let { ink, accent } = colorForPlacement(y, i, rng);
       if (params.mode === 'ca' && window.CAEngine) {

@@ -50,6 +50,7 @@ const LAYOUT_MODES = [
   { id: 'rails',     name: 'rails',     glyph: 'rail' },
   { id: 'ca',        name: 'cellular',  glyph: 'ca'   },
   { id: 'orbit',     name: 'orbit',     glyph: 'orbit'},
+  { id: 'abacus',    name: 'abacus',    glyph: 'abacus'},
 ];
 
 const COMPOSITION_PRESETS = [
@@ -166,12 +167,34 @@ const COMPOSITION_PRESETS = [
   {
     id: 'ghost-recoil',
     name: 'GHOST RECOIL ABACUS TOTEM',
-    desc: 'Chuck Anderson × Joshua Davis · Infinite Pressure #80 — totemic stack with shader-glitch recoil',
+    desc: 'Chuck Anderson × Joshua Davis · Infinite Pressure #80 — abacus rows with shader-glitch ghost recoil (audio Ben Lukas Boysen)',
     categories: ['geometric', 'fragments', 'stamps'],
     paletteShift: 'split',
     params: {
-      mode: 'layers', count: 320, scale: [0.3, 1.4], rotate: [-12, 12], alpha: [30, 95],
-      zTiers: 8, jitter: 22, density: 95, bleed: true, recolor: true, mirror: true, overlap: true,
+      mode: 'abacus', count: 420, scale: [0.35, 1.2], rotate: [-8, 8], alpha: [32, 95],
+      zTiers: 4, jitter: 8, density: 100, bleed: false, recolor: true, mirror: false, overlap: true,
+    },
+  },
+  {
+    id: 'conamara-chaos',
+    name: 'CONAMARA CHAOS',
+    desc: 'Joshua Davis · post-terrestrial moving landscape · macro-analog textures (Jana Stýblová) · audio (KØWCH)',
+    categories: ['organic', 'fragments', 'biosynthetic'],
+    paletteShift: 'band',
+    params: {
+      mode: 'flow', count: 280, scale: [0.45, 1.7], rotate: [-180, 180], alpha: [35, 95],
+      zTiers: 6, jitter: 92, density: 88, bleed: true, recolor: true, mirror: false, overlap: true,
+    },
+  },
+  {
+    id: 'first-contact-europa',
+    name: 'FIRST CONTACT ON EUROPA',
+    desc: 'Joshua Davis · post-terrestrial Europa · 60-item set with macro-analog textures + KØWCH audio',
+    categories: ['organic', 'crystalline', 'radial'],
+    paletteShift: 'band',
+    params: {
+      mode: 'orbit', count: 540, scale: [0.35, 1.55], rotate: [-180, 180], alpha: [28, 92],
+      zTiers: 4, jitter: 14, density: 95, bleed: true, recolor: true, mirror: false, overlap: true,
     },
   },
 ];
@@ -253,6 +276,7 @@ function ModeGlyph({ mode, active }) {
     case 'rails':     return <svg {...common}><g fill={fill}><circle cx="6" cy="16" r="1.5"/><circle cx="11" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="21" cy="16" r="1.5"/><circle cx="26" cy="16" r="1.5"/></g><g stroke={stroke} strokeWidth="1" opacity="0.5"><line x1="4" y1="10" x2="28" y2="10"/><line x1="4" y1="22" x2="28" y2="22"/></g></svg>;
     case 'ca':        return <svg {...common}><g fill={fill}><rect x="6" y="6" width="4" height="4"/><rect x="14" y="6" width="4" height="4"/><rect x="22" y="10" width="4" height="4"/><rect x="10" y="14" width="4" height="4"/><rect x="18" y="14" width="4" height="4"/><rect x="6" y="22" width="4" height="4"/><rect x="22" y="22" width="4" height="4"/></g></svg>;
     case 'orbit':     return <svg {...common}><g fill="none" stroke={stroke} strokeWidth="1.2"><circle cx="16" cy="16" r="4"/><circle cx="16" cy="16" r="9"/><circle cx="16" cy="16" r="13"/></g><g fill={fill}><circle cx="20" cy="16" r="1.4"/><circle cx="9" cy="20" r="1.4"/><circle cx="22" cy="9" r="1.4"/></g></svg>;
+    case 'abacus':    return <svg {...common}><g stroke={stroke} strokeWidth="1" opacity="0.55"><line x1="6" y1="8" x2="26" y2="8"/><line x1="6" y1="14" x2="26" y2="14"/><line x1="6" y1="20" x2="26" y2="20"/><line x1="6" y1="26" x2="26" y2="26"/></g><g fill={fill}><circle cx="10" cy="8" r="1.5"/><circle cx="14" cy="8" r="1.5"/><circle cx="22" cy="8" r="1.5"/><circle cx="11" cy="14" r="1.5"/><circle cx="20" cy="14" r="1.5"/><circle cx="24" cy="14" r="1.5"/><circle cx="9" cy="20" r="1.5"/><circle cx="16" cy="20" r="1.5"/><circle cx="23" cy="20" r="1.5"/><circle cx="13" cy="26" r="1.5"/><circle cx="19" cy="26" r="1.5"/><circle cx="25" cy="26" r="1.5"/></g></svg>;
     default:          return <svg {...common}/>;
   }
 }
@@ -386,6 +410,10 @@ function RouteRow({ src, label, route, setRoute }) {
 function OutputPanel({ palette, layout, seed, snapshots, addSnapshot }) {
   const [size, setSize] = useStateLM('1080x1080');
   const [collapsed, toggle] = useCollapse(true);
+  const dims = (() => {
+    const m = size.match(/^(\d+)x(\d+)$/);
+    return m ? { w: +m[1], h: +m[2] } : { w: 1080, h: 1080 };
+  })();
   return (
     <section className="panel panel-output">
       <PanelHeader tag="P05" title="OUTPUT.pde" subtitle="snapshot · pdf · config export"
@@ -401,11 +429,15 @@ function OutputPanel({ palette, layout, seed, snapshots, addSnapshot }) {
               <option>1920x1080</option>
               <option>2160x2700</option>
               <option>3000x3000</option>
+              <option>7200x10800</option>
             </select>
           </label>
-          <button className="big-btn" onClick={() => addSnapshot('png')}>↓ PNG</button>
-          <button className="big-btn" onClick={() => addSnapshot('pdf')}>↓ PDF (key:s)</button>
-          <button className="big-btn" onClick={() => addSnapshot('json')}>↓ CONFIG.json</button>
+          <button className="big-btn" onClick={() => addSnapshot('png', dims)}>↓ PNG</button>
+          <button className="big-btn" onClick={() => addSnapshot('pdf', dims)}>↓ PDF (key:s)</button>
+          <button className="big-btn" onClick={() => addSnapshot('json', dims)}>↓ CONFIG.json</button>
+        </div>
+        <div className="output-hint mono">
+          7200×10800 @ 300 DPI = print-still preset · matches Davis-style high-res deliverable
         </div>
         <div className="snapshot-strip">
           {snapshots.length === 0 && <span className="placeholder">no snapshots yet · key [s] in sketch saves to /out</span>}

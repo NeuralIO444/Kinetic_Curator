@@ -23,7 +23,7 @@ A generative art engine inspired by Joshua Davis and the HYPE framework, featuri
 - `KineticCuratorUI/ca-engine.jsx` - cellular automaton + bitwise color mutations
 - `KineticCuratorUI/styles.css` - UI styling
 
-## Composition Presets (11 Total)
+## Composition Presets (13 Total)
 
 ### Classic Presets (Joshua Davis style)
 - **PRAYSTATION** - dense bloom of glyphs and color bursts
@@ -42,13 +42,21 @@ A generative art engine inspired by Joshua Davis and the HYPE framework, featuri
 
 ### Davis-Lineage Presets
 - **ORBIT OF INFLUENCE** - 3 invisible planets (S/M/L), 50 painters orbit at varied speeds and brush sizes, painting trails around their orbit (Joshua Davis · fxhash · Proof of People · ZeroSpace NYC 2023)
-- **GHOST RECOIL ABACUS TOTEM** - layered totem with shader-glitch recoil; mirrored axis, slight rotation jitter (Chuck Anderson × Joshua Davis · *Infinite Pressure* #80, NoPattern × Joshua Davis 99-piece series)
+- **GHOST RECOIL ABACUS TOTEM** - abacus rows (varied count + slide per row) with ghost-recoil duplicates trailing each bead; per-row z-tiering for the totem stack (Chuck Anderson × Joshua Davis, *Infinite Pressure* #80; audio Ben Lukas Boysen)
+- **CONAMARA CHAOS** - flow-mode landscape, high jitter, banded palette — post-terrestrial moving landscape (Joshua Davis × macro-analog textures by Jana Stýblová × audio KØWCH)
+- **FIRST CONTACT ON EUROPA** - dense orbital field, banded palette, crystalline + radial bias — Europa-scale exploration (Joshua Davis × Jana Stýblová × KØWCH)
 
 Each preset includes tuned parameters for count, scale, rotation, density, and palette shift strategy.
 
 ## Layout Modes
 
-`random`, `grid`, `fibonacci`, `radial`, `swarm·hype`, `flow`, `layers`, `rails`, `cellular` (CA), `orbit` (3 invisible planets, 50 painters).
+`random`, `grid`, `fibonacci`, `radial`, `swarm·hype`, `flow`, `layers`, `rails`, `cellular` (CA), `orbit` (3 invisible planets, 50 painters), `abacus` (stacked bead rows with ghost-recoil duplicates).
+
+## Export resolutions
+
+The OUTPUT panel rasterizes the live SVG to any picked size. Built-in options:
+`1080×1080`, `1920×1080`, `2160×2700`, `3000×3000`, **`7200×10800`** (300 DPI 24"×36" print — matches the high-res still deliverable used in pieces like *Infinite Pressure* and *Conamara Chaos*).
+Filenames embed the export size for traceability.
 
 ## Asset Categories
 
