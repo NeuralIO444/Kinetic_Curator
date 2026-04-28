@@ -30,10 +30,25 @@ function classNames(...args) { return args.filter(Boolean).join(' '); }
 // ───────────────────────────────────────────────────────────────
 // Section header (shared chrome)
 // ───────────────────────────────────────────────────────────────
-function PanelHeader({ tag, title, subtitle, right }) {
+function PanelHeader({ tag, title, subtitle, right, collapsed, onToggle }) {
+  const isCollapsible = typeof onToggle === 'function';
+  const handle = (e) => {
+    if (!isCollapsible) return;
+    if (e.target.closest('button, input, select, a')) return;
+    onToggle();
+  };
   return (
-    <div className="panel-header">
+    <div className={classNames('panel-header', isCollapsible && 'panel-header-collapsible', collapsed && 'panel-header-collapsed')}
+         onClick={handle}
+         role={isCollapsible ? 'button' : undefined}
+         tabIndex={isCollapsible ? 0 : undefined}
+         onKeyDown={isCollapsible ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
+         aria-expanded={isCollapsible ? !collapsed : undefined}
+         title={isCollapsible ? (collapsed ? 'expand panel' : 'collapse panel') : undefined}>
       <div className="panel-header-left">
+        {isCollapsible && (
+          <span className="panel-collapse-caret mono" aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+        )}
         <span className="panel-tag">{tag}</span>
         <span className="panel-title">{title}</span>
         {subtitle && <span className="panel-subtitle">{subtitle}</span>}
@@ -41,6 +56,11 @@ function PanelHeader({ tag, title, subtitle, right }) {
       {right && <div className="panel-header-right">{right}</div>}
     </div>
   );
+}
+
+function useCollapse(defaultCollapsed = false) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  return [collapsed, () => setCollapsed(c => !c)];
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -113,6 +133,7 @@ function FpsBar({ fps }) {
 
 window.MasterBar = MasterBar;
 window.PanelHeader = PanelHeader;
+window.useCollapse = useCollapse;
 window.svgWrap = svgWrap;
 window.downloadSVG = downloadSVG;
 window.classNames = classNames;

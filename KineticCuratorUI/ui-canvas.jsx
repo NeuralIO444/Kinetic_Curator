@@ -48,11 +48,24 @@ const COMPOSITION_PRESETS = [
     categories: ['geometric', 'fragments', 'scanlines'],
     paletteShift: 'split',
   },
+  {
+    id: 'bitshifter-chaos',
+    categories: ['geometric', 'crystalline', 'fragments'],
+    paletteShift: 'split',
+  },
+  {
+    id: 'ca-growth',
+    categories: ['organic', 'geometric', 'biosynthetic'],
+    paletteShift: 'band',
+  },
 ];
 
-function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick }) {
+function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick, canvasRef, motionEnergy = 0, beatPulse = 0, slowRender = false, evolveActive = false }) {
   const wrapRef = useRefCV(null);
-  const innerRef = useRefCV(null);
+  const fallbackRef = useRefCV(null);
+  const innerRef = canvasRef || fallbackRef;
+  const [collapsed, toggleCollapse] = useCollapse(false);
+  const [compact, setCompact] = React.useState(false);
 
   const activeAssets = useMemoCV(() => window.ASSETS.filter(a => enabled[a.id]), [enabled]);
 
@@ -104,16 +117,33 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
     return { ink, accent };
   };
 
+  // Apply bitwise mutations for CA mode
+  const applyCAMutation = (colors, mutationSeed, cellIndex) => {
+    if (!window.CAEngine || mutationSeed === undefined) return colors;
+    const mutatedInk = window.CAEngine.bitMutateColor(colors.ink, mutationSeed ^ cellIndex);
+    const mutatedAccent = window.CAEngine.bitMutateColor(colors.accent, (mutationSeed ^ cellIndex) << 1);
+    return { ink: mutatedInk, accent: mutatedAccent };
+  };
+
   // Compute placements when relevant inputs change
   const placements = useMemoCV(() => {
     if (activeAssets.length === 0) return [];
     const W = 1000, H = 700;
     const rng = mkRng(seed);
-    const n = Math.max(1, Math.round(params.count * (params.density / 100)));
+    const energy = Math.max(0, Math.min(1, motionEnergy + beatPulse * 0.5));
+    const countMul = 1 + energy * 0.6;
+    const n = Math.max(1, Math.round(params.count * (params.density / 100) * countMul));
     const out = [];
     const phi = Math.PI * (3 - Math.sqrt(5));
+    // Hoist CA layout once for ca mode
+    const caPositions = (params.mode === 'ca' && window.CAEngine)
+      ? window.CAEngine.generateCALayout(params, rng, energy || 0.5, seed)
+      : null;
     for (let i = 0; i < n; i++) {
       let x, y;
+      let caScaleOverride = null;
+      let caRotOverride = null;
+      let caMutationSeed;
       switch (params.mode) {
         case 'grid': {
           const cols = Math.ceil(Math.sqrt(n * (W / H)));
@@ -168,6 +198,20 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
           y += (rng() - 0.5) * params.jitter;
           break;
         }
+        case 'ca': {
+          if (caPositions && caPositions.length > 0) {
+            const caPos = caPositions[i % caPositions.length];
+            x = caPos.x;
+            y = caPos.y;
+            caScaleOverride = caPos.scale;
+            caRotOverride = caPos.rot;
+            caMutationSeed = caPos.mutationSeed;
+          } else {
+            x = rng() * W;
+            y = rng() * H;
+          }
+          break;
+        }
         case 'random':
         default: {
           x = rng() * W;
@@ -179,33 +223,44 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
         if (!params.bleed) continue;
       }
       const asset = pickAsset(rng);
-      const sc = params.scale[0] + rng() * (params.scale[1] - params.scale[0]);
+      const sc = caScaleOverride !== null
+        ? caScaleOverride
+        : params.scale[0] + rng() * (params.scale[1] - params.scale[0]);
       const baseScale = asset.scale[0] + rng() * (asset.scale[1] - asset.scale[0]);
-      const finalScale = sc * baseScale;
+      const finalScale = sc * baseScale * (1 + beatPulse * 0.25);
       let rot = 0;
-      if (asset.rotate === 'free') rot = params.rotate[0] + rng() * (params.rotate[1] - params.rotate[0]);
+      if (caRotOverride !== null) rot = caRotOverride + (rng() - 0.5) * 20;
+      else if (asset.rotate === 'free') rot = params.rotate[0] + rng() * (params.rotate[1] - params.rotate[0]);
       else if (asset.rotate === 'step45') rot = Math.floor(rng() * 8) * 45;
       else if (asset.rotate === 'step60') rot = Math.floor(rng() * 6) * 60;
       else if (asset.rotate === 'step90') rot = Math.floor(rng() * 4) * 90;
       const alpha = (params.alpha[0] + rng() * (params.alpha[1] - params.alpha[0])) / 100;
       const tier = Math.floor(rng() * params.zTiers);
       if (params.mirror && i % 2 === 0) x = W - x;
-      const { ink, accent } = colorForPlacement(y, i, rng);
+      let { ink, accent } = colorForPlacement(y, i, rng);
+      if (params.mode === 'ca' && window.CAEngine) {
+        const mutationSeed = (caMutationSeed !== undefined ? caMutationSeed : Math.floor(x * y)) ^ seed;
+        ({ ink, accent } = applyCAMutation({ ink, accent }, mutationSeed, i));
+      }
       out.push({ x, y, scale: finalScale, rot, alpha, tier, ink, accent, svg: asset.svg, id: asset.id + '_' + i });
     }
     out.sort((a, b) => a.tier - b.tier);
     return out;
-  }, [seed, params, activeAssets, palette]);
+  }, [seed, params, activeAssets, palette, motionEnergy, beatPulse]);
 
-  // Soft FPS sim — scale with placement count
+  // Soft FPS sim — scale with placement count; slow-render reports ~2fps
   useEffectCV(() => {
     if (!running) return;
+    if (slowRender) {
+      onFpsTick(2);
+      const id = setInterval(() => onFpsTick(2 + (Math.random() - 0.5) * 0.4), 500);
+      return () => clearInterval(id);
+    }
     let raf, last = performance.now(), frames = 0, acc = 0;
     const tick = (now) => {
       const dt = now - last; last = now; acc += dt; frames++;
       if (acc >= 500) {
         const f = (frames * 1000) / acc;
-        // Add slight noise for realism
         onFpsTick(Math.max(8, f - placements.length * 0.01 + (Math.random() - 0.5) * 2));
         frames = 0; acc = 0;
       }
@@ -213,18 +268,31 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [running, placements.length]);
+  }, [running, placements.length, slowRender]);
 
   return (
-    <section className="panel panel-canvas">
-      <PanelHeader tag="P01" title="KINETIC_CURATOR.pde" subtitle="P3D · 1000×700 preview" right={
+    <section className={classNames('panel panel-canvas', compact && 'panel-canvas-compact', collapsed && 'panel-canvas-collapsed')}>
+      <PanelHeader tag="P01" title="KINETIC_CURATOR.pde" subtitle="P3D · 1000×700 preview"
+        collapsed={collapsed} onToggle={toggleCollapse}
+        right={
         <div className="header-tools">
           <span className="status-pill"><span className={classNames('status-dot', running && 'live')}/>{running ? 'render' : 'idle'}</span>
           <span className="meter-pill mono">obj {placements.length}</span>
           <span className="meter-pill mono">mode {params.mode}</span>
           <span className="meter-pill mono">preset {compositionPreset.id}</span>
+          {(motionEnergy > 0 || beatPulse > 0) && (
+            <span className="meter-pill mono" style={{ color: beatPulse > 0.1 ? '#0f0' : undefined }}>
+              stim {(motionEnergy * 100).toFixed(0)}% {beatPulse > 0.05 ? '♪' : ''}
+            </span>
+          )}
+          {evolveActive && <span className="meter-pill mono" style={{ color: '#0f0' }}>◉ EVOLVE</span>}
+          {slowRender && <span className="meter-pill mono">SLOW</span>}
+          <button className="chip-btn" onClick={() => setCompact(c => !c)} title="toggle canvas height">
+            {compact ? '↕ TALL' : '↔ COMPACT'}
+          </button>
         </div>
       }/>
+      {!collapsed && (
       <div className="canvas-wrap" ref={wrapRef}>
         <div className="canvas-bg" style={{ background: palette.bg }} />
         <div className="canvas-rulers" />
@@ -247,6 +315,7 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
         <div className="canvas-corner bl mono">[0,700]</div>
         <div className="canvas-corner br mono">[1000,700]</div>
       </div>
+      )}
     </section>
   );
 }

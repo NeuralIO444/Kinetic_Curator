@@ -3,6 +3,7 @@
 const { useState: useStateAP, useMemo: useMemoAP } = React;
 
 function AssetPool({ ink, accent, bg, enabled, setEnabled, search, setSearch, catFilter, setCatFilter, view, setView }) {
+  const [collapsed, toggle] = useCollapse(false);
   const cats = ['all', ...window.ASSET_CATEGORIES];
   const counts = useMemoAP(() => {
     const c = { all: window.ASSETS.length };
@@ -31,6 +32,8 @@ function AssetPool({ ink, accent, bg, enabled, setEnabled, search, setSearch, ca
         tag="P02"
         title="ASSET_POOL.pde"
         subtitle={`${window.ASSETS.length} glyphs · ${enabledCount}/${filtered.length} active in view`}
+        collapsed={collapsed}
+        onToggle={toggle}
         right={
           <div className="header-tools">
             <button
@@ -44,6 +47,8 @@ function AssetPool({ ink, accent, bg, enabled, setEnabled, search, setSearch, ca
           </div>
         }
       />
+      {!collapsed && (
+      <>
       <div className="pool-controls">
         <div className="cat-filter">
           {cats.map(c => (
@@ -121,6 +126,8 @@ function AssetPool({ ink, accent, bg, enabled, setEnabled, search, setSearch, ca
           </div>
         )}
       </div>
+      </>
+      )}
     </section>
   );
 }

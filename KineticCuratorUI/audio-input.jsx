@@ -11,7 +11,8 @@ function AudioInput({ enabled, onStimulus, onBeatDetect, onFrequencyData }) {
   
   const [isActive, setIsActive] = useStateAI(false);
   const [error, setError] = useStateAI(null);
-  
+
+  const runningRef = useRefAI(false);
   const prevEnergyRef = useRefAI(0);
   const beatCooldownRef = useRefAI(0);
 
@@ -21,8 +22,18 @@ function AudioInput({ enabled, onStimulus, onBeatDetect, onFrequencyData }) {
 
     const initAudio = async () => {
       try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Create audio context
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          throw new Error('Web Audio API not supported in this browser');
+        }
+        const audioCtx = new AudioContextClass();
         audioCtxRef.current = audioCtx;
+
+        // Resume audio context if suspended (required by most modern browsers)
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
 
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -33,6 +44,10 @@ function AudioInput({ enabled, onStimulus, onBeatDetect, onFrequencyData }) {
         });
         micStreamRef.current = stream;
 
+        // Create source from stream
+        if (!audioCtx.createMediaStreamAudioSource) {
+          throw new Error('createMediaStreamAudioSource not available on AudioContext');
+        }
         const source = audioCtx.createMediaStreamAudioSource(stream);
         const analyser = audioCtx.createAnalyser();
         analyser.fftSize = 2048;
@@ -40,10 +55,10 @@ function AudioInput({ enabled, onStimulus, onBeatDetect, onFrequencyData }) {
 
         source.connect(analyser);
 
+        runningRef.current = true;
         setIsActive(true);
         setError(null);
 
-        // Start the analysis loop
         analyzeAudio();
       } catch (err) {
         setError(err.message);
@@ -54,21 +69,24 @@ function AudioInput({ enabled, onStimulus, onBeatDetect, onFrequencyData }) {
     initAudio();
 
     return () => {
-      // Cleanup
+      runningRef.current = false;
       if (micStreamRef.current) {
         micStreamRef.current.getTracks().forEach(t => t.stop());
+        micStreamRef.current = null;
       }
       if (animIdRef.current) {
         cancelAnimationFrame(animIdRef.current);
       }
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close();
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
       }
+      setIsActive(false);
     };
   }, [enabled]);
 
   const analyzeAudio = () => {
-    if (!analyserRef.current || !isActive) return;
+    if (!runningRef.current || !analyserRef.current) return;
 
     const analyser = analyserRef.current;
     const bufferLength = analyser.frequencyBinCount;

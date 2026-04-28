@@ -46,6 +46,8 @@ Botanical or flower-inspired organic structures.
 - **Visual traits:** Petals, branching, leaf patterns
 - **Example assets:** Flower silhouettes, leaf arrays, botanical grids
 
+> **Note on experimental categories below.** The current SVG library only ships assets in the seven core categories above. The four experimental categories (`crystalline`, `biosynthetic`, `fragments`, `scanlines`) are referenced by presets but currently fall through to the full asset pool at render time — the visual mood for those presets comes from the parameter tuning (count, scale, palette shift) rather than category-restricted picks. Authoring true assets for these categories is a known follow-up.
+
 ## Experimental Categories (Rendah Mag Aesthetic)
 
 ### `crystalline`
@@ -105,6 +107,8 @@ Example asset definition:
 | **FUJIMOTO PRISM** | geometric, linework, crystalline | Sharp laser scan |
 | **MEINESZ BLOOM** | organic, radial, biosynthetic | Grown organic form |
 | **HALFTIME GLITCH** | geometric, fragments, scanlines | Digital breakage |
+| **BITSHIFTER CHAOS** | geometric, crystalline, fragments | CA + bitwise color mutation |
+| **CA GROWTH** | organic, geometric, biosynthetic | Conway-style emergent growth |
 
 ## Adding New Assets
 

@@ -48,6 +48,7 @@ const LAYOUT_MODES = [
   { id: 'flow',      name: 'flow',      glyph: 'flow' },
   { id: 'layers',    name: 'layers',    glyph: 'z'    },
   { id: 'rails',     name: 'rails',     glyph: 'rail' },
+  { id: 'ca',        name: 'cellular',  glyph: 'ca'   },
 ];
 
 const COMPOSITION_PRESETS = [
@@ -128,14 +129,40 @@ const COMPOSITION_PRESETS = [
       zTiers: 8, jitter: 74, density: 112, bleed: true, recolor: true, mirror: false, overlap: true,
     },
   },
+  {
+    id: 'bitshifter-chaos',
+    name: 'BITSHIFTER CHAOS',
+    desc: 'cellular automaton + bitwise mutations — chaotic evolution (motion-driven)',
+    categories: ['geometric', 'crystalline', 'fragments'],
+    paletteShift: 'split',
+    params: {
+      mode: 'ca', count: 180, scale: [0.25, 1.1], rotate: [-180, 180], alpha: [30, 90],
+      zTiers: 4, jitter: 28, density: 88, bleed: false, recolor: true, mirror: false, overlap: true,
+    },
+  },
+  {
+    id: 'ca-growth',
+    name: 'CA GROWTH',
+    desc: 'life-like cellular automaton — emergent organic patterns from digital rules',
+    categories: ['organic', 'geometric', 'biosynthetic'],
+    paletteShift: 'band',
+    params: {
+      mode: 'ca', count: 240, scale: [0.35, 1.5], rotate: [-90, 90], alpha: [40, 100],
+      zTiers: 5, jitter: 18, density: 75, bleed: false, recolor: true, mirror: true, overlap: true,
+    },
+  },
 ];
 
 function LayoutManager({ params, setParams }) {
   const set = (k, v) => setParams({ ...params, [k]: v });
   const applyPreset = (preset) => setParams({ ...params, ...preset.params, composition: preset.id });
+  const [collapsed, toggle] = useCollapse(false);
   return (
     <section className="panel panel-layout">
-      <PanelHeader tag="P04" title="LAYOUT_MANAGER.pde" subtitle="distribution · transform ranges · alpha" />
+      <PanelHeader tag="P04" title="LAYOUT_MANAGER.pde" subtitle="distribution · transform ranges · alpha"
+        collapsed={collapsed} onToggle={toggle}
+        right={<span className="meter-pill mono">{params.mode} · {params.composition}</span>} />
+      {!collapsed && (
       <div className="panel-body">
         <div className="preset-row">
           {COMPOSITION_PRESETS.map(p => (
@@ -174,6 +201,7 @@ function LayoutManager({ params, setParams }) {
           <Toggle label="overlap ok"   v={params.overlap} on={v => set('overlap', v)} />
         </div>
       </div>
+      )}
     </section>
   );
 }
@@ -262,11 +290,16 @@ function InputRouter({ routes, setRoutes }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  const [collapsed, toggle] = useCollapse(false);
+  const activeRoutes = routes.filter(r => r.target !== '—').length;
   return (
     <section className="panel panel-router">
-      <PanelHeader tag="P03" title="INPUT_ROUTER.pde" subtitle="webcam.motion → params" right={
-        <span className="status-pill"><span className="status-dot live"/> CAM 0 · 640×480 · 30fps</span>
-      }/>
+      <PanelHeader tag="P03" title="INPUT_ROUTER.pde" subtitle="webcam.motion → params"
+        collapsed={collapsed} onToggle={toggle}
+        right={
+          <span className="meter-pill mono">{activeRoutes}/{routes.length} routes</span>
+        }/>
+      {!collapsed && (
       <div className="router-body">
         <div className="cam-wrap">
           <canvas ref={motionRef} width={280} height={210} />
@@ -290,6 +323,7 @@ function InputRouter({ routes, setRoutes }) {
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }
@@ -326,9 +360,13 @@ function RouteRow({ src, label, route, setRoute }) {
 // ───────────────────────────────────────────────────────────────
 function OutputPanel({ palette, layout, seed, snapshots, addSnapshot }) {
   const [size, setSize] = useStateLM('1080x1080');
+  const [collapsed, toggle] = useCollapse(true);
   return (
     <section className="panel panel-output">
-      <PanelHeader tag="P05" title="OUTPUT.pde" subtitle="snapshot · pdf · config export" />
+      <PanelHeader tag="P05" title="OUTPUT.pde" subtitle="snapshot · pdf · config export"
+        collapsed={collapsed} onToggle={toggle}
+        right={<span className="meter-pill mono">{snapshots.length} saved</span>} />
+      {!collapsed && (
       <div className="panel-body output-body">
         <div className="output-row">
           <label className="field">
@@ -360,6 +398,7 @@ function OutputPanel({ palette, layout, seed, snapshots, addSnapshot }) {
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }
