@@ -1,13 +1,16 @@
 import hype.*;
 import processing.video.*;
 import processing.pdf.*;
+// import ddf.minim.*;  // Uncomment to enable audio stimulus
 
 AssetPool assetPool;
 InputRouter inputRouter;
 LayoutManager layout;
 HColorPool colors;
 Capture cam;
+AudioRouter audioRouter;
 boolean saveSnapshot = false;
+boolean enableAudio = false;  // Set to true to use audio stimulus
 
 void setup() {
   size(1280, 720, P3D);
@@ -23,7 +26,20 @@ void setup() {
 
   // Initialize live input and layout engine.
   cam = InputRouter.createCamera(this, 640, 480);
-  inputRouter = new InputRouter(cam);
+  
+  // Optional: Initialize audio router for beat detection and frequency analysis
+  if (enableAudio) {
+    try {
+      audioRouter = new AudioRouter(this);
+      inputRouter = new InputRouter(cam, audioRouter);
+    } catch (Exception e) {
+      println("Audio initialization failed; using webcam only.");
+      inputRouter = new InputRouter(cam);
+    }
+  } else {
+    inputRouter = new InputRouter(cam);
+  }
+  
   layout = new LayoutManager();
   layout.prepare(assetPool, colors);
 }

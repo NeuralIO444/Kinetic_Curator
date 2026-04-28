@@ -13,6 +13,9 @@ function App() {
   const [fps, setFps] = useStateApp(58.4);
   const [seed, setSeed] = useStateApp(0xa17e9b21);
 
+  // ─── Audio stimulus ───
+  const [audioEnabled, setAudioEnabled] = useStateApp(false);
+
   // ─── AssetPool state ───
   const [enabled, setEnabled] = useStateApp(() => {
     const e = {}; window.ASSETS.forEach(a => { e[a.id] = true; }); return e;
@@ -115,6 +118,31 @@ function App() {
         </div>
         {/* col 3: router + layout */}
         <div className="col col-c">
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span className="panel-title">INPUT</span>
+              <button
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  backgroundColor: audioEnabled ? palette.swatches[0] : '#333',
+                  color: audioEnabled ? '#000' : '#aaa',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+                onClick={() => setAudioEnabled(!audioEnabled)}
+              >
+                {audioEnabled ? '🎙️ AUDIO' : 'webcam'}
+              </button>
+            </div>
+            <AudioInput
+              enabled={audioEnabled}
+              onStimulus={() => {}}
+              onBeatDetect={() => {}}
+              onFrequencyData={() => {}}
+            />
+          </div>
           <InputRouter routes={routes} setRoutes={setRoutes}/>
           <LayoutManager params={layoutParams} setParams={setLayoutParams}/>
         </div>

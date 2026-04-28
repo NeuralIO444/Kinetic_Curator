@@ -33,6 +33,21 @@ const COMPOSITION_PRESETS = [
     categories: ['geometric', 'linework', 'floral'],
     paletteShift: 'zone',
   },
+  {
+    id: 'fujimoto-prism',
+    categories: ['geometric', 'linework', 'crystalline'],
+    paletteShift: 'zone',
+  },
+  {
+    id: 'meinesz-bloom',
+    categories: ['organic', 'radial', 'biosynthetic'],
+    paletteShift: 'band',
+  },
+  {
+    id: 'halftime-glitch',
+    categories: ['geometric', 'fragments', 'scanlines'],
+    paletteShift: 'split',
+  },
 ];
 
 function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick }) {

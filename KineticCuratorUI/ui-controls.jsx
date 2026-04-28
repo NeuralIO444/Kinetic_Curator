@@ -95,6 +95,39 @@ const COMPOSITION_PRESETS = [
       zTiers: 4, jitter: 48, density: 86, bleed: false, recolor: true, mirror: true, overlap: true,
     },
   },
+  {
+    id: 'fujimoto-prism',
+    name: 'FUJIMOTO PRISM',
+    desc: 'kinetic laser scan — sharp geometry in rapid color zones (Shohei Fujimoto)',
+    categories: ['geometric', 'linework', 'crystalline'],
+    paletteShift: 'zone',
+    params: {
+      mode: 'grid', count: 380, scale: [0.25, 1.6], rotate: [-180, 180], alpha: [18, 72],
+      zTiers: 7, jitter: 52, density: 105, bleed: true, recolor: true, mirror: false, overlap: true,
+    },
+  },
+  {
+    id: 'meinesz-bloom',
+    name: 'MEINESZ BLOOM',
+    desc: 'bio-synthetic growth — organic radials in flowing color (Lisa Meinesz)',
+    categories: ['organic', 'radial', 'biosynthetic'],
+    paletteShift: 'band',
+    params: {
+      mode: 'radial', count: 250, scale: [0.42, 1.8], rotate: [-120, 120], alpha: [28, 92],
+      zTiers: 6, jitter: 35, density: 78, bleed: false, recolor: true, mirror: true, overlap: true,
+    },
+  },
+  {
+    id: 'halftime-glitch',
+    name: 'HALFTIME GLITCH',
+    desc: 'fragmented bass aesthetic — crystalline + scanlines in split tones (Rendah Mag)',
+    categories: ['geometric', 'fragments', 'scanlines'],
+    paletteShift: 'split',
+    params: {
+      mode: 'swarm', count: 420, scale: [0.2, 1.3], rotate: [-170, 170], alpha: [20, 85],
+      zTiers: 8, jitter: 74, density: 112, bleed: true, recolor: true, mirror: false, overlap: true,
+    },
+  },
 ];
 
 function LayoutManager({ params, setParams }) {
