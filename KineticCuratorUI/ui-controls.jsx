@@ -49,6 +49,7 @@ const LAYOUT_MODES = [
   { id: 'layers',    name: 'layers',    glyph: 'z'    },
   { id: 'rails',     name: 'rails',     glyph: 'rail' },
   { id: 'ca',        name: 'cellular',  glyph: 'ca'   },
+  { id: 'orbit',     name: 'orbit',     glyph: 'orbit'},
 ];
 
 const COMPOSITION_PRESETS = [
@@ -151,6 +152,28 @@ const COMPOSITION_PRESETS = [
       zTiers: 5, jitter: 18, density: 75, bleed: false, recolor: true, mirror: true, overlap: true,
     },
   },
+  {
+    id: 'orbit-influence',
+    name: 'ORBIT OF INFLUENCE',
+    desc: '3 invisible planets, 50 painters orbit at varied speeds and brush sizes (Joshua Davis · fxhash · ZeroSpace 2023)',
+    categories: ['radial', 'organic', 'stamps'],
+    paletteShift: 'zone',
+    params: {
+      mode: 'orbit', count: 600, scale: [0.4, 1.6], rotate: [-180, 180], alpha: [25, 90],
+      zTiers: 3, jitter: 6, density: 100, bleed: true, recolor: true, mirror: false, overlap: true,
+    },
+  },
+  {
+    id: 'ghost-recoil',
+    name: 'GHOST RECOIL ABACUS TOTEM',
+    desc: 'Chuck Anderson × Joshua Davis · Infinite Pressure #80 — totemic stack with shader-glitch recoil',
+    categories: ['geometric', 'fragments', 'stamps'],
+    paletteShift: 'split',
+    params: {
+      mode: 'layers', count: 320, scale: [0.3, 1.4], rotate: [-12, 12], alpha: [30, 95],
+      zTiers: 8, jitter: 22, density: 95, bleed: true, recolor: true, mirror: true, overlap: true,
+    },
+  },
 ];
 
 function LayoutManager({ params, setParams }) {
@@ -228,6 +251,8 @@ function ModeGlyph({ mode, active }) {
     case 'flow':      return <svg {...common}><g stroke={stroke} strokeWidth="1.5" fill="none"><path d="M4 10 Q12 6 20 10 T28 10"/><path d="M4 16 Q12 12 20 16 T28 16"/><path d="M4 22 Q12 18 20 22 T28 22"/></g></svg>;
     case 'layers':    return <svg {...common}><g stroke={stroke} strokeWidth="1.5" fill="none"><rect x="4" y="6" width="20" height="6"/><rect x="6" y="13" width="20" height="6"/><rect x="8" y="20" width="20" height="6"/></g></svg>;
     case 'rails':     return <svg {...common}><g fill={fill}><circle cx="6" cy="16" r="1.5"/><circle cx="11" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="21" cy="16" r="1.5"/><circle cx="26" cy="16" r="1.5"/></g><g stroke={stroke} strokeWidth="1" opacity="0.5"><line x1="4" y1="10" x2="28" y2="10"/><line x1="4" y1="22" x2="28" y2="22"/></g></svg>;
+    case 'ca':        return <svg {...common}><g fill={fill}><rect x="6" y="6" width="4" height="4"/><rect x="14" y="6" width="4" height="4"/><rect x="22" y="10" width="4" height="4"/><rect x="10" y="14" width="4" height="4"/><rect x="18" y="14" width="4" height="4"/><rect x="6" y="22" width="4" height="4"/><rect x="22" y="22" width="4" height="4"/></g></svg>;
+    case 'orbit':     return <svg {...common}><g fill="none" stroke={stroke} strokeWidth="1.2"><circle cx="16" cy="16" r="4"/><circle cx="16" cy="16" r="9"/><circle cx="16" cy="16" r="13"/></g><g fill={fill}><circle cx="20" cy="16" r="1.4"/><circle cx="9" cy="20" r="1.4"/><circle cx="22" cy="9" r="1.4"/></g></svg>;
     default:          return <svg {...common}/>;
   }
 }

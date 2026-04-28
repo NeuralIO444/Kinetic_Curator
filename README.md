@@ -23,7 +23,7 @@ A generative art engine inspired by Joshua Davis and the HYPE framework, featuri
 - `KineticCuratorUI/ca-engine.jsx` - cellular automaton + bitwise color mutations
 - `KineticCuratorUI/styles.css` - UI styling
 
-## Composition Presets (9 Total)
+## Composition Presets (11 Total)
 
 ### Classic Presets (Joshua Davis style)
 - **PRAYSTATION** - dense bloom of glyphs and color bursts
@@ -40,11 +40,15 @@ A generative art engine inspired by Joshua Davis and the HYPE framework, featuri
 - **BITSHIFTER CHAOS** - cellular automaton + bitwise color mutations, motion-driven
 - **CA GROWTH** - life-like cellular automaton, emergent organic patterns
 
+### Davis-Lineage Presets
+- **ORBIT OF INFLUENCE** - 3 invisible planets (S/M/L), 50 painters orbit at varied speeds and brush sizes, painting trails around their orbit (Joshua Davis · fxhash · Proof of People · ZeroSpace NYC 2023)
+- **GHOST RECOIL ABACUS TOTEM** - layered totem with shader-glitch recoil; mirrored axis, slight rotation jitter (Chuck Anderson × Joshua Davis · *Infinite Pressure* #80, NoPattern × Joshua Davis 99-piece series)
+
 Each preset includes tuned parameters for count, scale, rotation, density, and palette shift strategy.
 
 ## Layout Modes
 
-`random`, `grid`, `fibonacci`, `radial`, `swarm·hype`, `flow`, `layers`, `rails`, `cellular` (CA).
+`random`, `grid`, `fibonacci`, `radial`, `swarm·hype`, `flow`, `layers`, `rails`, `cellular` (CA), `orbit` (3 invisible planets, 50 painters).
 
 ## Asset Categories
 

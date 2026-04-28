@@ -109,6 +109,8 @@ Example asset definition:
 | **HALFTIME GLITCH** | geometric, fragments, scanlines | Digital breakage |
 | **BITSHIFTER CHAOS** | geometric, crystalline, fragments | CA + bitwise color mutation |
 | **CA GROWTH** | organic, geometric, biosynthetic | Conway-style emergent growth |
+| **ORBIT OF INFLUENCE** | radial, organic, stamps | 3 invisible planets, 50 painters with brush sizes (J. Davis 2023) |
+| **GHOST RECOIL ABACUS TOTEM** | geometric, fragments, stamps | Layered totem, shader-glitch recoil (NoPattern × J. Davis) |
 
 ## Adding New Assets
 

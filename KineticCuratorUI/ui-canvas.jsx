@@ -58,6 +58,16 @@ const COMPOSITION_PRESETS = [
     categories: ['organic', 'geometric', 'biosynthetic'],
     paletteShift: 'band',
   },
+  {
+    id: 'orbit-influence',
+    categories: ['radial', 'organic', 'stamps'],
+    paletteShift: 'zone',
+  },
+  {
+    id: 'ghost-recoil',
+    categories: ['geometric', 'fragments', 'stamps'],
+    paletteShift: 'split',
+  },
 ];
 
 function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick, canvasRef, motionEnergy = 0, beatPulse = 0, slowRender = false, evolveActive = false }) {
@@ -139,11 +149,44 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
     const caPositions = (params.mode === 'ca' && window.CAEngine)
       ? window.CAEngine.generateCALayout(params, rng, energy || 0.5, seed)
       : null;
+
+    // ── Orbit of Influence: 3 invisible planets (S/M/L), 50 painters orbiting at varied speeds + brush sizes
+    let orbitState = null;
+    if (params.mode === 'orbit') {
+      const planetRng = mkRng(seed ^ 0x70AE7); // 'planet' :)
+      const minDim = Math.min(W, H);
+      const planets = [
+        { cx: W * (0.25 + planetRng() * 0.15), cy: H * (0.30 + planetRng() * 0.20), r: minDim * 0.10, tier: 2 }, // small (front)
+        { cx: W * (0.45 + planetRng() * 0.20), cy: H * (0.45 + planetRng() * 0.20), r: minDim * 0.22, tier: 1 }, // medium
+        { cx: W * (0.50 + planetRng() * 0.10), cy: H * (0.50 + planetRng() * 0.10), r: minDim * 0.38, tier: 0 }, // large (back)
+      ];
+      const numPainters = 50;
+      const painters = [];
+      for (let p = 0; p < numPainters; p++) {
+        const ps = mkRng(seed ^ ((p + 1) * 0x9E3779B1));
+        const planetIdx = Math.floor(ps() * 3);
+        painters.push({
+          planetIdx,
+          baseAngle: ps() * Math.PI * 2,
+          speed: (0.4 + ps() * 2.4) * (1 + energy * 0.5),
+          dir: ps() < 0.5 ? -1 : 1,
+          brush: Math.floor(ps() * 3), // 0=small, 1=med, 2=large
+          wobbleAmp: 0.04 + ps() * 0.10,
+          wobbleFreq: 2 + Math.floor(ps() * 5),
+          phaseShift: ps() * Math.PI * 2,
+        });
+      }
+      orbitState = { planets, painters, numPainters };
+    }
+
     for (let i = 0; i < n; i++) {
       let x, y;
       let caScaleOverride = null;
       let caRotOverride = null;
       let caMutationSeed;
+      let orbitBrushScale = null;
+      let orbitTier = null;
+      let orbitRotOverride = null;
       switch (params.mode) {
         case 'grid': {
           const cols = Math.ceil(Math.sqrt(n * (W / H)));
@@ -212,6 +255,27 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
           }
           break;
         }
+        case 'orbit': {
+          if (orbitState) {
+            const painterIdx = i % orbitState.numPainters;
+            const trailIdx = Math.floor(i / orbitState.numPainters);
+            const painter = orbitState.painters[painterIdx];
+            const planet = orbitState.planets[painter.planetIdx];
+            const angle = painter.baseAngle + painter.dir * painter.speed * trailIdx * 0.07;
+            const wobble = Math.sin(angle * painter.wobbleFreq + painter.phaseShift) * (planet.r * painter.wobbleAmp);
+            const r = planet.r + wobble;
+            x = planet.cx + r * Math.cos(angle);
+            y = planet.cy + r * Math.sin(angle);
+            const brushTable = [0.45, 0.85, 1.35]; // small / medium / large brush
+            orbitBrushScale = brushTable[painter.brush];
+            orbitTier = planet.tier;
+            orbitRotOverride = (angle * 180 / Math.PI) + 90; // tangent to orbit
+          } else {
+            x = rng() * W;
+            y = rng() * H;
+          }
+          break;
+        }
         case 'random':
         default: {
           x = rng() * W;
@@ -223,19 +287,22 @@ function CanvasPreview({ palette, params, enabled, seed, running, fps, onFpsTick
         if (!params.bleed) continue;
       }
       const asset = pickAsset(rng);
-      const sc = caScaleOverride !== null
-        ? caScaleOverride
-        : params.scale[0] + rng() * (params.scale[1] - params.scale[0]);
+      const baseSc = orbitBrushScale !== null
+        ? orbitBrushScale
+        : caScaleOverride !== null
+          ? caScaleOverride
+          : params.scale[0] + rng() * (params.scale[1] - params.scale[0]);
       const baseScale = asset.scale[0] + rng() * (asset.scale[1] - asset.scale[0]);
-      const finalScale = sc * baseScale * (1 + beatPulse * 0.25);
+      const finalScale = baseSc * baseScale * (1 + beatPulse * 0.25);
       let rot = 0;
-      if (caRotOverride !== null) rot = caRotOverride + (rng() - 0.5) * 20;
+      if (orbitRotOverride !== null) rot = orbitRotOverride + (rng() - 0.5) * 18;
+      else if (caRotOverride !== null) rot = caRotOverride + (rng() - 0.5) * 20;
       else if (asset.rotate === 'free') rot = params.rotate[0] + rng() * (params.rotate[1] - params.rotate[0]);
       else if (asset.rotate === 'step45') rot = Math.floor(rng() * 8) * 45;
       else if (asset.rotate === 'step60') rot = Math.floor(rng() * 6) * 60;
       else if (asset.rotate === 'step90') rot = Math.floor(rng() * 4) * 90;
       const alpha = (params.alpha[0] + rng() * (params.alpha[1] - params.alpha[0])) / 100;
-      const tier = Math.floor(rng() * params.zTiers);
+      const tier = orbitTier !== null ? orbitTier : Math.floor(rng() * params.zTiers);
       if (params.mirror && i % 2 === 0) x = W - x;
       let { ink, accent } = colorForPlacement(y, i, rng);
       if (params.mode === 'ca' && window.CAEngine) {
