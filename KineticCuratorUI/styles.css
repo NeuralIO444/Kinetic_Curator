@@ -220,8 +220,8 @@ input, select { font-family: inherit; font-size: 12px; }
 /* ────────────────────────────────────────────────────────────
    Canvas preview
    ──────────────────────────────────────────────────────────── */
-.panel-canvas { flex: 1.4; min-height: 280px; }
-.panel-canvas-compact { flex: 0 0 auto; }
+.panel-canvas { flex: 1 1 420px; min-height: 380px; }
+.panel-canvas-compact { flex: 0 0 auto; min-height: 0; }
 .panel-canvas-compact .canvas-wrap { aspect-ratio: 10/7; max-height: 320px; min-height: 200px; }
 .panel-canvas-collapsed { flex: 0 0 auto; min-height: 0; }
 .canvas-wrap {
@@ -698,7 +698,10 @@ input, select { font-family: inherit; font-size: 12px; }
 .fav-ts { color: var(--dim); }
 
 /* Stimulus panel — webcam + audio inputs */
-.panel-stimulus { padding: 0; }
+.panel-stimulus { padding: 0; flex: 0 0 auto; max-height: 50vh; }
+.panel-stimulus .stim-body { overflow-y: auto; max-height: calc(50vh - 36px); }
+.panel-davis { flex: 0 0 auto; max-height: 45vh; }
+.panel-davis .davis-body { overflow-y: auto; max-height: calc(45vh - 36px); }
 .stim-body { padding: 10px; }
 .stim-toggle-row {
   display: flex; gap: 6px; margin: 0 0 8px;
@@ -717,7 +720,8 @@ input, select { font-family: inherit; font-size: 12px; }
 .webcam-preview {
   display: block;
   width: 100%;
-  max-height: 180px;
+  height: 140px;
+  max-height: 140px;
   background: #000;
   border: 1px solid var(--line);
   margin-top: 6px;
