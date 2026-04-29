@@ -19,11 +19,14 @@ function StimulusPanel({
   palette, webcamEnabled, setWebcamEnabled, audioEnabled, setAudioEnabled,
   motionEnergy, audioStimulus, beatPulse, audioBands,
   onMotion, onStimulus, onBeat, onFreq,
+  webcamAdjustments, setWebcamAdjustments, webcamMirror, setWebcamMirror,
 }) {
   const [collapsed, toggle] = useCollapse(false);
   const accent = palette.swatches[0];
   const accent2 = palette.swatches[1];
   const accent3 = palette.swatches[2] || accent;
+  const setAdj = (k, v) => setWebcamAdjustments({ ...webcamAdjustments, [k]: v });
+  const resetAdj = () => setWebcamAdjustments({ brightness: 100, contrast: 100, blur: 0 });
   return (
     <section className="panel panel-stimulus">
       <PanelHeader
@@ -67,7 +70,47 @@ function StimulusPanel({
             </button>
           </div>
 
-          <WebcamInput enabled={webcamEnabled} onMotion={onMotion} onFrameData={() => {}} />
+          <WebcamInput
+            enabled={webcamEnabled}
+            onMotion={onMotion}
+            onFrameData={() => {}}
+            adjustments={webcamAdjustments}
+            mirror={webcamMirror}
+            showPreview={true}
+          />
+          {webcamEnabled && (
+            <div className="webcam-adjust">
+              <div className="webcam-adjust-row">
+                <span className="webcam-adjust-label mono">bright</span>
+                <input type="range" min={20} max={200} step={1}
+                  value={webcamAdjustments.brightness}
+                  onChange={e => setAdj('brightness', +e.target.value)} />
+                <span className="mono webcam-adjust-readout">{webcamAdjustments.brightness}%</span>
+              </div>
+              <div className="webcam-adjust-row">
+                <span className="webcam-adjust-label mono">contrast</span>
+                <input type="range" min={20} max={250} step={1}
+                  value={webcamAdjustments.contrast}
+                  onChange={e => setAdj('contrast', +e.target.value)} />
+                <span className="mono webcam-adjust-readout">{webcamAdjustments.contrast}%</span>
+              </div>
+              <div className="webcam-adjust-row">
+                <span className="webcam-adjust-label mono">blur</span>
+                <input type="range" min={0} max={20} step={0.5}
+                  value={webcamAdjustments.blur}
+                  onChange={e => setAdj('blur', +e.target.value)} />
+                <span className="mono webcam-adjust-readout">{webcamAdjustments.blur}px</span>
+              </div>
+              <div className="webcam-adjust-actions">
+                <button
+                  className={classNames('chip-btn', webcamMirror && 'active')}
+                  onClick={() => setWebcamMirror(!webcamMirror)}
+                  title="flip horizontally"
+                >⇋ MIRROR</button>
+                <button className="chip-btn" onClick={resetAdj}>↺ RESET</button>
+              </div>
+            </div>
+          )}
           <AudioInput enabled={audioEnabled} onStimulus={onStimulus} onBeatDetect={onBeat} onFrequencyData={onFreq} />
 
           <div className="stim-meters stim-meters-grid">
@@ -222,6 +265,8 @@ function App() {
   const [audioStimulus, setAudioStimulus] = useStateApp(0);
   const [beatPulse, setBeatPulse] = useStateApp(0);
   const [audioBands, setAudioBands] = useStateApp({ bass: 0, mid: 0, treble: 0, rms: 0 });
+  const [webcamAdjustments, setWebcamAdjustments] = useStateApp({ brightness: 100, contrast: 100, blur: 0 });
+  const [webcamMirror, setWebcamMirror] = useStateApp(true);
 
   // Decay beat pulse so it visibly throbs rather than latches
   useEffectApp(() => {
@@ -322,6 +367,7 @@ function App() {
     stimulus: {
       webcamEnabled, audioEnabled,
       motionEnergy, audioStimulus, beatPulse, audioBands,
+      webcamAdjustments, webcamMirror,
     },
     evolve: { mode: evolveMode, source: evolveSource, interval: evolveInterval, slowRender },
   });
@@ -483,6 +529,10 @@ function App() {
             onStimulus={onStimulus}
             onBeat={onBeat}
             onFreq={onFreq}
+            webcamAdjustments={webcamAdjustments}
+            setWebcamAdjustments={setWebcamAdjustments}
+            webcamMirror={webcamMirror}
+            setWebcamMirror={setWebcamMirror}
           />
           <DavisModePanel
             palette={palette}

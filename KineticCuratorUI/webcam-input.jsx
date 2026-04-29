@@ -3,17 +3,25 @@
 
 const { useEffect: useEffectWC, useRef: useRefWC, useState: useStateWC } = React;
 
-function WebcamInput({ enabled, onMotion, onFrameData }) {
+function WebcamInput({ enabled, onMotion, onFrameData, adjustments, mirror = true, showPreview = true }) {
   const videoRef = useRefWC(null);
   const canvasRef = useRefWC(null);
   const animIdRef = useRefWC(null);
-  
+
   const [isActive, setIsActive] = useStateWC(false);
   const [error, setError] = useStateWC(null);
 
   const runningRef = useRefWC(false);
   const prevFrameRef = useRefWC(null);
   const motionHistoryRef = useRefWC([]);
+  const adjustmentsRef = useRefWC(adjustments || { brightness: 100, contrast: 100, blur: 0 });
+  const mirrorRef = useRefWC(mirror);
+
+  // Keep adjustments + mirror live in the rAF loop without restarting it
+  React.useEffect(() => {
+    adjustmentsRef.current = adjustments || { brightness: 100, contrast: 100, blur: 0 };
+  }, [adjustments && adjustments.brightness, adjustments && adjustments.contrast, adjustments && adjustments.blur]);
+  React.useEffect(() => { mirrorRef.current = mirror; }, [mirror]);
 
   // Request webcam access and initialize video analysis
   useEffectWC(() => {
@@ -68,12 +76,18 @@ function WebcamInput({ enabled, onMotion, onFrameData }) {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    // Set canvas dimensions to match video
     canvas.width = video.videoWidth || 320;
     canvas.height = video.videoHeight || 240;
 
-    // Draw current frame to canvas
-    ctx.drawImage(video, 0, 0);
+    const adj = adjustmentsRef.current;
+    ctx.save();
+    ctx.filter = `brightness(${adj.brightness}%) contrast(${adj.contrast}%) blur(${adj.blur}px)`;
+    if (mirrorRef.current) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
 
@@ -117,24 +131,21 @@ function WebcamInput({ enabled, onMotion, onFrameData }) {
 
   return (
     <>
-      <div style={{ fontSize: '0.85rem', color: '#888', padding: '4px 0' }}>
+      <div className="webcam-status mono">
         {enabled && (
           <>
-            {isActive && (
-              <span style={{ color: '#00ff00' }}>📹 Webcam active</span>
-            )}
-            {error && (
-              <span style={{ color: '#ff3300' }}>⚠ {error}</span>
-            )}
-            {!isActive && !error && (
-              <span>Requesting webcam access...</span>
-            )}
+            {isActive && <span style={{ color: '#0f8' }}>● live</span>}
+            {error && <span style={{ color: '#f63' }}>⚠ {error}</span>}
+            {!isActive && !error && <span style={{ color: 'var(--dim)' }}>requesting webcam…</span>}
           </>
         )}
       </div>
-      {/* Hidden video and canvas elements for processing */}
-      <video ref={videoRef} style={{ display: 'none' }} />
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <video ref={videoRef} style={{ display: 'none' }} playsInline muted />
+      {showPreview && enabled && isActive ? (
+        <canvas ref={canvasRef} className="webcam-preview" />
+      ) : (
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
+      )}
     </>
   );
 }

@@ -706,6 +706,48 @@ input, select { font-family: inherit; font-size: 12px; }
 .stim-meters-grid {
   grid-template-columns: 1fr 1fr;
 }
+
+/* Live webcam preview + adjustments */
+.webcam-status {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 2px 0;
+  color: var(--dim);
+}
+.webcam-preview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  background: #000;
+  border: 1px solid var(--line);
+  margin-top: 6px;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.webcam-adjust {
+  margin-top: 6px;
+  padding: 8px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.webcam-adjust-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+}
+.webcam-adjust-label {
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.webcam-adjust-row input[type=range] { width: 100%; }
+.webcam-adjust-readout { color: var(--ink); text-align: right; }
+.webcam-adjust-actions {
+  display: flex; gap: 6px; margin-top: 4px;
+}
 .stim-toggle {
   flex: 1;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
