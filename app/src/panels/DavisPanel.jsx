@@ -6,7 +6,7 @@ import * as A from '../state/actions.js';
 
 export function DavisPanel() {
   const { dispatch, palette } = useApp();
-  const state = useApp(s => ({
+  const { state } = useApp(s => ({
     evolveMode: s.evolveMode,
     evolveSource: s.evolveSource,
     evolveTarget: s.evolveTarget,
@@ -77,9 +77,7 @@ export function DavisPanel() {
 
           <div className="davis-interval-row" style={{ marginTop: '8px' }}>
             <span className="davis-label">SMOOTHING</span>
-            <input type="checkbox" checked={motionSmoothing} onChange={e => {
-              import('../state/store.js').then(m => m.useStore.getState().setMotionSmoothing(e.target.checked));
-            }} />
+            <input type="checkbox" checked={motionSmoothing} onChange={e => dispatch({ type: A.SET_MOTION_SMOOTHING, payload: e.target.checked })} />
             <span className="davis-readout" style={{ fontSize: '9px', opacity: 0.6 }}>(fluid CSS transitions)</span>
           </div>
 

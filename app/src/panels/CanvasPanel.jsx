@@ -12,7 +12,7 @@ import { getPreset } from '../data/presets.js';
 
 export function CanvasPanel() {
   const { palette, assets, canvasRef, svgRef } = useApp();
-  const state = useApp(s => ({
+  const { state } = useApp(s => ({
     layoutParams: s.layoutParams,
     seed: s.seed,
     enabled: s.enabledAssets,

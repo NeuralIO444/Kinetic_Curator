@@ -7,7 +7,7 @@ import * as A from '../state/actions.js';
 
 export function OutputPanel() {
   const { dispatch, palette, svgRef } = useApp();
-  const state = useApp(s => ({
+  const { state } = useApp(s => ({
     snapshots: s.snapshots,
     exportResolution: s.exportResolution,
     isRecording: s.isRecording,

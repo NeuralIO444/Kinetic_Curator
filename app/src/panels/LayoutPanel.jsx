@@ -11,7 +11,7 @@ import * as A from '../state/actions.js';
 
 export function LayoutPanel() {
   const { dispatch } = useApp();
-  const state = useApp(s => ({
+  const { state } = useApp(s => ({
     layoutParams: s.layoutParams,
     lockedParams: s.lockedParams,
   }));

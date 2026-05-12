@@ -58,6 +58,7 @@ export const SET_IS_RECORDING    = 'SET_IS_RECORDING';
 export const ADD_FAVORITE      = 'ADD_FAVORITE';
 export const REMOVE_FAVORITE   = 'REMOVE_FAVORITE';
 export const RECALL_FAVORITE   = 'RECALL_FAVORITE';
+export const SET_MOTION_SMOOTHING = 'SET_MOTION_SMOOTHING';
 
 // ── Parameter exploration (Bundle 3) ─────────────────────────
 export const TOGGLE_PARAM_LOCK      = 'TOGGLE_PARAM_LOCK';

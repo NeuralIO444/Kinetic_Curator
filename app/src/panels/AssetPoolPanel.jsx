@@ -8,7 +8,7 @@ import * as A from '../state/actions.js';
 
 export function AssetPoolPanel() {
   const { dispatch, assets } = useApp();
-  const state = useApp(s => ({
+  const { state } = useApp(s => ({
     enabled: s.enabledAssets,
     search: s.search,
     catFilter: s.catFilter,

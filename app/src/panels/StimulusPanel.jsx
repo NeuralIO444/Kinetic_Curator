@@ -7,7 +7,7 @@ import * as A from '../state/actions.js';
 
 export function StimulusPanel() {
   const { dispatch } = useApp();
-  const state = useApp(s => ({
+  const { state } = useApp(s => ({
     webcamEnabled: s.webcamEnabled,
     audioEnabled: s.audioEnabled,
     motionEnergy: s.motionEnergy,

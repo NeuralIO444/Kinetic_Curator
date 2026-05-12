@@ -3,8 +3,8 @@ import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
 
 export function MasterBar() {
-  const { dispatch, palette } = useApp();
-  const state = useApp(s => ({
+  const { dispatch, palette, history, palettes } = useApp();
+  const { state } = useApp(s => ({
     running: s.running,
     fps: s.fps,
     seed: s.seed,

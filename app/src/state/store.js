@@ -140,7 +140,7 @@ const createDavisSlice = (set, get) => ({
       return { seed: (state.seed + 1) % 1000000, lastEvolveTs: ts };
     }
     if (state.evolveTarget === 'palette') {
-      const pIds = ['praystation', 'v01d', 'hydra', 'neonoir', 'totem'];
+      const pIds = ['praystation', 'v01d', 'hydra', 'dystopia', 'folktotem'];
       const currentIdx = pIds.indexOf(state.paletteId);
       const nextIdx = (currentIdx + 1) % pIds.length;
       return { paletteId: pIds[nextIdx], lastEvolveTs: ts };
@@ -161,7 +161,7 @@ const createDavisSlice = (set, get) => ({
       });
       
       if (state.evolveTarget === 'all') {
-        const pIds = ['praystation', 'v01d', 'hydra', 'neonoir', 'totem'];
+        const pIds = ['praystation', 'v01d', 'hydra', 'dystopia', 'folktotem'];
         const randomPalette = pIds[Math.floor(Math.random() * pIds.length)];
         return { seed: (state.seed + 1) % 1000000, paletteId: randomPalette, layoutParams: newLayout, lastEvolveTs: ts };
       }

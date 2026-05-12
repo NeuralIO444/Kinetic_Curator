@@ -1,15 +1,15 @@
-- `[/]` 1. Performance Refactor (Zustand Migration)
-  - `[ ]` Install `zustand` dependency.
-  - `[ ]` Create `state/store.js` and split the `reducer.js` logic into Zustand slices (layout, audio, davis, export).
-  - `[ ]` Replace `useApp` with `useStore` across all panels and components (`App.jsx`, `CanvasPanel.jsx`, etc.).
-  - `[ ]` Remove `AppContext.jsx` and `reducer.js`.
-- `[ ]` 2. Fluid Motion Engine
-  - `[ ]` Add `motionSmoothing` boolean to state (default: true).
-  - `[ ]` Update `CanvasPanel.jsx` to apply CSS `transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)` to SVG elements when smoothing is enabled.
-  - `[ ]` Add "Motion Smoothing" toggle button in `DavisPanel.jsx`.
-- `[ ]` 3. Production Hardening
-  - `[ ]` Add debounce logic to `exportSnapshot` to prevent rapid-fire auto-snapshots (limit to once every 2 seconds).
-  - `[ ]` Verify audio context suspension logic in `useAudioInput.js`.
-- `[ ]` 4. Documentation & Verification
-  - `[ ]` Verify build and runtime performance.
-  - `[ ]` Update `architecture.md` and `walkthrough.md` to document Zustand architecture and the new motion engine.
+- `[x]` 1. Performance Refactor (Zustand Migration)
+  - `[x]` Install `zustand` dependency.
+  - `[x]` Create `state/store.js` and split the `reducer.js` logic into Zustand slices (layout, audio, davis, export).
+  - `[x]` Replace `useApp` with `useStore` across all panels and components (`App.jsx`, `CanvasPanel.jsx`, etc.).
+  - `[x]` Remove `AppContext.jsx` and `reducer.js`. (Note: AppContext.jsx preserved as facade).
+- `[x]` 2. Fluid Motion Engine
+  - `[x]` Add `motionSmoothing` boolean to state (default: true).
+  - `[x]` Update `CanvasPanel.jsx` to apply CSS `transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)` to SVG elements when smoothing is enabled.
+  - `[x]` Add "Motion Smoothing" toggle button in `DavisPanel.jsx`.
+- `[x]` 3. Production Hardening
+  - `[x]` Add debounce logic to `exportSnapshot` to prevent rapid-fire auto-snapshots (limit to once every 2 seconds).
+  - `[x]` Verify audio context suspension logic in `useAudioInput.js`.
+- `[x]` 4. Documentation & Verification
+  - `[x]` Verify build and runtime performance.
+  - `[x]` Update `architecture.md` and `walkthrough.md` to document Zustand architecture and the new motion engine.

@@ -18,8 +18,8 @@ import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
 
 function AppInner() {
-  const { dispatch, history, svgRef } = useApp();
-  const state = useApp(s => ({
+  const { dispatch, history, palette, svgRef } = useApp();
+  const { state } = useApp(s => ({
     evolveMode: s.evolveMode,
     evolveSource: s.evolveSource,
     evolveInterval: s.evolveInterval,
@@ -32,6 +32,10 @@ function AppInner() {
     audioGain: s.audioGain,
     audioMonitor: s.audioMonitor,
     running: s.running,
+    seed: s.seed,
+    layoutParams: s.layoutParams,
+    enabled: s.enabledAssets,
+    isFullscreen: s.isFullscreen,
   }));
 
   // Reference for stable callbacks
