@@ -1,0 +1,64 @@
+/* ─── Canvas Preview ─── */
+.panel-canvas { flex: 0 0 auto; min-height: fit-content; }
+.canvas-wrap {
+  flex: 1; position: relative; margin: 8px;
+  border: 1px solid var(--line-2); overflow: hidden; min-height: 200px;
+}
+.canvas-bg { position: absolute; inset: 0; }
+.canvas-rulers {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+}
+/* ─── Checkerboard Background ─── */
+.canvas-wrap.checkerboard {
+  background-image: 
+    linear-gradient(45deg, #222 25%, transparent 25%, transparent 75%, #222 75%, #222),
+    linear-gradient(45deg, #222 25%, transparent 25%, transparent 75%, #222 75%, #222);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  background-color: #111;
+}
+
+.canvas-svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.canvas-corner {
+  position: absolute; font-size: 9px; color: var(--dim);
+  padding: 2px 5px; background: rgba(0,0,0,0.5);
+  border: 1px solid var(--line); letter-spacing: 0.1em;
+  opacity: 0; transition: opacity 0.2s; pointer-events: none;
+}
+.canvas-wrap:hover .canvas-corner { opacity: 1; }
+
+/* ─── Evolve Indicator ─── */
+.panel-canvas.evolve-active .canvas-wrap {
+  border-color: #00ff88;
+  box-shadow: 0 0 12px rgba(0,255,136,0.3);
+  animation: evolve-pulse 2s ease-in-out infinite;
+}
+@keyframes evolve-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0,255,136,0.2); }
+  50% { box-shadow: 0 0 24px rgba(0,255,136,0.6); }
+}
+.canvas-corner.tl { top: 4px; left: 4px; }
+.canvas-corner.tr { top: 4px; right: 4px; }
+.canvas-corner.bl { bottom: 4px; left: 4px; }
+.canvas-corner.br { bottom: 4px; right: 4px; }
+
+/* ─── Drag Resize Handle ─── */
+.canvas-resize-handle {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 12px; cursor: ns-resize;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(to top, rgba(0,0,0,0.4), transparent);
+  opacity: 0.3; transition: opacity 0.2s;
+}
+.canvas-resize-handle:hover, .canvas-resize-handle:active {
+  opacity: 1;
+}
+.resize-grip {
+  width: 40px; height: 3px; border-radius: 2px;
+  background: var(--dim);
+}

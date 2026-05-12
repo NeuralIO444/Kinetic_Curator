@@ -1,0 +1,77 @@
+/* ─── Slider Controls ─── */
+.param-block { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); }
+.range-row { display: grid; grid-template-columns: 70px 1fr 130px; align-items: center; gap: 8px; }
+.range-label { font-size: 10px; letter-spacing: 0.1em; color: var(--dim); }
+.range-readout { font-size: 10px; color: var(--ink); text-align: right; }
+
+.dual-slider { position: relative; height: 18px; display: flex; align-items: center; grid-column: 2; }
+.dual-slider input[type=range] {
+  position: absolute; inset: 0; width: 100%; margin: 0; background: transparent;
+  pointer-events: none; -webkit-appearance: none; appearance: none;
+}
+.dual-slider input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; pointer-events: all;
+  width: 10px; height: 14px; background: var(--accent3); border: none; cursor: ew-resize;
+}
+.dual-slider input[type=range]::-moz-range-thumb {
+  pointer-events: all; width: 10px; height: 14px;
+  background: var(--accent3); border: none; cursor: ew-resize;
+}
+.dual-track { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 2px; background: var(--line-2); }
+.dual-fill { position: absolute; top: 50%; transform: translateY(-50%); height: 2px; background: var(--accent3); }
+
+.single-slider { width: 100%; -webkit-appearance: none; appearance: none; background: transparent; }
+.single-slider::-webkit-slider-runnable-track { height: 2px; background: var(--line-2); }
+.single-slider::-moz-range-track { height: 2px; background: var(--line-2); }
+.single-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; margin-top: -6px;
+  width: 10px; height: 14px; background: var(--accent3); border: none;
+}
+.single-slider::-moz-range-thumb { width: 10px; height: 14px; background: var(--accent3); border: none; border-radius: 0; }
+
+/* ─── Bundle 3: Parameter Exploration ─── */
+.range-label-group { display: inline-flex; align-items: center; gap: 6px; }
+.range-right { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.range-readout { cursor: text; padding: 0 2px; }
+.range-readout:hover { background: rgba(255,255,255,0.06); border-radius: 2px; }
+
+.lock-btn, .dice-btn {
+  background: transparent; border: none; padding: 2px;
+  font-size: 11px; cursor: pointer; opacity: 0.3;
+  transition: opacity 0.1s, transform 0.1s;
+}
+.lock-btn:hover, .dice-btn:hover { opacity: 0.8; }
+.lock-btn:active, .dice-btn:active { transform: scale(0.9); }
+.lock-btn.locked { opacity: 1.0; }
+
+.range-locked .single-slider::-webkit-slider-thumb,
+.range-locked .dual-slider input[type=range]::-webkit-slider-thumb { background: var(--dim); cursor: not-allowed; }
+.range-locked .single-slider::-moz-range-thumb,
+.range-locked .dual-slider input[type=range]::-moz-range-thumb { background: var(--dim); cursor: not-allowed; }
+.range-locked .dual-fill { background: var(--dim); }
+
+.range-edit {
+  width: 32px; background: rgba(0,0,0,0.5); border: 1px solid var(--accent);
+  color: var(--ink); font-size: 10px; text-align: center; padding: 2px 0;
+  outline: none;
+}
+.range-edit-dual { display: flex; align-items: center; gap: 2px; }
+
+.randomize-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 8px; margin-bottom: 8px;
+  background: rgba(255,255,255,0.02); border: 1px solid var(--line);
+}
+.randomize-btn {
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; padding: 4px 8px;
+}
+.randomize-btn:hover { background: var(--ink); color: var(--bg); }
+.randomize-hint { font-size: 9px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+
+.lock-badge, .drift-badge {
+  font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 2px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.lock-badge { background: rgba(255,255,255,0.1); color: var(--ink); }
+.drift-badge { background: rgba(255,212,0,0.15); color: #ffd400; border: 1px solid rgba(255,212,0,0.3); }

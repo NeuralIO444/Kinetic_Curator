@@ -1,0 +1,12 @@
+- `[x]` 1. Clean Up / Polish
+  - `[x]` Verify ErrorBoundary styling.
+  - `[x]` Update package.json scripts (if necessary).
+- `[x]` 2. Write `README.md`
+  - `[x]` Describe the project, the tech stack (Vite + React), and installation instructions.
+  - `[x]` Document the UI hotkeys.
+- `[x]` 3. Compile `docs/architecture.md`
+  - `[x]` Document the React Context state structure.
+  - `[x]` Document the Render Pipeline (Seed -> Layout -> SVG Canvas).
+  - `[x]` Document the Audio/Video Engine (Web Audio API, MediaRecorder).
+- `[x]` 4. Compile `docs/manifesto.md`
+  - `[x]` The philosophical "why" behind Kinetic Curator (curated chaos, generative art).
