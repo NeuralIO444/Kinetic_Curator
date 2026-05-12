@@ -1,0 +1,9 @@
+{
+  "name": "kinetic-curator-root",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix app",
+    "build": "npm run build --prefix app",
+    "install-all": "npm install --prefix app"
+  }
+}
