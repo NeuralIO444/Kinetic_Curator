@@ -5,8 +5,19 @@ import { useCollapse } from '../hooks/useCollapse.js';
 import * as A from '../state/actions.js';
 
 export function DavisPanel() {
-  const { state, dispatch, palette } = useApp();
-  const { evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot, favorites, seed, layoutParams } = state;
+  const { dispatch, palette } = useApp();
+  const state = useApp(s => ({
+    evolveMode: s.evolveMode,
+    evolveSource: s.evolveSource,
+    evolveTarget: s.evolveTarget,
+    evolveInterval: s.evolveInterval,
+    autoSnapshot: s.autoSnapshot,
+    motionSmoothing: s.motionSmoothing,
+    favorites: s.favorites,
+    seed: s.seed,
+    layoutParams: s.layoutParams,
+  }));
+  const { evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot, motionSmoothing, favorites, seed, layoutParams } = state;
   const { open, toggle } = useCollapse(false);
 
   const favoriteCurrent = () => {
@@ -56,6 +67,20 @@ export function DavisPanel() {
             <input type="range" min={200} max={10000} step={100} value={evolveInterval}
               onChange={e => dispatch({ type: A.SET_EVOLVE_INTERVAL, payload: Number(e.target.value) })} />
             <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
+          </div>
+
+          <div className="davis-interval-row" style={{ marginTop: '8px' }}>
+            <span className="davis-label">AUTO-SNAP</span>
+            <input type="checkbox" checked={autoSnapshot} onChange={e => dispatch({ type: A.SET_AUTO_SNAPSHOT, payload: e.target.checked })} />
+            <span className="davis-readout" style={{ fontSize: '9px', opacity: 0.6 }}>(saves PNG on evolve)</span>
+          </div>
+
+          <div className="davis-interval-row" style={{ marginTop: '8px' }}>
+            <span className="davis-label">SMOOTHING</span>
+            <input type="checkbox" checked={motionSmoothing} onChange={e => {
+              import('../state/store.js').then(m => m.useStore.getState().setMotionSmoothing(e.target.checked));
+            }} />
+            <span className="davis-readout" style={{ fontSize: '9px', opacity: 0.6 }}>(fluid CSS transitions)</span>
           </div>
 
           <div className="davis-actions">

@@ -7,7 +7,13 @@ import { ALL_CATEGORIES } from '../data/categories.js';
 import * as A from '../state/actions.js';
 
 export function AssetPoolPanel() {
-  const { state, dispatch, assets } = useApp();
+  const { dispatch, assets } = useApp();
+  const state = useApp(s => ({
+    enabled: s.enabledAssets,
+    search: s.search,
+    catFilter: s.catFilter,
+    poolView: s.poolView,
+  }));
   const { enabled, search, catFilter, poolView } = state;
   const { open, toggle } = useCollapse(false);
 

@@ -18,7 +18,21 @@ import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
 
 function AppInner() {
-  const { state, dispatch, history, palette, svgRef } = useApp();
+  const { dispatch, history, svgRef } = useApp();
+  const state = useApp(s => ({
+    evolveMode: s.evolveMode,
+    evolveSource: s.evolveSource,
+    evolveInterval: s.evolveInterval,
+    evolveTarget: s.evolveTarget,
+    autoSnapshot: s.autoSnapshot,
+    lastEvolveTs: s.lastEvolveTs,
+    exportResolution: s.exportResolution,
+    audioEnabled: s.audioEnabled,
+    audioSource: s.audioSource,
+    audioGain: s.audioGain,
+    audioMonitor: s.audioMonitor,
+    running: s.running,
+  }));
 
   // Reference for stable callbacks
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
@@ -33,10 +47,15 @@ function AppInner() {
     return () => clearInterval(interval);
   }, [state.evolveMode, state.evolveSource, state.evolveInterval, dispatch]);
 
-  // Auto-Snapshot
+  // Auto-Snapshot (P10: Debounced to prevent browser crash)
+  const lastSnapRef = useRef(0);
   useEffect(() => {
+    const now = Date.now();
     if (state.lastEvolveTs && state.autoSnapshot && svgRef?.current) {
-      exportSnapshot(svgRef.current, state.exportResolution, state.seed.toString(16));
+      if (now - lastSnapRef.current > 2000) {
+        exportSnapshot(svgRef.current, state.exportResolution, state.seed.toString(16));
+        lastSnapRef.current = now;
+      }
     }
   }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, svgRef]);
 

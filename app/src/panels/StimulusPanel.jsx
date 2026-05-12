@@ -6,7 +6,17 @@ import { WaveformMeter } from '../components/WaveformMeter.jsx';
 import * as A from '../state/actions.js';
 
 export function StimulusPanel() {
-  const { state, dispatch } = useApp();
+  const { dispatch } = useApp();
+  const state = useApp(s => ({
+    webcamEnabled: s.webcamEnabled,
+    audioEnabled: s.audioEnabled,
+    motionEnergy: s.motionEnergy,
+    audioGain: s.audioGain,
+    audioSource: s.audioSource,
+    audioMonitor: s.audioMonitor,
+    beatPulse: s.beatPulse,
+    audioBands: s.audioBands,
+  }));
   const { webcamEnabled, audioEnabled, motionEnergy, audioGain, audioSource, audioMonitor, beatPulse, audioBands } = state;
   const { open, toggle } = useCollapse(false);
 

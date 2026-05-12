@@ -1,36 +1,29 @@
-# Bundle 8 — Davis/Evolve Panel Finalization
+# Bundle 10 — Production Hardening & Motion Engine
 
-This bundle activates the core "Generative Autopilot" of the application, turning the Davis Mode panel from a visual placeholder into a fully functional, automated curation engine.
+This bundle focuses on architecting the application for production scale. We will eliminate UI performance bottlenecks caused by the React Context API, introduce fluid motion to the generative assets, and restructure the codebase for long-term maintainability.
 
-## Proposed Changes
+## 1. Performance Refactor: The Zustand Migration
+Currently, the entire application state is wrapped in `AppContext.jsx`. Because the WebAudio engine updates the `beatPulse` and `audioBands` at 60 frames per second, **every panel in the UI is constantly re-rendering**, even if they aren't using the audio data. This is a classic React Context performance trap.
 
-### 1. State Management (`state/actions.js`, `state/reducer.js`)
-- Add new state variables: `evolveTarget` (default: `'seed'`), `autoSnapshot` (default: `false`), and `lastEvolveTs` (default: `0`).
-- Add actions: `SET_EVOLVE_TARGET`, `SET_AUTO_SNAPSHOT`, and `TRIGGER_EVOLVE`.
-- The `TRIGGER_EVOLVE` action will handle the randomization logic:
-  - If `evolveTarget === 'seed'`, it simply bumps the seed.
-  - If `evolveTarget === 'layout'`, it randomizes all unlocked layout parameters.
-  - If `evolveTarget === 'palette'`, it assigns a random palette.
-  - If `evolveTarget === 'all'`, it does all of the above.
+- **The Plan:** We will replace `AppContext.jsx` and `reducer.js` with **Zustand** (`npm install zustand`). 
+- Zustand allows components to selectively subscribe *only* to the exact piece of state they need. `CanvasPanel` will subscribe to layout changes, but `AssetPoolPanel` will ignore audio pulses completely. This will make the UI incredibly fast and eliminate lag during heavy audio playback.
 
-### 2. Auto-Evolve Engine (`App.jsx`)
-- **Time-based Evolve**: Implement a `setInterval` that fires `TRIGGER_EVOLVE` based on `state.evolveInterval` when `evolveMode` is active and `evolveSource` is `'time'`.
-- **Beat-based Evolve**: Update the `onBeat` callback from the audio engine to fire `TRIGGER_EVOLVE` when `evolveSource` is `'beat'`.
-- **Auto-Snapshot**: Add a `useEffect` that listens for changes to `lastEvolveTs`. If `autoSnapshot` is true, it automatically calls the `exportSnapshot` utility to save a PNG of the *previous* state right before or after it evolves.
+## 2. The Fluid Motion Engine (Addressing "Static Windows")
+To give the artwork continuous, fluid motion (similar to the aesthetic of Mario Carrillo) without rewriting the entire rendering engine in WebGL, we will implement a hardware-accelerated CSS transition layer.
 
-### 3. Davis Panel UI Polish (`panels/DavisPanel.jsx`)
-- Add **MIDI/OSC placeholders**: Add disabled, greyed-out buttons to represent future hardware integration (U26).
-- Add **Evolve Target Selection**: A new `<select>` dropdown to choose between `Seed Only`, `Layout`, `Palette`, and `All Parameters` (U27).
-- Add **Auto-Snapshot Toggle**: A toggle button to enable saving a snapshot frame every time an evolve triggers (U29).
-- Clean up the visual hierarchy of the panel to fit these new controls.
+- **The Plan:** We will add a `transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)` style to all rendered `<g>` and `<use>` SVG nodes in `CanvasPanel.jsx`.
+- When the `▶ EVOLVE` engine changes the layout, or the `beatPulse` scales the assets, they will no longer "snap" instantly to their new positions. Instead, they will smoothly glide, rotate, and scale across the screen, creating a mesmerizing, continuous kaleidoscopic motion.
+- We will add a **"Motion Smoothing"** toggle in the Davis Panel so you can switch between the classic "snappy" generative feel and the new fluid motion.
+
+## 3. Architecture & Code Cleanup
+- **Splitting the Monolith:** The current `reducer.js` is nearly 300 lines long. As we migrate to Zustand, we will split the state logic into domain-specific slices (e.g., `createLayoutSlice.js`, `createAudioSlice.js`, `createDavisSlice.js`) for a cleaner, production-ready codebase.
+- **Auto-Snapshot Hardening:** We will add a 2-second debounce limit to the Auto-Snapshot feature. Currently, if you set the Evolve interval to 200ms, the browser will attempt to download 5 images a second and likely crash. The debounce will ensure stability.
+- **WebAudio Auditing:** We will ensure that when you switch microphones in the Stimulus panel, the old `AudioContext` is properly suspended and garbage collected to prevent memory leaks over long sessions.
 
 ## Open Questions / Feedback Required
 
-> [!WARNING]  
-> If `Auto-Snapshot` is enabled and `Evolve` is running on a fast interval (e.g., every 500ms), it will attempt to download a PNG to your machine twice a second. Browsers usually suppress rapid automatic downloads to protect users. Is this acceptable, or should we limit auto-snapshots to only fire if the interval is > 2 seconds?
+> [!NOTE]  
+> Are you comfortable migrating the state manager from pure React Context to **Zustand**? It is an industry-standard, lightweight library (1.1kb) that solves exactly the 60fps rendering bottleneck we are facing.
 
-## Verification Plan
-1. Set Evolve Source to `Time`, Interval to `1s`, and Target to `Seed Only`. Start Evolve and verify the seed changes every second.
-2. Switch Target to `Palette` and verify the colors change.
-3. Turn on Audio, switch Evolve Source to `Beat`, and verify the visuals evolve on loud drum hits.
-4. Turn on `Auto-Snapshot` and verify that an image is downloaded alongside the evolve triggers.
+> [!TIP]
+> The CSS transition approach will add beautiful, smooth motion to the current SVG engine. If, in the future, you want to push this to 100,000+ particles with melting liquid GLSL shaders (like Joshua Davis's `voiding` filter), that would require a "Bundle 11" to entirely replace the SVG engine with a WebGL canvas (Pixi.js). Does the CSS motion sound like the right next step?

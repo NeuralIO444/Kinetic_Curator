@@ -1,12 +1,15 @@
-- `[x]` 1. Clean Up / Polish
-  - `[x]` Verify ErrorBoundary styling.
-  - `[x]` Update package.json scripts (if necessary).
-- `[x]` 2. Write `README.md`
-  - `[x]` Describe the project, the tech stack (Vite + React), and installation instructions.
-  - `[x]` Document the UI hotkeys.
-- `[x]` 3. Compile `docs/architecture.md`
-  - `[x]` Document the React Context state structure.
-  - `[x]` Document the Render Pipeline (Seed -> Layout -> SVG Canvas).
-  - `[x]` Document the Audio/Video Engine (Web Audio API, MediaRecorder).
-- `[x]` 4. Compile `docs/manifesto.md`
-  - `[x]` The philosophical "why" behind Kinetic Curator (curated chaos, generative art).
+- `[/]` 1. Performance Refactor (Zustand Migration)
+  - `[ ]` Install `zustand` dependency.
+  - `[ ]` Create `state/store.js` and split the `reducer.js` logic into Zustand slices (layout, audio, davis, export).
+  - `[ ]` Replace `useApp` with `useStore` across all panels and components (`App.jsx`, `CanvasPanel.jsx`, etc.).
+  - `[ ]` Remove `AppContext.jsx` and `reducer.js`.
+- `[ ]` 2. Fluid Motion Engine
+  - `[ ]` Add `motionSmoothing` boolean to state (default: true).
+  - `[ ]` Update `CanvasPanel.jsx` to apply CSS `transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)` to SVG elements when smoothing is enabled.
+  - `[ ]` Add "Motion Smoothing" toggle button in `DavisPanel.jsx`.
+- `[ ]` 3. Production Hardening
+  - `[ ]` Add debounce logic to `exportSnapshot` to prevent rapid-fire auto-snapshots (limit to once every 2 seconds).
+  - `[ ]` Verify audio context suspension logic in `useAudioInput.js`.
+- `[ ]` 4. Documentation & Verification
+  - `[ ]` Verify build and runtime performance.
+  - `[ ]` Update `architecture.md` and `walkthrough.md` to document Zustand architecture and the new motion engine.

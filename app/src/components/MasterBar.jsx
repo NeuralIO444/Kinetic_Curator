@@ -3,7 +3,15 @@ import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
 
 export function MasterBar() {
-  const { state, dispatch, history, palette, palettes } = useApp();
+  const { dispatch, palette } = useApp();
+  const state = useApp(s => ({
+    running: s.running,
+    fps: s.fps,
+    seed: s.seed,
+    isRecording: s.isRecording,
+    audioEnabled: s.audioEnabled,
+    beatPulse: s.beatPulse,
+  }));
   const { running, fps, seed } = state;
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';

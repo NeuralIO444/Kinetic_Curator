@@ -11,8 +11,17 @@ import { mkRng } from '../engine/prng.js';
 import { getPreset } from '../data/presets.js';
 
 export function CanvasPanel() {
-  const { state, palette, assets, canvasRef, svgRef } = useApp();
-  const { layoutParams, seed, enabled, evolveMode } = state;
+  const { palette, assets, canvasRef, svgRef } = useApp();
+  const state = useApp(s => ({
+    layoutParams: s.layoutParams,
+    seed: s.seed,
+    enabled: s.enabledAssets,
+    evolveMode: s.evolveMode,
+    beatPulse: s.beatPulse,
+    audioBands: s.audioBands,
+    motionSmoothing: s.motionSmoothing,
+  }));
+  const { layoutParams, seed, enabled, evolveMode, beatPulse, audioBands, motionSmoothing } = state;
   const { open, toggle } = useCollapse(true);
 
   // U14: Drag-resize canvas
@@ -146,6 +155,10 @@ export function CanvasPanel() {
                   key={i}
                   transform={`translate(${item.x}, ${item.y}) scale(${item.scale}) rotate(${item.rotation})`}
                   opacity={item.alpha / 100}
+                  style={{
+                    transition: motionSmoothing ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease' : 'none',
+                    transformOrigin: '0 0',
+                  }}
                   dangerouslySetInnerHTML={{ __html: svgStr }}
                 />
               );

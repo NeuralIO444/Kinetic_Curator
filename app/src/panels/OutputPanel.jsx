@@ -6,8 +6,15 @@ import { exportSnapshot, useVideoRecorder } from '../hooks/useMediaExport.js';
 import * as A from '../state/actions.js';
 
 export function OutputPanel() {
-  const { state, dispatch, palette, svgRef } = useApp();
-  const { snapshots, layoutParams, seed, exportResolution, isRecording } = state;
+  const { dispatch, palette, svgRef } = useApp();
+  const state = useApp(s => ({
+    snapshots: s.snapshots,
+    exportResolution: s.exportResolution,
+    isRecording: s.isRecording,
+    seed: s.seed,
+    layoutParams: s.layoutParams,
+  }));
+  const { snapshots, exportResolution, isRecording, seed, layoutParams } = state;
   const { open, toggle } = useCollapse(false);
 
   // Initialize the video recorder hook

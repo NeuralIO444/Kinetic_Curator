@@ -10,7 +10,11 @@ import { getPresetsByGroup, getPreset } from '../data/presets.js';
 import * as A from '../state/actions.js';
 
 export function LayoutPanel() {
-  const { state, dispatch } = useApp();
+  const { dispatch } = useApp();
+  const state = useApp(s => ({
+    layoutParams: s.layoutParams,
+    lockedParams: s.lockedParams,
+  }));
   const { layoutParams, lockedParams } = state;
   const { open, toggle } = useCollapse(true);
   const groups = getPresetsByGroup();

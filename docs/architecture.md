@@ -4,18 +4,21 @@ The Kinetic Curator app abandons the typical "Processing/p5.js HTML5 Canvas" par
 
 By representing thousands of graphical assets as React nodes within an `<svg>` tree, we gain access to React's vast ecosystem of hooks, context management, and declarative state without needing a custom draw loop (unless we are recording video).
 
-## The State Tree (`state/reducer.js`)
+## The State Tree (`state/store.js`)
 
-The entire application state is stored in a single unified object, heavily inspired by Redux but implemented via `useReducer` and the Context API (`AppContext.jsx`).
+The application uses **Zustand** for high-performance state management. This replaced the previous React Context architecture to eliminate the "60fps bottleneck."
+
+### Performance Optimization (Selectors)
+To ensure the UI remains responsive during high-frequency audio updates (60fps), components use **selective subscriptions**. Instead of subscribing to the entire state, panels only listen to the specific keys they need (e.g., `layoutParams`). This prevents unnecessary re-renders in heavy panels like the Asset Pool or Output settings.
 
 ### Key Domains
 1. **Layout Parameters:** `count`, `scale`, `rotate`, `alpha`, `mode`. These form the "DNA" of the current composition.
-2. **Generative Seeds:** `seed`, `paletteId`. A specific combination of layout parameters, a seed, and a palette will **always** yield the exact same composition. This determinism is what allows the "Save to Favorites" and "Export Config JSON" features to work.
-3. **Audio Reactivity:** `audioBands`, `beatPulse`, `audioGain`. These are continuously updated by the Web Audio API in a `requestAnimationFrame` loop.
+2. **Generative Seeds:** `seed`, `paletteId`. A specific combination of layout parameters, a seed, and a palette will **always** yield the exact same composition.
+3. **Audio Reactivity:** `audioBands`, `beatPulse`. Updated at 60fps via the Web Audio API.
 4. **Davis Mode (Autopilot):** `evolveMode`, `evolveTarget`, `evolveSource`.
 
 ### History Tracking
-We implemented a custom hook `useHistory.js` that wraps the main reducer. Whenever a specific layout or global state action is dispatched (e.g., `SET_LAYOUT_PARAM`), the hook pushes the previous state onto an undo stack. This allows full `Cmd+Z` / `Cmd+Shift+Z` capability.
+A custom `history` slice in the Zustand store manages a 20-step undo/redo stack for all layout and palette changes, while ignoring high-frequency audio data. This provides full `Cmd+Z` / `Cmd+Shift+Z` capability across the session.
 
 ## The Rendering Pipeline
 
