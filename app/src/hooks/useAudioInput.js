@@ -1,70 +1,84 @@
-// useAudioInput — audio analysis hook with proper rAF lifecycle
-// Fixes B7: guards requestAnimationFrame with runningRef check BEFORE scheduling
+// useAudioInput — audio analysis with Tone.js. Tone is dynamically imported
+// so it stays out of the initial bundle until audio is toggled on.
 
 import { useRef, useEffect, useCallback } from 'react';
 
+let ToneModule = null;
+async function loadTone() {
+  if (!ToneModule) ToneModule = await import('tone');
+  return ToneModule;
+}
+
+// Dispatch throttle — analyze runs at rAF rate, store updates run at 30 Hz.
+const DISPATCH_INTERVAL_MS = 33;
+
 export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBands, onBeat }) {
-  const ctxRef = useRef(null);
-  const analyserRef = useRef(null);
-  const sourceRef = useRef(null);
-  const audioElRef = useRef(null);
+  const meterRef = useRef(null);
+  const fftRef = useRef(null);
+  const inputRef = useRef(null);
   const gainNodeRef = useRef(null);
   const rafRef = useRef(null);
   const runningRef = useRef(false);
   const prevRmsRef = useRef(0);
+  const lastDispatchRef = useRef(0);
+  const toneRef = useRef(null);
 
   const analyze = useCallback(() => {
-    if (!runningRef.current) return; // guard BEFORE scheduling next frame
+    if (!runningRef.current) return;
+    const meter = meterRef.current;
+    const fft = fftRef.current;
+    const Tone = toneRef.current;
+    if (!meter || !fft || !Tone) return;
 
-    const analyser = analyserRef.current;
-    if (!analyser) return;
-
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(data);
-
-    const len = data.length;
-    const bassEnd = Math.floor(len * 0.15);
-    const midEnd = Math.floor(len * 0.5);
-
-    let bassSum = 0, midSum = 0, trebleSum = 0, total = 0;
-    for (let i = 0; i < len; i++) {
-      const v = data[i] / 255;
-      total += v;
-      if (i < bassEnd) bassSum += v;
-      else if (i < midEnd) midSum += v;
-      else trebleSum += v;
-    }
-
-    const rms = total / len;
-    const bass = bassEnd > 0 ? bassSum / bassEnd : 0;
-    const mid = (midEnd - bassEnd) > 0 ? midSum / (midEnd - bassEnd) : 0;
-    const treble = (len - midEnd) > 0 ? trebleSum / (len - midEnd) : 0;
-
-    onStimulus?.(rms);
-    onBands?.({ bass, mid, treble, rms });
-
-    // Beat detection: sharp rms spike
+    const now = performance.now();
+    const rms = Tone.dbToGain(meter.getValue());
+    // Beat detection runs every frame (transients are short) but is cheap.
     const delta = rms - prevRmsRef.current;
     if (delta > 0.15) onBeat?.();
     prevRmsRef.current = rms;
 
-    // Schedule next ONLY if still running
-    if (runningRef.current) {
-      rafRef.current = requestAnimationFrame(analyze);
+    // Bands/stimulus dispatch is throttled to 30 Hz — these wake store
+    // subscribers and we don't want 60 Hz cascades.
+    if (now - lastDispatchRef.current >= DISPATCH_INTERVAL_MS) {
+      lastDispatchRef.current = now;
+      const freqs = fft.getValue();
+      const len = freqs.length;
+      const bassEnd = Math.floor(len * 0.15);
+      const midEnd = Math.floor(len * 0.5);
+      let bassSum = 0, midSum = 0, trebleSum = 0;
+      for (let i = 0; i < len; i++) {
+        const v = Tone.dbToGain(freqs[i]);
+        if (i < bassEnd) bassSum += v;
+        else if (i < midEnd) midSum += v;
+        else trebleSum += v;
+      }
+      const bass = bassEnd > 0 ? bassSum / bassEnd : 0;
+      const mid = (midEnd - bassEnd) > 0 ? midSum / (midEnd - bassEnd) : 0;
+      const treble = (len - midEnd) > 0 ? trebleSum / (len - midEnd) : 0;
+      onStimulus?.(rms);
+      onBands?.({ bass, mid, treble, rms });
     }
+
+    rafRef.current = requestAnimationFrame(analyze);
   }, [onStimulus, onBands, onBeat]);
 
   useEffect(() => {
-    if (!enabled) {
+    // Clean up any prior session — null refs after dispose so a stale toggle
+    // can't double-dispose.
+    const teardown = () => {
       runningRef.current = false;
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      if (audioElRef.current) {
-        audioElRef.current.pause();
-        audioElRef.current.src = '';
-      }
+      if (inputRef.current) { try { inputRef.current.dispose(); } catch { /* idempotent */ } inputRef.current = null; }
+      if (gainNodeRef.current) { try { gainNodeRef.current.dispose(); } catch { /* idempotent */ } gainNodeRef.current = null; }
+      if (meterRef.current) { try { meterRef.current.dispose(); } catch { /* idempotent */ } meterRef.current = null; }
+      if (fftRef.current) { try { fftRef.current.dispose(); } catch { /* idempotent */ } fftRef.current = null; }
+    };
+
+    if (!enabled) {
+      teardown();
       return;
     }
 
@@ -72,76 +86,73 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
 
     (async () => {
       try {
-        const ctx = new window.AudioContext();
-        let srcNode;
-        let stream = null;
+        const Tone = await loadTone();
+        if (cancelled) return;
+        toneRef.current = Tone;
+        await Tone.start();
+        if (cancelled) return;
 
-        if (source.type === 'file') {
-          const audio = new Audio();
-          audio.src = source.url;
-          audio.loop = true;
-          audio.crossOrigin = 'anonymous';
-          await audio.play();
-          if (cancelled) { audio.pause(); return; }
-          srcNode = ctx.createMediaElementSource(audio);
-          audioElRef.current = audio;
+        let input;
+        if (source.type === 'device') {
+          input = new Tone.UserMedia();
+          // Pass the device id if it's a real id (not the sentinel "default").
+          const deviceId = source.id && source.id !== 'default' ? source.id : undefined;
+          await input.open(deviceId);
+        } else if (source.type === 'file') {
+          input = new Tone.Player(source.url);
+          input.loop = true;
+          await input.start();
         } else {
-          // Device
-          const constraints = { audio: source.id === 'default' ? true : { deviceId: { exact: source.id } } };
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
-          srcNode = ctx.createMediaStreamSource(stream);
+          return;
+        }
+        // Re-check cancellation immediately before wiring refs so a rapid
+        // disable→enable doesn't leave the *first* attempt running.
+        if (cancelled) { try { input.dispose(); } catch { /* ignore */ } return; }
+
+        const gainNode = new Tone.Gain(gain);
+        const meter = new Tone.Meter();
+        const fft = new Tone.FFT(256);
+
+        input.connect(gainNode);
+        gainNode.connect(meter);
+        gainNode.connect(fft);
+        if (monitor) gainNode.connect(Tone.Destination);
+
+        if (cancelled) {
+          try { input.dispose(); gainNode.dispose(); meter.dispose(); fft.dispose(); } catch { /* ignore */ }
+          return;
         }
 
-        const gainNode = ctx.createGain();
-        gainNode.gain.value = gain;
-
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.8;
-
-        srcNode.connect(gainNode);
-        gainNode.connect(analyser);
-        if (monitor) {
-          gainNode.connect(ctx.destination);
-        }
-
-        ctxRef.current = ctx;
-        sourceRef.current = { node: srcNode, stream };
+        inputRef.current = input;
         gainNodeRef.current = gainNode;
-        analyserRef.current = analyser;
-        runningRef.current = true;
+        meterRef.current = meter;
+        fftRef.current = fft;
 
+        runningRef.current = true;
         rafRef.current = requestAnimationFrame(analyze);
       } catch (err) {
-        console.warn('[useAudioInput] mic/audio access denied:', err.message);
+        console.warn('[useAudioInput] audio access error:', err.message);
       }
     })();
 
     return () => {
       cancelled = true;
-      runningRef.current = false;
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      if (audioElRef.current) {
-        audioElRef.current.pause();
-        audioElRef.current.src = '';
-      }
-      if (sourceRef.current?.stream) {
-        sourceRef.current.stream.getTracks().forEach(t => t.stop());
-      }
-      sourceRef.current?.node.disconnect();
-      gainNodeRef.current?.disconnect();
-      ctxRef.current?.close();
+      teardown();
     };
-  }, [enabled, source.id, source.url, source.type, monitor, analyze]); // Do NOT include `gain` in dependency array so it doesn't re-init the whole graph on slider drag!
+  }, [enabled, source, monitor, analyze]);
 
-  // Update gain dynamically without tearing down the audio graph
+  // Gain slider: update the actual Tone.Gain node in the chain. (Previously
+  // we wrote to `input.volume.value` which is a separate dB parameter and
+  // doesn't affect what the Meter / FFT see.)
   useEffect(() => {
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = gain;
+    const node = gainNodeRef.current;
+    if (!node) return;
+    try {
+      node.gain.rampTo(gain, 0.05);
+    } catch {
+      try { node.gain.value = gain; } catch { /* ignore */ }
     }
   }, [gain]);
+
+  return {};
 }

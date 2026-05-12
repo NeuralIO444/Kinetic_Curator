@@ -7,7 +7,8 @@
 }
 .grid {
   display: grid;
-  grid-template-columns: minmax(460px, 1.25fr) minmax(340px, 0.95fr) minmax(440px, 1.25fr);
+  /* Canvas column gets the most space (~50% on a 1440-wide screen). */
+  grid-template-columns: minmax(560px, 1.7fr) minmax(320px, 0.9fr) minmax(360px, 1fr);
   gap: 8px;
   padding: 8px;
   min-height: 0;

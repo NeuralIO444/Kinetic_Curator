@@ -1,5 +1,9 @@
-/* ─── Asset Pool ─── */
-.panel-pool { flex: 1; max-height: 60vh; }
+/* ─── Asset Pool ───
+   `flex: 1 1 auto` + `min-height: 0` lets the panel grow into the column's
+   leftover space (after the OutputPanel below it) without being capped at
+   60vh. The inner pool-body keeps `overflow-y: auto` for the cases when
+   even a full column isn't enough. */
+.panel-pool { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .panel-pool .pool-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .pool-controls { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.01); }
 .cat-filter { display: flex; flex-wrap: wrap; gap: 4px; }

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 
 export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange, readout,
-  defaultValue, locked, onToggleLock, onRandomize }) {
+  defaultValue, locked, kinetic, onToggleLock, onToggleKinetic, onRandomize }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef(null);
@@ -33,6 +33,21 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
         {onToggleLock && (
           <button className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>
             {locked ? '🔒' : '🔓'}
+          </button>
+        )}
+        {onToggleKinetic && (
+          <button
+            className={`lock-btn ${kinetic ? 'kinetic' : ''}`}
+            onClick={onToggleKinetic}
+            title={kinetic
+              ? 'Kinetic: AUTO-EVOLVE will mutate this param. Click to unmark.'
+              : 'Mark as kinetic — AUTO-EVOLVE will randomize this param every interval.'}
+            style={kinetic
+              ? { color: '#00ff88', borderColor: '#00ff88' }
+              : { color: 'var(--dim)', borderColor: 'var(--line)' }}
+            disabled={locked}
+          >
+            K
           </button>
         )}
         <span className="range-label" onDoubleClick={handleDoubleClick}
@@ -69,7 +84,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
 
 export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
   onChangeLow, onChangeHigh, readout, defaultLow, defaultHigh,
-  locked, onToggleLock, onRandomize }) {
+  locked, kinetic, onToggleLock, onToggleKinetic, onRandomize }) {
   const [editing, setEditing] = useState(false);
   const [editLow, setEditLow] = useState('');
   const [editHigh, setEditHigh] = useState('');
@@ -104,6 +119,21 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
         {onToggleLock && (
           <button className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>
             {locked ? '🔒' : '🔓'}
+          </button>
+        )}
+        {onToggleKinetic && (
+          <button
+            className={`lock-btn ${kinetic ? 'kinetic' : ''}`}
+            onClick={onToggleKinetic}
+            title={kinetic
+              ? 'Kinetic: AUTO-EVOLVE will mutate this param. Click to unmark.'
+              : 'Mark as kinetic — AUTO-EVOLVE will randomize this param every interval.'}
+            style={kinetic
+              ? { color: '#00ff88', borderColor: '#00ff88' }
+              : { color: 'var(--dim)', borderColor: 'var(--line)' }}
+            disabled={locked}
+          >
+            K
           </button>
         )}
         <span className="range-label" onDoubleClick={handleDoubleClick}

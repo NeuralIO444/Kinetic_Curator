@@ -29,4 +29,22 @@ button { font-family: inherit; cursor: pointer; }
 input, select { font-family: inherit; font-size: 12px; }
 .mono { font-family: var(--mono); letter-spacing: 0.02em; }
 
+/* ─── Scrollbars ───
+   Thin, dimmer-on-rest, brighter on hover. Matches the tool's dark theme so
+   the chrome doesn't shout at you when a panel overflows. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.10) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
+*::-webkit-scrollbar-corner { background: transparent; }
+
 @keyframes pulse { 50% { opacity: 0.5; } }

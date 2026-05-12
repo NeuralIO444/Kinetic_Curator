@@ -8,9 +8,16 @@ const SHORTCUTS = [
   { key: 'F', desc: 'Favorite current seed' },
   { key: 'E', desc: 'Toggle evolve mode' },
   { key: 'N', desc: 'New random seed' },
+  { key: 'P', desc: 'Toggle perf mode (caps effects)' },
   { key: '⌘Z', desc: 'Undo last change' },
   { key: '⌘⇧Z', desc: 'Redo' },
   { key: '?', desc: 'Toggle this overlay' },
+];
+
+const POINTERS = [
+  { key: 'ALT-CLICK', desc: 'Trigger blast at cursor (when Blast effect on)' },
+  { key: 'WHEEL', desc: 'Zoom canvas' },
+  { key: 'DRAG', desc: 'Pan canvas' },
 ];
 
 export function HotkeyOverlay() {
@@ -31,6 +38,15 @@ export function HotkeyOverlay() {
         </div>
         <div className="hotkey-list">
           {SHORTCUTS.map(s => (
+            <div key={s.key} className="hotkey-row">
+              <kbd className="hotkey-key">{s.key}</kbd>
+              <span className="hotkey-desc">{s.desc}</span>
+            </div>
+          ))}
+          <div className="hotkey-row" style={{ marginTop: 6, opacity: 0.6, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
+            <span style={{ width: '100%' }}>Pointer</span>
+          </div>
+          {POINTERS.map(s => (
             <div key={s.key} className="hotkey-row">
               <kbd className="hotkey-key">{s.key}</kbd>
               <span className="hotkey-desc">{s.desc}</span>

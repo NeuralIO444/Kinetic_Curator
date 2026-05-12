@@ -14,14 +14,16 @@ export function LayoutPanel() {
   const { state } = useApp(s => ({
     layoutParams: s.layoutParams,
     lockedParams: s.lockedParams,
+    kineticParams: s.kineticParams,
   }));
-  const { layoutParams, lockedParams } = state;
+  const { layoutParams, lockedParams, kineticParams = {} } = state;
   const { open, toggle } = useCollapse(true);
   const groups = getPresetsByGroup();
 
   const setParam = (key, value) => dispatch({ type: A.SET_LAYOUT_PARAM, key, value });
   const applyPreset = (preset) => dispatch({ type: A.APPLY_PRESET, preset });
   const toggleLock = (key) => dispatch({ type: A.TOGGLE_PARAM_LOCK, key });
+  const toggleKinetic = (key) => dispatch({ type: A.TOGGLE_PARAM_KINETIC, key });
   const randomizeParam = (key) => dispatch({ type: A.RANDOMIZE_PARAM, key });
   const randomizeUnlocked = () => dispatch({ type: A.RANDOMIZE_UNLOCKED });
 
@@ -100,6 +102,7 @@ export function LayoutPanel() {
             <RangeRow label="COUNT" value={layoutParams.count} min={10} max={800}
               onChange={v => setParam('count', v)} defaultValue={defaults.count}
               locked={lockedParams.count} onToggleLock={() => toggleLock('count')}
+              kinetic={kineticParams.count} onToggleKinetic={() => toggleKinetic('count')}
               onRandomize={() => randomizeParam('count')} />
 
             <DualRangeRow label="SCALE" low={layoutParams.scale[0]} high={layoutParams.scale[1]}
@@ -109,6 +112,7 @@ export function LayoutPanel() {
               readout={`${layoutParams.scale[0].toFixed(1)}–${layoutParams.scale[1].toFixed(1)}`}
               defaultLow={defaults.scale[0]} defaultHigh={defaults.scale[1]}
               locked={lockedParams.scale} onToggleLock={() => toggleLock('scale')}
+              kinetic={kineticParams.scale} onToggleKinetic={() => toggleKinetic('scale')}
               onRandomize={() => randomizeParam('scale')} />
 
             <DualRangeRow label="ROTATE" low={layoutParams.rotate[0]} high={layoutParams.rotate[1]}
@@ -118,6 +122,7 @@ export function LayoutPanel() {
               readout={`${layoutParams.rotate[0]}°–${layoutParams.rotate[1]}°`}
               defaultLow={defaults.rotate[0]} defaultHigh={defaults.rotate[1]}
               locked={lockedParams.rotate} onToggleLock={() => toggleLock('rotate')}
+              kinetic={kineticParams.rotate} onToggleKinetic={() => toggleKinetic('rotate')}
               onRandomize={() => randomizeParam('rotate')} />
 
             <DualRangeRow label="ALPHA" low={layoutParams.alpha[0]} high={layoutParams.alpha[1]}
@@ -127,16 +132,19 @@ export function LayoutPanel() {
               readout={`${layoutParams.alpha[0]}–${layoutParams.alpha[1]}%`}
               defaultLow={defaults.alpha[0]} defaultHigh={defaults.alpha[1]}
               locked={lockedParams.alpha} onToggleLock={() => toggleLock('alpha')}
+              kinetic={kineticParams.alpha} onToggleKinetic={() => toggleKinetic('alpha')}
               onRandomize={() => randomizeParam('alpha')} />
 
             <RangeRow label="JITTER" value={layoutParams.jitter} min={0} max={200}
               onChange={v => setParam('jitter', v)} defaultValue={defaults.jitter}
               locked={lockedParams.jitter} onToggleLock={() => toggleLock('jitter')}
+              kinetic={kineticParams.jitter} onToggleKinetic={() => toggleKinetic('jitter')}
               onRandomize={() => randomizeParam('jitter')} />
 
             <RangeRow label="DENSITY" value={layoutParams.density} min={10} max={120}
               onChange={v => setParam('density', v)} defaultValue={defaults.density}
               locked={lockedParams.density} onToggleLock={() => toggleLock('density')}
+              kinetic={kineticParams.density} onToggleKinetic={() => toggleKinetic('density')}
               onRandomize={() => randomizeParam('density')} />
 
             <RangeRow label="Z-TIERS" value={layoutParams.zTiers} min={1} max={12}

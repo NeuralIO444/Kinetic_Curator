@@ -9,12 +9,16 @@ import { AssetPoolPanel } from './panels/AssetPoolPanel.jsx';
 import { OutputPanel } from './panels/OutputPanel.jsx';
 import { StimulusPanel } from './panels/StimulusPanel.jsx';
 import { DavisPanel } from './panels/DavisPanel.jsx';
+import { EffectsPanel } from './panels/EffectsPanel.jsx';
+import { LayersPanel } from './panels/LayersPanel.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
 import { useAudioInput } from './hooks/useAudioInput.js';
+import { useWebcam } from './hooks/useWebcam.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
+import { interpolateSnapshots, favoriteToSnapshot } from './engine/interpolate.js';
 import * as A from './state/actions.js';
 
 function AppInner() {
@@ -27,6 +31,8 @@ function AppInner() {
     autoSnapshot: s.autoSnapshot,
     lastEvolveTs: s.lastEvolveTs,
     exportResolution: s.exportResolution,
+    perfMode: s.perfMode,
+    webcamEnabled: s.webcamEnabled,
     audioEnabled: s.audioEnabled,
     audioSource: s.audioSource,
     audioGain: s.audioGain,
@@ -36,20 +42,73 @@ function AppInner() {
     layoutParams: s.layoutParams,
     enabled: s.enabledAssets,
     isFullscreen: s.isFullscreen,
+    favorites: s.favorites,
+    keyframePlay: s.keyframePlay,
+    keyframeDuration: s.keyframeDuration,
+    mode: s.mode,
   }));
 
   // Reference for stable callbacks
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
   evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
 
-  // Time-based evolve
+  // Time-based evolve — gated on `running` so pause truly freezes.
   useEffect(() => {
+    if (!state.running) return;
     if (!state.evolveMode || state.evolveSource !== 'time') return;
     const interval = setInterval(() => {
       dispatch({ type: A.TRIGGER_EVOLVE });
     }, state.evolveInterval);
     return () => clearInterval(interval);
-  }, [state.evolveMode, state.evolveSource, state.evolveInterval, dispatch]);
+  }, [state.running, state.evolveMode, state.evolveSource, state.evolveInterval, dispatch]);
+
+  // Keyframe playback (Item 15): cycle through favorites, lerping numeric params
+  // between consecutive entries. Also gated on `running`.
+  useEffect(() => {
+    if (!state.running) return;
+    if (!state.keyframePlay) return;
+    if (!state.favorites || state.favorites.length < 2) return;
+    const dur = Math.max(500, state.keyframeDuration || 3000);
+    const favs = state.favorites;
+    let raf;
+    const start = performance.now();
+
+    const loop = (now) => {
+      const elapsed = now - start;
+      const segmentIdx = Math.floor(elapsed / dur);
+      const t = (elapsed % dur) / dur;
+      const fromIdx = segmentIdx % favs.length;
+      const toIdx = (fromIdx + 1) % favs.length;
+      const next = interpolateSnapshots(
+        favoriteToSnapshot(favs[fromIdx]),
+        favoriteToSnapshot(favs[toIdx]),
+        t,
+      );
+      dispatch({ type: A.RESTORE_STATE, payload: next });
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [state.running, state.keyframePlay, state.keyframeDuration, state.favorites, dispatch]);
+
+  // FPS monitor — rAF loop measuring real-time frame rate, updates store ~once/sec.
+  useEffect(() => {
+    let raf;
+    let frames = 0;
+    let last = performance.now();
+    const loop = (now) => {
+      frames++;
+      if (now - last >= 1000) {
+        const fps = Math.round((frames * 1000) / (now - last) * 10) / 10;
+        dispatch({ type: A.SET_FPS, payload: fps });
+        frames = 0;
+        last = now;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [dispatch]);
 
   // Auto-Snapshot (P10: Debounced to prevent browser crash)
   const lastSnapRef = useRef(0);
@@ -85,6 +144,7 @@ function AppInner() {
     'f': () => dispatch({ type: A.TOGGLE_FULLSCREEN }),
     'e': () => dispatch({ type: A.SET_EVOLVE_MODE, payload: p => !p }),
     'n': () => dispatch({ type: A.BUMP_SEED }),
+    'p': () => dispatch({ type: A.SET_PERF_MODE, payload: !state.perfMode }),
     ' ': () => dispatch({ type: A.SET_RUNNING, payload: !state.running }),
     // Undo / Redo (Cmd+Z / Cmd+Shift+Z)
     'z': (e) => { if (e.metaKey || e.ctrlKey) { e.shiftKey ? history.redo() : history.undo(); } },
@@ -99,15 +159,25 @@ function AppInner() {
       dispatch({ type: A.TRIGGER_EVOLVE });
     }
   }, [dispatch]);
-  useAudioInput({ 
-    enabled: state.audioEnabled, 
+  useAudioInput({
+    enabled: state.audioEnabled,
     source: state.audioSource,
     gain: state.audioGain,
     monitor: state.audioMonitor,
-    onStimulus: onAudioStimulus, 
-    onBands: onAudioBands, 
-    onBeat 
+    onStimulus: onAudioStimulus,
+    onBands: onAudioBands,
+    onBeat
   });
+
+  // Webcam → motion energy. High-motion frames trigger an evolve when
+  // evolve source is 'motion'.
+  const onMotion = useCallback((v) => {
+    dispatch({ type: A.SET_MOTION_ENERGY, payload: v });
+    if (evolveRef.current.mode && evolveRef.current.source === 'motion' && v > 0.25) {
+      dispatch({ type: A.TRIGGER_EVOLVE });
+    }
+  }, [dispatch]);
+  useWebcam({ enabled: state.webcamEnabled, onMotion });
 
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
@@ -118,11 +188,13 @@ function AppInner() {
           <ErrorBoundary>
             <CanvasPanel />
           </ErrorBoundary>
-          <StimulusPanel />
+          {state.mode === 'live' && <StimulusPanel />}
           <DavisPanel />
         </div>
         <div className="col">
           <LayoutPanel />
+          <EffectsPanel />
+          <LayersPanel />
         </div>
         <div className="col">
           <AssetPoolPanel />
