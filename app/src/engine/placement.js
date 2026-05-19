@@ -3,12 +3,16 @@
 
 import { mkRng } from './prng.js';
 import { aliveCells, stepGrid, createGrid } from './ca-engine.js';
+import { fBm3D } from './noise.js';
 
 /**
  * Compute placement positions for a given layout mode.
  * Returns: [{ x, y, scale, rotation, alpha, colorIndex, zTier }]
  */
-export function computePlacements({ mode, count, seed, scale, rotate, alpha, jitter, density, zTiers, bleed, canvasW, canvasH, caGrid }) {
+export function computePlacements({
+  mode, count, seed, scale, rotate, alpha, jitter, density, zTiers, bleed, canvasW, canvasH, caGrid,
+  displacement = 0, noiseFreq = 0.005, noiseSpeed = 0.5
+}) {
   const rng = mkRng(seed);
   const placements = [];
 
@@ -39,7 +43,17 @@ export function computePlacements({ mode, count, seed, scale, rotate, alpha, jit
       case 'ca':         pos = caPos(i, count, effectiveW, effectiveH, rng, jitter, caGrid); break;
       case 'orbit':      pos = orbitPos(i, count, effectiveW, effectiveH, rng, seed); break;
       case 'abacus':     pos = abacusPos(i, count, effectiveW, effectiveH, rng, seed); break;
+      case 'noise':      pos = gridPos(i, count, effectiveW, effectiveH, rng, jitter); break; // start with grid, then warp!
       default:           pos = randomPos(effectiveW, effectiveH, rng); break;
+    }
+
+    // TSK-14: Fractal Noise Displacement warping
+    if (displacement > 0) {
+      const nt = (seed & 0xffff) * 0.02; // seed acts as stable phase offset
+      const dx = fBm3D(pos.x * noiseFreq, pos.y * noiseFreq, nt, 3) * displacement;
+      const dy = fBm3D(pos.x * noiseFreq + 200, pos.y * noiseFreq + 200, nt + 100, 3) * displacement;
+      pos.x += dx;
+      pos.y += dy;
     }
 
     // Offset back from bleed origin

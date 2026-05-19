@@ -1,5 +1,16 @@
 /* ─── Slider Controls ─── */
 .param-block { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); }
+.param-subheader {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--accent2);
+  padding: 8px 0 4px 0;
+  margin-top: 12px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  text-transform: uppercase;
+}
 .range-row { display: grid; grid-template-columns: 62px 1fr 120px; align-items: center; gap: 6px; min-height: 22px; }
 .range-label { font-size: 9px; letter-spacing: 0.1em; color: var(--dim); }
 .range-readout { font-size: 10px; color: var(--ink); text-align: right; }

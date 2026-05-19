@@ -5,7 +5,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { RangeRow, DualRangeRow } from '../components/RangeRow.jsx';
 import { useCollapse } from '../hooks/useCollapse.js';
-import { LAYOUT_MODES } from '../data/layout-modes.js';
+import { LAYOUT_MODES, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { getPresetsByGroup, getPreset } from '../data/presets.js';
 import * as A from '../state/actions.js';
 
@@ -32,10 +32,18 @@ export function LayoutPanel() {
   // Preset match indicator: how many params differ from preset defaults
   const driftCount = useMemo(() => {
     let n = 0;
-    const keys = ['count', 'jitter', 'density', 'zTiers'];
-    keys.forEach(k => { if (layoutParams[k] !== defaults[k]) n++; });
+    const keys = [
+      'count', 'jitter', 'density', 'zTiers',
+      'noiseFreq', 'noiseSpeed', 'displacement',
+      'particleCount', 'swarmCohesion', 'gravityWells', 'damping'
+    ];
+    keys.forEach(k => {
+      const defVal = defaults[k] !== undefined ? defaults[k] : DEFAULT_LAYOUT_PARAMS[k];
+      if (layoutParams[k] !== defVal) n++;
+    });
     ['scale', 'rotate', 'alpha'].forEach(k => {
-      if (layoutParams[k][0] !== defaults[k][0] || layoutParams[k][1] !== defaults[k][1]) n++;
+      const defVal = defaults[k] !== undefined ? defaults[k] : DEFAULT_LAYOUT_PARAMS[k];
+      if (layoutParams[k][0] !== defVal[0] || layoutParams[k][1] !== defVal[1]) n++;
     });
     return n;
   }, [layoutParams, defaults]);
@@ -60,17 +68,17 @@ export function LayoutPanel() {
               <div className="preset-row">
                 {g.presets.map(p => (
                   <button
-                    key={p.id}
-                    className={`preset-btn ${layoutParams.composition === p.id ? 'active' : ''}`}
-                    onClick={() => applyPreset(p)}
-                    title={p.desc}
+                     key={p.id}
+                     className={`preset-btn ${layoutParams.composition === p.id ? 'active' : ''}`}
+                     onClick={() => applyPreset(p)}
+                     title={p.desc}
                   >
                     {p.name}
                   </button>
                 ))}
               </div>
               </div>
-          ))}
+            ))}
           </div>
 
           {/* Mode tiles */}
@@ -143,6 +151,47 @@ export function LayoutPanel() {
               onChange={v => setParam('zTiers', v)} defaultValue={defaults.zTiers}
               locked={lockedParams.zTiers} onToggleLock={() => toggleLock('zTiers')}
               onRandomize={() => randomizeParam('zTiers')} />
+
+            {/* Turbulence & Displacement */}
+            <div className="param-subheader">🌪️ TURBULENCE & DISPLACEMENT</div>
+
+            <RangeRow label="NOISE FREQ" value={layoutParams.noiseFreq} min={0.001} max={0.03} step={0.001}
+              onChange={v => setParam('noiseFreq', v)} defaultValue={defaults.noiseFreq !== undefined ? defaults.noiseFreq : DEFAULT_LAYOUT_PARAMS.noiseFreq}
+              locked={lockedParams.noiseFreq} onToggleLock={() => toggleLock('noiseFreq')}
+              onRandomize={() => randomizeParam('noiseFreq')} />
+
+            <RangeRow label="NOISE SPEED" value={layoutParams.noiseSpeed} min={0.1} max={3.0} step={0.1}
+              onChange={v => setParam('noiseSpeed', v)} defaultValue={defaults.noiseSpeed !== undefined ? defaults.noiseSpeed : DEFAULT_LAYOUT_PARAMS.noiseSpeed}
+              locked={lockedParams.noiseSpeed} onToggleLock={() => toggleLock('noiseSpeed')}
+              onRandomize={() => randomizeParam('noiseSpeed')} />
+
+            <RangeRow label="DISPLACE" value={layoutParams.displacement} min={0} max={250} step={1}
+              onChange={v => setParam('displacement', v)} defaultValue={defaults.displacement !== undefined ? defaults.displacement : DEFAULT_LAYOUT_PARAMS.displacement}
+              locked={lockedParams.displacement} onToggleLock={() => toggleLock('displacement')}
+              onRandomize={() => randomizeParam('displacement')} />
+
+            {/* Particle Swarm */}
+            <div className="param-subheader">🧬 SWARM PHYSIC FORCES</div>
+
+            <RangeRow label="PARTICLES" value={layoutParams.particleCount} min={10} max={500} step={5}
+              onChange={v => setParam('particleCount', v)} defaultValue={defaults.particleCount !== undefined ? defaults.particleCount : DEFAULT_LAYOUT_PARAMS.particleCount}
+              locked={lockedParams.particleCount} onToggleLock={() => toggleLock('particleCount')}
+              onRandomize={() => randomizeParam('particleCount')} />
+
+            <RangeRow label="COHESION" value={layoutParams.swarmCohesion} min={0} max={5.0} step={0.1}
+              onChange={v => setParam('swarmCohesion', v)} defaultValue={defaults.swarmCohesion !== undefined ? defaults.swarmCohesion : DEFAULT_LAYOUT_PARAMS.swarmCohesion}
+              locked={lockedParams.swarmCohesion} onToggleLock={() => toggleLock('swarmCohesion')}
+              onRandomize={() => randomizeParam('swarmCohesion')} />
+
+            <RangeRow label="GRAVITY" value={layoutParams.gravityWells} min={0} max={5.0} step={0.1}
+              onChange={v => setParam('gravityWells', v)} defaultValue={defaults.gravityWells !== undefined ? defaults.gravityWells : DEFAULT_LAYOUT_PARAMS.gravityWells}
+              locked={lockedParams.gravityWells} onToggleLock={() => toggleLock('gravityWells')}
+              onRandomize={() => randomizeParam('gravityWells')} />
+
+            <RangeRow label="DAMPING" value={layoutParams.damping} min={0.80} max={0.99} step={0.01}
+              onChange={v => setParam('damping', v)} defaultValue={defaults.damping !== undefined ? defaults.damping : DEFAULT_LAYOUT_PARAMS.damping}
+              locked={lockedParams.damping} onToggleLock={() => toggleLock('damping')}
+              onRandomize={() => randomizeParam('damping')} />
           </div>
 
           {/* Toggles */}

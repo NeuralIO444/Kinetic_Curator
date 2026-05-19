@@ -6,7 +6,9 @@ export const LAYOUT_MODES = [
   { id: 'grid',      name: 'grid',       glyph: 'grid'   },
   { id: 'fibonacci', name: 'fibonacci',  glyph: 'phi'    },
   { id: 'radial',    name: 'radial',     glyph: 'rad'    },
-  { id: 'swarm',     name: 'swarm·hype', glyph: 'hype'   },
+  { id: 'swarm',     name: 'swarm boids', glyph: 'swarm'  },
+  { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
+  { id: 'hype',      name: 'swarm·hype', glyph: 'hype'   },
   { id: 'flow',      name: 'flow',       glyph: 'flow'   },
   { id: 'layers',    name: 'layers',     glyph: 'z'      },
   { id: 'rails',     name: 'rails',      glyph: 'rail'   },
@@ -29,4 +31,13 @@ export const DEFAULT_LAYOUT_PARAMS = {
   recolor: true,
   mirror: false,
   overlap: true,
+  
+  // Physics & Turbulence Parameters
+  noiseFreq: 0.005,
+  noiseSpeed: 0.5,
+  displacement: 0,
+  particleCount: 150,
+  swarmCohesion: 1.5,
+  gravityWells: 1.0,
+  damping: 0.95,
 };

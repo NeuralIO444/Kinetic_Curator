@@ -1,7 +1,7 @@
 // CanvasPanel (P01) — live SVG preview
 // Placement logic is in engine/placement.js — this is render-only
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCollapse } from '../hooks/useCollapse.js';
@@ -9,6 +9,10 @@ import { computePlacements } from '../engine/placement.js';
 import { colorForPlacement, resolveColors } from '../engine/color.js';
 import { mkRng } from '../engine/prng.js';
 import { getPreset } from '../data/presets.js';
+import { ParticleSystem } from '../engine/particles.js';
+
+// Instantiate the single-source-of-truth particle engine
+const swarmSystem = new ParticleSystem();
 
 export function CanvasPanel() {
   const { palette, assets, canvasRef, svgRef } = useApp();
@@ -24,8 +28,6 @@ export function CanvasPanel() {
   }));
   const { layoutParams, seed, enabled, evolveMode, beatPulse, audioBands, motionSmoothing, caGrid } = state;
   const { open, toggle } = useCollapse(true);
-
-  // U14: Drag-resize canvas removed (Canvas occupies full column height)
 
   // U12: Scroll-to-Zoom & Drag-to-Pan
   const [zoom, setZoom] = useState(1);
@@ -73,6 +75,75 @@ export function CanvasPanel() {
     [assets, enabled],
   );
 
+  // Local frame count tick for 60fps swarm triggers
+  const [tick, setTick] = useState(0);
+  const attractorRef = useRef(null);
+
+  // Sync physics update tick loop strictly when mode is swarm
+  useEffect(() => {
+    if (layoutParams.mode !== 'swarm') return;
+
+    swarmSystem.init(
+      layoutParams.particleCount || 150,
+      canvasW,
+      canvasH,
+      activeAssets,
+      palette,
+      seed
+    );
+
+    let animId;
+    const step = () => {
+      swarmSystem.update(
+        layoutParams,
+        activeAssets,
+        palette,
+        seed,
+        Date.now(),
+        attractorRef.current
+      );
+      setTick(t => t + 1);
+      animId = requestAnimationFrame(step);
+    };
+
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [layoutParams.mode, activeAssets, palette, seed]);
+
+  // Pointer Attraction Gravity Coordinates Tracking
+  const handlePointerMove = (e) => {
+    if (canvasDragRef.current.active) return;
+    const svgEl = e.currentTarget;
+    const rect = svgEl.getBoundingClientRect();
+    const scaleX = canvasW / rect.width;
+    const scaleY = canvasH / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
+    // Correct zoom and pan transforms to resolve cursor coordinates accurately
+    const unpanX = (x - pan.x) / zoom;
+    const unpanY = (y - pan.y) / zoom;
+    
+    attractorRef.current = { x: unpanX, y: unpanY };
+  };
+
+  const handlePointerLeave = () => {
+    attractorRef.current = null;
+  };
+
+  const onCanvasPointerMoveCombined = (e) => {
+    if (canvasDragRef.current.active) {
+      onCanvasPointerMove(e);
+    } else {
+      handlePointerMove(e);
+    }
+  };
+
+  const onCanvasPointerUpCombined = (e) => {
+    attractorRef.current = null;
+    onCanvasPointerUp(e);
+  };
+
   const placements = useMemo(() => {
     if (activeAssets.length === 0) return [];
     return computePlacements({
@@ -89,6 +160,9 @@ export function CanvasPanel() {
       canvasW,
       canvasH,
       caGrid: layoutParams.mode === 'ca' ? caGrid : null,
+      displacement: layoutParams.displacement,
+      noiseFreq: layoutParams.noiseFreq,
+      noiseSpeed: layoutParams.noiseSpeed,
     });
   }, [activeAssets.length, layoutParams, seed, canvasW, canvasH, caGrid]);
 
@@ -125,6 +199,31 @@ export function CanvasPanel() {
     return mapped;
   }, [placements, activeAssets, palette.swatches, preset.paletteShift, seed, layoutParams.overlap, layoutParams.mirror, canvasW]);
 
+  // Dynamic selector for items mapping based on active layout modes
+  const renderItems = useMemo(() => {
+    if (layoutParams.mode === 'swarm') {
+      let swarmItems = swarmSystem.getItems(activeAssets);
+      
+      // Apply z-sorting when overlap is OFF
+      if (!layoutParams.overlap) {
+        swarmItems = [...swarmItems].sort((a, b) => a.scale - b.scale);
+      }
+      
+      // Apply mirror reflections if enabled
+      if (layoutParams.mirror) {
+        const mirrored = swarmItems.map(item => ({
+          ...item,
+          x: canvasW - item.x,
+          rotation: -item.rotation,
+          _mirrored: true,
+        }));
+        swarmItems = [...swarmItems, ...mirrored];
+      }
+      return swarmItems;
+    }
+    return items;
+  }, [layoutParams.mode, items, activeAssets, layoutParams.overlap, layoutParams.mirror, tick]);
+
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
       <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · ${activeAssets.length} assets`} collapsed={!open} onToggle={toggle}>
@@ -145,28 +244,29 @@ export function CanvasPanel() {
           <svg className="canvas-svg" ref={svgRef} viewBox={`0 0 ${canvasW} ${canvasH}`} xmlns="http://www.w3.org/2000/svg"
             onWheel={onCanvasWheel}
             onPointerDown={onCanvasPointerDown}
-            onPointerMove={onCanvasPointerMove}
-            onPointerUp={onCanvasPointerUp}
-            onPointerCancel={onCanvasPointerUp}
+            onPointerMove={onCanvasPointerMoveCombined}
+            onPointerUp={onCanvasPointerUpCombined}
+            onPointerCancel={onCanvasPointerUpCombined}
+            onPointerLeave={handlePointerLeave}
           >
             <g transform={`translate(${canvasW/2}, ${canvasH/2}) scale(${zoom}) translate(${-canvasW/2}, ${-canvasH/2}) translate(${pan.x/zoom}, ${pan.y/zoom})`}>
-              {items.map((item, i) => {
-              const ink = item.color;
-              const accent = palette.swatches[(palette.swatches.indexOf(ink) + 3) % palette.swatches.length] || palette.swatches[0];
-              const svgStr = resolveColors(item.asset.svg, ink, accent);
-              return (
-                <g
-                  key={i}
-                  transform={`translate(${item.x}, ${item.y}) scale(${item._mirrored ? -item.scale : item.scale}, ${item.scale}) rotate(${item.rotation})`}
-                  opacity={item.alpha / 100}
-                  style={{
-                    transition: motionSmoothing ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease' : 'none',
-                    transformOrigin: '0 0',
-                  }}
-                  dangerouslySetInnerHTML={{ __html: svgStr }}
-                />
-              );
-            })}
+              {renderItems.map((item, i) => {
+                const ink = item.color;
+                const accent = palette.swatches[(palette.swatches.indexOf(ink) + 3) % palette.swatches.length] || palette.swatches[0];
+                const svgStr = resolveColors(item.asset.svg, ink, accent);
+                return (
+                  <g
+                    key={i}
+                    transform={`translate(${item.x}, ${item.y}) scale(${item._mirrored ? -item.scale : item.scale}, ${item.scale}) rotate(${item.rotation})`}
+                    opacity={item.alpha / 100}
+                    style={{
+                      transition: motionSmoothing && layoutParams.mode !== 'swarm' ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease' : 'none',
+                      transformOrigin: '0 0',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: svgStr }}
+                  />
+                );
+              })}
             </g>
           </svg>
           <span className="canvas-corner tl">0,0</span>
