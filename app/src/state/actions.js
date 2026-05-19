@@ -16,8 +16,8 @@ export const SET_LAYOUT_PARAMS = 'SET_LAYOUT_PARAMS';
 export const APPLY_PRESET      = 'APPLY_PRESET';
 
 // ── Asset pool ───────────────────────────────────────────────
-export const TOGGLE_ASSET    = 'TOGGLE_ASSET';
-export const SET_ENABLED     = 'SET_ENABLED';
+export const TOGGLE_ASSET      = 'TOGGLE_ASSET';
+export const TOGGLE_ALL_ASSETS = 'TOGGLE_ALL_ASSETS';
 export const SET_SEARCH      = 'SET_SEARCH';
 export const SET_CAT_FILTER  = 'SET_CAT_FILTER';
 export const SET_POOL_VIEW   = 'SET_POOL_VIEW';
@@ -32,12 +32,7 @@ export const SET_AUDIO_BANDS     = 'SET_AUDIO_BANDS';
 export const SET_AUDIO_GAIN      = 'SET_AUDIO_GAIN';
 export const SET_AUDIO_SOURCE    = 'SET_AUDIO_SOURCE';
 export const SET_AUDIO_MONITOR   = 'SET_AUDIO_MONITOR';
-export const SET_WEBCAM_ADJUST   = 'SET_WEBCAM_ADJUST';
-export const SET_WEBCAM_MIRROR   = 'SET_WEBCAM_MIRROR';
 
-// ── Routes ───────────────────────────────────────────────────
-export const SET_ROUTE       = 'SET_ROUTE';
-export const SET_ROUTES      = 'SET_ROUTES';
 
 // ── Davis mode & Global View ───────────────────────────────────
 export const SET_EVOLVE_MODE     = 'SET_EVOLVE_MODE';
@@ -64,3 +59,7 @@ export const SET_MOTION_SMOOTHING = 'SET_MOTION_SMOOTHING';
 export const TOGGLE_PARAM_LOCK      = 'TOGGLE_PARAM_LOCK';
 export const RANDOMIZE_PARAM        = 'RANDOMIZE_PARAM';
 export const RANDOMIZE_UNLOCKED     = 'RANDOMIZE_UNLOCKED';
+
+// ── Cellular Automaton ───────────────────────────────────────
+export const STEP_CA_GRID    = 'STEP_CA_GRID';
+export const RESET_CA_GRID   = 'RESET_CA_GRID';

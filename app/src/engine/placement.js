@@ -6,35 +6,58 @@ import { aliveCells, stepGrid, createGrid } from './ca-engine.js';
 
 /**
  * Compute placement positions for a given layout mode.
- * Returns: [{ x, y, scale, rotation, alpha, colorIndex }]
+ * Returns: [{ x, y, scale, rotation, alpha, colorIndex, zTier }]
  */
-export function computePlacements({ mode, count, seed, scale, rotate, alpha, jitter, density, canvasW, canvasH, caGrid }) {
+export function computePlacements({ mode, count, seed, scale, rotate, alpha, jitter, density, zTiers, bleed, canvasW, canvasH, caGrid }) {
   const rng = mkRng(seed);
   const placements = [];
 
+  // Bleed extends bounds by 20% on each side
+  const bx = bleed ? canvasW * 0.2 : 0;
+  const by = bleed ? canvasH * 0.2 : 0;
+  const effectiveW = canvasW + bx * 2;
+  const effectiveH = canvasH + by * 2;
+
+  const tiers = Math.max(1, zTiers || 1);
+
   for (let i = 0; i < count; i++) {
     const t = count > 1 ? i / (count - 1) : 0.5;
+
+    // FG-03: density acts as a probability gate — skip placements to thin out
+    if (density < 100 && rng() * 100 > density) continue;
+
     let pos;
 
     switch (mode) {
-      case 'grid':      pos = gridPos(i, count, canvasW, canvasH, rng, jitter); break;
-      case 'fibonacci':  pos = fibPos(i, count, canvasW, canvasH, rng, jitter); break;
-      case 'radial':     pos = radialPos(i, count, canvasW, canvasH, rng, jitter); break;
-      case 'swarm':      pos = swarmPos(i, count, canvasW, canvasH, rng, jitter); break;
-      case 'flow':       pos = flowPos(i, count, canvasW, canvasH, rng, jitter); break;
-      case 'layers':     pos = layerPos(i, count, canvasW, canvasH, rng, jitter); break;
-      case 'rails':      pos = railsPos(i, count, canvasW, canvasH, rng, jitter); break;
-      case 'ca':         pos = caPos(i, count, canvasW, canvasH, rng, jitter, caGrid); break;
-      case 'orbit':      pos = orbitPos(i, count, canvasW, canvasH, rng, seed); break;
-      case 'abacus':     pos = abacusPos(i, count, canvasW, canvasH, rng, seed); break;
-      default:           pos = randomPos(canvasW, canvasH, rng); break;
+      case 'grid':      pos = gridPos(i, count, effectiveW, effectiveH, rng, jitter); break;
+      case 'fibonacci':  pos = fibPos(i, count, effectiveW, effectiveH, rng, jitter); break;
+      case 'radial':     pos = radialPos(i, count, effectiveW, effectiveH, rng, jitter); break;
+      case 'swarm':      pos = swarmPos(i, count, effectiveW, effectiveH, rng, jitter); break;
+      case 'flow':       pos = flowPos(i, count, effectiveW, effectiveH, rng, jitter); break;
+      case 'layers':     pos = layerPos(i, count, effectiveW, effectiveH, rng, jitter); break;
+      case 'rails':      pos = railsPos(i, count, effectiveW, effectiveH, rng, jitter); break;
+      case 'ca':         pos = caPos(i, count, effectiveW, effectiveH, rng, jitter, caGrid); break;
+      case 'orbit':      pos = orbitPos(i, count, effectiveW, effectiveH, rng, seed); break;
+      case 'abacus':     pos = abacusPos(i, count, effectiveW, effectiveH, rng, seed); break;
+      default:           pos = randomPos(effectiveW, effectiveH, rng); break;
     }
 
-    const s = lerp(scale[0], scale[1], rng());
+    // Offset back from bleed origin
+    if (bleed) {
+      pos.x -= bx;
+      pos.y -= by;
+    }
+
+    // FG-03: zTier assignment — distributes placements across depth tiers
+    const zTier = i % tiers;
+    // Rear tiers (0) scale down, front tiers (N-1) scale up
+    const depthFactor = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
+
+    const s = lerp(scale[0], scale[1], rng()) * depthFactor;
     const r = lerp(rotate[0], rotate[1], rng());
     const a = lerp(alpha[0], alpha[1], rng());
 
-    placements.push({ ...pos, scale: s, rotation: r, alpha: a, index: i, t });
+    placements.push({ ...pos, scale: s, rotation: r, alpha: a, index: i, t, zTier });
   }
 
   return placements;

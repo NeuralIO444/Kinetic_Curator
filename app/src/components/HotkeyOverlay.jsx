@@ -1,11 +1,11 @@
-// HotkeyOverlay — keyboard shortcut cheat sheet triggered by '?'
-import { useState } from 'react';
-import { useHotkeys } from '../hooks/useHotkeys.js';
+// HotkeyOverlay — keyboard shortcut cheat sheet
+// BUG-08 fix: controlled component — parent manages visibility via '?' hotkey
 
 const SHORTCUTS = [
   { key: 'SPACE', desc: 'Play / Pause' },
   { key: 'S', desc: 'Snapshot current frame' },
   { key: 'F', desc: 'Favorite current seed' },
+  { key: 'f', desc: 'Toggle fullscreen' },
   { key: 'E', desc: 'Toggle evolve mode' },
   { key: 'N', desc: 'New random seed' },
   { key: '⌘Z', desc: 'Undo last change' },
@@ -13,21 +13,15 @@ const SHORTCUTS = [
   { key: '?', desc: 'Toggle this overlay' },
 ];
 
-export function HotkeyOverlay() {
-  const [show, setShow] = useState(false);
-
-  useHotkeys({
-    '?': () => setShow(s => !s),
-  });
-
+export function HotkeyOverlay({ show, onClose }) {
   if (!show) return null;
 
   return (
-    <div className="hotkey-overlay" onClick={() => setShow(false)}>
+    <div className="hotkey-overlay" onClick={onClose}>
       <div className="hotkey-card" onClick={e => e.stopPropagation()}>
         <div className="hotkey-card-header">
           <span>⌨ KEYBOARD SHORTCUTS</span>
-          <button className="micro-btn" onClick={() => setShow(false)}>✕</button>
+          <button className="micro-btn" onClick={onClose}>✕</button>
         </div>
         <div className="hotkey-list">
           {SHORTCUTS.map(s => (

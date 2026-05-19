@@ -1,5 +1,4 @@
 // Shared PanelHeader component — panel chrome used by all 7 panels
-import { useCollapse } from '../hooks/useCollapse.js';
 
 export function PanelHeader({ tag, title, subtitle, collapsed, onToggle, children }) {
   const isCollapsible = typeof onToggle === 'function';

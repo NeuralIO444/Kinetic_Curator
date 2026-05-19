@@ -1,6 +1,6 @@
 // App.jsx — thin layout shell
 // All state lives in AppContext. Panels self-subscribe via useApp().
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
 import { CanvasPanel } from './panels/CanvasPanel.jsx';
@@ -13,6 +13,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
 import { useAudioInput } from './hooks/useAudioInput.js';
+import { useColumnResize } from './hooks/useColumnResize.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
@@ -37,6 +38,9 @@ function AppInner() {
     enabled: s.enabledAssets,
     isFullscreen: s.isFullscreen,
   }));
+
+  // BUG-08 fix: hotkey overlay state lifted here — single useHotkeys registration
+  const [showHotkeys, setShowHotkeys] = useState(false);
 
   // Reference for stable callbacks
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
@@ -88,6 +92,7 @@ function AppInner() {
     ' ': () => dispatch({ type: A.SET_RUNNING, payload: !state.running }),
     // Undo / Redo (Cmd+Z / Cmd+Shift+Z)
     'z': (e) => { if (e.metaKey || e.ctrlKey) { e.shiftKey ? history.redo() : history.undo(); } },
+    '?': () => setShowHotkeys(s => !s),
   });
 
   // Audio input → stimulus state (B7: proper rAF lifecycle)
@@ -109,23 +114,27 @@ function AppInner() {
     onBeat 
   });
 
+  // Draggable column dividers (2-column layout: Canvas on left, all other panels on right)
+  const { containerRef, gridTemplate, dividerProps } = useColumnResize(
+    2, [0.62, 0.38], 300
+  );
+
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
       <MasterBar />
-      <HotkeyOverlay />
-      <div className="grid">
-        <div className="col">
+      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} />
+      <div className="grid" ref={containerRef} style={{ gridTemplateColumns: gridTemplate }}>
+        <div className="col col-canvas">
           <ErrorBoundary>
             <CanvasPanel />
           </ErrorBoundary>
+        </div>
+        <div className="col-divider" {...dividerProps(0)} />
+        <div className="col col-panels">
+          <LayoutPanel />
+          <AssetPoolPanel />
           <StimulusPanel />
           <DavisPanel />
-        </div>
-        <div className="col">
-          <LayoutPanel />
-        </div>
-        <div className="col">
-          <AssetPoolPanel />
           <OutputPanel />
         </div>
       </div>

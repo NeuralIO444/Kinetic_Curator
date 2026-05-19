@@ -81,7 +81,7 @@ export function LayoutPanel() {
                 className={`mode-tile ${layoutParams.mode === m.id ? 'active' : ''}`}
                 onClick={() => setParam('mode', m.id)}
               >
-                <span style={{ fontSize: '14px' }}>{m.glyph}</span>
+                <span style={{ fontSize: '11px' }}>{m.glyph}</span>
                 {m.name}
               </button>
             ))}

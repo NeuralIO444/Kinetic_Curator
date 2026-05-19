@@ -1,12 +1,12 @@
 // CanvasPanel (P01) — live SVG preview
 // Placement logic is in engine/placement.js — this is render-only
 
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCollapse } from '../hooks/useCollapse.js';
 import { computePlacements } from '../engine/placement.js';
-import { colorForPlacement } from '../engine/color.js';
+import { colorForPlacement, resolveColors } from '../engine/color.js';
 import { mkRng } from '../engine/prng.js';
 import { getPreset } from '../data/presets.js';
 
@@ -20,29 +20,12 @@ export function CanvasPanel() {
     beatPulse: s.beatPulse,
     audioBands: s.audioBands,
     motionSmoothing: s.motionSmoothing,
+    caGrid: s.caGrid,
   }));
-  const { layoutParams, seed, enabled, evolveMode, beatPulse, audioBands, motionSmoothing } = state;
+  const { layoutParams, seed, enabled, evolveMode, beatPulse, audioBands, motionSmoothing, caGrid } = state;
   const { open, toggle } = useCollapse(true);
 
-  // U14: Drag-resize canvas
-  const [canvasHeight, setCanvasHeight] = useState(480);
-  const dragRef = useRef({ active: false, startY: 0, startH: 0 });
-
-  const onPointerDown = (e) => {
-    dragRef.current = { active: true, startY: e.clientY, startH: canvasHeight };
-    e.target.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e) => {
-    if (!dragRef.current.active) return;
-    const delta = e.clientY - dragRef.current.startY;
-    setCanvasHeight(Math.max(200, Math.min(1200, dragRef.current.startH + delta)));
-  };
-
-  const onPointerUp = (e) => {
-    dragRef.current.active = false;
-    e.target.releasePointerCapture(e.pointerId);
-  };
+  // U14: Drag-resize canvas removed (Canvas occupies full column height)
 
   // U12: Scroll-to-Zoom & Drag-to-Pan
   const [zoom, setZoom] = useState(1);
@@ -101,25 +84,46 @@ export function CanvasPanel() {
       alpha: layoutParams.alpha,
       jitter: layoutParams.jitter,
       density: layoutParams.density,
+      zTiers: layoutParams.zTiers,
+      bleed: layoutParams.bleed,
       canvasW,
       canvasH,
-      caGrid: null, // CA grid managed separately
+      caGrid: layoutParams.mode === 'ca' ? caGrid : null,
     });
-  }, [activeAssets.length, layoutParams, seed, canvasW, canvasH]);
+  }, [activeAssets.length, layoutParams, seed, canvasW, canvasH, caGrid]);
 
-  // Assign assets + colors to each placement
-  const rng = mkRng(seed + 1);
-  const items = placements.map((p, i) => {
-    const asset = activeAssets[i % activeAssets.length];
-    const color = colorForPlacement({
-      swatches: palette.swatches,
-      strategy: preset.paletteShift || 'band',
-      t: p.t,
-      index: p.index,
-      rng: () => rng(),
+  // BUG-04 fix: memoize rng + item mapping so it's deterministic across renders
+  const items = useMemo(() => {
+    const rng = mkRng(seed + 1);
+    let mapped = placements.map((p, i) => {
+      const asset = activeAssets[i % activeAssets.length];
+      const color = colorForPlacement({
+        swatches: palette.swatches,
+        strategy: preset.paletteShift || 'band',
+        t: p.t,
+        index: p.index,
+        rng: () => rng(),
+      });
+      return { ...p, asset, color };
     });
-    return { ...p, asset, color };
-  });
+
+    // FG-01: overlap — when OFF, sort by scale (ascending) for depth ordering
+    if (!layoutParams.overlap) {
+      mapped = [...mapped].sort((a, b) => a.scale - b.scale);
+    }
+
+    // FG-01: mirror — duplicate every item reflected around canvas center X
+    if (layoutParams.mirror) {
+      const mirrored = mapped.map(item => ({
+        ...item,
+        x: canvasW - item.x,
+        _mirrored: true,
+      }));
+      mapped = [...mapped, ...mirrored];
+    }
+
+    return mapped;
+  }, [placements, activeAssets, palette.swatches, preset.paletteShift, seed, layoutParams.overlap, layoutParams.mirror, canvasW]);
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
@@ -135,7 +139,7 @@ export function CanvasPanel() {
         </div>
       </PanelHeader>
       {open && (
-        <div className={`canvas-wrap ${bgMode === 'transparent' ? 'checkerboard' : ''}`} ref={canvasRef} style={{ height: canvasHeight }}>
+        <div className={`canvas-wrap ${bgMode === 'transparent' ? 'checkerboard' : ''}`} ref={canvasRef}>
           <div className="canvas-bg" style={bgStyle} />
           <div className="canvas-rulers" />
           <svg className="canvas-svg" ref={svgRef} viewBox={`0 0 ${canvasW} ${canvasH}`} xmlns="http://www.w3.org/2000/svg"
@@ -149,11 +153,11 @@ export function CanvasPanel() {
               {items.map((item, i) => {
               const ink = item.color;
               const accent = palette.swatches[(palette.swatches.indexOf(ink) + 3) % palette.swatches.length] || palette.swatches[0];
-              const svgStr = item.asset.svg.replace(/var\(--ink\)/g, ink).replace(/var\(--accent\)/g, accent);
+              const svgStr = resolveColors(item.asset.svg, ink, accent);
               return (
                 <g
                   key={i}
-                  transform={`translate(${item.x}, ${item.y}) scale(${item.scale}) rotate(${item.rotation})`}
+                  transform={`translate(${item.x}, ${item.y}) scale(${item._mirrored ? -item.scale : item.scale}, ${item.scale}) rotate(${item.rotation})`}
                   opacity={item.alpha / 100}
                   style={{
                     transition: motionSmoothing ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease' : 'none',
@@ -169,16 +173,6 @@ export function CanvasPanel() {
           <span className="canvas-corner tr">{layoutParams.mode}</span>
           <span className="canvas-corner bl">{preset.name}</span>
           <span className="canvas-corner br">{canvasW}×{canvasH}</span>
-          
-          {/* Resize handle */}
-          <div className="canvas-resize-handle"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-          >
-            <div className="resize-grip"></div>
-          </div>
         </div>
       )}
     </div>

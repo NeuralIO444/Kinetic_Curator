@@ -69,16 +69,16 @@ export function DavisPanel() {
             <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
           </div>
 
-          <div className="davis-interval-row" style={{ marginTop: '8px' }}>
+          <div className="davis-interval-row" style={{ marginTop: '4px' }}>
             <span className="davis-label">AUTO-SNAP</span>
             <input type="checkbox" checked={autoSnapshot} onChange={e => dispatch({ type: A.SET_AUTO_SNAPSHOT, payload: e.target.checked })} />
-            <span className="davis-readout" style={{ fontSize: '9px', opacity: 0.6 }}>(saves PNG on evolve)</span>
+            <span className="davis-readout" style={{ fontSize: '8px', opacity: 0.6 }}>(PNG on evolve)</span>
           </div>
 
-          <div className="davis-interval-row" style={{ marginTop: '8px' }}>
+          <div className="davis-interval-row" style={{ marginTop: '4px' }}>
             <span className="davis-label">SMOOTHING</span>
             <input type="checkbox" checked={motionSmoothing} onChange={e => dispatch({ type: A.SET_MOTION_SMOOTHING, payload: e.target.checked })} />
-            <span className="davis-readout" style={{ fontSize: '9px', opacity: 0.6 }}>(fluid CSS transitions)</span>
+            <span className="davis-readout" style={{ fontSize: '8px', opacity: 0.6 }}>(CSS transitions)</span>
           </div>
 
           <div className="davis-actions">

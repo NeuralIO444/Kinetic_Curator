@@ -5,11 +5,8 @@ import * as A from './actions.js';
 import { PALETTES } from '../data/palettes.js';
 import { ASSETS } from '../data/assets/index.js';
 
-const mockHistory = {
-  undo: () => {}, redo: () => {}, canUndo: false, canRedo: false, undoDepth: 0, redoDepth: 0,
-};
-
 const RefsContext = createContext({});
+const _emptySelector = () => null;
 
 export function AppProvider({ children }) {
   const canvasRef = useRef(null);
@@ -28,8 +25,25 @@ export function useApp(selector) {
   // Use a separate subscription for paletteId to ensure 'palette' is always reactive
   const paletteId = useStore(s => s.paletteId);
   
+  // Real reactive history subscriptions
+  const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
+  const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
+  const undo = useStore(s => s.undo);
+  const redo = useStore(s => s.redo);
+  
+  const history = {
+    undo,
+    redo,
+    canUndo: undoStackLength > 0,
+    canRedo: redoStackLength > 0,
+    undoDepth: undoStackLength,
+    redoDepth: redoStackLength,
+  };
+  
   // Main state subscription (selective)
-  const state = useStore(useShallow(selector || (s => s)));
+  // BUG-02 fix: when no selector is provided, use a no-op selector to avoid
+  // subscribing to the entire store (which caused 60fps re-renders from audio).
+  const state = useStore(useShallow(selector || _emptySelector));
 
   const dispatch = useCallback((action) => {
     const store = useStore.getState();
@@ -77,6 +91,8 @@ export function useApp(selector) {
       case A.REMOVE_FAVORITE: return store.removeFavorite(action.index);
       case A.RECALL_FAVORITE: return store.recallFavorite(action.favorite);
       case A.SET_MOTION_SMOOTHING: return store.setMotionSmoothing(payload);
+      case A.STEP_CA_GRID: return store.stepCaGrid();
+      case A.RESET_CA_GRID: return store.resetCaGrid();
       default: console.warn('Unhandled action:', type);
     }
   }, []);
@@ -84,5 +100,5 @@ export function useApp(selector) {
   // Derived state (reactive)
   const palette = PALETTES.find(p => p.id === paletteId) || PALETTES[0];
 
-  return { state, dispatch, history: mockHistory, palette, palettes: PALETTES, assets: ASSETS, ...refs };
+  return { state, dispatch, history, palette, palettes: PALETTES, assets: ASSETS, ...refs };
 }

@@ -63,8 +63,8 @@ export function StimulusPanel() {
             </button>
           </div>
 
-          <div style={{ padding: '8px', border: '1px solid var(--line-2)', marginBottom: '8px', background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <span style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em' }}>AUDIO SRC</span>
               <button 
                 className={`micro-btn ${audioMonitor ? 'active' : ''}`} 
@@ -78,17 +78,17 @@ export function StimulusPanel() {
             <select 
               value={audioSource.type === 'device' ? audioSource.id : 'file'} 
               onChange={handleDeviceChange}
-              style={{ width: '100%', marginBottom: '8px', background: 'var(--panel)', color: 'var(--ink)', border: '1px solid var(--line)', padding: '4px', fontSize: '11px' }}
+              style={{ width: '100%', marginBottom: '6px', background: 'var(--panel)', color: 'var(--ink)', border: '1px solid var(--line)', padding: '3px', fontSize: '10px' }}
             >
               <option value="default">Default Mic</option>
               {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 5)}...`}</option>)}
               {audioSource.type === 'file' && <option value="file">File: {audioSource.name}</option>}
             </select>
 
-            <input type="file" accept="audio/*" onChange={handleFileChange} style={{ fontSize: '10px', color: 'var(--dim)', width: '100%' }} />
+            <input type="file" accept="audio/*" onChange={handleFileChange} style={{ fontSize: '9px', color: 'var(--dim)', width: '100%' }} />
             
-            <div style={{ marginTop: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '4px' }}>
+            <div style={{ marginTop: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '3px' }}>
                 <span>GAIN</span>
                 <span>{audioGain.toFixed(2)}x</span>
               </div>
@@ -103,7 +103,7 @@ export function StimulusPanel() {
 
           <div className="stim-meters">
             <MeterRow label="MOTION" value={motionEnergy} color="#00ff88" />
-            <div style={{ height: '8px' }} />
+            <div style={{ height: '4px' }} />
             <WaveformMeter audioBands={audioBands} beatPulse={beatPulse} />
           </div>
         </div>

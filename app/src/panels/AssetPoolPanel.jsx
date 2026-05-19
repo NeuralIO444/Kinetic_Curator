@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCollapse } from '../hooks/useCollapse.js';
+import { usePanelResize } from '../hooks/usePanelResize.js';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import * as A from '../state/actions.js';
 
@@ -16,6 +17,7 @@ export function AssetPoolPanel() {
   }));
   const { enabled, search, catFilter, poolView } = state;
   const { open, toggle } = useCollapse(false);
+  const { height, handleProps } = usePanelResize(320, { min: 120, max: 600 });
 
   const filtered = useMemo(() => {
     let list = assets;
@@ -42,7 +44,7 @@ export function AssetPoolPanel() {
   const enabledCount = Object.values(enabled).filter(Boolean).length;
 
   return (
-    <div className="panel panel-pool">
+    <div className="panel panel-pool" style={open ? { height, maxHeight: 'none' } : undefined}>
       <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active`} collapsed={!open} onToggle={toggle}>
         <div className="header-tools">
           <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} onClick={() => dispatch({ type: A.SET_POOL_VIEW, payload: 'grid' })}>GRID</button>
@@ -66,6 +68,10 @@ export function AssetPoolPanel() {
                   </button>
                 );
               })}
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                <button className="chip-btn" onClick={() => dispatch({ type: A.TOGGLE_ALL_ASSETS, payload: true })}>ALL ON</button>
+                <button className="chip-btn" onClick={() => dispatch({ type: A.TOGGLE_ALL_ASSETS, payload: false })}>ALL OFF</button>
+              </span>
             </div>
             <div className="pool-search">
               <span className="prompt">⟩</span>
@@ -78,7 +84,7 @@ export function AssetPoolPanel() {
               {filtered.map(a => (
                 <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}`}>
                   <button className="tile-toggle" onClick={() => dispatch({ type: A.TOGGLE_ASSET, id: a.id })}>
-                    <svg className="tile-svg" viewBox="0 0 100 100" width="48" height="48"
+                    <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40"
                       dangerouslySetInnerHTML={{ __html: a.svg }} />
                   </button>
                   <div className="tile-meta">
@@ -88,6 +94,9 @@ export function AssetPoolPanel() {
                 </div>
               ))}
             </div>
+          </div>
+          <div className="panel-resize-handle" {...handleProps}>
+            <div className="resize-grip"></div>
           </div>
         </>
       )}

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 export function WaveformMeter({ audioBands, beatPulse }) {
   const canvasRef = useRef(null);
-  const historyRef = useRef(new Array(100).fill({ bass: 0, mid: 0, treble: 0, rms: 0 }));
+  const historyRef = useRef(Array.from({ length: 100 }, () => ({ bass: 0, mid: 0, treble: 0, rms: 0 })));
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -62,9 +62,9 @@ export function WaveformMeter({ audioBands, beatPulse }) {
 
   return (
     <div className={`waveform-wrap ${beatPulse > 0.5 ? 'beat-flash' : ''}`} style={{
-      width: '100%', height: '80px', border: '1px solid var(--line-2)', position: 'relative', overflow: 'hidden', background: '#0a0a0a', transition: 'box-shadow 0.1s'
+      width: '100%', height: '60px', border: '1px solid var(--line-2)', position: 'relative', overflow: 'hidden', background: '#0a0a0a', transition: 'box-shadow 0.1s'
     }}>
-      <canvas ref={canvasRef} width={300} height={80} style={{ width: '100%', height: '100%' }} />
+      <canvas ref={canvasRef} width={300} height={60} style={{ width: '100%', height: '100%' }} />
       <div style={{ position: 'absolute', top: 4, left: 4, display: 'flex', gap: '8px', fontSize: '9px', letterSpacing: '0.1em' }}>
         <span style={{ color: '#ff2d6f' }}>BASS</span>
         <span style={{ color: '#ffd400' }}>MID</span>
