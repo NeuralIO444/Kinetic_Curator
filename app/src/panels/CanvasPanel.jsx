@@ -1,5 +1,5 @@
 // CanvasPanel (P01) — live SVG preview
-// Assets via <symbol>+<use>; quality caps from store
+// Assets via <symbol>+<use>; quality caps; synthesizer audio modulation
 
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
@@ -28,8 +28,12 @@ export function CanvasPanel() {
     motionSmoothing: s.motionSmoothing,
     caGrid: s.caGrid,
     quality: s.quality,
+    running: s.running,
   }));
-  const { layoutParams, seed, enabled, evolveMode, motionSmoothing, caGrid, quality } = state;
+  const {
+    layoutParams, seed, enabled, evolveMode, beatPulse, audioBands,
+    motionSmoothing, caGrid, quality, running,
+  } = state;
   const { open, toggle } = useCollapse(true);
 
   const caps = getQualityCaps(quality || 'balanced');
@@ -37,6 +41,19 @@ export function CanvasPanel() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const canvasDragRef = useRef({ active: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
+
+  // Continuous time for subtle breathing when running
+  const [lifeT, setLifeT] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    let id;
+    const step = (now) => {
+      setLifeT(now * 0.001);
+      id = requestAnimationFrame(step);
+    };
+    id = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(id);
+  }, [running]);
 
   const onCanvasWheel = (e) => {
     const z = Math.max(0.1, Math.min(10, zoom - e.deltaY * 0.0015));
@@ -78,10 +95,44 @@ export function CanvasPanel() {
     [assets, enabled],
   );
 
-  // Quality-aware soft clamp
   const maxForMirror = layoutParams.mirror ? caps.maxCountMirrored : caps.maxCount;
   const safeCount = Math.min(Math.max(1, layoutParams.count), maxForMirror);
   const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
+
+  // ── Synthesizer modulation ──
+  const depth = layoutParams.audioModDepth ?? 0.65;
+  const scaleModAmt = layoutParams.audioScaleMod ?? 0.45;
+  const alphaModAmt = layoutParams.audioAlphaMod ?? 0.25;
+
+  const bands = audioBands || { bass: 0, mid: 0, treble: 0, rms: 0 };
+  const pulse = beatPulse || 0;
+
+  // Live scale multiplier from beat + bass/rms
+  const scaleMul = 1 + (
+    pulse * 0.38 * scaleModAmt +
+    (bands.bass * 0.55 + bands.rms * 0.35) * 0.28 * depth
+  ) * depth;
+
+  // Live alpha boost from beat
+  const alphaBoost = pulse * 18 * alphaModAmt * depth;
+
+  // Root breathing (always subtle when running)
+  const breathScale = 1 + Math.sin(lifeT * 0.8) * 0.012 * (layoutParams.lifeDrift ?? 0.35)
+    + pulse * 0.035 * depth;
+  const breathRot = Math.sin(lifeT * 0.35) * 0.6 * (layoutParams.lifeDrift ?? 0.35);
+
+  const effectiveScale = useMemo(() => {
+    const [lo, hi] = layoutParams.scale;
+    return [lo * scaleMul, hi * scaleMul];
+  }, [layoutParams.scale, scaleMul]);
+
+  const effectiveAlpha = useMemo(() => {
+    const [lo, hi] = layoutParams.alpha;
+    return [
+      Math.min(100, lo + alphaBoost * 0.4),
+      Math.min(100, hi + alphaBoost),
+    ];
+  }, [layoutParams.alpha, alphaBoost]);
 
   const [tick, setTick] = useState(0);
   const attractorRef = useRef(null);
@@ -128,9 +179,9 @@ export function CanvasPanel() {
       mode: layoutParams.mode,
       count: safeCount,
       seed,
-      scale: layoutParams.scale,
+      scale: effectiveScale,
       rotate: layoutParams.rotate,
-      alpha: layoutParams.alpha,
+      alpha: effectiveAlpha,
       jitter: layoutParams.jitter,
       density: layoutParams.density,
       zTiers: layoutParams.zTiers,
@@ -142,7 +193,7 @@ export function CanvasPanel() {
       noiseFreq: layoutParams.noiseFreq,
       noiseSpeed: layoutParams.noiseSpeed,
     });
-  }, [activeAssets.length, layoutParams, seed, canvasW, canvasH, caGrid, safeCount]);
+  }, [activeAssets.length, layoutParams, seed, canvasW, canvasH, caGrid, safeCount, effectiveScale, effectiveAlpha]);
 
   const items = useMemo(() => {
     const rng = mkRng(seed + 1);
@@ -161,7 +212,6 @@ export function CanvasPanel() {
 
     if (!layoutParams.overlap) mapped = [...mapped].sort((a, b) => a.scale - b.scale);
 
-    // Respect quality allowMirror
     if (layoutParams.mirror && caps.allowMirror) {
       const mirrored = mapped.map(item => ({ ...item, x: canvasW - item.x, _mirrored: true }));
       mapped = [...mapped, ...mirrored];
@@ -174,7 +224,14 @@ export function CanvasPanel() {
     if (layoutParams.mode === 'swarm') {
       let swarmItems = swarmSystem.getItems(activeAssets).map(item => {
         const accent = palette.swatches[(palette.swatches.indexOf(item.color) + 3) % palette.swatches.length] || palette.swatches[0];
-        return { ...item, assetId: item.asset?.id, accent };
+        // Apply live scale/alpha modulation to swarm particles too
+        return {
+          ...item,
+          assetId: item.asset?.id,
+          accent,
+          scale: item.scale * scaleMul,
+          alpha: Math.min(100, item.alpha + alphaBoost),
+        };
       });
 
       if (!layoutParams.overlap) swarmItems = [...swarmItems].sort((a, b) => a.scale - b.scale);
@@ -191,7 +248,7 @@ export function CanvasPanel() {
       return swarmItems;
     }
     return items;
-  }, [layoutParams.mode, items, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW, palette.swatches, caps.allowMirror]);
+  }, [layoutParams.mode, items, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW, palette.swatches, caps.allowMirror, scaleMul, alphaBoost]);
 
   useEffect(() => {
     if (typeof dispatch === 'function') {
@@ -200,6 +257,9 @@ export function CanvasPanel() {
   }, [renderItems.length, dispatch]);
 
   const half = ASSET_SIZE / 2;
+
+  // Audio-reactive border glow intensity
+  const glow = Math.min(1, pulse * 0.8 + bands.rms * 0.4) * depth;
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
@@ -216,7 +276,16 @@ export function CanvasPanel() {
         </div>
       </PanelHeader>
       {open && (
-        <div className={`canvas-wrap ${bgMode === 'transparent' ? 'checkerboard' : ''}`} ref={canvasRef}>
+        <div
+          className={`canvas-wrap ${bgMode === 'transparent' ? 'checkerboard' : ''}`}
+          ref={canvasRef}
+          style={{
+            boxShadow: glow > 0.05
+              ? `inset 0 0 ${20 + glow * 40}px rgba(0, 217, 255, ${0.08 + glow * 0.25})`
+              : undefined,
+            transition: 'box-shadow 0.08s linear',
+          }}
+        >
           <div className="canvas-bg" style={bgStyle} />
           <div className="canvas-rulers" />
           <svg className="canvas-svg" ref={svgRef} viewBox={`0 0 ${canvasW} ${canvasH}`} xmlns="http://www.w3.org/2000/svg"
@@ -229,27 +298,33 @@ export function CanvasPanel() {
           >
             <AssetSpriteSheet assets={assets} />
             <g transform={`translate(${canvasW / 2}, ${canvasH / 2}) scale(${zoom}) translate(${-canvasW / 2}, ${-canvasH / 2}) translate(${pan.x / zoom}, ${pan.y / zoom})`}>
-              {renderItems.map((item, i) => {
-                if (!item.assetId) return null;
-                const sx = item._mirrored ? -item.scale : item.scale;
-                return (
-                  <g
-                    key={i}
-                    transform={`translate(${item.x}, ${item.y}) rotate(${item.rotation}) scale(${sx}, ${item.scale}) translate(${-half}, ${-half})`}
-                    opacity={item.alpha / 100}
-                    style={{
-                      ['--ink']: item.color,
-                      ['--accent']: item.accent || item.color,
-                      transition: motionSmoothing && layoutParams.mode !== 'swarm'
-                        ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease'
-                        : 'none',
-                      transformOrigin: '0 0',
-                    }}
-                  >
-                    <use href={`#kc-asset-${item.assetId}`} width={ASSET_SIZE} height={ASSET_SIZE} />
-                  </g>
-                );
-              })}
+              {/* Root breathing group — continuous life + beat pulse */}
+              <g
+                transform={`translate(${canvasW / 2}, ${canvasH / 2}) rotate(${breathRot}) scale(${breathScale}) translate(${-canvasW / 2}, ${-canvasH / 2})`}
+                style={{ transition: 'transform 0.06s linear' }}
+              >
+                {renderItems.map((item, i) => {
+                  if (!item.assetId) return null;
+                  const sx = item._mirrored ? -item.scale : item.scale;
+                  return (
+                    <g
+                      key={i}
+                      transform={`translate(${item.x}, ${item.y}) rotate(${item.rotation}) scale(${sx}, ${item.scale}) translate(${-half}, ${-half})`}
+                      opacity={item.alpha / 100}
+                      style={{
+                        ['--ink']: item.color,
+                        ['--accent']: item.accent || item.color,
+                        transition: motionSmoothing && layoutParams.mode !== 'swarm'
+                          ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease'
+                          : 'none',
+                        transformOrigin: '0 0',
+                      }}
+                    >
+                      <use href={`#kc-asset-${item.assetId}`} width={ASSET_SIZE} height={ASSET_SIZE} />
+                    </g>
+                  );
+                })}
+              </g>
             </g>
           </svg>
           <span className="canvas-corner tl">0,0</span>
