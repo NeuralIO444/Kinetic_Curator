@@ -4,7 +4,7 @@ import { ASSETS } from '../data/assets/index.js';
 import { PALETTES } from '../data/palettes.js';
 import { createGrid, stepGrid } from '../engine/ca-engine.js';
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────
 const RANDOMIZABLE_KEYS = [
   'count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers',
   'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount', 'swarmCohesion', 'gravityWells', 'damping'
@@ -21,8 +21,6 @@ function randomizeKey(key) {
     case 'jitter':        return randInt(0, 150);
     case 'density':       return randInt(20, 120);
     case 'zTiers':        return randInt(1, 10);
-    
-    // Physics & Turbulence randomizations
     case 'noiseFreq':     return +(rand(0.002, 0.015).toFixed(4));
     case 'noiseSpeed':    return +(rand(0.1, 2.0).toFixed(2));
     case 'displacement':  return randInt(0, 150);
@@ -30,7 +28,6 @@ function randomizeKey(key) {
     case 'swarmCohesion': return +(rand(0.2, 4.0).toFixed(2));
     case 'gravityWells':  return +(rand(0.1, 3.0).toFixed(2));
     case 'damping':       return +(rand(0.90, 0.98).toFixed(2));
-    
     default:              return undefined;
   }
 }
@@ -38,7 +35,7 @@ function randomizeKey(key) {
 const initialEnabledAssets = {};
 ASSETS.forEach(a => { initialEnabledAssets[a.id] = true; });
 
-// ── Slices ─────────────────────────────────────────────────────────────────
+// ── Slices ──────────────────────────────────────────────────────────────
 
 const createAudioSlice = (set, get) => ({
   audioEnabled: false,
@@ -48,15 +45,15 @@ const createAudioSlice = (set, get) => ({
   audioBands: { bass: 0, mid: 0, treble: 0, rms: 0 },
   beatPulse: 0,
   audioStimulus: 0,
-  
+
   setAudioEnabled: (enabled) => set({ audioEnabled: enabled }),
   setAudioSource: (source) => set({ audioSource: source }),
   setAudioGain: (gain) => set({ audioGain: gain }),
   setAudioMonitor: (monitor) => set({ audioMonitor: monitor }),
   setAudioBands: (bands) => set({ audioBands: bands }),
   setAudioStimulus: (stim) => set({ audioStimulus: stim }),
-  setBeatPulse: (valOrFn) => set((state) => ({ 
-    beatPulse: typeof valOrFn === 'function' ? valOrFn(state.beatPulse) : valOrFn 
+  setBeatPulse: (valOrFn) => set((state) => ({
+    beatPulse: typeof valOrFn === 'function' ? valOrFn(state.beatPulse) : valOrFn
   })),
 });
 
@@ -69,13 +66,11 @@ const pushToUndo = (state, force = false) => {
     paletteId: state.paletteId,
     layoutParams: JSON.parse(JSON.stringify(state.layoutParams)),
   };
-  
+
   if (!force && now - lastPushTime < 800) {
-    return {
-      historyRedoStack: [],
-    };
+    return { historyRedoStack: [] };
   }
-  
+
   const last = state.historyUndoStack[state.historyUndoStack.length - 1];
   if (
     last &&
@@ -85,7 +80,7 @@ const pushToUndo = (state, force = false) => {
   ) {
     return {};
   }
-  
+
   lastPushTime = now;
   return {
     historyUndoStack: [...state.historyUndoStack, current].slice(-50),
@@ -99,7 +94,7 @@ const createLayoutSlice = (set, get) => ({
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
   motionSmoothing: true,
-  caGrid: null, // FG-02: CA grid for cellular automaton layout mode
+  caGrid: null,
   historyUndoStack: [],
   historyRedoStack: [],
 
@@ -110,7 +105,6 @@ const createLayoutSlice = (set, get) => ({
     if (state.layoutParams[key] === value) return {};
     const undoUpdate = pushToUndo(state, false);
     const next = { ...undoUpdate, layoutParams: { ...state.layoutParams, [key]: value } };
-    // FG-02: auto-init CA grid when switching to CA mode
     if (key === 'mode' && value === 'ca' && !state.caGrid) {
       next.caGrid = createGrid(40, 28);
     }
@@ -122,7 +116,7 @@ const createLayoutSlice = (set, get) => ({
     caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28),
   })),
   resetCaGrid: () => set({ caGrid: createGrid(40, 28) }),
-  
+
   applyPreset: (preset) => set((state) => {
     const incoming = { ...preset.params, composition: preset.id };
     const merged = { ...state.layoutParams };
@@ -197,11 +191,12 @@ const createLayoutSlice = (set, get) => ({
 const createGlobalSlice = (set, get) => ({
   running: true,
   fps: 58.4,
+  nodeCount: 0,
   isFullscreen: false,
   slowRender: false,
   webcamEnabled: false,
   motionEnergy: 0,
-  
+
   enabledAssets: initialEnabledAssets,
   search: '',
   catFilter: 'all',
@@ -209,11 +204,12 @@ const createGlobalSlice = (set, get) => ({
 
   setRunning: (running) => set({ running }),
   setFps: (fps) => set({ fps }),
+  setNodeCount: (count) => set({ nodeCount: count }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
   setSlowRender: (slow) => set({ slowRender: slow }),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
   setMotionEnergy: (energy) => set({ motionEnergy: energy }),
-  
+
   toggleAsset: (id) => set((state) => ({
     enabledAssets: { ...state.enabledAssets, [id]: !state.enabledAssets[id] }
   })),
@@ -245,10 +241,9 @@ const createDavisSlice = (set, get) => ({
   setEvolveTarget: (target) => set({ evolveTarget: target }),
   setEvolveInterval: (interval) => set({ evolveInterval: interval }),
   setAutoSnapshot: (auto) => set({ autoSnapshot: auto }),
-  
+
   triggerEvolve: () => set((state) => {
     const ts = Date.now();
-    // FG-02: step CA grid on every evolve tick when in CA mode
     const caUpdate = state.layoutParams.mode === 'ca'
       ? { caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28) }
       : {};
@@ -271,8 +266,6 @@ const createDavisSlice = (set, get) => ({
         jitter: { min: 0, max: 150, type: 'int', isRange: false },
         density: { min: 10, max: 100, type: 'int', isRange: false },
         zTiers: { min: 1, max: 10, type: 'int', isRange: false },
-        
-        // Physics & Turbulence Evolving bounds
         noiseFreq: { min: 0.002, max: 0.02, type: 'float', isRange: false },
         noiseSpeed: { min: 0.1, max: 2.0, type: 'float', isRange: false },
         displacement: { min: 0, max: 120, type: 'int', isRange: false },
@@ -296,7 +289,7 @@ const createDavisSlice = (set, get) => ({
           }
         }
       });
-      
+
       if (state.evolveTarget === 'all') {
         const pIds = ['praystation', 'v01d', 'hydra', 'dystopia', 'folktotem'];
         const randomPalette = pIds[Math.floor(Math.random() * pIds.length)];
@@ -309,8 +302,8 @@ const createDavisSlice = (set, get) => ({
 
   addFavorite: (fav) => set((state) => ({ favorites: [...state.favorites, fav] })),
   removeFavorite: (index) => set((state) => ({ favorites: state.favorites.filter((_, i) => i !== index) })),
-  recallFavorite: (fav) => set({ 
-    seed: fav.seed, 
+  recallFavorite: (fav) => set({
+    seed: fav.seed,
     ...(fav.config?.layout ? { layoutParams: fav.config.layout } : {}),
     ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {})
   }),
@@ -327,8 +320,6 @@ const createExportSlice = (set, get) => ({
   setExportResolution: (res) => set({ exportResolution: res }),
   setIsRecording: (recording) => set({ isRecording: recording }),
 });
-
-// ── Store ──────────────────────────────────────────────────────────────────
 
 export const useStore = create((set, get) => ({
   ...createAudioSlice(set, get),

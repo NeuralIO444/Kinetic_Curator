@@ -21,16 +21,14 @@ export function AppProvider({ children }) {
  */
 export function useApp(selector) {
   const refs = useContext(RefsContext);
-  
-  // Use a separate subscription for paletteId to ensure 'palette' is always reactive
+
   const paletteId = useStore(s => s.paletteId);
-  
-  // Real reactive history subscriptions
+
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const undo = useStore(s => s.undo);
   const redo = useStore(s => s.redo);
-  
+
   const history = {
     undo,
     redo,
@@ -39,19 +37,17 @@ export function useApp(selector) {
     undoDepth: undoStackLength,
     redoDepth: redoStackLength,
   };
-  
-  // Main state subscription (selective)
-  // BUG-02 fix: when no selector is provided, use a no-op selector to avoid
-  // subscribing to the entire store (which caused 60fps re-renders from audio).
+
   const state = useStore(useShallow(selector || _emptySelector));
 
   const dispatch = useCallback((action) => {
     const store = useStore.getState();
     const { type, payload } = action;
-    
+
     switch (type) {
       case A.SET_RUNNING: return store.setRunning(payload);
       case A.SET_FPS: return store.setFps(payload);
+      case 'SET_NODE_COUNT': return store.setNodeCount(payload);
       case A.SET_SEED: return store.setSeed(payload);
       case A.BUMP_SEED: return store.bumpSeed();
       case A.SET_PALETTE_ID: return store.setPaletteId(payload);
@@ -97,7 +93,6 @@ export function useApp(selector) {
     }
   }, []);
 
-  // Derived state (reactive)
   const palette = PALETTES.find(p => p.id === paletteId) || PALETTES[0];
 
   return { state, dispatch, history, palette, palettes: PALETTES, assets: ASSETS, ...refs };

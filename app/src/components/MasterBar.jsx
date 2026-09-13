@@ -8,14 +8,17 @@ export function MasterBar() {
     running: s.running,
     fps: s.fps,
     seed: s.seed,
+    nodeCount: s.nodeCount,
     isRecording: s.isRecording,
     audioEnabled: s.audioEnabled,
     beatPulse: s.beatPulse,
   }));
-  const { running, fps, seed } = state;
+  const { running, fps, seed, nodeCount = 0 } = state;
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
+
+  const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
 
   return (
     <div className="master-bar">
@@ -25,7 +28,7 @@ export function MasterBar() {
           <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
           <span className="logo-version">v0.5</span>
         </div>
-        
+
         {state.isRecording ? (
           <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}>
             <span className="status-dot beat-flash" style={{ background: '#ff2d6f', animationIterationCount: 'infinite' }} />
@@ -45,10 +48,17 @@ export function MasterBar() {
           </div>
           <span className="meter-value">{fps.toFixed(1)}</span>
         </div>
+
+        <div className="meter" title="Live placement / SVG node count">
+          <span className="meter-label">NODES</span>
+          <span className={`meter-value ${nodeClass}`}>{nodeCount}</span>
+        </div>
+
         <div className="meter">
           <span className="meter-label">SEED</span>
           <span className="meter-value">{seed.toString(16).padStart(8, '0')}</span>
         </div>
+
         <div className="undo-group">
           <button
             className={`undo-btn ${history.canUndo ? '' : 'disabled'}`}
