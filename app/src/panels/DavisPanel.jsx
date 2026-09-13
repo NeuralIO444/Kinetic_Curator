@@ -1,4 +1,3 @@
-// DavisPanel (P07) — evolve / phrase / favorite workflow
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCollapse } from '../hooks/useCollapse.js';
@@ -20,11 +19,15 @@ export function DavisPanel() {
     phraseLength: s.phraseLength,
     phraseMode: s.phraseMode,
     phraseBeat: s.phraseBeat,
+    morphEvolve: s.morphEvolve,
+    morphDurationMs: s.morphDurationMs,
+    morphing: s.morphing,
   }));
   const {
     evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot,
     motionSmoothing, favorites, seed, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
+    morphEvolve, morphDurationMs, morphing,
   } = state;
   const { open, toggle } = useCollapse(false);
 
@@ -46,7 +49,7 @@ export function DavisPanel() {
       <PanelHeader
         tag="P07"
         title="DAVIS MODE"
-        subtitle={phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}` : evolveMode ? 'evolving' : 'paused'}
+        subtitle={morphing ? 'morphing…' : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}` : evolveMode ? 'evolving' : 'paused'}
         collapsed={!open}
         onToggle={toggle}
       />
@@ -83,7 +86,33 @@ export function DavisPanel() {
             <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
           </div>
 
-          {/* Phrase / Loop */}
+          {/* Morph */}
+          <div style={{ marginTop: 8, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span className="davis-label" style={{ margin: 0 }}>MORPH EVOLVE</span>
+              <button
+                className={`chip-btn ${morphEvolve ? 'active' : ''}`}
+                onClick={() => dispatch({ type: A.SET_MORPH_EVOLVE, payload: !morphEvolve })}
+                style={morphEvolve ? { borderColor: '#c084fc', color: '#c084fc' } : {}}
+              >
+                {morphEvolve ? 'ON' : 'OFF'}
+              </button>
+            </div>
+            <div className="davis-interval-row">
+              <span className="davis-label">DURATION</span>
+              <input
+                type="range" min={300} max={4000} step={100} value={morphDurationMs || 1200}
+                onChange={e => dispatch({ type: A.SET_MORPH_DURATION, payload: Number(e.target.value) })}
+              />
+              <span className="davis-readout">{((morphDurationMs || 1200) / 1000).toFixed(1)}s</span>
+            </div>
+            <div className="davis-hint" style={{ marginTop: 4, fontSize: 9 }}>
+              Layout targets ease instead of hard-jump. Seed/palette still discrete.
+              {morphing && <span style={{ color: '#c084fc' }}> · morphing now</span>}
+            </div>
+          </div>
+
+          {/* Phrase */}
           <div style={{ marginTop: 10, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span className="davis-label" style={{ margin: 0 }}>PHRASE LOOP</span>
@@ -95,16 +124,12 @@ export function DavisPanel() {
                 {phraseEnabled ? 'ON' : 'OFF'}
               </button>
             </div>
-
             <div className="davis-interval-row">
               <span className="davis-label">LENGTH</span>
-              <input
-                type="range" min={4} max={32} step={1} value={phraseLength || 8}
-                onChange={e => dispatch({ type: A.SET_PHRASE_LENGTH, payload: Number(e.target.value) })}
-              />
+              <input type="range" min={4} max={32} step={1} value={phraseLength || 8}
+                onChange={e => dispatch({ type: A.SET_PHRASE_LENGTH, payload: Number(e.target.value) })} />
               <span className="davis-readout">{phraseLength || 8} beats</span>
             </div>
-
             <div className="davis-source-row" style={{ marginTop: 4 }}>
               <span className="davis-label">MODE</span>
               {[
@@ -112,21 +137,12 @@ export function DavisPanel() {
                 { id: 'cycle-seed', label: 'CYCLE' },
                 { id: 'step-ca', label: 'CA' },
               ].map(m => (
-                <button
-                  key={m.id}
-                  className={`chip-btn ${phraseMode === m.id ? 'active' : ''}`}
-                  onClick={() => dispatch({ type: A.SET_PHRASE_MODE, payload: m.id })}
-                  title={
-                    m.id === 'reset-seed' ? 'Return to origin seed each loop'
-                      : m.id === 'cycle-seed' ? 'Step origin seed each loop'
-                        : 'Step cellular automaton grid each loop'
-                  }
-                >
+                <button key={m.id} className={`chip-btn ${phraseMode === m.id ? 'active' : ''}`}
+                  onClick={() => dispatch({ type: A.SET_PHRASE_MODE, payload: m.id })}>
                   {m.label}
                 </button>
               ))}
             </div>
-
             {phraseEnabled && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--dim)', marginBottom: 3 }}>
@@ -135,52 +151,42 @@ export function DavisPanel() {
                 </div>
                 <div style={{ height: 4, background: 'var(--line-2)', borderRadius: 2, overflow: 'hidden' }}>
                   <div style={{
-                    height: '100%',
-                    width: `${phraseProgress}%`,
+                    height: '100%', width: `${phraseProgress}%`,
                     background: 'linear-gradient(90deg, #00d9ff, #00ff88)',
                     transition: 'width 0.1s linear',
                   }} />
                 </div>
               </div>
             )}
-
-            <div className="davis-hint" style={{ marginTop: 6, fontSize: 9 }}>
-              Needs AUDIO on. Counts beats; at boundary applies MODE.
-            </div>
           </div>
 
           <div className="davis-interval-row" style={{ marginTop: '8px' }}>
             <span className="davis-label">AUTO-SNAP</span>
             <input type="checkbox" checked={autoSnapshot} onChange={e => dispatch({ type: A.SET_AUTO_SNAPSHOT, payload: e.target.checked })} />
-            <span className="davis-readout" style={{ fontSize: '8px', opacity: 0.6 }}>(PNG on evolve)</span>
           </div>
-
           <div className="davis-interval-row" style={{ marginTop: '4px' }}>
             <span className="davis-label">SMOOTHING</span>
             <input type="checkbox" checked={motionSmoothing} onChange={e => dispatch({ type: A.SET_MOTION_SMOOTHING, payload: e.target.checked })} />
-            <span className="davis-readout" style={{ fontSize: '8px', opacity: 0.6 }}>(CSS transitions)</span>
           </div>
 
           <div className="davis-actions">
             <button className={`big-btn ${evolveMode ? 'active' : ''}`}
               onClick={() => dispatch({ type: A.SET_EVOLVE_MODE, payload: !evolveMode })}>
-              {evolveMode ? '\u25a0 STOP' : '\u25b6 EVOLVE'}
+              {evolveMode ? 'STOP' : 'EVOLVE'}
             </button>
-            <button className="big-btn" onClick={favoriteCurrent}>\u2605 FAVORITE</button>
-            <button className="big-btn" onClick={() => dispatch({ type: A.BUMP_SEED })}>\u27f3 NEW SEED</button>
+            <button className="big-btn" onClick={favoriteCurrent}>FAVORITE</button>
+            <button className="big-btn" onClick={() => dispatch({ type: A.BUMP_SEED })}>NEW SEED</button>
           </div>
 
           {favorites.length > 0 && (
             <div className="favorites-list">
-              <div className="favorites-header">\u2605 FAVORITES ({favorites.length})</div>
+              <div className="favorites-header">FAVORITES ({favorites.length})</div>
               {favorites.map((f, i) => (
                 <div key={i} className="fav-row">
                   <span className="fav-id">#{i + 1}</span>
                   <span className="fav-seed">{f.seed.toString(16)}</span>
-                  <span className="fav-meta">{f.config?.layout?.mode || '\u2014'} \u00b7 {f.config?.palette?.id || '\u2014'}</span>
-                  <span className="fav-ts">{f.timestamp}</span>
-                  <button className="micro-btn" onClick={() => dispatch({ type: A.RECALL_FAVORITE, favorite: f })}>\u21bb</button>
-                  <button className="micro-btn" onClick={() => dispatch({ type: A.REMOVE_FAVORITE, index: i })}>\u2715</button>
+                  <button className="micro-btn" onClick={() => dispatch({ type: A.RECALL_FAVORITE, favorite: f })}>R</button>
+                  <button className="micro-btn" onClick={() => dispatch({ type: A.REMOVE_FAVORITE, index: i })}>X</button>
                 </div>
               ))}
             </div>

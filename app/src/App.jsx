@@ -1,4 +1,3 @@
-// App.jsx — thin layout shell
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
@@ -18,6 +17,7 @@ import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
 import { useBeatDecay } from './hooks/useBeatDecay.js';
 import { useContinuousLife } from './hooks/useContinuousLife.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
+import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
@@ -48,17 +48,15 @@ function AppInner() {
   useBeatDecay();
   useContinuousLife();
   usePhraseLoop();
+  useMorphEvolve();
 
   const [showHotkeys, setShowHotkeys] = useState(false);
-
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
   evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
 
   useEffect(() => {
     if (!state.evolveMode || state.evolveSource !== 'time') return;
-    const interval = setInterval(() => {
-      dispatch({ type: A.TRIGGER_EVOLVE });
-    }, state.evolveInterval);
+    const interval = setInterval(() => dispatch({ type: A.TRIGGER_EVOLVE }), state.evolveInterval);
     return () => clearInterval(interval);
   }, [state.evolveMode, state.evolveSource, state.evolveInterval, dispatch]);
 
@@ -79,7 +77,7 @@ function AppInner() {
       snapshot: {
         seed: state.seed,
         format: 'PNG',
-        resolution: state.exportResolution === 1 ? '1920×1080' : state.exportResolution === 2 ? '3840×2160' : '7680×4320',
+        resolution: state.exportResolution === 1 ? '1920x1080' : state.exportResolution === 2 ? '3840x2160' : '7680x4320',
         timestamp: new Date().toISOString().slice(11, 19),
         config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
       },
@@ -126,9 +124,7 @@ function AppInner() {
       <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} />
       <div className="grid" ref={containerRef} style={{ gridTemplateColumns: gridTemplate }}>
         <div className="col col-canvas">
-          <ErrorBoundary>
-            <CanvasPanel />
-          </ErrorBoundary>
+          <ErrorBoundary><CanvasPanel /></ErrorBoundary>
         </div>
         <div className="col-divider" {...dividerProps(0)} />
         <div className="col col-panels">
@@ -140,17 +136,13 @@ function AppInner() {
         </div>
       </div>
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v0.5 \u00b7 {Object.values(state.enabled).filter(Boolean).length} assets active</span>
-        <span>{state.layoutParams.mode} \u00b7 seed:{state.seed.toString(16)}</span>
+        <span>KINETIC_CURATOR v0.5</span>
+        <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
       </footer>
     </div>
   );
 }
 
 export default function App() {
-  return (
-    <AppProvider>
-      <AppInner />
-    </AppProvider>
-  );
+  return <AppProvider><AppInner /></AppProvider>;
 }

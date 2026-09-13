@@ -16,17 +16,14 @@ export function AppProvider({ children }) {
 
 export function useApp(selector) {
   const refs = useContext(RefsContext);
-
   const paletteId = useStore(s => s.paletteId);
-
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const undo = useStore(s => s.undo);
   const redo = useStore(s => s.redo);
 
   const history = {
-    undo,
-    redo,
+    undo, redo,
     canUndo: undoStackLength > 0,
     canRedo: redoStackLength > 0,
     undoDepth: undoStackLength,
@@ -73,6 +70,8 @@ export function useApp(selector) {
       case A.SET_EVOLVE_INTERVAL: return store.setEvolveInterval(payload);
       case A.SET_AUTO_SNAPSHOT: return store.setAutoSnapshot(payload);
       case A.TRIGGER_EVOLVE: return store.triggerEvolve();
+      case A.SET_MORPH_EVOLVE: return store.setMorphEvolve(payload);
+      case A.SET_MORPH_DURATION: return store.setMorphDurationMs(payload);
       case A.SET_PHRASE_ENABLED: return store.setPhraseEnabled(payload);
       case A.SET_PHRASE_LENGTH: return store.setPhraseLength(payload);
       case A.SET_PHRASE_MODE: return store.setPhraseMode(payload);
@@ -95,6 +94,5 @@ export function useApp(selector) {
   }, []);
 
   const palette = PALETTES.find(p => p.id === paletteId) || PALETTES[0];
-
   return { state, dispatch, history, palette, palettes: PALETTES, assets: ASSETS, ...refs };
 }
