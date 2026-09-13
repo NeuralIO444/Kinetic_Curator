@@ -1,6 +1,6 @@
-import * as A from '../../state/actions.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
-export function FavoritesList({ favorites, onDispatch }) {
+export function FavoritesList({ favorites }) {
   if (!favorites || favorites.length === 0) return null;
 
   return (
@@ -10,8 +10,8 @@ export function FavoritesList({ favorites, onDispatch }) {
         <div key={i} className="fav-row">
           <span className="fav-id">#{i + 1}</span>
           <span className="fav-seed">{f.seed.toString(16)}</span>
-          <button className="micro-btn" onClick={() => onDispatch({ type: A.RECALL_FAVORITE, favorite: f })}>R</button>
-          <button className="micro-btn" onClick={() => onDispatch({ type: A.REMOVE_FAVORITE, index: i })}>X</button>
+          <button className="micro-btn" onClick={() => emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: f })}>R</button>
+          <button className="micro-btn" onClick={() => emit(Events.DAVIS_FAVORITE_REMOVE, { index: i })}>X</button>
         </div>
       ))}
     </div>
