@@ -1,6 +1,7 @@
-// MasterBar — top toolbar with logo, palette, status, controls
+// MasterBar — top toolbar
 import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
+import { QUALITY_PRESETS } from '../data/quality.js';
 
 export function MasterBar() {
   const { dispatch, palette, history, palettes } = useApp();
@@ -9,16 +10,16 @@ export function MasterBar() {
     fps: s.fps,
     seed: s.seed,
     nodeCount: s.nodeCount,
+    quality: s.quality,
+    autoQuality: s.autoQuality,
     isRecording: s.isRecording,
-    audioEnabled: s.audioEnabled,
-    beatPulse: s.beatPulse,
   }));
-  const { running, fps, seed, nodeCount = 0 } = state;
+  const { running, fps, seed, nodeCount = 0, quality = 'balanced' } = state;
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
-
   const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
+  const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.balanced;
 
   return (
     <div className="master-bar">
@@ -46,12 +47,18 @@ export function MasterBar() {
           <div className={`fps-bar ${fpsClass}`}>
             <span className="fps-bar-fill" style={{ width: `${fpsWidth}%` }} />
           </div>
-          <span className="meter-value">{fps.toFixed(1)}</span>
+          <span className="meter-value">{Number(fps).toFixed(1)}</span>
         </div>
 
         <div className="meter" title="Live placement / SVG node count">
           <span className="meter-label">NODES</span>
           <span className={`meter-value ${nodeClass}`}>{nodeCount}</span>
+        </div>
+
+        <div className="meter" title={q.description}>
+          <span className="meter-label">Q</span>
+          <span className="meter-value" style={{ letterSpacing: '0.06em' }}>{q.label}</span>
+          {state.autoQuality && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: 4 }}>AUTO</span>}
         </div>
 
         <div className="meter">
@@ -60,20 +67,10 @@ export function MasterBar() {
         </div>
 
         <div className="undo-group">
-          <button
-            className={`undo-btn ${history.canUndo ? '' : 'disabled'}`}
-            onClick={history.undo}
-            disabled={!history.canUndo}
-            title="Undo (⌘Z)"
-          >
+          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo">
             ↶{history.undoDepth > 0 ? ` ${history.undoDepth}` : ''}
           </button>
-          <button
-            className={`undo-btn ${history.canRedo ? '' : 'disabled'}`}
-            onClick={history.redo}
-            disabled={!history.canRedo}
-            title="Redo (⌘⇧Z)"
-          >
+          <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo">
             ↷{history.redoDepth > 0 ? ` ${history.redoDepth}` : ''}
           </button>
         </div>
