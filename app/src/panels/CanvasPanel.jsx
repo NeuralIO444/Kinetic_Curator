@@ -2,7 +2,8 @@
 // Placement logic is in engine/placement.js — this is render-only
 //
 // Performance notes:
-// - Colors are resolved once per seed/palette change (not every frame)
+// - Assets rendered via <symbol> + <use> (one DOM definition, many instances)
+// - Colors via CSS variables --ink / --accent (no per-node string replace)
 // - Extreme counts are soft-clamped to protect the main thread
 // - Swarm still forces a tick; spatial hash lives in particles.js
 
@@ -11,14 +12,18 @@ import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCollapse } from '../hooks/useCollapse.js';
 import { computePlacements } from '../engine/placement.js';
-import { colorForPlacement, resolveColors } from '../engine/color.js';
+import { colorForPlacement } from '../engine/color.js';
 import { mkRng } from '../engine/prng.js';
 import { getPreset } from '../data/presets.js';
 import { ParticleSystem } from '../engine/particles.js';
+import { AssetSpriteSheet } from '../components/AssetSpriteSheet.jsx';
 
 // Soft performance ceiling — beyond this we clamp before placement
 const SOFT_MAX_COUNT = 650;
 const HARD_MAX_COUNT = 900;
+
+// Nominal asset design size (matches viewBox of symbols)
+const ASSET_SIZE = 100;
 
 const swarmSystem = new ParticleSystem();
 
@@ -179,8 +184,7 @@ export function CanvasPanel() {
     });
   }, [activeAssets.length, layoutParams, seed, canvasW, canvasH, caGrid, safeCount]);
 
-  // Pre-resolve colors + SVG strings once per seed/palette/placements change
-  // (avoids string replace work on every React render)
+  // Build lightweight item descriptors (asset id + color only — no SVG strings)
   const items = useMemo(() => {
     const rng = mkRng(seed + 1);
     let mapped = placements.map((p, i) => {
@@ -193,8 +197,7 @@ export function CanvasPanel() {
         rng: () => rng(),
       });
       const accent = palette.swatches[(palette.swatches.indexOf(color) + 3) % palette.swatches.length] || palette.swatches[0];
-      const svg = resolveColors(asset.svg, color, accent);
-      return { ...p, asset, color, svg };
+      return { ...p, assetId: asset.id, color, accent };
     });
 
     if (!layoutParams.overlap) {
@@ -215,7 +218,14 @@ export function CanvasPanel() {
 
   const renderItems = useMemo(() => {
     if (layoutParams.mode === 'swarm') {
-      let swarmItems = swarmSystem.getItems(activeAssets);
+      let swarmItems = swarmSystem.getItems(activeAssets).map(item => {
+        const accent = palette.swatches[(palette.swatches.indexOf(item.color) + 3) % palette.swatches.length] || palette.swatches[0];
+        return {
+          ...item,
+          assetId: item.asset?.id,
+          accent,
+        };
+      });
 
       if (!layoutParams.overlap) {
         swarmItems = [...swarmItems].sort((a, b) => a.scale - b.scale);
@@ -233,7 +243,7 @@ export function CanvasPanel() {
       return swarmItems;
     }
     return items;
-  }, [layoutParams.mode, items, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW]);
+  }, [layoutParams.mode, items, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW, palette.swatches]);
 
   // Push live node count into the store for MasterBar / governor
   useEffect(() => {
@@ -241,6 +251,9 @@ export function CanvasPanel() {
       dispatch({ type: 'SET_NODE_COUNT', payload: renderItems.length });
     }
   }, [renderItems.length, dispatch]);
+
+  // Half-size offset so scale is centered on the placement point
+  const half = ASSET_SIZE / 2;
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
@@ -272,36 +285,37 @@ export function CanvasPanel() {
             onPointerCancel={onCanvasPointerUpCombined}
             onPointerLeave={handlePointerLeave}
           >
+            {/* One definition per unique asset — instances use <use> */}
+            <AssetSpriteSheet assets={assets} />
+
             <g transform={`translate(${canvasW/2}, ${canvasH/2}) scale(${zoom}) translate(${-canvasW/2}, ${-canvasH/2}) translate(${pan.x/zoom}, ${pan.y/zoom})`}>
               {renderItems.map((item, i) => {
-                // Prefer pre-resolved svg when available (static modes)
-                if (item.svg) {
-                  return (
-                    <g
-                      key={i}
-                      transform={`translate(${item.x}, ${item.y}) scale(${item._mirrored ? -item.scale : item.scale}, ${item.scale}) rotate(${item.rotation})`}
-                      opacity={item.alpha / 100}
-                      style={{
-                        transition: motionSmoothing && layoutParams.mode !== 'swarm' ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease' : 'none',
-                        transformOrigin: '0 0',
-                      }}
-                      dangerouslySetInnerHTML={{ __html: item.svg }}
-                    />
-                  );
-                }
+                if (!item.assetId) return null;
 
-                // Swarm path still resolves on the fly (particles carry color only)
-                const ink = item.color;
-                const accent = palette.swatches[(palette.swatches.indexOf(ink) + 3) % palette.swatches.length] || palette.swatches[0];
-                const svgStr = resolveColors(item.asset.svg, ink, accent);
+                const sx = item._mirrored ? -item.scale : item.scale;
+                const sy = item.scale;
+
                 return (
                   <g
                     key={i}
-                    transform={`translate(${item.x}, ${item.y}) scale(${item._mirrored ? -item.scale : item.scale}, ${item.scale}) rotate(${item.rotation})`}
+                    transform={`translate(${item.x}, ${item.y}) rotate(${item.rotation}) scale(${sx}, ${sy}) translate(${-half}, ${-half})`}
                     opacity={item.alpha / 100}
-                    style={{ transition: 'none', transformOrigin: '0 0' }}
-                    dangerouslySetInnerHTML={{ __html: svgStr }}
-                  />
+                    style={{
+                      // CSS variables inherited into the <use> symbol content
+                      ['--ink']: item.color,
+                      ['--accent']: item.accent || item.color,
+                      transition: motionSmoothing && layoutParams.mode !== 'swarm'
+                        ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease'
+                        : 'none',
+                      transformOrigin: '0 0',
+                    }}
+                  >
+                    <use
+                      href={`#kc-asset-${item.assetId}`}
+                      width={ASSET_SIZE}
+                      height={ASSET_SIZE}
+                    />
+                  </g>
                 );
               })}
             </g>
