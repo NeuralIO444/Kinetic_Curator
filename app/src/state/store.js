@@ -9,6 +9,12 @@ const RANDOMIZABLE_KEYS = [
   'count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers',
   'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount', 'swarmCohesion', 'gravityWells', 'damping'
 ];
+
+const MORPHABLE_KEYS = [
+  'count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers',
+  'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount', 'swarmCohesion', 'gravityWells', 'damping'
+];
+
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 const randInt = (lo, hi) => Math.floor(rand(lo, hi + 1));
 
@@ -30,6 +36,41 @@ function randomizeKey(key) {
     case 'damping':       return +(rand(0.90, 0.98).toFixed(2));
     default:              return undefined;
   }
+}
+
+function generateLayoutTargets(state) {
+  const newLayout = {};
+  const params = {
+    count: { min: 10, max: 500, type: 'int', isRange: false },
+    scale: { min: 0.1, max: 3.0, type: 'float', isRange: true },
+    rotate: { min: -180, max: 180, type: 'float', isRange: true },
+    alpha: { min: 10, max: 100, type: 'int', isRange: true },
+    jitter: { min: 0, max: 150, type: 'int', isRange: false },
+    density: { min: 10, max: 100, type: 'int', isRange: false },
+    zTiers: { min: 1, max: 10, type: 'int', isRange: false },
+    noiseFreq: { min: 0.002, max: 0.02, type: 'float', isRange: false },
+    noiseSpeed: { min: 0.1, max: 2.0, type: 'float', isRange: false },
+    displacement: { min: 0, max: 120, type: 'int', isRange: false },
+    particleCount: { min: 30, max: 300, type: 'int', isRange: false },
+    swarmCohesion: { min: 0.5, max: 3.5, type: 'float', isRange: false },
+    gravityWells: { min: 0.1, max: 3.5, type: 'float', isRange: false },
+    damping: { min: 0.90, max: 0.98, type: 'float', isRange: false },
+  };
+  Object.entries(params).forEach(([key, conf]) => {
+    if (state.lockedParams[key]) return;
+    if (conf.isRange) {
+      const mid = (conf.max + conf.min) / 2;
+      const low = Math.random() * (mid - conf.min) + conf.min;
+      const high = Math.random() * (conf.max - mid) + mid;
+      newLayout[key] = conf.type === 'int'
+        ? [Math.floor(low), Math.floor(high)]
+        : [Number(low.toFixed(2)), Number(high.toFixed(2))];
+    } else {
+      const v = Math.random() * (conf.max - conf.min) + conf.min;
+      newLayout[key] = conf.type === 'int' ? Math.floor(v) : Number(v.toFixed(2));
+    }
+  });
+  return newLayout;
 }
 
 const initialEnabledAssets = {};
@@ -108,7 +149,9 @@ const createLayoutSlice = (set, get) => ({
     }
     return next;
   }),
-  setLayoutParams: (params) => set((state) => ({ ...pushToUndo(state, true), layoutParams: { ...state.layoutParams, ...params } })),
+  setLayoutParams: (params) => set((state) => ({
+    layoutParams: { ...state.layoutParams, ...params }
+  })),
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
   stepCaGrid: () => set((state) => ({
     caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28),
@@ -243,10 +286,18 @@ const createDavisSlice = (set, get) => ({
   lastEvolveTs: 0,
   favorites: [],
 
+  // Morph evolve
+  morphEvolve: true,
+  morphDurationMs: 1200,
+  morphing: false,
+  morphFrom: null,
+  morphTo: null,
+  morphStart: 0,
+
   // Phrase / loop
   phraseEnabled: false,
   phraseLength: 8,
-  phraseMode: 'reset-seed', // reset-seed | step-ca | cycle-seed
+  phraseMode: 'reset-seed',
   phraseBeat: 0,
   phraseOriginSeed: null,
 
@@ -257,6 +308,10 @@ const createDavisSlice = (set, get) => ({
   setEvolveTarget: (target) => set({ evolveTarget: target }),
   setEvolveInterval: (interval) => set({ evolveInterval: interval }),
   setAutoSnapshot: (auto) => set({ autoSnapshot: auto }),
+
+  setMorphEvolve: (v) => set({ morphEvolve: !!v }),
+  setMorphDurationMs: (ms) => set({ morphDurationMs: Math.max(200, Math.min(8000, Number(ms) || 1200)) }),
+  finishMorph: () => set({ morphing: false, morphFrom: null, morphTo: null }),
 
   setPhraseEnabled: (enabled) => set({ phraseEnabled: !!enabled, phraseBeat: 0 }),
   setPhraseLength: (len) => set({ phraseLength: Math.max(2, Math.min(64, Number(len) || 8)), phraseBeat: 0 }),
@@ -273,24 +328,17 @@ const createDavisSlice = (set, get) => ({
     if (nextBeat < state.phraseLength) {
       return { phraseBeat: nextBeat };
     }
-
-    // Boundary hit
     const origin = state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed;
     let updates = { phraseBeat: 0 };
-
     if (state.phraseMode === 'reset-seed') {
       updates.seed = origin;
     } else if (state.phraseMode === 'cycle-seed') {
-      // Walk forward one step from origin each loop, but stay related
-      updates.seed = (origin + Math.floor(nextBeat / state.phraseLength)) >>> 0;
-      // Actually on each full loop, bump relative to origin by loop count stored implicitly via beat reset
       updates.seed = (origin + 1) >>> 0;
-      updates.phraseOriginSeed = updates.seed; // new origin for next phrase
+      updates.phraseOriginSeed = updates.seed;
     } else if (state.phraseMode === 'step-ca') {
       updates.caGrid = state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28);
-      updates.seed = origin; // keep seed, advance CA structure
+      updates.seed = origin;
     }
-
     return updates;
   }),
 
@@ -299,55 +347,60 @@ const createDavisSlice = (set, get) => ({
     const caUpdate = state.layoutParams.mode === 'ca'
       ? { caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28) }
       : {};
+
     if (state.evolveTarget === 'seed') {
       return { ...caUpdate, seed: (state.seed + 1) % 1000000, lastEvolveTs: ts };
     }
+
     if (state.evolveTarget === 'palette') {
       const pIds = ['praystation', 'v01d', 'hydra', 'dystopia', 'folktotem'];
       const currentIdx = pIds.indexOf(state.paletteId);
       const nextIdx = (currentIdx + 1) % pIds.length;
       return { ...caUpdate, paletteId: pIds[nextIdx], lastEvolveTs: ts };
     }
+
     if (state.evolveTarget === 'layout' || state.evolveTarget === 'all') {
-      const newLayout = { ...state.layoutParams };
-      const params = {
-        count: { min: 10, max: 500, type: 'int', isRange: false },
-        scale: { min: 0.1, max: 3.0, type: 'float', isRange: true },
-        rotate: { min: -180, max: 180, type: 'float', isRange: true },
-        alpha: { min: 10, max: 100, type: 'int', isRange: true },
-        jitter: { min: 0, max: 150, type: 'int', isRange: false },
-        density: { min: 10, max: 100, type: 'int', isRange: false },
-        zTiers: { min: 1, max: 10, type: 'int', isRange: false },
-        noiseFreq: { min: 0.002, max: 0.02, type: 'float', isRange: false },
-        noiseSpeed: { min: 0.1, max: 2.0, type: 'float', isRange: false },
-        displacement: { min: 0, max: 120, type: 'int', isRange: false },
-        particleCount: { min: 30, max: 300, type: 'int', isRange: false },
-        swarmCohesion: { min: 0.5, max: 3.5, type: 'float', isRange: false },
-        gravityWells: { min: 0.1, max: 3.5, type: 'float', isRange: false },
-        damping: { min: 0.90, max: 0.98, type: 'float', isRange: false },
-      };
-      Object.entries(params).forEach(([key, conf]) => {
-        if (!state.lockedParams[key]) {
-          if (conf.isRange) {
-            const mid = (conf.max + conf.min) / 2;
-            const low = Math.random() * (mid - conf.min) + conf.min;
-            const high = Math.random() * (conf.max - mid) + mid;
-            newLayout[key] = conf.type === 'int'
-              ? [Math.floor(low), Math.floor(high)]
-              : [Number(low.toFixed(2)), Number(high.toFixed(2))];
-          } else {
-            const v = Math.random() * (conf.max - conf.min) + conf.min;
-            newLayout[key] = conf.type === 'int' ? Math.floor(v) : Number(v.toFixed(2));
+      const targets = generateLayoutTargets(state);
+      const seedUpdate = state.evolveTarget === 'all'
+        ? { seed: (state.seed + 1) % 1000000 }
+        : {};
+      const paletteUpdate = state.evolveTarget === 'all'
+        ? (() => {
+            const pIds = ['praystation', 'v01d', 'hydra', 'dystopia', 'folktotem'];
+            return { paletteId: pIds[Math.floor(Math.random() * pIds.length)] };
+          })()
+        : {};
+
+      // Morph path: animate layout params
+      if (state.morphEvolve) {
+        const from = {};
+        const to = {};
+        for (const key of MORPHABLE_KEYS) {
+          if (key in targets && !state.lockedParams[key]) {
+            from[key] = state.layoutParams[key];
+            to[key] = targets[key];
           }
         }
-      });
-
-      if (state.evolveTarget === 'all') {
-        const pIds = ['praystation', 'v01d', 'hydra', 'dystopia', 'folktotem'];
-        const randomPalette = pIds[Math.floor(Math.random() * pIds.length)];
-        return { ...caUpdate, seed: (state.seed + 1) % 1000000, paletteId: randomPalette, layoutParams: newLayout, lastEvolveTs: ts };
+        return {
+          ...caUpdate,
+          ...seedUpdate,
+          ...paletteUpdate,
+          morphing: true,
+          morphFrom: from,
+          morphTo: to,
+          morphStart: performance.now(),
+          lastEvolveTs: ts,
+        };
       }
-      return { ...caUpdate, layoutParams: newLayout, lastEvolveTs: ts };
+
+      // Hard jump path
+      return {
+        ...caUpdate,
+        ...seedUpdate,
+        ...paletteUpdate,
+        layoutParams: { ...state.layoutParams, ...targets },
+        lastEvolveTs: ts,
+      };
     }
     return {};
   }),
