@@ -14,11 +14,6 @@ export function AppProvider({ children }) {
   return <RefsContext.Provider value={{ canvasRef, svgRef }}>{children}</RefsContext.Provider>;
 }
 
-/**
- * useApp Hook
- * High-performance selective state subscription for Kinetic Curator.
- * @param {Function} selector - Selector function for state slices.
- */
 export function useApp(selector) {
   const refs = useContext(RefsContext);
 
@@ -48,6 +43,8 @@ export function useApp(selector) {
       case A.SET_RUNNING: return store.setRunning(payload);
       case A.SET_FPS: return store.setFps(payload);
       case 'SET_NODE_COUNT': return store.setNodeCount(payload);
+      case A.SET_QUALITY: return store.setQuality(payload);
+      case A.SET_AUTO_QUALITY: return store.setAutoQuality(payload);
       case A.SET_SEED: return store.setSeed(payload);
       case A.BUMP_SEED: return store.bumpSeed();
       case A.SET_PALETTE_ID: return store.setPaletteId(payload);

@@ -1,5 +1,4 @@
 // App.jsx — thin layout shell
-// All state lives in AppContext. Panels self-subscribe via useApp().
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
@@ -14,6 +13,8 @@ import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
 import { useAudioInput } from './hooks/useAudioInput.js';
 import { useColumnResize } from './hooks/useColumnResize.js';
+import { useFpsMeter } from './hooks/useFpsMeter.js';
+import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
@@ -39,14 +40,15 @@ function AppInner() {
     isFullscreen: s.isFullscreen,
   }));
 
-  // BUG-08 fix: hotkey overlay state lifted here — single useHotkeys registration
+  // Real FPS + adaptive quality governor
+  useFpsMeter(true);
+  usePerformanceGovernor();
+
   const [showHotkeys, setShowHotkeys] = useState(false);
 
-  // Reference for stable callbacks
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
   evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
 
-  // Time-based evolve
   useEffect(() => {
     if (!state.evolveMode || state.evolveSource !== 'time') return;
     const interval = setInterval(() => {
@@ -55,7 +57,6 @@ function AppInner() {
     return () => clearInterval(interval);
   }, [state.evolveMode, state.evolveSource, state.evolveInterval, dispatch]);
 
-  // Auto-Snapshot (P10: Debounced to prevent browser crash)
   const lastSnapRef = useRef(0);
   useEffect(() => {
     const now = Date.now();
@@ -90,12 +91,10 @@ function AppInner() {
     'e': () => dispatch({ type: A.SET_EVOLVE_MODE, payload: p => !p }),
     'n': () => dispatch({ type: A.BUMP_SEED }),
     ' ': () => dispatch({ type: A.SET_RUNNING, payload: !state.running }),
-    // Undo / Redo (Cmd+Z / Cmd+Shift+Z)
     'z': (e) => { if (e.metaKey || e.ctrlKey) { e.shiftKey ? history.redo() : history.undo(); } },
     '?': () => setShowHotkeys(s => !s),
   });
 
-  // Audio input → stimulus state (B7: proper rAF lifecycle)
   const onAudioStimulus = useCallback(v => dispatch({ type: A.SET_AUDIO_STIMULUS, payload: v }), [dispatch]);
   const onAudioBands = useCallback(v => dispatch({ type: A.SET_AUDIO_BANDS, payload: v }), [dispatch]);
   const onBeat = useCallback(() => {
@@ -104,17 +103,16 @@ function AppInner() {
       dispatch({ type: A.TRIGGER_EVOLVE });
     }
   }, [dispatch]);
-  useAudioInput({ 
-    enabled: state.audioEnabled, 
+  useAudioInput({
+    enabled: state.audioEnabled,
     source: state.audioSource,
     gain: state.audioGain,
     monitor: state.audioMonitor,
-    onStimulus: onAudioStimulus, 
-    onBands: onAudioBands, 
-    onBeat 
+    onStimulus: onAudioStimulus,
+    onBands: onAudioBands,
+    onBeat
   });
 
-  // Draggable column dividers (2-column layout: Canvas on left, all other panels on right)
   const { containerRef, gridTemplate, dividerProps } = useColumnResize(
     2, [0.62, 0.38], 300
   );
