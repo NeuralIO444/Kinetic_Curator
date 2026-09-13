@@ -208,7 +208,6 @@ const createGlobalSlice = (set, get) => ({
   setQuality: (quality) => set((state) => {
     const caps = getQualityCaps(quality);
     const next = { quality };
-    // When switching to performance, force mirror off if not allowed
     if (!caps.allowMirror && state.layoutParams.mirror) {
       next.layoutParams = { ...state.layoutParams, mirror: false };
     }
@@ -244,6 +243,13 @@ const createDavisSlice = (set, get) => ({
   lastEvolveTs: 0,
   favorites: [],
 
+  // Phrase / loop
+  phraseEnabled: false,
+  phraseLength: 8,
+  phraseMode: 'reset-seed', // reset-seed | step-ca | cycle-seed
+  phraseBeat: 0,
+  phraseOriginSeed: null,
+
   setEvolveMode: (valOrFn) => set((state) => ({
     evolveMode: typeof valOrFn === 'function' ? valOrFn(state.evolveMode) : valOrFn
   })),
@@ -251,6 +257,42 @@ const createDavisSlice = (set, get) => ({
   setEvolveTarget: (target) => set({ evolveTarget: target }),
   setEvolveInterval: (interval) => set({ evolveInterval: interval }),
   setAutoSnapshot: (auto) => set({ autoSnapshot: auto }),
+
+  setPhraseEnabled: (enabled) => set({ phraseEnabled: !!enabled, phraseBeat: 0 }),
+  setPhraseLength: (len) => set({ phraseLength: Math.max(2, Math.min(64, Number(len) || 8)), phraseBeat: 0 }),
+  setPhraseMode: (mode) => set({ phraseMode: mode }),
+  armPhrase: (seed) => set({ phraseOriginSeed: seed, phraseBeat: 0 }),
+  resetPhrase: () => set((state) => ({
+    phraseBeat: 0,
+    seed: state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed,
+  })),
+
+  tickPhraseBeat: () => set((state) => {
+    if (!state.phraseEnabled) return {};
+    const nextBeat = state.phraseBeat + 1;
+    if (nextBeat < state.phraseLength) {
+      return { phraseBeat: nextBeat };
+    }
+
+    // Boundary hit
+    const origin = state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed;
+    let updates = { phraseBeat: 0 };
+
+    if (state.phraseMode === 'reset-seed') {
+      updates.seed = origin;
+    } else if (state.phraseMode === 'cycle-seed') {
+      // Walk forward one step from origin each loop, but stay related
+      updates.seed = (origin + Math.floor(nextBeat / state.phraseLength)) >>> 0;
+      // Actually on each full loop, bump relative to origin by loop count stored implicitly via beat reset
+      updates.seed = (origin + 1) >>> 0;
+      updates.phraseOriginSeed = updates.seed; // new origin for next phrase
+    } else if (state.phraseMode === 'step-ca') {
+      updates.caGrid = state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28);
+      updates.seed = origin; // keep seed, advance CA structure
+    }
+
+    return updates;
+  }),
 
   triggerEvolve: () => set((state) => {
     const ts = Date.now();
