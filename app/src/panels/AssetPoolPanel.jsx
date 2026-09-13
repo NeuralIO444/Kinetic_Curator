@@ -1,14 +1,14 @@
-// AssetPoolPanel (P02) — browse, filter, toggle assets
+// AssetPoolPanel (P02) — browse, filter, toggle assets (emit-only actions)
 import { useMemo } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCollapse } from '../hooks/useCollapse.js';
 import { usePanelResize } from '../hooks/usePanelResize.js';
 import { ALL_CATEGORIES } from '../data/categories.js';
-import * as A from '../state/actions.js';
+import { emit, Events } from '../composition/eventBus.js';
 
 export function AssetPoolPanel() {
-  const { dispatch, assets } = useApp();
+  const { assets } = useApp();
   const { state } = useApp(s => ({
     enabled: s.enabledAssets,
     search: s.search,
@@ -47,8 +47,8 @@ export function AssetPoolPanel() {
     <div className="panel panel-pool" style={open ? { height, maxHeight: 'none' } : undefined}>
       <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active`} collapsed={!open} onToggle={toggle}>
         <div className="header-tools">
-          <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} onClick={() => dispatch({ type: A.SET_POOL_VIEW, payload: 'grid' })}>GRID</button>
-          <button className={`chip-btn ${poolView === 'list' ? 'active' : ''}`} onClick={() => dispatch({ type: A.SET_POOL_VIEW, payload: 'list' })}>LIST</button>
+          <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'grid')}>GRID</button>
+          <button className={`chip-btn ${poolView === 'list' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'list')}>LIST</button>
         </div>
       </PanelHeader>
       {open && (
@@ -56,34 +56,34 @@ export function AssetPoolPanel() {
           <div className="pool-controls">
             <div className="cat-filter">
               <button className={`cat-chip ${catFilter === 'all' ? 'active' : ''}`}
-                onClick={() => dispatch({ type: A.SET_CAT_FILTER, payload: 'all' })}>
+                onClick={() => emit(Events.ASSETS_CAT_FILTER, 'all')}>
                 ALL <span className="cat-chip-count">{assets.length}</span>
               </button>
               {ALL_CATEGORIES.map(c => {
                 const cc = catCounts[c] || { total: 0, on: 0 };
                 return (
                   <button key={c} className={`cat-chip ${catFilter === c ? 'active' : ''}`}
-                    onClick={() => dispatch({ type: A.SET_CAT_FILTER, payload: c })}>
+                    onClick={() => emit(Events.ASSETS_CAT_FILTER, c)}>
                     {c} <span className="cat-chip-count">{cc.on}/{cc.total}</span>
                   </button>
                 );
               })}
               <span style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-                <button className="chip-btn" onClick={() => dispatch({ type: A.TOGGLE_ALL_ASSETS, payload: true })}>ALL ON</button>
-                <button className="chip-btn" onClick={() => dispatch({ type: A.TOGGLE_ALL_ASSETS, payload: false })}>ALL OFF</button>
+                <button className="chip-btn" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, true)}>ALL ON</button>
+                <button className="chip-btn" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, false)}>ALL OFF</button>
               </span>
             </div>
             <div className="pool-search">
               <span className="prompt">⟩</span>
               <input placeholder="filter assets…" value={search}
-                onChange={e => dispatch({ type: A.SET_SEARCH, payload: e.target.value })} />
+                onChange={e => emit(Events.ASSETS_SEARCH, e.target.value)} />
             </div>
           </div>
           <div className={`pool-body ${poolView}`}>
             <div className="asset-grid">
               {filtered.map(a => (
                 <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}`}>
-                  <button className="tile-toggle" onClick={() => dispatch({ type: A.TOGGLE_ASSET, id: a.id })}>
+                  <button className="tile-toggle" onClick={() => emit(Events.ASSETS_TOGGLE, { id: a.id })}>
                     <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40"
                       dangerouslySetInnerHTML={{ __html: a.svg }} />
                   </button>

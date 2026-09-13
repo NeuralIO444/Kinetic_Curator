@@ -16,13 +16,16 @@ import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
-import { createDispatchPipe, subscribeDispatch } from './composition/dispatchPipe.js';
+import { wireEventBus } from './composition/wireEventBus.js';
+import { subscribeDispatch } from './composition/dispatchPipe.js';
 
 function AppInner() {
   const { dispatch: rawDispatch, history, palette, svgRef } = useApp();
-  const dispatch = createDispatchPipe(rawDispatch);
+  // Wire the event bus once — all panel emits flow through the dispatch pipe
+  const dispatch = useRef(null);
+  if (!dispatch.current) dispatch.current = wireEventBus(rawDispatch);
+  const piped = dispatch.current;
 
-  // Optional: log every action through the pipe (telemetry hook point)
   useEffect(() => subscribeDispatch((a) => {
     if (import.meta.env.DEV) console.debug('[pipe]', a.type);
   }), []);
@@ -59,9 +62,9 @@ function AppInner() {
 
   useEffect(() => {
     if (!state.evolveMode || state.evolveSource !== 'time') return;
-    const interval = setInterval(() => dispatch({ type: A.TRIGGER_EVOLVE }), state.evolveInterval);
+    const interval = setInterval(() => piped({ type: A.TRIGGER_EVOLVE }), state.evolveInterval);
     return () => clearInterval(interval);
-  }, [state.evolveMode, state.evolveSource, state.evolveInterval, dispatch]);
+  }, [state.evolveMode, state.evolveSource, state.evolveInterval, piped]);
 
   const lastSnapRef = useRef(0);
   useEffect(() => {
@@ -75,7 +78,7 @@ function AppInner() {
   }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, svgRef]);
 
   useHotkeys({
-    's': () => dispatch({
+    's': () => piped({
       type: A.ADD_SNAPSHOT,
       snapshot: {
         seed: state.seed,
@@ -85,7 +88,7 @@ function AppInner() {
         config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
       },
     }),
-    'F': () => dispatch({
+    'F': () => piped({
       type: A.ADD_FAVORITE,
       favorite: {
         seed: state.seed,
@@ -93,22 +96,22 @@ function AppInner() {
         config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
       },
     }),
-    'f': () => dispatch({ type: A.TOGGLE_FULLSCREEN }),
-    'e': () => dispatch({ type: A.SET_EVOLVE_MODE, payload: p => !p }),
-    'n': () => dispatch({ type: A.BUMP_SEED }),
-    ' ': () => dispatch({ type: A.SET_RUNNING, payload: !state.running }),
+    'f': () => piped({ type: A.TOGGLE_FULLSCREEN }),
+    'e': () => piped({ type: A.SET_EVOLVE_MODE, payload: p => !p }),
+    'n': () => piped({ type: A.BUMP_SEED }),
+    ' ': () => piped({ type: A.SET_RUNNING, payload: !state.running }),
     'z': (e) => { if (e.metaKey || e.ctrlKey) { e.shiftKey ? history.redo() : history.undo(); } },
     '?': () => setShowHotkeys(s => !s),
   });
 
-  const onAudioStimulus = useCallback(v => dispatch({ type: A.SET_AUDIO_STIMULUS, payload: v }), [dispatch]);
-  const onAudioBands = useCallback(v => dispatch({ type: A.SET_AUDIO_BANDS, payload: v }), [dispatch]);
+  const onAudioStimulus = useCallback(v => piped({ type: A.SET_AUDIO_STIMULUS, payload: v }), [piped]);
+  const onAudioBands = useCallback(v => piped({ type: A.SET_AUDIO_BANDS, payload: v }), [piped]);
   const onBeat = useCallback(() => {
-    dispatch({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
+    piped({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
     if (evolveRef.current.mode && evolveRef.current.source === 'beat') {
-      dispatch({ type: A.TRIGGER_EVOLVE });
+      piped({ type: A.TRIGGER_EVOLVE });
     }
-  }, [dispatch]);
+  }, [piped]);
   useAudioInput({
     enabled: state.audioEnabled,
     source: state.audioSource,
@@ -126,7 +129,7 @@ function AppInner() {
       <MasterBar />
       <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} />
       <Shell
-        dispatchPipe={dispatch}
+        dispatchPipe={piped}
         containerRef={containerRef}
         gridTemplate={gridTemplate}
         dividerProps={dividerProps}

@@ -1,9 +1,8 @@
-// RangeRow — slider with lock, dice, and click-to-type readout
-// Bundle 3: parameter exploration controls
+// RangeRow — slider with lock, dice, click-to-type readout, optional hint tooltip
 import { useState, useRef, useEffect } from 'react';
 
 export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange, readout,
-  defaultValue, locked, onToggleLock, onRandomize }) {
+  defaultValue, locked, onToggleLock, onRandomize, hint }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef(null);
@@ -27,16 +26,18 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
     setEditing(false);
   };
 
+  const labelTitle = [hint, defaultValue !== undefined ? `Double-click to reset (${defaultValue})` : null]
+    .filter(Boolean).join(' · ') || undefined;
+
   return (
-    <div className={`range-row ${locked ? 'range-locked' : ''}`}>
+    <div className={`range-row ${locked ? 'range-locked' : ''}`} title={hint}>
       <div className="range-label-group">
         {onToggleLock && (
           <button className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>
             {locked ? '🔒' : '🔓'}
           </button>
         )}
-        <span className="range-label" onDoubleClick={handleDoubleClick}
-          title={defaultValue !== undefined ? `Double-click to reset (${defaultValue})` : undefined}>
+        <span className="range-label" onDoubleClick={handleDoubleClick} title={labelTitle}>
           {label}
         </span>
       </div>
@@ -48,6 +49,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
         onChange={e => onChange(Number(e.target.value))}
         onDoubleClick={handleDoubleClick}
         disabled={locked}
+        title={hint}
       />
       <div className="range-right">
         {editing ? (
@@ -69,7 +71,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
 
 export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
   onChangeLow, onChangeHigh, readout, defaultLow, defaultHigh,
-  locked, onToggleLock, onRandomize }) {
+  locked, onToggleLock, onRandomize, hint }) {
   const [editing, setEditing] = useState(false);
   const [editLow, setEditLow] = useState('');
   const [editHigh, setEditHigh] = useState('');
@@ -98,20 +100,22 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
     setEditing(false);
   };
 
+  const labelTitle = [hint, defaultLow !== undefined ? `Double-click to reset (${defaultLow}–${defaultHigh})` : null]
+    .filter(Boolean).join(' · ') || undefined;
+
   return (
-    <div className={`range-row ${locked ? 'range-locked' : ''}`}>
+    <div className={`range-row ${locked ? 'range-locked' : ''}`} title={hint}>
       <div className="range-label-group">
         {onToggleLock && (
           <button className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>
             {locked ? '🔒' : '🔓'}
           </button>
         )}
-        <span className="range-label" onDoubleClick={handleDoubleClick}
-          title={defaultLow !== undefined ? `Double-click to reset (${defaultLow}–${defaultHigh})` : undefined}>
+        <span className="range-label" onDoubleClick={handleDoubleClick} title={labelTitle}>
           {label}
         </span>
       </div>
-      <div className="dual-slider" onDoubleClick={handleDoubleClick}>
+      <div className="dual-slider" onDoubleClick={handleDoubleClick} title={hint}>
         <div className="dual-track" />
         <div className="dual-fill" style={{ left: `${((low - min) / (max - min)) * 100}%`, width: `${((high - low) / (max - min)) * 100}%` }} />
         <input type="range" min={min} max={max} step={step} value={low} onChange={e => onChangeLow(Number(e.target.value))} disabled={locked} />

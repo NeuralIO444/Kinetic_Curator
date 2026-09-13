@@ -1,4 +1,4 @@
-// OutputPanel (P05) — export + quality controls
+// OutputPanel (P05) — export + quality (emit-only actions)
 import { useRef } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
@@ -6,10 +6,10 @@ import { useCollapse } from '../hooks/useCollapse.js';
 import { usePanelResize } from '../hooks/usePanelResize.js';
 import { exportSnapshot, useVideoRecorder } from '../hooks/useMediaExport.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
-import * as A from '../state/actions.js';
+import { emit, Events } from '../composition/eventBus.js';
 
 export function OutputPanel() {
-  const { dispatch, palette, svgRef } = useApp();
+  const { palette, svgRef } = useApp();
   const { state } = useApp(s => ({
     snapshots: s.snapshots,
     exportResolution: s.exportResolution,
@@ -32,15 +32,12 @@ export function OutputPanel() {
 
   const addSnapshot = () => {
     exportSnapshot(svgRef.current, exportResolution, seed.toString(16));
-    dispatch({
-      type: A.ADD_SNAPSHOT,
-      snapshot: {
-        seed,
-        format: 'PNG',
-        resolution: exportResolution === 1 ? '1920×1080' : exportResolution === 2 ? '3840×2160' : '7680×4320',
-        timestamp: new Date().toISOString().slice(11, 19),
-        config: { layout: { ...layoutParams }, palette: { id: palette.id } },
-      },
+    emit(Events.EXPORT_SNAPSHOT, {
+      seed,
+      format: 'PNG',
+      resolution: exportResolution === 1 ? '1920×1080' : exportResolution === 2 ? '3840×2160' : '7680×4320',
+      timestamp: new Date().toISOString().slice(11, 19),
+      config: { layout: { ...layoutParams }, palette: { id: palette.id } },
     });
   };
 
@@ -69,11 +66,11 @@ export function OutputPanel() {
         const config = JSON.parse(ev.target.result);
         if (config.seed) {
           const seedVal = typeof config.seed === 'string' ? parseInt(config.seed, 16) : config.seed;
-          if (!isNaN(seedVal)) dispatch({ type: A.SET_SEED, payload: seedVal });
+          if (!isNaN(seedVal)) emit(Events.EXPORT_SEED, seedVal);
         }
-        if (config.palette) dispatch({ type: A.SET_PALETTE_ID, payload: config.palette });
+        if (config.palette) emit(Events.EXPORT_PALETTE, config.palette);
         if (config.layout) {
-          dispatch({ type: A.APPLY_PRESET, preset: { id: config.layout.composition || 'praystation', params: config.layout } });
+          emit(Events.EXPORT_IMPORT_LAYOUT, { id: config.layout.composition || 'praystation', params: config.layout });
         }
       } catch (err) {
         console.warn('Failed to import config:', err);
@@ -89,7 +86,6 @@ export function OutputPanel() {
       {open && (
         <>
           <div className="panel-body output-body" style={{ flex: 1, overflow: 'auto' }}>
-            {/* Quality presets */}
             <div style={{ marginBottom: 8 }}>
               <div style={{ fontSize: 9, letterSpacing: '0.1em', color: 'var(--dim)', marginBottom: 4 }}>QUALITY</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -98,7 +94,7 @@ export function OutputPanel() {
                     key={q.id}
                     className={`chip-btn ${quality === q.id ? 'active' : ''}`}
                     title={q.description}
-                    onClick={() => dispatch({ type: A.SET_QUALITY, payload: q.id })}
+                    onClick={() => emit(Events.EXPORT_QUALITY, q.id)}
                     style={quality === q.id ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}}
                   >
                     {q.label}
@@ -107,7 +103,7 @@ export function OutputPanel() {
                 <button
                   className={`chip-btn ${autoQuality ? 'active' : ''}`}
                   title="Automatically step quality down when FPS stays low"
-                  onClick={() => dispatch({ type: A.SET_AUTO_QUALITY, payload: !autoQuality })}
+                  onClick={() => emit(Events.EXPORT_AUTO_QUALITY, !autoQuality)}
                   style={autoQuality ? { borderColor: '#00ff88', color: '#00ff88' } : {}}
                 >
                   AUTO {autoQuality ? 'ON' : 'OFF'}
@@ -118,31 +114,31 @@ export function OutputPanel() {
             <div className="output-row">
               <select
                 value={exportResolution}
-                onChange={e => dispatch({ type: A.SET_EXPORT_RESOLUTION, payload: parseInt(e.target.value) })}
+                onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value))}
                 style={{ padding: '4px', fontSize: '10px', background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', flex: 1 }}
               >
                 <option value={1}>1x (1920×1080)</option>
                 <option value={2}>2x (3840×2160)</option>
                 <option value={4}>4x (7680×4320)</option>
               </select>
-              <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }}>\u2193 SNAP</button>
+              <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }}>↓ SNAP</button>
             </div>
 
             <div className="output-row">
               <button
                 className="big-btn"
-                onClick={() => dispatch({ type: A.SET_IS_RECORDING, payload: !isRecording })}
+                onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
                 style={isRecording ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
               >
-                {isRecording ? '\u23f9 STOP REC' : '\u23fa REC WEBM'}
+                {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}
               </button>
-              <button className="big-btn dl" onClick={exportJSON} style={{ flex: 1 }}>\u2193 JSON</button>
-              <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }}>\u2191 IMPORT</button>
+              <button className="big-btn dl" onClick={exportJSON} style={{ flex: 1 }}>↓ JSON</button>
+              <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }}>↑ IMPORT</button>
               <input ref={fileInputRef} type="file" accept=".json" onChange={importConfig} style={{ display: 'none' }} />
             </div>
 
             <div className="output-row">
-              <button className="big-btn dl" onClick={() => dispatch({ type: A.CLEAR_SNAPSHOTS })} style={{ width: '100%' }}>\u2715 CLEAR</button>
+              <button className="big-btn dl" onClick={() => emit(Events.EXPORT_CLEAR_SNAPSHOTS)} style={{ width: '100%' }}>✕ CLEAR</button>
             </div>
 
             {snapshots.length > 0 && (
@@ -159,7 +155,7 @@ export function OutputPanel() {
               </div>
             )}
             {snapshots.length === 0 && (
-              <div className="output-hint">Press <b>S</b> to capture \u00b7 JSON sidecar included</div>
+              <div className="output-hint">Press <b>S</b> to capture · JSON sidecar included</div>
             )}
           </div>
           <div className="panel-resize-handle" {...handleProps}>

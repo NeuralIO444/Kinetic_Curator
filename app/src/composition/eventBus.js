@@ -1,8 +1,5 @@
 // Typed event bus — panels emit, shell/store subscribes.
-// This is the decoupling layer: panels no longer import the store or receive onDispatch.
-// Every emit still flows through the dispatch pipe observers (telemetry chokepoint).
-
-const listeners = new Map(); // event -> Set<fn>
+const listeners = new Map();
 
 export function on(event, fn) {
   if (!listeners.has(event)) listeners.set(event, new Set());
@@ -37,7 +34,6 @@ export function once(event, fn) {
   on(event, wrap);
 }
 
-// Domain namespaces for clarity
 export const Events = {
   DAVIS_EVOLVE: 'davis:evolve',
   DAVIS_MORPH: 'davis:morph',
@@ -55,6 +51,18 @@ export const Events = {
   AUDIO_SOURCE: 'audio:source',
   AUDIO_MONITOR: 'audio:monitor',
   WEBCAM_TOGGLE: 'webcam:toggle',
+  ASSETS_TOGGLE: 'assets:toggle',
+  ASSETS_TOGGLE_ALL: 'assets:toggleAll',
+  ASSETS_SEARCH: 'assets:search',
+  ASSETS_CAT_FILTER: 'assets:catFilter',
+  ASSETS_POOL_VIEW: 'assets:poolView',
   EXPORT_SNAPSHOT: 'export:snapshot',
   EXPORT_RECORD: 'export:record',
+  EXPORT_RESOLUTION: 'export:resolution',
+  EXPORT_CLEAR_SNAPSHOTS: 'export:clearSnapshots',
+  EXPORT_QUALITY: 'export:quality',
+  EXPORT_AUTO_QUALITY: 'export:autoQuality',
+  EXPORT_SEED: 'export:seed',
+  EXPORT_PALETTE: 'export:palette',
+  EXPORT_IMPORT_LAYOUT: 'export:importLayout',
 };
