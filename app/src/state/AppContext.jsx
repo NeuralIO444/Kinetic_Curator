@@ -73,6 +73,10 @@ export function useApp(selector) {
       case A.SET_EVOLVE_INTERVAL: return store.setEvolveInterval(payload);
       case A.SET_AUTO_SNAPSHOT: return store.setAutoSnapshot(payload);
       case A.TRIGGER_EVOLVE: return store.triggerEvolve();
+      case A.SET_PHRASE_ENABLED: return store.setPhraseEnabled(payload);
+      case A.SET_PHRASE_LENGTH: return store.setPhraseLength(payload);
+      case A.SET_PHRASE_MODE: return store.setPhraseMode(payload);
+      case A.RESET_PHRASE: return store.resetPhrase();
       case A.SET_SLOW_RENDER: return store.setSlowRender(payload);
       case A.TOGGLE_FULLSCREEN: return store.toggleFullscreen();
       case A.ADD_SNAPSHOT: return store.addSnapshot(action.snapshot);

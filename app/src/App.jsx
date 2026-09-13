@@ -17,6 +17,7 @@ import { useFpsMeter } from './hooks/useFpsMeter.js';
 import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
 import { useBeatDecay } from './hooks/useBeatDecay.js';
 import { useContinuousLife } from './hooks/useContinuousLife.js';
+import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
@@ -46,6 +47,7 @@ function AppInner() {
   usePerformanceGovernor();
   useBeatDecay();
   useContinuousLife();
+  usePhraseLoop();
 
   const [showHotkeys, setShowHotkeys] = useState(false);
 
@@ -138,8 +140,8 @@ function AppInner() {
         </div>
       </div>
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v0.5 · {Object.values(state.enabled).filter(Boolean).length} assets active</span>
-        <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
+        <span>KINETIC_CURATOR v0.5 \u00b7 {Object.values(state.enabled).filter(Boolean).length} assets active</span>
+        <span>{state.layoutParams.mode} \u00b7 seed:{state.seed.toString(16)}</span>
       </footer>
     </div>
   );
