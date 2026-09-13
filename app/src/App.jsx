@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
-import { CanvasPanel } from './panels/CanvasPanel.jsx';
-import { LayoutPanel } from './panels/LayoutPanel.jsx';
-import { AssetPoolPanel } from './panels/AssetPoolPanel.jsx';
-import { OutputPanel } from './panels/OutputPanel.jsx';
-import { StimulusPanel } from './panels/StimulusPanel.jsx';
-import { DavisPanel } from './panels/DavisPanel.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
@@ -21,9 +15,18 @@ import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
+import { Shell } from './composition/Shell.jsx';
+import { createDispatchPipe, subscribeDispatch } from './composition/dispatchPipe.js';
 
 function AppInner() {
-  const { dispatch, history, palette, svgRef } = useApp();
+  const { dispatch: rawDispatch, history, palette, svgRef } = useApp();
+  const dispatch = createDispatchPipe(rawDispatch);
+
+  // Optional: log every action through the pipe (telemetry hook point)
+  useEffect(() => subscribeDispatch((a) => {
+    if (import.meta.env.DEV) console.debug('[pipe]', a.type);
+  }), []);
+
   const { state } = useApp(s => ({
     evolveMode: s.evolveMode,
     evolveSource: s.evolveSource,
@@ -122,21 +125,14 @@ function AppInner() {
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
       <MasterBar />
       <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} />
-      <div className="grid" ref={containerRef} style={{ gridTemplateColumns: gridTemplate }}>
-        <div className="col col-canvas">
-          <ErrorBoundary><CanvasPanel /></ErrorBoundary>
-        </div>
-        <div className="col-divider" {...dividerProps(0)} />
-        <div className="col col-panels">
-          <LayoutPanel />
-          <AssetPoolPanel />
-          <StimulusPanel />
-          <DavisPanel />
-          <OutputPanel />
-        </div>
-      </div>
+      <Shell
+        dispatchPipe={dispatch}
+        containerRef={containerRef}
+        gridTemplate={gridTemplate}
+        dividerProps={dividerProps}
+      />
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v0.5</span>
+        <span>KINETIC_CURATOR v0.6</span>
         <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
       </footer>
     </div>
