@@ -6,58 +6,78 @@ A modern generative art engine and live visual performance tool built with React
 
 ## Core Philosophy: "Curated Chaos"
 
-Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the parameters (the layout grid, the SVG assets, the color palettes) and let the random seed drive the chaos. By combining algorithmic layout modes (Fibonacci, CA, Perlin Flow) with live microphone input and dynamic seed mutation, the tool functions like a generative synthesizer. 
+Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the parameters (the layout grid, the SVG assets, the color palettes) and let the random seed drive the chaos. By combining algorithmic layout modes (Fibonacci, CA, Perlin Flow) with live microphone input and dynamic seed mutation, the tool functions like a generative synthesizer.
 
 ## Features
 
 - **Live SVG Rendering Engine:** Harnesses React to instantly re-render thousands of SVG nodes across multiple generative layout algorithms (Fibonacci, Grid, Cellular Automata, Orbit, Flow, etc.).
 - **Audio Reactivity:** Built-in Web Audio API support. Route live microphone data or load MP3/WAV files to drive the scale, density, and count of the generative elements via transient (beat) detection.
-- **Generative Autopilot (Davis Mode):** Set up a time-based or beat-based "Evolve" interval to automatically mutate the seed, layout parameters, or color palettes without touching the mouse.
-- **Export Pipeline:** Capture the canvas as high-resolution (up to 8K) PNG snapshots, or stream the live SVG canvas into a 30fps `.webm` video recording directly from the browser.
-- **Save & Recall State:** Favorite generative "hits" on the fly, saving their exact seed and parameter configurations to jump back to them later. All PNG snapshots include JSON sidecar data for reproducibility.
+- **Generative Autopilot (Davis Mode):** Time- or beat-based Evolve with optional **morphing** parameter transitions, continuous LFO life, and phrase/loop clocks.
+- **Export Pipeline:** High-resolution PNG snapshots (up to 8K) and WebM recording from the live SVG canvas.
+- **Save & Recall State:** Favorites for seed + layout + palette; PNG snapshots include JSON sidecars.
 
 ## Technology Stack
 
-- **Framework:** React 18 + Vite
-- **Styling:** Custom CSS Custom Properties (Dark Mode / Creative Tool UI)
-- **State Management:** React Context API + Custom `useHistory` Hook (Undo/Redo)
-- **Exporting:** Canvas API (`canvas.toBlob`), MediaRecorder API (`canvas.captureStream`)
+- **Framework:** React 19 + Vite 8
+- **State:** Zustand
+- **Styling:** CSS custom properties (dark creative-tool UI)
+- **Export:** Canvas API + MediaRecorder
 
-## Installation & Setup
+## Installation & Setup (local)
 
-1. Make sure you have Node.js installed.
-2. Clone this repository.
-3. Navigate to the `app/` directory:
-   ```bash
-   cd app
-   ```
-4. Install the dependencies:
-   ```bash
-   npm install
-   ```
-5. Start the development server:
-   ```bash
-   npm run dev
-   ```
-6. Open your browser to `http://localhost:5173`.
+```bash
+git clone https://github.com/NeuralIO444/Kinetic_Curator.git
+cd Kinetic_Curator/app
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173**.
+
+## Public deployment
+
+### Option A — GitHub Pages (already wired)
+
+1. Open the repo on GitHub → **Settings → Pages**.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Push to `main` (or run the **Deploy to GitHub Pages** workflow manually under Actions).
+4. After the workflow succeeds, the site is at:
+
+   **https://neuralio444.github.io/Kinetic_Curator/**
+
+(Exact URL uses your GitHub username/org casing.)
+
+The workflow lives in `.github/workflows/deploy-pages.yml` and builds `app/` with `base: /Kinetic_Curator/`.
+
+### Option B — Vercel (root URL, great for custom domains)
+
+1. Go to [vercel.com](https://vercel.com) → **Add New Project** → import this repo.
+2. Framework preset can be **Other**; `vercel.json` already sets:
+   - build: `cd app && npm ci && VITE_BASE=/ npm run build`
+   - output: `app/dist`
+3. Deploy. You’ll get a URL like `https://kinetic-curator.vercel.app`.
+
+Mic/audio works on HTTPS (required by browsers for `getUserMedia`).
+
+### Option C — Netlify
+
+- Build command: `cd app && npm ci && VITE_BASE=/ npm run build`
+- Publish directory: `app/dist`
 
 ## Architecture & Further Reading
 
-For a deep dive into how the engine processes layout modes and how the state tree is structured, refer to the [Architecture Document](docs/architecture.md).
-
-For the philosophical background and aesthetic inspirations behind the tool, read the [Kinetic Manifesto](docs/manifesto.md).
+- [Architecture Document](docs/architecture.md)
+- [Kinetic Manifesto](docs/manifesto.md)
 
 ## Hotkeys
 
-The tool is designed to be "played" like an instrument. Use the following hotkeys to control the engine:
-
-- `Space` — Pause / Resume live painting (useful for freezing a frame)
-- `S` — Capture a PNG Snapshot
-- `F` — Save the current Seed to Favorites
-- `E` — Toggle Auto-Evolve mode ON/OFF
-- `N` — Generate a New Seed
-- `Cmd+Z` — Undo parameter change
-- `Cmd+Shift+Z` — Redo parameter change
+- `Space` — Pause / Resume
+- `S` — PNG Snapshot
+- `F` — Favorite current seed/config
+- `E` — Toggle Evolve
+- `N` — New seed
+- `Cmd+Z` / `Cmd+Shift+Z` — Undo / Redo
+- `?` — Hotkey overlay
 
 ## License
 
