@@ -1,5 +1,10 @@
 // CanvasPanel (P01) — live SVG preview
 // Placement logic is in engine/placement.js — this is render-only
+//
+// Performance notes:
+// - Colors are resolved once per seed/palette change (not every frame)
+// - Extreme counts are soft-clamped to protect the main thread
+// - Swarm still forces a tick; spatial hash lives in particles.js
 
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
@@ -11,11 +16,14 @@ import { mkRng } from '../engine/prng.js';
 import { getPreset } from '../data/presets.js';
 import { ParticleSystem } from '../engine/particles.js';
 
-// Instantiate the single-source-of-truth particle engine
+// Soft performance ceiling — beyond this we clamp before placement
+const SOFT_MAX_COUNT = 650;
+const HARD_MAX_COUNT = 900;
+
 const swarmSystem = new ParticleSystem();
 
 export function CanvasPanel() {
-  const { palette, assets, canvasRef, svgRef } = useApp();
+  const { palette, assets, canvasRef, svgRef, dispatch } = useApp();
   const { state } = useApp(s => ({
     layoutParams: s.layoutParams,
     seed: s.seed,
@@ -75,6 +83,12 @@ export function CanvasPanel() {
     [assets, enabled],
   );
 
+  // Soft-clamp count to protect the main thread
+  const safeCount = Math.min(
+    Math.max(1, layoutParams.count),
+    layoutParams.mirror ? SOFT_MAX_COUNT : HARD_MAX_COUNT
+  );
+
   // Local frame count tick for 60fps swarm triggers
   const [tick, setTick] = useState(0);
   const attractorRef = useRef(null);
@@ -84,7 +98,7 @@ export function CanvasPanel() {
     if (layoutParams.mode !== 'swarm') return;
 
     swarmSystem.init(
-      layoutParams.particleCount || 150,
+      Math.min(layoutParams.particleCount || 150, 350),
       canvasW,
       canvasH,
       activeAssets,
@@ -119,11 +133,10 @@ export function CanvasPanel() {
     const scaleY = canvasH / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
-    
-    // Correct zoom and pan transforms to resolve cursor coordinates accurately
+
     const unpanX = (x - pan.x) / zoom;
     const unpanY = (y - pan.y) / zoom;
-    
+
     attractorRef.current = { x: unpanX, y: unpanY };
   };
 
@@ -148,7 +161,7 @@ export function CanvasPanel() {
     if (activeAssets.length === 0) return [];
     return computePlacements({
       mode: layoutParams.mode,
-      count: layoutParams.count,
+      count: safeCount,
       seed,
       scale: layoutParams.scale,
       rotate: layoutParams.rotate,
@@ -164,9 +177,10 @@ export function CanvasPanel() {
       noiseFreq: layoutParams.noiseFreq,
       noiseSpeed: layoutParams.noiseSpeed,
     });
-  }, [activeAssets.length, layoutParams, seed, canvasW, canvasH, caGrid]);
+  }, [activeAssets.length, layoutParams, seed, canvasW, canvasH, caGrid, safeCount]);
 
-  // BUG-04 fix: memoize rng + item mapping so it's deterministic across renders
+  // Pre-resolve colors + SVG strings once per seed/palette/placements change
+  // (avoids string replace work on every React render)
   const items = useMemo(() => {
     const rng = mkRng(seed + 1);
     let mapped = placements.map((p, i) => {
@@ -178,15 +192,15 @@ export function CanvasPanel() {
         index: p.index,
         rng: () => rng(),
       });
-      return { ...p, asset, color };
+      const accent = palette.swatches[(palette.swatches.indexOf(color) + 3) % palette.swatches.length] || palette.swatches[0];
+      const svg = resolveColors(asset.svg, color, accent);
+      return { ...p, asset, color, svg };
     });
 
-    // FG-01: overlap — when OFF, sort by scale (ascending) for depth ordering
     if (!layoutParams.overlap) {
       mapped = [...mapped].sort((a, b) => a.scale - b.scale);
     }
 
-    // FG-01: mirror — duplicate every item reflected around canvas center X
     if (layoutParams.mirror) {
       const mirrored = mapped.map(item => ({
         ...item,
@@ -199,17 +213,14 @@ export function CanvasPanel() {
     return mapped;
   }, [placements, activeAssets, palette.swatches, preset.paletteShift, seed, layoutParams.overlap, layoutParams.mirror, canvasW]);
 
-  // Dynamic selector for items mapping based on active layout modes
   const renderItems = useMemo(() => {
     if (layoutParams.mode === 'swarm') {
       let swarmItems = swarmSystem.getItems(activeAssets);
-      
-      // Apply z-sorting when overlap is OFF
+
       if (!layoutParams.overlap) {
         swarmItems = [...swarmItems].sort((a, b) => a.scale - b.scale);
       }
-      
-      // Apply mirror reflections if enabled
+
       if (layoutParams.mirror) {
         const mirrored = swarmItems.map(item => ({
           ...item,
@@ -222,7 +233,14 @@ export function CanvasPanel() {
       return swarmItems;
     }
     return items;
-  }, [layoutParams.mode, items, activeAssets, layoutParams.overlap, layoutParams.mirror, tick]);
+  }, [layoutParams.mode, items, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW]);
+
+  // Push live node count into the store for MasterBar / governor
+  useEffect(() => {
+    if (typeof dispatch === 'function') {
+      dispatch({ type: 'SET_NODE_COUNT', payload: renderItems.length });
+    }
+  }, [renderItems.length, dispatch]);
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
@@ -235,6 +253,11 @@ export function CanvasPanel() {
             RESET VIEW
           </button>
           <span className="meter-pill">{canvasW}×{canvasH}</span>
+          {safeCount < layoutParams.count && (
+            <span className="meter-pill" title="Count soft-clamped for performance" style={{ color: '#ffaa00' }}>
+              CLAMPED {safeCount}
+            </span>
+          )}
         </div>
       </PanelHeader>
       {open && (
@@ -251,6 +274,23 @@ export function CanvasPanel() {
           >
             <g transform={`translate(${canvasW/2}, ${canvasH/2}) scale(${zoom}) translate(${-canvasW/2}, ${-canvasH/2}) translate(${pan.x/zoom}, ${pan.y/zoom})`}>
               {renderItems.map((item, i) => {
+                // Prefer pre-resolved svg when available (static modes)
+                if (item.svg) {
+                  return (
+                    <g
+                      key={i}
+                      transform={`translate(${item.x}, ${item.y}) scale(${item._mirrored ? -item.scale : item.scale}, ${item.scale}) rotate(${item.rotation})`}
+                      opacity={item.alpha / 100}
+                      style={{
+                        transition: motionSmoothing && layoutParams.mode !== 'swarm' ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease' : 'none',
+                        transformOrigin: '0 0',
+                      }}
+                      dangerouslySetInnerHTML={{ __html: item.svg }}
+                    />
+                  );
+                }
+
+                // Swarm path still resolves on the fly (particles carry color only)
                 const ink = item.color;
                 const accent = palette.swatches[(palette.swatches.indexOf(ink) + 3) % palette.swatches.length] || palette.swatches[0];
                 const svgStr = resolveColors(item.asset.svg, ink, accent);
@@ -259,10 +299,7 @@ export function CanvasPanel() {
                     key={i}
                     transform={`translate(${item.x}, ${item.y}) scale(${item._mirrored ? -item.scale : item.scale}, ${item.scale}) rotate(${item.rotation})`}
                     opacity={item.alpha / 100}
-                    style={{
-                      transition: motionSmoothing && layoutParams.mode !== 'swarm' ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease' : 'none',
-                      transformOrigin: '0 0',
-                    }}
+                    style={{ transition: 'none', transformOrigin: '0 0' }}
                     dangerouslySetInnerHTML={{ __html: svgStr }}
                   />
                 );

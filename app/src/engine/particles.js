@@ -1,7 +1,10 @@
 /**
  * particles.js
  * Physics-based particle simulation system for Kinetic Curator.
- * Implements Perlin winds, Reynolds flocking, and mouse attraction gravity wells.
+ * Implements Perlin winds, Reynolds flocking (spatial-hash), and mouse attraction.
+ *
+ * Performance: neighbor queries use a uniform grid spatial hash (~O(N))
+ * instead of a naïve O(N²) double loop.
  */
 
 import { noise3D, seedNoise } from './noise.js';
@@ -10,29 +13,26 @@ class Particle {
   constructor(x, y, assetIndex, color, mass) {
     this.x = x;
     this.y = y;
-    
-    // Random initial velocity
+
     const angle = Math.random() * Math.PI * 2;
     const speed = Math.random() * 1.5 + 0.5;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
-    
-    // Accumulator forces
+
     this.ax = 0;
     this.ay = 0;
-    
+
     this.mass = mass || Math.random() * 0.8 + 0.4;
-    this.scale = this.mass; // Scale aligns with mass for depth perspective
+    this.scale = this.mass;
     this.rotation = angle;
-    
+
     this.assetIndex = assetIndex;
     this.color = color;
-    
+
     this.seedOffset = Math.random() * 10000;
   }
 
   applyForce(fx, fy) {
-    // F = ma -> a = F/m
     this.ax += fx / this.mass;
     this.ay += fy / this.mass;
   }
@@ -45,18 +45,13 @@ export class ParticleSystem {
     this.canvasH = 700;
   }
 
-  /**
-   * Initializes the particle array based on count.
-   * Maps assets and colors from active pools.
-   */
   init(count, canvasW, canvasH, activeAssets, palette, seed) {
     this.canvasW = canvasW;
     this.canvasH = canvasH;
     this.particles = [];
-    
+
     if (!activeAssets || activeAssets.length === 0) return;
-    
-    // Seed noise with active layout seed
+
     seedNoise(seed || 444);
 
     const swatches = palette?.swatches || ['#ffffff'];
@@ -66,20 +61,37 @@ export class ParticleSystem {
       const y = Math.random() * canvasH;
       const assetIdx = i % activeAssets.length;
       const color = swatches[i % swatches.length];
-      const mass = Math.random() * 0.8 + 0.4; // mass between 0.4 and 1.2
-      
+      const mass = Math.random() * 0.8 + 0.4;
+
       this.particles.push(new Particle(x, y, assetIdx, color, mass));
     }
   }
 
   /**
-   * Main simulation step ticking at 60fps.
-   * Resolves wind fields, flocking steering, attractor gravity, and damping.
+   * Build a uniform-grid spatial hash for neighbor queries.
+   * cellSize should be >= the largest interaction radius used.
    */
+  _buildSpatialHash(cellSize) {
+    const grid = new Map();
+    const key = (cx, cy) => `${cx},${cy}`;
+
+    for (const p of this.particles) {
+      const cx = Math.floor(p.x / cellSize);
+      const cy = Math.floor(p.y / cellSize);
+      const k = key(cx, cy);
+      let bucket = grid.get(k);
+      if (!bucket) {
+        bucket = [];
+        grid.set(k, bucket);
+      }
+      bucket.push(p);
+    }
+    return { grid, key, cellSize };
+  }
+
   update(layoutParams, activeAssets, palette, seed, time, attractor) {
     if (this.particles.length === 0) return;
 
-    // Sync count dynamic adjustments
     const targetCount = layoutParams.particleCount || 100;
     if (this.particles.length !== targetCount) {
       this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed);
@@ -98,73 +110,83 @@ export class ParticleSystem {
     const [minScale, maxScale] = scale;
     const [minAlpha, maxAlpha] = alpha;
 
-    const nt = time * noiseSpeed * 0.001; // time dimension for noise
+    const nt = time * noiseSpeed * 0.001;
 
     const sepRadius = 35;
     const aliRadius = 60;
     const cohRadius = 70;
+    const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
 
     const separationWeight = 1.8;
     const alignmentWeight = 1.0;
     const cohesionWeight = swarmCohesion;
 
-    // Pre-calculate flocking factors to prevent O(N^2) double-computations
     const numParticles = this.particles.length;
+
+    // Spatial hash — cell size matches largest interaction radius
+    const { grid, key, cellSize } = this._buildSpatialHash(maxRadius);
 
     for (let i = 0; i < numParticles; i++) {
       const p1 = this.particles[i];
 
-      // Wind force computed using Simplex Flow Field
+      // Wind force (Simplex flow field)
       const n = noise3D(p1.x * noiseFreq, p1.y * noiseFreq, nt + p1.seedOffset * 0.0001);
       const windAngle = n * Math.PI * 2;
       const windMag = (noise3D(p1.x * noiseFreq + 200, p1.y * noiseFreq + 200, nt) + 1.0) * 0.4;
       p1.applyForce(Math.cos(windAngle) * windMag, Math.sin(windAngle) * windMag);
 
-      // Mouse pointer attractor gravity pull
+      // Mouse attractor
       if (attractor && gravityWells > 0) {
         const dx = attractor.x - p1.x;
         const dy = attractor.y - p1.y;
         const d = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (d > 5) {
-          // Attract force scaled by gravityWells and mass
           const forceMag = (gravityWells * 0.25) / Math.max(20, d * 0.05);
           p1.applyForce((dx / d) * forceMag, (dy / d) * forceMag);
         }
       }
 
-      // Reynolds flocking variables
+      // Reynolds flocking via spatial hash (only neighboring cells)
       let sepX = 0, sepY = 0, sepCount = 0;
       let aliX = 0, aliY = 0, aliCount = 0;
       let cohX = 0, cohY = 0, cohCount = 0;
 
-      for (let j = 0; j < numParticles; j++) {
-        if (i === j) continue;
-        const p2 = this.particles[j];
+      const cx = Math.floor(p1.x / cellSize);
+      const cy = Math.floor(p1.y / cellSize);
 
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const d = Math.sqrt(dx * dx + dy * dy);
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          const bucket = grid.get(key(cx + ox, cy + oy));
+          if (!bucket) continue;
 
-        if (d > 0 && d < sepRadius) {
-          // Point away from neighbor
-          sepX -= dx / d;
-          sepY -= dy / d;
-          sepCount++;
-        }
-        if (d > 0 && d < aliRadius) {
-          aliX += p2.vx;
-          aliY += p2.vy;
-          aliCount++;
-        }
-        if (d > 0 && d < cohRadius) {
-          cohX += p2.x;
-          cohY += p2.y;
-          cohCount++;
+          for (let j = 0; j < bucket.length; j++) {
+            const p2 = bucket[j];
+            if (p2 === p1) continue;
+
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+
+            if (d > 0 && d < sepRadius) {
+              sepX -= dx / d;
+              sepY -= dy / d;
+              sepCount++;
+            }
+            if (d > 0 && d < aliRadius) {
+              aliX += p2.vx;
+              aliY += p2.vy;
+              aliCount++;
+            }
+            if (d > 0 && d < cohRadius) {
+              cohX += p2.x;
+              cohY += p2.y;
+              cohCount++;
+            }
+          }
         }
       }
 
-      // Apply separation force
       if (sepCount > 0) {
         sepX /= sepCount;
         sepY /= sepCount;
@@ -174,7 +196,6 @@ export class ParticleSystem {
         }
       }
 
-      // Apply alignment force
       if (aliCount > 0) {
         aliX /= aliCount;
         aliY /= aliCount;
@@ -184,7 +205,6 @@ export class ParticleSystem {
         }
       }
 
-      // Apply cohesion force (steer to center of mass)
       if (cohCount > 0) {
         cohX /= cohCount;
         cohY /= cohCount;
@@ -197,8 +217,8 @@ export class ParticleSystem {
       }
     }
 
-    // Step Newtonian integration & resolve bounding wraps
-    const pad = 120; // bounding pad so assets flow off-screen cleanly
+    // Integrate + bounds
+    const pad = 120;
     const limitL = -pad;
     const limitR = this.canvasW + pad;
     const limitT = -pad;
@@ -207,11 +227,9 @@ export class ParticleSystem {
     for (let i = 0; i < numParticles; i++) {
       const p = this.particles[i];
 
-      // Integrate
       p.vx = (p.vx + p.ax) * damping;
       p.vy = (p.vy + p.ay) * damping;
-      
-      // Speed clamps to prevent physical numerical explosions
+
       const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
       const maxSpeed = 8.0;
       if (speed > maxSpeed) {
@@ -222,20 +240,16 @@ export class ParticleSystem {
       p.x += p.vx;
       p.y += p.vy;
 
-      // Reset acceleration accumulator
       p.ax = 0;
       p.ay = 0;
 
-      // Align rotation to movement vector
       if (speed > 0.1) {
         p.rotation = Math.atan2(p.vy, p.vx) * (180 / Math.PI);
       }
 
-      // Dynamic scales and alphas based on mass relative to bounds
       p.scale = minScale + (p.mass * (maxScale - minScale));
       p.alpha = minAlpha + (p.mass * (maxAlpha - minAlpha));
 
-      // Boundary wraps
       if (p.x < limitL) p.x = limitR;
       else if (p.x > limitR) p.x = limitL;
 
@@ -244,12 +258,9 @@ export class ParticleSystem {
     }
   }
 
-  /**
-   * Fetches particles mapped to their corresponding SVG asset configurations.
-   */
   getItems(activeAssets) {
     if (!activeAssets || activeAssets.length === 0) return [];
-    
+
     return this.particles.map(p => {
       const asset = activeAssets[p.assetIndex % activeAssets.length];
       return {

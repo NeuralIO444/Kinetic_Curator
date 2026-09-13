@@ -13,16 +13,16 @@ function getSvgDataUri(svgNode) {
 
 export function exportSnapshot(svgNode, resolution = 1, seedStr = '') {
   if (!svgNode) return;
-  
+
   const viewBox = svgNode.getAttribute('viewBox').split(' ');
   const width = parseInt(viewBox[2]);
   const height = parseInt(viewBox[3]);
-  
+
   const canvas = document.createElement('canvas');
   canvas.width = width * resolution;
   canvas.height = height * resolution;
   const ctx = canvas.getContext('2d');
-  
+
   const img = new Image();
   img.onload = () => {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -37,10 +37,24 @@ export function exportSnapshot(svgNode, resolution = 1, seedStr = '') {
   img.src = getSvgDataUri(svgNode);
 }
 
-export function useVideoRecorder({ svgRef, isRecording, seedStr = '', fps = 30 }) {
+/**
+ * Video recorder with throttled SVG serialization.
+ * Re-serializing the full SVG every frame is extremely expensive.
+ * We only re-serialize every `serializeEvery` frames and reuse the
+ * last successful bitmap for intermediate frames (draft quality).
+ * Default fps lowered to 15 for smoother live performance while recording.
+ */
+export function useVideoRecorder({
+  svgRef,
+  isRecording,
+  seedStr = '',
+  fps = 15,
+  serializeEvery = 2,
+}) {
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const rafRef = useRef(null);
+  const lastImgRef = useRef(null);
 
   useEffect(() => {
     if (!isRecording) {
@@ -48,6 +62,7 @@ export function useVideoRecorder({ svgRef, isRecording, seedStr = '', fps = 30 }
         mediaRecorderRef.current.stop();
       }
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      lastImgRef.current = null;
       return;
     }
 
@@ -57,7 +72,7 @@ export function useVideoRecorder({ svgRef, isRecording, seedStr = '', fps = 30 }
     const viewBox = svgNode.getAttribute('viewBox').split(' ');
     const width = parseInt(viewBox[2]);
     const height = parseInt(viewBox[3]);
-    
+
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
@@ -68,7 +83,7 @@ export function useVideoRecorder({ svgRef, isRecording, seedStr = '', fps = 30 }
     if (!MediaRecorder.isTypeSupported(options.mimeType)) {
       options = { mimeType: 'video/webm' };
     }
-    
+
     const mediaRecorder = new MediaRecorder(stream, options);
     mediaRecorderRef.current = mediaRecorder;
     chunksRef.current = [];
@@ -90,6 +105,7 @@ export function useVideoRecorder({ svgRef, isRecording, seedStr = '', fps = 30 }
     mediaRecorder.start();
 
     let lastTime = 0;
+    let frameCounter = 0;
     const frameInterval = 1000 / fps;
 
     const drawFrame = (time) => {
@@ -98,13 +114,23 @@ export function useVideoRecorder({ svgRef, isRecording, seedStr = '', fps = 30 }
 
       if (time - lastTime < frameInterval) return;
       lastTime = time;
+      frameCounter++;
 
-      const img = new Image();
-      img.onload = () => {
+      const shouldSerialize = frameCounter % serializeEvery === 0 || !lastImgRef.current;
+
+      if (shouldSerialize) {
+        const img = new Image();
+        img.onload = () => {
+          lastImgRef.current = img;
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+        };
+        img.src = getSvgDataUri(svgRef.current);
+      } else if (lastImgRef.current) {
+        // Reuse last successful frame bitmap — keeps stream smooth without full serialize
         ctx.clearRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-      };
-      img.src = getSvgDataUri(svgRef.current);
+        ctx.drawImage(lastImgRef.current, 0, 0, width, height);
+      }
     };
 
     rafRef.current = requestAnimationFrame(drawFrame);
@@ -114,6 +140,7 @@ export function useVideoRecorder({ svgRef, isRecording, seedStr = '', fps = 30 }
         mediaRecorderRef.current.stop();
       }
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      lastImgRef.current = null;
     };
-  }, [isRecording, svgRef, seedStr, fps]);
+  }, [isRecording, svgRef, seedStr, fps, serializeEvery]);
 }
