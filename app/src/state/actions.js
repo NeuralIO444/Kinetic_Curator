@@ -1,28 +1,30 @@
 // Action types — VERB_NOUN naming convention
 // Every state mutation goes through dispatch(action)
 
-// ── Playback ─────────────────────────────────────────────────
+// ── Playback ───────────────────────────────────────────────
 export const SET_RUNNING     = 'SET_RUNNING';
 export const SET_FPS         = 'SET_FPS';
 export const SET_SEED        = 'SET_SEED';
 export const BUMP_SEED       = 'BUMP_SEED';
+export const SET_QUALITY     = 'SET_QUALITY';
+export const SET_AUTO_QUALITY = 'SET_AUTO_QUALITY';
 
-// ── Palette ──────────────────────────────────────────────────
+// ── Palette ────────────────────────────────────────────────
 export const SET_PALETTE_ID  = 'SET_PALETTE_ID';
 
-// ── Layout params ────────────────────────────────────────────
+// ── Layout params ──────────────────────────────────────────
 export const SET_LAYOUT_PARAM  = 'SET_LAYOUT_PARAM';
 export const SET_LAYOUT_PARAMS = 'SET_LAYOUT_PARAMS';
 export const APPLY_PRESET      = 'APPLY_PRESET';
 
-// ── Asset pool ───────────────────────────────────────────────
+// ── Asset pool ───────────────────────────────────────────
 export const TOGGLE_ASSET      = 'TOGGLE_ASSET';
 export const TOGGLE_ALL_ASSETS = 'TOGGLE_ALL_ASSETS';
 export const SET_SEARCH      = 'SET_SEARCH';
 export const SET_CAT_FILTER  = 'SET_CAT_FILTER';
 export const SET_POOL_VIEW   = 'SET_POOL_VIEW';
 
-// ── Stimulus / input ─────────────────────────────────────────
+// ── Stimulus / input ─────────────────────────────────────
 export const SET_WEBCAM_ENABLED  = 'SET_WEBCAM_ENABLED';
 export const SET_AUDIO_ENABLED   = 'SET_AUDIO_ENABLED';
 export const SET_MOTION_ENERGY   = 'SET_MOTION_ENERGY';
@@ -33,8 +35,7 @@ export const SET_AUDIO_GAIN      = 'SET_AUDIO_GAIN';
 export const SET_AUDIO_SOURCE    = 'SET_AUDIO_SOURCE';
 export const SET_AUDIO_MONITOR   = 'SET_AUDIO_MONITOR';
 
-
-// ── Davis mode & Global View ───────────────────────────────────
+// ── Davis mode & Global View ──────────────────────────────
 export const SET_EVOLVE_MODE     = 'SET_EVOLVE_MODE';
 export const SET_EVOLVE_SOURCE   = 'SET_EVOLVE_SOURCE';
 export const SET_EVOLVE_TARGET   = 'SET_EVOLVE_TARGET';
@@ -44,7 +45,7 @@ export const TRIGGER_EVOLVE      = 'TRIGGER_EVOLVE';
 export const SET_SLOW_RENDER     = 'SET_SLOW_RENDER';
 export const TOGGLE_FULLSCREEN   = 'TOGGLE_FULLSCREEN';
 
-// ── Snapshots / favorites ────────────────────────────────────
+// ── Snapshots / favorites ─────────────────────────────────
 export const ADD_SNAPSHOT      = 'ADD_SNAPSHOT';
 export const REMOVE_SNAPSHOT   = 'REMOVE_SNAPSHOT';
 export const CLEAR_SNAPSHOTS   = 'CLEAR_SNAPSHOTS';
@@ -55,11 +56,11 @@ export const REMOVE_FAVORITE   = 'REMOVE_FAVORITE';
 export const RECALL_FAVORITE   = 'RECALL_FAVORITE';
 export const SET_MOTION_SMOOTHING = 'SET_MOTION_SMOOTHING';
 
-// ── Parameter exploration (Bundle 3) ─────────────────────────
+// ── Parameter exploration ────────────────────────────────
 export const TOGGLE_PARAM_LOCK      = 'TOGGLE_PARAM_LOCK';
 export const RANDOMIZE_PARAM        = 'RANDOMIZE_PARAM';
 export const RANDOMIZE_UNLOCKED     = 'RANDOMIZE_UNLOCKED';
 
-// ── Cellular Automaton ───────────────────────────────────────
+// ── Cellular Automaton ───────────────────────────────────
 export const STEP_CA_GRID    = 'STEP_CA_GRID';
 export const RESET_CA_GRID   = 'RESET_CA_GRID';
