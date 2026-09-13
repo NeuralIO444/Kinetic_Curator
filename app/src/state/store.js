@@ -3,8 +3,8 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
 import { PALETTES } from '../data/palettes.js';
 import { createGrid, stepGrid } from '../engine/ca-engine.js';
+import { getQualityCaps } from '../data/quality.js';
 
-// ── Helpers ──────────────────────────────────────────────────────────────
 const RANDOMIZABLE_KEYS = [
   'count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers',
   'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount', 'swarmCohesion', 'gravityWells', 'damping'
@@ -34,8 +34,6 @@ function randomizeKey(key) {
 
 const initialEnabledAssets = {};
 ASSETS.forEach(a => { initialEnabledAssets[a.id] = true; });
-
-// ── Slices ──────────────────────────────────────────────────────────────
 
 const createAudioSlice = (set, get) => ({
   audioEnabled: false,
@@ -190,8 +188,10 @@ const createLayoutSlice = (set, get) => ({
 
 const createGlobalSlice = (set, get) => ({
   running: true,
-  fps: 58.4,
+  fps: 60,
   nodeCount: 0,
+  quality: 'balanced',
+  autoQuality: true,
   isFullscreen: false,
   slowRender: false,
   webcamEnabled: false,
@@ -205,6 +205,16 @@ const createGlobalSlice = (set, get) => ({
   setRunning: (running) => set({ running }),
   setFps: (fps) => set({ fps }),
   setNodeCount: (count) => set({ nodeCount: count }),
+  setQuality: (quality) => set((state) => {
+    const caps = getQualityCaps(quality);
+    const next = { quality };
+    // When switching to performance, force mirror off if not allowed
+    if (!caps.allowMirror && state.layoutParams.mirror) {
+      next.layoutParams = { ...state.layoutParams, mirror: false };
+    }
+    return next;
+  }),
+  setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
   setSlowRender: (slow) => set({ slowRender: slow }),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
