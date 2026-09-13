@@ -15,6 +15,8 @@ import { useAudioInput } from './hooks/useAudioInput.js';
 import { useColumnResize } from './hooks/useColumnResize.js';
 import { useFpsMeter } from './hooks/useFpsMeter.js';
 import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
+import { useBeatDecay } from './hooks/useBeatDecay.js';
+import { useContinuousLife } from './hooks/useContinuousLife.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
@@ -40,9 +42,10 @@ function AppInner() {
     isFullscreen: s.isFullscreen,
   }));
 
-  // Real FPS + adaptive quality governor
   useFpsMeter(true);
   usePerformanceGovernor();
+  useBeatDecay();
+  useContinuousLife();
 
   const [showHotkeys, setShowHotkeys] = useState(false);
 
@@ -98,7 +101,7 @@ function AppInner() {
   const onAudioStimulus = useCallback(v => dispatch({ type: A.SET_AUDIO_STIMULUS, payload: v }), [dispatch]);
   const onAudioBands = useCallback(v => dispatch({ type: A.SET_AUDIO_BANDS, payload: v }), [dispatch]);
   const onBeat = useCallback(() => {
-    dispatch({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.5) });
+    dispatch({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
     if (evolveRef.current.mode && evolveRef.current.source === 'beat') {
       dispatch({ type: A.TRIGGER_EVOLVE });
     }
@@ -113,9 +116,7 @@ function AppInner() {
     onBeat
   });
 
-  const { containerRef, gridTemplate, dividerProps } = useColumnResize(
-    2, [0.62, 0.38], 300
-  );
+  const { containerRef, gridTemplate, dividerProps } = useColumnResize(2, [0.62, 0.38], 300);
 
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>

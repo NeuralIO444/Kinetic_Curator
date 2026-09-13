@@ -16,8 +16,12 @@ export function StimulusPanel() {
     audioMonitor: s.audioMonitor,
     beatPulse: s.beatPulse,
     audioBands: s.audioBands,
+    layoutParams: s.layoutParams,
   }));
-  const { webcamEnabled, audioEnabled, motionEnergy, audioGain, audioSource, audioMonitor, beatPulse, audioBands } = state;
+  const {
+    webcamEnabled, audioEnabled, motionEnergy, audioGain, audioSource,
+    audioMonitor, beatPulse, audioBands, layoutParams,
+  } = state;
   const { open, toggle } = useCollapse(false);
 
   const [devices, setDevices] = useState([]);
@@ -40,6 +44,13 @@ export function StimulusPanel() {
       dispatch({ type: A.SET_AUDIO_SOURCE, payload: { type: 'device', id: e.target.value } });
     }
   };
+
+  const setParam = (key, value) => dispatch({ type: A.SET_LAYOUT_PARAM, key, value });
+
+  const depth = layoutParams.audioModDepth ?? 0.65;
+  const scaleMod = layoutParams.audioScaleMod ?? 0.45;
+  const alphaMod = layoutParams.audioAlphaMod ?? 0.25;
+  const life = layoutParams.lifeDrift ?? 0.35;
 
   return (
     <div className="panel panel-stimulus">
@@ -66,17 +77,17 @@ export function StimulusPanel() {
           <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <span style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em' }}>AUDIO SRC</span>
-              <button 
-                className={`micro-btn ${audioMonitor ? 'active' : ''}`} 
+              <button
+                className={`micro-btn ${audioMonitor ? 'active' : ''}`}
                 onClick={() => dispatch({ type: A.SET_AUDIO_MONITOR, payload: !audioMonitor })}
                 style={audioMonitor ? { background: '#00ff88', color: '#000', borderColor: '#00ff88' } : {}}
               >
                 {audioMonitor ? '🔊 MON ON' : '🔈 MON OFF'}
               </button>
             </div>
-            
-            <select 
-              value={audioSource.type === 'device' ? audioSource.id : 'file'} 
+
+            <select
+              value={audioSource.type === 'device' ? audioSource.id : 'file'}
               onChange={handleDeviceChange}
               style={{ width: '100%', marginBottom: '6px', background: 'var(--panel)', color: 'var(--ink)', border: '1px solid var(--line)', padding: '3px', fontSize: '10px' }}
             >
@@ -86,19 +97,33 @@ export function StimulusPanel() {
             </select>
 
             <input type="file" accept="audio/*" onChange={handleFileChange} style={{ fontSize: '9px', color: 'var(--dim)', width: '100%' }} />
-            
+
             <div style={{ marginTop: '8px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '3px' }}>
                 <span>GAIN</span>
                 <span>{audioGain.toFixed(2)}x</span>
               </div>
-              <input 
-                type="range" min="0" max="5" step="0.1" 
-                value={audioGain} 
+              <input
+                type="range" min="0" max="5" step="0.1"
+                value={audioGain}
                 onChange={e => dispatch({ type: A.SET_AUDIO_GAIN, payload: parseFloat(e.target.value) })}
                 style={{ width: '100%' }}
               />
             </div>
+          </div>
+
+          {/* Synthesizer reactivity */}
+          <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
+            <div style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '6px' }}>REACTIVITY / LIFE</div>
+
+            <ModSlider label="DEPTH" value={depth} min={0} max={1} step={0.05}
+              onChange={v => setParam('audioModDepth', v)} hint="Global audio → visual amount" />
+            <ModSlider label="SCALE" value={scaleMod} min={0} max={1} step={0.05}
+              onChange={v => setParam('audioScaleMod', v)} hint="Beat/bands → scale pulse" />
+            <ModSlider label="ALPHA" value={alphaMod} min={0} max={1} step={0.05}
+              onChange={v => setParam('audioAlphaMod', v)} hint="Beat → opacity pulse" />
+            <ModSlider label="LIFE" value={life} min={0} max={1} step={0.05}
+              onChange={v => setParam('lifeDrift', v)} hint="Continuous LFO drift while running" />
           </div>
 
           <div className="stim-meters">
@@ -108,6 +133,23 @@ export function StimulusPanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ModSlider({ label, value, min, max, step, onChange, hint }) {
+  return (
+    <div style={{ marginBottom: 6 }} title={hint}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.08em', marginBottom: 2 }}>
+        <span>{label}</span>
+        <span>{Number(value).toFixed(2)}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step}
+        value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%' }}
+      />
     </div>
   );
 }
