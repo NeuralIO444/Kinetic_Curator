@@ -1,5 +1,4 @@
 // Layout mode definitions — single source of truth
-// Used by both LayoutPanel (P04) and CanvasPanel (P01)
 
 export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
@@ -31,8 +30,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   recolor: true,
   mirror: false,
   overlap: true,
-  
-  // Physics & Turbulence Parameters
+
+  // Physics & Turbulence
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
   displacement: 0,
@@ -40,4 +39,10 @@ export const DEFAULT_LAYOUT_PARAMS = {
   swarmCohesion: 1.5,
   gravityWells: 1.0,
   damping: 0.95,
+
+  // Synthesizer / audio reactivity
+  audioModDepth: 0.65,   // global 0–1 reactivity amount
+  audioScaleMod: 0.45,   // how much beat/bands affect scale
+  audioAlphaMod: 0.25,   // how much beat affects opacity pulse
+  lifeDrift: 0.35,       // continuous LFO depth when running (0 = still)
 };
