@@ -27,7 +27,7 @@ export function MasterBar() {
         <div className="logo">
           <span className="logo-mark">◈</span>
           <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
-          <span className="logo-version">v0.5</span>
+          <span className="logo-version">v0.7</span>
         </div>
 
         {state.isRecording ? (
