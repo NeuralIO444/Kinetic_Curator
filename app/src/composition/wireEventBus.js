@@ -25,6 +25,7 @@ export function wireEventBus(rawDispatch) {
       : { type: A.RANDOMIZE_PARAM, key: p.key }));
 
   on(Events.DAVIS_EVOLVE, (p) => {
+    if (p.mode !== undefined) return dispatch({ type: A.SET_EVOLVE_MODE, payload: !!p.mode });
     if (p.toggle) return dispatch({ type: A.SET_EVOLVE_MODE, payload: (m) => !m });
     if (p.bumpSeed) return dispatch({ type: A.BUMP_SEED });
     if (p.target !== undefined) return dispatch({ type: A.SET_EVOLVE_TARGET, payload: p.target });

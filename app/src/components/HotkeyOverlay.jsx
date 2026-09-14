@@ -11,6 +11,7 @@ const SHORTCUTS = [
   { key: '⌘Z', desc: 'Undo last change' },
   { key: '⌘⇧Z', desc: 'Redo' },
   { key: '?', desc: 'Toggle this overlay' },
+  { key: '1–9', desc: 'Recall hit from tray (when focused)' },
 ];
 
 export function HotkeyOverlay({ show, onClose }) {

@@ -7,6 +7,7 @@ import './styles/panels.css';
 import './styles/controls.css';
 import './styles/canvas.css';
 import './styles/pool.css';
+import './styles/ux-polish.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

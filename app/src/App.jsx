@@ -3,6 +3,8 @@ import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
+import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
+import { FavoritesTray } from './components/FavoritesTray.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
 import { useAudioInput } from './hooks/useAudioInput.js';
 import { useColumnResize } from './hooks/useColumnResize.js';
@@ -124,18 +126,27 @@ function AppInner() {
 
   const { containerRef, gridTemplate, dividerProps } = useColumnResize(2, [0.62, 0.38], 300);
 
+  const onPlayMe = useCallback(() => {
+    piped({ type: A.SET_RUNNING, payload: true });
+    piped({ type: A.SET_AUDIO_ENABLED, payload: true });
+    piped({ type: A.SET_EVOLVE_MODE, payload: true });
+  }, [piped]);
+
+
   return (
-    <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
+    <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''`}>
       <MasterBar />
       <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} />
+      <FirstRunOverlay onPlay={onPlayMe} />
       <Shell
         dispatchPipe={piped}
         containerRef={containerRef}
         gridTemplate={gridTemplate}
         dividerProps={dividerProps}
       />
+      <FavoritesTray />
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v0.6</span>
+        <span>KINETIC_CURATOR v0.7</span>
         <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
       </footer>
     </div>
