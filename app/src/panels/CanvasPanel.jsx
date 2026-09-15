@@ -1,5 +1,4 @@
-// CanvasPanel (P01) — live SVG preview
-// Refactored: viewport, life, swarm, items extracted into hooks.
+// CanvasPanel (P01) — live SVG preview + optional accumulation buffer (#28)
 
 import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
@@ -11,11 +10,12 @@ import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewpor
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
 import { useSwarmTick } from '../hooks/useSwarmTick.js';
 import { useCanvasItems } from '../hooks/useCanvasItems.js';
+import { useAccumulationBuffer } from '../hooks/useAccumulationBuffer.js';
 
 const ASSET_SIZE = 100;
 
 export function CanvasPanel() {
-  const { palette, assets, canvasRef, svgRef, dispatch } = useApp();
+  const { palette, assets, canvasRef, svgRef, accumRef, dispatch } = useApp();
   const { state } = useApp(s => ({
     layoutParams: s.layoutParams,
     seed: s.seed,
@@ -35,6 +35,7 @@ export function CanvasPanel() {
   } = state;
 
   const caps = getQualityCaps(quality || 'balanced');
+  const accumOn = !!layoutParams.accumulation;
 
   const viewport = useCanvasViewport();
   const { zoom, pan } = viewport;
@@ -46,7 +47,6 @@ export function CanvasPanel() {
   if (bgMode === 'white') bgStyle.background = '#ffffff';
   else if (bgMode === 'transparent') bgStyle.background = 'transparent';
 
-  // Apply runtime weight overrides so weighted pick reflects UI mix (#34)
   const activeAssets = useMemo(
     () => assets
       .filter(a => enabled[a.id])
@@ -75,6 +75,15 @@ export function CanvasPanel() {
   const nodeCount = renderItems?.length || 0;
   const showGloss = shouldRenderGloss(quality, layoutParams.shading, nodeCount);
 
+  const { clear: clearAccum } = useAccumulationBuffer({
+    svgRef,
+    accumRef,
+    enabled: accumOn,
+    fade: layoutParams.accumulationFade ?? 0.88,
+    background: palette.bg,
+    running,
+  });
+
   useEffect(() => {
     if (typeof dispatch === 'function' && renderItems) {
       dispatch({ type: 'SET_NODE_COUNT', payload: renderItems.length });
@@ -90,7 +99,15 @@ export function CanvasPanel() {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button className="chip-btn" onClick={cycleBg} title="Toggle Background">BG: {bgMode.toUpperCase()}</button>
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
+          {accumOn && (
+            <button className="chip-btn" onClick={clearAccum} title="Clear accumulation buffer" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+              CLEAR ACCUM
+            </button>
+          )}
           <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>
+          {accumOn && (
+            <span className="meter-pill" title="Accumulation buffer active" style={{ color: 'var(--accent)' }}>ACCUM</span>
+          )}
           {safeCount < layoutParams.count && (
             <span className="meter-pill" title="Count clamped by quality preset" style={{ color: '#ffaa00' }}>
               CLAMPED {safeCount}
@@ -111,12 +128,21 @@ export function CanvasPanel() {
               ? `inset 0 0 ${20 + glow * 40}px rgba(0, 217, 255, ${0.08 + glow * 0.25})`
               : undefined,
             transition: 'box-shadow 0.08s linear',
+            position: 'relative',
           }}
         >
           <div className="canvas-bg" style={bgStyle} />
           <div className="canvas-rulers" />
-          <svg className="canvas-svg" ref={svgRef} viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} xmlns="http://www.w3.org/2000/svg"
-            style={layoutParams.hueRotate ? { filter: `hue-rotate(${layoutParams.hueRotate}deg)` } : undefined}
+          <svg
+            className="canvas-svg"
+            ref={svgRef}
+            viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+            xmlns="http://www.w3.org/2000/svg"
+            style={{
+              ...(layoutParams.hueRotate ? { filter: `hue-rotate(${layoutParams.hueRotate}deg)` } : {}),
+              // When ACCUM is on, hide SVG visually but keep it in DOM for composite + export source
+              ...(accumOn ? { opacity: 0, pointerEvents: 'none' } : {}),
+            }}
             onWheel={viewport.onWheel}
             onPointerDown={viewport.onPointerDown}
             onPointerMove={viewport.onPointerMoveCombined}
@@ -124,7 +150,6 @@ export function CanvasPanel() {
             onPointerCancel={viewport.onPointerUpCombined}
             onPointerLeave={viewport.clearAttractor}
           >
-            {/* #36: only register symbols for enabled assets */}
             <AssetSpriteSheet assets={activeAssets} />
             <defs>
               <radialGradient id="kc-gloss-grad" cx="35%" cy="30%" r="70%">
@@ -173,8 +198,31 @@ export function CanvasPanel() {
               </g>
             </g>
           </svg>
+          {accumOn && (
+            <canvas
+              ref={accumRef}
+              className="canvas-accum"
+              width={CANVAS_W}
+              height={CANVAS_H}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                pointerEvents: 'auto',
+                zIndex: 2,
+              }}
+              onWheel={viewport.onWheel}
+              onPointerDown={viewport.onPointerDown}
+              onPointerMove={viewport.onPointerMoveCombined}
+              onPointerUp={viewport.onPointerUpCombined}
+              onPointerCancel={viewport.onPointerUpCombined}
+              onPointerLeave={viewport.clearAttractor}
+            />
+          )}
           <span className="canvas-corner tl">0,0</span>
-          <span className="canvas-corner tr">{layoutParams.mode}</span>
+          <span className="canvas-corner tr">{layoutParams.mode}{accumOn ? ' · ACCUM' : ''}</span>
           <span className="canvas-corner bl">{preset.name}</span>
           <span className="canvas-corner br">{CANVAS_W}×{CANVAS_H}</span>
       </div>
