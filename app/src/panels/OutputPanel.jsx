@@ -58,7 +58,7 @@ export function OutputPanel() {
     fps: 15,
   });
 
-  const resLabel = exportResolution === 1 ? '1920×1080' : exportResolution === 2 ? '3840×2160' : '7680×4320';
+  const resLabel = `1000×700@${exportResolution}x`;
 
   /** Prefer accumulation buffer when ACCUM is on (#28). */
   const captureStill = async (onThumbnail) => {
@@ -120,7 +120,6 @@ export function OutputPanel() {
 
     try {
       if (accumOn) {
-        // Buffer already holds history — capture it (uncapped lift is less meaningful for accum)
         await captureStill((thumb) => {
           emit(Events.EXPORT_SNAPSHOT, {
             seed,
@@ -256,7 +255,6 @@ export function OutputPanel() {
     downloadProject(doc);
   };
 
-  /** Palette library JSON (#55) — the operator's kit, not project state. */
   const exportPalettes = () => {
     const blob = new Blob([JSON.stringify(userPalettes || [], null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -269,10 +267,6 @@ export function OutputPanel() {
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   };
 
-  /** Favourited seeds -> studio/hits_bridge.py input (#91). Not a project
-   * (state at export time), not a palette kit — the "likes" half of a label
-   * set. `project` carries enabledAssets/quality/etc. so hits_bridge.py can
-   * render any favourite whose seed wasn't already batch-rendered. */
   const exportHits = () => {
     const doc = {
       version: 1,
@@ -379,9 +373,9 @@ export function OutputPanel() {
               onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value, 10))}
               style={{ padding: '4px', fontSize: '10px', background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', flex: 1 }}
             >
-              <option value={1}>1x (1920×1080)</option>
-              <option value={2}>2x (3840×2160)</option>
-              <option value={4}>4x (7680×4320)</option>
+              <option value={1}>1x (1000×700@1x)</option>
+              <option value={2}>2x (1000×700@2x)</option>
+              <option value={4}>4x (1000×700@4x)</option>
             </select>
             <button
               type="button"
