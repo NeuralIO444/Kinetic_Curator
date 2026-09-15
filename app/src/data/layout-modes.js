@@ -16,6 +16,9 @@ export const LAYOUT_MODES = [
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
 ];
 
+/** Color strategies from engine/color.js; 'auto' defers to the preset (#54). */
+export const PALETTE_SHIFTS = ['auto', 'band', 'zone', 'split'];
+
 export const BLEND_MODES = [
   'normal', 'screen', 'multiply', 'overlay', 'difference', 'plus-lighter', 'soft-light',
 ];
@@ -37,6 +40,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   blendMode: 'normal',
   shading: 'flat',
   hueRotate: 0,
+  paletteShift: 'auto',
 
   // Accumulation / trails (#28) — pixel buffer, not SVG DOM
   accumulation: false,

@@ -90,7 +90,11 @@ export function buildPlacements({
     );
     const color = colorForPlacement({
       swatches: palette.swatches,
-      strategy: preset.paletteShift || 'band',
+      // 'auto' (default) defers to the composition preset, so presets keep
+      // their authored coloring until the operator overrides it (#54).
+      strategy: layoutParams.paletteShift && layoutParams.paletteShift !== 'auto'
+        ? layoutParams.paletteShift
+        : (preset.paletteShift || 'band'),
       t: p.t,
       index: p.index,
       rng: colorRngForIndex(seed, p.index),
