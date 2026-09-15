@@ -115,7 +115,7 @@
 .fps-bar.mid  .fps-bar-fill { background: #ffd400; }
 .fps-bar.bad  .fps-bar-fill { background: #ff2d6f; }
 
-.palette-switch { display: inline-flex; align-items: center; gap: 3px; }
+.palette-switch { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; }
 .palette-switch-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; margin-right: 3px; }
 .palette-chip {
   display: inline-flex; align-items: center; gap: 5px;
@@ -130,6 +130,42 @@
 .palette-chip.active { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,0.04); }
 .palette-chip-swatches { display: inline-flex; gap: 1px; }
 .palette-chip-sw { width: 7px; height: 10px; }
+
+/* Color P0 — full active strip (#51) */
+.palette-active-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.palette-active-swatches {
+  display: inline-flex;
+  gap: 1px;
+}
+.palette-sw-full {
+  width: 9px;
+  height: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-sizing: border-box;
+}
+.palette-meta-sw {
+  position: relative;
+  width: 14px;
+  height: 12px;
+  border: 1px solid rgba(255,255,255,0.25);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.palette-meta-label {
+  font-size: 6px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #fff;
+  text-shadow: 0 0 2px #000, 0 0 2px #000;
+  pointer-events: none;
+  padding-bottom: 1px;
+}
 
 .run-btn {
   background: var(--accent); color: #000; border: none;
@@ -221,9 +257,6 @@
     gap: var(--sp-1);
     align-items: flex-start;
   }
-  /* The app is taller than the viewport here, so the document must scroll.
-     Without this, body{overflow:hidden} made the lower panels unreachable —
-     previously masked by every panel defaulting to collapsed. */
   html, body { overflow: auto; }
   .col-canvas { height: auto; }
   .col-panels { max-height: none; overflow: visible; }
