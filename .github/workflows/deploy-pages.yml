@@ -24,6 +24,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # deploy-pages fails with "Failed to create deployment (status: 404)" when
+      # GitHub has no Pages site record for the repo — which can happen even with
+      # Settings > Pages > Source already set to "GitHub Actions". enablement:true
+      # creates that record if it is missing.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
