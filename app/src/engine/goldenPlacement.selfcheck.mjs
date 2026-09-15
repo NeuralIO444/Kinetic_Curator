@@ -1,16 +1,21 @@
-// Golden placement fixture (#37)
+// Golden placement fixture (#37 / kernel K0 #58)
 // Fixed seed + layout + assets → stable SHA-256 of canonical placement list.
 // Update EXPECTED_HASH only when the placement engine intentionally changes.
 //
 //   node src/engine/goldenPlacement.selfcheck.mjs
+//
+// kernel.v1 — index-stable channel RNG (K0). Previous 0.8 hash:
+//   0680677b5fa52c81d3c60e9538c1173f89430971e1d89ab8c57b432062fec6d1
 
 import assert from 'node:assert';
 import { createHash } from 'node:crypto';
 import { buildPlacements } from './buildPlacements.js';
 
-/** Bump intentionally when placement/weight/color pipeline changes. */
+/** kernel.v1 — bump when placement/weight/color pipeline changes. */
 export const EXPECTED_HASH =
-  '0680677b5fa52c81d3c60e9538c1173f89430971e1d89ab8c57b432062fec6d1';
+  'e892d112b20d92b6611c0619cb6b6e2bbddb52a179d1c9dc38d3b8185690a9a2';
+
+export const KERNEL_GOLDEN_VERSION = 'kernel.v1';
 
 const GOLDEN = {
   seed: 0x1a4f,
@@ -80,11 +85,10 @@ export function runGolden() {
   assert.strictEqual(
     hash,
     EXPECTED_HASH,
-    `Golden placement hash mismatch.\n  got:      ${hash}\n  expected: ${EXPECTED_HASH}\n` +
+    `Golden placement hash mismatch (${KERNEL_GOLDEN_VERSION}).\n  got:      ${hash}\n  expected: ${EXPECTED_HASH}\n` +
       'If the engine change is intentional, update EXPECTED_HASH in goldenPlacement.selfcheck.mjs.',
   );
 
-  // Determinism: second call must match
   const again = buildPlacements({
     layoutParams: GOLDEN.layoutParams,
     seed: GOLDEN.seed,
@@ -96,7 +100,7 @@ export function runGolden() {
   });
   assert.strictEqual(fingerprintPlacements(again.items, again.safeCount), hash);
 
-  return { hash, n: items.length };
+  return { hash, n: items.length, version: KERNEL_GOLDEN_VERSION };
 }
 
 const result = runGolden();
