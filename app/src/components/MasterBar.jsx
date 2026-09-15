@@ -161,21 +161,17 @@ export function MasterBar() {
           <span className="palette-switch-label">PALETTE</span>
           {palettes.map(p => {
             const active = p.id === palette.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                className={`palette-chip ${active ? 'active' : ''} ${active && palette.dirty ? 'dirty' : ''}`}
-                onClick={() => {
-                  if (!active) dispatch({ type: A.SET_PALETTE_ID, payload: p.id });
-                }}
-                title={
-                  active
-                    ? `${p.name} · edit swatches · switch palette clears customs`
-                    : `${p.name} (clears custom colors)`
-                }
-              >
-                {active ? (
+            // The active chip hosts the editor (colour inputs + reset button),
+            // so it must not itself be a <button> — nesting interactive
+            // controls is invalid HTML and breaks keyboard/AT semantics.
+            // Inactive chips stay buttons; switching is their only job.
+            if (active) {
+              return (
+                <div
+                  key={p.id}
+                  className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`}
+                  title={`${p.name} · edit swatches · switch palette clears customs`}
+                >
                   <ActivePaletteStrip
                     palette={palette}
                     dirty={!!palette.dirty}
@@ -186,9 +182,19 @@ export function MasterBar() {
                     onInk={(hex) => dispatch({ type: A.SET_PALETTE_INK, payload: hex })}
                     onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
                   />
-                ) : (
-                  <CompactSwatches swatches={p.swatches || []} />
-                )}
+                  {p.name}
+                </div>
+              );
+            }
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className="palette-chip"
+                onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
+                title={`${p.name} (clears custom colors)`}
+              >
+                <CompactSwatches swatches={p.swatches || []} />
                 {p.name}
               </button>
             );

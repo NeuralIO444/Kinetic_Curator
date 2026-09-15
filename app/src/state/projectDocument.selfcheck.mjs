@@ -30,6 +30,24 @@ assert.ok(legacy.ok);
 assert.strictEqual(legacy.doc.seed, 0x1a4f);
 assert.strictEqual(legacy.doc.layoutParams.mode, 'orbit');
 
+// Custom palette colours must survive the round trip (#53)
+const withPalette = serializeProject({
+  ...state,
+  paletteOverrides: { swatches: ['#112233', '#445566'], bg: '#000102', ink: '#fffefd' },
+});
+assert.ok(withPalette.paletteOverrides, 'paletteOverrides must be serialized');
+const rtPalette = parseProject(withPalette);
+assert.ok(rtPalette.ok);
+assert.deepStrictEqual(
+  rtPalette.doc.paletteOverrides,
+  { swatches: ['#112233', '#445566'], bg: '#000102', ink: '#fffefd' },
+  'custom palette must round-trip intact',
+);
+
+// No overrides means the catalog palette, and must parse as an explicit null
+const noPalette = parseProject(serializeProject(state));
+assert.strictEqual(noPalette.doc.paletteOverrides, null, 'absent overrides parse to null');
+
 const bad = parseProject({ version: 99 });
 assert.ok(!bad.ok);
 
