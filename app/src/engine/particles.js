@@ -5,28 +5,32 @@
  */
 
 import { createNoise } from './noise.js';
+import { CH, rngForIndex } from './kernel/rng.js';
 
 class Particle {
-  constructor(x, y, assetIndex, color, mass) {
+  /**
+   * Every random quantity is supplied by the caller (K4, #63). Nothing here
+   * reaches for Math.random, so a swarm is a pure function of its seed and
+   * can be replayed offline.
+   */
+  constructor(x, y, assetIndex, color, mass, angle, speed, seedOffset) {
     this.x = x;
     this.y = y;
 
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 1.5 + 0.5;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
 
     this.ax = 0;
     this.ay = 0;
 
-    this.mass = mass || Math.random() * 0.8 + 0.4;
+    this.mass = mass;
     this.scale = this.mass;
     this.rotation = angle;
 
     this.assetIndex = assetIndex;
     this.color = color;
 
-    this.seedOffset = Math.random() * 10000;
+    this.seedOffset = seedOffset;
   }
 
   applyForce(fx, fy) {
@@ -54,13 +58,20 @@ export class ParticleSystem {
     const swatches = palette?.swatches || ['#ffffff'];
 
     for (let i = 0; i < count; i++) {
-      const x = Math.random() * canvasW;
-      const y = Math.random() * canvasH;
+      // Per-particle stream off the `dyn` channel: particle i's starting
+      // state depends on (seed, i) alone, so it is stable as the population
+      // changes and identical on every run (K4 AC1).
+      const r = rngForIndex(seed >>> 0, CH.dyn, i);
+      const x = r() * canvasW;
+      const y = r() * canvasH;
       const assetIdx = i % activeAssets.length;
       const color = swatches[i % swatches.length];
-      const mass = Math.random() * 0.8 + 0.4;
+      const mass = r() * 0.8 + 0.4;
+      const angle = r() * Math.PI * 2;
+      const speed = r() * 1.5 + 0.5;
+      const seedOffset = r() * 10000;
 
-      this.particles.push(new Particle(x, y, assetIdx, color, mass));
+      this.particles.push(new Particle(x, y, assetIdx, color, mass, angle, speed, seedOffset));
     }
   }
 

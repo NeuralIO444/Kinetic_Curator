@@ -13,6 +13,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ASSETS } from '../app/src/data/assets/index.js';
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
+import { bakeSwarmItems } from '../app/src/engine/kernel/bake/index.js';
 import { resolvePalette } from '../app/src/data/palettes.js';
 import { getRenderCaps, shouldRenderGloss } from '../app/src/data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../app/src/data/layout-modes.js';
@@ -65,7 +66,7 @@ function warnOnce(msg) {
 }
 
 /** Visible layers in draw order (later = on top), each fully resolved. */
-export function resolveLayers(doc, { caps, ramp = null, progress = 0 }) {
+export function resolveLayers(doc, { caps, ramp = null, progress = 0, bakeSteps = 180 }) {
   const weightOverrides = doc.assetWeightOverrides || {};
   const snapshots = doc.layerSnapshots || {};
   const layers = Array.isArray(doc.layers) && doc.layers.length
@@ -81,33 +82,38 @@ export function resolveLayers(doc, { caps, ramp = null, progress = 0 }) {
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
       if (ramp) for (const [k, [a, b]] of Object.entries(ramp)) layoutParams[k] = a + (b - a) * progress;
 
-      // swarm/hype are a live Date.now() particle simulation, not a pure
-      // placement function — offline they fall back to buildPlacements and
-      // will NOT match what the browser showed. Say so rather than quietly
-      // handing back a different image.
-      if (layoutParams.mode === 'swarm' || layoutParams.mode === 'hype') {
-        warnOnce(
-          `layer mode "${layoutParams.mode}" is a live particle sim; offline render falls back to ` +
-          'static placement and will not match the browser. See studio/README.md.',
-        );
-      }
-
       const palette = resolvePalette(src.paletteId || 'praystation', src.paletteOverrides || null);
       const enabled = src.enabledAssets;
       const activeAssets = ASSETS
         .filter((a) => !enabled || enabled[a.id])
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
 
-      const { items } = buildPlacements({
-        layoutParams,
-        seed: src.seed >>> 0,
-        activeAssets,
-        palette,
-        caGrid: src.caGrid ?? null,
-        caps,
-        canvasW: CANVAS_W,
-        canvasH: CANVAS_H,
-      });
+      // swarm/hype are particle dynamics, not a placement function. K4
+      // (#63) makes them replayable: seeded init + fixed timestep, so the
+      // offline still is reproducible instead of "whatever frame the
+      // browser was on".
+      const isSwarm = layoutParams.mode === 'swarm' || layoutParams.mode === 'hype';
+      const items = isSwarm
+        ? bakeSwarmItems({
+          seed: src.seed >>> 0,
+          count: Math.min(layoutParams.particleCount || 150, caps.maxParticles),
+          layoutParams,
+          activeAssets,
+          palette,
+          canvasW: CANVAS_W,
+          canvasH: CANVAS_H,
+          steps: bakeSteps,
+        })
+        : buildPlacements({
+          layoutParams,
+          seed: src.seed >>> 0,
+          activeAssets,
+          palette,
+          caGrid: src.caGrid ?? null,
+          caps,
+          canvasW: CANVAS_W,
+          canvasH: CANVAS_H,
+        }).items;
 
       return {
         id: layer.id,
@@ -139,7 +145,7 @@ export function renderSvg(doc, opts = {}) {
   } = opts;
 
   const caps = getRenderCaps(doc.quality || 'balanced', uncapped);
-  const layers = resolveLayers(doc, { caps, ramp, progress });
+  const layers = resolveLayers(doc, { caps, ramp, progress, bakeSteps: opts.bakeSteps ?? 180 });
 
   // Breath — the only continuous motion in the live app without audio.
   // Copied verbatim from useCanvasLife so a t=0 frame is identity.
