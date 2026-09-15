@@ -1,7 +1,7 @@
-// Runnable self-check for weighted asset selection (issue #26).
+// Runnable self-check for weighted asset selection (issue #26 / #32).
 // node src/hooks/useCanvasItems.selfcheck.mjs
 import assert from 'node:assert';
-import { pickWeighted } from './useCanvasItems.js';
+import { pickWeighted } from '../engine/buildPlacements.js';
 import { mkRng } from '../engine/prng.js';
 
 const assets = [{ id: 'heavy' }, { id: 'medium' }, { id: 'light' }];
