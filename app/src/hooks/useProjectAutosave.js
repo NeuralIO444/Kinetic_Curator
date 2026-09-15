@@ -39,7 +39,8 @@ export function useProjectAutosave() {
         state.paletteId === prev.paletteId &&
         state.quality === prev.quality &&
         state.layoutParams === prev.layoutParams &&
-        state.enabledAssets === prev.enabledAssets
+        state.enabledAssets === prev.enabledAssets &&
+        state.assetWeightOverrides === prev.assetWeightOverrides
       ) {
         return;
       }
