@@ -5,6 +5,7 @@
 // no matter how many layers exist or how often they're added/removed.
 import { useEffect } from 'react';
 import { shouldRenderGloss } from '../../data/quality.js';
+import { isLiveSwarmMode } from '../../data/layout-modes.js';
 import { useSwarmTick } from '../../hooks/useSwarmTick.js';
 import { useCanvasItems } from '../../hooks/useCanvasItems.js';
 
@@ -27,7 +28,7 @@ export function Layer({
     canvasW, canvasH, scaleMul, alphaBoost, caps, attractorRef,
   });
 
-  const renderItems = layoutParams.mode === 'swarm' ? swarmItems : items;
+  const renderItems = isLiveSwarmMode(layoutParams.mode) ? swarmItems : items;
   const nodeCount = renderItems?.length || 0;
   const showGloss = shouldRenderGloss(quality, layoutParams.shading, nodeCount);
   const half = ASSET_SIZE / 2;
@@ -55,7 +56,7 @@ export function Layer({
             style={{
               ['--ink']: item.color,
               ['--accent']: item.accent || item.color,
-              transition: motionSmoothing && layoutParams.mode !== 'swarm'
+              transition: motionSmoothing && !isLiveSwarmMode(layoutParams.mode)
                 ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease'
                 : 'none',
               transformOrigin: '0 0',
