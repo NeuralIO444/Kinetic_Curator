@@ -8,6 +8,7 @@ export const LAYOUT_MODES = [
   { id: 'swarm',     name: 'swarm boids', glyph: 'swarm'  },
   { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
   { id: 'hype',      name: 'swarm·hype', glyph: 'hype'   },
+  { id: 'stratified', name: 'stratified', glyph: 'strat' },
   { id: 'flow',      name: 'flow',       glyph: 'flow'   },
   { id: 'layers',    name: 'layers',     glyph: 'z'      },
   { id: 'rails',     name: 'rails',      glyph: 'rail'   },
@@ -17,6 +18,10 @@ export const LAYOUT_MODES = [
 ];
 
 /** Color strategies from engine/color.js; 'auto' defers to the preset (#54). */
+export function isLiveSwarmMode(mode) {
+  return mode === 'swarm' || mode === 'hype';
+}
+
 export const PALETTE_SHIFTS = ['auto', 'band', 'zone', 'split'];
 
 export const BLEND_MODES = [

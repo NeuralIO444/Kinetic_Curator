@@ -94,7 +94,7 @@ function AppInner() {
           snapshot: {
             seed: state.seed,
             format: 'PNG',
-            resolution: state.exportResolution === 1 ? '1920x1080' : state.exportResolution === 2 ? '3840x2160' : '7680x4320',
+            resolution: state.exportResolution === 1 ? '1000x700@1x' : state.exportResolution === 2 ? '1000x700@2x' : '1000x700@4x',
             timestamp: new Date().toISOString().slice(11, 19),
             config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
             thumb,
@@ -160,7 +160,7 @@ function AppInner() {
       </ErrorBoundary>
       <FavoritesTray />
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v0.8</span>
+        <span>KINETIC_CURATOR v0.9.0 · kernel.v1</span>
         <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
       </footer>
     </div>

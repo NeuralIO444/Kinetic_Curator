@@ -8,9 +8,7 @@ import { MeterBlock } from './stimulus/MeterBlock.jsx';
 
 export function StimulusPanel() {
   const { state } = useApp(s => ({
-    webcamEnabled: s.webcamEnabled,
     audioEnabled: s.audioEnabled,
-    motionEnergy: s.motionEnergy,
     audioGain: s.audioGain,
     audioSource: s.audioSource,
     audioMonitor: s.audioMonitor,
@@ -19,7 +17,7 @@ export function StimulusPanel() {
     layoutParams: s.layoutParams,
   }));
   const {
-    webcamEnabled, audioEnabled, motionEnergy, audioGain, audioSource,
+    audioEnabled, audioGain, audioSource,
     audioMonitor, beatPulse, audioBands, layoutParams,
   } = state;
 
@@ -38,15 +36,15 @@ export function StimulusPanel() {
 
   return (
     <div className="panel panel-stimulus">
-      <PanelHeader tag="P06" title="STIMULUS" subtitle={webcamEnabled || audioEnabled ? 'active' : 'idle'} />
+      <PanelHeader tag="P06" title="STIMULUS" subtitle={audioEnabled ? 'active' : 'idle'} />
       <div className="stim-body">
           <div className="stim-toggle-row">
             <button
-              className={`stim-toggle ${webcamEnabled ? 'on' : ''}`}
-              style={webcamEnabled ? { background: '#00ff88', borderColor: '#00ff88' } : {}}
-              onClick={() => emit(Events.WEBCAM_TOGGLE, !webcamEnabled)}
+              className="stim-toggle"
+              disabled
+              title="Camera capture is not wired — motionEnergy is unused. See #105."
             >
-              🎥 VIDEO {webcamEnabled ? 'ON' : 'OFF'}
+              🎥 VIDEO (soon)
             </button>
             <button
               className={`stim-toggle ${audioEnabled ? 'on' : ''}`}
@@ -66,7 +64,7 @@ export function StimulusPanel() {
 
           <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} />
 
-          <MeterBlock motionEnergy={motionEnergy} audioBands={audioBands} beatPulse={beatPulse} />
+          <MeterBlock audioBands={audioBands} beatPulse={beatPulse} />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { ParticleSystem } from '../engine/particles.js';
+import { isLiveSwarmMode } from '../data/layout-modes.js';
 
 export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed, layoutParams, canvasW, canvasH, scaleMul, alphaBoost, caps, attractorRef }) {
   const [tick, setTick] = useState(0);
@@ -16,7 +17,7 @@ export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed,
   });
 
   useEffect(() => {
-    if (mode !== 'swarm') return;
+    if (!isLiveSwarmMode(mode)) return;
 
     const l = liveRef.current;
     swarmSystem.init(safeParticles, canvasW, canvasH, l.activeAssets, l.palette, l.seed);
@@ -35,7 +36,7 @@ export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed,
   }, [mode, seed, safeParticles, canvasW, canvasH, swarmSystem, attractorRef]);
 
   const swarmItems = useMemo(() => {
-    if (mode !== 'swarm') return null;
+    if (!isLiveSwarmMode(mode)) return null;
     let items = swarmSystem.getItems(activeAssets).map(item => {
       const accent = palette.swatches[(palette.swatches.indexOf(item.color) + 3) % palette.swatches.length] || palette.swatches[0];
       return {

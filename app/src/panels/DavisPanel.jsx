@@ -24,12 +24,13 @@ export function DavisPanel() {
     morphEvolve: s.morphEvolve,
     morphDurationMs: s.morphDurationMs,
     morphing: s.morphing,
+    audioEnabled: s.audioEnabled,
   }));
   const {
     evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot,
     motionSmoothing, favorites, seed, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
-    morphEvolve, morphDurationMs, morphing,
+    morphEvolve, morphDurationMs, morphing, audioEnabled,
   } = state;
   const { palette } = useApp();
 
@@ -49,7 +50,13 @@ export function DavisPanel() {
       <PanelHeader
         tag="P07"
         title="DAVIS MODE"
-        subtitle={morphing ? 'morphing…' : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}` : evolveMode ? 'evolving' : 'paused'}
+        subtitle={
+          morphing ? 'morphing…'
+            : phraseEnabled && !audioEnabled ? 'phrase armed · waiting for beat'
+            : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}`
+            : evolveMode ? 'evolving'
+            : 'paused'
+        }
       />
       <div className="davis-body">
           <EvolveControls
@@ -72,6 +79,8 @@ export function DavisPanel() {
             phraseMode={phraseMode}
             phraseBeat={phraseBeat}
             phraseProgress={phraseProgress}
+            layoutMode={layoutParams.mode}
+            audioEnabled={audioEnabled}
           />
 
           <div className="davis-actions">

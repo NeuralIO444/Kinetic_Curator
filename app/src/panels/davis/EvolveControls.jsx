@@ -27,9 +27,11 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, aut
         ))}
       </div>
 
-      <div className="davis-interval-row">
+      <div className="davis-interval-row" style={evolveSource !== 'time' ? { opacity: 0.4 } : undefined}>
         <span className="davis-label">INTERVAL</span>
         <input type="range" min={200} max={10000} step={100} value={evolveInterval}
+          disabled={evolveSource !== 'time'}
+          title={evolveSource !== 'time' ? 'Interval applies when SOURCE is TIME' : undefined}
           onChange={e => emit(Events.DAVIS_EVOLVE, { interval: Number(e.target.value) })} />
         <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
       </div>

@@ -6,7 +6,11 @@ const PHRASE_MODES = [
   { id: 'step-ca', label: 'CA' },
 ];
 
-export function PhraseControls({ phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseProgress }) {
+export function PhraseControls({
+  phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseProgress,
+  layoutMode, audioEnabled,
+}) {
+  const caLive = layoutMode === 'ca';
   return (
     <div style={{ marginTop: 10, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -27,17 +31,29 @@ export function PhraseControls({ phraseEnabled, phraseLength, phraseMode, phrase
       </div>
       <div className="davis-source-row" style={{ marginTop: 4 }}>
         <span className="davis-label">MODE</span>
-        {PHRASE_MODES.map(m => (
-          <button key={m.id} className={`chip-btn ${phraseMode === m.id ? 'active' : ''}`}
-            onClick={() => emit(Events.DAVIS_PHRASE, { mode: m.id })}>
-            {m.label}
-          </button>
-        ))}
+        {PHRASE_MODES.map(m => {
+          const blocked = m.id === 'step-ca' && !caLive;
+          return (
+            <button
+              key={m.id}
+              className={`chip-btn ${phraseMode === m.id ? 'active' : ''}`}
+              disabled={blocked}
+              title={blocked ? 'CA wrap only affects the picture when layout mode is Cellular' : undefined}
+              onClick={() => { if (!blocked) emit(Events.DAVIS_PHRASE, { mode: m.id }); }}
+            >
+              {m.label}
+            </button>
+          );
+        })}
       </div>
       {phraseEnabled && (
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--dim)', marginBottom: 3 }}>
-            <span>BEAT {phraseBeat}/{phraseLength}</span>
+            <span>
+              {audioEnabled
+                ? `BEAT ${phraseBeat}/${phraseLength}`
+                : 'waiting for beat · audio off'}
+            </span>
             <button className="micro-btn" onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>RESET NOW</button>
           </div>
           <div style={{ height: 4, background: 'var(--line-2)', borderRadius: 2, overflow: 'hidden' }}>
