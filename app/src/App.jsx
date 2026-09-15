@@ -160,7 +160,7 @@ function AppInner() {
       </ErrorBoundary>
       <FavoritesTray />
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v0.7</span>
+        <span>KINETIC_CURATOR v0.8</span>
         <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
       </footer>
     </div>
