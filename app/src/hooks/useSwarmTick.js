@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { ParticleSystem } from '../engine/particles.js';
 
-const swarmSystem = new ParticleSystem();
-
 export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed, layoutParams, canvasW, canvasH, scaleMul, alphaBoost, caps }) {
   const [tick, setTick] = useState(0);
   const attractorRef = useRef(null);
+  // Per-hook-instance, not module-level, so each layer gets its own swarm.
+  const [swarmSystem] = useState(() => new ParticleSystem());
 
   // Live values the loop reads each frame. Keeping them in a ref means a
   // slider drag tunes the swarm instead of re-seeding it from scratch.
@@ -33,7 +33,7 @@ export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed,
     animId = requestAnimationFrame(step);
     return () => cancelAnimationFrame(animId);
     // Only a genuine identity change (mode / seed / population / canvas) re-seeds.
-  }, [mode, seed, safeParticles, canvasW, canvasH]);
+  }, [mode, seed, safeParticles, canvasW, canvasH, swarmSystem]);
 
   const swarmItems = useMemo(() => {
     if (mode !== 'swarm') return null;
@@ -62,9 +62,7 @@ export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed,
     return items;
     // `tick` is the intentional invalidation signal for the mutable particle system.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW, palette.swatches, caps.allowMirror, scaleMul, alphaBoost]);
+  }, [mode, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW, palette.swatches, caps.allowMirror, scaleMul, alphaBoost, swarmSystem]);
 
   return { tick, swarmItems, attractorRef };
 }
-
-export { swarmSystem };
