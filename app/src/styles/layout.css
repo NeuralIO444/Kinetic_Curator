@@ -124,6 +124,17 @@
 .palette-chip:hover { color: var(--ink); border-color: var(--line-2); }
 .palette-chip.active { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,0.04); }
 .palette-chip.dirty { border-color: var(--accent2); }
+.palette-chip-wrap { display: inline-flex; align-items: center; }
+.palette-del-btn {
+  background: transparent; border: 1px solid transparent; color: var(--dim);
+  font-size: 10px; line-height: 1; padding: 1px 3px; margin-left: 1px;
+}
+.palette-del-btn:hover { color: var(--accent2); border-color: var(--accent2); }
+.palette-save-btn {
+  background: transparent; border: 1px dashed var(--line-2); color: var(--dim);
+  font-size: 9px; letter-spacing: 0.06em; padding: 2px 6px; margin-left: 4px;
+}
+.palette-save-btn:hover { color: var(--ink); border-color: var(--ink); }
 .palette-chip-swatches { display: inline-flex; gap: 1px; }
 .palette-chip-sw { width: 7px; height: 10px; }
 

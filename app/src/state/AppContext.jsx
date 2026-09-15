@@ -24,6 +24,7 @@ export function useApp(selector) {
   const refs = useContext(RefsContext);
   const paletteId = useStore(s => s.paletteId);
   const paletteOverrides = useStore(s => s.paletteOverrides);
+  const userPalettes = useStore(s => s.userPalettes);
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const undo = useStore(s => s.undo);
@@ -116,18 +117,24 @@ export function useApp(selector) {
       case A.RENAME_LAYER: return store.renameLayer(action.id, action.name);
       case A.SET_LAYER_BLEND_MODE: return store.setLayerBlendMode(action.id, action.mode);
       case A.SET_LAYER_OPACITY: return store.setLayerOpacity(action.id, action.opacity);
+      case A.SAVE_USER_PALETTE: return store.saveUserPalette(action.name);
+      case A.DELETE_USER_PALETTE: return store.deleteUserPalette(action.id);
+      case A.RENAME_USER_PALETTE: return store.renameUserPalette(action.id, action.name);
+      case A.IMPORT_USER_PALETTES: return store.importUserPalettes(payload);
+      case A.CLEAR_USER_PALETTES: return store.clearUserPalettes();
       default: console.warn('Unhandled action:', type);
     }
   }, []);
 
-  const palette = resolvePalette(paletteId, paletteOverrides);
+  const palette = resolvePalette(paletteId, paletteOverrides, userPalettes);
   return {
     state,
     dispatch,
     history,
     palette,
     paletteOverrides,
-    palettes: PALETTES,
+    palettes: [...PALETTES, ...(userPalettes || [])],
+    userPalettes: userPalettes || [],
     assets: ASSETS,
     ...refs,
   };

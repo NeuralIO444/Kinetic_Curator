@@ -31,7 +31,7 @@ export const createLayoutSlice = (set) => ({
   setPaletteSwatch: (index, hex) => set((state) => {
     const n = normalizeHex(hex);
     if (n == null) return {};
-    const base = getCatalogPalette(state.paletteId);
+    const base = getCatalogPalette(state.paletteId, state.userPalettes);
     if (index < 0 || index >= base.swatches.length) return {};
     const prev = state.paletteOverrides?.swatches
       ? [...state.paletteOverrides.swatches]
@@ -57,7 +57,7 @@ export const createLayoutSlice = (set) => ({
   setPaletteBg: (hex) => set((state) => {
     const n = normalizeHex(hex);
     if (n == null) return {};
-    const base = getCatalogPalette(state.paletteId);
+    const base = getCatalogPalette(state.paletteId, state.userPalettes);
     const next = { ...(state.paletteOverrides || {}), bg: n };
     if (n === base.bg) delete next.bg;
     const empty = !next.swatches && !next.bg && !next.ink;
@@ -70,7 +70,7 @@ export const createLayoutSlice = (set) => ({
   setPaletteInk: (hex) => set((state) => {
     const n = normalizeHex(hex);
     if (n == null) return {};
-    const base = getCatalogPalette(state.paletteId);
+    const base = getCatalogPalette(state.paletteId, state.userPalettes);
     const next = { ...(state.paletteOverrides || {}), ink: n };
     if (n === base.ink) delete next.ink;
     const empty = !next.swatches && !next.bg && !next.ink;

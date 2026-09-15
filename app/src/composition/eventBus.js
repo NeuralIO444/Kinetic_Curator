@@ -79,4 +79,9 @@ export const Events = {
   LAYER_RENAME: 'layer:rename',
   LAYER_SET_BLEND_MODE: 'layer:setBlendMode',
   LAYER_SET_OPACITY: 'layer:setOpacity',
+  PALETTE_SAVE: 'palette:save',
+  PALETTE_DELETE: 'palette:delete',
+  PALETTE_RENAME: 'palette:rename',
+  PALETTE_IMPORT: 'palette:import',
+  PALETTE_CLEAR_LIBRARY: 'palette:clearLibrary',
 };

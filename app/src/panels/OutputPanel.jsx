@@ -31,11 +31,13 @@ export function OutputPanel() {
     layers: s.layers,
     activeLayerId: s.activeLayerId,
     layerSnapshots: s.layerSnapshots,
+    userPalettes: s.userPalettes,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, layers, activeLayerId, layerSnapshots,
+    userPalettes,
   } = state;
 
   const [uncapped, setUncapped] = useState(false);
@@ -253,6 +255,38 @@ export function OutputPanel() {
     downloadProject(doc);
   };
 
+  /** Palette library JSON (#55) — the operator's kit, not project state. */
+  const exportPalettes = () => {
+    const blob = new Blob([JSON.stringify(userPalettes || [], null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'kinetic-curator-palettes.json';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  };
+
+  const paletteInputRef = useRef(null);
+  const importPalettes = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        emit(Events.PALETTE_IMPORT, list);
+        setImportMsg(`Imported ${list.length} palette${list.length === 1 ? '' : 's'}`);
+      } catch {
+        setImportMsg('Invalid palette JSON');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const fileInputRef = useRef(null);
   const importProject = (e) => {
     const file = e.target.files[0];
@@ -426,6 +460,11 @@ export function OutputPanel() {
           <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project">↓ PROJECT</button>
           <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
           <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
+        </div>
+        <div className="output-row">
+          <button className="big-btn dl" onClick={exportPalettes} style={{ flex: 1 }} title={`Export your ${(userPalettes || []).length} saved palettes`}>↓ PALETTES</button>
+          <button className="big-btn" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Import palette library JSON">↑ PALETTES</button>
+          <input ref={paletteInputRef} type="file" accept=".json,application/json" onChange={importPalettes} style={{ display: 'none' }} />
         </div>
         {importMsg && (
           <div className="output-hint" style={{ color: importMsg.includes('done') || importMsg === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>

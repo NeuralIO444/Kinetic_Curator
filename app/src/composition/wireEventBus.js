@@ -125,5 +125,16 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) =>
     dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
 
+  on(Events.PALETTE_SAVE, ({ name } = {}) =>
+    dispatch({ type: A.SAVE_USER_PALETTE, name }));
+  on(Events.PALETTE_DELETE, ({ id }) =>
+    dispatch({ type: A.DELETE_USER_PALETTE, id }));
+  on(Events.PALETTE_RENAME, ({ id, name }) =>
+    dispatch({ type: A.RENAME_USER_PALETTE, id, name }));
+  on(Events.PALETTE_IMPORT, (list) =>
+    dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
+  on(Events.PALETTE_CLEAR_LIBRARY, () =>
+    dispatch({ type: A.CLEAR_USER_PALETTES }));
+
   return dispatch;
 }
