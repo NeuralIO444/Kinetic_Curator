@@ -1,13 +1,16 @@
 {
   "name": "app",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
     "react": "^19.2.6",
@@ -16,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.49.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
