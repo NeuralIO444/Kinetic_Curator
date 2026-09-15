@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { AssetSpriteSheet } from '../components/AssetSpriteSheet.jsx';
-import { getQualityCaps } from '../data/quality.js';
+import { getQualityCaps, shouldRenderGloss } from '../data/quality.js';
 import { clampCount } from '../engine/buildPlacements.js';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
@@ -72,6 +72,8 @@ export function CanvasPanel() {
   });
 
   const renderItems = layoutParams.mode === 'swarm' ? swarmItems : items;
+  const nodeCount = renderItems?.length || 0;
+  const showGloss = shouldRenderGloss(quality, layoutParams.shading, nodeCount);
 
   useEffect(() => {
     if (typeof dispatch === 'function' && renderItems) {
@@ -92,6 +94,11 @@ export function CanvasPanel() {
           {safeCount < layoutParams.count && (
             <span className="meter-pill" title="Count clamped by quality preset" style={{ color: '#ffaa00' }}>
               CLAMPED {safeCount}
+            </span>
+          )}
+          {layoutParams.shading === 'gloss' && !showGloss && (
+            <span className="meter-pill" title="Gloss LOD: skipped under PERF or high node count" style={{ color: '#ffaa00' }}>
+              GLOSS OFF
             </span>
           )}
         </div>
@@ -117,7 +124,8 @@ export function CanvasPanel() {
             onPointerCancel={viewport.onPointerUpCombined}
             onPointerLeave={viewport.clearAttractor}
           >
-            <AssetSpriteSheet assets={assets} />
+            {/* #36: only register symbols for enabled assets */}
+            <AssetSpriteSheet assets={activeAssets} />
             <defs>
               <radialGradient id="kc-gloss-grad" cx="35%" cy="30%" r="70%">
                 <stop offset="0%" stopColor="#fff" stopOpacity="0.9" />
@@ -133,9 +141,10 @@ export function CanvasPanel() {
                 {renderItems && renderItems.map((item, i) => {
                   if (!item.assetId) return null;
                   const sx = item._mirrored ? -item.scale : item.scale;
+                  const reactKey = item.key || `${item.assetId}-${i}${item._mirrored ? '-m' : ''}`;
                   return (
                     <g
-                      key={i}
+                      key={reactKey}
                       transform={`translate(${item.x}, ${item.y}) rotate(${item.rotation}) scale(${sx}, ${item.scale}) translate(${-half}, ${-half})`}
                       opacity={item.alpha / 100}
                       style={{
@@ -149,7 +158,7 @@ export function CanvasPanel() {
                       }}
                     >
                       <use href={`#kc-asset-${item.assetId}`} width={ASSET_SIZE} height={ASSET_SIZE} />
-                      {layoutParams.shading === 'gloss' && (
+                      {showGloss && (
                         <use
                           href={`#kc-asset-${item.assetId}`}
                           width={ASSET_SIZE}
