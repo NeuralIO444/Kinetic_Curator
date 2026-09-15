@@ -1,9 +1,10 @@
 // Placement engine — orchestrates mode positions + depth + noise warp
 // Kernel K0: density + attributes index-stable; per-index geo streams (#58)
+// Kernel K1: displacement uses instanced noise from seed (#59)
 
-import { fBm3D } from './noise.js';
+import { createNoise } from './noise.js';
 import { MODE_FNS, randomPos } from './placement/modes.js';
-import { CH, hashU01, rngForIndex } from './kernel/rng.js';
+import { CH, hashU01, hashU32, rngForIndex } from './kernel/rng.js';
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
@@ -27,13 +28,16 @@ export function computePlacements({
   const tiers = Math.max(1, zTiers || 1);
   const posFn = MODE_FNS[mode] || randomPos;
 
+  // K1: noise field isolated to this eval (channel subseed)
+  const noise = displacement > 0
+    ? createNoise(hashU32(seed, CH.noise, 0))
+    : null;
+
   for (let i = 0; i < count; i++) {
     const t = count > 1 ? i / (count - 1) : 0.5;
 
-    // K0: density skip is index-stable (does not advance geo/attr streams)
     if (density < 100 && hashU01(seed, CH.dens, i) * 100 > density) continue;
 
-    // Per-index geo stream so skips / larger count do not reshuffle other indices' jitter
     const rng = rngForIndex(seed, CH.geo, i);
 
     let pos;
@@ -47,10 +51,10 @@ export function computePlacements({
       pos = posFn(i, count, effectiveW, effectiveH, rng, jitter);
     }
 
-    if (displacement > 0) {
+    if (noise && displacement > 0) {
       const nt = (seed & 0xffff) * 0.02 * noiseSpeed;
-      const dx = fBm3D(pos.x * noiseFreq, pos.y * noiseFreq, nt, 3) * displacement;
-      const dy = fBm3D(pos.x * noiseFreq + 200, pos.y * noiseFreq + 200, nt + 100, 3) * displacement;
+      const dx = noise.fBm3D(pos.x * noiseFreq, pos.y * noiseFreq, nt, 3) * displacement;
+      const dy = noise.fBm3D(pos.x * noiseFreq + 200, pos.y * noiseFreq + 200, nt + 100, 3) * displacement;
       pos.x += dx;
       pos.y += dy;
     }
@@ -63,7 +67,6 @@ export function computePlacements({
     const zTier = i % tiers;
     const depthFactor = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
 
-    // K0: attributes from attr channel + index (independent of geo draws / density)
     const s = lerp(scale[0], scale[1], hashU01(seed, CH.attr, i * 3)) * depthFactor;
     const r = lerp(rotate[0], rotate[1], hashU01(seed, CH.attr, i * 3 + 1));
     const a = lerp(alpha[0], alpha[1], hashU01(seed, CH.attr, i * 3 + 2));
