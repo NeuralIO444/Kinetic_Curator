@@ -6,6 +6,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { AssetSpriteSheet } from '../components/AssetSpriteSheet.jsx';
 import { getQualityCaps } from '../data/quality.js';
+import { clampCount } from '../engine/buildPlacements.js';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
 import { useSwarmTick } from '../hooks/useSwarmTick.js';
@@ -49,8 +50,7 @@ export function CanvasPanel() {
     [assets, enabled],
   );
 
-  const maxForMirror = layoutParams.mirror ? caps.maxCountMirrored : caps.maxCount;
-  const safeCount = Math.min(Math.max(1, layoutParams.count), maxForMirror);
+  const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
   const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
 
   const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
