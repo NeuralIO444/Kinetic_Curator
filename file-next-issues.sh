@@ -14,38 +14,38 @@ DRY=""
 [[ "${1:-}" == "--dry-run" ]] && DRY="echo [dry-run]"
 cd "$(dirname "$0")"
 
-# NOTE: 'render' / 'engine' / 'research' labels don't exist yet on the
-# tracker and this token lacks label-creation permission (403). Filing
-# with 'enhancement' only; add the missing labels by hand once created.
+for L in render engine research; do
+  $DRY gh label create "$L" --repo "$REPO" --force >/dev/null 2>&1 || true
+done
 
 $DRY gh issue create --repo "$REPO" \
   --title "Render pipeline: lift quality caps at render time, not just pixels" \
-  --label "enhancement" \
+  --label "enhancement" --label "render" \
   --body-file "bodies/n01.md"
 
 $DRY gh issue create --repo "$REPO" \
   --title "Blend modes per shape (screen / multiply / overlay / plus-lighter)" \
-  --label "enhancement" \
+  --label "enhancement" --label "render" \
   --body-file "bodies/n02.md"
 
 $DRY gh issue create --repo "$REPO" \
   --title "Weighted asset selection — replace round-robin i % length" \
-  --label "enhancement" \
+  --label "enhancement" --label "engine" \
   --body-file "bodies/n03.md"
 
 $DRY gh issue create --repo "$REPO" \
   --title "Gradient shading pass — GLOSS vs FLAT" \
-  --label "enhancement" \
+  --label "enhancement" --label "render" \
   --body-file "bodies/n04.md"
 
 $DRY gh issue create --repo "$REPO" \
   --title "Accumulation buffer (HYPE BitmapCanvas-style trails)" \
-  --label "enhancement" \
+  --label "enhancement" --label "research" \
   --body-file "bodies/n05.md"
 
 $DRY gh issue create --repo "$REPO" \
   --title "Batch edition render — N seeds to disk" \
-  --label "enhancement" \
+  --label "enhancement" --label "render" \
   --body-file "bodies/n06.md"
 
 $DRY gh issue create --repo "$REPO" \
