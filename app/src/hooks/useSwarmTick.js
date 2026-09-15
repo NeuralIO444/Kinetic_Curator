@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { ParticleSystem } from '../engine/particles.js';
 
-export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed, layoutParams, canvasW, canvasH, scaleMul, alphaBoost, caps }) {
+export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed, layoutParams, canvasW, canvasH, scaleMul, alphaBoost, caps, attractorRef }) {
   const [tick, setTick] = useState(0);
-  const attractorRef = useRef(null);
   // Per-hook-instance, not module-level, so each layer gets its own swarm.
   const [swarmSystem] = useState(() => new ParticleSystem());
 
@@ -25,7 +24,7 @@ export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed,
     let animId;
     const step = () => {
       const c = liveRef.current;
-      swarmSystem.update(c.layoutParams, c.activeAssets, c.palette, c.seed, Date.now(), attractorRef.current);
+      swarmSystem.update(c.layoutParams, c.activeAssets, c.palette, c.seed, Date.now(), attractorRef?.current);
       setTick(t => (t + 1) % 1000000);
       animId = requestAnimationFrame(step);
     };
@@ -33,7 +32,7 @@ export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed,
     animId = requestAnimationFrame(step);
     return () => cancelAnimationFrame(animId);
     // Only a genuine identity change (mode / seed / population / canvas) re-seeds.
-  }, [mode, seed, safeParticles, canvasW, canvasH, swarmSystem]);
+  }, [mode, seed, safeParticles, canvasW, canvasH, swarmSystem, attractorRef]);
 
   const swarmItems = useMemo(() => {
     if (mode !== 'swarm') return null;
@@ -64,5 +63,5 @@ export function useSwarmTick({ mode, safeParticles, activeAssets, palette, seed,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, activeAssets, layoutParams.overlap, layoutParams.mirror, tick, canvasW, palette.swatches, caps.allowMirror, scaleMul, alphaBoost, swarmSystem]);
 
-  return { tick, swarmItems, attractorRef };
+  return { tick, swarmItems };
 }

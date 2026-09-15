@@ -14,7 +14,7 @@ export function Layer({
   layoutParams, seed, activeAssets, palette, caGrid, caps,
   safeCount, safeParticles, effectiveScale, effectiveAlpha,
   canvasW, canvasH, scaleMul, alphaBoost, motionSmoothing, quality,
-  layerBlendMode, layerOpacity, onCount,
+  layerBlendMode, layerOpacity, onCount, attractorRef,
 }) {
   const { items } = useCanvasItems({
     layoutParams, seed, activeAssets, palette, caGrid, safeCount,
@@ -24,7 +24,7 @@ export function Layer({
   const { swarmItems } = useSwarmTick({
     mode: layoutParams.mode,
     safeParticles, activeAssets, palette, seed, layoutParams,
-    canvasW, canvasH, scaleMul, alphaBoost, caps,
+    canvasW, canvasH, scaleMul, alphaBoost, caps, attractorRef,
   });
 
   const renderItems = layoutParams.mode === 'swarm' ? swarmItems : items;

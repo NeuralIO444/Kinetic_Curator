@@ -218,6 +218,7 @@ export function CanvasPanel() {
                     quality={quality}
                     layerBlendMode={rl.layer.layerBlendMode}
                     layerOpacity={rl.layer.layerOpacity}
+                    attractorRef={viewport.attractorRef}
                     onCount={(count) => reportCount(rl.layer.id, count)}
                   />
                 ))}

@@ -22,7 +22,7 @@ jobs:
         working-directory: app
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # deploy-pages fails with "Failed to create deployment (status: 404)" when
       # GitHub has no Pages site record for the repo — which can happen even with
@@ -34,7 +34,7 @@ jobs:
           enablement: true
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
