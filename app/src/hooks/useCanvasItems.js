@@ -6,6 +6,19 @@ import { colorForPlacement } from '../engine/color.js';
 import { mkRng } from '../engine/prng.js';
 import { getPreset } from '../data/presets.js';
 
+// Authored per-asset weight ('heavy'/'medium'/'light') drives selection
+// frequency: heavy shapes read as dominant forms, light ones as rare accents.
+const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
+
+export function pickWeighted(assets, weights, totalWeight, rng) {
+  let r = rng() * totalWeight;
+  for (let i = 0; i < assets.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return assets[i];
+  }
+  return assets[assets.length - 1];
+}
+
 export function useCanvasItems({ layoutParams, seed, activeAssets, palette, caGrid, safeCount, effectiveScale, effectiveAlpha, canvasW, canvasH, caps }) {
   const preset = getPreset(layoutParams.composition);
 
@@ -33,8 +46,10 @@ export function useCanvasItems({ layoutParams, seed, activeAssets, palette, caGr
 
   const items = useMemo(() => {
     const rng = mkRng(seed + 1);
-    let mapped = placements.map((p, i) => {
-      const asset = activeAssets[i % activeAssets.length];
+    const weights = activeAssets.map((a) => SELECTION_WEIGHT[a.weight] || 1);
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    let mapped = placements.map((p) => {
+      const asset = pickWeighted(activeAssets, weights, totalWeight, rng);
       const color = colorForPlacement({
         swatches: palette.swatches,
         strategy: preset.paletteShift || 'band',
