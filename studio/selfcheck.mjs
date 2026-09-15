@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { getRenderCaps } from '../app/src/data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../app/src/data/layout-modes.js';
 import { ASSETS } from '../app/src/data/assets/index.js';
-import { renderSvg, resolveLayers, CANVAS_W, CANVAS_H } from './render.mjs';
+import { renderSvg, resolveLayers, resolveMotionRamp, MOTION_PRESETS, CANVAS_W, CANVAS_H } from './render.mjs';
 
 const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const base = {
@@ -80,6 +80,51 @@ const caps = getRenderCaps('balanced', false);
   assert.notEqual(
     renderSvg(base, { ramp: { displacement: [0, 200] }, progress: 0 }),
     renderSvg(base, { ramp: { displacement: [0, 200] }, progress: 1 }),
+  );
+}
+
+// 6. Motion presets (#94): pure ramp resolution, no project/render needed.
+{
+  const lp = { ...DEFAULT_LAYOUT_PARAMS };
+
+  // 'none' and unknown names fall back to the explicit ramp untouched.
+  assert.equal(resolveMotionRamp('none', lp, null), null);
+  assert.equal(resolveMotionRamp(null, lp, null), null);
+  const explicitOnly = resolveMotionRamp('none', lp, { count: [0, 10] });
+  assert.deepEqual(explicitOnly, { count: [0, 10] });
+
+  // Every preset builds a non-empty ramp from default params (except 'none').
+  for (const name of Object.keys(MOTION_PRESETS)) {
+    if (name === 'none') continue;
+    const ramp = resolveMotionRamp(name, lp, null);
+    assert.ok(ramp && Object.keys(ramp).length > 0, `${name} preset should produce a ramp`);
+  }
+
+  // 'auto' picks swarm-settle for swarm/hype, drift otherwise.
+  assert.deepEqual(resolveMotionRamp('auto', { ...lp, mode: 'swarm' }, null),
+    MOTION_PRESETS.swarm.build(lp));
+  assert.deepEqual(resolveMotionRamp('auto', { ...lp, mode: 'fibonacci' }, null),
+    MOTION_PRESETS.drift.build(lp));
+
+  // Explicit --ramp overrides a preset key but leaves its other keys intact.
+  const combined = resolveMotionRamp('drift', lp, { displacement: [5, 9] });
+  assert.deepEqual(combined.displacement, [5, 9], 'explicit ramp wins on shared key');
+  assert.ok(combined.noiseSpeed, 'preset keys not named by --ramp still apply');
+
+  // Virtual array keys (scaleMax etc.) land in the right slot without
+  // clobbering the sibling bound, and 'bloom' visibly changes the frame.
+  const doc = { ...base, layoutParams: { ...base.layoutParams, lifeDrift: 0 } };
+  const f0 = renderSvg(doc, { motion: 'bloom', progress: 0 });
+  const f1 = renderSvg(doc, { motion: 'bloom', progress: 1 });
+  assert.notEqual(f0, f1, 'bloom preset moves the frame across progress');
+  assert.equal(renderSvg(doc, { motion: 'bloom', progress: 0 }), f0, 'deterministic: same inputs -> same frame');
+
+  // 'swarm' preset only matters in swarm/hype mode (bakeSteps ramp).
+  const swarmDoc = { ...doc, layoutParams: { ...doc.layoutParams, mode: 'swarm' } };
+  assert.notEqual(
+    renderSvg(swarmDoc, { motion: 'swarm', progress: 0 }),
+    renderSvg(swarmDoc, { motion: 'swarm', progress: 1 }),
+    'swarm preset advances the K4 bake across the clip',
   );
 }
 
