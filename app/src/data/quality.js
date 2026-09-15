@@ -8,6 +8,7 @@ export const QUALITY_PRESETS = {
     maxCountMirrored: 650,
     maxParticles: 350,
     allowMirror: true,
+    allowGloss: true,
     description: 'Full fidelity — best hardware',
   },
   balanced: {
@@ -17,6 +18,7 @@ export const QUALITY_PRESETS = {
     maxCountMirrored: 360,
     maxParticles: 200,
     allowMirror: true,
+    allowGloss: true,
     description: 'Good density, stable frame rate',
   },
   performance: {
@@ -26,6 +28,7 @@ export const QUALITY_PRESETS = {
     maxCountMirrored: 140,
     maxParticles: 100,
     allowMirror: false,
+    allowGloss: false,
     description: 'Protects interactivity on weaker machines',
   },
 };
@@ -38,8 +41,12 @@ export const FINAL_CAPS = {
   maxCountMirrored: 800,
   maxParticles: 400,
   allowMirror: true,
+  allowGloss: true,
   description: 'Render-time density (not for live play)',
 };
+
+/** Skip second gloss <use> when node count exceeds this under BALANCED/HIGH. */
+export const GLOSS_NODE_THRESHOLD = 280;
 
 export function getQualityCaps(qualityId) {
   return QUALITY_PRESETS[qualityId] || QUALITY_PRESETS.balanced;
@@ -49,4 +56,13 @@ export function getQualityCaps(qualityId) {
 export function getRenderCaps(qualityId, uncapped = false) {
   if (uncapped) return FINAL_CAPS;
   return getQualityCaps(qualityId);
+}
+
+/** Whether the live path should draw the gloss overlay pass. */
+export function shouldRenderGloss(qualityId, shading, nodeCount) {
+  if (shading !== 'gloss') return false;
+  const caps = getQualityCaps(qualityId);
+  if (caps.allowGloss === false) return false;
+  if (nodeCount > GLOSS_NODE_THRESHOLD) return false;
+  return true;
 }

@@ -1,5 +1,5 @@
 // Pure placement + asset + color + mirror pipeline.
-// Shared by live preview (useCanvasItems) and future renderFinal (#24 / #32).
+// Shared by live preview (useCanvasItems) and renderFinal (#24 / #32).
 // No React, no store — deterministic given the same inputs.
 
 import { computePlacements } from './placement.js';
@@ -115,7 +115,9 @@ export function buildPlacements({
     const accent =
       palette.swatches[(palette.swatches.indexOf(color) + 3) % palette.swatches.length] ||
       palette.swatches[0];
-    return { ...p, assetId: asset.id, color, accent };
+    // Stable React key: seed-derived slot + asset (survives sort / mirror twin)
+    const key = `p${p.index}-${asset.id}`;
+    return { ...p, assetId: asset.id, color, accent, key };
   });
 
   if (!layoutParams.overlap) {
@@ -127,6 +129,7 @@ export function buildPlacements({
       ...item,
       x: canvasW - item.x,
       _mirrored: true,
+      key: `${item.key}-m`,
     }));
     mapped = [...mapped, ...mirrored];
   }
