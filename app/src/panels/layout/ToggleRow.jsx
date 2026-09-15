@@ -1,6 +1,6 @@
 // Toggle row: bleed / recolor / mirror / overlap / accum / blend / shading
 import { emit, Events } from '../../composition/eventBus.js';
-import { BLEND_MODES } from '../../data/layout-modes.js';
+import { BLEND_MODES, PALETTE_SHIFTS } from '../../data/layout-modes.js';
 
 const TOGGLES = ['bleed', 'recolor', 'mirror', 'overlap', 'accumulation'];
 
@@ -59,6 +59,16 @@ export function ToggleRow({ layoutParams }) {
       >
         <option value="flat">SHADING: FLAT</option>
         <option value="gloss">SHADING: GLOSS</option>
+      </select>
+      <select
+        value={layoutParams.paletteShift ?? 'auto'}
+        onChange={e => emit(Events.LAYOUT_PARAM, { key: 'paletteShift', value: e.target.value })}
+        className="tg blend-mode-select"
+        title="How palette colors are distributed across shapes. AUTO follows the composition preset."
+      >
+        {PALETTE_SHIFTS.map(s => (
+          <option key={s} value={s}>COLOR: {s.toUpperCase()}</option>
+        ))}
       </select>
     </div>
   );
