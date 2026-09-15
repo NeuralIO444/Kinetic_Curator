@@ -10,3 +10,7 @@ dist/
 # Python
 __pycache__/
 *.pyc
+
+# Untracked WASM particle experiment — see docs/BUGLIST.md and #95
+app/public/particles.wasm
+app/public/particles.wat
