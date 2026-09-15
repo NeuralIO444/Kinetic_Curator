@@ -7,6 +7,9 @@
 import { createNoise } from './noise.js';
 import { CH, rngForIndex } from './kernel/rng.js';
 
+/** Pointer-attraction gain. See the force block below for why it's this big. */
+export const ATTRACTOR_GAIN = 8;
+
 class Particle {
   /**
    * Every random quantity is supplied by the caller (K4, #63). Nothing here
@@ -145,7 +148,12 @@ export class ParticleSystem {
         const d = Math.sqrt(dx * dx + dy * dy);
 
         if (d > 5) {
-          const forceMag = (gravityWells * 0.25) / Math.max(20, d * 0.05);
+          // GRAVITY has to be able to beat the wind, or the control reads as
+          // dead (#89). Wind peaks at 0.8; with this constant the pull is
+          // ~0.4 at the 1.0 default (present but not dominant) and ~2.0 at
+          // the 5.0 maximum (clearly in charge). The distance term stays
+          // clamped so close-range attraction doesn't diverge.
+          const forceMag = (gravityWells * ATTRACTOR_GAIN) / Math.max(20, d * 0.05);
           p1.applyForce((dx / d) * forceMag, (dy / d) * forceMag);
         }
       }
