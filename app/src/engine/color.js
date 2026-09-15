@@ -35,13 +35,3 @@ export function colorForPlacement({ swatches, strategy, t, index, rng }) {
       return swatches[Math.floor(rng() * swatches.length)];
   }
 }
-
-/**
- * Resolve CSS custom property colors for an SVG string.
- * Replaces var(--ink) and var(--accent) with actual hex values.
- */
-export function resolveColors(svgStr, ink, accent) {
-  return svgStr
-    .replace(/var\(--ink\)/g, ink)
-    .replace(/var\(--accent\)/g, accent);
-}

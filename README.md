@@ -76,6 +76,7 @@ Mic/audio works on HTTPS (required by browsers for `getUserMedia`).
 - `F` — Favorite current seed/config
 - `E` — Toggle Evolve
 - `N` — New seed
+- `G` — Toggle fullscreen
 - `Cmd+Z` / `Cmd+Shift+Z` — Undo / Redo
 - `?` — Hotkey overlay
 

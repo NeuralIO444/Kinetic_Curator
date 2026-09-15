@@ -1,6 +1,6 @@
 import { emit, Events } from '../../composition/eventBus.js';
 
-export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, autoSnapshot, motionSmoothing, evolveMode }) {
+export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, autoSnapshot, motionSmoothing }) {
   return (
     <>
       <div className="davis-source-row">

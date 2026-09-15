@@ -23,11 +23,24 @@
   --gap-panel: 6px;
   --gap-grid: 6px;
 
-  /* Panel resize handle */
-  --resize-handle: 10px;
+  /* Keyboard focus ring */
+  --focus: var(--accent2);
 }
 
 * { box-sizing: border-box; }
+
+/* Keyboard users had no focus indicator anywhere in the app. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 html, body { margin: 0; padding: 0; }
 body {
   background: var(--bg);

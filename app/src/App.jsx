@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
@@ -18,15 +18,18 @@ import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
+
+// Module scope: a fresh array literal each render would reset the divider's
+// double-click-to-reset target on every frame.
+const COLUMN_FRACTIONS = [0.62, 0.38];
 import { wireEventBus } from './composition/wireEventBus.js';
 import { subscribeDispatch } from './composition/dispatchPipe.js';
 
 function AppInner() {
   const { dispatch: rawDispatch, history, palette, svgRef } = useApp();
-  // Wire the event bus once — all panel emits flow through the dispatch pipe
-  const dispatch = useRef(null);
-  if (!dispatch.current) dispatch.current = wireEventBus(rawDispatch);
-  const piped = dispatch.current;
+  // Wire the event bus once — all panel emits flow through the dispatch pipe.
+  // wireEventBus is idempotent, and rawDispatch is stable.
+  const piped = useMemo(() => wireEventBus(rawDispatch), [rawDispatch]);
 
   useEffect(() => subscribeDispatch((a) => {
     if (import.meta.env.DEV) console.debug('[pipe]', a.type);
@@ -60,7 +63,9 @@ function AppInner() {
 
   const [showHotkeys, setShowHotkeys] = useState(false);
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
-  evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
+  useEffect(() => {
+    evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
+  }, [state.evolveMode, state.evolveSource]);
 
   useEffect(() => {
     if (!state.evolveMode || state.evolveSource !== 'time') return;
@@ -73,24 +78,32 @@ function AppInner() {
     const now = Date.now();
     if (state.lastEvolveTs && state.autoSnapshot && svgRef?.current) {
       if (now - lastSnapRef.current > 2000) {
-        exportSnapshot(svgRef.current, state.exportResolution, state.seed.toString(16));
+        exportSnapshot(svgRef.current, state.exportResolution, state.seed.toString(16), palette.bg);
         lastSnapRef.current = now;
       }
     }
-  }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, svgRef]);
+  }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, svgRef, palette.bg]);
 
   useHotkeys({
-    's': () => piped({
-      type: A.ADD_SNAPSHOT,
-      snapshot: {
-        seed: state.seed,
-        format: 'PNG',
-        resolution: state.exportResolution === 1 ? '1920x1080' : state.exportResolution === 2 ? '3840x2160' : '7680x4320',
-        timestamp: new Date().toISOString().slice(11, 19),
-        config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
-      },
-    }),
-    'F': () => piped({
+    's': () => {
+      // Write the PNG, then add the sidecar record once we have a thumbnail
+      // for it — a capture that fails to rasterize no longer leaves a
+      // phantom history entry with nothing behind it.
+      exportSnapshot(svgRef?.current, state.exportResolution, state.seed.toString(16), palette.bg, (thumb) => {
+        piped({
+          type: A.ADD_SNAPSHOT,
+          snapshot: {
+            seed: state.seed,
+            format: 'PNG',
+            resolution: state.exportResolution === 1 ? '1920x1080' : state.exportResolution === 2 ? '3840x2160' : '7680x4320',
+            timestamp: new Date().toISOString().slice(11, 19),
+            config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
+            thumb,
+          },
+        });
+      });
+    },
+    'f': () => piped({
       type: A.ADD_FAVORITE,
       favorite: {
         seed: state.seed,
@@ -98,7 +111,7 @@ function AppInner() {
         config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
       },
     }),
-    'f': () => piped({ type: A.TOGGLE_FULLSCREEN }),
+    'g': () => piped({ type: A.TOGGLE_FULLSCREEN }),
     'e': () => piped({ type: A.SET_EVOLVE_MODE, payload: p => !p }),
     'n': () => piped({ type: A.BUMP_SEED }),
     ' ': () => piped({ type: A.SET_RUNNING, payload: !state.running }),
@@ -124,7 +137,7 @@ function AppInner() {
     onBeat
   });
 
-  const { containerRef, gridTemplate, dividerProps } = useColumnResize(2, [0.62, 0.38], 300);
+  const { containerRef, gridTemplate, dividerProps } = useColumnResize(COLUMN_FRACTIONS, 300);
 
   const onPlayMe = useCallback(() => {
     piped({ type: A.SET_RUNNING, payload: true });
@@ -134,16 +147,18 @@ function AppInner() {
 
 
   return (
-    <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''`}>
+    <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
       <MasterBar />
       <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} />
       <FirstRunOverlay onPlay={onPlayMe} />
-      <Shell
-        dispatchPipe={piped}
-        containerRef={containerRef}
-        gridTemplate={gridTemplate}
-        dividerProps={dividerProps}
-      />
+      <ErrorBoundary>
+        <Shell
+          dispatchPipe={piped}
+          containerRef={containerRef}
+          gridTemplate={gridTemplate}
+          dividerProps={dividerProps}
+        />
+      </ErrorBoundary>
       <FavoritesTray />
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v0.7</span>

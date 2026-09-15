@@ -1,6 +1,5 @@
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { useCollapse } from '../hooks/useCollapse.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { EvolveControls } from './davis/EvolveControls.jsx';
 import { MorphControls } from './davis/MorphControls.jsx';
@@ -28,11 +27,20 @@ export function DavisPanel() {
   }));
   const {
     evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot,
-    motionSmoothing, favorites,
+    motionSmoothing, favorites, seed, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
     morphEvolve, morphDurationMs, morphing,
   } = state;
-  const { open, toggle } = useCollapse(false);
+  const { palette } = useApp();
+
+  const saveFavorite = () => emit(Events.DAVIS_FAVORITE, {
+    action: 'add',
+    favorite: {
+      seed,
+      timestamp: new Date().toISOString().slice(11, 19),
+      config: { layout: { ...layoutParams }, palette: { id: palette.id } },
+    },
+  });
 
   const phraseProgress = phraseLength > 0 ? (phraseBeat / phraseLength) * 100 : 0;
 
@@ -42,18 +50,14 @@ export function DavisPanel() {
         tag="P07"
         title="DAVIS MODE"
         subtitle={morphing ? 'morphing…' : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}` : evolveMode ? 'evolving' : 'paused'}
-        collapsed={!open}
-        onToggle={toggle}
       />
-      {open && (
-        <div className="davis-body">
+      <div className="davis-body">
           <EvolveControls
             evolveTarget={evolveTarget}
             evolveSource={evolveSource}
             evolveInterval={evolveInterval}
             autoSnapshot={autoSnapshot}
             motionSmoothing={motionSmoothing}
-            evolveMode={evolveMode}
           />
 
           <MorphControls
@@ -75,13 +79,12 @@ export function DavisPanel() {
               onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>
               {evolveMode ? 'STOP' : 'EVOLVE'}
             </button>
-            <button className="big-btn" onClick={() => emit(Events.DAVIS_FAVORITE, { action: 'add' })}>FAVORITE</button>
+            <button className="big-btn" onClick={saveFavorite}>FAVORITE</button>
             <button className="big-btn" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>NEW SEED</button>
           </div>
 
           <FavoritesList favorites={favorites} />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

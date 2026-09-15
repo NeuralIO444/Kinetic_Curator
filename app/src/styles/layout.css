@@ -221,6 +221,21 @@
     gap: var(--sp-1);
     align-items: flex-start;
   }
+  /* The app is taller than the viewport here, so the document must scroll.
+     Without this, body{overflow:hidden} made the lower panels unreachable —
+     previously masked by every panel defaulting to collapsed. */
+  html, body { overflow: auto; }
+  .col-canvas { height: auto; }
+  .col-panels { max-height: none; overflow: visible; }
+  .panel-tab-content { overflow: visible; }
+  .panel-body,
+  .panel-stimulus .stim-body,
+  .davis-body,
+  .output-body,
+  .pool-body {
+    overflow-y: visible;
+    max-height: none;
+  }
 }
 
 @media (max-width: 640px) {

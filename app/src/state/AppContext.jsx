@@ -14,6 +14,7 @@ export function AppProvider({ children }) {
   return <RefsContext.Provider value={{ canvasRef, svgRef }}>{children}</RefsContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp(selector) {
   const refs = useContext(RefsContext);
   const paletteId = useStore(s => s.paletteId);
@@ -79,12 +80,12 @@ export function useApp(selector) {
       case A.SET_SLOW_RENDER: return store.setSlowRender(payload);
       case A.TOGGLE_FULLSCREEN: return store.toggleFullscreen();
       case A.ADD_SNAPSHOT: return store.addSnapshot(action.snapshot);
-      case A.REMOVE_SNAPSHOT: return store.removeSnapshot(action.index);
+      case A.REMOVE_SNAPSHOT: return store.removeSnapshot(action.id);
       case A.CLEAR_SNAPSHOTS: return store.clearSnapshots();
       case A.SET_EXPORT_RESOLUTION: return store.setExportResolution(payload);
       case A.SET_IS_RECORDING: return store.setIsRecording(payload);
       case A.ADD_FAVORITE: return store.addFavorite(action.favorite);
-      case A.REMOVE_FAVORITE: return store.removeFavorite(action.index);
+      case A.REMOVE_FAVORITE: return store.removeFavorite(action.id);
       case A.RECALL_FAVORITE: return store.recallFavorite(action.favorite);
       case A.SET_MOTION_SMOOTHING: return store.setMotionSmoothing(payload);
       case A.STEP_CA_GRID: return store.stepCaGrid();

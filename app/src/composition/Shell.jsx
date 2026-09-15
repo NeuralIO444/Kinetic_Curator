@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { panelsByZone } from './PanelRegistry.js';
 
 const TAB_STORAGE_KEY = 'kc:active-panel-tab';
@@ -6,7 +6,8 @@ const TAB_STORAGE_KEY = 'kc:active-panel-tab';
 /**
  * Composition root — zero business logic.
  * Renders registry entries by zone.
- * Secondary zone uses tabs to avoid vertical scrolling (#13).
+ * The secondary zone is a tab strip: one panel visible at a time, and the
+ * tab is the only show/hide control in the app.
  */
 export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }) {
   const primary = panelsByZone('primary');
@@ -26,7 +27,23 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
     } catch { /* ignore */ }
   }, [activeTab]);
 
+  const tabRefs = useRef({});
   const selectTab = useCallback((id) => setActiveTab(id), []);
+
+  // Arrow / Home / End navigation — expected of any role="tablist".
+  const onTabKeyDown = useCallback((e) => {
+    const ids = secondary.map((p) => p.id);
+    const i = ids.indexOf(activeTab);
+    let next = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = ids[(i + 1) % ids.length];
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = ids[(i - 1 + ids.length) % ids.length];
+    else if (e.key === 'Home') next = ids[0];
+    else if (e.key === 'End') next = ids[ids.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    setActiveTab(next);
+    tabRefs.current[next]?.focus();
+  }, [secondary, activeTab]);
 
   const activePanel = secondary.find((p) => p.id === activeTab) ?? secondary[0];
 
@@ -40,28 +57,43 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       </div>
       <div className="col-divider" {...dividerProps(0)} />
       <div className="col col-panels">
-        <div className="panel-tabs" role="tablist" aria-label="Control panels">
-          {secondary.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="tab"
-              aria-selected={p.id === activeTab}
-              className={`panel-tab ${p.id === activeTab ? 'active' : ''}`}
-              onClick={() => selectTab(p.id)}
-              title={p.title}
-            >
-              <span className="panel-tab-icon">{p.icon}</span>
-              <span className="panel-tab-label">{p.title}</span>
-            </button>
-          ))}
+        <div className="panel-tabs" role="tablist" aria-label="Control panels" onKeyDown={onTabKeyDown}>
+          {secondary.map((p) => {
+            const selected = p.id === activeTab;
+            return (
+              <button
+                key={p.id}
+                ref={(el) => { tabRefs.current[p.id] = el; }}
+                type="button"
+                role="tab"
+                id={`kc-tab-${p.id}`}
+                aria-controls={`kc-tabpanel-${p.id}`}
+                aria-selected={selected}
+                tabIndex={selected ? 0 : -1}
+                className={`panel-tab ${selected ? 'active' : ''}`}
+                onClick={() => selectTab(p.id)}
+                title={p.title}
+              >
+                <span className="panel-tab-icon" aria-hidden="true">{p.icon}</span>
+                <span className="panel-tab-label">{p.title}</span>
+              </button>
+            );
+          })}
         </div>
-        <div className="panel-tab-content" role="tabpanel">
-          {activePanel && (() => {
-            const Comp = activePanel.component;
-            return <Comp key={activePanel.id} dispatch={dispatchPipe} />;
-          })()}
-        </div>
+        {activePanel && (
+          <div
+            className="panel-tab-content"
+            role="tabpanel"
+            id={`kc-tabpanel-${activePanel.id}`}
+            aria-labelledby={`kc-tab-${activePanel.id}`}
+            tabIndex={0}
+          >
+            {(() => {
+              const Comp = activePanel.component;
+              return <Comp key={activePanel.id} dispatch={dispatchPipe} />;
+            })()}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 // Preset groups + apply
 import { useMemo } from 'react';
-import { getPresetsByGroup, getPreset } from '../../data/presets.js';
+import { getPresetsByGroup } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
 export function PresetBrowser({ composition }) {

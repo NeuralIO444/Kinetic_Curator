@@ -50,8 +50,8 @@ export function wireEventBus(rawDispatch) {
     if (fav.action === 'recall') return dispatch({ type: A.RECALL_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'add' && fav.favorite) return dispatch({ type: A.ADD_FAVORITE, favorite: fav.favorite });
   });
-  on(Events.DAVIS_FAVORITE_REMOVE, ({ index }) =>
-    dispatch({ type: A.REMOVE_FAVORITE, index }));
+  on(Events.DAVIS_FAVORITE_REMOVE, ({ id }) =>
+    dispatch({ type: A.REMOVE_FAVORITE, id }));
 
   on(Events.AUDIO_TOGGLE, (enabled) =>
     dispatch({ type: A.SET_AUDIO_ENABLED, payload: enabled }));

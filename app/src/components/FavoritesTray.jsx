@@ -63,7 +63,7 @@ export function FavoritesTray() {
           const seedHex = (f.seed >>> 0).toString(16).padStart(4, '0').slice(-4);
           return (
             <div
-              key={`${f.seed}-${f.timestamp || i}`}
+              key={f.id ?? `${f.seed}-${f.timestamp || i}`}
               className={`fav-chip ${isCurrent ? 'active' : ''}`}
               title={`Seed ${f.seed.toString(16)} · click recall · shift+click evolve from`}
             >

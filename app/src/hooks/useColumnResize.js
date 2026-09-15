@@ -1,13 +1,12 @@
 // useColumnResize — draggable column dividers for 3-column grid
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback } from 'react';
 
 /**
  * Manages widths of N columns with draggable dividers between them.
- * @param {number} count - number of columns
  * @param {number[]} initialFractions - initial width fractions (must sum to 1)
  * @param {number} minPx - minimum column width in pixels
  */
-export function useColumnResize(count = 3, initialFractions = [0.32, 0.34, 0.34], minPx = 200) {
+export function useColumnResize(initialFractions = [0.32, 0.34, 0.34], minPx = 200) {
   const [fractions, setFractions] = useState(initialFractions);
   const containerRef = useRef(null);
   const dragRef = useRef({ active: false, index: -1, startX: 0, startFractions: [] });

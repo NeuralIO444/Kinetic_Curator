@@ -1,5 +1,6 @@
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { generateLayoutTargets, MORPHABLE_KEYS, PALETTE_IDS } from '../paramUtils.js';
+import { genId } from '../id.js';
 
 export const createDavisSlice = (set) => ({
   evolveMode: false,
@@ -126,9 +127,9 @@ export const createDavisSlice = (set) => ({
     return {};
   }),
 
-  addFavorite: (fav) => set((state) => ({ favorites: [...state.favorites, fav] })),
-  removeFavorite: (index) => set((state) => ({
-    favorites: state.favorites.filter((_, i) => i !== index),
+  addFavorite: (fav) => set((state) => ({ favorites: [...state.favorites, { id: genId(), ...fav }] })),
+  removeFavorite: (id) => set((state) => ({
+    favorites: state.favorites.filter((f) => f.id !== id),
   })),
   recallFavorite: (fav) => set({
     seed: fav.seed,

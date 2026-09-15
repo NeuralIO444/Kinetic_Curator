@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { useCollapse } from '../hooks/useCollapse.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SourceControls } from './stimulus/SourceControls.jsx';
 import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
@@ -23,7 +22,6 @@ export function StimulusPanel() {
     webcamEnabled, audioEnabled, motionEnergy, audioGain, audioSource,
     audioMonitor, beatPulse, audioBands, layoutParams,
   } = state;
-  const { open, toggle } = useCollapse(false);
 
   const [devices, setDevices] = useState([]);
 
@@ -40,9 +38,8 @@ export function StimulusPanel() {
 
   return (
     <div className="panel panel-stimulus">
-      <PanelHeader tag="P06" title="STIMULUS" subtitle={webcamEnabled || audioEnabled ? 'active' : 'idle'} collapsed={!open} onToggle={toggle} />
-      {open && (
-        <div className="stim-body">
+      <PanelHeader tag="P06" title="STIMULUS" subtitle={webcamEnabled || audioEnabled ? 'active' : 'idle'} />
+      <div className="stim-body">
           <div className="stim-toggle-row">
             <button
               className={`stim-toggle ${webcamEnabled ? 'on' : ''}`}
@@ -61,8 +58,6 @@ export function StimulusPanel() {
           </div>
 
           <SourceControls
-            webcamEnabled={webcamEnabled}
-            audioEnabled={audioEnabled}
             audioSource={audioSource}
             audioGain={audioGain}
             audioMonitor={audioMonitor}
@@ -72,8 +67,7 @@ export function StimulusPanel() {
           <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} />
 
           <MeterBlock motionEnergy={motionEnergy} audioBands={audioBands} beatPulse={beatPulse} />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

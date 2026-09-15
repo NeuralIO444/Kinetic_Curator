@@ -43,7 +43,7 @@ export function computePlacements({
     }
 
     if (displacement > 0) {
-      const nt = (seed & 0xffff) * 0.02;
+      const nt = (seed & 0xffff) * 0.02 * noiseSpeed;
       const dx = fBm3D(pos.x * noiseFreq, pos.y * noiseFreq, nt, 3) * displacement;
       const dy = fBm3D(pos.x * noiseFreq + 200, pos.y * noiseFreq + 200, nt + 100, 3) * displacement;
       pos.x += dx;

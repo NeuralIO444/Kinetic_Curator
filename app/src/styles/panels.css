@@ -7,6 +7,8 @@
 }
 .panel-header {
   display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
   padding: 4px 8px;
   background: var(--panel-2);
   border-bottom: 1px solid var(--line);
@@ -19,7 +21,7 @@
 .panel-header-right { display: flex; align-items: center; gap: 6px; }
 .header-tools { display: inline-flex; gap: 3px; align-items: center; }
 .meter-pill { font-size: 9px; padding: 1px 5px; border: 1px solid var(--line); color: var(--dim); }
-.panel-body { padding: 8px; overflow: auto; min-height: 0; }
+.panel-body { padding: 8px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 
 .chip-btn {
   padding: 2px 6px;
@@ -31,12 +33,6 @@
 }
 .chip-btn:hover { color: var(--ink); border-color: var(--ink); }
 .chip-btn.active { color: var(--bg); background: var(--ink); border-color: var(--ink); }
-
-.panel-header-collapsible { cursor: pointer; user-select: none; }
-.panel-header-collapsible:hover { background: rgba(255,255,255,0.04); }
-.panel-collapse-caret { display: inline-block; width: 10px; text-align: center; color: var(--dim); font-size: 10px; transition: color 120ms; }
-.panel-header-collapsible:hover .panel-collapse-caret { color: var(--ink); }
-.panel-header-collapsed { border-bottom-color: transparent; }
 
 /* ─── Preset + Mode ─── */
 .preset-groups { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
@@ -85,8 +81,8 @@
 .tg.tg-on { color: var(--accent3); border-color: var(--accent3); }
 
 /* ─── Stimulus ─── */
-.panel-stimulus { padding: 0; flex: 0 0 auto; }
-.panel-stimulus .stim-body { padding: 8px; }
+.panel-stimulus { padding: 0; }
+.panel-stimulus .stim-body { padding: 8px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .stim-toggle-row { display: flex; gap: 4px; margin: 0 0 6px; }
 .stim-toggle {
   flex: 1;
@@ -109,9 +105,9 @@
 .stim-meter-fill { position: absolute; top: 0; left: 0; height: 100%; transition: width 0.1s; }
 
 /* ─── Davis Mode ─── */
-.panel-davis { padding: 0; flex: 0 0 auto; }
+.panel-davis { padding: 0; }
 .panel-davis .davis-body { padding: 8px; }
-.davis-body { display: flex; flex-direction: column; gap: 6px; }
+.davis-body { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .davis-source-row, .davis-interval-row { display: flex; align-items: center; gap: 6px; font-size: 10px; }
 .davis-label { color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; width: 52px; font-size: 9px; }
 .davis-interval-row input[type=range] { flex: 1; min-width: 0; }
@@ -141,7 +137,7 @@
 
 /* ─── Output ─── */
 .panel-output { min-height: 0; }
-.output-body { gap: 6px; display: flex; flex-direction: column; }
+.output-body { gap: 6px; display: flex; flex-direction: column; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .output-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .big-btn {
   padding: 5px 10px;
@@ -160,7 +156,9 @@
 .snap-thumb {
   height: 44px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 2px;
   background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 4px, transparent 4px 8px);
+  overflow: hidden;
 }
+.snap-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .snap-fmt { font-size: 8px; letter-spacing: 0.1em; padding: 1px 3px; background: var(--ink); color: var(--bg); font-weight: 800; }
 .snap-meta { display: flex; flex-direction: column; padding: 2px 4px; font-size: 8px; color: var(--dim); gap: 1px; }
 .snap-meta span:first-child { color: var(--ink); }
@@ -233,23 +231,3 @@
   100% { box-shadow: inset 0 0 0 0 transparent; border-color: var(--line-2); }
 }
 .beat-flash { animation: beatFlash 0.15s ease-out; }
-
-/* ─── Panel Resize Handle (generic for all panels) ─── */
-.panel-resize-handle {
-  position: relative;
-  height: 12px;
-  cursor: ns-resize;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(to top, rgba(0,0,0,0.2), transparent);
-  opacity: 0.4; transition: opacity 0.2s;
-  flex-shrink: 0;
-}
-.panel:hover > .panel-resize-handle { opacity: 0.6; }
-.panel-resize-handle:hover,
-.panel-resize-handle:active { opacity: 1; background: linear-gradient(to top, rgba(0,217,255,0.1), transparent); }
-.panel-resize-handle .resize-grip {
-  width: 36px; height: 3px; border-radius: 2px;
-  background: var(--dim);
-  transition: background 150ms;
-}
-.panel-resize-handle:hover .resize-grip { background: var(--accent2); }

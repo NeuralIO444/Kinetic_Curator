@@ -8,7 +8,9 @@ export function useContinuousLife() {
   const running = useStore(s => s.running);
   const lifeDrift = useStore(s => s.layoutParams.lifeDrift ?? 0.35);
   const lockedParams = useStore(s => s.lockedParams);
-  const setLayoutParam = useStore(s => s.setLayoutParam);
+  // Drift is machine-generated: write via setLayoutParams so it never lands
+  // in the undo stack (setLayoutParam records history on every call).
+  const setLayoutParams = useStore(s => s.setLayoutParams);
 
   const baseRef = useRef(null);
   const tRef = useRef(0);
@@ -36,29 +38,35 @@ export function useContinuousLife() {
       const base = baseRef.current;
       if (!base) return;
 
+      const next = {};
       if (!lockedParams.jitter) {
         const v = Math.round(base.jitter + Math.sin(t * 0.7) * 12 * depth);
-        setLayoutParam('jitter', Math.max(0, Math.min(200, v)));
+        next.jitter = Math.max(0, Math.min(200, v));
       }
       if (!lockedParams.displacement) {
         const v = Math.round(base.displacement + Math.sin(t * 0.45 + 1.2) * 18 * depth);
-        setLayoutParam('displacement', Math.max(0, Math.min(250, v)));
+        next.displacement = Math.max(0, Math.min(250, v));
       }
       if (!lockedParams.noiseSpeed) {
         const v = +(base.noiseSpeed + Math.sin(t * 0.3 + 0.5) * 0.25 * depth).toFixed(2);
-        setLayoutParam('noiseSpeed', Math.max(0.1, Math.min(3, v)));
+        next.noiseSpeed = Math.max(0.1, Math.min(3, v));
       }
+      if (Object.keys(next).length > 0) setLayoutParams(next);
     }, 80);
 
     return () => clearInterval(id);
-  }, [running, lifeDrift, lockedParams.jitter, lockedParams.displacement, lockedParams.noiseSpeed, setLayoutParam]);
+  }, [running, lifeDrift, lockedParams.jitter, lockedParams.displacement, lockedParams.noiseSpeed, setLayoutParams]);
 
-  // Reset baseline when user manually changes these params significantly
+  // Reset baseline when user manually changes these params significantly.
+  // NOTE: the store has no subscribeWithSelector middleware, so subscribe()
+  // takes a single (state, prevState) listener — the two-arg selector form
+  // silently never fired.
   useEffect(() => {
-    const unsub = useStore.subscribe(
-      (s) => s.layoutParams,
-      (lp, prev) => {
-        if (!prev) return;
+    const unsub = useStore.subscribe((s, prevS) => {
+      const lp = s.layoutParams;
+      const prev = prevS?.layoutParams;
+      {
+        if (!prev || lp === prev) return;
         // If user (or evolve) hard-jumps a value, re-anchor baseline
         if (
           Math.abs(lp.jitter - prev.jitter) > 20 ||
@@ -72,7 +80,7 @@ export function useContinuousLife() {
           };
         }
       }
-    );
+    });
     return unsub;
   }, []);
 }

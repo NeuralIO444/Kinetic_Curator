@@ -4,7 +4,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { useCollapse } from '../hooks/useCollapse.js';
 import { AssetSpriteSheet } from '../components/AssetSpriteSheet.jsx';
 import { getQualityCaps } from '../data/quality.js';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
@@ -32,12 +31,11 @@ export function CanvasPanel() {
     layoutParams, seed, enabled, evolveMode, beatPulse, audioBands,
     motionSmoothing, caGrid, quality, running,
   } = state;
-  const { open, toggle } = useCollapse(true);
 
   const caps = getQualityCaps(quality || 'balanced');
 
   const viewport = useCanvasViewport();
-  const { zoom, pan, dragRef, attractorRef } = viewport;
+  const { zoom, pan } = viewport;
 
   const [bgMode, setBgMode] = useState('palette');
   const cycleBg = () => setBgMode(m => m === 'palette' ? 'transparent' : m === 'transparent' ? 'white' : 'palette');
@@ -56,7 +54,7 @@ export function CanvasPanel() {
   const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
 
   const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
-  const { scaleMul, alphaBoost, breathScale, breathRot, glow, effectiveScale, effectiveAlpha, depth } = life;
+  const { scaleMul, alphaBoost, breathScale, breathRot, glow, effectiveScale, effectiveAlpha } = life;
 
   const { preset, items } = useCanvasItems({
     layoutParams, seed, activeAssets, palette, caGrid, safeCount,
@@ -69,24 +67,21 @@ export function CanvasPanel() {
     canvasW: CANVAS_W, canvasH: CANVAS_H, scaleMul, alphaBoost, caps,
   });
 
-  // Keep swarm attractor in sync with viewport
-  useEffect(() => {
-    // attractorRef is shared; viewport updates it on pointer move
-  }, [pan, zoom]);
-
   const renderItems = layoutParams.mode === 'swarm' ? swarmItems : items;
 
   useEffect(() => {
     if (typeof dispatch === 'function' && renderItems) {
       dispatch({ type: 'SET_NODE_COUNT', payload: renderItems.length });
     }
+    // Only the count matters here; the array identity changes every frame.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renderItems?.length, dispatch]);
 
   const half = ASSET_SIZE / 2;
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
-      <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · ${activeAssets.length} assets`} collapsed={!open} onToggle={toggle}>
+      <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · ${activeAssets.length} assets`}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button className="chip-btn" onClick={cycleBg} title="Toggle Background">BG: {bgMode.toUpperCase()}</button>
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
@@ -98,8 +93,7 @@ export function CanvasPanel() {
           )}
         </div>
       </PanelHeader>
-      {open && (
-        <div
+      <div
           className={`canvas-wrap ${bgMode === 'transparent' ? 'checkerboard' : ''}`}
           ref={canvasRef}
           style={{
@@ -153,8 +147,7 @@ export function CanvasPanel() {
           <span className="canvas-corner tr">{layoutParams.mode}</span>
           <span className="canvas-corner bl">{preset.name}</span>
           <span className="canvas-corner br">{CANVAS_W}×{CANVAS_H}</span>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

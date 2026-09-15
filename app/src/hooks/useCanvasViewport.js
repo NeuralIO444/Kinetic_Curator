@@ -37,7 +37,7 @@ export function useCanvasViewport() {
 
   const onPointerUp = useCallback((e) => {
     dragRef.current.active = false;
-    try { e.target.releasePointerCapture(e.pointerId); } catch (_) { /* already released */ }
+    try { e.target.releasePointerCapture(e.pointerId); } catch { /* already released */ }
   }, []);
 
   const updateAttractor = useCallback((e) => {

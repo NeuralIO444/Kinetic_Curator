@@ -1,7 +1,7 @@
 // Centralized hotkey manager
 // Fixes B1: uses refs so handlers always see current state
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Register keyboard shortcuts.
@@ -10,11 +10,19 @@ import { useEffect, useRef, useCallback } from 'react';
  */
 export function useHotkeys(keyMap) {
   const mapRef = useRef(keyMap);
-  mapRef.current = keyMap; // always current — fixes stale closure
+
+  // Refs must not be written during render.
+  useEffect(() => { mapRef.current = keyMap; });
 
   useEffect(() => {
     function onKey(e) {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.repeat) return;
+      const t = e.target;
+      const tag = t?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+      // Let the browser own its own chords; we only claim Cmd/Ctrl+Z ourselves.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() !== 'z') return;
+      if (e.altKey) return;
       const handler = mapRef.current[e.key] || mapRef.current[e.key.toLowerCase()];
       if (handler) {
         e.preventDefault();

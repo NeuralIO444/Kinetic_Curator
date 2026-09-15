@@ -7,11 +7,14 @@ import { useStore } from '../state/store.js';
 export function useFpsMeter(enabled = true) {
   const setFps = useStore(s => s.setFps);
   const framesRef = useRef(0);
-  const lastReportRef = useRef(performance.now());
+  const lastReportRef = useRef(0);
   const rafRef = useRef(null);
 
   useEffect(() => {
     if (!enabled) return;
+
+    lastReportRef.current = performance.now();
+    framesRef.current = 0;
 
     const tick = (now) => {
       framesRef.current += 1;

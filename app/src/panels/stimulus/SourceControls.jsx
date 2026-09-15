@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 
-export function SourceControls({ webcamEnabled, audioEnabled, audioSource, audioGain, audioMonitor, devices }) {
+export function SourceControls({ audioSource, audioGain, audioMonitor, devices }) {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;

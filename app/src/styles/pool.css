@@ -1,5 +1,6 @@
 /* ─── Asset Pool ─── */
-.panel-pool { flex: 1; max-height: 55vh; }
+/* 55vh was a stacked-panels cap; as a tab the pool should fill the column. */
+.panel-pool { flex: 1 1 auto; min-height: 0; }
 .panel-pool .pool-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .pool-controls { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.01); }
 .cat-filter { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }

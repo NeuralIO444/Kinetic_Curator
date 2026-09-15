@@ -11,6 +11,7 @@
 .panel-tab {
   flex: 1 1 0;
   min-width: 0;
+  min-height: 34px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -33,15 +34,18 @@
   color: var(--bg);
   background: var(--accent);
 }
+.panel-tab:focus-visible { outline-offset: -3px; }
 .panel-tab-icon { font-size: 11px; line-height: 1; }
 .panel-tab-label { font-size: 8px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .panel-tab-content {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  /* The active panel pins its own header and scrolls its own body. */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
+.panel-tab-content:focus-visible { outline-offset: -2px; }
 .panel-tab-content > .panel {
   flex: 1 1 auto;
   border-top: none;
