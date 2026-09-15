@@ -14,6 +14,7 @@ import { useBeatDecay } from './hooks/useBeatDecay.js';
 import { useContinuousLife } from './hooks/useContinuousLife.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
+import { useProjectAutosave } from './hooks/useProjectAutosave.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
@@ -60,6 +61,7 @@ function AppInner() {
   useContinuousLife();
   usePhraseLoop();
   useMorphEvolve();
+  useProjectAutosave();
 
   const [showHotkeys, setShowHotkeys] = useState(false);
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
@@ -86,9 +88,6 @@ function AppInner() {
 
   useHotkeys({
     's': () => {
-      // Write the PNG, then add the sidecar record once we have a thumbnail
-      // for it — a capture that fails to rasterize no longer leaves a
-      // phantom history entry with nothing behind it.
       exportSnapshot(svgRef?.current, state.exportResolution, state.seed.toString(16), palette.bg, (thumb) => {
         piped({
           type: A.ADD_SNAPSHOT,
