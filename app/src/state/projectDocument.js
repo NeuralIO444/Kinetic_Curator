@@ -1,4 +1,4 @@
-// Project document — portable session state (#33).
+// Project document — portable session state (#33 / #34).
 // Full project JSON is the reproducible unit (seed alone is not).
 
 export const PROJECT_VERSION = 1;
@@ -9,7 +9,7 @@ export const AUTOSAVE_KEY = 'kc:project:v1';
  * @returns {object} project document
  */
 export function serializeProject(state) {
-  return {
+  const doc = {
     version: PROJECT_VERSION,
     seed: state.seed >>> 0,
     paletteId: state.paletteId,
@@ -17,6 +17,10 @@ export function serializeProject(state) {
     enabledAssets: { ...state.enabledAssets },
     quality: state.quality || 'balanced',
   };
+  if (state.assetWeightOverrides && Object.keys(state.assetWeightOverrides).length > 0) {
+    doc.assetWeightOverrides = { ...state.assetWeightOverrides };
+  }
+  return doc;
 }
 
 /**
@@ -44,6 +48,7 @@ export function parseProject(raw) {
         layoutParams: raw.layoutParams || raw.layout || {},
         enabledAssets: raw.enabledAssets || null,
         quality: raw.quality || 'balanced',
+        assetWeightOverrides: raw.assetWeightOverrides || null,
       },
     };
   }
@@ -68,6 +73,10 @@ export function parseProject(raw) {
       enabledAssets:
         raw.enabledAssets && typeof raw.enabledAssets === 'object' ? { ...raw.enabledAssets } : null,
       quality: typeof raw.quality === 'string' ? raw.quality : 'balanced',
+      assetWeightOverrides:
+        raw.assetWeightOverrides && typeof raw.assetWeightOverrides === 'object'
+          ? { ...raw.assetWeightOverrides }
+          : null,
     },
   };
 }

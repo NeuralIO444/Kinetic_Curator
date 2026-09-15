@@ -23,10 +23,11 @@ export function OutputPanel() {
     autoQuality: s.autoQuality,
     paletteId: s.paletteId,
     enabledAssets: s.enabledAssets,
+    assetWeightOverrides: s.assetWeightOverrides,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, layoutParams,
-    quality, autoQuality, paletteId, enabledAssets,
+    quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
   } = state;
 
   const [uncapped, setUncapped] = useState(false);
@@ -115,6 +116,7 @@ export function OutputPanel() {
       layoutParams,
       enabledAssets,
       quality,
+      assetWeightOverrides,
     });
     downloadProject(doc);
   };
@@ -230,7 +232,7 @@ export function OutputPanel() {
         </div>
 
         <div className="output-row">
-          <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project (seed, layout, palette, assets, quality)">↓ PROJECT</button>
+          <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project (seed, layout, palette, assets, weights, quality)">↓ PROJECT</button>
           <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
           <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
         </div>

@@ -20,6 +20,7 @@ export function CanvasPanel() {
     layoutParams: s.layoutParams,
     seed: s.seed,
     enabled: s.enabledAssets,
+    weightOverrides: s.assetWeightOverrides || {},
     evolveMode: s.evolveMode,
     beatPulse: s.beatPulse,
     audioBands: s.audioBands,
@@ -29,7 +30,7 @@ export function CanvasPanel() {
     running: s.running,
   }));
   const {
-    layoutParams, seed, enabled, evolveMode, beatPulse, audioBands,
+    layoutParams, seed, enabled, weightOverrides, evolveMode, beatPulse, audioBands,
     motionSmoothing, caGrid, quality, running,
   } = state;
 
@@ -45,9 +46,12 @@ export function CanvasPanel() {
   if (bgMode === 'white') bgStyle.background = '#ffffff';
   else if (bgMode === 'transparent') bgStyle.background = 'transparent';
 
+  // Apply runtime weight overrides so weighted pick reflects UI mix (#34)
   const activeAssets = useMemo(
-    () => assets.filter(a => enabled[a.id]),
-    [assets, enabled],
+    () => assets
+      .filter(a => enabled[a.id])
+      .map(a => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a)),
+    [assets, enabled, weightOverrides],
   );
 
   const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
@@ -73,7 +77,6 @@ export function CanvasPanel() {
     if (typeof dispatch === 'function' && renderItems) {
       dispatch({ type: 'SET_NODE_COUNT', payload: renderItems.length });
     }
-    // Only the count matters here; the array identity changes every frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renderItems?.length, dispatch]);
 

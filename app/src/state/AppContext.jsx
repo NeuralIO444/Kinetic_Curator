@@ -58,6 +58,10 @@ export function useApp(selector) {
       case A.SET_SEARCH: return store.setSearch(payload);
       case A.SET_CAT_FILTER: return store.setCatFilter(payload);
       case A.SET_POOL_VIEW: return store.setPoolView(payload);
+      case A.SET_ASSET_WEIGHT: return store.setAssetWeight(action.id, action.weight);
+      case A.SET_CATEGORY_WEIGHT: return store.setCategoryWeight(action.category, action.weight);
+      case A.CLEAR_WEIGHT_OVERRIDES: return store.clearWeightOverrides();
+      case 'CYCLE_ASSET_WEIGHT': return store.cycleAssetWeight(action.id);
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
       case A.SET_AUDIO_GAIN: return store.setAudioGain(payload);
