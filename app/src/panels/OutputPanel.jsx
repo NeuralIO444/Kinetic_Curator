@@ -32,12 +32,13 @@ export function OutputPanel() {
     activeLayerId: s.activeLayerId,
     layerSnapshots: s.layerSnapshots,
     userPalettes: s.userPalettes,
+    favorites: s.favorites,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, layers, activeLayerId, layerSnapshots,
-    userPalettes,
+    userPalettes, favorites,
   } = state;
 
   const [uncapped, setUncapped] = useState(false);
@@ -268,6 +269,35 @@ export function OutputPanel() {
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   };
 
+  /** Favourited seeds -> studio/hits_bridge.py input (#91). Not a project
+   * (state at export time), not a palette kit — the "likes" half of a label
+   * set. `project` carries enabledAssets/quality/etc. so hits_bridge.py can
+   * render any favourite whose seed wasn't already batch-rendered. */
+  const exportHits = () => {
+    const doc = {
+      version: 1,
+      project: serializeProject({
+        seed, paletteId, paletteOverrides, layoutParams, lockedParams, caGrid,
+        enabledAssets, quality, assetWeightOverrides, layers, activeLayerId, layerSnapshots,
+      }),
+      hits: (favorites || []).map((f) => ({
+        seed: f.seed >>> 0,
+        timestamp: f.timestamp,
+        layoutParams: f.config?.layout || null,
+        paletteId: f.config?.palette?.id || null,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'kinetic-curator-hits.json';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  };
+
   const paletteInputRef = useRef(null);
   const importPalettes = (e) => {
     const file = e.target.files[0];
@@ -465,6 +495,16 @@ export function OutputPanel() {
           <button className="big-btn dl" onClick={exportPalettes} style={{ flex: 1 }} title={`Export your ${(userPalettes || []).length} saved palettes`}>↓ PALETTES</button>
           <button className="big-btn" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Import palette library JSON">↑ PALETTES</button>
           <input ref={paletteInputRef} type="file" accept=".json,application/json" onChange={importPalettes} style={{ display: 'none' }} />
+        </div>
+        <div className="output-row">
+          <button
+            className="big-btn dl"
+            onClick={exportHits}
+            style={{ width: '100%' }}
+            title={`Export ${(favorites || []).length} favourited seed(s) for studio/hits_bridge.py (issue #91)`}
+          >
+            ↓ HITS ({(favorites || []).length})
+          </button>
         </div>
         {importMsg && (
           <div className="output-hint" style={{ color: importMsg.includes('done') || importMsg === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>
