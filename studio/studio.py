@@ -48,7 +48,7 @@ def parse_res(spec: str) -> tuple[int, int]:
 
 
 def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
-              ramps=None, uncapped=False, width=None, height=None,
+              ramps=None, motion=None, uncapped=False, width=None, height=None,
               background=None) -> bytes:
     cmd = ["node", str(RENDER_MJS), str(project)]
     if seed is not None:
@@ -59,6 +59,8 @@ def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
         cmd += ["--progress", repr(progress)]
     for r in ramps or []:
         cmd += ["--ramp", r]
+    if motion:
+        cmd += ["--motion", motion]
     if uncapped:
         cmd += ["--uncapped"]
     if width:
@@ -86,9 +88,9 @@ def rasterize(svg: bytes, out_png: Path, monospace=DEFAULT_MONOSPACE) -> None:
 
 def render_one(project: Path, out_png: Path, size: tuple[int, int], *,
                seed=None, uncapped=False, background=None, time=0.0,
-               progress=0.0, ramps=None, monospace=DEFAULT_MONOSPACE) -> None:
+               progress=0.0, ramps=None, motion=None, monospace=DEFAULT_MONOSPACE) -> None:
     svg = build_svg(project, seed=seed, time=time, progress=progress,
-                    ramps=ramps, uncapped=uncapped, width=size[0],
+                    ramps=ramps, motion=motion, uncapped=uncapped, width=size[0],
                     height=size[1], background=background)
     rasterize(svg, out_png, monospace)
 
@@ -154,6 +156,11 @@ def cmd_batch(a) -> None:
 
 
 def cmd_video(a) -> None:
+    if a.motion == "list":
+        # Presets live in render.mjs (the file with kernel/layoutParams
+        # context); delegate instead of keeping a second copy of the list.
+        subprocess.run(["node", str(RENDER_MJS), "--motion", "list"], check=True)
+        return
     size = parse_res(a.res)
     project = Path(a.project)
     frames = max(1, round(a.duration * a.fps))
@@ -166,7 +173,7 @@ def cmd_video(a) -> None:
         render_one(project, tmp / f"f{i:06d}.png", size, seed=a.seed,
                    uncapped=a.uncapped, background=a.background, time=t,
                    progress=i / max(1, frames - 1), ramps=a.ramp,
-                   monospace=a.monospace)
+                   motion=a.motion, monospace=a.monospace)
 
     with ThreadPoolExecutor(max_workers=a.jobs) as pool:
         for i, _ in enumerate(pool.map(one, range(frames)), 1):
@@ -226,7 +233,11 @@ def main(argv=None) -> None:
     sp.add_argument("--duration", type=float, default=4.0, help="seconds")
     sp.add_argument("--crf", type=int, default=16)
     sp.add_argument("--ramp", action="append", default=[],
-                    help="layoutParam=from:to, interpolated linearly over the clip (repeatable)")
+                    help="layoutParam=from:to, interpolated linearly over the clip (repeatable). "
+                         "Overrides the --motion preset per-parameter; composes with it otherwise.")
+    sp.add_argument("--motion", default="auto",
+                    help="named motion recipe so a plain `video` invocation visibly moves "
+                         "(default: auto). 'list' prints presets and exits (#94).")
     sp.add_argument("--frames", default=None, help="keep the PNG frame sequence in this directory")
     sp.set_defaults(func=cmd_video)
 

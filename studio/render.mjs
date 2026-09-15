@@ -65,8 +65,95 @@ function warnOnce(msg) {
   console.warn(`[studio] WARNING: ${msg}`);
 }
 
+// ── Motion presets (issue #94) ──────────────────────────────────────────
+// buildPlacements has no time axis, so the only way to get a `video` clip
+// to visibly move without a hand-written --ramp is to ship named ramp
+// recipes. Each preset is a pure function of a layer's *base* layoutParams
+// (pre-ramp) -> a ramp object in the same {param: [from, to]} shape the
+// CLI's --ramp already uses, so it composes with everything below for free.
+//
+// 'scaleMin'/'scaleMax'/'rotateMin'/'rotateMax'/'alphaMin'/'alphaMax' are
+// virtual keys: buildPlacements wants scale/rotate/alpha as [min, max]
+// arrays, so these write into one slot of the array instead of clobbering
+// it with a bare number. 'bakeSteps' is virtual too: it's a render option
+// (K4 replay step count), not a layoutParam.
+const VIRTUAL_ARRAY_RAMP_KEYS = {
+  scaleMin: ['scale', 0], scaleMax: ['scale', 1],
+  rotateMin: ['rotate', 0], rotateMax: ['rotate', 1],
+  alphaMin: ['alpha', 0], alphaMax: ['alpha', 1],
+};
+
+export const MOTION_PRESETS = {
+  drift: {
+    describe: 'displacement + noiseSpeed sweep — the field drifts through the flow noise',
+    build: (lp) => ({
+      displacement: [lp.displacement || 0, (lp.displacement || 0) + 70],
+      noiseSpeed: [lp.noiseSpeed ?? 0.5, (lp.noiseSpeed ?? 0.5) + 4],
+    }),
+  },
+  bloom: {
+    describe: 'scale + count grow across the clip, like the composition inflating',
+    build: (lp) => ({
+      scaleMax: [lp.scale[1], lp.scale[1] * 1.8],
+      count: [lp.count, Math.round(lp.count * 1.35)],
+    }),
+  },
+  churn: {
+    describe: 'jitter + rotation range widen — a chaotic spin-up',
+    build: (lp) => ({
+      jitter: [lp.jitter, lp.jitter + 55],
+      rotateMin: [lp.rotate[0] * 0.15, lp.rotate[0]],
+      rotateMax: [lp.rotate[1] * 0.15, lp.rotate[1]],
+    }),
+  },
+  swarm: {
+    describe: 'K4 particle bake step count advances across the clip (swarm/hype modes only)',
+    build: () => ({ bakeSteps: [0, 420] }),
+  },
+  none: {
+    describe: 'no preset motion (breath LFO only, or a hand-written --ramp)',
+    build: () => ({}),
+  },
+  auto: {
+    describe: 'drift, or swarm-settle when the layer mode is swarm/hype',
+    build: (lp) => (lp.mode === 'swarm' || lp.mode === 'hype'
+      ? MOTION_PRESETS.swarm.build(lp)
+      : MOTION_PRESETS.drift.build(lp)),
+  },
+};
+
+/** Resolve a preset name + explicit --ramp into one ramp object. Explicit
+ *  --ramp keys win per-parameter; everything else the preset touches still
+ *  animates. Pure function of its inputs — safe to unit test directly. */
+export function resolveMotionRamp(motion, layoutParams, ramp) {
+  const preset = motion && motion !== 'none' ? MOTION_PRESETS[motion] : null;
+  if (!preset) return ramp || null;
+  const presetRamp = preset.build(layoutParams);
+  return ramp ? { ...presetRamp, ...ramp } : presetRamp;
+}
+
+/** Apply a resolved ramp to a layoutParams object (mutates a copy) and
+ *  return the possibly-overridden bake step count. */
+function applyRamp(layoutParams, ramp, progress, bakeSteps) {
+  let steps = bakeSteps;
+  if (!ramp) return steps;
+  for (const [k, [a, b]] of Object.entries(ramp)) {
+    const v = a + (b - a) * progress;
+    if (k === 'bakeSteps') { steps = Math.round(v); continue; }
+    const virtual = VIRTUAL_ARRAY_RAMP_KEYS[k];
+    if (virtual) {
+      const [arrKey, idx] = virtual;
+      layoutParams[arrKey] = [...layoutParams[arrKey]];
+      layoutParams[arrKey][idx] = v;
+    } else {
+      layoutParams[k] = v;
+    }
+  }
+  return steps;
+}
+
 /** Visible layers in draw order (later = on top), each fully resolved. */
-export function resolveLayers(doc, { caps, ramp = null, progress = 0, bakeSteps = 180 }) {
+export function resolveLayers(doc, { caps, ramp = null, motion = null, progress = 0, bakeSteps = 180 }) {
   const weightOverrides = doc.assetWeightOverrides || {};
   const snapshots = doc.layerSnapshots || {};
   const layers = Array.isArray(doc.layers) && doc.layers.length
@@ -80,7 +167,8 @@ export function resolveLayers(doc, { caps, ramp = null, progress = 0, bakeSteps 
       const src = isActive ? topLevelSource(doc) : (snapshots[layer.id] || topLevelSource(doc));
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
-      if (ramp) for (const [k, [a, b]] of Object.entries(ramp)) layoutParams[k] = a + (b - a) * progress;
+      const resolvedRamp = resolveMotionRamp(motion, layoutParams, ramp);
+      const layerBakeSteps = applyRamp(layoutParams, resolvedRamp, progress, bakeSteps);
 
       const palette = resolvePalette(src.paletteId || 'praystation', src.paletteOverrides || null);
       const enabled = src.enabledAssets;
@@ -102,7 +190,7 @@ export function resolveLayers(doc, { caps, ramp = null, progress = 0, bakeSteps 
           palette,
           canvasW: CANVAS_W,
           canvasH: CANVAS_H,
-          steps: bakeSteps,
+          steps: layerBakeSteps,
         })
         : buildPlacements({
           layoutParams,
@@ -133,6 +221,7 @@ export function resolveLayers(doc, { caps, ramp = null, progress = 0, bakeSteps 
  * @param {number} [opts.time]      seconds, drives the breath transform (useCanvasLife)
  * @param {number} [opts.progress]  0..1, drives --ramp interpolation
  * @param {object} [opts.ramp]      { layoutParam: [from, to] }
+ * @param {string|null} [opts.motion]  named preset from MOTION_PRESETS (#94); composes with ramp
  * @param {boolean} [opts.uncapped] use FINAL_CAPS instead of the project's quality caps
  * @param {number|null} [opts.width]  output px (default CANVAS_W)
  * @param {number|null} [opts.height]
@@ -140,12 +229,12 @@ export function resolveLayers(doc, { caps, ramp = null, progress = 0, bakeSteps 
  */
 export function renderSvg(doc, opts = {}) {
   const {
-    time = 0, progress = 0, ramp = null, uncapped = false,
+    time = 0, progress = 0, ramp = null, motion = null, uncapped = false,
     width = null, height = null, background = null,
   } = opts;
 
   const caps = getRenderCaps(doc.quality || 'balanced', uncapped);
-  const layers = resolveLayers(doc, { caps, ramp, progress, bakeSteps: opts.bakeSteps ?? 180 });
+  const layers = resolveLayers(doc, { caps, ramp, motion, progress, bakeSteps: opts.bakeSteps ?? 180 });
 
   // Breath — the only continuous motion in the live app without audio.
   // Copied verbatim from useCanvasLife so a t=0 frame is identity.
@@ -280,10 +369,17 @@ function parseArgs(argv) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = parseArgs(process.argv.slice(2));
+  if (args.motion === 'list') {
+    console.log('motion presets (--motion <name>):');
+    for (const [name, def] of Object.entries(MOTION_PRESETS)) {
+      console.log(`  ${name.padEnd(8)} ${def.describe}`);
+    }
+    process.exit(0);
+  }
   if (!args._[0]) {
     console.error('usage: node studio/render.mjs <project.json> [--out f.svg] [--width N --height N]\n'
       + '       [--background #rrggbb|none] [--seed N] [--time SEC] [--progress 0..1]\n'
-      + '       [--ramp param=from:to ...] [--uncapped]');
+      + '       [--ramp param=from:to ...] [--motion name|list] [--uncapped]');
     process.exit(2);
   }
   const doc = loadProject(args._[0]);
@@ -292,6 +388,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     time: Number(args.time || 0),
     progress: Number(args.progress || 0),
     ramp: args.ramp,
+    motion: args.motion || null,
     uncapped: !!args.uncapped,
     width: args.width ? Number(args.width) : null,
     height: args.height ? Number(args.height) : null,
