@@ -36,6 +36,20 @@ Facade: `AppContext` + `useApp(selector)` provides selective subscriptions and a
 
 History (`state/history.js`) tracks layout/palette changes for undo/redo; ignores high-frequency audio.
 
+## Kernel (0.9 / v1)
+
+Pure modules under `engine/kernel/` (no React). Plan: [KERNEL_V1_PLAN.md](KERNEL_V1_PLAN.md).
+
+| Module | Role |
+|--------|------|
+| `kernel/rng.js` | Channel hashes (`dens`, `geo`, `attr`, `asset`, `color`, `noise`, `dyn`); index-stable unit floats |
+| `noise.js` → `createNoise(seed)` | Instanced Simplex / fBm / curl2 |
+| `kernel/sample/registry.js` | Samplers: `(ctx) => {x,y}`; `getSampler(mode)` |
+
+`computePlacements` uses samplers + channel RNG + optional displacement noise. `buildPlacements` adds index-stable weighted assets and color.
+
+**Breaking:** seeds from 0.8 are not pixel-identical under kernel.v1. No legacy dual RNG path.
+
 ## Rendering pipeline
 
 1. **`buildPlacements`** (`engine/buildPlacements.js`) — pure: caps → `computePlacements` → weighted assets → color → mirror. Emits stable `item.key`. Shared by live and final paths.
@@ -48,9 +62,9 @@ History (`state/history.js`) tracks layout/palette changes for undo/redo; ignore
 
 ## Reproducibility contract
 
-Seed-only is **not** a bit-identical still across quality presets (count clamps change RNG consumption). **Full project JSON** is the unit of record. Audio / LFO / evolve are live-only. ACCUM history is **pixels**, not SVG DOM.
+**Full project JSON** is the unit of record. Index-stable channels keep placement *identity* across count/density changes; quality caps still limit how many indices are drawn. Audio / LFO / evolve are live-only. ACCUM history is **pixels**, not SVG DOM.
 
-Golden CI fixture: fixed seed + layout → SHA-256 of canonical placement list (`src/engine/goldenPlacement.selfcheck.mjs`).
+Golden CI fixture: fixed seed + layout → SHA-256 of canonical placement list (`kernel.v1` in `goldenPlacement.selfcheck.mjs`).
 
 ## UX surfaces
 
@@ -67,5 +81,5 @@ Golden CI fixture: fixed seed + layout → SHA-256 of canonical placement list (
 
 ## CI
 
-- Lint + `npm run selfcheck` + production build.
+- Lint + `npm run selfcheck` (buildPlacements, canvas items, golden, kernel rng/noise/sample) + production build.
 - Playwright smoke: load app, switch tabs, toggle a layout control.

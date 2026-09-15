@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.0 — 2026-09-15
+
+### Kernel v1 (sleeper math backend)
+
+**Seed-driven looks change.** Project JSON still loads; re-favorite hits if a seed no longer matches your eye. There is **no** dual legacy RNG path.
+
+- **K0** — Channel RNG (`dens` / `geo` / `attr` / `asset` / `color` / `noise` / `dyn`). Index-stable density skips and attributes; per-index geo streams; index-stable asset + color picks (#58).
+- **K1** — Instanced Simplex/fBm via `createNoise(seed)` (no shared global perm table). Placement displacement + particle wind use isolated instances (#59).
+- **K2** — Sampler registry (`getSampler` / `registerSampler`). All layout modes migrated; power sampler **`stratified`** (jittered stratum, seed-stable) (#60).
+- Golden placement fixture retargeted to **`kernel.v1`** hash `e892d112…a9a2` (#58 / #61).
+
+Plan: [docs/KERNEL_V1_PLAN.md](docs/KERNEL_V1_PLAN.md). Post-MVP: fields (#62), bake particles (#63), color channel (#64).
+
+### Docs / CI
+- README reproducibility updated for index-stable channels.
+- Architecture documents kernel modules under `engine/kernel/`.
+- `npm run selfcheck` includes rng + noise + sample checks.
+
 ## 0.8.0 — 2026-09-15
 
 ### Engine / export

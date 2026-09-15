@@ -4,24 +4,34 @@ A modern generative art engine and live visual performance tool built with React
 
 ![UI Overview](docs/ui_audit_1778535473448.webp)
 
-**Current release: [0.8.0](CHANGELOG.md)** — pure placement pipeline, project JSON, RENDER / BATCH / ACCUM, setlist morph, CI golden fixture.
+**Current release: [0.9.0](CHANGELOG.md)** — Kernel v1 (index-stable RNG, instanced noise, sampler registry) + 0.8 export/project/setlist stack.
 
 ## Core Philosophy: "Curated Chaos"
 
-Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the parameters (the layout grid, the SVG assets, the color palettes) and let the random seed drive the chaos. By combining algorithmic layout modes (Fibonacci, CA, Perlin Flow) with live microphone input and dynamic seed mutation, the tool functions like a generative synthesizer.
+Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the parameters (the layout grid, the SVG assets, the color palettes) and let the random seed drive the chaos. By combining algorithmic layout modes (Fibonacci, CA, Perlin Flow, Stratified) with live microphone input and dynamic seed mutation, the tool functions like a generative synthesizer.
 
 ## Reproducibility
 
-**Seed alone does not guarantee an identical PNG across quality presets.** Live quality caps change how many placements are drawn and therefore how the seeded PRNG is consumed.
+**Full project JSON** (OUTPUT → ↓ PROJECT) is the reproducible unit: seed, palette, layout, enabled assets, weight overrides, quality.
 
-- **Full project JSON** (OUTPUT → ↓ PROJECT) is the reproducible unit: seed, palette, layout, enabled assets, weight overrides, quality.
+### Kernel v1 (0.9+)
+
+- Placement identity is **index-stable**: scale / rotation / alpha / asset / color for index `i` do not reshuffle when count or density changes.
+- Density skips and attributes use isolated RNG **channels** (`engine/kernel/rng.js`).
+- Noise displacement uses **`createNoise(seed)`** instances (no global perm table).
+- Layout modes are **samplers** (`getSampler`); optional mode **`stratified`** for even coverage.
+- Golden CI fixture version: **`kernel.v1`**. Seeds from **0.8 and earlier will not match** pixel-for-pixel under 0.9 — re-curate favorites if needed.
+
+### Still true
+
+- Quality caps still clamp how many placements draw; prefer saving **project JSON** over seed alone.
 - Audio, LFO life, and Evolve are **live-only** and are not part of deterministic stills.
 - **RENDER FINAL** (UNCAPPED off) matches the live preview; UNCAPPED may densify then restore live caps.
 - **ACCUM** stills export the **pixel trail buffer** (live resolution, upscaled) — not a pure SVG DOM snapshot.
 
 ## Features
 
-- **Live SVG engine** — React + SVG nodes across layout modes (Fibonacci, Grid, CA, Orbit, Flow, Swarm, …).
+- **Live SVG engine** — React + SVG nodes across layout modes (Fibonacci, Grid, CA, Orbit, Flow, Swarm, Stratified, …).
 - **Audio reactivity** — mic or file drives scale, opacity, and evolve-on-beat.
 - **Davis mode** — time/beat Evolve, morph transitions, phrase clocks, continuous LFO life.
 - **Hits setlist** — ordered favorites, 1–9 recall, Enter advances, morph layout A→B.
@@ -37,9 +47,10 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 
 - **Framework:** React 19 + Vite 8
 - **State:** Zustand slices + `useApp` dispatch facade + typed event bus
+- **Engine:** Pure kernel (`engine/kernel/*`) + `buildPlacements`
 - **Styling:** CSS custom properties (dark creative-tool UI)
 - **Export:** Canvas API + MediaRecorder
-- **CI:** ESLint, `npm run selfcheck` (golden placement SHA), Playwright smoke
+- **CI:** ESLint, `npm run selfcheck` (golden placement SHA + kernel checks), Playwright smoke
 
 ## Installation & Setup (local)
 
@@ -59,7 +70,7 @@ Open **http://localhost:5173**.
 | `npm run dev` | Vite dev server |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint |
-| `npm run selfcheck` | Placement determinism + golden hash |
+| `npm run selfcheck` | Placement determinism + golden hash + kernel checks |
 | `npm run test:e2e` | Playwright smoke (needs build + browsers) |
 
 ## Public deployment
@@ -82,6 +93,7 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 ## Architecture & Further Reading
 
 - [Architecture](docs/architecture.md)
+- [Kernel v1 plan](docs/KERNEL_V1_PLAN.md)
 - [Known limitations / buglist](docs/BUGLIST.md)
 - [Changelog](CHANGELOG.md)
 - [Kinetic Manifesto](docs/manifesto.md)
