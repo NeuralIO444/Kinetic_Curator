@@ -3,13 +3,12 @@
 // Kernel K0: asset + color channels index-stable (#58).
 
 import { computePlacements } from './placement.js';
-import { colorForPlacement } from './color.js';
+import { assignColor, resolveStrategy } from './kernel/color/index.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
 import {
   pickWeightedIndexStable,
-  colorRngForIndex,
 } from './kernel/rng.js';
 
 /** Authored per-asset weight → selection frequency. */
@@ -88,20 +87,12 @@ export function buildPlacements({
     const asset = pickWeightedIndexStable(
       activeAssets, weights, totalWeight, seed, p.index,
     );
-    const color = colorForPlacement({
-      swatches: palette.swatches,
-      // 'auto' (default) defers to the composition preset, so presets keep
-      // their authored coloring until the operator overrides it (#54).
-      strategy: layoutParams.paletteShift && layoutParams.paletteShift !== 'auto'
-        ? layoutParams.paletteShift
-        : (preset.paletteShift || 'band'),
-      t: p.t,
-      index: p.index,
-      rng: colorRngForIndex(seed, p.index),
-    });
-    const accent =
-      palette.swatches[(palette.swatches.indexOf(color) + 3) % palette.swatches.length] ||
-      palette.swatches[0];
+    // K5 (#64): colour comes from the kernel's colour channel only.
+    const { color, accent } = assignColor(
+      { seed, index: p.index, t: p.t },
+      palette,
+      resolveStrategy(layoutParams, preset),
+    );
     const key = `p${p.index}-${asset.id}`;
     return { ...p, assetId: asset.id, color, accent, key };
   });
