@@ -2,7 +2,7 @@ import { useCallback, useRef, createContext, useContext } from 'react';
 import { useStore } from './store.js';
 import { useShallow } from 'zustand/react/shallow';
 import * as A from './actions.js';
-import { PALETTES } from '../data/palettes.js';
+import { PALETTES, resolvePalette } from '../data/palettes.js';
 import { ASSETS } from '../data/assets/index.js';
 
 const RefsContext = createContext({});
@@ -23,6 +23,7 @@ export function AppProvider({ children }) {
 export function useApp(selector) {
   const refs = useContext(RefsContext);
   const paletteId = useStore(s => s.paletteId);
+  const paletteOverrides = useStore(s => s.paletteOverrides);
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const undo = useStore(s => s.undo);
@@ -51,6 +52,10 @@ export function useApp(selector) {
       case A.SET_SEED: return store.setSeed(payload);
       case A.BUMP_SEED: return store.bumpSeed();
       case A.SET_PALETTE_ID: return store.setPaletteId(payload);
+      case A.SET_PALETTE_SWATCH: return store.setPaletteSwatch(action.index, action.hex);
+      case A.SET_PALETTE_BG: return store.setPaletteBg(payload);
+      case A.SET_PALETTE_INK: return store.setPaletteInk(payload);
+      case A.CLEAR_PALETTE_OVERRIDES: return store.clearPaletteOverrides();
       case A.SET_LAYOUT_PARAM: return store.setLayoutParam(action.key, action.value);
       case A.SET_LAYOUT_PARAMS: return store.setLayoutParams(payload);
       case A.APPLY_PRESET: return store.applyPreset(action.preset);
@@ -107,6 +112,15 @@ export function useApp(selector) {
     }
   }, []);
 
-  const palette = PALETTES.find(p => p.id === paletteId) || PALETTES[0];
-  return { state, dispatch, history, palette, palettes: PALETTES, assets: ASSETS, ...refs };
+  const palette = resolvePalette(paletteId, paletteOverrides);
+  return {
+    state,
+    dispatch,
+    history,
+    palette,
+    paletteOverrides,
+    palettes: PALETTES,
+    assets: ASSETS,
+    ...refs,
+  };
 }
