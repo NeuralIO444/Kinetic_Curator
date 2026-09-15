@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs && node src/engine/kernel/rng.selfcheck.mjs",
+    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs && node src/engine/kernel/rng.selfcheck.mjs && node src/engine/kernel/noise.selfcheck.mjs",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium"
   },

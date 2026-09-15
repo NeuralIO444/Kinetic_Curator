@@ -1,13 +1,10 @@
 /**
  * particles.js
- * Physics-based particle simulation system for Kinetic Curator.
- * Implements Perlin winds, Reynolds flocking (spatial-hash), and mouse attraction.
- *
- * Performance: neighbor queries use a uniform grid spatial hash (~O(N))
- * instead of a naïve O(N²) double loop.
+ * Physics-based particle simulation — Perlin winds, Reynolds flocking, mouse attract.
+ * Kernel K1: wind field from createNoise(seed) instance (#59).
  */
 
-import { noise3D, seedNoise } from './noise.js';
+import { createNoise } from './noise.js';
 
 class Particle {
   constructor(x, y, assetIndex, color, mass) {
@@ -43,16 +40,16 @@ export class ParticleSystem {
     this.particles = [];
     this.canvasW = 1000;
     this.canvasH = 700;
+    this._noise = null;
   }
 
   init(count, canvasW, canvasH, activeAssets, palette, seed) {
     this.canvasW = canvasW;
     this.canvasH = canvasH;
     this.particles = [];
+    this._noise = createNoise(seed || 444);
 
     if (!activeAssets || activeAssets.length === 0) return;
-
-    seedNoise(seed || 444);
 
     const swatches = palette?.swatches || ['#ffffff'];
 
@@ -67,10 +64,6 @@ export class ParticleSystem {
     }
   }
 
-  /**
-   * Build a uniform-grid spatial hash for neighbor queries.
-   * cellSize should be >= the largest interaction radius used.
-   */
   _buildSpatialHash(cellSize) {
     const grid = new Map();
     const key = (cx, cy) => `${cx},${cy}`;
@@ -97,6 +90,9 @@ export class ParticleSystem {
       this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed);
     }
 
+    if (!this._noise) this._noise = createNoise(seed || 444);
+    const noise = this._noise;
+
     const {
       noiseFreq = 0.005,
       noiseSpeed = 0.5,
@@ -122,20 +118,16 @@ export class ParticleSystem {
     const cohesionWeight = swarmCohesion;
 
     const numParticles = this.particles.length;
-
-    // Spatial hash — cell size matches largest interaction radius
     const { grid, key, cellSize } = this._buildSpatialHash(maxRadius);
 
     for (let i = 0; i < numParticles; i++) {
       const p1 = this.particles[i];
 
-      // Wind force (Simplex flow field)
-      const n = noise3D(p1.x * noiseFreq, p1.y * noiseFreq, nt + p1.seedOffset * 0.0001);
+      const n = noise.noise3D(p1.x * noiseFreq, p1.y * noiseFreq, nt + p1.seedOffset * 0.0001);
       const windAngle = n * Math.PI * 2;
-      const windMag = (noise3D(p1.x * noiseFreq + 200, p1.y * noiseFreq + 200, nt) + 1.0) * 0.4;
+      const windMag = (noise.noise3D(p1.x * noiseFreq + 200, p1.y * noiseFreq + 200, nt) + 1.0) * 0.4;
       p1.applyForce(Math.cos(windAngle) * windMag, Math.sin(windAngle) * windMag);
 
-      // Mouse attractor
       if (attractor && gravityWells > 0) {
         const dx = attractor.x - p1.x;
         const dy = attractor.y - p1.y;
@@ -147,7 +139,6 @@ export class ParticleSystem {
         }
       }
 
-      // Reynolds flocking via spatial hash (only neighboring cells)
       let sepX = 0, sepY = 0, sepCount = 0;
       let aliX = 0, aliY = 0, aliCount = 0;
       let cohX = 0, cohY = 0, cohCount = 0;
@@ -217,7 +208,6 @@ export class ParticleSystem {
       }
     }
 
-    // Integrate + bounds
     const pad = 120;
     const limitL = -pad;
     const limitR = this.canvasW + pad;
