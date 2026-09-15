@@ -1,0 +1,19 @@
+[project]
+name = "kinetic-curator-studio"
+version = "0.1.0"
+description = "Headless render farm for Kinetic Curator (Backend A, issue #74)"
+requires-python = ">=3.11"
+# Stdlib only. resvg and ffmpeg are native binaries (brew install resvg ffmpeg),
+# not Python packages — the plan named resvg-py, but shelling out to the CLI
+# removes a build dependency and parallelises the same way.
+dependencies = []
+
+[project.optional-dependencies]
+# Only needed by verify.py, which compares this pipeline against the browser.
+verify = ["pillow>=11", "numpy>=2"]
+
+[project.scripts]
+studio = "studio:main"
+
+[tool.uv]
+package = false
