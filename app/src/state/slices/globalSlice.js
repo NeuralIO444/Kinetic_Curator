@@ -129,8 +129,15 @@ export const createGlobalSlice = (set) => ({
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
       next.assetWeightOverrides = { ...doc.assetWeightOverrides };
     }
+    if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
+      next.layers = doc.layers;
+      next.activeLayerId = doc.activeLayerId;
+      next.layerSnapshots = doc.layerSnapshots || {};
+      next.historyUndoStack = [];
+      next.historyRedoStack = [];
+    }
     return next;
   }),
 });
 
-export { WEIGHT_CYCLE };
+export { WEIGHT_CYCLE, initialEnabledAssets };

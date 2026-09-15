@@ -136,6 +136,24 @@
 .fav-meta { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fav-ts { color: var(--dim); }
 
+/* ─── Layers ─── */
+.layer-list { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+.layer-row { border: 1px solid var(--line); padding: 4px; background: rgba(0,0,0,0.15); }
+.layer-row-active { border-color: var(--accent3); }
+.layer-row-main { display: flex; align-items: center; gap: 4px; }
+.layer-reorder { display: flex; flex-direction: column; }
+.layer-reorder .micro-btn { padding: 0 4px; line-height: 1.1; font-size: 8px; }
+.layer-name {
+  flex: 1; text-align: left; background: transparent; border: none;
+  color: var(--dim); font-size: 10px; letter-spacing: 0.03em; padding: 2px 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.layer-row-active .layer-name { color: var(--accent3); font-weight: 700; }
+.layer-row-composite { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.layer-row-composite .blend-mode-select { flex: 1; grid-column: unset; }
+.layer-row-composite input[type=range] { flex: 1; }
+.layer-opacity-readout { font-size: 9px; color: var(--dim); width: 32px; text-align: right; }
+
 /* ─── Output ─── */
 .panel-output { min-height: 0; }
 .output-body { gap: 6px; display: flex; flex-direction: column; flex: 1 1 auto; overflow-y: auto; min-height: 0; }

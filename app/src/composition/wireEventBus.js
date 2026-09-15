@@ -108,5 +108,22 @@ export function wireEventBus(rawDispatch) {
   on(Events.EXPORT_LOAD_PROJECT, (project) =>
     dispatch({ type: A.LOAD_PROJECT, project }));
 
+  on(Events.LAYER_ADD, () =>
+    dispatch({ type: A.ADD_LAYER }));
+  on(Events.LAYER_REMOVE, ({ id }) =>
+    dispatch({ type: A.REMOVE_LAYER, id }));
+  on(Events.LAYER_SET_ACTIVE, ({ id }) =>
+    dispatch({ type: A.SET_ACTIVE_LAYER, id }));
+  on(Events.LAYER_REORDER, ({ id, delta }) =>
+    dispatch({ type: A.REORDER_LAYER, id, delta }));
+  on(Events.LAYER_TOGGLE_VISIBLE, ({ id }) =>
+    dispatch({ type: A.TOGGLE_LAYER_VISIBLE, id }));
+  on(Events.LAYER_RENAME, ({ id, name }) =>
+    dispatch({ type: A.RENAME_LAYER, id, name }));
+  on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) =>
+    dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
+  on(Events.LAYER_SET_OPACITY, ({ id, opacity }) =>
+    dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
+
   return dispatch;
 }

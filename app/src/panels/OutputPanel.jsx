@@ -25,10 +25,17 @@ export function OutputPanel() {
     paletteId: s.paletteId,
     enabledAssets: s.enabledAssets,
     assetWeightOverrides: s.assetWeightOverrides,
+    paletteOverrides: s.paletteOverrides,
+    lockedParams: s.lockedParams,
+    caGrid: s.caGrid,
+    layers: s.layers,
+    activeLayerId: s.activeLayerId,
+    layerSnapshots: s.layerSnapshots,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
+    paletteOverrides, lockedParams, caGrid, layers, activeLayerId, layerSnapshots,
   } = state;
 
   const [uncapped, setUncapped] = useState(false);
@@ -232,10 +239,16 @@ export function OutputPanel() {
     const doc = serializeProject({
       seed,
       paletteId,
+      paletteOverrides,
       layoutParams,
+      lockedParams,
+      caGrid,
       enabledAssets,
       quality,
       assetWeightOverrides,
+      layers,
+      activeLayerId,
+      layerSnapshots,
     });
     downloadProject(doc);
   };

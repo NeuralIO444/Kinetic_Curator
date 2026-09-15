@@ -1,11 +1,14 @@
 // Project document — portable session state (#33 / #34).
 // Full project JSON is the reproducible unit (seed alone is not).
+import { captureSnapshot } from './slices/layersSlice.js';
 
 export const PROJECT_VERSION = 1;
 export const AUTOSAVE_KEY = 'kc:project:v1';
 
 /**
- * @param {object} state - zustand-like slice of relevant fields
+ * @param {object} state - zustand-like slice of relevant fields. `seed` /
+ *   `layoutParams` / `enabledAssets` always describe the *active* layer
+ *   (see layersSlice.js); `layers` (if present) carries the rest.
  * @returns {object} project document
  */
 export function serializeProject(state) {
@@ -19,6 +22,16 @@ export function serializeProject(state) {
   };
   if (state.assetWeightOverrides && Object.keys(state.assetWeightOverrides).length > 0) {
     doc.assetWeightOverrides = { ...state.assetWeightOverrides };
+  }
+  if (Array.isArray(state.layers) && state.activeLayerId) {
+    doc.layers = state.layers;
+    doc.activeLayerId = state.activeLayerId;
+    // The active layer's true data lives in the live top-level fields
+    // above, not in layerSnapshots — fold it in so every layer round-trips.
+    doc.layerSnapshots = {
+      ...(state.layerSnapshots || {}),
+      [state.activeLayerId]: captureSnapshot(state),
+    };
   }
   return doc;
 }
@@ -49,6 +62,9 @@ export function parseProject(raw) {
         enabledAssets: raw.enabledAssets || null,
         quality: raw.quality || 'balanced',
         assetWeightOverrides: raw.assetWeightOverrides || null,
+        layers: Array.isArray(raw.layers) ? raw.layers : null,
+        activeLayerId: raw.activeLayerId || null,
+        layerSnapshots: raw.layerSnapshots && typeof raw.layerSnapshots === 'object' ? raw.layerSnapshots : null,
       },
     };
   }
@@ -77,6 +93,10 @@ export function parseProject(raw) {
         raw.assetWeightOverrides && typeof raw.assetWeightOverrides === 'object'
           ? { ...raw.assetWeightOverrides }
           : null,
+      layers: Array.isArray(raw.layers) ? raw.layers : null,
+      activeLayerId: typeof raw.activeLayerId === 'string' ? raw.activeLayerId : null,
+      layerSnapshots:
+        raw.layerSnapshots && typeof raw.layerSnapshots === 'object' ? raw.layerSnapshots : null,
     },
   };
 }

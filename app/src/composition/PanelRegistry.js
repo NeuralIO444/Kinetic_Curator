@@ -2,6 +2,7 @@
 // Adding a panel = one entry here. The Shell knows nothing about features.
 import { CanvasPanel } from '../panels/CanvasPanel.jsx';
 import { LayoutPanel } from '../panels/LayoutPanel.jsx';
+import { LayersPanel } from '../panels/LayersPanel.jsx';
 import { AssetPoolPanel } from '../panels/AssetPoolPanel.jsx';
 import { StimulusPanel } from '../panels/StimulusPanel.jsx';
 import { DavisPanel } from '../panels/DavisPanel.jsx';
@@ -10,6 +11,7 @@ import { OutputPanel } from '../panels/OutputPanel.jsx';
 export const PANEL_REGISTRY = [
   { id: 'canvas',   title: 'CANVAS',   icon: '◆', component: CanvasPanel,    zone: 'primary' },
   { id: 'layout',   title: 'LAYOUT',   icon: '■', component: LayoutPanel,    zone: 'secondary' },
+  { id: 'layers',   title: 'LAYERS',   icon: '▤', component: LayersPanel,    zone: 'secondary' },
   { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'secondary' },
   { id: 'stimulus', title: 'STIMULUS', icon: '▸', component: StimulusPanel,  zone: 'secondary' },
   { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },

@@ -1,25 +1,53 @@
 // CanvasPanel (P01) — live SVG preview + optional accumulation buffer (#28)
+// Renders every visible layer (see state/slices/layersSlice.js) as a
+// sibling <g> inside one shared <svg>, so export/recording (which just
+// serialize that node) capture the whole stack for free.
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { AssetSpriteSheet } from '../components/AssetSpriteSheet.jsx';
 import { getQualityCaps, shouldRenderGloss } from '../data/quality.js';
 import { clampCount } from '../engine/buildPlacements.js';
+import { resolvePalette } from '../data/palettes.js';
+import { getPreset } from '../data/presets.js';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
-import { useSwarmTick } from '../hooks/useSwarmTick.js';
-import { useCanvasItems } from '../hooks/useCanvasItems.js';
 import { useAccumulationBuffer } from '../hooks/useAccumulationBuffer.js';
+import { Layer } from './canvas/Layer.jsx';
 
-const ASSET_SIZE = 100;
+/** Resolve one layer's composition data: live top-level fields for the
+ * active layer (exactly what every other panel reads/writes), or its
+ * stored snapshot otherwise. */
+function resolveLayerSource(layer, state) {
+  if (layer.id === state.activeLayerId) {
+    return {
+      seed: state.seed,
+      paletteId: state.paletteId,
+      paletteOverrides: state.paletteOverrides,
+      layoutParams: state.layoutParams,
+      caGrid: state.caGrid,
+      enabledAssets: state.enabledAssets,
+    };
+  }
+  return state.layerSnapshots[layer.id] || {
+    seed: state.seed,
+    paletteId: state.paletteId,
+    paletteOverrides: null,
+    layoutParams: state.layoutParams,
+    caGrid: null,
+    enabledAssets: state.enabledAssets,
+  };
+}
 
 export function CanvasPanel() {
-  const { palette, assets, canvasRef, svgRef, accumRef, dispatch } = useApp();
+  const { palette: activePalette, assets, canvasRef, svgRef, accumRef, dispatch } = useApp();
   const { state } = useApp(s => ({
     layoutParams: s.layoutParams,
     seed: s.seed,
-    enabled: s.enabledAssets,
+    paletteId: s.paletteId,
+    paletteOverrides: s.paletteOverrides,
+    enabledAssets: s.enabledAssets,
     weightOverrides: s.assetWeightOverrides || {},
     evolveMode: s.evolveMode,
     beatPulse: s.beatPulse,
@@ -28,12 +56,16 @@ export function CanvasPanel() {
     caGrid: s.caGrid,
     quality: s.quality,
     running: s.running,
+    layers: s.layers,
+    activeLayerId: s.activeLayerId,
+    layerSnapshots: s.layerSnapshots,
   }));
   const {
-    layoutParams, seed, enabled, weightOverrides, evolveMode, beatPulse, audioBands,
-    motionSmoothing, caGrid, quality, running,
+    layoutParams, weightOverrides, evolveMode, beatPulse, audioBands,
+    motionSmoothing, quality, running, layers, activeLayerId,
   } = state;
 
+  const preset = getPreset(layoutParams.composition);
   const caps = getQualityCaps(quality || 'balanced');
   const accumOn = !!layoutParams.accumulation;
 
@@ -43,59 +75,65 @@ export function CanvasPanel() {
   const [bgMode, setBgMode] = useState('palette');
   const cycleBg = () => setBgMode(m => m === 'palette' ? 'transparent' : m === 'transparent' ? 'white' : 'palette');
 
-  let bgStyle = { background: palette.bg };
+  let bgStyle = { background: activePalette.bg };
   if (bgMode === 'white') bgStyle.background = '#ffffff';
   else if (bgMode === 'transparent') bgStyle.background = 'transparent';
 
-  const activeAssets = useMemo(
-    () => assets
-      .filter(a => enabled[a.id])
-      .map(a => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a)),
-    [assets, enabled, weightOverrides],
-  );
+  const visibleLayers = useMemo(() => layers.filter(l => l.visible), [layers]);
 
-  const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
-  const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
+  // Per-layer resolved composition data: palette, filtered+weighted assets,
+  // clamped counts. Recomputed whenever any layer's source data changes.
+  const resolvedLayers = useMemo(() => visibleLayers.map(layer => {
+    const src = resolveLayerSource(layer, state);
+    const palette = resolvePalette(src.paletteId, src.paletteOverrides);
+    const activeAssets = assets
+      .filter(a => src.enabledAssets[a.id])
+      .map(a => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
+    const safeCount = clampCount(src.layoutParams.count, src.layoutParams.mirror, caps);
+    const safeParticles = Math.min(src.layoutParams.particleCount || 150, caps.maxParticles);
+    return { layer, ...src, palette, activeAssets, safeCount, safeParticles };
+  }), [visibleLayers, state, assets, weightOverrides, caps]);
+
+  // Union of every visible layer's enabled assets — shared sprite sheet.
+  const spriteAssets = useMemo(() => {
+    const seen = new Map();
+    for (const rl of resolvedLayers) for (const a of rl.activeAssets) seen.set(a.id, a);
+    return [...seen.values()];
+  }, [resolvedLayers]);
 
   const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
   const { scaleMul, alphaBoost, breathScale, breathRot, glow, effectiveScale, effectiveAlpha } = life;
 
-  const { preset, items } = useCanvasItems({
-    layoutParams, seed, activeAssets, palette, caGrid, safeCount,
-    effectiveScale, effectiveAlpha, canvasW: CANVAS_W, canvasH: CANVAS_H, caps,
-  });
+  // Per-layer item counts, reported up so NODES/CLAMPED/GLOSS reflect the
+  // whole stack (total) and the active layer (badges) respectively.
+  const [layerCounts, setLayerCounts] = useState({});
+  const reportCount = useCallback((layerId, count) => {
+    setLayerCounts(prev => (prev[layerId] === count ? prev : { ...prev, [layerId]: count }));
+  }, []);
 
-  const { swarmItems } = useSwarmTick({
-    mode: layoutParams.mode,
-    safeParticles, activeAssets, palette, seed, layoutParams,
-    canvasW: CANVAS_W, canvasH: CANVAS_H, scaleMul, alphaBoost, caps,
-  });
-
-  const renderItems = layoutParams.mode === 'swarm' ? swarmItems : items;
-  const nodeCount = renderItems?.length || 0;
-  const showGloss = shouldRenderGloss(quality, layoutParams.shading, nodeCount);
+  const totalNodeCount = resolvedLayers.reduce((sum, rl) => sum + (layerCounts[rl.layer.id] || 0), 0);
+  const activeCount = layerCounts[activeLayerId] || 0;
+  const activeSafeCount = resolvedLayers.find(rl => rl.layer.id === activeLayerId)?.safeCount ?? 0;
+  const showGloss = shouldRenderGloss(quality, layoutParams.shading, activeCount);
 
   const { clear: clearAccum } = useAccumulationBuffer({
     svgRef,
     accumRef,
     enabled: accumOn,
     fade: layoutParams.accumulationFade ?? 0.88,
-    background: palette.bg,
+    background: activePalette.bg,
     running,
   });
 
   useEffect(() => {
-    if (typeof dispatch === 'function' && renderItems) {
-      dispatch({ type: 'SET_NODE_COUNT', payload: renderItems.length });
+    if (typeof dispatch === 'function') {
+      dispatch({ type: 'SET_NODE_COUNT', payload: totalNodeCount });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [renderItems?.length, dispatch]);
-
-  const half = ASSET_SIZE / 2;
+  }, [totalNodeCount, dispatch]);
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
-      <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · ${activeAssets.length} assets`}>
+      <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · ${spriteAssets.length} assets · ${layers.length} layer${layers.length > 1 ? 's' : ''}`}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button className="chip-btn" onClick={cycleBg} title="Toggle Background">BG: {bgMode.toUpperCase()}</button>
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
@@ -108,9 +146,9 @@ export function CanvasPanel() {
           {accumOn && (
             <span className="meter-pill" title="Accumulation buffer active" style={{ color: 'var(--accent)' }}>ACCUM</span>
           )}
-          {safeCount < layoutParams.count && (
+          {activeSafeCount < layoutParams.count && (
             <span className="meter-pill" title="Count clamped by quality preset" style={{ color: '#ffaa00' }}>
-              CLAMPED {safeCount}
+              CLAMPED {activeSafeCount}
             </span>
           )}
           {layoutParams.shading === 'gloss' && !showGloss && (
@@ -138,11 +176,7 @@ export function CanvasPanel() {
             ref={svgRef}
             viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
             xmlns="http://www.w3.org/2000/svg"
-            style={{
-              ...(layoutParams.hueRotate ? { filter: `hue-rotate(${layoutParams.hueRotate}deg)` } : {}),
-              // When ACCUM is on, hide SVG visually but keep it in DOM for composite + export source
-              ...(accumOn ? { opacity: 0, pointerEvents: 'none' } : {}),
-            }}
+            style={accumOn ? { opacity: 0, pointerEvents: 'none' } : undefined}
             onWheel={viewport.onWheel}
             onPointerDown={viewport.onPointerDown}
             onPointerMove={viewport.onPointerMoveCombined}
@@ -150,7 +184,7 @@ export function CanvasPanel() {
             onPointerCancel={viewport.onPointerUpCombined}
             onPointerLeave={viewport.clearAttractor}
           >
-            <AssetSpriteSheet assets={activeAssets} />
+            <AssetSpriteSheet assets={spriteAssets} />
             <defs>
               <radialGradient id="kc-gloss-grad" cx="35%" cy="30%" r="70%">
                 <stop offset="0%" stopColor="#fff" stopOpacity="0.9" />
@@ -163,38 +197,30 @@ export function CanvasPanel() {
                 transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) rotate(${breathRot}) scale(${breathScale}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2})`}
                 style={{ transition: 'transform 0.06s linear', isolation: 'isolate' }}
               >
-                {renderItems && renderItems.map((item, i) => {
-                  if (!item.assetId) return null;
-                  const sx = item._mirrored ? -item.scale : item.scale;
-                  const reactKey = item.key || `${item.assetId}-${i}${item._mirrored ? '-m' : ''}`;
-                  return (
-                    <g
-                      key={reactKey}
-                      transform={`translate(${item.x}, ${item.y}) rotate(${item.rotation}) scale(${sx}, ${item.scale}) translate(${-half}, ${-half})`}
-                      opacity={item.alpha / 100}
-                      style={{
-                        ['--ink']: item.color,
-                        ['--accent']: item.accent || item.color,
-                        transition: motionSmoothing && layoutParams.mode !== 'swarm'
-                          ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease'
-                          : 'none',
-                        transformOrigin: '0 0',
-                        mixBlendMode: layoutParams.blendMode !== 'normal' ? layoutParams.blendMode : undefined,
-                      }}
-                    >
-                      <use href={`#kc-asset-${item.assetId}`} width={ASSET_SIZE} height={ASSET_SIZE} />
-                      {showGloss && (
-                        <use
-                          href={`#kc-asset-${item.assetId}`}
-                          width={ASSET_SIZE}
-                          height={ASSET_SIZE}
-                          style={{ ['--ink']: 'url(#kc-gloss-grad)', ['--accent']: 'url(#kc-gloss-grad)', mixBlendMode: 'soft-light' }}
-                          pointerEvents="none"
-                        />
-                      )}
-                    </g>
-                  );
-                })}
+                {resolvedLayers.map(rl => (
+                  <Layer
+                    key={rl.layer.id}
+                    layoutParams={rl.layoutParams}
+                    seed={rl.seed}
+                    activeAssets={rl.activeAssets}
+                    palette={rl.palette}
+                    caGrid={rl.caGrid}
+                    caps={caps}
+                    safeCount={rl.safeCount}
+                    safeParticles={rl.safeParticles}
+                    effectiveScale={effectiveScale}
+                    effectiveAlpha={effectiveAlpha}
+                    canvasW={CANVAS_W}
+                    canvasH={CANVAS_H}
+                    scaleMul={scaleMul}
+                    alphaBoost={alphaBoost}
+                    motionSmoothing={motionSmoothing}
+                    quality={quality}
+                    layerBlendMode={rl.layer.layerBlendMode}
+                    layerOpacity={rl.layer.layerOpacity}
+                    onCount={(count) => reportCount(rl.layer.id, count)}
+                  />
+                ))}
               </g>
             </g>
           </svg>

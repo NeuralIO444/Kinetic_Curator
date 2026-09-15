@@ -108,6 +108,14 @@ export function useApp(selector) {
       case A.STEP_CA_GRID: return store.stepCaGrid();
       case A.RESET_CA_GRID: return store.resetCaGrid();
       case A.LOAD_PROJECT: return store.applyProject(action.project || payload);
+      case A.ADD_LAYER: return store.addLayer();
+      case A.REMOVE_LAYER: return store.removeLayer(action.id);
+      case A.SET_ACTIVE_LAYER: return store.setActiveLayer(action.id);
+      case A.REORDER_LAYER: return store.reorderLayer(action.id, action.delta);
+      case A.TOGGLE_LAYER_VISIBLE: return store.toggleLayerVisible(action.id);
+      case A.RENAME_LAYER: return store.renameLayer(action.id, action.name);
+      case A.SET_LAYER_BLEND_MODE: return store.setLayerBlendMode(action.id, action.mode);
+      case A.SET_LAYER_OPACITY: return store.setLayerOpacity(action.id, action.opacity);
       default: console.warn('Unhandled action:', type);
     }
   }, []);

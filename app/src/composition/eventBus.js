@@ -71,4 +71,12 @@ export const Events = {
   EXPORT_PALETTE: 'export:palette',
   EXPORT_IMPORT_LAYOUT: 'export:importLayout',
   EXPORT_LOAD_PROJECT: 'export:loadProject',
+  LAYER_ADD: 'layer:add',
+  LAYER_REMOVE: 'layer:remove',
+  LAYER_SET_ACTIVE: 'layer:setActive',
+  LAYER_REORDER: 'layer:reorder',
+  LAYER_TOGGLE_VISIBLE: 'layer:toggleVisible',
+  LAYER_RENAME: 'layer:rename',
+  LAYER_SET_BLEND_MODE: 'layer:setBlendMode',
+  LAYER_SET_OPACITY: 'layer:setOpacity',
 };
