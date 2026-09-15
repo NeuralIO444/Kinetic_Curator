@@ -7,7 +7,6 @@
 }
 .grid {
   display: grid;
-  /* grid-template-columns set dynamically via useColumnResize */
   gap: 0;
   padding: var(--gap-grid);
   min-height: 0;
@@ -29,8 +28,6 @@
   overflow: hidden !important;
 }
 
-
-/* ─── Column Divider ─── */
 .col-divider {
   width: 6px;
   cursor: col-resize;
@@ -63,7 +60,6 @@
   max-height: 100%;
 }
 
-/* ─── Fullscreen Mode ─── */
 .app-fullscreen .master-bar,
 .app-fullscreen .footer-bar { display: none; }
 .app-fullscreen .grid {
@@ -78,7 +74,6 @@
 .app-fullscreen .panel-canvas { height: 100vh; min-height: 100vh; max-height: 100vh; border: none; margin: 0; }
 .app-fullscreen .canvas-wrap { margin: 0; border: none; height: 100vh !important; }
 
-/* ─── Master Bar ─── */
 .master-bar {
   display: flex;
   justify-content: space-between;
@@ -128,10 +123,10 @@
 }
 .palette-chip:hover { color: var(--ink); border-color: var(--line-2); }
 .palette-chip.active { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,0.04); }
+.palette-chip.dirty { border-color: var(--accent2); }
 .palette-chip-swatches { display: inline-flex; gap: 1px; }
 .palette-chip-sw { width: 7px; height: 10px; }
 
-/* Color P0 — full active strip (#51) */
 .palette-active-strip {
   display: inline-flex;
   align-items: center;
@@ -146,6 +141,7 @@
   height: 12px;
   border: 1px solid rgba(255,255,255,0.12);
   box-sizing: border-box;
+  display: block;
 }
 .palette-meta-sw {
   position: relative;
@@ -165,6 +161,36 @@
   text-shadow: 0 0 2px #000, 0 0 2px #000;
   pointer-events: none;
   padding-bottom: 1px;
+  z-index: 1;
+}
+.palette-sw-edit {
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+.palette-color-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+.palette-reset-btn {
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1;
+  padding: 1px 4px;
+  cursor: pointer;
+}
+.palette-reset-btn:hover {
+  color: var(--ink);
+  border-color: var(--accent2);
 }
 
 .run-btn {
@@ -174,7 +200,6 @@
 }
 .run-btn:hover { filter: brightness(1.1); }
 
-/* ─── Footer ─── */
 .footer-bar {
   display: flex; justify-content: space-between; align-items: center;
   padding: 0 10px;
@@ -198,7 +223,6 @@
 .micro-btn:hover { background: rgba(255,255,255,0.06); border-color: var(--ink); }
 .micro-btn.active { background: rgba(255,255,255,0.08); border-color: var(--accent2); color: var(--accent2); }
 
-/* ─── Undo / Redo ─── */
 .undo-group { display: inline-flex; gap: 2px; align-items: center; }
 .undo-btn {
   display: inline-flex; align-items: center; gap: 3px;
@@ -212,7 +236,6 @@
 .undo-btn:hover:not(.disabled) { background: rgba(255,255,255,0.08); border-color: var(--ink); }
 .undo-btn.disabled { opacity: 0.25; cursor: default; }
 
-/* ─── Responsive Collapse Breakpoints ─── */
 @media (max-width: 1023px) {
   .app {
     height: auto;
@@ -231,9 +254,7 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
   }
-  .master-left .logo {
-    margin-right: auto;
-  }
+  .master-left .logo { margin-right: auto; }
   .grid {
     grid-template-columns: 1fr !important;
     height: auto;
@@ -241,9 +262,7 @@
     gap: var(--gap-panel);
     padding: var(--sp-2);
   }
-  .col-divider {
-    display: none !important;
-  }
+  .col-divider { display: none !important; }
   .col {
     max-height: none !important;
     overflow-y: visible !important;
@@ -278,7 +297,6 @@
   }
 }
 
-/* Right column — tabs + single active panel */
 .col-panels {
   display: flex;
   flex-direction: column;

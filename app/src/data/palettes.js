@@ -44,3 +44,46 @@ export const PALETTES = [
     swatches: ['#c1432e', '#d68c45', '#e6b85c', '#3a6a4f', '#1d3557', '#f0e4d0', '#7a2e1f', '#2a1a14'],
   },
 ];
+
+export function getCatalogPalette(id) {
+  return PALETTES.find((p) => p.id === id) || PALETTES[0];
+}
+
+/** Normalize to #rrggbb lowercase; null if invalid. */
+export function normalizeHex(hex) {
+  if (typeof hex !== 'string') return null;
+  let h = hex.trim();
+  if (h[0] !== '#') h = `#${h}`;
+  if (/^#[0-9a-fA-F]{3}$/.test(h)) {
+    h = `#${h[1]}${h[1]}${h[2]}${h[2]}${h[3]}${h[3]}`;
+  }
+  if (!/^#[0-9a-fA-F]{6}$/.test(h)) return null;
+  return h.toLowerCase();
+}
+
+/**
+ * Resolve effective palette from catalog + optional overrides.
+ * Never mutates PALETTES. Missing override slots fall back to catalog.
+ *
+ * @param {string} paletteId
+ * @param {null|{ swatches?: string[], bg?: string, ink?: string }} overrides
+ */
+export function resolvePalette(paletteId, overrides = null) {
+  const base = getCatalogPalette(paletteId);
+  const swatches = base.swatches.map((s, i) => {
+    const o = overrides?.swatches?.[i];
+    const n = o != null ? normalizeHex(o) : null;
+    return n || s;
+  });
+  const bg = (overrides?.bg && normalizeHex(overrides.bg)) || base.bg;
+  const ink = (overrides?.ink && normalizeHex(overrides.ink)) || base.ink;
+  return {
+    id: base.id,
+    name: base.name,
+    era: base.era,
+    bg,
+    ink,
+    swatches: [...swatches],
+    dirty: !!(overrides && (overrides.swatches || overrides.bg || overrides.ink)),
+  };
+}

@@ -3,7 +3,6 @@ import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 
-/** Compact preview for inactive chips */
 function CompactSwatches({ swatches }) {
   return (
     <span className="palette-chip-swatches">
@@ -14,35 +13,73 @@ function CompactSwatches({ swatches }) {
   );
 }
 
-/** Full strip for active palette: all swatches + BG + INK with hex tooltips (#51) */
-function ActivePaletteStrip({ palette }) {
+/** Editable strip: all swatches + BG + INK (#51 / #52) */
+function ActivePaletteStrip({ palette, dirty, onSwatch, onBg, onInk, onReset }) {
   const swatches = palette.swatches || [];
   return (
-    <span className="palette-active-strip" aria-label={`${palette.name} full palette`}>
+    <span className="palette-active-strip" aria-label={`${palette.name} palette editor`}>
       <span className="palette-active-swatches">
         {swatches.map((s, i) => (
-          <span
+          <label
             key={i}
-            className="palette-chip-sw palette-sw-full"
-            style={{ background: s }}
-            title={`S${i + 1} ${s}`}
-          />
+            className="palette-sw-edit"
+            title={`S${i + 1} ${s} — click to edit`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="palette-chip-sw palette-sw-full" style={{ background: s }} />
+            <input
+              type="color"
+              className="palette-color-input"
+              value={s}
+              onChange={(e) => onSwatch(i, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </label>
         ))}
       </span>
-      <span
-        className="palette-meta-sw"
+      <label
+        className="palette-meta-sw palette-sw-edit"
         style={{ background: palette.bg }}
-        title={`BG ${palette.bg}`}
+        title={`BG ${palette.bg} — click to edit`}
+        onClick={(e) => e.stopPropagation()}
       >
         <span className="palette-meta-label">BG</span>
-      </span>
-      <span
-        className="palette-meta-sw"
+        <input
+          type="color"
+          className="palette-color-input"
+          value={palette.bg}
+          onChange={(e) => onBg(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </label>
+      <label
+        className="palette-meta-sw palette-sw-edit"
         style={{ background: palette.ink }}
-        title={`INK ${palette.ink}`}
+        title={`INK ${palette.ink} — click to edit`}
+        onClick={(e) => e.stopPropagation()}
       >
         <span className="palette-meta-label">INK</span>
-      </span>
+        <input
+          type="color"
+          className="palette-color-input"
+          value={palette.ink}
+          onChange={(e) => onInk(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </label>
+      {dirty && (
+        <button
+          type="button"
+          className="palette-reset-btn"
+          title="Reset to catalog colors (clears overrides)"
+          onClick={(e) => {
+            e.stopPropagation();
+            onReset();
+          }}
+        >
+          ↺
+        </button>
+      )}
     </span>
   );
 }
@@ -128,12 +165,27 @@ export function MasterBar() {
               <button
                 key={p.id}
                 type="button"
-                className={`palette-chip ${active ? 'active' : ''}`}
-                onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
-                title={active ? `${p.name} · ${p.swatches?.length || 0} swatches + BG + INK` : p.name}
+                className={`palette-chip ${active ? 'active' : ''} ${active && palette.dirty ? 'dirty' : ''}`}
+                onClick={() => {
+                  if (!active) dispatch({ type: A.SET_PALETTE_ID, payload: p.id });
+                }}
+                title={
+                  active
+                    ? `${p.name} · edit swatches · switch palette clears customs`
+                    : `${p.name} (clears custom colors)`
+                }
               >
                 {active ? (
-                  <ActivePaletteStrip palette={palette.id === p.id ? palette : p} />
+                  <ActivePaletteStrip
+                    palette={palette}
+                    dirty={!!palette.dirty}
+                    onSwatch={(i, hex) =>
+                      dispatch({ type: A.SET_PALETTE_SWATCH, index: i, hex })
+                    }
+                    onBg={(hex) => dispatch({ type: A.SET_PALETTE_BG, payload: hex })}
+                    onInk={(hex) => dispatch({ type: A.SET_PALETTE_INK, payload: hex })}
+                    onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
+                  />
                 ) : (
                   <CompactSwatches swatches={p.swatches || []} />
                 )}

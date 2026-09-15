@@ -7,6 +7,9 @@ export function pushToUndo(state, force = false) {
   const current = {
     seed: state.seed,
     paletteId: state.paletteId,
+    paletteOverrides: state.paletteOverrides
+      ? JSON.parse(JSON.stringify(state.paletteOverrides))
+      : null,
     layoutParams: JSON.parse(JSON.stringify(state.layoutParams)),
   };
 
@@ -19,6 +22,7 @@ export function pushToUndo(state, force = false) {
     last &&
     last.seed === current.seed &&
     last.paletteId === current.paletteId &&
+    JSON.stringify(last.paletteOverrides) === JSON.stringify(current.paletteOverrides) &&
     JSON.stringify(last.layoutParams) === JSON.stringify(current.layoutParams)
   ) {
     return {};

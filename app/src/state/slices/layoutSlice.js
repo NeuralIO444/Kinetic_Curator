@@ -2,10 +2,13 @@ import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
+import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
 
 export const createLayoutSlice = (set) => ({
   seed: 0xa17e9b21,
   paletteId: 'praystation',
+  /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
+  paletteOverrides: null,
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
   motionSmoothing: true,
@@ -18,7 +21,74 @@ export const createLayoutSlice = (set) => ({
     ...pushToUndo(state, true),
     seed: (state.seed ^ ((Math.random() * 0xffffffff) | 0)) >>> 0,
   })),
-  setPaletteId: (id) => set((state) => ({ ...pushToUndo(state, true), paletteId: id })),
+  // Switching catalog id clears overrides (AC6)
+  setPaletteId: (id) => set((state) => ({
+    ...pushToUndo(state, true),
+    paletteId: id,
+    paletteOverrides: null,
+  })),
+
+  setPaletteSwatch: (index, hex) => set((state) => {
+    const n = normalizeHex(hex);
+    if (n == null) return {};
+    const base = getCatalogPalette(state.paletteId);
+    if (index < 0 || index >= base.swatches.length) return {};
+    const prev = state.paletteOverrides?.swatches
+      ? [...state.paletteOverrides.swatches]
+      : [...base.swatches];
+    // Ensure length
+    while (prev.length < base.swatches.length) prev.push(base.swatches[prev.length]);
+    prev[index] = n;
+    // If identical to catalog, collapse that slot conceptually but keep array
+    const nextOverrides = {
+      ...(state.paletteOverrides || {}),
+      swatches: prev,
+    };
+    // Drop if fully matches catalog
+    const matches = prev.every((s, i) => s === base.swatches[i])
+      && (!nextOverrides.bg || nextOverrides.bg === base.bg)
+      && (!nextOverrides.ink || nextOverrides.ink === base.ink);
+    return {
+      ...pushToUndo(state, true),
+      paletteOverrides: matches ? null : nextOverrides,
+    };
+  }),
+
+  setPaletteBg: (hex) => set((state) => {
+    const n = normalizeHex(hex);
+    if (n == null) return {};
+    const base = getCatalogPalette(state.paletteId);
+    const next = { ...(state.paletteOverrides || {}), bg: n };
+    if (n === base.bg) delete next.bg;
+    const empty = !next.swatches && !next.bg && !next.ink;
+    return {
+      ...pushToUndo(state, true),
+      paletteOverrides: empty ? null : next,
+    };
+  }),
+
+  setPaletteInk: (hex) => set((state) => {
+    const n = normalizeHex(hex);
+    if (n == null) return {};
+    const base = getCatalogPalette(state.paletteId);
+    const next = { ...(state.paletteOverrides || {}), ink: n };
+    if (n === base.ink) delete next.ink;
+    const empty = !next.swatches && !next.bg && !next.ink;
+    return {
+      ...pushToUndo(state, true),
+      paletteOverrides: empty ? null : next,
+    };
+  }),
+
+  clearPaletteOverrides: () => set((state) => {
+    if (!state.paletteOverrides) return {};
+    return { ...pushToUndo(state, true), paletteOverrides: null };
+  }),
+
+  setPaletteOverrides: (overrides) => set((state) => ({
+    ...pushToUndo(state, true),
+    paletteOverrides: overrides,
+  })),
 
   setLayoutParam: (key, value) => set((state) => {
     if (state.layoutParams[key] === value) return {};
@@ -82,11 +152,15 @@ export const createLayoutSlice = (set) => ({
     const current = {
       seed: state.seed,
       paletteId: state.paletteId,
+      paletteOverrides: state.paletteOverrides
+        ? JSON.parse(JSON.stringify(state.paletteOverrides))
+        : null,
       layoutParams: JSON.parse(JSON.stringify(state.layoutParams)),
     };
     return {
       seed: previous.seed,
       paletteId: previous.paletteId,
+      paletteOverrides: previous.paletteOverrides ?? null,
       layoutParams: previous.layoutParams,
       historyUndoStack: state.historyUndoStack.slice(0, -1),
       historyRedoStack: [...state.historyRedoStack, current],
@@ -99,11 +173,15 @@ export const createLayoutSlice = (set) => ({
     const current = {
       seed: state.seed,
       paletteId: state.paletteId,
+      paletteOverrides: state.paletteOverrides
+        ? JSON.parse(JSON.stringify(state.paletteOverrides))
+        : null,
       layoutParams: JSON.parse(JSON.stringify(state.layoutParams)),
     };
     return {
       seed: next.seed,
       paletteId: next.paletteId,
+      paletteOverrides: next.paletteOverrides ?? null,
       layoutParams: next.layoutParams,
       historyUndoStack: [...state.historyUndoStack, current],
       historyRedoStack: state.historyRedoStack.slice(0, -1),
