@@ -5,6 +5,8 @@ import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
 
+const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
+
 export const createGlobalSlice = (set) => ({
   running: true,
   fps: 60,
@@ -17,6 +19,8 @@ export const createGlobalSlice = (set) => ({
   motionEnergy: 0,
 
   enabledAssets: initialEnabledAssets,
+  /** Runtime overrides over authored asset.weight — id → 'heavy'|'medium'|'light' */
+  assetWeightOverrides: {},
   search: '',
   catFilter: 'all',
   poolView: 'grid',
@@ -58,6 +62,51 @@ export const createGlobalSlice = (set) => ({
   setCatFilter: (filter) => set({ catFilter: filter }),
   setPoolView: (view) => set({ poolView: view }),
 
+  setAssetWeight: (id, weight) => set((state) => {
+    if (!WEIGHT_CYCLE.includes(weight)) return {};
+    const asset = ASSETS.find((a) => a.id === id);
+    if (!asset) return {};
+    // Clear override if it matches authored weight
+    if (asset.weight === weight) {
+      if (!(id in state.assetWeightOverrides)) return {};
+      const next = { ...state.assetWeightOverrides };
+      delete next[id];
+      return { assetWeightOverrides: next };
+    }
+    return {
+      assetWeightOverrides: { ...state.assetWeightOverrides, [id]: weight },
+    };
+  }),
+
+  cycleAssetWeight: (id) => set((state) => {
+    const asset = ASSETS.find((a) => a.id === id);
+    if (!asset) return {};
+    const current = state.assetWeightOverrides[id] || asset.weight || 'medium';
+    const idx = WEIGHT_CYCLE.indexOf(current);
+    const nextW = WEIGHT_CYCLE[(idx + 1) % WEIGHT_CYCLE.length];
+    if (nextW === asset.weight) {
+      const next = { ...state.assetWeightOverrides };
+      delete next[id];
+      return { assetWeightOverrides: next };
+    }
+    return {
+      assetWeightOverrides: { ...state.assetWeightOverrides, [id]: nextW },
+    };
+  }),
+
+  setCategoryWeight: (category, weight) => set((state) => {
+    if (!WEIGHT_CYCLE.includes(weight)) return {};
+    const next = { ...state.assetWeightOverrides };
+    ASSETS.forEach((a) => {
+      if (a.category !== category) return;
+      if (a.weight === weight) delete next[a.id];
+      else next[a.id] = weight;
+    });
+    return { assetWeightOverrides: next };
+  }),
+
+  clearWeightOverrides: () => set({ assetWeightOverrides: {} }),
+
   /** Apply a parsed project document in one store update (#33). */
   applyProject: (doc) => set((state) => {
     const next = {
@@ -77,6 +126,11 @@ export const createGlobalSlice = (set) => ({
       }
       next.enabledAssets = enabled;
     }
+    if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
+      next.assetWeightOverrides = { ...doc.assetWeightOverrides };
+    }
     return next;
   }),
 });
+
+export { WEIGHT_CYCLE };
