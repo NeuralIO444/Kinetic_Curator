@@ -6,6 +6,7 @@ import { createGlobalSlice } from './slices/globalSlice.js';
 import { createDavisSlice } from './slices/davisSlice.js';
 import { createExportSlice } from './slices/exportSlice.js';
 import { createLayersSlice } from './slices/layersSlice.js';
+import { createPaletteLibrarySlice } from './slices/paletteLibrarySlice.js';
 
 export const useStore = create((set, get) => ({
   ...createAudioSlice(set, get),
@@ -14,4 +15,5 @@ export const useStore = create((set, get) => ({
   ...createDavisSlice(set, get),
   ...createExportSlice(set, get),
   ...createLayersSlice(set, get),
+  ...createPaletteLibrarySlice(set, get),
 }));

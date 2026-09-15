@@ -1,6 +1,7 @@
 // MasterBar — top toolbar
 import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
+import { emit, Events } from '../composition/eventBus.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 
 function CompactSwatches({ swatches }) {
@@ -183,22 +184,51 @@ export function MasterBar() {
                     onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
                   />
                   {p.name}
+                  {p.user && (
+                    <button
+                      type="button"
+                      className="palette-del-btn"
+                      title={`Delete ${p.name} from your library`}
+                      onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               );
             }
             return (
-              <button
-                key={p.id}
-                type="button"
-                className="palette-chip"
-                onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
-                title={`${p.name} (clears custom colors)`}
-              >
-                <CompactSwatches swatches={p.swatches || []} />
-                {p.name}
-              </button>
+              <span key={p.id} className="palette-chip-wrap">
+                <button
+                  type="button"
+                  className="palette-chip"
+                  onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
+                  title={`${p.name} (clears custom colors)`}
+                >
+                  <CompactSwatches swatches={p.swatches || []} />
+                  {p.name}
+                </button>
+                {p.user && (
+                  <button
+                    type="button"
+                    className="palette-del-btn"
+                    title={`Delete ${p.name} from your library`}
+                    onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
             );
           })}
+          <button
+            type="button"
+            className="palette-save-btn"
+            title="Save the palette on screen to your library (#55)"
+            onClick={() => emit(Events.PALETTE_SAVE, {})}
+          >
+            + SAVE
+          </button>
         </div>
         <button className="run-btn" onClick={() => dispatch({ type: A.SET_RUNNING, payload: !running })}>
           {running ? '■ STOP' : '▶ RUN'}

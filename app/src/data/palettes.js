@@ -45,8 +45,14 @@ export const PALETTES = [
   },
 ];
 
-export function getCatalogPalette(id) {
-  return PALETTES.find((p) => p.id === id) || PALETTES[0];
+/**
+ * Look up a palette by id. `extra` carries user-saved palettes (#55) so the
+ * catalog stays immutable while user entries resolve through the same path.
+ */
+export function getCatalogPalette(id, extra = []) {
+  return PALETTES.find((p) => p.id === id)
+    || (Array.isArray(extra) ? extra.find((p) => p && p.id === id) : null)
+    || PALETTES[0];
 }
 
 /** Normalize to #rrggbb lowercase; null if invalid. */
@@ -68,8 +74,8 @@ export function normalizeHex(hex) {
  * @param {string} paletteId
  * @param {null|{ swatches?: string[], bg?: string, ink?: string }} overrides
  */
-export function resolvePalette(paletteId, overrides = null) {
-  const base = getCatalogPalette(paletteId);
+export function resolvePalette(paletteId, overrides = null, extra = []) {
+  const base = getCatalogPalette(paletteId, extra);
   const swatches = base.swatches.map((s, i) => {
     const o = overrides?.swatches?.[i];
     const n = o != null ? normalizeHex(o) : null;

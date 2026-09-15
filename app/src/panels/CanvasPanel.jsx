@@ -56,6 +56,7 @@ export function CanvasPanel() {
     caGrid: s.caGrid,
     quality: s.quality,
     running: s.running,
+    userPalettes: s.userPalettes,
     layers: s.layers,
     activeLayerId: s.activeLayerId,
     layerSnapshots: s.layerSnapshots,
@@ -85,7 +86,7 @@ export function CanvasPanel() {
   // clamped counts. Recomputed whenever any layer's source data changes.
   const resolvedLayers = useMemo(() => visibleLayers.map(layer => {
     const src = resolveLayerSource(layer, state);
-    const palette = resolvePalette(src.paletteId, src.paletteOverrides);
+    const palette = resolvePalette(src.paletteId, src.paletteOverrides, state.userPalettes);
     const activeAssets = assets
       .filter(a => src.enabledAssets[a.id])
       .map(a => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
