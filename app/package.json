@@ -1,14 +1,14 @@
 {
   "name": "app",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs",
+    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs && node src/engine/kernel/rng.selfcheck.mjs && node src/engine/kernel/noise.selfcheck.mjs && node src/engine/kernel/sample/sample.selfcheck.mjs",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium"
   },

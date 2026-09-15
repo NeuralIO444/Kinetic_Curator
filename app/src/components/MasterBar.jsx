@@ -3,6 +3,50 @@ import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 
+/** Compact preview for inactive chips */
+function CompactSwatches({ swatches }) {
+  return (
+    <span className="palette-chip-swatches">
+      {swatches.slice(0, 5).map((s, i) => (
+        <span key={i} className="palette-chip-sw" style={{ background: s }} title={s} />
+      ))}
+    </span>
+  );
+}
+
+/** Full strip for active palette: all swatches + BG + INK with hex tooltips (#51) */
+function ActivePaletteStrip({ palette }) {
+  const swatches = palette.swatches || [];
+  return (
+    <span className="palette-active-strip" aria-label={`${palette.name} full palette`}>
+      <span className="palette-active-swatches">
+        {swatches.map((s, i) => (
+          <span
+            key={i}
+            className="palette-chip-sw palette-sw-full"
+            style={{ background: s }}
+            title={`S${i + 1} ${s}`}
+          />
+        ))}
+      </span>
+      <span
+        className="palette-meta-sw"
+        style={{ background: palette.bg }}
+        title={`BG ${palette.bg}`}
+      >
+        <span className="palette-meta-label">BG</span>
+      </span>
+      <span
+        className="palette-meta-sw"
+        style={{ background: palette.ink }}
+        title={`INK ${palette.ink}`}
+      >
+        <span className="palette-meta-label">INK</span>
+      </span>
+    </span>
+  );
+}
+
 export function MasterBar() {
   const { dispatch, palette, history, palettes } = useApp();
   const { state } = useApp(s => ({
@@ -27,7 +71,7 @@ export function MasterBar() {
         <div className="logo">
           <span className="logo-mark">◈</span>
           <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
-          <span className="logo-version">v0.7</span>
+          <span className="logo-version">v0.9</span>
         </div>
 
         {state.isRecording ? (
@@ -78,40 +122,26 @@ export function MasterBar() {
       <div className="master-right">
         <div className="palette-switch">
           <span className="palette-switch-label">PALETTE</span>
-          {palettes.map(p => (
-            <button
-              key={p.id}
-              className={`palette-chip ${p.id === palette.id ? 'active' : ''}`}
-              onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
-            >
-              <span className="palette-chip-swatches">
-                {(p.id === palette.id ? p.swatches : p.swatches.slice(0, 5)).map((s, i) => (
-                  <span key={i} className="palette-chip-sw" style={{ background: s }} title={s} />
-                ))}
-                {p.id === palette.id && (
-                  <>
-                    <span
-                      className="palette-chip-sw palette-chip-bg"
-                      style={{ background: p.bg }}
-                      title={p.bg}
-                    >
-                      BG
-                    </span>
-                    {p.ink && (
-                      <span
-                        className="palette-chip-sw palette-chip-ink"
-                        style={{ background: p.ink }}
-                        title={p.ink}
-                      >
-                        INK
-                      </span>
-                    )}
-                  </>
+
+          {palettes.map(p => {
+            const active = p.id === palette.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`palette-chip ${active ? 'active' : ''}`}
+                onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
+                title={active ? `${p.name} · ${p.swatches?.length || 0} swatches + BG + INK` : p.name}
+              >
+                {active ? (
+                  <ActivePaletteStrip palette={palette.id === p.id ? palette : p} />
+                ) : (
+                  <CompactSwatches swatches={p.swatches || []} />
                 )}
-              </span>
-              {p.name}
-            </button>
-          ))}
+                {p.name}
+              </button>
+            );
+          })}
         </div>
         <button className="run-btn" onClick={() => dispatch({ type: A.SET_RUNNING, payload: !running })}>
           {running ? '■ STOP' : '▶ RUN'}

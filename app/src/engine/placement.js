@@ -1,7 +1,11 @@
 // Placement engine — orchestrates mode positions + depth + noise warp
-import { mkRng } from './prng.js';
-import { fBm3D } from './noise.js';
-import { MODE_FNS, randomPos } from './placement/modes.js';
+// Kernel K0: density + attributes index-stable; per-index geo streams (#58)
+// Kernel K1: displacement uses instanced noise from seed (#59)
+// Kernel K2: samplers via getSampler(mode) (#60)
+
+import { createNoise } from './noise.js';
+import { getSampler } from './kernel/sample/registry.js';
+import { CH, hashU01, hashU32, rngForIndex } from './kernel/rng.js';
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
@@ -16,7 +20,6 @@ export function computePlacements({
   canvasW, canvasH, caGrid,
   displacement = 0, noiseFreq = 0.005, noiseSpeed = 0.5,
 }) {
-  const rng = mkRng(seed);
   const placements = [];
 
   const bx = bleed ? canvasW * 0.2 : 0;
@@ -24,28 +27,34 @@ export function computePlacements({
   const effectiveW = canvasW + bx * 2;
   const effectiveH = canvasH + by * 2;
   const tiers = Math.max(1, zTiers || 1);
-  const posFn = MODE_FNS[mode] || randomPos;
+  const sample = getSampler(mode);
+
+  const noise = displacement > 0
+    ? createNoise(hashU32(seed, CH.noise, 0))
+    : null;
 
   for (let i = 0; i < count; i++) {
-    const t = count > 1 ? i / (count - 1) : 0.5;
+    const tDefault = count > 1 ? i / (count - 1) : 0.5;
 
-    if (density < 100 && rng() * 100 > density) continue;
+    if (density < 100 && hashU01(seed, CH.dens, i) * 100 > density) continue;
 
-    let pos;
-    if (mode === 'ca') {
-      pos = posFn(i, count, effectiveW, effectiveH, rng, jitter, caGrid);
-    } else if (mode === 'orbit' || mode === 'abacus') {
-      pos = posFn(i, count, effectiveW, effectiveH, rng, seed);
-    } else if (posFn === randomPos) {
-      pos = randomPos(effectiveW, effectiveH, rng);
-    } else {
-      pos = posFn(i, count, effectiveW, effectiveH, rng, jitter);
-    }
+    const rng = rngForIndex(seed, CH.geo, i);
 
-    if (displacement > 0) {
+    const pos = sample({
+      i,
+      count,
+      w: effectiveW,
+      h: effectiveH,
+      rng,
+      jitter: jitter || 0,
+      seed,
+      caGrid: mode === 'ca' ? caGrid : null,
+    });
+
+    if (noise && displacement > 0) {
       const nt = (seed & 0xffff) * 0.02 * noiseSpeed;
-      const dx = fBm3D(pos.x * noiseFreq, pos.y * noiseFreq, nt, 3) * displacement;
-      const dy = fBm3D(pos.x * noiseFreq + 200, pos.y * noiseFreq + 200, nt + 100, 3) * displacement;
+      const dx = noise.fBm3D(pos.x * noiseFreq, pos.y * noiseFreq, nt, 3) * displacement;
+      const dy = noise.fBm3D(pos.x * noiseFreq + 200, pos.y * noiseFreq + 200, nt + 100, 3) * displacement;
       pos.x += dx;
       pos.y += dy;
     }
@@ -57,11 +66,13 @@ export function computePlacements({
 
     const zTier = i % tiers;
     const depthFactor = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
-    const s = lerp(scale[0], scale[1], rng()) * depthFactor;
-    const r = lerp(rotate[0], rotate[1], rng());
-    const a = lerp(alpha[0], alpha[1], rng());
 
-    placements.push({ ...pos, scale: s, rotation: r, alpha: a, index: i, t, zTier });
+    const s = lerp(scale[0], scale[1], hashU01(seed, CH.attr, i * 3)) * depthFactor;
+    const r = lerp(rotate[0], rotate[1], hashU01(seed, CH.attr, i * 3 + 1));
+    const a = lerp(alpha[0], alpha[1], hashU01(seed, CH.attr, i * 3 + 2));
+    const t = pos.t !== undefined ? pos.t : tDefault;
+
+    placements.push({ x: pos.x, y: pos.y, scale: s, rotation: r, alpha: a, index: i, t, zTier });
   }
 
   return placements;
