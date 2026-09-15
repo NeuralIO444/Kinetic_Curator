@@ -4,7 +4,7 @@
 // Pure; no React. Jitter/bleed/displacement applied in placement orchestrator optional —
 // legacy modes still apply their own jitter for visual parity.
 
-import { aliveCells } from '../../ca-engine.js';
+import { makeCaField, sampleFieldPoint } from '../field/index.js';
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
 
@@ -98,17 +98,35 @@ function rails(ctx) {
   return { x: x + (rng() - 0.5) * jitter, y: t * h + (rng() - 0.5) * jitter, t };
 }
 
+// Field cache keyed by grid identity: stepGrid() returns a new array each
+// tick, so identity is exactly the right key — one blur per grid, not one
+// per placement (the old aliveCells() call was O(n) inside an O(n) loop).
+let _caFieldGrid = null;
+let _caField = null;
+function caFieldFor(caGrid) {
+  if (_caFieldGrid !== caGrid) {
+    _caFieldGrid = caGrid;
+    _caField = makeCaField(caGrid, { softness: 1 });
+  }
+  return _caField;
+}
+
+/**
+ * K3 (#62): density sampling against a soft CA mask.
+ *
+ * AC1 — CA mode uses the *field*, not a sorted-cell mapping. The previous
+ * `cells[i % cells.length]` was a round-robin over a list whose order and
+ * length changed on every CA tick, so placement i had no stable identity.
+ * Rejection sampling makes position a function of (seed, i, field) only.
+ */
 function ca(ctx) {
-  const { i, w, h, rng, jitter, caGrid } = ctx;
+  const { i, w, h, rng, jitter, caGrid, seed } = ctx;
   if (!caGrid) return random(ctx);
-  const cells = aliveCells(caGrid);
-  if (cells.length === 0) return random(ctx);
-  const cell = cells[i % cells.length];
-  const cols = caGrid[0].length;
-  const rows = caGrid.length;
+  const field = caFieldFor(caGrid);
+  const p = sampleFieldPoint(field, seed, i, { channel: 'ca' });
   return {
-    x: (cell.x / cols) * w + (rng() - 0.5) * jitter,
-    y: (cell.y / rows) * h + (rng() - 0.5) * jitter,
+    x: p.x * w + (rng() - 0.5) * jitter,
+    y: p.y * h + (rng() - 0.5) * jitter,
   };
 }
 
