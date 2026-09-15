@@ -9,6 +9,7 @@ export const SET_LAYOUT_PARAM  = 'SET_LAYOUT_PARAM';
 export const SET_LAYOUT_PARAMS = 'SET_LAYOUT_PARAMS';
 export const APPLY_PRESET      = 'APPLY_PRESET';
 export const TOGGLE_ASSET      = 'TOGGLE_ASSET';
+export const SOLO_ASSET        = 'SOLO_ASSET';
 export const TOGGLE_ALL_ASSETS = 'TOGGLE_ALL_ASSETS';
 export const SET_SEARCH      = 'SET_SEARCH';
 export const SET_CAT_FILTER  = 'SET_CAT_FILTER';

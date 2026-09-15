@@ -40,6 +40,11 @@ export const createGlobalSlice = (set) => ({
   toggleAsset: (id) => set((state) => ({
     enabledAssets: { ...state.enabledAssets, [id]: !state.enabledAssets[id] },
   })),
+  soloAsset: (id) => set(() => {
+    const next = {};
+    ASSETS.forEach((a) => { next[a.id] = a.id === id; });
+    return { enabledAssets: next };
+  }),
   toggleAllAssets: (enabled) => set((state) => {
     const next = { ...state.enabledAssets };
     ASSETS.forEach((a) => {

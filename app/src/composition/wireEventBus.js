@@ -66,6 +66,8 @@ export function wireEventBus(rawDispatch) {
 
   on(Events.ASSETS_TOGGLE, ({ id }) =>
     dispatch({ type: A.TOGGLE_ASSET, id }));
+  on(Events.ASSETS_SOLO, ({ id }) =>
+    dispatch({ type: A.SOLO_ASSET, id }));
   on(Events.ASSETS_TOGGLE_ALL, (on) =>
     dispatch({ type: A.TOGGLE_ALL_ASSETS, payload: on }));
   on(Events.ASSETS_SEARCH, (q) =>

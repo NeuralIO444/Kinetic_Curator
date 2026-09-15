@@ -53,6 +53,7 @@ export function useApp(selector) {
       case A.RANDOMIZE_PARAM: return store.randomizeParam(action.key);
       case A.RANDOMIZE_UNLOCKED: return store.randomizeUnlocked();
       case A.TOGGLE_ASSET: return store.toggleAsset(action.id);
+      case A.SOLO_ASSET: return store.soloAsset(action.id);
       case A.TOGGLE_ALL_ASSETS: return store.toggleAllAssets(payload);
       case A.SET_SEARCH: return store.setSearch(payload);
       case A.SET_CAT_FILTER: return store.setCatFilter(payload);

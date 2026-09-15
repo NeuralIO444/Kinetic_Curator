@@ -77,9 +77,22 @@ export function AssetPoolPanel() {
         <div className="asset-grid">
           {filtered.map(a => (
             <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}`}>
-              <button className="tile-toggle" onClick={() => emit(Events.ASSETS_TOGGLE, { id: a.id })}>
+              <button
+                className="tile-toggle"
+                onClick={(e) => {
+                  if (e.altKey) emit(Events.ASSETS_SOLO, { id: a.id });
+                  else emit(Events.ASSETS_TOGGLE, { id: a.id });
+                }}
+              >
                 <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40"
                   dangerouslySetInnerHTML={{ __html: a.svg }} />
+              </button>
+              <button
+                className="tile-solo"
+                title="Solo this shape (or ⌥-click the tile)"
+                onClick={() => emit(Events.ASSETS_SOLO, { id: a.id })}
+              >
+                ◉
               </button>
               <div className="tile-meta">
                 <span className="tile-id">{a.id}</span>

@@ -52,6 +52,7 @@ export const Events = {
   AUDIO_MONITOR: 'audio:monitor',
   WEBCAM_TOGGLE: 'webcam:toggle',
   ASSETS_TOGGLE: 'assets:toggle',
+  ASSETS_SOLO: 'assets:solo',
   ASSETS_TOGGLE_ALL: 'assets:toggleAll',
   ASSETS_SEARCH: 'assets:search',
   ASSETS_CAT_FILTER: 'assets:catFilter',
