@@ -25,6 +25,7 @@ export function useApp(selector) {
   const paletteId = useStore(s => s.paletteId);
   const paletteOverrides = useStore(s => s.paletteOverrides);
   const userPalettes = useStore(s => s.userPalettes);
+  const paletteLocks = useStore(s => s.paletteLocks);
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const undo = useStore(s => s.undo);
@@ -122,6 +123,9 @@ export function useApp(selector) {
       case A.RENAME_USER_PALETTE: return store.renameUserPalette(action.id, action.name);
       case A.IMPORT_USER_PALETTES: return store.importUserPalettes(payload);
       case A.CLEAR_USER_PALETTES: return store.clearUserPalettes();
+      case A.TOGGLE_PALETTE_LOCK: return store.togglePaletteLock(action.index);
+      case A.CLEAR_PALETTE_LOCKS: return store.clearPaletteLocks();
+      case A.APPLY_HARMONY: return store.applyHarmony(action.scheme);
       default: console.warn('Unhandled action:', type);
     }
   }, []);
@@ -135,6 +139,7 @@ export function useApp(selector) {
     paletteOverrides,
     palettes: [...PALETTES, ...(userPalettes || [])],
     userPalettes: userPalettes || [],
+    paletteLocks: paletteLocks || {},
     assets: ASSETS,
     ...refs,
   };

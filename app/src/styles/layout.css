@@ -125,6 +125,18 @@
 .palette-chip.active { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,0.04); }
 .palette-chip.dirty { border-color: var(--accent2); }
 .palette-chip-wrap { display: inline-flex; align-items: center; }
+.palette-sw-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
+.palette-lock-pip {
+  width: 9px; height: 5px; padding: 0; line-height: 4px; font-size: 6px;
+  background: transparent; border: 1px solid var(--line); color: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+}
+.palette-sw-cell.locked .palette-lock-pip { border-color: var(--accent2); color: var(--accent2); }
+.palette-sw-cell.locked .palette-sw-full { outline: 1px solid var(--accent2); }
+.palette-harmony-select {
+  background: transparent; border: 1px solid var(--line); color: var(--dim);
+  font-size: 8px; letter-spacing: 0.04em; padding: 1px 2px; margin-left: 4px;
+}
 .palette-del-btn {
   background: transparent; border: 1px solid transparent; color: var(--dim);
   font-size: 10px; line-height: 1; padding: 1px 3px; margin-left: 1px;

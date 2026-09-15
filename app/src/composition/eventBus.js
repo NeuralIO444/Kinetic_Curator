@@ -84,4 +84,6 @@ export const Events = {
   PALETTE_RENAME: 'palette:rename',
   PALETTE_IMPORT: 'palette:import',
   PALETTE_CLEAR_LIBRARY: 'palette:clearLibrary',
+  PALETTE_LOCK: 'palette:lock',
+  PALETTE_HARMONY: 'palette:harmony',
 };
