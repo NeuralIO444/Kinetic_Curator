@@ -1,7 +1,9 @@
 // Placement engine — orchestrates mode positions + depth + noise warp
-import { mkRng } from './prng.js';
+// Kernel K0: density + attributes index-stable; per-index geo streams (#58)
+
 import { fBm3D } from './noise.js';
 import { MODE_FNS, randomPos } from './placement/modes.js';
+import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
@@ -16,7 +18,6 @@ export function computePlacements({
   canvasW, canvasH, caGrid,
   displacement = 0, noiseFreq = 0.005, noiseSpeed = 0.5,
 }) {
-  const rng = mkRng(seed);
   const placements = [];
 
   const bx = bleed ? canvasW * 0.2 : 0;
@@ -29,7 +30,11 @@ export function computePlacements({
   for (let i = 0; i < count; i++) {
     const t = count > 1 ? i / (count - 1) : 0.5;
 
-    if (density < 100 && rng() * 100 > density) continue;
+    // K0: density skip is index-stable (does not advance geo/attr streams)
+    if (density < 100 && hashU01(seed, CH.dens, i) * 100 > density) continue;
+
+    // Per-index geo stream so skips / larger count do not reshuffle other indices' jitter
+    const rng = rngForIndex(seed, CH.geo, i);
 
     let pos;
     if (mode === 'ca') {
@@ -57,9 +62,11 @@ export function computePlacements({
 
     const zTier = i % tiers;
     const depthFactor = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
-    const s = lerp(scale[0], scale[1], rng()) * depthFactor;
-    const r = lerp(rotate[0], rotate[1], rng());
-    const a = lerp(alpha[0], alpha[1], rng());
+
+    // K0: attributes from attr channel + index (independent of geo draws / density)
+    const s = lerp(scale[0], scale[1], hashU01(seed, CH.attr, i * 3)) * depthFactor;
+    const r = lerp(rotate[0], rotate[1], hashU01(seed, CH.attr, i * 3 + 1));
+    const a = lerp(alpha[0], alpha[1], hashU01(seed, CH.attr, i * 3 + 2));
 
     placements.push({ ...pos, scale: s, rotation: r, alpha: a, index: i, t, zTier });
   }

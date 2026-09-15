@@ -1,22 +1,23 @@
 // Pure placement + asset + color + mirror pipeline.
 // Shared by live preview (useCanvasItems) and renderFinal (#24 / #32).
-// No React, no store — deterministic given the same inputs.
+// Kernel K0: asset + color channels index-stable (#58).
 
 import { computePlacements } from './placement.js';
 import { colorForPlacement } from './color.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
+import {
+  pickWeightedIndexStable,
+  colorRngForIndex,
+} from './kernel/rng.js';
 
 /** Authored per-asset weight → selection frequency. */
 export const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
 
 /**
- * Seeded weighted pick from an asset list.
- * @param {Array<{ id: string, weight?: string }>} assets
- * @param {number[]} weights
- * @param {number} totalWeight
- * @param {() => number} rng
+ * Seeded weighted pick from an asset list (sequential stream — tests / legacy).
+ * Prefer pickWeightedIndexStable for pipeline.
  */
 export function pickWeighted(assets, weights, totalWeight, rng) {
   let r = rng() * totalWeight;
@@ -27,12 +28,6 @@ export function pickWeighted(assets, weights, totalWeight, rng) {
   return assets[assets.length - 1];
 }
 
-/**
- * Clamp requested count against quality caps (and mirror budget).
- * @param {number} count
- * @param {boolean} mirror
- * @param {{ maxCount?: number, maxCountMirrored?: number }} caps
- */
 export function clampCount(count, mirror, caps) {
   const maxForMirror = mirror
     ? (caps.maxCountMirrored ?? caps.maxCount ?? 420)
@@ -42,19 +37,6 @@ export function clampCount(count, mirror, caps) {
 
 /**
  * Build fully attributed items for the canvas (or offline render).
- *
- * @param {object} opts
- * @param {object} opts.layoutParams
- * @param {number} opts.seed
- * @param {Array}  opts.activeAssets - enabled asset objects
- * @param {{ swatches: string[] }} opts.palette
- * @param {object|null} [opts.caGrid]
- * @param {object} [opts.caps] - quality caps; defaults to balanced
- * @param {number} opts.canvasW
- * @param {number} opts.canvasH
- * @param {[number, number]} [opts.scale] - override scale range (live audio/life)
- * @param {[number, number]} [opts.alpha] - override alpha range (live audio/life)
- * @returns {{ preset: object, items: object[], safeCount: number }}
  */
 export function buildPlacements({
   layoutParams,
@@ -99,23 +81,23 @@ export function buildPlacements({
     noiseSpeed: layoutParams.noiseSpeed,
   });
 
-  const rng = mkRng(seed + 1);
   const weights = activeAssets.map((a) => SELECTION_WEIGHT[a.weight] || 1);
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
 
   let mapped = placements.map((p) => {
-    const asset = pickWeighted(activeAssets, weights, totalWeight, rng);
+    const asset = pickWeightedIndexStable(
+      activeAssets, weights, totalWeight, seed, p.index,
+    );
     const color = colorForPlacement({
       swatches: palette.swatches,
       strategy: preset.paletteShift || 'band',
       t: p.t,
       index: p.index,
-      rng: () => rng(),
+      rng: colorRngForIndex(seed, p.index),
     });
     const accent =
       palette.swatches[(palette.swatches.indexOf(color) + 3) % palette.swatches.length] ||
       palette.swatches[0];
-    // Stable React key: seed-derived slot + asset (survives sort / mirror twin)
     const key = `p${p.index}-${asset.id}`;
     return { ...p, assetId: asset.id, color, accent, key };
   });
@@ -136,3 +118,6 @@ export function buildPlacements({
 
   return { preset, items: mapped, safeCount };
 }
+
+// Re-export for tests that still use sequential streams
+export { mkRng };
