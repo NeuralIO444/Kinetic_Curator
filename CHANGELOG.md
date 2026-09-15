@@ -7,11 +7,22 @@
 - **RENDER FINAL** with optional **UNCAPPED** density lift (#24).
 - **Project document** v1 (seed, palette, layout, assets, weights, quality) + localStorage autosave (#33).
 - Runtime **asset weight overrides** + category bulk mix UI (#34).
+- **Batch edition** — N sequential seeds → PNG + JSON sidecar (max 48) (#29).
+- **Accumulation buffer** — HYPE-style trails; SNAP/RENDER capture the pixel buffer when ACCUM is on (#28).
+
+### UX / performance
+- **Hits setlist** — ordered tray, Enter advances, reorder, morph-to-favorite (#35).
+- **Perf LOD** — stable placement keys, enabled-only SVG symbols, gloss skip under PERF / high node count (#36).
+
+### CI / quality
+- **`npm run selfcheck`** — determinism + **golden placement SHA** fixture (#37).
+- **Playwright smoke** — load app, switch tabs, toggle layout param (#37).
+- CI: lint → selfcheck → build → e2e smoke.
 
 ### Chore
-- Removed legacy `KineticCuratorUI/`, `KineticCuratorSketch/`, `design_handoff*`, empty p5 stub (#6 / #38).
-- Documented reproducibility contract in README + architecture.
-- Closed shipped visual/UX issues that landed on main.
+- Removed legacy `KineticCuratorUI/`, `KineticCuratorSketch/` content targets, `design_handoff*` (#38).
+- Reproducibility contract documented in README + architecture.
+- Known limitations: [docs/BUGLIST.md](docs/BUGLIST.md).
 
 ## 0.7.0 — 2026-09-13
 
