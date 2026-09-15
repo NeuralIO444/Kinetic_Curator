@@ -7,8 +7,8 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist']),
   {
-    // Vite config runs in Node, not the browser.
-    files: ['vite.config.js', 'eslint.config.js'],
+    // Tooling configs run in Node, not the browser.
+    files: ['vite.config.js', 'eslint.config.js', 'playwright.config.js'],
     languageOptions: { globals: globals.node },
   },
   {

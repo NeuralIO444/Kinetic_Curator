@@ -58,7 +58,7 @@ export function OutputPanel() {
   const resLabel = exportResolution === 1 ? '1920×1080' : exportResolution === 2 ? '3840×2160' : '7680×4320';
 
   /** Prefer accumulation buffer when ACCUM is on (#28). */
-  const captureStill = async (onThumbnail, labelSuffix = '') => {
+  const captureStill = async (onThumbnail) => {
     if (accumOn && accumRef?.current) {
       const result = await exportAccumulationCanvas(
         accumRef.current,

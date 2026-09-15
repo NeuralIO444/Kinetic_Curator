@@ -36,8 +36,12 @@ export function useAccumulationBuffer({
   const rafRef = useRef(null);
   const fadeRef = useRef(fade);
   const bgRef = useRef(background);
-  fadeRef.current = fade;
-  bgRef.current = background;
+  // Live values for the rAF loop, updated after commit rather than during
+  // render so the loop never re-subscribes on a slider drag.
+  useEffect(() => {
+    fadeRef.current = fade;
+    bgRef.current = background;
+  });
 
   const ensureBuffer = useCallback(() => {
     if (!bufRef.current) {
@@ -79,11 +83,8 @@ export function useAccumulationBuffer({
       return;
     }
 
-    const display = accumRef?.current;
-    if (display) {
-      display.width = CANVAS_W;
-      display.height = CANVAS_H;
-    }
+    // Display canvas dimensions come from the JSX width/height attributes
+    // in CanvasPanel; setting them here again only re-cleared it.
 
     let lastSerialize = 0;
     const SERIALIZE_MS = 48; // ~20fps composite is enough for trails

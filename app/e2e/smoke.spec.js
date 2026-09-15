@@ -29,7 +29,7 @@ test.describe('Kinetic Curator smoke', () => {
     const outputTab = page.getByRole('tab', { name: /output/i });
     if (await outputTab.count()) {
       await outputTab.click();
-      await expect(page.locator('.panel-output, [id*="tabpanel"]')).toBeVisible();
+      await expect(page.locator('.panel-output')).toBeVisible();
     }
 
     const layoutTab = page.getByRole('tab', { name: /layout/i });

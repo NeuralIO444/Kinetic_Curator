@@ -14,7 +14,8 @@ export function useCanvasItems({
   activeAssets,
   palette,
   caGrid,
-  safeCount: _safeCountIgnored, // clamped inside buildPlacements via caps
+  // NOTE: callers still pass safeCount; it is deliberately unused here
+  // because buildPlacements clamps count from caps itself.
   effectiveScale,
   effectiveAlpha,
   canvasW,
