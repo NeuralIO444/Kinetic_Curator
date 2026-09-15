@@ -51,3 +51,4 @@ export const RANDOMIZE_PARAM        = 'RANDOMIZE_PARAM';
 export const RANDOMIZE_UNLOCKED     = 'RANDOMIZE_UNLOCKED';
 export const STEP_CA_GRID    = 'STEP_CA_GRID';
 export const RESET_CA_GRID   = 'RESET_CA_GRID';
+export const LOAD_PROJECT    = 'LOAD_PROJECT';

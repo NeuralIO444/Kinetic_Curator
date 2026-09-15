@@ -95,6 +95,8 @@ export function wireEventBus(rawDispatch) {
     dispatch({ type: A.SET_PALETTE_ID, payload: id }));
   on(Events.EXPORT_IMPORT_LAYOUT, (preset) =>
     dispatch({ type: A.APPLY_PRESET, preset }));
+  on(Events.EXPORT_LOAD_PROJECT, (project) =>
+    dispatch({ type: A.LOAD_PROJECT, project }));
 
   return dispatch;
 }

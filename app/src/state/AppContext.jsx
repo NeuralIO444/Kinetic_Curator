@@ -91,6 +91,7 @@ export function useApp(selector) {
       case A.SET_MOTION_SMOOTHING: return store.setMotionSmoothing(payload);
       case A.STEP_CA_GRID: return store.stepCaGrid();
       case A.RESET_CA_GRID: return store.resetCaGrid();
+      case A.LOAD_PROJECT: return store.applyProject(action.project || payload);
       default: console.warn('Unhandled action:', type);
     }
   }, []);

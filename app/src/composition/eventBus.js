@@ -66,4 +66,5 @@ export const Events = {
   EXPORT_SEED: 'export:seed',
   EXPORT_PALETTE: 'export:palette',
   EXPORT_IMPORT_LAYOUT: 'export:importLayout',
+  EXPORT_LOAD_PROJECT: 'export:loadProject',
 };

@@ -5,6 +5,11 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { exportSnapshot, renderFinal, useVideoRecorder } from '../hooks/useMediaExport.js';
 import { QUALITY_PRESETS, FINAL_CAPS } from '../data/quality.js';
 import { emit, Events } from '../composition/eventBus.js';
+import {
+  serializeProject,
+  parseProject,
+  downloadProject,
+} from '../state/projectDocument.js';
 
 export function OutputPanel() {
   const { palette, svgRef } = useApp();
@@ -16,11 +21,17 @@ export function OutputPanel() {
     layoutParams: s.layoutParams,
     quality: s.quality,
     autoQuality: s.autoQuality,
+    paletteId: s.paletteId,
+    enabledAssets: s.enabledAssets,
   }));
-  const { snapshots, exportResolution, isRecording, seed, layoutParams, quality, autoQuality } = state;
+  const {
+    snapshots, exportResolution, isRecording, seed, layoutParams,
+    quality, autoQuality, paletteId, enabledAssets,
+  } = state;
 
   const [uncapped, setUncapped] = useState(false);
   const [rendering, setRendering] = useState(false);
+  const [importMsg, setImportMsg] = useState(null);
   const restoreRef = useRef(null);
 
   useVideoRecorder({
@@ -97,39 +108,36 @@ export function OutputPanel() {
     }
   };
 
-  const exportJSON = () => {
-    const config = {
-      seed: seed.toString(16),
-      palette: palette.id,
-      layout: layoutParams,
-      timestamp: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `kinetic-curator-${seed.toString(16)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+  const exportProject = () => {
+    const doc = serializeProject({
+      seed,
+      paletteId,
+      layoutParams,
+      enabledAssets,
+      quality,
+    });
+    downloadProject(doc);
   };
 
   const fileInputRef = useRef(null);
-  const importConfig = (e) => {
+  const importProject = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const config = JSON.parse(ev.target.result);
-        if (config.seed) {
-          const seedVal = typeof config.seed === 'string' ? parseInt(config.seed, 16) : config.seed;
-          if (!isNaN(seedVal)) emit(Events.EXPORT_SEED, seedVal);
+        const raw = JSON.parse(ev.target.result);
+        const result = parseProject(raw);
+        if (!result.ok) {
+          setImportMsg(result.error);
+          return;
         }
-        if (config.palette) emit(Events.EXPORT_PALETTE, config.palette);
-        if (config.layout) {
-          emit(Events.EXPORT_IMPORT_LAYOUT, { id: config.layout.composition || 'praystation', params: config.layout });
-        }
+        emit(Events.EXPORT_LOAD_PROJECT, result.doc);
+        setImportMsg('Project loaded');
+        setTimeout(() => setImportMsg(null), 2000);
       } catch (err) {
-        console.warn('Failed to import config:', err);
+        console.warn('Failed to import project:', err);
+        setImportMsg('Invalid JSON');
       }
     };
     reader.readAsText(file);
@@ -222,10 +230,15 @@ export function OutputPanel() {
         </div>
 
         <div className="output-row">
-          <button className="big-btn dl" onClick={exportJSON} style={{ flex: 1 }}>↓ JSON</button>
-          <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }}>↑ IMPORT</button>
-          <input ref={fileInputRef} type="file" accept=".json" onChange={importConfig} style={{ display: 'none' }} />
+          <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project (seed, layout, palette, assets, quality)">↓ PROJECT</button>
+          <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
+          <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
         </div>
+        {importMsg && (
+          <div className="output-hint" style={{ color: importMsg === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>
+            {importMsg}
+          </div>
+        )}
 
         <div className="output-row">
           <button className="big-btn dl" onClick={() => emit(Events.EXPORT_CLEAR_SNAPSHOTS)} style={{ width: '100%' }}>✕ CLEAR</button>
@@ -249,7 +262,7 @@ export function OutputPanel() {
           </div>
         )}
         {snapshots.length === 0 && (
-          <div className="output-hint">Press <b>S</b> for quick snap · RENDER for deliberate final</div>
+          <div className="output-hint">Press <b>S</b> for quick snap · RENDER for final · PROJECT for full state</div>
         )}
       </div>
     </div>
