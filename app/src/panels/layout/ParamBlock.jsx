@@ -69,6 +69,11 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         locked={lockedParams.zTiers} onToggleLock={() => lock('zTiers')}
         onRandomize={() => rand('zTiers')} />
 
+      <RangeRow label="HUE ROTATE" value={layoutParams.hueRotate} min={0} max={360}
+        hint="Global hue shift applied to the whole canvas"
+        readout={`${layoutParams.hueRotate}°`}
+        onChange={v => set('hueRotate', v)} defaultValue={0} />
+
       <div className="param-subheader">🌪️ TURBULENCE & DISPLACEMENT</div>
 
       <RangeRow label="NOISE FREQ" value={layoutParams.noiseFreq} min={0.001} max={0.03} step={0.001}

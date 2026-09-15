@@ -106,6 +106,7 @@ export function CanvasPanel() {
           <div className="canvas-bg" style={bgStyle} />
           <div className="canvas-rulers" />
           <svg className="canvas-svg" ref={svgRef} viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} xmlns="http://www.w3.org/2000/svg"
+            style={layoutParams.hueRotate ? { filter: `hue-rotate(${layoutParams.hueRotate}deg)` } : undefined}
             onWheel={viewport.onWheel}
             onPointerDown={viewport.onPointerDown}
             onPointerMove={viewport.onPointerMoveCombined}
