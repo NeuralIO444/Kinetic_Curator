@@ -1,14 +1,26 @@
 # Changelog
 
+## 0.8.0 — 2026-09-15
+
+### Engine / export
+- Pure **`buildPlacements`** shared by live preview and final render (#32).
+- **RENDER FINAL** with optional **UNCAPPED** density lift (#24).
+- **Project document** v1 (seed, palette, layout, assets, weights, quality) + localStorage autosave (#33).
+- Runtime **asset weight overrides** + category bulk mix UI (#34).
+
+### Chore
+- Removed legacy `KineticCuratorUI/`, `KineticCuratorSketch/`, `design_handoff*`, empty p5 stub (#6 / #38).
+- Documented reproducibility contract in README + architecture.
+- Closed shipped visual/UX issues that landed on main.
+
 ## 0.7.0 — 2026-09-13
 
 ### UX
-- **Right-column tabs** — Layout / Assets / Stimulus / Davis / Output; last tab persisted in localStorage (#13).
-- **First-run “Play Me” overlay** — enables audio + Evolve on first visit (#12).
-- **Floating Favorites / Hits tray** — always-visible strip; click to recall, ↻ or Shift+click to evolve from hit; number keys 1–9 when tray focused (#8).
+- **Right-column tabs** — Layout / Assets / Stimulus / Davis / Output; last tab persisted (#13).
+- **First-run “Play Me” overlay** (#12).
+- **Floating Favorites / Hits tray** — 1–9 recall when focused (#8).
 
 ### Chore
-- Removed legacy `KineticCuratorUI/`, `KineticCuratorSketch/`, `design_handoff*`, empty p5 project stub (#6).
 - Architecture docs aligned with Zustand slices + composition root + event bus.
 - Package version bumped; basic CI (lint + build).
 
