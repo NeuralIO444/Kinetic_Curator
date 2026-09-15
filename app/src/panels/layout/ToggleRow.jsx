@@ -27,6 +27,15 @@ export function ToggleRow({ layoutParams }) {
           <option key={mode} value={mode}>{mode.toUpperCase()}</option>
         ))}
       </select>
+      <select
+        value={layoutParams.shading}
+        onChange={e => emit(Events.LAYOUT_PARAM, { key: 'shading', value: e.target.value })}
+        className="tg blend-mode-select"
+        title="Shading"
+      >
+        <option value="flat">SHADING: FLAT</option>
+        <option value="gloss">SHADING: GLOSS</option>
+      </select>
     </div>
   );
 }

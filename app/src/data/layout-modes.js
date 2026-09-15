@@ -35,6 +35,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   mirror: false,
   overlap: true,
   blendMode: 'normal',
+  shading: 'flat',
 
   // Physics & Turbulence
   noiseFreq: 0.005,

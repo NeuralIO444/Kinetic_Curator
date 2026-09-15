@@ -114,6 +114,13 @@ export function CanvasPanel() {
             onPointerLeave={viewport.clearAttractor}
           >
             <AssetSpriteSheet assets={assets} />
+            <defs>
+              <radialGradient id="kc-gloss-grad" cx="35%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="#fff" stopOpacity="0.9" />
+                <stop offset="60%" stopColor="#fff" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+              </radialGradient>
+            </defs>
             <g transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) scale(${zoom}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2}) translate(${pan.x / zoom}, ${pan.y / zoom})`}>
               <g
                 transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) rotate(${breathRot}) scale(${breathScale}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2})`}
@@ -138,6 +145,15 @@ export function CanvasPanel() {
                       }}
                     >
                       <use href={`#kc-asset-${item.assetId}`} width={ASSET_SIZE} height={ASSET_SIZE} />
+                      {layoutParams.shading === 'gloss' && (
+                        <use
+                          href={`#kc-asset-${item.assetId}`}
+                          width={ASSET_SIZE}
+                          height={ASSET_SIZE}
+                          style={{ ['--ink']: 'url(#kc-gloss-grad)', ['--accent']: 'url(#kc-gloss-grad)', mixBlendMode: 'soft-light' }}
+                          pointerEvents="none"
+                        />
+                      )}
                     </g>
                   );
                 })}
