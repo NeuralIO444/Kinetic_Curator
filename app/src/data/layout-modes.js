@@ -16,6 +16,10 @@ export const LAYOUT_MODES = [
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
 ];
 
+export const BLEND_MODES = [
+  'normal', 'screen', 'multiply', 'overlay', 'difference', 'plus-lighter', 'soft-light',
+];
+
 export const DEFAULT_LAYOUT_PARAMS = {
   composition: 'praystation',
   mode: 'fibonacci',
@@ -30,6 +34,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   recolor: true,
   mirror: false,
   overlap: true,
+  blendMode: 'normal',
 
   // Physics & Turbulence
   noiseFreq: 0.005,

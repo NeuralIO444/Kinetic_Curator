@@ -117,7 +117,7 @@ export function CanvasPanel() {
             <g transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) scale(${zoom}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2}) translate(${pan.x / zoom}, ${pan.y / zoom})`}>
               <g
                 transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) rotate(${breathRot}) scale(${breathScale}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2})`}
-                style={{ transition: 'transform 0.06s linear' }}
+                style={{ transition: 'transform 0.06s linear', isolation: 'isolate' }}
               >
                 {renderItems && renderItems.map((item, i) => {
                   if (!item.assetId) return null;
@@ -134,6 +134,7 @@ export function CanvasPanel() {
                           ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease'
                           : 'none',
                         transformOrigin: '0 0',
+                        mixBlendMode: layoutParams.blendMode !== 'normal' ? layoutParams.blendMode : undefined,
                       }}
                     >
                       <use href={`#kc-asset-${item.assetId}`} width={ASSET_SIZE} height={ASSET_SIZE} />

@@ -79,6 +79,7 @@
   transition: all 100ms;
 }
 .tg.tg-on { color: var(--accent3); border-color: var(--accent3); }
+.blend-mode-select { grid-column: 1 / -1; cursor: pointer; }
 
 /* ─── Stimulus ─── */
 .panel-stimulus { padding: 0; }
