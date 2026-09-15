@@ -65,7 +65,14 @@ def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
         cmd += ["--width", str(width), "--height", str(height)]
     if background:
         cmd += ["--background", background]
-    return subprocess.run(cmd, check=True, capture_output=True).stdout
+    proc = subprocess.run(cmd, check=True, capture_output=True)
+    # render.mjs warns on stderr about things it cannot reproduce offline
+    # (swarm/hype). Capturing and discarding that would make a wrong render
+    # look like a clean one.
+    if proc.stderr:
+        sys.stderr.write(proc.stderr.decode("utf-8", "replace"))
+        sys.stderr.flush()
+    return proc.stdout
 
 
 def rasterize(svg: bytes, out_png: Path, monospace=DEFAULT_MONOSPACE) -> None:

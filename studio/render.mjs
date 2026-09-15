@@ -56,6 +56,14 @@ function topLevelSource(doc) {
   };
 }
 
+const _warned = new Set();
+/** Warn once per message — a 500-edition batch shouldn't print 500 copies. */
+function warnOnce(msg) {
+  if (_warned.has(msg)) return;
+  _warned.add(msg);
+  console.warn(`[studio] WARNING: ${msg}`);
+}
+
 /** Visible layers in draw order (later = on top), each fully resolved. */
 export function resolveLayers(doc, { caps, ramp = null, progress = 0 }) {
   const weightOverrides = doc.assetWeightOverrides || {};
@@ -72,6 +80,17 @@ export function resolveLayers(doc, { caps, ramp = null, progress = 0 }) {
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
       if (ramp) for (const [k, [a, b]] of Object.entries(ramp)) layoutParams[k] = a + (b - a) * progress;
+
+      // swarm/hype are a live Date.now() particle simulation, not a pure
+      // placement function — offline they fall back to buildPlacements and
+      // will NOT match what the browser showed. Say so rather than quietly
+      // handing back a different image.
+      if (layoutParams.mode === 'swarm' || layoutParams.mode === 'hype') {
+        warnOnce(
+          `layer mode "${layoutParams.mode}" is a live particle sim; offline render falls back to ` +
+          'static placement and will not match the browser. See studio/README.md.',
+        );
+      }
 
       const palette = resolvePalette(src.paletteId || 'praystation', src.paletteOverrides || null);
       const enabled = src.enabledAssets;
