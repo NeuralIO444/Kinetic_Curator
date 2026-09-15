@@ -92,6 +92,8 @@ export function useApp(selector) {
       case A.ADD_FAVORITE: return store.addFavorite(action.favorite);
       case A.REMOVE_FAVORITE: return store.removeFavorite(action.id);
       case A.RECALL_FAVORITE: return store.recallFavorite(action.favorite);
+      case A.REORDER_FAVORITE: return store.reorderFavorite(action.id, action.delta);
+      case A.MORPH_TO_FAVORITE: return store.morphToFavorite(action.favorite);
       case A.SET_MOTION_SMOOTHING: return store.setMotionSmoothing(payload);
       case A.STEP_CA_GRID: return store.stepCaGrid();
       case A.RESET_CA_GRID: return store.resetCaGrid();

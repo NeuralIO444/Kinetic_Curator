@@ -17,6 +17,8 @@ export const createDavisSlice = (set) => ({
   morphFrom: null,
   morphTo: null,
   morphStart: 0,
+  morphPendingSeed: null,
+  morphPendingPalette: null,
 
   phraseEnabled: false,
   phraseLength: 8,
@@ -36,7 +38,15 @@ export const createDavisSlice = (set) => ({
   setMorphDurationMs: (ms) => set({
     morphDurationMs: Math.max(200, Math.min(8000, Number(ms) || 1200)),
   }),
-  finishMorph: () => set({ morphing: false, morphFrom: null, morphTo: null }),
+  finishMorph: () => set((state) => ({
+    morphing: false,
+    morphFrom: null,
+    morphTo: null,
+    ...(state.morphPendingSeed != null ? { seed: state.morphPendingSeed } : {}),
+    ...(state.morphPendingPalette ? { paletteId: state.morphPendingPalette } : {}),
+    morphPendingSeed: null,
+    morphPendingPalette: null,
+  })),
 
   setPhraseEnabled: (enabled) => set({ phraseEnabled: !!enabled, phraseBeat: 0 }),
   setPhraseLength: (len) => set({
@@ -112,6 +122,8 @@ export const createDavisSlice = (set) => ({
           morphFrom: from,
           morphTo: to,
           morphStart: performance.now(),
+          morphPendingSeed: null,
+          morphPendingPalette: null,
           lastEvolveTs: ts,
         };
       }
@@ -131,9 +143,59 @@ export const createDavisSlice = (set) => ({
   removeFavorite: (id) => set((state) => ({
     favorites: state.favorites.filter((f) => f.id !== id),
   })),
+  /** Reorder setlist: delta −1 = earlier in performance order, +1 = later. */
+  reorderFavorite: (id, delta) => set((state) => {
+    const idx = state.favorites.findIndex((f) => f.id === id);
+    if (idx < 0) return {};
+    const j = Math.max(0, Math.min(state.favorites.length - 1, idx + delta));
+    if (j === idx) return {};
+    const next = [...state.favorites];
+    const [item] = next.splice(idx, 1);
+    next.splice(j, 0, item);
+    return { favorites: next };
+  }),
   recallFavorite: (fav) => set({
     seed: fav.seed,
-    ...(fav.config?.layout ? { layoutParams: fav.config.layout } : {}),
+    ...(fav.config?.layout ? { layoutParams: { ...fav.config.layout } } : {}),
     ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
+  }),
+  /** Morph numeric layout params toward a favorite; apply seed/palette at end (#35). */
+  morphToFavorite: (fav) => set((state) => {
+    const target = fav.config?.layout;
+    if (!target || typeof target !== 'object') {
+      return {
+        seed: fav.seed,
+        ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
+      };
+    }
+    const from = {};
+    const to = {};
+    for (const key of MORPHABLE_KEYS) {
+      if (key in target && state.layoutParams[key] !== undefined) {
+        from[key] = state.layoutParams[key];
+        to[key] = target[key];
+      }
+    }
+    // Also copy non-morphable discrete fields immediately (mode, blend, etc.)
+    const discrete = {};
+    for (const [k, v] of Object.entries(target)) {
+      if (!(k in from) && k !== 'composition') discrete[k] = v;
+    }
+    if (Object.keys(to).length === 0) {
+      return {
+        seed: fav.seed,
+        layoutParams: { ...state.layoutParams, ...target },
+        ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
+      };
+    }
+    return {
+      layoutParams: { ...state.layoutParams, ...discrete },
+      morphing: true,
+      morphFrom: from,
+      morphTo: to,
+      morphStart: performance.now(),
+      morphPendingSeed: fav.seed,
+      morphPendingPalette: fav.config?.palette?.id || null,
+    };
   }),
 });
