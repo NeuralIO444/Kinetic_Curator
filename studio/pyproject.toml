@@ -11,6 +11,8 @@ dependencies = []
 [project.optional-dependencies]
 # Only needed by verify.py, which compares this pipeline against the browser.
 verify = ["pillow>=11", "numpy>=2"]
+# geom.py only (asset audit + blend, issue #76). studio.py stays stdlib-only.
+geom = ["svgpathtools>=1.6", "numpy>=2"]
 
 [project.scripts]
 studio = "studio:main"
