@@ -129,6 +129,9 @@ export const createGlobalSlice = (set) => ({
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
       next.assetWeightOverrides = { ...doc.assetWeightOverrides };
     }
+    // Absent key means "catalog palette" — restore null rather than leaving
+    // whatever the previous session had overridden (#53).
+    next.paletteOverrides = doc.paletteOverrides ?? null;
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       next.layers = doc.layers;
       next.activeLayerId = doc.activeLayerId;

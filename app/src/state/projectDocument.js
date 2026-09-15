@@ -23,6 +23,11 @@ export function serializeProject(state) {
   if (state.assetWeightOverrides && Object.keys(state.assetWeightOverrides).length > 0) {
     doc.assetWeightOverrides = { ...state.assetWeightOverrides };
   }
+  // Custom palette colours (#52) are part of the look — without these a
+  // reopened project silently reverts to the catalog palette (#53).
+  if (state.paletteOverrides) {
+    doc.paletteOverrides = JSON.parse(JSON.stringify(state.paletteOverrides));
+  }
   if (Array.isArray(state.layers) && state.activeLayerId) {
     doc.layers = state.layers;
     doc.activeLayerId = state.activeLayerId;
@@ -62,6 +67,7 @@ export function parseProject(raw) {
         enabledAssets: raw.enabledAssets || null,
         quality: raw.quality || 'balanced',
         assetWeightOverrides: raw.assetWeightOverrides || null,
+        paletteOverrides: raw.paletteOverrides || null,
         layers: Array.isArray(raw.layers) ? raw.layers : null,
         activeLayerId: raw.activeLayerId || null,
         layerSnapshots: raw.layerSnapshots && typeof raw.layerSnapshots === 'object' ? raw.layerSnapshots : null,
@@ -92,6 +98,10 @@ export function parseProject(raw) {
       assetWeightOverrides:
         raw.assetWeightOverrides && typeof raw.assetWeightOverrides === 'object'
           ? { ...raw.assetWeightOverrides }
+          : null,
+      paletteOverrides:
+        raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
+          ? raw.paletteOverrides
           : null,
       layers: Array.isArray(raw.layers) ? raw.layers : null,
       activeLayerId: typeof raw.activeLayerId === 'string' ? raw.activeLayerId : null,
