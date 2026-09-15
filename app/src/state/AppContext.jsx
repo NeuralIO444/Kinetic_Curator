@@ -30,13 +30,24 @@ export function useApp(selector) {
   const customAssets = useStore(s => s.customAssets);
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
+  // Entries are tagged per-layer (#92) — only the top entry belonging to the
+  // active layer is actually undoable/redoable right now, so canUndo/canRedo
+  // must check that, not just stack length, or the button lies.
+  const canUndo = useStore(s => {
+    const top = s.historyUndoStack && s.historyUndoStack[s.historyUndoStack.length - 1];
+    return !!top && top.layerId === s.activeLayerId;
+  });
+  const canRedo = useStore(s => {
+    const top = s.historyRedoStack && s.historyRedoStack[s.historyRedoStack.length - 1];
+    return !!top && top.layerId === s.activeLayerId;
+  });
   const undo = useStore(s => s.undo);
   const redo = useStore(s => s.redo);
 
   const history = {
     undo, redo,
-    canUndo: undoStackLength > 0,
-    canRedo: redoStackLength > 0,
+    canUndo,
+    canRedo,
     undoDepth: undoStackLength,
     redoDepth: redoStackLength,
   };
