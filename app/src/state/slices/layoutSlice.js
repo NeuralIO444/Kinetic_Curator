@@ -3,12 +3,15 @@ import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
+import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 
 export const createLayoutSlice = (set) => ({
   seed: 0xa17e9b21,
   paletteId: 'praystation',
   /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
   paletteOverrides: null,
+  /** Swatch slots the operator pinned; harmony/shuffle leave these alone (#56). */
+  paletteLocks: {},
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
   motionSmoothing: true,
@@ -26,6 +29,8 @@ export const createLayoutSlice = (set) => ({
     ...pushToUndo(state, true),
     paletteId: id,
     paletteOverrides: null,
+  /** Swatch slots the operator pinned; harmony/shuffle leave these alone (#56). */
+  paletteLocks: {},
   })),
 
   setPaletteSwatch: (index, hex) => set((state) => {
@@ -89,6 +94,31 @@ export const createLayoutSlice = (set) => ({
     ...pushToUndo(state, true),
     paletteOverrides: overrides,
   })),
+
+  togglePaletteLock: (index) => set((state) => ({
+    paletteLocks: { ...state.paletteLocks, [index]: !state.paletteLocks[index] },
+  })),
+
+  clearPaletteLocks: () => set({ paletteLocks: {} }),
+
+  /**
+   * Regenerate unlocked swatches from a harmony scheme (#56).
+   * Base colour is the first locked swatch if there is one — so locking a
+   * colour you like and shuffling builds around it — else swatch 0.
+   */
+  applyHarmony: (scheme) => set((state) => {
+    const base = getCatalogPalette(state.paletteId, state.userPalettes);
+    const current = base.swatches.map((sw, i) => state.paletteOverrides?.swatches?.[i] || sw);
+    const lockedIdx = Object.keys(state.paletteLocks).find((k) => state.paletteLocks[k]);
+    const anchor = current[lockedIdx != null ? Number(lockedIdx) : 0] || current[0];
+    const generated = buildHarmony(anchor, scheme, current.length);
+    const swatches = applyWithLocks(current, generated, state.paletteLocks);
+    if (swatches.every((c, i) => c === current[i])) return {};
+    return {
+      ...pushToUndo(state, true),
+      paletteOverrides: { ...(state.paletteOverrides || {}), swatches },
+    };
+  }),
 
   setLayoutParam: (key, value) => set((state) => {
     if (state.layoutParams[key] === value) return {};

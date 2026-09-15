@@ -135,6 +135,10 @@ export function wireEventBus(rawDispatch) {
     dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
   on(Events.PALETTE_CLEAR_LIBRARY, () =>
     dispatch({ type: A.CLEAR_USER_PALETTES }));
+  on(Events.PALETTE_LOCK, ({ index, clear }) =>
+    dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }));
+  on(Events.PALETTE_HARMONY, ({ scheme }) =>
+    dispatch({ type: A.APPLY_HARMONY, scheme }));
 
   return dispatch;
 }

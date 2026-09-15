@@ -1,8 +1,10 @@
+import { useState } from 'react';
 // MasterBar — top toolbar
 import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
+import { SCHEME_IDS } from '../engine/harmony.js';
 
 function CompactSwatches({ swatches }) {
   return (
@@ -15,27 +17,37 @@ function CompactSwatches({ swatches }) {
 }
 
 /** Editable strip: all swatches + BG + INK (#51 / #52) */
-function ActivePaletteStrip({ palette, dirty, onSwatch, onBg, onInk, onReset }) {
+function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onReset, onLock }) {
   const swatches = palette.swatches || [];
   return (
     <span className="palette-active-strip" aria-label={`${palette.name} palette editor`}>
       <span className="palette-active-swatches">
         {swatches.map((s, i) => (
-          <label
-            key={i}
-            className="palette-sw-edit"
-            title={`S${i + 1} ${s} — click to edit`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="palette-chip-sw palette-sw-full" style={{ background: s }} />
-            <input
-              type="color"
-              className="palette-color-input"
-              value={s}
-              onChange={(e) => onSwatch(i, e.target.value)}
+          <span key={i} className={`palette-sw-cell ${locks?.[i] ? 'locked' : ''}`}>
+            <label
+              className="palette-sw-edit"
+              title={`S${i + 1} ${s} — click to edit`}
               onClick={(e) => e.stopPropagation()}
-            />
-          </label>
+            >
+              <span className="palette-chip-sw palette-sw-full" style={{ background: s }} />
+              <input
+                type="color"
+                className="palette-color-input"
+                value={s}
+                onChange={(e) => onSwatch(i, e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </label>
+            <button
+              type="button"
+              className="palette-lock-pip"
+              title={locks?.[i] ? `S${i + 1} locked — harmony and shuffle skip it` : `Lock S${i + 1}`}
+              aria-pressed={!!locks?.[i]}
+              onClick={(e) => { e.stopPropagation(); onLock(i); }}
+            >
+              {locks?.[i] ? '▪' : ''}
+            </button>
+          </span>
         ))}
       </span>
       <label
@@ -86,7 +98,7 @@ function ActivePaletteStrip({ palette, dirty, onSwatch, onBg, onInk, onReset }) 
 }
 
 export function MasterBar() {
-  const { dispatch, palette, history, palettes } = useApp();
+  const { dispatch, palette, history, palettes, paletteLocks } = useApp();
   const { state } = useApp(s => ({
     running: s.running,
     fps: s.fps,
@@ -97,6 +109,7 @@ export function MasterBar() {
     isRecording: s.isRecording,
   }));
   const { running, fps, seed, nodeCount = 0, quality = 'balanced' } = state;
+  const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
@@ -176,6 +189,8 @@ export function MasterBar() {
                   <ActivePaletteStrip
                     palette={palette}
                     dirty={!!palette.dirty}
+                    locks={paletteLocks}
+                    onLock={(i) => emit(Events.PALETTE_LOCK, { index: i })}
                     onSwatch={(i, hex) =>
                       dispatch({ type: A.SET_PALETTE_SWATCH, index: i, hex })
                     }
@@ -221,6 +236,25 @@ export function MasterBar() {
               </span>
             );
           })}
+          <select
+            className="palette-harmony-select"
+            value={harmonyScheme}
+            onChange={(e) => setHarmonyScheme(e.target.value)}
+            title="Colour harmony scheme — locked swatches are preserved"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {SCHEME_IDS.map((id) => (
+              <option key={id} value={id}>{id.toUpperCase()}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="palette-save-btn"
+            title="Regenerate unlocked swatches from the scheme, built around your locked colour"
+            onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}
+          >
+            ⟳ SHUFFLE
+          </button>
           <button
             type="button"
             className="palette-save-btn"
