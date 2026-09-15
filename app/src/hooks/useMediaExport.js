@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { FINAL_CAPS } from '../data/quality.js';
 
 // Serializes SVG to a data URI safely
 function getSvgDataUri(svgNode) {
@@ -40,8 +41,6 @@ function drawThumbnail(img, background) {
     tctx.fillRect(0, 0, w, h);
   }
   tctx.drawImage(img, 0, 0, w, h);
-  // jpeg: thumbnails don't need the PNG's lossless/alpha guarantee, and
-  // compress far smaller — the strip keeps many of these in memory at once.
   return tc.toDataURL('image/jpeg', 0.72);
 }
 
@@ -54,59 +53,110 @@ function download(blob, filename) {
   document.body.appendChild(a);
   a.click();
   a.remove();
-  // Revoking synchronously can cancel the download in Safari/Firefox.
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+function waitFrames(n = 2) {
+  return new Promise((resolve) => {
+    let left = n;
+    const step = () => {
+      left -= 1;
+      if (left <= 0) resolve();
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 /**
- * @param {SVGSVGElement} svgNode
- * @param {number} resolution
- * @param {string} seedStr
- * @param {string|null} background - paint behind the art (null = transparent PNG)
- * @param {(dataUrl: string) => void} [onThumbnail] - called with a small jpeg
- *   data URL once the capture succeeds, so callers can attach it to a
- *   history record.
+ * Rasterize live SVG to PNG. Returns a Promise that resolves with { thumb } or rejects.
  */
 export function exportSnapshot(svgNode, resolution = 1, seedStr = '', background = null, onThumbnail = null) {
   if (!svgNode) {
     console.warn('[exportSnapshot] no SVG node — nothing captured');
-    return;
+    return Promise.reject(new Error('no SVG node'));
   }
 
   const { width, height } = svgPixelSize(svgNode);
-
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(width * resolution);
   canvas.height = Math.round(height * resolution);
   const ctx = canvas.getContext('2d');
 
-  const img = new Image();
-  img.onload = () => {
-    if (background) {
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        console.warn('[exportSnapshot] canvas.toBlob returned null');
-        return;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      if (background) {
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
-      download(blob, `kinetic-curator-${seedStr}-${resolution}x.png`);
-    }, 'image/png');
-    onThumbnail?.(drawThumbnail(img, background));
-  };
-  img.onerror = (e) => console.warn('[exportSnapshot] SVG rasterization failed', e);
-  img.src = getSvgDataUri(svgNode);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const thumb = drawThumbnail(img, background);
+      onThumbnail?.(thumb);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          console.warn('[exportSnapshot] canvas.toBlob returned null');
+          reject(new Error('toBlob null'));
+          return;
+        }
+        download(blob, `kinetic-curator-${seedStr}-${resolution}x.png`);
+        resolve({ thumb, width: canvas.width, height: canvas.height });
+      }, 'image/png');
+    };
+    img.onerror = (e) => {
+      console.warn('[exportSnapshot] SVG rasterization failed', e);
+      reject(e);
+    };
+    img.src = getSvgDataUri(svgNode);
+  });
 }
 
 /**
- * Video recorder with throttled SVG serialization.
- * Re-serializing the full SVG every frame is extremely expensive.
- * We only re-serialize every `serializeEvery` frames and reuse the
- * last successful bitmap for intermediate frames (draft quality).
- * Default fps lowered to 15 for smoother live performance while recording.
+ * Deliberate final still (#24).
+ * - uncapped=false: rasterize current live SVG (matches preview).
+ * - uncapped=true: apply FINAL density via applyUncapped / restore, wait for paint, then capture.
+ *
+ * @param {object} opts
+ * @param {SVGSVGElement} opts.svgNode
+ * @param {number} opts.resolution
+ * @param {string} opts.seedStr
+ * @param {string|null} opts.background
+ * @param {boolean} opts.uncapped
+ * @param {() => void} [opts.applyUncapped] - set live state to final density
+ * @param {() => void} [opts.restore] - restore live state after capture
+ * @param {(thumb: string) => void} [opts.onThumbnail]
  */
+export async function renderFinal({
+  svgNode,
+  resolution = 1,
+  seedStr = '',
+  background = null,
+  uncapped = false,
+  applyUncapped,
+  restore,
+  onThumbnail,
+}) {
+  let restored = false;
+  const doRestore = () => {
+    if (restored) return;
+    restored = true;
+    try { restore?.(); } catch (e) { console.warn('[renderFinal] restore failed', e); }
+  };
+
+  try {
+    if (uncapped && typeof applyUncapped === 'function') {
+      applyUncapped(FINAL_CAPS);
+      await waitFrames(3);
+    }
+    const result = await exportSnapshot(svgNode, resolution, seedStr, background, onThumbnail);
+    doRestore();
+    return result;
+  } catch (e) {
+    doRestore();
+    throw e;
+  }
+}
+
 export function useVideoRecorder({
   svgRef,
   isRecording,
@@ -185,7 +235,6 @@ export function useVideoRecorder({
         };
         img.src = getSvgDataUri(svgRef.current);
       } else if (lastImgRef.current) {
-        // Reuse last successful frame bitmap — keeps stream smooth without full serialize
         ctx.clearRect(0, 0, width, height);
         ctx.drawImage(lastImgRef.current, 0, 0, width, height);
       }

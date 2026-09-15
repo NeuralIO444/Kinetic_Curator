@@ -1,9 +1,9 @@
 // OutputPanel (P05) — export + quality (emit-only actions)
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { exportSnapshot, useVideoRecorder } from '../hooks/useMediaExport.js';
-import { QUALITY_PRESETS } from '../data/quality.js';
+import { exportSnapshot, renderFinal, useVideoRecorder } from '../hooks/useMediaExport.js';
+import { QUALITY_PRESETS, FINAL_CAPS } from '../data/quality.js';
 import { emit, Events } from '../composition/eventBus.js';
 
 export function OutputPanel() {
@@ -19,6 +19,10 @@ export function OutputPanel() {
   }));
   const { snapshots, exportResolution, isRecording, seed, layoutParams, quality, autoQuality } = state;
 
+  const [uncapped, setUncapped] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const restoreRef = useRef(null);
+
   useVideoRecorder({
     svgRef,
     isRecording,
@@ -26,17 +30,71 @@ export function OutputPanel() {
     fps: 15,
   });
 
+  const resLabel = exportResolution === 1 ? '1920×1080' : exportResolution === 2 ? '3840×2160' : '7680×4320';
+
   const addSnapshot = () => {
     exportSnapshot(svgRef.current, exportResolution, seed.toString(16), palette.bg, (thumb) => {
       emit(Events.EXPORT_SNAPSHOT, {
         seed,
         format: 'PNG',
-        resolution: exportResolution === 1 ? '1920×1080' : exportResolution === 2 ? '3840×2160' : '7680×4320',
+        resolution: resLabel,
         timestamp: new Date().toISOString().slice(11, 19),
         config: { layout: { ...layoutParams }, palette: { id: palette.id } },
         thumb,
       });
-    });
+    }).catch(() => {});
+  };
+
+  const runRenderFinal = async () => {
+    if (rendering) return;
+    setRendering(true);
+    const prev = {
+      quality,
+      count: layoutParams.count,
+      mirror: layoutParams.mirror,
+    };
+    restoreRef.current = prev;
+
+    const applyUncapped = () => {
+      emit(Events.EXPORT_QUALITY, 'high');
+      emit(Events.LAYOUT_PARAM, { key: 'count', value: FINAL_CAPS.maxCount });
+      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: true });
+    };
+    const restore = () => {
+      const r = restoreRef.current;
+      if (!r) return;
+      emit(Events.EXPORT_QUALITY, r.quality);
+      emit(Events.LAYOUT_PARAM, { key: 'count', value: r.count });
+      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: r.mirror });
+      restoreRef.current = null;
+    };
+
+    try {
+      await renderFinal({
+        svgNode: svgRef.current,
+        resolution: exportResolution,
+        seedStr: seed.toString(16),
+        background: palette.bg,
+        uncapped,
+        applyUncapped: uncapped ? applyUncapped : undefined,
+        restore: uncapped ? restore : undefined,
+        onThumbnail: (thumb) => {
+          emit(Events.EXPORT_SNAPSHOT, {
+            seed,
+            format: 'PNG',
+            resolution: `${resLabel}${uncapped ? ' · UNCAPPED' : ' · FINAL'}`,
+            timestamp: new Date().toISOString().slice(11, 19),
+            config: { layout: { ...layoutParams }, palette: { id: palette.id }, uncapped },
+            thumb,
+          });
+        },
+      });
+    } catch (e) {
+      console.warn('[RENDER]', e);
+      restore();
+    } finally {
+      setRendering(false);
+    }
   };
 
   const exportJSON = () => {
@@ -107,20 +165,53 @@ export function OutputPanel() {
           </div>
         </div>
 
-        <div className="output-row">
-          <select
-            value={exportResolution}
-            onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value))}
-            style={{ padding: '4px', fontSize: '10px', background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', flex: 1 }}
+        <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>RENDER · FINAL STILL</div>
+          <div className="output-row" style={{ marginBottom: 6 }}>
+            <select
+              value={exportResolution}
+              onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value, 10))}
+              style={{ padding: '4px', fontSize: '10px', background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', flex: 1 }}
+            >
+              <option value={1}>1x (1920×1080)</option>
+              <option value={2}>2x (3840×2160)</option>
+              <option value={4}>4x (7680×4320)</option>
+            </select>
+            <button
+              type="button"
+              className={`chip-btn ${uncapped ? 'active' : ''}`}
+              title="Lift live quality caps for denser final (same seed; different RNG consumption). Default off = match preview."
+              onClick={() => setUncapped(v => !v)}
+              style={uncapped ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}}
+            >
+              UNCAPPED {uncapped ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="big-btn"
+            onClick={runRenderFinal}
+            disabled={rendering}
+            style={{
+              width: '100%',
+              background: rendering ? 'var(--line)' : 'var(--accent)',
+              color: rendering ? 'var(--dim)' : '#000',
+              borderColor: 'var(--accent)',
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+            }}
           >
-            <option value={1}>1x (1920×1080)</option>
-            <option value={2}>2x (3840×2160)</option>
-            <option value={4}>4x (7680×4320)</option>
-          </select>
-          <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }}>↓ SNAP</button>
+            {rendering ? 'RENDERING…' : '▶ RENDER FINAL'}
+          </button>
+          <div className="output-hint" style={{ marginTop: 6 }}>
+            {uncapped
+              ? 'UNCAPPED densifies composition then restores live caps.'
+              : 'Matches live preview. Toggle UNCAPPED for denser final.'}
+          </div>
         </div>
 
         <div className="output-row">
+          <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }}>↓ SNAP</button>
           <button
             className="big-btn"
             onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
@@ -128,6 +219,9 @@ export function OutputPanel() {
           >
             {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}
           </button>
+        </div>
+
+        <div className="output-row">
           <button className="big-btn dl" onClick={exportJSON} style={{ flex: 1 }}>↓ JSON</button>
           <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }}>↑ IMPORT</button>
           <input ref={fileInputRef} type="file" accept=".json" onChange={importConfig} style={{ display: 'none' }} />
@@ -155,7 +249,7 @@ export function OutputPanel() {
           </div>
         )}
         {snapshots.length === 0 && (
-          <div className="output-hint">Press <b>S</b> to capture · JSON sidecar included</div>
+          <div className="output-hint">Press <b>S</b> for quick snap · RENDER for deliberate final</div>
         )}
       </div>
     </div>
