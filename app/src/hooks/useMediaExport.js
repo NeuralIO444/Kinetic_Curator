@@ -56,6 +56,11 @@ function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+function downloadJson(obj, filename) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  download(blob, filename);
+}
+
 function waitFrames(n = 2) {
   return new Promise((resolve) => {
     let left = n;
@@ -69,9 +74,10 @@ function waitFrames(n = 2) {
 }
 
 /**
- * Rasterize live SVG to PNG. Returns a Promise that resolves with { thumb } or rejects.
+ * Rasterize live SVG to PNG. Returns a Promise that resolves with { thumb, width, height } or rejects.
+ * When downloadFile=false, only returns canvas data URL (no download) for batch control.
  */
-export function exportSnapshot(svgNode, resolution = 1, seedStr = '', background = null, onThumbnail = null) {
+export function exportSnapshot(svgNode, resolution = 1, seedStr = '', background = null, onThumbnail = null, { downloadFile = true } = {}) {
   if (!svgNode) {
     console.warn('[exportSnapshot] no SVG node — nothing captured');
     return Promise.reject(new Error('no SVG node'));
@@ -99,8 +105,10 @@ export function exportSnapshot(svgNode, resolution = 1, seedStr = '', background
           reject(new Error('toBlob null'));
           return;
         }
-        download(blob, `kinetic-curator-${seedStr}-${resolution}x.png`);
-        resolve({ thumb, width: canvas.width, height: canvas.height });
+        if (downloadFile) {
+          download(blob, `kinetic-curator-${seedStr}-${resolution}x.png`);
+        }
+        resolve({ thumb, width: canvas.width, height: canvas.height, blob });
       }, 'image/png');
     };
     img.onerror = (e) => {
@@ -115,16 +123,6 @@ export function exportSnapshot(svgNode, resolution = 1, seedStr = '', background
  * Deliberate final still (#24).
  * - uncapped=false: rasterize current live SVG (matches preview).
  * - uncapped=true: apply FINAL density via applyUncapped / restore, wait for paint, then capture.
- *
- * @param {object} opts
- * @param {SVGSVGElement} opts.svgNode
- * @param {number} opts.resolution
- * @param {string} opts.seedStr
- * @param {string|null} opts.background
- * @param {boolean} opts.uncapped
- * @param {() => void} [opts.applyUncapped] - set live state to final density
- * @param {() => void} [opts.restore] - restore live state after capture
- * @param {(thumb: string) => void} [opts.onThumbnail]
  */
 export async function renderFinal({
   svgNode,
@@ -135,6 +133,7 @@ export async function renderFinal({
   applyUncapped,
   restore,
   onThumbnail,
+  downloadFile = true,
 }) {
   let restored = false;
   const doRestore = () => {
@@ -148,13 +147,105 @@ export async function renderFinal({
       applyUncapped(FINAL_CAPS);
       await waitFrames(3);
     }
-    const result = await exportSnapshot(svgNode, resolution, seedStr, background, onThumbnail);
+    const result = await exportSnapshot(svgNode, resolution, seedStr, background, onThumbnail, { downloadFile });
     doRestore();
     return result;
   } catch (e) {
     doRestore();
     throw e;
   }
+}
+
+/**
+ * Batch edition (#29) — loop N seeds, download PNG + JSON sidecar per frame.
+ *
+ * @param {object} opts
+ * @param {SVGSVGElement} opts.svgNode
+ * @param {number} opts.count - number of editions (1–48)
+ * @param {number} opts.startSeed - first seed (inclusive)
+ * @param {number} opts.resolution
+ * @param {string|null} opts.background
+ * @param {boolean} opts.uncapped
+ * @param {(seed: number) => void} opts.setSeed - apply seed to live state
+ * @param {() => void} [opts.applyUncapped]
+ * @param {() => void} [opts.restore]
+ * @param {() => object} opts.getSidecar - snapshot metadata for current frame
+ * @param {(progress: { done: number, total: number, seed: number }) => void} [opts.onProgress]
+ * @param {() => boolean} [opts.shouldCancel] - return true to abort
+ */
+export async function renderBatch({
+  svgNode,
+  count = 8,
+  startSeed = 0,
+  resolution = 1,
+  background = null,
+  uncapped = false,
+  setSeed,
+  applyUncapped,
+  restore,
+  getSidecar,
+  onProgress,
+  shouldCancel,
+}) {
+  const n = Math.max(1, Math.min(48, Math.floor(Number(count) || 1)));
+  const base = (Number(startSeed) >>> 0);
+  const results = [];
+
+  // Apply uncapped once for whole batch if requested
+  let lifted = false;
+  if (uncapped && typeof applyUncapped === 'function') {
+    applyUncapped(FINAL_CAPS);
+    lifted = true;
+    await waitFrames(3);
+  }
+
+  try {
+    for (let i = 0; i < n; i++) {
+      if (shouldCancel?.()) break;
+      const seed = (base + i) >>> 0;
+      setSeed(seed);
+      await waitFrames(3);
+
+      const seedStr = seed.toString(16).padStart(6, '0');
+      const { blob, thumb, width, height } = await exportSnapshot(
+        svgNode,
+        resolution,
+        seedStr,
+        background,
+        null,
+        { downloadFile: false },
+      );
+
+      const basename = `kc-edition-${String(i + 1).padStart(3, '0')}-s${seedStr}`;
+      download(blob, `${basename}.png`);
+
+      const sidecar = {
+        edition: i + 1,
+        of: n,
+        seed,
+        seedHex: seedStr,
+        resolution,
+        width,
+        height,
+        uncapped: !!uncapped,
+        ...(typeof getSidecar === 'function' ? getSidecar() : {}),
+        timestamp: new Date().toISOString(),
+      };
+      downloadJson(sidecar, `${basename}.json`);
+
+      results.push({ seed, thumb, width, height, sidecar });
+      onProgress?.({ done: i + 1, total: n, seed, thumb });
+
+      // Brief pause so browser can flush downloads without choking
+      await new Promise((r) => setTimeout(r, 120));
+    }
+  } finally {
+    if (lifted) {
+      try { restore?.(); } catch (e) { console.warn('[renderBatch] restore failed', e); }
+    }
+  }
+
+  return results;
 }
 
 export function useVideoRecorder({
@@ -217,7 +308,7 @@ export function useVideoRecorder({
     const frameInterval = 1000 / fps;
 
     const drawFrame = (time) => {
-      if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return;
+      if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'recording') return;
       rafRef.current = requestAnimationFrame(drawFrame);
 
       if (time - lastTime < frameInterval) return;
