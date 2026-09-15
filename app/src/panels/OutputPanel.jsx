@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { exportSnapshot, renderFinal, useVideoRecorder } from '../hooks/useMediaExport.js';
+import { exportSnapshot, renderFinal, renderBatch, useVideoRecorder } from '../hooks/useMediaExport.js';
 import { QUALITY_PRESETS, FINAL_CAPS } from '../data/quality.js';
 import { emit, Events } from '../composition/eventBus.js';
 import {
@@ -33,6 +33,9 @@ export function OutputPanel() {
   const [uncapped, setUncapped] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
+  const [batchCount, setBatchCount] = useState(8);
+  const [batchProgress, setBatchProgress] = useState(null); // { done, total, seed }
+  const cancelBatchRef = useRef(false);
   const restoreRef = useRef(null);
 
   useVideoRecorder({
@@ -106,6 +109,85 @@ export function OutputPanel() {
       restore();
     } finally {
       setRendering(false);
+    }
+  };
+
+  const runBatch = async () => {
+    if (rendering) return;
+    setRendering(true);
+    cancelBatchRef.current = false;
+    setBatchProgress({ done: 0, total: batchCount, seed });
+
+    const prev = {
+      quality,
+      count: layoutParams.count,
+      mirror: layoutParams.mirror,
+      seed,
+    };
+    restoreRef.current = prev;
+
+    const applyUncapped = () => {
+      emit(Events.EXPORT_QUALITY, 'high');
+      emit(Events.LAYOUT_PARAM, { key: 'count', value: FINAL_CAPS.maxCount });
+      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: true });
+    };
+    const restore = () => {
+      const r = restoreRef.current;
+      if (!r) return;
+      emit(Events.EXPORT_QUALITY, r.quality);
+      emit(Events.LAYOUT_PARAM, { key: 'count', value: r.count });
+      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: r.mirror });
+      emit(Events.EXPORT_SEED, r.seed);
+      restoreRef.current = null;
+    };
+
+    try {
+      const results = await renderBatch({
+        svgNode: svgRef.current,
+        count: batchCount,
+        startSeed: seed,
+        resolution: exportResolution,
+        background: palette.bg,
+        uncapped,
+        setSeed: (s) => emit(Events.EXPORT_SEED, s),
+        applyUncapped: uncapped ? applyUncapped : undefined,
+        restore: uncapped ? restore : undefined,
+        getSidecar: () => ({
+          layout: { ...layoutParams },
+          palette: { id: paletteId },
+          quality,
+        }),
+        onProgress: ({ done, total, seed: s, thumb }) => {
+          setBatchProgress({ done, total, seed: s });
+          if (thumb) {
+            emit(Events.EXPORT_SNAPSHOT, {
+              seed: s,
+              format: 'PNG',
+              resolution: `${resLabel} · BATCH ${done}/${total}`,
+              timestamp: new Date().toISOString().slice(11, 19),
+              config: { layout: { ...layoutParams }, palette: { id: palette.id }, batch: true },
+              thumb,
+            });
+          }
+        },
+        shouldCancel: () => cancelBatchRef.current,
+      });
+      // Restore seed (and caps if not already restored inside batch)
+      if (!uncapped) {
+        emit(Events.EXPORT_SEED, prev.seed);
+      } else {
+        restore();
+      }
+      setImportMsg(`Batch done · ${results.length} files`);
+      setTimeout(() => setImportMsg(null), 3000);
+    } catch (e) {
+      console.warn('[BATCH]', e);
+      restore();
+      setImportMsg('Batch failed');
+    } finally {
+      setRendering(false);
+      setBatchProgress(null);
+      cancelBatchRef.current = false;
     }
   };
 
@@ -211,7 +293,7 @@ export function OutputPanel() {
               letterSpacing: '0.08em',
             }}
           >
-            {rendering ? 'RENDERING…' : '▶ RENDER FINAL'}
+            {rendering && !batchProgress ? 'RENDERING…' : '▶ RENDER FINAL'}
           </button>
           <div className="output-hint" style={{ marginTop: 6 }}>
             {uncapped
@@ -220,11 +302,65 @@ export function OutputPanel() {
           </div>
         </div>
 
+        <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>BATCH EDITION</div>
+          <div className="output-row" style={{ marginBottom: 6, gap: 6 }}>
+            <label style={{ fontSize: 10, color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              N
+              <input
+                type="number"
+                min={1}
+                max={48}
+                value={batchCount}
+                disabled={rendering}
+                onChange={(e) => setBatchCount(Math.max(1, Math.min(48, parseInt(e.target.value, 10) || 1)))}
+                style={{ width: 48, padding: '4px', fontSize: 11, background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)' }}
+              />
+            </label>
+            <span style={{ fontSize: 10, color: 'var(--dim)' }}>
+              from seed <code>{seed.toString(16)}</code>
+            </span>
+          </div>
+          <div className="output-row" style={{ gap: 6 }}>
+            <button
+              type="button"
+              className="big-btn"
+              onClick={runBatch}
+              disabled={rendering}
+              style={{
+                flex: 2,
+                background: rendering && batchProgress ? 'var(--line)' : undefined,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+              }}
+              title="Render N sequential seeds as PNG + JSON sidecar (browser downloads)"
+            >
+              {batchProgress
+                ? `BATCH ${batchProgress.done}/${batchProgress.total}…`
+                : `▶ BATCH ×${batchCount}`}
+            </button>
+            {batchProgress && (
+              <button
+                type="button"
+                className="chip-btn"
+                onClick={() => { cancelBatchRef.current = true; }}
+                title="Stop after current frame"
+              >
+                STOP
+              </button>
+            )}
+          </div>
+          <div className="output-hint" style={{ marginTop: 6 }}>
+            Downloads <code>kc-edition-###-sXXXXXX.png</code> + matching JSON. Max 48. Allow multiple downloads in the browser.
+          </div>
+        </div>
+
         <div className="output-row">
-          <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }}>↓ SNAP</button>
+          <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }} disabled={rendering}>↓ SNAP</button>
           <button
             className="big-btn"
             onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
+            disabled={rendering}
             style={isRecording ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
           >
             {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}
@@ -237,7 +373,7 @@ export function OutputPanel() {
           <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
         </div>
         {importMsg && (
-          <div className="output-hint" style={{ color: importMsg === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>
+          <div className="output-hint" style={{ color: importMsg.includes('done') || importMsg === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>
             {importMsg}
           </div>
         )}
@@ -264,7 +400,7 @@ export function OutputPanel() {
           </div>
         )}
         {snapshots.length === 0 && (
-          <div className="output-hint">Press <b>S</b> for quick snap · RENDER for final · PROJECT for full state</div>
+          <div className="output-hint">Press <b>S</b> for quick snap · RENDER for final · BATCH for print series · PROJECT for full state</div>
         )}
       </div>
     </div>
