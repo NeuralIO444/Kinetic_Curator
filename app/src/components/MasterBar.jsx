@@ -85,9 +85,29 @@ export function MasterBar() {
               onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
             >
               <span className="palette-chip-swatches">
-                {p.swatches.slice(0, 5).map((s, i) => (
-                  <span key={i} className="palette-chip-sw" style={{ background: s }} />
+                {(p.id === palette.id ? p.swatches : p.swatches.slice(0, 5)).map((s, i) => (
+                  <span key={i} className="palette-chip-sw" style={{ background: s }} title={s} />
                 ))}
+                {p.id === palette.id && (
+                  <>
+                    <span
+                      className="palette-chip-sw palette-chip-bg"
+                      style={{ background: p.bg }}
+                      title={p.bg}
+                    >
+                      BG
+                    </span>
+                    {p.ink && (
+                      <span
+                        className="palette-chip-sw palette-chip-ink"
+                        style={{ background: p.ink }}
+                        title={p.ink}
+                      >
+                        INK
+                      </span>
+                    )}
+                  </>
+                )}
               </span>
               {p.name}
             </button>

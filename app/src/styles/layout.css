@@ -130,6 +130,16 @@
 .palette-chip.active { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,0.04); }
 .palette-chip-swatches { display: inline-flex; gap: 1px; }
 .palette-chip-sw { width: 7px; height: 10px; }
+.palette-chip-bg,
+.palette-chip-ink {
+  width: auto;
+  min-width: 18px;
+  padding: 0 2px;
+  font-size: 7px;
+  line-height: 10px;
+  text-align: center;
+  box-sizing: border-box;
+}
 
 .run-btn {
   background: var(--accent); color: #000; border: none;
