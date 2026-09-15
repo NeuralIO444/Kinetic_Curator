@@ -1,5 +1,6 @@
 import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
+import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
@@ -52,7 +53,30 @@ export const createGlobalSlice = (set) => ({
     });
     return { enabledAssets: next };
   }),
+  setEnabledAssets: (map) => set({ enabledAssets: { ...map } }),
   setSearch: (search) => set({ search }),
   setCatFilter: (filter) => set({ catFilter: filter }),
   setPoolView: (view) => set({ poolView: view }),
+
+  /** Apply a parsed project document in one store update (#33). */
+  applyProject: (doc) => set((state) => {
+    const next = {
+      seed: doc.seed >>> 0,
+      paletteId: doc.paletteId || state.paletteId,
+      quality: doc.quality || state.quality,
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        ...state.layoutParams,
+        ...(doc.layoutParams || {}),
+      },
+    };
+    if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
+      const enabled = { ...initialEnabledAssets };
+      for (const [id, on] of Object.entries(doc.enabledAssets)) {
+        if (id in enabled) enabled[id] = !!on;
+      }
+      next.enabledAssets = enabled;
+    }
+    return next;
+  }),
 });
