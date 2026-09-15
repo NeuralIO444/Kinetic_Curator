@@ -38,6 +38,10 @@ export const DEFAULT_LAYOUT_PARAMS = {
   shading: 'flat',
   hueRotate: 0,
 
+  // Accumulation / trails (#28) — pixel buffer, not SVG DOM
+  accumulation: false,
+  accumulationFade: 0.88, // 0–0.99; higher = longer trails
+
   // Physics & Turbulence
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
@@ -48,8 +52,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   damping: 0.95,
 
   // Synthesizer / audio reactivity
-  audioModDepth: 0.65,   // global 0–1 reactivity amount
-  audioScaleMod: 0.45,   // how much beat/bands affect scale
-  audioAlphaMod: 0.25,   // how much beat affects opacity pulse
-  lifeDrift: 0.35,       // continuous LFO depth when running (0 = still)
+  audioModDepth: 0.65,
+  audioScaleMod: 0.45,
+  audioAlphaMod: 0.25,
+  lifeDrift: 0.35,
 };

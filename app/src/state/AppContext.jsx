@@ -11,7 +11,12 @@ const _emptySelector = () => null;
 export function AppProvider({ children }) {
   const canvasRef = useRef(null);
   const svgRef = useRef(null);
-  return <RefsContext.Provider value={{ canvasRef, svgRef }}>{children}</RefsContext.Provider>;
+  const accumRef = useRef(null);
+  return (
+    <RefsContext.Provider value={{ canvasRef, svgRef, accumRef }}>
+      {children}
+    </RefsContext.Provider>
+  );
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

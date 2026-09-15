@@ -1,8 +1,8 @@
-// Toggle row: bleed / recolor / mirror / overlap / blend mode
+// Toggle row: bleed / recolor / mirror / overlap / accum / blend / shading
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES } from '../../data/layout-modes.js';
 
-const TOGGLES = ['bleed', 'recolor', 'mirror', 'overlap'];
+const TOGGLES = ['bleed', 'recolor', 'mirror', 'overlap', 'accumulation'];
 
 export function ToggleRow({ layoutParams }) {
   return (
@@ -11,12 +11,36 @@ export function ToggleRow({ layoutParams }) {
         <button
           key={key}
           className={`tg ${layoutParams[key] ? 'tg-on' : ''}`}
+          title={key === 'accumulation' ? 'HYPE-style trails — composites into a persistent bitmap' : undefined}
           onClick={() => emit(Events.LAYOUT_PARAM, { key, value: !layoutParams[key] })}
         >
           <span className="tg-box">{layoutParams[key] ? '◉' : '○'}</span>
-          {key.toUpperCase()}
+          {key === 'accumulation' ? 'ACCUM' : key.toUpperCase()}
         </button>
       ))}
+      {layoutParams.accumulation && (
+        <label
+          className="tg"
+          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
+          title="Trail persistence (higher = longer exposure)"
+        >
+          FADE
+          <input
+            type="range"
+            min={0.5}
+            max={0.98}
+            step={0.01}
+            value={layoutParams.accumulationFade ?? 0.88}
+            onChange={(e) =>
+              emit(Events.LAYOUT_PARAM, {
+                key: 'accumulationFade',
+                value: parseFloat(e.target.value),
+              })
+            }
+            style={{ width: 64 }}
+          />
+        </label>
+      )}
       <select
         value={layoutParams.blendMode}
         onChange={e => emit(Events.LAYOUT_PARAM, { key: 'blendMode', value: e.target.value })}

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { exportSnapshot, renderFinal, renderBatch, useVideoRecorder } from '../hooks/useMediaExport.js';
+import { exportAccumulationCanvas } from '../hooks/useAccumulationBuffer.js';
 import { QUALITY_PRESETS, FINAL_CAPS } from '../data/quality.js';
 import { emit, Events } from '../composition/eventBus.js';
 import {
@@ -12,7 +13,7 @@ import {
 } from '../state/projectDocument.js';
 
 export function OutputPanel() {
-  const { palette, svgRef } = useApp();
+  const { palette, svgRef, accumRef } = useApp();
   const { state } = useApp(s => ({
     snapshots: s.snapshots,
     exportResolution: s.exportResolution,
@@ -34,9 +35,11 @@ export function OutputPanel() {
   const [rendering, setRendering] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
   const [batchCount, setBatchCount] = useState(8);
-  const [batchProgress, setBatchProgress] = useState(null); // { done, total, seed }
+  const [batchProgress, setBatchProgress] = useState(null);
   const cancelBatchRef = useRef(false);
   const restoreRef = useRef(null);
+
+  const accumOn = !!layoutParams.accumulation;
 
   useVideoRecorder({
     svgRef,
@@ -47,12 +50,33 @@ export function OutputPanel() {
 
   const resLabel = exportResolution === 1 ? '1920×1080' : exportResolution === 2 ? '3840×2160' : '7680×4320';
 
+  /** Prefer accumulation buffer when ACCUM is on (#28). */
+  const captureStill = async (onThumbnail, labelSuffix = '') => {
+    if (accumOn && accumRef?.current) {
+      const result = await exportAccumulationCanvas(
+        accumRef.current,
+        exportResolution,
+        seed.toString(16),
+        palette.bg,
+      );
+      onThumbnail?.(result.thumb);
+      return result;
+    }
+    return exportSnapshot(
+      svgRef.current,
+      exportResolution,
+      seed.toString(16),
+      palette.bg,
+      onThumbnail,
+    );
+  };
+
   const addSnapshot = () => {
-    exportSnapshot(svgRef.current, exportResolution, seed.toString(16), palette.bg, (thumb) => {
+    captureStill((thumb) => {
       emit(Events.EXPORT_SNAPSHOT, {
         seed,
         format: 'PNG',
-        resolution: resLabel,
+        resolution: `${resLabel}${accumOn ? ' · ACCUM' : ''}`,
         timestamp: new Date().toISOString().slice(11, 19),
         config: { layout: { ...layoutParams }, palette: { id: palette.id } },
         thumb,
@@ -85,25 +109,39 @@ export function OutputPanel() {
     };
 
     try {
-      await renderFinal({
-        svgNode: svgRef.current,
-        resolution: exportResolution,
-        seedStr: seed.toString(16),
-        background: palette.bg,
-        uncapped,
-        applyUncapped: uncapped ? applyUncapped : undefined,
-        restore: uncapped ? restore : undefined,
-        onThumbnail: (thumb) => {
+      if (accumOn) {
+        // Buffer already holds history — capture it (uncapped lift is less meaningful for accum)
+        await captureStill((thumb) => {
           emit(Events.EXPORT_SNAPSHOT, {
             seed,
             format: 'PNG',
-            resolution: `${resLabel}${uncapped ? ' · UNCAPPED' : ' · FINAL'}`,
+            resolution: `${resLabel} · ACCUM`,
             timestamp: new Date().toISOString().slice(11, 19),
-            config: { layout: { ...layoutParams }, palette: { id: palette.id }, uncapped },
+            config: { layout: { ...layoutParams }, palette: { id: palette.id }, accum: true },
             thumb,
           });
-        },
-      });
+        });
+      } else {
+        await renderFinal({
+          svgNode: svgRef.current,
+          resolution: exportResolution,
+          seedStr: seed.toString(16),
+          background: palette.bg,
+          uncapped,
+          applyUncapped: uncapped ? applyUncapped : undefined,
+          restore: uncapped ? restore : undefined,
+          onThumbnail: (thumb) => {
+            emit(Events.EXPORT_SNAPSHOT, {
+              seed,
+              format: 'PNG',
+              resolution: `${resLabel}${uncapped ? ' · UNCAPPED' : ' · FINAL'}`,
+              timestamp: new Date().toISOString().slice(11, 19),
+              config: { layout: { ...layoutParams }, palette: { id: palette.id }, uncapped },
+              thumb,
+            });
+          },
+        });
+      }
     } catch (e) {
       console.warn('[RENDER]', e);
       restore();
@@ -172,7 +210,6 @@ export function OutputPanel() {
         },
         shouldCancel: () => cancelBatchRef.current,
       });
-      // Restore seed (and caps if not already restored inside batch)
       if (!uncapped) {
         emit(Events.EXPORT_SEED, prev.seed);
       } else {
@@ -272,11 +309,12 @@ export function OutputPanel() {
             <button
               type="button"
               className={`chip-btn ${uncapped ? 'active' : ''}`}
-              title="Lift live quality caps for denser final (same seed; different RNG consumption). Default off = match preview."
+              title="Lift live quality caps for denser final. Less relevant when ACCUM is on."
               onClick={() => setUncapped(v => !v)}
-              style={uncapped ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}}
+              disabled={accumOn}
+              style={uncapped && !accumOn ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}}
             >
-              UNCAPPED {uncapped ? 'ON' : 'OFF'}
+              UNCAPPED {uncapped && !accumOn ? 'ON' : 'OFF'}
             </button>
           </div>
           <button
@@ -293,12 +331,14 @@ export function OutputPanel() {
               letterSpacing: '0.08em',
             }}
           >
-            {rendering && !batchProgress ? 'RENDERING…' : '▶ RENDER FINAL'}
+            {rendering && !batchProgress ? 'RENDERING…' : accumOn ? '▶ RENDER ACCUM' : '▶ RENDER FINAL'}
           </button>
           <div className="output-hint" style={{ marginTop: 6 }}>
-            {uncapped
-              ? 'UNCAPPED densifies composition then restores live caps.'
-              : 'Matches live preview. Toggle UNCAPPED for denser final.'}
+            {accumOn
+              ? 'ACCUM on — export captures the trail buffer (history is pixels, not SVG).'
+              : uncapped
+                ? 'UNCAPPED densifies composition then restores live caps.'
+                : 'Matches live preview. Toggle UNCAPPED for denser final.'}
           </div>
         </div>
 
@@ -326,14 +366,14 @@ export function OutputPanel() {
               type="button"
               className="big-btn"
               onClick={runBatch}
-              disabled={rendering}
+              disabled={rendering || accumOn}
               style={{
                 flex: 2,
                 background: rendering && batchProgress ? 'var(--line)' : undefined,
                 fontWeight: 700,
                 letterSpacing: '0.06em',
               }}
-              title="Render N sequential seeds as PNG + JSON sidecar (browser downloads)"
+              title={accumOn ? 'Batch uses SVG path — turn ACCUM off' : 'Render N sequential seeds as PNG + JSON sidecar'}
             >
               {batchProgress
                 ? `BATCH ${batchProgress.done}/${batchProgress.total}…`
@@ -351,7 +391,9 @@ export function OutputPanel() {
             )}
           </div>
           <div className="output-hint" style={{ marginTop: 6 }}>
-            Downloads <code>kc-edition-###-sXXXXXX.png</code> + matching JSON. Max 48. Allow multiple downloads in the browser.
+            {accumOn
+              ? 'Batch disabled while ACCUM is on (buffer is continuous time, not per-seed).'
+              : 'Downloads kc-edition-###-sXXXXXX.png + JSON. Max 48.'}
           </div>
         </div>
 
@@ -368,7 +410,7 @@ export function OutputPanel() {
         </div>
 
         <div className="output-row">
-          <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project (seed, layout, palette, assets, weights, quality)">↓ PROJECT</button>
+          <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project">↓ PROJECT</button>
           <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
           <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
         </div>
@@ -400,7 +442,7 @@ export function OutputPanel() {
           </div>
         )}
         {snapshots.length === 0 && (
-          <div className="output-hint">Press <b>S</b> for quick snap · RENDER for final · BATCH for print series · PROJECT for full state</div>
+          <div className="output-hint">Press <b>S</b> for snap · RENDER · BATCH · ACCUM for trails · PROJECT for state</div>
         )}
       </div>
     </div>
