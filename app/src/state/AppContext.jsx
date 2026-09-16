@@ -134,6 +134,8 @@ export function useApp(selector) {
       case A.RENAME_LAYER: return store.renameLayer(action.id, action.name);
       case A.SET_LAYER_BLEND_MODE: return store.setLayerBlendMode(action.id, action.mode);
       case A.SET_LAYER_OPACITY: return store.setLayerOpacity(action.id, action.opacity);
+      case 'DUPLICATE_LAYER': return store.duplicateLayer(action.id);
+      case 'SOLO_LAYER': return store.soloLayer(action.id);
       case A.SAVE_USER_PALETTE: return store.saveUserPalette(action.name);
       case A.DELETE_USER_PALETTE: return store.deleteUserPalette(action.id);
       case A.RENAME_USER_PALETTE: return store.renameUserPalette(action.id, action.name);
