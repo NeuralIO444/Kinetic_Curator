@@ -1,6 +1,6 @@
 // Parameter block — RangeRows with tooltips (#14)
 import { RangeRow, DualRangeRow } from '../../components/RangeRow.jsx';
-import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES } from '../../data/layout-modes.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
@@ -119,6 +119,46 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         onChange={v => set('damping', v)} defaultValue={d('damping', DEFAULT_LAYOUT_PARAMS.damping)}
         locked={lockedParams.damping} onToggleLock={() => lock('damping')}
         onRandomize={() => rand('damping')} />
+
+      <div className="param-subheader">🦋 MOTH / HYPE</div>
+
+      <RangeRow label="BODY" value={layoutParams.body ?? 3} min={1} max={7} step={1}
+        hint="Spine length. 1 = spore, 3–7 = bug. Physics count unchanged."
+        onChange={v => set('body', v)} defaultValue={d('body', DEFAULT_LAYOUT_PARAMS.body)}
+        locked={lockedParams.body} onToggleLock={() => lock('body')}
+        onRandomize={() => rand('body')} />
+
+      <RangeRow label="FLAP" value={layoutParams.flap ?? 0.35} min={0} max={1} step={0.05}
+        hint="Wing beat amplitude on bilateral attachments"
+        onChange={v => set('flap', v)} defaultValue={d('flap', DEFAULT_LAYOUT_PARAMS.flap)}
+        locked={lockedParams.flap} onToggleLock={() => lock('flap')}
+        onRandomize={() => rand('flap')} />
+
+      <RangeRow label="TIGHT" value={layoutParams.tight ?? 0.55} min={0.05} max={0.95} step={0.05}
+        hint="How stiff the spine follows the leader"
+        onChange={v => set('tight', v)} defaultValue={d('tight', DEFAULT_LAYOUT_PARAMS.tight)}
+        locked={lockedParams.tight} onToggleLock={() => lock('tight')}
+        onRandomize={() => rand('tight')} />
+
+      <RangeRow label="WIND" value={layoutParams.wind ?? 1} min={0} max={3} step={0.1}
+        hint="Hype-only multiplier on the noise wind"
+        onChange={v => set('wind', v)} defaultValue={d('wind', DEFAULT_LAYOUT_PARAMS.wind)}
+        locked={lockedParams.wind} onToggleLock={() => lock('wind')}
+        onRandomize={() => rand('wind')} />
+
+      <div className="davis-source-row" style={{ marginTop: 6 }}>
+        <span className="davis-label">SYMMETRY</span>
+        {SYMMETRY_MODES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={`chip-btn ${(layoutParams.symmetry || 'none') === s ? 'active' : ''}`}
+            onClick={() => set('symmetry', s)}
+          >
+            {s.toUpperCase()}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

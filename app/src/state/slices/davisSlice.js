@@ -25,6 +25,7 @@ export const createDavisSlice = (set) => ({
   phraseMode: 'reset-seed',
   phraseBeat: 0,
   phraseOriginSeed: null,
+  phraseWrapGen: 0,
 
   setEvolveMode: (valOrFn) => set((state) => ({
     evolveMode: typeof valOrFn === 'function' ? valOrFn(state.evolveMode) : valOrFn,
@@ -57,6 +58,7 @@ export const createDavisSlice = (set) => ({
   armPhrase: (seed) => set({ phraseOriginSeed: seed, phraseBeat: 0 }),
   resetPhrase: () => set((state) => ({
     phraseBeat: 0,
+    phraseWrapGen: (state.phraseWrapGen || 0) + 1,
     seed: state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed,
   })),
 
@@ -67,7 +69,10 @@ export const createDavisSlice = (set) => ({
       return { phraseBeat: nextBeat };
     }
     const origin = state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed;
-    const updates = { phraseBeat: 0 };
+    const updates = {
+      phraseBeat: 0,
+      phraseWrapGen: (state.phraseWrapGen || 0) + 1,
+    };
     if (state.phraseMode === 'reset-seed') {
       updates.seed = origin;
     } else if (state.phraseMode === 'cycle-seed') {
@@ -143,7 +148,6 @@ export const createDavisSlice = (set) => ({
   removeFavorite: (id) => set((state) => ({
     favorites: state.favorites.filter((f) => f.id !== id),
   })),
-  /** Reorder setlist: delta −1 = earlier in performance order, +1 = later. */
   reorderFavorite: (id, delta) => set((state) => {
     const idx = state.favorites.findIndex((f) => f.id === id);
     if (idx < 0) return {};
@@ -159,7 +163,6 @@ export const createDavisSlice = (set) => ({
     ...(fav.config?.layout ? { layoutParams: { ...fav.config.layout } } : {}),
     ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
   }),
-  /** Morph numeric layout params toward a favorite; apply seed/palette at end (#35). */
   morphToFavorite: (fav) => set((state) => {
     const target = fav.config?.layout;
     if (!target || typeof target !== 'object') {
@@ -176,7 +179,6 @@ export const createDavisSlice = (set) => ({
         to[key] = target[key];
       }
     }
-    // Also copy non-morphable discrete fields immediately (mode, blend, etc.)
     const discrete = {};
     for (const [k, v] of Object.entries(target)) {
       if (!(k in from) && k !== 'composition') discrete[k] = v;
@@ -195,7 +197,7 @@ export const createDavisSlice = (set) => ({
       morphTo: to,
       morphStart: performance.now(),
       morphPendingSeed: fav.seed,
-      morphPendingPalette: fav.config?.palette?.id || null,
+      morphPendingPalette: fav.config?.palette.id || null,
     };
   }),
 });
