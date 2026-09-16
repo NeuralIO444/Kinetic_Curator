@@ -105,16 +105,16 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     const wrapped = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`;
     if (seedId && String(seedId).startsWith('user:')) emit(Events.ASSETS_REPLACE, { id: seedId, svg: wrapped });
     else emit(Events.ASSETS_INGEST, { svg: wrapped, hint });
-    onClose();
+    onClose(true);
   };
 
   return (
-    <div style={veil} onClick={onClose} role="presentation">
+    <div style={veil} onClick={() => onClose(false)} role="presentation">
       <div style={sheet} onClick={(e) => e.stopPropagation()}>
         <header style={head}>
           <span>ASSET STUDIO</span>
           <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · snap {SNAP}</span>
-          <button type="button" className="chip-btn" onClick={onClose}>ESC</button>
+          <button type="button" className="chip-btn" onClick={() => onClose(false)}>ESC</button>
         </header>
         <div style={body}>
           <svg ref={svgRef} viewBox="0 0 100 100" style={stage}

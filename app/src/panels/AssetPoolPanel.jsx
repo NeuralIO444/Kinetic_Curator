@@ -36,6 +36,12 @@ export function AssetPoolPanel() {
     setStudioSeed(seed || null);
   };
 
+  const closeStudio = (saved) => {
+    setStudio(null);
+    setStudioSeed(null);
+    if (saved) emit(Events.ASSETS_CAT_FILTER, 'user');
+  };
+
   const filtered = useMemo(() => {
     let list = assets;
     if (catFilter === 'user') list = list.filter(a => String(a.id).startsWith('user:'));
@@ -164,7 +170,7 @@ export function AssetPoolPanel() {
         <Studio
           seedSvg={studioSeed?.svg || ''}
           seedId={studioSeed?.id || ''}
-          onClose={() => { setStudio(null); setStudioSeed(null); }}
+          onClose={closeStudio}
         />
       )}
     </div>
