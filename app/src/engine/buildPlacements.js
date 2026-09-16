@@ -2,7 +2,7 @@
 // Shared by live preview (useCanvasItems) and renderFinal (#24 / #32).
 // Kernel K0: asset + color channels index-stable (#58).
 
-import { computePlacements } from './placement.js';
+import { computePlacementsSoA } from './placement.js';
 import { assignColor, resolveStrategy } from './kernel/color/index.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
@@ -61,7 +61,10 @@ export function buildPlacements({
   const scale = scaleOverride ?? layoutParams.scale;
   const alpha = alphaOverride ?? layoutParams.alpha;
 
-  const placements = computePlacements({
+  // Kernel v2 (#108) step 2: read columns and build the item object once,
+  // instead of computePlacements building one object per point and this
+  // spreading it into a second one.
+  const soa = computePlacementsSoA({
     mode: layoutParams.mode,
     count: safeCount,
     seed,
@@ -83,22 +86,35 @@ export function buildPlacements({
   const weights = activeAssets.map((a) => SELECTION_WEIGHT[a.weight] || 1);
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
 
-  let mapped = placements.map((p) => {
+  const strategy = resolveStrategy(layoutParams, preset);
+  let mapped = new Array(soa.n);
+  for (let k = 0; k < soa.n; k++) {
+    const index = soa.index[k];
+    const t = soa.t[k];
     const asset = pickWeightedIndexStable(
-      activeAssets, weights, totalWeight, seed, p.index,
+      activeAssets, weights, totalWeight, seed, index,
     );
     // K5 (#64): colour comes from the kernel's colour channel only.
-    const { color, accent } = assignColor(
-      { seed, index: p.index, t: p.t },
-      palette,
-      resolveStrategy(layoutParams, preset),
-    );
-    const key = `p${p.index}-${asset.id}`;
-    return { ...p, assetId: asset.id, color, accent, key };
-  });
+    const { color, accent } = assignColor({ seed, index, t }, palette, strategy);
+    mapped[k] = {
+      x: soa.x[k],
+      y: soa.y[k],
+      scale: soa.scale[k],
+      rotation: soa.rotation[k],
+      alpha: soa.alpha[k],
+      index,
+      t,
+      zTier: soa.zTier[k],
+      assetId: asset.id,
+      color,
+      accent,
+      key: `p${index}-${asset.id}`,
+    };
+  }
 
   if (!layoutParams.overlap) {
-    mapped = [...mapped].sort((a, b) => a.scale - b.scale);
+    // `mapped` is already a fresh array we own — no defensive copy needed.
+    mapped.sort((a, b) => a.scale - b.scale);
   }
 
   if (mirror && caps.allowMirror) {

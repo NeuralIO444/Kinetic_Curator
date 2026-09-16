@@ -328,10 +328,11 @@ Related: color epic [#50](https://github.com/NeuralIO444/Kinetic_Curator/issues/
 
 ## 16. Kernel v2 addendum — SoA, staged eval, Worker ABI (#108)
 
-**Status:** measurement phase. `engine/perf.selfcheck.mjs` landed first, per the
-issue's own rule — *"measure first... rewrite is a response to a missed
-budget, not a vibe."* Everything below is baseline data and a proposed
-sequence, not a claim that the rewrite is done.
+**Status:** step 1 (measurement harness) and step 2 (SoA + in-place fill)
+landed. `engine/perf.selfcheck.mjs` went first, per the issue's own rule —
+*"measure first... rewrite is a response to a missed budget, not a vibe."*
+Steps 3–6 (field texture, swarm SoA, staged eval, Worker ABI) are still
+outstanding; this is not a claim that the rewrite is done.
 
 ### Baseline (M2 Max, local — CI hardware will read slower)
 
@@ -351,20 +352,69 @@ would suggest, consistent with the issue's diagnosis: `Particle` class
 instances + `applyForce` method dispatch + a spatial hash rebuilt every
 step, none of which SoA + dropping the class removes for free elsewhere.
 
+### Step 2 result — SoA + in-place fill (measured, including the bad news)
+
+`computePlacementsSoA` fills eight pre-allocated columns; `computePlacements`
+is now a thin shim that materializes the old array-of-objects for callers
+that still want it, and `buildPlacements` reads the columns directly.
+Golden hash `e892d112…` is unchanged **bit-for-bit** — that was the gate.
+
+Columns are `Float64Array`, not the `Float32Array` this plan originally
+specified. The golden fixture fingerprints coordinates to 4 decimals on
+values up to ~1000, which sits right at float32's ~7-significant-digit
+resolution; narrowing would perturb the hash and leave us unable to tell a
+rounding artifact from a real kernel regression. 20k points is 960KB of f64.
+Not worth the ambiguity.
+
+Kernel-only timings (`perf.selfcheck.mjs`, which now times the columns, not
+the shim):
+
+| | Before (AoS) | After (SoA) |
+|---|---|---|
+| 20k fill, fresh buffers | 0.95–0.99ms | **0.73–0.83ms** |
+| 20k fill, buffers reused | — | **0.49–0.58ms** |
+| 8k + fBm displacement | 2.95–3.26ms | **2.83–3.03ms** |
+
+End-to-end `buildPlacements` at 20k, interleaved head-to-head against `main`
+in one process (40 trials each, medians):
+
+| Shape | main | branch | Δ |
+|---|---|---|---|
+| plain | 2.35–2.73ms | 2.59–2.75ms | **−9% to −1% (wash to slight loss)** |
+| mirror | 6.18–6.31ms | 4.31–4.69ms | **+26% to +31%** |
+| sorted (overlap off) | 9.70–10.83ms | 8.31–8.62ms | **+13% to +20%** |
+
+**The plain path did not get faster, and that is the most useful number
+here.** The fill is ~20% faster, but the bind loop that follows it reads all
+eight columns for every point — eight concurrent cache streams over ~1.1MB,
+against AoS's one object per point whose fields share a cache line. SoA pays
+off when a pass touches one or two columns, not all of them. That is
+precisely what staged eval (step 4) makes true, and it means **step 2's
+speedup is largely still unrealized until step 4 lands.** Nothing here
+justifies claiming a win on the headline case.
+
+The mirror and sorted gains are a separate, real effect and not about
+columns at all: `buildPlacements` used to build items via `{...p, …}`, a
+spread of an object that was itself freshly built, and the resulting hidden
+class made the *second* spread (mirror) and the `.scale` reads (sort) slower.
+Building one explicit 12-property literal fixes that.
+
+At the shipped quality cap (`maxCount` 420) every one of these paths is under
+0.05ms and the differences are unmeasurable. This is headroom work for the
+20k target in the issue, not a fix for anything a user feels today.
+
 ### Proposed sequence for the remaining work items
 
 Ordered so each step is independently measurable against the same harness
 before the next begins — no big-bang rewrite, no step that can't be
 reverted on its own.
 
-1. **SoA + in-place fill** (item 1) — rewrite `computePlacements` to fill
-   pre-allocated `Float32Array`/`Uint16Array` buffers instead of pushing
-   object literals. `buildPlacements` gets an adapter that reads the SoA
-   buffers back into the `{x,y,...}` item shape the live SVG path and
-   `studio/render.mjs` already consume, so nothing downstream changes yet.
-   Golden hash: re-run `goldenPlacement.selfcheck.mjs` bit-for-bit against
-   the adapter's output before touching anything else — if it doesn't
-   match, the SoA fill has a bug, full stop.
+1. ~~**SoA + in-place fill** (item 1)~~ — **DONE**, see "Step 2 result" above.
+   Columns landed as `Float64Array` (not `Float32Array` — golden-hash
+   precision), `computePlacements` survives as a shim, `buildPlacements`
+   reads columns. Golden hash bit-for-bit identical. The measured outcome
+   moved the argument for step 4: staged eval is now the step that *pays
+   for* the columns, not merely a step that benefits from them.
 2. **Swarm SoA** (item 4) — highest measured gain per the baseline above.
    Replace `Particle` instances with parallel typed arrays; keep the
    existing spatial-hash *algorithm* but drop the per-step rebuild if the
