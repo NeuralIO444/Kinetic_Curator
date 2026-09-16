@@ -36,7 +36,7 @@ export function StimulusPanel() {
 
   return (
     <div className="panel panel-stimulus">
-      <PanelHeader tag="P06" title="STIMULUS" subtitle={audioEnabled ? 'active' : 'idle'} />
+      <PanelHeader tag="P06" title="STIMULI" subtitle={audioEnabled ? 'active' : 'idle'} />
       <div className="stim-body">
           <div className="stim-toggle-row">
             <button
