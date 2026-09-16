@@ -1,10 +1,5 @@
 /**
- * particles.js
- * Physics-based particle simulation — Perlin winds, Reynolds flocking, mouse attract.
- * Kernel K1: wind field from createNoise(seed) instance (#59).
- *
- * #109 — when layout mode is `hype`, each physics particle is an organism
- * leader. Spine / wings are visual only. `swarm` stays a cloud.
+ * particles.js — swarm cloud + hype organisms (#109 / #118).
  */
 
 import { createNoise } from './noise.js';
@@ -13,8 +8,11 @@ import { isOrganismMode } from '../data/layout-modes.js';
 
 export const ATTRACTOR_GAIN = 8;
 const TAU = Math.PI * 2;
-const MAX_TURN_DEG = 14;
-const MAX_SPEED = 8.0;
+const MAX_TURN_DEG = 10;
+const MAX_SPEED_CLOUD = 8.0;
+const MAX_SPEED_MOTH = 1.65;
+const BOUNCE = 0.62;
+const MARGIN = 8;
 
 class Particle {
   constructor(x, y, assetIndex, color, mass, angle, speed, seedOffset) {
@@ -41,6 +39,12 @@ class Particle {
   }
 }
 
+function bounceAxis(pos, vel, min, max) {
+  if (pos < min) return { pos: min, vel: Math.abs(vel) * BOUNCE };
+  if (pos > max) return { pos: max, vel: -Math.abs(vel) * BOUNCE };
+  return { pos, vel };
+}
+
 export class ParticleSystem {
   constructor() {
     this.particles = [];
@@ -63,20 +67,17 @@ export class ParticleSystem {
     this.canvasH = canvasH;
     this.particles = [];
     this._noise = createNoise(seed || 444);
-
     if (!activeAssets || activeAssets.length === 0) return;
-
     const swatches = palette?.swatches || ['#ffffff'];
-
     for (let i = 0; i < count; i++) {
       const r = rngForIndex(seed >>> 0, CH.dyn, i);
-      const x = r() * canvasW;
-      const y = r() * canvasH;
+      const x = MARGIN + r() * Math.max(1, canvasW - MARGIN * 2);
+      const y = MARGIN + r() * Math.max(1, canvasH - MARGIN * 2);
       const assetIdx = i % activeAssets.length;
       const color = swatches[i % swatches.length];
       const mass = r() * 0.8 + 0.4;
       const angle = r() * TAU;
-      const speed = r() * 1.5 + 0.5;
+      const speed = r() * 0.55 + 0.15;
       const seedOffset = r() * 10000;
       this.particles.push(new Particle(x, y, assetIdx, color, mass, angle, speed, seedOffset));
     }
@@ -102,15 +103,12 @@ export class ParticleSystem {
   update(layoutParams, activeAssets, palette, seed, time, attractor) {
     if (this.particles.length === 0) return;
     this._layout = layoutParams;
-
     const targetCount = layoutParams.particleCount || 100;
     if (this.particles.length !== targetCount) {
       this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed);
     }
-
     if (!this._noise) this._noise = createNoise(seed || 444);
     const noise = this._noise;
-
     const {
       noiseFreq = 0.005,
       noiseSpeed = 0.5,
@@ -125,18 +123,17 @@ export class ParticleSystem {
     } = layoutParams;
 
     const organism = isOrganismMode(layoutParams.mode);
+    const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
+    const damp = organism ? Math.max(damping, 0.97) : damping;
     const [minScale, maxScale] = scale;
     const [minAlpha, maxAlpha] = alpha;
     const nt = time * noiseSpeed * 0.001;
-    const windMul = organism ? wind : 1;
+    const windMul = organism ? (wind * 0.35) : 1;
 
-    const sepRadius = 35;
+    const sepRadius = organism ? 48 : 35;
     const aliRadius = 60;
     const cohRadius = 70;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
-    const separationWeight = 1.8;
-    const alignmentWeight = 1.0;
-    const cohesionWeight = swarmCohesion;
     const numParticles = this.particles.length;
     const { grid, key, cellSize } = this._buildSpatialHash(maxRadius);
 
@@ -146,7 +143,6 @@ export class ParticleSystem {
       const windAngle = n * TAU;
       const windMag = (noise.noise3D(p1.x * noiseFreq + 200, p1.y * noiseFreq + 200, nt) + 1.0) * 0.4 * windMul;
       p1.applyForce(Math.cos(windAngle) * windMag, Math.sin(windAngle) * windMag);
-
       if (attractor && gravityWells > 0) {
         const dx = attractor.x - p1.x;
         const dy = attractor.y - p1.y;
@@ -156,7 +152,6 @@ export class ParticleSystem {
           p1.applyForce((dx / d) * forceMag, (dy / d) * forceMag);
         }
       }
-
       let sepX = 0, sepY = 0, sepCount = 0;
       let aliX = 0, aliY = 0, aliCount = 0;
       let cohX = 0, cohY = 0, cohCount = 0;
@@ -181,42 +176,41 @@ export class ParticleSystem {
       if (sepCount > 0) {
         sepX /= sepCount; sepY /= sepCount;
         const mag = Math.sqrt(sepX * sepX + sepY * sepY);
-        if (mag > 0) p1.applyForce((sepX / mag) * separationWeight, (sepY / mag) * separationWeight);
+        if (mag > 0) p1.applyForce((sepX / mag) * 1.8, (sepY / mag) * 1.8);
       }
       if (aliCount > 0) {
         aliX /= aliCount; aliY /= aliCount;
         const mag = Math.sqrt(aliX * aliX + aliY * aliY);
-        if (mag > 0) p1.applyForce((aliX / mag) * alignmentWeight, (aliY / mag) * alignmentWeight);
+        if (mag > 0) p1.applyForce((aliX / mag) * 1.0, (aliY / mag) * 1.0);
       }
       if (cohCount > 0) {
         cohX /= cohCount; cohY /= cohCount;
         const steerX = cohX - p1.x;
         const steerY = cohY - p1.y;
         const mag = Math.sqrt(steerX * steerX + steerY * steerY);
-        if (mag > 0) p1.applyForce((steerX / mag) * cohesionWeight, (steerY / mag) * cohesionWeight);
+        if (mag > 0) p1.applyForce((steerX / mag) * swarmCohesion, (steerY / mag) * swarmCohesion);
       }
     }
 
     const pad = 120;
-    const limitL = -pad, limitR = this.canvasW + pad, limitT = -pad, limitB = this.canvasH + pad;
     const bodyLen = Math.max(1, Math.min(7, Math.round(body || 1)));
     const follow = Math.max(0.05, Math.min(0.95, tight));
 
     for (let i = 0; i < numParticles; i++) {
       const p = this.particles[i];
-      p.vx = (p.vx + p.ax) * damping;
-      p.vy = (p.vy + p.ay) * damping;
+      p.vx = (p.vx + p.ax) * damp;
+      p.vy = (p.vy + p.ay) * damp;
       const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-      if (speed > MAX_SPEED) {
-        p.vx = (p.vx / speed) * MAX_SPEED;
-        p.vy = (p.vy / speed) * MAX_SPEED;
+      if (speed > maxSpeed) {
+        p.vx = (p.vx / speed) * maxSpeed;
+        p.vy = (p.vy / speed) * maxSpeed;
       }
       p.x += p.vx;
       p.y += p.vy;
       p.ax = 0;
       p.ay = 0;
 
-      if (speed > 0.1) {
+      if (speed > 0.04) {
         const next = Math.atan2(p.vy, p.vx) * (180 / Math.PI);
         if (organism) {
           let d = next - p.rotation;
@@ -232,10 +226,14 @@ export class ParticleSystem {
 
       p.scale = minScale + (p.mass * (maxScale - minScale));
       p.alpha = minAlpha + (p.mass * (maxAlpha - minAlpha));
-      p.u = Math.max(0, Math.min(1, speed / MAX_SPEED));
-      p.phase = (p.phase + 0.008 * noiseSpeed) % 1;
+      p.u = Math.max(0, Math.min(1, speed / maxSpeed));
+      p.phase = (p.phase + 0.004 * noiseSpeed) % 1;
 
       if (organism) {
+        const bx = bounceAxis(p.x, p.vx, MARGIN, this.canvasW - MARGIN);
+        const by = bounceAxis(p.y, p.vy, MARGIN, this.canvasH - MARGIN);
+        p.x = bx.pos; p.vx = bx.vel;
+        p.y = by.pos; p.vy = by.vel;
         if (!p.spine || p.spine.length === 0) p.spine = [{ x: p.x, y: p.y }];
         const head = { x: p.x, y: p.y };
         const nextSpine = [head];
@@ -248,12 +246,12 @@ export class ParticleSystem {
           });
         }
         p.spine = nextSpine;
+      } else {
+        if (p.x < -pad) p.x = this.canvasW + pad;
+        else if (p.x > this.canvasW + pad) p.x = -pad;
+        if (p.y < -pad) p.y = this.canvasH + pad;
+        else if (p.y > this.canvasH + pad) p.y = -pad;
       }
-
-      if (p.x < limitL) p.x = limitR;
-      else if (p.x > limitR) p.x = limitL;
-      if (p.y < limitT) p.y = limitB;
-      else if (p.y > limitB) p.y = limitT;
     }
   }
 
@@ -262,14 +260,8 @@ export class ParticleSystem {
     const lp = this._layout || {};
     if (!isOrganismMode(lp.mode)) {
       return this.particles.map((p) => ({
-        x: p.x,
-        y: p.y,
-        scale: p.scale,
-        rotation: p.rotation,
-        alpha: p.alpha,
-        asset: activeAssets[p.assetIndex % activeAssets.length],
-        color: p.color,
-        u: p.u,
+        x: p.x, y: p.y, scale: p.scale, rotation: p.rotation, alpha: p.alpha,
+        asset: activeAssets[p.assetIndex % activeAssets.length], color: p.color, u: p.u,
       }));
     }
     return this._organismItems(activeAssets, lp);
@@ -287,16 +279,9 @@ export class ParticleSystem {
       for (let s = 0; s < bodyLen; s++) {
         const pt = spine[Math.min(s, spine.length - 1)];
         items.push({
-          x: pt.x,
-          y: pt.y,
-          scale: p.scale * (1 - s * 0.1),
-          rotation: p.rotation,
-          alpha: p.alpha * (1 - s * 0.08),
-          asset,
-          color: p.color,
-          u: p.u,
-          key: `o${i}-s${s}`,
-          role: s === 0 ? 'body' : 'segment',
+          x: pt.x, y: pt.y, scale: p.scale * (1 - s * 0.1), rotation: p.rotation,
+          alpha: p.alpha * (1 - s * 0.08), asset, color: p.color, u: p.u,
+          key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment',
         });
       }
       if (symmetry === 'bilateral') {
@@ -305,19 +290,15 @@ export class ParticleSystem {
         const py = Math.sin(heading);
         const amp = flap * Math.sin(p.phase * TAU + p.seedOffset);
         const reach = 16 + Math.abs(amp) * 20;
-        const ox = -py * reach;
-        const oy = px * reach;
         items.push({
-          x: p.x + ox, y: p.y + oy,
+          x: p.x - py * reach, y: p.y + px * reach,
           scale: p.scale * 0.7, rotation: p.rotation + amp * 18,
-          alpha: p.alpha, asset, color: p.color, u: p.u,
-          key: `o${i}-wl`, role: 'wing',
+          alpha: p.alpha, asset, color: p.color, u: p.u, key: `o${i}-wl`, role: 'wing',
         });
         items.push({
-          x: p.x - ox, y: p.y - oy,
+          x: p.x + py * reach, y: p.y - px * reach,
           scale: p.scale * 0.7, rotation: p.rotation - amp * 18,
-          alpha: p.alpha, asset, color: p.color, u: p.u,
-          key: `o${i}-wr`, role: 'wing', _mirrored: true,
+          alpha: p.alpha, asset, color: p.color, u: p.u, key: `o${i}-wr`, role: 'wing', _mirrored: true,
         });
       }
     }
