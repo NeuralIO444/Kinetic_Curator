@@ -66,3 +66,24 @@ export const DEFAULT_LAYOUT_PARAMS = {
   audioAlphaMod: 0.25,
   lifeDrift: 0.35,
 };
+
+const RANGE_KEYS = ['scale', 'rotate', 'alpha'];
+
+/**
+ * Fill missing layout keys from DEFAULT_LAYOUT_PARAMS.
+ * Sparse / legacy project JSON must not leave sliders on `undefined`.
+ * Documented keys in `partial` win; unknown extra keys are kept.
+ */
+export function normalizeLayoutParams(partial) {
+  const src = partial && typeof partial === 'object' && !Array.isArray(partial) ? partial : {};
+  const next = { ...DEFAULT_LAYOUT_PARAMS, ...src };
+  for (const key of RANGE_KEYS) {
+    const v = next[key];
+    if (!Array.isArray(v) || v.length < 2) {
+      next[key] = DEFAULT_LAYOUT_PARAMS[key].slice();
+    } else {
+      next[key] = [v[0], v[1]];
+    }
+  }
+  return next;
+}

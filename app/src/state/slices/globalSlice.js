@@ -1,11 +1,24 @@
 import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
-import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
+import { normalizeLayoutParams } from '../../data/layout-modes.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
 
 const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
+
+function normalizeSnapshots(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  const out = {};
+  for (const [id, snap] of Object.entries(raw)) {
+    if (!snap || typeof snap !== 'object') continue;
+    out[id] = {
+      ...snap,
+      layoutParams: normalizeLayoutParams(snap.layoutParams),
+    };
+  }
+  return out;
+}
 
 export const createGlobalSlice = (set) => ({
   running: true,
@@ -66,7 +79,6 @@ export const createGlobalSlice = (set) => ({
     if (!WEIGHT_CYCLE.includes(weight)) return {};
     const asset = ASSETS.find((a) => a.id === id);
     if (!asset) return {};
-    // Clear override if it matches authored weight
     if (asset.weight === weight) {
       if (!(id in state.assetWeightOverrides)) return {};
       const next = { ...state.assetWeightOverrides };
@@ -113,11 +125,7 @@ export const createGlobalSlice = (set) => ({
       seed: doc.seed >>> 0,
       paletteId: doc.paletteId || state.paletteId,
       quality: doc.quality || state.quality,
-      layoutParams: {
-        ...DEFAULT_LAYOUT_PARAMS,
-        ...state.layoutParams,
-        ...(doc.layoutParams || {}),
-      },
+      layoutParams: normalizeLayoutParams(doc.layoutParams),
     };
     if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
       const enabled = { ...initialEnabledAssets };
@@ -129,13 +137,11 @@ export const createGlobalSlice = (set) => ({
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
       next.assetWeightOverrides = { ...doc.assetWeightOverrides };
     }
-    // Absent key means "catalog palette" — restore null rather than leaving
-    // whatever the previous session had overridden (#53).
     next.paletteOverrides = doc.paletteOverrides ?? null;
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       next.layers = doc.layers;
       next.activeLayerId = doc.activeLayerId;
-      next.layerSnapshots = doc.layerSnapshots || {};
+      next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots);
       next.historyUndoStack = [];
       next.historyRedoStack = [];
     }
