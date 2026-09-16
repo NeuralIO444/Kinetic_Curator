@@ -1,20 +1,3 @@
-// Layers — N independent compositions, each with its own mode/params/asset
-// pool, compositing onto the stack below with its own blend mode + opacity.
-//
-// Design: the top-level fields this app already had (seed, paletteId,
-// paletteOverrides, layoutParams, lockedParams, caGrid, enabledAssets)
-// keep meaning exactly what they always meant — "the currently active
-// layer's live editable state." Every existing panel/setter/history entry
-// keeps reading and writing them completely unchanged. Switching the active
-// layer just swaps a snapshot in and out of those same fields; only
-// CanvasPanel needs to know layers exist at all, to render the inactive
-// ones from their stored snapshots alongside the live active one.
-//
-// Undo/redo (#92): historyUndoStack/historyRedoStack are NOT reset here.
-// Each entry is tagged with the layerId it was captured for (history.js),
-// and layoutSlice's undo()/redo() only ever act on a top entry whose
-// layerId matches the active layer — so the shared stack survives a
-// switch without one layer's edits ever landing on another.
 import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { initialEnabledAssets } from './globalSlice.js';
 
@@ -34,7 +17,6 @@ function freshSnapshot(seed) {
   };
 }
 
-/** Capture the live top-level fields as a snapshot (for the layer being deactivated). */
 export function captureSnapshot(state) {
   return {
     seed: state.seed,
@@ -54,8 +36,6 @@ export const createLayersSlice = (set) => ({
     { id: INITIAL_LAYER_ID, name: 'Layer 1', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
   ],
   activeLayerId: INITIAL_LAYER_ID,
-  // Snapshots for every layer EXCEPT the active one (whose truth lives in
-  // the live top-level fields above).
   layerSnapshots: {},
 
   addLayer: () => set((state) => {
@@ -70,6 +50,39 @@ export const createLayersSlice = (set) => ({
       },
       activeLayerId: id,
       ...snapshot,
+    };
+  }),
+
+  duplicateLayer: (id) => set((state) => {
+    const src = state.layers.find((l) => l.id === id);
+    if (!src) return {};
+    const nid = makeLayerId();
+    const snap = id === state.activeLayerId
+      ? captureSnapshot(state)
+      : (state.layerSnapshots[id] || freshSnapshot(state.seed));
+    const copy = {
+      id: nid,
+      name: `${src.name} copy`,
+      visible: src.visible,
+      layerBlendMode: src.layerBlendMode,
+      layerOpacity: src.layerOpacity,
+    };
+    const i = state.layers.findIndex((l) => l.id === id);
+    const layers = [...state.layers];
+    layers.splice(i + 1, 0, copy);
+    return {
+      layers,
+      layerSnapshots: { ...state.layerSnapshots, [nid]: structuredClone(snap) },
+    };
+  }),
+
+  soloLayer: (id) => set((state) => {
+    const othersHidden = state.layers.every((l) => l.id === id || !l.visible);
+    if (othersHidden) {
+      return { layers: state.layers.map((l) => ({ ...l, visible: true })) };
+    }
+    return {
+      layers: state.layers.map((l) => ({ ...l, visible: l.id === id })),
     };
   }),
 
