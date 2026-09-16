@@ -7,7 +7,7 @@ export const LAYOUT_MODES = [
   { id: 'radial',    name: 'radial',     glyph: 'rad'    },
   { id: 'swarm',     name: 'swarm boids', glyph: 'swarm'  },
   { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
-  { id: 'hype',      name: 'swarm·hype', glyph: 'hype'   },
+  { id: 'hype',      name: 'moth·hype', glyph: 'hype'   },
   { id: 'stratified', name: 'stratified', glyph: 'strat' },
   { id: 'flow',      name: 'flow',       glyph: 'flow'   },
   { id: 'layers',    name: 'layers',     glyph: 'z'      },
@@ -17,10 +17,16 @@ export const LAYOUT_MODES = [
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
 ];
 
-/** Color strategies from engine/color.js; 'auto' defers to the preset (#54). */
 export function isLiveSwarmMode(mode) {
   return mode === 'swarm' || mode === 'hype';
 }
+
+/** hype is the organism swarm (#109). swarm stays a particle cloud. */
+export function isOrganismMode(mode) {
+  return mode === 'hype';
+}
+
+export const SYMMETRY_MODES = ['none', 'bilateral', 'stamp'];
 
 export const PALETTE_SHIFTS = ['auto', 'band', 'zone', 'split'];
 
@@ -47,11 +53,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   hueRotate: 0,
   paletteShift: 'auto',
 
-  // Accumulation / trails (#28) — pixel buffer, not SVG DOM
   accumulation: false,
-  accumulationFade: 0.88, // 0–0.99; higher = longer trails
+  accumulationFade: 0.88,
 
-  // Physics & Turbulence
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
   displacement: 0,
@@ -60,7 +64,13 @@ export const DEFAULT_LAYOUT_PARAMS = {
   gravityWells: 1.0,
   damping: 0.95,
 
-  // Synthesizer / audio reactivity
+  // Organism / moth (#109) — sleeper knobs. Species radii stay dyn.
+  body: 3,
+  flap: 0.35,
+  tight: 0.55,
+  wind: 1,
+  symmetry: 'none',
+
   audioModDepth: 0.65,
   audioScaleMod: 0.45,
   audioAlphaMod: 0.25,
@@ -69,11 +79,6 @@ export const DEFAULT_LAYOUT_PARAMS = {
 
 const RANGE_KEYS = ['scale', 'rotate', 'alpha'];
 
-/**
- * Fill missing layout keys from DEFAULT_LAYOUT_PARAMS.
- * Sparse / legacy project JSON must not leave sliders on `undefined`.
- * Documented keys in `partial` win; unknown extra keys are kept.
- */
 export function normalizeLayoutParams(partial) {
   const src = partial && typeof partial === 'object' && !Array.isArray(partial) ? partial : {};
   const next = { ...DEFAULT_LAYOUT_PARAMS, ...src };
@@ -85,5 +90,7 @@ export function normalizeLayoutParams(partial) {
       next[key] = [v[0], v[1]];
     }
   }
+  if (!SYMMETRY_MODES.includes(next.symmetry)) next.symmetry = 'none';
+  next.body = Math.max(1, Math.min(7, Math.round(Number(next.body) || 1)));
   return next;
 }
