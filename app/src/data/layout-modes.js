@@ -1,5 +1,7 @@
 // Layout mode definitions — single source of truth
 
+import { BEHAVE_IDS } from '../engine/organisms/behave.js';
+
 export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
   { id: 'grid',      name: 'grid',       glyph: 'grid'   },
@@ -21,12 +23,12 @@ export function isLiveSwarmMode(mode) {
   return mode === 'swarm' || mode === 'hype';
 }
 
-/** hype is the organism swarm (#109). swarm stays a particle cloud. */
 export function isOrganismMode(mode) {
   return mode === 'hype';
 }
 
 export const SYMMETRY_MODES = ['none', 'bilateral', 'stamp'];
+export const BEHAVE_MODES = BEHAVE_IDS;
 
 export const PALETTE_SHIFTS = ['auto', 'band', 'zone', 'split'];
 
@@ -64,12 +66,13 @@ export const DEFAULT_LAYOUT_PARAMS = {
   gravityWells: 1.0,
   damping: 0.95,
 
-  // Organism / moth (#109) — sleeper knobs. Species radii stay dyn.
   body: 3,
   flap: 0.35,
   tight: 0.55,
   wind: 1,
   symmetry: 'none',
+  behave: 'cruise',
+  material: 'plate',
 
   audioModDepth: 0.65,
   audioScaleMod: 0.45,
@@ -91,6 +94,7 @@ export function normalizeLayoutParams(partial) {
     }
   }
   if (!SYMMETRY_MODES.includes(next.symmetry)) next.symmetry = 'none';
+  if (!BEHAVE_MODES.includes(next.behave)) next.behave = 'cruise';
   next.body = Math.max(1, Math.min(7, Math.round(Number(next.body) || 1)));
   return next;
 }
