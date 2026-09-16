@@ -217,8 +217,14 @@ export class ParticleSystem {
       }
       p.scale = minScale + (p.mass * (maxScale - minScale));
       p.alpha = minAlpha + (p.mass * (maxAlpha - minAlpha));
-      p.u = Math.max(0, Math.min(1, speed / maxSpeed));
       p.phase = (p.phase + 0.004 * noiseSpeed) % 1;
+      const spdU = Math.max(0, Math.min(1, speed / maxSpeed));
+      if (organism) {
+        const flapU = 0.5 + 0.5 * Math.sin(p.phase * TAU + p.seedOffset);
+        p.u = Math.max(0, Math.min(1, 0.5 * flapU + 0.5 * spdU));
+      } else {
+        p.u = spdU;
+      }
       if (organism) {
         const bx = bounceAxis(p.x, p.vx, MARGIN, this.canvasW - MARGIN);
         const by = bounceAxis(p.y, p.vy, MARGIN, this.canvasH - MARGIN);
