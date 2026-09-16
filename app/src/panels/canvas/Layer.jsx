@@ -5,6 +5,7 @@ import { isLiveSwarmMode } from '../../data/layout-modes.js';
 import { useSwarmTick } from '../../hooks/useSwarmTick.js';
 import { useCanvasItems } from '../../hooks/useCanvasItems.js';
 import { DEMO_LADDER_ID, ladderFrame } from '../../data/bodies/demoLadder.js';
+import { materialHref } from '../../engine/materials.js';
 
 const ASSET_SIZE = 100;
 
@@ -29,6 +30,7 @@ export function Layer({
   const nodeCount = renderItems?.length || 0;
   const showGloss = shouldRenderGloss(quality, layoutParams.shading, nodeCount);
   const half = ASSET_SIZE / 2;
+  const mat = materialHref(layoutParams.material);
 
   useEffect(() => { onCount?.(nodeCount); }, [nodeCount, onCount]);
 
@@ -48,13 +50,14 @@ export function Layer({
         const href = item.role === 'wing'
           ? `#kc-blend-${DEMO_LADDER_ID}-${ladderFrame(item.u)}`
           : `#kc-asset-${item.assetId}`;
+        const ink = item.role === 'wing' && mat ? `url(${mat})` : item.color;
         return (
           <g
             key={reactKey}
             transform={`translate(${item.x}, ${item.y}) rotate(${item.rotation}) scale(${sx}, ${item.scale}) translate(${-half}, ${-half})`}
             opacity={item.alpha / 100}
             style={{
-              ['--ink']: item.color,
+              ['--ink']: ink,
               ['--accent']: item.accent || item.color,
               transition: motionSmoothing && !isLiveSwarmMode(layoutParams.mode)
                 ? 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease'
