@@ -11,24 +11,31 @@
 // composition from the same seed. Every user project with a swarm layer
 // would render differently.
 //
-// So the hashes below were captured from the PRE-SoA implementation (heap
-// Particle objects + a Map keyed by `${cx},${cy}`) and must not move. If one
-// of them fails, the rewrite changed behaviour somewhere, and the fix is to
-// find the reordering — not to update the hash.
+// This runs the real engine and a verbatim copy of the pre-SoA engine
+// (particles.reference.mjs) side by side and requires them to agree on every
+// field of every particle.
 //
-// Legitimate reasons to update these: a deliberate, announced change to the
-// swarm physics. Never a refactor.
+// It deliberately does NOT compare against recorded hashes. The first version of
+// this file did, and CI caught the flaw: the swarm's output depends on
+// Math.sin/cos/atan2, which ECMAScript does not require to be correctly
+// rounded, and V8 evaluates them differently on x64 and arm64. Hashes
+// captured on arm64 failed on CI's x64 even though the code was correct.
+// Comparing two implementations in the same process cancels the platform out.
+//
+// (That platform dependence is a real property of the engine, not an artifact
+// of this test — see docs/KERNEL_V1_PLAN.md §16. A bake is reproducible on a
+// given machine, not across architectures.)
 
 import assert from 'node:assert';
-import { createHash } from 'node:crypto';
 import { ParticleSystem } from './particles.js';
+import { ReferenceParticleSystem } from './particles.reference.mjs';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 
 const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
 const palette = { swatches: ['#ff0000', '#00ff00', '#0000ff', '#ffff00'] };
 
-function run(mode, count, steps, attractor, extra = {}) {
-  const sys = new ParticleSystem();
+function run(Cls, mode, count, steps, attractor, extra = {}) {
+  const sys = new Cls();
   const lp = normalizeLayoutParams({
     ...DEFAULT_LAYOUT_PARAMS, mode, particleCount: count, ...extra,
   });
@@ -39,12 +46,22 @@ function run(mode, count, steps, attractor, extra = {}) {
   return sys.getItems(assets);
 }
 
-function fingerprint(items) {
-  const canon = items.map((it) => [
-    it.x, it.y, it.scale, it.rotation, it.alpha, it.u,
-    it.color, it.asset?.id, it.key ?? null, it.role ?? null,
-  ]);
-  return createHash('sha256').update(JSON.stringify(canon)).digest('hex');
+const FIELDS = ['x', 'y', 'scale', 'rotation', 'alpha', 'u', 'color', 'key', 'role'];
+
+function assertSameSwarm(got, want, label) {
+  assert.strictEqual(got.length, want.length, `${label}: item count`);
+  for (let i = 0; i < want.length; i++) {
+    for (const f of FIELDS) {
+      assert.ok(
+        Object.is(got[i][f], want[i][f]),
+        `${label}: item[${i}].${f} — SoA ${got[i][f]} vs pre-SoA reference ${want[i][f]}.\n`
+        + '  The rewrite changed behaviour. Look for a reordered neighbour visit\n'
+        + '  or a rewritten arithmetic expression (f/mass vs f*(1/mass),\n'
+        + '  x/cellSize vs x*(1/cellSize)) — do not relax this assertion.',
+      );
+    }
+    assert.strictEqual(got[i].asset?.id, want[i].asset?.id, `${label}: item[${i}].asset`);
+  }
 }
 
 // Chosen to exercise every branch the rewrite touched: the cloud path, the
@@ -53,49 +70,15 @@ function fingerprint(items) {
 // particles, and a wind-heavy run that drives particles off-canvas into the
 // negative cell coordinates the old Map handled implicitly.
 const CASES = [
-  {
-    name: 'cloud-swarm-160x90',
-    hash: '511ab610e4eb346a4733bbff83564eb63f85139556d655c8b56e0f78b32c875c',
-    n: 160,
-    run: () => run('swarm', 160, 90, null),
-  },
-  {
-    name: 'cloud-attractor',
-    hash: '82a8d3665bb774bed100dcb60ff92859dd113b19a991f77f63716189733d547e',
-    n: 120,
-    run: () => run('swarm', 120, 60, { x: 300, y: 250 }),
-  },
-  {
-    name: 'organism-hype-body3',
-    hash: '38c6bc12d5c6ecbf4abeeefe15648abd4bd82f959ace761c8083ffe57642d44a',
-    n: 400,
-    run: () => run('hype', 80, 60, null, { body: 3, symmetry: 'bilateral' }),
-  },
-  {
-    name: 'dense-400x120',
-    hash: '335900b0995d65dc54f4015fa3b8b9bac2fd1200ac57dab8b8b26d3d58b1d497',
-    n: 400,
-    run: () => run('swarm', 400, 120, null),
-  },
-  {
-    name: 'wrap-stress',
-    hash: '5aa2bfb56cd5e02a0992e41fbb6e14442494a50be35919db7c180ea02112ab5f',
-    n: 200,
-    run: () => run('swarm', 200, 200, null, { wind: 3, damping: 0.99 }),
-  },
+  ['cloud-swarm-160x90', ['swarm', 160, 90, null, {}]],
+  ['cloud-attractor', ['swarm', 120, 60, { x: 300, y: 250 }, {}]],
+  ['organism-hype-body3', ['hype', 80, 60, null, { body: 3, symmetry: 'bilateral' }]],
+  ['dense-400x120', ['swarm', 400, 120, null, {}]],
+  ['wrap-stress', ['swarm', 200, 200, null, { wind: 3, damping: 0.99 }]],
 ];
 
-for (const c of CASES) {
-  const items = c.run();
-  assert.strictEqual(items.length, c.n, `${c.name}: item count`);
-  const got = fingerprint(items);
-  assert.strictEqual(
-    got, c.hash,
-    `${c.name}: swarm behaviour changed.\n  got:      ${got}\n  expected: ${c.hash}\n`
-    + '  These hashes come from the pre-SoA engine. A mismatch means the\n'
-    + '  refactor reordered neighbour visits or changed an arithmetic\n'
-    + '  expression — find that, do not update the hash.',
-  );
+for (const [name, args] of CASES) {
+  assertSameSwarm(run(ParticleSystem, ...args), run(ReferenceParticleSystem, ...args), name);
 }
 
 // The negative-cell case the counting-sort grid has to get right: cloud

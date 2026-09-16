@@ -63,6 +63,9 @@ export function useCanvasItems({
       canvasH,
       effectiveScale,
       effectiveAlpha,
+      // Stable for the life of the component (useState lazy init); listed to
+      // satisfy exhaustive-deps, not because it can change.
+      cache,
     ],
   );
 

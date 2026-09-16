@@ -527,6 +527,24 @@ The squared-distance rejection is exact rather than approximate: `sqrt` is
 correctly rounded, so `d2 >= maxRadius²` implies the distance fails all three
 radius tests, and skipping those candidates contributes the same nothing.
 
+**Found while building the gate: the swarm is not reproducible across CPU
+architectures.** The first version of `particles.selfcheck.mjs` compared
+against hashes recorded on this machine, and CI rejected them — same code,
+arm64 vs x64. The cause is `Math.sin`/`Math.cos`/`Math.atan2`, which
+ECMAScript does not require to be correctly rounded and which V8 evaluates
+differently per architecture; the swarm amplifies the last-bit difference over
+120 chaotic steps. This is a pre-existing property of the engine, not
+something the SoA work introduced — `main`'s own output was verified identical
+under Node 20 and 22 on arm64, and differs from CI's x64 result.
+
+It qualifies K4's claim that a bake is "a pure function of its inputs": it is,
+*on a given machine*. A seed rendered on an M2 and on a Linux x64 box will not
+produce byte-identical swarm stills. That matters for `studio/`'s render farm
+if it is ever distributed across mixed hardware, and it is why the behaviour
+lock is a differential test against a reference implementation in the same
+process rather than a recorded constant — the reference cancels the platform
+out and tests the property we actually care about.
+
 **The 30ms budget is still missed, at 41ms.** The remaining cost is real work:
 boids cohesion clumps the swarm, so a settled 400-particle run scans **40.5**
 candidates per particle against the **13.5** a uniform density predicts (83 of
