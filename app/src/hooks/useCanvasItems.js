@@ -2,7 +2,7 @@
 // Live path passes audio/life-modulated scale + alpha; final render will call
 // buildPlacements directly with layoutParams ranges and lifted caps.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { buildPlacements } from '../engine/buildPlacements.js';
 
 // Re-export for existing selfcheck / callers
@@ -22,6 +22,21 @@ export function useCanvasItems({
   canvasH,
   caps,
 }) {
+  // Kernel v2 (#108) step 4. One cache per hook instance, so each <Layer />
+  // gets its own — a module-level cache would thrash between layers, which
+  // is exactly the case the multi-layer work introduced.
+  //
+  // useState with a lazy initializer, not useRef: this is read during render,
+  // which react-hooks/refs correctly forbids for refs. The setter is never
+  // called — useState is only being used for its one guarantee, a stable
+  // object per component instance. Nothing here schedules a render.
+  //
+  // Under StrictMode's double-render the cache may be written twice; that is
+  // harmless, because buildPlacements re-validates every cached stage against
+  // its inputs before reusing it. A stale or duplicated write costs a
+  // recompute, never a wrong frame.
+  const [cache] = useState(() => ({}));
+
   const { preset, items } = useMemo(
     () =>
       buildPlacements({
@@ -35,6 +50,7 @@ export function useCanvasItems({
         canvasH,
         scale: effectiveScale,
         alpha: effectiveAlpha,
+        cache,
       }),
     [
       layoutParams,

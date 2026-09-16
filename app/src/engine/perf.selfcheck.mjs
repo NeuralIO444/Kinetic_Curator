@@ -3,23 +3,29 @@
 // Kernel v2 (#108) baseline + regression gate. "Measure first... rewrite is
 // a response to a missed budget, not a vibe" — this file is that measurement.
 //
-// STATUS: SoA landed (step 2 of 6). Budgets 1 and 2 now time
+// STATUS: SoA (step 2) and staged eval (step 4) landed. Budgets 1 and 2 time
 // computePlacementsSoA — that IS the kernel. computePlacements is a
 // compatibility shim that materializes array-of-objects on top of the
 // columns for callers not yet reading them, and it gets its own separate
 // line so its cost stays visible instead of being smuggled into the
 // kernel's number.
 //
-// Budgets remain #108's target contract for the FINISHED engine (steps 3-6
-// still outstanding: field texture, staged eval, worker ABI). Correctness
-// assertions below are real gates — they fail the build. Budget numbers are
-// measured and printed every run so the trend shows in CI logs, but only
-// THROW once ENFORCE_BUDGET flips, which needs the fBm field texture (step
-// 3) and the swarm SoA — flipping it now would fail CI on work not yet done.
+// Step 3 (the fBm field texture) was measured and REJECTED — see
+// docs/KERNEL_V1_PLAN.md §16. Short version: building a 128² texture costs
+// ~4.8ms (32,768 fBm evals) against ~2.5ms for evaluating all 8k points
+// directly, so it needs >16k points in one call to break even, versus a
+// shipped cap of 420 — and at the noiseFreq slider's max a 128² texture is
+// off by up to 108px. Budget 2 therefore stays as-is; it is met anyway.
+//
+// Correctness assertions below are real gates — they fail the build. Budget
+// numbers are measured and printed every run so the trend shows in CI logs,
+// but only THROW once ENFORCE_BUDGET flips, which needs the swarm SoA
+// (budget 3 is still ~2x over) — flipping it now fails CI on undone work.
 const ENFORCE_BUDGET = false;
 
 import assert from 'node:assert';
 import { computePlacements, computePlacementsSoA } from './placement.js';
+import { buildPlacements } from './buildPlacements.js';
 import { bakeParticles } from './kernel/bake/index.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
@@ -175,10 +181,54 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 }
 
 // ── 4. Incremental dirty-C (scale/alpha only) vs full eval ──────────────
-// Not measurable yet: today's kernel has no staged eval and no dirty
-// flags (work item #2 in the issue) — there is nothing to re-run partially.
-// Recorded as N/A rather than faked.
-console.log('  [N/A ] incremental dirty-C vs full eval — staged eval not implemented yet (#108 item 2)');
+// Measurable as of step 4. "Dirty-C" is the live app's per-frame case:
+// useCanvasLife ticks lifeT every rAF, so effectiveScale/effectiveAlpha are
+// new arrays each frame while every geometry input holds still.
+//
+// Ratio is incremental / full ON THIS BRANCH — not against main — so it
+// keeps meaning something after the AoS kernel is gone.
+{
+  const assets = [
+    { id: 'a', weight: 'heavy' }, { id: 'b', weight: 'medium' }, { id: 'c', weight: 'light' },
+  ];
+  const mk = (count, extra) => ({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'fibonacci', count, ...extra },
+    seed: SEED,
+    activeAssets: assets,
+    palette: { swatches: ['#111', '#222', '#333', '#444'] },
+    caps: { maxCount: 100000, maxCountMirrored: 100000, allowMirror: true },
+    canvasW: CANVAS_W, canvasH: CANVAS_H,
+  });
+
+  for (const [label, count, extra, limit] of [
+    ['420 (BALANCED cap)', 420, {}, 0.6],
+    ['8k + displacement', 8000, { displacement: 40 }, 0.1],
+  ]) {
+    const base = mk(count, extra);
+    let f = 0;
+    // A fresh cache object every call = every stage misses = full eval.
+    const full = timeMs(() => {
+      f++;
+      return buildPlacements({ ...base, scale: [0.4 + f * 7e-4, 1.6], cache: {} });
+    });
+    const cache = {};
+    buildPlacements({ ...base, cache });
+    const incr = timeMs(() => {
+      f++;
+      return buildPlacements({ ...base, scale: [0.4 + f * 7e-4, 1.6], cache });
+    });
+    const pct = (incr / full) * 100;
+    const pass = pct <= 10;
+    results.push({ name: `dirty-C ${label}`, ms: incr, limitMs: full * 0.1, pass });
+    console.log(
+      `  [${pass ? 'OK  ' : 'MISS'}] dirty-C ${label}: ${incr.toFixed(4)}ms vs full ${full.toFixed(4)}ms `
+      + `= ${pct.toFixed(1)}% of full (budget <=10%)`,
+    );
+  }
+  console.log('  [note] the 420 floor is the per-frame item-object rebuild, which no cache');
+  console.log('         stage skips; it dominates once geometry is cached. Mutating cached');
+  console.log('         items in place would clear it, at the cost of aliasing last frame.');
+}
 
 console.log('\nperf.selfcheck: budgets are #108 targets, not current gates (ENFORCE_BUDGET=false).');
 console.log(`perf.selfcheck: ${results.filter((r) => r.pass).length}/${results.length} budgets already met.`);
