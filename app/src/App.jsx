@@ -20,16 +20,13 @@ import { useApp } from './state/AppContext.jsx';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
 
-// Module scope: a fresh array literal each render would reset the divider's
-// double-click-to-reset target on every frame.
 const COLUMN_FRACTIONS = [0.62, 0.38];
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
 import { wireEventBus } from './composition/wireEventBus.js';
 import { subscribeDispatch } from './composition/dispatchPipe.js';
 
 function AppInner() {
   const { dispatch: rawDispatch, history, palette, svgRef } = useApp();
-  // Wire the event bus once — all panel emits flow through the dispatch pipe.
-  // wireEventBus is idempotent, and rawDispatch is stable.
   const piped = useMemo(() => wireEventBus(rawDispatch), [rawDispatch]);
 
   useEffect(() => subscribeDispatch((a) => {
@@ -144,7 +141,6 @@ function AppInner() {
     piped({ type: A.SET_EVOLVE_MODE, payload: true });
   }, [piped]);
 
-
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
       <MasterBar />
@@ -160,7 +156,7 @@ function AppInner() {
       </ErrorBoundary>
       <FavoritesTray />
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v0.9.0 · kernel.v1</span>
+        <span>KINETIC_CURATOR v{APP_VERSION} · kernel.v1</span>
         <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
       </footer>
     </div>
