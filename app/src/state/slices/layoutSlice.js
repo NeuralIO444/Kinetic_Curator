@@ -176,10 +176,18 @@ export const createLayoutSlice = (set) => ({
     return { ...pushToUndo(state, true), layoutParams: rp };
   }),
 
+  // Entries are tagged with the layerId they were captured for (#92) and the
+  // stack is shared across layers (never reset on switch). Only ever act on
+  // the top entry if it belongs to the layer currently active — otherwise
+  // it would restore one layer's values onto a different layer, which is
+  // the exact corruption this is guarding against. A mismatched top entry
+  // means "nothing to undo/redo for this layer right now" — no-op.
   undo: () => set((state) => {
     if (state.historyUndoStack.length === 0) return {};
     const previous = state.historyUndoStack[state.historyUndoStack.length - 1];
+    if (previous.layerId !== state.activeLayerId) return {};
     const current = {
+      layerId: state.activeLayerId,
       seed: state.seed,
       paletteId: state.paletteId,
       paletteOverrides: state.paletteOverrides
@@ -200,7 +208,9 @@ export const createLayoutSlice = (set) => ({
   redo: () => set((state) => {
     if (state.historyRedoStack.length === 0) return {};
     const next = state.historyRedoStack[state.historyRedoStack.length - 1];
+    if (next.layerId !== state.activeLayerId) return {};
     const current = {
+      layerId: state.activeLayerId,
       seed: state.seed,
       paletteId: state.paletteId,
       paletteOverrides: state.paletteOverrides

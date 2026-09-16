@@ -9,6 +9,12 @@
 // layer just swaps a snapshot in and out of those same fields; only
 // CanvasPanel needs to know layers exist at all, to render the inactive
 // ones from their stored snapshots alongside the live active one.
+//
+// Undo/redo (#92): historyUndoStack/historyRedoStack are NOT reset here.
+// Each entry is tagged with the layerId it was captured for (history.js),
+// and layoutSlice's undo()/redo() only ever act on a top entry whose
+// layerId matches the active layer — so the shared stack survives a
+// switch without one layer's edits ever landing on another.
 import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { initialEnabledAssets } from './globalSlice.js';
 
@@ -63,8 +69,6 @@ export const createLayersSlice = (set) => ({
         [state.activeLayerId]: captureSnapshot(state),
       },
       activeLayerId: id,
-      historyUndoStack: [],
-      historyRedoStack: [],
       ...snapshot,
     };
   }),
@@ -85,8 +89,6 @@ export const createLayersSlice = (set) => ({
       layers,
       layerSnapshots: snapshots,
       activeLayerId: nextActive.id,
-      historyUndoStack: [],
-      historyRedoStack: [],
       ...nextSnapshot,
     };
   }),
@@ -102,8 +104,6 @@ export const createLayersSlice = (set) => ({
         ...state.layerSnapshots,
         [state.activeLayerId]: captureSnapshot(state),
       },
-      historyUndoStack: [],
-      historyRedoStack: [],
       ...snapshot,
     };
   }),
