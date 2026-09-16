@@ -87,11 +87,15 @@ export function normalizeLayoutParams(partial) {
   const next = { ...DEFAULT_LAYOUT_PARAMS, ...src };
   for (const key of RANGE_KEYS) {
     const v = next[key];
-    if (!Array.isArray(v) || v.length < 2) {
-      next[key] = DEFAULT_LAYOUT_PARAMS[key].slice();
-    } else {
-      next[key] = [v[0], v[1]];
-    }
+    // QA (2026-09-16): length was checked but entries were not, so
+    // {scale:['a','b']} from a hand-edited or corrupted project JSON
+    // passed through unchanged and fed NaN/strings into transform math
+    // downstream instead of falling back to a safe default.
+    const usable = Array.isArray(v) && v.length >= 2
+      && Number.isFinite(Number(v[0])) && Number.isFinite(Number(v[1]));
+    next[key] = usable
+      ? [Number(v[0]), Number(v[1])]
+      : DEFAULT_LAYOUT_PARAMS[key].slice();
   }
   if (!SYMMETRY_MODES.includes(next.symmetry)) next.symmetry = 'none';
   if (!BEHAVE_MODES.includes(next.behave)) next.behave = 'cruise';
