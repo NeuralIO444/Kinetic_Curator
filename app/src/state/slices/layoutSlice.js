@@ -1,4 +1,4 @@
-import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
@@ -120,19 +120,59 @@ export const createLayoutSlice = (set) => ({
     };
   }),
 
+  // ── State firewall (#107 §1) ─────────────────────────────────────────────
+  // Every layoutParams write in the app funnels through these two setters —
+  // sliders, presets, randomize, the governor, morph lerps, evolve targets
+  // and ambient drift. Validating here rather than at each call site is both
+  // the smaller diff and the one that cannot be forgotten by the next writer.
+  //
+  // Out-of-range but well-formed values clamp; structurally invalid ones
+  // (NaN, null, wrong type, unknown mode) are rejected and the previous value
+  // is kept. See validateLayoutParams for why those are treated differently.
   setLayoutParam: (key, value) => set((state) => {
     if (state.layoutParams[key] === value) return {};
+    const { params, rejected } = validateLayoutParams({ ...state.layoutParams, [key]: value });
+    if (rejected.includes(key)) {
+      // Keep previous state entirely: do not push an undo entry for a write
+      // that did not happen, or Ctrl-Z stops lining up with what the operator
+      // actually did.
+      if (import.meta.env?.DEV) {
+        console.warn(`[state] rejected setLayoutParam(${key}):`, value);
+      }
+      return {};
+    }
+    // A value that clamps to what is already there is not an edit. Without
+    // this, holding a slider past its maximum pushes an undo entry per event
+    // while the composition never changes, and Ctrl-Z then has to be pressed
+    // twenty times to get anywhere.
+    const cur = state.layoutParams[key];
+    const nextVal = params[key];
+    const unchanged = Array.isArray(nextVal) && Array.isArray(cur)
+      ? nextVal.length === cur.length && nextVal.every((v, i) => Object.is(v, cur[i]))
+      : Object.is(nextVal, cur);
+    if (unchanged) return {};
+
     const undoUpdate = pushToUndo(state, false);
-    const next = { ...undoUpdate, layoutParams: { ...state.layoutParams, [key]: value } };
+    const next = { ...undoUpdate, layoutParams: params };
     if (key === 'mode' && value === 'ca' && !state.caGrid) {
       next.caGrid = createGrid(40, 28);
     }
     return next;
   }),
 
-  setLayoutParams: (params) => set((state) => ({
-    layoutParams: { ...state.layoutParams, ...params },
-  })),
+  setLayoutParams: (params) => set((state) => {
+    const { params: safe, rejected } = validateLayoutParams({ ...state.layoutParams, ...params });
+    if (rejected.length === 0) return { layoutParams: safe };
+    // Partial accept: a bad key in a machine-generated batch (a morph lerp
+    // that produced NaN, an evolve target off the end of a range) must not
+    // discard the good keys alongside it.
+    const kept = { ...safe };
+    for (const key of rejected) kept[key] = state.layoutParams[key];
+    if (import.meta.env?.DEV) {
+      console.warn('[state] rejected setLayoutParams keys:', rejected);
+    }
+    return { layoutParams: kept };
+  }),
 
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
   stepCaGrid: () => set((state) => ({

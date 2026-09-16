@@ -107,8 +107,14 @@ export function MasterBar() {
     quality: s.quality,
     autoQuality: s.autoQuality,
     isRecording: s.isRecording,
+    persistStatus: s.persistStatus,
   }));
-  const { running, fps, seed, nodeCount = 0, quality = 'balanced' } = state;
+  // Default to 'ok' rather than showing the warning for an undefined value:
+  // this selector is explicit, so a field missing from it reads as undefined,
+  // and a pill that fails open would cry UNSAVED on every boot.
+  const {
+    running, fps, seed, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
+  } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
@@ -136,6 +142,22 @@ export function MasterBar() {
           <div className="status-pill">
             <span className={`status-dot ${running ? 'live' : ''}`} />
             {running ? 'LIVE' : 'PAUSED'}
+          </div>
+        )}
+
+        {/* #107 §6: never let the operator assume a long set is being saved
+            when localStorage refused the write, or when boot could not read
+            their last document. */}
+        {persistStatus !== 'ok' && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title={persistStatus === 'quarantined'
+              ? 'Last autosave could not be read. Started from defaults; the file is kept at kc:project:quarantine.'
+              : 'Autosave is failing (storage full or blocked). This session will not be restored.'}
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
           </div>
         )}
 

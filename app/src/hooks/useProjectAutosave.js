@@ -29,7 +29,12 @@ export function useProjectAutosave() {
     restored.current = true;
     try {
       if (sessionStorage.getItem(RESTORED_FLAG)) return;
-      const doc = readAutosave();
+      const { doc, quarantined } = readAutosave();
+      if (quarantined) {
+        // Boot factory defaults and say so. Never silently apply a document
+        // we could not parse (#107 §6).
+        useStore.getState().setPersistStatus('quarantined');
+      }
       if (!doc) return;
       useStore.getState().applyProject(doc);
       sessionStorage.setItem(RESTORED_FLAG, '1');
@@ -56,7 +61,15 @@ export function useProjectAutosave() {
       if (firstChangeAt.current == null) firstChangeAt.current = now;
       const doWrite = () => {
         firstChangeAt.current = null;
-        writeAutosave(serializeProject(useStore.getState()));
+        const res = writeAutosave(serializeProject(useStore.getState()));
+        const store = useStore.getState();
+        // Do not clear a quarantine flag on a later successful write: the
+        // operator still needs to know this session did not start from their
+        // last document.
+        if (store.persistStatus !== 'quarantined') {
+          const next = res.ok ? 'ok' : 'unsaved';
+          if (store.persistStatus !== next) store.setPersistStatus(next);
+        }
       };
 
       if (timer.current) clearTimeout(timer.current);
