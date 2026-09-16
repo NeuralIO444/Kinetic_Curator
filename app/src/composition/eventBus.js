@@ -84,6 +84,8 @@ export const Events = {
   LAYER_RENAME: 'layer:rename',
   LAYER_SET_BLEND_MODE: 'layer:setBlendMode',
   LAYER_SET_OPACITY: 'layer:setOpacity',
+  LAYER_DUPLICATE: 'layer:duplicate',
+  LAYER_SOLO: 'layer:solo',
   PALETTE_SAVE: 'palette:save',
   PALETTE_DELETE: 'palette:delete',
   PALETTE_RENAME: 'palette:rename',
