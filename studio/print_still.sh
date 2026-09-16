@@ -1,5 +1,5 @@
 #!/bin/sh
-# Print still: render at Nx then box-filter to 1000x700.
+# Print still: render at Nx then down-filter to 1000x700.
 # Usage: studio/print_still.sh /full/path/to/saved.project.json /tmp/print.png [scale]
 set -e
 PROJECT=${1:?project json}
@@ -10,5 +10,5 @@ HI=$(mktemp /tmp/kc-print.XXXXXX)
 mv "$HI" "$HI.png"
 HI="$HI.png"
 python3 "$HERE/studio.py" render "$PROJECT" -o "$HI" --res "$SCALE" --sidecar
-ffmpeg -y -i "$HI" -vf "scale=1000:700:flags=box" "$OUT"
+ffmpeg -y -hide_banner -loglevel error -i "$HI" -vf "scale=1000:700:flags=area" "$OUT"
 echo "$OUT"
