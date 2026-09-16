@@ -62,6 +62,7 @@ function AppInner() {
   useProjectAutosave();
 
   const [showHotkeys, setShowHotkeys] = useState(false);
+  const [helpTab, setHelpTab] = useState('help');
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
   useEffect(() => {
     evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
@@ -113,7 +114,7 @@ function AppInner() {
     'n': () => piped({ type: A.BUMP_SEED }),
     ' ': () => piped({ type: A.SET_RUNNING, payload: !state.running }),
     'z': (e) => { if (e.metaKey || e.ctrlKey) { e.shiftKey ? history.redo() : history.undo(); } },
-    '?': () => setShowHotkeys(s => !s),
+    '?': () => { setHelpTab('help'); setShowHotkeys(s => !s); },
   });
 
   const onAudioStimulus = useCallback(v => piped({ type: A.SET_AUDIO_STIMULUS, payload: v }), [piped]);
@@ -145,7 +146,7 @@ function AppInner() {
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
       <MasterBar />
-      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} />
+      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} />
       <FirstRunOverlay onPlay={onPlayMe} />
       <ErrorBoundary>
         <Shell
@@ -158,7 +159,13 @@ function AppInner() {
       <FavoritesTray />
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION}</span>
-        <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {state.layoutParams.mode} · seed:{state.seed.toString(16)}
+          <button type="button" className="micro-btn" title="Settings — no second prefs store"
+            style={{ opacity: 0.45 }} onClick={() => { setHelpTab('settings'); setShowHotkeys(true); }}>⚙</button>
+          <button type="button" className="micro-btn" title="Help"
+            style={{ opacity: 0.45 }} onClick={() => { setHelpTab('help'); setShowHotkeys(true); }}>?</button>
+        </span>
       </footer>
     </div>
   );
