@@ -1,7 +1,10 @@
 import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
-import { sanitizeOverlay, duplicateIntoOverlay } from '../../assets/overlay.js';
+import {
+  sanitizeOverlay, duplicateIntoOverlay, ingestIntoOverlay,
+  removeFromOverlay, renameOverlayAsset, replaceOverlayAsset,
+} from '../../assets/overlay.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
@@ -13,10 +16,7 @@ function normalizeSnapshots(raw) {
   const out = {};
   for (const [id, snap] of Object.entries(raw)) {
     if (!snap || typeof snap !== 'object') continue;
-    out[id] = {
-      ...snap,
-      layoutParams: normalizeLayoutParams(snap.layoutParams),
-    };
+    out[id] = { ...snap, layoutParams: normalizeLayoutParams(snap.layoutParams) };
   }
   return out;
 }
@@ -39,6 +39,7 @@ export const createGlobalSlice = (set) => ({
   enabledAssets: initialEnabledAssets,
   assetWeightOverrides: {},
   customAssets: [],
+  ingestError: null,
   search: '',
   catFilter: 'all',
   poolView: 'grid',
@@ -71,11 +72,13 @@ export const createGlobalSlice = (set) => ({
   }),
   toggleAllAssets: (enabled) => set((state) => {
     const next = { ...state.enabledAssets };
+    const userOnly = state.catFilter === 'user';
     ASSETS.forEach((a) => {
+      if (userOnly) return;
       if (state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
     });
     sanitizeOverlay(state.customAssets).forEach((a) => {
-      if (state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
+      if (state.catFilter === 'all' || state.catFilter === 'user' || a.category === state.catFilter) next[a.id] = enabled;
     });
     return { enabledAssets: next };
   }),
@@ -88,11 +91,47 @@ export const createGlobalSlice = (set) => ({
     const src = findAsset(id, sanitizeOverlay(state.customAssets));
     if (!src) return {};
     const result = duplicateIntoOverlay(src, state.customAssets);
-    if (!result.ok) return {};
+    if (!result.ok) return { ingestError: result.error };
     return {
       customAssets: result.overlay,
       enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
+      ingestError: null,
     };
+  }),
+
+  ingestAsset: (svg, hint) => set((state) => {
+    const result = ingestIntoOverlay(svg, state.customAssets, hint);
+    if (!result.ok) return { ingestError: result.error || 'ingest failed' };
+    return {
+      customAssets: result.overlay,
+      enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
+      ingestError: null,
+    };
+  }),
+
+  removeCustomAsset: (id) => set((state) => {
+    const result = removeFromOverlay(id, state.customAssets);
+    if (!result.ok) return { ingestError: result.error };
+    const enabled = { ...state.enabledAssets };
+    delete enabled[id];
+    return { customAssets: result.overlay, enabledAssets: enabled, ingestError: null };
+  }),
+
+  renameCustomAsset: (id, name) => set((state) => {
+    const result = renameOverlayAsset(id, name, state.customAssets);
+    if (!result.ok) return { ingestError: result.error };
+    const enabled = { ...state.enabledAssets };
+    if (result.from !== result.to) {
+      enabled[result.to] = enabled[result.from];
+      delete enabled[result.from];
+    }
+    return { customAssets: result.overlay, enabledAssets: enabled, ingestError: null };
+  }),
+
+  replaceCustomAsset: (id, svg) => set((state) => {
+    const result = replaceOverlayAsset(id, svg, state.customAssets);
+    if (!result.ok) return { ingestError: result.error };
+    return { customAssets: result.overlay, ingestError: null };
   }),
 
   setAssetWeight: (id, weight) => set((state) => {
@@ -105,9 +144,7 @@ export const createGlobalSlice = (set) => ({
       delete next[id];
       return { assetWeightOverrides: next };
     }
-    return {
-      assetWeightOverrides: { ...state.assetWeightOverrides, [id]: weight },
-    };
+    return { assetWeightOverrides: { ...state.assetWeightOverrides, [id]: weight } };
   }),
 
   cycleAssetWeight: (id) => set((state) => {
@@ -121,9 +158,7 @@ export const createGlobalSlice = (set) => ({
       delete next[id];
       return { assetWeightOverrides: next };
     }
-    return {
-      assetWeightOverrides: { ...state.assetWeightOverrides, [id]: nextW },
-    };
+    return { assetWeightOverrides: { ...state.assetWeightOverrides, [id]: nextW } };
   }),
 
   setCategoryWeight: (category, weight) => set((state) => {
@@ -146,12 +181,11 @@ export const createGlobalSlice = (set) => ({
       quality: doc.quality || state.quality,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
+      ingestError: null,
     };
     if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
       const enabled = { ...initialEnabledAssets };
-      for (const [id, on] of Object.entries(doc.enabledAssets)) {
-        enabled[id] = !!on;
-      }
+      for (const [id, on] of Object.entries(doc.enabledAssets)) enabled[id] = !!on;
       next.enabledAssets = enabled;
     }
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {

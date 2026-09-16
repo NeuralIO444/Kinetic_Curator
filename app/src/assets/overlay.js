@@ -1,4 +1,4 @@
-import { ingestSvg, duplicateAsset, isHostile } from './ingest.js';
+import { ingestSvg, duplicateAsset, isHostile, overlayId } from './ingest.js';
 
 export const OVERLAY_CAP = 32;
 
@@ -42,4 +42,52 @@ export function duplicateIntoOverlay(source, overlay) {
     ? { ...copy.asset, svg: checked.asset.svg, compound: checked.asset.compound }
     : copy.asset;
   return { ok: true, asset, overlay: [...clean, asset] };
+}
+
+export function ingestIntoOverlay(rawSvg, overlay, hint = 'ingest') {
+  const clean = sanitizeOverlay(overlay);
+  if (clean.length >= OVERLAY_CAP) return { ok: false, error: 'overlay full', overlay: clean };
+  const taken = new Set(clean.map((a) => a.id));
+  let base = String(hint || 'ingest').replace(/\.svg$/i, '');
+  let parsed = ingestSvg(rawSvg, { id: base });
+  if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
+  let n = 2;
+  while (taken.has(parsed.asset.id)) {
+    parsed = ingestSvg(rawSvg, { id: `${base}_${n}` });
+    n += 1;
+    if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
+  }
+  const asset = { ...parsed.asset, source: 'ingest', tags: [...new Set([...(parsed.asset.tags || []), 'overlay', 'ingest'])] };
+  return { ok: true, asset, overlay: [...clean, asset] };
+}
+
+export function removeFromOverlay(id, overlay) {
+  if (!String(id).startsWith('user:')) return { ok: false, error: 'canon is read-only', overlay: sanitizeOverlay(overlay) };
+  return { ok: true, overlay: sanitizeOverlay(overlay).filter((a) => a.id !== id) };
+}
+
+export function renameOverlayAsset(id, nextName, overlay) {
+  if (!String(id).startsWith('user:')) return { ok: false, error: 'canon is read-only', overlay: sanitizeOverlay(overlay) };
+  const clean = sanitizeOverlay(overlay);
+  const nextId = overlayId(nextName || 'motif');
+  if (clean.some((a) => a.id === nextId && a.id !== id)) return { ok: false, error: 'id taken', overlay: clean };
+  return {
+    ok: true,
+    overlay: clean.map((a) => (a.id === id ? { ...a, id: nextId } : a)),
+    from: id,
+    to: nextId,
+  };
+}
+
+export function replaceOverlayAsset(id, rawSvg, overlay) {
+  if (!String(id).startsWith('user:')) return { ok: false, error: 'canon is read-only', overlay: sanitizeOverlay(overlay) };
+  const clean = sanitizeOverlay(overlay);
+  const parsed = ingestSvg(rawSvg, { id: String(id).replace(/^user:/, '') });
+  if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
+  const asset = { ...parsed.asset, id, source: 'replace' };
+  return {
+    ok: true,
+    overlay: clean.map((a) => (a.id === id ? asset : a)),
+    asset,
+  };
 }

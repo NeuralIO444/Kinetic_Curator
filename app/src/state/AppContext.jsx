@@ -46,7 +46,6 @@ export function useApp(selector) {
   const dispatch = useCallback((action) => {
     const store = useStore.getState();
     const { type, payload } = action;
-
     switch (type) {
       case A.SET_RUNNING: return store.setRunning(payload);
       case A.SET_FPS: return store.setFps(payload);
@@ -77,6 +76,10 @@ export function useApp(selector) {
       case A.CLEAR_WEIGHT_OVERRIDES: return store.clearWeightOverrides();
       case 'CYCLE_ASSET_WEIGHT': return store.cycleAssetWeight(action.id);
       case 'DUPLICATE_ASSET': return store.duplicateAsset(action.id);
+      case 'INGEST_ASSET': return store.ingestAsset(action.svg, action.hint);
+      case 'REMOVE_CUSTOM_ASSET': return store.removeCustomAsset(action.id);
+      case 'RENAME_CUSTOM_ASSET': return store.renameCustomAsset(action.id, action.name);
+      case 'REPLACE_CUSTOM_ASSET': return store.replaceCustomAsset(action.id, action.svg);
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
       case A.SET_AUDIO_GAIN: return store.setAudioGain(payload);
@@ -135,11 +138,7 @@ export function useApp(selector) {
 
   const palette = resolvePalette(paletteId, paletteOverrides, userPalettes);
   return {
-    state,
-    dispatch,
-    history,
-    palette,
-    paletteOverrides,
+    state, dispatch, history, palette, paletteOverrides,
     palettes: [...PALETTES, ...(userPalettes || [])],
     userPalettes: userPalettes || [],
     paletteLocks: paletteLocks || {},
