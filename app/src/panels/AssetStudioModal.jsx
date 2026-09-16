@@ -7,6 +7,11 @@ import { emit, Events } from '../composition/eventBus.js';
 let seq = 1;
 const SNAP = 10;
 const snap = (n) => Math.round(n / SNAP) * SNAP;
+const clampS = (n) => Math.max(0.3, Math.min(2.5, +Number(n).toFixed(2)));
+
+function axes(p) {
+  return { sx: p.sx ?? p.scale ?? 1, sy: p.sy ?? p.scale ?? 1 };
+}
 
 function toSvg(parts) {
   return parts.map((p) => {
@@ -14,13 +19,14 @@ function toSvg(parts) {
     const paint = p.stroke
       ? `color: ${token}; fill: none; stroke: currentColor; stroke-width: 3`
       : `color: ${token}`;
+    const { sx, sy } = axes(p);
     const inner = PRIMITIVES[p.kind] || p.svg || '';
-    return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${p.scale}) translate(-50 -50)">${inner}</g>`;
+    return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${sx} ${sy}) translate(-50 -50)">${inner}</g>`;
   }).join('');
 }
 
 function fresh(kind, extra = {}) {
-  return { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1, token: 'ink', stroke: false, ...extra };
+  return { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1, sx: 1, sy: 1, token: 'ink', stroke: false, ...extra };
 }
 
 export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
@@ -46,6 +52,15 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     if (picked < 0) return;
     setParts((p) => p.map((row, i) => (i === picked ? fn(row) : row)));
   };
+  const bump = (key, d) => patchSel((r) => {
+    const { sx, sy } = axes(r);
+    if (key === 'both') {
+      const n = clampS((sx + sy) / 2 + d);
+      return { ...r, scale: n, sx: n, sy: n };
+    }
+    const next = key === 'sx' ? clampS(sx + d) : clampS(sy + d);
+    return key === 'sx' ? { ...r, sx: next } : { ...r, sy: next };
+  });
   const undo = () => { setParts((p) => p.slice(0, -1)); setPicked(-1); };
   const dup = () => {
     if (picked < 0) return;
@@ -138,8 +153,12 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: snap(r.y + SNAP) }))}>↓</button>
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}>↺15</button>
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}>↻15</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.max(0.3, +(r.scale - 0.1).toFixed(2)) }))}>S-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.min(2.5, +(r.scale + 0.1).toFixed(2)) }))}>S+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('both', -0.1)}>S-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('both', 0.1)}>S+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sx', -0.1)}>Sx-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sx', 0.1)}>Sx+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sy', -0.1)}>Sy-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sy', 0.1)}>Sy+</button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}>INK</button>
@@ -160,7 +179,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <input value={hint} onChange={(e) => setHint(e.target.value)} style={field} />
             </label>
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
-              Drag corner of this window to grow the stage. Snap {SNAP}. No boolean — ring is a hole primitive. Pen stays in Illustrator.
+              Sx/Sy stretch on one axis. S± stays uniform. No boolean. Pen stays in Illustrator.
             </p>
           </div>
         </div>
