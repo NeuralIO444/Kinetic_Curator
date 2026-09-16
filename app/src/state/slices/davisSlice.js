@@ -63,7 +63,14 @@ export const createDavisSlice = (set) => ({
     seed: state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed,
   })),
 
-  tickPhraseBeat: () => set((state) => tickPhraseBeat(state, { stepGrid, createGrid })),
+  tickPhraseBeat: () => set((state) => {
+    const next = tickPhraseBeat(state, { stepGrid, createGrid });
+    if (next.phraseDidWrap) {
+      const { phraseDidWrap, ...rest } = next;
+      return rest;
+    }
+    return next;
+  }),
 
   triggerEvolve: () => set((state) => {
     const ts = Date.now();
