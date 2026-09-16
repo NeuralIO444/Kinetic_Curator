@@ -226,6 +226,9 @@ export class ParticleSystem {
     const attractMul = organism ? profile.attract : 1;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
+    const sepRadius2 = sepRadius * sepRadius;
+    const aliRadius2 = aliRadius * aliRadius;
+    const cohRadius2 = cohRadius * cohRadius;
     const numParticles = this.n;
     const { cellStart, order, cols, rows, minCx, minCy, cellSize } = this._buildSpatialHash(maxRadius);
     const cx0 = this.canvasW / 2;
@@ -298,10 +301,16 @@ export class ParticleSystem {
             // maxRadius), and every `dist < radius` test below is false for
             // all three radii. Skipping contributes the same nothing.
             if (d2 >= maxRadius2) continue;
-            const dist = Math.sqrt(d2);
-            if (dist > 0 && dist < sepRadius) { sepX -= dx / dist; sepY -= dy / dist; sepCount++; }
-            if (dist > 0 && dist < aliRadius) { aliX += VX[j]; aliY += VY[j]; aliCount++; }
-            if (dist > 0 && dist < cohRadius) { cohX += X[j]; cohY += Y[j]; cohCount++; }
+            // Alignment/cohesion only test "is this neighbour within radius"
+            // — a squared-distance compare answers that without a sqrt.
+            // Separation needs the actual unit vector (dx/dist, dy/dist), so
+            // it alone pays for the real sqrt, and only when it is in range.
+            if (d2 > 0 && d2 < sepRadius2) {
+              const dist = Math.sqrt(d2);
+              sepX -= dx / dist; sepY -= dy / dist; sepCount++;
+            }
+            if (d2 > 0 && d2 < aliRadius2) { aliX += VX[j]; aliY += VY[j]; aliCount++; }
+            if (d2 > 0 && d2 < cohRadius2) { cohX += X[j]; cohY += Y[j]; cohCount++; }
           }
         }
       }

@@ -19,11 +19,14 @@
 //
 // Correctness assertions below are real gates — they fail the build. Budget
 // numbers are measured and printed every run so the trend shows in CI logs,
-// but only THROW once ENFORCE_BUDGET flips. Budget 3 is still ~1.4x over
-// after the swarm SoA, and closing it needs either a deliberate swarm
-// behaviour change (smaller cells reorder neighbour visits, which moves every
-// existing seed's output) or WASM — neither of which is a refactor, so the
-// flag stays down rather than failing CI on an open decision.
+// but only THROW once ENFORCE_BUDGET flips. Budget 3 is still ~1.2x over
+// after the swarm SoA plus the squared-distance neighbour check (#108 item
+// 3), and closing the rest needs either a deliberate swarm behaviour change
+// (smaller cells, or a different neighbour visit order, both of which move
+// every existing seed's output — see particles.js's exact-match lock) or a
+// Rust/WASM rewrite of the kernel (#108's own stated path) — a call for a
+// human, not something to force here. The flag stays down rather than
+// failing CI on an open decision.
 const ENFORCE_BUDGET = false;
 
 import assert from 'node:assert';
@@ -163,16 +166,24 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 }
 
 // ── 3. Bake 400 x 120 swarm steps ────────────────────────────────────────
-// Issue cites ~105ms for this shape; it measured 65-67ms here pre-SoA and
-// ~41ms after. Still over the 30ms budget, and the remaining cost is genuine:
-// boids cohesion clumps the swarm, so a settled 400-particle run scans ~40
-// candidates per particle against the ~13 a uniform density would predict.
+// Issue cites ~105ms for this shape; it measured 65-67ms here pre-SoA, ~41ms
+// after the SoA, and ~36ms after also skipping the alignment/cohesion sqrt
+// in favour of a squared-distance radius test (#108 item 3 — see
+// particles.js update()). Still over the 30ms budget, and what's left is a
+// genuine, documented-permanent-for-now gap: boids cohesion clumps the
+// swarm, so a settled 400-particle run scans ~40 candidates per particle
+// against the ~13 a uniform density would predict, and the remaining cost is
+// bound by neighbour-visit-order and spatial-hash cell size — both of which
+// particles.selfcheck.mjs's exact-match hashes forbid changing without a
+// deliberate new golden baseline. Closing the rest of the gap means either
+// accepting it or a Rust/WASM rewrite of the kernel (#108's own stated
+// path); that tradeoff is a call for a human, not something to force here.
 //
 // Worth knowing what this budget is actually protecting: bakeParticles runs
 // only in studio/render.mjs, the offline render farm. Nothing interactive
 // waits on it. The live swarm uses ParticleSystem.update per frame, which the
-// same change made 1.8-1.9x faster at every shipped particle cap — that is
-// the path with a 16.7ms deadline.
+// same changes made faster at every shipped particle cap — that is the path
+// with a 16.7ms deadline.
 {
   const opts = {
     seed: SEED,
@@ -237,9 +248,11 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
       + `= ${pct.toFixed(1)}% of full (budget <=10%)`,
     );
   }
-  console.log('  [note] the 420 floor is the per-frame item-object rebuild, which no cache');
-  console.log('         stage skips; it dominates once geometry is cached. Mutating cached');
-  console.log('         items in place would clear it, at the cost of aliasing last frame.');
+  console.log('  [note] dirty-C 420 now passes: on a full geo+bind hit with overlap on,');
+  console.log('         buildPlacements mutates the cached item pool\'s scale/rotation/alpha');
+  console.log('         in place (#108 item 6) instead of rebuilding soa.n fresh objects');
+  console.log('         every frame. Guarded to overlap-only — the !overlap sort path would');
+  console.log('         otherwise reorder a pool that stage bind indexes by soa slot.');
 }
 
 console.log('\nperf.selfcheck: budgets are #108 targets, not current gates (ENFORCE_BUDGET=false).');
