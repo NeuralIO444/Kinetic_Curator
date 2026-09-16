@@ -18,7 +18,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
       ? [{ key: seq++, kind: 'seed', svg: seedSvg, x: 50, y: 50, rot: 0, scale: 1 }]
       : []
   ));
-  const [sel, setSel] = useState(-1);
+  const [picked, setPicked] = useState(-1);
   const [category, setCategory] = useState('organic');
   const [hint, setHint] = useState(seedId.replace(/^user:/, '') || 'motif');
   const drag = useRef(null);
@@ -28,16 +28,18 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const compound = parts.length > 1 || (seedSvg && parts.length >= 1);
 
   const add = (kind) => {
-    setParts((p) => [...p, { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1 }]);
-    setSel(parts.length);
+    setParts((p) => {
+      setPicked(p.length);
+      return [...p, { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1 }];
+    });
   };
   const patchSel = (fn) => {
-    if (sel < 0) return;
-    setParts((p) => p.map((row, i) => (i === sel ? fn(row) : row)));
+    if (picked < 0) return;
+    setParts((p) => p.map((row, i) => (i === picked ? fn(row) : row)));
   };
   const undo = () => {
     setParts((p) => p.slice(0, -1));
-    setSel(-1);
+    setPicked(-1);
   };
 
   const pt = (e) => {
@@ -58,7 +60,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
       const d = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d < best && d < 18 * 18) { best = d; hit = i; }
     });
-    setSel(hit);
+    setPicked(hit);
     if (hit >= 0) {
       drag.current = { i: hit, dx: parts[hit].x - x, dy: parts[hit].y - y };
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -94,8 +96,8 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
             <g dangerouslySetInnerHTML={{ __html: grid }} />
             <g dangerouslySetInnerHTML={{ __html: svg }} />
-            {sel >= 0 && parts[sel] && (
-              <circle cx={parts[sel].x} cy={parts[sel].y} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
+            {picked >= 0 && parts[picked] && (
+              <circle cx={parts[picked].x} cy={parts[picked].y} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
             )}
           </svg>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
@@ -105,24 +107,24 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               ))}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, x: r.x - 5 }))}>←</button>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, x: r.x + 5 }))}>→</button>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, y: r.y - 5 }))}>↑</button>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, y: r.y + 5 }))}>↓</button>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}>↺15</button>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}>↻15</button>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.max(0.3, +(r.scale - 0.1).toFixed(2)) }))}>S-</button>
-              <button type="button" className="chip-btn" disabled={sel < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.min(2.5, +(r.scale + 0.1).toFixed(2)) }))}>S+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: r.x - 5 }))}>←</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: r.x + 5 }))}>→</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: r.y - 5 }))}>↑</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: r.y + 5 }))}>↓</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}>↺15</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}>↻15</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.max(0.3, +(r.scale - 0.1).toFixed(2)) }))}>S-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.min(2.5, +(r.scale + 0.1).toFixed(2)) }))}>S+</button>
             </div>
             <label style={lbl}>
               family
-              <select value={category} onChange={(e) => setCategory(e.target.value)} style={sel}>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} style={field}>
                 {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
             <label style={lbl}>
               id hint
-              <input value={hint} onChange={(e) => setHint(e.target.value)} style={sel} />
+              <input value={hint} onChange={(e) => setHint(e.target.value)} style={field} />
             </label>
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
               Click a shape, drag or nudge. 15° rotate. Save → user: overlay.
@@ -131,7 +133,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
         </div>
         <footer style={foot}>
           <button type="button" className="chip-btn" onClick={undo} disabled={!parts.length}>UNDO</button>
-          <button type="button" className="chip-btn" onClick={() => { setParts([]); setSel(-1); }}>CLEAR</button>
+          <button type="button" className="chip-btn" onClick={() => { setParts([]); setPicked(-1); }}>CLEAR</button>
           <button type="button" className="chip-btn" onClick={save} disabled={!parts.length} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
         </footer>
       </div>
@@ -150,4 +152,4 @@ const body = { display: 'flex', gap: 12, padding: 12 };
 const stage = { background: '#0a0a0a', border: '1px solid var(--line)', flex: '0 0 auto', touchAction: 'none' };
 const foot = { display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line)' };
 const lbl = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 9, letterSpacing: '0.08em', color: 'var(--dim)', textTransform: 'uppercase' };
-const sel = { background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', fontSize: 11, padding: '4px 6px' };
+const field = { background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', fontSize: 11, padding: '4px 6px' };
