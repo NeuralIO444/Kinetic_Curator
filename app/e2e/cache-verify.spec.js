@@ -3,14 +3,33 @@
 // useState slot in useCanvasItems, and a stale one would silently swallow
 // geometry edits while the canvas kept animating convincingly.
 //
-// NOTE: screenshot diffing is useless here — the canvas animates every frame,
-// so two shots always differ whether or not an edit took effect. Assert on
-// node identity instead, which only changes when the kernel re-derives.
+// Two things this test learned the hard way, both worth keeping:
+//
+// 1. Screenshot diffing is useless here. The canvas animates every frame, so
+//    two shots always differ whether or not an edit took effect — the
+//    assertion passes vacuously. Assert on node count, which only moves when
+//    the kernel re-derives.
+// 2. Do not drive the slider with keyboard repeat. It worked locally and
+//    failed on CI, where focus was lost partway and the restore keypresses
+//    went nowhere (198 -> 147 -> 147). Set the value explicitly instead, and
+//    compare against values far enough apart that ambient layoutParams drift
+//    cannot account for the difference.
 import { test, expect } from '@playwright/test';
 
-const keys = async (page) => page.evaluate(() =>
-  Array.from(document.querySelectorAll('svg use')).map((u) =>
-    u.getAttribute('href') + '@' + (u.getAttribute('transform') || '')));
+const nodeCount = (page) => page.locator('svg use').count();
+
+/** Set a range input to an exact value and let React commit it. */
+async function setRange(page, slider, value) {
+  await slider.evaluate((el, v) => {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value',
+    ).set;
+    setter.call(el, String(v));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+  await page.waitForTimeout(700);
+}
 
 test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   const errors = [];
@@ -24,37 +43,26 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1000);
 
-  const before = await keys(page);
-  expect(before.length).toBeGreaterThan(0);
-  console.log('[cache] initial <use> nodes:', before.length);
-
-  // COUNT is a stage-A input. If the geometry cache were stale, the node
-  // count would not move — and node count cannot be faked by animation.
   await page.getByRole('tab', { name: /layout/i }).first().click();
   await page.waitForTimeout(300);
-  const countSlider = page.locator('input[type="range"]').first();
-  await countSlider.focus();
-  for (let k = 0; k < 25; k++) await page.keyboard.press('ArrowLeft');
-  await page.waitForTimeout(800);
 
-  const after = await keys(page);
-  console.log('[cache] after COUNT edit:', after.length);
-  expect(after.length, 'COUNT edit did not change node count — geometry cache is stale')
-    .not.toBe(before.length);
+  // COUNT is a stage-A input: if the geometry cache went stale, changing it
+  // would not move the node count. Node count cannot be faked by animation.
+  const count = page.locator('input[type="range"]').first();
+  await expect(count).toBeVisible();
 
-  // Direction, not an exact value: ambient drift and key-repeat timing move
-  // the node count by a few units run to run, so asserting an exact restore
-  // is flaky even on main (verified: main returns 196/201/205, never 198).
-  expect(after.length, 'lowering COUNT should lower the node count')
-    .toBeLessThan(before.length);
+  await setRange(page, count, 700);
+  const high = await nodeCount(page);
+  await setRange(page, count, 60);
+  const low = await nodeCount(page);
+  await setRange(page, count, 700);
+  const restored = await nodeCount(page);
+  console.log(`[cache] COUNT 700 -> ${high} nodes, 60 -> ${low}, back to 700 -> ${restored}`);
 
-  // And back up again — the cache must not be one-way sticky.
-  for (let k = 0; k < 25; k++) await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(800);
-  const restored = await keys(page);
-  console.log('[cache] after restoring COUNT:', restored.length);
-  expect(restored.length, 'raising COUNT again should raise the node count')
-    .toBeGreaterThan(after.length);
+  expect(high, 'COUNT=700 should place many more shapes than COUNT=60')
+    .toBeGreaterThan(low * 2);
+  expect(restored, 'returning COUNT to 700 should restore the high node count')
+    .toBeGreaterThan(low * 2);
 
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);
 });
