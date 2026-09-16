@@ -41,6 +41,22 @@ export const createGlobalSlice = (set) => ({
    * composition suddenly stopped breathing.
    */
   slowRender: false,
+  /**
+   * Tier 1 of the watchdog (#107 §4): FPS < 16 sustained 2s. Shedding, not
+   * stopping — ACCUM, gloss and mirror render-off across every visible
+   * layer, not just the active one, since a bad layer or a heavy inactive
+   * snapshot can be the one costing the frame. Auto-clears the instant FPS
+   * recovers; tripWatchdog (tier 2) also sets it, since a full trip should
+   * shed everything tier 1 sheds too.
+   */
+  perfTier1: false,
+  /** Bumped by every tripWatchdog() call — lets a subscriber (OutputPanel's
+   * in-flight export restore) react to a NEW trip instead of a boolean it
+   * has already seen. */
+  watchdogTripGen: 0,
+  /** Last string passed to tripWatchdog(reason) — surfaced for debugging why
+   * the session is paused (e.g. 'fps-critical' vs a render-error label). */
+  lastWatchdogReason: null,
   webcamEnabled: false,
   motionEnergy: 0,
 
@@ -78,6 +94,23 @@ export const createGlobalSlice = (set) => ({
   setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
   setSlowRender: (slow) => set({ slowRender: slow }),
+  setPerfTier1: (on) => set({ perfTier1: !!on }),
+  /**
+   * Tier 2 of the watchdog (#107 §4): FPS ~ 0 sustained, or a critical
+   * render-error (top-level Shell boundary only). Unlike tier 1, this is a
+   * hard stop that does not undo itself on recovery — matches the Escape
+   * panic-key precedent, where a panic action pauses but never resumes.
+   * Cross-slice write (evolveMode lives in davisSlice): already precedented
+   * by setQuality reaching into layoutParams above.
+   */
+  tripWatchdog: (reason) => set((state) => ({
+    slowRender: true,
+    running: false,
+    evolveMode: false,
+    perfTier1: true,
+    watchdogTripGen: state.watchdogTripGen + 1,
+    lastWatchdogReason: reason,
+  })),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
   setMotionEnergy: (energy) => set({ motionEnergy: energy }),
 

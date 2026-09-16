@@ -66,15 +66,21 @@ export function CanvasPanel() {
     driftOverlay: s.driftOverlay,
     perfClampOverride: s.perfClampOverride,
     slowRender: s.slowRender,
+    perfTier1: s.perfTier1,
   }));
   const {
     layoutParams, weightOverrides, evolveMode, beatPulse, audioBands,
     motionSmoothing, quality, running, layers, activeLayerId, slowRender,
+    perfTier1,
   } = state;
 
   const preset = getPreset(layoutParams.composition);
   const caps = getQualityCaps(quality || 'balanced');
-  const accumOn = !!layoutParams.accumulation;
+  // #107 §4 tier 1: ACCUM is a render-only buffer (see useAccumulationBuffer),
+  // so shedding it under sustained low FPS is another render-only override —
+  // same treatment as driftOverlay/perfClampOverride, just gated here instead
+  // of merged into layoutParams.
+  const accumOn = !!layoutParams.accumulation && !perfTier1;
   const viewport = useCanvasViewport();
   const { zoom, pan } = viewport;
   const [bgMode, setBgMode] = useState('palette');
@@ -87,14 +93,20 @@ export function CanvasPanel() {
   const visibleLayers = useMemo(() => layers.filter(l => l.visible), [layers]);
   const resolvedLayers = useMemo(() => visibleLayers.map(layer => {
     const src = resolveLayerSource(layer, state);
+    // #107 §4 tier 1: unlike driftOverlay/perfClampOverride (active layer
+    // only), mirror sheds on EVERY visible layer — an inactive snapshot can
+    // be the one costing the frame.
+    const layoutParams = (perfTier1 && src.layoutParams.mirror)
+      ? { ...src.layoutParams, mirror: false }
+      : src.layoutParams;
     const palette = resolvePalette(src.paletteId, src.paletteOverrides, state.userPalettes);
     const activeAssets = assets
       .filter(a => src.enabledAssets[a.id])
       .map(a => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
-    const safeCount = clampCount(src.layoutParams.count, src.layoutParams.mirror, caps);
-    const safeParticles = Math.min(src.layoutParams.particleCount || 150, caps.maxParticles);
-    return { layer, ...src, palette, activeAssets, safeCount, safeParticles };
-  }), [visibleLayers, state, assets, weightOverrides, caps]);
+    const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
+    const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
+    return { layer, ...src, layoutParams, palette, activeAssets, safeCount, safeParticles };
+  }), [visibleLayers, state, assets, weightOverrides, caps, perfTier1]);
 
   const spriteAssets = useMemo(() => {
     const seen = new Map();
@@ -111,7 +123,7 @@ export function CanvasPanel() {
   const totalNodeCount = resolvedLayers.reduce((sum, rl) => sum + (layerCounts[rl.layer.id] || 0), 0);
   const activeCount = layerCounts[activeLayerId] || 0;
   const activeSafeCount = resolvedLayers.find(rl => rl.layer.id === activeLayerId)?.safeCount ?? 0;
-  const showGloss = shouldRenderGloss(quality, layoutParams.shading, activeCount);
+  const showGloss = shouldRenderGloss(quality, layoutParams.shading, activeCount) && !perfTier1;
   const { clear: clearAccum } = useAccumulationBuffer({
     svgRef, accumRef, enabled: accumOn,
     fade: layoutParams.accumulationFade ?? 0.88,
@@ -177,6 +189,7 @@ export function CanvasPanel() {
                     palette={rl.palette} caGrid={rl.caGrid} caps={caps} safeCount={rl.safeCount} safeParticles={rl.safeParticles}
                     effectiveScale={effectiveScale} effectiveAlpha={effectiveAlpha} canvasW={CANVAS_W} canvasH={CANVAS_H}
                     scaleMul={scaleMul} alphaBoost={alphaBoost} motionSmoothing={motionSmoothing} quality={quality}
+                    perfTier1={perfTier1}
                     layerBlendMode={rl.layer.layerBlendMode} layerOpacity={rl.layer.layerOpacity}
                     attractorRef={viewport.attractorRef} onCount={(count) => reportCount(rl.layer.id, count)} />
                 </ErrorBoundary>

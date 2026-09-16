@@ -109,13 +109,14 @@ export function MasterBar() {
     isRecording: s.isRecording,
     persistStatus: s.persistStatus,
     slowRender: s.slowRender,
+    perfTier1: s.perfTier1,
   }));
   // Default to 'ok' rather than showing the warning for an undefined value:
   // this selector is explicit, so a field missing from it reads as undefined,
   // and a pill that fails open would cry UNSAVED on every boot.
   const {
     running, fps, seed, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
-    slowRender = false,
+    slowRender = false, perfTier1 = false,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -163,17 +164,33 @@ export function MasterBar() {
           </div>
         )}
 
-        {/* #107 §4: the governor paused evolve/life/ACCUM/swarm because FPS
-            is on the floor — otherwise this looks like the app just stopped
-            breathing for no reason. */}
+        {/* #107 §4: the watchdog tripped (tier 2 — FPS ~0, or a critical
+            render-error) — running/evolve are OFF and do not resume on their
+            own, otherwise this looks like the app just stopped for no
+            reason and the operator waits for a recovery that never comes. */}
         {slowRender && (
           <div
             className="status-pill"
             style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
-            title="FPS is sustained near zero. Evolve, ambient life drift, ACCUM and swarm are paused until it recovers."
+            title="Watchdog tripped: running and evolve are off and will not resume on their own. Press space or ▶ RUN to resume."
           >
             <span className="status-dot" style={{ background: '#ff2d6f' }} />
             PERF PAUSED
+          </div>
+        )}
+
+        {/* #107 §4 tier 1: a milder, self-clearing shed (FPS < 16 sustained
+            2s) — ACCUM/gloss/mirror are off across every visible layer.
+            Suppressed once tier 2 has tripped: PERF PAUSED above already
+            covers that, and this would just be a redundant second pill. */}
+        {perfTier1 && !slowRender && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title="FPS is sustained below 16. ACCUM, gloss and mirror are off across all visible layers — clears automatically once FPS recovers."
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            LOAD SHED
           </div>
         )}
 

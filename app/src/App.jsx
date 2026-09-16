@@ -166,7 +166,7 @@ function AppInner() {
       <MasterBar />
       <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} />
       <FirstRunOverlay onPlay={onPlayMe} />
-      <ErrorBoundary>
+      <ErrorBoundary critical>
         <Shell
           dispatchPipe={piped}
           containerRef={containerRef}

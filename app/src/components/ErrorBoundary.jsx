@@ -13,7 +13,13 @@
 // logs either way.
 // `label`: optional string included in the console.error, since "Render
 // error" alone doesn't say which of several nested boundaries caught it.
+// `critical`: optional bool (#107 §4) — trips the watchdog (running/evolve
+// off, requires manual resume) on top of the local fail-soft above. Only the
+// top-level Shell boundary in App.jsx should ever pass this: a per-layer
+// boundary escalating into a full trip would defeat the nested fail-soft
+// work #107 §3 already did.
 import { Component } from 'react';
+import { useStore } from '../state/store.js';
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -27,6 +33,10 @@ export class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error(`[ErrorBoundary]${this.props.label ? ` ${this.props.label}` : ''}`, error, info.componentStack);
+    if (this.props.critical) {
+      const label = this.props.label ? ` (${this.props.label})` : '';
+      useStore.getState().tripWatchdog(`render-error${label}`);
+    }
   }
 
   render() {
