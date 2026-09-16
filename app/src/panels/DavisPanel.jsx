@@ -21,6 +21,8 @@ export function DavisPanel() {
     phraseLength: s.phraseLength,
     phraseMode: s.phraseMode,
     phraseBeat: s.phraseBeat,
+    phraseClock: s.phraseClock,
+    phraseBpm: s.phraseBpm,
     morphEvolve: s.morphEvolve,
     morphDurationMs: s.morphDurationMs,
     morphing: s.morphing,
@@ -30,6 +32,7 @@ export function DavisPanel() {
     evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot,
     motionSmoothing, favorites, seed, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
+    phraseClock, phraseBpm,
     morphEvolve, morphDurationMs, morphing, audioEnabled,
   } = state;
   const { palette } = useApp();
@@ -44,6 +47,7 @@ export function DavisPanel() {
   });
 
   const phraseProgress = phraseLength > 0 ? (phraseBeat / phraseLength) * 100 : 0;
+  const metro = phraseClock === 'metro';
 
   return (
     <div className="panel panel-davis">
@@ -52,6 +56,7 @@ export function DavisPanel() {
         title="DAVIS MODE"
         subtitle={
           morphing ? 'morphing…'
+            : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`
             : phraseEnabled && !audioEnabled ? 'phrase armed · waiting for beat'
             : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}`
             : evolveMode ? 'evolving'
@@ -81,6 +86,8 @@ export function DavisPanel() {
             phraseProgress={phraseProgress}
             layoutMode={layoutParams.mode}
             audioEnabled={audioEnabled}
+            phraseClock={phraseClock || 'audio'}
+            phraseBpm={phraseBpm || 120}
           />
 
           <div className="davis-actions">
