@@ -40,16 +40,15 @@
 }
 .single-slider::-moz-range-thumb { width: 14px; height: 18px; background: var(--accent3); border: none; border-radius: 0; cursor: ew-resize; }
 
-/* ─── Bundle 3: Parameter Exploration ─── */
 .range-label-group { display: inline-flex; align-items: center; gap: 4px; }
 .range-right { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
 .range-readout { cursor: text; padding: 0 2px; }
 .range-readout:hover { background: rgba(255,255,255,0.06); border-radius: 2px; }
 
 .lock-btn, .dice-btn {
-  background: transparent; border: none; padding: 4px;
-  min-width: 22px; min-height: 22px;
-  font-size: 12px; cursor: pointer; opacity: 0.55;
+  background: transparent; border: none; padding: 6px;
+  min-width: 26px; min-height: 26px;
+  font-size: 13px; cursor: pointer; opacity: 0.7;
   transition: opacity 0.1s, transform 0.1s;
 }
 .lock-btn:hover, .dice-btn:hover { opacity: 1; }
