@@ -115,6 +115,7 @@ export function MasterBar() {
   const fpsWidth = Math.min(100, (fps / 60) * 100);
   const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
   const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.balanced;
+  const buildId = import.meta.env.VITE_BUILD_ID || 'dev';
 
   return (
     <div className="master-bar">
@@ -122,7 +123,8 @@ export function MasterBar() {
         <div className="logo">
           <span className="logo-mark">◈</span>
           <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
-          <span className="logo-version">v0.9</span>
+          <span className="logo-version">v0.9.0</span>
+          <span className="logo-build" title="Build id from VITE_BUILD_ID">Build: {buildId}</span>
         </div>
 
         {state.isRecording ? (
