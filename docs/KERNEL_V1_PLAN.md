@@ -328,13 +328,13 @@ Related: color epic [#50](https://github.com/NeuralIO444/Kinetic_Curator/issues/
 
 ## 16. Kernel v2 addendum — SoA, staged eval, Worker ABI (#108)
 
-**Status:** steps 1 (measurement harness), 2 (SoA + in-place fill) and 4
-(staged eval + dirty flags) landed. Step 3 (displacement field texture) was
-measured and rejected — it is slower than what it replaces at every count
-this app ships. `engine/perf.selfcheck.mjs` went first, per the issue's own rule —
+**Status:** steps 1 (measurement harness), 2 (SoA + in-place fill), 4 (staged
+eval + dirty flags) and the swarm SoA landed. Step 3 (displacement field
+texture) was measured and rejected — it is slower than what it replaces at
+every count this app ships. `engine/perf.selfcheck.mjs` went first, per the issue's own rule —
 *"measure first... rewrite is a response to a missed budget, not a vibe."*
-The swarm SoA and the Worker ABI are still outstanding; this is not a claim
-that the rewrite is done.
+The Worker ABI is still outstanding; this is not a claim that the rewrite is
+done.
 
 ### Baseline (M2 Max, local — CI hardware will read slower)
 
@@ -483,6 +483,68 @@ slow no-op nothing else would notice. `e2e/cache-verify.spec.js` covers the
 React wiring, where a stale cache would swallow geometry edits while the
 canvas kept animating convincingly.
 
+### Swarm SoA result
+
+Profiled before rewriting. For the 400x120 bake (67.4ms pre-change):
+
+| Section | ms/bake | share |
+|---|---|---|
+| boids neighbour loop (sep/ali/coh) | 54.1 | **80%** |
+| wind + attractor forces | 7.5 | 11% |
+| spatial hash rebuild | 3.4 | 5% |
+| integration | 2.2 | 3% |
+
+That redirected the work. The plan guessed the per-step hash *rebuild* might
+dominate; it was 5%. Three changes, each measured separately:
+
+| Change | bake 400x120 |
+|---|---|
+| baseline (heap `Particle` + `Map` keyed `` `${cx},${cy}` ``) | 67.4ms |
+| …integer Map key instead of a template literal | 49.8ms |
+| …counting-sort `Int32Array` grid instead of `Map` | 45.7ms |
+| …SoA columns + squared-distance rejection | **41.0ms** |
+
+The single biggest win was **deleting a string allocation**: nine neighbour
+cells per particle per step is 3.9M key strings across one bake. The SoA
+conversion itself was worth less than an isolated micro-benchmark predicted
+(37% there, ~10% here) because the neighbour set is small and stays cache-warm
+— worth recording, since "SoA is faster" is exactly the kind of claim that
+travels further than its evidence.
+
+**Everything is bit-for-bit identical to the pre-SoA engine.** That was the
+hard constraint, and it shaped the implementation: neighbours are visited in
+the Map version's order (ox outer, oy inner; ascending index within a cell),
+the grid is sized to the particles' real cell extent rather than clamped (cloud
+particles wrap to negative cell coordinates), and every arithmetic expression
+keeps its original form — `f / mass`, not `f * (1/mass)`; `x / cellSize`, not
+`x * (1/cellSize)`. Float addition is not associative and the system is
+chaotic, so a single reordered sum would have given every existing swarm seed a
+different composition. `particles.selfcheck.mjs` pins five configurations
+(cloud, attractor, organism with spine + bilateral wings, dense, off-canvas
+wrap) to hashes captured from the old engine.
+
+The squared-distance rejection is exact rather than approximate: `sqrt` is
+correctly rounded, so `d2 >= maxRadius²` implies the distance fails all three
+radius tests, and skipping those candidates contributes the same nothing.
+
+**The 30ms budget is still missed, at 41ms.** The remaining cost is real work:
+boids cohesion clumps the swarm, so a settled 400-particle run scans **40.5**
+candidates per particle against the **13.5** a uniform density predicts (83 of
+266 cells occupied, densest holding 21). Closing the gap needs either smaller
+cells — which reorders neighbour visits and so changes every existing seed's
+output, a product decision rather than a refactor — or WASM (step 6).
+
+Worth being clear about what that budget protects: `bakeParticles` runs only
+in `studio/render.mjs`, the offline render farm. Nothing interactive waits on
+it. The live swarm calls `ParticleSystem.update` once per frame, and that is
+where the change actually lands:
+
+| Live per-frame `update()` | main | swarm SoA | |
+|---|---|---|---|
+| 100 particles (PERF cap) | 0.093ms | 0.049ms | **1.91×** |
+| 200 particles (BALANCED cap) | 0.224ms | 0.126ms | **1.78×** |
+| 350 particles (HIGH cap) | 0.413ms | 0.231ms | **1.79×** |
+
 ### Proposed sequence for the remaining work items
 
 Ordered so each step is independently measurable against the same harness
@@ -495,11 +557,11 @@ reverted on its own.
    reads columns. Golden hash bit-for-bit identical. The measured outcome
    moved the argument for step 4: staged eval is now the step that *pays
    for* the columns, not merely a step that benefits from them.
-2. **Swarm SoA** (item 4) — highest measured gain per the baseline above.
-   Replace `Particle` instances with parallel typed arrays; keep the
-   existing spatial-hash *algorithm* but drop the per-step rebuild if the
-   profile shows it dominating (measure before assuming). `bakeParticles`
-   keeps its current signature; only its internals change.
+2. ~~**Swarm SoA** (item 4)~~ — **DONE**, see "Swarm SoA result" above.
+   The "drop the per-step rebuild if the profile shows it dominating" hedge
+   was right to include: the profile showed the rebuild was **5%** of the
+   cost, not the bottleneck. What it *did* show was that the rebuild's Map
+   keyed by a template literal was, and that the neighbour loop was 80%.
 3. ~~**Displacement field texture** (item 3)~~ — **REJECTED on measurement.**
    See "Step 3 rejected" below. It is a pessimization at every count this app
    ships, and inaccurate at the top of the `noiseFreq` range.
@@ -517,5 +579,6 @@ reverted on its own.
 ### What this addendum is not
 
 Not a claim that #108 is done. `ENFORCE_BUDGET` in `perf.selfcheck.mjs`
-stays `false` until the swarm SoA lands — the bake budget is still ~2x over,
-so flipping it now would fail every CI run on work that hasn't happened yet.
+stays `false`. After the swarm SoA the bake budget is still ~1.4x over, and
+closing it needs either a deliberate swarm behaviour change or WASM — an open
+decision, not undone work. Flipping the flag would just fail CI on it.

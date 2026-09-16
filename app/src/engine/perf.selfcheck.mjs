@@ -19,8 +19,11 @@
 //
 // Correctness assertions below are real gates — they fail the build. Budget
 // numbers are measured and printed every run so the trend shows in CI logs,
-// but only THROW once ENFORCE_BUDGET flips, which needs the swarm SoA
-// (budget 3 is still ~2x over) — flipping it now fails CI on undone work.
+// but only THROW once ENFORCE_BUDGET flips. Budget 3 is still ~1.4x over
+// after the swarm SoA, and closing it needs either a deliberate swarm
+// behaviour change (smaller cells reorder neighbour visits, which moves every
+// existing seed's output) or WASM — neither of which is a refactor, so the
+// flag stays down rather than failing CI on an open decision.
 const ENFORCE_BUDGET = false;
 
 import assert from 'node:assert';
@@ -160,7 +163,16 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 }
 
 // ── 3. Bake 400 x 120 swarm steps ────────────────────────────────────────
-// Issue cites ~105ms today for this exact shape.
+// Issue cites ~105ms for this shape; it measured 65-67ms here pre-SoA and
+// ~41ms after. Still over the 30ms budget, and the remaining cost is genuine:
+// boids cohesion clumps the swarm, so a settled 400-particle run scans ~40
+// candidates per particle against the ~13 a uniform density would predict.
+//
+// Worth knowing what this budget is actually protecting: bakeParticles runs
+// only in studio/render.mjs, the offline render farm. Nothing interactive
+// waits on it. The live swarm uses ParticleSystem.update per frame, which the
+// same change made 1.8-1.9x faster at every shipped particle cap — that is
+// the path with a 16.7ms deadline.
 {
   const opts = {
     seed: SEED,
@@ -177,7 +189,7 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
   const out = bakeParticles(opts);
   assert.strictEqual(out.length, 400, 'bake should return the requested particle count');
   const ms = timeMs(() => bakeParticles(opts), { warmup: 1, trials: 5 });
-  budget('bake 400x120 swarm steps', ms, 30, 'today: Particle class + spatial hash rebuild per step, issue cites ~105ms');
+  budget('bake 400x120 swarm steps', ms, 30, 'post swarm-SoA; remaining cost is real neighbour work in a clustered swarm');
 }
 
 // ── 4. Incremental dirty-C (scale/alpha only) vs full eval ──────────────
