@@ -1,6 +1,6 @@
 import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
-import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../data/layout-modes.js';
+import { normalizeLayoutParams } from '../../data/layout-modes.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
@@ -79,7 +79,6 @@ export const createGlobalSlice = (set) => ({
     if (!WEIGHT_CYCLE.includes(weight)) return {};
     const asset = ASSETS.find((a) => a.id === id);
     if (!asset) return {};
-    // Clear override if it matches authored weight
     if (asset.weight === weight) {
       if (!(id in state.assetWeightOverrides)) return {};
       const next = { ...state.assetWeightOverrides };
@@ -126,7 +125,6 @@ export const createGlobalSlice = (set) => ({
       seed: doc.seed >>> 0,
       paletteId: doc.paletteId || state.paletteId,
       quality: doc.quality || state.quality,
-      // Defaults + document only — do not leak the previous session's params.
       layoutParams: normalizeLayoutParams(doc.layoutParams),
     };
     if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
@@ -139,8 +137,6 @@ export const createGlobalSlice = (set) => ({
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
       next.assetWeightOverrides = { ...doc.assetWeightOverrides };
     }
-    // Absent key means "catalog palette" — restore null rather than leaving
-    // whatever the previous session had overridden (#53).
     next.paletteOverrides = doc.paletteOverrides ?? null;
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       next.layers = doc.layers;
@@ -153,4 +149,4 @@ export const createGlobalSlice = (set) => ({
   }),
 });
 
-export { WEIGHT_CYCLE, initialEnabledAssets, DEFAULT_LAYOUT_PARAMS };
+export { WEIGHT_CYCLE, initialEnabledAssets };
