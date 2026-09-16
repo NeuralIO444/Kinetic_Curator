@@ -100,6 +100,17 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
     setEditing(false);
   };
 
+  const onTrackPointer = (e) => {
+    if (locked) return;
+    if (e.target.tagName === 'INPUT') return;
+    const box = e.currentTarget.getBoundingClientRect();
+    const t = Math.max(0, Math.min(1, (e.clientX - box.left) / box.width));
+    const raw = min + t * (max - min);
+    const v = Math.round(raw / step) * step;
+    if (Math.abs(v - low) <= Math.abs(v - high)) onChangeLow(Math.min(v, high));
+    else onChangeHigh(Math.max(v, low));
+  };
+
   const labelTitle = [hint, defaultLow !== undefined ? `Double-click to reset (${defaultLow}–${defaultHigh})` : null]
     .filter(Boolean).join(' · ') || undefined;
 
@@ -115,7 +126,7 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
           {label}
         </span>
       </div>
-      <div className="dual-slider" onDoubleClick={handleDoubleClick} title={hint}>
+      <div className="dual-slider" onDoubleClick={handleDoubleClick} onPointerDown={onTrackPointer} title={hint}>
         <div className="dual-track" />
         <div className="dual-fill" style={{ left: `${((low - min) / (max - min)) * 100}%`, width: `${((high - low) / (max - min)) * 100}%` }} />
         <input type="range" min={min} max={max} step={step} value={low} onChange={e => onChangeLow(Number(e.target.value))} disabled={locked} />
