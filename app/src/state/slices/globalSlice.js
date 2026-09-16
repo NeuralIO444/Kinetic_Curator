@@ -1,7 +1,7 @@
 import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
-import { sanitizeOverlay, duplicateIntoOverlay } from '../../assets/overlay.js';
+import { sanitizeOverlay, duplicateIntoOverlay, ingestIntoOverlay } from '../../assets/overlay.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
@@ -39,6 +39,7 @@ export const createGlobalSlice = (set) => ({
   enabledAssets: initialEnabledAssets,
   assetWeightOverrides: {},
   customAssets: [],
+  ingestError: null,
   search: '',
   catFilter: 'all',
   poolView: 'grid',
@@ -88,10 +89,21 @@ export const createGlobalSlice = (set) => ({
     const src = findAsset(id, sanitizeOverlay(state.customAssets));
     if (!src) return {};
     const result = duplicateIntoOverlay(src, state.customAssets);
-    if (!result.ok) return {};
+    if (!result.ok) return { ingestError: result.error };
     return {
       customAssets: result.overlay,
       enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
+      ingestError: null,
+    };
+  }),
+
+  ingestAsset: (svg, hint) => set((state) => {
+    const result = ingestIntoOverlay(svg, state.customAssets, hint);
+    if (!result.ok) return { ingestError: result.error || 'ingest failed' };
+    return {
+      customAssets: result.overlay,
+      enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
+      ingestError: null,
     };
   }),
 
@@ -146,6 +158,7 @@ export const createGlobalSlice = (set) => ({
       quality: doc.quality || state.quality,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
+      ingestError: null,
     };
     if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
       const enabled = { ...initialEnabledAssets };
