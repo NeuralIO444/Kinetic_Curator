@@ -90,7 +90,7 @@ Do **not** add a second kernel. Do **not** reopen Track E.
 
 ### Work items
 
-1. ~~**Shared project sanitize**~~ — **Done** (#142). `normalizeLayoutParams` gained `PARAM_SPEC`/`RANGE_SPEC` (bounds mirroring the sliders), enum allow-lists for every string field, boolean coercion and prototype-key stripping; `getSampler` no longer bare-indexes `SAMPLERS`. Batch writes `{ ok: false, error, stderr }` sidecars and continues instead of `sys.exit`-ing from a worker thread. Sidecars now also carry `_render.normalized` — what the kernel actually ran, which differs from the authored JSON exactly when the project was out of bounds.
+1. ~~**Shared project sanitize**~~ — **Done** (#143). `normalizeLayoutParams` gained `PARAM_SPEC`/`RANGE_SPEC` (bounds mirroring the sliders), enum allow-lists for every string field, boolean coercion and prototype-key stripping; `getSampler` no longer bare-indexes `SAMPLERS`. Batch writes `{ ok: false, error, stderr }` sidecars and continues instead of `sys.exit`-ing from a worker thread. Sidecars now also carry `_render.normalized` — what the kernel actually ran, which differs from the authored JSON exactly when the project was out of bounds.
 2. **Subprocess timeouts + resource caps** — wall timeouts; clamp resolution and `--jobs` vs unified memory.
 3. **Output jail** — `-o` stays under the requested tree.
 4. **Repro report sidecar** — kernel version, caps, bake steps, blend fallback (`plus-lighter` → `screen`), seed, status.
@@ -124,7 +124,7 @@ Share the same **normalize** helper with #106.
       └─ Bake still 41 ms vs 30 ms budget; closing it is a product decision
          (swarm output changes) or WASM, so ENFORCE_BUDGET stays down
 
-2. Studio harden (#106) — item 1 DONE (#142); items 2–5 outstanding
+2. Studio harden (#106) — item 1 DONE (#143); items 2–5 outstanding
       └─ timeouts + resource caps, output jail, repro sidecar, batch resume
 
 3. Live harden (#107) in parallel where normalize overlaps
@@ -170,4 +170,4 @@ Share the same **normalize** helper with #106.
 | [#137](https://github.com/NeuralIO444/Kinetic_Curator/issues/137) | QA: studio video/batch + ACCUM | Coverage |
 | [#136](https://github.com/NeuralIO444/Kinetic_Curator/issues/136) | Harden SVG ingest further | Security / hygiene |
 
-*Last updated: 2026-09-16 (post #141 swarm SoA, #142 shared sanitize)*
+*Last updated: 2026-09-16 (post #141 swarm SoA, #143 shared sanitize)*
