@@ -87,6 +87,8 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYER_RENAME, ({ id, name }) => dispatch({ type: A.RENAME_LAYER, id, name }));
   on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
+  on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));
+  on(Events.LAYER_SOLO, ({ id }) => dispatch({ type: 'SOLO_LAYER', id }));
 
   on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
   on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));
