@@ -13,7 +13,7 @@ export const PANEL_REGISTRY = [
   { id: 'layout',   title: 'LAYOUT',   icon: '■', component: LayoutPanel,    zone: 'secondary' },
   { id: 'layers',   title: 'LAYERS',   icon: '▤', component: LayersPanel,    zone: 'secondary' },
   { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'secondary' },
-  { id: 'stimulus', title: 'STIMULUS', icon: '▸', component: StimulusPanel,  zone: 'secondary' },
+  { id: 'stimulus', title: 'STIMULI',  icon: '▸', component: StimulusPanel,  zone: 'secondary' },
   { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },
   { id: 'output',   title: 'OUTPUT',   icon: '⬇', component: OutputPanel,    zone: 'secondary' },
 ];
