@@ -112,6 +112,7 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 - [Architecture](docs/architecture.md)
 - [Kernel v1 plan](docs/KERNEL_V1_PLAN.md) (incl. v2 SoA / staged-eval addendum)
 - [Backend v2 plan](docs/BACKEND_V2_PLAN.md) (studio render farm, Curator, geometry, genassets)
+- [Next phase — kernel & backend](docs/NEXT_PHASE.md) (swarm SoA, studio harden, live survivability)
 - [Known limitations / buglist](docs/BUGLIST.md)
 - [Changelog](CHANGELOG.md)
 - [Kinetic Manifesto](docs/manifesto.md)

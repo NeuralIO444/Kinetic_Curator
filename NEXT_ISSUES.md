@@ -44,25 +44,25 @@ BACKEND_V2_PLAN §3.E.
 0.8 next-gen table also shipped (render, weights, project, batch, accum,
 setlist, CI).
 
-## Open
+## Open — what matters next
 
-Bugs and gaps found while building the above are filed as #89–#96. The
-honest short list of what matters next:
+Authoritative sequencing and issue map:
+**[docs/NEXT_PHASE.md](docs/NEXT_PHASE.md)** (kernel v2 remainder, studio harden, live survivability).
 
-1. **#91 — validate the taste model on real hits.** The machinery is
-   proven (AUC 1.000 on a positive control) but has only ever seen
-   synthetic labels. This is what makes the app deserve its name.
-2. **#90 — render ACCUM trails offline** at true resolution rather than
-   upscaling a 1000×700 snapshot.
-3. The rest (#92 #94 #96) are real but can wait; #93 and #95 were closed
-   as decisions and recorded in [docs/BUGLIST.md](docs/BUGLIST.md).
+Primary tracks:
+
+1. **#108 Kernel v2** — swarm SoA + bake under budget, then EvalContext / Worker ABI (steps 5–6; 1–4 done, step 3 rejected).
+2. **#106 Studio harden** — sanitize, timeouts, batch resume, repro sidecars; viable 4K / batch / video.
+3. **#107 Live harden** — state firewall, life drift out of document state, fail-soft canvas (share normalize with #106).
+4. **#109 Moth Bodies** — second ladder + paint `u` (after columns are stable).
+
+Closed while building the epics (reference): #90 true-res ACCUM offline; #91 Curator real-hits follow-up may still need ops labels. Residual notes in [docs/BUGLIST.md](docs/BUGLIST.md).
 
 ## Possible follow-ups (not filed)
 
 - WEBM recorder sampling the ACCUM canvas (capture graph)
 - Continuous high-res accumulation (memory cost)
 - Expose `stratified` in Layout mode UI
-- Asset SVG import + unknown-id hygiene
 - Modulation matrix (audio/LFO → layout targets)
 
-See [docs/BUGLIST.md](docs/BUGLIST.md).
+See [docs/BUGLIST.md](docs/BUGLIST.md) and [docs/NEXT_PHASE.md](docs/NEXT_PHASE.md).
