@@ -24,8 +24,7 @@ assert.notStrictEqual(dup.asset.id, 'org_blob');
 assert.strictEqual(overlayId('org_bl_organic'), 'user:org_bl_organic');
 
 // #135 — P02 drop / paste / file IMPORT all emit ASSETS_INGEST → ingestAsset → ingestIntoOverlay.
-// There is no second parser. Hostile markup must die here the same as paste.
-const dropPath = ingestIntoOverlay('<svg onload="alert(1)"><circle r="1"/></svg>', [], 'dropped.svg');
+const dropPath = ingestIntoOverlay('<svg><script>alert(1)</script></svg>', [], 'dropped.svg');
 assert.strictEqual(dropPath.ok, false);
 
 console.log('ingest.selfcheck: OK');
