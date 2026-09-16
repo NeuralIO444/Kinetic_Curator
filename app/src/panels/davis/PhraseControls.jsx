@@ -9,10 +9,12 @@ const PHRASE_MODES = [
 export function PhraseControls({
   phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseProgress,
   layoutMode, audioEnabled, phraseClock = 'audio', phraseBpm = 120,
+  beatPulse = 0, rms = 0,
 }) {
   const caLive = layoutMode === 'ca';
   const metro = phraseClock === 'metro';
   const waiting = phraseEnabled && !metro && !audioEnabled;
+  const noAttack = phraseEnabled && !metro && audioEnabled && phraseBeat === 0 && rms > 0.2;
   return (
     <div style={{ marginTop: 10, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -74,17 +76,24 @@ export function PhraseControls({
             <span>
               {waiting
                 ? 'waiting for beat · audio off'
-                : metro
-                  ? `METRO ${phraseBeat}/${phraseLength}`
-                  : `BEAT ${phraseBeat}/${phraseLength}`}
+                : noAttack
+                  ? 'armed · no attack'
+                  : metro
+                    ? `METRO ${phraseBeat}/${phraseLength}`
+                    : `BEAT ${phraseBeat}/${phraseLength}`}
             </span>
             <button className="micro-btn" onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>RESET NOW</button>
           </div>
-          <div style={{ height: 4, background: 'var(--line-2)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', height: 4, background: 'var(--line-2)', borderRadius: 2, overflow: 'hidden' }}>
             <div style={{
               height: '100%', width: `${phraseProgress}%`,
               background: 'linear-gradient(90deg, #00d9ff, #00ff88)',
               transition: 'width 0.1s linear',
+            }} />
+            <div style={{
+              position: 'absolute', top: 0, right: 0, width: 6, height: '100%',
+              background: '#fff',
+              opacity: metro ? 0 : Math.max(0, Math.min(1, beatPulse)),
             }} />
           </div>
         </div>
