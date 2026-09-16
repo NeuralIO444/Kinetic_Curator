@@ -117,10 +117,10 @@ export function CanvasPanel() {
           <button className="chip-btn" onClick={cycleBg} title="Toggle Background">BG: {bgMode.toUpperCase()}</button>
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
           {accumOn && (
-            <button className="chip-btn" onClick={clearAccum} title="Clear accumulation buffer" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>CLEAR ACCUM</button>
+            <button className="chip-btn" onClick={clearAccum} title="Wipe pixel buffer only. Live SVG stays hidden while ACCUM is on." style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>CLEAR ACCUM</button>
           )}
           <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>
-          {accumOn && <span className="meter-pill" title="Accumulation buffer active" style={{ color: 'var(--accent)' }}>ACCUM</span>}
+          {accumOn && <span className="meter-pill" title="Showing pixel buffer. Live SVG is hidden. WEBM does not record this buffer — use studio --accum for trail stills." style={{ color: 'var(--accent)' }}>ACCUM</span>}
           {activeSafeCount < layoutParams.count && (
             <span className="meter-pill" title="Count clamped by quality preset" style={{ color: '#ffaa00' }}>CLAMPED {activeSafeCount}</span>
           )}
