@@ -113,12 +113,10 @@ def sidecar(project: Path, seed, size, uncapped, extra=None) -> dict:
 
 
 def composite_accum(frames: list[Path], out_png: Path, fade: float) -> None:
-    """destination-in keep, then source-over — same law as useAccumulationBuffer."""
     ffmpeg = which("ffmpeg")
     keep = clamp_fade(fade)
-    buf = frames[0]
     work = out_png.with_suffix(".accum-buf.png")
-    shutil.copyfile(buf, work)
+    shutil.copyfile(frames[0], work)
     for nxt in frames[1:]:
         tmp = out_png.with_suffix(".accum-next.png")
         subprocess.run([
@@ -127,9 +125,8 @@ def composite_accum(frames: list[Path], out_png: Path, fade: float) -> None:
             f"[0:v]format=rgba,colorchannelmixer=aa={keep:.4f}[f];[f][1:v]overlay=format=auto",
             "-frames:v", "1", str(tmp),
         ], check=True, capture_output=True)
-        work.replace if False else None
-        shutil.move(tmp, work)
-    shutil.move(work, out_png)
+        shutil.move(str(tmp), str(work))
+    shutil.move(str(work), str(out_png))
 
 
 def cmd_render(a) -> None:
@@ -213,7 +210,7 @@ def cmd_video(a) -> None:
         return
     size = parse_res(a.res)
     project = Path(a.project)
-    frames = max(1, round(a.duration * a.fps))
+    frames_n = max(1, round(a.duration * a.fps))
     keep = Path(a.frames) if a.frames else None
     tmp = Path(tempfile.mkdtemp(prefix="kc-frames-")) if keep is None else keep
     tmp.mkdir(parents=True, exist_ok=True)
@@ -222,13 +219,13 @@ def cmd_video(a) -> None:
         t = i / a.fps
         render_one(project, tmp / f"f{i:06d}.png", size, seed=a.seed,
                    uncapped=a.uncapped, background=a.background, time=t,
-                   progress=i / max(1, frames - 1), ramps=a.ramp,
+                   progress=i / max(1, frames_n - 1), ramps=a.ramp,
                    motion=a.motion, monospace=a.monospace)
 
     with ThreadPoolExecutor(max_workers=a.jobs) as pool:
-        for i, _ in enumerate(pool.map(one, range(frames)), 1):
-            if i % 10 == 0 or i == frames:
-                print(f"  frame {i}/{frames}", flush=True)
+        for i, _ in enumerate(pool.map(one, range(frames_n)), 1):
+            if i % 10 == 0 or i == frames_n:
+                print(f"  frame {i}/{frames_n}", flush=True)
 
     which("ffmpeg")
     subprocess.run([
@@ -252,7 +249,7 @@ def main(argv=None) -> None:
     def common(sp):
         sp.add_argument("project", help="project JSON exported from the app")
         sp.add_argument("--res", default="1", help="WxH in px, or a scale factor of 1000x700 (default 1)")
-        sp.add_argument("--seed", type=int, default=None, help="override the project's seed")
+        sp.add_argument("--seed", type=int, default=None)
         sp.add_argument("--uncapped", action="store_true")
         sp.add_argument("--background", default=None)
         sp.add_argument("--monospace", default=DEFAULT_MONOSPACE)
@@ -264,11 +261,10 @@ def main(argv=None) -> None:
     sp.add_argument("--sidecar", action="store_true")
     sp.add_argument("--accum", action="store_true",
                     help="composite N frames with the live ACCUM fade law at target resolution (#90)")
-    sp.add_argument("--steps", type=int, default=24, help="ACCUM frames (default 24)")
-    sp.add_argument("--fps", type=int, default=30, help="ACCUM time base (default 30)")
-    sp.add_argument("--fade", type=float, default=None,
-                    help="ACCUM keep fraction; default project accumulationFade or 0.88")
-    sp.add_argument("--ramp", action="append", default=[], help="layoutParam=from:to over the ACCUM steps")
+    sp.add_argument("--steps", type=int, default=24)
+    sp.add_argument("--fps", type=int, default=30)
+    sp.add_argument("--fade", type=float, default=None)
+    sp.add_argument("--ramp", action="append", default=[])
     sp.add_argument("--motion", default="auto")
     sp.set_defaults(func=cmd_render)
 
