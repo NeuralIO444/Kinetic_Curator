@@ -110,13 +110,14 @@ export function MasterBar() {
     persistStatus: s.persistStatus,
     slowRender: s.slowRender,
     perfTier1: s.perfTier1,
+    audioDenied: s.audioDenied,
   }));
   // Default to 'ok' rather than showing the warning for an undefined value:
   // this selector is explicit, so a field missing from it reads as undefined,
   // and a pill that fails open would cry UNSAVED on every boot.
   const {
     running, fps, seed, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
-    slowRender = false, perfTier1 = false,
+    slowRender = false, perfTier1 = false, audioDenied = false,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -161,6 +162,21 @@ export function MasterBar() {
           >
             <span className="status-dot" style={{ background: '#ffb000' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
+          </div>
+        )}
+
+        {/* #107 §5: the browser denied mic access — audioEnabled has already
+            been forced off (see useAudioInput's onDenied), so without this
+            the operator just sees AUDIO silently do nothing. Clears itself
+            on a successful retry (turn AUDIO back on). */}
+        {audioDenied && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title="Browser denied mic access. Turning AUDIO back on will retry."
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            MIC BLOCKED
           </div>
         )}
 

@@ -219,6 +219,10 @@ export function OutputPanel() {
       restoreRef.current = null;
     };
 
+    // #107 §5: hold evolve/drift off for the whole batch, independent of the
+    // watchdog's own slowRender/perfTier1 (which auto-clear on live FPS and
+    // would fight a pause that must last the whole batch regardless).
+    emit(Events.EXPORT_BATCH_PAUSE, true);
     try {
       const results = await renderBatch({
         svgNode: svgRef.current,
@@ -265,6 +269,7 @@ export function OutputPanel() {
       setRendering(false);
       setBatchProgress(null);
       cancelBatchRef.current = false;
+      emit(Events.EXPORT_BATCH_PAUSE, false);
     }
   };
 

@@ -53,6 +53,7 @@ function AppInner() {
     enabled: s.enabledAssets,
     isFullscreen: s.isFullscreen,
     slowRender: s.slowRender,
+    batchPaused: s.batchPaused,
     isRecording: s.isRecording,
     isRendering: s.isRendering,
   }));
@@ -76,10 +77,13 @@ function AppInner() {
     // #107 §4: an automatic trigger, not a manual one — pauses under
     // slowRender so evolve stops adding param churn on top of a near-zero
     // frame rate. An explicit "evolve now" action is unaffected.
-    if (!state.evolveMode || state.evolveSource !== 'time' || state.slowRender) return;
+    // #107 §5: also pauses for the duration of a batch export (batchPaused) —
+    // independent of slowRender, since a batch must hold regardless of the
+    // momentary FPS reading.
+    if (!state.evolveMode || state.evolveSource !== 'time' || state.slowRender || state.batchPaused) return;
     const interval = setInterval(() => piped({ type: A.TRIGGER_EVOLVE }), state.evolveInterval);
     return () => clearInterval(interval);
-  }, [state.evolveMode, state.evolveSource, state.evolveInterval, state.slowRender, piped]);
+  }, [state.evolveMode, state.evolveSource, state.evolveInterval, state.slowRender, state.batchPaused, piped]);
 
   const lastSnapRef = useRef(0);
   useEffect(() => {
@@ -136,10 +140,18 @@ function AppInner() {
 
   const onAudioStimulus = useCallback(v => piped({ type: A.SET_AUDIO_STIMULUS, payload: v }), [piped]);
   const onAudioBands = useCallback(v => piped({ type: A.SET_AUDIO_BANDS, payload: v }), [piped]);
+  // #107 §5: honesty on mic denial — flip audioEnabled back off (rather than
+  // silently doing nothing) and surface it so MasterBar can explain why.
+  const onAudioDenied = useCallback((denied) => {
+    piped({ type: A.SET_AUDIO_DENIED, payload: denied });
+    if (denied) piped({ type: A.SET_AUDIO_ENABLED, payload: false });
+  }, [piped]);
   const onBeat = useCallback(() => {
     piped({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
-    // #107 §4: same automatic-trigger pause as the time-source interval above.
-    if (evolveRef.current.mode && evolveRef.current.source === 'beat' && !useStore.getState().slowRender) {
+    // #107 §4/§5: same automatic-trigger pause as the time-source interval
+    // above — slowRender and batchPaused each independently gate this.
+    const s = useStore.getState();
+    if (evolveRef.current.mode && evolveRef.current.source === 'beat' && !s.slowRender && !s.batchPaused) {
       piped({ type: A.TRIGGER_EVOLVE });
     }
   }, [piped]);
@@ -150,7 +162,8 @@ function AppInner() {
     monitor: state.audioMonitor,
     onStimulus: onAudioStimulus,
     onBands: onAudioBands,
-    onBeat
+    onBeat,
+    onDenied: onAudioDenied
   });
 
   const { containerRef, gridTemplate, dividerProps } = useColumnResize(COLUMN_FRACTIONS, 300);

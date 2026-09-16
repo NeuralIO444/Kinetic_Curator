@@ -8,7 +8,7 @@
 
 import { useRef, useEffect } from 'react';
 
-export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBands, onBeat }) {
+export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBands, onBeat, onDenied }) {
   const ctxRef = useRef(null);
   const analyserRef = useRef(null);
   const sourceRef = useRef(null);
@@ -18,13 +18,23 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
   const runningRef = useRef(false);
   const prevRmsRef = useRef(0);
 
-  const cbRef = useRef({ onStimulus, onBands, onBeat });
+  const cbRef = useRef({ onStimulus, onBands, onBeat, onDenied });
   const gainRef = useRef(gain);
-  useEffect(() => { cbRef.current = { onStimulus, onBands, onBeat }; });
+  useEffect(() => { cbRef.current = { onStimulus, onBands, onBeat, onDenied }; });
   useEffect(() => { gainRef.current = gain; }, [gain]);
+  // Set in the catch block below, cleared on a successful start. Guards the
+  // early-return clear just below: the denial handler itself flips `enabled`
+  // back to false (SET_AUDIO_ENABLED false), which would otherwise re-run
+  // this effect and immediately clear the denial notice it just raised.
+  const deniedRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!enabled) {
+      // Clears a stale denial notice when audio is manually turned off —
+      // but not when this shutdown IS the denial (see deniedRef above).
+      if (!deniedRef.current) cbRef.current.onDenied?.(false);
+      return undefined;
+    }
 
     let cancelled = false;
 
@@ -109,9 +119,13 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
         analyserRef.current = analyser;
         runningRef.current = true;
 
+        deniedRef.current = false;
+        cbRef.current.onDenied?.(false);
         rafRef.current = requestAnimationFrame(analyze);
       } catch (err) {
         console.warn('[useAudioInput] mic/audio access denied:', err?.message ?? err);
+        deniedRef.current = true;
+        cbRef.current.onDenied?.(true);
       }
     })();
 

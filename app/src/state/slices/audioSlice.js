@@ -1,5 +1,8 @@
 export const createAudioSlice = (set) => ({
   audioEnabled: false,
+  // #107 §5: set true when the browser denies mic access, so the UI can say
+  // why audio silently isn't running instead of leaving it looking idle.
+  audioDenied: false,
   audioSource: { type: 'device', id: 'default' },
   audioGain: 1.0,
   audioMonitor: false,
@@ -8,6 +11,7 @@ export const createAudioSlice = (set) => ({
   audioStimulus: 0,
 
   setAudioEnabled: (enabled) => set({ audioEnabled: enabled }),
+  setAudioDenied: (denied) => set({ audioDenied: !!denied }),
   setAudioSource: (source) => set({ audioSource: source }),
   setAudioGain: (gain) => set({ audioGain: gain }),
   setAudioMonitor: (monitor) => set({ audioMonitor: monitor }),

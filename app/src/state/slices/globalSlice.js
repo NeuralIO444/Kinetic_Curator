@@ -42,6 +42,13 @@ export const createGlobalSlice = (set) => ({
    */
   slowRender: false,
   /**
+   * Set for the duration of a batch export (#107 §5). Deliberately separate
+   * from slowRender/perfTier1 above — those are owned by usePerformanceGovernor
+   * and auto-clear on live FPS, which would fight a pause that must hold for
+   * the whole batch regardless of momentary FPS readings.
+   */
+  batchPaused: false,
+  /**
    * Tier 1 of the watchdog (#107 §4): FPS < 16 sustained 2s. Shedding, not
    * stopping — ACCUM, gloss and mirror render-off across every visible
    * layer, not just the active one, since a bad layer or a heavy inactive
@@ -94,6 +101,7 @@ export const createGlobalSlice = (set) => ({
   setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
   setSlowRender: (slow) => set({ slowRender: slow }),
+  setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
   /**
    * Tier 2 of the watchdog (#107 §4): FPS ~ 0 sustained, or a critical
