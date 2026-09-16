@@ -16,7 +16,15 @@ export function registerSampler(id, fn) {
 }
 
 export function getSampler(mode) {
-  return SAMPLERS[mode] || SAMPLERS.random;
+  // Own-property check, not a bare index. `SAMPLERS['__proto__']` returns
+  // Object.prototype — truthy but not callable — so a poisoned project's mode
+  // threw "sample is not a function" from inside the placement loop, taking
+  // down a studio batch or the live canvas. normalizeLayoutParams allow-lists
+  // `mode` now; this is the second line of defence for callers that assemble
+  // layoutParams themselves (#106).
+  return Object.hasOwn(SAMPLERS, mode) && typeof SAMPLERS[mode] === 'function'
+    ? SAMPLERS[mode]
+    : SAMPLERS.random;
 }
 
 export function listSamplers() {

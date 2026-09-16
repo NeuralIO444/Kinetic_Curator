@@ -290,6 +290,7 @@ function parseArgs(argv) {
     if (!a.startsWith('--')) { out._.push(a); continue; }
     const key = a.slice(2);
     if (key === 'uncapped') { out.uncapped = true; continue; }
+    if (key === 'emit-normalized') { out.emitNormalized = true; continue; }
     const v = argv[++i];
     if (key === 'ramp') {
       const m = /^([A-Za-z0-9_]+)=(-?[\d.]+):(-?[\d.]+)$/.exec(v);
@@ -312,10 +313,26 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (!args._[0]) {
     console.error('usage: node studio/render.mjs <project.json> [--out f.svg] [--width N --height N]\n'
       + '       [--background #rrggbb|none] [--seed N] [--time SEC] [--progress 0..1]\n'
-      + '       [--ramp param=from:to ...] [--motion name|list] [--uncapped]');
+      + '       [--ramp param=from:to ...] [--motion name|list] [--uncapped]\n'
+      + '       [--emit-normalized]  print the sanitized project as JSON and exit');
     process.exit(2);
   }
   const doc = loadProject(args._[0]);
+  // What the kernel will actually use, after normalizeLayoutParams has
+  // clamped and allow-listed everything (#106). studio.py records this in the
+  // sidecar so the sidecar describes the render that happened rather than the
+  // JSON that was requested — those differ whenever a project is out of
+  // bounds, which is exactly when you need the sidecar to be honest.
+  if (args.emitNormalized) {
+    process.stdout.write(JSON.stringify({
+      seed: doc.seed,
+      paletteId: doc.paletteId,
+      layoutParams: doc.layoutParams,
+      layerSnapshots: doc.layerSnapshots || null,
+      activeLayerId: doc.activeLayerId || null,
+    }, null, 2));
+    process.exit(0);
+  }
   if (args.seed != null) doc.seed = Number(args.seed) >>> 0;
   const svg = renderSvg(doc, {
     time: Number(args.time || 0),

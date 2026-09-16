@@ -34,7 +34,7 @@ Pillar: denser modes that do not drop frames. Sleeper UI — artists never see �
 | 2 | SoA + in-place placement fill (`PlacementSoA`) | **Done** (#139) |
 | 3 | Displacement field texture | **Rejected** — measured slower and inaccurate at shipped N (#140) |
 | 4 | Staged eval + dirty flags (`computeGeometrySoA` / `applyAttributes` + caller cache) | **Done** (#140) |
-| 5 | **Swarm SoA** + spatial-hash inner loop; bake writes same buffers | **Outstanding** — bake budget still ~2× over |
+| 5 | **Swarm SoA** + spatial-hash inner loop | **Done** (#141) — bake 67→41 ms, live `update()` 1.8–1.9× faster. Budget still missed; see below |
 | 6 | **`EvalContext` ABI** — main thread, Worker (`Transferable` SoA), long-lived Node studio | **Outstanding** |
 
 ### Budgets (local `perf.selfcheck`; enforce when step 5 lands)
@@ -43,8 +43,28 @@ Pillar: denser modes that do not drop frames. Sleeper UI — artists never see �
 |--------|--------|--------|
 | 20k pts, sample + attrs, no fBm | < 2 ms | Met post-SoA |
 | 8k pts + fBm displacement | < 3 ms | Met; field texture not required |
-| Bake 400 × 120 swarm steps | < 30 ms | **Miss** — driver for step 5 |
+| Bake 400 × 120 swarm steps | < 30 ms | **Miss at 41 ms** after step 5 — see note |
 | Incremental dirty-C vs full | ≤ 10% of full | Met at high N after staged eval |
+
+**On the bake budget after step 5.** 67.4 → 41.0 ms, and the remainder is real
+work rather than overhead: boids cohesion clumps the swarm, so a settled
+400-particle run scans ~40 candidates per particle against the ~13 a uniform
+density predicts. Closing the last 11 ms needs either smaller grid cells —
+which reorders neighbour visits and therefore changes every existing seed's
+output, a product decision — or WASM. Note also that `bakeParticles` runs only
+in `studio/render.mjs`; nothing interactive waits on it. The live swarm
+(`ParticleSystem.update`, once per frame) got 1.8–1.9× faster at every shipped
+particle cap, which is the path with a 16.7 ms deadline.
+
+So `ENFORCE_BUDGET` stays down: it is gated on an open decision, not on undone
+work. Flipping it would just fail CI on that decision.
+
+**Also found in step 5:** the swarm is not reproducible across CPU
+architectures. `Math.sin`/`cos`/`atan2` are not required to be correctly
+rounded and V8 evaluates them differently on x64 vs arm64; 120 chaotic steps
+amplify the last-bit difference. Pre-existing, not introduced by the SoA work.
+A bake is a pure function of its inputs *on a given machine*. Relevant if the
+farm is ever distributed over mixed hardware.
 
 ### Language policy
 
@@ -70,7 +90,7 @@ Do **not** add a second kernel. Do **not** reopen Track E.
 
 ### Work items
 
-1. **Shared project sanitize** — `normalizeLayoutParams` / `normalizeProject` used by live `applyProject` and `studio/render.mjs`. Clamp count / layers / modes; finite ranges; allow-listed mode. Bad edition → sidecar `{ ok: false, … }`, continue batch.
+1. ~~**Shared project sanitize**~~ — **Done** (#142). `normalizeLayoutParams` gained `PARAM_SPEC`/`RANGE_SPEC` (bounds mirroring the sliders), enum allow-lists for every string field, boolean coercion and prototype-key stripping; `getSampler` no longer bare-indexes `SAMPLERS`. Batch writes `{ ok: false, error, stderr }` sidecars and continues instead of `sys.exit`-ing from a worker thread. Sidecars now also carry `_render.normalized` — what the kernel actually ran, which differs from the authored JSON exactly when the project was out of bounds.
 2. **Subprocess timeouts + resource caps** — wall timeouts; clamp resolution and `--jobs` vs unified memory.
 3. **Output jail** — `-o` stays under the requested tree.
 4. **Repro report sidecar** — kernel version, caps, bake steps, blend fallback (`plus-lighter` → `screen`), seed, status.
@@ -100,11 +120,12 @@ Share the same **normalize** helper with #106.
 ## 5. Suggested sequencing
 
 ```text
-1. Kernel v2 step 5 — Swarm SoA + bake under budget
-      └─ Unblocks #108 acceptance; enables ENFORCE_BUDGET in perf.selfcheck
+1. ~~Kernel v2 step 5 — Swarm SoA~~  DONE (#141)
+      └─ Bake still 41 ms vs 30 ms budget; closing it is a product decision
+         (swarm output changes) or WASM, so ENFORCE_BUDGET stays down
 
-2. Shared normalize + studio harden (#106 items 1–5)
-      └─ 4K / long batch / video become trustworthy
+2. Studio harden (#106) — item 1 DONE (#142); items 2–5 outstanding
+      └─ timeouts + resource caps, output jail, repro sidecar, batch resume
 
 3. Live harden (#107) in parallel where normalize overlaps
 
@@ -149,4 +170,4 @@ Share the same **normalize** helper with #106.
 | [#137](https://github.com/NeuralIO444/Kinetic_Curator/issues/137) | QA: studio video/batch + ACCUM | Coverage |
 | [#136](https://github.com/NeuralIO444/Kinetic_Curator/issues/136) | Harden SVG ingest further | Security / hygiene |
 
-*Last updated: 2026-09-16*
+*Last updated: 2026-09-16 (post #141 swarm SoA, #142 shared sanitize)*

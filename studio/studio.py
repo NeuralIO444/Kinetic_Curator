@@ -52,6 +52,15 @@ def project_fade(project: Path, override) -> float:
         return DEFAULT_ACCUM_FADE
 
 
+class RenderError(RuntimeError):
+    """One edition failed to render. Carries enough to write a sidecar."""
+
+    def __init__(self, message, *, returncode=None, stderr=""):
+        super().__init__(message)
+        self.returncode = returncode
+        self.stderr = stderr
+
+
 def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
               ramps=None, motion=None, uncapped=False, width=None, height=None,
               background=None) -> bytes:
@@ -78,11 +87,20 @@ def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
     if background:
         cmd += ["--background", background]
     proc = subprocess.run(cmd, capture_output=True)
-    if proc.stderr:
-        sys.stderr.write(proc.stderr.decode("utf-8", "replace"))
+    err = proc.stderr.decode("utf-8", "replace") if proc.stderr else ""
+    if err:
+        sys.stderr.write(err)
         sys.stderr.flush()
     if proc.returncode != 0:
-        sys.exit(proc.returncode or 1)
+        # Raise, never sys.exit: this runs inside ThreadPoolExecutor workers in
+        # cmd_batch, where SystemExit does not end the process - it surfaces
+        # through pool.map and takes down the whole run. One unrenderable
+        # edition must not cost the other 499 (#106).
+        raise RenderError(
+            f"render.mjs exited {proc.returncode} for {project}",
+            returncode=proc.returncode,
+            stderr=err.strip()[-2000:],
+        )
     return proc.stdout
 
 
@@ -104,7 +122,29 @@ def render_one(project: Path, out_png: Path, size: tuple[int, int], *,
     rasterize(svg, out_png, monospace)
 
 
-def sidecar(project: Path, seed, size, uncapped, extra=None) -> dict:
+def normalized_project(project: Path) -> dict | None:
+    """What the kernel will actually use, after normalizeLayoutParams.
+
+    A sidecar exists so an edition can be reproduced later, so it has to
+    describe the render that happened rather than the JSON that was asked
+    for. Those differ exactly when the project is out of bounds - which is
+    when you most need to know (#106). Normalization depends only on the
+    project, not the seed, so this runs once per batch rather than per
+    edition; a failure here is not worth aborting a render over.
+    """
+    try:
+        proc = subprocess.run(
+            ["node", str(RENDER_MJS), str(project), "--emit-normalized"],
+            capture_output=True, timeout=60,
+        )
+        if proc.returncode != 0:
+            return None
+        return json.loads(proc.stdout.decode("utf-8"))
+    except (subprocess.SubprocessError, OSError, ValueError):
+        return None
+
+
+def sidecar(project: Path, seed, size, uncapped, extra=None, normalized=None) -> dict:
     doc = json.loads(project.read_text())
     if seed is not None:
         doc["seed"] = int(seed) & 0xFFFFFFFF
@@ -114,6 +154,11 @@ def sidecar(project: Path, seed, size, uncapped, extra=None) -> dict:
         "renderer": "studio/render.mjs + resvg",
         "source": str(project),
     }
+    if normalized is not None:
+        # The top-level keys above are the project as authored; this is the
+        # sanitized form the kernel ran on. Keep both - the difference is the
+        # audit trail.
+        doc["_render"]["normalized"] = normalized.get("layoutParams")
     if extra:
         doc["_render"].update(extra)
     return doc
@@ -191,24 +236,64 @@ def cmd_batch(a) -> None:
     project = Path(a.project)
     seeds = [(a.start_seed + i) & 0xFFFFFFFF for i in range(a.count)]
     width = len(str(a.count))
+    # Once for the whole batch: normalization is a function of the project.
+    normalized = normalized_project(project)
 
     def one(i_seed):
         i, seed = i_seed
         stem = outdir / f"{i:0{width}d}-{seed:08x}"
-        render_one(project, stem.with_suffix(".png"), size, seed=seed,
-                   uncapped=a.uncapped, background=a.background,
-                   monospace=a.monospace)
-        stem.with_suffix(".json").write_text(
-            json.dumps(sidecar(project, seed, size, a.uncapped), indent=2))
-        return stem
+        try:
+            render_one(project, stem.with_suffix(".png"), size, seed=seed,
+                       uncapped=a.uncapped, background=a.background,
+                       monospace=a.monospace)
+        except (RenderError, subprocess.CalledProcessError, OSError, ValueError) as exc:
+            # A batch is a long unattended job. Losing 499 good editions
+            # because one seed hit a bad code path is the worst outcome, so
+            # record the failure in the sidecar and keep going (#106).
+            doc = {
+                "ok": False,
+                "seed": int(seed) & 0xFFFFFFFF,
+                "error": str(exc),
+                "stderr": getattr(exc, "stderr", "") or "",
+                "_render": {
+                    "width": size[0], "height": size[1],
+                    "uncapped": a.uncapped,
+                    "renderer": "studio/render.mjs + resvg",
+                    "source": str(project),
+                },
+            }
+            stem.with_suffix(".json").write_text(json.dumps(doc, indent=2))
+            # Do not leave a truncated PNG behind to be mistaken for output.
+            png = stem.with_suffix(".png")
+            if png.exists():
+                png.unlink()
+            return (stem, False)
+
+        doc = sidecar(project, seed, size, a.uncapped, normalized=normalized)
+        doc["ok"] = True
+        stem.with_suffix(".json").write_text(json.dumps(doc, indent=2))
+        return (stem, True)
 
     done = 0
+    failed = []
     with ThreadPoolExecutor(max_workers=a.jobs) as pool:
-        for _ in pool.map(one, enumerate(seeds)):
+        for stem, ok in pool.map(one, enumerate(seeds)):
             done += 1
+            if not ok:
+                failed.append(stem.name)
             if done % 25 == 0 or done == len(seeds):
-                print(f"  {done}/{len(seeds)}", flush=True)
+                print(f"  {done}/{len(seeds)}"
+                      + (f" ({len(failed)} failed)" if failed else ""), flush=True)
     print(outdir)
+    if failed:
+        # Report every failure, then exit non-zero so a wrapping script or CI
+        # notices - but only after the rest of the batch has been written.
+        print(f"  {len(failed)} of {len(seeds)} editions failed:", file=sys.stderr)
+        for name in failed[:20]:
+            print(f"    {name}.json", file=sys.stderr)
+        if len(failed) > 20:
+            print(f"    ... and {len(failed) - 20} more", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_video(a) -> None:
@@ -298,7 +383,14 @@ def main(argv=None) -> None:
     sp.set_defaults(func=cmd_video)
 
     a = p.parse_args(argv)
-    a.func(a)
+    try:
+        a.func(a)
+    except RenderError as exc:
+        # Single-shot commands still fail fast and quietly - a traceback here
+        # would bury the actual render.mjs error that was already printed to
+        # stderr. cmd_batch handles its own failures per edition instead.
+        print(f"studio: {exc}", file=sys.stderr)
+        sys.exit(exc.returncode or 1)
 
 
 if __name__ == "__main__":
