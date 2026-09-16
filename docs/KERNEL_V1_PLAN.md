@@ -600,3 +600,81 @@ Not a claim that #108 is done. `ENFORCE_BUDGET` in `perf.selfcheck.mjs`
 stays `false`. After the swarm SoA the bake budget is still ~1.4x over, and
 closing it needs either a deliberate swarm behaviour change or WASM — an open
 decision, not undone work. Flipping the flag would just fail CI on it.
+
+## EvalContext ABI (#108 item 5)
+
+`src/engine/kernel/evalContext.js` exports `evaluate(ctx)`, a thin adapter
+over `buildPlacements()` — no geometry/attribute/bind logic lives in it. The
+point is a single stable argument shape a caller can target without knowing
+`buildPlacements`' flat, historically-grown field names, so a future Worker
+boundary (main thread ↔ worker) has one ABI to agree on instead of two.
+
+### Canonical ctx shape
+
+```
+ctx = {
+  seed,     // number
+  layout,   // { layoutParams, canvasW, canvasH, caGrid }
+  palette,  // palette object (swatches, etc.)
+  assets,   // activeAssets array
+  t,        // reserved, currently unused — see below
+  caps,     // quality caps object
+  buffers,  // the staged-eval cache object (optional)
+}
+```
+
+### Field-name mapping to `buildPlacements(args)`
+
+| ctx field         | buildPlacements arg                              |
+|--------------------|--------------------------------------------------|
+| `seed`             | `seed`                                            |
+| `layout.layoutParams` | `layoutParams`                                 |
+| `layout.canvasW`   | `canvasW`                                         |
+| `layout.canvasH`   | `canvasH`                                         |
+| `layout.caGrid`    | `caGrid`                                          |
+| `palette`          | `palette`                                         |
+| `assets`           | `activeAssets`                                    |
+| `caps`             | `caps`                                            |
+| `buffers`          | `cache` — the object that owns the SoA columns and pooled items across calls (step 4's staged eval) |
+| `t`                | **not threaded through** — see below              |
+
+`t` is part of the canonical shape (so the ABI doesn't need to change if a
+future eval path needs a clock input) but `evaluate()` does not read it: the
+non-swarm SVG placement path has no time input of its own — per-point time
+comes out of geometry (`soa.t`), and live per-frame motion already arrives
+pre-baked into `layout.layoutParams`' scale/alpha ranges via the caller
+(`useCanvasLife`'s `effectiveScale`/`effectiveAlpha`), not as a raw clock
+value. `evalContext.selfcheck.mjs` asserts this directly: two otherwise
+identical ctx objects that differ only in `t` produce identical output.
+
+### Main thread and studio already satisfy this ABI
+
+Both existing callers already pass buildPlacements exactly the arguments this
+ABI names, just spelled directly instead of through a `ctx` object:
+`src/hooks/useCanvasItems.js` (live preview, with a per-`<Layer>` cache as
+`buffers`) and `studio/render.mjs` (offline render farm, no cache). Neither
+needed to change for this adapter to exist — that was the point of landing
+steps 1–4 first.
+
+### Non-decision: no Web Worker yet
+
+Item 5 in the original sequencing paired the EvalContext ABI with a Worker
+path ("once the function is pure-buffers-in/pure-buffers-out... a
+`Transferable`-based Worker call is a thin wrapper"). The ABI adapter is
+landing; the Worker is not, deliberately:
+
+The live SVG path is synchronous per animation-frame tick — `buildPlacements`
+runs inside the same rAF callback that reads its output and paints. A
+`postMessage` round trip (even with the SoA columns transferred rather than
+copied) adds at least one message-port hop each direction, and at shipped
+particle counts the compute itself is sub-millisecond to a few ms (see
+`perf.selfcheck.mjs`'s budgets 1/2/4) — comparable to or smaller than the
+messaging overhead it would be paying to avoid. Moving the work off-thread
+without evidence it is actually a threading problem, rather than a compute
+one, is exactly the kind of change #108's own "measure first" rule exists to
+block.
+
+This is a non-decision, not a rejection: `evalContext.js` exists specifically
+so that if a real before/after measurement (e.g. dropped frames tied to main
+thread work, not simulated) shows a Worker would help, the ABI it would call
+through already exists and needs no rework. Revisit with numbers, not before.
