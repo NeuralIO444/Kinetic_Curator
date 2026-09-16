@@ -1,6 +1,7 @@
 import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
+import { sanitizeOverlay, duplicateIntoOverlay } from '../../assets/overlay.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
@@ -20,6 +21,10 @@ function normalizeSnapshots(raw) {
   return out;
 }
 
+function findAsset(id, overlay) {
+  return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
+}
+
 export const createGlobalSlice = (set) => ({
   running: true,
   fps: 60,
@@ -32,8 +37,8 @@ export const createGlobalSlice = (set) => ({
   motionEnergy: 0,
 
   enabledAssets: initialEnabledAssets,
-  /** Runtime overrides over authored asset.weight — id → 'heavy'|'medium'|'light' */
   assetWeightOverrides: {},
+  customAssets: [],
   search: '',
   catFilter: 'all',
   poolView: 'grid',
@@ -58,14 +63,18 @@ export const createGlobalSlice = (set) => ({
   toggleAsset: (id) => set((state) => ({
     enabledAssets: { ...state.enabledAssets, [id]: !state.enabledAssets[id] },
   })),
-  soloAsset: (id) => set(() => {
+  soloAsset: (id) => set((state) => {
     const next = {};
     ASSETS.forEach((a) => { next[a.id] = a.id === id; });
+    sanitizeOverlay(state.customAssets).forEach((a) => { next[a.id] = a.id === id; });
     return { enabledAssets: next };
   }),
   toggleAllAssets: (enabled) => set((state) => {
     const next = { ...state.enabledAssets };
     ASSETS.forEach((a) => {
+      if (state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
+    });
+    sanitizeOverlay(state.customAssets).forEach((a) => {
       if (state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
     });
     return { enabledAssets: next };
@@ -75,9 +84,20 @@ export const createGlobalSlice = (set) => ({
   setCatFilter: (filter) => set({ catFilter: filter }),
   setPoolView: (view) => set({ poolView: view }),
 
+  duplicateAsset: (id) => set((state) => {
+    const src = findAsset(id, sanitizeOverlay(state.customAssets));
+    if (!src) return {};
+    const result = duplicateIntoOverlay(src, state.customAssets);
+    if (!result.ok) return {};
+    return {
+      customAssets: result.overlay,
+      enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
+    };
+  }),
+
   setAssetWeight: (id, weight) => set((state) => {
     if (!WEIGHT_CYCLE.includes(weight)) return {};
-    const asset = ASSETS.find((a) => a.id === id);
+    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
     if (!asset) return {};
     if (asset.weight === weight) {
       if (!(id in state.assetWeightOverrides)) return {};
@@ -91,7 +111,7 @@ export const createGlobalSlice = (set) => ({
   }),
 
   cycleAssetWeight: (id) => set((state) => {
-    const asset = ASSETS.find((a) => a.id === id);
+    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
     if (!asset) return {};
     const current = state.assetWeightOverrides[id] || asset.weight || 'medium';
     const idx = WEIGHT_CYCLE.indexOf(current);
@@ -119,18 +139,18 @@ export const createGlobalSlice = (set) => ({
 
   clearWeightOverrides: () => set({ assetWeightOverrides: {} }),
 
-  /** Apply a parsed project document in one store update (#33). */
   applyProject: (doc) => set((state) => {
     const next = {
       seed: doc.seed >>> 0,
       paletteId: doc.paletteId || state.paletteId,
       quality: doc.quality || state.quality,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
+      customAssets: sanitizeOverlay(doc.customAssets),
     };
     if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
       const enabled = { ...initialEnabledAssets };
       for (const [id, on] of Object.entries(doc.enabledAssets)) {
-        if (id in enabled) enabled[id] = !!on;
+        enabled[id] = !!on;
       }
       next.enabledAssets = enabled;
     }
