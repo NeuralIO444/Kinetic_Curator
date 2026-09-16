@@ -11,6 +11,14 @@
 // origin. Bake is therefore a pure function of its inputs, and RENDER/BATCH
 // can produce a swarm still without depending on the live loop at all.
 //
+// That purity has one limit, found while building the #108 swarm SoA
+// behaviour lock: Math.sin/cos/atan2 are not required by ECMAScript to be
+// correctly rounded, and V8 evaluates them differently on x64 and arm64. Over
+// 120 chaotic steps that last-bit difference becomes a visibly different
+// swarm. A bake is a pure function of its inputs *on a given machine*; it is
+// not byte-identical across architectures, which matters if studio/ ever
+// distributes renders over mixed hardware. See docs/KERNEL_V1_PLAN.md §16.
+//
 // AC3 — dual path, stated plainly: the live canvas keeps its RAF loop for
 // interactivity (it needs to respond to the pointer attractor). Both paths
 // now run identical, seeded physics, so a bake at step N matches what the

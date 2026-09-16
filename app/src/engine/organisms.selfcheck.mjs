@@ -38,22 +38,26 @@ assert.strictEqual(bi.getItems(assets).length, 40 + 80, 'spore + two wings');
 assert.ok(bi.getItems(assets).some((it) => it._mirrored && it.role === 'wing'));
 assert.ok(bi.getItems(assets).every((it) => typeof it.u === 'number' && it.u >= 0 && it.u <= 1));
 
+// #108 swarm SoA: state lives in parallel typed arrays, so these read
+// columns over [0, n) rather than an array of Particle objects.
+const rows = (sys) => Array.from({ length: sys.physicsCount() }, (_, i) => i);
+
 bi.resetPhase();
-assert.ok(bi.particles.every((p) => p.phase === 0));
-assert.strictEqual(bi.particles[0].assetIndex, 0);
+assert.ok(rows(bi).every((i) => bi.phase[i] === 0));
+assert.strictEqual(bi.assetIndex[0], 0);
 
 const a = run('hype', 'bilateral', 2);
 const b = run('hype', 'bilateral', 2);
 assert.deepStrictEqual(
-  a.particles.map((p) => [p.x, p.y]),
-  b.particles.map((p) => [p.x, p.y]),
+  rows(a).map((i) => [a.x[i], a.y[i]]),
+  rows(b).map((i) => [b.x[i], b.y[i]]),
   'same seed same leaders',
 );
 
 const dish = run('hype', 'bilateral', 3, 90);
-for (const p of dish.particles) {
-  assert.ok(p.x >= 0 && p.x <= 1000, `x left the dish: ${p.x}`);
-  assert.ok(p.y >= 0 && p.y <= 700, `y left the dish: ${p.y}`);
+for (const i of rows(dish)) {
+  assert.ok(dish.x[i] >= 0 && dish.x[i] <= 1000, `x left the dish: ${dish.x[i]}`);
+  assert.ok(dish.y[i] >= 0 && dish.y[i] <= 700, `y left the dish: ${dish.y[i]}`);
 }
 
 console.log('organisms.selfcheck: OK');
