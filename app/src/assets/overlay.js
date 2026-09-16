@@ -43,3 +43,20 @@ export function duplicateIntoOverlay(source, overlay) {
     : copy.asset;
   return { ok: true, asset, overlay: [...clean, asset] };
 }
+
+export function ingestIntoOverlay(rawSvg, overlay, hint = 'ingest') {
+  const clean = sanitizeOverlay(overlay);
+  if (clean.length >= OVERLAY_CAP) return { ok: false, error: 'overlay full', overlay: clean };
+  const taken = new Set(clean.map((a) => a.id));
+  let base = String(hint || 'ingest').replace(/\.svg$/i, '');
+  let parsed = ingestSvg(rawSvg, { id: base });
+  if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
+  let n = 2;
+  while (taken.has(parsed.asset.id)) {
+    parsed = ingestSvg(rawSvg, { id: `${base}_${n}` });
+    n += 1;
+    if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
+  }
+  const asset = { ...parsed.asset, source: 'ingest', tags: [...new Set([...(parsed.asset.tags || []), 'overlay', 'ingest'])] };
+  return { ok: true, asset, overlay: [...clean, asset] };
+}
