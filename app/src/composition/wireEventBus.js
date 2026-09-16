@@ -88,6 +88,8 @@ export function wireEventBus(rawDispatch) {
     dispatch({ type: A.CLEAR_WEIGHT_OVERRIDES }));
   on(Events.ASSETS_DUPLICATE, ({ id }) =>
     dispatch({ type: 'DUPLICATE_ASSET', id }));
+  on(Events.ASSETS_INGEST, ({ svg, hint }) =>
+    dispatch({ type: 'INGEST_ASSET', svg, hint }));
 
   on(Events.EXPORT_RECORD, (recording) =>
     dispatch({ type: A.SET_IS_RECORDING, payload: recording }));
