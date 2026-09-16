@@ -43,12 +43,13 @@ export function AssetPoolPanel() {
 
   const enabledCount = Object.values(enabled).filter(Boolean).length;
   const overrideCount = Object.keys(weightOverrides).length;
+  const overlayCount = assets.filter((a) => String(a.id).startsWith('user:')).length;
 
   const effectiveWeight = (a) => weightOverrides[a.id] || a.weight || 'medium';
 
   return (
     <div className="panel panel-pool">
-      <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active${overrideCount ? ` · ${overrideCount} wt` : ''}`}>
+      <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active${overrideCount ? ` · ${overrideCount} wt` : ''}${overlayCount ? ` · ${overlayCount} user` : ''}`}>
         <div className="header-tools">
           <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'grid')}>GRID</button>
           <button className={`chip-btn ${poolView === 'list' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'list')}>LIST</button>
@@ -105,8 +106,10 @@ export function AssetPoolPanel() {
           {filtered.map(a => {
             const w = effectiveWeight(a);
             const isOverride = !!weightOverrides[a.id];
+            const isUser = String(a.id).startsWith('user:');
             return (
-              <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}`}>
+              <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}`}
+                style={isUser ? { outline: '1px dashed var(--accent)' } : undefined}>
                 <button
                   className="tile-toggle"
                   onClick={(e) => {
@@ -148,9 +151,32 @@ export function AssetPoolPanel() {
                 >
                   ◉
                 </button>
+                <button
+                  type="button"
+                  title="Duplicate into project overlay (does not edit the shipped 137)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    emit(Events.ASSETS_DUPLICATE, { id: a.id });
+                  }}
+                  style={{
+                    position: 'absolute',
+                    bottom: 22,
+                    right: 2,
+                    fontSize: 8,
+                    letterSpacing: '0.06em',
+                    padding: '2px 4px',
+                    border: '1px solid var(--line)',
+                    background: 'rgba(0,0,0,0.55)',
+                    color: 'var(--dim)',
+                    cursor: 'pointer',
+                    zIndex: 2,
+                  }}
+                >
+                  DUP
+                </button>
                 <div className="tile-meta">
                   <span className="tile-id">{a.id}</span>
-                  <span className="tile-cat">{a.category}</span>
+                  <span className="tile-cat">{isUser ? 'user' : a.category}</span>
                 </div>
               </div>
             );

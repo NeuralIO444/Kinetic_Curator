@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import * as A from './actions.js';
 import { PALETTES, resolvePalette } from '../data/palettes.js';
 import { ASSETS } from '../data/assets/index.js';
+import { mergePool } from '../assets/overlay.js';
 
 const RefsContext = createContext({});
 const _emptySelector = () => null;
@@ -26,6 +27,7 @@ export function useApp(selector) {
   const paletteOverrides = useStore(s => s.paletteOverrides);
   const userPalettes = useStore(s => s.userPalettes);
   const paletteLocks = useStore(s => s.paletteLocks);
+  const customAssets = useStore(s => s.customAssets);
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const undo = useStore(s => s.undo);
@@ -74,6 +76,7 @@ export function useApp(selector) {
       case A.SET_CATEGORY_WEIGHT: return store.setCategoryWeight(action.category, action.weight);
       case A.CLEAR_WEIGHT_OVERRIDES: return store.clearWeightOverrides();
       case 'CYCLE_ASSET_WEIGHT': return store.cycleAssetWeight(action.id);
+      case 'DUPLICATE_ASSET': return store.duplicateAsset(action.id);
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
       case A.SET_AUDIO_GAIN: return store.setAudioGain(payload);
@@ -140,7 +143,7 @@ export function useApp(selector) {
     palettes: [...PALETTES, ...(userPalettes || [])],
     userPalettes: userPalettes || [],
     paletteLocks: paletteLocks || {},
-    assets: ASSETS,
+    assets: mergePool(ASSETS, customAssets),
     ...refs,
   };
 }
