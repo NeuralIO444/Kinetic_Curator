@@ -41,7 +41,6 @@ export function AssetPoolPanel() {
 
   const overlayCount = assets.filter((a) => String(a.id).startsWith('user:')).length;
   const enabledCount = Object.values(enabled).filter(Boolean).length;
-  const overrideCount = Object.keys(weightOverrides).length;
   const effectiveWeight = (a) => weightOverrides[a.id] || a.weight || 'medium';
 
   const onDrop = (e) => {
