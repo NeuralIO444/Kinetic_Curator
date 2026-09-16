@@ -4,6 +4,8 @@ import { sanitizeOverlay } from '../assets/overlay.js';
 
 export const PROJECT_VERSION = 1;
 export const AUTOSAVE_KEY = 'kc:project:v1';
+/** Where a document that failed to parse is kept instead of being applied (#107 §6). */
+export const QUARANTINE_KEY = 'kc:project:quarantine';
 
 function normalizeSnapshots(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -124,22 +126,82 @@ export function downloadProject(doc, filename) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 }
 
+/**
+ * Autosave is a crash-only journal (#107 §6): boot either restores a document
+ * that parsed cleanly, or starts from factory defaults. There is no third
+ * option where a half-understood document is applied anyway — that is how an
+ * operator loses a set to a blob they cannot see and cannot delete.
+ *
+ * A document that fails to parse is moved to QUARANTINE_KEY rather than
+ * dropped, so it can be recovered by hand, and so the next boot does not
+ * retry the same poison and fail the same way.
+ *
+ * @returns {{doc: object|null, quarantined: boolean}}
+ */
 export function readAutosave() {
+  let raw = null;
   try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const result = parseProject(parsed);
-    return result.ok ? result.doc : null;
+    raw = localStorage.getItem(AUTOSAVE_KEY);
   } catch {
-    return null;
+    return { doc: null, quarantined: false };
+  }
+  if (!raw) return { doc: null, quarantined: false };
+
+  const quarantine = (reason) => {
+    try {
+      localStorage.setItem(QUARANTINE_KEY, JSON.stringify({
+        quarantinedAt: new Date().toISOString(), reason, raw,
+      }));
+      localStorage.removeItem(AUTOSAVE_KEY);
+    } catch { /* storage is already unhappy; nothing useful to do */ }
+    console.warn(`[project] autosave quarantined (${reason}); booting defaults`);
+    return { doc: null, quarantined: true };
+  };
+
+  let envelope;
+  try {
+    envelope = JSON.parse(raw);
+  } catch (e) {
+    return quarantine(`unparseable JSON: ${e.message}`);
+  }
+
+  // Envelope form is { version, savedAt, doc }; older builds wrote the bare
+  // document, so accept both rather than quarantining every existing session
+  // on upgrade.
+  const candidate = envelope && typeof envelope === 'object' && envelope.doc
+    ? envelope.doc
+    : envelope;
+
+  const result = parseProject(candidate);
+  if (!result.ok) return quarantine(result.error || 'failed to parse');
+  return { doc: result.doc, quarantined: false };
+}
+
+/**
+ * @returns {{ok: boolean, error?: string}} so the shell can show UNSAVED
+ *   instead of letting the operator believe the set is being persisted.
+ */
+export function writeAutosave(doc) {
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
+      version: PROJECT_VERSION,
+      savedAt: new Date().toISOString(),
+      doc,
+    }));
+    return { ok: true };
+  } catch (e) {
+    // Quota exceeded, or a private window that refuses storage entirely.
+    console.warn('[project] autosave failed', e);
+    return { ok: false, error: e?.name === 'QuotaExceededError' ? 'quota' : 'blocked' };
   }
 }
 
-export function writeAutosave(doc) {
+/** The document that was refused at boot, if any. */
+export function readQuarantine() {
   try {
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(doc));
-  } catch (e) {
-    console.warn('[project] autosave failed', e);
+    const raw = localStorage.getItem(QUARANTINE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
 }

@@ -40,10 +40,22 @@ export const createGlobalSlice = (set) => ({
   assetWeightOverrides: {},
   customAssets: [],
   ingestError: null,
+  /**
+   * Whether the session is actually being persisted (#107 §6).
+   *   'ok'          last autosave written
+   *   'unsaved'     localStorage refused the write (quota, or a private window)
+   *   'quarantined' boot found a document it could not parse; defaults were
+   *                 loaded and the bad blob moved to kc:project:quarantine
+   *
+   * Surfaced in MasterBar because the failure this guards against is an
+   * operator believing a long set is being saved when nothing is.
+   */
+  persistStatus: 'ok',
   search: '',
   catFilter: 'all',
   poolView: 'grid',
 
+  setPersistStatus: (persistStatus) => set({ persistStatus }),
   setRunning: (running) => set({ running }),
   setFps: (fps) => set({ fps }),
   setNodeCount: (count) => set({ nodeCount: count }),

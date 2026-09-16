@@ -156,6 +156,67 @@ function pickEnum(value, allowed, fallback) {
   return typeof value === 'string' && allowed.includes(value) ? value : fallback;
 }
 
+const ENUM_SPEC = {
+  mode: MODE_IDS,
+  composition: COMPOSITION_IDS,
+  blendMode: BLEND_MODES,
+  shading: SHADING_MODES,
+  material: MATERIAL_IDS,
+  paletteShift: PALETTE_SHIFTS,
+  symmetry: SYMMETRY_MODES,
+  behave: BEHAVE_MODES,
+};
+
+/** True when `value` is a number we can meaningfully clamp. */
+function isNumericish(value) {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'string' && value.trim() !== '') return Number.isFinite(Number(value));
+  return false;
+}
+
+/**
+ * Which supplied keys are *structurally* wrong, as opposed to merely out of
+ * range (#107 §1).
+ *
+ * The distinction matters. A slider that runs past its maximum should clamp —
+ * that is what a slider does, and rejecting it would feel broken. But NaN,
+ * null, a boolean where a number belongs, or a mode that does not exist is
+ * not a value at the edge of a range; it is a caller that has gone wrong, and
+ * silently substituting a default would hide the bug while changing the
+ * operator's composition underneath them.
+ *
+ * So: clamp what can be clamped, reject what cannot, and let the caller keep
+ * the previous state for the rejected keys.
+ *
+ * @returns {{ params: object, rejected: string[] }}
+ */
+export function validateLayoutParams(partial) {
+  const src = partial && typeof partial === 'object' && !Array.isArray(partial) ? partial : {};
+  const rejected = [];
+
+  for (const key of Object.keys(src)) {
+    if (UNSAFE_KEYS.has(key)) { rejected.push(key); continue; }
+    const value = src[key];
+    if (PARAM_SPEC[key]) {
+      if (!isNumericish(value)) rejected.push(key);
+    } else if (RANGE_SPEC[key]) {
+      const usable = Array.isArray(value) && value.length >= 2
+        && isNumericish(value[0]) && isNumericish(value[1]);
+      if (!usable) rejected.push(key);
+    } else if (ENUM_SPEC[key]) {
+      if (!pickEnumOk(value, ENUM_SPEC[key])) rejected.push(key);
+    }
+    // Booleans coerce rather than reject; unknown keys are passed through
+    // untouched, same as normalizeLayoutParams.
+  }
+
+  return { params: normalizeLayoutParams(src), rejected };
+}
+
+function pickEnumOk(value, allowed) {
+  return typeof value === 'string' && allowed.includes(value);
+}
+
 export function normalizeLayoutParams(partial) {
   const src = partial && typeof partial === 'object' && !Array.isArray(partial) ? partial : {};
   const next = { ...DEFAULT_LAYOUT_PARAMS };
