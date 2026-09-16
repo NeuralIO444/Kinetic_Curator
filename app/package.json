@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs && node src/engine/kernel/rng.selfcheck.mjs && node src/engine/kernel/noise.selfcheck.mjs && node src/engine/kernel/sample/sample.selfcheck.mjs && node src/engine/kernel/field/field.selfcheck.mjs && node src/engine/kernel/color/color.selfcheck.mjs && node src/engine/kernel/bake/bake.selfcheck.mjs && node src/state/projectDocument.selfcheck.mjs && node src/data/palettes.selfcheck.mjs && node src/state/paletteLibrary.selfcheck.mjs && node src/engine/harmony.selfcheck.mjs && node src/engine/organisms.selfcheck.mjs && node src/state/undoLayers.selfcheck.mjs",
+    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs && node src/engine/kernel/rng.selfcheck.mjs && node src/engine/kernel/noise.selfcheck.mjs && node src/engine/kernel/sample/sample.selfcheck.mjs && node src/engine/kernel/field/field.selfcheck.mjs && node src/engine/kernel/color/color.selfcheck.mjs && node src/engine/kernel/bake/bake.selfcheck.mjs && node src/state/projectDocument.selfcheck.mjs && node src/data/palettes.selfcheck.mjs && node src/state/paletteLibrary.selfcheck.mjs && node src/engine/harmony.selfcheck.mjs && node src/engine/organisms.selfcheck.mjs && node src/state/undoLayers.selfcheck.mjs && node src/engine/perf.selfcheck.mjs",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
     "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e"
