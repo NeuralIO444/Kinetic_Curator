@@ -168,31 +168,58 @@ export function buildPlacements({
     cache.keys = keys;
   }
 
-  // Items are rebuilt every call rather than mutated in place. At the shipped
-  // caps that is ~0.01ms, and it keeps the returned objects unaliased from
-  // the cache — a caller that held on to last frame's items would otherwise
-  // see them mutate underneath it.
-  let mapped = new Array(soa.n);
-  for (let k = 0; k < soa.n; k++) {
-    mapped[k] = {
-      x: soa.x[k],
-      y: soa.y[k],
-      scale: soa.scale[k],
-      rotation: soa.rotation[k],
-      alpha: soa.alpha[k],
-      index: soa.index[k],
-      t: soa.t[k],
-      zTier: soa.zTier[k],
-      assetId: assetIds[k],
-      color: colors[k],
-      accent: accents[k],
-      key: keys[k],
-    };
+  // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
+  // (below sorts the array, see the pool guard for why that must stay
+  // unpooled). On a full hit with overlap on, x/y/index/t/zTier/assetId/
+  // color/accent/key are all still valid from the geo+bind cache — only
+  // scale/rotation/alpha (stage C) can have moved — so the pooled objects
+  // from last call are mutated in place instead of reallocated. That does
+  // alias last frame's returned items (the old caution below no longer
+  // fully holds for this path), but nothing downstream holds a reference
+  // across frames — useCanvasItems' useMemo hands out a fresh result each
+  // call and Layer only ever reads the latest one.
+  const poolHit = cache && geoHit && bindHit && layoutParams.overlap
+    && cache.itemPool && cache.itemPool.length === soa.n;
+
+  let mapped;
+  if (poolHit) {
+    mapped = cache.itemPool;
+    for (let k = 0; k < soa.n; k++) {
+      const item = mapped[k];
+      item.scale = soa.scale[k];
+      item.rotation = soa.rotation[k];
+      item.alpha = soa.alpha[k];
+    }
+  } else {
+    mapped = new Array(soa.n);
+    for (let k = 0; k < soa.n; k++) {
+      mapped[k] = {
+        x: soa.x[k],
+        y: soa.y[k],
+        scale: soa.scale[k],
+        rotation: soa.rotation[k],
+        alpha: soa.alpha[k],
+        index: soa.index[k],
+        t: soa.t[k],
+        zTier: soa.zTier[k],
+        assetId: assetIds[k],
+        color: colors[k],
+        accent: accents[k],
+        key: keys[k],
+      };
+    }
   }
 
   if (!layoutParams.overlap) {
     // `mapped` is already a fresh array we own — no defensive copy needed.
+    // Never stash a sorted array into cache.itemPool: the pool is indexed by
+    // soa slot (item[k] <-> soa.x[k]/scale[k]/...), and sorting breaks that
+    // correspondence — a later pool-hit would mutate the wrong item's
+    // scale/rotation/alpha. That aliasing bug was caught in review; the
+    // overlap-only guard above is what prevents it.
     mapped.sort((a, b) => a.scale - b.scale);
+  } else if (cache) {
+    cache.itemPool = mapped;
   }
 
   if (mirror && caps.allowMirror) {

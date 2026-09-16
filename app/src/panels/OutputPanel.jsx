@@ -1,5 +1,5 @@
 // OutputPanel (P05) — export + quality (emit-only actions)
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { exportSnapshot, renderFinal, renderBatch, useVideoRecorder } from '../hooks/useMediaExport.js';
@@ -34,12 +34,13 @@ export function OutputPanel() {
     layerSnapshots: s.layerSnapshots,
     userPalettes: s.userPalettes,
     favorites: s.favorites,
+    watchdogTripGen: s.watchdogTripGen,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, layers, activeLayerId, layerSnapshots,
-    userPalettes, favorites, rendering,
+    userPalettes, favorites, rendering, watchdogTripGen,
   } = state;
   // #107 §7: this lives in the store (not local state) so the App-level
   // hotkey map can debounce N/E while a render is in flight — a seed bump
@@ -52,8 +53,43 @@ export function OutputPanel() {
   const [batchProgress, setBatchProgress] = useState(null);
   const cancelBatchRef = useRef(false);
   const restoreRef = useRef(null);
+  const watchdogGenRef = useRef(watchdogTripGen);
 
   const accumOn = !!layoutParams.accumulation;
+
+  // Shared by RENDER FINAL and BATCH — both stash pre-export quality/count/
+  // mirror (batch also stashes seed) in restoreRef and undo it the same way.
+  const restoreFromSnapshot = (snap) => {
+    if (!snap) return;
+    emit(Events.EXPORT_QUALITY, snap.quality);
+    emit(Events.LAYOUT_PARAM, { key: 'count', value: snap.count });
+    emit(Events.LAYOUT_PARAM, { key: 'mirror', value: snap.mirror });
+    if (snap.seed !== undefined) emit(Events.EXPORT_SEED, snap.seed);
+  };
+
+  // #107 §4: a watchdog trip (tier 2 — FPS ~0 or a critical render-error)
+  // mid-export must not leave the live document stuck on FINAL/BATCH's
+  // lifted quality/count/mirror forever, nor the UI stuck showing RENDERING —
+  // running=false alone doesn't undo either of those.
+  useEffect(() => {
+    if (watchdogTripGen === watchdogGenRef.current) return;
+    watchdogGenRef.current = watchdogTripGen;
+    if (restoreRef.current) {
+      restoreFromSnapshot(restoreRef.current);
+      restoreRef.current = null;
+    }
+    if (batchProgress) {
+      // Reuse the CANCEL button's flag rather than inventing a second one.
+      cancelBatchRef.current = true;
+      // This effect exists to sync local UI state to an external system (the
+      // watchdog trip in the zustand store) — exactly the case the lint rule
+      // itself carves out, it just can't tell that from the call site.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBatchProgress(null);
+    }
+    setRendering(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchdogTripGen]);
 
   useVideoRecorder({
     svgRef,
@@ -114,11 +150,7 @@ export function OutputPanel() {
       emit(Events.LAYOUT_PARAM, { key: 'mirror', value: true });
     };
     const restore = () => {
-      const r = restoreRef.current;
-      if (!r) return;
-      emit(Events.EXPORT_QUALITY, r.quality);
-      emit(Events.LAYOUT_PARAM, { key: 'count', value: r.count });
-      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: r.mirror });
+      restoreFromSnapshot(restoreRef.current);
       restoreRef.current = null;
     };
 
@@ -183,15 +215,14 @@ export function OutputPanel() {
       emit(Events.LAYOUT_PARAM, { key: 'mirror', value: true });
     };
     const restore = () => {
-      const r = restoreRef.current;
-      if (!r) return;
-      emit(Events.EXPORT_QUALITY, r.quality);
-      emit(Events.LAYOUT_PARAM, { key: 'count', value: r.count });
-      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: r.mirror });
-      emit(Events.EXPORT_SEED, r.seed);
+      restoreFromSnapshot(restoreRef.current);
       restoreRef.current = null;
     };
 
+    // #107 §5: hold evolve/drift off for the whole batch, independent of the
+    // watchdog's own slowRender/perfTier1 (which auto-clear on live FPS and
+    // would fight a pause that must last the whole batch regardless).
+    emit(Events.EXPORT_BATCH_PAUSE, true);
     try {
       const results = await renderBatch({
         svgNode: svgRef.current,
@@ -238,6 +269,7 @@ export function OutputPanel() {
       setRendering(false);
       setBatchProgress(null);
       cancelBatchRef.current = false;
+      emit(Events.EXPORT_BATCH_PAUSE, false);
     }
   };
 

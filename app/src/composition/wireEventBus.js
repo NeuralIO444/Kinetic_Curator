@@ -70,6 +70,7 @@ export function wireEventBus(rawDispatch) {
 
   on(Events.EXPORT_RECORD, (recording) => dispatch({ type: A.SET_IS_RECORDING, payload: recording }));
   on(Events.EXPORT_RENDERING, (rendering) => dispatch({ type: A.SET_IS_RENDERING, payload: rendering }));
+  on(Events.EXPORT_BATCH_PAUSE, (paused) => dispatch({ type: A.SET_BATCH_PAUSED, payload: paused }));
   on(Events.EXPORT_RESOLUTION, (res) => dispatch({ type: A.SET_EXPORT_RESOLUTION, payload: res }));
   on(Events.EXPORT_CLEAR_SNAPSHOTS, () => dispatch({ type: A.CLEAR_SNAPSHOTS }));
   on(Events.EXPORT_QUALITY, (q) => dispatch({ type: A.SET_QUALITY, payload: q }));

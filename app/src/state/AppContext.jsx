@@ -90,6 +90,7 @@ export function useApp(selector) {
       case 'REPLACE_CUSTOM_ASSET': return store.replaceCustomAsset(action.id, action.svg);
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
+      case A.SET_AUDIO_DENIED: return store.setAudioDenied(payload);
       case A.SET_AUDIO_GAIN: return store.setAudioGain(payload);
       case A.SET_AUDIO_SOURCE: return store.setAudioSource(payload);
       case A.SET_AUDIO_MONITOR: return store.setAudioMonitor(payload);
@@ -111,6 +112,7 @@ export function useApp(selector) {
       case A.SET_PHRASE_BPM: return store.setPhraseBpm(payload);
       case A.RESET_PHRASE: return store.resetPhrase();
       case A.SET_SLOW_RENDER: return store.setSlowRender(payload);
+      case A.SET_BATCH_PAUSED: return store.setBatchPaused(payload);
       case A.TOGGLE_FULLSCREEN: return store.toggleFullscreen();
       case A.ADD_SNAPSHOT: return store.addSnapshot(action.snapshot);
       case A.REMOVE_SNAPSHOT: return store.removeSnapshot(action.id);

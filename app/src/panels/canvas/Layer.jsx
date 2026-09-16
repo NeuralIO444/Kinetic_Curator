@@ -13,7 +13,7 @@ export function Layer({
   layoutParams, seed, activeAssets, palette, caGrid, caps,
   safeCount, safeParticles, effectiveScale, effectiveAlpha,
   canvasW, canvasH, scaleMul, alphaBoost, motionSmoothing, quality,
-  layerBlendMode, layerOpacity, onCount, attractorRef,
+  layerBlendMode, layerOpacity, onCount, attractorRef, perfTier1,
 }) {
   const { items } = useCanvasItems({
     layoutParams, seed, activeAssets, palette, caGrid, safeCount,
@@ -28,7 +28,7 @@ export function Layer({
 
   const renderItems = isLiveSwarmMode(layoutParams.mode) ? swarmItems : items;
   const nodeCount = renderItems?.length || 0;
-  const showGloss = shouldRenderGloss(quality, layoutParams.shading, nodeCount);
+  const showGloss = shouldRenderGloss(quality, layoutParams.shading, nodeCount) && !perfTier1;
   const half = ASSET_SIZE / 2;
   const mat = materialHref(layoutParams.material);
 

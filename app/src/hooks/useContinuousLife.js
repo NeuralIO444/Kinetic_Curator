@@ -22,12 +22,15 @@ export function useContinuousLife() {
   // is exactly the wrong thing to keep doing while the frame rate is on the
   // floor.
   const slowRender = useStore(s => s.slowRender);
+  // #107 §5: held for the whole duration of a batch export, independent of
+  // slowRender — see globalSlice.js for why this is a separate flag.
+  const batchPaused = useStore(s => s.batchPaused);
 
   const baseRef = useRef(null);
   const tRef = useRef(0);
 
   useEffect(() => {
-    if (!running || lifeDrift <= 0.01 || slowRender) {
+    if (!running || lifeDrift <= 0.01 || slowRender || batchPaused) {
       baseRef.current = null;
       setDriftOverlay(null);
       return;
@@ -67,7 +70,7 @@ export function useContinuousLife() {
     }, 80);
 
     return () => clearInterval(id);
-  }, [running, lifeDrift, slowRender, lockedParams.jitter, lockedParams.displacement, lockedParams.noiseSpeed, setDriftOverlay]);
+  }, [running, lifeDrift, slowRender, batchPaused, lockedParams.jitter, lockedParams.displacement, lockedParams.noiseSpeed, setDriftOverlay]);
 
   // Re-anchor the baseline whenever the operator (or a preset/evolve target)
   // actually edits one of these params. layoutParams no longer carries

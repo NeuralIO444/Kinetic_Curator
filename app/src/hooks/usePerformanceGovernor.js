@@ -6,12 +6,14 @@
 //   step quality down one level (high → balanced → performance)
 // - Optionally clamp count further if already on performance
 // - Never fights a user who manually chose 'performance'
-// - #107 §4: quality/count only shrink what gets drawn. At ~0 FPS that is
-//   not enough — evolve, ambient life drift, ACCUM and swarm are each doing
-//   full-rate work independent of quality, so a sustained near-zero reading
-//   sets `slowRender`, which those four pause on directly until FPS
-//   recovers. Recovery is immediate (no sustain window): a false-positive
-//   resume just means one hook does a frame of work it could have skipped.
+// - #107 §4: quality/count only shrink what gets drawn. Two tiers below that:
+//     tier 1 (FPS < 16 sustained 2s): shed ACCUM/gloss/mirror render-only,
+//       across every visible layer. Auto-clears the instant FPS recovers —
+//       no sustain needed, a false-positive resume just costs one frame.
+//     tier 2 (FPS ~0 sustained, or a critical render-error elsewhere): a hard
+//       stop via tripWatchdog — running/evolve off, does not auto-resume.
+//   Recovery for tier 1 and the tier-2 `slowRender` flag is immediate; only
+//   `running`/`evolveMode` require a manual resume (panic-key precedent).
 // - #107 §5: the last-resort count clamp below is a render-only overlay
 //   (perfClampOverride), not a layoutParams write — see the comment at that
 //   branch for why.
@@ -21,8 +23,10 @@ import { useStore } from '../state/store.js';
 
 const LOW_FPS = 32;
 const CRITICAL_FPS = 10; // ~0 FPS: the tab is barely getting frames at all
+const TIER1_FPS = 16; // shed ACCUM/gloss/mirror before things go fully critical
 const SUSTAIN_MS = 1600; // must stay low this long before acting
 const CRITICAL_SUSTAIN_MS = 800; // react faster — this is the worse case
+const TIER1_SUSTAIN_MS = 2000; // #107 §4 spec: 2s sustained below TIER1_FPS
 const COOLDOWN_MS = 8000; // don't auto-step again for a while
 
 export function usePerformanceGovernor() {
@@ -30,15 +34,19 @@ export function usePerformanceGovernor() {
   const quality = useStore(s => s.quality);
   const autoQuality = useStore(s => s.autoQuality);
   const slowRender = useStore(s => s.slowRender);
+  const perfTier1 = useStore(s => s.perfTier1);
   const perfClampOverride = useStore(s => s.perfClampOverride);
   const setQuality = useStore(s => s.setQuality);
   const setSlowRender = useStore(s => s.setSlowRender);
+  const setPerfTier1 = useStore(s => s.setPerfTier1);
+  const tripWatchdog = useStore(s => s.tripWatchdog);
   const setPerfClampOverride = useStore(s => s.setPerfClampOverride);
   const layoutParams = useStore(s => s.layoutParams);
 
   const lowSinceRef = useRef(null);
   const lastActionRef = useRef(0);
   const criticalSinceRef = useRef(null);
+  const tier1SinceRef = useRef(null);
 
   useEffect(() => {
     if (!autoQuality) {
@@ -61,10 +69,35 @@ export function usePerformanceGovernor() {
       return;
     }
     if (!slowRender && now - criticalSinceRef.current >= CRITICAL_SUSTAIN_MS) {
-      setSlowRender(true);
-      console.info('[Kinetic] Perf critical: pausing evolve/life/ACCUM/swarm (FPS below', CRITICAL_FPS, ')');
+      tripWatchdog('fps-critical');
+      console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS, ')');
     }
-  }, [fps, autoQuality, slowRender, setSlowRender]);
+  }, [fps, autoQuality, slowRender, tripWatchdog, setSlowRender]);
+
+  // Tier 1 (#107 §4): a milder, self-clearing shed. Independent sustain
+  // window from the critical tier above — this one fires first, at a higher
+  // FPS floor, and never touches running/evolveMode.
+  useEffect(() => {
+    if (!autoQuality) {
+      tier1SinceRef.current = null;
+      if (perfTier1) setPerfTier1(false);
+      return;
+    }
+    if (fps >= TIER1_FPS) {
+      tier1SinceRef.current = null;
+      if (perfTier1) setPerfTier1(false);
+      return;
+    }
+    const now = Date.now();
+    if (tier1SinceRef.current == null) {
+      tier1SinceRef.current = now;
+      return;
+    }
+    if (!perfTier1 && now - tier1SinceRef.current >= TIER1_SUSTAIN_MS) {
+      setPerfTier1(true);
+      console.info('[Kinetic] Perf tier1: ACCUM/gloss/mirror off (FPS below', TIER1_FPS, ')');
+    }
+  }, [fps, autoQuality, perfTier1, setPerfTier1]);
 
   useEffect(() => {
     // The premise for a density clamp is "still struggling at the lowest
