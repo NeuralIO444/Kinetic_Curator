@@ -1,12 +1,12 @@
-import { execSync, readFileSync } from 'node:child_process'
-import { readFileSync as readFile } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const pkg = JSON.parse(readFile(join(here, 'package.json'), 'utf8'))
+const pkg = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8'))
 
 const base = process.env.VITE_BASE ?? '/Kinetic_Curator/'
 
