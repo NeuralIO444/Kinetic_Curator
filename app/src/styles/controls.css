@@ -47,11 +47,12 @@
 .range-readout:hover { background: rgba(255,255,255,0.06); border-radius: 2px; }
 
 .lock-btn, .dice-btn {
-  background: transparent; border: none; padding: 1px;
-  font-size: 10px; cursor: pointer; opacity: 0.3;
+  background: transparent; border: none; padding: 4px;
+  min-width: 22px; min-height: 22px;
+  font-size: 12px; cursor: pointer; opacity: 0.55;
   transition: opacity 0.1s, transform 0.1s;
 }
-.lock-btn:hover, .dice-btn:hover { opacity: 0.8; }
+.lock-btn:hover, .dice-btn:hover { opacity: 1; }
 .lock-btn:active, .dice-btn:active { transform: scale(0.9); }
 .lock-btn.locked { opacity: 1.0; }
 
