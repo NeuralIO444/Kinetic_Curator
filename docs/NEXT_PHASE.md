@@ -91,13 +91,15 @@ Do **not** add a second kernel. Do **not** reopen Track E.
 ### Work items
 
 1. ~~**Shared project sanitize**~~ — **Done** (#143). `normalizeLayoutParams` gained `PARAM_SPEC`/`RANGE_SPEC` (bounds mirroring the sliders), enum allow-lists for every string field, boolean coercion and prototype-key stripping; `getSampler` no longer bare-indexes `SAMPLERS`. Batch writes `{ ok: false, error, stderr }` sidecars and continues instead of `sys.exit`-ing from a worker thread. Sidecars now also carry `_render.normalized` — what the kernel actually ran, which differs from the authored JSON exactly when the project was out of bounds.
-2. **Subprocess timeouts + resource caps** — wall timeouts; clamp resolution and `--jobs` vs unified memory.
-3. **Output jail** — `-o` stays under the requested tree.
-4. **Repro report sidecar** — kernel version, caps, bake steps, blend fallback (`plus-lighter` → `screen`), seed, status.
-5. **Batch resume** — manifest `{ seed, hash, status, path }`; skip existing PNGs by default.
+2. ~~**Subprocess timeouts + resource caps**~~ — **Done** (#145). Wall timeouts on node/resvg/ffmpeg, surfacing as `RenderError` so a hang fails one edition instead of stalling the batch forever. `--res` validated and capped at 16384px/side and 64MP (4K unaffected); `--jobs` clamped against cores *and* against half of physical RAM using an estimated in-flight bytes-per-pixel.
+3. ~~**Output jail**~~ — **Done** (#145). `under(base, …)` resolves and asserts containment at the point of write, for batch stems and video frames.
+4. ~~**Repro report sidecar**~~ — **Done** (#145). `render.mjs --emit-normalized` now reports kernel version, resolved caps, per-layer mode/safeCount/bakeSteps/blend modes, and — the useful part — a `substitutions` list naming every value the renderer silently swapped (`plus-lighter` → `screen`). `KERNEL_VERSION` is a real constant now instead of a string duplicated between `App.jsx` and the golden fixture.
+5. ~~**Batch resume**~~ — **Done** (#145). `manifest.json` carries `{ seed, hash, status, path }`; a rerun skips editions whose PNG exists and whose input hash matches, `--force` overrides. The hash covers the *normalized* project, so reformatting the JSON does not invalidate a finished batch but a real change does.
 6. **Tier-2 sidecar (later)** — FastAPI on `127.0.0.1` + one-shot token.
 
 Related QA gaps: **#137** (video/batch + ACCUM), **#135** / **#134** (ingest / overlay coverage).
+
+Still open here: item 6, the tier-2 FastAPI sidecar, which was always marked *later*.
 
 ---
 
@@ -124,8 +126,8 @@ Share the same **normalize** helper with #106.
       └─ Bake still 41 ms vs 30 ms budget; closing it is a product decision
          (swarm output changes) or WASM, so ENFORCE_BUDGET stays down
 
-2. Studio harden (#106) — item 1 DONE (#143); items 2–5 outstanding
-      └─ timeouts + resource caps, output jail, repro sidecar, batch resume
+2. ~~Studio harden (#106) items 1–5~~  DONE (#143, #145)
+      └─ Item 6 (FastAPI tier-2 sidecar) still deferred as 'later'
 
 3. Live harden (#107) in parallel where normalize overlaps
 
@@ -170,4 +172,4 @@ Share the same **normalize** helper with #106.
 | [#137](https://github.com/NeuralIO444/Kinetic_Curator/issues/137) | QA: studio video/batch + ACCUM | Coverage |
 | [#136](https://github.com/NeuralIO444/Kinetic_Curator/issues/136) | Harden SVG ingest further | Security / hygiene |
 
-*Last updated: 2026-09-16 (post #141 swarm SoA, #143 shared sanitize)*
+*Last updated: 2026-09-16 (post #141 swarm SoA, #143 sanitize, #145 studio harden)*

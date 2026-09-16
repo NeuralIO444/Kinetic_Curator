@@ -10,12 +10,13 @@
 import assert from 'node:assert';
 import { createHash } from 'node:crypto';
 import { buildPlacements } from './buildPlacements.js';
+import { KERNEL_VERSION } from './kernel/version.js';
 
 /** kernel.v1 — bump when placement/weight/color pipeline changes. */
 export const EXPECTED_HASH =
   'e892d112b20d92b6611c0619cb6b6e2bbddb52a179d1c9dc38d3b8185690a9a2';
 
-export const KERNEL_GOLDEN_VERSION = 'kernel.v1';
+export const KERNEL_GOLDEN_VERSION = KERNEL_VERSION;
 
 const GOLDEN = {
   seed: 0x1a4f,

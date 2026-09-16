@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { KERNEL_VERSION } from './engine/kernel/version.js';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
@@ -156,7 +157,7 @@ function AppInner() {
       </ErrorBoundary>
       <FavoritesTray />
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v{APP_VERSION} · kernel.v1</span>
+        <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION}</span>
         <span>{state.layoutParams.mode} · seed:{state.seed.toString(16)}</span>
       </footer>
     </div>
