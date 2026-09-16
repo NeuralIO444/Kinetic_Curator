@@ -55,6 +55,11 @@ def project_fade(project: Path, override) -> float:
 def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
               ramps=None, motion=None, uncapped=False, width=None, height=None,
               background=None) -> bytes:
+    if not project.is_file():
+        sys.exit(
+            f"project not found: {project}\n"
+            "In the app: OUTPUT → save project, then pass that file path."
+        )
     cmd = ["node", str(RENDER_MJS), str(project)]
     if seed is not None:
         cmd += ["--seed", str(seed)]
@@ -72,10 +77,12 @@ def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
         cmd += ["--width", str(width), "--height", str(height)]
     if background:
         cmd += ["--background", background]
-    proc = subprocess.run(cmd, check=True, capture_output=True)
+    proc = subprocess.run(cmd, capture_output=True)
     if proc.stderr:
         sys.stderr.write(proc.stderr.decode("utf-8", "replace"))
         sys.stderr.flush()
+    if proc.returncode != 0:
+        sys.exit(proc.returncode or 1)
     return proc.stdout
 
 
@@ -132,7 +139,7 @@ def composite_accum(frames: list[Path], out_png: Path, fade: float) -> None:
 def cmd_render(a) -> None:
     size = parse_res(a.res)
     out = Path(a.out)
-    if a.accum:
+    if getattr(a, "accum", False):
         cmd_accum(a, size, out)
         return
     render_one(Path(a.project), out, size, seed=a.seed, uncapped=a.uncapped,
@@ -259,8 +266,7 @@ def main(argv=None) -> None:
     common(sp)
     sp.add_argument("-o", "--out", required=True)
     sp.add_argument("--sidecar", action="store_true")
-    sp.add_argument("--accum", action="store_true",
-                    help="composite N frames with the live ACCUM fade law at target resolution (#90)")
+    sp.add_argument("--accum", action="store_true")
     sp.add_argument("--steps", type=int, default=24)
     sp.add_argument("--fps", type=int, default=30)
     sp.add_argument("--fade", type=float, default=None)
