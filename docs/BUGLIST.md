@@ -7,7 +7,7 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | Topic | Notes |
 |-------|--------|
 | **Seed ≠ bit-identical still** | Quality caps change placement count and PRNG consumption. Use **project JSON** for reproducibility. |
-| **ACCUM buffer size** | Live buffer is **1000×700**. High-res export **upscales** that snapshot; it does not accumulate at 4×/8× continuously. |
+| **ACCUM live buffer size** | Live buffer is **1000×700**. In-app high-res export still upscales that snapshot. **True-res trails:** `studio.py render --accum --steps N --res 4`. |
 | **ACCUM vs BATCH** | Batch is per-seed SVG path; disabled while ACCUM is on (continuous time ≠ edition index). |
 | **Gloss LOD** | Second `<use>` skipped under PERF or when node count > 280. |
 | **Batch downloads** | Browser must allow multiple downloads; max **48** editions per run. |
@@ -22,7 +22,7 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 |-------|--------|
 | **package-lock + Playwright** | CI uses `npm install` so `@playwright/test` can resolve without a fully regenerated lock after 0.8. Prefer regenerating lock when convenient. |
 | **First-run overlay** | Smoke tests set `kc:first-run-seen`; real users see Play Me once. |
-| **WEBM + ACCUM** | Recorder still samples the **SVG** path, not the accumulation canvas — trails may not appear in video until a follow-up. |
+| **WEBM + ACCUM** | In-app recorder still samples the **SVG** path. Offline `studio.py video` is the trail-honest path; `--accum` stills are the trail-honest stills (#90). |
 | **Legacy folder stubs** | Empty or residual paths may remain on disk history; active app is **`app/`** only. |
 | **`app/public/particles.*`** | An untracked WASM particle experiment predating the current app, referenced nowhere. Now git-ignored so it can never reach a Pages deploy; left on disk rather than deleted. See #95. |
 | **Offline swarm needs a bake** | `studio/` replays swarm deterministically (#63). The live canvas keeps its RAF loop for pointer response, so the two agree only for the same seed and step count. |
@@ -47,5 +47,7 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 - Kernel K3 scalar fields (#62), K4 particle bake (#63), K5 colour channel (#64)
 - Colour: paletteShift in UI (#54), project round-trip (#53), user library (#55), harmony (#56)
 - Studio tier: render farm (#74), Curator (#75), geometry blend (#76), gated generation (#77)
+- Overlay ingest + media manager (#113 / #123)
+- Offline ACCUM at target resolution (#90)
 
-*Last updated: 2026-09-15*
+*Last updated: 2026-09-16*

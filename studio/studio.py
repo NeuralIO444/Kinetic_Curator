@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
-"""Kinetic Curator studio CLI — headless render farm (issue #74).
-
-Pipeline (docs/BACKEND_V2_PLAN.md §3.A):
-
-    project.json -> node studio/render.mjs -> SVG -> resvg -> PNG -> ffmpeg -> MP4
-
-Python never computes a placement. It shells out to Node (which runs the app's
-real JS kernel) and to resvg/ffmpeg. See §2.1: two implementations of the same
-math would drift and void the golden-hash fixture.
-"""
+"""Kinetic Curator studio CLI — headless render farm (issue #74 / #90)."""
 from __future__ import annotations
 
 import argparse
@@ -24,11 +15,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 RENDER_MJS = HERE / "render.mjs"
 CANVAS_W, CANVAS_H = 1000, 700
-
-# resvg maps the CSS generic `monospace` (the assets ask for
-# "ui-monospace,monospace") to Courier New by default; Menlo is much closer to
-# what the browser picks on macOS.
 DEFAULT_MONOSPACE = "Menlo"
+DEFAULT_ACCUM_FADE = 0.88
 
 
 def which(name: str) -> str:
@@ -39,7 +27,6 @@ def which(name: str) -> str:
 
 
 def parse_res(spec: str) -> tuple[int, int]:
-    """'7680x4320' -> (7680, 4320); '4' -> 4x the 1000x700 canvas."""
     if "x" in spec.lower():
         w, _, h = spec.lower().partition("x")
         return int(w), int(h)
@@ -47,9 +34,32 @@ def parse_res(spec: str) -> tuple[int, int]:
     return round(CANVAS_W * mul), round(CANVAS_H * mul)
 
 
+def clamp_fade(fade) -> float:
+    try:
+        n = float(fade)
+    except (TypeError, ValueError):
+        return DEFAULT_ACCUM_FADE
+    return max(0.0, min(0.99, n))
+
+
+def project_fade(project: Path, override) -> float:
+    if override is not None:
+        return clamp_fade(override)
+    try:
+        doc = json.loads(project.read_text())
+        return clamp_fade((doc.get("layoutParams") or {}).get("accumulationFade"))
+    except Exception:
+        return DEFAULT_ACCUM_FADE
+
+
 def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
               ramps=None, motion=None, uncapped=False, width=None, height=None,
               background=None) -> bytes:
+    if not project.is_file():
+        sys.exit(
+            f"project not found: {project}\n"
+            "In the app: OUTPUT → save project, then pass that file path."
+        )
     cmd = ["node", str(RENDER_MJS), str(project)]
     if seed is not None:
         cmd += ["--seed", str(seed)]
@@ -67,13 +77,12 @@ def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
         cmd += ["--width", str(width), "--height", str(height)]
     if background:
         cmd += ["--background", background]
-    proc = subprocess.run(cmd, check=True, capture_output=True)
-    # render.mjs warns on stderr about things it cannot reproduce offline
-    # (swarm/hype). Capturing and discarding that would make a wrong render
-    # look like a clean one.
+    proc = subprocess.run(cmd, capture_output=True)
     if proc.stderr:
         sys.stderr.write(proc.stderr.decode("utf-8", "replace"))
         sys.stderr.flush()
+    if proc.returncode != 0:
+        sys.exit(proc.returncode or 1)
     return proc.stdout
 
 
@@ -95,7 +104,7 @@ def render_one(project: Path, out_png: Path, size: tuple[int, int], *,
     rasterize(svg, out_png, monospace)
 
 
-def sidecar(project: Path, seed, size, uncapped) -> dict:
+def sidecar(project: Path, seed, size, uncapped, extra=None) -> dict:
     doc = json.loads(project.read_text())
     if seed is not None:
         doc["seed"] = int(seed) & 0xFFFFFFFF
@@ -105,20 +114,67 @@ def sidecar(project: Path, seed, size, uncapped) -> dict:
         "renderer": "studio/render.mjs + resvg",
         "source": str(project),
     }
+    if extra:
+        doc["_render"].update(extra)
     return doc
 
 
-# ── commands ──────────────────────────────────────────────────────────
+def composite_accum(frames: list[Path], out_png: Path, fade: float) -> None:
+    ffmpeg = which("ffmpeg")
+    keep = clamp_fade(fade)
+    work = out_png.with_suffix(".accum-buf.png")
+    shutil.copyfile(frames[0], work)
+    for nxt in frames[1:]:
+        tmp = out_png.with_suffix(".accum-next.png")
+        subprocess.run([
+            ffmpeg, "-y", "-i", str(work), "-i", str(nxt),
+            "-filter_complex",
+            f"[0:v]format=rgba,colorchannelmixer=aa={keep:.4f}[f];[f][1:v]overlay=format=auto",
+            "-frames:v", "1", str(tmp),
+        ], check=True, capture_output=True)
+        shutil.move(str(tmp), str(work))
+    shutil.move(str(work), str(out_png))
 
 
 def cmd_render(a) -> None:
     size = parse_res(a.res)
     out = Path(a.out)
+    if getattr(a, "accum", False):
+        cmd_accum(a, size, out)
+        return
     render_one(Path(a.project), out, size, seed=a.seed, uncapped=a.uncapped,
                background=a.background, monospace=a.monospace)
     if a.sidecar:
         out.with_suffix(".json").write_text(
             json.dumps(sidecar(Path(a.project), a.seed, size, a.uncapped), indent=2))
+    print(out)
+
+
+def cmd_accum(a, size, out: Path) -> None:
+    project = Path(a.project)
+    steps = max(2, int(a.steps))
+    fps = max(1, int(a.fps))
+    fade = project_fade(project, a.fade)
+    tmp = Path(tempfile.mkdtemp(prefix="kc-accum-"))
+    frames = []
+    try:
+        for i in range(steps):
+            png = tmp / f"f{i:04d}.png"
+            render_one(project, png, size, seed=a.seed, uncapped=a.uncapped,
+                       background=a.background, time=i / fps,
+                       progress=i / max(1, steps - 1), ramps=a.ramp,
+                       motion=a.motion, monospace=a.monospace)
+            frames.append(png)
+            if (i + 1) % 5 == 0 or i + 1 == steps:
+                print(f"  accum frame {i + 1}/{steps}", flush=True)
+        composite_accum(frames, out, fade)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    if a.sidecar:
+        out.with_suffix(".json").write_text(json.dumps(sidecar(
+            project, a.seed, size, a.uncapped,
+            extra={"accum": True, "steps": steps, "fade": fade, "fps": fps},
+        ), indent=2))
     print(out)
 
 
@@ -157,13 +213,11 @@ def cmd_batch(a) -> None:
 
 def cmd_video(a) -> None:
     if a.motion == "list":
-        # Presets live in render.mjs (the file with kernel/layoutParams
-        # context); delegate instead of keeping a second copy of the list.
         subprocess.run(["node", str(RENDER_MJS), "--motion", "list"], check=True)
         return
     size = parse_res(a.res)
     project = Path(a.project)
-    frames = max(1, round(a.duration * a.fps))
+    frames_n = max(1, round(a.duration * a.fps))
     keep = Path(a.frames) if a.frames else None
     tmp = Path(tempfile.mkdtemp(prefix="kc-frames-")) if keep is None else keep
     tmp.mkdir(parents=True, exist_ok=True)
@@ -172,13 +226,13 @@ def cmd_video(a) -> None:
         t = i / a.fps
         render_one(project, tmp / f"f{i:06d}.png", size, seed=a.seed,
                    uncapped=a.uncapped, background=a.background, time=t,
-                   progress=i / max(1, frames - 1), ramps=a.ramp,
+                   progress=i / max(1, frames_n - 1), ramps=a.ramp,
                    motion=a.motion, monospace=a.monospace)
 
     with ThreadPoolExecutor(max_workers=a.jobs) as pool:
-        for i, _ in enumerate(pool.map(one, range(frames)), 1):
-            if i % 10 == 0 or i == frames:
-                print(f"  frame {i}/{frames}", flush=True)
+        for i, _ in enumerate(pool.map(one, range(frames_n)), 1):
+            if i % 10 == 0 or i == frames_n:
+                print(f"  frame {i}/{frames_n}", flush=True)
 
     which("ffmpeg")
     subprocess.run([
@@ -202,26 +256,32 @@ def main(argv=None) -> None:
     def common(sp):
         sp.add_argument("project", help="project JSON exported from the app")
         sp.add_argument("--res", default="1", help="WxH in px, or a scale factor of 1000x700 (default 1)")
-        sp.add_argument("--seed", type=int, default=None, help="override the project's seed")
-        sp.add_argument("--uncapped", action="store_true", help="use FINAL_CAPS density instead of the project's quality caps")
-        sp.add_argument("--background", default=None, help="#rrggbb, or 'none' for transparent (default: palette bg)")
-        sp.add_argument("--monospace", default=DEFAULT_MONOSPACE, help=f"font for the text assets (default {DEFAULT_MONOSPACE})")
+        sp.add_argument("--seed", type=int, default=None)
+        sp.add_argument("--uncapped", action="store_true")
+        sp.add_argument("--background", default=None)
+        sp.add_argument("--monospace", default=DEFAULT_MONOSPACE)
         sp.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
 
     sp = sub.add_parser("render", help="one project -> one PNG")
     common(sp)
     sp.add_argument("-o", "--out", required=True)
-    sp.add_argument("--sidecar", action="store_true", help="also write <out>.json")
+    sp.add_argument("--sidecar", action="store_true")
+    sp.add_argument("--accum", action="store_true")
+    sp.add_argument("--steps", type=int, default=24)
+    sp.add_argument("--fps", type=int, default=30)
+    sp.add_argument("--fade", type=float, default=None)
+    sp.add_argument("--ramp", action="append", default=[])
+    sp.add_argument("--motion", default="auto")
     sp.set_defaults(func=cmd_render)
 
-    sp = sub.add_parser("svg", help="one project -> SVG (vector, no raster step)")
+    sp = sub.add_parser("svg", help="one project -> SVG")
     common(sp)
-    sp.add_argument("-o", "--out", default=None, help="default stdout")
+    sp.add_argument("-o", "--out", default=None)
     sp.set_defaults(func=cmd_svg)
 
     sp = sub.add_parser("batch", help="N seeds -> PNG + JSON sidecar each")
     common(sp)
-    sp.add_argument("-o", "--out", required=True, help="output directory")
+    sp.add_argument("-o", "--out", required=True)
     sp.add_argument("--count", type=int, default=100)
     sp.add_argument("--start-seed", type=int, default=0)
     sp.set_defaults(func=cmd_batch)
@@ -230,15 +290,11 @@ def main(argv=None) -> None:
     common(sp)
     sp.add_argument("-o", "--out", required=True)
     sp.add_argument("--fps", type=int, default=30)
-    sp.add_argument("--duration", type=float, default=4.0, help="seconds")
+    sp.add_argument("--duration", type=float, default=4.0)
     sp.add_argument("--crf", type=int, default=16)
-    sp.add_argument("--ramp", action="append", default=[],
-                    help="layoutParam=from:to, interpolated linearly over the clip (repeatable). "
-                         "Overrides the --motion preset per-parameter; composes with it otherwise.")
-    sp.add_argument("--motion", default="auto",
-                    help="named motion recipe so a plain `video` invocation visibly moves "
-                         "(default: auto). 'list' prints presets and exits (#94).")
-    sp.add_argument("--frames", default=None, help="keep the PNG frame sequence in this directory")
+    sp.add_argument("--ramp", action="append", default=[])
+    sp.add_argument("--motion", default="auto")
+    sp.add_argument("--frames", default=None)
     sp.set_defaults(func=cmd_video)
 
     a = p.parse_args(argv)
