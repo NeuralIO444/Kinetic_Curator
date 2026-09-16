@@ -1,5 +1,3 @@
-// LayersPanel (new) — add/remove/reorder/activate layers, and control how
-// each one composites onto the stack below (blend mode + opacity).
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
@@ -19,8 +17,9 @@ export function LayersPanel() {
       </PanelHeader>
       <div className="panel-body layer-list">
         {[...layers].reverse().map((layer, ri) => {
-          const i = layers.length - 1 - ri; // true index, for reorder bounds
+          const i = layers.length - 1 - ri;
           const isActive = layer.id === activeLayerId;
+          const soloed = layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
           return (
             <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''}`}>
               <div className="layer-row-main">
@@ -36,10 +35,16 @@ export function LayersPanel() {
                   onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>
                   {layer.visible ? '●' : '○'}
                 </button>
+                <button className="micro-btn" title={soloed ? 'Show all layers' : 'Solo this layer'}
+                  onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>
+                  {soloed ? 'S·' : 'S'}
+                </button>
                 <button className="layer-name" onClick={() => emit(Events.LAYER_SET_ACTIVE, { id: layer.id })}
                   title="Click to make this the active layer (LAYOUT/ASSETS/DAVIS edit it)">
                   {layer.name}{isActive ? ' · editing' : ''}
                 </button>
+                <button className="micro-btn" title="Duplicate layer + snapshot"
+                  onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
                 <button className="micro-btn" title="Delete layer" disabled={layers.length <= 1}
                   onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
               </div>
