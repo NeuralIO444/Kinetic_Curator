@@ -11,34 +11,34 @@
   border-bottom: 1px solid rgba(255,255,255,0.06);
   text-transform: uppercase;
 }
-.range-row { display: grid; grid-template-columns: 62px 1fr 120px; align-items: center; gap: 6px; min-height: 22px; }
+.range-row { display: grid; grid-template-columns: 62px 1fr 120px; align-items: center; gap: 6px; min-height: 28px; }
 .range-label { font-size: 9px; letter-spacing: 0.1em; color: var(--dim); }
 .range-readout { font-size: 10px; color: var(--ink); text-align: right; }
 
-.dual-slider { position: relative; height: 16px; display: flex; align-items: center; grid-column: 2; }
+.dual-slider { position: relative; height: 22px; display: flex; align-items: center; grid-column: 2; }
 .dual-slider input[type=range] {
   position: absolute; inset: 0; width: 100%; margin: 0; background: transparent;
   pointer-events: none; -webkit-appearance: none; appearance: none;
 }
 .dual-slider input[type=range]::-webkit-slider-thumb {
   -webkit-appearance: none; pointer-events: all;
-  width: 8px; height: 12px; background: var(--accent3); border: none; cursor: ew-resize;
+  width: 14px; height: 18px; background: var(--accent3); border: none; cursor: ew-resize;
 }
 .dual-slider input[type=range]::-moz-range-thumb {
-  pointer-events: all; width: 8px; height: 12px;
+  pointer-events: all; width: 14px; height: 18px;
   background: var(--accent3); border: none; cursor: ew-resize;
 }
-.dual-track { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 2px; background: var(--line-2); }
-.dual-fill { position: absolute; top: 50%; transform: translateY(-50%); height: 2px; background: var(--accent3); }
+.dual-track { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 3px; background: var(--line-2); }
+.dual-fill { position: absolute; top: 50%; transform: translateY(-50%); height: 3px; background: var(--accent3); }
 
-.single-slider { width: 100%; -webkit-appearance: none; appearance: none; background: transparent; }
-.single-slider::-webkit-slider-runnable-track { height: 2px; background: var(--line-2); }
-.single-slider::-moz-range-track { height: 2px; background: var(--line-2); }
+.single-slider { width: 100%; height: 22px; -webkit-appearance: none; appearance: none; background: transparent; cursor: ew-resize; }
+.single-slider::-webkit-slider-runnable-track { height: 3px; background: var(--line-2); }
+.single-slider::-moz-range-track { height: 3px; background: var(--line-2); }
 .single-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; margin-top: -5px;
-  width: 8px; height: 12px; background: var(--accent3); border: none;
+  -webkit-appearance: none; margin-top: -8px;
+  width: 14px; height: 18px; background: var(--accent3); border: none; cursor: ew-resize;
 }
-.single-slider::-moz-range-thumb { width: 8px; height: 12px; background: var(--accent3); border: none; border-radius: 0; }
+.single-slider::-moz-range-thumb { width: 14px; height: 18px; background: var(--accent3); border: none; border-radius: 0; cursor: ew-resize; }
 
 /* ─── Bundle 3: Parameter Exploration ─── */
 .range-label-group { display: inline-flex; align-items: center; gap: 4px; }
