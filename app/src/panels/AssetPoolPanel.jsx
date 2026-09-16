@@ -1,5 +1,5 @@
-// AssetPoolPanel (P02) — pool + overlay media manager (#113)
-import { useMemo, useRef } from 'react';
+// AssetPoolPanel (P02) — pool + overlay media manager (#113) + studio (#114)
+import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { ALL_CATEGORIES } from '../data/categories.js';
@@ -17,6 +17,8 @@ export function AssetPoolPanel() {
   const fileRef = useRef(null);
   const swapRef = useRef(null);
   const swapId = useRef(null);
+  const [Studio, setStudio] = useState(null);
+  const [studioSeed, setStudioSeed] = useState(null);
   const { assets } = useApp();
   const { state } = useApp(s => ({
     enabled: s.enabledAssets,
@@ -27,6 +29,12 @@ export function AssetPoolPanel() {
     ingestError: s.ingestError,
   }));
   const { enabled, search, catFilter, poolView, weightOverrides, ingestError } = state;
+
+  const openStudio = async (seed) => {
+    const mod = await import('./AssetStudioModal.jsx');
+    setStudio(() => mod.AssetStudioModal);
+    setStudioSeed(seed || null);
+  };
 
   const filtered = useMemo(() => {
     let list = assets;
@@ -76,6 +84,7 @@ export function AssetPoolPanel() {
         }} />
       <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active${overlayCount ? ` · ${overlayCount} user` : ''}`}>
         <div className="header-tools">
+          <button className="chip-btn" title="Motif kit — overlay only" onClick={() => openStudio(null)}>NEW</button>
           <button className="chip-btn" title="Import SVG into project overlay" onClick={() => fileRef.current?.click()}>IMPORT</button>
           <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'grid')}>GRID</button>
           <button className={`chip-btn ${poolView === 'list' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'list')}>LIST</button>
@@ -124,6 +133,8 @@ export function AssetPoolPanel() {
                   style={{ position: 'absolute', bottom: 22, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>DUP</button>
                 {isUser && (
                   <>
+                    <button type="button" title="Edit in motif kit" onClick={(e) => { e.stopPropagation(); openStudio({ id: a.id, svg: a.svg }); }}
+                      style={{ position: 'absolute', bottom: 22, left: 28, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>EDIT</button>
                     <button type="button" title="Rename overlay id" onClick={(e) => {
                       e.stopPropagation();
                       const name = window.prompt('Overlay id (no user: prefix)', a.id.replace(/^user:/, ''));
@@ -149,6 +160,13 @@ export function AssetPoolPanel() {
           })}
         </div>
       </div>
+      {Studio && (
+        <Studio
+          seedSvg={studioSeed?.svg || ''}
+          seedId={studioSeed?.id || ''}
+          onClose={() => { setStudio(null); setStudioSeed(null); }}
+        />
+      )}
     </div>
   );
 }
