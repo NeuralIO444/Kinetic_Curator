@@ -77,6 +77,7 @@ export function useApp(selector) {
       case A.CLEAR_WEIGHT_OVERRIDES: return store.clearWeightOverrides();
       case 'CYCLE_ASSET_WEIGHT': return store.cycleAssetWeight(action.id);
       case 'DUPLICATE_ASSET': return store.duplicateAsset(action.id);
+      case 'INGEST_ASSET': return store.ingestAsset(action.svg, action.hint);
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
       case A.SET_AUDIO_GAIN: return store.setAudioGain(payload);
