@@ -1,13 +1,10 @@
-// Layer — one composition's worth of rendered shapes. Extracted so the
-// canvas can render N of these (one per store layer) without violating the
-// Rules of Hooks: each <Layer key={layer.id}> is its own component
-// instance, so calling useCanvasItems/useSwarmTick once inside it is legal
-// no matter how many layers exist or how often they're added/removed.
+// Layer — one composition's worth of rendered shapes.
 import { useEffect } from 'react';
 import { shouldRenderGloss } from '../../data/quality.js';
 import { isLiveSwarmMode } from '../../data/layout-modes.js';
 import { useSwarmTick } from '../../hooks/useSwarmTick.js';
 import { useCanvasItems } from '../../hooks/useCanvasItems.js';
+import { DEMO_LADDER_ID, ladderFrame } from '../../data/bodies/demoLadder.js';
 
 const ASSET_SIZE = 100;
 
@@ -45,9 +42,12 @@ export function Layer({
       }}
     >
       {renderItems && renderItems.map((item, i) => {
-        if (!item.assetId) return null;
+        if (!item.assetId && item.role !== 'wing') return null;
         const sx = item._mirrored ? -item.scale : item.scale;
         const reactKey = item.key || `${item.assetId}-${i}${item._mirrored ? '-m' : ''}`;
+        const href = item.role === 'wing'
+          ? `#kc-blend-${DEMO_LADDER_ID}-${ladderFrame(item.u)}`
+          : `#kc-asset-${item.assetId}`;
         return (
           <g
             key={reactKey}
@@ -63,10 +63,10 @@ export function Layer({
               mixBlendMode: layoutParams.blendMode !== 'normal' ? layoutParams.blendMode : undefined,
             }}
           >
-            <use href={`#kc-asset-${item.assetId}`} width={ASSET_SIZE} height={ASSET_SIZE} />
+            <use href={href} width={ASSET_SIZE} height={ASSET_SIZE} />
             {showGloss && (
               <use
-                href={`#kc-asset-${item.assetId}`}
+                href={href}
                 width={ASSET_SIZE}
                 height={ASSET_SIZE}
                 style={{ ['--ink']: 'url(#kc-gloss-grad)', ['--accent']: 'url(#kc-gloss-grad)', mixBlendMode: 'soft-light' }}
