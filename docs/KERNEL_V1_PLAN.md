@@ -323,3 +323,70 @@ Related: color epic [#50](https://github.com/NeuralIO444/Kinetic_Curator/issues/
 | Dual RNG path | Prefer no; timebox if needed |
 | Poisson vs stratum | Implementer picks one power sampler in K2 |
 | Server backend | Out of scope |
+
+---
+
+## 16. Kernel v2 addendum — SoA, staged eval, Worker ABI (#108)
+
+**Status:** measurement phase. `engine/perf.selfcheck.mjs` landed first, per the
+issue's own rule — *"measure first... rewrite is a response to a missed
+budget, not a vibe."* Everything below is baseline data and a proposed
+sequence, not a claim that the rewrite is done.
+
+### Baseline (M2 Max, local — CI hardware will read slower)
+
+| Target | Budget | Measured | Verdict |
+|---|---|---|---|
+| 20k pts, sample+attrs, no fBm | < 2ms | **0.95–0.99ms** | already under budget |
+| 8k pts + displacement (fBm) | < 3ms | **2.95–3.26ms** | right on the line, noisy |
+| Bake 400×120 swarm steps | < 30ms | **66.9–67.6ms** | ~2.2× over |
+| Incremental dirty-C vs full | ≤10% | — | N/A, staged eval doesn't exist yet |
+
+Reading this straight: pure position sampling is already fine at this N.
+Displacement is marginal — it's a coin flip whether a given run passes,
+which itself is a signal that the fBm-per-point approach has no headroom
+and needs the field-texture replacement (item 3) rather than micro-tuning.
+Swarm bake is the real offender, worse in absolute terms than pure sampling
+would suggest, consistent with the issue's diagnosis: `Particle` class
+instances + `applyForce` method dispatch + a spatial hash rebuilt every
+step, none of which SoA + dropping the class removes for free elsewhere.
+
+### Proposed sequence for the remaining work items
+
+Ordered so each step is independently measurable against the same harness
+before the next begins — no big-bang rewrite, no step that can't be
+reverted on its own.
+
+1. **SoA + in-place fill** (item 1) — rewrite `computePlacements` to fill
+   pre-allocated `Float32Array`/`Uint16Array` buffers instead of pushing
+   object literals. `buildPlacements` gets an adapter that reads the SoA
+   buffers back into the `{x,y,...}` item shape the live SVG path and
+   `studio/render.mjs` already consume, so nothing downstream changes yet.
+   Golden hash: re-run `goldenPlacement.selfcheck.mjs` bit-for-bit against
+   the adapter's output before touching anything else — if it doesn't
+   match, the SoA fill has a bug, full stop.
+2. **Swarm SoA** (item 4) — highest measured gain per the baseline above.
+   Replace `Particle` instances with parallel typed arrays; keep the
+   existing spatial-hash *algorithm* but drop the per-step rebuild if the
+   profile shows it dominating (measure before assuming). `bakeParticles`
+   keeps its current signature; only its internals change.
+3. **Displacement field texture** (item 3) — precompute a 128²×2 `Float32Array`
+   of the fBm field once per `(seed, noiseFreq, noiseSpeed, t)` and
+   bilinear-sample it per point instead of calling `fBm3D` twice per point.
+   PERF quality tier uses hash noise (no fBm at all) per the issue's spec.
+4. **Staged eval + dirty flags** (item 2) — split `computePlacements` into
+   the A/B/C/D/E stages once 1–3 exist as real, separately-timed pieces;
+   dirty flags are meaningless to design before there's a staged
+   pipeline to attach them to.
+5. **`EvalContext` ABI + Worker path** (item 5) — once the function is
+   pure-buffers-in/pure-buffers-out (a consequence of 1–4), a
+   `Transferable`-based Worker call is a thin wrapper, not new engine work.
+6. **Rust/WASM** — only if 1–5 still miss budget on real hardware (not just
+   this M2 Max), per the issue's explicit rule. Nothing above requires it;
+   the numbers so far don't show a JS ceiling, they show unoptimized JS.
+
+### What this addendum is not
+
+Not a claim that #108 is done. `ENFORCE_BUDGET` in `perf.selfcheck.mjs`
+stays `false` until step 4 above lands — flipping it earlier would fail
+every CI run on work that hasn't happened yet.
