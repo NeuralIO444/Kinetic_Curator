@@ -3,22 +3,16 @@
  * Never writes into the shipped 137. Live tab does not eval markup.
  */
 
-// QA (2026-09-16): the enumerated onload=/onerror=/onclick= list let every
-// other DOM event attribute through untouched — onmouseover, onfocus, the
-// SMIL on* set, all of it. Ingested assets render via dangerouslySetInnerHTML
-// and drive moving canvas organisms, so a handler like onmouseover fires from
-// mere cursor movement, no click needed. None of the allowed shape tags below
-// have a legitimate use for an event handler, so block the whole attribute
-// class by pattern instead of naming individual handlers one at a time.
-// Also switched bare `image|img` (substring match) to `<image|<img` (tag-open
-// match) — the old pattern rejected any SVG containing those letters in an
-// id/class, e.g. id="hero-image-01", as "hostile" with zero actual <image> tag.
 const FORBIDDEN = /<script|foreignObject|<iframe|<object|<embed|<image|<img|\bon[a-z]+\s*=|javascript:|data:text\/html/i;
+const REMOTE_HREF = /(?:xlink:)?href\s*=\s*["']\s*(?!#)/i;
+const STYLE_URL = /style\s*=\s*["'][^"']*url\s*\(/i;
+const ENTITY = /<!ENTITY|&#/i;
 const ALLOWED = new Set([
   'svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'polygon', 'polyline', 'line',
   'defs', 'title', 'clippath', 'lineargradient', 'radialgradient', 'stop',
 ]);
 const MAX_BYTES = 48_000;
+const MAX_G_DEPTH = 24;
 const ACCENT_HEX = /#e0245e|#ff2d95|#ff006e/gi;
 
 export function stripAuthoringChrome(svg) {
@@ -33,7 +27,23 @@ export function stripAuthoringChrome(svg) {
 }
 
 export function isHostile(svg) {
-  return FORBIDDEN.test(String(svg || ''));
+  const s = String(svg || '');
+  return FORBIDDEN.test(s) || REMOTE_HREF.test(s) || STYLE_URL.test(s) || ENTITY.test(s);
+}
+
+export function gDepth(svg) {
+  let depth = 0;
+  let max = 0;
+  const re = /<\/?g\b/gi;
+  let m;
+  while ((m = re.exec(String(svg || '')))) {
+    if (m[0].startsWith('</')) depth = Math.max(0, depth - 1);
+    else {
+      depth += 1;
+      if (depth > max) max = depth;
+    }
+  }
+  return max;
 }
 
 export function countSubpaths(svg) {
@@ -52,6 +62,7 @@ export function ingestSvg(raw, { id, category = 'fragments', weight = 'medium' }
   if (!svg) return { ok: false, error: 'empty' };
   if (svg.length > MAX_BYTES) return { ok: false, error: 'too large' };
   if (isHostile(svg)) return { ok: false, error: 'hostile markup' };
+  if (gDepth(svg) > MAX_G_DEPTH) return { ok: false, error: 'too deep' };
   if (!/<svg[\s>]|<path[\s>]|<g[\s>]/i.test(svg)) return { ok: false, error: 'not svg' };
 
   const tags = [...svg.matchAll(/<\/?\s*([a-zA-Z0-9:-]+)/g)].map((m) => m[1].toLowerCase().replace(/:.*/, ''));
