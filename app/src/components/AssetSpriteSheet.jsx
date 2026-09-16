@@ -1,14 +1,7 @@
 // AssetSpriteSheet — registers every asset once as an SVG <symbol>
-// Colors are applied at instance time via CSS variables --ink / --accent
-// on the parent <g> that wraps each <use>.
-
 import { memo } from 'react';
+import { DEMO_LADDER_ID, DEMO_LADDER_STEPS } from '../data/bodies/demoLadder.js';
 
-/**
- * Renders a <defs> block of <symbol> elements for the given assets.
- * Must live inside the same <svg> that contains the <use> instances
- * so that href="#kc-asset-..." resolves and export serialization includes them.
- */
 export const AssetSpriteSheet = memo(function AssetSpriteSheet({ assets }) {
   if (!assets || assets.length === 0) return null;
 
@@ -21,8 +14,17 @@ export const AssetSpriteSheet = memo(function AssetSpriteSheet({ assets }) {
           viewBox="0 0 100 100"
           overflow="visible"
         >
-          {/* Assets are authored with var(--ink) / var(--accent) */}
           <g dangerouslySetInnerHTML={{ __html: asset.svg }} />
+        </symbol>
+      ))}
+      {DEMO_LADDER_STEPS.map((svg, i) => (
+        <symbol
+          key={`${DEMO_LADDER_ID}-${i}`}
+          id={`kc-blend-${DEMO_LADDER_ID}-${i}`}
+          viewBox="0 0 100 100"
+          overflow="visible"
+        >
+          <g dangerouslySetInnerHTML={{ __html: svg }} />
         </symbol>
       ))}
     </defs>
