@@ -62,6 +62,7 @@ export const Events = {
   ASSETS_CATEGORY_WEIGHT: 'assets:categoryWeight',
   ASSETS_WEIGHT_CLEAR: 'assets:weightClear',
   ASSETS_DUPLICATE: 'assets:duplicate',
+  ASSETS_INGEST: 'assets:ingest',
   EXPORT_SNAPSHOT: 'export:snapshot',
   EXPORT_RECORD: 'export:record',
   EXPORT_RESOLUTION: 'export:resolution',
