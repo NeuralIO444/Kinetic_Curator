@@ -23,8 +23,20 @@ assert.notStrictEqual(dup.asset.id, 'org_blob');
 
 assert.strictEqual(overlayId('org_bl_organic'), 'user:org_bl_organic');
 
-// #135 — P02 drop / paste / file IMPORT all emit ASSETS_INGEST → ingestAsset → ingestIntoOverlay.
 const dropPath = ingestIntoOverlay('<svg><script>alert(1)</script></svg>', [], 'dropped.svg');
 assert.strictEqual(dropPath.ok, false);
+
+assert.strictEqual(ingestSvg('<svg><linearGradient href="https://evil.test/x"/></svg>').ok, false);
+assert.strictEqual(ingestSvg('<svg><linearGradient xlink:href="data:image/svg+xml,x"/></svg>').ok, false);
+assert.strictEqual(ingestSvg('<svg><circle style="fill:url(https://evil.test)" r="1"/></svg>').ok, false);
+assert.strictEqual(ingestSvg('<svg><path d="M0 0&#x20;L1 1"/></svg>').ok, false);
+const localHref = ingestSvg('<svg><linearGradient id="g"/><rect href="#g" width="1" height="1"/></svg>');
+assert.strictEqual(localHref.ok, true);
+
+let nest = '<svg>';
+for (let i = 0; i < 30; i++) nest += '<g>';
+for (let i = 0; i < 30; i++) nest += '</g>';
+nest += '</svg>';
+assert.strictEqual(ingestSvg(nest).ok, false);
 
 console.log('ingest.selfcheck: OK');
