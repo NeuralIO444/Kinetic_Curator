@@ -5,18 +5,27 @@ import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
 
 let seq = 1;
+const SNAP = 10;
+const snap = (n) => Math.round(n / SNAP) * SNAP;
 
 function toSvg(parts) {
-  return parts.map((p) => (
-    `<g transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${p.scale}) translate(-50 -50)">${PRIMITIVES[p.kind] || p.svg || ''}</g>`
-  )).join('');
+  return parts.map((p) => {
+    const token = p.token === 'accent' ? 'var(--accent)' : 'var(--ink)';
+    const paint = p.stroke
+      ? `color: ${token}; fill: none; stroke: currentColor; stroke-width: 3`
+      : `color: ${token}`;
+    const inner = PRIMITIVES[p.kind] || p.svg || '';
+    return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${p.scale}) translate(-50 -50)">${inner}</g>`;
+  }).join('');
+}
+
+function fresh(kind, extra = {}) {
+  return { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1, token: 'ink', stroke: false, ...extra };
 }
 
 export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const [parts, setParts] = useState(() => (
-    seedSvg
-      ? [{ key: seq++, kind: 'seed', svg: seedSvg, x: 50, y: 50, rot: 0, scale: 1 }]
-      : []
+    seedSvg ? [fresh('seed', { svg: seedSvg })] : []
   ));
   const [picked, setPicked] = useState(-1);
   const [category, setCategory] = useState('organic');
@@ -25,21 +34,37 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const svgRef = useRef(null);
 
   const svg = useMemo(() => toSvg(parts), [parts]);
-  const compound = parts.length > 1 || (seedSvg && parts.length >= 1);
+  const compound = parts.length > 1;
 
   const add = (kind) => {
     setParts((p) => {
       setPicked(p.length);
-      return [...p, { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1 }];
+      return [...p, fresh(kind)];
     });
   };
   const patchSel = (fn) => {
     if (picked < 0) return;
     setParts((p) => p.map((row, i) => (i === picked ? fn(row) : row)));
   };
-  const undo = () => {
-    setParts((p) => p.slice(0, -1));
-    setPicked(-1);
+  const undo = () => { setParts((p) => p.slice(0, -1)); setPicked(-1); };
+  const dup = () => {
+    if (picked < 0) return;
+    setParts((p) => {
+      const copy = { ...p[picked], key: seq++, x: snap(p[picked].x + 10), y: snap(p[picked].y + 10) };
+      setPicked(p.length);
+      return [...p, copy];
+    });
+  };
+  const zShift = (dir) => {
+    if (picked < 0) return;
+    setParts((p) => {
+      const j = picked + dir;
+      if (j < 0 || j >= p.length) return p;
+      const next = p.slice();
+      const tmp = next[picked]; next[picked] = next[j]; next[j] = tmp;
+      setPicked(j);
+      return next;
+    });
   };
 
   const pt = (e) => {
@@ -70,7 +95,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     if (!drag.current) return;
     const { x, y } = pt(e);
     const { i, dx, dy } = drag.current;
-    setParts((p) => p.map((row, n) => (n === i ? { ...row, x: Math.round(x + dx), y: Math.round(y + dy) } : row)));
+    setParts((p) => p.map((row, n) => (n === i ? { ...row, x: snap(x + dx), y: snap(y + dy) } : row)));
   };
   const onUp = () => { drag.current = null; };
 
@@ -88,11 +113,11 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
       <div style={sheet} onClick={(e) => e.stopPropagation()}>
         <header style={head}>
           <span>ASSET STUDIO</span>
-          <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · 100²</span>
+          <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · snap {SNAP}</span>
           <button type="button" className="chip-btn" onClick={onClose}>ESC</button>
         </header>
         <div style={body}>
-          <svg ref={svgRef} viewBox="0 0 100 100" width="256" height="256" style={stage}
+          <svg ref={svgRef} viewBox="0 0 100 100" style={stage}
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
             <g dangerouslySetInnerHTML={{ __html: grid }} />
             <g dangerouslySetInnerHTML={{ __html: svg }} />
@@ -100,21 +125,29 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <circle cx={parts[picked].x} cy={parts[picked].y} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
             )}
           </svg>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 160 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {Object.keys(PRIMITIVES).map((id) => (
                 <button key={id} type="button" className="chip-btn" onClick={() => add(id)}>{id}</button>
               ))}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: r.x - 5 }))}>←</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: r.x + 5 }))}>→</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: r.y - 5 }))}>↑</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: r.y + 5 }))}>↓</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: snap(r.x - SNAP) }))}>←</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: snap(r.x + SNAP) }))}>→</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: snap(r.y - SNAP) }))}>↑</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: snap(r.y + SNAP) }))}>↓</button>
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}>↺15</button>
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}>↻15</button>
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.max(0.3, +(r.scale - 0.1).toFixed(2)) }))}>S-</button>
               <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, scale: Math.min(2.5, +(r.scale + 0.1).toFixed(2)) }))}>S+</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}>INK</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}>ACCENT</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}>FILL/STROKE</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={dup}>DUP</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => zShift(-1)}>Z-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => zShift(1)}>Z+</button>
             </div>
             <label style={lbl}>
               family
@@ -127,7 +160,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <input value={hint} onChange={(e) => setHint(e.target.value)} style={field} />
             </label>
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
-              Click a shape, drag or nudge. 15° rotate. Save → user: overlay.
+              Drag corner of this window to grow the stage. Snap {SNAP}. No boolean — ring is a hole primitive. Pen stays in Illustrator.
             </p>
           </div>
         </div>
@@ -146,10 +179,15 @@ const grid = '<g stroke="rgba(255,255,255,0.08)" stroke-width="0.4" fill="none">
   + '</g>';
 
 const veil = { position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const sheet = { width: 520, background: 'var(--bg, #111)', border: '1px solid var(--line)', color: 'var(--ink)', fontFamily: 'inherit' };
-const head = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--line)', fontSize: 10, letterSpacing: '0.14em', fontWeight: 700 };
-const body = { display: 'flex', gap: 12, padding: 12 };
-const stage = { background: '#0a0a0a', border: '1px solid var(--line)', flex: '0 0 auto', touchAction: 'none' };
-const foot = { display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line)' };
+const sheet = {
+  width: 720, height: 520, minWidth: 520, minHeight: 380, maxWidth: '92vw', maxHeight: '88vh',
+  resize: 'both', overflow: 'auto',
+  background: 'var(--bg, #111)', border: '1px solid var(--line)', color: 'var(--ink)', fontFamily: 'inherit',
+  display: 'flex', flexDirection: 'column',
+};
+const head = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--line)', fontSize: 10, letterSpacing: '0.14em', fontWeight: 700, flex: '0 0 auto' };
+const body = { display: 'flex', gap: 12, padding: 12, flex: '1 1 auto', minHeight: 0 };
+const stage = { background: '#0a0a0a', border: '1px solid var(--line)', flex: '1 1 auto', minWidth: 280, height: '100%', touchAction: 'none' };
+const foot = { display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line)', flex: '0 0 auto' };
 const lbl = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 9, letterSpacing: '0.08em', color: 'var(--dim)', textTransform: 'uppercase' };
 const field = { background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', fontSize: 11, padding: '4px 6px' };
