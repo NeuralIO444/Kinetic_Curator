@@ -14,6 +14,26 @@ export const createLayoutSlice = (set) => ({
   paletteLocks: {},
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
+  /**
+   * Render-only overlay for ambient "life" drift (#107 §2): null, or a
+   * partial { jitter?, displacement?, noiseSpeed? } that the canvas merges
+   * over layoutParams for display. Deliberately outside the firewall below —
+   * it never reaches layoutParams, undo, or autosave, same treatment as
+   * audioBands/beatPulse. See useContinuousLife.
+   */
+  driftOverlay: null,
+  /**
+   * Render-only overlay for the performance governor's last-resort density
+   * cut (#107 §5): null, or a partial { count?, mirror? } merged over
+   * layoutParams for display, same mechanism as driftOverlay above. The
+   * governor used to call setLayoutParam('count', ...) directly, which
+   * permanently shrank the authored value — so a "FINAL · UNCAPPED" export
+   * restoring "what count was before the render" restored the *degraded*
+   * number, not what the operator actually set. Keeping this out of
+   * layoutParams means every snapshot/export path keeps reading the true
+   * authored count regardless of what the live canvas is drawing.
+   */
+  perfClampOverride: null,
   motionSmoothing: true,
   caGrid: null,
   historyUndoStack: [],
@@ -120,11 +140,16 @@ export const createLayoutSlice = (set) => ({
     };
   }),
 
+  setDriftOverlay: (overlay) => set({ driftOverlay: overlay }),
+  setPerfClampOverride: (overlay) => set({ perfClampOverride: overlay }),
+
   // ── State firewall (#107 §1) ─────────────────────────────────────────────
   // Every layoutParams write in the app funnels through these two setters —
-  // sliders, presets, randomize, the governor, morph lerps, evolve targets
-  // and ambient drift. Validating here rather than at each call site is both
-  // the smaller diff and the one that cannot be forgotten by the next writer.
+  // sliders, presets, randomize, the governor, morph lerps and evolve
+  // targets. (Ambient drift used to be a seventh writer here; #107 §2 moved
+  // it to driftOverlay above so it never touches this state at all.)
+  // Validating here rather than at each call site is both the smaller diff
+  // and the one that cannot be forgotten by the next writer.
   //
   // Out-of-range but well-formed values clamp; structurally invalid ones
   // (NaN, null, wrong type, unknown mode) are rejected and the previous value
@@ -242,6 +267,12 @@ export const createLayoutSlice = (set) => ({
       layoutParams: previous.layoutParams,
       historyUndoStack: state.historyUndoStack.slice(0, -1),
       historyRedoStack: [...state.historyRedoStack, current],
+      // #107 §7: an in-flight morph's rAF loop calls setLayoutParams every
+      // frame from its own morphFrom/morphTo/morphStart — left running, it
+      // would overwrite what undo just restored within one frame. Cancel it.
+      morphing: false,
+      morphFrom: null,
+      morphTo: null,
     };
   }),
 
@@ -265,6 +296,10 @@ export const createLayoutSlice = (set) => ({
       layoutParams: next.layoutParams,
       historyUndoStack: [...state.historyUndoStack, current],
       historyRedoStack: state.historyRedoStack.slice(0, -1),
+      // #107 §7: same in-flight-morph cancellation as undo() above.
+      morphing: false,
+      morphFrom: null,
+      morphTo: null,
     };
   }),
 });

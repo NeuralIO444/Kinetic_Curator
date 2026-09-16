@@ -1,16 +1,19 @@
 // node src/state/firewall.selfcheck.mjs
 //
-// #107 §1 (state firewall) and §6 (autosave as a crash-only journal).
+// #107 §1 (state firewall), §2 (life drift out of document state), and §6
+// (autosave as a crash-only journal).
 //
 // The live instrument has to survive a poisoned document for forty minutes,
-// which means two invariants:
+// which means three invariants:
 //
 //   1. Store state is ALWAYS valid. Every layoutParams write in the app —
-//      sliders, presets, randomize, the governor, morph lerps, evolve targets,
-//      ambient drift — funnels through setLayoutParam/setLayoutParams, so the
-//      check lives there rather than at six call sites that each have to
-//      remember.
-//   2. Boot either restores a document that parsed cleanly, or starts from
+//      sliders, presets, randomize, the governor, morph lerps, evolve targets
+//      — funnels through setLayoutParam/setLayoutParams, so the check lives
+//      there rather than at each call site that has to remember.
+//   2. Ambient life drift never lands in that state at all. It writes to the
+//      ephemeral driftOverlay slot, which is merged over layoutParams for
+//      render only — never persisted, never undoable.
+//   3. Boot either restores a document that parsed cleanly, or starts from
 //      factory defaults and says so. There is no third option where a
 //      half-understood document is applied anyway.
 //
@@ -174,6 +177,29 @@ function makeStore() {
   assert.strictEqual({}.polluted, undefined, 'prototype was polluted');
 }
 
+// ── §2: ambient life drift never touches document state ───────────────────
+// useContinuousLife used to sine-modulate jitter/displacement/noiseSpeed by
+// calling setLayoutParams directly on an interval, which fought the autosave
+// debounce and put machine-generated noise in the same field undo/redo
+// operate on. Drift now lands in the ephemeral driftOverlay field instead —
+// same treatment as audioBands/beatPulse — merged into the render path only.
+{
+  const s = makeStore();
+  const before = s.lp();
+  const undoDepth = (s.get().historyUndoStack || []).length;
+  s.get().setDriftOverlay({ jitter: 999, displacement: 999, noiseSpeed: 999 });
+  assert.strictEqual(s.lp(), before, 'drift overlay must not replace layoutParams');
+  assert.strictEqual((s.get().historyUndoStack || []).length, undoDepth,
+    'drift overlay must not push an undo entry');
+  assert.deepStrictEqual(s.get().driftOverlay, { jitter: 999, displacement: 999, noiseSpeed: 999 });
+
+  const { serializeProject } = await import('./projectDocument.js');
+  const doc = serializeProject(s.get());
+  assert.strictEqual(doc.driftOverlay, undefined, 'drift overlay must never be persisted');
+  assert.strictEqual(doc.layoutParams.jitter, DEFAULT_LAYOUT_PARAMS.jitter,
+    'drift overlay must not leak into the persisted layoutParams');
+}
+
 // ── §6: autosave is a crash-only journal ──────────────────────────────────
 {
   // Stub just enough localStorage to drive the real module.
@@ -247,4 +273,4 @@ function makeStore() {
   assert.ok(QUARANTINE_KEY.startsWith('kc:'), 'quarantine key is namespaced');
 }
 
-console.log('firewall.selfcheck: OK (#107 §1 state firewall, §6 crash-only autosave)');
+console.log('firewall.selfcheck: OK (#107 §1 state firewall, §2 drift overlay, §6 crash-only autosave)');

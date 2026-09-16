@@ -108,12 +108,14 @@ export function MasterBar() {
     autoQuality: s.autoQuality,
     isRecording: s.isRecording,
     persistStatus: s.persistStatus,
+    slowRender: s.slowRender,
   }));
   // Default to 'ok' rather than showing the warning for an undefined value:
   // this selector is explicit, so a field missing from it reads as undefined,
   // and a pill that fails open would cry UNSAVED on every boot.
   const {
     running, fps, seed, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
+    slowRender = false,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -158,6 +160,20 @@ export function MasterBar() {
           >
             <span className="status-dot" style={{ background: '#ffb000' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
+          </div>
+        )}
+
+        {/* #107 §4: the governor paused evolve/life/ACCUM/swarm because FPS
+            is on the floor — otherwise this looks like the app just stopped
+            breathing for no reason. */}
+        {slowRender && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+            title="FPS is sustained near zero. Evolve, ambient life drift, ACCUM and swarm are paused until it recovers."
+          >
+            <span className="status-dot" style={{ background: '#ff2d6f' }} />
+            PERF PAUSED
           </div>
         )}
 

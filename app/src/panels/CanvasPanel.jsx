@@ -9,17 +9,26 @@ import { clampCount } from '../engine/buildPlacements.js';
 import { resolvePalette } from '../data/palettes.js';
 import { getPreset } from '../data/presets.js';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
+import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
 import { useAccumulationBuffer } from '../hooks/useAccumulationBuffer.js';
 import { Layer } from './canvas/Layer.jsx';
 
 function resolveLayerSource(layer, state) {
   if (layer.id === state.activeLayerId) {
+    // #107 §2 / §5: ambient life drift and the performance governor's last-
+    // resort density cut both live in ephemeral overlay slots, not in
+    // layoutParams — merge them in for render only, active layer only
+    // (matches where each used to land before being moved out of document
+    // state).
+    const layoutParams = (state.driftOverlay || state.perfClampOverride)
+      ? { ...state.layoutParams, ...state.driftOverlay, ...state.perfClampOverride }
+      : state.layoutParams;
     return {
       seed: state.seed,
       paletteId: state.paletteId,
       paletteOverrides: state.paletteOverrides,
-      layoutParams: state.layoutParams,
+      layoutParams,
       caGrid: state.caGrid,
       enabledAssets: state.enabledAssets,
     };
@@ -54,10 +63,13 @@ export function CanvasPanel() {
     layers: s.layers,
     activeLayerId: s.activeLayerId,
     layerSnapshots: s.layerSnapshots,
+    driftOverlay: s.driftOverlay,
+    perfClampOverride: s.perfClampOverride,
+    slowRender: s.slowRender,
   }));
   const {
     layoutParams, weightOverrides, evolveMode, beatPulse, audioBands,
-    motionSmoothing, quality, running, layers, activeLayerId,
+    motionSmoothing, quality, running, layers, activeLayerId, slowRender,
   } = state;
 
   const preset = getPreset(layoutParams.composition);
@@ -103,7 +115,12 @@ export function CanvasPanel() {
   const { clear: clearAccum } = useAccumulationBuffer({
     svgRef, accumRef, enabled: accumOn,
     fade: layoutParams.accumulationFade ?? 0.88,
-    background: activePalette.bg, running,
+    background: activePalette.bg,
+    // #107 §4: pause the per-frame serialize/composite work under
+    // slowRender, not `enabled` — toggling `enabled` re-clears the buffer
+    // (see useAccumulationBuffer), which would wipe the trail history on
+    // every perf dip. `running` already just skips the frame's work.
+    running: running && !slowRender,
   });
 
   useEffect(() => {
@@ -150,12 +167,19 @@ export function CanvasPanel() {
             <g transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) rotate(${breathRot}) scale(${breathScale}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2})`}
               style={{ transition: 'transform 0.06s linear', isolation: 'isolate' }}>
               {resolvedLayers.map(rl => (
-                <Layer key={rl.layer.id} layoutParams={rl.layoutParams} seed={rl.seed} activeAssets={rl.activeAssets}
-                  palette={rl.palette} caGrid={rl.caGrid} caps={caps} safeCount={rl.safeCount} safeParticles={rl.safeParticles}
-                  effectiveScale={effectiveScale} effectiveAlpha={effectiveAlpha} canvasW={CANVAS_W} canvasH={CANVAS_H}
-                  scaleMul={scaleMul} alphaBoost={alphaBoost} motionSmoothing={motionSmoothing} quality={quality}
-                  layerBlendMode={rl.layer.layerBlendMode} layerOpacity={rl.layer.layerOpacity}
-                  attractorRef={viewport.attractorRef} onCount={(count) => reportCount(rl.layer.id, count)} />
+                // #107 §3: one bad layer (a poisoned snapshot, a missing asset)
+                // must not take the other layers or the rest of the Shell down
+                // with it. `fallback={() => null}` because a DOM error card
+                // is not valid markup inside <svg> — componentDidCatch still
+                // logs it, and the layer just stops contributing shapes.
+                <ErrorBoundary key={rl.layer.id} label={`layer:${rl.layer.id}`} fallback={() => null}>
+                  <Layer layoutParams={rl.layoutParams} seed={rl.seed} activeAssets={rl.activeAssets}
+                    palette={rl.palette} caGrid={rl.caGrid} caps={caps} safeCount={rl.safeCount} safeParticles={rl.safeParticles}
+                    effectiveScale={effectiveScale} effectiveAlpha={effectiveAlpha} canvasW={CANVAS_W} canvasH={CANVAS_H}
+                    scaleMul={scaleMul} alphaBoost={alphaBoost} motionSmoothing={motionSmoothing} quality={quality}
+                    layerBlendMode={rl.layer.layerBlendMode} layerOpacity={rl.layer.layerOpacity}
+                    attractorRef={viewport.attractorRef} onCount={(count) => reportCount(rl.layer.id, count)} />
+                </ErrorBoundary>
               ))}
             </g>
           </g>

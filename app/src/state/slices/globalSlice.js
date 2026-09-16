@@ -32,6 +32,14 @@ export const createGlobalSlice = (set) => ({
   quality: 'balanced',
   autoQuality: true,
   isFullscreen: false,
+  /**
+   * Set by usePerformanceGovernor when FPS is sustained near zero (#107 §4).
+   * Quality/count steps only shrink what gets drawn; at ~0 FPS the cost is
+   * often evolve/ambient-drift/ACCUM/swarm still doing full-rate work
+   * underneath whatever quality is set, so those pause outright on this flag
+   * until FPS recovers. MasterBar surfaces it so the operator knows why the
+   * composition suddenly stopped breathing.
+   */
   slowRender: false,
   webcamEnabled: false,
   motionEnergy: 0,

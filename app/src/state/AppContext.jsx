@@ -117,6 +117,7 @@ export function useApp(selector) {
       case A.CLEAR_SNAPSHOTS: return store.clearSnapshots();
       case A.SET_EXPORT_RESOLUTION: return store.setExportResolution(payload);
       case A.SET_IS_RECORDING: return store.setIsRecording(payload);
+      case A.SET_IS_RENDERING: return store.setIsRendering(payload);
       case A.ADD_FAVORITE: return store.addFavorite(action.favorite);
       case A.REMOVE_FAVORITE: return store.removeFavorite(action.id);
       case A.RECALL_FAVORITE: return store.recallFavorite(action.favorite);

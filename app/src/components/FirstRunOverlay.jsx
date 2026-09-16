@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'kc:first-run-seen';
 
@@ -22,6 +22,15 @@ export function FirstRunOverlay({ onPlay }) {
     setVisible(false);
     if (play && typeof onPlay === 'function') onPlay();
   }, [onPlay]);
+
+  // #107 §7: Escape is the app's one panic key — it must close this too,
+  // not just the things App.jsx's central hotkey map already owns.
+  useEffect(() => {
+    if (!visible) return;
+    const onKey = (e) => { if (e.key === 'Escape') dismiss(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [visible, dismiss]);
 
   if (!visible) return null;
 

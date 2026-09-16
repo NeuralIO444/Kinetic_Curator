@@ -8,6 +8,9 @@ export const createExportSlice = (set) => ({
   snapshots: [],
   exportResolution: 1,
   isRecording: false,
+  /** RENDER FINAL / batch export in progress (#107 §7) — lets the hotkey
+   * map debounce N/E so a seed bump or evolve toggle doesn't land mid-encode. */
+  isRendering: false,
 
   addSnapshot: (snap) => set((state) => ({
     snapshots: [...state.snapshots, { id: genId(), ...snap }].slice(-MAX_SNAPSHOTS),
@@ -18,4 +21,5 @@ export const createExportSlice = (set) => ({
   clearSnapshots: () => set({ snapshots: [] }),
   setExportResolution: (res) => set({ exportResolution: res }),
   setIsRecording: (recording) => set({ isRecording: recording }),
+  setIsRendering: (rendering) => set({ isRendering: !!rendering }),
 });

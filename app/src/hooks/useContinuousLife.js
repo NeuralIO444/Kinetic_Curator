@@ -1,5 +1,13 @@
 // useContinuousLife — subtle LFO drift on unlocked params while running
 // Makes the composition breathe even when Evolve is off.
+//
+// #107 §2: this used to call setLayoutParams every 80ms, writing the sine
+// values straight into document state — which fought the autosave debounce
+// and put machine-generated noise in the same field undo/redo operate on.
+// It now writes to the ephemeral driftOverlay slot instead (see
+// layoutSlice.js), which the canvas merges over layoutParams for render
+// only. layoutParams itself is untouched, so it only ever changes from a
+// real edit.
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
@@ -8,16 +16,20 @@ export function useContinuousLife() {
   const running = useStore(s => s.running);
   const lifeDrift = useStore(s => s.layoutParams.lifeDrift ?? 0.35);
   const lockedParams = useStore(s => s.lockedParams);
-  // Drift is machine-generated: write via setLayoutParams so it never lands
-  // in the undo stack (setLayoutParam records history on every call).
-  const setLayoutParams = useStore(s => s.setLayoutParams);
+  const setDriftOverlay = useStore(s => s.setDriftOverlay);
+  // #107 §4: this is the "life" the performance governor pauses at ~0 FPS —
+  // every tick invalidates the geometry cache (see buildPlacements.js), which
+  // is exactly the wrong thing to keep doing while the frame rate is on the
+  // floor.
+  const slowRender = useStore(s => s.slowRender);
 
   const baseRef = useRef(null);
   const tRef = useRef(0);
 
   useEffect(() => {
-    if (!running || lifeDrift <= 0.01) {
+    if (!running || lifeDrift <= 0.01 || slowRender) {
       baseRef.current = null;
+      setDriftOverlay(null);
       return;
     }
 
@@ -51,34 +63,28 @@ export function useContinuousLife() {
         const v = +(base.noiseSpeed + Math.sin(t * 0.3 + 0.5) * 0.25 * depth).toFixed(2);
         next.noiseSpeed = Math.max(0.1, Math.min(3, v));
       }
-      if (Object.keys(next).length > 0) setLayoutParams(next);
+      setDriftOverlay(Object.keys(next).length > 0 ? next : null);
     }, 80);
 
     return () => clearInterval(id);
-  }, [running, lifeDrift, lockedParams.jitter, lockedParams.displacement, lockedParams.noiseSpeed, setLayoutParams]);
+  }, [running, lifeDrift, slowRender, lockedParams.jitter, lockedParams.displacement, lockedParams.noiseSpeed, setDriftOverlay]);
 
-  // Reset baseline when user manually changes these params significantly.
-  // NOTE: the store has no subscribeWithSelector middleware, so subscribe()
-  // takes a single (state, prevState) listener — the two-arg selector form
-  // silently never fired.
+  // Re-anchor the baseline whenever the operator (or a preset/evolve target)
+  // actually edits one of these params. layoutParams no longer carries
+  // drift's own writes, so any change observed here is a real edit — no
+  // threshold needed to tell the two apart anymore.
   useEffect(() => {
     const unsub = useStore.subscribe((s, prevS) => {
+      if (!baseRef.current) return;
       const lp = s.layoutParams;
       const prev = prevS?.layoutParams;
-      {
-        if (!prev || lp === prev) return;
-        // If user (or evolve) hard-jumps a value, re-anchor baseline
-        if (
-          Math.abs(lp.jitter - prev.jitter) > 20 ||
-          Math.abs(lp.displacement - prev.displacement) > 25 ||
-          Math.abs(lp.noiseSpeed - prev.noiseSpeed) > 0.4
-        ) {
-          baseRef.current = {
-            jitter: lp.jitter,
-            displacement: lp.displacement,
-            noiseSpeed: lp.noiseSpeed,
-          };
-        }
+      if (!prev || lp === prev) return;
+      if (lp.jitter !== prev.jitter || lp.displacement !== prev.displacement || lp.noiseSpeed !== prev.noiseSpeed) {
+        baseRef.current = {
+          jitter: lp.jitter,
+          displacement: lp.displacement,
+          noiseSpeed: lp.noiseSpeed,
+        };
       }
     });
     return unsub;
