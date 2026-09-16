@@ -15,6 +15,7 @@ const ENFORCE_BUDGET = false;
 import assert from 'node:assert';
 import { computePlacements } from './placement.js';
 import { bakeParticles } from './kernel/bake/index.js';
+import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 const SEED = 0xa17e9b21;
 const CANVAS_W = 1000;
@@ -83,6 +84,9 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
   };
   const out = computePlacements(args);
   assert.strictEqual(out.length, 8000);
+  for (const p of out) {
+    assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y), 'non-finite position after fBm displacement');
+  }
   const ms = timeMs(() => computePlacements(args));
   budget('8k pts + displacement (fBm)', ms, 3, 'today: 2x fBm3D(3 octaves) per point, no field texture yet');
 }
@@ -93,11 +97,10 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
   const opts = {
     seed: SEED,
     count: 400,
-    layoutParams: {
-      noiseFreq: 0.005, noiseSpeed: 0.5, swarmCohesion: 1.5,
-      gravityWells: 1.0, damping: 0.95, scale: [0.4, 1.6], alpha: [40, 100],
-      particleCount: 400,
-    },
+    // Spread the real defaults rather than hand-copied literals, so this
+    // baseline tracks production values instead of silently going stale
+    // if DEFAULT_LAYOUT_PARAMS is tuned later.
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
     activeAssets: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
     palette: { swatches: ['#ff0000', '#00ff00', '#0000ff', '#ffff00'] },
     canvasW: CANVAS_W, canvasH: CANVAS_H,
