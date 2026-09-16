@@ -5,6 +5,21 @@
 // Kernel v2 (#108) step 2: SoA + in-place fill. computePlacementsSoA fills
 // pre-allocated typed arrays; computePlacements is now a thin adapter that
 // materializes the legacy array-of-objects for callers that still want it.
+//
+// Kernel v2 (#108) step 4: staged eval. The fill is split in two —
+//
+//   computeGeometrySoA  (stage A+B)  position sample, fBm displacement,
+//                                    t / index / zTier / depth, and the UNIT
+//                                    attribute draws u ∈ [0,1)
+//   applyAttributes     (stage C)    scale/rotation/alpha from those units
+//
+// The split exists because of what the app actually does per frame:
+// useCanvasLife updates lifeT every rAF tick, so effectiveScale and
+// effectiveAlpha are new arrays on every frame while the geometry params sit
+// perfectly still. Before this split that re-ran the sampler, the fBm
+// displacement, the asset pick and the colour assignment every frame to
+// recompute values that were bit-identical to the previous frame. Stage C is
+// pure arithmetic over cached unit draws — no hashing, no sampling, no fBm.
 
 import { createNoise } from './noise.js';
 import { getSampler } from './kernel/sample/registry.js';
@@ -21,6 +36,10 @@ import { CH, hashU01, hashU32, rngForIndex } from './kernel/rng.js';
  * @property {Float64Array} t
  * @property {Uint32Array} index  source index i (stable identity; NOT the slot)
  * @property {Uint16Array} zTier
+ * @property {Float64Array} depth    zTier depth factor (stage A; scale multiplier)
+ * @property {Float64Array} uScale   unit attribute draw, scale    (stage A)
+ * @property {Float64Array} uRot     unit attribute draw, rotation (stage A)
+ * @property {Float64Array} uAlpha   unit attribute draw, alpha    (stage A)
  */
 
 // Float64, not Float32, deliberately. The golden fixture fingerprints
@@ -40,24 +59,35 @@ function allocSoA(capacity) {
     t: new Float64Array(capacity),
     index: new Uint32Array(capacity),
     zTier: new Uint16Array(capacity),
+    depth: new Float64Array(capacity),
+    uScale: new Float64Array(capacity),
+    uRot: new Float64Array(capacity),
+    uAlpha: new Float64Array(capacity),
   };
 }
 
 /**
- * Fill pre-allocated columns for a given layout mode.
+ * Stage A + B — everything that does NOT depend on the scale/rotate/alpha
+ * ranges: density rejection, position sampling, fBm displacement, bleed,
+ * t / index / zTier / depth, and the unit attribute draws.
+ *
+ * Deliberately does not read `scale`, `rotate` or `alpha`. That is the whole
+ * contract: a caller may cache this output and re-run only applyAttributes
+ * when the ranges change. If a future edit reads a range here, the cache in
+ * buildPlacements silently goes stale — geometrySignature() below is the
+ * list that has to stay in sync.
  *
  * Allocates one set of buffers per call rather than reusing a module-level
  * pool: multi-layer render calls this several times per frame and
  * studio/render.mjs calls it off the main thread, so a shared pool would
- * make it non-reentrant. Per-call is 8 allocations total instead of ~5 per
- * point, which is where the win actually was.
+ * make it non-reentrant.
  *
  * @param {object} params
  * @param {PlacementSoA} [out] reuse these buffers (must have capacity >= count)
  * @returns {PlacementSoA}
  */
-export function computePlacementsSoA({
-  mode, count, seed, scale, rotate, alpha, jitter, density, zTiers, bleed,
+export function computeGeometrySoA({
+  mode, count, seed, jitter, density, zTiers, bleed,
   canvasW, canvasH, caGrid,
   displacement = 0, noiseFreq = 0.005, noiseSpeed = 0.5,
 }, out) {
@@ -86,12 +116,6 @@ export function computePlacementsSoA({
     caGrid: mode === 'ca' ? caGrid : null,
   };
 
-  const scale0 = scale[0];
-  const scaleD = scale[1] - scale[0];
-  const rot0 = rotate[0];
-  const rotD = rotate[1] - rotate[0];
-  const alpha0 = alpha[0];
-  const alphaD = alpha[1] - alpha[0];
   const tDenom = count > 1 ? count - 1 : 0;
 
   let n = 0;
@@ -118,22 +142,76 @@ export function computePlacementsSoA({
     }
 
     const zTier = i % tiers;
-    const depthFactor = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
 
     soa.x[n] = px;
     soa.y[n] = py;
-    // lerp inlined as base + delta * u — identical FP sequence to lerp().
-    soa.scale[n] = (scale0 + scaleD * hashU01(seed, CH.attr, i * 3)) * depthFactor;
-    soa.rotation[n] = rot0 + rotD * hashU01(seed, CH.attr, i * 3 + 1);
-    soa.alpha[n] = alpha0 + alphaD * hashU01(seed, CH.attr, i * 3 + 2);
     soa.t[n] = pos.t !== undefined ? pos.t : (tDenom ? i / tDenom : 0.5);
     soa.index[n] = i;
     soa.zTier[n] = zTier;
+    soa.depth[n] = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
+    soa.uScale[n] = hashU01(seed, CH.attr, i * 3);
+    soa.uRot[n] = hashU01(seed, CH.attr, i * 3 + 1);
+    soa.uAlpha[n] = hashU01(seed, CH.attr, i * 3 + 2);
     n++;
   }
 
   soa.n = n;
   return soa;
+}
+
+/**
+ * Stage C — apply scale/rotate/alpha ranges to the cached unit draws.
+ *
+ * Pure arithmetic: no hashing, no sampling, no noise. This is the only stage
+ * that re-runs when audio/life modulation moves the ranges, which is every
+ * frame in the live app.
+ *
+ * @param {PlacementSoA} soa mutated in place
+ */
+export function applyAttributes(soa, { scale, rotate, alpha }) {
+  const scale0 = scale[0];
+  const scaleD = scale[1] - scale[0];
+  const rot0 = rotate[0];
+  const rotD = rotate[1] - rotate[0];
+  const alpha0 = alpha[0];
+  const alphaD = alpha[1] - alpha[0];
+
+  const { n, uScale, uRot, uAlpha, depth } = soa;
+  for (let k = 0; k < n; k++) {
+    // Same expression and the same FP operation order as the fused kernel —
+    // `(base + delta * u) * depth`. Any reassociation here moves the golden
+    // hash.
+    soa.scale[k] = (scale0 + scaleD * uScale[k]) * depth[k];
+    soa.rotation[k] = rot0 + rotD * uRot[k];
+    soa.alpha[k] = alpha0 + alphaD * uAlpha[k];
+  }
+  return soa;
+}
+
+/**
+ * Stages A+B+C fused. Back-compat entry point for callers with no cache to
+ * hold (selfchecks, studio render, the perf harness).
+ *
+ * @param {object} params
+ * @param {PlacementSoA} [out] reuse these buffers (must have capacity >= count)
+ * @returns {PlacementSoA}
+ */
+export function computePlacementsSoA(params, out) {
+  return applyAttributes(computeGeometrySoA(params, out), params);
+}
+
+/**
+ * The inputs stage A+B reads. buildPlacements compares this array
+ * element-wise to decide whether cached geometry is still valid, so it must
+ * list every parameter computeGeometrySoA destructures — objects by
+ * identity (caGrid), everything else by value.
+ */
+export function geometrySignature(p) {
+  return [
+    p.mode, p.count, p.seed, p.jitter, p.density, p.zTiers, p.bleed,
+    p.canvasW, p.canvasH, p.caGrid,
+    p.displacement, p.noiseFreq, p.noiseSpeed,
+  ];
 }
 
 /**

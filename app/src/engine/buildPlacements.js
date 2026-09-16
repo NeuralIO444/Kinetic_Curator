@@ -1,8 +1,22 @@
 // Pure placement + asset + color + mirror pipeline.
 // Shared by live preview (useCanvasItems) and renderFinal (#24 / #32).
 // Kernel K0: asset + color channels index-stable (#58).
+//
+// Kernel v2 (#108) step 4: optional staged-eval cache. Pass `cache` (an
+// object the CALLER owns and keeps across calls — useCanvasItems holds one
+// per Layer in a ref) and stages A/B (geometry + displacement), D (asset
+// bind) and E (colour) are skipped whenever their inputs are unchanged,
+// leaving only stage C (scale/rotate/alpha arithmetic) and the item build.
+//
+// This matters because useCanvasLife ticks lifeT every rAF frame, so
+// effectiveScale/effectiveAlpha are fresh arrays on every frame while the
+// geometry params sit still — the full pipeline was re-deriving identical
+// positions, asset picks and colours 60x a second.
+//
+// Omit `cache` and nothing is retained: the function computes everything,
+// exactly as before. Selfchecks and studio/render.mjs take that path.
 
-import { computePlacementsSoA } from './placement.js';
+import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
 import { assignColor, resolveStrategy } from './kernel/color/index.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
@@ -27,6 +41,23 @@ export function pickWeighted(assets, weights, totalWeight, rng) {
   return assets[assets.length - 1];
 }
 
+/**
+ * Element-wise signature compare. Uses Object.is, so NaN matches NaN and
+ * objects (caGrid, activeAssets, palette) compare by identity — which is
+ * what we want: the store replaces those references on edit rather than
+ * mutating them, and a deep compare per frame would cost more than the
+ * recompute it saves.
+ *
+ * ponytail: identity compare means a caller that mutates activeAssets or
+ * palette in place gets a stale cache. Upgrade path is a version counter on
+ * those slices, not a deep compare.
+ */
+function sameSignature(a, b) {
+  if (!a || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}
+
 export function clampCount(count, mirror, caps) {
   const maxForMirror = mirror
     ? (caps.maxCountMirrored ?? caps.maxCount ?? 420)
@@ -48,6 +79,7 @@ export function buildPlacements({
   canvasH,
   scale: scaleOverride,
   alpha: alphaOverride,
+  cache,
 }) {
   const caps = capsIn || getQualityCaps('balanced');
   const preset = getPreset(layoutParams.composition);
@@ -61,16 +93,10 @@ export function buildPlacements({
   const scale = scaleOverride ?? layoutParams.scale;
   const alpha = alphaOverride ?? layoutParams.alpha;
 
-  // Kernel v2 (#108) step 2: read columns and build the item object once,
-  // instead of computePlacements building one object per point and this
-  // spreading it into a second one.
-  const soa = computePlacementsSoA({
+  const geoParams = {
     mode: layoutParams.mode,
     count: safeCount,
     seed,
-    scale,
-    rotate: layoutParams.rotate,
-    alpha,
     jitter: layoutParams.jitter,
     density: layoutParams.density,
     zTiers: layoutParams.zTiers,
@@ -81,34 +107,86 @@ export function buildPlacements({
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
-  });
-
-  const weights = activeAssets.map((a) => SELECTION_WEIGHT[a.weight] || 1);
-  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  };
 
   const strategy = resolveStrategy(layoutParams, preset);
+
+  // ── Stage A+B: geometry. Reused whenever nothing it reads has changed.
+  const geoSig = geometrySignature(geoParams);
+  const geoHit = cache && sameSignature(cache.geoSig, geoSig);
+  // Reuse the buffers even on a miss — same shape, one fewer allocation.
+  const soa = geoHit ? cache.soa : computeGeometrySoA(geoParams, cache?.soa);
+
+  // ── Stage C: attributes. Always runs; this is what the audio/life
+  // modulation actually moves, and it is pure arithmetic over cached units.
+  applyAttributes(soa, { scale, rotate: layoutParams.rotate, alpha });
+
+  // ── Stage D+E: asset bind + colour. Both are functions of (seed, index)
+  // plus the asset pool / palette / strategy — never of the ranges — so they
+  // ride on the geometry cache plus their own inputs.
+  // geoHit is required: the bind arrays are indexed by slot, and a geometry
+  // change can alter both n and which source index sits in each slot.
+  const bindSig = [activeAssets, palette, strategy, seed];
+  const bindHit = cache && geoHit && sameSignature(cache.bindSig, bindSig);
+
+  let assetIds;
+  let colors;
+  let accents;
+  let keys;
+  if (bindHit) {
+    ({ assetIds, colors, accents, keys } = cache);
+  } else {
+    const weights = activeAssets.map((a) => SELECTION_WEIGHT[a.weight] || 1);
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    assetIds = new Array(soa.n);
+    colors = new Array(soa.n);
+    accents = new Array(soa.n);
+    keys = new Array(soa.n);
+    for (let k = 0; k < soa.n; k++) {
+      const index = soa.index[k];
+      const asset = pickWeightedIndexStable(
+        activeAssets, weights, totalWeight, seed, index,
+      );
+      // K5 (#64): colour comes from the kernel's colour channel only.
+      const { color, accent } = assignColor(
+        { seed, index, t: soa.t[k] }, palette, strategy,
+      );
+      assetIds[k] = asset.id;
+      colors[k] = color;
+      accents[k] = accent;
+      keys[k] = `p${index}-${asset.id}`;
+    }
+  }
+
+  if (cache) {
+    cache.geoSig = geoSig;
+    cache.soa = soa;
+    cache.bindSig = bindSig;
+    cache.assetIds = assetIds;
+    cache.colors = colors;
+    cache.accents = accents;
+    cache.keys = keys;
+  }
+
+  // Items are rebuilt every call rather than mutated in place. At the shipped
+  // caps that is ~0.01ms, and it keeps the returned objects unaliased from
+  // the cache — a caller that held on to last frame's items would otherwise
+  // see them mutate underneath it.
   let mapped = new Array(soa.n);
   for (let k = 0; k < soa.n; k++) {
-    const index = soa.index[k];
-    const t = soa.t[k];
-    const asset = pickWeightedIndexStable(
-      activeAssets, weights, totalWeight, seed, index,
-    );
-    // K5 (#64): colour comes from the kernel's colour channel only.
-    const { color, accent } = assignColor({ seed, index, t }, palette, strategy);
     mapped[k] = {
       x: soa.x[k],
       y: soa.y[k],
       scale: soa.scale[k],
       rotation: soa.rotation[k],
       alpha: soa.alpha[k],
-      index,
-      t,
+      index: soa.index[k],
+      t: soa.t[k],
       zTier: soa.zTier[k],
-      assetId: asset.id,
-      color,
-      accent,
-      key: `p${index}-${asset.id}`,
+      assetId: assetIds[k],
+      color: colors[k],
+      accent: accents[k],
+      key: keys[k],
     };
   }
 

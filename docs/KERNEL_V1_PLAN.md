@@ -328,11 +328,13 @@ Related: color epic [#50](https://github.com/NeuralIO444/Kinetic_Curator/issues/
 
 ## 16. Kernel v2 addendum — SoA, staged eval, Worker ABI (#108)
 
-**Status:** step 1 (measurement harness) and step 2 (SoA + in-place fill)
-landed. `engine/perf.selfcheck.mjs` went first, per the issue's own rule —
+**Status:** steps 1 (measurement harness), 2 (SoA + in-place fill) and 4
+(staged eval + dirty flags) landed. Step 3 (displacement field texture) was
+measured and rejected — it is slower than what it replaces at every count
+this app ships. `engine/perf.selfcheck.mjs` went first, per the issue's own rule —
 *"measure first... rewrite is a response to a missed budget, not a vibe."*
-Steps 3–6 (field texture, swarm SoA, staged eval, Worker ABI) are still
-outstanding; this is not a claim that the rewrite is done.
+The swarm SoA and the Worker ABI are still outstanding; this is not a claim
+that the rewrite is done.
 
 ### Baseline (M2 Max, local — CI hardware will read slower)
 
@@ -403,6 +405,84 @@ At the shipped quality cap (`maxCount` 420) every one of these paths is under
 0.05ms and the differences are unmeasurable. This is headroom work for the
 20k target in the issue, not a fix for anything a user feels today.
 
+### Step 3 rejected — the displacement field texture does not pay
+
+This plan specified a 128²×2 `Float32Array` of precomputed fBm, bilinearly
+sampled per point. Measured before building it, it fails on both axes.
+
+**It costs more than it saves.** Building a 128² two-channel texture is
+32,768 fBm evaluations at **4.78ms**. Evaluating all 8,000 points directly —
+the entire thing it was meant to replace — is 16,000 evaluations at
+**2.54ms**. Bilinear sampling 8k points is 0.17ms. Break-even in a single
+call needs **~16,100 points**; the shipped cap is **420** (800 on HIGH).
+Amortised across frames it needs ~38 consecutive frames at an unchanged
+`(seed, noiseFreq, noiseSpeed)` to repay a 128² build, ~130 frames at 256²,
+~467 at 512² — and the cache-invalidating event is *dragging the noise
+slider*, which is exactly when displacement cost is most visible. Each drag
+frame would pay a full rebuild: a 4.8–58ms hitch per frame against 0.13ms
+today.
+
+**And it isn't accurate enough.** `noiseFreq` reaches 0.03 and
+`displacement` reaches 250 on the sliders. Error against exact fBm, in
+pixels of displacement:
+
+| noiseFreq | 128² | 256² | 512² |
+|---|---|---|---|
+| 0.005 (default) | 1.7 RMS / 5.4 max | 0.4 / 1.4 | 0.1 / 0.5 |
+| 0.015 | 12.6 / 41.4 | 3.7 / 12.9 | 1.0 / 2.9 |
+| 0.030 (slider max) | **31.2 / 108.5** | 12.2 / 40.2 | 3.7 / 12.2 |
+
+A 108px maximum error is a shape in visibly the wrong place. The resolution
+needed scales with `noiseFreq`, and the build cost scales with resolution
+squared — so the configurations that most need the speedup are precisely the
+ones where the texture is most expensive and least accurate.
+
+The generalisable point: a lookup table only wins when lookups vastly
+outnumber table entries. Here the table is larger than the workload.
+Budget 2 (8k + fBm, <3ms) is met anyway at 2.83–3.03ms post-SoA.
+
+### Step 4 result — staged eval + dirty flags
+
+Split the kernel into `computeGeometrySoA` (stage A+B: sampling,
+displacement, `t`/`index`/`zTier`/`depth`, and the *unit* attribute draws)
+and `applyAttributes` (stage C: the scale/rotate/alpha arithmetic over those
+units). `buildPlacements` takes an optional caller-owned `cache` and skips
+stages A/B and D/E (asset bind, colour) whenever their inputs are unchanged.
+`useCanvasItems` holds one cache per `<Layer />`.
+
+Why this turned out to be the important step: `useCanvasLife` calls
+`setLifeT` on **every rAF frame**, so `effectiveScale`/`effectiveAlpha` are
+fresh arrays 60× a second while every geometry input sits still. The full
+pipeline was re-running the sampler, the fBm displacement, the weighted asset
+pick and `assignColor` every frame to reproduce bit-identical values, purely
+so a different scale range could be applied at the end.
+
+Per modulation frame, against `main`:
+
+| Shape | main | staged | |
+|---|---|---|---|
+| 420 (BALANCED cap) | 0.095ms | 0.046ms | **2.1×** |
+| 800 (HIGH cap) | 0.175ms | 0.079ms | **2.2×** |
+| 420 + displacement | 0.145ms | 0.042ms | **3.4×** |
+| 8000 + displacement | 2.80ms | 0.078ms | **35.9×** |
+
+Budget 4 (incremental dirty-C ≤10% of full eval) is now measurable and
+**met at 8k + displacement: 2.4%**. At 420 it reads **20%** and misses. That
+floor is the per-frame rebuild of 420 item objects, which no cache stage
+skips — once geometry is cached it is nearly all that is left. Closing it
+means mutating cached item objects in place, which aliases the previous
+frame's items for anyone holding them. Not worth 0.04ms/frame; recorded
+rather than hidden.
+
+Correctness is gated by `stagedEval.selfcheck.mjs`: a cached and an uncached
+instance are driven in lockstep through 27 scripted parameter transitions and
+4,000 seeded-random ones, comparing all 12 fields of every item with
+`Object.is`. It also asserts the cache *hits* — 60 modulation frames must
+re-run geometry exactly once — because a correct cache that never hits is a
+slow no-op nothing else would notice. `e2e/cache-verify.spec.js` covers the
+React wiring, where a stale cache would swallow geometry edits while the
+canvas kept animating convincingly.
+
 ### Proposed sequence for the remaining work items
 
 Ordered so each step is independently measurable against the same harness
@@ -420,14 +500,13 @@ reverted on its own.
    existing spatial-hash *algorithm* but drop the per-step rebuild if the
    profile shows it dominating (measure before assuming). `bakeParticles`
    keeps its current signature; only its internals change.
-3. **Displacement field texture** (item 3) — precompute a 128²×2 `Float32Array`
-   of the fBm field once per `(seed, noiseFreq, noiseSpeed, t)` and
-   bilinear-sample it per point instead of calling `fBm3D` twice per point.
-   PERF quality tier uses hash noise (no fBm at all) per the issue's spec.
-4. **Staged eval + dirty flags** (item 2) — split `computePlacements` into
-   the A/B/C/D/E stages once 1–3 exist as real, separately-timed pieces;
-   dirty flags are meaningless to design before there's a staged
-   pipeline to attach them to.
+3. ~~**Displacement field texture** (item 3)~~ — **REJECTED on measurement.**
+   See "Step 3 rejected" below. It is a pessimization at every count this app
+   ships, and inaccurate at the top of the `noiseFreq` range.
+4. ~~**Staged eval + dirty flags** (item 2)~~ — **DONE**, see "Step 4 result"
+   below. Done *before* the swarm SoA and instead of the field texture,
+   because the measurement said it was the only remaining change that helps
+   the frame the user actually sees.
 5. **`EvalContext` ABI + Worker path** (item 5) — once the function is
    pure-buffers-in/pure-buffers-out (a consequence of 1–4), a
    `Transferable`-based Worker call is a thin wrapper, not new engine work.
@@ -438,5 +517,5 @@ reverted on its own.
 ### What this addendum is not
 
 Not a claim that #108 is done. `ENFORCE_BUDGET` in `perf.selfcheck.mjs`
-stays `false` until step 4 above lands — flipping it earlier would fail
-every CI run on work that hasn't happened yet.
+stays `false` until the swarm SoA lands — the bake budget is still ~2x over,
+so flipping it now would fail every CI run on work that hasn't happened yet.
