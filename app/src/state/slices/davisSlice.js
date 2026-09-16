@@ -2,6 +2,7 @@ import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { generateLayoutTargets, MORPHABLE_KEYS, PALETTE_IDS } from '../paramUtils.js';
 import { genId } from '../id.js';
 import { tickPhraseBeat } from '../phraseTick.js';
+import { pushToUndo } from '../history.js';
 
 export const createDavisSlice = (set) => ({
   evolveMode: false,
@@ -70,7 +71,8 @@ export const createDavisSlice = (set) => ({
   tickPhraseBeat: () => set((state) => {
     const next = tickPhraseBeat(state, { stepGrid, createGrid });
     if (next.phraseDidWrap) {
-      const { phraseDidWrap, ...rest } = next;
+      const rest = { ...next };
+      delete rest.phraseDidWrap;
       return rest;
     }
     return next;
@@ -111,6 +113,10 @@ export const createDavisSlice = (set) => ({
           }
         }
         return {
+          // #107 §7: one undo entry for the whole morph, capturing the look
+          // right before it starts — not one per lerp frame (useMorphEvolve
+          // calls setLayoutParams, which never pushes undo, on every tick).
+          ...pushToUndo(state, true),
           ...caUpdate,
           ...seedUpdate,
           ...paletteUpdate,
@@ -182,6 +188,8 @@ export const createDavisSlice = (set) => ({
       };
     }
     return {
+      // #107 §7: same one-entry-per-morph undo as triggerEvolve above.
+      ...pushToUndo(state, true),
       layoutParams: { ...state.layoutParams, ...discrete },
       morphing: true,
       morphFrom: from,

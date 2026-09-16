@@ -18,6 +18,7 @@ import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
 import { exportSnapshot } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
+import { useStore } from './state/store.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
 
@@ -51,6 +52,9 @@ function AppInner() {
     layoutParams: s.layoutParams,
     enabled: s.enabledAssets,
     isFullscreen: s.isFullscreen,
+    slowRender: s.slowRender,
+    isRecording: s.isRecording,
+    isRendering: s.isRendering,
   }));
 
   useFpsMeter(true);
@@ -69,10 +73,13 @@ function AppInner() {
   }, [state.evolveMode, state.evolveSource]);
 
   useEffect(() => {
-    if (!state.evolveMode || state.evolveSource !== 'time') return;
+    // #107 §4: an automatic trigger, not a manual one — pauses under
+    // slowRender so evolve stops adding param churn on top of a near-zero
+    // frame rate. An explicit "evolve now" action is unaffected.
+    if (!state.evolveMode || state.evolveSource !== 'time' || state.slowRender) return;
     const interval = setInterval(() => piped({ type: A.TRIGGER_EVOLVE }), state.evolveInterval);
     return () => clearInterval(interval);
-  }, [state.evolveMode, state.evolveSource, state.evolveInterval, piped]);
+  }, [state.evolveMode, state.evolveSource, state.evolveInterval, state.slowRender, piped]);
 
   const lastSnapRef = useRef(0);
   useEffect(() => {
@@ -110,18 +117,29 @@ function AppInner() {
       },
     }),
     'g': () => piped({ type: A.TOGGLE_FULLSCREEN }),
-    'e': () => piped({ type: A.SET_EVOLVE_MODE, payload: p => !p }),
-    'n': () => piped({ type: A.BUMP_SEED }),
+    // #107 §7: while recording or batch/final-rendering, N/E are debounced —
+    // a seed bump or evolve toggle mid-encode changes what's being captured
+    // partway through, and there is no clean way to fix that after the fact.
+    'e': () => { if (!state.isRecording && !state.isRendering) piped({ type: A.SET_EVOLVE_MODE, payload: p => !p }); },
+    'n': () => { if (!state.isRecording && !state.isRendering) piped({ type: A.BUMP_SEED }); },
     ' ': () => piped({ type: A.SET_RUNNING, payload: !state.running }),
     'z': (e) => { if (e.metaKey || e.ctrlKey) { e.shiftKey ? history.redo() : history.undo(); } },
     '?': () => { setHelpTab('help'); setShowHotkeys(s => !s); },
+    // #107 §7: one panic key — always pause, always exit (never enter)
+    // fullscreen, always close the hotkey sheet, regardless of current state.
+    'Escape': () => {
+      piped({ type: A.SET_RUNNING, payload: false });
+      if (state.isFullscreen) piped({ type: A.TOGGLE_FULLSCREEN });
+      setShowHotkeys(false);
+    },
   });
 
   const onAudioStimulus = useCallback(v => piped({ type: A.SET_AUDIO_STIMULUS, payload: v }), [piped]);
   const onAudioBands = useCallback(v => piped({ type: A.SET_AUDIO_BANDS, payload: v }), [piped]);
   const onBeat = useCallback(() => {
     piped({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
-    if (evolveRef.current.mode && evolveRef.current.source === 'beat') {
+    // #107 §4: same automatic-trigger pause as the time-source interval above.
+    if (evolveRef.current.mode && evolveRef.current.source === 'beat' && !useStore.getState().slowRender) {
       piped({ type: A.TRIGGER_EVOLVE });
     }
   }, [piped]);

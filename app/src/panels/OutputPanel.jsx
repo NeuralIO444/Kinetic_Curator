@@ -18,6 +18,7 @@ export function OutputPanel() {
     snapshots: s.snapshots,
     exportResolution: s.exportResolution,
     isRecording: s.isRecording,
+    rendering: s.isRendering,
     seed: s.seed,
     layoutParams: s.layoutParams,
     quality: s.quality,
@@ -38,11 +39,14 @@ export function OutputPanel() {
     snapshots, exportResolution, isRecording, seed, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, layers, activeLayerId, layerSnapshots,
-    userPalettes, favorites,
+    userPalettes, favorites, rendering,
   } = state;
+  // #107 §7: this lives in the store (not local state) so the App-level
+  // hotkey map can debounce N/E while a render is in flight — a seed bump
+  // or evolve toggle mid-encode would change what RENDER FINAL is capturing.
+  const setRendering = (v) => emit(Events.EXPORT_RENDERING, v);
 
   const [uncapped, setUncapped] = useState(false);
-  const [rendering, setRendering] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
   const [batchCount, setBatchCount] = useState(8);
   const [batchProgress, setBatchProgress] = useState(null);

@@ -13,10 +13,15 @@ export function useSwarmTick({
   const [swarmSystem] = useState(() => new ParticleSystem());
   const phraseWrapGen = useStore((s) => s.phraseWrapGen || 0);
   const wrapSeen = useRef(phraseWrapGen);
+  // #107 §4: swarm physics run every rAF frame regardless of the app's
+  // `running` flag — the performance governor's pause has to reach in here
+  // directly rather than through a prop, since nothing upstream already
+  // threads a pause signal into this hook.
+  const slowRender = useStore((s) => s.slowRender);
 
-  const liveRef = useRef({ layoutParams, activeAssets, palette, seed });
+  const liveRef = useRef({ layoutParams, activeAssets, palette, seed, slowRender });
   useEffect(() => {
-    liveRef.current = { layoutParams, activeAssets, palette, seed };
+    liveRef.current = { layoutParams, activeAssets, palette, seed, slowRender };
   });
 
   useEffect(() => {
@@ -26,8 +31,13 @@ export function useSwarmTick({
     let animId;
     const step = () => {
       const c = liveRef.current;
-      swarmSystem.update(c.layoutParams, c.activeAssets, c.palette, c.seed, Date.now(), attractorRef?.current);
-      setTick((t) => (t + 1) % 1000000);
+      // Read slowRender fresh each frame (not as an effect dependency) so
+      // pausing never re-runs this setup and re-inits the particle system —
+      // it would otherwise reset positions/velocities on every perf dip.
+      if (!c.slowRender) {
+        swarmSystem.update(c.layoutParams, c.activeAssets, c.palette, c.seed, Date.now(), attractorRef?.current);
+        setTick((t) => (t + 1) % 1000000);
+      }
       animId = requestAnimationFrame(step);
     };
     animId = requestAnimationFrame(step);

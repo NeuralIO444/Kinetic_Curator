@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { panelsByZone } from './PanelRegistry.js';
+import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 
 const TAB_STORAGE_KEY = 'kc:active-panel-tab';
 
@@ -52,7 +53,11 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       <div className="col col-canvas">
         {primary.map((p) => {
           const Comp = p.component;
-          return <Comp key={p.id} dispatch={dispatchPipe} />;
+          return (
+            <ErrorBoundary key={p.id} label={`panel:${p.id}`}>
+              <Comp dispatch={dispatchPipe} />
+            </ErrorBoundary>
+          );
         })}
       </div>
       <div className="col-divider" {...dividerProps(0)} />
@@ -90,7 +95,11 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
           >
             {(() => {
               const Comp = activePanel.component;
-              return <Comp key={activePanel.id} dispatch={dispatchPipe} />;
+              return (
+                <ErrorBoundary key={activePanel.id} label={`panel:${activePanel.id}`}>
+                  <Comp dispatch={dispatchPipe} />
+                </ErrorBoundary>
+              );
             })()}
           </div>
         )}

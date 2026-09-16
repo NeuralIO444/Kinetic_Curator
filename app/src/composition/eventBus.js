@@ -68,6 +68,7 @@ export const Events = {
   ASSETS_REPLACE: 'assets:replace',
   EXPORT_SNAPSHOT: 'export:snapshot',
   EXPORT_RECORD: 'export:record',
+  EXPORT_RENDERING: 'export:rendering',
   EXPORT_RESOLUTION: 'export:resolution',
   EXPORT_CLEAR_SNAPSHOTS: 'export:clearSnapshots',
   EXPORT_QUALITY: 'export:quality',
