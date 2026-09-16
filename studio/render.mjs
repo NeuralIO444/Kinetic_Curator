@@ -8,7 +8,8 @@ import { resolvePalette } from '../app/src/data/palettes.js';
 import { getRenderCaps, shouldRenderGloss } from '../app/src/data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../app/src/data/layout-modes.js';
 import { parseProject } from '../app/src/state/projectDocument.js';
-import { blend } from './blendFallback.mjs';
+import { blend, BLEND_FALLBACK } from './blendFallback.mjs';
+import { KERNEL_VERSION } from '../app/src/engine/kernel/version.js';
 
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
@@ -168,6 +169,9 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
         safeCount: clampCount(layoutParams.count, layoutParams.mirror, caps),
         layerBlendMode: layer.layerBlendMode || 'normal',
         layerOpacity: layer.layerOpacity ?? 1,
+        // Exposed for the repro report (#106): a swarm still is only
+        // reproducible if you know how many steps it was baked for.
+        bakeSteps: layerBakeSteps,
       };
     });
 }
@@ -318,18 +322,55 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(2);
   }
   const doc = loadProject(args._[0]);
-  // What the kernel will actually use, after normalizeLayoutParams has
-  // clamped and allow-listed everything (#106). studio.py records this in the
-  // sidecar so the sidecar describes the render that happened rather than the
-  // JSON that was requested — those differ whenever a project is out of
-  // bounds, which is exactly when you need the sidecar to be honest.
+  // The repro report (#106 item 4): everything needed to explain, later, how
+  // this edition was produced — and in particular every place the renderer
+  // silently substituted something. studio.py embeds it in the sidecar.
+  //
+  // It describes the render that HAPPENED, not the JSON that was requested.
+  // Those differ whenever a project is out of bounds, which is exactly when a
+  // sidecar that echoes the request is worse than useless.
   if (args.emitNormalized) {
+    const caps = getRenderCaps(doc.quality || 'balanced', !!args.uncapped);
+    const layers = resolveLayers(doc, {
+      caps, ramp: args.ramp, motion: args.motion || null, progress: 0,
+      bakeSteps: args.bakeSteps ? Number(args.bakeSteps) : 180,
+    });
+    // Record substitutions rather than just the requested value: resvg has no
+    // plus-lighter, so an offline still legitimately differs from the live
+    // canvas here and the sidecar should say so (#96).
+    const substitutions = [];
+    const noteBlend = (where, requested) => {
+      const used = blend(requested);
+      if (requested && requested !== 'normal' && used !== requested) {
+        substitutions.push({ where, requested, used, reason: 'not supported by resvg' });
+      }
+    };
+    for (const L of layers) {
+      noteBlend(`layer:${L.id}:item`, L.layoutParams?.blendMode);
+      noteBlend(`layer:${L.id}:layer`, L.layerBlendMode);
+    }
     process.stdout.write(JSON.stringify({
+      kernelVersion: KERNEL_VERSION,
       seed: doc.seed,
       paletteId: doc.paletteId,
+      quality: doc.quality || 'balanced',
+      uncapped: !!args.uncapped,
+      caps,
       layoutParams: doc.layoutParams,
       layerSnapshots: doc.layerSnapshots || null,
       activeLayerId: doc.activeLayerId || null,
+      layers: layers.map((L) => ({
+        id: L.id,
+        mode: L.layoutParams?.mode,
+        safeCount: L.safeCount,
+        items: Array.isArray(L.items) ? L.items.length : null,
+        bakeSteps: L.bakeSteps ?? null,
+        blendMode: L.layoutParams?.blendMode ?? 'normal',
+        layerBlendMode: L.layerBlendMode ?? 'normal',
+        layerOpacity: L.layerOpacity ?? 1,
+      })),
+      substitutions,
+      blendFallbackTable: BLEND_FALLBACK,
     }, null, 2));
     process.exit(0);
   }
