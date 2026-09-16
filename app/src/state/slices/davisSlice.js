@@ -27,6 +27,8 @@ export const createDavisSlice = (set) => ({
   phraseBeat: 0,
   phraseOriginSeed: null,
   phraseWrapGen: 0,
+  phraseClock: 'audio',
+  phraseBpm: 120,
 
   setEvolveMode: (valOrFn) => set((state) => ({
     evolveMode: typeof valOrFn === 'function' ? valOrFn(state.evolveMode) : valOrFn,
@@ -56,6 +58,8 @@ export const createDavisSlice = (set) => ({
     phraseBeat: 0,
   }),
   setPhraseMode: (mode) => set({ phraseMode: mode }),
+  setPhraseClock: (clock) => set({ phraseClock: clock === 'metro' ? 'metro' : 'audio' }),
+  setPhraseBpm: (bpm) => set({ phraseBpm: Math.max(40, Math.min(240, Number(bpm) || 120)) }),
   armPhrase: (seed) => set({ phraseOriginSeed: seed, phraseBeat: 0 }),
   resetPhrase: () => set((state) => ({
     phraseBeat: 0,

@@ -8,9 +8,11 @@ const PHRASE_MODES = [
 
 export function PhraseControls({
   phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseProgress,
-  layoutMode, audioEnabled,
+  layoutMode, audioEnabled, phraseClock = 'audio', phraseBpm = 120,
 }) {
   const caLive = layoutMode === 'ca';
+  const metro = phraseClock === 'metro';
+  const waiting = phraseEnabled && !metro && !audioEnabled;
   return (
     <div style={{ marginTop: 10, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -23,6 +25,26 @@ export function PhraseControls({
           {phraseEnabled ? 'ON' : 'OFF'}
         </button>
       </div>
+      <div className="davis-source-row">
+        <span className="davis-label">CLOCK</span>
+        {['audio', 'metro'].map((c) => (
+          <button
+            key={c}
+            className={`chip-btn ${phraseClock === c ? 'active' : ''}`}
+            onClick={() => emit(Events.DAVIS_PHRASE, { clock: c })}
+          >
+            {c.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      {metro && (
+        <div className="davis-interval-row">
+          <span className="davis-label">BPM</span>
+          <input type="range" min={40} max={240} step={1} value={phraseBpm}
+            onChange={(e) => emit(Events.DAVIS_PHRASE, { bpm: Number(e.target.value) })} />
+          <span className="davis-readout">{phraseBpm}</span>
+        </div>
+      )}
       <div className="davis-interval-row">
         <span className="davis-label">LENGTH</span>
         <input type="range" min={4} max={32} step={1} value={phraseLength || 8}
@@ -50,9 +72,11 @@ export function PhraseControls({
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--dim)', marginBottom: 3 }}>
             <span>
-              {audioEnabled
-                ? `BEAT ${phraseBeat}/${phraseLength}`
-                : 'waiting for beat · audio off'}
+              {waiting
+                ? 'waiting for beat · audio off'
+                : metro
+                  ? `METRO ${phraseBeat}/${phraseLength}`
+                  : `BEAT ${phraseBeat}/${phraseLength}`}
             </span>
             <button className="micro-btn" onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>RESET NOW</button>
           </div>

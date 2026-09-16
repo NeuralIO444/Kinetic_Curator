@@ -30,9 +30,6 @@ export function useApp(selector) {
   const customAssets = useStore(s => s.customAssets);
   const undoStackLength = useStore(s => s.historyUndoStack ? s.historyUndoStack.length : 0);
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
-  // Entries are tagged per-layer (#92) — only the top entry belonging to the
-  // active layer is actually undoable/redoable right now, so canUndo/canRedo
-  // must check that, not just stack length, or the button lies.
   const canUndo = useStore(s => {
     const top = s.historyUndoStack && s.historyUndoStack[s.historyUndoStack.length - 1];
     return !!top && top.layerId === s.activeLayerId;
@@ -110,6 +107,8 @@ export function useApp(selector) {
       case A.SET_PHRASE_ENABLED: return store.setPhraseEnabled(payload);
       case A.SET_PHRASE_LENGTH: return store.setPhraseLength(payload);
       case A.SET_PHRASE_MODE: return store.setPhraseMode(payload);
+      case A.SET_PHRASE_CLOCK: return store.setPhraseClock(payload);
+      case A.SET_PHRASE_BPM: return store.setPhraseBpm(payload);
       case A.RESET_PHRASE: return store.resetPhrase();
       case A.SET_SLOW_RENDER: return store.setSlowRender(payload);
       case A.TOGGLE_FULLSCREEN: return store.toggleFullscreen();

@@ -34,6 +34,8 @@ export function wireEventBus(rawDispatch) {
     if (p.enabled !== undefined) dispatch({ type: A.SET_PHRASE_ENABLED, payload: p.enabled });
     if (p.length !== undefined) dispatch({ type: A.SET_PHRASE_LENGTH, payload: p.length });
     if (p.mode !== undefined) dispatch({ type: A.SET_PHRASE_MODE, payload: p.mode });
+    if (p.clock !== undefined) dispatch({ type: A.SET_PHRASE_CLOCK, payload: p.clock });
+    if (p.bpm !== undefined) dispatch({ type: A.SET_PHRASE_BPM, payload: p.bpm });
   });
   on(Events.DAVIS_RESET_PHRASE, () => dispatch({ type: A.RESET_PHRASE }));
   on(Events.DAVIS_FAVORITE, (fav) => {
