@@ -1,9 +1,23 @@
 // Project document — portable session state (#33 / #34).
 // Full project JSON is the reproducible unit (seed alone is not).
 import { captureSnapshot } from './slices/layersSlice.js';
+import { normalizeLayoutParams } from '../data/layout-modes.js';
 
 export const PROJECT_VERSION = 1;
 export const AUTOSAVE_KEY = 'kc:project:v1';
+
+function normalizeSnapshots(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {};
+  for (const [id, snap] of Object.entries(raw)) {
+    if (!snap || typeof snap !== 'object') continue;
+    out[id] = {
+      ...snap,
+      layoutParams: normalizeLayoutParams(snap.layoutParams),
+    };
+  }
+  return out;
+}
 
 /**
  * @param {object} state - zustand-like slice of relevant fields. `seed` /
@@ -16,7 +30,7 @@ export function serializeProject(state) {
     version: PROJECT_VERSION,
     seed: state.seed >>> 0,
     paletteId: state.paletteId,
-    layoutParams: { ...state.layoutParams },
+    layoutParams: normalizeLayoutParams(state.layoutParams),
     enabledAssets: { ...state.enabledAssets },
     quality: state.quality || 'balanced',
   };
@@ -33,10 +47,11 @@ export function serializeProject(state) {
     doc.activeLayerId = state.activeLayerId;
     // The active layer's true data lives in the live top-level fields
     // above, not in layerSnapshots — fold it in so every layer round-trips.
-    doc.layerSnapshots = {
+    const snaps = {
       ...(state.layerSnapshots || {}),
       [state.activeLayerId]: captureSnapshot(state),
     };
+    doc.layerSnapshots = normalizeSnapshots(snaps);
   }
   return doc;
 }
@@ -63,14 +78,14 @@ export function parseProject(raw) {
         version: PROJECT_VERSION,
         seed: seed >>> 0,
         paletteId: raw.paletteId || raw.palette || 'praystation',
-        layoutParams: raw.layoutParams || raw.layout || {},
+        layoutParams: normalizeLayoutParams(raw.layoutParams || raw.layout),
         enabledAssets: raw.enabledAssets || null,
         quality: raw.quality || 'balanced',
         assetWeightOverrides: raw.assetWeightOverrides || null,
         paletteOverrides: raw.paletteOverrides || null,
         layers: Array.isArray(raw.layers) ? raw.layers : null,
         activeLayerId: raw.activeLayerId || null,
-        layerSnapshots: raw.layerSnapshots && typeof raw.layerSnapshots === 'object' ? raw.layerSnapshots : null,
+        layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
       },
     };
   }
@@ -91,7 +106,7 @@ export function parseProject(raw) {
       version: PROJECT_VERSION,
       seed: seed >>> 0,
       paletteId: typeof raw.paletteId === 'string' ? raw.paletteId : 'praystation',
-      layoutParams: raw.layoutParams && typeof raw.layoutParams === 'object' ? { ...raw.layoutParams } : {},
+      layoutParams: normalizeLayoutParams(raw.layoutParams),
       enabledAssets:
         raw.enabledAssets && typeof raw.enabledAssets === 'object' ? { ...raw.enabledAssets } : null,
       quality: typeof raw.quality === 'string' ? raw.quality : 'balanced',
@@ -105,8 +120,7 @@ export function parseProject(raw) {
           : null,
       layers: Array.isArray(raw.layers) ? raw.layers : null,
       activeLayerId: typeof raw.activeLayerId === 'string' ? raw.activeLayerId : null,
-      layerSnapshots:
-        raw.layerSnapshots && typeof raw.layerSnapshots === 'object' ? raw.layerSnapshots : null,
+      layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
     },
   };
 }
