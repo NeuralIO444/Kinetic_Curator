@@ -6,11 +6,17 @@ import { useEffect, useRef, useCallback } from 'react';
 import { CANVAS_W, CANVAS_H } from './useCanvasViewport.js';
 
 function serializeSvg(svgNode) {
-  const serializer = new XMLSerializer();
-  let source = serializer.serializeToString(svgNode);
-  if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
-    source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  const clone = svgNode.cloneNode(true);
+  clone.style.opacity = '1';
+  clone.style.pointerEvents = 'none';
+  if (!clone.getAttribute('xmlns')) {
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   }
+  if (!clone.getAttribute('xmlns:xlink')) {
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  }
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(clone);
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(source);
 }
 
@@ -31,13 +37,11 @@ export function useAccumulationBuffer({
   background = '#000000',
   running = true,
 }) {
-  const bufRef = useRef(null); // offscreen working buffer
+  const bufRef = useRef(null);
   const imgRef = useRef(null);
   const rafRef = useRef(null);
   const fadeRef = useRef(fade);
   const bgRef = useRef(background);
-  // Live values for the rAF loop, updated after commit rather than during
-  // render so the loop never re-subscribes on a slider drag.
   useEffect(() => {
     fadeRef.current = fade;
     bgRef.current = background;
@@ -71,7 +75,6 @@ export function useAccumulationBuffer({
     }
   }, [ensureBuffer, accumRef]);
 
-  // Reset buffer when toggled on
   useEffect(() => {
     if (enabled) clear();
   }, [enabled]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,11 +86,8 @@ export function useAccumulationBuffer({
       return;
     }
 
-    // Display canvas dimensions come from the JSX width/height attributes
-    // in CanvasPanel; setting them here again only re-cleared it.
-
     let lastSerialize = 0;
-    const SERIALIZE_MS = 48; // ~20fps composite is enough for trails
+    const SERIALIZE_MS = 48;
 
     const tick = (now) => {
       rafRef.current = requestAnimationFrame(tick);
@@ -97,16 +97,12 @@ export function useAccumulationBuffer({
       const disp = accumRef?.current;
       if (!svg || !disp) return;
 
-      if (now - lastSerialize < SERIALIZE_MS && imgRef.current) {
-        // still paint last img if we have one after fade
-        return;
-      }
+      if (now - lastSerialize < SERIALIZE_MS && imgRef.current) return;
       lastSerialize = now;
 
       const buf = ensureBuffer();
       const bctx = buf.getContext('2d');
 
-      // Fade previous content toward transparent via destination-in alpha
       const keep = Math.max(0, Math.min(0.99, Number(fadeRef.current) || 0.88));
       bctx.save();
       bctx.globalCompositeOperation = 'destination-in';
@@ -137,9 +133,6 @@ export function useAccumulationBuffer({
   return { clear, bufferCanvas: bufRef };
 }
 
-/**
- * Rasterize accumulation buffer (or fall back) to PNG blob + download.
- */
 export function exportAccumulationCanvas(canvas, resolution = 1, seedStr = '', background = null) {
   if (!canvas) return Promise.reject(new Error('no accumulation canvas'));
   const w = Math.round(canvas.width * resolution);
@@ -172,7 +165,6 @@ export function exportAccumulationCanvas(canvas, resolution = 1, seedStr = '', b
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10000);
 
-      // thumb
       const tw = Math.min(96, w);
       const th = Math.round((h / w) * tw);
       const tc = document.createElement('canvas');
