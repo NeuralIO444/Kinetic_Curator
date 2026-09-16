@@ -1,6 +1,7 @@
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { generateLayoutTargets, MORPHABLE_KEYS, PALETTE_IDS } from '../paramUtils.js';
 import { genId } from '../id.js';
+import { tickPhraseBeat } from '../phraseTick.js';
 
 export const createDavisSlice = (set) => ({
   evolveMode: false,
@@ -62,28 +63,7 @@ export const createDavisSlice = (set) => ({
     seed: state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed,
   })),
 
-  tickPhraseBeat: () => set((state) => {
-    if (!state.phraseEnabled) return {};
-    const nextBeat = state.phraseBeat + 1;
-    if (nextBeat < state.phraseLength) {
-      return { phraseBeat: nextBeat };
-    }
-    const origin = state.phraseOriginSeed != null ? state.phraseOriginSeed : state.seed;
-    const updates = {
-      phraseBeat: 0,
-      phraseWrapGen: (state.phraseWrapGen || 0) + 1,
-    };
-    if (state.phraseMode === 'reset-seed') {
-      updates.seed = origin;
-    } else if (state.phraseMode === 'cycle-seed') {
-      updates.seed = (origin + 1) >>> 0;
-      updates.phraseOriginSeed = updates.seed;
-    } else if (state.phraseMode === 'step-ca') {
-      updates.caGrid = state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28);
-      updates.seed = origin;
-    }
-    return updates;
-  }),
+  tickPhraseBeat: () => set((state) => tickPhraseBeat(state, { stepGrid, createGrid })),
 
   triggerEvolve: () => set((state) => {
     const ts = Date.now();
