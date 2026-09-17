@@ -58,3 +58,43 @@ test('poisoned project loads without killing the canvas', async ({ page }) => {
     .not.toMatch(/__proto__/);
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);
 });
+
+// #103 Track B — a hostile project with 200 layers, a bloated asset map,
+// and a dangling quality key must boot, apply the caps, and keep rendering.
+const LAYERS_200 = Array.from({ length: 200 }, (_, i) =>
+  `{"id":"l${i}","name":"L${i}","type":"content","visible":true}`).join(',');
+const EVIL_KEYS = Array.from({ length: 5000 }, (_, i) => `"evil-${i}":true`).join(',');
+const HOSTILE = `{
+  "version": 1,
+  "seed": 6735,
+  "paletteId": "praystation",
+  "quality": "ultra-mega",
+  "enabledAssets": {${EVIL_KEYS}},
+  "layers": [${LAYERS_200}],
+  "activeLayerId": "l150"
+}`;
+
+test('hostile 200-layer project boots capped and keeps rendering', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+
+  await page.addInitScript((doc) => {
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+      localStorage.setItem('kc:project:v1', doc);
+    } catch { /* ignore */ }
+  }, HOSTILE);
+
+  await page.goto('/');
+  await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+
+  await waitForLiveFrame(page);
+  const nodes = await glNodeCount(page);
+  console.log('[hostile] nodes:', nodes);
+
+  expect(nodes, 'canvas rendered nothing — the hostile project broke the loop')
+    .toBeGreaterThan(0);
+  expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);
+});

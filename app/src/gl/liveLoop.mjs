@@ -33,6 +33,8 @@ import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
+import { createGpuTimer } from './debug/gpuTimer.mjs';
+import { reportStage } from '../hooks/useFpsMeter.js';
 
 const CX = CANVAS_W / 2;
 const CY = CANVAS_H / 2;
@@ -57,6 +59,17 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
 
   const live = createLiveRenderer(canvas);
   const resolver = createLiveResolver();
+
+  // #103 Track A — per-tick GPU frame timing for the governor. Timer query
+  // when EXT_disjoint_timer_query_webgl2 exists, CPU-wall fallback otherwise
+  // (see gl/debug/gpuTimer.mjs). Reported through the Showrunner patrol
+  // channel; the governor reads the rolling average from stageTimings and
+  // treats sustained GPU saturation like sustained low FPS.
+  let gpuTimer = null;
+  const ensureGpuTimer = () => {
+    if (!gpuTimer) gpuTimer = createGpuTimer(live.getGL());
+    return gpuTimer;
+  };
 
   let rafId = 0;
   let running = false;
@@ -262,37 +275,58 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
           : '';
       }
 
-      if (accumOn) {
-        if (!accumActive) {
-          accumObj = live.ensureAccum(payload.width, payload.height);
-          accumObj.begin(bgCss);
-          accumActive = true;
-        }
-        lastAccumOn = true;
-        if (accumFrozen) {
-          // FREEZE: hold the feedback image, skip render + step.
-          live.present(accumObj.texture());
+      // #103 Track A — time the GPU work itself: content render, ACCUM step,
+      // and present. Timer query when the extension exists; CPU-wall
+      // fallback (submission time) otherwise. Reported through the patrol
+      // channel; disjoint or still-pending queries skip this round.
+      const timer = ensureGpuTimer();
+      const cpuFallback = !timer.isHardware;
+      const cpuT0 = cpuFallback ? performance.now() : 0;
+      if (!cpuFallback) timer.begin('frame');
+      try {
+        if (accumOn) {
+          if (!accumActive) {
+            accumObj = live.ensureAccum(payload.width, payload.height);
+            accumObj.begin(bgCss);
+            accumActive = true;
+          }
+          lastAccumOn = true;
+          if (accumFrozen) {
+            // FREEZE: hold the feedback image, skip render + step.
+            live.present(accumObj.texture());
+          } else {
+            const target = live.renderFrame(payload, { transparent: true });
+            const bands = audioBands || { rms: 0, beatPulse: 0 };
+            // Silence is a true no-op: the envelope passes params through at 0.
+            const rp = applyAudioEnvelope(accumRecipeParams(accumParams), {
+              rms: audioOn ? bands.rms || 0 : 0,
+              flux: 0,
+              beatPulse: audioOn ? bands.beatPulse || 0 : 0,
+            });
+            accumObj.step(target.tex, rp);
+            live.present(accumObj.texture());
+          }
         } else {
-          const target = live.renderFrame(payload, { transparent: true });
-          const bands = audioBands || { rms: 0, beatPulse: 0 };
-          // Silence is a true no-op: the envelope passes params through at 0.
-          const rp = applyAudioEnvelope(accumRecipeParams(accumParams), {
-            rms: audioOn ? bands.rms || 0 : 0,
-            flux: 0,
-            beatPulse: audioOn ? bands.beatPulse || 0 : 0,
-          });
-          accumObj.step(target.tex, rp);
-          live.present(accumObj.texture());
+          if (lastAccumOn) {
+            live.dropAccum();
+            accumObj = null;
+            accumActive = false;
+          }
+          lastAccumOn = false;
+          const target = live.renderFrame(payload, { transparent });
+          live.present(target);
         }
-      } else {
-        if (lastAccumOn) {
-          live.dropAccum();
-          accumObj = null;
-          accumActive = false;
+      } finally {
+        if (cpuFallback) {
+          reportStage('gpuFrame', performance.now() - cpuT0);
+        } else {
+          timer.end('frame');
+          const r = timer.poll();
+          if (r.done && !r.disjoint) {
+            const ms = r.timings.get('frame');
+            if (typeof ms === 'number') reportStage('gpuFrame', ms);
+          }
         }
-        lastAccumOn = false;
-        const target = live.renderFrame(payload, { transparent });
-        live.present(target);
       }
       frameCount++;
     } catch (e) {

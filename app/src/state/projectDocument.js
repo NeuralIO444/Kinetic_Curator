@@ -5,6 +5,11 @@ import { sanitizeOverlay } from '../assets/overlay.js';
 // keep working; the implementations live in the cycle-free module.
 import { normalizeSnapshots, normalizeLayers } from './projectNormalize.js';
 export { normalizeSnapshots, normalizeLayers };
+import {
+  sanitizeEnabledAssets,
+  sanitizeAssetWeightOverrides,
+  sanitizeQuality,
+} from './projectNormalize.js';
 
 export const PROJECT_VERSION = 1;
 export const AUTOSAVE_KEY = 'kc:project:v1';
@@ -50,6 +55,7 @@ export function parseProject(raw) {
     let seed = raw.seed;
     if (typeof seed === 'string') seed = parseInt(seed, 16);
     if (!Number.isFinite(seed)) seed = 0;
+    const customAssets = sanitizeOverlay(raw.customAssets);
     return {
       ok: true,
       doc: {
@@ -57,11 +63,13 @@ export function parseProject(raw) {
         seed: seed >>> 0,
         paletteId: raw.paletteId || raw.palette || 'praystation',
         layoutParams: normalizeLayoutParams(raw.layoutParams || raw.layout),
-        enabledAssets: raw.enabledAssets || null,
-        quality: raw.quality || 'balanced',
-        assetWeightOverrides: raw.assetWeightOverrides || null,
+        // #103 Track B — validate asset maps against the registry; a hostile
+        // 100k-key map collapses to the known set instead of bloating the store.
+        enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
+        quality: sanitizeQuality(raw.quality),
+        assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides),
         paletteOverrides: raw.paletteOverrides || null,
-        customAssets: sanitizeOverlay(raw.customAssets),
+        customAssets,
         ...normalizeLayers(raw.layers, raw.activeLayerId),
         layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
       },
@@ -78,6 +86,7 @@ export function parseProject(raw) {
     return { ok: false, error: 'Invalid seed' };
   }
 
+  const customAssets = sanitizeOverlay(raw.customAssets);
   return {
     ok: true,
     doc: {
@@ -85,18 +94,16 @@ export function parseProject(raw) {
       seed: seed >>> 0,
       paletteId: typeof raw.paletteId === 'string' ? raw.paletteId : 'praystation',
       layoutParams: normalizeLayoutParams(raw.layoutParams),
-      enabledAssets:
-        raw.enabledAssets && typeof raw.enabledAssets === 'object' ? { ...raw.enabledAssets } : null,
-      quality: typeof raw.quality === 'string' ? raw.quality : 'balanced',
-      assetWeightOverrides:
-        raw.assetWeightOverrides && typeof raw.assetWeightOverrides === 'object'
-          ? { ...raw.assetWeightOverrides }
-          : null,
+      // #103 Track B — validate asset maps against the registry; a hostile
+      // 100k-key map collapses to the known set instead of bloating the store.
+      enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
+      quality: sanitizeQuality(raw.quality),
+      assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides),
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
           ? raw.paletteOverrides
           : null,
-      customAssets: sanitizeOverlay(raw.customAssets),
+      customAssets,
       ...normalizeLayers(raw.layers, raw.activeLayerId),
       layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
     },

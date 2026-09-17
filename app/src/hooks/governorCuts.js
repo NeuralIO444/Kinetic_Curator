@@ -128,3 +128,25 @@ export function shedSummary(s) {
   if (s.watchdogTripped) out.push('watchdog');
   return out.length ? out : null;
 }
+
+/**
+ * #103 Track A — GPU-implied frame rate from the live loop's per-tick GPU
+ * timing (stageTimings.gpuFrame, rolling-average ms reported by the live
+ * loop via reportStage). Under vsync the rAF cadence lies: the GPU can be
+ * saturated (fill-rate, ACCUM ping-pong) while FPS reads 60. Absent timing
+ * (no live loop, no samples yet) this returns Infinity so the governor
+ * reduces exactly to the rAF rate.
+ */
+export function gpuImpliedFps(stageTimings) {
+  const ms = Number(stageTimings?.gpuFrame) || 0;
+  return ms > 0 ? 1000 / ms : Infinity;
+}
+
+/**
+ * The rate the governor's sustain windows run against: the worse of the
+ * rAF rate and the GPU-implied rate. A GPU-bound instrument (rAF 60, GPU
+ * frame 40ms → 25fps) trips the same sustain windows as sustained low FPS.
+ */
+export function effectiveGovernorFps(fps, stageTimings) {
+  return Math.min(fps, gpuImpliedFps(stageTimings));
+}
