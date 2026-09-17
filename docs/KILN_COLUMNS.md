@@ -36,10 +36,13 @@ round-trips through project JSON.
 - **assets:** `organic` category only; the reference project enables the 12
   round ones (5 blobs, 2 blob outlines/dotted, 2 drops, kidney, lobe).
   Petals/leaves/pods off.
-- **params:** `count: 340, scale: [0.8, 2.0], rotate: [-14, 14],
+- **params:** `count: 520, scale: [0.8, 2.0], rotate: [-14, 14],
   alpha: [45, 85], zTiers: 4, jitter: 26, density: 110, bleed: false,
   recolor: true, mirror: false, overlap: true, blendMode: 'soft-light',
   lifeDrift: 0.04, displacement: 0, behave: 'cruise'`
+  (`count` is the "steps" control — more shapes per rail = finer,
+  more continuous columns. Quality caps apply: 520 honored at high,
+  420 at balanced.)
 - **Evolve/audio:** off — `lifeDrift: 0.04` (near-still), no audio params set.
 
 ## The last 10%: layer blend

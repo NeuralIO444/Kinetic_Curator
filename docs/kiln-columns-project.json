@@ -4,7 +4,7 @@
   "paletteId": "kiln-columns",
   "layoutParams": {
     "mode": "rails",
-    "count": 340,
+    "count": 520,
     "scale": [
       0.8,
       2
