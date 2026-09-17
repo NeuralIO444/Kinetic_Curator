@@ -22,7 +22,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
-import { buildSceneContract } from './sceneContract.js';
+import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
 import { resolveLayers } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderAccumViaGL, closeGlDriver } from './parity/glDriver.mjs';
@@ -172,6 +172,7 @@ async function main(argv) {
   // Background: explicit flag wins, else the project's palette bg (same rule
   // as the parity candidate), same as studio.py's old accum path.
   const firstLayers = resolveLayers(doc, { caps, ramp, motion, progress: 0 });
+  warnUnsupportedMaterials(firstLayers);
   const paletteBg = firstLayers[0]?.palette?.bg || '#000000';
   const background = /^#[0-9a-fA-F]{6}$/.test(args.background || '') ? args.background : paletteBg;
 
