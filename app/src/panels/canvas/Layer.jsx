@@ -4,7 +4,8 @@ import { shouldRenderGloss } from '../../data/quality.js';
 import { isLiveSwarmMode } from '../../data/layout-modes.js';
 import { useSwarmTick } from '../../hooks/useSwarmTick.js';
 import { useCanvasItems } from '../../hooks/useCanvasItems.js';
-import { DEMO_LADDER_ID, ladderFrame } from '../../data/bodies/demoLadder.js';
+import { DEMO_LADDER_ID, ladderFrame, ladderSymbolId } from '../../data/bodies/demoLadder.js';
+import { MOTH_U_GRADIENT_ID } from '../../components/AssetSpriteSheet.jsx';
 import { materialHref } from '../../engine/materials.js';
 
 const ASSET_SIZE = 100;
@@ -47,10 +48,17 @@ export function Layer({
         if (!item.assetId && item.role !== 'wing') return null;
         const sx = item._mirrored ? -item.scale : item.scale;
         const reactKey = item.key || `${item.assetId}-${i}${item._mirrored ? '-m' : ''}`;
-        const href = item.role === 'wing'
-          ? `#kc-blend-${DEMO_LADDER_ID}-${ladderFrame(item.u)}`
+        const isWing = item.role === 'wing';
+        const ladderId = isWing ? (item.ladderId || DEMO_LADDER_ID) : null;
+        const href = isWing
+          ? `#${ladderSymbolId(ladderId, ladderFrame(item.u, ladderId))}`
           : `#kc-asset-${item.assetId}`;
-        const ink = item.role === 'wing' && mat ? `url(${mat})` : item.color;
+        const ink = isWing && mat ? `url(${mat})` : item.color;
+        // #109B — the SAME scalar u that picks the geometry frame also drives
+        // the paint: a second <use> of the identical baked frame, tinted with
+        // the demo sheet's u-gradient, at opacity = u. Mix of --ink/--accent
+        // follows u; compounds never interpolate live.
+        const u = Number.isFinite(item.u) ? Math.min(1, Math.max(0, item.u)) : 0;
         return (
           <g
             key={reactKey}
@@ -67,6 +75,16 @@ export function Layer({
             }}
           >
             <use href={href} width={ASSET_SIZE} height={ASSET_SIZE} />
+            {isWing && (
+              <use
+                href={href}
+                width={ASSET_SIZE}
+                height={ASSET_SIZE}
+                opacity={u}
+                style={{ ['--ink']: `url(#${MOTH_U_GRADIENT_ID})` }}
+                pointerEvents="none"
+              />
+            )}
             {showGloss && (
               <use
                 href={href}

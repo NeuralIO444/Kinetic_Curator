@@ -28,6 +28,7 @@
 
 import { createNoise } from './noise.js';
 import { CH, rngForIndex } from './kernel/rng.js';
+import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { isOrganismMode } from '../data/layout-modes.js';
 import { resolveBehave, orbitForce } from './organisms/behave.js';
 
@@ -450,15 +451,19 @@ export class ParticleSystem {
         const pyh = Math.sin(heading);
         const amp = flap * Math.sin(this.phase[i] * TAU + this.seedOffset[i]);
         const reach = 16 + Math.abs(amp) * 20;
+        // #109A — one blend ladder per moth, round-robin over the shipped set.
+        const ladderId = MOTH_LADDERS[i % MOTH_LADDERS.length].id;
         items.push({
           x: px - pyh * reach, y: py + pxh * reach,
           scale: pscale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
+          ladderId,
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
           scale: pscale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
+          ladderId,
         });
       }
     }
