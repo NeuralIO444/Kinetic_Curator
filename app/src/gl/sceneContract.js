@@ -22,7 +22,7 @@
  */
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
-import { sanitizeAccumOptics } from './accum.mjs';
+import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism } from './accum.mjs';
 
 export const GL_CONTRACT_VERSION = 1;
 
@@ -143,7 +143,7 @@ function buildFxWraps(resolvedLayers, caps) {
  * @param {object} args.doc — project document (seed, quality, layers…)
  * @param {Array} args.resolvedLayers — resolveLayers(doc, {caps}) output
  * @param {object} [args.caps] — render caps (recorded for provenance)
- * @param {object|null} [args.accum] — { enabled, fade, optics, background } or null
+ * @param {object|null} [args.accum] — { enabled, fade, optics, tunnel, prism, background } or null
  * @returns versioned, JSON-serializable scene object
  */
 const warnedMaterials = new Set();
@@ -257,6 +257,8 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
           enabled: true,
           fade: Math.min(0.99, Math.max(0, Number(accum.fade ?? 0.88))),
           optics: sanitizeAccumOptics(accum.optics ?? 0), // #190: bloom/halation/blur-over-time amount
+          tunnel: sanitizeAccumTunnel(accum.tunnel ?? 0), // Phase A: feedback zoom/spin amount
+          prism: sanitizeAccumPrism(accum.prism ?? 0), // Phase A: chromatic drift amount
           background: hexColor(accum.background, '#000000'),
         }
       : null,

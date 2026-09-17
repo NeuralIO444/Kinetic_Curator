@@ -64,6 +64,51 @@ export function ToggleRow({ layoutParams }) {
           />
         </label>
       )}
+      {layoutParams.accumulation && (
+        <div className="tg" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+          <span title="Feedback transforms on the trail buffer — zoom + spin light-tunnels, RGB channel drift">FEEDBACK</span>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            title="TUNNEL: per-frame zoom + spin of the trail buffer — motion spirals into light-tunnels (0 = off)"
+          >
+            TUNNEL
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layoutParams.accumulationTunnel ?? 0}
+              onChange={(e) =>
+                emit(Events.LAYOUT_PARAM, {
+                  key: 'accumulationTunnel',
+                  value: parseFloat(e.target.value),
+                })
+              }
+              style={{ width: 64 }}
+            />
+          </label>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            title="PRISM: trails split into rainbow fringes that separate over time (0 = off)"
+          >
+            PRISM
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layoutParams.accumulationPrism ?? 0}
+              onChange={(e) =>
+                emit(Events.LAYOUT_PARAM, {
+                  key: 'accumulationPrism',
+                  value: parseFloat(e.target.value),
+                })
+              }
+              style={{ width: 64 }}
+            />
+          </label>
+        </div>
+      )}
       <select
         value={layoutParams.blendMode}
         onChange={e => emit(Events.LAYOUT_PARAM, { key: 'blendMode', value: e.target.value })}

@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { CANVAS_W, CANVAS_H } from './useCanvasViewport.js';
+import { emit, Events } from '../composition/eventBus.js';
 
 function serializeSvg(svgNode) {
   const clone = svgNode.cloneNode(true);
@@ -46,10 +47,23 @@ export function useAccumulationBuffer({
   const rafRef = useRef(null);
   const fadeRef = useRef(fade);
   const bgRef = useRef(background);
+  // Phase A gesture: FREEZE holds the buffer mid-air — the tick skips both
+  // fade and new-frame composite, so the display keeps its last image.
+  const frozenRef = useRef(false);
+  const swellRef = useRef(null); // active swell interval id, if any
   useEffect(() => {
     fadeRef.current = fade;
     bgRef.current = background;
   });
+  // Toggling ACCUM off/on rebuilds the performance context: unfreeze, and
+  // stop any swell, so a stale gesture can't hold the new buffer hostage.
+  useEffect(() => {
+    frozenRef.current = false;
+    if (swellRef.current) {
+      clearInterval(swellRef.current);
+      swellRef.current = null;
+    }
+  }, [enabled]);
 
   const ensureBuffer = useCallback(() => {
     if (!bufRef.current) {
@@ -79,6 +93,33 @@ export function useAccumulationBuffer({
     }
   }, [ensureBuffer, accumRef]);
 
+  // Phase A gesture: SWELL breathes the trail length — a ~2.4s cosine
+  // envelope on the FADE param (current -> peak -> back). It drives the
+  // same LAYOUT_PARAM the FADE slider writes, so the slider visibly
+  // breathes and no state forks.
+  const swell = useCallback(() => {
+    if (swellRef.current) return; // one swell at a time
+    const base = Math.max(0, Math.min(0.98, Number(fadeRef.current) || 0.88));
+    const peak = Math.min(0.98, base + 0.25);
+    const durMs = 2400;
+    const t0 = performance.now();
+    swellRef.current = setInterval(() => {
+      const t = Math.min(1, (performance.now() - t0) / durMs);
+      const env = 0.5 - 0.5 * Math.cos(t * Math.PI * 2); // 0 -> 1 -> 0
+      const value = Math.round((base + (peak - base) * env) * 100) / 100;
+      emit(Events.LAYOUT_PARAM, { key: 'accumulationFade', value });
+      if (t >= 1) {
+        clearInterval(swellRef.current);
+        swellRef.current = null;
+        emit(Events.LAYOUT_PARAM, { key: 'accumulationFade', value: base });
+      }
+    }, 33);
+  }, []);
+
+  const setFrozen = useCallback((frozen) => {
+    frozenRef.current = !!frozen;
+  }, []);
+
   useEffect(() => {
     if (enabled) clear();
   }, [enabled]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -95,7 +136,7 @@ export function useAccumulationBuffer({
 
     const tick = (now) => {
       rafRef.current = requestAnimationFrame(tick);
-      if (!running) return;
+      if (!running || frozenRef.current) return; // FREEZE: buffer holds mid-air
 
       const svg = svgRef?.current;
       const disp = accumRef?.current;
@@ -134,7 +175,7 @@ export function useAccumulationBuffer({
     };
   }, [enabled, running, svgRef, accumRef, ensureBuffer]);
 
-  return { clear, bufferCanvas: bufRef };
+  return { clear, setFrozen, swell, bufferCanvas: bufRef };
 }
 
 export function exportAccumulationCanvas(canvas, resolution = 1, seedStr = '', background = null) {

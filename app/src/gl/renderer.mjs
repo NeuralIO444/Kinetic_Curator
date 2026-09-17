@@ -518,7 +518,7 @@ export function createRenderer(canvas) {
    * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb' }
    * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
    */
-  function renderAccumSequence(frames, { fade = 0.88, optics = 0, background = '#000000' } = {}) {
+  function renderAccumSequence(frames, { fade = 0.88, optics = 0, tunnel = 0, prism = 0, background = '#000000' } = {}) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
     const { width: w, height: h, contract } = frames[0];
     if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
@@ -530,7 +530,7 @@ export function createRenderer(canvas) {
     const accum = createAccum(gl, bridge, { width: w, height: h });
     try {
       accum.begin(background);
-      const params = accumRecipeParams({ fade, optics });
+      const params = accumRecipeParams({ fade, optics, tunnel, prism });
       for (const payload of frames) {
         if (payload.contract.version !== 1) {
           throw new Error(`[gl] unsupported contract version ${payload.contract.version}`);

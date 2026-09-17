@@ -36,6 +36,7 @@ const BROWSER_MISSING_RE = /Executable doesn't exist/;
 function parseArgs(argv) {
   const out = {
     project: null, out: null, steps: 24, fps: 30, fade: 0.88, optics: 0,
+    tunnel: 0, prism: 0,
     res: '1', seed: null, uncapped: false, background: null, ramps: [], motion: 'auto',
   };
   const rest = [];
@@ -51,6 +52,8 @@ function parseArgs(argv) {
     else if (a === '--fps') out.fps = Math.max(1, Math.round(num('--fps')));
     else if (a === '--fade') out.fade = num('--fade');
     else if (a === '--optics') out.optics = num('--optics');
+    else if (a === '--tunnel') out.tunnel = num('--tunnel');
+    else if (a === '--prism') out.prism = num('--prism');
     else if (a === '--res') out.res = argv[++i];
     else if (a === '--seed') out.seed = num('--seed') | 0;
     else if (a === '--uncapped') out.uncapped = true;
@@ -136,7 +139,7 @@ async function main(argv) {
       const resolvedLayers = resolveLayers(doc, { caps, ramp, motion, progress });
       frames.push(buildSceneContract({
         doc, resolvedLayers, caps,
-        accum: { enabled: true, fade: args.fade, optics: args.optics, background },
+        accum: { enabled: true, fade: args.fade, optics: args.optics, tunnel: args.tunnel, prism: args.prism, background },
       }));
       if ((i + 1) % 5 === 0 || i + 1 === args.steps) {
         console.log(`  accum frame ${i + 1}/${args.steps}`);
@@ -144,6 +147,7 @@ async function main(argv) {
     }
     const { pixels, width, height } = await renderAccumViaGL(frames, {
       width: w, height: h, bg: background, fade: args.fade, optics: args.optics,
+      tunnel: args.tunnel, prism: args.prism,
     });
     await writePngFile(args.out, pixels, width, height);
     console.log(args.out);

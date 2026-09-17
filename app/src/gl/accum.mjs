@@ -12,7 +12,11 @@
  *
  * Recipe — per frame, on premultiplied 16F textures, opaque buffer:
  *
- *   1. Fade/decay:  accum.rgb *= keep            (keep = fade, 0..0.99)
+ *   1. Fade/decay + feedback: accum.rgb *= keep (keep = fade, 0..0.99),
+ *      sampled through the Phase A feedback transform — per-frame zoom +
+ *      spin (TUNNEL, light-tunnels) and radial RGB channel separation
+ *      (PRISM). All amounts 0/off by default: the transform is skipped and
+ *      the sample is exactly the old one (the optics no-op precedent).
  *   2. Blur-over-time (#169): the incoming frame is blurred with a small
  *      separable gaussian (sigma = 5px * optics) BEFORE compositing, so old
  *      marks go soft instead of merely transparent.
@@ -53,11 +57,13 @@ const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
 
 /**
  * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
- * @param {object} p { fade: 0..0.99, optics: 0..1 }
+ * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1 }
  */
-export function accumRecipeParams({ fade = 0.88, optics = 0 } = {}) {
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0 } = {}) {
   const keep = Math.min(0.99, Math.max(0, Number(fade)));
   const o = clamp01(optics);
+  const t = clamp01(tunnel);
+  const pr = clamp01(prism);
   return {
     keep,
     optics: o,
@@ -67,11 +73,29 @@ export function accumRecipeParams({ fade = 0.88, optics = 0 } = {}) {
     halationAmount: 0.45 * o,
     halationSigma: 22.0 * (0.5 + o), // wider than bloom, per #169
     halationTint: [1.0, 0.6, 0.35], // red/warm bias, per #169
+    // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
+    // each is derived so that amount 0 is exactly the identity transform.
+    // Ranges are tuned for stills (~24 frames): tunnel = 1 is a strong
+    // spiral (27% zoom + 14 deg over the sequence); prism = 1 is a bold
+    // rainbow at long fades (fringe width ~ p/(1-keep)), tasteful below ~0.4.
+    tunnelZoom: 1 + 0.01 * t, // per-frame magnification; >1 recedes content toward center
+    tunnelSpin: 0.01 * t, // radians per frame
+    prismUv: 0.001 * pr, // radial UV offset per channel at prism = 1 (constant across canvas)
   };
 }
 
 /** Sanitize the optics amount for the scene contract (additive field). */
 export function sanitizeAccumOptics(v) {
+  return clamp01(v);
+}
+
+/** Sanitize the tunnel amount for the scene contract (additive field). */
+export function sanitizeAccumTunnel(v) {
+  return clamp01(v);
+}
+
+/** Sanitize the prism amount for the scene contract (additive field). */
+export function sanitizeAccumPrism(v) {
   return clamp01(v);
 }
 
@@ -81,10 +105,35 @@ const FADE_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
 uniform float u_keep;
+uniform float u_tunnelZoom;  // 1.0 = off
+uniform float u_tunnelSpin;  // 0.0 = off (radians per frame)
+uniform float u_prism;       // 0.0 = off (radial UV offset per channel)
 in vec2 v_cuv;
 out vec4 o;
 void main() {
-  vec4 c = texture(u_src, v_cuv);
+  // Phase A feedback: the transform branch is skipped unless a feedback
+  // amount is live, so tunnel = 0 / prism = 0 is exactly the old sample
+  // (no float drift through the affine math — the optics no-op precedent).
+  vec2 tuv = v_cuv;
+  if (u_tunnelZoom != 1.0 || u_tunnelSpin != 0.0) {
+    vec2 off = v_cuv - vec2(0.5);
+    float ca = cos(u_tunnelSpin);
+    float sa = sin(u_tunnelSpin);
+    vec2 rot = vec2(ca * off.x - sa * off.y, sa * off.x + ca * off.y);
+    tuv = vec2(0.5) + rot * u_tunnelZoom;
+  }
+  vec4 c;
+  if (u_prism > 0.0) {
+    vec2 poff = tuv - vec2(0.5);
+    vec2 pr = (poff / max(length(poff), 1e-4)) * u_prism;
+    c = vec4(
+      texture(u_src, tuv + pr).r,
+      texture(u_src, tuv).g,
+      texture(u_src, tuv - pr).b,
+      texture(u_src, tuv).a);
+  } else {
+    c = texture(u_src, tuv);
+  }
   o = vec4(c.rgb * u_keep, c.a);
 }`;
 
@@ -288,13 +337,54 @@ function bilinearUpsample(src, bw, bh, w, h) {
 export function mirrorAccumStep({ accum, frame, w, h, params }) {
   const p = params;
   const n = w * h * 4;
-  // 1. fade
+  // 1. fade (+ Phase A feedback transform). The feedback textures are
+  // NEAREST + CLAMP_TO_EDGE, so the mirror samples the nearest texel:
+  // sx = clamp(floor(u * w), 0, w - 1). At tunnel/prism = 0 the transform
+  // is skipped and this is the exact old path.
   const faded = new Float64Array(n);
-  for (let i = 0; i < n; i += 4) {
-    faded[i] = accum[i] * p.keep;
-    faded[i + 1] = accum[i + 1] * p.keep;
-    faded[i + 2] = accum[i + 2] * p.keep;
-    faded[i + 3] = accum[i + 3];
+  const feedback = p.tunnelZoom !== 1 || p.tunnelSpin !== 0 || p.prismUv !== 0;
+  if (!feedback) {
+    for (let i = 0; i < n; i += 4) {
+      faded[i] = accum[i] * p.keep;
+      faded[i + 1] = accum[i + 1] * p.keep;
+      faded[i + 2] = accum[i + 2] * p.keep;
+      faded[i + 3] = accum[i + 3];
+    }
+  } else {
+    const nearest = (u, v, c) => {
+      const sx = Math.min(w - 1, Math.max(0, Math.floor(u * w)));
+      const sy = Math.min(h - 1, Math.max(0, Math.floor(v * h)));
+      return accum[(sy * w + sx) * 4 + c];
+    };
+    const ca = Math.cos(p.tunnelSpin), sa = Math.sin(p.tunnelSpin);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const u = (x + 0.5) / w, v = (y + 0.5) / h;
+        const ox = u - 0.5, oy = v - 0.5;
+        const tu = 0.5 + (ca * ox - sa * oy) * p.tunnelZoom;
+        const tv = 0.5 + (sa * ox + ca * oy) * p.tunnelZoom;
+        let r, g, b, a;
+        if (p.prismUv > 0) {
+          const pox = tu - 0.5, poy = tv - 0.5;
+          const len = Math.max(Math.hypot(pox, poy), 1e-4);
+          const prx = (pox / len) * p.prismUv, pry = (poy / len) * p.prismUv;
+          r = nearest(tu + prx, tv + pry, 0);
+          g = nearest(tu, tv, 1);
+          b = nearest(tu - prx, tv - pry, 2);
+          a = nearest(tu, tv, 3);
+        } else {
+          r = nearest(tu, tv, 0);
+          g = nearest(tu, tv, 1);
+          b = nearest(tu, tv, 2);
+          a = nearest(tu, tv, 3);
+        }
+        const o = (y * w + x) * 4;
+        faded[o] = r * p.keep;
+        faded[o + 1] = g * p.keep;
+        faded[o + 2] = b * p.keep;
+        faded[o + 3] = a;
+      }
+    }
   }
   // 2. blur-over-time on the incoming frame
   const fIn = gaussBlur(frame, w, h, p.frameBlurSigma);
@@ -351,7 +441,8 @@ export function createAccum(gl, bridge, { width, height }) {
       });
       const L = {};
       const U = (n) => gl.getUniformLocation(progs[name], n);
-      for (const u of ['u_src', 'u_dst', 'u_keep', 'u_texel', 'u_sigma', 'u_vertical',
+      for (const u of ['u_src', 'u_dst', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
+        'u_texel', 'u_sigma', 'u_vertical',
         'u_base', 'u_bloom', 'u_bloomSize', 'u_amount', 'u_tint']) {
         L[u] = U(u);
       }
@@ -455,11 +546,14 @@ export function createAccum(gl, bridge, { width, height }) {
      */
     step(frameTex, params) {
       const p = params;
-      // 1. fade
+      // 1. fade (+ Phase A feedback: tunnel zoom/spin, prism drift)
       let write = other();
       pass('fade', write, (u, bind) => {
         gl.uniform1i(u.u_src, bind(0, cur.tex));
         gl.uniform1f(u.u_keep, p.keep);
+        gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
+        gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
+        gl.uniform1f(u.u_prism, p.prismUv);
       });
       cur = write;
       // 2. blur-over-time on the incoming frame

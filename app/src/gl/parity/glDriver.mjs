@@ -232,10 +232,10 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
  * the page. One atlas is baked from the union of asset combos across frames.
  *
  * @param {Array<object>} frameContracts scene contracts v1, one per frame
- * @param {object} opts { width, height, bg, fade, optics }
+ * @param {object} opts { width, height, bg, fade, optics, tunnel, prism }
  * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
  */
-export async function renderAccumViaGL(frameContracts, { width = 400, height = 280, bg = '#0a0a0a', fade = 0.88, optics = 0 } = {}) {
+export async function renderAccumViaGL(frameContracts, { width = 400, height = 280, bg = '#0a0a0a', fade = 0.88, optics = 0, tunnel = 0, prism = 0 } = {}) {
   if (!frameContracts.length) throw new Error('[gl] renderAccumViaGL: no frame contracts');
   const page = await ensurePage();
   const combos = [];
@@ -271,7 +271,7 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
     }
   }
   const payload = {
-    width, height, bg, fade, optics,
+    width, height, bg, fade, optics, tunnel, prism,
     cells,
     atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
     atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
