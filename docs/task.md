@@ -1,3 +1,5 @@
+> **Historical task board (0.8.0 cycle).** All items shipped. Kept for the record.
+
 # Task board
 
 ## 0.8.0 cycle — complete

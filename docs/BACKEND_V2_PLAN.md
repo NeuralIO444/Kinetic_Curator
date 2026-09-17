@@ -1,3 +1,5 @@
+> **Historical plan — the studio render farm shipped (2026-09-15) and its stills path moved to WebGL2 GPU readback (#191, 2026-09-17).** Planning record kept for reference; current behavior is in `studio/README.md`.
+
 # Backend v2 — Local compute tier (macOS / Apple Silicon)
 
 **Status:** Proposed

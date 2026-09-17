@@ -1,3 +1,5 @@
+> **Historical snapshot — assessed at v0.4.1.** The repo has moved far since (kernel v1, WebGL2 export engine, Showrunner). Kept for the record; see `README.md` for current state.
+
 # Kinetic Curator — Repository Review
 
 > **Version assessed:** v0.4.1 · `main` branch @ `0f6dff1`

@@ -8,14 +8,14 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 |-------|--------|
 | **Seed ≠ bit-identical still** | Quality caps change placement count and PRNG consumption. Use **project JSON** for reproducibility. |
 | **ACCUM live buffer size** | Live buffer is **1000×700**. In-app high-res export still upscales that snapshot. **True-res trails:** `studio.py render --accum --steps N --res 4`. |
-| **ACCUM vs BATCH** | Batch is per-seed SVG path; disabled while ACCUM is on (continuous time ≠ edition index). |
+| **ACCUM vs BATCH** | Batch walks seeds through the GPU stills path (`studio.py batch`); disabled while ACCUM is on (continuous time ≠ edition index). |
 | **Gloss LOD** | Second `<use>` skipped under PERF or when node count > 280. |
 | **Batch downloads** | Browser must allow multiple downloads; max **48** editions per run. |
 | **Audio / LFO / Evolve** | Live-only; not encoded in deterministic stills or project still fidelity. |
 | **Quality caps are per layer** | Each layer clamps against the quality preset independently, so N layers can draw N x `maxCount`. Deliberate: `usePerformanceGovernor` already steps quality down on FPS drop, and a shared budget would thin every layer as you add more. Decided in #93. |
 | **Evolve targets the active layer** | Evolve/morph act on whichever layer is selected, not the whole stack. |
 | **Life/breath is global** | Audio reactivity and the breath LFO are computed once for the canvas from the active layer's params, then applied to every layer. |
-| **FX filters excluded from determinism** | `feTurbulence` differs between browsers and resvg — the exact grain/displace/tear pattern varies subtly across renderers. Effect structure (kinds, order, params) is deterministic and round-trips exactly. See `docs/FX_LAYERS.md`. |
+| **FX filters excluded from determinism** | `feTurbulence` differs between browsers (live canvas) and the GPU noise differs again (finals) — the exact grain/displace/tear pattern varies subtly across renderers. Effect structure (kinds, order, params) is deterministic and round-trips exactly. See `docs/FX_LAYERS.md`. |
 | **FX filter region is the viewport** | Displacement pushing pixels outside the canvas is clipped. Unbounded filter regions are a silent frame-rate killer, so this is a clamp, not a tier. |
 
 ## Residual / watch
@@ -28,7 +28,7 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **Legacy folder stubs** | Empty or residual paths may remain on disk history; active app is **`app/`** only. |
 | **`app/public/particles.*`** | An untracked WASM particle experiment predating the current app, referenced nowhere. Now git-ignored so it can never reach a Pages deploy; left on disk rather than deleted. See #95. |
 | **Offline swarm needs a bake** | `studio/` replays swarm deterministically (#63). The live canvas keeps its RAF loop for pointer response, so the two agree only for the same seed and step count. |
-| **`plus-lighter` offline** | resvg has no `plus-lighter`; `studio/` falls back to `screen`, which is not additive. See #96. |
+| **`plus-lighter` in finals** | The GL backend maps `plus-lighter` → `screen` and records the substitution in the sidecar (#96). The old resvg path (which couldn't do it at all) is retired. |
 
 ## Fixed in 0.8.0 (reference)
 

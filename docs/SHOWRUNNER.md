@@ -15,17 +15,19 @@ Order is the contract. One step per sustain (1.6s) + cooldown (8s) cycle:
 
 | # | Cut | What it does | Recovery |
 |---|-----|--------------|----------|
-| 1 | FX simplify | Turbulence octaves → 1, grain off | Auto |
-| 2 | FX bypass | Keep first visible FX layer only | Auto |
-| 3 | Quality step | HIGH → BALANCED → PERF | Auto |
-| 4 | Mirror/gloss/ACCUM shed | Existing `perfTier1` (FPS < 16, 2s) | Auto |
-| 5 | Asset thinning | Drop highest-`costScore` assets first (25%) | Auto |
-| 5b | Count clamp | Existing render-only `perfClampOverride` | Auto |
+| 1 | Resolution scaling | `renderScale` 1 → 0.75 → 0.5 → 0.33 | Auto |
+| 2 | Quality step | HIGH → BALANCED → PERF | Auto |
+| 3 | Mirror/gloss/ACCUM shed | Existing `perfTier1` (FPS < 16, 2s) | Auto |
+| 4 | Asset thinning | Drop highest-`costScore` assets first (25%) | Auto |
+| 5 | Count clamp | Existing render-only `perfClampOverride` | Auto |
 | 6 | Freeze motion | `slowRender`: Evolve/LFO/ACCUM/swarm paused | Auto |
 | 7 | Hard stop | Existing watchdog trip — manual resume | Manual |
 
-Cuts 1–2 are **live since #180**: FX layers (`type: 'fx'`) exist and the
-governor spends ladder steps on them — simplify, then bypass.
+Pixels drop before anything visible is cut. (#192 / WebGL Phase 6 retired the
+old FX-simplify / FX-bypass cuts 1–2: on the GPU, FX compositing is one extra
+FBO pair + one filter pass per wrap — 10–50x headroom — and culling FX caused
+the **silent-cull trap**: an FX layer shown in the UI while its wrap was
+dropped. Contract: `src/hooks/governorCuts.js`, pure and unit-tested.)
 
 ## Budgets (§7)
 
@@ -35,10 +37,17 @@ Each quality tier carries per-subsystem ceilings in `data/quality.js`:
 |---|---:|---:|---:|
 | Placements | 180 | 420 | 800 |
 | Particles | 100 | 200 | 350 |
-| Active FX layers | 1 | 2 | 3 |
-| Filter primitives / FX layer | 4 | 6 | 8 |
+| Active FX layers | ∞ | ∞ | ∞ |
+| Filter primitives / FX layer | warning only | warning only | warning only |
 | Assets / layer | 24 | 48 | 96 |
 | Turbulence octaves | 1 | 2 | 3 |
+
+`maxFxLayers` is retired as a budget (#192) — every tier carries `Infinity`;
+FX layers are never culled in normal operation. `maxFilterPrimitives`
+**warns** once per session instead of dropping: primitive count correlates
+weakly with real GPU cost (a 7-prim channel split is cheaper than one big
+turbulence+displacement at 4K), so the binding degradation is the cut ladder
+above, not prim counting.
 
 Filter regions clamp to the viewport (`MAX_FILTER_REGION = 1.0`) — a clamp,
 not a tier; it applies at every quality level.

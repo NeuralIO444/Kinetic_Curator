@@ -52,13 +52,15 @@ Pure modules under `engine/kernel/` (no React). Plan: [KERNEL_V1_PLAN.md](KERNEL
 
 ## Rendering pipeline
 
-1. **`buildPlacements`** (`engine/buildPlacements.js`) — pure: caps → `computePlacements` → weighted assets → color → mirror. Emits stable `item.key`. Shared by live and final paths.
-2. Live path: `useCanvasItems` wraps `buildPlacements` with audio/life scale & alpha.
-3. SVG `<use>` of **enabled-only** symbol sprite sheet; optional gloss second pass (LOD: off under PERF or node count > 280); blend modes via `mixBlendMode`.
-4. Optional spatial-hash swarm particles.
-5. **RENDER FINAL** — deliberate still; optional UNCAPPED densifies live state briefly then restores.
-6. **BATCH** — loop seeds, download PNG + JSON sidecar (`renderBatch`).
-7. **ACCUM** (`useAccumulationBuffer`) — offscreen buffer: fade previous pixels, composite live SVG; display canvas; export reads the buffer when ACCUM is on.
+Two renders, one kernel:
+
+1. **`buildPlacements`** (`engine/buildPlacements.js`) — pure: caps → `computePlacements` → weighted assets → color → mirror. Emits stable `item.key`. Shared by both paths.
+2. **Live path** — `useCanvasItems` wraps `buildPlacements` with audio/life scale & alpha; React/SVG canvas with `<use>` of the enabled-only symbol sprite sheet; optional gloss second pass (LOD: off under PERF or node count > 280); blend modes via `mixBlendMode`; optional spatial-hash swarm particles; optional 2D-canvas ACCUM buffer (`useAccumulationBuffer`).
+3. **Finals path (WebGL2)** — the same project resolves layers (`studio/render.mjs` `resolveLayers`) → `buildSceneContract` → `app/src/gl/renderer.mjs`: texture-atlas assets, GLSL FX chain per FX layer, layer compositing + mattes, GPU accumulation + bloom. `app/src/gl/exportStill.mjs` renders offscreen at 1×–8K and reads back a PNG + JSON sidecar — a pure function of (project, seed, size), never touching the live store.
+4. **Parity** — the retired SVG emitter stays in-repo as the dev-only reference; the headless harness (`app/src/gl/parity/`) diffs the GPU render against it on fixed seeds and fails `npm run selfcheck` above threshold. The production bundle's import graph is asserted to never reach the SVG emitter (`phase6.selfcheck.mjs`).
+5. **RENDER FINAL** (in-app) renders the live composition in place at preview quality. Denser finals come from the GPU export path (`studio.py render --uncapped`).
+6. **BATCH** — `studio.py batch` walks seeds through the GPU path (PNG + sidecar per edition). The in-app batch caps at 48 editions (browser multi-download).
+7. **ACCUM** — the live tab keeps the 2D-canvas feedback buffer; finals and `studio.py render --accum` run the shared GPU ACCUM recipe (`app/src/gl/accum.mjs` via `accumStill.mjs`). If headless Chromium is unavailable the export **refuses** rather than rendering a different recipe.
 
 ## Reproducibility contract
 
@@ -77,7 +79,9 @@ Golden CI fixture: fixed seed + layout → SHA-256 of canonical placement list (
 
 ## Export
 
-`useMediaExport` serializes SVG → Image → offscreen canvas for PNG / MediaRecorder WEBM. Accumulation path uses `exportAccumulationCanvas`. Project documents via OUTPUT → ↓ PROJECT.
+- **In-app:** `useMediaExport` serializes the live SVG canvas → Image → offscreen canvas for PNG (SNAP) / MediaRecorder WEBM. Project documents via OUTPUT → ↓ PROJECT.
+- **Finals:** GPU readback (`app/src/gl/exportStill.mjs`) — offscreen WebGL2 render at any resolution, PNG + JSON sidecar, off-store. No SVG serialization, no resvg, no live-state mutation.
+- **Farm:** `studio.py render | batch | video` — same GPU recipe at scale, per-frame PNGs → ffmpeg for video.
 
 ## CI
 
