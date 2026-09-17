@@ -76,3 +76,31 @@ towering columns, no re-composition. Regenerate with:
   for the same seed.
 - **Seed stability:** seeds 7 and 21 both read as stacked melting columns;
   the look is not seed-lucky.
+
+## Firing cycle (animation)
+
+The columns heat and cool without disturbing the still composition —
+geometry is 100% stable under the ramp, ~75% of sampled pixels shift color
+(LFO audit). The cycle is a `hueRotate` ramp played as a ping-pong:
+
+```bash
+node studio/render.mjs docs/kiln-columns-project.json --out kiln.svg \
+  --ramp hueRotate=0:45 --progress <0→1→0>
+```
+
+- `progress 0` — cold kiln (the dusty rose/teal still).
+- `progress 0.5` — warming: ember-orange columns against dusty blue.
+- `progress 1` — peak firing: full amber heat, navy glowing violet.
+
+`docs/kiln-columns-firing.png` is the cold → warming → peak strip.
+Loop progress 0→1→0 for the full fire-and-cool cycle; hold at 1 for the
+soak. No engine changes — existing ramp + progress machinery only.
+
+## Later (denoted, not built)
+
+- **Thrown Vessels** — same kiln palette, true lathe-style vase/pot
+  silhouettes instead of stacked blobs. Sibling preset family.
+- **Ceramic texture** — pipe the FX stack over the preset: `grain`
+  (SourceAlpha-masked, so no filter-region box) + a whisper of `displace`
+  for a fired-clay feel.
+- **Print run** — render at 4–6k px as a print-ready poster.
