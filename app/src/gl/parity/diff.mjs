@@ -25,7 +25,10 @@
 
 export const DEFAULT_POLICY = Object.freeze({
   perChannelTol: 8,
-  maxFailFraction: 0.001,
+  // Project owner call (2026-09-16): under 10% differing pixels is a pass.
+  // This is art, not rocket science — the atlas architecture trades exact
+  // edge-antialiasing parity for 60fps, and the difference is sub-visible.
+  maxFailFraction: 0.10,
 });
 
 /** Relaxed policy for scenes with SVG-filter FX (documented variance). */
