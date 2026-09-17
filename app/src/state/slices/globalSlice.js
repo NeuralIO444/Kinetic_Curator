@@ -191,8 +191,8 @@ export const createGlobalSlice = (set) => ({
     };
   }),
 
-  ingestAsset: (svg, hint) => set((state) => {
-    const result = ingestIntoOverlay(svg, state.customAssets, hint);
+  ingestAsset: (svg, hint, opts = {}) => set((state) => {
+    const result = ingestIntoOverlay(svg, state.customAssets, hint, opts);
     if (!result.ok) return { ingestError: result.error || 'ingest failed' };
     return {
       customAssets: result.overlay,

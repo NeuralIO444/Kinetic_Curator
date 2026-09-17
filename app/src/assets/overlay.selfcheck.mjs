@@ -102,5 +102,25 @@ assert.strictEqual(swapped.overlay.find((a) => a.id === 'user:beta').svg, '<path
 // Canon assets are read-only; hostile replacement markup is refused.
 assert.strictEqual(replaceOverlayAsset('org_blob_01', NEW_SVG, pair).ok, false);
 assert.strictEqual(replaceOverlayAsset('user:alpha', '<svg><script>x</script></svg>', pair).ok, false);
+// #114: studio save lands as a hand-source overlay record with the chosen family.
+const hand = ingestIntoOverlay(
+  '<svg viewBox="0 0 100 100"><rect x="28" y="28" width="44" height="44" fill="currentColor"/></svg>',
+  [],
+  'hex-motif',
+  { category: 'organic', source: 'hand' },
+);
+assert.ok(hand.ok);
+assert.ok(hand.asset.id.startsWith('user:'));
+assert.strictEqual(hand.asset.category, 'organic');
+assert.strictEqual(hand.asset.weight, 'medium');
+assert.strictEqual(hand.asset.source, 'hand');
+assert.ok(hand.asset.tags.includes('hand'));
+assert.ok(hand.asset.tags.includes('overlay'));
+
+// Defaults preserved when the pool ingests without studio opts (#113 path).
+const pooled = ingestIntoOverlay('<svg viewBox="0 0 100 100"><path d="M0 0L1 1"/></svg>', [], 'drop');
+assert.ok(pooled.ok);
+assert.strictEqual(pooled.asset.source, 'ingest');
+assert.strictEqual(pooled.asset.category, 'fragments');
 
 console.log('overlay.selfcheck: OK');
