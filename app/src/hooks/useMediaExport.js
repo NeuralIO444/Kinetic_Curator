@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { exportAccumulationCanvas } from './useAccumulationBuffer.js';
 
 // Serializes SVG to a data URI safely
 function getSvgDataUri(svgNode) {
@@ -125,6 +126,22 @@ export function exportSnapshot(svgNode, resolution = 1, seedStr = '', background
  * (`studio.py render --uncapped`, app/src/gl/exportStill.mjs), which renders
  * offscreen at FINAL_CAPS without ever touching the live store.
  */
+/**
+ * Prefer the accumulation buffer when ACCUM is on (#28) — its trail history
+ * lives in pixels on a separate canvas, not the SVG, so it needs its own
+ * capture path rather than exportSnapshot's SVG serialization. Was
+ * duplicated inline between addSnapshot and runRenderFinal in OutputPanel;
+ * this is the one copy both call through now.
+ */
+export async function captureStill({ accumOn, accumRef, svgNode, resolution, seedStr, background, onThumbnail }) {
+  if (accumOn && accumRef?.current) {
+    const result = await exportAccumulationCanvas(accumRef.current, resolution, seedStr, background);
+    onThumbnail?.(result.thumb);
+    return result;
+  }
+  return exportSnapshot(svgNode, resolution, seedStr, background, onThumbnail);
+}
+
 export async function renderFinal({
   svgNode,
   resolution = 1,
