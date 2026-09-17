@@ -1,12 +1,12 @@
-// Joshua Davis-inspired palettes
+// Ghost Station palettes — generative-art lineage
 // Each: { id, name, era, bg, ink, swatches: [colors] }
 // `ink` = catalog-page text color when this palette is active (high contrast vs bg)
 
 export const PALETTES = [
   {
     id: 'praystation',
-    name: 'PRAYSTATION',
-    era: 'Once-Upon-a-Forest era · 1999',
+    name: 'ORIGIN',
+    era: 'Origin era',
     bg: '#0a0a0a',
     ink: '#f0f0e8',
     swatches: ['#ff2d6f', '#00d9ff', '#ffd400', '#ff6b00', '#00ff88', '#b400ff', '#f0f0e8', '#0a0a0a'],

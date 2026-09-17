@@ -1,6 +1,6 @@
-# Davis clock
+# Ghost Station clock
 
-Homage to Joshua Davis’s *practice*: a generative composition-machine. Hand assets in (P02 / Illustrator), rule + chance out (seed, modes, evolve), keep the hit (F / favorites / farm). Not Praystation pixels, not HYPE, not VO1D/PULSAR skins.
+A generative composition-machine in the lineage of early-2000s generative art. Hand assets in (P02 / Illustrator), rule + chance out (seed, modes, evolve), keep the hit (F / favorites / farm). Not anyone's pixels — homage to the practice, not the pictures.
 
 ## Panel (P07)
 

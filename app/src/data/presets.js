@@ -3,13 +3,13 @@ export const PRESET_GROUPS = [
   { id: 'classic', label: 'Classic' },
   { id: 'rendah',  label: 'Rendah Mag' },
   { id: 'ca',      label: 'Cellular Automaton' },
-  { id: 'davis',   label: 'Davis-Lineage' },
+  { id: 'davis',   label: 'Ghost-Lineage' },
 ];
 
 export const COMPOSITION_PRESETS = [
   {
-    id: 'praystation', name: 'PRAYSTATION', group: 'classic',
-    desc: 'Davis dense glyph bloom — phi spiral, slow breath, no boids',
+    id: 'praystation', name: 'ORIGIN', group: 'classic',
+    desc: 'Dense glyph bloom — phi spiral, slow breath, no boids',
     categories: ['organic', 'radial', 'stamps'], paletteShift: 'band',
     params: {
       mode: 'fibonacci', count: 240, scale: [0.4, 1.5], rotate: [-55, 55], alpha: [40, 96],
