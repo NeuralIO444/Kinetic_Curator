@@ -925,3 +925,20 @@ export function createAccum(gl, bridge, { width, height }) {
     },
   };
 }
+
+/**
+ * Additive export for the MLX harness intelligence work (backend hardening 6/6).
+ * Maps accum pass name -> its fragment shader source, for static feature
+ * extraction (app/src/gl/mlx/). Nothing above changed; this only exposes what
+ * was already there.
+ */
+export const ACCUM_PASS_SOURCES = Object.freeze({
+  fade: FADE_FS,
+  feed: FEED_FS,
+  echo: ECHO_FS,
+  copy: COPY_FS,
+  over: OVER_FS,
+  down: DOWN_FS,
+  blur: BLUR_FS,
+  add: ADD_FS,
+});
