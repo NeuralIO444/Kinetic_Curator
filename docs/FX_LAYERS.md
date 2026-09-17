@@ -50,7 +50,7 @@ is the single source of truth for the compiler, the panel UI, and this doc.
 | `displace {scale, seed}` | `feTurbulence type="fractalNoise"` → `feDisplacementMap` | 2 |
 | `tear {bands, amount}` | stretched `feTurbulence` (high Y frequency, near-zero X) → `feComponentTransfer` flattens the Y channel to exactly 0.5 via `feFuncG` → `feDisplacementMap` with `scale = amount × 4` — strictly horizontal shear | 3 |
 | `grain {amount}` | `feTurbulence` → `feColorMatrix` (noise → alpha, RGB zeroed) → `feComposite operator="in"` against `SourceAlpha` (grain masked to artwork — no filter-region box on transparent areas) → `feComposite operator="over"` | 4 |
-| `blur {radius}` | `feGaussianBlur stdDeviation={radius}` on the source. One primitive — cheapest effect in the stack | 1 |
+| `blur {radius}` | `feGaussianBlur stdDeviation={radius}` on the source. One primitive — cheapest effect in the stack. WebGL honesty contract (#225): the shader's tap loop caps at 64, so wide radii subdivide into up to 4 (H,V) pass pairs at σ/√n — the full gaussian is always delivered, never a truncated kernel; past the 4-pair ceiling the radius clamps to the honest max for the render width (max 40 is fully delivered at the live loop's full render scale, width 1000) | 1 |
 | `scanlines {density, amount}` | anisotropic `feTurbulence` (near-zero X frequency, high Y) → `feColorMatrix` (noise → alpha, RGB zeroed) → `feComposite operator="in"` against `SourceAlpha` → `feComposite operator="over"` — CRT banding, alpha-masked like grain | 4 |
 | `posterize {levels}` | `feComponentTransfer` with `feFuncR/G/B type="discrete"` (alpha channel untouched) | 1 |
 | `invert` | `feComponentTransfer` with `feFuncR/G/B type="linear" slope="-1"` — full channel flip, no params | 1 |

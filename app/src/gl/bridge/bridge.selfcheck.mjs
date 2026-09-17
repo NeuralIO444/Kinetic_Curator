@@ -7,7 +7,7 @@
 // the Phase-1 renderer through the bridge after the #194 rewire.
 import assert from 'node:assert';
 import { createBridge, BRIDGE_VERSION } from './bridge.mjs';
-import { registerBuiltinEffects } from './builtinEffects.mjs';
+import { registerBuiltinEffects, clampBlurSigma, blurSubPassSigmas, honestBlurSigmaMax, BLUR_MAX_PASS_PAIRS, BLUR_PASS_SIGMA_MAX } from './builtinEffects.mjs';
 import { UniformAuditError } from '../debug/diagnostics.mjs';
 
 let n = 0;
@@ -174,6 +174,89 @@ ok('blur expands to two separable passes', () => {
   const sigmas = gl.withName('uniform4f').map((c) => c.args[1]);
   const expected = Math.max(0.5, 6 * (400 / 1000));
   assert.ok(sigmas.every((s) => Math.abs(s - expected) < 1e-9), 'sigma scaled by write width');
+});
+
+ok('bridge: passes may be a function of (stepParams, {width,height}) (#225)', () => {
+  const gl = makeMockGl({ nullUniforms: ['u_res'] });
+  const bridge = makeBridge(gl);
+  let seen = null;
+  bridge.defineEffect('dyn', {
+    program: 'effect',
+    passes: (p, ctx) => {
+      seen = { p, ctx };
+      return [{ mode: 0, params: () => [1, 0, 0, 0] }];
+    },
+  });
+  const L = bridge.layer('fx1');
+  bridge.runChain('fx1', L.t0, [{ kind: 'dyn', params: { radius: 6 } }]);
+  assert.deepEqual(seen.p, { radius: 6 }, 'step params forwarded');
+  assert.deepEqual(seen.ctx, { width: 400, height: 280 }, 'write-target size forwarded');
+  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
+  assert.deepEqual(modes, [0], 'returned passes run');
+});
+
+ok('bridge: defineEffect rejects a non-array non-function passes', () => {
+  const gl = makeMockGl();
+  const bridge = makeBridge(gl);
+  assert.throws(
+    () => bridge.defineEffect('bad', { program: 'effect', passes: 42 }),
+    /passes must be an array or a/,
+    'fail closed on a bad passes shape');
+});
+
+ok('honest blur: subdivision math — per-pass within 64 taps, convolves back (#225)', () => {
+  for (const width of [280, 400, 1000, 1920]) {
+    for (const radius of [0.5, 6, 11, 21.3, 22, 40]) {
+      const sigma = clampBlurSigma(radius * (width / 1000));
+      const subs = blurSubPassSigmas(sigma);
+      assert.ok(subs.length >= 1 && subs.length <= BLUR_MAX_PASS_PAIRS,
+        `1..${BLUR_MAX_PASS_PAIRS} pairs (radius=${radius}, width=${width}, got ${subs.length})`);
+      for (const s of subs) {
+        assert.ok(s <= BLUR_PASS_SIGMA_MAX + 1e-9, `per-pass sigma ${s} within the 64-tap loop`);
+      }
+      const back = subs.reduce((a, s) => a + s * s, 0);
+      assert.ok(Math.abs(back - sigma * sigma) < 1e-9,
+        `sub-passes convolve back to σ (radius=${radius}, width=${width})`);
+    }
+  }
+  assert.deepEqual(blurSubPassSigmas(0), [], 'sigma 0 → no passes');
+  assert.deepEqual(blurSubPassSigmas(-3), [], 'negative sigma → no passes');
+  assert.equal(clampBlurSigma(1e9), honestBlurSigmaMax(), 'huge sigma clamps to the ceiling');
+  assert.equal(clampBlurSigma(-5), 0, 'negative sigma clamps to 0');
+  assert.ok(Math.abs(honestBlurSigmaMax() - (64 / 3) * 2) < 1e-12, 'ceiling = 64/3 × √4');
+});
+
+ok('honest blur: radius 40 at width 1000 subdivides to 4 pass pairs (#225)', () => {
+  const gl = makeMockGl({ nullUniforms: ['u_res'] });
+  const bridge = makeBridge(gl, 1000, 700);
+  const L = bridge.layer('fx1');
+  bridge.runChain('fx1', L.t0, [{ kind: 'blur', params: { radius: 40 } }]);
+  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
+  assert.deepEqual(modes, [3, 4, 3, 4, 3, 4, 3, 4], 'four (H,V) pairs');
+  const sigmas = gl.withName('uniform4f').map((c) => c.args[1]);
+  assert.equal(sigmas.length, 1, 'identical sub-pass sigmas upload once (dirty-check)');
+  assert.ok(Math.abs(sigmas[0] - 20) < 1e-9, 'σ/√4 = 20 per pass, within the 64-tap loop');
+});
+
+ok('honest blur: wide widths clamp to the ceiling — true gaussian, never truncated (#225)', () => {
+  const gl = makeMockGl({ nullUniforms: ['u_res'] });
+  const bridge = makeBridge(gl, 1920, 1080);
+  const L = bridge.layer('fx1');
+  bridge.runChain('fx1', L.t0, [{ kind: 'blur', params: { radius: 40 } }]);
+  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
+  assert.deepEqual(modes, [3, 4, 3, 4, 3, 4, 3, 4], 'clamped to 4 pairs, not 13 truncated ones');
+  const sigmas = gl.withName('uniform4f').map((c) => c.args[1]);
+  assert.ok(Math.abs(sigmas[0] - (64 / 3)) < 1e-9, 'per-pass sigma at the 64-tap ceiling');
+});
+
+ok('honest blur: radius 0 is a true no-op — zero passes (#225)', () => {
+  const gl = makeMockGl({ nullUniforms: ['u_res'] });
+  const bridge = makeBridge(gl);
+  const L = bridge.layer('fx1');
+  const before = gl.count('drawArrays');
+  const out = bridge.runChain('fx1', L.t0, [{ kind: 'blur', params: { radius: 0 } }]);
+  assert.equal(gl.count('drawArrays'), before, 'no passes drawn');
+  assert.equal(out, L.t0, 'chain returns the input target untouched');
 });
 
 ok('u_texel and u_res reflect the write target size', () => {

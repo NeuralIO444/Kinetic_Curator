@@ -51,7 +51,7 @@ import { FULL_VS, EFFECT_FS } from '../shaders.mjs';
 import { TEMPLATE_VS, uniformDecls, uploadUniformsFor } from '../effects/template.mjs';
 import { injectCommon } from '../effects/chunks.mjs';
 import { buildProgramChecked, auditProgramChecked } from './diagnostics.mjs';
-import { UNIFORMS as BUILTIN_UNIFORMS } from '../bridge/builtinEffects.mjs';
+import { UNIFORMS as BUILTIN_UNIFORMS, clampBlurSigma, blurSubPassSigmas } from '../bridge/builtinEffects.mjs';
 import { ACCUM_PROGRAMS } from '../accum.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
 import { createSweepLab, runEffectSweep, locMap } from './sweep.mjs';
@@ -201,7 +201,7 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
   };
 }
 
-/** Builtin blur is two separable passes (H then V), like the bridge chain. */
+/** Builtin blur: (H,V) separable pass pairs, like the bridge chain (#225). */
 function builtinBlurDef() {
   const base = builtinEffectDef('blur', 3, (c, lab) => [
     c.params.sigmaDirect !== undefined ? c.params.sigmaDirect : (c.params.radius || 0) * (lab.w / 1000),
@@ -216,20 +216,31 @@ function builtinBlurDef() {
       program,
       locs,
       apply: (glA, locsA, c, lab, targets) => {
-        const sigma = c.params.sigmaDirect !== undefined
+        // Mirrors the bridge's honest-blur stack (#225): clamp to the
+        // ceiling, subdivide into (H,V) pairs at σ/√n so the harness tests
+        // the production path. A zero sigma is one identity pass so the
+        // noop case still lands byte-exact output in `out`.
+        const raw = c.params.sigmaDirect !== undefined
           ? c.params.sigmaDirect
           : (c.params.radius || 0) * (lab.w / 1000);
-        for (const [mode, target] of [[3, targets.tmp], [4, targets.out]]) {
-          lab.render(program, target, locsA, decls, {
-            u_src: target === targets.tmp ? lab.input.tex : targets.tmp.tex,
-            u_aux: lab.input.tex,
-            u_effect: mode,
-            u_p: [sigma, 0, 0, 0],
-            u_texel: [1 / target.w, 1 / target.h],
-            u_clip: [0, 0, 0, 0],
-            u_clipOn: 0,
-          });
-        }
+        const subs = blurSubPassSigmas(clampBlurSigma(raw));
+        let src = lab.input.tex;
+        const renderPair = (s) => {
+          for (const [mode, target] of [[3, targets.tmp], [4, targets.out]]) {
+            lab.render(program, target, locsA, decls, {
+              u_src: src,
+              u_aux: lab.input.tex,
+              u_effect: mode,
+              u_p: [s, 0, 0, 0],
+              u_texel: [1 / target.w, 1 / target.h],
+              u_clip: [0, 0, 0, 0],
+              u_clipOn: 0,
+            });
+            src = target.tex;
+          }
+        };
+        if (subs.length) for (const s of subs) renderPair(s);
+        else renderPair(0);
       },
       dispose: built.dispose,
     };
