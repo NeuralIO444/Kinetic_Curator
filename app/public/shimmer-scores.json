@@ -1,0 +1,1 @@
+{"_note":"STUB sample for the whisper shimmer prototype. Real scores come from the sidecar (studio/curator.py rank -> scores.json). Percentiles only — never raw model output.","evolve-target:all":41,"evolve-target:layout":88,"evolve-target:palette":96,"evolve-target:seed":62}

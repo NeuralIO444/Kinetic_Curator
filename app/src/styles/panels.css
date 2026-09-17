@@ -266,3 +266,49 @@
   100% { box-shadow: inset 0 0 0 0 transparent; border-color: var(--line-2); }
 }
 .beat-flash { animation: beatFlash 0.15s ease-out; }
+
+/* ─── Shimmer "whisper" prototype — EVOLVE target chips only ────────────────
+   The tuner rule: shimmer is a readout of predicted taste, never a reward,
+   never an action. One signal, one meaning. Levels differ by glow strength;
+   nothing here reorders, auto-applies, or changes behavior. */
+
+@property --shimmer-a {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.65;
+}
+
+@keyframes shimmer-breath {
+  0%, 100% { --shimmer-a: 0.4; }
+  50% { --shimmer-a: 1; }
+}
+
+.shimmer-row { --shimmer-gain: 1; }
+.shimmer-row.quiet { --shimmer-gain: 0; }          /* ambient breath off … */
+.shimmer-row.listening { --shimmer-gain: 3; }      /* …until SHIFT (LISTEN) */
+.shimmer-row.quiet.listening { --shimmer-gain: 3; }
+
+.chip-btn[class*="shimmer-lvl-"] {
+  animation: shimmer-breath 10s ease-in-out infinite; /* ~0.1 Hz, free-running, never beat-synced */
+  box-shadow: 0 0 14px rgba(255, 205, 130, calc(var(--glow, 0) * var(--shimmer-a) * var(--shimmer-gain)));
+}
+
+/* ~4 compressive levels, capped dim — this is a whisper */
+.shimmer-lvl-1 { --glow: 0.10; border-color: rgba(255, 205, 130, 0.35); }
+.shimmer-lvl-2 { --glow: 0.18; border-color: rgba(255, 205, 130, 0.50); }
+.shimmer-lvl-3 { --glow: 0.28; border-color: rgba(255, 205, 130, 0.65); }
+.shimmer-lvl-4 { --glow: 0.40; border-color: rgba(255, 205, 130, 0.85); }
+
+/* Reduced motion: shimmer collapses to a STATIC encoding of the same
+   information (outline weight), never motion-only meaning. */
+@media (prefers-reduced-motion: reduce) {
+  .chip-btn[class*="shimmer-lvl-"] {
+    animation: none;
+    box-shadow: none;
+    border-color: var(--line-2);
+  }
+  .shimmer-lvl-1 { outline: 1px solid var(--dim); outline-offset: 1px; }
+  .shimmer-lvl-2 { outline: 2px solid var(--dim); outline-offset: 1px; }
+  .shimmer-lvl-3 { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .shimmer-lvl-4 { outline: 3px solid var(--ink); outline-offset: 1px; }
+}
