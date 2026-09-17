@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { panelsByZone } from './PanelRegistry.js';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 
@@ -47,6 +47,22 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
   }, [secondary, activeTab]);
 
   const activePanel = secondary.find((p) => p.id === activeTab) ?? secondary[0];
+
+  // Dev-only (#193): backtick jumps to the Shader Lab tab.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    const onKey = (e) => {
+      if (e.key !== '`' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const t = e.target;
+      const tag = t?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+      if (!secondary.some((p) => p.id === 'shaderlab')) return;
+      e.preventDefault();
+      setActiveTab('shaderlab');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [secondary]);
 
   return (
     <div className="grid" ref={containerRef} style={{ gridTemplateColumns: gridTemplate }}>
@@ -97,7 +113,9 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
               const Comp = activePanel.component;
               return (
                 <ErrorBoundary key={activePanel.id} label={`panel:${activePanel.id}`}>
-                  <Comp dispatch={dispatchPipe} />
+                  <Suspense fallback={<div style={{ padding: 12, opacity: 0.6 }}>loading panel…</div>}>
+                    <Comp dispatch={dispatchPipe} />
+                  </Suspense>
                 </ErrorBoundary>
               );
             })()}

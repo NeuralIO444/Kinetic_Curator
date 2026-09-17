@@ -23,29 +23,10 @@ import {
   QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, EFFECT_FS, RESOLVE_FS, COPY_FS,
   BLEND_IDS, EFFECT_IDS,
 } from './shaders.mjs';
+import { buildProgramChecked } from './debug/diagnostics.mjs';
 
-function compile(gl, type, src) {
-  const sh = gl.createShader(type);
-  gl.shaderSource(sh, src);
-  gl.compileShader(sh);
-  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(sh);
-    gl.deleteShader(sh);
-    throw new Error(`[gl] shader compile failed: ${log}\n---\n${src.slice(0, 400)}`);
-  }
-  return sh;
-}
-
-function program(gl, vsSrc, fsSrc) {
-  const p = gl.createProgram();
-  gl.attachShader(p, compile(gl, gl.VERTEX_SHADER, vsSrc));
-  gl.attachShader(p, compile(gl, gl.FRAGMENT_SHADER, fsSrc));
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-    throw new Error(`[gl] program link failed: ${gl.getProgramInfoLog(p)}`);
-  }
-  return p;
-}
+// All program builds go through the debug harness (#193): a compile/link
+// failure throws naming the program, source file, and line number.
 
 function makeTarget(gl, w, h, float16) {
   const tex = gl.createTexture();
@@ -111,11 +92,11 @@ export function createRenderer(canvas) {
     throw new Error('[gl] EXT_color_buffer_float not available');
   }
 
-  const quadProg = program(gl, QUAD_VS, QUAD_FS);
-  const compProg = program(gl, FULL_VS, COMPOSITE_FS);
-  const fxProg = program(gl, FULL_VS, EFFECT_FS);
-  const resProg = program(gl, FULL_VS, RESOLVE_FS);
-  const copyProg = program(gl, FULL_VS, COPY_FS);
+  const quadProg = buildProgramChecked(gl, QUAD_VS, QUAD_FS, { name: 'quad', vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS' });
+  const compProg = buildProgramChecked(gl, FULL_VS, COMPOSITE_FS, { name: 'composite', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COMPOSITE_FS' });
+  const fxProg = buildProgramChecked(gl, FULL_VS, EFFECT_FS, { name: 'effect', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:EFFECT_FS' });
+  const resProg = buildProgramChecked(gl, FULL_VS, RESOLVE_FS, { name: 'resolve', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:RESOLVE_FS' });
+  const copyProg = buildProgramChecked(gl, FULL_VS, COPY_FS, { name: 'copy', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COPY_FS' });
 
   const U = (p, n) => gl.getUniformLocation(p, n);
 
