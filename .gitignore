@@ -14,3 +14,6 @@ __pycache__/
 # Untracked WASM particle experiment — see docs/BUGLIST.md and #95
 app/public/particles.wasm
 app/public/particles.wat
+# MLX harness working data (measurements, PNGs, failure logs) — local only.
+# The committed products live in mlx_artifacts/ (see its README).
+mlx_data/
