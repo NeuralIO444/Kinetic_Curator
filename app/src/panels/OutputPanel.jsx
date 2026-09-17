@@ -4,7 +4,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { exportSnapshot, renderFinal, renderBatch, useVideoRecorder } from '../hooks/useMediaExport.js';
 import { exportAccumulationCanvas } from '../hooks/useAccumulationBuffer.js';
-import { QUALITY_PRESETS, FINAL_CAPS } from '../data/quality.js';
+import { QUALITY_PRESETS } from '../data/quality.js';
 import { emit, Events } from '../composition/eventBus.js';
 import {
   serializeProject,
@@ -47,37 +47,21 @@ export function OutputPanel() {
   // or evolve toggle mid-encode would change what RENDER FINAL is capturing.
   const setRendering = (v) => emit(Events.EXPORT_RENDERING, v);
 
-  const [uncapped, setUncapped] = useState(false);
   const [importMsg, setImportMsg] = useState(null);
   const [batchCount, setBatchCount] = useState(8);
   const [batchProgress, setBatchProgress] = useState(null);
   const cancelBatchRef = useRef(false);
-  const restoreRef = useRef(null);
   const watchdogGenRef = useRef(watchdogTripGen);
 
   const accumOn = !!layoutParams.accumulation;
 
-  // Shared by RENDER FINAL and BATCH — both stash pre-export quality/count/
-  // mirror (batch also stashes seed) in restoreRef and undo it the same way.
-  const restoreFromSnapshot = (snap) => {
-    if (!snap) return;
-    emit(Events.EXPORT_QUALITY, snap.quality);
-    emit(Events.LAYOUT_PARAM, { key: 'count', value: snap.count });
-    emit(Events.LAYOUT_PARAM, { key: 'mirror', value: snap.mirror });
-    if (snap.seed !== undefined) emit(Events.EXPORT_SEED, snap.seed);
-  };
-
-  // #107 §4: a watchdog trip (tier 2 — FPS ~0 or a critical render-error)
-  // mid-export must not leave the live document stuck on FINAL/BATCH's
-  // lifted quality/count/mirror forever, nor the UI stuck showing RENDERING —
-  // running=false alone doesn't undo either of those.
+  // #107 §4 (flip mechanism deleted in #191): a watchdog trip (tier 2 — FPS
+  // ~0 or a critical render-error) mid-export must not leave the UI stuck
+  // showing RENDERING — running=false alone doesn't undo that. There is no
+  // live-store flip left to undo; batch cancellation is the only restore.
   useEffect(() => {
     if (watchdogTripGen === watchdogGenRef.current) return;
     watchdogGenRef.current = watchdogTripGen;
-    if (restoreRef.current) {
-      restoreFromSnapshot(restoreRef.current);
-      restoreRef.current = null;
-    }
     if (batchProgress) {
       // Reuse the CANCEL button's flag rather than inventing a second one.
       cancelBatchRef.current = true;
@@ -134,25 +118,12 @@ export function OutputPanel() {
     }).catch(() => {});
   };
 
+  // #191: RENDER FINAL rasterizes the live composition as-is — no live-store
+  // flip. Denser finals are the GPU export path's job
+  // (`studio.py render --uncapped` → app/src/gl/exportStill.mjs).
   const runRenderFinal = async () => {
     if (rendering) return;
     setRendering(true);
-    const prev = {
-      quality,
-      count: layoutParams.count,
-      mirror: layoutParams.mirror,
-    };
-    restoreRef.current = prev;
-
-    const applyUncapped = () => {
-      emit(Events.EXPORT_QUALITY, 'high');
-      emit(Events.LAYOUT_PARAM, { key: 'count', value: FINAL_CAPS.maxCount });
-      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: true });
-    };
-    const restore = () => {
-      restoreFromSnapshot(restoreRef.current);
-      restoreRef.current = null;
-    };
 
     try {
       if (accumOn) {
@@ -172,16 +143,13 @@ export function OutputPanel() {
           resolution: exportResolution,
           seedStr: seed.toString(16),
           background: palette.bg,
-          uncapped,
-          applyUncapped: uncapped ? applyUncapped : undefined,
-          restore: uncapped ? restore : undefined,
           onThumbnail: (thumb) => {
             emit(Events.EXPORT_SNAPSHOT, {
               seed,
               format: 'PNG',
-              resolution: `${resLabel}${uncapped ? ' · UNCAPPED' : ' · FINAL'}`,
+              resolution: `${resLabel} · FINAL`,
               timestamp: new Date().toISOString().slice(11, 19),
-              config: { layout: { ...layoutParams }, palette: { id: palette.id }, uncapped },
+              config: { layout: { ...layoutParams }, palette: { id: palette.id } },
               thumb,
             });
           },
@@ -189,7 +157,6 @@ export function OutputPanel() {
       }
     } catch (e) {
       console.warn('[RENDER]', e);
-      restore();
     } finally {
       setRendering(false);
     }
@@ -201,23 +168,7 @@ export function OutputPanel() {
     cancelBatchRef.current = false;
     setBatchProgress({ done: 0, total: batchCount, seed });
 
-    const prev = {
-      quality,
-      count: layoutParams.count,
-      mirror: layoutParams.mirror,
-      seed,
-    };
-    restoreRef.current = prev;
-
-    const applyUncapped = () => {
-      emit(Events.EXPORT_QUALITY, 'high');
-      emit(Events.LAYOUT_PARAM, { key: 'count', value: FINAL_CAPS.maxCount });
-      emit(Events.LAYOUT_PARAM, { key: 'mirror', value: true });
-    };
-    const restore = () => {
-      restoreFromSnapshot(restoreRef.current);
-      restoreRef.current = null;
-    };
+    const startSeed = seed;
 
     // #107 §5: hold evolve/drift off for the whole batch, independent of the
     // watchdog's own slowRender/perfTier1 (which auto-clear on live FPS and
@@ -230,10 +181,7 @@ export function OutputPanel() {
         startSeed: seed,
         resolution: exportResolution,
         background: palette.bg,
-        uncapped,
         setSeed: (s) => emit(Events.EXPORT_SEED, s),
-        applyUncapped: uncapped ? applyUncapped : undefined,
-        restore: uncapped ? restore : undefined,
         getSidecar: () => ({
           layout: { ...layoutParams },
           palette: { id: paletteId },
@@ -254,16 +202,13 @@ export function OutputPanel() {
         },
         shouldCancel: () => cancelBatchRef.current,
       });
-      if (!uncapped) {
-        emit(Events.EXPORT_SEED, prev.seed);
-      } else {
-        restore();
-      }
+      // Batch walks the live seed; put it back where the user had it.
+      emit(Events.EXPORT_SEED, startSeed);
       setImportMsg(`Batch done · ${results.length} files`);
       setTimeout(() => setImportMsg(null), 3000);
     } catch (e) {
       console.warn('[BATCH]', e);
-      restore();
+      emit(Events.EXPORT_SEED, startSeed);
       setImportMsg('Batch failed');
     } finally {
       setRendering(false);
@@ -413,16 +358,6 @@ export function OutputPanel() {
               <option value={2}>2x (1000×700@2x)</option>
               <option value={4}>4x (1000×700@4x)</option>
             </select>
-            <button
-              type="button"
-              className={`chip-btn ${uncapped ? 'active' : ''}`}
-              title="Lift live quality caps for denser final. Less relevant when ACCUM is on."
-              onClick={() => setUncapped(v => !v)}
-              disabled={accumOn}
-              style={uncapped && !accumOn ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : {}}
-            >
-              UNCAPPED {uncapped && !accumOn ? 'ON' : 'OFF'}
-            </button>
           </div>
           <button
             type="button"
@@ -443,9 +378,7 @@ export function OutputPanel() {
           <div className="output-hint" style={{ marginTop: 6 }}>
             {accumOn
               ? 'ACCUM on — export captures the trail buffer (history is pixels, not SVG).'
-              : uncapped
-                ? 'UNCAPPED densifies composition then restores live caps.'
-                : 'Matches live preview. Toggle UNCAPPED for denser final.'}
+              : 'Matches live preview. Denser 4K/8K finals: studio.py render --uncapped.'}
           </div>
         </div>
 

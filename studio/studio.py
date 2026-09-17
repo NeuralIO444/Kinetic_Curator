@@ -15,23 +15,25 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 RENDER_MJS = HERE / "render.mjs"
+EXPORT_STILL_MJS = HERE / ".." / "app" / "src" / "gl" / "exportStill.mjs"
 ACCUM_STILL_MJS = HERE / ".." / "app" / "src" / "gl" / "accumStill.mjs"
 CANVAS_W, CANVAS_H = 1000, 700
-DEFAULT_MONOSPACE = "Menlo"
 DEFAULT_ACCUM_FADE = 0.88
 DEFAULT_ACCUM_OPTICS = 0.0
 
 # ── Resource ceilings (#106 item 2) ────────────────────────────────────────
 # A render farm runs unattended on whatever a project file says. Without
-# these, `--res 99999x99999` asks resvg for a 40GB RGBA buffer and the machine
-# swaps until something is killed, and a hung `node` blocks the batch forever
-# with no output and no error.
-MAX_DIM = 16384                   # resvg/PNG sanity, and 16384^2 is already 1GB RGBA
+# these, `--res 99999x99999` asks the GPU readback for a 40GB RGBA buffer and
+# the machine swaps until something is killed, and a hung `node` blocks the
+# batch forever with no output and no error.
+MAX_DIM = 16384                   # PNG sanity, and 16384^2 is already 1GB RGBA
 MAX_PIXELS = 64_000_000           # ~256MB RGBA per in-flight frame; 8K is 33MP
+# Named still presets, shared with app/src/gl/exportStill.mjs (4k/8k).
+RES_PRESETS = {"4k": (3840, 2688), "8k": (7680, 5376)}
 RENDER_TIMEOUT_S = 300            # one node render; 4K swarm bakes are slow but finite
-RASTER_TIMEOUT_S = 300            # one resvg rasterise
 FFMPEG_TIMEOUT_S = 1800           # whole-clip encode
-BYTES_PER_PIXEL_INFLIGHT = 8      # resvg RGBA + PNG encode buffer, roughly
+BYTES_PER_PIXEL_INFLIGHT = 8      # RGBA frame + PNG encode buffer, roughly
+CHROMIUM_JOB_BYTES = 384 * 1024 * 1024  # one headless Chromium per in-flight job (#191)
 
 
 def which(name: str) -> str:
@@ -42,16 +44,19 @@ def which(name: str) -> str:
 
 
 def parse_res(spec: str) -> tuple[int, int]:
-    """WxH or a scale factor, clamped to something a machine can actually hold."""
+    """WxH, a 4k/8k preset, or a scale factor, clamped to something a machine can actually hold."""
+    key = str(spec).strip().lower()
+    if key in RES_PRESETS:
+        return RES_PRESETS[key]
     try:
-        if "x" in str(spec).lower():
-            w, _, h = str(spec).lower().partition("x")
+        if "x" in key:
+            w, _, h = key.partition("x")
             w, h = int(w), int(h)
         else:
-            mul = float(spec)
+            mul = float(key)
             w, h = round(CANVAS_W * mul), round(CANVAS_H * mul)
     except (TypeError, ValueError):
-        sys.exit(f"bad --res {spec!r}: expected WxH (e.g. 3840x2160) or a scale factor (e.g. 2)")
+        sys.exit(f"bad --res {spec!r}: expected WxH, 4k, 8k, or a scale factor (e.g. 2)")
 
     if w < 1 or h < 1:
         sys.exit(f"bad --res {spec!r}: dimensions must be positive")
@@ -76,16 +81,16 @@ def total_memory_bytes() -> int | None:
 def safe_jobs(requested: int, size: tuple[int, int]) -> int:
     """Clamp --jobs against cores and against memory (#106 item 2).
 
-    Every in-flight job holds a full RGBA frame in resvg plus an encode
-    buffer, so on unified-memory hardware a large --res with a large --jobs
-    is how you wedge the machine. Cap at half of RAM; the renderer is not the
-    only thing running.
+    Every in-flight job holds a full RGBA frame plus an encode buffer, and —
+    since #191 — its own headless Chromium, so on unified-memory hardware a
+    large --res with a large --jobs is how you wedge the machine. Cap at half
+    of RAM; the renderer is not the only thing running.
     """
     jobs = max(1, int(requested or 1))
     jobs = min(jobs, (os.cpu_count() or 4) * 2)
     mem = total_memory_bytes()
     if mem:
-        per_job = max(1, size[0] * size[1] * BYTES_PER_PIXEL_INFLIGHT)
+        per_job = max(1, size[0] * size[1] * BYTES_PER_PIXEL_INFLIGHT + CHROMIUM_JOB_BYTES)
         by_mem = max(1, int((mem // 2) // per_job))
         if by_mem < jobs:
             print(
@@ -210,33 +215,64 @@ def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
     return proc.stdout
 
 
-def rasterize(svg: bytes, out_png: Path, monospace=DEFAULT_MONOSPACE) -> None:
-    out_png.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        proc = subprocess.run(
-            ["resvg", "--monospace-family", monospace, "--resources-dir", str(HERE),
-             "--quiet", "-", str(out_png)],
-            input=svg, capture_output=True, timeout=RASTER_TIMEOUT_S,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RenderError(f"resvg exceeded {RASTER_TIMEOUT_S}s for {out_png}") from exc
-    if proc.returncode != 0:
-        # Same reason as build_svg: a raise can be caught per edition, a
-        # CalledProcessError escaping a worker thread is just noise.
-        raise RenderError(
-            f"resvg exited {proc.returncode} for {out_png}",
-            returncode=proc.returncode,
-            stderr=proc.stderr.decode("utf-8", "replace").strip()[-2000:],
-        )
-
-
-def render_one(project: Path, out_png: Path, size: tuple[int, int], *,
+def render_gpu(project: Path, out_png: Path, size: tuple[int, int], *,
                seed=None, uncapped=False, background=None, time=0.0,
-               progress=0.0, ramps=None, motion=None, monospace=DEFAULT_MONOSPACE) -> None:
-    svg = build_svg(project, seed=seed, time=time, progress=progress,
-                    ramps=ramps, motion=motion, uncapped=uncapped, width=size[0],
-                    height=size[1], background=background)
-    rasterize(svg, out_png, monospace)
+               progress=0.0, ramps=None, motion="none") -> None:
+    """One still via the SHARED GPU recipe (#191).
+
+    project → app/src/gl/exportStill.mjs → WebGL2 render at `size` →
+    readPixels → PNG. A pure function of (project, seed, size): no live
+    store, no SVG flip-then-restore, no resvg. Raises RenderError on failure
+    (safe inside ThreadPoolExecutor workers — see build_svg).
+    """
+    if not project.is_file():
+        sys.exit(
+            f"project not found: {project}\n"
+            "In the app: OUTPUT → save project, then pass that file path."
+        )
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ["node", str(EXPORT_STILL_MJS), str(project),
+           "--out", str(out_png), "--res", f"{size[0]}x{size[1]}"]
+    if seed is not None:
+        cmd += ["--seed", str(seed)]
+    if uncapped:
+        cmd += ["--uncapped"]
+    if background:
+        cmd += ["--background", background]
+    if time:
+        cmd += ["--time", repr(time)]
+    if progress:
+        cmd += ["--progress", repr(progress)]
+    for r in ramps or []:
+        cmd += ["--ramp", r]
+    if motion:
+        cmd += ["--motion", motion]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, timeout=RENDER_TIMEOUT_S)
+    except subprocess.TimeoutExpired as exc:
+        raise RenderError(
+            f"exportStill.mjs exceeded {RENDER_TIMEOUT_S}s for {project}",
+            returncode=None,
+            stderr=(exc.stderr or b"").decode("utf-8", "replace").strip()[-2000:],
+        ) from exc
+    err = proc.stderr.decode("utf-8", "replace") if proc.stderr else ""
+    if err:
+        sys.stderr.write(err)
+        sys.stderr.flush()
+    if proc.returncode == 3:
+        # Headless Chromium missing: refuse rather than rendering a different
+        # recipe. The guidance is already on stderr.
+        raise RenderError(
+            "refusing: the shared GPU recipe needs headless Chromium "
+            "(cd app && npx playwright install chromium)",
+            returncode=3, stderr=err.strip()[-2000:],
+        )
+    if proc.returncode != 0:
+        raise RenderError(
+            f"exportStill.mjs exited {proc.returncode} for {project}",
+            returncode=proc.returncode,
+            stderr=err.strip()[-2000:],
+        )
 
 
 def normalized_project(project: Path) -> dict | None:
@@ -268,7 +304,7 @@ def sidecar(project: Path, seed, size, uncapped, extra=None, normalized=None) ->
     doc["_render"] = {
         "width": size[0], "height": size[1],
         "uncapped": uncapped,
-        "renderer": "studio/render.mjs + resvg",
+        "renderer": "app/src/gl/exportStill.mjs (WebGL2 GPU readback)",
         "source": str(project),
     }
     if normalized is not None:
@@ -287,9 +323,10 @@ def cmd_render(a) -> None:
     if getattr(a, "accum", False):
         cmd_accum(a, size, out)
         return
-    which("resvg")
-    render_one(Path(a.project), out, size, seed=a.seed, uncapped=a.uncapped,
-               background=a.background, monospace=a.monospace)
+    # #191: FINAL stills come from the GPU readback path (exportStill.mjs).
+    # The render.mjs + resvg stills path is retired for final output.
+    render_gpu(Path(a.project), out, size, seed=a.seed, uncapped=a.uncapped,
+               background=a.background)
     if a.sidecar:
         out.with_suffix(".json").write_text(
             json.dumps(sidecar(Path(a.project), a.seed, size, a.uncapped), indent=2))
@@ -380,6 +417,7 @@ def edition_hash(project: Path, seed, size, uncapped, normalized) -> str:
     that actually alters the render does.
     """
     payload = json.dumps({
+        "renderer": "gpu-readback",  # #191: a renderer change invalidates old manifests
         "normalized": normalized,
         "raw": None if normalized else json.loads(project.read_text()),
         "seed": int(seed) & 0xFFFFFFFF,
@@ -398,7 +436,6 @@ def read_manifest(path: Path) -> dict:
 
 
 def cmd_batch(a) -> None:
-    which("resvg")
     size = parse_res(a.res)
     outdir = Path(a.out)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -428,9 +465,10 @@ def cmd_batch(a) -> None:
                 return (stem, True, "skipped", digest)
 
         try:
-            render_one(project, stem.with_suffix(".png"), size, seed=seed,
-                       uncapped=a.uncapped, background=a.background,
-                       monospace=a.monospace)
+            # #191: each edition renders through the shared GPU path — same
+            # path per seed, no live store, no resvg.
+            render_gpu(project, stem.with_suffix(".png"), size, seed=seed,
+                       uncapped=a.uncapped, background=a.background)
         except (RenderError, subprocess.CalledProcessError, OSError, ValueError) as exc:
             # A batch is a long unattended job. Losing 499 good editions
             # because one seed hit a bad code path is the worst outcome, so
@@ -443,7 +481,7 @@ def cmd_batch(a) -> None:
                 "_render": {
                     "width": size[0], "height": size[1],
                     "uncapped": a.uncapped,
-                    "renderer": "studio/render.mjs + resvg",
+                    "renderer": "app/src/gl/exportStill.mjs (WebGL2 GPU readback)",
                     "source": str(project),
                 },
             }
@@ -514,7 +552,6 @@ def cmd_video(a) -> None:
     if a.motion == "list":
         subprocess.run(["node", str(RENDER_MJS), "--motion", "list"], check=True)
         return
-    which("resvg")
     size = parse_res(a.res)
     project = Path(a.project)
     frames_n = max(1, round(a.duration * a.fps))
@@ -524,10 +561,12 @@ def cmd_video(a) -> None:
 
     def one(i):
         t = i / a.fps
-        render_one(project, under(tmp, f"f{i:06d}.png"), size, seed=a.seed,
+        # #191: frames come from the GPU readback path (same recipe as
+        # stills); ffmpeg still assembles the clip — file-delivery post only.
+        render_gpu(project, under(tmp, f"f{i:06d}.png"), size, seed=a.seed,
                    uncapped=a.uncapped, background=a.background, time=t,
                    progress=i / max(1, frames_n - 1), ramps=a.ramp,
-                   motion=a.motion, monospace=a.monospace)
+                   motion=a.motion)
 
     with ThreadPoolExecutor(max_workers=safe_jobs(a.jobs, size)) as pool:
         for i, _ in enumerate(pool.map(one, range(frames_n)), 1):
@@ -547,8 +586,6 @@ def cmd_video(a) -> None:
 
 def main(argv=None) -> None:
     which("node")
-    # resvg is checked per-command: `render --accum` uses the shared GPU recipe
-    # and does not need it.
 
     p = argparse.ArgumentParser(prog="studio", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -556,11 +593,10 @@ def main(argv=None) -> None:
 
     def common(sp):
         sp.add_argument("project", help="project JSON exported from the app")
-        sp.add_argument("--res", default="1", help="WxH in px, or a scale factor of 1000x700 (default 1)")
+        sp.add_argument("--res", default="1", help="WxH in px, 4k/8k preset, or a scale factor of 1000x700 (default 1)")
         sp.add_argument("--seed", type=int, default=None)
         sp.add_argument("--uncapped", action="store_true")
         sp.add_argument("--background", default=None)
-        sp.add_argument("--monospace", default=DEFAULT_MONOSPACE)
         sp.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
 
     sp = sub.add_parser("render", help="one project -> one PNG")

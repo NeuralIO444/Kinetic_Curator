@@ -83,8 +83,10 @@ farm is ever distributed over mixed hardware.
 MVP tracks A–D shipped. Architecture stays:
 
 ```text
-project.json → node (app kernel) → SVG → resvg → PNG → ffmpeg
+project.json → node (GL pipeline, app/src/gl/exportStill.mjs) → readPixels → PNG → ffmpeg
 ```
+
+(#191: the render.mjs + resvg stills path is retired for final output.)
 
 Do **not** add a second kernel. Do **not** reopen Track E.
 

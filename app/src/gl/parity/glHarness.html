@@ -92,6 +92,34 @@ window.__kcAccum = async (payload) => {
 };
 
 /**
+ * Export stills with chunked readback (#191). payload is the same shape as
+ * __kcRender's, but pixels come back in 16MB base64 pieces: an 8K RGBA
+ * readback is ~132MB (~177MB base64), past the ~100MB page.evaluate result
+ * limit that motivated the chunked payload ferry in glDriver.mjs.
+ *
+ * __kcExportBegin(payload) -> { width, height, chunks }
+ * __kcExportChunk(i)       -> { pixelsB64 }   // i in [0, chunks)
+ * __kcExportEnd()          -> releases the stashed pixels
+ */
+let __kcExportPixels = null;
+const __KC_EXPORT_PIECE = 16 * 1024 * 1024;
+window.__kcExportBegin = async (payload) => {
+  if (!renderer) renderer = createRenderer(canvas);
+  const { pixels, width, height } = renderer.renderScene(renderArgs(payload));
+  __kcExportPixels = pixels;
+  return { width, height, chunks: Math.max(1, Math.ceil(pixels.length / __KC_EXPORT_PIECE)) };
+};
+window.__kcExportChunk = async (i) => {
+  if (!__kcExportPixels) throw new Error('[export] no active export — call __kcExportBegin first');
+  const s = __kcExportPixels.subarray(i * __KC_EXPORT_PIECE, (i + 1) * __KC_EXPORT_PIECE);
+  return { pixelsB64: u8ToB64(s) };
+};
+window.__kcExportEnd = async () => {
+  __kcExportPixels = null;
+  return true;
+};
+
+/**
  * Perf probe (#189 acceptance: 3 stacked FX layers hold 60fps).
  * Uploads the atlas once, warms up, then times `iters` renderScene calls
  * (targets are allocated/freed per call, as in renderScene today). Includes
