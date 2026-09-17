@@ -112,14 +112,17 @@ export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT) {
 
   const current = captureUndoEntry(state, kind);
 
-  const last = state.historyUndoStack[state.historyUndoStack.length - 1];
+  // Defensive: slice unit tests drive the actions with partial mock state
+  // that has no history stacks — pushing there must not crash.
+  const undoStack = state.historyUndoStack || [];
+  const last = undoStack[undoStack.length - 1];
   if (last && entrySignature(last) === entrySignature(current)) {
     return {};
   }
 
   lastPushTime = now;
   return {
-    historyUndoStack: trimUndoStack([...state.historyUndoStack, current]),
+    historyUndoStack: trimUndoStack([...undoStack, current]),
     historyRedoStack: [],
   };
 }
