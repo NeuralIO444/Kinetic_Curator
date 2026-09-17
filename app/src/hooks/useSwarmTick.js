@@ -19,9 +19,9 @@ export function useSwarmTick({
   // threads a pause signal into this hook.
   const slowRender = useStore((s) => s.slowRender);
 
-  const liveRef = useRef({ layoutParams, activeAssets, palette, seed, slowRender });
+  const liveRef = useRef({ layoutParams, activeAssets, palette, seed, slowRender, caps });
   useEffect(() => {
-    liveRef.current = { layoutParams, activeAssets, palette, seed, slowRender };
+    liveRef.current = { layoutParams, activeAssets, palette, seed, slowRender, caps };
   });
 
   useEffect(() => {
@@ -35,7 +35,12 @@ export function useSwarmTick({
       // pausing never re-runs this setup and re-inits the particle system —
       // it would otherwise reset positions/velocities on every perf dip.
       if (!c.slowRender) {
-        swarmSystem.update(c.layoutParams, c.activeAssets, c.palette, c.seed, Date.now(), attractorRef?.current);
+        // #167 — the quality cap rides on layoutParams so breed() can gate
+        // population growth without changing update()'s signature. Read off
+        // liveRef (not the effect deps) so a quality-tier change can't
+        // re-init the particle system mid-flight.
+        swarmSystem.update({ ...c.layoutParams, maxParticles: c.caps?.maxParticles },
+          c.activeAssets, c.palette, c.seed, Date.now(), attractorRef?.current);
         setTick((t) => (t + 1) % 1000000);
       }
       animId = requestAnimationFrame(step);

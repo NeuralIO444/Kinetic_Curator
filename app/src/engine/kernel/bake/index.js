@@ -47,6 +47,7 @@ export const BAKE_DT_MS = 1000 / 60;
  * @param {number}   [opts.steps=180]  simulation steps to settle (3s at 60fps)
  * @param {number}   [opts.dt=BAKE_DT_MS]
  * @param {{x:number,y:number}|null} [opts.attractor=null]
+ * @param {number}   [opts.maxParticles] quality cap gating breed() growth
  * @returns {Array<{x,y,rotation,scale,alpha,color,assetIndex}>}
  */
 export function bakeParticles({
@@ -60,11 +61,18 @@ export function bakeParticles({
   steps = 180,
   dt = BAKE_DT_MS,
   attractor = null,
+  maxParticles,
 }) {
   const sys = new ParticleSystem();
   sys.init(count, canvasW, canvasH, activeAssets, palette, seed);
 
-  const params = { ...layoutParams, particleCount: count };
+  // #167 — the quality cap rides on the params so contact breed() can gate
+  // population growth; the bake stays a pure function of its inputs.
+  const params = {
+    ...layoutParams,
+    particleCount: count,
+    maxParticles: maxParticles ?? count,
+  };
   for (let s = 0; s < steps; s++) {
     // Fixed timestep from a fixed origin — the one thing that makes this
     // reproducible. The live loop passes Date.now() here.

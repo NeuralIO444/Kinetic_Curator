@@ -160,6 +160,8 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
         ? bakeSwarmItems({
           seed: src.seed >>> 0,
           count: Math.min(layoutParams.particleCount || 150, caps.maxParticles),
+          // #167 — the quality cap gates contact breed() population growth.
+          maxParticles: caps.maxParticles,
           layoutParams,
           activeAssets,
           palette,
