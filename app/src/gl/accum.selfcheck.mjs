@@ -590,6 +590,20 @@ async function runBrowserTests() {
       assert.equal(at(10), 0, 'no light ahead of the motion');
     });
 
+    await okAsync('probe: echo mix clamps alpha to <= 1 (GPU and mirror)', async () => {
+      const w = 8, h = 8;
+      // Two identical frames stacked: additive mixing would push alpha to
+      // 1.85 without the clamp. (RGB goes HDR here, which the 8-bit probe
+      // readback clips — so this locks the alpha guarantee specifically,
+      // not the RGB values.)
+      const frames = [whiteDot(w, h, 4, 4), whiteDot(w, h, 4, 4), whiteDot(w, h, 4, 4)];
+      const { gpu } = await runProbe({ w, h, fade: 0, optics: 0, echoes: 2, frames });
+      const ref = mirrorSeq({ w, h, bg: '#000000', fade: 0, optics: 0, echoes: 2, frames });
+      const maxAlpha = (buf) => { let m = 0; for (let i = 3; i < buf.length; i += 4) m = Math.max(m, buf[i]); return m; };
+      assert.ok(maxAlpha(gpu) <= 1 + 1e-6, `GPU echo alpha clamped, got max ${maxAlpha(gpu).toFixed(3)}`);
+      assert.ok(maxAlpha(ref) <= 1 + 1e-6, `mirror echo alpha clamped, got max ${maxAlpha(ref).toFixed(3)}`);
+    });
+
     await okAsync('probe: audio envelope modulates per-frame params (GPU = mirror)', async () => {
       const w = 12, h = 12;
       // One dot, then silence: with a loud envelope the trail survives
