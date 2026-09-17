@@ -11,8 +11,10 @@
  * - Counts are small (12–48 items) — the corpus must stay fast in CI.
  *
  * Each scene declares its diff `policy`:
- * - 'default': strict (perChannelTol 8, 0.1% pixels) — geometry, blends,
- *   and deterministic effects (invert, posterize, blur).
+ * - 'default': perChannelTol 8, 10% pixel budget (owner call 2026-09-16:
+ *   under 10% is a pass — sub-visible edge AA variance from the atlas
+ *   architecture is accepted) — geometry, blends, and deterministic
+ *   effects (invert, posterize, blur).
  * - 'fx': relaxed (perChannelTol 24, 2% pixels) — turbulence-based
  *   effects (grain, displace, tear, scanlines) rasterize differently on
  *   every backend by design; filter output is outside the determinism
