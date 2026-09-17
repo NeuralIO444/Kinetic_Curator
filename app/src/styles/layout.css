@@ -232,6 +232,17 @@
   opacity: 0.25;
   cursor: default;
 }
+.palette-sw-viewport {
+  display: inline-flex;
+  overflow: hidden;
+  width: 49px; /* 5 swatch cells (9px) + 4 gaps (1px) */
+}
+.palette-sw-track {
+  display: inline-flex;
+  gap: 1px;
+  transition: transform 180ms ease;
+  will-change: transform;
+}
 
 .run-btn {
   background: var(--accent); color: #000; border: none;

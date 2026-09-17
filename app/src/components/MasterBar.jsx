@@ -17,8 +17,10 @@ function CompactSwatches({ swatches }) {
 }
 
 /** Editable strip: sliding window of 5 swatches + pinned BG + INK (#51 / #52).
- *  Palettes with more than 5 swatches get ‹ › arrows to slide the window. */
+ *  Palettes with more than 5 swatches get ‹ › arrows fixed on each side;
+ *  the swatch track physically slides one cell per click. */
 const SWATCH_WIN = 5;
+const SWATCH_STEP = 10; // 9px cell + 1px gap
 function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onReset, onLock }) {
   const swatches = palette.swatches || [];
   const [start, setStart] = useState(0);
@@ -29,6 +31,33 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
     e.stopPropagation();
     setStart(Math.max(0, Math.min(maxStart, s + d)));
   };
+  const cell = (sw, i) => (
+    <span key={i} className={`palette-sw-cell ${locks?.[i] ? 'locked' : ''}`}>
+      <label
+        className="palette-sw-edit"
+        title={`S${i + 1} ${sw} — click to edit`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="palette-chip-sw palette-sw-full" style={{ background: sw }} />
+        <input
+          type="color"
+          className="palette-color-input"
+          value={sw}
+          onChange={(e) => onSwatch(i, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </label>
+      <button
+        type="button"
+        className="palette-lock-pip"
+        title={locks?.[i] ? `S${i + 1} locked — harmony and shuffle skip it` : `Lock S${i + 1}`}
+        aria-pressed={!!locks?.[i]}
+        onClick={(e) => { e.stopPropagation(); onLock(i); }}
+      >
+        {locks?.[i] ? '▪' : ''}
+      </button>
+    </span>
+  );
   return (
     <span className="palette-active-strip" aria-label={`${palette.name} palette editor`}>
       {overflow && (
@@ -42,38 +71,20 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
           ‹
         </button>
       )}
-      <span className="palette-active-swatches">
-        {swatches.slice(s, s + SWATCH_WIN).map((sw, vi) => {
-          const i = s + vi;
-          return (
-          <span key={i} className={`palette-sw-cell ${locks?.[i] ? 'locked' : ''}`}>
-            <label
-              className="palette-sw-edit"
-              title={`S${i + 1} ${sw} — click to edit`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span className="palette-chip-sw palette-sw-full" style={{ background: sw }} />
-              <input
-                type="color"
-                className="palette-color-input"
-                value={sw}
-                onChange={(e) => onSwatch(i, e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </label>
-            <button
-              type="button"
-              className="palette-lock-pip"
-              title={locks?.[i] ? `S${i + 1} locked — harmony and shuffle skip it` : `Lock S${i + 1}`}
-              aria-pressed={!!locks?.[i]}
-              onClick={(e) => { e.stopPropagation(); onLock(i); }}
-            >
-              {locks?.[i] ? '▪' : ''}
-            </button>
+      {overflow ? (
+        <span className="palette-sw-viewport" aria-hidden={false}>
+          <span
+            className="palette-sw-track"
+            style={{ transform: `translateX(${-s * SWATCH_STEP}px)` }}
+          >
+            {swatches.map(cell)}
           </span>
-          );
-        })}
-      </span>
+        </span>
+      ) : (
+        <span className="palette-active-swatches">
+          {swatches.map(cell)}
+        </span>
+      )}
       {overflow && (
         <button
           type="button"
