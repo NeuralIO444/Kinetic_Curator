@@ -92,11 +92,11 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
           srcNode = ctx.createMediaElementSource(audio);
           audioElRef.current = audio;
           await audio.play();
-          if (cancelled) { audio.pause(); return; }
+          if (cancelled) { audio.pause(); ctx.close().catch(() => {}); return; }
         } else {
           const constraints = { audio: source.id === 'default' ? true : { deviceId: { exact: source.id } } };
           stream = await navigator.mediaDevices.getUserMedia(constraints);
-          if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+          if (cancelled) { stream.getTracks().forEach(t => t.stop()); ctx.close().catch(() => {}); return; }
           srcNode = ctx.createMediaStreamSource(stream);
         }
 

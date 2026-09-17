@@ -1,3 +1,5 @@
+> **Historical walkthrough (Bundle 0, Vite migration era).** Kept for the record.
+
 # Bundle 0 — Foundation Refactor · Walkthrough
 
 ## What Changed

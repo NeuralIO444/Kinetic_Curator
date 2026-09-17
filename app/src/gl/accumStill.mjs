@@ -20,10 +20,14 @@
  * Exit codes: 0 ok; 1 render failure; 2 bad args; 3 headless browser
  * unavailable (studio.py treats this as "refuse --accum" with guidance).
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { deflateSync } from 'node:zlib';
-import { buildSceneContract } from './sceneContract.js';
-import { resolveLayers } from '../../../studio/render.mjs';
+import { readFileSync } from 'node:fs';
+import { writePngFile } from './png.mjs';
+// exportStill's parseRes enforces the 16384px/side + 64MP ceilings (same as
+// studio.py); accumStill used to accept any --res, e.g. 30000x30000 →
+// ~3.6GB pixel buffer → OOM on an unattended batch tool.
+import { parseRes } from './exportStill.mjs';
+import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
+import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderAccumViaGL, closeGlDriver } from './parity/glDriver.mjs';
 
@@ -32,6 +36,7 @@ const BROWSER_MISSING_RE = /Executable doesn't exist/;
 function parseArgs(argv) {
   const out = {
     project: null, out: null, steps: 24, fps: 30, fade: 0.88, optics: 0,
+    tunnel: 0, prism: 0,
     res: '1', seed: null, uncapped: false, background: null, ramps: [], motion: 'auto',
   };
   const rest = [];
@@ -47,6 +52,8 @@ function parseArgs(argv) {
     else if (a === '--fps') out.fps = Math.max(1, Math.round(num('--fps')));
     else if (a === '--fade') out.fade = num('--fade');
     else if (a === '--optics') out.optics = num('--optics');
+    else if (a === '--tunnel') out.tunnel = num('--tunnel');
+    else if (a === '--prism') out.prism = num('--prism');
     else if (a === '--res') out.res = argv[++i];
     else if (a === '--seed') out.seed = num('--seed') | 0;
     else if (a === '--uncapped') out.uncapped = true;
@@ -62,22 +69,6 @@ function parseArgs(argv) {
   return out;
 }
 
-function parseRes(spec) {
-  let w, h;
-  if (/x/i.test(String(spec))) {
-    const [ws, hs] = String(spec).toLowerCase().split('x');
-    w = parseInt(ws, 10); h = parseInt(hs, 10);
-  } else {
-    const mul = Number(spec);
-    if (!Number.isFinite(mul) || mul <= 0) throw new Error(`bad --res ${spec}`);
-    w = Math.round(1000 * mul); h = Math.round(700 * mul);
-  }
-  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1) {
-    throw new Error(`bad --res ${spec}: expected WxH or a scale factor`);
-  }
-  return { w, h };
-}
-
 function parseRamps(list) {
   const ramp = {};
   for (const r of list) {
@@ -88,45 +79,9 @@ function parseRamps(list) {
   return Object.keys(ramp).length ? ramp : null;
 }
 
-// Minimal PNG encoder (8-bit RGBA, no interlace): IHDR + IDAT(zlib) + IEND.
-function writePng(path, pixels, w, h) {
-  const crcTable = (() => {
-    const t = new Int32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-      t[n] = c;
-    }
-    return t;
-  })();
-  const crc = (buf) => {
-    let c = 0xffffffff;
-    for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  };
-  const chunk = (type, data) => {
-    const td = Buffer.from(type, 'ascii');
-    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
-    const cd = Buffer.alloc(4); cd.writeUInt32BE(crc(Buffer.concat([td, data])));
-    return Buffer.concat([len, td, data, cd]);
-  };
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
-  ihdr[8] = 8; ihdr[9] = 6; // 8-bit, RGBA
-  const raw = Buffer.alloc((w * 4 + 1) * h);
-  const px = Buffer.from(pixels);
-  for (let y = 0; y < h; y++) {
-    // Pixels arrive top-first; PNG rows are top-first. Filter byte 0 (none).
-    px.copy(raw, y * (w * 4 + 1) + 1, y * w * 4, (y + 1) * w * 4);
-  }
-  const png = Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw)),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-  writeFileSync(path, png);
-}
+// PNG encoding lives in ./png.mjs (shared with exportStill): it validates
+// the pixel buffer and streams rows through deflate instead of allocating
+// a second full-resolution filtered buffer up front (~177MB saved at 8K).
 
 async function main(argv) {
   let args;
@@ -169,9 +124,11 @@ async function main(argv) {
     return;
   }
   const motion = args.motion && args.motion !== 'none' ? args.motion : null;
+  await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
   // Background: explicit flag wins, else the project's palette bg (same rule
   // as the parity candidate), same as studio.py's old accum path.
   const firstLayers = resolveLayers(doc, { caps, ramp, motion, progress: 0 });
+  warnUnsupportedMaterials(firstLayers);
   const paletteBg = firstLayers[0]?.palette?.bg || '#000000';
   const background = /^#[0-9a-fA-F]{6}$/.test(args.background || '') ? args.background : paletteBg;
 
@@ -182,7 +139,7 @@ async function main(argv) {
       const resolvedLayers = resolveLayers(doc, { caps, ramp, motion, progress });
       frames.push(buildSceneContract({
         doc, resolvedLayers, caps,
-        accum: { enabled: true, fade: args.fade, optics: args.optics, background },
+        accum: { enabled: true, fade: args.fade, optics: args.optics, tunnel: args.tunnel, prism: args.prism, background },
       }));
       if ((i + 1) % 5 === 0 || i + 1 === args.steps) {
         console.log(`  accum frame ${i + 1}/${args.steps}`);
@@ -190,8 +147,9 @@ async function main(argv) {
     }
     const { pixels, width, height } = await renderAccumViaGL(frames, {
       width: w, height: h, bg: background, fade: args.fade, optics: args.optics,
+      tunnel: args.tunnel, prism: args.prism,
     });
-    writePng(args.out, pixels, width, height);
+    await writePngFile(args.out, pixels, width, height);
     console.log(args.out);
   } catch (e) {
     if (BROWSER_MISSING_RE.test(e.message || '')) {

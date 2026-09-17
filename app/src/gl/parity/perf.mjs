@@ -15,7 +15,7 @@
 // density between tiers.
 import { getScene } from './corpus.mjs';
 import { buildSceneContract } from '../sceneContract.js';
-import { resolveLayers } from '../../../../studio/render.mjs';
+import { resolveLayers, whenSwarmWasmReady } from '../../../../studio/render.mjs';
 import { getRenderCaps } from '../../data/quality.js';
 import { buildRenderPayload, openHarnessPage, closeGlDriver } from './glDriver.mjs';
 
@@ -27,6 +27,7 @@ async function main(argv) {
   const scene = getScene(sceneId);
   const doc = { ...scene.doc, ...(quality ? { quality } : {}) };
   const caps = getRenderCaps(doc.quality || 'balanced', false);
+  await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
   const resolvedLayers = resolveLayers(doc, { caps });
   const contract = buildSceneContract({ doc, resolvedLayers, caps });
   const bg = resolvedLayers[0]?.palette?.bg || '#000000';

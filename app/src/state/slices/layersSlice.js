@@ -103,17 +103,22 @@ export const createLayersSlice = (set) => ({
     const layers = state.layers.filter((l) => l.id !== id);
     const snapshots = { ...state.layerSnapshots };
     delete snapshots[id];
+    // Don't leave a dangling FX-selection pointing at a deleted layer.
+    const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;
 
     if (id !== state.activeLayerId) {
-      return { layers, layerSnapshots: snapshots };
+      return { layers, layerSnapshots: snapshots, selectedFxLayerId };
     }
-    const nextActive = layers[0];
+    // FX layers are never the content-active layer (see setActiveLayer) —
+    // prefer a content layer so the invariant survives the deletion.
+    const nextActive = layers.find((l) => !isFxLayer(l)) || layers[0];
     const nextSnapshot = snapshots[nextActive.id] || freshSnapshot(state.seed);
     delete snapshots[nextActive.id];
     return {
       layers,
       layerSnapshots: snapshots,
       activeLayerId: nextActive.id,
+      selectedFxLayerId,
       ...nextSnapshot,
     };
   }),

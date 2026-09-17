@@ -12,7 +12,16 @@ export const createAudioSlice = (set) => ({
 
   setAudioEnabled: (enabled) => set({ audioEnabled: enabled }),
   setAudioDenied: (denied) => set({ audioDenied: !!denied }),
-  setAudioSource: (source) => set({ audioSource: source }),
+  setAudioSource: (source) => set((state) => {
+    // Blob URLs from file picks accumulate if never revoked. The previous
+    // source's element is torn down right after this update, so revoking
+    // here is safe — nothing will need the old URL again.
+    const prev = state.audioSource;
+    if (prev && prev.type === 'file' && typeof prev.url === 'string' && prev.url !== source?.url) {
+      try { URL.revokeObjectURL(prev.url); } catch { /* already revoked */ }
+    }
+    return { audioSource: source };
+  }),
   setAudioGain: (gain) => set({ audioGain: gain }),
   setAudioMonitor: (monitor) => set({ audioMonitor: monitor }),
   setAudioBands: (bands) => set({ audioBands: bands }),

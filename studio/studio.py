@@ -134,6 +134,15 @@ def clamp_optics(optics) -> float:
     return max(0.0, min(1.0, n))
 
 
+def clamp_accum01(v, default=0.0) -> float:
+    """Phase A feedback amounts (TUNNEL/PRISM): 0..1, off by default."""
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return default
+    return max(0.0, min(1.0, n))
+
+
 def project_fade(project: Path, override) -> float:
     if override is not None:
         return clamp_fade(override)
@@ -153,6 +162,28 @@ def project_optics(project: Path, override) -> float:
         return clamp_optics((doc.get("layoutParams") or {}).get("accumulationOptics"))
     except Exception:
         return DEFAULT_ACCUM_OPTICS
+
+
+def project_tunnel(project: Path, override) -> float:
+    """The TUNNEL slider (layoutParams.accumulationTunnel), or --tunnel."""
+    if override is not None:
+        return clamp_accum01(override)
+    try:
+        doc = json.loads(project.read_text())
+        return clamp_accum01((doc.get("layoutParams") or {}).get("accumulationTunnel"))
+    except Exception:
+        return 0.0
+
+
+def project_prism(project: Path, override) -> float:
+    """The PRISM slider (layoutParams.accumulationPrism), or --prism."""
+    if override is not None:
+        return clamp_accum01(override)
+    try:
+        doc = json.loads(project.read_text())
+        return clamp_accum01((doc.get("layoutParams") or {}).get("accumulationPrism"))
+    except Exception:
+        return 0.0
 
 
 class RenderError(RuntimeError):
@@ -300,12 +331,16 @@ def cmd_accum(a, size, out: Path) -> None:
     steps = max(2, int(a.steps))
     fade = project_fade(project, a.fade)
     optics = project_optics(project, a.optics)
+    tunnel = project_tunnel(project, a.tunnel)
+    prism = project_prism(project, a.prism)
     cmd = [
         "node", str(ACCUM_STILL_MJS), str(project),
         "--out", str(out),
         "--steps", str(steps),
         "--fade", repr(fade),
         "--optics", repr(optics),
+        "--tunnel", repr(tunnel),
+        "--prism", repr(prism),
         "--res", f"{size[0]}x{size[1]}",
     ]
     if a.seed is not None:
@@ -344,7 +379,7 @@ def cmd_accum(a, size, out: Path) -> None:
         out.with_suffix(".json").write_text(json.dumps(sidecar(
             project, a.seed, size, a.uncapped,
             extra={"accum": True, "steps": steps, "fade": fade,
-                   "optics": optics,
+                   "optics": optics, "tunnel": tunnel, "prism": prism,
                    "renderer": "app/src/gl (WebGL2) shared ACCUM recipe"},
         ), indent=2))
     print(out)
@@ -552,6 +587,10 @@ def main(argv=None) -> None:
     sp.add_argument("--fade", type=float, default=None)
     sp.add_argument("--optics", type=float, default=None,
                     help="ACCUM optics amount 0..1 (GLOW slider: bloom + halation + blur-over-time)")
+    sp.add_argument("--tunnel", type=float, default=None,
+                    help="ACCUM feedback amount 0..1 (TUNNEL slider: zoom + spin light-tunnels)")
+    sp.add_argument("--prism", type=float, default=None,
+                    help="ACCUM chromatic drift 0..1 (PRISM slider: trails split into rainbow fringes)")
     sp.add_argument("--ramp", action="append", default=[])
     sp.add_argument("--motion", default="auto")
     sp.set_defaults(func=cmd_render)

@@ -1,0 +1,21 @@
+[package]
+name = "swarm-bake"
+version = "0.1.0"
+edition = "2021"
+description = "Swarm bake inner loop for Kinetic_Curator (#175) — compiled to wasm32-unknown-unknown"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Pure-Rust math for sin/cos/atan2 on wasm (no system libm on
+# wasm32-unknown-unknown). sqrt/floor/abs are compiler intrinsics and match
+# JS Math.sqrt/Math.floor bit-for-bit; sin/cos/atan2 may differ from V8 in
+# the last ulp — see the crate docs and swarmWasm.selfcheck.mjs.
+libm = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

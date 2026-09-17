@@ -3,13 +3,13 @@ export const PRESET_GROUPS = [
   { id: 'classic', label: 'Classic' },
   { id: 'rendah',  label: 'Rendah Mag' },
   { id: 'ca',      label: 'Cellular Automaton' },
-  { id: 'davis',   label: 'Davis-Lineage' },
+  { id: 'davis',   label: 'Ghost-Lineage' },
 ];
 
 export const COMPOSITION_PRESETS = [
   {
-    id: 'praystation', name: 'PRAYSTATION', group: 'classic',
-    desc: 'Davis dense glyph bloom — phi spiral, slow breath, no boids',
+    id: 'praystation', name: 'ORIGIN', group: 'classic',
+    desc: 'Dense glyph bloom — phi spiral, slow breath, no boids',
     categories: ['organic', 'radial', 'stamps'], paletteShift: 'band',
     params: {
       mode: 'fibonacci', count: 240, scale: [0.4, 1.5], rotate: [-55, 55], alpha: [40, 96],
@@ -148,6 +148,17 @@ export const COMPOSITION_PRESETS = [
       zTiers: 4, jitter: 26, density: 110, bleed: false, recolor: true, mirror: false, overlap: true,
       blendMode: 'soft-light',
       lifeDrift: 0.04, displacement: 0, behave: 'cruise',
+    },
+  },
+  {
+    id: 'vortex-rwb', name: 'VORTEX RWB', group: 'classic',
+    desc: 'Ribbon-vortex study — marbled RWB bands warped by Perlin displacement, mirrored. Still image; see docs/VORTEX_RWB.md.',
+    categories: ['organic'], paletteShift: 'band',
+    params: {
+      mode: 'fibonacci', count: 640, scale: [1.3, 2.2], rotate: [0, 0], alpha: [80, 100],
+      zTiers: 3, jitter: 18, density: 100, bleed: true, recolor: true, mirror: true, overlap: true,
+      blendMode: 'normal',
+      lifeDrift: 0.04, displacement: 130, noiseFreq: 0.006, behave: 'cruise',
     },
   },
 ];

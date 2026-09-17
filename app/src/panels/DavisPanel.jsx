@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
@@ -53,12 +54,21 @@ export function DavisPanel() {
   const metro = phraseClock === 'metro';
   const rms = audioBands?.rms || 0;
   const noAttack = phraseEnabled && !metro && audioEnabled && phraseBeat === 0 && rms > 0.2;
+  // Phase A gesture: local FREEZE toggle state (the hook resets on ACCUM
+  // toggle, and this row unmounts with it, so the two stay in sync).
+  const [accumFrozen, setAccumFrozen] = useState(false);
+  const toggleFreeze = () => {
+    const next = !accumFrozen;
+    setAccumFrozen(next);
+    emit(Events.ACCUM_GESTURE, { action: 'freeze', value: next });
+  };
+  const accumOn = !!layoutParams.accumulation;
 
   return (
     <div className="panel panel-davis">
       <PanelHeader
         tag="P07"
-        title="DAVIS MODE"
+        title="GHOST STATION"
         subtitle={
           morphing ? 'morphing…'
             : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`
@@ -107,6 +117,26 @@ export function DavisPanel() {
             <button className="big-btn" title="Save the current seed as a hit (F)." onClick={saveFavorite}>FAVORITE</button>
             <button className="big-btn" title="Jump to a fresh random seed (N)." onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>NEW SEED</button>
           </div>
+
+          {accumOn && (
+            <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
+              <button className={`big-btn ${accumFrozen ? 'active' : ''}`}
+                onClick={toggleFreeze}
+                title="FREEZE: hold the trails mid-air — no fade, no new marks">
+                {accumFrozen ? 'THAW' : 'FREEZE'}
+              </button>
+              <button className="big-btn"
+                onClick={() => emit(Events.ACCUM_GESTURE, { action: 'clear' })}
+                title="CLEAR: wipe the trail buffer to the background">
+                CLEAR
+              </button>
+              <button className="big-btn"
+                onClick={() => emit(Events.ACCUM_GESTURE, { action: 'swell' })}
+                title="SWELL: breathe the trail length out and back over ~2 seconds">
+                SWELL
+              </button>
+            </div>
+          )}
 
           <FavoritesList favorites={favorites} />
       </div>

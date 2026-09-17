@@ -33,7 +33,7 @@ export function registerBuiltinEffects(bridge) {
   bridge.defineEffect('invert', one(id.invert, () => [0, 0, 0, 0]));
   bridge.defineEffect('rgbSplit', one(id.rgbSplit, (p) => [(p.dx || 0) / 1000, 0, 0, 0]));
   bridge.defineEffect('grain', one(id.grain, (p) => [p.amount ?? 0.4, 0, 0, 0]));
-  const sigma = (p, ctx) => [Math.max(0.5, (p.radius || 0) * (ctx.width / 1000)), 0, 0, 0];
+  const sigma = (p, ctx) => [(p.radius || 0) * (ctx.width / 1000), 0, 0, 0];
   bridge.defineEffect('blur', {
     program: 'effect',
     pad: 0, // padded blur routing activates with Phase-2 shaders

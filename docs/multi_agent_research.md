@@ -1,3 +1,5 @@
+> **Historical research report.** Idea bank and audit notes from the multi-agent research pass. Kept for the record.
+
 # Kinetic Curator — Multi-Agent Research Report
 
 > **5 parallel research tracks**, synthesized into actionable feature ideas, bug reports, and UX/UI suggestions.

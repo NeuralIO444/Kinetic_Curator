@@ -56,7 +56,7 @@ window.__kcRender = async (payload) => {
 
 /**
  * ACCUM trail still (#190). payload:
- *   { width, height, bg, fade, optics,
+ *   { width, height, bg, fade, optics, tunnel, prism,
  *     atlasB64, atlasW, atlasH, atlasMips, cells, grainLuts,
  *     frames: [{ contract, wrapBoxes }] }   // atlas shared across frames
  * Runs the whole sequence through the shared recipe (accum.mjs) and returns
@@ -86,6 +86,8 @@ window.__kcAccum = async (payload) => {
   const { pixels, width, height } = renderer.renderAccumSequence(frames, {
     fade: payload.fade,
     optics: payload.optics,
+    tunnel: payload.tunnel ?? 0,
+    prism: payload.prism ?? 0,
     background: payload.bg,
   });
   return { pixelsB64: u8ToB64(pixels), width, height };

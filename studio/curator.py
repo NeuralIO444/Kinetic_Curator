@@ -3,12 +3,13 @@
 
 Turns hit-hunting into search over the generative space:
 
-    studio.py batch -> PNGs -> embed (CLIP) -> label -> train -> rank / similar
+    studio.py batch -> PNGs -> embed (SigLIP on Apple MLX) -> label -> train -> rank / similar
 
-The taste model is a linear probe over frozen CLIP embeddings trained on *this
+The taste model is a linear probe over frozen SigLIP embeddings trained on *this
 operator's* likes vs passes. Deliberately not a generic aesthetic scorer.
 
-Everything runs locally. Weights come from the normal HF cache (~/.cache).
+Everything runs locally on the Mac Studio. Weights come from the normal HF cache
+(~/.cache/huggingface).
 
 The selection logic (`rank_indices`, `diversify`) is stdlib-only and covered by
 `python3 studio/curator.py selfcheck`, which needs no model and no numpy.
@@ -22,12 +23,16 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-# OpenAI's CLIP weights were trained with QuickGELU. Loading them into the
-# plain "ViT-L-14" config silently substitutes nn.GELU — open_clip warns, and
-# the embeddings come out subtly wrong. The -quickgelu config matches the
-# weights, so the index actually reflects what CLIP saw.
-DEFAULT_MODEL = "ViT-L-14-quickgelu"
-DEFAULT_PRETRAINED = "openai"
+# Apple MLX backend via the mlx-embeddings package (macOS / Apple Silicon only).
+# SigLIP so400m/384 is the embedding model; --model takes a full HF repo id.
+# Indexes embedded with the old torch/open_clip backend (model string
+# "ViT-L-14-quickgelu/openai") are NOT comparable — re-run `embed` to rebuild
+# the index under the new model. The model string stored in the .npz guards
+# against silent mixing (see score_all).
+DEFAULT_MODEL = "mlx-community/siglip-so400m-patch14-384"
+# Legacy torch/open_clip flag, kept so old scripts still parse; ignored by the
+# MLX backend (the model comes from --model alone).
+DEFAULT_PRETRAINED = ""
 
 
 # ── pure selection logic (stdlib only — this is what selfcheck covers) ────
@@ -80,33 +85,50 @@ def load_index(path: Path):
             "emb": z["emb"], "model": str(z["model"])}
 
 
-def open_clip_model(name: str, pretrained: str):
-    import torch
-    import open_clip
+def mlx_embed_model(repo_id: str):
+    """(model, processor) for image embedding — Apple MLX backend.
 
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
-    model, _, preprocess = open_clip.create_model_and_transforms(name, pretrained=pretrained)
-    return model.to(device).eval(), preprocess, device
+    All heavy imports happen here, never at module top level, so
+    `curator.py selfcheck` stays stdlib-only.
+    """
+    from mlx_embeddings.utils import load
+
+    try:
+        model, processor = load(repo_id)
+    except Exception as e:
+        raise SystemExit(
+            f"could not load {repo_id} via mlx-embeddings: {e}\n"
+            "hint: pip install mlx-embeddings (Apple Silicon Mac only). "
+            "Indexes built with the old torch/CLIP backend must be rebuilt: "
+            "re-run `curator.py embed <folder>`."
+        ) from e
+    model.eval()
+    return model, processor
 
 
-def embed_images(paths, name, pretrained, batch=32, log=print):
-    """-> float32 (N, D), L2-normalised."""
+def embed_images(paths, model_id, pretrained="", batch=32, log=print):
+    """-> float32 (N, D), L2-normalised. Apple MLX backend (SigLIP)."""
     import numpy as np
-    import torch
+    import mlx.core as mx
     from PIL import Image
 
-    model, preprocess, device = open_clip_model(name, pretrained)
-    log(f"  {name}/{pretrained} on {device}, {len(paths)} images")
+    if pretrained:
+        log(f"  note: --pretrained {pretrained!r} is ignored by the MLX backend "
+            f"(the model comes from --model {model_id!r})")
+    model, processor = mlx_embed_model(model_id)
+    log(f"  {model_id} via mlx-embeddings, {len(paths)} images")
     chunks = []
-    with torch.no_grad():
-        for s in range(0, len(paths), batch):
-            batch_paths = paths[s:s + batch]
-            # PNGs have an alpha channel; CLIP's preprocess wants RGB.
-            px = torch.stack([preprocess(Image.open(p).convert("RGB")) for p in batch_paths])
-            feats = model.encode_image(px.to(device)).float()
-            feats /= feats.norm(dim=-1, keepdim=True)
-            chunks.append(feats.cpu().numpy())
-            log(f"  {min(s + batch, len(paths))}/{len(paths)}")
+    for s in range(0, len(paths), batch):
+        batch_paths = paths[s:s + batch]
+        # PNGs have an alpha channel; the SigLIP processor wants RGB.
+        images = [Image.open(p).convert("RGB") for p in batch_paths]
+        pixel_values = mx.array(processor(images=images, return_tensors="np")["pixel_values"])
+        feats = model.get_image_features(pixel_values=pixel_values)
+        mx.eval(feats)
+        arr = np.asarray(feats, dtype=np.float32)
+        arr /= np.linalg.norm(arr, axis=-1, keepdims=True)
+        chunks.append(arr)
+        log(f"  {min(s + batch, len(paths))}/{len(paths)}")
     return np.concatenate(chunks).astype("float32")
 
 
@@ -119,8 +141,10 @@ def cmd_embed(a) -> None:
         sys.exit(f"no PNGs under {root}")
     out = index_path(root, a.index)
     emb = embed_images(paths, a.model, a.pretrained)
+    # The model string is the HF repo id verbatim; score_all refuses to mix a
+    # taste model trained on one embedding model with an index from another.
     np.savez(out, root=str(root), paths=np.array([label_path(root, p) for p in paths]),
-             emb=emb, model=f"{a.model}/{a.pretrained}")
+             emb=emb, model=a.model)
     print(f"{out}  ({len(paths)} x {emb.shape[1]})")
 
 
@@ -289,7 +313,10 @@ def cmd_similar(a) -> None:
         rel = label_path(idx["root"], query)
         q = idx["emb"][idx["paths"].index(rel)]
     except (ValueError, KeyError):
-        q = embed_images([query], *idx["model"].split("/"), log=lambda *_: None)[0]
+        # The stored model string is the HF repo id verbatim (MLX backend).
+        # An old torch/CLIP index ("ViT-L-14-quickgelu/openai") fails here with
+        # a clear load error telling you to re-run `embed` — never silently.
+        q = embed_images([query], idx["model"], log=lambda *_: None)[0]
     sims = idx["emb"] @ q
     for i in rank_indices(sims.tolist())[: a.k]:
         print(f"{sims[i]:.4f}  {idx['paths'][i]}")
@@ -338,11 +365,13 @@ def main(argv=None) -> None:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sp = sub.add_parser("embed", help="CLIP-embed every PNG under a folder -> .npz index")
+    sp = sub.add_parser("embed", help="SigLIP/MLX-embed every PNG under a folder -> .npz index")
     sp.add_argument("folder")
     sp.add_argument("--index", default=None, help="default <folder>/curator-index.npz")
-    sp.add_argument("--model", default=DEFAULT_MODEL)
-    sp.add_argument("--pretrained", default=DEFAULT_PRETRAINED)
+    sp.add_argument("--model", default=DEFAULT_MODEL,
+                    help="HF repo id for the MLX embedding model")
+    sp.add_argument("--pretrained", default=DEFAULT_PRETRAINED,
+                    help="legacy torch/open_clip flag, ignored by the MLX backend")
     sp.set_defaults(func=cmd_embed)
 
     sp = sub.add_parser("label", help="flip through the index in Preview, y/n")
@@ -386,7 +415,7 @@ def main(argv=None) -> None:
     sp.add_argument("--open", action="store_true", help="open the shortlist in Preview")
     sp.set_defaults(func=cmd_rank)
 
-    sp = sub.add_parser("similar", help="more like this — nearest neighbours in CLIP space")
+    sp = sub.add_parser("similar", help="more like this — nearest neighbours in embedding space")
     sp.add_argument("image")
     sp.add_argument("--index", required=True)
     sp.add_argument("-k", type=int, default=10)

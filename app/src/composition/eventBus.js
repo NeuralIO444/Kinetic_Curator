@@ -42,6 +42,7 @@ export const Events = {
   DAVIS_RESET_PHRASE: 'davis:resetPhrase',
   DAVIS_FAVORITE: 'davis:favorite',
   DAVIS_FAVORITE_REMOVE: 'davis:favoriteRemove',
+  ACCUM_GESTURE: 'accum:gesture', // Phase A: { action: 'freeze'|'clear'|'swell', value? }
   LAYOUT_PARAM: 'layout:param',
   LAYOUT_PRESET: 'layout:preset',
   LAYOUT_LOCK: 'layout:lock',
@@ -50,7 +51,6 @@ export const Events = {
   AUDIO_GAIN: 'audio:gain',
   AUDIO_SOURCE: 'audio:source',
   AUDIO_MONITOR: 'audio:monitor',
-  WEBCAM_TOGGLE: 'webcam:toggle',
   ASSETS_TOGGLE: 'assets:toggle',
   ASSETS_SOLO: 'assets:solo',
   ASSETS_TOGGLE_ALL: 'assets:toggleAll',
@@ -83,7 +83,6 @@ export const Events = {
   LAYER_SET_ACTIVE: 'layer:setActive',
   LAYER_REORDER: 'layer:reorder',
   LAYER_TOGGLE_VISIBLE: 'layer:toggleVisible',
-  LAYER_RENAME: 'layer:rename',
   LAYER_SET_BLEND_MODE: 'layer:setBlendMode',
   LAYER_SET_OPACITY: 'layer:setOpacity',
   LAYER_DUPLICATE: 'layer:duplicate',
@@ -96,9 +95,7 @@ export const Events = {
   FX_EFFECT_SET_PARAM: 'fx:effectSetParam',
   PALETTE_SAVE: 'palette:save',
   PALETTE_DELETE: 'palette:delete',
-  PALETTE_RENAME: 'palette:rename',
   PALETTE_IMPORT: 'palette:import',
-  PALETTE_CLEAR_LIBRARY: 'palette:clearLibrary',
   PALETTE_LOCK: 'palette:lock',
   PALETTE_HARMONY: 'palette:harmony',
 };

@@ -44,20 +44,24 @@ export function duplicateIntoOverlay(source, overlay) {
   return { ok: true, asset, overlay: [...clean, asset] };
 }
 
-export function ingestIntoOverlay(rawSvg, overlay, hint = 'ingest') {
+export function ingestIntoOverlay(rawSvg, overlay, hint = 'ingest', opts = {}) {
   const clean = sanitizeOverlay(overlay);
   if (clean.length >= OVERLAY_CAP) return { ok: false, error: 'overlay full', overlay: clean };
   const taken = new Set(clean.map((a) => a.id));
   let base = String(hint || 'ingest').replace(/\.svg$/i, '');
-  let parsed = ingestSvg(rawSvg, { id: base });
+  const source = opts.source || 'ingest';
+  const ingestOpts = { id: base };
+  if (opts.category) ingestOpts.category = opts.category;
+  if (opts.weight) ingestOpts.weight = opts.weight;
+  let parsed = ingestSvg(rawSvg, ingestOpts);
   if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
   let n = 2;
   while (taken.has(parsed.asset.id)) {
-    parsed = ingestSvg(rawSvg, { id: `${base}_${n}` });
+    parsed = ingestSvg(rawSvg, { ...ingestOpts, id: `${base}_${n}` });
     n += 1;
     if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
   }
-  const asset = { ...parsed.asset, source: 'ingest', tags: [...new Set([...(parsed.asset.tags || []), 'overlay', 'ingest'])] };
+  const asset = { ...parsed.asset, source, tags: [...new Set([...(parsed.asset.tags || []), 'overlay', source])] };
   return { ok: true, asset, overlay: [...clean, asset] };
 }
 

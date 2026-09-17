@@ -217,7 +217,7 @@ export function createRenderer(canvas) {
   };
 
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
-  /** Draw instance list (Float32Array, 10 floats each) into the bound FBO. */
+  /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
@@ -518,7 +518,7 @@ export function createRenderer(canvas) {
    * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb' }
    * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
    */
-  function renderAccumSequence(frames, { fade = 0.88, optics = 0, background = '#000000' } = {}) {
+  function renderAccumSequence(frames, { fade = 0.88, optics = 0, tunnel = 0, prism = 0, background = '#000000' } = {}) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
     const { width: w, height: h, contract } = frames[0];
     if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
@@ -530,7 +530,7 @@ export function createRenderer(canvas) {
     const accum = createAccum(gl, bridge, { width: w, height: h });
     try {
       accum.begin(background);
-      const params = accumRecipeParams({ fade, optics });
+      const params = accumRecipeParams({ fade, optics, tunnel, prism });
       for (const payload of frames) {
         if (payload.contract.version !== 1) {
           throw new Error(`[gl] unsupported contract version ${payload.contract.version}`);

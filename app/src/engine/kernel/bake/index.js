@@ -25,6 +25,11 @@
 // live loop would show after N steps from the same seed.
 
 import { ParticleSystem } from '../../particles.js';
+import { ensureSwarmWasm, getSwarmWasm, runSwarmWasm, resolveWasmParams, wasmBakeEligible, wasmForcedOff } from './swarmWasm.mjs';
+
+// Re-exported so the studio render path can preload the wasm fast path
+// without importing the loader module directly.
+export { ensureSwarmWasm };
 
 /** Fixed origin for baked time — any constant works; this one is arbitrary
  *  and deliberately not Date.now(). */
@@ -47,6 +52,14 @@ export const BAKE_DT_MS = 1000 / 60;
  * @param {number}   [opts.steps=180]  simulation steps to settle (3s at 60fps)
  * @param {number}   [opts.dt=BAKE_DT_MS]
  * @param {{x:number,y:number}|null} [opts.attractor=null]
+ * @param {number}   [opts.maxParticles] quality cap gating breed() growth
+ * @param {'auto'|'js'|'wasm'} [opts.engine='auto'] bake engine. 'auto'
+ *   uses the Rust/wasm fast path (#175) when it has been preloaded (see
+ *   ensureSwarmWasm, called by the studio render path) and the config is in
+ *   the wasm scope (cloud swarm, no contacts, no attractor); anything else
+ *   — and any load failure — falls back to the JS engine. 'wasm' throws if
+ *   the module is unavailable; 'js' forces the JS engine. KC_SWARM_WASM=0
+ *   also forces the JS engine.
  * @returns {Array<{x,y,rotation,scale,alpha,color,assetIndex}>}
  */
 export function bakeParticles({
@@ -60,15 +73,47 @@ export function bakeParticles({
   steps = 180,
   dt = BAKE_DT_MS,
   attractor = null,
+  maxParticles,
+  engine = 'auto',
 }) {
   const sys = new ParticleSystem();
   sys.init(count, canvasW, canvasH, activeAssets, palette, seed);
 
-  const params = { ...layoutParams, particleCount: count };
-  for (let s = 0; s < steps; s++) {
-    // Fixed timestep from a fixed origin — the one thing that makes this
-    // reproducible. The live loop passes Date.now() here.
-    sys.update(params, activeAssets, palette, seed, BAKE_TIME_ORIGIN + s * dt, attractor);
+  // #167 — the quality cap rides on the params so contact breed() can gate
+  // population growth; the bake stays a pure function of its inputs.
+  const params = {
+    ...layoutParams,
+    particleCount: count,
+    maxParticles: maxParticles ?? count,
+  };
+
+  // #175 — Rust/wasm fast path. Opt-in at the call site via ensureSwarmWasm()
+  // preload; scope-gated to the cloud path the wasm module implements.
+  let ranWasm = false;
+  if (!wasmForcedOff() && engine !== 'js' && wasmBakeEligible({ layoutParams: params, attractor, count: sys.n }).ok) {
+    const wasm = getSwarmWasm();
+    if (wasm) {
+      runSwarmWasm(wasm, sys, {
+        n: sys.n,
+        steps,
+        time0: BAKE_TIME_ORIGIN,
+        dt,
+        params16: resolveWasmParams(params, canvasW, canvasH),
+        seed,
+      });
+      ranWasm = true;
+    } else if (engine === 'wasm') {
+      throw new Error(
+        'bakeParticles: engine "wasm" requested but the swarm wasm module is not loaded — call ensureSwarmWasm() first.',
+      );
+    }
+  }
+  if (!ranWasm) {
+    for (let s = 0; s < steps; s++) {
+      // Fixed timestep from a fixed origin — the one thing that makes this
+      // reproducible. The live loop passes Date.now() here.
+      sys.update(params, activeAssets, palette, seed, BAKE_TIME_ORIGIN + s * dt, attractor);
+    }
   }
   return sys.getItems(activeAssets);
 }

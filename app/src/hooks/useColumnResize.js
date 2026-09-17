@@ -56,7 +56,7 @@ export function useColumnResize(initialFractions = [0.32, 0.34, 0.34], minPx = 2
 
   const onDividerPointerUp = useCallback((e) => {
     dragRef.current.active = false;
-    e.target.releasePointerCapture(e.pointerId);
+    try { e.target.releasePointerCapture(e.pointerId); } catch { /* already released */ }
   }, []);
 
   // Double-click to reset

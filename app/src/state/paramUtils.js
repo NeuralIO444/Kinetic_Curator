@@ -1,4 +1,5 @@
 // Shared parameter randomization + morph key lists
+import { PALETTES } from '../data/palettes.js';
 
 export const RANDOMIZABLE_KEYS = [
   'count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers',
@@ -68,4 +69,6 @@ export function generateLayoutTargets(state) {
   return newLayout;
 }
 
-export const PALETTE_IDS = ['praystation', 'v01d', 'hydra', 'dystopia', 'folktotem'];
+// Derived from the palette catalog so new palettes join Evolve's cycle
+// without a second edit site.
+export const PALETTE_IDS = PALETTES.map((p) => p.id);

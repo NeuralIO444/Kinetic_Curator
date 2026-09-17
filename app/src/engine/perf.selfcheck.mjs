@@ -33,6 +33,7 @@ import assert from 'node:assert';
 import { computePlacements, computePlacementsSoA } from './placement.js';
 import { buildPlacements } from './buildPlacements.js';
 import { bakeParticles } from './kernel/bake/index.js';
+import { ensureSwarmWasm, swarmWasmLoadError } from './kernel/bake/swarmWasm.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 const SEED = 0xa17e9b21;
@@ -175,9 +176,9 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 // against the ~13 a uniform density would predict, and the remaining cost is
 // bound by neighbour-visit-order and spatial-hash cell size — both of which
 // particles.selfcheck.mjs's exact-match hashes forbid changing without a
-// deliberate new golden baseline. Closing the rest of the gap means either
-// accepting it or a Rust/WASM rewrite of the kernel (#108's own stated
-// path); that tradeoff is a call for a human, not something to force here.
+// deliberate new golden baseline. #175 closed the gap the other stated way:
+// a Rust/wasm port of the hot loop (kernel/bake/swarm-bake), measured in the
+// row below against this same JS baseline.
 //
 // Worth knowing what this budget is actually protecting: bakeParticles runs
 // only in studio/render.mjs, the offline render farm. Nothing interactive
@@ -200,7 +201,19 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
   const out = bakeParticles(opts);
   assert.strictEqual(out.length, 400, 'bake should return the requested particle count');
   const ms = timeMs(() => bakeParticles(opts), { warmup: 1, trials: 5 });
-  budget('bake 400x120 swarm steps', ms, 30, 'post swarm-SoA; remaining cost is real neighbour work in a clustered swarm');
+  budget('bake 400x120 swarm steps (JS)', ms, 30, 'post swarm-SoA; remaining cost is real neighbour work in a clustered swarm');
+
+  // #175 — the Rust/wasm fast path for this exact bake. Correctness and
+  // distribution gates live in kernel/bake/swarmWasm.selfcheck.mjs; here we
+  // just record the before/after on the same machine.
+  const wasm = await ensureSwarmWasm();
+  if (wasm) {
+    const wms = timeMs(() => bakeParticles({ ...opts, engine: 'wasm' }), { warmup: 2, trials: 5 });
+    budget('bake 400x120 swarm steps (wasm)', wms, 30,
+      `#175 fast path; ${(ms / wms).toFixed(2)}x the JS engine on this machine`);
+  } else {
+    console.log(`  [skip] wasm bake 400x120: module unavailable — ${swarmWasmLoadError()}`);
+  }
 }
 
 // ── 4. Incremental dirty-C (scale/alpha only) vs full eval ──────────────

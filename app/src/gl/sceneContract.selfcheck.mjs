@@ -154,7 +154,7 @@ ok('accum defaults null; enabled accum recorded and clamped', () => {
     resolvedLayers: resolveLayers(doc, { caps }),
     accum: { enabled: true, fade: 5, background: '#101010' },
   });
-  assert.deepEqual(s.accum, { enabled: true, fade: 0.99, optics: 0, background: '#101010' });
+  assert.deepEqual(s.accum, { enabled: true, fade: 0.99, optics: 0, tunnel: 0, prism: 0, background: '#101010' });
 });
 
 ok('assertSceneContract rejects malformed scenes', () => {

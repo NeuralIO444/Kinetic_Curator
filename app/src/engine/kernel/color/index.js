@@ -28,7 +28,7 @@ export function assignColor(ctx, palette, strategy) {
     return { color: '#ffffff', accent: '#ffffff', slot: -1 };
   }
 
-  const color = colorForPlacement({
+  const { color, slot } = colorForPlacement({
     swatches,
     strategy,
     t: ctx.t,
@@ -41,7 +41,6 @@ export function assignColor(ctx, palette, strategy) {
   // near-black twice, and user palettes and harmony shuffles can produce
   // duplicates freely — in which case indexOf silently returns the first
   // match and every duplicate gets the same wrong accent.
-  const slot = swatches.indexOf(color);
   const accent = swatches[(slot + ACCENT_OFFSET) % swatches.length] || swatches[0];
   return { color, accent, slot };
 }

@@ -10,12 +10,6 @@ export const MATERIALS = [
   { id: 'stipple', kind: 'pattern', cell: 6 },
 ];
 
-export function materialFrame(id, u) {
-  const t = Number.isFinite(u) ? Math.min(1, Math.max(0, u)) : 0;
-  const mat = MATERIALS.find((m) => m.id === id) || MATERIALS[0];
-  return { ...mat, t };
-}
-
 export function materialHref(id) {
   const mat = MATERIALS.find((m) => m.id === id) || MATERIALS[0];
   if (mat.kind === 'flat') return null;

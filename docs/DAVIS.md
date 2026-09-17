@@ -1,6 +1,6 @@
-# Davis clock
+# Ghost Station clock
 
-Homage to Joshua Davis’s *practice*: a generative composition-machine. Hand assets in (P02 / Illustrator), rule + chance out (seed, modes, evolve), keep the hit (F / favorites / farm). Not Praystation pixels, not HYPE, not VO1D/PULSAR skins.
+A generative composition-machine in the lineage of early-2000s generative art. Hand assets in (P02 / Illustrator), rule + chance out (seed, modes, evolve), keep the hit (F / favorites / farm). Not anyone's pixels — homage to the practice, not the pictures.
 
 ## Panel (P07)
 
@@ -11,6 +11,7 @@ Homage to Joshua Davis’s *practice*: a generative composition-machine. Hand as
 | CLOCK AUDIO | Needs Stimulus audio. Subtitle `waiting for beat` if armed and silent. |
 | CLOCK METRO | Internal pulse at BPM. No mic. |
 | Hits | Archive. Farm prints editions. |
+| ACCUM gestures | Appear when ACCUM is on. FREEZE holds the trail buffer mid-air (toggles to THAW); CLEAR wipes it to the background; SWELL breathes FADE up and back over ~2.4s. They play the live 2D buffer (`useAccumulationBuffer`), not the GPU still recipe. |
 
 CA wrap only paints when layout mode is Cellular. INTERVAL is inert on BEAT.
 

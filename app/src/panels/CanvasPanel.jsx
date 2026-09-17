@@ -13,6 +13,7 @@ import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewpor
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
 import { useAccumulationBuffer } from '../hooks/useAccumulationBuffer.js';
+import { on, Events } from '../composition/eventBus.js';
 import { Layer } from './canvas/Layer.jsx';
 import { isFxLayer, fxFilterId, compileFxPrimitives } from '../fx/fxFilters.js';
 import { FxFilterDefs } from '../fx/FxFilterDefs.jsx';
@@ -106,7 +107,24 @@ export function CanvasPanel() {
     layoutParams, weightOverrides, evolveMode, beatPulse, audioBands,
     motionSmoothing, quality, running, layers, activeLayerId, slowRender,
     perfTier1, assetThin,
+    // resolveLayerSource's full read set — kept as explicit memo deps below
+    // so beatPulse/audioBands frames don't redo layer resolution.
+    seed, paletteId, paletteOverrides, caGrid, enabledAssets, layerSnapshots,
+    userPalettes, driftOverlay, perfClampOverride,
   } = state;
+
+  // Narrow, stable-identity view of exactly what layer resolution reads.
+  // The old code passed the whole `state` object here, so every beatPulse /
+  // audioBands tick (60fps during audio) re-ran palette resolution, asset
+  // filtering and cost sorting for every layer. If resolveLayerSource ever
+  // reads a new state field, add it here AND to the memo deps below.
+  const layerSrcState = useMemo(() => ({
+    activeLayerId, driftOverlay, perfClampOverride, layoutParams,
+    seed, paletteId, paletteOverrides, caGrid, enabledAssets, layerSnapshots,
+  }), [
+    activeLayerId, driftOverlay, perfClampOverride, layoutParams,
+    seed, paletteId, paletteOverrides, caGrid, enabledAssets, layerSnapshots,
+  ]);
 
   const preset = getPreset(layoutParams.composition);
   const caps = getQualityCaps(quality || 'balanced');
@@ -129,14 +147,14 @@ export function CanvasPanel() {
     // FX layers hold no content — they wrap the accumulated stack below in
     // a filter group. Skip the whole content-resolution path for them.
     if (isFxLayer(layer)) return { layer, isFx: true, activeAssets: [] };
-    const src = resolveLayerSource(layer, state);
+    const src = resolveLayerSource(layer, layerSrcState);
     // #107 §4 tier 1: unlike driftOverlay/perfClampOverride (active layer
     // only), mirror sheds on EVERY visible layer — an inactive snapshot can
     // be the one costing the frame.
     const layoutParams = (perfTier1 && src.layoutParams.mirror)
       ? { ...src.layoutParams, mirror: false }
       : src.layoutParams;
-    const palette = resolvePalette(src.paletteId, src.paletteOverrides, state.userPalettes);
+    const palette = resolvePalette(src.paletteId, src.paletteOverrides, userPalettes);
     let activeAssets = assets
       .filter(a => src.enabledAssets[a.id])
       .map(a => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
@@ -153,7 +171,7 @@ export function CanvasPanel() {
     const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
     const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
     return { layer, ...src, layoutParams, palette, activeAssets, safeCount, safeParticles };
-  }), [visibleLayers, state, assets, weightOverrides, caps, perfTier1, assetThin]);
+  }), [visibleLayers, layerSrcState, userPalettes, assets, weightOverrides, caps, perfTier1, assetThin]);
 
   // Cheap-first sprite order (§6): the sprite sheet renders its cache in
   // cost order, so if anything downstream ever has to drop a sprite, the
@@ -201,7 +219,7 @@ export function CanvasPanel() {
   const activeCount = layerCounts[activeLayerId] || 0;
   const activeSafeCount = resolvedLayers.find(rl => rl.layer.id === activeLayerId)?.safeCount ?? 0;
   const showGloss = shouldRenderGloss(quality, layoutParams.shading, activeCount) && !perfTier1;
-  const { clear: clearAccum } = useAccumulationBuffer({
+  const { clear: clearAccum, setFrozen: setAccumFrozen, swell: swellAccum } = useAccumulationBuffer({
     svgRef, accumRef, enabled: accumOn,
     fade: layoutParams.accumulationFade ?? 0.88,
     background: activePalette.bg,
@@ -211,6 +229,15 @@ export function CanvasPanel() {
     // every perf dip. `running` already just skips the frame's work.
     running: running && !slowRender,
   });
+
+  // Phase A gestures (Davis panel PERFORM): FREEZE / CLEAR / SWELL act on
+  // the live accum buffer owned by this panel's hook.
+  useEffect(() => on(Events.ACCUM_GESTURE, (p) => {
+    if (!p || typeof p !== 'object') return;
+    if (p.action === 'clear') clearAccum();
+    else if (p.action === 'freeze') setAccumFrozen(p.value);
+    else if (p.action === 'swell') swellAccum();
+  }), [clearAccum, setAccumFrozen, swellAccum]);
 
   useEffect(() => {
     if (typeof dispatch === 'function') dispatch({ type: 'SET_NODE_COUNT', payload: totalNodeCount });

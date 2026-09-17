@@ -29,6 +29,7 @@ export function OutputPanel() {
     paletteOverrides: s.paletteOverrides,
     lockedParams: s.lockedParams,
     caGrid: s.caGrid,
+    customAssets: s.customAssets,
     layers: s.layers,
     activeLayerId: s.activeLayerId,
     layerSnapshots: s.layerSnapshots,
@@ -39,7 +40,7 @@ export function OutputPanel() {
   const {
     snapshots, exportResolution, isRecording, seed, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
-    paletteOverrides, lockedParams, caGrid, layers, activeLayerId, layerSnapshots,
+    paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
     userPalettes, favorites, rendering, watchdogTripGen,
   } = state;
   // #107 §7: this lives in the store (not local state) so the App-level
@@ -229,6 +230,7 @@ export function OutputPanel() {
       enabledAssets,
       quality,
       assetWeightOverrides,
+      customAssets,
       layers,
       activeLayerId,
       layerSnapshots,
@@ -253,7 +255,7 @@ export function OutputPanel() {
       version: 1,
       project: serializeProject({
         seed, paletteId, paletteOverrides, layoutParams, lockedParams, caGrid,
-        enabledAssets, quality, assetWeightOverrides, layers, activeLayerId, layerSnapshots,
+        enabledAssets, quality, assetWeightOverrides, customAssets, layers, activeLayerId, layerSnapshots,
       }),
       hits: (favorites || []).map((f) => ({
         seed: f.seed >>> 0,
@@ -446,7 +448,8 @@ export function OutputPanel() {
             className="big-btn"
             title="Record the canvas as WebM. Does not sample the ACCUM buffer."
             onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
-            disabled={rendering}
+            disabled={rendering || (accumOn && !isRecording)}
+            title={accumOn && !isRecording ? 'REC is disabled while ACCUM is on: the recorder captures the SVG layer, not the accumulation buffer' : 'Record live output to WEBM'}
             style={isRecording ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
           >
             {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}

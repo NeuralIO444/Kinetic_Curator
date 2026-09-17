@@ -206,15 +206,22 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
   }
 
   function uploadUniforms(rec, def, values, cache) {
+    // The cache is shared per layer but uniform LOCATIONS are per program:
+    // a later program in the same chain must not inherit an earlier
+    // program's "already uploaded" marks. (Concretely: u_res uploaded for
+    // displace was then skipped for edge, leaving it at (0,0) so
+    // 1.0/u_res produced Inf offsets and garbage output.) Key by program.
+    const ns = rec.name + '\0';
     for (const [uname, value] of Object.entries(values)) {
       const glType = def.uniforms[uname];
       if (!glType) throw new Error(`[bridge] program "${rec.name}": uniform "${uname}" not declared`);
       const loc = locationOf(rec, uname);
       if (loc == null) { stats.uniformSkips++; continue; } // optimized out of the shader
-      const prev = cache.get(uname);
+      const key = ns + uname;
+      const prev = cache.get(key);
       if (prev !== undefined && sameValue(prev, value)) { stats.uniformSkips++; continue; }
       setUniform(glType, loc, value);
-      cache.set(uname, copyValue(value));
+      cache.set(key, copyValue(value));
       stats.uniformUploads++;
     }
   }

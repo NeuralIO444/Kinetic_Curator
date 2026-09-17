@@ -12,7 +12,7 @@
  * -> render in headless Chromium (WebGL2, renderer.mjs) -> readPixels.
  */
 import { buildSceneContract } from './sceneContract.js';
-import { resolveLayers } from '../../../studio/render.mjs';
+import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderViaGL, closeGlDriver } from './parity/glDriver.mjs';
 
@@ -23,6 +23,7 @@ export async function renderCandidate(scene, { width = 400 } = {}) {
   if (!doc) throw new Error('[parity] GL candidate: scene has no doc');
   // Same resolution path as the SVG reference (renderSvg with defaults).
   const caps = getRenderCaps(doc.quality || 'balanced', false);
+  await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
   const resolvedLayers = resolveLayers(doc, { caps });
   const contract = buildSceneContract({ doc, resolvedLayers, caps });
   const height = Math.round((width * 700) / 1000);

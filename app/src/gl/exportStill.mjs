@@ -48,8 +48,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSceneContract } from './sceneContract.js';
-import { resolveLayers } from '../../../studio/render.mjs';
+import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
+import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderExportViaGL, closeGlDriver } from './parity/glDriver.mjs';
 import { writePngFile } from './png.mjs';
@@ -162,6 +162,7 @@ export async function renderExport({
   }
   const d = seed != null ? { ...doc, seed: seed >>> 0 } : doc;
   const caps = getRenderCaps(d.quality || 'balanced', !!uncapped);
+  await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
   const resolvedLayers = resolveLayers(d, {
     caps,
     ramp: ramp || null,
@@ -169,6 +170,7 @@ export async function renderExport({
     progress,
   });
   const contract = buildSceneContract({ doc: d, resolvedLayers, caps });
+  warnUnsupportedMaterials(resolvedLayers);
   // Background: explicit flag wins, else the project's palette bg (same rule
   // as the parity candidate and accumStill).
   const paletteBg = resolvedLayers[0]?.palette?.bg || '#000000';

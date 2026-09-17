@@ -1,3 +1,5 @@
+> **Historical plan (Bundle 10, pre-0.8).** Shipped long ago. Kept for the record.
+
 # Bundle 10 — Production Hardening & Motion Engine
 
 This bundle focuses on architecting the application for production scale. We will eliminate UI performance bottlenecks caused by the React Context API, introduce fluid motion to the generative assets, and restructure the codebase for long-term maintainability.

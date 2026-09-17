@@ -1,16 +1,24 @@
 // AssetStudioModal — motif kit over P02. Not Illustrator.
-import { useMemo, useRef, useState } from 'react';
-import { PRIMITIVES } from '../assets/primitives.js';
+// Lazy-loaded: the live bundle never imports this until the modal opens.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { PRIMITIVES, polyInner } from '../assets/primitives.js';
+import { ingestSvg } from '../assets/ingest.js';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
 
 let seq = 1;
 const SNAP = 10;
+const UNDO_CAP = 20;
 const snap = (n) => Math.round(n / SNAP) * SNAP;
 const clampS = (n) => Math.max(0.3, Math.min(2.5, +Number(n).toFixed(2)));
 
 function axes(p) {
   return { sx: p.sx ?? p.scale ?? 1, sy: p.sy ?? p.scale ?? 1 };
+}
+
+function innerFor(p) {
+  if (p.kind === 'poly') return polyInner(p.n);
+  return PRIMITIVES[p.kind] || p.svg || '';
 }
 
 function toSvg(parts) {
@@ -20,8 +28,7 @@ function toSvg(parts) {
       ? `color: ${token}; fill: none; stroke: currentColor; stroke-width: 3`
       : `color: ${token}`;
     const { sx, sy } = axes(p);
-    const inner = PRIMITIVES[p.kind] || p.svg || '';
-    return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${sx} ${sy}) translate(-50 -50)">${inner}</g>`;
+    return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${sx} ${sy}) translate(-50 -50)">${innerFor(p)}</g>`;
   }).join('');
 }
 
@@ -36,21 +43,59 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const [picked, setPicked] = useState(-1);
   const [category, setCategory] = useState('organic');
   const [hint, setHint] = useState(seedId.replace(/^user:/, '') || 'motif');
+  const [sides, setSides] = useState(6);
+  const [error, setError] = useState('');
+  const [undoDepth, setUndoDepth] = useState(0);
   const drag = useRef(null);
   const svgRef = useRef(null);
+  const sheetRef = useRef(null);
+
+  // Parts ref mirrors state so commits can snapshot synchronously.
+  const partsRef = useRef(parts);
+  const histRef = useRef([]);
+  const sync = (next) => { partsRef.current = next; setParts(next); };
+  const snapshot = () => {
+    histRef.current.push(partsRef.current);
+    if (histRef.current.length > UNDO_CAP) histRef.current.shift();
+    setUndoDepth(histRef.current.length);
+  };
+  /** Commit a new parts array, pushing the pre-state onto the undo stack. */
+  const commit = (fn) => {
+    snapshot();
+    sync(fn(partsRef.current));
+  };
+  /** Apply without pushing (drag moves snapshot once at drag start). */
+  const live = (fn) => sync(fn(partsRef.current));
+  const undo = () => {
+    const prev = histRef.current.pop();
+    if (prev === undefined) return;
+    sync(prev);
+    setUndoDepth(histRef.current.length);
+    setPicked(-1);
+    setError('');
+  };
 
   const svg = useMemo(() => toSvg(parts), [parts]);
   const compound = parts.length > 1;
 
+  // Esc closes the modal; the live canvas keeps running underneath.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const add = (kind) => {
-    setParts((p) => {
-      setPicked(p.length);
-      return [...p, fresh(kind)];
+    commit((p) => {
+      const extra = kind === 'poly' ? { n: sides } : {};
+      const next = [...p, fresh(kind, extra)];
+      setPicked(next.length - 1);
+      return next;
     });
   };
   const patchSel = (fn) => {
     if (picked < 0) return;
-    setParts((p) => p.map((row, i) => (i === picked ? fn(row) : row)));
+    commit((p) => p.map((row, i) => (i === picked ? fn(row) : row)));
   };
   const bump = (key, d) => patchSel((r) => {
     const { sx, sy } = axes(r);
@@ -61,22 +106,29 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     const next = key === 'sx' ? clampS(sx + d) : clampS(sy + d);
     return key === 'sx' ? { ...r, sx: next } : { ...r, sy: next };
   });
-  const undo = () => { setParts((p) => p.slice(0, -1)); setPicked(-1); };
+  const delSel = () => {
+    if (picked < 0) return;
+    const i = picked;
+    commit((p) => p.filter((_, n) => n !== i));
+    setPicked(-1);
+  };
   const dup = () => {
     if (picked < 0) return;
-    setParts((p) => {
+    commit((p) => {
       const copy = { ...p[picked], key: seq++, x: snap(p[picked].x + 10), y: snap(p[picked].y + 10) };
-      setPicked(p.length);
-      return [...p, copy];
+      const next = [...p, copy];
+      setPicked(next.length - 1);
+      return next;
     });
   };
   const zShift = (dir) => {
     if (picked < 0) return;
-    setParts((p) => {
-      const j = picked + dir;
+    const i = picked;
+    commit((p) => {
+      const j = i + dir;
       if (j < 0 || j >= p.length) return p;
       const next = p.slice();
-      const tmp = next[picked]; next[picked] = next[j]; next[j] = tmp;
+      const tmp = next[i]; next[i] = next[j]; next[j] = tmp;
       setPicked(j);
       return next;
     });
@@ -96,13 +148,14 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     const { x, y } = pt(e);
     let hit = -1;
     let best = 1e9;
-    parts.forEach((p, i) => {
+    partsRef.current.forEach((p, i) => {
       const d = (p.x - x) ** 2 + (p.y - y) ** 2;
       if (d < best && d < 18 * 18) { best = d; hit = i; }
     });
     setPicked(hit);
     if (hit >= 0) {
-      drag.current = { i: hit, dx: parts[hit].x - x, dy: parts[hit].y - y };
+      snapshot(); // one undo step for the whole drag
+      drag.current = { i: hit, dx: partsRef.current[hit].x - x, dy: partsRef.current[hit].y - y };
       e.currentTarget.setPointerCapture(e.pointerId);
     }
   };
@@ -110,25 +163,56 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     if (!drag.current) return;
     const { x, y } = pt(e);
     const { i, dx, dy } = drag.current;
-    setParts((p) => p.map((row, n) => (n === i ? { ...row, x: snap(x + dx), y: snap(y + dy) } : row)));
+    live((p) => p.map((row, n) => (n === i ? { ...row, x: snap(x + dx), y: snap(y + dy) } : row)));
   };
   const onUp = () => { drag.current = null; };
 
+  // Paste into the stage runs the same allow-list as ingest (#113).
+  const onPaste = (e) => {
+    const text = e.clipboardData?.getData('text/plain') || e.clipboardData?.getData('image/svg+xml');
+    if (!text || !/<svg|<(path|g|circle|ellipse|rect|polygon|polyline|line)[\s>]/i.test(text)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const res = ingestSvg(text, { id: 'paste' });
+    if (!res.ok) { setError(`paste rejected: ${res.error}`); return; }
+    setError('');
+    commit((p) => {
+      const next = [...p, fresh('seed', { svg: res.asset.svg })];
+      setPicked(next.length - 1);
+      return next;
+    });
+  };
+
+  const wrapped = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${svg}</svg>`;
+
   const save = () => {
-    if (!svg.includes('<') && !seedSvg) return;
+    if (!parts.length && !seedSvg) return;
     const body = svg || seedSvg;
-    const wrapped = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`;
-    if (seedId && String(seedId).startsWith('user:')) emit(Events.ASSETS_REPLACE, { id: seedId, svg: wrapped });
-    else emit(Events.ASSETS_INGEST, { svg: wrapped, hint });
+    const out = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`;
+    if (seedId && String(seedId).startsWith('user:')) emit(Events.ASSETS_REPLACE, { id: seedId, svg: out });
+    else emit(Events.ASSETS_INGEST, { svg: out, hint, category, weight: 'medium', source: 'hand' });
     onClose(true);
+  };
+
+  const exportSvg = () => {
+    if (!parts.length && !seedSvg) return;
+    const blob = new Blob([wrapped()], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(hint || 'motif').replace(/[^a-z0-9_-]+/gi, '_')}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
     <div style={veil} onClick={() => onClose(false)} role="presentation">
-      <div style={sheet} onClick={(e) => e.stopPropagation()}>
+      <div ref={sheetRef} style={sheet} onClick={(e) => e.stopPropagation()} onPaste={onPaste}>
         <header style={head}>
           <span>ASSET STUDIO</span>
-          <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · snap {SNAP}</span>
+          <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · snap {SNAP} · undo {undoDepth}/{UNDO_CAP}</span>
           <button type="button" className="chip-btn" title="Close without saving" onClick={() => onClose(false)}>ESC</button>
         </header>
         <div style={body}>
@@ -145,6 +229,10 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               {Object.keys(PRIMITIVES).map((id) => (
                 <button key={id} type="button" className="chip-btn" title={`Add a ${id} shape`} onClick={() => add(id)}>{id}</button>
               ))}
+              <button type="button" className="chip-btn" onClick={() => add('poly')}>POLY</button>
+              <select value={sides} onChange={(e) => setSides(+e.target.value)} style={field} title="polygon sides">
+                {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape left" onClick={() => patchSel((r) => ({ ...r, x: snap(r.x - SNAP) }))}>←</button>
@@ -165,6 +253,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <button type="button" className="chip-btn" disabled={picked < 0} title="Paint the picked shape accent" onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}>ACCENT</button>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Flip the picked shape between filled and outline" onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}>FILL/STROKE</button>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Duplicate the picked shape" onClick={dup}>DUP</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Delete the picked shape" onClick={delSel}>DEL</button>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Send the picked shape one step back" onClick={() => zShift(-1)}>Z-</button>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Bring the picked shape one step forward" onClick={() => zShift(1)}>Z+</button>
             </div>
@@ -178,15 +267,17 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               id hint
               <input value={hint} title="Name for the saved overlay asset." onChange={(e) => setHint(e.target.value)} style={field} />
             </label>
+            {error && <p style={{ margin: 0, fontSize: 10, color: 'var(--accent)' }}>{error}</p>}
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
               Sx/Sy stretch on one axis. S± stays uniform. No boolean. Pen stays in Illustrator.
             </p>
           </div>
         </div>
         <footer style={foot}>
-          <button type="button" className="chip-btn" title="Remove the last added shape" onClick={undo} disabled={!parts.length}>UNDO</button>
-          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { setParts([]); setPicked(-1); }}>CLEAR</button>
-          <button type="button" className="chip-btn" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
+          <button type="button" className="chip-btn" title="Remove the last added shape" onClick={undo} disabled={!undoDepth}>UNDO</button>
+          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); }}>CLEAR</button>
+          <button type="button" className="chip-btn" title="Download the motif as an SVG file" onClick={exportSvg} disabled={!parts.length && !seedSvg}>EXPORT SVG</button>
+          <button type="button" className="chip-btn" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length && !seedSvg} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
         </footer>
       </div>
     </div>
