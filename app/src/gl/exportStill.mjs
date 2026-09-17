@@ -48,7 +48,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSceneContract } from './sceneContract.js';
+import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
 import { resolveLayers } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderExportViaGL, closeGlDriver } from './parity/glDriver.mjs';
@@ -169,6 +169,7 @@ export async function renderExport({
     progress,
   });
   const contract = buildSceneContract({ doc: d, resolvedLayers, caps });
+  warnUnsupportedMaterials(resolvedLayers);
   // Background: explicit flag wins, else the project's palette bg (same rule
   // as the parity candidate and accumStill).
   const paletteBg = resolvedLayers[0]?.palette?.bg || '#000000';

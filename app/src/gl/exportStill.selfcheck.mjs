@@ -97,6 +97,68 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/OutputPanel.jsx'])
   check(`${rel}: no restoreFromSnapshot`, !src.includes('restoreFromSnapshot'));
 }
 
+// ── #168: FINAL export is off-store, caps hold, materials disclosed ──────
+{
+  const { getScene } = await import('./parity/corpus.mjs');
+  const { resolveLayers } = await import('../../../studio/render.mjs');
+  const { buildSceneContract, warnUnsupportedMaterials } =
+    await import('./sceneContract.js');
+  const { getRenderCaps, QUALITY_PRESETS, FINAL_CAPS } =
+    await import('../data/quality.js');
+
+  const scene = getScene('single-basic');
+
+  // The shared recipe must not mutate the project doc it reads (#168:
+  // FINAL export is off-store — the input doc is the only shared state).
+  const doc = scene.doc;
+  const before = JSON.stringify(doc);
+  const capsLive = getRenderCaps(doc.quality || 'balanced', false);
+  const rl = resolveLayers(doc, { caps: capsLive });
+  buildSceneContract({ doc, resolvedLayers: rl, caps: capsLive });
+  check('export recipe does not mutate the project doc',
+    JSON.stringify(doc) === before);
+
+  // Export drivers never touch the live zustand store — all inputs are
+  // explicit arguments (doc, seed, width, height).
+  for (const rel of ['src/gl/exportStill.mjs', 'src/gl/accumStill.mjs']) {
+    const src = readFileSync(path.join(APP, rel), 'utf8');
+    check(`${rel}: no store import`, !src.includes('state/store') && !src.includes('AppContext'));
+  }
+
+  // Caps hold on export: HIGH never renders more than its ceiling, even at
+  // print sizes (#168 "so HIGH does not turn to mud"). Deep-clone: the
+  // corpus scenes are module-shared and the browser section below renders
+  // 'single-basic' at its authored count.
+  const big = JSON.parse(JSON.stringify(getScene('single-basic').doc));
+  big.layoutParams = { ...big.layoutParams, count: 5000 };
+  big.quality = 'high';
+  const highCaps = getRenderCaps('high', false);
+  check('HIGH caps resolve', highCaps === QUALITY_PRESETS.high);
+  const rlHigh = resolveLayers(big, { caps: highCaps });
+  check('HIGH clamps count to ceiling',
+    rlHigh.every((L) => L.safeCount === QUALITY_PRESETS.high.maxCount),
+    rlHigh.map((L) => L.safeCount).join(','));
+  check('uncapped resolves FINAL_CAPS',
+    getRenderCaps('high', true) === FINAL_CAPS);
+
+  // Materials honesty (#168): non-flat material on wing items warns once;
+  // flat or no wings stays silent.
+  const warned = [];
+  const origWarn = console.warn;
+  console.warn = (m) => warned.push(String(m));
+  try {
+    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'wing' }] }]);
+    check('material warning fires', warned.length === 1 && warned[0].includes('"plate"'));
+    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'wing' }] }]);
+    check('material warning fires once', warned.length === 1);
+    warnUnsupportedMaterials([{ layoutParams: { material: 'flat' }, items: [{ role: 'wing' }] }]);
+    warnUnsupportedMaterials([{ layoutParams: { material: 'wash' }, items: [{ role: 'body' }] }]);
+    check('flat / no-wing materials stay silent', warned.length === 1);
+  } finally {
+    console.warn = origWarn;
+  }
+}
+
 // ── #176's rule: 1x export ≡ live preview render ─────────────────────────
 // renderExport shares the exact scene→contract→GL path with the parity
 // candidate (candidate.mjs); the resolution is the only difference. Both

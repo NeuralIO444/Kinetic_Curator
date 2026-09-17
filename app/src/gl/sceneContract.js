@@ -146,6 +146,42 @@ function buildFxWraps(resolvedLayers, caps) {
  * @param {object|null} [args.accum] — { enabled, fade, optics, background } or null
  * @returns versioned, JSON-serializable scene object
  */
+const warnedMaterials = new Set();
+
+/**
+ * Disclose — don't silently drop — gradient materials on studio stills
+ * (#168, "live and studio agree or refuse").
+ *
+ * The GL backend renders every instance flat: gradient materials (plate /
+ * wash / stipple, app/src/engine/materials.js) exist only in the live SVG
+ * layer (Layer.jsx paints wing-role assets with the material gradient).
+ * A studio export of a project using a non-flat material therefore renders
+ * the wings flatter than the live tab. Real gradient shading in the shaders
+ * is a Phase-6-scale job, so this issue discloses instead of refusing: warn
+ * once per material per process, like studio/blendFallback.mjs.
+ *
+ * @param {Array} resolvedLayers — resolveLayers(doc, {caps}) output
+ */
+export function warnUnsupportedMaterials(resolvedLayers) {
+  const used = new Set();
+  for (const L of resolvedLayers || []) {
+    const mat = L.layoutParams?.material;
+    if (!mat || mat === 'flat') continue;
+    if (Array.isArray(L.items) && L.items.some((it) => it.role === 'wing')) {
+      used.add(mat);
+    }
+  }
+  for (const mat of used) {
+    if (warnedMaterials.has(mat)) continue;
+    warnedMaterials.add(mat);
+    console.warn(
+      `[export] material "${mat}" renders flat in studio stills (#168): ` +
+      'gradient materials (plate/wash/stipple) apply to wing assets in the live tab only; ' +
+      'the GL backend has no gradient shading. See docs/QUALITY.md.',
+    );
+  }
+}
+
 export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = null }) {
   if (!doc || typeof doc !== 'object') throw new TypeError('buildSceneContract: doc required');
   if (!Array.isArray(resolvedLayers)) throw new TypeError('buildSceneContract: resolvedLayers required');
