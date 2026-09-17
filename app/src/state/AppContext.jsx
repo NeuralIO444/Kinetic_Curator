@@ -11,10 +11,10 @@ const _emptySelector = () => null;
 
 export function AppProvider({ children }) {
   const canvasRef = useRef(null);
-  const svgRef = useRef(null);
-  const accumRef = useRef(null);
+  const glCanvasRef = useRef(null); // the visible WebGL canvas (CanvasPanel)
+  const glLoopRef = useRef(null); // the live GL loop handle (capture/record source)
   return (
-    <RefsContext.Provider value={{ canvasRef, svgRef, accumRef }}>
+    <RefsContext.Provider value={{ canvasRef, glCanvasRef, glLoopRef }}>
       {children}
     </RefsContext.Provider>
   );

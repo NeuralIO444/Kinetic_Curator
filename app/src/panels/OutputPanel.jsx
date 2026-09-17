@@ -24,7 +24,7 @@ import { DataExportRow } from './output/DataExportRow.jsx';
 import { SnapshotGallery } from './output/SnapshotGallery.jsx';
 
 export function OutputPanel() {
-  const { palette, svgRef, accumRef } = useApp();
+  const { palette, glCanvasRef, glLoopRef } = useApp();
   const { state } = useApp(s => ({
     snapshots: s.snapshots,
     exportResolution: s.exportResolution,
@@ -92,7 +92,7 @@ export function OutputPanel() {
         <QualityRow quality={quality} autoQuality={autoQuality} />
 
         <RenderFinalBlock
-          svgRef={svgRef} accumRef={accumRef} palette={palette} seed={seed} layoutParams={layoutParams}
+          glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
           exportResolution={exportResolution} accumOn={accumOn}
           rendering={rendering} setRendering={setRendering}
           batchActive={!!batchProgress}
@@ -101,7 +101,7 @@ export function OutputPanel() {
         <PrintDeskBlock rendering={rendering} onOpen={openPrintDesk} />
 
         <BatchEditionBlock
-          svgRef={svgRef} palette={palette} seed={seed} layoutParams={layoutParams}
+          glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
           quality={quality} paletteId={paletteId} exportResolution={exportResolution}
           accumOn={accumOn} rendering={rendering} setRendering={setRendering}
           batchProgress={batchProgress} setBatchProgress={setBatchProgress}
@@ -109,7 +109,7 @@ export function OutputPanel() {
         />
 
         <SnapRecordRow
-          svgRef={svgRef} accumRef={accumRef} palette={palette} seed={seed} layoutParams={layoutParams}
+          glCanvasRef={glCanvasRef} glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
           exportResolution={exportResolution} accumOn={accumOn} isRecording={isRecording} rendering={rendering}
         />
 

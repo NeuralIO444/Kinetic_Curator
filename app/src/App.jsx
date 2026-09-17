@@ -16,7 +16,7 @@ import { useContinuousLife } from './hooks/useContinuousLife.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
-import { exportSnapshot } from './hooks/useMediaExport.js';
+import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import { useStore } from './state/store.js';
 import { shedSummary } from './hooks/governorCuts.js';
@@ -66,7 +66,7 @@ import { wireEventBus } from './composition/wireEventBus.js';
 import { subscribeDispatch } from './composition/dispatchPipe.js';
 
 function AppInner() {
-  const { dispatch: rawDispatch, history, palette, svgRef } = useApp();
+  const { dispatch: rawDispatch, history, palette, glLoopRef } = useApp();
   const piped = useMemo(() => wireEventBus(rawDispatch), [rawDispatch]);
 
   useEffect(() => subscribeDispatch((a) => {
@@ -126,29 +126,38 @@ function AppInner() {
   const lastSnapRef = useRef(0);
   useEffect(() => {
     const now = Date.now();
-    if (state.lastEvolveTs && state.autoSnapshot && svgRef?.current) {
+    if (state.lastEvolveTs && state.autoSnapshot && glLoopRef?.current) {
       if (now - lastSnapRef.current > 2000) {
-        exportSnapshot(svgRef.current, state.exportResolution, state.seed.toString(16), palette.bg);
+        captureStill({
+          loopRef: glLoopRef,
+          resolution: state.exportResolution,
+          seedStr: state.seed.toString(16),
+        }).catch(() => {});
         lastSnapRef.current = now;
       }
     }
-  }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, svgRef, palette.bg]);
+  }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, glLoopRef]);
 
   useHotkeys({
     's': () => {
-      exportSnapshot(svgRef?.current, state.exportResolution, state.seed.toString(16), palette.bg, (thumb) => {
-        piped({
-          type: A.ADD_SNAPSHOT,
-          snapshot: {
-            seed: state.seed,
-            format: 'PNG',
-            resolution: state.exportResolution === 1 ? '1000x700@1x' : state.exportResolution === 2 ? '1000x700@2x' : '1000x700@4x',
-            timestamp: new Date().toISOString().slice(11, 19),
-            config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
-            thumb,
-          },
-        });
-      });
+      captureStill({
+        loopRef: glLoopRef,
+        resolution: state.exportResolution,
+        seedStr: state.seed.toString(16),
+        onThumbnail: (thumb) => {
+          piped({
+            type: A.ADD_SNAPSHOT,
+            snapshot: {
+              seed: state.seed,
+              format: 'PNG',
+              resolution: state.exportResolution === 1 ? '1000x700@1x' : state.exportResolution === 2 ? '1000x700@2x' : '1000x700@4x',
+              timestamp: new Date().toISOString().slice(11, 19),
+              config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
+              thumb,
+            },
+          });
+        },
+      }).catch(() => {});
     },
     'f': () => piped({
       type: A.ADD_FAVORITE,

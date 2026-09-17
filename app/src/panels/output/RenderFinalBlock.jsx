@@ -1,9 +1,9 @@
 import { emit, Events } from '../../composition/eventBus.js';
-import { captureStill, renderFinal } from '../../hooks/useMediaExport.js';
+import { renderFinal } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
 
 export function RenderFinalBlock({
-  svgRef, accumRef, palette, seed, layoutParams, exportResolution,
+  glLoopRef, palette, seed, layoutParams, exportResolution,
   accumOn, rendering, setRendering, batchActive,
 }) {
   const resLabel = resolutionLabel(exportResolution);
@@ -13,41 +13,23 @@ export function RenderFinalBlock({
     setRendering(true);
 
     try {
-      if (accumOn) {
-        await captureStill({
-          accumOn, accumRef, svgNode: svgRef.current,
-          resolution: exportResolution, seedStr: seed.toString(16), background: palette.bg,
-          onThumbnail: (thumb) => {
-            emit(Events.EXPORT_SNAPSHOT, {
-              seed,
-              format: 'PNG',
-              resolution: `${resLabel} · ACCUM`,
-              timestamp: new Date().toISOString().slice(11, 19),
-              config: { layout: { ...layoutParams }, palette: { id: palette.id }, accum: true },
-              thumb,
-            });
-          },
-        });
-      } else {
-        // #191: rasterizes the live composition as-is, no live-store flip.
-        // Denser finals are studio.py render --uncapped's job now.
-        await renderFinal({
-          svgNode: svgRef.current,
-          resolution: exportResolution,
-          seedStr: seed.toString(16),
-          background: palette.bg,
-          onThumbnail: (thumb) => {
-            emit(Events.EXPORT_SNAPSHOT, {
-              seed,
-              format: 'PNG',
-              resolution: `${resLabel} · FINAL`,
-              timestamp: new Date().toISOString().slice(11, 19),
-              config: { layout: { ...layoutParams }, palette: { id: palette.id } },
-              thumb,
-            });
-          },
-        });
-      }
+      // One instrument: finals capture the live GL frame as-is — with ACCUM
+      // on, the captured frame is the trail buffer (history is pixels).
+      await renderFinal({
+        loopRef: glLoopRef,
+        resolution: exportResolution,
+        seedStr: seed.toString(16),
+        onThumbnail: (thumb) => {
+          emit(Events.EXPORT_SNAPSHOT, {
+            seed,
+            format: 'PNG',
+            resolution: accumOn ? `${resLabel} · ACCUM` : `${resLabel} · FINAL`,
+            timestamp: new Date().toISOString().slice(11, 19),
+            config: { layout: { ...layoutParams }, palette: { id: palette.id }, ...(accumOn ? { accum: true } : {}) },
+            thumb,
+          });
+        },
+      });
     } catch (e) {
       console.warn('[RENDER]', e);
     } finally {
@@ -87,7 +69,7 @@ export function RenderFinalBlock({
       </button>
       <div className="output-hint" style={{ marginTop: 6 }}>
         {accumOn
-          ? 'ACCUM on — export captures the trail buffer (history is pixels, not SVG).'
+          ? 'ACCUM on — export captures the live trail buffer.'
           : 'Matches live preview. Denser 4K/8K finals: studio.py render --uncapped.'}
       </div>
     </div>

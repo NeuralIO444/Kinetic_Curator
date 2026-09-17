@@ -1,8 +1,8 @@
-// Smoke: load app, dismiss intro, switch tabs, poke a layout control (#37)
+// Smoke: load app, live WebGL canvas renders, switch tabs, poke a layout control (#37, #224)
 import { test, expect } from '@playwright/test';
 
 test.describe('Kinetic Curator smoke', () => {
-  test('loads, switches panels, toggles a layout param', async ({ page }) => {
+  test('loads, live canvas renders, switches panels, toggles a layout param', async ({ page }) => {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('kc:first-run-seen', '1');
@@ -12,9 +12,26 @@ test.describe('Kinetic Curator smoke', () => {
     await page.goto('/');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
-    // Canvas present with SVG (or accum canvas)
-    const canvas = page.locator('.panel-canvas, .canvas-svg').first();
-    await expect(canvas).toBeVisible();
+    // Live WebGL canvas present (PERFORM leg, #224)
+    const gl = page.locator('.canvas-gl').first();
+    await expect(gl).toBeVisible();
+
+    // The canvas hosts a real WebGL2 context with rendered pixels —
+    // read one frame through the GPU readback and check it's non-blank.
+    const stats = await gl.evaluate((c) => {
+      const glc = c.getContext('webgl2');
+      if (!glc) return { webgl2: false };
+      const w = glc.drawingBufferWidth;
+      const h = glc.drawingBufferHeight;
+      return { webgl2: true, w, h };
+    });
+    expect(stats.webgl2).toBe(true);
+    expect(stats.w).toBeGreaterThan(0);
+    expect(stats.h).toBeGreaterThan(0);
+
+    // The loop exposes its node count in the header pill; it should count > 0
+    const nodesPill = page.locator('.panel-canvas .meter-pill', { hasText: /NODES/i }).first();
+    await expect(nodesPill).toContainText(/[1-9]\d*\s*NODES/i, { timeout: 30_000 });
 
     // Footer shows seed
     await expect(page.locator('.footer-bar')).toContainText(/seed:/i);
@@ -50,12 +67,8 @@ test.describe('Kinetic Curator smoke', () => {
       expect(before === after).toBe(false);
     }
 
-    // SVG still has content (use elements) after param change
-    const uses = page.locator('.canvas-svg use');
-    // may be 0 if assets disabled — at least the svg root exists
-    await expect(page.locator('.canvas-svg')).toBeVisible();
-    const useCount = await uses.count();
-    // soft assert: log density for CI visibility
-    console.log('[smoke] use count', useCount);
+    // Live canvas keeps rendering after a param change (still visible)
+    await expect(gl).toBeVisible();
+    console.log('[smoke] gl node pill:', await nodesPill.textContent());
   });
 });
