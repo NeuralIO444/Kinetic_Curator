@@ -16,16 +16,32 @@ export const CH = Object.freeze({
 
 /**
  * Avalanche mix → uint32.
+ * String channels are hashed to a stable uint32 first: the old
+ * `channel | 0` coerced every string to 0, so the documented 'field' and
+ * 'ca' sampling channels produced *identical* point streams and the
+ * channel isolation this module promises was silently defeated.
+ * Numeric channels (CH.*) are untouched — their streams are bit-identical.
  * @param {number} seed
- * @param {number} channel
+ * @param {number|string} channel
  * @param {number} [index=0]
  */
 export function hashU32(seed, channel, index = 0) {
-  let h = (seed | 0) ^ Math.imul(channel | 0, 0x9e3779b9) ^ Math.imul(index | 0, 0x85ebca6b);
+  const ch = typeof channel === 'number' ? channel | 0 : hashChannel(String(channel));
+  let h = (seed | 0) ^ Math.imul(ch, 0x9e3779b9) ^ Math.imul(index | 0, 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
   h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
   h = (h ^ (h >>> 16)) >>> 0;
   return h || 1;
+}
+
+/** FNV-1a → uint32: stable string→channel mix. */
+function hashChannel(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }
 
 /** Uniform [0, 1). */

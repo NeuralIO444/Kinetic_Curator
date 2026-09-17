@@ -57,6 +57,11 @@ export class ParticleSystem {
     // `die` recycles into and `breed` consumes from.
     this._dead = [];
     this._breedSeq = 0;
+    // Authored population from the last init — tracked separately from the
+    // runtime population (this.n), which `breed` grows past the authored
+    // count. update() re-inits only when the authored count changes, so
+    // newborns survive to the next frame instead of being wiped.
+    this._authoredCount = 0;
   }
 
   /** Hot columns. Float64, not Float32: these carry the simulation state
@@ -138,12 +143,14 @@ export class ParticleSystem {
     this._noise = createNoise(seed || 444);
     if (!activeAssets || activeAssets.length === 0) {
       this.n = 0;
+      this._authoredCount = 0;
       this.color = [];
       this.spine = [];
       return;
     }
     if (count > this._cap) this._allocate(count);
     this.n = count;
+    this._authoredCount = count;
     this.color = new Array(count);
     this.spine = new Array(count);
     const swatches = palette?.swatches || ['#ffffff'];
@@ -471,7 +478,7 @@ export class ParticleSystem {
     if (this.n === 0) return;
     this._layout = layoutParams;
     const targetCount = layoutParams.particleCount || 100;
-    if (this.n !== targetCount) {
+    if (this._authoredCount !== targetCount) {
       this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed);
     }
     if (!this._noise) this._noise = createNoise(seed || 444);
@@ -517,8 +524,14 @@ export class ParticleSystem {
     const VX = this.vx; const VY = this.vy;
     const AX = this.ax; const AY = this.ay;
     const MASS = this.mass;
+    const ALIVE = this.alive;
 
     for (let i = 0; i < numParticles; i++) {
+      // Dead slots integrate nothing and their forces are never consumed
+      // (integration skips them; _breed zeroes ax/ay on recycle) — skip the
+      // noise3D pair entirely. Behaviour-identical, saves ~2 noise calls
+      // per dead particle per frame.
+      if (!ALIVE[i]) continue;
       const pxi = X[i];
       const pyi = Y[i];
       const m = MASS[i];

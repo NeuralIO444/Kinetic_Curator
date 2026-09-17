@@ -28,31 +28,12 @@ function legacyWrap(id) {
 }
 
 export const gridPos = legacyWrap('grid');
-export const fibPos = legacyWrap('fibonacci');
 export const radialPos = legacyWrap('radial');
-export const swarmPos = legacyWrap('swarm');
 export const flowPos = legacyWrap('flow');
 export const layerPos = legacyWrap('layers');
 export const railsPos = legacyWrap('rails');
 export const caPos = legacyWrap('ca');
 export const orbitPos = legacyWrap('orbit');
 export const abacusPos = legacyWrap('abacus');
-
-/** Dispatch table — includes stratified power sampler */
-export const MODE_FNS = {
-  grid: gridPos,
-  fibonacci: fibPos,
-  radial: radialPos,
-  swarm: swarmPos,
-  flow: flowPos,
-  layers: layerPos,
-  rails: railsPos,
-  ca: caPos,
-  orbit: orbitPos,
-  abacus: abacusPos,
-  noise: gridPos,
-  hype: swarmPos,
-  stratified: legacyWrap('stratified'),
-};
 
 export { getSampler, SAMPLERS };

@@ -217,7 +217,7 @@ export function createRenderer(canvas) {
   };
 
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
-  /** Draw instance list (Float32Array, 10 floats each) into the bound FBO. */
+  /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);

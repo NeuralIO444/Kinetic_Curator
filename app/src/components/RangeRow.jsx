@@ -8,10 +8,12 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
   const inputRef = useRef(null);
 
   const handleDoubleClick = () => {
+    if (locked) return;
     if (defaultValue !== undefined) onChange(defaultValue);
   };
 
   const startEdit = () => {
+    if (locked) return;
     setEditValue(String(value));
     setEditing(true);
   };
@@ -21,6 +23,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
   }, [editing]);
 
   const commitEdit = () => {
+    if (locked) { setEditing(false); return; }
     const n = Number(editValue);
     if (!isNaN(n)) onChange(Math.max(min, Math.min(max, n)));
     setEditing(false);
@@ -78,11 +81,13 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
   const lowRef = useRef(null);
 
   const handleDoubleClick = () => {
+    if (locked) return;
     if (defaultLow !== undefined) onChangeLow(defaultLow);
     if (defaultHigh !== undefined) onChangeHigh(defaultHigh);
   };
 
   const startEdit = () => {
+    if (locked) return;
     setEditLow(String(low));
     setEditHigh(String(high));
     setEditing(true);
@@ -93,6 +98,7 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
   }, [editing]);
 
   const commitEdit = () => {
+    if (locked) { setEditing(false); return; }
     const nLow = Number(editLow);
     const nHigh = Number(editHigh);
     if (!isNaN(nLow)) onChangeLow(Math.max(min, Math.min(max, nLow)));

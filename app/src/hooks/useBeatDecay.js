@@ -11,7 +11,12 @@ export function useBeatDecay() {
 
   useEffect(() => {
     const tick = () => {
-      setBeatPulse(p => (p > 0.002 ? p * DECAY : 0));
+      // Skip the store write once the pulse has settled at 0 — the old code
+      // allocated a new state object and notified every subscriber on every
+      // frame for the life of the app. The value trajectory is unchanged.
+      const p = useStore.getState().beatPulse;
+      if (p > 0.002) setBeatPulse(p * DECAY);
+      else if (p !== 0) setBeatPulse(0);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);

@@ -21,6 +21,9 @@ export function FavoritesTray() {
   // Performance order = favorites array order (oldest → newest); show last N
   const start = Math.max(0, favorites.length - MAX_VISIBLE);
   const visible = favorites.slice(start);
+  // The window slides as favorites are added/removed — clamp the cursor so
+  // it never points past the end or at a shifted item.
+  const cur = Math.min(cursor, Math.max(0, visible.length - 1));
 
   const recall = useCallback((fav) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
@@ -42,10 +45,10 @@ export function FavoritesTray() {
 
   const advance = useCallback(() => {
     if (visible.length === 0) return;
-    const next = (cursor + 1) % visible.length;
+    const next = (cur + 1) % visible.length;
     setCursor(next);
     recall(visible[next]);
-  }, [visible, cursor, recall]);
+  }, [visible, cur, recall]);
 
   const onKeyDown = useCallback((e) => {
     if (e.key >= '1' && e.key <= '9') {
@@ -70,11 +73,11 @@ export function FavoritesTray() {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault();
       if (visible.length === 0) return;
-      const next = (cursor - 1 + visible.length) % visible.length;
+      const next = (cur - 1 + visible.length) % visible.length;
       setCursor(next);
       recall(visible[next]);
     }
-  }, [visible, recall, advance, cursor]);
+  }, [visible, recall, advance, cur]);
 
   if (visible.length === 0) {
     return (
@@ -99,7 +102,7 @@ export function FavoritesTray() {
       <div className="favorites-tray-chips">
         {visible.map((f, i) => {
           const isCurrent = f.seed === state.seed;
-          const isCursor = i === cursor;
+          const isCursor = i === cur;
           const seedHex = (f.seed >>> 0).toString(16).padStart(4, '0').slice(-4);
           return (
             <div

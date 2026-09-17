@@ -270,7 +270,7 @@ export function useVideoRecorder({
     const frameInterval = 1000 / fps;
 
     const drawFrame = (time) => {
-      if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'recording') return;
+      if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return;
       rafRef.current = requestAnimationFrame(drawFrame);
 
       if (time - lastTime < frameInterval) return;

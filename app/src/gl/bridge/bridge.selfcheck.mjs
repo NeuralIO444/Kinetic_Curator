@@ -297,4 +297,33 @@ ok('passes may supply a custom uniform map (#195 template)', () => {
   assert.equal(a[0].args[1], 0.25);
 });
 
+ok('uniform dirty-cache is per-program: a second program re-uploads u_res (QA sweep)', () => {
+  // Two template programs (#195) declaring the same uniform name. The
+  // dirty-cache used to be keyed by layer only, so the second program's
+  // u_res upload was skipped — it then divided by (0,0) and produced
+  // garbage. Each program must upload its own uniforms.
+  const gl = makeMockGl();
+  const bridge = makeBridge(gl);
+  for (const name of ['progA', 'progB']) {
+    bridge.registerProgram(name, 'vs-src', 'fs-src', {
+      uniforms: { u_tex: { kind: 'sampler', unit: 0 }, u_res: { kind: 'vec2' } },
+    });
+    bridge.defineEffect(`fx-${name}`, {
+      program: name,
+      pad: 0,
+      passes: [{
+        uniforms: (step, { read, wTarget }) => ({
+          u_tex: read.tex,
+          u_res: [wTarget.w, wTarget.h],
+        }),
+      }],
+    });
+  }
+  const L = bridge.layer('fx1');
+  bridge.runChain('fx1', L.t0, [{ kind: 'fx-progA', params: {} }, { kind: 'fx-progB', params: {} }]);
+  const resUploads = gl.withName('uniform2f').filter((c) => c.args[0] === 'u_res');
+  assert.equal(resUploads.length, 2, 'each program uploads its own u_res');
+  assert.deepEqual([resUploads[0].args[1], resUploads[0].args[2]], [400, 280]);
+});
+
 console.log(`bridge.selfcheck: OK (${n} cases)`);

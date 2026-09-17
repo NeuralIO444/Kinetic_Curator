@@ -50,7 +50,6 @@ export function wireEventBus(rawDispatch) {
   on(Events.AUDIO_GAIN, (gain) => dispatch({ type: A.SET_AUDIO_GAIN, payload: gain }));
   on(Events.AUDIO_SOURCE, (src) => dispatch({ type: A.SET_AUDIO_SOURCE, payload: src }));
   on(Events.AUDIO_MONITOR, (mon) => dispatch({ type: A.SET_AUDIO_MONITOR, payload: mon }));
-  on(Events.WEBCAM_TOGGLE, (enabled) => dispatch({ type: A.SET_WEBCAM_ENABLED, payload: enabled }));
 
   on(Events.ASSETS_TOGGLE, ({ id }) => dispatch({ type: A.TOGGLE_ASSET, id }));
   on(Events.ASSETS_SOLO, ({ id }) => dispatch({ type: A.SOLO_ASSET, id }));
@@ -86,7 +85,6 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYER_SET_ACTIVE, ({ id }) => dispatch({ type: A.SET_ACTIVE_LAYER, id }));
   on(Events.LAYER_REORDER, ({ id, delta }) => dispatch({ type: A.REORDER_LAYER, id, delta }));
   on(Events.LAYER_TOGGLE_VISIBLE, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_VISIBLE, id }));
-  on(Events.LAYER_RENAME, ({ id, name }) => dispatch({ type: A.RENAME_LAYER, id, name }));
   on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
   on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));
@@ -100,9 +98,7 @@ export function wireEventBus(rawDispatch) {
 
   on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
   on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));
-  on(Events.PALETTE_RENAME, ({ id, name }) => dispatch({ type: A.RENAME_USER_PALETTE, id, name }));
   on(Events.PALETTE_IMPORT, (list) => dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
-  on(Events.PALETTE_CLEAR_LIBRARY, () => dispatch({ type: A.CLEAR_USER_PALETTES }));
   on(Events.PALETTE_LOCK, ({ index, clear }) => dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }));
   on(Events.PALETTE_HARMONY, ({ scheme }) => dispatch({ type: A.APPLY_HARMONY, scheme }));
 

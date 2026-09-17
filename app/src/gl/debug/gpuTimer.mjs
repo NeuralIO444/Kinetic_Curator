@@ -30,8 +30,13 @@ export function createGpuTimer(gl) {
 
     begin(label) {
       if (ext) {
-        const query = ext.createQuery();
-        ext.beginQuery(ext.TIME_ELAPSED_EXT, query);
+        // WebGL2 note: EXT_disjoint_timer_query_webgl2 exposes only the
+        // constants; createQuery/beginQuery/endQuery/getQueryParameter/
+        // deleteQuery are core gl.* entry points (the EXT-suffixed methods
+        // exist only on the WebGL1 extension). Calling them on `ext`
+        // throws TypeError on every machine where the extension exists.
+        const query = gl.createQuery();
+        gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
         pending.push({ label, query, open: true });
       } else {
         pending.push({ label, t0: performance.now(), open: true });
@@ -41,7 +46,7 @@ export function createGpuTimer(gl) {
     end(label) {
       const p = findOpen(label);
       if (!p) throw new Error(`[gl-debug] gpuTimer.end without begin: ${label}`);
-      if (ext) ext.endQuery(ext.TIME_ELAPSED_EXT);
+      if (ext) gl.endQuery(ext.TIME_ELAPSED_EXT);
       else p.t1 = performance.now();
       p.open = false;
     },
@@ -55,22 +60,22 @@ export function createGpuTimer(gl) {
     poll() {
       const disjoint = ext ? !!gl.getParameter(ext.GPU_DISJOINT_EXT) : false;
       if (disjoint) {
-        for (const p of pending) if (p.query) ext.deleteQuery(p.query);
+        for (const p of pending) if (p.query) gl.deleteQuery(p.query);
         pending.length = 0;
         return { done: true, disjoint: true, timings: new Map() };
       }
       for (const p of pending) {
         if (p.open) return { done: false, disjoint: false, timings: new Map() };
-        if (p.query && !ext.getQueryParameter(p.query, ext.QUERY_RESULT_AVAILABLE_EXT)) {
+        if (p.query && !gl.getQueryParameter(p.query, ext.QUERY_RESULT_AVAILABLE_EXT)) {
           return { done: false, disjoint: false, timings: new Map() };
         }
       }
       const timings = new Map();
       for (const p of pending) {
         const ms = p.query
-          ? ext.getQueryParameter(p.query, ext.QUERY_RESULT_EXT) / 1e6
+          ? gl.getQueryParameter(p.query, ext.QUERY_RESULT_EXT) / 1e6
           : p.t1 - p.t0;
-        if (p.query) ext.deleteQuery(p.query);
+        if (p.query) gl.deleteQuery(p.query);
         timings.set(p.label, ms);
       }
       pending.length = 0;
