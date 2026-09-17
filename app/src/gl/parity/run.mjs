@@ -15,7 +15,7 @@
 // Exit code 0 iff every scene passes; non-zero otherwise (CI-friendly).
 import { CORPUS, getScene, POLICIES } from './corpus.mjs';
 import { renderReference } from './reference.mjs';
-import { renderCandidate, CANDIDATE_READY } from '../candidate.mjs';
+import { renderCandidate, closeCandidate, CANDIDATE_READY } from '../candidate.mjs';
 import { diffPixels, formatReport } from './diff.mjs';
 
 function parseArgs(argv) {
@@ -55,6 +55,7 @@ async function main(argv) {
   const { candidate, scene, width, json } = parseArgs(argv);
   const scenes = scene ? [getScene(scene)] : CORPUS;
   const results = [];
+  try {
   for (const s of scenes) {
     const r = await runScene(s, candidate, s.width || width);
     results.push(r);
@@ -77,6 +78,9 @@ async function main(argv) {
       }
     }
     process.exitCode = 1;
+  }
+  } finally {
+    if (candidate === 'gl') await closeCandidate(); // release headless Chromium
   }
 }
 

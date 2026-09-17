@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC GL parity harness</title></head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { createRenderer } from '../renderer.mjs';
+
+const canvas = document.getElementById('c');
+let renderer = null;
+
+const b64ToU8 = (b64) => {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+};
+const u8ToB64 = (u8) => {
+  let s = '';
+  const CH = 0x8000;
+  for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+  return btoa(s);
+};
+
+/**
+ * payload: { width, height, bg, contract, cells, atlasB64, atlasW, atlasH,
+ *            grainLuts: {id:{b64,w,h}}, wrapBoxes: {id:[x0,y0,x1,y1]} }
+ * returns { pixelsB64, width, height } — pixels are top-first RGBA bytes.
+ */
+window.__kcRender = async (payload) => {
+  if (!renderer) renderer = createRenderer(canvas);
+  const atlasPx = b64ToU8(payload.atlasB64);
+  const atlasMips = (payload.atlasMips || []).map((m) => ({
+    pixels: b64ToU8(m.b64), width: m.w, height: m.h,
+  }));
+  const grainLuts = {};
+  for (const [id, lut] of Object.entries(payload.grainLuts || {})) {
+    grainLuts[id] = { pixels: b64ToU8(lut.b64), width: lut.w, height: lut.h };
+  }
+  const { pixels, width, height } = renderer.renderScene({
+    width: payload.width,
+    height: payload.height,
+    bg: payload.bg,
+    contract: payload.contract,
+    cells: payload.cells,
+    atlas: { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips },
+    grainLuts,
+    wrapBoxes: payload.wrapBoxes || {},
+  });
+  return { pixelsB64: u8ToB64(pixels), width, height };
+};
+window.__kcReady = true;
+</script>
+</body>
+</html>
