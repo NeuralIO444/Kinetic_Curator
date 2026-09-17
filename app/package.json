@@ -8,10 +8,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs && node src/engine/kernel/rng.selfcheck.mjs && node src/engine/kernel/noise.selfcheck.mjs && node src/engine/kernel/sample/sample.selfcheck.mjs && node src/engine/kernel/field/field.selfcheck.mjs && node src/engine/kernel/color/color.selfcheck.mjs && node src/engine/kernel/bake/bake.selfcheck.mjs && node src/state/projectDocument.selfcheck.mjs && node src/state/firewall.selfcheck.mjs && node src/state/watchdog.selfcheck.mjs && node src/data/normalize.selfcheck.mjs && node src/data/palettes.selfcheck.mjs && node src/state/paletteLibrary.selfcheck.mjs && node src/engine/harmony.selfcheck.mjs && node src/engine/organisms.selfcheck.mjs && node src/state/undoLayers.selfcheck.mjs && node src/engine/particles.selfcheck.mjs && node src/engine/stagedEval.selfcheck.mjs && node src/engine/perf.selfcheck.mjs && node src/state/phraseTick.selfcheck.mjs && node src/state/showrunner.selfcheck.mjs && node src/fx/fxFilters.selfcheck.mjs",
+    "selfcheck": "node src/engine/buildPlacements.selfcheck.mjs && node src/hooks/useCanvasItems.selfcheck.mjs && node src/engine/goldenPlacement.selfcheck.mjs && node src/engine/kernel/rng.selfcheck.mjs && node src/engine/kernel/noise.selfcheck.mjs && node src/engine/kernel/sample/sample.selfcheck.mjs && node src/engine/kernel/field/field.selfcheck.mjs && node src/engine/kernel/color/color.selfcheck.mjs && node src/engine/kernel/bake/bake.selfcheck.mjs && node src/state/projectDocument.selfcheck.mjs && node src/state/firewall.selfcheck.mjs && node src/state/watchdog.selfcheck.mjs && node src/data/normalize.selfcheck.mjs && node src/data/palettes.selfcheck.mjs && node src/state/paletteLibrary.selfcheck.mjs && node src/engine/harmony.selfcheck.mjs && node src/engine/organisms.selfcheck.mjs && node src/state/undoLayers.selfcheck.mjs && node src/engine/particles.selfcheck.mjs && node src/engine/stagedEval.selfcheck.mjs && node src/engine/perf.selfcheck.mjs && node src/state/phraseTick.selfcheck.mjs && node src/state/showrunner.selfcheck.mjs && node src/fx/fxFilters.selfcheck.mjs && node src/gl/sceneContract.selfcheck.mjs && node src/gl/parity/diff.selfcheck.mjs && node src/gl/parity/parity.selfcheck.mjs",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e"
+    "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e",
+    "parity": "node src/gl/parity/run.mjs"
   },
   "dependencies": {
     "react": "^19.2.6",
@@ -28,6 +29,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "@resvg/resvg-js": "^2.6.2"
   }
 }
