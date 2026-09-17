@@ -169,6 +169,12 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
    * ctx carries the write target size ({ width, height }) for
    * resolution-dependent params (e.g. blur sigma).
    *
+   * `passes` may instead be a FUNCTION (stepParams, {width, height}) ->
+   * Pass[], for effects whose pass count depends on the step's params —
+   * the builtin blur (#225) subdivides wide sigmas into multiple (H,V)
+   * pairs past the shader's 64-tap loop limit. Evaluated once per step
+   * against the first write target's size.
+   *
    * Template effects (#195) use { uniforms } instead: a function
    * (step, { read, wTarget, time }) -> { uname: value } returning the
    * full uniform map for the pass (u_tex/u_res/u_time/u_<param>).
@@ -176,6 +182,9 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
   function defineEffect(kind, def) {
     if (!programDefs.has(def.program)) {
       throw new Error(`[bridge] defineEffect "${kind}": program "${def.program}" is not registered`);
+    }
+    if (!Array.isArray(def.passes) && typeof def.passes !== 'function') {
+      throw new Error(`[bridge] defineEffect "${kind}": passes must be an array or a (params, ctx) -> passes function`);
     }
     effects.set(kind, { pad: 0, ...def });
   }
@@ -257,12 +266,18 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
       if (!def) throw new Error(`[bridge] unknown effect kind "${step.kind}" — register it with defineEffect first`);
       const rec = programs.get(def.program);
       if (!rec) throw new Error(`[bridge] program "${def.program}" not compiled`);
-      for (const pass of def.passes) {
-        // Padded passes route into the padded pair (allocated when any
-        // registered effect declares pad > 0). UV remapping for the
-        // padded region and the composite crop are Phase 2/3 work;
-        // Phase-1 builtins declare pad: 0.
-        const padded = (def.pad || 0) > 0 && L.padT0;
+      // Padded passes route into the padded pair (allocated when any
+      // registered effect declares pad > 0). UV remapping for the
+      // padded region and the composite crop are Phase 2/3 work;
+      // Phase-1 builtins declare pad: 0.
+      const padded = (def.pad || 0) > 0 && L.padT0;
+      const firstWrite = padded ? (read === L.padT0 ? L.padT1 : L.padT0) : write;
+      // #225: function-form passes are evaluated once per step against the
+      // first write target's size (all ping-pong targets share the size).
+      const passes = typeof def.passes === 'function'
+        ? def.passes(step.params || {}, { width: firstWrite.w, height: firstWrite.h })
+        : def.passes;
+      for (const pass of passes) {
         const wTarget = padded ? (read === L.padT0 ? L.padT1 : L.padT0) : write;
         gl.bindFramebuffer(gl.FRAMEBUFFER, wTarget.fb);
         gl.viewport(0, 0, wTarget.w, wTarget.h);
