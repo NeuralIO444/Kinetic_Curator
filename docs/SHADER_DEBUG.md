@@ -20,6 +20,8 @@ the failure — never a silent black screen.
 | `tapPoints.mjs` | 2 — visual | `createTapRecorder(gl).tap(name, w, h)` snapshots the bound read framebuffer — one tap per chain stage, so a bad stage is found by inspection. `tapToDataURL` makes thumbnails. |
 | `debugStrip.mjs` | 3 — printf | `packStripValues` / `unpackStripPixels`: float32 bit patterns in RGBA8 — bit-exact for every finite float, NaN/Inf included. `writeStrip` / `readStrip` round-trip through a 1×N target; `formatStripTable` prints the table. |
 | `gpuTimer.mjs` | 4 — perf | `createGpuTimer(gl)`: `EXT_disjoint_timer_query_webgl2` with CPU fallback. `begin` / `end` / `poll()` → `{ done, disjoint, timings }`. |
+| `sweep.mjs` | 2 — visual | Uniform-sweep engine: deterministic premultiplied test pattern, RGBA16F scan targets, RGBA8 bit-exact no-op target, per-effect sweep runner. Scans with the `nan`/`range` flag views + a direct FLOAT readback as ground truth (byte readback from float targets is `INVALID_OPERATION` in Chromium). `runAllSweeps(gl)` prints the loud `sweep tests skipped: no headless Chromium` skip when WebGL2 is unavailable. |
+| `sweepEffects.mjs` | 2 — visual | Sweep tables for all 18 effects (5 template FX, 5 builtin FX, 8 ACCUM passes): contract cases (normal/zero/max/boundary — asserted, incl. bit-exact no-op proofs) and hostile cases (negative/extreme — characterized, never fail). |
 
 ## Wiring — every shader goes through the gate
 
@@ -71,6 +73,67 @@ Node tier:
 - `src/gl/effects/fxShaders.selfcheck.mjs` / `template.selfcheck.mjs` —
   mock-GL registration of the template effects already runs the static +
   runtime audits, now including the bridge-level checked audit.
+
+## Uniform sweeps (backend hardening 1/6)
+
+Beyond "does it compile", the harness now *runs* every effect across its
+parameter space and checks the output pixels. `src/gl/debug/sweep.mjs` is
+the sweep engine; `src/gl/debug/sweepEffects.mjs` holds the per-effect sweep
+tables. 18 effects: the 5 template FX, the 5 builtin FX, and the 8 ACCUM
+passes.
+
+**Procedure.** Each case renders a deterministic 32×32 premultiplied test
+pattern (seeded ramps + alpha ladder — the same bytes every run) through
+the effect's checked builder into a RGBA16F target (float, so NaN/Inf and
+>1 survive), then scans it two ways:
+
+1. The existing magenta flag views (`flagPass.mjs`): the `nan` view paints
+   every non-finite pixel magenta; the `range` view paints every
+   out-of-[0,1] pixel magenta.
+2. A direct FLOAT readback of the target as ground truth (Chromium queues
+   `INVALID_OPERATION` for byte readback from float targets, so the bytes
+   path can't be used here). This arbitrates the range view's one ambiguity:
+   a legitimately-magenta in-range pixel passes that view through untouched.
+
+The downsample pass renders quarter-resolution (32→8) into its own float
+target, matching its production shape — rendering it full-size would read
+out of bounds via `texelFetch`.
+
+**Case policy.** Every effect sweeps normal, zero, maximum, and
+boundary/minimum values, plus hostile negatives and extremes.
+
+- *Contract* cases (in-spec values) **fail** on any non-finite pixel or any
+  out-of-[0,1] pixel. HDR-by-design passes (echo, add) fail only on
+  non-finite; their over-range output is logged, not failed.
+- *Hostile* cases (below-minimum, negative, extreme) never fail: non-finite
+  output is reported as `[HOSTILE-NaN]`, out-of-range as `[info]`, so the
+  suite *characterizes* out-of-contract behavior instead of asserting on it.
+  (Example it documents: posterize at `levels=1` divides by zero — the
+  recipe never sends it, but the sweep proves what the shader does.)
+
+**No-op rule.** Every parameter that means "off" must be a provably true
+no-op: the effect renders the input into an RGBA8 target and the bytes must
+match the input **bit-exactly** (IEEE `x+0==x`, `x*1==x` — no tolerance).
+Effects whose off-state is structural (the recipe skips the pass, e.g.
+accum-blur at sigma 0) get a documented `near: 1` budget instead of a false
+zero claim, and effects with no amount parameter (solarize, edge, invert —
+off means "removed from the chain") don't claim a shader-level zero proof.
+
+**Running it.** `npm run selfcheck:sweep` runs just the sweeps;
+`npm run selfcheck` runs them as the tail of the debug suite. Output lines:
+
+- `[ok] sweep <effect> — N case(s), M no-op proof(s)` — all cases passed.
+- `[FAIL] sweep <effect> — <case>: …` — a contract assertion failed.
+- `[info] sweep … (beyond contract — logged, not failing)` — hostile/HDR
+  out-of-range, characterized.
+- `[HOSTILE-NaN] sweep … (beyond contract; see sanitization audit)` —
+  hostile non-finite, characterized.
+
+**No-Chromium behavior.** If headless Chromium (or WebGL2) is unavailable,
+the sweep prints the loud skip
+`SWEEP TESTS SKIPPED: no headless Chromium — uniform-sweep property tests
+did not run` and exits successfully — CI stays green, but the skip is
+impossible to miss in the log.
 
 ## Shader Lab panel
 
