@@ -93,11 +93,15 @@ byte-identical JSON (`serializeSceneContract`).
 
 ## Semantics the backend must preserve
 
-1. **FX wrap fold.** An FX layer wraps *all content accumulated below it*
-   (see `fxWraps`); layers above the topmost FX layer are never wrapped.
-   A shed/inactive FX layer passes content through unwrapped (it simply
-   produces no wrap entry). The wrap group's opacity is the FX layer's
-   `layerOpacity`; the FX layer's own blend mode is ignored.
+1. **FX wrap fold.** (#227) An FX layer adjusts *everything below it*: the
+   wrap input is the whole composite below the FX layer — the canvas
+   background plus every lower layer's output, including lower FX layers —
+   so stacked FX layers compose like adjustment layers. `contentLayerIds`
+   lists the content layers below (bottom-up); layers above the topmost FX
+   layer are never wrapped. A shed/inactive FX layer passes content through
+   unwrapped (it simply produces no wrap entry). The wrap group's opacity
+   is the FX layer's `layerOpacity`; the FX layer's own blend mode is
+   ignored.
 2. **Effect order.** `fx` arrays execute top-down, first effect reading
    the wrapped source. Unknown kinds never appear (builder sanitizes);
    `assertSceneContract` rejects hand-built scenes containing them.

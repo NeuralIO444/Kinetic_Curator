@@ -340,6 +340,38 @@ async function runBrowserTests() {
     assert.ok(bad.equals(ref), 'self-matte on fx layer must fail closed');
   });
 
+  await okAsync('pipeline: stacked FX layers compose — double invert cancels (#227)', async () => {
+    // #227: an FX layer adjusts EVERYTHING below it, including lower FX
+    // layers' output. Two stacked full-opacity inverts must cancel back to
+    // the unwrapped render; under the old fold the upper FX never saw the
+    // lower FX's output (and a directly-adjacent upper FX was shed outright).
+    const base = JSON.parse(JSON.stringify(getScene('fx-invert-wrap').doc));
+    base.layers = base.layers.filter((l) => l.id !== 'top');
+    base.layers.find((l) => l.id === 'fx1').layerOpacity = 1;
+    base.layers.push({
+      id: 'fx2', name: 'FX2', type: 'fx', visible: true,
+      layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'invert', params: {} }],
+    });
+    const noFx = JSON.parse(JSON.stringify(base));
+    noFx.layers = noFx.layers.filter((l) => l.type !== 'fx');
+    const single = JSON.parse(JSON.stringify(base));
+    single.layers = single.layers.filter((l) => l.id !== 'fx2');
+
+    const fracBad = (a, b, tol = 6) => {
+      let bad = 0;
+      for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > tol) bad++;
+      return bad / (a.length / 4);
+    };
+    const pxDouble = await renderDoc(base);
+    const pxNone = await renderDoc(noFx);
+    const pxSingle = await renderDoc(single);
+    assert.ok(fracBad(pxSingle, pxNone) > 0.5, 'sanity: a single invert must change most pixels');
+    assert.ok(
+      fracBad(pxDouble, pxNone) < 0.01,
+      `double invert must cancel to the unwrapped render, got ${(fracBad(pxDouble, pxNone) * 100).toFixed(2)}% bad pixels`
+    );
+  });
+
   await closeGlDriver();
 }
 
