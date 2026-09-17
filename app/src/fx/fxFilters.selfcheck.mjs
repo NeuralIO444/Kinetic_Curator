@@ -91,6 +91,37 @@ ok('unknown kinds fail closed mid-stack', () => {
   ]);
   assert.equal(prims.length, 11); // 7 + 4, the unknown one skipped
 });
+ok('stack chains top-down: later effects read earlier output', () => {
+  const prims = compileFxPrimitives([
+    { kind: 'rgbSplit', params: { dx: 3 } },
+    { kind: 'grain', params: { amount: 0.4 } },
+  ]);
+  assert.equal(prims.length, 11);
+  // First effect still reads the raw source...
+  assert.equal(prims[0].attrs.in, 'SourceGraphic');
+  assert.equal(prims[1].attrs.in, 'SourceGraphic');
+  assert.equal(prims[2].attrs.in, 'SourceGraphic');
+  // ...but its output is named and consumed by grain — not orphaned
+  const splitOut = prims[6].attrs.result;
+  assert.ok(splitOut, 'non-final effect gets a named output');
+  assert.equal(prims[9].attrs.in2, splitOut); // grain alpha-masked by split output
+  assert.equal(prims[10].attrs.in2, splitOut); // grain composited over split output
+  assert.ok(!('result' in prims[10].attrs), 'final effect output stays implicit (filter output)');
+});
+ok('three-deep chain threads every stage', () => {
+  const prims = compileFxPrimitives([
+    { kind: 'blur', params: { radius: 6 } },
+    { kind: 'rgbSplit', params: { dx: 3 } },
+    { kind: 'grain', params: { amount: 0.4 } },
+  ]);
+  assert.equal(prims.length, 12); // 1 + 7 + 4
+  const blurOut = prims[0].attrs.result;
+  assert.ok(blurOut);
+  assert.equal(prims[1].attrs.in, blurOut); // rgbSplit reads blurred source
+  const splitOut = prims[7].attrs.result;
+  assert.ok(splitOut);
+  assert.equal(prims[11].attrs.in2, splitOut); // grain over split-of-blur
+});
 ok('primBudget warns but never drops (binding degradation is the shed ladder)', () => {
   const prims = compileFxPrimitives([{ kind: 'rgbSplit', params: { dx: 3 } }], { primBudget: 4 });
   assert.equal(prims.length, 7);
