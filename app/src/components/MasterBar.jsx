@@ -210,12 +210,13 @@ export function MasterBar() {
         </div>
 
         {state.isRecording ? (
-          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}>
+          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+            title="Recording the live canvas to WEBM — what plays is what records, ACCUM included">
             <span className="status-dot beat-flash" style={{ background: '#ff2d6f', animationIterationCount: 'infinite' }} />
             REC WEBM
           </div>
         ) : (
-          <div className="status-pill">
+          <div className="status-pill" title={running ? 'Live loop is running — Space pauses' : 'Live loop is paused — Space resumes'}>
             <span className={`status-dot ${running ? 'live' : ''}`} />
             {running ? 'LIVE' : 'PAUSED'}
           </div>

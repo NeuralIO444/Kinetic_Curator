@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { HELP_SHORTCUTS, HELP_TOPICS } from '../data/helpCopy.js';
 
-export function HotkeyOverlay({ show, onClose, initialTab = 'help' }) {
+export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
   const [tab, setTab] = useState(initialTab);
   const [q, setQ] = useState('');
   const topics = useMemo(() => {
@@ -36,6 +36,17 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help' }) {
               onChange={(e) => setQ(e.target.value)}
               style={{ width: '100%', marginBottom: 8, fontSize: 11, background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', padding: 4 }}
             />
+            {typeof onTour === 'function' && (
+              <button
+                type="button"
+                className="micro-btn"
+                onClick={onTour}
+                title="Replay the 4-step first-run tour"
+                style={{ marginBottom: 8 }}
+              >
+                ↻ Replay the tour
+              </button>
+            )}
             <div className="hotkey-list" style={{ maxHeight: 280, overflow: 'auto' }}>
               {topics.map((t) => (
                 <div key={t.id} className="hotkey-row" style={{ alignItems: 'flex-start' }}>
