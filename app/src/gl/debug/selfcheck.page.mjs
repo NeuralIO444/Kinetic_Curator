@@ -24,6 +24,13 @@ import {
 } from './debugStrip.mjs';
 import { createGpuTimer } from './gpuTimer.mjs';
 import { createTapRecorder } from './tapPoints.mjs';
+import {
+  COMMON_VERSION,
+  auditChunks,
+  injectCommon,
+  chunksUsedBy,
+} from '../effects/chunks.mjs';
+import { refHash12, refVnoise } from '../effects/chunkReference.mjs';
 
 const failures = [];
 const lines = [];
@@ -280,6 +287,89 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
     rec.clear();
     eq(rec.getTaps().length, 0, 'clear');
     gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb);
+  });
+
+  // ---- chunk library (#196) ----
+  log('chunks: library audits clean', () => {
+    eq(auditChunks().errors.length, 0, 'no audit errors');
+    eq(COMMON_VERSION, 1, 'version');
+  });
+  log('chunks: injection keeps #line mapping for chunks and effect body', () => {
+    const lines = injectCommon('#version 300 es\nprecision highp float;\nvoid main() {}\n').split('\n');
+    eq(lines[0], '#version 300 es', 'version first');
+    eq(lines[1], '#line 1', 'chunk block -> common.glsl lines');
+    const marker = lines.findIndex((l, i) => i > 2 && l.startsWith('#line '));
+    eq(lines[marker], '#line 2', 'effect body -> effect source lines');
+    eq(lines[marker + 1], 'precision highp float;', 'body intact');
+  });
+  const renderChunk = (expr) => {
+    const fs = injectCommon(`#version 300 es
+precision highp float;
+out vec4 o;
+void main() {
+  vec2 p = gl_FragCoord.xy;
+  o = ${expr};
+}
+`);
+    const prog = buildProgramChecked(gl, SIMPLE_VS, fs, { name: 'chunk-probe' });
+    const W = 8, H = 8;
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.viewport(0, 0, W, H);
+    gl.useProgram(prog);
+    const vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disableVertexAttribArray(0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    const px = new Uint8Array(W * H * 4);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.deleteBuffer(vbo);
+    gl.deleteFramebuffer(fb);
+    gl.deleteTexture(tex);
+    gl.deleteProgram(prog);
+    return px;
+  };
+  log('chunks: injected library compiles through the harness', () => {
+    // A successful renderChunk already proves compile+link; this one is the
+    // explicit syntax gate with the harness's diagnostics attached.
+    const fs = injectCommon('#version 300 es\nprecision highp float;\nout vec4 o;\nvoid main() { o = vec4(kc_fbm(vec2(1.0), 3)); }\n');
+    const sh = compileShaderChecked(gl, gl.FRAGMENT_SHADER, fs, { name: 'chunk-syntax', file: 'common.glsl' });
+    eq(!!sh, true, 'chunk block compiles');
+    gl.deleteShader(sh);
+  });
+  log('chunks: kc_hash12 renders like the CPU reference', () => {
+    const px = renderChunk('vec4(kc_hash12(p), 0.0, 0.0, 1.0)');
+    for (let j = 0; j < 8; j++) {
+      for (let i = 0; i < 8; i++) {
+        near(px[(j * 8 + i) * 4] / 255, refHash12(i + 0.5, j + 0.5), 0.02, `hash12 ${i},${j}`);
+      }
+    }
+  });
+  log('chunks: kc_vnoise (calls kc_hash12) renders like the CPU reference', () => {
+    const px = renderChunk('vec4(kc_vnoise(p * 0.35), 0.0, 0.0, 1.0)');
+    for (let j = 0; j < 8; j++) {
+      for (let i = 0; i < 8; i++) {
+        near(px[(j * 8 + i) * 4] / 255, refVnoise((i + 0.5) * 0.35, (j + 0.5) * 0.35), 0.02, `vnoise ${i},${j}`);
+      }
+    }
+  });
+  log('chunks: chunksUsedBy tracks chunk -> effect dependencies', () => {
+    eq(
+      chunksUsedBy('void main() { o = vec4(kc_dither(p), kc_vnoise(p), 0.0, 1.0); }').join(','),
+      'kc_dither,kc_vnoise',
+      'direct chunk uses'
+    );
+    eq(chunksUsedBy('void main() {}').length, 0, 'no chunk uses');
   });
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);

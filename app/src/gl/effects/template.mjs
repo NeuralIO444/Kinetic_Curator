@@ -26,6 +26,9 @@
  * - FBO padding: effects that sample outside their pixel (blur, displace)
  *   declare `pad` (pixels) in the descriptor; the bridge sizes the padded
  *   write FBO from it. No per-effect FBO math.
+ * - Shared chunks: `common.glsl` (#196) is injected into every effect shader
+ *   before compile — call the `kc_*` helpers instead of reimplementing
+ *   noise/hash/color math. Effects never define their own copies.
  *
  * Mismatches surface at load: registration runs a static source audit
  * (descriptor param with no matching `uniform` in the shader fails closed)
@@ -36,6 +39,7 @@
 
 import { FULL_VS } from '../shaders.mjs';
 import { auditUniforms, diagnosticsLog } from '../debug/diagnostics.mjs';
+import { injectCommon } from './chunks.mjs';
 
 export const TEMPLATE_VERSION = 1;
 
@@ -289,7 +293,12 @@ export function registerTemplateEffect(bridge, gl, kind, { fs, descriptor, file 
   }
   const decls = uniformDecls(d);
   const programName = `fx/${kind}`;
-  const rec = bridge.registerProgram(programName, TEMPLATE_VS, fs, {
+  // The shared chunk library (common.glsl) is injected into every template
+  // effect before compile — effects call kc_* helpers instead of redefining
+  // them. The static audit above runs on the author's raw source; the
+  // #line mapping in injectCommon keeps compile errors pointed at the right
+  // file (chunk block -> common.glsl lines, body -> effect source lines).
+  const rec = bridge.registerProgram(programName, TEMPLATE_VS, injectCommon(fs), {
     uniforms: decls,
     file: file || `effect:${kind}`,
   });
