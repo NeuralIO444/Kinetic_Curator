@@ -43,9 +43,6 @@ python3 studio/studio.py render my.project.json -o out.png --res 7680x4320 --sid
 # ACCUM trail still (not a movie)
 python3 studio/studio.py render my.project.json -o trails.png --accum --steps 24
 
-# vector out, no raster step
-python3 studio/studio.py svg my.project.json -o out.svg
-
 # 500 editions, one PNG + one JSON sidecar each
 python3 studio/studio.py batch my.project.json -o editions/ --count 500 --start-seed 0 --res 2
 

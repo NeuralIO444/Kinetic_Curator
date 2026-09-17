@@ -18,9 +18,10 @@
  * - Param values are sanitized against FX_EFFECT_DEFS (clamped, defaulted).
  * - Filter output is EXCLUDED from the determinism contract (like audio/LFO):
  *   filter rasterization may vary subtly across browsers and resvg.
- * - Showrunner cuts are honored via ctx: shedLevel 1 forces turbulence
- *   octaves to 1 and drops grain; shedLevel 2 / maxFxLayers are applied by
- *   the caller (CanvasPanel skips whole FX layers).
+ * - #192 retired the Showrunner FX cut ladder: effects always compile at
+ *   full fidelity (ctx.turbulenceOctaves from the quality tier). No effect
+ *   is ever silently simplified or dropped — the governor sheds resolution
+ *   (renderScale) before anything visible is cut.
  */
 
 const r3 = (v) => Math.round(Number(v) * 1000) / 1000;
@@ -170,8 +171,8 @@ function buildRgbSplit(params, ctx, rid, src) {
 }
 
 function buildDisplace(params, ctx, rid, src) {
-  // Showrunner cut 1 (and the turbulenceOctaves budget) clamp noise detail.
-  const octaves = ctx.shedLevel >= 1 ? 1 : Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
+  // The turbulenceOctaves tier budget clamps noise detail (#192: no FX cuts).
+  const octaves = Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
   const noise = rid();
   return [
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.012, numOctaves: octaves, seed: Math.round(params.seed), result: noise } },
@@ -216,8 +217,8 @@ function buildBlur(params, ctx, rid, src) {
 }
 
 function buildScanlines(params, ctx, rid, src, srcAlpha) {
-  // Showrunner cut 1 (and the turbulenceOctaves budget) clamp noise detail.
-  const octaves = ctx.shedLevel >= 1 ? 1 : Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
+  // The turbulenceOctaves tier budget clamps noise detail (#192: no FX cuts).
+  const octaves = Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
   // Noise varies along Y (bands across the height), near-constant along X:
   // fine horizontal dark lines. Alpha-masked to the source like grain.
   const n = rid(), la = rid(), lam = rid();
@@ -276,9 +277,9 @@ const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: build
 
 /**
  * Compile an effects array into filter primitives.
- * ctx: { octaves, shedLevel, dxMod, primBudget }
- *  - shedLevel >= 1: grain effects are dropped (Showrunner cut 1); turbulence
- *    detail (displace, tear, scanlines) is forced to 1 octave.
+ * ctx: { octaves, dxMod, primBudget }
+ *  - octaves: turbulence detail budget from the quality tier (displace,
+ *    tear, scanlines). #192: effects are never silently simplified.
  *  - primBudget: soft ceiling — exceeding it warns (see docs/FX_LAYERS.md
  *    for why this warns instead of dropping: the binding degradation is
  *    the shed ladder, not prim counting).
@@ -294,7 +295,7 @@ export function compileFxPrimitives(effects, ctx = {}) {
   // primitive stays implicit (it becomes the filter output), which keeps
   // single-effect stacks compiling exactly as before.
   const active = list.filter((fx) => {
-    if (ctx.shedLevel >= 1 && fx.kind === 'grain') return false; // Showrunner cut 1
+    // #192: no FX culling — every sanitized effect compiles, always.
     return !!BUILDERS[fx.kind]; // unknown kind: fail closed (also guarded by sanitize)
   });
   let src = 'SourceGraphic';

@@ -101,12 +101,11 @@ export function CanvasPanel() {
     slowRender: s.slowRender,
     perfTier1: s.perfTier1,
     assetThin: s.assetThin,
-    fxShedLevel: s.fxShedLevel,
   }));
   const {
     layoutParams, weightOverrides, evolveMode, beatPulse, audioBands,
     motionSmoothing, quality, running, layers, activeLayerId, slowRender,
-    perfTier1, assetThin, fxShedLevel,
+    perfTier1, assetThin,
   } = state;
 
   const preset = getPreset(layoutParams.composition);
@@ -168,33 +167,28 @@ export function CanvasPanel() {
   // -- FX layer stack ------------------------------------------------------
   // Fold bottom-up: content layers accumulate; each applied FX layer wraps
   // the accumulator in <g filter="url(#fx-…)">, then stacking continues.
-  // Which FX layers apply: Showrunner cut 2 keeps only the first visible one
-  // (lowest = smallest wrapped subtree = cheapest); otherwise the tier's
-  // maxFxLayers budget keeps the first N bottom-up. Layers with an empty
-  // effect stack compile to nothing and pass content through unwrapped.
-  // Hidden FX layers never reach here (visibleLayers filtered them) — no
-  // filter cost, per spec.
+  // Which FX layers apply: ALL of them. #192 retired both the Showrunner
+  // FX cut ladder and the per-tier maxFxLayers budgets — FX layers are never
+  // culled in normal operation (the silent-cull trap: a layer shown in the
+  // UI while its effect was shed). Layers with an empty effect stack compile
+  // to nothing and pass content through unwrapped. Hidden FX layers never
+  // reach here (visibleLayers filtered them) — no filter cost, per spec.
   const fxCtx = useMemo(() => ({
-    shedLevel: fxShedLevel || 0,
     octaves: caps.turbulenceOctaves,
     primBudget: caps.maxFilterPrimitives,
     dxMod: (typeof beatPulse === 'number' ? beatPulse : 0) * 3,
-  }), [fxShedLevel, caps, beatPulse]);
+  }), [caps, beatPulse]);
 
   const fxActive = useMemo(() => {
     const out = [];
-    let n = 0;
-    const maxFx = caps.maxFxLayers ?? Infinity;
-    const keep = (fxShedLevel || 0) >= 2 ? 1 : maxFx;
     for (const rl of resolvedLayers) {
       if (!rl.isFx) continue;
-      if (n < keep && compileFxPrimitives(rl.layer.effects, fxCtx).length > 0) {
+      if (compileFxPrimitives(rl.layer.effects, fxCtx).length > 0) {
         out.push(rl.layer);
       }
-      n += 1;
     }
     return out;
-  }, [resolvedLayers, caps, fxShedLevel, fxCtx]);
+  }, [resolvedLayers, fxCtx]);
   const fxActiveIds = useMemo(() => new Set(fxActive.map((l) => l.id)), [fxActive]);
 
   const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });

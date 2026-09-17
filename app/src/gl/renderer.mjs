@@ -410,8 +410,11 @@ export function createRenderer(canvas) {
       if (layer.type === 'fx') {
         const wrap = wrapByFx.get(layerId);
         if (!wrap || !wrap.contentLayerIds.length) {
-          // Shed (over the tier's maxFxLayers budget) or effect-less FX
-          // layer: content passes through unwrapped, like the SVG pushAcc.
+          // #192: no silent shed — an FX layer with no wrap is named in
+          // contract.shed.fxLayerIds by buildSceneContract (maxFxLayers is
+          // retired as a budget, so this is empty in normal operation).
+          // Effect-less FX layers also land here: content passes through
+          // unwrapped, like the SVG pushAcc.
           for (const pl of pending) {
             compositeLayerTo(pl, byLayer.get(pl.id) || [], mRead, mWrite);
             [mRead, mWrite] = [mWrite, mRead];

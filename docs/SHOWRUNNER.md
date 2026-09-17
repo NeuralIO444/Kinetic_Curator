@@ -73,24 +73,24 @@ Showrunner degrades only the **live proxy**:
 
 - `RENDER FINAL · UNCAPPED` bypasses every cut via `FINAL_CAPS`
   (`getRenderCaps(q, true)` is tier-independent).
-- Governor state (`fxShedLevel`, `assetThin`, `frameLock`, `perfTier1`,
+- Governor state (`renderScale`, `assetThin`, `frameLock`, `perfTier1`,
   `slowRender`, `perfClampOverride`, `stageTimings`) never serializes into
   project JSON; neither does `costScore` (deterministic from `svg`).
+  (#192: `fxShedLevel` retired — the FX cut ladder is gone.)
 - Enforced by `src/state/showrunner.selfcheck.mjs` in `npm run selfcheck`.
 
 ## Extension points for the FX system (#152) — implemented in #180
 
 The FX layer system (`docs/FX_LAYERS.md`) wires up every cut:
 
-- `fxShedLevel` is read in `CanvasPanel.jsx`'s FX fold: `1` → octaves=1 /
-  grain off (in `compileFxPrimitives`), `2` → only the first visible FX
-  layer (bottom-up) still applies.
-- Per-tier budgets from `getQualityCaps()`: `maxFxLayers` skips FX layers
-  beyond the allowance; `turbulenceOctaves` hard-clamps noise detail;
-  `maxFilterPrimitives` warns once per session instead of dropping —
-  primitive count correlates weakly with real GPU cost, so the binding
-  degradation is the shed ladder, not prim counting.
-- The studio/export path runs at `shedLevel: 0` (the Showrunner never runs
-  offline) but honors `maxFxLayers`; uncapped final renders get
-  `FINAL_CAPS` (`maxFxLayers: Infinity`) — full FX, per the proxy/final
-  invariant.
+> #192 (WebGL Phase 6) retired the FX cut ladder and the per-tier
+> `maxFxLayers` budgets. FX layers are never culled or simplified — the
+> governor sheds resolution (`renderScale`) before anything visible is cut.
+> See `src/hooks/governorCuts.js` for the cut order contract.
+>
+> - Per-tier budgets from `getQualityCaps()`: `turbulenceOctaves`
+>   hard-clamps noise detail; `maxFilterPrimitives` warns once per session
+>   instead of dropping — primitive count correlates weakly with real GPU
+>   cost, so the binding degradation is the shed ladder, not prim counting.
+> - `buildSceneContract` reports any shed FX wrap as `shed.fxLayerIds`
+>   (empty in normal operation) — the silent-cull trap cannot return.

@@ -164,57 +164,6 @@ class RenderError(RuntimeError):
         self.stderr = stderr
 
 
-def build_svg(project: Path, *, seed=None, time=0.0, progress=0.0,
-              ramps=None, motion=None, uncapped=False, width=None, height=None,
-              background=None) -> bytes:
-    if not project.is_file():
-        sys.exit(
-            f"project not found: {project}\n"
-            "In the app: OUTPUT → save project, then pass that file path."
-        )
-    cmd = ["node", str(RENDER_MJS), str(project)]
-    if seed is not None:
-        cmd += ["--seed", str(seed)]
-    if time:
-        cmd += ["--time", repr(time)]
-    if progress:
-        cmd += ["--progress", repr(progress)]
-    for r in ramps or []:
-        cmd += ["--ramp", r]
-    if motion:
-        cmd += ["--motion", motion]
-    if uncapped:
-        cmd += ["--uncapped"]
-    if width:
-        cmd += ["--width", str(width), "--height", str(height)]
-    if background:
-        cmd += ["--background", background]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, timeout=RENDER_TIMEOUT_S)
-    except subprocess.TimeoutExpired as exc:
-        # Surfaces as a failed edition rather than a batch that never returns.
-        raise RenderError(
-            f"render.mjs exceeded {RENDER_TIMEOUT_S}s for {project}",
-            returncode=None,
-            stderr=(exc.stderr or b"").decode("utf-8", "replace").strip()[-2000:],
-        ) from exc
-    err = proc.stderr.decode("utf-8", "replace") if proc.stderr else ""
-    if err:
-        sys.stderr.write(err)
-        sys.stderr.flush()
-    if proc.returncode != 0:
-        # Raise, never sys.exit: this runs inside ThreadPoolExecutor workers in
-        # cmd_batch, where SystemExit does not end the process - it surfaces
-        # through pool.map and takes down the whole run. One unrenderable
-        # edition must not cost the other 499 (#106).
-        raise RenderError(
-            f"render.mjs exited {proc.returncode} for {project}",
-            returncode=proc.returncode,
-            stderr=err.strip()[-2000:],
-        )
-    return proc.stdout
-
-
 def render_gpu(project: Path, out_png: Path, size: tuple[int, int], *,
                seed=None, uncapped=False, background=None, time=0.0,
                progress=0.0, ramps=None, motion="none") -> None:
@@ -222,8 +171,8 @@ def render_gpu(project: Path, out_png: Path, size: tuple[int, int], *,
 
     project → app/src/gl/exportStill.mjs → WebGL2 render at `size` →
     readPixels → PNG. A pure function of (project, seed, size): no live
-    store, no SVG flip-then-restore, no resvg. Raises RenderError on failure
-    (safe inside ThreadPoolExecutor workers — see build_svg).
+    store, no SVG serialization, no resvg. Raises RenderError on failure
+    (safe inside ThreadPoolExecutor workers: raises, never sys.exit).
     """
     if not project.is_file():
         sys.exit(
@@ -399,12 +348,6 @@ def cmd_accum(a, size, out: Path) -> None:
                    "renderer": "app/src/gl (WebGL2) shared ACCUM recipe"},
         ), indent=2))
     print(out)
-
-
-def cmd_svg(a) -> None:
-    svg = build_svg(Path(a.project), seed=a.seed, uncapped=a.uncapped,
-                    background=a.background)
-    Path(a.out).write_bytes(svg) if a.out else sys.stdout.buffer.write(svg)
 
 
 def edition_hash(project: Path, seed, size, uncapped, normalized) -> str:
@@ -612,11 +555,6 @@ def main(argv=None) -> None:
     sp.add_argument("--ramp", action="append", default=[])
     sp.add_argument("--motion", default="auto")
     sp.set_defaults(func=cmd_render)
-
-    sp = sub.add_parser("svg", help="one project -> SVG")
-    common(sp)
-    sp.add_argument("-o", "--out", default=None)
-    sp.set_defaults(func=cmd_svg)
 
     sp = sub.add_parser("batch", help="N seeds -> PNG + JSON sidecar each")
     common(sp)
