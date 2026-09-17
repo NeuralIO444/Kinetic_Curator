@@ -30,6 +30,15 @@ The governor already sheds load in a documented order. The manifesto promotes it
 - **Deliberate limitations, performed.** The governor doesn't dim the show and apologize. The constraint readout in PLAY says what's shed and why, and recovers when headroom returns. The limits are visible, honest, and part of the music.
 - **The shed order is the taste, written down.** Resolution, quality, assets, counts, motion — that priority is a curatorial statement. It changes only deliberately, the way a tracklist changes.
 
+## The curator engine: two adversarial dynamics
+
+The curator engine is driven by two forces pulling in opposite directions:
+
+1. **The Teenage Engineering dynamic — the enforcer.** Measured cost, the shed order, the honest readout. Asks one question: *what can we afford right now?*
+2. **The Davis dynamic — the curator.** The taste model, the keep/pass ledger, semantic judgment. Asks one question: *what's worth keeping?*
+
+They're adversarial the way a good producer and a good editor are adversarial: one protects the budget, the other protects the art. The engine lives in the negotiation — when the enforcer says "cut something" and the curator says "not that one," the system learns what matters. Neither side wins outright. The tension is the product.
+
 ## What this demands of every PR
 
 The standing gate, restated: every change serves **perform, capture, learn, or guide** — or it doesn't ship. The manifesto adds the second question: *does it serve the instrument or the ego?* A feature that makes the system more surprising inside its limits ships. A feature that makes the limits fuzzier doesn't.
