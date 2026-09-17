@@ -318,6 +318,10 @@ void main() {
 
 // Separable gaussian, same kernel convention as the builtin blur effect
 // (EFFECT_FS): w0 = 1/sqrt(2pi)/sigma, R = ceil(3*sigma), normalized.
+// The loop is capped at 64 taps per pass; createAccum's blurInto subdivides
+// wider sigmas into multiple passes at sigma/sqrt(n) (blurPassSigmas), so
+// the full kernel is always evaluated and the GPU matches the JS mirror's
+// reference look (#226).
 export const BLUR_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
@@ -410,8 +414,11 @@ export const ACCUM_PROGRAMS = {
   down: { fs: DOWN_FS, file: 'accum.mjs:DOWN_FS', uniforms: ['u_src'],
     cost: { tier: 1, memoryBytes: FRAME_16F / 16, timeMs: 0.3, notes: 'chain plumbing: 4x4 box downsample, shed with the chain' } },
   // Separable gaussian at bloom/halation sigma: the blurriest ACCUM pass.
+  // Sigmas whose 3σ radius exceeds the shader's 64-tap limit are subdivided
+  // into multiple passes (blurPassSigmas): halation σ ≤ 33 runs 3 sub-passes
+  // at high optics, so the worst case is ~3x the single-pass cost below.
   blur: { fs: BLUR_FS, file: 'accum.mjs:BLUR_FS', uniforms: ['u_src', 'u_texel', 'u_sigma', 'u_vertical'],
-    cost: { tier: 1, memoryBytes: 2 * FRAME_16F, timeMs: 2.0, notes: 'H+V separable at sigma up to 33 (halation); shed with ACCUM' } },
+    cost: { tier: 1, memoryBytes: 2 * FRAME_16F, timeMs: 2.0, notes: 'H+V separable at sigma up to 33 (halation); subdivided past 64 taps, up to ~3x passes; shed with ACCUM' } },
   // Bloom extras: adds the blurred bloom back into the frame.
   add: { fs: ADD_FS, file: 'accum.mjs:ADD_FS', uniforms: ['u_base', 'u_bloom', 'u_bloomSize', 'u_amount', 'u_tint'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.5, notes: 'bloom extras; shed with ACCUM' } },
@@ -459,6 +466,26 @@ function deleteTarget(gl, t) {
 
 // --- JS mirror (float64) of the per-frame recipe, for cross-checks ---------
 
+/**
+ * Subdivide a blur sigma across multiple BLUR_FS passes so the full 3σ
+ * gaussian kernel is always evaluated, even when R = ceil(3σ) exceeds the
+ * shader's 64-tap loop limit (issue #226). Repeated gaussian passes
+ * convolve — G(σ) = G(σ/√n) ∗ … ∗ G(σ/√n) — so each pass runs at σ/√n and
+ * the stack matches the JS mirror's single-pass reference kernel: the wide
+ * warm halation look #169 designed. The full 3σ kernel is the reference;
+ * the GPU's old truncated-at-64 kernel (narrower, weaker at high optics)
+ * was the implementation artifact, not the look.
+ * Returns [] for a no-op sigma (≤ 1e-3), mirroring mirrorGaussBlur's early
+ * return — callers already guard on this.
+ */
+export function blurPassSigmas(sigma) {
+  if (!(sigma > 1e-3)) return [];
+  const MAX_PASS_SIGMA = 64 / 3; // per-pass R = ceil(3σ) ≤ 64 taps
+  const n = Math.max(1, Math.ceil((sigma / MAX_PASS_SIGMA) ** 2));
+  const sub = sigma / Math.sqrt(n);
+  return Array.from({ length: n }, () => sub);
+}
+
 function gaussKernel(sigma) {
   const R = Math.ceil(sigma * 3);
   const w0 = 0.3989422804014327 / sigma;
@@ -472,7 +499,7 @@ function gaussKernel(sigma) {
   return { R, w, sum };
 }
 
-function gaussBlur(src, w, h, sigma) {
+export function mirrorGaussBlur(src, w, h, sigma) {
   if (!(sigma > 1e-3)) return src.slice();
   const { R, w: kw, sum } = gaussKernel(sigma);
   const tmp = new Float64Array(src.length);
@@ -685,7 +712,7 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
     }
   }
   // 3. blur-over-time on the incoming frame (post-echo mix)
-  const fIn = gaussBlur(frameIn, w, h, p.frameBlurSigma);
+  const fIn = mirrorGaussBlur(frameIn, w, h, p.frameBlurSigma);
   // 4. over
   const comp = new Float64Array(n);
   for (let i = 0; i < n; i += 4) {
@@ -698,8 +725,8 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   if (p.optics <= 0) return comp;
   // 5/6. bloom + halation from the same downsampled buffer
   const { px: down, w: bw, h: bh } = boxDownsample(comp, w, h);
-  const bloomBlur = gaussBlur(down, bw, bh, p.bloomSigma);
-  const halBlur = gaussBlur(down, bw, bh, p.halationSigma);
+  const bloomBlur = mirrorGaussBlur(down, bw, bh, p.bloomSigma);
+  const halBlur = mirrorGaussBlur(down, bw, bh, p.halationSigma);
   const bloomUp = bilinearUpsample(bloomBlur, bw, bh, w, h);
   const halUp = bilinearUpsample(halBlur, bw, bh, w, h);
   const out = new Float64Array(n);
@@ -823,20 +850,36 @@ export function createAccum(gl, bridge, { width, height }) {
   }
 
   function blurInto(srcTex, wTarget, sigma, swapT) {
-    // Two separable passes: srcTex -> wTarget(H) -> swapT(V). Returns the target holding the result.
-    pass('blur', wTarget, (u, bind) => {
-      gl.uniform1i(u.u_src, bind(0, srcTex));
-      gl.uniform2f(u.u_texel, 1 / wTarget.w, 1 / wTarget.h);
-      gl.uniform1f(u.u_sigma, sigma);
-      gl.uniform1f(u.u_vertical, 0);
-    });
-    pass('blur', swapT, (u, bind) => {
-      gl.uniform1i(u.u_src, bind(0, wTarget.tex));
-      gl.uniform2f(u.u_texel, 1 / swapT.w, 1 / swapT.h);
-      gl.uniform1f(u.u_sigma, sigma);
-      gl.uniform1f(u.u_vertical, 1);
-    });
-    return swapT;
+    // Subdivided separable passes: per subdivision two passes,
+    // src -> wTarget (H) -> swapT (V), ping-ponging on repeats. Returns the
+    // target holding the result (always swapT, as before).
+    const passes = blurPassSigmas(sigma);
+    if (passes.length === 0) {
+      // No-op sigma (callers guard on this): plain copy through.
+      pass('copy', swapT, (u, bind) => {
+        gl.uniform1i(u.u_src, bind(0, srcTex));
+      });
+      return swapT;
+    }
+    let src = srcTex;
+    let a = wTarget;
+    let b = swapT;
+    for (const s of passes) {
+      pass('blur', a, (u, bind) => {
+        gl.uniform1i(u.u_src, bind(0, src));
+        gl.uniform2f(u.u_texel, 1 / a.w, 1 / a.h);
+        gl.uniform1f(u.u_sigma, s);
+        gl.uniform1f(u.u_vertical, 0);
+      });
+      pass('blur', b, (u, bind) => {
+        gl.uniform1i(u.u_src, bind(0, a.tex));
+        gl.uniform2f(u.u_texel, 1 / b.w, 1 / b.h);
+        gl.uniform1f(u.u_sigma, s);
+        gl.uniform1f(u.u_vertical, 1);
+      });
+      src = b.tex; // next subdivision reads the previous result
+    }
+    return b;
   }
 
   const hexToRgb = (hex) => {
