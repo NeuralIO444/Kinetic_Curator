@@ -75,6 +75,21 @@ export const FX_EFFECT_DEFS = {
       levels: { label: 'Levels', min: 2, max: 8, step: 1, def: 4, hint: 'Tonal steps per channel' },
     },
   },
+  invert: {
+    label: 'Invert',
+    hint: 'Flip every channel. No parameters — stack it, strobe it.',
+    params: {},
+  },
+  solarize: {
+    label: 'Solarize',
+    hint: 'Fold the tonal curve: mid-tones push bright, shadows and highlights stay dark. Psych-poster look.',
+    params: {},
+  },
+  edge: {
+    label: 'Edge Detect',
+    hint: '3×3 convolution edge detection. Alpha channel is preserved, so transparent areas stay clean.',
+    params: {},
+  },
 };
 
 export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
@@ -224,7 +239,36 @@ function buildPosterize(params) {
   ];
 }
 
-const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain, blur: buildBlur, scanlines: buildScanlines, posterize: buildPosterize };
+function buildInvert() {
+  const flip = (prim) => ({ prim, attrs: { type: 'linear', slope: -1, intercept: 1 } });
+  return [
+    {
+      prim: 'feComponentTransfer', attrs: { in: 'SourceGraphic' },
+      children: [flip('feFuncR'), flip('feFuncG'), flip('feFuncB')],
+    },
+  ];
+}
+
+function buildSolarize() {
+  const curve = (prim) => ({ prim, attrs: { type: 'table', tableValues: '0 0.5 1 0.5 0' } });
+  return [
+    {
+      prim: 'feComponentTransfer', attrs: { in: 'SourceGraphic' },
+      children: [curve('feFuncR'), curve('feFuncG'), curve('feFuncB')],
+    },
+  ];
+}
+
+function buildEdge() {
+  return [
+    {
+      prim: 'feConvolveMatrix',
+      attrs: { in: 'SourceGraphic', order: 3, kernelMatrix: '-1 -1 -1 -1 8 -1 -1 -1 -1', preserveAlpha: 'true' },
+    },
+  ];
+}
+
+const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain, blur: buildBlur, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
 
 /**
  * Compile an effects array into filter primitives.

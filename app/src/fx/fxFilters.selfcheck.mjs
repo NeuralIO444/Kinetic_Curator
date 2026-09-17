@@ -253,5 +253,30 @@ ok('posterize: discrete component transfer, alpha untouched', () => {
     assert.equal(c.attrs.tableValues, '0 0.333 0.667 1');
   }
 });
+ok('invert: linear channel flip, no params needed', () => {
+  const prims = compileFxPrimitives([{ kind: 'invert', params: {} }]);
+  assert.deepEqual(prims.map((p) => p.prim), ['feComponentTransfer']);
+  assert.deepEqual(prims[0].children.map((c) => c.prim), ['feFuncR', 'feFuncG', 'feFuncB']);
+  for (const c of prims[0].children) {
+    assert.equal(c.attrs.type, 'linear');
+    assert.equal(c.attrs.slope, -1);
+    assert.equal(c.attrs.intercept, 1);
+  }
+});
+ok('solarize: folded table curve per channel', () => {
+  const prims = compileFxPrimitives([{ kind: 'solarize' }]);
+  assert.deepEqual(prims.map((p) => p.prim), ['feComponentTransfer']);
+  for (const c of prims[0].children) {
+    assert.equal(c.attrs.type, 'table');
+    assert.equal(c.attrs.tableValues, '0 0.5 1 0.5 0');
+  }
+});
+ok('edge: 3x3 convolve, alpha preserved', () => {
+  const prims = compileFxPrimitives([{ kind: 'edge' }]);
+  assert.deepEqual(prims.map((p) => p.prim), ['feConvolveMatrix']);
+  assert.equal(prims[0].attrs.order, 3);
+  assert.equal(prims[0].attrs.preserveAlpha, 'true');
+  assert.equal(prims[0].attrs.in, 'SourceGraphic');
+});
 
 console.log(`fxFilters.selfcheck: OK (${n} cases)`);

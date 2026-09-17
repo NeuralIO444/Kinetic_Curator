@@ -43,6 +43,9 @@ is the single source of truth for the compiler, the panel UI, and this doc.
 | `blur {radius}` | `feGaussianBlur stdDeviation={radius}` on the source. One primitive — cheapest effect in the stack | 1 |
 | `scanlines {density, amount}` | anisotropic `feTurbulence` (near-zero X frequency, high Y) → `feColorMatrix` (noise → alpha, RGB zeroed) → `feComposite operator="in"` against `SourceAlpha` → `feComposite operator="over"` — CRT banding, alpha-masked like grain | 4 |
 | `posterize {levels}` | `feComponentTransfer` with `feFuncR/G/B type="discrete"` (alpha channel untouched) | 1 |
+| `invert` | `feComponentTransfer` with `feFuncR/G/B type="linear" slope="-1"` — full channel flip, no params | 1 |
+| `solarize` | `feComponentTransfer` with `feFuncR/G/B type="table"` folding mids bright (`0 0.5 1 0.5 0`) | 1 |
+| `edge` | `feConvolveMatrix` 3×3 edge kernel, `preserveAlpha="true"` so transparent areas stay clean | 1 |
 
 Hard rules:
 
@@ -94,7 +97,7 @@ deterministic and round-trips exactly through project JSON.
 
 ## Export audit (resvg, via `studio/render.mjs`)
 
-Tested 2026-09-16 with `@resvg/resvg-js`: a project with all seven effects
+Tested 2026-09-16 with `@resvg/resvg-js`: a project with all ten effects
 was rendered to SVG via the studio path and rasterized at 1000×700, plus
 isolated per-effect variants diffed against a no-FX baseline.
 
@@ -107,6 +110,9 @@ isolated per-effect variants diffed against a no-FX baseline.
 | `blur` | ✅ survives — soft edges, 6040 px changed vs baseline |
 | `scanlines` | ✅ survives — horizontal banding over artwork, alpha-masked (no filter-region box) |
 | `posterize` | ✅ survives — stepped tones, alpha untouched |
+| `invert` | ✅ survives — full channel flip |
+| `solarize` | ✅ survives — folded tonal curve |
+| `edge` | ✅ survives — edge outlines, alpha preserved (no halo on transparent areas) |
 
 No silent mismatches: every primitive used (`feTurbulence`,
 `feDisplacementMap`, `feColorMatrix`, `feOffset`, `feBlend mode="screen"`,
