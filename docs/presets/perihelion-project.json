@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "seed": 101,
+  "paletteId": "perihelion",
+  "layoutParams": {
+    "mode": "orbit",
+    "count": 300,
+    "scale": [
+      0.3,
+      1.1
+    ],
+    "rotate": [
+      -100,
+      100
+    ],
+    "alpha": [
+      34,
+      90
+    ],
+    "zTiers": 3,
+    "jitter": 4,
+    "density": 90,
+    "bleed": true,
+    "recolor": true,
+    "mirror": false,
+    "overlap": true,
+    "lifeDrift": 0.1,
+    "displacement": 0,
+    "behave": "orbit",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "rad_orbit_01": true,
+    "rad_orbit_02": true,
+    "rad_orbit_dot_01": true,
+    "dot_single_01": true
+  },
+  "layers": [
+    {
+      "id": "perihelion-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "perihelion-main"
+}
