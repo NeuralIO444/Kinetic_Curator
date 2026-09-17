@@ -37,6 +37,24 @@ const KNOWN_BLENDS = new Set([
 const r3 = (v) => Math.round(Number(v) * 1000) / 1000;
 const clamp01 = (v) => Math.min(1, Math.max(0, Number(v)));
 
+/**
+ * Sanitize a doc layer's `matte` field (#154 re-plan, landed in #189 as a
+ * mask texture — never the SVG mask/feColorMatrix path).
+ *
+ * Shape: { sourceId, mode: 'alpha'|'luma', invert }. Returns null when the
+ * field is absent or unusable; the backend then renders the layer normally
+ * (fail closed). Additive: does not bump GL_CONTRACT_VERSION.
+ */
+export function sanitizeMatte(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (typeof raw.sourceId !== 'string' || !raw.sourceId) return null;
+  return {
+    sourceId: raw.sourceId,
+    mode: raw.mode === 'luma' ? 'luma' : 'alpha',
+    invert: !!raw.invert,
+  };
+}
+
 function hexColor(c, fallback = '#000000') {
   const s = String(c || '');
   return /^#[0-9a-fA-F]{3,8}$/.test(s) ? s : fallback;
@@ -72,13 +90,21 @@ function toInstance(item, layerId, itemBlend) {
  * the FX layer, its filter id, its opacity, and the content layer ids it
  * wraps (bottom-up). Content layers above the topmost FX layer, or with
  * no FX layer below them, are not wrapped.
+ *
+ * Mirrors studio/render.mjs exactly, including the shed rules: the tier's
+ * maxFxLayers budget drops FX layers past the budget, and a layer whose
+ * effects sanitize to nothing produces no filter (fxFilterStringForLayer
+ * returns null) — both pass content through unwrapped (no wrap entry).
  */
-function buildFxWraps(resolvedLayers) {
+function buildFxWraps(resolvedLayers, caps) {
   const wraps = [];
+  const maxFx = caps?.maxFxLayers ?? Infinity;
   let acc = [];
+  let fxIndex = 0;
   for (const rl of resolvedLayers) {
     if (rl.isFx) {
-      if (acc.length > 0) {
+      const fx = sanitizeFxEffects(rl.layer?.effects);
+      if (acc.length > 0 && fxIndex < maxFx && fx.length > 0) {
         wraps.push({
           fxLayerId: rl.id,
           filterId: `fx-${String(rl.id).replace(/[^A-Za-z0-9_-]/g, '_')}`,
@@ -87,6 +113,7 @@ function buildFxWraps(resolvedLayers) {
         });
       }
       acc = [];
+      fxIndex += 1;
     } else {
       acc.push(rl);
     }
@@ -111,6 +138,11 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
   const layers = [];
   const instances = [];
   const assetIds = new Set();
+  // Doc layers are looked up by id for fields resolveLayers() doesn't
+  // forward (matte); the app model itself is untouched (#189).
+  const docLayerById = new Map(
+    (doc.layers || []).filter((l) => l && l.id != null).map((l) => [String(l.id), l])
+  );
 
   for (const rl of resolvedLayers) {
     if (rl.isFx) {
@@ -122,6 +154,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         opacity: clamp01(rl.layerOpacity ?? rl.layer?.layerOpacity ?? 1),
         blend: 'normal', // FX wrap groups carry no blend mode (buildLayerStack)
         fx: sanitizeFxEffects(rl.layer?.effects), // top-down, #185 order preserved
+        matte: sanitizeMatte(rl.layer?.matte),
       });
       continue;
     }
@@ -134,6 +167,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       visible: true,
       opacity: clamp01(rl.layerOpacity ?? 1),
       blend: KNOWN_BLENDS.has(rl.layerBlendMode) ? rl.layerBlendMode : 'normal',
+      matte: sanitizeMatte(docLayerById.get(layerId)?.matte),
       layout: {
         blendMode: KNOWN_BLENDS.has(itemBlend) ? itemBlend : 'normal',
         hueRotate: Number(rl.layoutParams?.hueRotate) || 0,
@@ -157,7 +191,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     },
     layers,
     compositeOrder: layers.map((l) => l.id), // bottom -> top; backend draws in this order
-    fxWraps: buildFxWraps(resolvedLayers),
+    fxWraps: buildFxWraps(resolvedLayers, caps),
     instances, // draw order = array order within each layer's slice
     textRuns: [], // reserved for Phase 1 glyph atlas; text is baked into stamp assets today
     accum: accum && accum.enabled
@@ -197,6 +231,14 @@ export function assertSceneContract(scene) {
     if (!l.id || layerIds.has(l.id)) fail(`duplicate or missing layer id: ${l.id}`);
     layerIds.add(l.id);
     if (l.type !== 'content' && l.type !== 'fx') fail(`layer ${l.id}: bad type ${l.type}`);
+    if (l.matte !== null && l.matte !== undefined) {
+      const m = l.matte;
+      if (typeof m !== 'object' || typeof m.sourceId !== 'string' || !m.sourceId) {
+        fail(`layer ${l.id}: matte.sourceId must be a non-empty string`);
+      }
+      if (m.mode !== 'alpha' && m.mode !== 'luma') fail(`layer ${l.id}: matte.mode must be alpha|luma`);
+      if (typeof m.invert !== 'boolean') fail(`layer ${l.id}: matte.invert must be boolean`);
+    }
     if (l.type === 'fx') {
       if (!Array.isArray(l.fx)) fail(`fx layer ${l.id}: fx must be an array`);
       for (const fx of l.fx) {

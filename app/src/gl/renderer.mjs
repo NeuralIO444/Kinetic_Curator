@@ -1,5 +1,6 @@
 /**
- * WebGL2 scene renderer — Phase 1 (#187). Browser-safe (no Node imports).
+ * WebGL2 scene renderer — Phase 1 (#187), layer compositing + mattes (#189).
+ * Browser-safe (no Node imports).
  *
  * Consumes the Phase 0 scene contract (docs/GL_CONTRACT.md, v1) and renders
  * it to RGBA pixels for the parity harness. Structure mirrors the SVG
@@ -8,10 +9,13 @@
  * - bg clear (palette bg, opaque)
  * - one 16F FBO per content layer: instanced textured quads, premultiplied
  *   "over" compositing, per-item blend fallback via scratch FBO
- * - layer -> target compositing with full CSS blend modes + group opacity
+ * - layer -> target compositing with full CSS blend modes (plus-lighter
+ *   falls back to screen, matching the SVG reference's #96 substitution)
+ *   + group opacity + optional layer matte (mask texture, #154 re-plan)
  * - FX wrap groups: content layers folded into a wrap FBO (same as the
  *   SVG <g filter> fold), effect chain as fullscreen passes, SVG filter-
- *   region clipping, then compositing with the wrap opacity
+ *   region clipping, then compositing with the wrap opacity (and the FX
+ *   layer's own matte, if any)
  * - final resolve to RGBA8 premultiplied bytes (resvg's pixel convention)
  *
  * Animated params (life/beat) are buffer updates by construction: per-frame
@@ -21,12 +25,53 @@
 
 import {
   QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, RESOLVE_FS, COPY_FS,
-  BLEND_IDS,
+  blendIdFor,
 } from './shaders.mjs';
 import { buildProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
+
+/**
+ * Resolve per-layer mattes (#189, #154 re-plan) to renderable mask specs.
+ *
+ * Returns Map(layerId -> { sourceId, mode: 'alpha'|'luma', invert } | null).
+ * Fail-closed: a matte is ignored (null) when the source is missing, is not
+ * a content layer, or the source chain cycles back (self-matte, A↔B, longer
+ * loops). The chain is walked only to detect cycles — the mask always
+ * renders the *immediate* source's raw group content, never an FX-wrapped
+ * or recursively-matted result.
+ *
+ * Pure (no GL): unit-tested in composite.selfcheck.mjs.
+ */
+export function resolveLayerMattes(contract) {
+  const byId = new Map((contract.layers || []).map((l) => [l.id, l]));
+  const out = new Map();
+  for (const layer of contract.layers || []) {
+    const m = layer.matte;
+    let valid = false;
+    if (m && typeof m.sourceId === 'string' && m.sourceId) {
+      const seen = new Set([layer.id]);
+      let cur = m.sourceId;
+      for (;;) {
+        if (seen.has(cur)) break; // cycle → ignore the matte
+        const src = byId.get(cur);
+        if (!src || src.type !== 'content') break; // missing / non-content → ignore
+        seen.add(cur);
+        const next = src.matte && typeof src.matte.sourceId === 'string' ? src.matte.sourceId : '';
+        if (!next) { valid = true; break; } // chain ends cleanly
+        cur = next; // walk on, cycle-checking
+      }
+    }
+    out.set(
+      layer.id,
+      valid
+        ? { sourceId: m.sourceId, mode: m.mode === 'luma' ? 'luma' : 'alpha', invert: !!m.invert }
+        : null
+    );
+  }
+  return out;
+}
 
 // All program builds go through the debug harness (#193): a compile/link
 // failure throws naming the program, source file, and line number.
@@ -136,9 +181,10 @@ export function createRenderer(canvas) {
 
   /**
    * Composite srcTex over dstTex (ping-pong): reads dstRead, writes dstWrite.
-   * blend: BLEND_IDS value; opacity: group opacity; clip: [x0,y0,x1,y1] or null.
+   * blend: blend id from blendIdFor(); opacity: group opacity; clip: [x0,y0,x1,y1] or null.
+   * mask: { tex, mode: 'alpha'|'luma', invert } or null — a layer matte (#189).
    */
-  function composite(prog, u, srcTex, dstRead, dstWrite, blend, opacity, clip) {
+  function composite(prog, u, srcTex, dstRead, dstWrite, blend, opacity, clip, mask = null) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstWrite.fb);
     gl.viewport(0, 0, dstWrite.w, dstWrite.h);
     gl.disable(gl.BLEND);
@@ -153,12 +199,19 @@ export function createRenderer(canvas) {
     } else {
       gl.uniform1f(u.u_clipOn, 0);
     }
+    // Matte: bind a real texture even when off (the sampler must be valid).
+    gl.uniform1i(u.u_mask, bindTex(2, mask ? mask.tex : dstRead.tex));
+    gl.uniform1f(u.u_maskOn, mask ? 1 : 0);
+    gl.uniform1i(u.u_maskMode, mask && mask.mode === 'luma' ? 1 : 0);
+    gl.uniform1f(u.u_maskInvert, mask && mask.invert ? 1 : 0);
     drawFullscreen(prog);
   }
   const compU = {
     u_src: U(compProg, 'u_src'), u_dst: U(compProg, 'u_dst'),
     u_blend: U(compProg, 'u_blend'), u_opacity: U(compProg, 'u_opacity'),
     u_clip: U(compProg, 'u_clip'), u_clipOn: U(compProg, 'u_clipOn'),
+    u_mask: U(compProg, 'u_mask'), u_maskOn: U(compProg, 'u_maskOn'),
+    u_maskMode: U(compProg, 'u_maskMode'), u_maskInvert: U(compProg, 'u_maskInvert'),
   };
 
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
@@ -191,10 +244,11 @@ export function createRenderer(canvas) {
 
   const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
 
-  function instanceData(instances, cells) {
+  function instanceData(instances, cells, alphaScale = 1) {
     // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0).
     // The trailing pad keeps attribute 3's vec4 fetch inside the buffer —
     // ANGLE/Metal raises INVALID_OPERATION for out-of-bounds attrib reads.
+    // alphaScale folds a group opacity into per-instance alpha (mask bakes, #189).
     const out = new Float32Array(instances.length * 12);
     instances.forEach((it, i) => {
       const cell = cells[comboKey(it.asset, it.tint, it.accent)];
@@ -202,7 +256,7 @@ export function createRenderer(canvas) {
       const o = i * 12;
       out[o] = it.x; out[o + 1] = it.y;
       out[o + 2] = it.scaleX; out[o + 3] = it.scaleY;
-      out[o + 4] = it.rotation; out[o + 5] = it.opacity;
+      out[o + 4] = it.rotation; out[o + 5] = it.opacity * alphaScale;
       out[o + 6] = cell.u0; out[o + 7] = cell.v0;
       out[o + 8] = cell.u1; out[o + 9] = cell.v1;
     });
@@ -212,15 +266,17 @@ export function createRenderer(canvas) {
   /**
    * Render one content layer's instances into layerTarget (cleared first).
    * Non-normal per-item blends go through the scratch target (slow but exact).
+   * groupOpacity folds into instance alpha (mask bakes; normal layers keep
+   * group opacity in the composite pass, matching the SVG <g opacity>).
    */
-  function renderLayerInstances(layerTarget, instances, cells, atlasTex, scratch, blendTmp, w, h) {
+  function renderLayerInstances(layerTarget, instances, cells, atlasTex, scratch, blendTmp, w, h, groupOpacity = 1) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     let batch = [];
     const flush = () => {
-      if (batch.length) drawInstances(instanceData(batch, cells), atlasTex, w, h);
+      if (batch.length) drawInstances(instanceData(batch, cells, groupOpacity), atlasTex, w, h);
       batch = [];
     };
     for (const it of instances) {
@@ -232,10 +288,8 @@ export function createRenderer(canvas) {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      drawInstances(instanceData([it], cells), atlasTex, w, h);
-      const id = BLEND_IDS[b];
-      if (id == null) throw new Error(`[gl] unknown blend mode "${b}"`);
-      composite(compProg, compU, scratch.tex, layerTarget, blendTmp, id, 1, null);
+      drawInstances(instanceData([it], cells, groupOpacity), atlasTex, w, h);
+      composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(b), 1, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
       gl.viewport(0, 0, w, h);
       gl.disable(gl.BLEND);
@@ -266,10 +320,11 @@ export function createRenderer(canvas) {
     const layerT = makeTarget(gl, w, h, true);
     const scratchT = makeTarget(gl, w, h, true);
     const blendT = makeTarget(gl, w, h, true);
+    const maskT = makeTarget(gl, w, h, true); // layer-matte bakes (#189)
     const mainA = makeTarget(gl, w, h, true);
     const mainB = makeTarget(gl, w, h, true);
     const outT = makeTarget(gl, w, h, false);
-    const targets = [layerT, scratchT, blendT, mainA, mainB, outT];
+    const targets = [layerT, scratchT, blendT, maskT, mainA, mainB, outT];
 
     const byLayer = new Map();
     for (const it of contract.instances) {
@@ -278,6 +333,22 @@ export function createRenderer(canvas) {
     }
     const layerById = new Map(contract.layers.map((l) => [l.id, l]));
     const wrapByFx = new Map((contract.fxWraps || []).map((x) => [x.fxLayerId, x]));
+    const matteMap = resolveLayerMattes(contract);
+
+    // Bake a matte source layer's raw group content into maskT (premultiplied).
+    // The mask is the source layer's own content over transparent — its blend
+    // mode and any matte of its own are ignored (documented #154 semantics);
+    // its opacity is baked into the mask alpha.
+    const renderMask = (sourceId) => {
+      const src = layerById.get(sourceId);
+      renderLayerInstances(maskT, byLayer.get(sourceId) || [], cells, atlasTex, scratchT, blendT, w, h, src.opacity);
+    };
+    const maskFor = (layerId) => {
+      const m = matteMap.get(layerId);
+      if (!m) return null;
+      renderMask(m.sourceId);
+      return { tex: maskT.tex, mode: m.mode, invert: m.invert };
+    };
 
     // Main accumulation, ping-ponged.
     let mRead = mainA, mWrite = mainB;
@@ -292,8 +363,10 @@ export function createRenderer(canvas) {
         throw new Error('[gl] layer hueRotate is not implemented in Phase 1');
       }
       renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h);
-      const blendId = BLEND_IDS[layer.blend] ?? BLEND_IDS.normal;
-      composite(compProg, compU, layerT.tex, dRead, dWrite, blendId, layer.opacity, null);
+      composite(
+        compProg, compU, layerT.tex, dRead, dWrite,
+        blendIdFor(layer.blend), layer.opacity, null, maskFor(layer.id)
+      );
     };
 
     let pending = []; // content layers accumulated below the next FX layer (SVG pushAcc fold)
@@ -310,7 +383,16 @@ export function createRenderer(canvas) {
       if (!layer) throw new Error(`[gl] compositeOrder references unknown layer ${layerId}`);
       if (layer.type === 'fx') {
         const wrap = wrapByFx.get(layerId);
-        if (!wrap || !wrap.contentLayerIds.length) { pending = []; continue; }
+        if (!wrap || !wrap.contentLayerIds.length) {
+          // Shed (over the tier's maxFxLayers budget) or effect-less FX
+          // layer: content passes through unwrapped, like the SVG pushAcc.
+          for (const pl of pending) {
+            compositeLayerTo(pl, byLayer.get(pl.id) || [], mRead, mWrite);
+            [mRead, mWrite] = [mWrite, mRead];
+          }
+          pending = [];
+          continue;
+        }
         // Fold the pending content layers into the bridge's ping-pong targets.
         const bt = bridge.layer(layerId);
         let wRead = bt.t0, wWrite = bt.t1;
@@ -340,7 +422,11 @@ export function createRenderer(canvas) {
           },
         });
         const afterFx = bridge.runChain(layerId, wRead, steps);
-        composite(compProg, compU, afterFx.tex, mRead, mWrite, BLEND_IDS.normal, wrap.opacity, clip);
+        // An FX layer's own matte masks the wrap result at composite time.
+        composite(
+          compProg, compU, afterFx.tex, mRead, mWrite,
+          blendIdFor('normal'), wrap.opacity, clip, maskFor(layerId)
+        );
         [mRead, mWrite] = [mWrite, mRead];
         continue;
       }
