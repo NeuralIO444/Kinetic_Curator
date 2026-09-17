@@ -27,7 +27,7 @@ import { writePngFile } from './png.mjs';
 // ~3.6GB pixel buffer → OOM on an unattended batch tool.
 import { parseRes } from './exportStill.mjs';
 import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
-import { resolveLayers } from '../../../studio/render.mjs';
+import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderAccumViaGL, closeGlDriver } from './parity/glDriver.mjs';
 
@@ -121,6 +121,7 @@ async function main(argv) {
     return;
   }
   const motion = args.motion && args.motion !== 'none' ? args.motion : null;
+  await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
   // Background: explicit flag wins, else the project's palette bg (same rule
   // as the parity candidate), same as studio.py's old accum path.
   const firstLayers = resolveLayers(doc, { caps, ramp, motion, progress: 0 });
