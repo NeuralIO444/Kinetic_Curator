@@ -39,7 +39,7 @@ is the single source of truth for the compiler, the panel UI, and this doc.
 | `rgbSplit {dx}` | `feColorMatrix` isolates R/G/B → `feOffset` shifts R by +dx, B by −dx → two `feBlend mode="screen"` recombines (lossless per-channel) | 7 |
 | `displace {scale, seed}` | `feTurbulence type="fractalNoise"` → `feDisplacementMap` | 2 |
 | `tear {bands, amount}` | stretched `feTurbulence` (high Y frequency, near-zero X) → `feComponentTransfer` flattens the Y channel to exactly 0.5 via `feFuncG` → `feDisplacementMap` with `scale = amount × 4` — strictly horizontal shear | 3 |
-| `grain {amount}` | `feTurbulence` → `feColorMatrix` (noise → alpha, RGB zeroed) → `feComposite operator="over"` | 3 |
+| `grain {amount}` | `feTurbulence` → `feColorMatrix` (noise → alpha, RGB zeroed) → `feComposite operator="in"` against `SourceAlpha` (grain masked to artwork — no filter-region box on transparent areas) → `feComposite operator="over"` | 4 |
 
 Hard rules:
 
@@ -100,7 +100,7 @@ isolated per-effect variants diffed against a no-FX baseline.
 | `rgbSplit` | ✅ survives — chromatic fringing on edges, mean abs diff 5.98 vs baseline |
 | `displace` | ✅ survives — warped edges, mean abs diff 10.87 |
 | `tear` | ✅ survives — horizontal band shear, strictly x-only, mean abs diff 14.12 |
-| `grain` | ✅ survives — film grain over source, mean abs diff 6.97 |
+| `grain` | ✅ survives — film grain over source, alpha-masked to the artwork (2026-09-16 fix: earlier build painted grain across the whole filter region, visible as a box on transparent backgrounds) |
 
 No silent mismatches: every primitive used (`feTurbulence`,
 `feDisplacementMap`, `feColorMatrix`, `feOffset`, `feBlend mode="screen"`,

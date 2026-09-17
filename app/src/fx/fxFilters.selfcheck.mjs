@@ -69,9 +69,11 @@ ok('tear: x-only displacement via flattened Y channel', () => {
 });
 ok('grain: noise alpha composited over source', () => {
   const prims = compileFxPrimitives([{ kind: 'grain', params: { amount: 0.4 } }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feTurbulence', 'feColorMatrix', 'feComposite']);
-  assert.equal(prims[2].attrs.operator, 'over');
-  assert.equal(prims[2].attrs.in2, 'SourceGraphic');
+  assert.deepEqual(prims.map((p) => p.prim), ['feTurbulence', 'feColorMatrix', 'feComposite', 'feComposite']);
+  assert.equal(prims[2].attrs.operator, 'in'); // alpha-aware: grain masked by source alpha
+  assert.equal(prims[2].attrs.in2, 'SourceAlpha');
+  assert.equal(prims[3].attrs.operator, 'over');
+  assert.equal(prims[3].attrs.in2, 'SourceGraphic');
 });
 ok('shedLevel 1: grain dropped, turbulence octaves forced to 1', () => {
   const withGrain = compileFxPrimitives([{ kind: 'grain', params: { amount: 0.4 } }], { shedLevel: 1 });
@@ -87,7 +89,7 @@ ok('unknown kinds fail closed mid-stack', () => {
     { kind: 'vaporwave' },
     { kind: 'grain', params: { amount: 0.4 } },
   ]);
-  assert.equal(prims.length, 10); // 7 + 3, the unknown one skipped
+  assert.equal(prims.length, 11); // 7 + 4, the unknown one skipped
 });
 ok('primBudget warns but never drops (binding degradation is the shed ladder)', () => {
   const prims = compileFxPrimitives([{ kind: 'rgbSplit', params: { dx: 3 } }], { primBudget: 4 });

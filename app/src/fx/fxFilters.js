@@ -155,13 +155,16 @@ function buildTear(params, ctx, rid) {
 }
 
 function buildGrain(params, ctx, rid) {
-  const n = rid(), ga = rid();
+  const n = rid(), ga = rid(), gam = rid();
   const k = r3(Math.max(0, Math.min(1, params.amount)));
   return [
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.9, numOctaves: 2, seed: 3, result: n } },
     // Noise alpha channel, RGB zeroed: black grain with varying opacity.
     { prim: 'feColorMatrix', attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: ga } },
-    { prim: 'feComposite', attrs: { in: ga, in2: 'SourceGraphic', operator: 'over' } },
+    // Alpha-aware: mask the grain by the source's own alpha so it never paints
+    // the filter-region box over transparent areas.
+    { prim: 'feComposite', attrs: { in: ga, in2: 'SourceAlpha', operator: 'in', result: gam } },
+    { prim: 'feComposite', attrs: { in: gam, in2: 'SourceGraphic', operator: 'over' } },
   ];
 }
 
