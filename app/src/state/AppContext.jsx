@@ -32,11 +32,13 @@ export function useApp(selector) {
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const canUndo = useStore(s => {
     const top = s.historyUndoStack && s.historyUndoStack[s.historyUndoStack.length - 1];
-    return !!top && top.layerId === s.activeLayerId;
+    // #223: 'layers' entries are structural and always apply; 'edit'
+    // entries still need their layer active (#92).
+    return !!top && (top.kind === 'layers' || top.layerId === s.activeLayerId);
   });
   const canRedo = useStore(s => {
     const top = s.historyRedoStack && s.historyRedoStack[s.historyRedoStack.length - 1];
-    return !!top && top.layerId === s.activeLayerId;
+    return !!top && (top.kind === 'layers' || top.layerId === s.activeLayerId);
   });
   const undo = useStore(s => s.undo);
   const redo = useStore(s => s.redo);

@@ -315,10 +315,10 @@ export function MasterBar() {
         </button>
 
         <div className="undo-group">
-          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo">
+          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo the last parameter, layer, or palette action (Ctrl/⌘+Z)">
             ↶{history.undoDepth > 0 ? ` ${history.undoDepth}` : ''}
           </button>
-          <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo">
+          <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl/⌘+Shift+Z)">
             ↷{history.redoDepth > 0 ? ` ${history.redoDepth}` : ''}
           </button>
         </div>
