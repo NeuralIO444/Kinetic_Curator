@@ -1,20 +1,130 @@
+import { useEffect, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
+import {
+  sanitizeScores,
+  levelFor,
+  whyCopy,
+  ariaNote,
+  logShimmer,
+} from '../../shimmer/shimmer.js';
+
+// The four EVOLVE mutation targets. Candidate ids match the sidecar's
+// scores.json namespace: { "evolve-target:seed": percentile, ... }.
+const TARGETS = [
+  { value: 'seed', label: 'SEED', hint: 'Evolve jumps the seed only.' },
+  { value: 'layout', label: 'LAYOUT', hint: 'Evolve jumps layout params.' },
+  { value: 'palette', label: 'PALETTE', hint: 'Evolve jumps the palette.' },
+  { value: 'all', label: 'ALL', hint: 'Evolve jumps every parameter.' },
+];
+
+const MODES = ['on', 'quiet', 'off'];
+const MODE_LABEL = { on: 'ON', quiet: 'QUIET', off: 'OFF' };
 
 export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, autoSnapshot, motionSmoothing }) {
+  // Shimmer "whisper" prototype: scores load once per session. Absent file
+  // or junk content = {} = zero shimmer, real no-op, no errors.
+  const [scores, setScores] = useState(null);
+  const [mode, setMode] = useState('on'); // on = whisper, quiet = listen-only, off = dark
+  const [listening, setListening] = useState(false); // SHIFT held
+
+  useEffect(() => {
+    let alive = true;
+    const url = `${import.meta.env.BASE_URL}shimmer-scores.json`;
+    fetch(url)
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(raw => {
+        if (!alive) return;
+        const clean = sanitizeScores(raw);
+        setScores(clean);
+        logShimmer({ event: 'scores-loaded', source: url, candidates: Object.keys(clean).length });
+      })
+      .catch(() => {
+        if (!alive) return;
+        setScores({}); // no shimmer, no error surfaced
+        logShimmer({ event: 'scores-unavailable', source: url });
+      });
+    return () => { alive = false; };
+  }, []);
+
+  // LISTEN: hold SHIFT to amplify the shimmer ~3x; release recedes.
+  useEffect(() => {
+    const down = e => { if (e.key === 'Shift') setListening(true); };
+    const up = e => { if (e.key === 'Shift') setListening(false); };
+    const blur = () => setListening(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
+    };
+  }, []);
+
+  const pickTarget = (value) => {
+    const id = `evolve-target:${value}`;
+    if (mode !== 'off' && scores) {
+      const pct = scores[id] ?? null;
+      logShimmer({
+        event: 'touch', candidate: id, percentile: pct,
+        level: levelFor(scores, id), outcome: 'touched',
+        mode, listening,
+      });
+    }
+    emit(Events.DAVIS_EVOLVE, { target: value });
+  };
+
+  const cycleMode = () => {
+    const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+    setMode(next);
+    logShimmer({ event: 'mode', mode: next });
+  };
+
+  const rowClass = [
+    'davis-source-row',
+    'shimmer-row',
+    mode === 'quiet' ? 'quiet' : '',
+    listening ? 'listening' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <>
-      <div className="davis-source-row" title="What jumps when Evolve fires.">
+      <div className={rowClass} title="What jumps when Evolve fires. Shimmer is the taste model's read — a guess, not an order.">
         <span className="davis-label">TARGET</span>
-        <select
-          value={evolveTarget}
-          onChange={e => emit(Events.DAVIS_EVOLVE, { target: e.target.value })}
-          style={{ padding: '4px', fontSize: '10px', background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', flex: 1 }}
-        >
-          <option value="seed">Seed Only</option>
-          <option value="layout">Layout Params</option>
-          <option value="palette">Palette</option>
-          <option value="all">All Parameters</option>
-        </select>
+        {TARGETS.map((t, i) => {
+          const id = `evolve-target:${t.value}`;
+          const level = mode === 'off' ? 0 : levelFor(scores, id);
+          const pct = scores ? scores[id] ?? null : null;
+          const note = ariaNote(level);
+          const cls = [
+            'chip-btn',
+            evolveTarget === t.value ? 'active' : '',
+            level > 0 ? `shimmer-lvl-${level}` : '',
+          ].filter(Boolean).join(' ');
+          return (
+            <button
+              key={t.value}
+              className={cls}
+              aria-pressed={evolveTarget === t.value}
+              aria-label={note ? `${t.label} — ${note}` : t.label}
+              title={level > 0 ? whyCopy(t.label.charAt(0) + t.label.slice(1).toLowerCase(), pct) : t.hint}
+              style={level > 0 ? { animationDelay: `${-i * 2.5}s` } : undefined}
+              onClick={() => pickTarget(t.value)}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="davis-source-row" title="Shimmer readout: ON whispers, QUIET only answers while you hold SHIFT, OFF goes dark.">
+        <span className="davis-label">SHIMMER</span>
+        <button className="chip-btn" onClick={cycleMode} aria-pressed={mode !== 'off'}>
+          {MODE_LABEL[mode]}
+        </button>
+        {listening && mode !== 'off' && (
+          <span className="davis-readout" aria-hidden="true">listening</span>
+        )}
       </div>
 
       <div className="davis-source-row">
