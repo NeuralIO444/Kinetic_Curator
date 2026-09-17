@@ -1,5 +1,6 @@
 /**
- * WebGL2 scene renderer — Phase 1 (#187), layer compositing + mattes (#189).
+ * WebGL2 scene renderer — Phase 1 (#187), layer compositing + mattes (#189),
+ * ACCUM feedback + bloom on GPU (#190).
  * Browser-safe (no Node imports).
  *
  * Consumes the Phase 0 scene contract (docs/GL_CONTRACT.md, v1) and renders
@@ -31,6 +32,7 @@ import { buildProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
+import { createAccum, accumRecipeParams } from './accum.mjs';
 
 /**
  * Resolve per-layer mattes (#189, #154 re-plan) to renderable mask specs.
@@ -301,22 +303,25 @@ export function createRenderer(canvas) {
   }
 
   /**
-   * @param {object} payload
-   * @returns {{pixels: Uint8Array, width: number, height: number}} bottom-first RGBA
+   * Upload the per-render static textures (atlas + grain LUTs). Shared by
+   * renderScene and renderAccumSequence — a sequence uploads once.
    */
-  function renderScene(payload) {
-    const { width: w, height: h, contract, cells, bg } = payload;
-    if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
-    canvas.width = w; canvas.height = h;
-    bridge.resize(w, h, 1);
-
+  function uploadStatic(payload) {
     const atlasTex = uploadTexture(gl, payload.atlas.pixels, payload.atlas.width, payload.atlas.height, { mipmaps: payload.atlas.mipmaps || null });
     const grainLuts = {};
     for (const [id, lut] of Object.entries(payload.grainLuts || {})) {
       grainLuts[id] = uploadTexture(gl, lut.pixels, lut.width, lut.height, { nearest: true });
     }
+    return { atlasTex, grainLuts };
+  }
 
-    // Targets (16F premultiplied; RGBA8 for final output).
+  function freeStatic(uploaded) {
+    gl.deleteTexture(uploaded.atlasTex);
+    for (const k of Object.keys(uploaded.grainLuts)) gl.deleteTexture(uploaded.grainLuts[k]);
+  }
+
+  /** Frame targets (16F premultiplied; RGBA8 for final output). */
+  function allocFrameTargets(w, h) {
     const layerT = makeTarget(gl, w, h, true);
     const scratchT = makeTarget(gl, w, h, true);
     const blendT = makeTarget(gl, w, h, true);
@@ -324,7 +329,21 @@ export function createRenderer(canvas) {
     const mainA = makeTarget(gl, w, h, true);
     const mainB = makeTarget(gl, w, h, true);
     const outT = makeTarget(gl, w, h, false);
-    const targets = [layerT, scratchT, blendT, maskT, mainA, mainB, outT];
+    return { layerT, scratchT, blendT, maskT, mainA, mainB, outT };
+  }
+
+  function freeFrameTargets(T) {
+    for (const t of Object.values(T)) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+  }
+
+  /**
+   * Composite one scene contract into the main ping-pong.
+   * @returns the 16F target holding the frame (one of T.mainA/mainB)
+   */
+  function renderFrameInto(payload, T, uploaded, { transparent = false } = {}) {
+    const { width: w, height: h, contract, cells, bg } = payload;
+    const { atlasTex, grainLuts } = uploaded;
+    const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
 
     const byLayer = new Map();
     for (const it of contract.instances) {
@@ -354,8 +373,15 @@ export function createRenderer(canvas) {
     let mRead = mainA, mWrite = mainB;
     gl.bindFramebuffer(gl.FRAMEBUFFER, mRead.fb);
     gl.viewport(0, 0, w, h);
-    const [br, bgc, bb] = hexToRgb(bg);
-    gl.clearColor(br, bgc, bb, 1);
+    if (transparent) {
+      // ACCUM input frames: transparent so the opaque project background
+      // owned by accum.begin() shows through; opaque here would erase trails
+      // in the OVER pass (s.a=1 -> o=s).
+      gl.clearColor(0, 0, 0, 0);
+    } else {
+      const [br, bgc, bb] = hexToRgb(bg);
+      gl.clearColor(br, bgc, bb, 1);
+    }
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const compositeLayerTo = (layer, instances, dRead, dWrite) => {
@@ -438,9 +464,12 @@ export function createRenderer(canvas) {
     if (contract.textRuns && contract.textRuns.length) {
       throw new Error('[gl] textRuns are not wired into the Phase 1 renderer yet (glyph atlas baker exists; compositing lands with live text)');
     }
+    return mRead;
+  }
 
-    // Resolve to RGBA8 premultiplied bytes.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, outT.fb);
+  /** Resolve a 16F premultiplied target to RGBA8 bytes (top-first rows). */
+  function resolveTargetToBytes(mRead, T, w, h) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, T.outT.fb);
     gl.viewport(0, 0, w, h);
     gl.disable(gl.BLEND);
     gl.useProgram(resProg);
@@ -448,14 +477,74 @@ export function createRenderer(canvas) {
     drawFullscreen(resProg);
     const pixels = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    return pixels;
+  }
 
-    for (const t of targets) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
-    gl.deleteTexture(atlasTex);
-    for (const k of Object.keys(grainLuts)) gl.deleteTexture(grainLuts[k]);
+  /**
+   * @param {object} payload
+   * @returns {{pixels: Uint8Array, width: number, height: number}} bottom-first RGBA
+   */
+  function renderScene(payload) {
+    const { width: w, height: h, contract } = payload;
+    if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
+    canvas.width = w; canvas.height = h;
+    bridge.resize(w, h, 1);
 
-    const err = gl.getError();
-    if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after render: 0x${err.toString(16)}`);
-    return { pixels, width: w, height: h };
+    const uploaded = uploadStatic(payload);
+    const T = allocFrameTargets(w, h);
+    try {
+      const mRead = renderFrameInto(payload, T, uploaded);
+      const pixels = resolveTargetToBytes(mRead, T, w, h);
+      const err = gl.getError();
+      if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after render: 0x${err.toString(16)}`);
+      return { pixels, width: w, height: h };
+    } finally {
+      freeFrameTargets(T);
+      freeStatic(uploaded);
+    }
+  }
+
+  /**
+   * ACCUM trail still — Phase 4 (#190). Renders each frame contract through
+   * renderFrameInto, then feeds the frame texture through the shared ACCUM
+   * recipe (app/src/gl/accum.mjs): the SAME code the future live loop and
+   * `studio.py render --accum` run. The buffer is off by default — this entry
+   * is only called when the caller passes accum-enabled contracts.
+   *
+   * @param {Array<object>} frames per-frame render payloads (shared atlas)
+   * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb' }
+   * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
+   */
+  function renderAccumSequence(frames, { fade = 0.88, optics = 0, background = '#000000' } = {}) {
+    if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
+    const { width: w, height: h, contract } = frames[0];
+    if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
+    canvas.width = w; canvas.height = h;
+    bridge.resize(w, h, 1);
+
+    const uploaded = uploadStatic(frames[0]);
+    const T = allocFrameTargets(w, h);
+    const accum = createAccum(gl, bridge, { width: w, height: h });
+    try {
+      accum.begin(background);
+      const params = accumRecipeParams({ fade, optics });
+      for (const payload of frames) {
+        if (payload.contract.version !== 1) {
+          throw new Error(`[gl] unsupported contract version ${payload.contract.version}`);
+        }
+        // Transparent: accum.begin() owns the opaque project background.
+        const frameT = renderFrameInto(payload, T, uploaded, { transparent: true });
+        accum.step(frameT.tex, params);
+      }
+      const pixels = resolveTargetToBytes(accum.texture(), T, w, h);
+      const err = gl.getError();
+      if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after accum render: 0x${err.toString(16)}`);
+      return { pixels, width: w, height: h };
+    } finally {
+      accum.dispose();
+      freeFrameTargets(T);
+      freeStatic(uploaded);
+    }
   }
 
   function dispose() {
@@ -464,5 +553,5 @@ export function createRenderer(canvas) {
     gl.deleteBuffer(fullVbo); gl.deleteBuffer(cornerVbo); gl.deleteBuffer(instVbo);
   }
 
-  return { renderScene, dispose };
+  return { renderScene, renderAccumSequence, dispose };
 }
