@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>gl debug selfcheck</title></head>
+<body>
+<script type="module">
+import { runAll } from './selfcheck.page.mjs';
+try {
+  const { lines, failures } = runAll();
+  window.__kcDebugResult = { ok: failures.length === 0, lines, failures };
+} catch (e) {
+  window.__kcDebugResult = { ok: false, lines: [], failures: ['harness'], error: String((e && e.stack) || e) };
+}
+window.__kcDebugDone = true;
+</script>
+</body>
+</html>

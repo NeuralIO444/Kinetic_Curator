@@ -1,5 +1,6 @@
 // Panel registry — panels are data, not hard-coded imports.
 // Adding a panel = one entry here. The Shell knows nothing about features.
+import { lazy } from 'react';
 import { CanvasPanel } from '../panels/CanvasPanel.jsx';
 import { LayoutPanel } from '../panels/LayoutPanel.jsx';
 import { LayersPanel } from '../panels/LayersPanel.jsx';
@@ -7,6 +8,11 @@ import { AssetPoolPanel } from '../panels/AssetPoolPanel.jsx';
 import { StimulusPanel } from '../panels/StimulusPanel.jsx';
 import { DavisPanel } from '../panels/DavisPanel.jsx';
 import { OutputPanel } from '../panels/OutputPanel.jsx';
+
+// Shader Lab (#193) is dev-only: lazy chunk, never registered in prod builds.
+const ShaderLabPanel = import.meta.env.DEV
+  ? lazy(() => import('../panels/ShaderLabPanel.jsx').then((m) => ({ default: m.ShaderLabPanel })))
+  : null;
 
 export const PANEL_REGISTRY = [
   { id: 'canvas',   title: 'CANVAS',   icon: '◆', component: CanvasPanel,    zone: 'primary' },
@@ -17,5 +23,11 @@ export const PANEL_REGISTRY = [
   { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },
   { id: 'output',   title: 'OUTPUT',   icon: '⬇', component: OutputPanel,    zone: 'secondary' },
 ];
+
+if (import.meta.env.DEV && ShaderLabPanel) {
+  PANEL_REGISTRY.push(
+    { id: 'shaderlab', title: 'SHADER LAB', icon: '◈', component: ShaderLabPanel, zone: 'secondary' },
+  );
+}
 
 export const panelsByZone = (zone) => PANEL_REGISTRY.filter((p) => p.zone === zone);
