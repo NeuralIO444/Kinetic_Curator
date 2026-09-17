@@ -62,7 +62,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) => dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }));
   on(Events.ASSETS_WEIGHT_CLEAR, () => dispatch({ type: A.CLEAR_WEIGHT_OVERRIDES }));
   on(Events.ASSETS_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_ASSET', id }));
-  on(Events.ASSETS_INGEST, ({ svg, hint }) => dispatch({ type: 'INGEST_ASSET', svg, hint }));
+  on(Events.ASSETS_INGEST, ({ svg, hint, category, source }) => dispatch({ type: 'INGEST_ASSET', svg, hint, category, source }));
   on(Events.ASSETS_REMOVE, ({ id }) => dispatch({ type: 'REMOVE_CUSTOM_ASSET', id }));
   on(Events.ASSETS_RENAME, ({ id, name }) => dispatch({ type: 'RENAME_CUSTOM_ASSET', id, name }));
   on(Events.ASSETS_REPLACE, ({ id, svg }) => dispatch({ type: 'REPLACE_CUSTOM_ASSET', id, svg }));
