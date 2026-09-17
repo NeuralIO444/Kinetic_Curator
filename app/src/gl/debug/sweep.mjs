@@ -282,8 +282,10 @@ export function createSweepLab(gl, { w = SWEEP_W, h = SWEEP_H } = {}) {
  * def = {
  *   id, label,
  *   build(gl) -> { program, apply(gl, locs, c, lab, targets), dispose() },
- *   cases: [{ name, kind: 'contract'|'hostile', params, hdr?, noop?, note? }],
+ *   cases: [{ name, kind: 'contract'|'hostile', params, hdr?, noop?, note?, costly? }],
  * }
+ * `costly` tags the maximum-cost contract case — the knob position the
+ * cost measurement (measureCosts.mjs) uses.
  * apply() renders the case's params with the final image in targets.out.
  * Contract cases assert: finite output, in-[0,1] output (unless hdr), and
  * byte-exact input==output when noop. Hostile cases assert finite output

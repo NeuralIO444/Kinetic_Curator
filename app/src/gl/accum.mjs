@@ -50,6 +50,7 @@
 
 import { FULL_VS, COPY_FS } from './shaders.mjs';
 import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
+import { registerCostTier } from './costTiers.mjs';
 
 export const ACCUM_VERSION = 1;
 
@@ -378,16 +379,58 @@ void main() {
  * pass). `uniforms` is the exact set each pass's setup callback uploads;
  * the checked audit throws if the shader declares anything outside it.
  */
+/**
+ * Cost-tier declarations (hardening 3/6): the cost lives IN each pass
+ * definition, not in a separate list. The whole ACCUM chain is tier 1 —
+ * the governor's perfTier1 shed covers the chain exactly (see
+ * costTiers.tier1ShedIds()); copy/over/down are structural plumbing
+ * *within* the chain, so they ride tier 1 with it rather than tier 0.
+ * One 1080p RGBA16F frame = 1920*1080*8 bytes.
+ *
+ * The registry reads the declarations straight out of ACCUM_PROGRAMS —
+ * there is no parallel cost-only map to drift out of sync.
+ */
+const FRAME_16F = 1920 * 1080 * 8;
 export const ACCUM_PROGRAMS = {
-  fade: { fs: FADE_FS, file: 'accum.mjs:FADE_FS', uniforms: ['u_src', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'] },
-  feed: { fs: FEED_FS, file: 'accum.mjs:FEED_FS', uniforms: ['u_src', 'u_flow'] },
-  echo: { fs: ECHO_FS, file: 'accum.mjs:ECHO_FS', uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps'] },
-  copy: { fs: COPY_FS, file: 'shaders.mjs:COPY_FS', uniforms: ['u_src'] },
-  over: { fs: OVER_FS, file: 'accum.mjs:OVER_FS', uniforms: ['u_src', 'u_dst'] },
-  down: { fs: DOWN_FS, file: 'accum.mjs:DOWN_FS', uniforms: ['u_src'] },
-  blur: { fs: BLUR_FS, file: 'accum.mjs:BLUR_FS', uniforms: ['u_src', 'u_texel', 'u_sigma', 'u_vertical'] },
-  add: { fs: ADD_FS, file: 'accum.mjs:ADD_FS', uniforms: ['u_base', 'u_bloom', 'u_bloomSize', 'u_amount', 'u_tint'] },
+  // Fade + tunnel/prism feedback in one pass.
+  fade: { fs: FADE_FS, file: 'accum.mjs:FADE_FS', uniforms: ['u_src', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.8, notes: 'fade + tunnel/prism feedback; shed with ACCUM' } },
+  // Flow feedback: advects the buffer through the flow field.
+  feed: { fs: FEED_FS, file: 'accum.mjs:FEED_FS', uniforms: ['u_src', 'u_flow'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 1.0, notes: 'flow feedback advection' } },
+  // Echoes: mixes up to 4 past frames; the ring is the memory-heavy one.
+  echo: { fs: ECHO_FS, file: 'accum.mjs:ECHO_FS', uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps'],
+    cost: { tier: 1, memoryBytes: 5 * FRAME_16F, timeMs: 1.2,
+      notes: '4-frame ring + mix; ring dominates the working set',
+      memoryGate: { minWidth: 2048, maxTaps: 3 } } },
+  copy: { fs: COPY_FS, file: 'shaders.mjs:COPY_FS', uniforms: ['u_src'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.2, notes: 'chain plumbing: ping-pong copy, shed with the chain' } },
+  over: { fs: OVER_FS, file: 'accum.mjs:OVER_FS', uniforms: ['u_src', 'u_dst'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.25, notes: 'chain plumbing: source-over, shed with the chain' } },
+  down: { fs: DOWN_FS, file: 'accum.mjs:DOWN_FS', uniforms: ['u_src'],
+    cost: { tier: 1, memoryBytes: FRAME_16F / 16, timeMs: 0.3, notes: 'chain plumbing: 4x4 box downsample, shed with the chain' } },
+  // Separable gaussian at bloom/halation sigma: the blurriest ACCUM pass.
+  blur: { fs: BLUR_FS, file: 'accum.mjs:BLUR_FS', uniforms: ['u_src', 'u_texel', 'u_sigma', 'u_vertical'],
+    cost: { tier: 1, memoryBytes: 2 * FRAME_16F, timeMs: 2.0, notes: 'H+V separable at sigma up to 33 (halation); shed with ACCUM' } },
+  // Bloom extras: adds the blurred bloom back into the frame.
+  add: { fs: ADD_FS, file: 'accum.mjs:ADD_FS', uniforms: ['u_base', 'u_bloom', 'u_bloomSize', 'u_amount', 'u_tint'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.5, notes: 'bloom extras; shed with ACCUM' } },
 };
+
+for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
+  registerCostTier(`accum/${name}`, def.cost);
+}
+
+/**
+ * Audio modulation: scalar math on the recipe params per frame (CPU, no
+ * GPU pass, no textures). Effectively free — tier 0, never shed, per the
+ * architecture contract. Declared at its definition site
+ * (applyAudioEnvelope, just below).
+ */
+registerCostTier('audio/modulation', {
+  tier: 0, memoryBytes: 0, timeMs: 0.01,
+  notes: 'scalar per-frame recipe math (CPU); the cheapest thing in the chain, never shed',
+});
 
 // --- targets ---------------------------------------------------------------
 

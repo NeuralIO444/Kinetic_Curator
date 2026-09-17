@@ -43,6 +43,10 @@ import { FULL_VS, EFFECT_FS } from '../shaders.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
 import { TEMPLATE_VS, uniformDecls } from '../effects/template.mjs';
 import { runAllSweeps } from './sweepEffects.mjs';
+import {
+  createCostMeasurer,
+  MEASURE_W, MEASURE_H, MEASURE_WARMUP, MEASURE_BATCH_DRAWS, MEASURE_BATCHES,
+} from './measureCosts.mjs';
 
 const failures = [];
 const lines = [];
@@ -488,4 +492,33 @@ function runSweepsOn(gl) {
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   return { lines, failures };
+}
+
+/**
+ * The GPU-cost measurement section on its own (`npm run measure-costs`,
+ * ?only=measure). Builds the measurer and parks it on window for the node
+ * driver (costTiers.measure.mjs), which wall-times each batch itself —
+ * headless Chromium's in-page clock does not advance across blocking GL
+ * calls, so the page cannot time itself there. Never asserts: measurement
+ * is data; the declaration-vs-measured gate is costTiers.selfcheck.mjs.
+ */
+export function runMeasureSection() {
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2');
+  const measurer = createCostMeasurer(gl);
+  window.__kcMeasure = {
+    ids: measurer.ids,
+    hwTimer: measurer.hwTimer,
+    caseName: (id) => measurer.caseName(id),
+    warmup: (id) => measurer.warmup(id),
+    runBatch: (id, draws) => measurer.runBatch(id, draws),
+    dispose: () => measurer.dispose(),
+  };
+  window.__kcMeasureReady = true;
+  const lines = [
+    `measure: ${measurer.ids.length} effects ready @${MEASURE_W}x${MEASURE_H} ` +
+    `(warmup ${MEASURE_WARMUP}, ${MEASURE_BATCHES} batches x ${MEASURE_BATCH_DRAWS} draws, ` +
+    `${measurer.hwTimer ? 'hardware' : 'node wall-time'} timing)`,
+  ];
+  return { lines };
 }

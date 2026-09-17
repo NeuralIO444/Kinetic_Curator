@@ -304,7 +304,7 @@ export const SWEEP_EFFECTS = [
     cases: [
       C('defaults', { scale: 24, seed: 7 }),
       C('zero → no-op', { scale: 0, seed: 7 }, { noop: true }),
-      C('max', { scale: 120, seed: 99 }),
+      C('max', { scale: 120, seed: 99 }, { costly: true }),
       C('min scale, min seed', { scale: 1, seed: 0 }),
       H('hostile negative scale', { scale: -10, seed: 7 }),
     ],
@@ -314,7 +314,7 @@ export const SWEEP_EFFECTS = [
     cases: [
       C('defaults', { bands: 18, amount: 12 }),
       C('zero → no-op', { bands: 18, amount: 0 }, { noop: true }),
-      C('max', { bands: 60, amount: 40 }),
+      C('max', { bands: 60, amount: 40 }, { costly: true }),
       C('min', { bands: 2, amount: 1 }),
       H('hostile negative bands', { bands: -4, amount: 12 }),
       H('hostile negative amount', { bands: 18, amount: -5 }),
@@ -325,7 +325,7 @@ export const SWEEP_EFFECTS = [
     cases: [
       C('defaults', { density: 0.35, amount: 0.5 }),
       C('zero → no-op', { density: 0.35, amount: 0 }, { noop: true }),
-      C('max', { density: 1, amount: 1 }),
+      C('max', { density: 1, amount: 1 }, { costly: true }),
       C('min', { density: 0.05, amount: 0.05 }),
       H('hostile negative density', { density: -1, amount: 0.5 }),
       H('hostile over-max amount', { density: 0.35, amount: 2 }),
@@ -336,14 +336,14 @@ export const SWEEP_EFFECTS = [
     cases: [
       // No params: always-on transform. Off means dropped from the chain,
       // so there is no zero-param identity to prove.
-      C('always-on', {}),
+      C('always-on', {}, { costly: true }),
     ],
   },
   {
     ...templateEffectDef('edge'),
     cases: [
       // No params: always-on transform (see solarize note).
-      C('always-on', {}),
+      C('always-on', {}, { costly: true }),
     ],
   },
 
@@ -352,7 +352,7 @@ export const SWEEP_EFFECTS = [
     ...builtinEffectDef('invert', 0, () => [0, 0, 0, 0]),
     cases: [
       // No strength param: always-on (see solarize note).
-      C('on', {}),
+      C('on', {}, { costly: true }),
     ],
   },
   {
@@ -363,7 +363,7 @@ export const SWEEP_EFFECTS = [
       // fractional alphas. Matches the SVG reference (as-designed); off
       // means dropped from the chain.
       C('zero (not a no-op by design)', { dx: 0 }),
-      C('max', { dx: 24 }),
+      C('max', { dx: 24 }, { costly: true }),
       C('mid', { dx: 12 }),
       H('hostile negative dx', { dx: -8 }),
     ],
@@ -373,7 +373,7 @@ export const SWEEP_EFFECTS = [
     cases: [
       C('defaults', { amount: 0.4 }),
       C('zero → no-op', { amount: 0 }, { noop: true }),
-      C('max', { amount: 1 }),
+      C('max', { amount: 1 }, { costly: true }),
       C('high', { amount: 0.7 }),
       H('hostile negative amount', { amount: -0.5 }),
     ],
@@ -383,7 +383,7 @@ export const SWEEP_EFFECTS = [
     cases: [
       C('defaults', { radius: 6 }),
       C('zero → no-op', { radius: 0 }, { noop: true }),
-      C('max', { radius: 40 }),
+      C('max', { radius: 40 }, { costly: true }),
       C('small', { radius: 0.5 }),
       H('hostile deep-loop sigma', { sigmaDirect: 25 }),
     ],
@@ -393,7 +393,7 @@ export const SWEEP_EFFECTS = [
     cases: [
       C('defaults', { levels: 4 }),
       C('min', { levels: 2 }),
-      C('max', { levels: 8 }),
+      C('max', { levels: 8 }, { costly: true }),
       // levels=1 is below the catalog minimum of 2: 0/0 → NaN. Reachable
       // today only via unclamped project JSON (builtins pass params
       // through) — flagged for the sanitization audit (item 7).
@@ -416,7 +416,7 @@ export const SWEEP_EFFECTS = [
       // <=0.99, so this is the shader-level proof of the no-op shape).
       C('identity → no-op', { keep: 1, tz: 1, ts: 0, prism: 0 }, { noop: true }),
       C('zero keep (fade to black)', { keep: 0, tz: 1, ts: 0, prism: 0 }),
-      C('max feedback', { keep: 0.88, tz: 1.01, ts: 0.01, prism: 0.001 }),
+      C('max feedback', { keep: 0.88, tz: 1.01, ts: 0.01, prism: 0.001 }, { costly: true }),
       H('hostile negative keep', { keep: -0.5, tz: 1, ts: 0, prism: 0 }),
     ],
   },
@@ -429,7 +429,7 @@ export const SWEEP_EFFECTS = [
       // shader at flow=0 is independently the identity.
       C('zero → no-op', { flow: 0 }, { noop: true }),
       C('light', { flow: 0.015 }),
-      C('max', { flow: 0.03 }),
+      C('max', { flow: 0.03 }, { costly: true }),
       H('hostile negative flow', { flow: -0.03 }),
       H('hostile huge flow', { flow: 0.5 }),
     ],
@@ -451,7 +451,7 @@ export const SWEEP_EFFECTS = [
       C('zero taps → no-op', { ntaps: 0 }, { noop: true }),
       C('one tap', { ntaps: 1 }),
       C('two taps', { ntaps: 2 }),
-      C('four taps', { ntaps: 4 }),
+      C('four taps', { ntaps: 4 }, { costly: true }),
     ],
   },
   {
@@ -469,7 +469,7 @@ export const SWEEP_EFFECTS = [
       C('zero → near-identity (pass skipped in recipe)', { sigma: 0 }, { near: 1 }),
       C('frame blur scale', { sigma: 5 }),
       C('bloom scale', { sigma: 13.5 }),
-      C('halation scale', { sigma: 33 }),
+      C('halation scale', { sigma: 33 }, { costly: true }),
       H('hostile negative sigma', { sigma: -5 }),
     ],
   },
@@ -488,7 +488,7 @@ export const SWEEP_EFFECTS = [
       // amount=0: base.rgb + 0 is exactly base (IEEE: x+0==x).
       C('zero → no-op', { amount: 0 }, { noop: true }),
       C('bloom scale', { amount: 0.55 }),
-      C('max', { amount: 1 }),
+      C('max', { amount: 1 }, { costly: true }),
       H('hostile negative amount', { amount: -0.5 }),
     ],
   },
@@ -496,21 +496,21 @@ export const SWEEP_EFFECTS = [
     ...accumDef('copy', { u_src: S(0) }, (c, lab) => ({ u_src: lab.input.tex })),
     cases: [
       // Identity control: proves the sweep machinery itself is bit-exact.
-      C('passthrough → no-op', {}, { noop: true }),
+      C('passthrough → no-op', {}, { noop: true, costly: true }),
     ],
   },
   {
     ...accumDef('over',
       { u_src: S(0), u_dst: S(1) },
       (c, lab, aux) => ({ u_src: lab.input.tex, u_dst: aux.gray })),
-    cases: [C('source-over', {})],
+    cases: [C('source-over', {}, { costly: true })],
   },
   {
     ...accumDef('down', { u_src: S(0) }, (c, lab) => ({ u_src: lab.input.tex })),
     // Production shape: the downsample pass box-filters 4x4 source blocks,
     // so it renders quarter-resolution (32 -> 8) into the lab's t16q.
     outSize: 8,
-    cases: [C('4x4 box downsample', {})],
+    cases: [C('4x4 box downsample', {}, { costly: true })],
   },
 ];
 

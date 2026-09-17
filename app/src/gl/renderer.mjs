@@ -33,6 +33,7 @@ import { createBridge } from './bridge/bridge.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
+import { registerCostTier } from './costTiers.mjs';
 
 /**
  * Resolve per-layer mattes (#189, #154 re-plan) to renderable mask specs.
@@ -139,32 +140,50 @@ const hexToRgb = (hex) => {
  * for the program; the checked audit throws if the shader declares
  * anything outside it.
  */
+/**
+ * Cost-tier declarations (hardening 3/6): the cost lives IN each program
+ * definition — the renderer's own programs are structural plumbing
+ * (compositing and present), so tier 0, never shed, per the architecture
+ * contract. The registry reads the declarations straight out of
+ * RENDERER_PROGRAMS; there is no parallel cost-only map.
+ */
 export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
     uniforms: ['u_canvas', 'u_atlas'],
+    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
   {
     key: 'composite', name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS,
     vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COMPOSITE_FS',
     uniforms: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn',
       'u_mask', 'u_maskOn', 'u_maskMode', 'u_maskInvert'],
+    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
   {
     key: 'resolve', name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS,
     vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:RESOLVE_FS',
     uniforms: ['u_src'],
+    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
   {
     key: 'copy', name: 'copy', vs: FULL_VS, fs: COPY_FS,
     vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COPY_FS',
     uniforms: ['u_src'],
+    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
 ];
 
-export function createRenderer(canvas) {
-  const gl = canvas.getContext('webgl2', {
+for (const def of RENDERER_PROGRAMS) {
+  registerCostTier(`renderer/${def.key}`, def.cost);
+}
+
+export function createRenderer(canvas) {  const gl = canvas.getContext('webgl2', {
     alpha: false, antialias: false, depth: false, stencil: false,
     premultipliedAlpha: false, preserveDrawingBuffer: false,
   });
