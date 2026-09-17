@@ -56,6 +56,9 @@ python3 studio/studio.py render my.project.json -o trails.png --accum --steps 24
 # 500 editions, one PNG + one JSON sidecar each
 python3 studio/studio.py batch my.project.json -o editions/ --count 500 --start-seed 0 --res 2
 
+# re-render a manifest and prove byte-identical output
+python3 studio/studio.py verify editions/manifest.json
+
 # fixed-timestep frame sequence → MP4
 python3 studio/studio.py video my.project.json -o out.mp4 \
     --fps 30 --duration 4 --res 1920x1080 \
@@ -83,6 +86,32 @@ the project. Motion therefore comes from two deterministic sources:
 Every frame is a pure function of `(project, frame)`, so a re-render is
 bit-identical — that's the point of doing video here instead of screen-capturing
 the live canvas.
+
+## Run manifests, structured logging, verify
+
+Every `batch`/`render`/`video` run writes a **run manifest v2**
+(`manifest.json` in the batch outdir, `<stem>.manifest.json` next to a
+still): run id, start/end time, git sha of the code, the exact command and
+flags, SHA-256 content hashes of every input (project JSON, audio sidecar),
+and per-edition results (seed, duration, GPU, output file hash, sidecar
+path). Progress is logged twice — the terminal lines look the same as
+before, and a `run-<id>.jsonl` event stream on disk carries every event as
+parseable JSON.
+
+Failures are classified, and the class decides the behavior:
+
+- **user-error** (bad project, missing Chromium): fail fast, with how to fix it.
+- **degradable** (malformed `--audio` sidecar): warn loudly, render without
+  audio, record it in the manifest.
+- **transient** (a render timeout): retry once, then record and continue.
+- **bug** (anything else): fail loud, with diagnostics. Never swallowed.
+
+`studio.py verify <manifest>` re-renders every edition and compares output
+hashes — byte-identical output, proven by re-running. Honest limitations
+are documented in [`docs/RUN_MANIFEST.md`](../docs/RUN_MANIFEST.md):
+different GPUs/drivers can differ by a pixel or two (that's what the parity
+tolerance is for), and audio-reactive renders are deterministic only given
+the recorded envelope, which the manifest pins by hash.
 
 ## Aspect ratio
 
@@ -120,5 +149,8 @@ diffs them on fixed seeds. Known, intentional differences:
 
 ```sh
 node studio/selfcheck.mjs      # asserts the parity reference agrees with the kernel
+python3 studio/run_manifest_selfcheck.py   # manifest schema, input hashing, failure classes,
+                                           # log format; plus a real batch → verify GPU round trip
+                                           # when headless Chromium is present
 cd app && npm run selfcheck    # golden hash + GL parity — must stay green, unchanged
 ```
