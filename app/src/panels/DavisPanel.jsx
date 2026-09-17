@@ -58,7 +58,7 @@ export function DavisPanel() {
     <div className="panel panel-davis">
       <PanelHeader
         tag="P07"
-        title="DAVIS MODE"
+        title="GHOST STATION"
         subtitle={
           morphing ? 'morphing…'
             : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`

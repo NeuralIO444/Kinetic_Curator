@@ -16,11 +16,11 @@ Instead of drawing the image, you curate the mathematical DNA of the image. You 
 
 By abstracting yourself one layer away from the final pixels, you enter a collaborative dialogue with the machine. 
 
-## The Davis Mode (Autopilot)
+## Ghost Station (Autopilot)
 
-This philosophy peaks with "Davis Mode" (named after generative pioneer Joshua Davis). 
+This philosophy peaks with Ghost Station, the instrument's homage to the generative-art practice — rule plus chance, curated by a human.
 
-In traditional workflows, you have to drag sliders until it looks good. In Davis Mode, you simply click `▶ EVOLVE`. The engine begins mutating the seed, the layout parameters, and the palettes automatically. 
+In traditional workflows, you have to drag sliders until it looks good. In Ghost Station, you simply click `▶ EVOLVE`. The engine begins mutating the seed, the layout parameters, and the palettes automatically.
 
 Your job shifts from "Creator" to "Curator". You sit back and watch the machine churn out thousands of unique compositions. When a mathematical mutation produces a striking result, you hit `S` to snapshot it, or `F` to save it to your favorites. You are hunting for serendipitous beauty in an infinite mathematical space.
 
