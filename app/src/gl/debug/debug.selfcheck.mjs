@@ -16,6 +16,8 @@ const GL_DIR = path.join(DEBUG_DIR, '..');
 const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript' };
 
 async function main() {
+  // --sweep-only runs just the uniform-sweep section (npm run selfcheck:sweep).
+  const sweepOnly = process.argv.includes('--sweep-only');
   const server = http.createServer(async (req, res) => {
     try {
       const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -43,6 +45,7 @@ async function main() {
       // the whole selfcheck suite.
       if (/Executable doesn't exist/.test(String((e && e.message) || ''))) {
         console.log('[skip] debug.selfcheck: Playwright browser not installed in this environment');
+        console.log('SWEEP TESTS SKIPPED: no headless Chromium — uniform-sweep property tests did not run');
         return;
       }
       throw e;
@@ -50,7 +53,7 @@ async function main() {
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String((e && e.stack) || e)));
-    await page.goto(`http://127.0.0.1:${port}/debug/selfcheck.html`);
+    await page.goto(`http://127.0.0.1:${port}/debug/selfcheck.html${sweepOnly ? '?only=sweep' : ''}`);
     await page.waitForFunction('window.__kcDebugDone === true', null, { timeout: 120000 });
     const result = await page.evaluate('window.__kcDebugResult');
     for (const line of result.lines || []) console.log(line);
