@@ -28,7 +28,7 @@ import {
   QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, RESOLVE_FS, COPY_FS,
   blendIdFor,
 } from './shaders.mjs';
-import { buildProgramChecked } from './debug/diagnostics.mjs';
+import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
@@ -132,6 +132,37 @@ const hexToRgb = (hex) => {
   return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
 };
 
+/**
+ * Every renderer-owned GPU program in one table — the single source of
+ * truth for what createRenderer builds and what the debug harness audits
+ * (#193 second pass). `uniforms` is the exact set the renderer uploads
+ * for the program; the checked audit throws if the shader declares
+ * anything outside it.
+ */
+export const RENDERER_PROGRAMS = [
+  {
+    key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
+    vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
+    uniforms: ['u_canvas', 'u_atlas'],
+  },
+  {
+    key: 'composite', name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS,
+    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COMPOSITE_FS',
+    uniforms: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn',
+      'u_mask', 'u_maskOn', 'u_maskMode', 'u_maskInvert'],
+  },
+  {
+    key: 'resolve', name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS,
+    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:RESOLVE_FS',
+    uniforms: ['u_src'],
+  },
+  {
+    key: 'copy', name: 'copy', vs: FULL_VS, fs: COPY_FS,
+    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COPY_FS',
+    uniforms: ['u_src'],
+  },
+];
+
 export function createRenderer(canvas) {
   const gl = canvas.getContext('webgl2', {
     alpha: false, antialias: false, depth: false, stencil: false,
@@ -142,10 +173,22 @@ export function createRenderer(canvas) {
     throw new Error('[gl] EXT_color_buffer_float not available');
   }
 
-  const quadProg = buildProgramChecked(gl, QUAD_VS, QUAD_FS, { name: 'quad', vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS' });
-  const compProg = buildProgramChecked(gl, FULL_VS, COMPOSITE_FS, { name: 'composite', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COMPOSITE_FS' });
-  const resProg = buildProgramChecked(gl, FULL_VS, RESOLVE_FS, { name: 'resolve', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:RESOLVE_FS' });
-  const copyProg = buildProgramChecked(gl, FULL_VS, COPY_FS, { name: 'copy', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COPY_FS' });
+  const progs = {};
+  for (const def of RENDERER_PROGRAMS) {
+    progs[def.key] = buildProgramChecked(gl, def.vs, def.fs, {
+      name: def.name, vsFile: def.vsFile, fsFile: def.fsFile,
+    });
+    // Uniform gate (#193 second pass): the shader may only declare
+    // uniforms the renderer uploads. A mismatch throws here — naming the
+    // program and file — instead of failing silently mid-render.
+    auditProgramChecked(gl, progs[def.key], def.uniforms, {
+      name: def.name, file: 'shaders.mjs',
+    });
+  }
+  const quadProg = progs.quad;
+  const compProg = progs.composite;
+  const resProg = progs.resolve;
+  const copyProg = progs.copy;
 
   // FX chain execution lives in the JS↔GL bridge (#194): programs compile
   // once, uniform uploads are dirty-checked, targets are bridge-owned.

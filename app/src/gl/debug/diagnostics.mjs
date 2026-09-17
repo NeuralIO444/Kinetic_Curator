@@ -219,3 +219,46 @@ export function auditUniforms(gl, program, setNames) {
     undeclared: [...set].filter((u) => !declared.has(u)),
   };
 }
+
+export class UniformAuditError extends Error {
+  constructor({ name, file, neverSet, undeclared }) {
+    const bits = [];
+    if (neverSet && neverSet.length) bits.push(`declared-but-never-set: [${neverSet.join(', ')}]`);
+    if (undeclared && undeclared.length) bits.push(`set-but-not-declared: [${undeclared.join(', ')}]`);
+    super(`[gl-debug] uniform audit failed: ${name} (${file || 'unknown file'})\n${bits.join('; ')}`);
+    this.name = 'UniformAuditError';
+    this.programName = name;
+    this.file = file;
+    this.neverSet = neverSet || [];
+    this.undeclared = undeclared || [];
+  }
+}
+
+/**
+ * Checked uniform audit: every uniform the shader declares must be set by
+ * the renderer. Throws UniformAuditError naming the effect and file, so a
+ * bad shader fails the build (or startup) instead of rendering wrong.
+ *
+ * `set-but-not-declared` names are reported in the error and the
+ * diagnostics log but do NOT throw: the bridge deliberately declares
+ * upload names (e.g. u_res) that a particular shader may not declare —
+ * null locations are skipped by design. The typo class is still caught:
+ * a misspelled upload name leaves the real uniform in `neverSet`.
+ *
+ * @param {string[]} setNames — uniform names the renderer sets for this program.
+ * @returns {{neverSet: string[], undeclared: string[]}} (neverSet is empty here)
+ * @throws {UniformAuditError} when any declared uniform is never set.
+ */
+export function auditProgramChecked(gl, program, setNames, { name = 'program', file } = {}) {
+  const r = auditUniforms(gl, program, setNames);
+  diagnosticsLog.record({
+    kind: 'uniform-audit',
+    name,
+    file,
+    ok: r.neverSet.length === 0,
+    neverSet: r.neverSet,
+    undeclared: r.undeclared,
+  });
+  if (r.neverSet.length) throw new UniformAuditError({ name, file, ...r });
+  return r;
+}
