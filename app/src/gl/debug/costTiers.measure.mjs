@@ -1,0 +1,134 @@
+/**
+ * costTiers.measure.mjs — `npm run measure-costs` (backend hardening 3/6).
+ * Node-only.
+ *
+ * Drives the per-effect GPU cost measurement (gl/debug/measureCosts.mjs)
+ * in headless Chromium via the same serve-and-load pattern as
+ * debug.selfcheck.mjs, then commits the result as
+ * app/src/gl/effects/measuredCosts.mjs. The CI gate
+ * (gl/costTiers.selfcheck.mjs) compares declarations against this committed
+ * file, so the gate needs no GPU.
+ *
+ * Timing honesty (see measureCosts.mjs for the full story): headless
+ * Chromium's in-page clock does not advance across blocking GL calls and
+ * SwiftShader elides draws that are never read back, so the page exposes
+ * a batch runner (window.__kcMeasure) and THIS script wall-times each
+ * batch with Date.now(). Reported ms/draw = median of 3 batches x 30
+ * readback-forced draws, after warmup.
+ *
+ * Re-bless rule: re-run this command whenever a shader's cost could have
+ * changed (new effect, new pass, shader edit that adds texture taps or
+ * loop iterations). The measured file carries its own method stamp so a
+ * stale file is recognizable.
+ */
+import http from 'node:http';
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+
+const DEBUG_DIR = path.dirname(fileURLToPath(import.meta.url));
+const GL_DIR = path.join(DEBUG_DIR, '..');
+const OUT_FILE = path.join(GL_DIR, 'effects', 'measuredCosts.mjs');
+const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript' };
+
+// Must match measureCosts.mjs (duplicated here so the driver doesn't have
+// to evaluate page-side constants before the measurer exists).
+const BATCH_DRAWS = 30;
+const BATCHES = 3;
+
+function median(xs) {
+  const s = [...xs].sort((a, b) => a - b);
+  const n = s.length;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+}
+
+async function main() {
+  const server = http.createServer(async (req, res) => {
+    try {
+      const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+      const file = path.normalize(path.join(GL_DIR, urlPath));
+      if (!file.startsWith(GL_DIR)) { res.writeHead(403); res.end(); return; }
+      const data = await readFile(file);
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+      res.end(data);
+    } catch {
+      res.writeHead(404); res.end('nf');
+    }
+  });
+
+  let browser = null;
+  try {
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const port = server.address().port;
+    try {
+      browser = await chromium.launch();
+    } catch (e) {
+      if (/Executable doesn't exist/.test(String((e && e.message) || ''))) {
+        console.error('[measure] Playwright browser not installed — run `npx playwright install chromium` first');
+        process.exitCode = 1;
+        return;
+      }
+      throw e;
+    }
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(String((e && e.stack) || e)));
+    await page.goto(`http://127.0.0.1:${port}/debug/selfcheck.html?only=measure`, { waitUntil: 'commit', timeout: 60000 });
+    await page.waitForFunction('window.__kcMeasureReady === true', null, { timeout: 120000 });
+    const info = await page.evaluate('({ ids: window.__kcMeasure.ids, hwTimer: window.__kcMeasure.hwTimer })');
+    console.log(`[measure] ${info.ids.length} effects, ${info.hwTimer ? 'hardware timer' : 'node wall-time'} timing`);
+
+    const results = {};
+    for (const id of info.ids) {
+      await page.evaluate((x) => window.__kcMeasure.warmup(x), id);
+      const batchMs = [];
+      let hwMs = null;
+      for (let b = 0; b < BATCHES; b++) {
+        const t0 = Date.now();
+        const hw = await page.evaluate(([x, n]) => window.__kcMeasure.runBatch(x, n), [id, BATCH_DRAWS]);
+        const wall = (Date.now() - t0) / BATCH_DRAWS;
+        if (hw && typeof hw.hwMs === 'number') hwMs = hw.hwMs; // hardware path: page times itself
+        else batchMs.push(wall);
+      }
+      const ms = hwMs !== null ? hwMs : median(batchMs);
+      const caseName = await page.evaluate((x) => window.__kcMeasure.caseName(x), id);
+      results[id] = { ms: +ms.toFixed(4), method: hwMs !== null ? 'hw' : 'wall', draws: BATCH_DRAWS * BATCHES };
+      console.log(`  [cost] ${id} [${caseName}]: ${ms.toFixed(4)} ms/draw (${results[id].method})`);
+    }
+    await page.evaluate('window.__kcMeasure.dispose()');
+    if (errors.length) { console.error('page errors:\n' + errors.join('\n')); process.exitCode = 1; return; }
+
+    const entries = Object.entries(results)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([id, r]) => `  '${id}': { ms: ${r.ms}, method: '${r.method}', draws: ${r.draws} },`);
+    const stamp = new Date().toISOString();
+    const body = `/**
+ * measuredCosts.mjs — GENERATED by \`npm run measure-costs\`. DO NOT EDIT.
+ *
+ * Per-effect GPU cost: 512x512 RGBA16F targets, worst-case contract params,
+ * 8 warmup + 3x30 readback-forced draws, median ms/draw. Re-bless (re-run
+ * the command) whenever a shader's cost could have changed.
+ *
+ * The CI gate (gl/costTiers.selfcheck.mjs) works on RATIOS to the overall
+ * median, not absolute ms — the numbers stay meaningful when a different
+ * GPU re-measures them.
+ *
+ * method: { w: 512, h: 512, warmup: 8, batches: 3, drawsPerBatch: 30, stat: 'median', params: 'max-contract-case' }
+ * measuredAt: '${stamp}'
+ */
+export const MEASURED_AT = '${stamp}';
+export const MEASURE_METHOD = { w: 512, h: 512, warmup: 8, batches: 3, drawsPerBatch: 30, stat: 'median', params: 'max-contract-case' };
+export const MEASURED_COSTS = {
+${entries.join('\n')}
+};
+`;
+    await writeFile(OUT_FILE, body);
+    console.log(`[measure] wrote ${path.relative(process.cwd(), OUT_FILE)} (${entries.length} effects, ${stamp})`);
+  } finally {
+    try { await browser?.close(); } catch { /* noop */ }
+    server.close();
+  }
+}
+
+await main();

@@ -44,6 +44,7 @@
 
 import { sanitizeParams, getTemplateEffect, registerTemplateEffect } from './template.mjs';
 import { chunksUsedBy } from './chunks.mjs';
+import { registerCostTier } from '../costTiers.mjs';
 
 export const FX_DISPLACE_FS = `#version 300 es
 precision highp float;
@@ -215,14 +216,34 @@ export const FX_EDGE_DESCRIPTOR = {
   params: {},
 };
 
-/** [kind, { fs, descriptor, file }] — registration order is irrelevant. */
+/**
+ * [kind, { fs, descriptor, file, cost }] — registration order is irrelevant.
+ *
+ * Cost-tier declarations (hardening 3/6) live IN each effect definition,
+ * not in a separate list. One 1080p RGBA16F write target = 1920*1080*8
+ * bytes of transient working set; timeMs is the author's per-frame
+ * estimate at 1080p (the harness measures the truth; the build gate
+ * cross-checks).
+ */
 export const FX_SHADER_EFFECTS = [
-  ['displace', { fs: FX_DISPLACE_FS, descriptor: FX_DISPLACE_DESCRIPTOR, file: 'fxShaders.mjs:displace' }],
-  ['tear', { fs: FX_TEAR_FS, descriptor: FX_TEAR_DESCRIPTOR, file: 'fxShaders.mjs:tear' }],
-  ['scanlines', { fs: FX_SCANLINES_FS, descriptor: FX_SCANLINES_DESCRIPTOR, file: 'fxShaders.mjs:scanlines' }],
-  ['solarize', { fs: FX_SOLARIZE_FS, descriptor: FX_SOLARIZE_DESCRIPTOR, file: 'fxShaders.mjs:solarize' }],
-  ['edge', { fs: FX_EDGE_FS, descriptor: FX_EDGE_DESCRIPTOR, file: 'fxShaders.mjs:edge' }],
+  // 2x fbm-3 noise lookups: the costliest template FX — a quality scaler.
+  ['displace', { fs: FX_DISPLACE_FS, descriptor: FX_DISPLACE_DESCRIPTOR, file: 'fxShaders.mjs:displace',
+    cost: { tier: 2, memoryBytes: 1920 * 1080 * 8, timeMs: 1.2, notes: '2x fbm-3 noise; warp cost scales with octaves' } }],
+  ['tear', { fs: FX_TEAR_FS, descriptor: FX_TEAR_DESCRIPTOR, file: 'fxShaders.mjs:tear',
+    cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.5, notes: 'single noise lookup + shear' } }],
+  ['scanlines', { fs: FX_SCANLINES_FS, descriptor: FX_SCANLINES_DESCRIPTOR, file: 'fxShaders.mjs:scanlines',
+    cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3, notes: 'cheap mask multiply' } }],
+  ['solarize', { fs: FX_SOLARIZE_FS, descriptor: FX_SOLARIZE_DESCRIPTOR, file: 'fxShaders.mjs:solarize',
+    cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'pure ALU color op' } }],
+  ['edge', { fs: FX_EDGE_FS, descriptor: FX_EDGE_DESCRIPTOR, file: 'fxShaders.mjs:edge',
+    cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.4, notes: '3x3 kernel, 9 taps' } }],
 ];
+
+// The registry reads the cost declarations straight out of the definitions
+// above — there is no parallel cost-only map to drift out of sync.
+for (const [kind, def] of FX_SHADER_EFFECTS) {
+  registerCostTier(`fx/${kind}`, def.cost);
+}
 
 export const FX_SHADER_KINDS = FX_SHADER_EFFECTS.map(([kind]) => kind);
 

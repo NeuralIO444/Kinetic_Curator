@@ -19,13 +19,22 @@
 // resolution scaling: render scale drops before anything is cut. FX layers
 // are never culled in normal operation.
 //
-// Every cut is a render-only overlay: it never writes layoutParams, never
-// serializes into project JSON, and auto-clears on recovery — except the
-// hard stop, which needs manual resume (panic-key precedent, #107).
+// Hardening 3/6: the ladder's per-effect knowledge now comes from the cost
+// registry (gl/costTiers.mjs) instead of hard-coded comments. The ORDER
+// above is unchanged — the contract — but the inputs are honest: cut 3's
+// coverage is tier1ShedIds(), the memory gate on echoes is declared on
+// accum/echo and enforced by the recipe, and the CI gate
+// (gl/costTiers.selfcheck.mjs) proves declared tiers match measured GPU
+// cost. Every cut is still a render-only overlay: it never writes
+// layoutParams, never serializes into project JSON, and auto-clears on
+// recovery — except the hard stop, which needs manual resume (panic-key
+// precedent, #107).
 //
 // Kept pure (no React, no store) so the order is unit-testable — see
 // gl/phase6.selfcheck.mjs, which asserts resolution sheds before effects
 // and that no FX-culling cut exists.
+
+import { tier1ShedIds } from '../gl/costTiers.mjs';
 
 /** Dynamic resolution ladder — the primary shed. GPU headroom means the
  *  live canvas can drop pixels before it drops anything visible. */
@@ -33,6 +42,19 @@ export const RENDER_SCALES = [1, 0.75, 0.5, 0.33];
 
 /** The lowest render scale the ladder reaches. */
 export const MIN_RENDER_SCALE = RENDER_SCALES[RENDER_SCALES.length - 1];
+
+/**
+ * Cut 3's coverage — the passes the independent perfTier1 mechanism sheds.
+ * Read from the cost registry (tier 1 = "shed first": the ACCUM chain),
+ * not hard-coded here. Resolved at call time: registrations land when the
+ * effect modules load, so this must not be snapshotted at import time.
+ * The shed ORDER is unchanged; this is the input the registry owns.
+ *
+ * @returns {string[]} effect ids at cost tier 1 (e.g. accum/fade, …).
+ */
+export function perfTier1Passes() {
+  return tier1ShedIds();
+}
 
 /**
  * Decide the next governor cut, given the current governor state.
@@ -65,7 +87,8 @@ export function nextGovernorCut(s) {
   }
 
   // Cut 4: cost-aware asset thinning. (Cut 3 — mirror/gloss/ACCUM — is the
-  // independent perfTier1 mechanism at its own lower FPS floor.)
+  // independent perfTier1 mechanism at its own lower FPS floor; its pass
+  // coverage is perfTier1Passes(), read from the cost registry.)
   if (!s.assetThin) {
     return { kind: 'assetThin', label: 'asset thinning — highest-cost assets drop first' };
   }
