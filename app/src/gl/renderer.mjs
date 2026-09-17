@@ -20,10 +20,12 @@
  */
 
 import {
-  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, EFFECT_FS, RESOLVE_FS, COPY_FS,
-  BLEND_IDS, EFFECT_IDS,
+  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, RESOLVE_FS, COPY_FS,
+  BLEND_IDS,
 } from './shaders.mjs';
 import { buildProgramChecked } from './debug/diagnostics.mjs';
+import { createBridge } from './bridge/bridge.mjs';
+import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 
 // All program builds go through the debug harness (#193): a compile/link
 // failure throws naming the program, source file, and line number.
@@ -94,9 +96,13 @@ export function createRenderer(canvas) {
 
   const quadProg = buildProgramChecked(gl, QUAD_VS, QUAD_FS, { name: 'quad', vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS' });
   const compProg = buildProgramChecked(gl, FULL_VS, COMPOSITE_FS, { name: 'composite', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COMPOSITE_FS' });
-  const fxProg = buildProgramChecked(gl, FULL_VS, EFFECT_FS, { name: 'effect', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:EFFECT_FS' });
   const resProg = buildProgramChecked(gl, FULL_VS, RESOLVE_FS, { name: 'resolve', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:RESOLVE_FS' });
   const copyProg = buildProgramChecked(gl, FULL_VS, COPY_FS, { name: 'copy', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COPY_FS' });
+
+  // FX chain execution lives in the JS↔GL bridge (#194): programs compile
+  // once, uniform uploads are dirty-checked, targets are bridge-owned.
+  const bridge = createBridge(gl, canvas, { width: 2, height: 2, dpr: 1 });
+  registerBuiltinEffects(bridge);
 
   const U = (p, n) => gl.getUniformLocation(p, n);
 
@@ -154,30 +160,6 @@ export function createRenderer(canvas) {
   };
 
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
-  function effectPass(u, fx, srcTex, dstFb, params, clip, auxTex, w, h) {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, dstFb);
-    gl.viewport(0, 0, w, h);
-    gl.disable(gl.BLEND);
-    gl.useProgram(fxProg);
-    gl.uniform1i(u.u_src, bindTex(0, srcTex));
-    gl.uniform1i(u.u_aux, bindTex(1, auxTex || srcTex));
-    gl.uniform1i(u.u_effect, fx);
-    gl.uniform4f(u.u_p, params[0], params[1] || 0, params[2] || 0, params[3] || 0);
-    gl.uniform2f(u.u_texel, 1 / w, 1 / h);
-    if (clip) {
-      gl.uniform4f(u.u_clip, clip[0], clip[1], clip[2], clip[3]);
-      gl.uniform1f(u.u_clipOn, 1);
-    } else {
-      gl.uniform1f(u.u_clipOn, 0);
-    }
-    drawFullscreen(fxProg);
-  }
-  const fxU = {
-    u_src: U(fxProg, 'u_src'), u_aux: U(fxProg, 'u_aux'),
-    u_effect: U(fxProg, 'u_effect'), u_p: U(fxProg, 'u_p'),
-    u_texel: U(fxProg, 'u_texel'), u_clip: U(fxProg, 'u_clip'), u_clipOn: U(fxProg, 'u_clipOn'),
-  };
-
   /** Draw instance list (Float32Array, 10 floats each) into the bound FBO. */
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
@@ -262,33 +244,6 @@ export function createRenderer(canvas) {
     flush();
   }
 
-  function applyEffectChain(wrap, fxList, acc, tmp, grainLuts, w, h, clip) {
-    let read = acc, write = tmp;
-    for (const fx of fxList) {
-      if (fx.kind === 'blur') {
-        const sigma = Math.max(0.5, (fx.params.radius || 0) * (w / 1000));
-        const params = [sigma];
-        effectPass(fxU, EFFECT_IDS.blurH, read.tex, write.fb, params, clip, null, w, h);
-        [read, write] = [write, read];
-        effectPass(fxU, EFFECT_IDS.blurV, read.tex, write.fb, params, clip, null, w, h);
-        [read, write] = [write, read];
-        continue;
-      }
-      const id = EFFECT_IDS[fx.kind];
-      if (id == null) throw new Error(`[gl] Phase 1 cannot render effect "${fx.kind}" (lands in Phase 2, #188)`);
-      let params = [0], aux = null;
-      if (fx.kind === 'rgbSplit') params = [(fx.params.dx || 0) / 1000];
-      else if (fx.kind === 'grain') {
-        params = [fx.params.amount ?? 0.4];
-        aux = grainLuts[wrap.fxLayerId];
-        if (!aux) throw new Error(`[gl] missing grain LUT for wrap ${wrap.fxLayerId}`);
-      } else if (fx.kind === 'posterize') params = [fx.params.levels || 4];
-      effectPass(fxU, id, read.tex, write.fb, params, clip, aux, w, h);
-      [read, write] = [write, read];
-    }
-    return read;
-  }
-
   /**
    * @param {object} payload
    * @returns {{pixels: Uint8Array, width: number, height: number}} bottom-first RGBA
@@ -297,6 +252,7 @@ export function createRenderer(canvas) {
     const { width: w, height: h, contract, cells, bg } = payload;
     if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
     canvas.width = w; canvas.height = h;
+    bridge.resize(w, h, 1);
 
     const atlasTex = uploadTexture(gl, payload.atlas.pixels, payload.atlas.width, payload.atlas.height, { mipmaps: payload.atlas.mipmaps || null });
     const grainLuts = {};
@@ -353,11 +309,9 @@ export function createRenderer(canvas) {
       if (layer.type === 'fx') {
         const wrap = wrapByFx.get(layerId);
         if (!wrap || !wrap.contentLayerIds.length) { pending = []; continue; }
-        // Fold the pending content layers into the wrap FBO.
-        const wrapA = makeTarget(gl, w, h, true);
-        const wrapB = makeTarget(gl, w, h, true);
-        targets.push(wrapA, wrapB);
-        let wRead = wrapA, wWrite = wrapB;
+        // Fold the pending content layers into the bridge's ping-pong targets.
+        const bt = bridge.layer(layerId);
+        let wRead = bt.t0, wWrite = bt.t1;
         gl.bindFramebuffer(gl.FRAMEBUFFER, wRead.fb);
         gl.viewport(0, 0, w, h);
         gl.clearColor(0, 0, 0, 0);
@@ -371,7 +325,17 @@ export function createRenderer(canvas) {
         // Effect passes run unclipped (SVG primitives see the unclipped
         // input; only the final filter output is region-clipped). The clip
         // is applied once, on the wrap->main composite below.
-        const afterFx = applyEffectChain(wrap, layer.fx || [], wRead, wWrite, grainLuts, w, h, null);
+        // The chain runs through the JS↔GL bridge (#194) as a plain
+        // snapshot: kind/params per effect, grain LUT as aux texture.
+        const steps = (layer.fx || []).map((fx) => {
+          let aux = null;
+          if (fx.kind === 'grain') {
+            aux = grainLuts[wrap.fxLayerId];
+            if (!aux) throw new Error(`[gl] missing grain LUT for wrap ${wrap.fxLayerId}`);
+          }
+          return { kind: fx.kind, params: fx.params || {}, aux };
+        });
+        const afterFx = bridge.runChain(layerId, wRead, steps);
         composite(compProg, compU, afterFx.tex, mRead, mWrite, BLEND_IDS.normal, wrap.opacity, clip);
         [mRead, mWrite] = [mWrite, mRead];
         continue;
@@ -405,7 +369,8 @@ export function createRenderer(canvas) {
   }
 
   function dispose() {
-    for (const p of [quadProg, compProg, fxProg, resProg, copyProg]) gl.deleteProgram(p);
+    bridge.dispose();
+    for (const p of [quadProg, compProg, resProg, copyProg]) gl.deleteProgram(p);
     gl.deleteBuffer(fullVbo); gl.deleteBuffer(cornerVbo); gl.deleteBuffer(instVbo);
   }
 
