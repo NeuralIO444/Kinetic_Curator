@@ -212,14 +212,14 @@ export function createRenderer(canvas) {
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     for (let i = 1; i <= 3; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 40, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 48, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 10);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 12);
     for (let i = 0; i <= 3; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
@@ -227,11 +227,14 @@ export function createRenderer(canvas) {
   const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
 
   function instanceData(instances, cells) {
-    const out = new Float32Array(instances.length * 10);
+    // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0).
+    // The trailing pad keeps attribute 3's vec4 fetch inside the buffer —
+    // ANGLE/Metal raises INVALID_OPERATION for out-of-bounds attrib reads.
+    const out = new Float32Array(instances.length * 12);
     instances.forEach((it, i) => {
       const cell = cells[comboKey(it.asset, it.tint, it.accent)];
       if (!cell) throw new Error(`[gl] no atlas cell for ${comboKey(it.asset, it.tint, it.accent)}`);
-      const o = i * 10;
+      const o = i * 12;
       out[o] = it.x; out[o + 1] = it.y;
       out[o + 2] = it.scaleX; out[o + 3] = it.scaleY;
       out[o + 4] = it.rotation; out[o + 5] = it.opacity;
