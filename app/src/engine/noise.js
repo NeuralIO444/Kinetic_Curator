@@ -1,7 +1,7 @@
 /**
  * noise.js — 3D Simplex + fBm (Kernel K1 #59)
  * Primary API: createNoise(seed) → isolated instance (no shared mutable perm).
- * Legacy module-level noise3D / fBm3D / seedNoise delegate to a default instance.
+ * Legacy module-level noise3D / fBm3D delegate to a default instance.
  */
 
 const F3 = 1.0 / 3.0;
@@ -162,11 +162,6 @@ export function createNoise(seedValue) {
 
 // ── Legacy module-level API (default instance) ─────────────────
 let _default = createNoise(444);
-
-/** @deprecated Prefer createNoise(seed) for isolation. */
-export function seedNoise(seedValue) {
-  _default = createNoise(seedValue);
-}
 
 /** @deprecated Prefer createNoise(seed).noise3D */
 export function noise3D(x, y, z) {

@@ -251,6 +251,10 @@ void main() {
     o = vec4(s.rgb * (1.0 - gA), gA + s.a * (1.0 - gA));
   } else if (u_effect == 3 || u_effect == 4) { // separable gaussian blur
     float sigma = u_p.x;                      // device px
+    if (sigma <= 0.0) {
+      o = s; // radius 0 is identity (matches SVG stdDeviation=0); sigma=0
+             // would divide by zero in the kernel weights below.
+    } else {
     // vertical pass moves in texture-v (y-up): negate for canvas y-down
     vec2 stepv = u_effect == 3 ? vec2(u_texel.x, 0.0) : vec2(0.0, -u_texel.y);
     int R = int(ceil(sigma * 3.0));
@@ -265,6 +269,7 @@ void main() {
       wsum += 2.0 * w;
     }
     o = acc / wsum;
+    }
   } else if (u_effect == 5) {                 // posterize: discrete table in straight space
     float levels = u_p.x;
     vec3 cs = unpre(s.rgb, s.a);

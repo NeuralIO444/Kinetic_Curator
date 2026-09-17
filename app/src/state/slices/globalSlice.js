@@ -5,21 +5,12 @@ import {
   sanitizeOverlay, duplicateIntoOverlay, ingestIntoOverlay,
   removeFromOverlay, renameOverlayAsset, replaceOverlayAsset,
 } from '../../assets/overlay.js';
+import { normalizeSnapshots } from '../projectNormalize.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
 
 const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
-
-function normalizeSnapshots(raw) {
-  if (!raw || typeof raw !== 'object') return {};
-  const out = {};
-  for (const [id, snap] of Object.entries(raw)) {
-    if (!snap || typeof snap !== 'object') continue;
-    out[id] = { ...snap, layoutParams: normalizeLayoutParams(snap.layoutParams) };
-  }
-  return out;
-}
 
 function findAsset(id, overlay) {
   return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
@@ -100,7 +91,6 @@ export const createGlobalSlice = (set) => ({
    * the session is paused (e.g. 'fps-critical' vs a render-error label). */
   lastWatchdogReason: null,
   webcamEnabled: false,
-  motionEnergy: 0,
 
   enabledAssets: initialEnabledAssets,
   assetWeightOverrides: {},
@@ -162,7 +152,6 @@ export const createGlobalSlice = (set) => ({
     lastWatchdogReason: reason,
   })),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
-  setMotionEnergy: (energy) => set({ motionEnergy: energy }),
 
   toggleAsset: (id) => set((state) => ({
     enabledAssets: { ...state.enabledAssets, [id]: !state.enabledAssets[id] },
@@ -306,6 +295,10 @@ export const createGlobalSlice = (set) => ({
     }
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
       next.assetWeightOverrides = { ...doc.assetWeightOverrides };
+    } else {
+      // The serializer omits the field when empty — without this, loading a
+      // clean project over a session with overrides kept the old weights.
+      next.assetWeightOverrides = {};
     }
     next.paletteOverrides = doc.paletteOverrides ?? null;
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
@@ -314,6 +307,23 @@ export const createGlobalSlice = (set) => ({
       next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots);
       next.historyUndoStack = [];
       next.historyRedoStack = [];
+      // Install the active layer's snapshot onto live state. The serializer
+      // writes lockedParams/caGrid only into snapshots (never root fields),
+      // so without this a load silently dropped parameter locks and the CA
+      // grid; and a doc whose root values disagree with its active snapshot
+      // rendered the wrong composition until a layer switch. For well-formed
+      // docs this is a no-op — the snapshot was captured from the same
+      // state as the root values.
+      const activeSnap = next.layerSnapshots[doc.activeLayerId];
+      if (activeSnap) {
+        next.seed = activeSnap.seed >>> 0;
+        next.paletteId = activeSnap.paletteId || next.paletteId;
+        next.paletteOverrides = activeSnap.paletteOverrides ?? null;
+        next.layoutParams = normalizeLayoutParams(activeSnap.layoutParams);
+        next.lockedParams = activeSnap.lockedParams || {};
+        next.caGrid = activeSnap.caGrid || null;
+        next.enabledAssets = { ...initialEnabledAssets, ...(activeSnap.enabledAssets || {}) };
+      }
     }
     return next;
   }),

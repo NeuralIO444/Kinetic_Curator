@@ -5,9 +5,6 @@ import { MATERIALS } from '../../engine/materials.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
-const WEIGHT_LABEL = null; // keep file focused; unused
-void WEIGHT_LABEL;
-
 export function ParamBlock({ layoutParams, lockedParams }) {
   const preset = getPreset(layoutParams.composition);
   const defaults = preset.params;

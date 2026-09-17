@@ -21,7 +21,6 @@ export const SET_POOL_VIEW   = 'SET_POOL_VIEW';
 export const SET_WEBCAM_ENABLED  = 'SET_WEBCAM_ENABLED';
 export const SET_AUDIO_ENABLED   = 'SET_AUDIO_ENABLED';
 export const SET_AUDIO_DENIED    = 'SET_AUDIO_DENIED';
-export const SET_MOTION_ENERGY   = 'SET_MOTION_ENERGY';
 export const SET_AUDIO_STIMULUS  = 'SET_AUDIO_STIMULUS';
 export const SET_BEAT_PULSE      = 'SET_BEAT_PULSE';
 export const SET_AUDIO_BANDS     = 'SET_AUDIO_BANDS';
