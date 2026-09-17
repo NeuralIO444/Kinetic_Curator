@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 // MasterBar — top toolbar
 import { useApp } from '../state/AppContext.jsx';
 import * as A from '../state/actions.js';
@@ -164,16 +164,41 @@ export function MasterBar() {
   // this selector is explicit, so a field missing from it reads as undefined,
   // and a pill that fails open would cry UNSAVED on every boot.
   const {
-    running, fps, seed, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
+    running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
     slowRender = false, perfTier1 = false, frameLock = false, audioDenied = false,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
+
+  // Palette-chip carousel: ~4 chips visible, ‹ › arrows slide the track.
+  const CHIP_WIN = 4;
+  const chipTrackRef = useRef(null);
+  const activeChipRef = useRef(null);
+  const [canChipPrev, setCanChipPrev] = useState(false);
+  const [canChipNext, setCanChipNext] = useState(false);
+  const chipOverflow = palettes.length > CHIP_WIN;
+  const syncChipNav = (t) => {
+    if (!t) return;
+    setCanChipPrev(t.scrollLeft > 4);
+    setCanChipNext(t.scrollLeft < t.scrollWidth - t.clientWidth - 4);
+  };
+  const handleChipTrackScroll = (e) => syncChipNav(e.currentTarget);
+  const handleChipSlide = (e, dir) => {
+    const track = e.currentTarget.parentElement?.querySelector('.palette-chip-track');
+    if (!track) return;
+    const first = track.querySelector(':scope > *');
+    const step = first ? first.getBoundingClientRect().width + 3 : 120;
+    track.scrollBy({ left: dir * step, behavior: 'smooth' });
+  };
+  // Keep the active palette chip in view when switching.
+  useEffect(() => {
+    activeChipRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    syncChipNav(chipTrackRef.current);
+  }, [palette.id]);
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
   const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
   const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.balanced;
-  const buildId = import.meta.env.VITE_BUILD_ID || 'dev';
 
   return (
     <div className="master-bar">
@@ -182,7 +207,6 @@ export function MasterBar() {
           <span className="logo-mark">◈</span>
           <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
           <span className="logo-version">v0.9.0</span>
-          <span className="logo-build" title="Build id from VITE_BUILD_ID">Build: {buildId}</span>
         </div>
 
         {state.isRecording ? (
@@ -290,11 +314,6 @@ export function MasterBar() {
           30FPS{frameLock ? '' : ' · OFF'}
         </button>
 
-        <div className="meter">
-          <span className="meter-label">SEED</span>
-          <span className="meter-value">{seed.toString(16).padStart(8, '0')}</span>
-        </div>
-
         <div className="undo-group">
           <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo">
             ↶{history.undoDepth > 0 ? ` ${history.undoDepth}` : ''}
@@ -307,6 +326,12 @@ export function MasterBar() {
       <div className="master-right">
         <div className="palette-switch">
           <span className="palette-switch-label">PALETTE</span>
+          {chipOverflow && (
+            <button type="button" className="palette-nav-btn" title="Previous palettes"
+              disabled={!canChipPrev} onClick={(e) => handleChipSlide(e, -1)}>‹</button>
+          )}
+          <div className="palette-chip-viewport">
+            <div ref={chipTrackRef} className="palette-chip-track" onScroll={handleChipTrackScroll}>
           {palettes.map(p => {
             const active = p.id === palette.id;
             // The active chip hosts the editor (colour inputs + reset button),
@@ -317,6 +342,7 @@ export function MasterBar() {
               return (
                 <div
                   key={p.id}
+                  ref={activeChipRef}
                   className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`}
                   title={`${p.name} · edit swatches · switch palette clears customs`}
                 >
@@ -371,6 +397,12 @@ export function MasterBar() {
               </span>
             );
           })}
+            </div>
+          </div>
+          {chipOverflow && (
+            <button type="button" className="palette-nav-btn" title="Next palettes"
+              disabled={!canChipNext} onClick={(e) => handleChipSlide(e, 1)}>›</button>
+          )}
           <select
             className="palette-harmony-select"
             value={harmonyScheme}

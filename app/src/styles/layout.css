@@ -244,6 +244,18 @@
   transition: transform 180ms ease;
   will-change: transform;
 }
+.palette-chip-viewport {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  max-width: 470px; /* ~4 palette chips; arrows carousel the rest */
+}
+.palette-chip-viewport::-webkit-scrollbar { display: none; }
+.palette-chip-track {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
 
 .run-btn {
   background: var(--accent); color: #000; border: none;

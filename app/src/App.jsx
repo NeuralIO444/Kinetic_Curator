@@ -189,7 +189,7 @@ function AppInner() {
       </ErrorBoundary>
       <FavoritesTray />
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION}</span>
+        <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {state.layoutParams.mode} · seed:{state.seed.toString(16)}
           <button type="button" className="micro-btn" title="Settings — no second prefs store"
