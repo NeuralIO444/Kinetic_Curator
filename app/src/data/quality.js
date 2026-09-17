@@ -1,4 +1,8 @@
-// Quality presets — soft ceilings for interactive performance
+// Quality presets — soft ceilings for interactive performance.
+// Showrunner budgets (§7): each tier now carries per-subsystem ceilings so
+// the governor can shed the right thing instead of only stepping density.
+// New keys: maxFxLayers, maxFilterPrimitives, maxAssetsPerLayer,
+// turbulenceOctaves. FINAL_CAPS stays the ungoverned "cinematic" tier.
 
 export const QUALITY_PRESETS = {
   high: {
@@ -9,6 +13,10 @@ export const QUALITY_PRESETS = {
     maxParticles: 350,
     allowMirror: true,
     allowGloss: true,
+    maxFxLayers: 3,
+    maxFilterPrimitives: 8,
+    maxAssetsPerLayer: 96,
+    turbulenceOctaves: 3,
     description: 'Full fidelity — best hardware',
   },
   balanced: {
@@ -19,6 +27,10 @@ export const QUALITY_PRESETS = {
     maxParticles: 200,
     allowMirror: true,
     allowGloss: true,
+    maxFxLayers: 2,
+    maxFilterPrimitives: 6,
+    maxAssetsPerLayer: 48,
+    turbulenceOctaves: 2,
     description: 'Good density, stable frame rate',
   },
   performance: {
@@ -29,6 +41,10 @@ export const QUALITY_PRESETS = {
     maxParticles: 100,
     allowMirror: false,
     allowGloss: false,
+    maxFxLayers: 1,
+    maxFilterPrimitives: 4,
+    maxAssetsPerLayer: 24,
+    turbulenceOctaves: 1,
     description: 'Protects interactivity on weaker machines',
   },
 };
@@ -42,11 +58,23 @@ export const FINAL_CAPS = {
   maxParticles: 400,
   allowMirror: true,
   allowGloss: true,
+  maxFxLayers: Infinity,
+  maxFilterPrimitives: Infinity,
+  maxAssetsPerLayer: Infinity,
+  turbulenceOctaves: 4,
   description: 'Render-time density (not for live play)',
 };
 
 /** Skip second gloss <use> when node count exceeds this under BALANCED/HIGH. */
 export const GLOSS_NODE_THRESHOLD = 280;
+
+/**
+ * SVG filter regions are clamped to this fraction of the viewport.
+ * Unbounded filter regions are a silent frame-rate killer (the browser
+ * rasterizes the whole region per filter pass), so this is a clamp, not a
+ * tier — it applies at every quality level including final renders.
+ */
+export const MAX_FILTER_REGION = 1.0;
 
 export function getQualityCaps(qualityId) {
   return QUALITY_PRESETS[qualityId] || QUALITY_PRESETS.balanced;

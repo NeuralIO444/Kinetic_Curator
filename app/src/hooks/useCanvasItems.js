@@ -4,6 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import { buildPlacements } from '../engine/buildPlacements.js';
+import { timeStage } from './useFpsMeter.js';
 
 // Re-export for existing selfcheck / callers
 export { pickWeighted, SELECTION_WEIGHT } from '../engine/buildPlacements.js';
@@ -39,19 +40,25 @@ export function useCanvasItems({
 
   const { preset, items } = useMemo(
     () =>
-      buildPlacements({
-        layoutParams,
-        seed,
-        activeAssets,
-        palette,
-        caGrid,
-        caps,
-        canvasW,
-        canvasH,
-        scale: effectiveScale,
-        alpha: effectiveAlpha,
-        cache,
-      }),
+      // Showrunner patrol: time the kernel+staged-eval stage at the hook
+      // boundary (the engine itself is frozen — no instrumentation inside).
+      // buildPlacements is cached per layer instance, so most frames report
+      // ~0ms here; spikes mark genuine recompute frames.
+      timeStage('kernel', () =>
+        buildPlacements({
+          layoutParams,
+          seed,
+          activeAssets,
+          palette,
+          caGrid,
+          caps,
+          canvasW,
+          canvasH,
+          scale: effectiveScale,
+          alpha: effectiveAlpha,
+          cache,
+        }),
+      ),
     [
       layoutParams,
       seed,

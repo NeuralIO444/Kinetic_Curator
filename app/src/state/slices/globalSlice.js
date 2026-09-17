@@ -57,6 +57,38 @@ export const createGlobalSlice = (set) => ({
    * shed everything tier 1 sheds too.
    */
   perfTier1: false,
+  /**
+   * Showrunner patrol snapshot (§4): per-stage rolling-average timings in
+   * ms, synced ~4Hz by useFpsMeter. Keys are stage names ('kernel', …);
+   * `__frame` carries { avg, worst } RAF-delta stats. Read-only signal for
+   * the operator and for future governor stages — the governor currently
+   * acts on FPS only. Never serialized (live-only, like fps itself).
+   */
+  stageTimings: {},
+  /**
+   * Showrunner cut 1–2: FX filter shedding, render-only overlay.
+   *   0 — no FX cut
+   *   1 — simplify: turbulence octaves → 1, grain off (cheapest primitives cut first)
+   *   2 — bypass: skip FX layers beyond the first visible one
+   * The FX renderer (#152) reads this; until FX layers exist no layer has
+   * kind 'fx' and these cuts are dormant but wired. Auto-clears on recovery,
+   * like perfTier1. Never serialized.
+   */
+  fxShedLevel: 0,
+  /**
+   * Showrunner cut 5: cost-aware asset thinning, render-only overlay.
+   * When on, layers drop highest-cost-score assets first instead of
+   * thinning uniformly. Never serialized.
+   */
+  assetThin: false,
+  /**
+   * Showrunner frame-lock show mode: a USER choice, not a degradation.
+   * When on, the life/breathing tick (the dominant per-frame re-render
+   * driver) is gated to ~30Hz — a locked 30fps reads smoother than a
+   * fluctuating 40–60 and halves React render work. Never auto-cleared.
+   * Never serialized (it is a machine-specific choice, not composition).
+   */
+  frameLock: false,
   /** Bumped by every tripWatchdog() call — lets a subscriber (OutputPanel's
    * in-flight export restore) react to a NEW trip instead of a boolean it
    * has already seen. */
@@ -103,6 +135,10 @@ export const createGlobalSlice = (set) => ({
   setSlowRender: (slow) => set({ slowRender: slow }),
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
+  setStageTimings: (stages) => set({ stageTimings: { ...stages } }),
+  setFxShedLevel: (level) => set({ fxShedLevel: Math.max(0, Math.min(2, level | 0)) }),
+  setAssetThin: (on) => set({ assetThin: !!on }),
+  setFrameLock: (on) => set({ frameLock: !!on }),
   /**
    * Tier 2 of the watchdog (#107 §4): FPS ~ 0 sustained, or a critical
    * render-error (top-level Shell boundary only). Unlike tier 1, this is a

@@ -110,6 +110,8 @@ export function MasterBar() {
     persistStatus: s.persistStatus,
     slowRender: s.slowRender,
     perfTier1: s.perfTier1,
+    frameLock: s.frameLock,
+    setFrameLock: s.setFrameLock,
     audioDenied: s.audioDenied,
   }));
   // Default to 'ok' rather than showing the warning for an undefined value:
@@ -117,7 +119,7 @@ export function MasterBar() {
   // and a pill that fails open would cry UNSAVED on every boot.
   const {
     running, fps, seed, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
-    slowRender = false, perfTier1 = false, audioDenied = false,
+    slowRender = false, perfTier1 = false, frameLock = false, audioDenied = false,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -228,6 +230,19 @@ export function MasterBar() {
           <span className="meter-value" style={{ letterSpacing: '0.06em' }}>{q.label}</span>
           {state.autoQuality && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: 4 }}>AUTO</span>}
         </div>
+
+        {/* Showrunner frame-lock: a user-chosen 30fps show mode, not a
+            degradation. Gates the life tick (the dominant re-render driver)
+            to ~30Hz — a locked 30 reads smoother than a fluctuating 40–60
+            and roughly halves React render work. Never auto-cleared. */}
+        <button
+          className={`undo-btn ${frameLock ? '' : 'disabled'}`}
+          onClick={() => state.setFrameLock(!frameLock)}
+          title="Frame-lock show mode: gate the live loop to a locked 30fps (user choice, never auto-cleared)"
+          style={{ fontSize: '10px', letterSpacing: '0.06em' }}
+        >
+          30FPS{frameLock ? '' : ' · OFF'}
+        </button>
 
         <div className="meter">
           <span className="meter-label">SEED</span>
