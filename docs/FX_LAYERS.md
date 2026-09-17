@@ -31,7 +31,10 @@ above it.
 
 ## Filter compiler (`app/src/fx/fxFilters.js`)
 
-One `<filter>` per FX layer, primitives in effect order. `FX_EFFECT_DEFS`
+One `<filter>` per FX layer, primitives in effect order. Effects **chain
+top-down**: the first effect reads `SourceGraphic`, each later effect reads
+the previous effect's output, so the stack compounds like an adjustment-layer
+chain. `FX_EFFECT_DEFS`
 is the single source of truth for the compiler, the panel UI, and this doc.
 
 | Effect | Recipe | Primitives |

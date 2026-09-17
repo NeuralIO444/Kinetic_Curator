@@ -4,7 +4,11 @@
  * An FX layer holds an ordered `effects` array, e.g.
  *   [{ kind: 'rgbSplit', params: { dx: 3 } }, { kind: 'grain', params: { amount: 0.4 } }]
  * This module compiles it into a single SVG <filter> per layer, as an
- * ordered list of filter primitives. Two renderers exist:
+ * ordered list of filter primitives. Effects chain top-down: the first
+ * effect reads SourceGraphic, and each later effect reads the previous
+ * effect's output, so the stack compounds like an adjustment-layer chain.
+ * (Before chaining, every effect read SourceGraphic independently and only
+ * the last effect's output was visible.) Two renderers exist:
  *   - FxFilterDefs (./FxFilterDefs.jsx) for the live React app
  *   - renderFxFilterString() for the offline studio path (studio/render.mjs)
  * Both consume the same primitive list, so live and export agree.
@@ -150,13 +154,13 @@ const CH_R = '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0';
 const CH_G = '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0';
 const CH_B = '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0';
 
-function buildRgbSplit(params, ctx, rid) {
+function buildRgbSplit(params, ctx, rid, src) {
   const dx = r3(params.dx + (ctx.dxMod || 0));
   const rIso = rid(), gIso = rid(), bIso = rid(), rOff = rid(), bOff = rid(), rg = rid();
   return [
-    { prim: 'feColorMatrix', attrs: { in: 'SourceGraphic', type: 'matrix', values: CH_R, result: rIso } },
-    { prim: 'feColorMatrix', attrs: { in: 'SourceGraphic', type: 'matrix', values: CH_G, result: gIso } },
-    { prim: 'feColorMatrix', attrs: { in: 'SourceGraphic', type: 'matrix', values: CH_B, result: bIso } },
+    { prim: 'feColorMatrix', attrs: { in: src, type: 'matrix', values: CH_R, result: rIso } },
+    { prim: 'feColorMatrix', attrs: { in: src, type: 'matrix', values: CH_G, result: gIso } },
+    { prim: 'feColorMatrix', attrs: { in: src, type: 'matrix', values: CH_B, result: bIso } },
     { prim: 'feOffset', attrs: { in: rIso, dx, dy: 0, result: rOff } },
     { prim: 'feOffset', attrs: { in: bIso, dx: r3(-dx), dy: 0, result: bOff } },
     // screen() recombines isolated channels losslessly: screen(c,0)=c per channel.
@@ -165,17 +169,17 @@ function buildRgbSplit(params, ctx, rid) {
   ];
 }
 
-function buildDisplace(params, ctx, rid) {
+function buildDisplace(params, ctx, rid, src) {
   // Showrunner cut 1 (and the turbulenceOctaves budget) clamp noise detail.
   const octaves = ctx.shedLevel >= 1 ? 1 : Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
   const noise = rid();
   return [
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.012, numOctaves: octaves, seed: Math.round(params.seed), result: noise } },
-    { prim: 'feDisplacementMap', attrs: { in: 'SourceGraphic', in2: noise, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' } },
+    { prim: 'feDisplacementMap', attrs: { in: src, in2: noise, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' } },
   ];
 }
 
-function buildTear(params, ctx, rid) {
+function buildTear(params, ctx, rid, src) {
   // Stretched noise: varies along Y (bands across the height), near-constant
   // along X. Y displacement is flattened to exactly 0 via feFuncG so the
   // shear is strictly horizontal.
@@ -187,31 +191,31 @@ function buildTear(params, ctx, rid) {
       prim: 'feComponentTransfer', attrs: { in: raw, result: flat },
       children: [{ prim: 'feFuncG', attrs: { type: 'linear', slope: 0, intercept: 0.5 } }],
     },
-    { prim: 'feDisplacementMap', attrs: { in: 'SourceGraphic', in2: flat, scale: r3(params.amount * 4), xChannelSelector: 'R', yChannelSelector: 'G' } },
+    { prim: 'feDisplacementMap', attrs: { in: src, in2: flat, scale: r3(params.amount * 4), xChannelSelector: 'R', yChannelSelector: 'G' } },
   ];
 }
 
-function buildGrain(params, ctx, rid) {
+function buildGrain(params, ctx, rid, src, srcAlpha) {
   const n = rid(), ga = rid(), gam = rid();
   const k = r3(Math.max(0, Math.min(1, params.amount)));
   return [
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.9, numOctaves: 2, seed: 3, result: n } },
     // Noise alpha channel, RGB zeroed: black grain with varying opacity.
     { prim: 'feColorMatrix', attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: ga } },
-    // Alpha-aware: mask the grain by the source's own alpha so it never paints
+    // Alpha-aware: mask the grain by the chained source's own alpha so it never paints
     // the filter-region box over transparent areas.
-    { prim: 'feComposite', attrs: { in: ga, in2: 'SourceAlpha', operator: 'in', result: gam } },
-    { prim: 'feComposite', attrs: { in: gam, in2: 'SourceGraphic', operator: 'over' } },
+    { prim: 'feComposite', attrs: { in: ga, in2: srcAlpha, operator: 'in', result: gam } },
+    { prim: 'feComposite', attrs: { in: gam, in2: src, operator: 'over' } },
   ];
 }
 
-function buildBlur(params) {
+function buildBlur(params, ctx, rid, src) {
   return [
-    { prim: 'feGaussianBlur', attrs: { in: 'SourceGraphic', stdDeviation: r3(Math.max(0, params.radius)) } },
+    { prim: 'feGaussianBlur', attrs: { in: src, stdDeviation: r3(Math.max(0, params.radius)) } },
   ];
 }
 
-function buildScanlines(params, ctx, rid) {
+function buildScanlines(params, ctx, rid, src, srcAlpha) {
   // Showrunner cut 1 (and the turbulenceOctaves budget) clamp noise detail.
   const octaves = ctx.shedLevel >= 1 ? 1 : Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
   // Noise varies along Y (bands across the height), near-constant along X:
@@ -222,48 +226,48 @@ function buildScanlines(params, ctx, rid) {
   return [
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: `0.01 ${fy}`, numOctaves: octaves, seed: 11, result: n } },
     { prim: 'feColorMatrix', attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: la } },
-    { prim: 'feComposite', attrs: { in: la, in2: 'SourceAlpha', operator: 'in', result: lam } },
-    { prim: 'feComposite', attrs: { in: lam, in2: 'SourceGraphic', operator: 'over' } },
+    { prim: 'feComposite', attrs: { in: la, in2: srcAlpha, operator: 'in', result: lam } },
+    { prim: 'feComposite', attrs: { in: lam, in2: src, operator: 'over' } },
   ];
 }
 
-function buildPosterize(params) {
+function buildPosterize(params, ctx, rid, src) {
   const levels = Math.max(2, Math.min(8, Math.round(params.levels)));
   const table = Array.from({ length: levels }, (_, i) => r3(i / (levels - 1))).join(' ');
   const func = (prim) => ({ prim, attrs: { type: 'discrete', tableValues: table } });
   return [
     {
-      prim: 'feComponentTransfer', attrs: { in: 'SourceGraphic' },
+      prim: 'feComponentTransfer', attrs: { in: src },
       children: [func('feFuncR'), func('feFuncG'), func('feFuncB')],
     },
   ];
 }
 
-function buildInvert() {
+function buildInvert(params, ctx, rid, src) {
   const flip = (prim) => ({ prim, attrs: { type: 'linear', slope: -1, intercept: 1 } });
   return [
     {
-      prim: 'feComponentTransfer', attrs: { in: 'SourceGraphic' },
+      prim: 'feComponentTransfer', attrs: { in: src },
       children: [flip('feFuncR'), flip('feFuncG'), flip('feFuncB')],
     },
   ];
 }
 
-function buildSolarize() {
+function buildSolarize(params, ctx, rid, src) {
   const curve = (prim) => ({ prim, attrs: { type: 'table', tableValues: '0 0.5 1 0.5 0' } });
   return [
     {
-      prim: 'feComponentTransfer', attrs: { in: 'SourceGraphic' },
+      prim: 'feComponentTransfer', attrs: { in: src },
       children: [curve('feFuncR'), curve('feFuncG'), curve('feFuncB')],
     },
   ];
 }
 
-function buildEdge() {
+function buildEdge(params, ctx, rid, src) {
   return [
     {
       prim: 'feConvolveMatrix',
-      attrs: { in: 'SourceGraphic', order: 3, kernelMatrix: '-1 -1 -1 -1 8 -1 -1 -1 -1', preserveAlpha: 'true' },
+      attrs: { in: src, order: 3, kernelMatrix: '-1 -1 -1 -1 8 -1 -1 -1 -1', preserveAlpha: 'true' },
     },
   ];
 }
@@ -284,12 +288,27 @@ export function compileFxPrimitives(effects, ctx = {}) {
   const prims = [];
   let n = 0;
   const rid = () => `r${n++}`;
-  for (const fx of list) {
-    if (ctx.shedLevel >= 1 && fx.kind === 'grain') continue;
-    const build = BUILDERS[fx.kind];
-    if (!build) continue; // unknown kind: fail closed (also guarded by sanitize)
-    prims.push(...build(fx.params, ctx, rid));
-  }
+  // Chain top-down: the first effect reads SourceGraphic/SourceAlpha; each
+  // later effect reads the previous effect's output, so the stack compounds.
+  // Only non-final effects get a named output id — the final effect's last
+  // primitive stays implicit (it becomes the filter output), which keeps
+  // single-effect stacks compiling exactly as before.
+  const active = list.filter((fx) => {
+    if (ctx.shedLevel >= 1 && fx.kind === 'grain') return false; // Showrunner cut 1
+    return !!BUILDERS[fx.kind]; // unknown kind: fail closed (also guarded by sanitize)
+  });
+  let src = 'SourceGraphic';
+  let srcAlpha = 'SourceAlpha';
+  active.forEach((fx, i) => {
+    const built = BUILDERS[fx.kind](fx.params, ctx, rid, src, srcAlpha);
+    if (i < active.length - 1) {
+      const out = rid();
+      built[built.length - 1].attrs.result = out;
+      src = out;
+      srcAlpha = out;
+    }
+    prims.push(...built);
+  });
   if (ctx.primBudget != null && prims.length > ctx.primBudget && !compileFxPrimitives._warned) {
     compileFxPrimitives._warned = true;
     console.warn(`[fx] ${prims.length} filter primitives exceed budget ${ctx.primBudget} — stacking FX is the steepest per-frame cost; consider fewer effects or layers`);
