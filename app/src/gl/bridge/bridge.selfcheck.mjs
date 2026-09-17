@@ -8,6 +8,7 @@
 import assert from 'node:assert';
 import { createBridge, BRIDGE_VERSION } from './bridge.mjs';
 import { registerBuiltinEffects } from './builtinEffects.mjs';
+import { UniformAuditError } from '../debug/diagnostics.mjs';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -17,9 +18,26 @@ function makeMockGl({ nullUniforms = [] } = {}) {
   const calls = [];
   let nextId = 1;
   const call = (name, ...args) => { calls.push({ name, args }); };
+  // Active-uniform derivation: the harness audit reads ACTIVE_UNIFORMS /
+  // getActiveUniform, so the mock parses them out of the attached FS source
+  // (same pattern as the template/fxShaders mocks).
+  const shaders = new Map(); // shader -> { type, src }
+  const attached = new Map(); // program -> [shaders]
+  const parseUniforms = (src) => {
+    const names = [];
+    const re = /uniform\s+\w+\s+(\w+)\s*;/g;
+    let m;
+    while ((m = re.exec(src || ''))) names.push(m[1]);
+    return names;
+  };
+  const activeNames = (p) => {
+    const list = attached.get(p) || [];
+    const fs = list.map((s) => shaders.get(s)).find((s) => s && s.type === 'fs');
+    return fs ? parseUniforms(fs.src) : [];
+  };
   const gl = {
     VERTEX_SHADER: 0x8b31, FRAGMENT_SHADER: 0x8b30,
-    COMPILE_STATUS: 0x8b81, LINK_STATUS: 0x8b82,
+    COMPILE_STATUS: 0x8b81, LINK_STATUS: 0x8b82, ACTIVE_UNIFORMS: 0x8b86,
     TEXTURE_2D: 0x0de1, TEXTURE0: 0x84c0, FRAMEBUFFER: 0x8d40,
     COLOR_ATTACHMENT0: 0x8ce0, FRAMEBUFFER_COMPLETE: 0x8cd5,
     RGBA16F: 0x881a, RGBA: 0x1908, HALF_FLOAT: 0x140b,
@@ -30,16 +48,22 @@ function makeMockGl({ nullUniforms = [] } = {}) {
     calls,
     count: (name) => calls.filter((c) => c.name === name).length,
     withName: (name) => calls.filter((c) => c.name === name),
-    createShader: (t) => { call('createShader', t); return { __s: nextId++ }; },
-    shaderSource: (s) => call('shaderSource', s),
+    createShader: (t) => {
+      call('createShader', t);
+      const s = { __s: nextId++, type: t === gl.VERTEX_SHADER ? 'vs' : 'fs', src: '' };
+      shaders.set(s, s);
+      return s;
+    },
+    shaderSource: (s, src) => { shaders.get(s).src = src; call('shaderSource', s); },
     compileShader: (s) => call('compileShader', s),
     getShaderParameter: () => true,
     getShaderInfoLog: () => '',
     deleteShader: (s) => call('deleteShader', s),
-    createProgram: () => { call('createProgram'); return { __p: nextId++ }; },
-    attachShader: (p) => call('attachShader', p),
+    createProgram: () => { call('createProgram'); const p = { __p: nextId++ }; attached.set(p, []); return p; },
+    attachShader: (p, s) => { attached.get(p).push(s); call('attachShader', p); },
     linkProgram: (p) => call('linkProgram', p),
-    getProgramParameter: () => true,
+    getProgramParameter: (p, pname) => (pname === gl.ACTIVE_UNIFORMS ? activeNames(p).length : true),
+    getActiveUniform: (p, i) => ({ name: activeNames(p)[i] }),
     getProgramInfoLog: () => '',
     deleteProgram: (p) => call('deleteProgram', p),
     getUniformLocation: (p, uname) => {
@@ -181,6 +205,42 @@ ok('defineEffect rejects unregistered programs', () => {
     () => bridge.defineEffect('nope', { program: 'missing', passes: [] }),
     /not registered/
   );
+});
+
+ok('uniform audit gate: a shader declaring an un-uploaded uniform throws, naming the program', () => {
+  // The #193 second pass: compileProgram runs the checked uniform audit,
+  // so a program whose shader declares a uniform nobody uploads fails at
+  // registration — with the program name on the error — instead of
+  // rendering wrong downstream.
+  const gl = makeMockGl();
+  const bridge = createBridge(gl, mockCanvas(), {});
+  const badFs = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform float u_mystery;
+out vec4 o;
+void main() { o = texture(u_src, vec2(0.5)) * u_mystery; }
+`;
+  let err = null;
+  try {
+    bridge.registerProgram('badProg', 'void main() {}', badFs, {
+      uniforms: { u_src: { kind: 'sampler', unit: 0 } },
+      file: 'test:badProg',
+    });
+  } catch (e) { err = e; }
+  assert.ok(err instanceof UniformAuditError, `expected UniformAuditError, got ${err}`);
+  assert.equal(err.programName, 'badProg', 'names the program');
+  assert.deepEqual(err.neverSet, ['u_mystery'], 'names the unset uniform');
+  assert.match(err.message, /test:badProg/, 'message names the file');
+});
+
+ok('uniform audit gate: the builtin effect program passes the audit', () => {
+  // registerBuiltinEffects runs through compileProgram, so the checked
+  // audit covers the real EFFECT_FS here in Node (mock GL) — no browser
+  // needed for the gate itself.
+  const gl = makeMockGl({ nullUniforms: ['u_res'] });
+  assert.doesNotThrow(() => makeBridge(gl));
+  assert.ok(gl.count('createProgram') >= 1, 'the effect program compiled');
 });
 
 ok('zero GL allocation per frame after warmup', () => {

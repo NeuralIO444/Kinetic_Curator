@@ -18,7 +18,7 @@
 // fx-stack-3 corpus scene against the SVG reference.
 import assert from 'node:assert';
 import { blendIdFor, BLEND_IDS } from './shaders.mjs';
-import { resolveLayerMattes } from './renderer.mjs';
+import { resolveLayerMattes, RENDERER_PROGRAMS } from './renderer.mjs';
 import { buildSceneContract, assertSceneContract, sanitizeMatte } from './sceneContract.js';
 
 let n = 0;
@@ -133,6 +133,41 @@ ok('resolveLayerMattes: valid, self-cycle, 2-cycle, missing, fx source', () => {
     m.get('i'), { sourceId: 'j', mode: 'luma', invert: true },
     'chained sources resolve to the immediate layer'
   );
+});
+
+// --- harness coverage: every renderer program is audit-registered -----------
+// The #193 second pass routes the four renderer programs (quad, composite,
+// resolve, copy) through the checked compile/link builders and the uniform
+// audit in createRenderer. The real compile needs a GL context (covered in
+// the debug harness's in-page suite); here in Node we prove the audit
+// table is complete and honest: every uniform each shader declares is in
+// its program's upload list — the exact direction the checked audit
+// throws on.
+ok('harness: RENDERER_PROGRAMS covers all four renderer programs', () => {
+  const keys = RENDERER_PROGRAMS.map((d) => d.key).sort();
+  assert.deepEqual(keys, ['composite', 'copy', 'quad', 'resolve']);
+  for (const def of RENDERER_PROGRAMS) {
+    assert.equal(typeof def.vs, 'string', `${def.key}: has vertex source`);
+    assert.equal(typeof def.fs, 'string', `${def.key}: has fragment source`);
+    assert.ok(Array.isArray(def.uniforms) && def.uniforms.length > 0, `${def.key}: has an upload list`);
+    assert.equal(typeof def.fsFile, 'string', `${def.key}: names its file for errors`);
+  }
+});
+
+ok('harness: every uniform each renderer shader declares is in its upload list', () => {
+  const parse = (src) => {
+    const names = [];
+    const re = /uniform\s+\w+\s+(\w+)\s*;/g;
+    let m;
+    while ((m = re.exec(src || ''))) names.push(m[1]);
+    return names;
+  };
+  for (const def of RENDERER_PROGRAMS) {
+    // Vertex + fragment stages both feed ACTIVE_UNIFORMS.
+    const declared = [...parse(def.vs), ...parse(def.fs)];
+    const missing = declared.filter((u) => !def.uniforms.includes(u));
+    assert.deepEqual(missing, [], `${def.name}: declared-but-never-set [${missing}]`);
+  }
 });
 
 // --- Browser: exact shader math + pipeline behavior -------------------------

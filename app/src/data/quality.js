@@ -91,6 +91,12 @@ export const GLOSS_NODE_THRESHOLD = 280;
  */
 export const MAX_FILTER_REGION = 1.0;
 
+/** Was a local const in OutputPanel.jsx; needed by every file the OUTPUT
+ *  panel split into, so it lives here instead of being recomputed per file. */
+export function resolutionLabel(exportResolution) {
+  return `1000×700@${exportResolution}x`;
+}
+
 export function getQualityCaps(qualityId) {
   return QUALITY_PRESETS[qualityId] || QUALITY_PRESETS.balanced;
 }
