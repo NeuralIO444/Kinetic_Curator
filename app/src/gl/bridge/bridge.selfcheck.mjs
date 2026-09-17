@@ -263,4 +263,36 @@ ok('stats expose the dev instrumentation counters', () => {
   assert.equal(s.framesRun, 1);
 });
 
+ok('passes may supply a custom uniform map (#195 template)', () => {
+  const gl = makeMockGl();
+  const bridge = makeBridge(gl);
+  bridge.registerProgram('custom', 'vs-src', 'fs-src', {
+    uniforms: {
+      u_tex: { kind: 'sampler', unit: 0 },
+      u_res: { kind: 'vec2' },
+      u_time: { kind: 'float' },
+      u_amount: { kind: 'float' },
+    },
+  });
+  bridge.defineEffect('customFx', {
+    program: 'custom',
+    pad: 0,
+    passes: [{
+      uniforms: (step, { read, wTarget, time }) => ({
+        u_tex: read.tex,
+        u_res: [wTarget.w, wTarget.h],
+        u_time: time,
+        u_amount: step.params.amount ?? 0.5,
+      }),
+    }],
+  });
+  const L = bridge.layer('fx1');
+  bridge.runChain('fx1', L.t0, [{ kind: 'customFx', params: { amount: 0.25 } }], { time: 2.5 });
+  const t = gl.withName('uniform1f').filter((c) => c.args[0] === 'u_time');
+  assert.equal(t.length, 1, 'u_time reaches the pass');
+  assert.equal(t[0].args[1], 2.5);
+  const a = gl.withName('uniform1f').filter((c) => c.args[0] === 'u_amount');
+  assert.equal(a[0].args[1], 0.25);
+});
+
 console.log(`bridge.selfcheck: OK (${n} cases)`);
