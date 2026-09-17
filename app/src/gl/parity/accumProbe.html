@@ -7,7 +7,7 @@
 import { FULL_VS, COPY_FS } from '../shaders.mjs';
 import { buildProgramChecked } from '../debug/diagnostics.mjs';
 import { createBridge } from '../bridge/bridge.mjs';
-import { createAccum, accumRecipeParams } from '../accum.mjs';
+import { createAccum, accumRecipeParams, applyAudioEnvelope } from '../accum.mjs';
 
 // Shader-level probe for the Phase 4 ACCUM recipe (#190): runs the full
 // feedback loop on caller-supplied synthetic frames and reads the final
@@ -15,7 +15,9 @@ import { createAccum, accumRecipeParams } from '../accum.mjs';
 // mirror (mirrorAccumStep) exactly, without a scene.
 //
 // window.__kcAccumProbe(p) -> { pixels, width, height }
-//   p = { w, h, bg: '#rrggbb', fade, optics,
+//   p = { w, h, bg: '#rrggbb', fade, optics, tunnel, prism,
+//         flow, echoes, echoWidth,
+//         audio: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
 //         frames: [ [r,g,b,a …] … ] }   // premultiplied bytes, bottom-first
 // Returns bottom-first RGBA bytes (COPY_FS, no flip), matching upload order.
 const canvas = document.getElementById('c');
@@ -57,16 +59,24 @@ window.__kcAccumProbe = (p) => {
   const frameTexs = [];
   try {
     accum.begin(p.bg || '#000000');
-    const params = accumRecipeParams({
+    const base = accumRecipeParams({
       fade: p.fade ?? 0.88,
       optics: p.optics ?? 0,
       tunnel: p.tunnel ?? 0,
       prism: p.prism ?? 0,
+      flow: p.flow ?? 0,
+      echoes: p.echoes ?? 0,
+      echoWidth: p.echoWidth ?? p.w,
     });
+    const audio = p.audio || null;
+    let i = 0;
     for (const bytes of p.frames) {
       const t = texFrom(bytes, w, h);
       frameTexs.push(t);
+      // B1: per-frame audio envelope modulates the recipe params.
+      const params = audio ? applyAudioEnvelope(base, audio[i] || {}) : base;
       accum.step(t, params);
+      i++;
     }
     // Resolve the 16F accum buffer to RGBA8 without flipping (COPY_FS).
     const outT = gl.createTexture();

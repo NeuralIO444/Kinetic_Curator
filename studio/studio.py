@@ -333,6 +333,13 @@ def cmd_accum(a, size, out: Path) -> None:
     optics = project_optics(project, a.optics)
     tunnel = project_tunnel(project, a.tunnel)
     prism = project_prism(project, a.prism)
+    flow = clamp_accum01(a.flow) if a.flow is not None else 0.0
+    echoes = max(0, min(4, int(a.echoes))) if a.echoes is not None else 0
+    audio = Path(a.audio) if a.audio else None
+    if audio is not None and not audio.is_file():
+        # Missing sidecar = real no-op (warn, keep rendering without audio).
+        print(f"[studio] --audio not found: {audio} — rendering without audio", file=sys.stderr)
+        audio = None
     cmd = [
         "node", str(ACCUM_STILL_MJS), str(project),
         "--out", str(out),
@@ -341,8 +348,12 @@ def cmd_accum(a, size, out: Path) -> None:
         "--optics", repr(optics),
         "--tunnel", repr(tunnel),
         "--prism", repr(prism),
+        "--flow", repr(flow),
+        "--echoes", str(echoes),
         "--res", f"{size[0]}x{size[1]}",
     ]
+    if audio is not None:
+        cmd += ["--audio", str(audio)]
     if a.seed is not None:
         cmd += ["--seed", str(a.seed)]
     if a.uncapped:
@@ -591,6 +602,12 @@ def main(argv=None) -> None:
                     help="ACCUM feedback amount 0..1 (TUNNEL slider: zoom + spin light-tunnels)")
     sp.add_argument("--prism", type=float, default=None,
                     help="ACCUM chromatic drift 0..1 (PRISM slider: trails split into rainbow fringes)")
+    sp.add_argument("--flow", type=float, default=None,
+                    help="ACCUM flow-advected feedback 0..1 (Phase B2: trails curl like smoke; 0 = off)")
+    sp.add_argument("--echoes", type=int, default=None,
+                    help="ACCUM echo taps 0..4 (Phase B3: discrete afterimages; capped at >=2K widths)")
+    sp.add_argument("--audio", default=None,
+                    help="audio envelope JSON for --accum (Phase B1: kc-audio-envelope/1 sidecar; modulates keep/optics/tunnel/prism)")
     sp.add_argument("--ramp", action="append", default=[])
     sp.add_argument("--motion", default="auto")
     sp.set_defaults(func=cmd_render)

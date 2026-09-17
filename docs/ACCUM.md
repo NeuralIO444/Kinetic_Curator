@@ -34,17 +34,25 @@ refuses. There is intentionally no second implementation.
 Per frame, on premultiplied RGBA16F, opaque buffer (`bridge.layer('__accum__')`
 ping-pong, NEAREST):
 
-1. **Fade/decay** — `accum.rgb *= keep` (keep = FADE, 0..0.99).
-2. **Blur-over-time** (#169) — the incoming frame is blurred with a small
+0. **Echoes** (Phase B3) — the ring buffer's past taps are mixed into the
+   incoming frame first (tap *i* = the frame from *i*+1 steps ago, additive
+   ghosts, α clamped ≤ 1); the current frame is then pushed into the ring.
+   Skipped at echoes = 0 (no ring, no mix pass).
+1. **Feed** (Phase B2) — flow-advected feedback: the buffer is sampled at
+   `uv + flowVec(uv) * strength` through an in-shader value-noise field, so
+   trails curl as they decay. Skipped at flow = 0 (exact old buffer).
+2. **Fade/decay** — `accum.rgb *= keep` (keep = FADE, 0..0.99), sampled
+   through the Phase A feedback transform (tunnel zoom/spin, prism drift).
+3. **Blur-over-time** (#169) — the incoming frame is blurred with a small
    separable gaussian (σ = 5px × optics) *before* compositing, so old marks
    go soft instead of merely transparent.
-3. **Composite** — `accum = frame OVER accum` (premultiplied source-over).
-4. **Bloom** (#169) — downsample the buffer to 1/4 (4×4 box), separable
+4. **Composite** — `accum = frame OVER accum` (premultiplied source-over).
+5. **Bloom** (#169) — downsample the buffer to 1/4 (4×4 box), separable
    gaussian blur, add back: `accum.rgb += 0.55 × optics × blurred`.
-5. **Halation** (#169) — the same downsampled buffer blurred *wider*, added
+6. **Halation** (#169) — the same downsampled buffer blurred *wider*, added
    back with a red/warm bias: `accum.rgb += 0.45 × optics × (1.0, 0.6, 0.35) × blurredWide`.
 
-One amount drives steps 2/4/5: **optics** 0..1 — the GLOW slider next to
+One amount drives steps 3/5/6: **optics** 0..1 — the GLOW slider next to
 FADE in the toggle row (`layoutParams.accumulationOptics`, default 0).
 optics = 0 reduces the recipe to fade + over; the optics passes are no-ops,
 not a second engine. Everything is off by default: the recipe only runs when
@@ -78,6 +86,129 @@ sliders from the project doc). The in-app RENDER ACCUM button captures the
 live 2D buffer, so tunnel/prism are still-side only — the live canvas keeps
 the legacy 2D path until the live WebGL loop lands (#224).
 
+## Phase B — dynamics: AUDIO + FLOW + ECHOES
+
+Three new amounts, all 0/off by default, all studio/still-path only (the
+GPU recipe in `accumStill.mjs` + `studio.py render --accum`). Nothing here
+touches the live React/SVG canvas — live wiring waits for the WebGL loop
+(#224).
+
+### B1. Audio-reactive dynamics
+
+`--audio track.audio.json` feeds a per-step envelope that modulates `keep` /
+`optics` and the Phase-A amounts through the shared recipe
+(`applyAudioEnvelope` in `accum.mjs` — pure, mirrored, selfchecked; not a
+studio-only hack). On screen: the trail system breathes with the music —
+kick lands → trails punch longer and glow swells; quiet passage → trails
+die fast and the frame goes clean.
+
+**Sidecar format** — schema `kc-audio-envelope/1`, written by the offline
+generator `python3 studio/audio_envelope.py track.mp3 -o track.audio.json`
+(needs `pip install -e ".[audio]"` in `studio/`: librosa 1.0.0, pure-Python
+arm64 wheels; `studio.py` itself stays stdlib-only and only reads the JSON):
+
+```json
+{
+  "schema": "kc-audio-envelope/1",
+  "source": "track.mp3",
+  "sr": 22050, "hop_length": 512, "fps": 43.066,
+  "duration": 237.4,
+  "tempo_bpm": 128.04,
+  "frames": [
+    { "t": 0.0, "rms": 0.12, "flux": 0.05, "beat_phase": 0.0 },
+    { "t": 0.5, "rms": 0.90, "flux": 0.83, "beat_phase": 0.47 }
+  ],
+  "beats": [0.47, 0.94, 1.41],
+  "downbeats": []
+}
+```
+
+- `frames`: fixed-rate grid (~43 fps at 22050 Hz / hop 512). `rms` 0..~1
+  peak-normalized (loudness); `flux` 0..1 normalized onset strength
+  (transient novelty); `beat_phase` 0..1 within the beat interval, 0 before
+  the first beat.
+- `beats`: absolute beat times in seconds (empty if tracking confidence
+  is low). `downbeats`: reserved, empty for now — librosa does not do
+  downbeats; the essentia upgrade path (below) fills it.
+- The sidecar's `fps` is informational (the grid rate); the renderer
+  ignores it and resamples onto its own frame times.
+
+**Sampler** (`audioEnvelope.mjs`, shared by the still renderer): per step,
+`t_i = (i / (steps-1)) * (steps / fps)`; `rms` and `flux` interpolate
+linearly, `beat_phase` takes the nearest sample (avoids 0↔1 wrap
+artifacts), and `beatPulse` is derived from `beats[]`: fires 1.0 at each
+beat, decays linearly over one beat interval, 0 before the first beat.
+
+**Modulation** — three distinct gestures, one per signal:
+
+- `rms` (the swell): `keep += 0.08 * rms` (≤ 0.99), `optics += 0.3 * rms`
+  (≤ 1).
+- `flux` (the transient hit): `keep += 0.04 * flux` — hits punch the
+  trails longer without swelling the glow.
+- `beatPulse` (the on-the-one): `optics += 0.1 * beatPulse` — glow pops
+  on the beat without lengthening trails.
+- tunnel zoom/spin and prism amounts scale × `(1 + 2*rms + flux + beatPulse)`.
+- Silence (all zeros) returns the params unchanged — the no-audio path is
+  exactly the old recipe.
+- The optics swing is deliberately gentle: bloom is an additive per-frame
+  feedback (`accum.rgb += bloomAmount * blurred`), so big optics swings
+  ratchet bright content toward white over a long sequence. If a loud
+  passage still blows out the highlights, back off the base `--optics` —
+  audio swells the glow you dial in, it doesn't replace it.
+
+A missing or malformed sidecar warns on stderr and is a real no-op (renders
+without audio); the pre-research sketch (bare `[{t, rms, beat}]`) is still
+accepted as a legacy alias. Without `--accum`, `--audio` is ignored.
+
+**Upgrade hooks.** Beat tracking is the classical DSP stack (spectral flux +
+autocorrelation tempogram + DP tracking — the right weight class for aiming
+a feedback slider; neural trackers are SOTA but overkill here). If librosa's
+tracking ever feels too loose, essentia (2.1b6.dev1438+, which now ships
+`macosx_15_0_arm64` wheels, cp314-only for now) is the documented upgrade:
+swap the generator's beat stage and fill `downbeats`, which then drives a
+bar-aware gesture from `beat_phase`. Live input (post-#224) is a separate
+path: `sounddevice` callbacks into the same feature math is the recommended
+first prototype; `AVAudioEngine` + Accelerate/vDSP only if a native macOS
+app ever ships. SoundAnalysis is classification-only and has no beat
+tracker; aubio is sdist-only on PyPI (compile friction); madmom is
+unmaintained; AudioKit is Swift-only.
+
+### B2. Flow-advected feedback
+
+`--flow 0..1`. A new FEED pass runs on the accum buffer before the
+fade/decay pass: the buffer is sampled at `uv + flow(uv) * strength`
+through a small in-shader value-noise field (integer hash, no textures),
+so trails curl, braid, and billow as they decay instead of fading in
+place. Max displacement at flow = 1 is 0.03 UV (~30px on a 1000px canvas).
+At 0 the pass is skipped entirely — the buffer is exactly the old one
+(the optics no-op precedent).
+
+The field is static per frame, but the buffer is re-advected every frame,
+so motion ribbons corkscrew as they die. The warp is a forward warp
+(`uv + vec(uv)`), not divergence-free: at high flow it dissipates a few
+percent of light per frame on top of the fade — part of the billow look,
+and it never creates light. The hash is integer-based so the
+JS mirror reproduces the GPU field (float sin-hashes would diverge between
+GPU float32 and JS float64); parity is cross-checked within a few LSB on
+smooth content.
+
+### B3. Echoes
+
+`--echoes 0..4` (tap count). A ring buffer of K full-res 16F targets holds
+past frames; the incoming frame is mixed with tap *i* = the frame from
+*i+1* steps ago (delays 1..K), additive ghosts with decaying weights
+`[0.5, 0.35, 0.25, 0.18]`. The live frame stays at weight 1.0. On screen:
+motion leaves discrete afterimages — strobe-like, each sharper than a fade
+trail. At 0 there is no ring and no mix pass — exactly the old composite.
+
+**Resolution gate.** Each ring target is ~8 bytes/px, so taps are capped by
+render width: **≥2048px wide → max 3 taps** (enforced in
+`accumRecipeParams` via `echoWidth`, so GPU and mirror agree). The 8K
+ceiling: at 7680×4320 one target is ~253 MB; 3 gated taps ≈ 760 MB plus the
+ping-pong and scratch — it runs, but it is the heaviest thing the still
+pipeline allocates. If Chromium refuses the allocation the render fails
+loudly rather than rendering a different recipe.
+
 ## The documented light-feel
 
 The acceptance bar for a trail still:
@@ -105,3 +236,6 @@ the recipe runs on rendered frames, never inside `evaluate()`.
   `renderAccumViaGL` trail still.
 - `node src/gl/accumStill.mjs <project> --out t.png --steps 12 --optics 0.6`
   renders a real trail still through the shared recipe.
+- `node src/gl/accumStill.mjs <project> --out t.png --steps 24 --flow 0.6 --echoes 2 --audio env.json`
+  renders a Phase B still: flow-advected trails, 2 echo taps, audio-modulated
+  fade/glow (see "Audio envelope sidecar" above for the env.json format).

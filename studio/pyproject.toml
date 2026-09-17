@@ -20,6 +20,10 @@ geom = ["svgpathtools>=1.6", "numpy>=2"]
 curator = ["mlx-embeddings>=0.1; sys_platform=='darwin'", "pillow>=11", "numpy>=2", "scikit-learn>=1.5"]
 # genassets.py (#77) — local diffusion -> vector. Gated on the curator.
 gen = ["diffusers>=0.31", "transformers>=4.44", "accelerate>=1.0", "vtracer>=0.6", "torch>=2.4"]
+# audio_envelope.py (ACCUM Phase B1) — offline beat/rms/flux sidecar generator
+# for `studio.py render --accum --audio`. librosa 1.0.0 ships pure-Python
+# arm64 wheels; studio.py itself stays stdlib-only and reads the JSON sidecar.
+audio = ["librosa>=1.0", "soundfile>=0.13", "numpy>=2"]
 
 [project.scripts]
 studio = "studio:main"

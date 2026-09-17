@@ -56,7 +56,8 @@ window.__kcRender = async (payload) => {
 
 /**
  * ACCUM trail still (#190). payload:
- *   { width, height, bg, fade, optics, tunnel, prism,
+ *   { width, height, bg, fade, optics, tunnel, prism, flow, echoes,
+ *     audioFrames: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
  *     atlasB64, atlasW, atlasH, atlasMips, cells, grainLuts,
  *     frames: [{ contract, wrapBoxes }] }   // atlas shared across frames
  * Runs the whole sequence through the shared recipe (accum.mjs) and returns
@@ -88,6 +89,9 @@ window.__kcAccum = async (payload) => {
     optics: payload.optics,
     tunnel: payload.tunnel ?? 0,
     prism: payload.prism ?? 0,
+    flow: payload.flow ?? 0,
+    echoes: payload.echoes ?? 0,
+    audio: payload.audioFrames || null,
     background: payload.bg,
   });
   return { pixelsB64: u8ToB64(pixels), width, height };

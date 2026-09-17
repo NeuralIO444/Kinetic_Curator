@@ -12,10 +12,17 @@
  *     [--steps 24] [--fps 30] [--fade 0.88] [--optics 0] [--res 1000x700|2]
  *     [--seed N] [--uncapped] [--background #rrggbb]
  *     [--ramp param=from:to ...] [--motion auto]
+ *     [--tunnel 0] [--prism 0] [--flow 0] [--echoes 0] [--audio env.json]
  *
  * Frames vary with progress (i/(steps-1)) and the motion/ramp inputs, exactly
  * like studio.py's old per-frame loop — the placements move, the ACCUM
  * feedback loop turns motion into trails. Writes a PNG of the final buffer.
+ *
+ * --audio takes a JSON envelope (see "Audio envelope sidecar" in
+ * docs/ACCUM.md): per-step { rms, flux, beatPulse } samples modulate
+ * keep/optics and the Phase-A amounts through the shared recipe
+ * (applyAudioEnvelope in accum.mjs) — the studio path only. Live-canvas
+ * audio wiring waits for #224.
  *
  * Exit codes: 0 ok; 1 render failure; 2 bad args; 3 headless browser
  * unavailable (studio.py treats this as "refuse --accum" with guidance).
@@ -26,6 +33,7 @@ import { writePngFile } from './png.mjs';
 // studio.py); accumStill used to accept any --res, e.g. 30000x30000 →
 // ~3.6GB pixel buffer → OOM on an unattended batch tool.
 import { parseRes } from './exportStill.mjs';
+import { loadAudioEnvelope, sampleEnvelope } from './audioEnvelope.mjs';
 import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
 import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
@@ -36,7 +44,7 @@ const BROWSER_MISSING_RE = /Executable doesn't exist/;
 function parseArgs(argv) {
   const out = {
     project: null, out: null, steps: 24, fps: 30, fade: 0.88, optics: 0,
-    tunnel: 0, prism: 0,
+    tunnel: 0, prism: 0, flow: 0, echoes: 0, audio: null,
     res: '1', seed: null, uncapped: false, background: null, ramps: [], motion: 'auto',
   };
   const rest = [];
@@ -54,6 +62,9 @@ function parseArgs(argv) {
     else if (a === '--optics') out.optics = num('--optics');
     else if (a === '--tunnel') out.tunnel = num('--tunnel');
     else if (a === '--prism') out.prism = num('--prism');
+    else if (a === '--flow') out.flow = num('--flow');
+    else if (a === '--echoes') out.echoes = num('--echoes');
+    else if (a === '--audio') out.audio = argv[++i];
     else if (a === '--res') out.res = argv[++i];
     else if (a === '--seed') out.seed = num('--seed') | 0;
     else if (a === '--uncapped') out.uncapped = true;
@@ -78,6 +89,14 @@ function parseRamps(list) {
   }
   return Object.keys(ramp).length ? ramp : null;
 }
+
+// --- Phase B1: audio envelope sidecar --------------------------------------
+// See ./audioEnvelope.mjs for the loader/sampler. Sidecar schema
+// "kc-audio-envelope/1" (written by studio/audio_envelope.py):
+//   { schema, source, sr, hop_length, fps, duration, tempo_bpm,
+//     frames: [{t, rms, flux, beat_phase}], beats: [t…], downbeats: [] }
+// Sampled time-wise per step: t_i = (i / (steps-1)) * (steps / fps).
+// A missing or malformed sidecar warns on stderr and is a real no-op.
 
 // PNG encoding lives in ./png.mjs (shared with exportStill): it validates
 // the pixel buffer and streams rows through deflate instead of allocating
@@ -125,6 +144,16 @@ async function main(argv) {
   }
   const motion = args.motion && args.motion !== 'none' ? args.motion : null;
   await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
+  // Phase B1: optional audio envelope — sampled per step, time-wise.
+  // A missing or malformed sidecar is a real no-op (warns, renders anyway).
+  let audioEnv = null;
+  if (args.audio) {
+    audioEnv = loadAudioEnvelope(args.audio);
+    if (audioEnv) {
+      console.log(`  audio envelope: ${audioEnv.samples.length} frames, ${audioEnv.beats.length} beats from ${args.audio}`);
+    }
+  }
+  const duration = args.steps / args.fps; // seconds across the sequence
   // Background: explicit flag wins, else the project's palette bg (same rule
   // as the parity candidate), same as studio.py's old accum path.
   const firstLayers = resolveLayers(doc, { caps, ramp, motion, progress: 0 });
@@ -133,21 +162,26 @@ async function main(argv) {
   const background = /^#[0-9a-fA-F]{6}$/.test(args.background || '') ? args.background : paletteBg;
 
   const frames = [];
+  const audioFrames = audioEnv ? [] : null;
   try {
     for (let i = 0; i < args.steps; i++) {
       const progress = i / Math.max(1, args.steps - 1);
       const resolvedLayers = resolveLayers(doc, { caps, ramp, motion, progress });
       frames.push(buildSceneContract({
         doc, resolvedLayers, caps,
-        accum: { enabled: true, fade: args.fade, optics: args.optics, tunnel: args.tunnel, prism: args.prism, background },
+        accum: { enabled: true, fade: args.fade, optics: args.optics, tunnel: args.tunnel, prism: args.prism, flow: args.flow, echoes: args.echoes, background },
       }));
+      if (audioEnv) {
+        audioFrames.push(sampleEnvelope(audioEnv, progress * duration));
+      }
       if ((i + 1) % 5 === 0 || i + 1 === args.steps) {
         console.log(`  accum frame ${i + 1}/${args.steps}`);
       }
     }
     const { pixels, width, height } = await renderAccumViaGL(frames, {
       width: w, height: h, bg: background, fade: args.fade, optics: args.optics,
-      tunnel: args.tunnel, prism: args.prism,
+      tunnel: args.tunnel, prism: args.prism, flow: args.flow, echoes: args.echoes,
+      audio: audioFrames,
     });
     await writePngFile(args.out, pixels, width, height);
     console.log(args.out);

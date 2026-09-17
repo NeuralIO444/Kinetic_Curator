@@ -12,18 +12,24 @@
  *
  * Recipe — per frame, on premultiplied 16F textures, opaque buffer:
  *
- *   1. Fade/decay + feedback: accum.rgb *= keep (keep = fade, 0..0.99),
+ *   0. Echoes (Phase B3): a ring buffer of past frames is mixed into the
+ *      incoming frame — tap i holds the frame from i+1 steps ago, additive
+ *      ghosts. Skipped at echoes = 0 (no ring, no mix pass).
+ *   1. Feed (Phase B2): flow-advected feedback — the buffer is sampled at
+ *      uv + flow(uv) * strength through a small in-shader noise field, so
+ *      trails curl as they decay. Skipped at flow = 0 (exact old buffer).
+ *   2. Fade/decay + feedback: accum.rgb *= keep (keep = fade, 0..0.99),
  *      sampled through the Phase A feedback transform — per-frame zoom +
  *      spin (TUNNEL, light-tunnels) and radial RGB channel separation
  *      (PRISM). All amounts 0/off by default: the transform is skipped and
  *      the sample is exactly the old one (the optics no-op precedent).
- *   2. Blur-over-time (#169): the incoming frame is blurred with a small
+ *   3. Blur-over-time (#169): the incoming frame is blurred with a small
  *      separable gaussian (sigma = 5px * optics) BEFORE compositing, so old
  *      marks go soft instead of merely transparent.
- *   3. Composite:    accum = frame OVER accum      (premultiplied source-over)
- *   4. Bloom (#169): downsample accum to 1/4 (4x4 box) -> separable gaussian
+ *   4. Composite:    accum = frame OVER accum      (premultiplied source-over)
+ *   5. Bloom (#169): downsample accum to 1/4 (4x4 box) -> separable gaussian
  *      blur -> add back: accum.rgb += bloomAmount * blurred.
- *   5. Halation (#169): the same downsampled buffer blurred wider, added
+ *   6. Halation (#169): the same downsampled buffer blurred wider, added
  *      back with a warm/red bias: accum.rgb += halationAmount * warm * blurred.
  *
  * One amount drives 2/4/5: `optics` 0..1 (the GLOW slider next to FADE).
@@ -42,7 +48,7 @@
  * mirror below is float64, so cross-checks use an epsilon, not exactness.
  */
 
-import { FULL_VS } from './shaders.mjs';
+import { FULL_VS, COPY_FS } from './shaders.mjs';
 import { buildProgramChecked } from './debug/diagnostics.mjs';
 
 export const ACCUM_VERSION = 1;
@@ -55,17 +61,11 @@ export const BLOOM_DIV = 4;
 
 const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
 
-/**
- * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
- * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1 }
- */
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0 } = {}) {
-  const keep = Math.min(0.99, Math.max(0, Number(fade)));
-  const o = clamp01(optics);
-  const t = clamp01(tunnel);
-  const pr = clamp01(prism);
+/** All recipe fields derived from the optics amount — one place, so audio
+ *  modulation (applyAudioEnvelope) recomputes exactly what the base params
+ *  carry. o = 0 is exactly the old path (no blur, no bloom, no halation). */
+function opticsDerived(o) {
   return {
-    keep,
     optics: o,
     frameBlurSigma: 5.0 * o, // device px at full res (#169 blur-over-time)
     bloomAmount: 0.55 * o,
@@ -73,6 +73,27 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
     halationAmount: 0.45 * o,
     halationSigma: 22.0 * (0.5 + o), // wider than bloom, per #169
     halationTint: [1.0, 0.6, 0.35], // red/warm bias, per #169
+  };
+}
+
+/**
+ * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
+ * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
+ *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
+ */
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0 } = {}) {
+  const keep = Math.min(0.99, Math.max(0, Number(fade)));
+  const o = clamp01(optics);
+  const t = clamp01(tunnel);
+  const pr = clamp01(prism);
+  const fl = clamp01(flow);
+  const e = Math.min(4, Math.max(0, Math.round(Number(echoes) || 0)));
+  // B3 resolution gate: a full-res 16F ring target is ~8 bytes/px, so at
+  // >=2K widths the tap count is capped (see "Echoes" in docs/ACCUM.md).
+  const gated = echoWidth >= 2048 ? Math.min(e, 3) : e;
+  return {
+    keep,
+    ...opticsDerived(o),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
     // each is derived so that amount 0 is exactly the identity transform.
     // Ranges are tuned for stills (~24 frames): tunnel = 1 is a strong
@@ -81,7 +102,58 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
     tunnelZoom: 1 + 0.01 * t, // per-frame magnification; >1 recedes content toward center
     tunnelSpin: 0.01 * t, // radians per frame
     prismUv: 0.001 * pr, // radial UV offset per channel at prism = 1 (constant across canvas)
+    // Phase B2 — flow-advected feedback. Max UV displacement per frame at
+    // flow = 1 (30px on a 1000px canvas); 0 skips the FEED pass entirely.
+    flowUv: 0.03 * fl,
+    // Phase B3 — echoes. echoTaps K: tap i mixes the frame from i+1 steps
+    // ago (delays 1..K), additive ghosts; weights decay with age. 0 = no
+    // ring, no mix pass — exactly the old composite.
+    echoTaps: gated,
+    echoWeights: [0.5, 0.35, 0.25, 0.18].slice(0, gated),
   };
+}
+
+/**
+ * Phase B1 — audio-reactive dynamics. Pure: takes recipe params and one
+ * envelope sample { rms, flux, beatPulse } and returns modulated params.
+ * The three gestures are deliberately distinct (per the audio research):
+ *   rms       — loudness: swells keep and optics (the "swell")
+ *   flux      — transient novelty: punches keep and stretches motion
+ *   beatPulse — where-in-the-beat: fires 1.0 at each beat, decays over one
+ *               beat interval (the "on the one" hit)
+ * Silence (all zeros) returns the input values exactly — the no-audio path
+ * is untouched. Note the optics modulation is deliberately gentle: bloom
+ * is an additive per-frame feedback (accum.rgb += bloomAmount * blurred),
+ * so large optics swings ratchet bright content toward white over a long
+ * sequence. Audio swells the glow; it doesn't shove it.
+ *
+ * Modulation (documented in docs/ACCUM.md):
+ *   keep   += 0.08*rms + 0.04*flux            (clamped <= 0.99)
+ *   optics += 0.3*rms + 0.1*beatPulse         (clamped <= 1)
+ *   tunnel / prism amounts scale x (1 + 2*rms + flux + beatPulse)
+ */
+export function applyAudioEnvelope(p, a = {}) {
+  const { rms, flux, beatPulse } = sanitizeAudioSample(a);
+  const r = rms;
+  const x = flux;
+  const b = beatPulse;
+  if (r <= 0 && x <= 0 && b <= 0) return { ...p };
+  const stretch = 1 + 2 * r + x + b;
+  return {
+    ...p,
+    keep: Math.min(0.99, p.keep + 0.08 * r + 0.04 * x),
+    // Optics is one amount driving blur + bloom + halation: recompute every
+    // derived field so the glow genuinely swells with the music.
+    ...opticsDerived(Math.min(1, p.optics + 0.3 * r + 0.1 * b)),
+    tunnelZoom: 1 + (p.tunnelZoom - 1) * stretch,
+    tunnelSpin: p.tunnelSpin * stretch,
+    prismUv: p.prismUv * stretch,
+  };
+}
+
+/** Sanitize one audio envelope sample for the recipe (rms/flux/beatPulse 0..1). */
+export function sanitizeAudioSample({ rms = 0, flux = 0, beatPulse = 0 } = {}) {
+  return { rms: clamp01(rms), flux: clamp01(flux), beatPulse: clamp01(beatPulse) };
 }
 
 /** Sanitize the optics amount for the scene contract (additive field). */
@@ -97,6 +169,16 @@ export function sanitizeAccumTunnel(v) {
 /** Sanitize the prism amount for the scene contract (additive field). */
 export function sanitizeAccumPrism(v) {
   return clamp01(v);
+}
+
+/** Sanitize the flow amount for the scene contract (additive field). */
+export function sanitizeAccumFlow(v) {
+  return clamp01(v);
+}
+
+/** Sanitize the echo tap count for the scene contract (additive field). */
+export function sanitizeAccumEchoes(v) {
+  return Math.min(4, Math.max(0, Math.round(Number(v) || 0)));
 }
 
 // --- GLSL -----------------------------------------------------------------
@@ -135,6 +217,73 @@ void main() {
     c = texture(u_src, tuv);
   }
   o = vec4(c.rgb * u_keep, c.a);
+}`;
+
+// Phase B2 — flow-advected feedback. Samples the buffer at
+// uv + flow(uv) * u_flow, where flow() is a small in-shader value-noise
+// field (no textures). The hash is integer-based so the JS mirror can
+// reproduce it exactly (float sin-hashes diverge between GPU float32 and
+// JS float64). Skipped on the CPU side at flow = 0 — exact old behavior.
+const FEED_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform float u_flow;   // max UV displacement; 0 = off (pass skipped)
+in vec2 v_cuv;
+out vec4 o;
+uint ihash(uvec2 p) {
+  p = p * 1664525u + 1013904223u;
+  uint h = p.x ^ p.y;
+  h ^= h >> 16u; h *= 2246822519u; h ^= h >> 13u;
+  return h;
+}
+float hash2(vec2 p) { return float(ihash(uvec2(p))) * 2.3283064365386963e-10; }
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash2(i);
+  float b = hash2(i + vec2(1.0, 0.0));
+  float c = hash2(i + vec2(0.0, 1.0));
+  float d = hash2(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+vec2 flowVec(vec2 uv) {
+  // Static curl-ish field: two coarse octaves minus their means, plus a
+  // fine octave for braid detail. Static per frame, but the buffer is
+  // re-advected every frame, so trails curl as they decay.
+  vec2 p = uv * 6.0;
+  float n1 = vnoise(p);
+  float n2 = vnoise(p + vec2(7.3, 2.9));
+  float n3 = vnoise(p * 2.0 + vec2(3.1, 9.7));
+  return vec2(n1 - 0.5 + 0.5 * (n3 - 0.5), n2 - 0.5 - 0.5 * (n3 - 0.5));
+}
+void main() {
+  vec2 tuv = v_cuv + flowVec(v_cuv) * u_flow;
+  o = texture(u_src, tuv);
+}`;
+
+// Phase B3 — echoes. Mixes the live frame with ring-buffer taps:
+// tap i holds the frame from i+1 steps ago (delays 1..K). Additive
+// ghosts — the live frame stays at weight 1.0.
+const ECHO_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;   // live frame
+uniform sampler2D u_t0;
+uniform sampler2D u_t1;
+uniform sampler2D u_t2;
+uniform sampler2D u_t3;
+uniform vec4 u_w;          // per-tap weights
+uniform int u_ntaps;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec4 acc = texture(u_src, v_cuv);
+  if (u_ntaps > 0) acc += texture(u_t0, v_cuv) * u_w.x;
+  if (u_ntaps > 1) acc += texture(u_t1, v_cuv) * u_w.y;
+  if (u_ntaps > 2) acc += texture(u_t2, v_cuv) * u_w.z;
+  if (u_ntaps > 3) acc += texture(u_t3, v_cuv) * u_w.w;
+  // Additive RGB, but the result feeds source-over: clamp alpha to <= 1.
+  o = vec4(acc.rgb, min(acc.a, 1.0));
 }`;
 
 const OVER_FS = `#version 300 es
@@ -331,13 +480,102 @@ function bilinearUpsample(src, bw, bh, w, h) {
 }
 
 /**
+ * Phase B2 mirror of the FEED pass noise field. Integer hash — identical
+ * algorithm to FEED_FS (GLSL uint wraps mod 2^32; JS uses Math.imul + >>>0),
+ * so the mirror reproduces the GPU field up to float32/float64 rounding.
+ * All lattice coords are non-negative (uv in [0,1], positive offsets), so
+ * float->uint truncation matches uvec2() on both sides.
+ */
+function ihash2(px, py) {
+  const x = (Math.imul(px, 1664525) + 1013904223) >>> 0;
+  const y = (Math.imul(py, 1664525) + 1013904223) >>> 0;
+  let h = (x ^ y) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  h = Math.imul(h, 2246822519) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return h / 4294967296;
+}
+
+function vnoise2(px, py) {
+  const ix = Math.floor(px), iy = Math.floor(py);
+  const fx = px - ix, fy = py - iy;
+  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = ihash2(ix, iy);
+  const b = ihash2(ix + 1, iy);
+  const c = ihash2(ix, iy + 1);
+  const d = ihash2(ix + 1, iy + 1);
+  return (a + (b - a) * ux) * (1 - uy) + (c + (d - c) * ux) * uy;
+}
+
+/** Flow displacement vector for UV (u, v), matching FEED_FS flowVec. */
+export function mirrorFlowVec(u, v) {
+  const px = u * 6, py = v * 6;
+  const n1 = vnoise2(px, py);
+  const n2 = vnoise2(px + 7.3, py + 2.9);
+  const n3 = vnoise2(px * 2 + 3.1, py * 2 + 9.7);
+  return [n1 - 0.5 + 0.5 * (n3 - 0.5), n2 - 0.5 - 0.5 * (n3 - 0.5)];
+}
+
+/** Phase B3 echo ring state for the mirror (persists across steps). */
+export function createEchoState() {
+  return { frames: [] };
+}
+
+/**
  * Float64 mirror of one recipe step. accum/frame are Float64Array(w*h*4),
  * premultiplied, bottom-first. Returns a new Float64Array.
+ * @param {object} [args.echo] — createEchoState() ring; required when
+ *   params.echoTaps > 0, ignored otherwise.
  */
-export function mirrorAccumStep({ accum, frame, w, h, params }) {
+export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   const p = params;
   const n = w * h * 4;
-  // 1. fade (+ Phase A feedback transform). The feedback textures are
+  // 0. echoes — ring buffer of past frames, multi-tap mix. Tap i mixes the
+  // frame from i+1 steps ago. Skipped at echoTaps = 0 (no ring, no mix).
+  // Mix from the historical frames FIRST, then push the current frame:
+  // K targets hold exactly K past-frame taps (delays 1..K).
+  let frameIn = frame;
+  if (p.echoTaps > 0) {
+    if (!echo) throw new Error('[accum] mirrorAccumStep: echoTaps > 0 requires an echo state (createEchoState())');
+    const taps = Math.min(echo.frames.length, p.echoTaps);
+    if (taps > 0) {
+      frameIn = frame.slice();
+      for (let t = 0; t < taps; t++) {
+        const past = echo.frames[echo.frames.length - 1 - t];
+        const wt = p.echoWeights[t] || 0;
+        for (let i = 0; i < n; i++) frameIn[i] += past[i] * wt;
+      }
+      // Additive RGB, but the result must stay a valid source-over alpha.
+      for (let i = 3; i < n; i += 4) frameIn[i] = Math.min(1, frameIn[i]);
+    }
+    echo.frames.push(frame.slice());
+    while (echo.frames.length > p.echoTaps) echo.frames.shift();
+  }
+  // 1. feed — Phase B2 flow advection of the buffer. The buffer texture is
+  // NEAREST + CLAMP_TO_EDGE, so the mirror samples the nearest texel. At
+  // flow = 0 the pass is skipped and the buffer is exactly the old one.
+  let fed = accum;
+  if (p.flowUv > 0) {
+    fed = new Float64Array(n);
+    const nearest = (u, v, c) => {
+      const sx = Math.min(w - 1, Math.max(0, Math.floor(u * w)));
+      const sy = Math.min(h - 1, Math.max(0, Math.floor(v * h)));
+      return accum[(sy * w + sx) * 4 + c];
+    };
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const u = (x + 0.5) / w, v = (y + 0.5) / h;
+        const [fx, fy] = mirrorFlowVec(u, v);
+        const tu = u + fx * p.flowUv, tv = v + fy * p.flowUv;
+        const o = (y * w + x) * 4;
+        fed[o] = nearest(tu, tv, 0);
+        fed[o + 1] = nearest(tu, tv, 1);
+        fed[o + 2] = nearest(tu, tv, 2);
+        fed[o + 3] = nearest(tu, tv, 3);
+      }
+    }
+  }
+  // 2. fade (+ Phase A feedback transform). The feedback textures are
   // NEAREST + CLAMP_TO_EDGE, so the mirror samples the nearest texel:
   // sx = clamp(floor(u * w), 0, w - 1). At tunnel/prism = 0 the transform
   // is skipped and this is the exact old path.
@@ -345,16 +583,16 @@ export function mirrorAccumStep({ accum, frame, w, h, params }) {
   const feedback = p.tunnelZoom !== 1 || p.tunnelSpin !== 0 || p.prismUv !== 0;
   if (!feedback) {
     for (let i = 0; i < n; i += 4) {
-      faded[i] = accum[i] * p.keep;
-      faded[i + 1] = accum[i + 1] * p.keep;
-      faded[i + 2] = accum[i + 2] * p.keep;
-      faded[i + 3] = accum[i + 3];
+      faded[i] = fed[i] * p.keep;
+      faded[i + 1] = fed[i + 1] * p.keep;
+      faded[i + 2] = fed[i + 2] * p.keep;
+      faded[i + 3] = fed[i + 3];
     }
   } else {
     const nearest = (u, v, c) => {
       const sx = Math.min(w - 1, Math.max(0, Math.floor(u * w)));
       const sy = Math.min(h - 1, Math.max(0, Math.floor(v * h)));
-      return accum[(sy * w + sx) * 4 + c];
+      return fed[(sy * w + sx) * 4 + c];
     };
     const ca = Math.cos(p.tunnelSpin), sa = Math.sin(p.tunnelSpin);
     for (let y = 0; y < h; y++) {
@@ -386,9 +624,9 @@ export function mirrorAccumStep({ accum, frame, w, h, params }) {
       }
     }
   }
-  // 2. blur-over-time on the incoming frame
-  const fIn = gaussBlur(frame, w, h, p.frameBlurSigma);
-  // 3. over
+  // 3. blur-over-time on the incoming frame (post-echo mix)
+  const fIn = gaussBlur(frameIn, w, h, p.frameBlurSigma);
+  // 4. over
   const comp = new Float64Array(n);
   for (let i = 0; i < n; i += 4) {
     const sa = fIn[i + 3];
@@ -398,7 +636,7 @@ export function mirrorAccumStep({ accum, frame, w, h, params }) {
     comp[i + 3] = sa + faded[i + 3] * (1 - sa);
   }
   if (p.optics <= 0) return comp;
-  // 4/5. bloom + halation from the same downsampled buffer
+  // 5/6. bloom + halation from the same downsampled buffer
   const { px: down, w: bw, h: bh } = boxDownsample(comp, w, h);
   const bloomBlur = gaussBlur(down, bw, bh, p.bloomSigma);
   const halBlur = gaussBlur(down, bw, bh, p.halationSigma);
@@ -431,7 +669,8 @@ export function createAccum(gl, bridge, { width, height }) {
   const locs = {};
   const build = () => {
     const defs = {
-      fade: FADE_FS, over: OVER_FS, down: DOWN_FS, blur: BLUR_FS, add: ADD_FS,
+      fade: FADE_FS, feed: FEED_FS, echo: ECHO_FS, copy: COPY_FS,
+      over: OVER_FS, down: DOWN_FS, blur: BLUR_FS, add: ADD_FS,
     };
     for (const [name, fs] of Object.entries(defs)) {
       progs[name] = buildProgramChecked(gl, FULL_VS, fs, {
@@ -442,6 +681,8 @@ export function createAccum(gl, bridge, { width, height }) {
       const L = {};
       const U = (n) => gl.getUniformLocation(progs[name], n);
       for (const u of ['u_src', 'u_dst', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
+        'u_flow',
+        'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps',
         'u_texel', 'u_sigma', 'u_vertical',
         'u_base', 'u_bloom', 'u_bloomSize', 'u_amount', 'u_tint']) {
         L[u] = U(u);
@@ -466,11 +707,33 @@ export function createAccum(gl, bridge, { width, height }) {
     const bh = Math.max(1, Math.floor(H / BLOOM_DIV));
     scratch = {
       fs0: makeTarget(gl, W, H), fs1: makeTarget(gl, W, H),
+      em: makeTarget(gl, W, H), // B3 echo mix target (full-res)
       bd: makeTarget(gl, bw, bh), bs0: makeTarget(gl, bw, bh), bs1: makeTarget(gl, bw, bh),
       bw, bh,
     };
   };
   allocScratch();
+
+  // B3 echo ring: accum-owned full-res 16F targets holding past frames.
+  // Tap i = frame from i+1 steps ago (delays 1..K).
+  let echoRing = [];
+  let echoHead = 0; // next slot to write
+  let echoCount = 0; // valid frames in the ring
+  const ensureEcho = (taps) => {
+    if (echoRing.length !== taps) {
+      for (const t of echoRing) deleteTarget(gl, t);
+      echoRing = [];
+      for (let i = 0; i < taps; i++) echoRing.push(makeTarget(gl, W, H));
+      echoHead = 0;
+      echoCount = 0;
+    }
+  };
+  const freeEcho = () => {
+    for (const t of echoRing) deleteTarget(gl, t);
+    echoRing = [];
+    echoHead = 0;
+    echoCount = 0;
+  };
 
   let cur = L.t0; // target holding the current accum image
   const other = () => (cur === L.t0 ? L.t1 : L.t0);
@@ -528,6 +791,8 @@ export function createAccum(gl, bridge, { width, height }) {
       if (bridge.lost) throw new Error('[accum] context lost — chain paused');
       L = bridge.layer(ACCUM_LAYER_ID);
       cur = L.t0;
+      echoHead = 0;
+      echoCount = 0; // B3: the ring holds no valid frames after CLEAR
       const [r, g, b] = hexToRgb(background);
       for (const t of [L.t0, L.t1]) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
@@ -546,8 +811,49 @@ export function createAccum(gl, bridge, { width, height }) {
      */
     step(frameTex, params) {
       const p = params;
-      // 1. fade (+ Phase A feedback: tunnel zoom/spin, prism drift)
+      // 0. echoes (B3) — mix the live frame with the ring's past taps
+      // FIRST, then push the incoming frame: K targets hold exactly K
+      // past-frame taps (delays 1..K). Skipped at echoTaps = 0: the live
+      // frame feeds the composite directly (exact old behavior).
+      let frameIn = frameTex;
+      if (p.echoTaps > 0) {
+        ensureEcho(p.echoTaps);
+        const K = echoRing.length;
+        const taps = Math.min(echoCount, p.echoTaps);
+        if (taps > 0) {
+          pass('echo', scratch.em, (u, bind) => {
+            gl.uniform1i(u.u_src, bind(0, frameTex));
+            for (let i = 0; i < 4; i++) {
+              // Tap i = frame from i+1 steps ago (ring holds past frames only).
+              const slot = i < taps
+                ? echoRing[(echoHead - 1 - i + 2 * K) % K].tex
+                : frameTex; // unused sampler: any valid texture
+              gl.uniform1i(u[`u_t${i}`], bind(1 + i, slot));
+            }
+            const wv = p.echoWeights;
+            gl.uniform4f(u.u_w, wv[0] || 0, wv[1] || 0, wv[2] || 0, wv[3] || 0);
+            gl.uniform1i(u.u_ntaps, taps);
+          });
+          frameIn = scratch.em.tex;
+        }
+        pass('copy', echoRing[echoHead], (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, frameTex));
+        });
+        echoHead = (echoHead + 1) % K;
+        echoCount = Math.min(echoCount + 1, K);
+      }
+      // 1. feed (B2) — flow-advected feedback. Skipped at flow = 0: the
+      // buffer is exactly the old one (the optics no-op precedent).
       let write = other();
+      if (p.flowUv > 0) {
+        pass('feed', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, cur.tex));
+          gl.uniform1f(u.u_flow, p.flowUv);
+        });
+        cur = write;
+        write = other();
+      }
+      // 2. fade (+ Phase A feedback: tunnel zoom/spin, prism drift)
       pass('fade', write, (u, bind) => {
         gl.uniform1i(u.u_src, bind(0, cur.tex));
         gl.uniform1f(u.u_keep, p.keep);
@@ -556,20 +862,19 @@ export function createAccum(gl, bridge, { width, height }) {
         gl.uniform1f(u.u_prism, p.prismUv);
       });
       cur = write;
-      // 2. blur-over-time on the incoming frame
-      let frameIn = frameTex;
+      // 3. blur-over-time on the incoming frame (post-echo mix)
       if (p.optics > 0 && p.frameBlurSigma > 1e-3) {
-        const blurred = blurInto(frameTex, scratch.fs0, p.frameBlurSigma, scratch.fs1);
+        const blurred = blurInto(frameIn, scratch.fs0, p.frameBlurSigma, scratch.fs1);
         frameIn = blurred.tex;
       }
-      // 3. over
+      // 4. over
       write = other();
       pass('over', write, (u, bind) => {
         gl.uniform1i(u.u_src, bind(0, frameIn));
         gl.uniform1i(u.u_dst, bind(1, cur.tex));
       });
       cur = write;
-      // 4/5. bloom + halation (no-ops when optics = 0)
+      // 5/6. bloom + halation (no-ops when optics = 0)
       if (p.optics > 0) {
         pass('down', scratch.bd, (u, bind) => {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
@@ -602,16 +907,18 @@ export function createAccum(gl, bridge, { width, height }) {
     resize(width, height) {
       W = Math.max(4, Math.round(width));
       H = Math.max(4, Math.round(height));
-      for (const t of [scratch.fs0, scratch.fs1, scratch.bd, scratch.bs0, scratch.bs1]) deleteTarget(gl, t);
+      for (const t of [scratch.fs0, scratch.fs1, scratch.em, scratch.bd, scratch.bs0, scratch.bs1]) deleteTarget(gl, t);
       allocScratch();
+      freeEcho(); // B3: ring targets are sized to the canvas
       // Bridge-owned feedback targets resize via bridge.resize (caller-owned).
       L = bridge.layer(ACCUM_LAYER_ID);
       cur = L.t0;
     },
 
     dispose() {
-      for (const t of [scratch.fs0, scratch.fs1, scratch.bd, scratch.bs0, scratch.bs1]) deleteTarget(gl, t);
+      for (const t of [scratch.fs0, scratch.fs1, scratch.em, scratch.bd, scratch.bs0, scratch.bs1]) deleteTarget(gl, t);
       scratch = null;
+      freeEcho();
       for (const p of Object.values(progs)) gl.deleteProgram(p);
       gl.deleteBuffer(vbo);
       // Bridge-owned feedback targets die with bridge.dispose().

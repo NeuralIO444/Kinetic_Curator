@@ -32,7 +32,7 @@ import { buildProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
-import { createAccum, accumRecipeParams } from './accum.mjs';
+import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 
 /**
  * Resolve per-layer mattes (#189, #154 re-plan) to renderable mask specs.
@@ -518,7 +518,7 @@ export function createRenderer(canvas) {
    * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb' }
    * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
    */
-  function renderAccumSequence(frames, { fade = 0.88, optics = 0, tunnel = 0, prism = 0, background = '#000000' } = {}) {
+  function renderAccumSequence(frames, { fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, background = '#000000' } = {}) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
     const { width: w, height: h, contract } = frames[0];
     if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
@@ -530,14 +530,18 @@ export function createRenderer(canvas) {
     const accum = createAccum(gl, bridge, { width: w, height: h });
     try {
       accum.begin(background);
-      const params = accumRecipeParams({ fade, optics, tunnel, prism });
+      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w });
+      let i = 0;
       for (const payload of frames) {
         if (payload.contract.version !== 1) {
           throw new Error(`[gl] unsupported contract version ${payload.contract.version}`);
         }
         // Transparent: accum.begin() owns the opaque project background.
         const frameT = renderFrameInto(payload, T, uploaded, { transparent: true });
+        // B1: per-frame audio envelope modulates the recipe params.
+        const params = audio ? applyAudioEnvelope(base, audio[i] || {}) : base;
         accum.step(frameT.tex, params);
+        i++;
       }
       const pixels = resolveTargetToBytes(accum.texture(), T, w, h);
       const err = gl.getError();
