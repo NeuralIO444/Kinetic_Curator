@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "seed": 7,
+  "paletteId": "kiln-columns",
+  "layoutParams": {
+    "mode": "rails",
+    "count": 340,
+    "scale": [
+      0.8,
+      2
+    ],
+    "rotate": [
+      -14,
+      14
+    ],
+    "alpha": [
+      45,
+      85
+    ],
+    "zTiers": 4,
+    "jitter": 26,
+    "density": 110,
+    "bleed": false,
+    "recolor": true,
+    "mirror": false,
+    "overlap": true,
+    "blendMode": "normal",
+    "lifeDrift": 0.04,
+    "displacement": 0,
+    "behave": "cruise",
+    "paletteShift": "zone"
+  },
+  "enabledAssets": {
+    "org_blob_01": true,
+    "org_blob_02": true,
+    "org_blob_03": true,
+    "org_blob_04": true,
+    "org_blob_05": true,
+    "org_blob_outline_01": true,
+    "org_blob_dotted_01": true,
+    "org_drop_01": true,
+    "org_drop_02": true,
+    "org_kidney_01": true,
+    "org_lobe_01": true
+  },
+  "layers": [
+    {
+      "id": "kiln-main",
+      "type": "content",
+      "visible": true,
+      "layerBlendMode": "soft-light",
+      "layerOpacity": 1
+    }
+  ],
+  "activeLayerId": "kiln-main"
+}

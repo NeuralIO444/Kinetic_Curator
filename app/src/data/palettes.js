@@ -43,6 +43,14 @@ export const PALETTES = [
     ink: '#f0e4d0',
     swatches: ['#c1432e', '#d68c45', '#e6b85c', '#3a6a4f', '#1d3557', '#f0e4d0', '#7a2e1f', '#2a1a14'],
   },
+  {
+    id: 'kiln-columns',
+    name: 'KILN COLUMNS',
+    era: 'Stacked organic melt · 2026',
+    bg: '#a27a84',
+    ink: '#224655',
+    swatches: ['#7496a1', '#4d7182', '#d9d4d3', '#224655', '#a27a84', '#e95f63'],
+  },
 ];
 
 /**
