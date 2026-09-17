@@ -480,7 +480,7 @@ function createRendererBase(canvas, { alpha = false } = {}) {
       if (!layer) throw new Error(`[gl] compositeOrder references unknown layer ${layerId}`);
       if (layer.type === 'fx') {
         const wrap = wrapByFx.get(layerId);
-        if (!wrap || !wrap.contentLayerIds.length) {
+        if (!wrap) {
           // #192: no silent shed — an FX layer with no wrap is named in
           // contract.shed.fxLayerIds by buildSceneContract (maxFxLayers is
           // retired as a budget, so this is empty in normal operation).
@@ -493,22 +493,24 @@ function createRendererBase(canvas, { alpha = false } = {}) {
           pending = [];
           continue;
         }
-        // Fold the pending content layers into the bridge's ping-pong targets.
+        // #227: an FX layer adjusts EVERYTHING below it — seed the wrap with
+        // the current main composite (background + lower layers' output,
+        // including lower FX layers), then fold the pending content over it.
+        // The wrap used to start from transparent, so with multiple FX
+        // layers an upper one never saw what the lower ones had done.
         const bt = bridge.layer(layerId);
         let wRead = bt.t0, wWrite = bt.t1;
         gl.bindFramebuffer(gl.FRAMEBUFFER, wRead.fb);
         gl.viewport(0, 0, w, h);
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.disable(gl.BLEND);
+        gl.useProgram(copyProg);
+        gl.uniform1i(U(copyProg, 'u_src'), bindTex(0, mRead.tex));
+        drawFullscreen(copyProg);
         for (const pl of pending) {
           compositeLayerTo(pl, byLayer.get(pl.id) || [], wRead, wWrite);
           [wRead, wWrite] = [wWrite, wRead];
         }
         pending = [];
-        const clip = (payload.wrapBoxes || {})[wrap.fxLayerId] || null;
-        // Effect passes run unclipped (SVG primitives see the unclipped
-        // input; only the final filter output is region-clipped). The clip
-        // is applied once, on the wrap->main composite below.
         // The chain runs through the JS↔GL bridge (#194) via the #188 GL
         // compiler: sanitized (unknown kinds dropped, params clamped),
         // grain LUT wired as aux. Template effects (#195) need zero
@@ -523,9 +525,12 @@ function createRendererBase(canvas, { alpha = false } = {}) {
         });
         const afterFx = bridge.runChain(layerId, wRead, steps);
         // An FX layer's own matte masks the wrap result at composite time.
+        // #227: no region clip — the FX output is defined over the whole
+        // composite below, so clipping to the pending layers' bbox would cut
+        // the effect (e.g. an invert would only invert inside the box).
         composite(
           compProg, compU, afterFx.tex, mRead, mWrite,
-          blendIdFor('normal'), wrap.opacity, clip, maskFor(layerId)
+          blendIdFor('normal'), wrap.opacity, null, maskFor(layerId)
         );
         [mRead, mWrite] = [mWrite, mRead];
         continue;
@@ -714,7 +719,7 @@ export function createLiveRenderer(canvas) {
 
   /**
    * Render one frame into the persistent targets.
-   * payload: { width, height, bg, contract, cells, wrapBoxes, transparent? } —
+   * payload: { width, height, bg, contract, cells, transparent? } —
    *   contract instances are in logical 1000x700 scene units regardless of
    *   width/height (governor renderScale only changes output resolution).
    * Returns the target holding the composited frame.

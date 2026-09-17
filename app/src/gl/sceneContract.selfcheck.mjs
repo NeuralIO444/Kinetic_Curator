@@ -102,6 +102,36 @@ ok('fxWraps captures the buildLayerStack fold', () => {
   assert.deepEqual(w.contentLayerIds, ['bg']); // 'top' sits above the FX layer: not wrapped
 });
 
+ok('fxWraps: stacked FX layers each get a wrap (#227)', () => {
+  const d = fixtureDoc();
+  // Adjacent FX layers: the upper one wraps the lower one's output — the
+  // old fold shed it because its direct segment was empty.
+  d.layers = [
+    { id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    { id: 'fx1', name: 'FX 1', type: 'fx', visible: true, layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'invert', params: {} }] },
+    { id: 'fx2', name: 'FX 2', type: 'fx', visible: true, layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'posterize', params: { levels: 4 } }] },
+    { id: 'top', name: 'Top', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+  ];
+  const s = build(d);
+  assert.equal(s.fxWraps.length, 2);
+  assert.deepEqual(s.fxWraps.map((w) => w.fxLayerId), ['fx1', 'fx2']);
+  assert.deepEqual(s.fxWraps[0].contentLayerIds, ['bg']);
+  assert.deepEqual(s.fxWraps[1].contentLayerIds, ['bg']);
+  assert.deepEqual(s.shed.fxLayerIds, [], 'nothing shed: every FX layer has the canvas below it');
+});
+
+ok('fxWraps: bottom FX layer wraps the canvas background (#227)', () => {
+  const d = fixtureDoc();
+  d.layers = [
+    { id: 'fx1', name: 'FX 1', type: 'fx', visible: true, layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'invert', params: {} }] },
+    { id: 'top', name: 'Top', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+  ];
+  const s = build(d);
+  assert.equal(s.fxWraps.length, 1);
+  assert.deepEqual(s.fxWraps[0].contentLayerIds, []);
+  assert.deepEqual(s.shed.fxLayerIds, []);
+});
+
 ok('instances are finite, layer-bound, draw-ordered', () => {
   const s = build();
   assert.ok(s.instances.length > 0);
