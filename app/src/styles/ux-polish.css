@@ -102,6 +102,22 @@
   transition: filter 120ms, transform 120ms;
 }
 .first-run-play:hover { filter: brightness(1.08); transform: scale(1.01); }
+/* What the big button does — no mystery before the first click (#177). */
+.first-run-sub {
+  margin: -6px 0 10px;
+  color: var(--dimmer);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* First three keys worth knowing — the 15-second tour (#177). */
+.first-run-keys {
+  margin: 14px 0 0;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.first-run-keys b { color: var(--ink); font-weight: 700; }
 .first-run-skip {
   background: transparent;
   border: none;
@@ -111,6 +127,23 @@
   text-transform: uppercase;
 }
 .first-run-skip:hover { color: var(--dim); }
+
+/* ─── ShedBadge — Showrunner governor honesty indicator (#177) ─── */
+/* Amber matches the MasterBar LOAD SHED pill; terse items are operator
+   shorthand (the title tooltip says it in plain words). */
+.shed-badge {
+  display: inline-flex;
+  align-items: center;
+  color: #ffb454;
+  border: 1px solid #ffb454;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  background: rgba(255, 180, 84, 0.08);
+  cursor: help;
+}
 
 /* ─── Floating Favorites tray (#8) ─── */
 .favorites-tray {

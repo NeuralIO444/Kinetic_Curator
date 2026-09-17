@@ -90,34 +90,34 @@ export function AssetPoolPanel() {
         }} />
       <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active${overlayCount ? ` · ${overlayCount} user` : ''}`}>
         <div className="header-tools">
-          <button className="chip-btn" title="Motif kit — overlay only" onClick={() => openStudio(null)}>NEW</button>
-          <button className="chip-btn" title="Import SVG into project overlay" onClick={() => fileRef.current?.click()}>IMPORT</button>
-          <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'grid')}>GRID</button>
-          <button className={`chip-btn ${poolView === 'list' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'list')}>LIST</button>
+          <button className="chip-btn" title="Open the motif kit — draw a new overlay asset" onClick={() => openStudio(null)}>NEW</button>
+          <button className="chip-btn" title="Drop an SVG into the project overlay. The canon is untouched." onClick={() => fileRef.current?.click()}>IMPORT</button>
+          <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} title="Tile view" onClick={() => emit(Events.ASSETS_POOL_VIEW, 'grid')}>GRID</button>
+          <button className={`chip-btn ${poolView === 'list' ? 'active' : ''}`} title="Compact row view" onClick={() => emit(Events.ASSETS_POOL_VIEW, 'list')}>LIST</button>
         </div>
       </PanelHeader>
       {ingestError && <div style={{ color: 'var(--accent)', fontSize: 11, padding: '4px 10px' }}>INGEST: {ingestError}</div>}
       <div className="pool-controls">
         <div className="cat-filter">
-          <button className={`cat-chip ${catFilter === 'all' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_CAT_FILTER, 'all')}>
+          <button className={`cat-chip ${catFilter === 'all' ? 'active' : ''}`} title="Show every asset" onClick={() => emit(Events.ASSETS_CAT_FILTER, 'all')}>
             ALL <span className="cat-chip-count">{assets.length}</span>
           </button>
-          <button className={`cat-chip ${catFilter === 'user' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_CAT_FILTER, 'user')}>
+          <button className={`cat-chip ${catFilter === 'user' ? 'active' : ''}`} title="Only your imported and studio-made assets" onClick={() => emit(Events.ASSETS_CAT_FILTER, 'user')}>
             USER <span className="cat-chip-count">{overlayCount}</span>
           </button>
           {ALL_CATEGORIES.map(c => (
-            <button key={c} className={`cat-chip ${catFilter === c ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_CAT_FILTER, c)}>
+            <button key={c} className={`cat-chip ${catFilter === c ? 'active' : ''}`} title={`Only the ${c} family`} onClick={() => emit(Events.ASSETS_CAT_FILTER, c)}>
               {c}
             </button>
           ))}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-            <button className="chip-btn" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, true)}>ALL ON</button>
-            <button className="chip-btn" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, false)}>ALL OFF</button>
+            <button className="chip-btn" title="Turn every asset on" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, true)}>ALL ON</button>
+            <button className="chip-btn" title="Turn every asset off" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, false)}>ALL OFF</button>
           </span>
         </div>
         <div className="pool-search">
           <span className="prompt">⟩</span>
-          <input placeholder="filter · drop or paste SVG" value={search} onChange={e => emit(Events.ASSETS_SEARCH, e.target.value)} />
+          <input placeholder="filter · drop or paste SVG" title="Filter assets by name or tag. You can also drop or paste SVG anywhere in this panel." value={search} onChange={e => emit(Events.ASSETS_SEARCH, e.target.value)} />
         </div>
       </div>
       <div className={`pool-body ${poolView}`}>
@@ -127,14 +127,14 @@ export function AssetPoolPanel() {
             const isUser = String(a.id).startsWith('user:');
             return (
               <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}`} style={isUser ? { outline: '1px dashed var(--accent)' } : undefined}>
-                <button className="tile-toggle" onClick={(e) => e.altKey ? emit(Events.ASSETS_SOLO, { id: a.id }) : emit(Events.ASSETS_TOGGLE, { id: a.id })}>
+                <button className="tile-toggle" title="Toggle in the layout · Alt-click to solo" onClick={(e) => e.altKey ? emit(Events.ASSETS_SOLO, { id: a.id }) : emit(Events.ASSETS_TOGGLE, { id: a.id })}>
                   <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40" dangerouslySetInnerHTML={{ __html: a.svg }} />
                 </button>
                 <button className="tile-weight" title={WEIGHT_TITLE[w]} onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_WEIGHT_CYCLE, { id: a.id }); }}
                   style={{ position: 'absolute', top: 2, left: 2, fontSize: 9, fontWeight: 700, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.5)', color: 'var(--dim)', zIndex: 2 }}>
                   {WEIGHT_LABEL[w]}
                 </button>
-                <button className="tile-solo" title="Solo" onClick={() => emit(Events.ASSETS_SOLO, { id: a.id })}>◉</button>
+                <button className="tile-solo" title="Solo this asset — only it shows" onClick={() => emit(Events.ASSETS_SOLO, { id: a.id })}>◉</button>
                 <button type="button" title="Duplicate overlay copy" onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}
                   style={{ position: 'absolute', bottom: 22, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>DUP</button>
                 {isUser && (

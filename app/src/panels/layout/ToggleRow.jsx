@@ -3,6 +3,13 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES, PALETTE_SHIFTS } from '../../data/layout-modes.js';
 
 const TOGGLES = ['bleed', 'recolor', 'mirror', 'overlap', 'accumulation'];
+const TOGGLE_TITLES = {
+  bleed: 'Let shapes spill past the canvas edge.',
+  recolor: 'Re-tint shapes from the palette on re-roll.',
+  mirror: 'Mirror the layout.',
+  overlap: 'Let shapes overlap each other.',
+  accumulation: 'HYPE-style trails — composites into a persistent bitmap',
+};
 
 export function ToggleRow({ layoutParams }) {
   return (
@@ -11,7 +18,7 @@ export function ToggleRow({ layoutParams }) {
         <button
           key={key}
           className={`tg ${layoutParams[key] ? 'tg-on' : ''}`}
-          title={key === 'accumulation' ? 'HYPE-style trails — composites into a persistent bitmap' : undefined}
+          title={TOGGLE_TITLES[key]}
           onClick={() => emit(Events.LAYOUT_PARAM, { key, value: !layoutParams[key] })}
         >
           <span className="tg-box">{layoutParams[key] ? '◉' : '○'}</span>
@@ -31,6 +38,7 @@ export function ToggleRow({ layoutParams }) {
             max={0.98}
             step={0.01}
             value={layoutParams.accumulationFade ?? 0.88}
+            title="Trail persistence (higher = longer exposure)"
             onChange={(e) =>
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationFade',
@@ -54,6 +62,7 @@ export function ToggleRow({ layoutParams }) {
             max={1}
             step={0.01}
             value={layoutParams.accumulationOptics ?? 0}
+            title="ACCUM optics: bloom + halation + blur-over-time on the trail buffer (0 = off)"
             onChange={(e) =>
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationOptics',
@@ -68,7 +77,7 @@ export function ToggleRow({ layoutParams }) {
         value={layoutParams.blendMode}
         onChange={e => emit(Events.LAYOUT_PARAM, { key: 'blendMode', value: e.target.value })}
         className="tg blend-mode-select"
-        title="Blend mode"
+        title="How shapes mix where they overlap."
       >
         {BLEND_MODES.map(mode => (
           <option key={mode} value={mode}>{mode.toUpperCase()}</option>
@@ -78,7 +87,7 @@ export function ToggleRow({ layoutParams }) {
         value={layoutParams.shading}
         onChange={e => emit(Events.LAYOUT_PARAM, { key: 'shading', value: e.target.value })}
         className="tg blend-mode-select"
-        title="Shading"
+        title="Shading: flat color or a glossy highlight."
       >
         <option value="flat">SHADING: FLAT</option>
         <option value="gloss">SHADING: GLOSS</option>

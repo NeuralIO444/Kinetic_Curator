@@ -8,6 +8,7 @@ export function ModSlider({ label, value, min, max, step, onChange, hint }) {
       <input
         type="range" min={min} max={max} step={step}
         value={value}
+        title={hint}
         onChange={e => onChange(parseFloat(e.target.value))}
         style={{ width: '100%' }}
       />

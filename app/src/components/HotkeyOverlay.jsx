@@ -18,11 +18,13 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help' }) {
       <div className="hotkey-card" onClick={(e) => e.stopPropagation()} style={{ minWidth: 360, maxWidth: 440 }}>
         <div className="hotkey-card-header">
           <span>HELP</span>
-          <button className="micro-btn" onClick={onClose}>✕</button>
+          <button className="micro-btn" title="Close" onClick={onClose}>✕</button>
         </div>
         <div className="davis-source-row" style={{ margin: '8px 0' }}>
           {['help', 'keys', 'settings'].map((id) => (
-            <button key={id} className={`chip-btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
+            <button key={id} className={`chip-btn ${tab === id ? 'active' : ''}`}
+              title={id === 'help' ? 'One-line tips for every control' : id === 'keys' ? 'Keyboard shortcuts' : 'Where settings live'}
+              onClick={() => setTab(id)}>
               {id.toUpperCase()}
             </button>
           ))}
@@ -32,6 +34,7 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help' }) {
             <input
               type="search"
               placeholder="Search controls…"
+              title="Search the help list"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               style={{ width: '100%', marginBottom: 8, fontSize: 11, background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', padding: 4 }}

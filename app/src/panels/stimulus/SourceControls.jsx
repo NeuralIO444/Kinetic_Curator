@@ -20,6 +20,7 @@ export function SourceControls({ audioSource, audioGain, audioMonitor, devices }
         <span style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em' }}>AUDIO SRC</span>
         <button
           className={`micro-btn ${audioMonitor ? 'active' : ''}`}
+          title="Hear the mic through your speakers. Watch for feedback."
           onClick={() => emit(Events.AUDIO_MONITOR, !audioMonitor)}
           style={audioMonitor ? { background: '#00ff88', color: '#000', borderColor: '#00ff88' } : {}}
         >
@@ -29,6 +30,7 @@ export function SourceControls({ audioSource, audioGain, audioMonitor, devices }
 
       <select
         value={audioSource.type === 'device' ? audioSource.id : 'file'}
+        title="Which mic to listen to."
         onChange={handleDeviceChange}
         style={{ width: '100%', marginBottom: '6px', background: 'var(--panel)', color: 'var(--ink)', border: '1px solid var(--line)', padding: '3px', fontSize: '10px' }}
       >
@@ -37,7 +39,7 @@ export function SourceControls({ audioSource, audioGain, audioMonitor, devices }
         {audioSource.type === 'file' && <option value="file">File: {audioSource.name}</option>}
       </select>
 
-      <input type="file" accept="audio/*" onChange={handleFileChange} style={{ fontSize: '9px', color: 'var(--dim)', width: '100%' }} />
+      <input type="file" accept="audio/*" title="Or drive the visuals from an audio file." onChange={handleFileChange} style={{ fontSize: '9px', color: 'var(--dim)', width: '100%' }} />
 
       <div style={{ marginTop: '8px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '3px' }}>
@@ -47,6 +49,7 @@ export function SourceControls({ audioSource, audioGain, audioMonitor, devices }
         <input
           type="range" min="0" max="5" step="0.1"
           value={audioGain}
+          title="Mic input level."
           onChange={e => emit(Events.AUDIO_GAIN, parseFloat(e.target.value))}
           style={{ width: '100%' }}
         />

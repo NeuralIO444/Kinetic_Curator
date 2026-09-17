@@ -24,11 +24,13 @@ import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
 
 /**
- * ShedBadge — #192's minimal honest indicator. When the Showrunner governor
- * sheds anything (dynamic resolution scale, mirror/gloss/ACCUM, asset
- * thinning, count clamp, motion freeze, watchdog), the UI says so — the
- * silent-cull trap must not survive in any form. #177 owns the full
- * indicator design later; this badge is the stopgap.
+ * ShedBadge — the Showrunner governor's honest indicator (#177 owns the full
+ * design; #192 shipped the stopgap this replaces). When the governor sheds
+ * anything (dynamic resolution scale, mirror/gloss/ACCUM, asset thinning,
+ * count clamp, motion freeze, watchdog), the UI says so — the silent-cull
+ * trap must not survive in any form. It lives in the footer next to the
+ * seed readout so it is visible in every panel state; the tooltip says in
+ * plain words what was cut and that it auto-clears on recovery.
  */
 function ShedBadge() {
   // NOTE: select primitives individually. An object-literal selector with
@@ -49,13 +51,9 @@ function ShedBadge() {
   return (
     <span
       className="shed-badge"
-      title={`Showrunner shed active: ${summary.join('; ')}. Auto-clears on recovery (watchdog needs manual resume).`}
-      style={{
-        color: '#ffb454', border: '1px solid #ffb454', borderRadius: 4,
-        padding: '0 6px', fontSize: 11, whiteSpace: 'nowrap',
-      }}
+      title={`Showrunner shed active: ${summary.join('; ')} — quality was lowered automatically to protect the frame rate. Clears on recovery (watchdog needs a manual resume).`}
     >
-      ⚠ shed · {summary.join(' · ')}
+      ⚠ SHED · {summary.join(' · ')}
     </span>
   );
 }
@@ -233,7 +231,7 @@ function AppInner() {
           <ShedBadge />
           <button type="button" className="micro-btn" title="Settings — no second prefs store"
             style={{ opacity: 0.45 }} onClick={() => { setHelpTab('settings'); setShowHotkeys(true); }}>⚙</button>
-          <button type="button" className="micro-btn" title="Help"
+          <button type="button" className="micro-btn" title="Help — every control has a one-line hover tip"
             style={{ opacity: 0.45 }} onClick={() => { setHelpTab('help'); setShowHotkeys(true); }}>?</button>
         </span>
       </footer>

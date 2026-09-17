@@ -58,15 +58,15 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_SEARCH, (q) => dispatch({ type: A.SET_SEARCH, payload: q }));
   on(Events.ASSETS_CAT_FILTER, (cat) => dispatch({ type: A.SET_CAT_FILTER, payload: cat }));
   on(Events.ASSETS_POOL_VIEW, (view) => dispatch({ type: A.SET_POOL_VIEW, payload: view }));
-  on(Events.ASSETS_WEIGHT_CYCLE, ({ id }) => dispatch({ type: 'CYCLE_ASSET_WEIGHT', id }));
+  on(Events.ASSETS_WEIGHT_CYCLE, ({ id }) => dispatch({ type: A.CYCLE_ASSET_WEIGHT, id }));
   on(Events.ASSETS_WEIGHT_SET, ({ id, weight }) => dispatch({ type: A.SET_ASSET_WEIGHT, id, weight }));
   on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) => dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }));
   on(Events.ASSETS_WEIGHT_CLEAR, () => dispatch({ type: A.CLEAR_WEIGHT_OVERRIDES }));
-  on(Events.ASSETS_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_ASSET', id }));
-  on(Events.ASSETS_INGEST, ({ svg, hint }) => dispatch({ type: 'INGEST_ASSET', svg, hint }));
-  on(Events.ASSETS_REMOVE, ({ id }) => dispatch({ type: 'REMOVE_CUSTOM_ASSET', id }));
-  on(Events.ASSETS_RENAME, ({ id, name }) => dispatch({ type: 'RENAME_CUSTOM_ASSET', id, name }));
-  on(Events.ASSETS_REPLACE, ({ id, svg }) => dispatch({ type: 'REPLACE_CUSTOM_ASSET', id, svg }));
+  on(Events.ASSETS_DUPLICATE, ({ id }) => dispatch({ type: A.DUPLICATE_ASSET, id }));
+  on(Events.ASSETS_INGEST, ({ svg, hint }) => dispatch({ type: A.INGEST_ASSET, svg, hint }));
+  on(Events.ASSETS_REMOVE, ({ id }) => dispatch({ type: A.REMOVE_CUSTOM_ASSET, id }));
+  on(Events.ASSETS_RENAME, ({ id, name }) => dispatch({ type: A.RENAME_CUSTOM_ASSET, id, name }));
+  on(Events.ASSETS_REPLACE, ({ id, svg }) => dispatch({ type: A.REPLACE_CUSTOM_ASSET, id, svg }));
 
   on(Events.EXPORT_RECORD, (recording) => dispatch({ type: A.SET_IS_RECORDING, payload: recording }));
   on(Events.EXPORT_RENDERING, (rendering) => dispatch({ type: A.SET_IS_RENDERING, payload: rendering }));
@@ -89,8 +89,8 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYER_RENAME, ({ id, name }) => dispatch({ type: A.RENAME_LAYER, id, name }));
   on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
-  on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));
-  on(Events.LAYER_SOLO, ({ id }) => dispatch({ type: 'SOLO_LAYER', id }));
+  on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: A.DUPLICATE_LAYER, id }));
+  on(Events.LAYER_SOLO, ({ id }) => dispatch({ type: A.SOLO_LAYER, id }));
   on(Events.LAYER_ADD_FX, () => dispatch({ type: A.ADD_FX_LAYER }));
   on(Events.FX_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_FX_LAYER, id }));
   on(Events.FX_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.FX_EFFECT_ADD, layerId, kind }));

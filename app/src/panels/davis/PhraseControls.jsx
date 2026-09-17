@@ -41,6 +41,7 @@ export function PhraseControls({
         <div className="davis-interval-row" title="Metronome speed.">
           <span className="davis-label">BPM</span>
           <input type="range" min={40} max={240} step={1} value={phraseBpm}
+            title="Metronome speed."
             onChange={(e) => emit(Events.DAVIS_PHRASE, { bpm: Number(e.target.value) })} />
           <span className="davis-readout">{phraseBpm}</span>
         </div>
@@ -48,6 +49,7 @@ export function PhraseControls({
       <div className="davis-interval-row" title="Beats in the bar before wrap.">
         <span className="davis-label">LENGTH</span>
         <input type="range" min={4} max={32} step={1} value={phraseLength || 8}
+          title="Beats in the bar before wrap."
           onChange={e => emit(Events.DAVIS_PHRASE, { length: Number(e.target.value) })} />
         <span className="davis-readout">{phraseLength || 8} beats</span>
       </div>

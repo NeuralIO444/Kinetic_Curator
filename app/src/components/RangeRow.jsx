@@ -54,6 +54,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
       <div className="range-right">
         {editing ? (
           <input ref={inputRef} className="range-edit" type="text" value={editValue}
+            title="Type a value, Enter to set"
             onChange={e => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
@@ -129,18 +130,20 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
       <div className="dual-slider" onDoubleClick={handleDoubleClick} onPointerDown={onTrackPointer} title={hint}>
         <div className="dual-track" />
         <div className="dual-fill" style={{ left: `${((low - min) / (max - min)) * 100}%`, width: `${((high - low) / (max - min)) * 100}%` }} />
-        <input type="range" min={min} max={max} step={step} value={low} onChange={e => onChangeLow(Number(e.target.value))} disabled={locked} />
-        <input type="range" min={min} max={max} step={step} value={high} onChange={e => onChangeHigh(Number(e.target.value))} disabled={locked} />
+        <input type="range" min={min} max={max} step={step} value={low} title={hint} onChange={e => onChangeLow(Number(e.target.value))} disabled={locked} />
+        <input type="range" min={min} max={max} step={step} value={high} title={hint} onChange={e => onChangeHigh(Number(e.target.value))} disabled={locked} />
       </div>
       <div className="range-right">
         {editing ? (
           <span className="range-edit-dual">
             <input ref={lowRef} className="range-edit" type="text" value={editLow}
+              title="Type the low value, Enter to set"
               onChange={e => setEditLow(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
             />
             <span>–</span>
             <input className="range-edit" type="text" value={editHigh}
+              title="Type the high value, Enter to set"
               onChange={e => setEditHigh(e.target.value)}
               onBlur={commitEdit}
               onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}

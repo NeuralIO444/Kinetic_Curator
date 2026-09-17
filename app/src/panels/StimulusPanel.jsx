@@ -48,6 +48,7 @@ export function StimulusPanel() {
             </button>
             <button
               className={`stim-toggle ${audioEnabled ? 'on' : ''}`}
+              title="Mic on. Drives reactivity and the Davis AUDIO / BEAT clocks."
               style={audioEnabled ? { background: '#00d9ff', borderColor: '#00d9ff' } : {}}
               onClick={() => emit(Events.AUDIO_TOGGLE, !audioEnabled)}
             >

@@ -88,3 +88,13 @@ export const CLEAR_USER_PALETTES = 'CLEAR_USER_PALETTES';
 export const TOGGLE_PALETTE_LOCK = 'TOGGLE_PALETTE_LOCK';
 export const CLEAR_PALETTE_LOCKS = 'CLEAR_PALETTE_LOCKS';
 export const APPLY_HARMONY = 'APPLY_HARMONY';
+// Raw-string replacements for wireEventBus (order:13, #177). Values must stay
+// identical to the string literals the AppContext reducer matches on.
+export const CYCLE_ASSET_WEIGHT = 'CYCLE_ASSET_WEIGHT';
+export const DUPLICATE_ASSET = 'DUPLICATE_ASSET';
+export const INGEST_ASSET = 'INGEST_ASSET';
+export const REMOVE_CUSTOM_ASSET = 'REMOVE_CUSTOM_ASSET';
+export const RENAME_CUSTOM_ASSET = 'RENAME_CUSTOM_ASSET';
+export const REPLACE_CUSTOM_ASSET = 'REPLACE_CUSTOM_ASSET';
+export const DUPLICATE_LAYER = 'DUPLICATE_LAYER';
+export const SOLO_LAYER = 'SOLO_LAYER';

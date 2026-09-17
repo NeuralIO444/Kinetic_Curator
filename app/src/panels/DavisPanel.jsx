@@ -100,11 +100,12 @@ export function DavisPanel() {
 
           <div className="davis-actions">
             <button className={`big-btn ${evolveMode ? 'active' : ''}`}
+              title="Re-roll the picture. TIME fires on INTERVAL; BEAT fires on a mic attack."
               onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>
               {evolveMode ? 'STOP' : 'EVOLVE'}
             </button>
-            <button className="big-btn" onClick={saveFavorite}>FAVORITE</button>
-            <button className="big-btn" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>NEW SEED</button>
+            <button className="big-btn" title="Save the current seed as a hit (F)." onClick={saveFavorite}>FAVORITE</button>
+            <button className="big-btn" title="Jump to a fresh random seed (N)." onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>NEW SEED</button>
           </div>
 
           <FavoritesList favorites={favorites} />

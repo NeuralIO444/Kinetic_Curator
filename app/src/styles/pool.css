@@ -34,6 +34,37 @@
   gap: 3px;
   padding: 6px;
 }
+/* Compact row view — the LIST toggle in the pool header (#177). Without
+   this the toggle only stripped the grid and the tiles stacked unstyled. */
+.pool-body.list .asset-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+}
+.pool-body.list .tile {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 2px 2px;
+}
+.pool-body.list .tile-toggle {
+  height: 36px;
+  width: 48px;
+  flex: none;
+  padding: 2px;
+}
+.pool-body.list .tile-toggle .tile-svg {
+  width: 28px;
+  height: 28px;
+}
+.pool-body.list .tile-meta {
+  border-top: none;
+  flex: 1 1 auto;
+  padding: 0;
+  font-size: 9px;
+}
+.pool-body.list .tile-id { max-width: none; }
 .tile {
   position: relative;
   background: rgba(255,255,255,0.02);

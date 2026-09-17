@@ -129,7 +129,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
         <header style={head}>
           <span>ASSET STUDIO</span>
           <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · snap {SNAP}</span>
-          <button type="button" className="chip-btn" onClick={() => onClose(false)}>ESC</button>
+          <button type="button" className="chip-btn" title="Close without saving" onClick={() => onClose(false)}>ESC</button>
         </header>
         <div style={body}>
           <svg ref={svgRef} viewBox="0 0 100 100" style={stage}
@@ -143,40 +143,40 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {Object.keys(PRIMITIVES).map((id) => (
-                <button key={id} type="button" className="chip-btn" onClick={() => add(id)}>{id}</button>
+                <button key={id} type="button" className="chip-btn" title={`Add a ${id} shape`} onClick={() => add(id)}>{id}</button>
               ))}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: snap(r.x - SNAP) }))}>←</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, x: snap(r.x + SNAP) }))}>→</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: snap(r.y - SNAP) }))}>↑</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, y: snap(r.y + SNAP) }))}>↓</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}>↺15</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}>↻15</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('both', -0.1)}>S-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('both', 0.1)}>S+</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sx', -0.1)}>Sx-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sx', 0.1)}>Sx+</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sy', -0.1)}>Sy-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => bump('sy', 0.1)}>Sy+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape left" onClick={() => patchSel((r) => ({ ...r, x: snap(r.x - SNAP) }))}>←</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape right" onClick={() => patchSel((r) => ({ ...r, x: snap(r.x + SNAP) }))}>→</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape up" onClick={() => patchSel((r) => ({ ...r, y: snap(r.y - SNAP) }))}>↑</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape down" onClick={() => patchSel((r) => ({ ...r, y: snap(r.y + SNAP) }))}>↓</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Rotate the picked shape −15°" onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}>↺15</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Rotate the picked shape +15°" onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}>↻15</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Shrink the picked shape" onClick={() => bump('both', -0.1)}>S-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Grow the picked shape" onClick={() => bump('both', 0.1)}>S+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Squash the picked shape horizontally" onClick={() => bump('sx', -0.1)}>Sx-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Stretch the picked shape horizontally" onClick={() => bump('sx', 0.1)}>Sx+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Squash the picked shape vertically" onClick={() => bump('sy', -0.1)}>Sy-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Stretch the picked shape vertically" onClick={() => bump('sy', 0.1)}>Sy+</button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}>INK</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}>ACCENT</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}>FILL/STROKE</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={dup}>DUP</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => zShift(-1)}>Z-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} onClick={() => zShift(1)}>Z+</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Paint the picked shape ink" onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}>INK</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Paint the picked shape accent" onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}>ACCENT</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Flip the picked shape between filled and outline" onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}>FILL/STROKE</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Duplicate the picked shape" onClick={dup}>DUP</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Send the picked shape one step back" onClick={() => zShift(-1)}>Z-</button>
+              <button type="button" className="chip-btn" disabled={picked < 0} title="Bring the picked shape one step forward" onClick={() => zShift(1)}>Z+</button>
             </div>
-            <label style={lbl}>
+            <label style={lbl} title="Which family the saved asset lands in.">
               family
-              <select value={category} onChange={(e) => setCategory(e.target.value)} style={field}>
+              <select value={category} title="Which family the saved asset lands in." onChange={(e) => setCategory(e.target.value)} style={field}>
                 {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
-            <label style={lbl}>
+            <label style={lbl} title="Name for the saved overlay asset.">
               id hint
-              <input value={hint} onChange={(e) => setHint(e.target.value)} style={field} />
+              <input value={hint} title="Name for the saved overlay asset." onChange={(e) => setHint(e.target.value)} style={field} />
             </label>
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
               Sx/Sy stretch on one axis. S± stays uniform. No boolean. Pen stays in Illustrator.
@@ -184,9 +184,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
           </div>
         </div>
         <footer style={foot}>
-          <button type="button" className="chip-btn" onClick={undo} disabled={!parts.length}>UNDO</button>
-          <button type="button" className="chip-btn" onClick={() => { setParts([]); setPicked(-1); }}>CLEAR</button>
-          <button type="button" className="chip-btn" onClick={save} disabled={!parts.length} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
+          <button type="button" className="chip-btn" title="Remove the last added shape" onClick={undo} disabled={!parts.length}>UNDO</button>
+          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { setParts([]); setPicked(-1); }}>CLEAR</button>
+          <button type="button" className="chip-btn" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
         </footer>
       </div>
     </div>

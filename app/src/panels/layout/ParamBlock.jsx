@@ -128,22 +128,22 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         locked={lockedParams.wind} onToggleLock={() => lock('wind')}
         onRandomize={() => rand('wind')} />
 
-      <div className="davis-source-row" style={{ marginTop: 6 }}>
+      <div className="davis-source-row" style={{ marginTop: 6 }} title="Mirror the layout across an axis.">
         <span className="davis-label">SYMMETRY</span>
         {SYMMETRY_MODES.map((s) => (
-          <button key={s} type="button" className={`chip-btn ${(layoutParams.symmetry || 'none') === s ? 'active' : ''}`} onClick={() => set('symmetry', s)}>{s.toUpperCase()}</button>
+          <button key={s} type="button" className={`chip-btn ${(layoutParams.symmetry || 'none') === s ? 'active' : ''}`} title={`Symmetry: ${s}`} onClick={() => set('symmetry', s)}>{s.toUpperCase()}</button>
         ))}
       </div>
-      <div className="davis-source-row" style={{ marginTop: 6 }}>
+      <div className="davis-source-row" style={{ marginTop: 6 }} title="How the picture drifts when RUN is on.">
         <span className="davis-label">BEHAVE</span>
         {BEHAVE_MODES.map((s) => (
-          <button key={s} type="button" className={`chip-btn ${(layoutParams.behave || 'cruise') === s ? 'active' : ''}`} onClick={() => set('behave', s)}>{s.toUpperCase()}</button>
+          <button key={s} type="button" className={`chip-btn ${(layoutParams.behave || 'cruise') === s ? 'active' : ''}`} title={`Motion behavior: ${s}`} onClick={() => set('behave', s)}>{s.toUpperCase()}</button>
         ))}
       </div>
-      <div className="davis-source-row" style={{ marginTop: 6 }}>
+      <div className="davis-source-row" style={{ marginTop: 6 }} title="Surface finish on the shapes.">
         <span className="davis-label">MATERIAL</span>
         {MATERIALS.map((m) => (
-          <button key={m.id} type="button" className={`chip-btn ${(layoutParams.material || 'plate') === m.id ? 'active' : ''}`} onClick={() => set('material', m.id)}>{m.id.toUpperCase()}</button>
+          <button key={m.id} type="button" className={`chip-btn ${(layoutParams.material || 'plate') === m.id ? 'active' : ''}`} title={`Material: ${m.id}`} onClick={() => set('material', m.id)}>{m.id.toUpperCase()}</button>
         ))}
       </div>
     </div>

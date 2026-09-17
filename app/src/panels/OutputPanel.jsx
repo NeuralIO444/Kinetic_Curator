@@ -351,6 +351,7 @@ export function OutputPanel() {
           <div className="output-row" style={{ marginBottom: 6 }}>
             <select
               value={exportResolution}
+              title="Export resolution. Higher = bigger file, slower render."
               onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value, 10))}
               style={{ padding: '4px', fontSize: '10px', background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', flex: 1 }}
             >
@@ -364,6 +365,7 @@ export function OutputPanel() {
             className="big-btn"
             onClick={runRenderFinal}
             disabled={rendering}
+            title="Save the current frame as PNG at the chosen resolution."
             style={{
               width: '100%',
               background: rendering ? 'var(--line)' : 'var(--accent)',
@@ -385,7 +387,7 @@ export function OutputPanel() {
         <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
           <div style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>BATCH EDITION</div>
           <div className="output-row" style={{ marginBottom: 6, gap: 6 }}>
-            <label style={{ fontSize: 10, color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <label style={{ fontSize: 10, color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: 4 }} title="How many seeds to render, starting from the current one.">
               N
               <input
                 type="number"
@@ -393,6 +395,7 @@ export function OutputPanel() {
                 max={48}
                 value={batchCount}
                 disabled={rendering}
+                title="How many seeds to render (max 48)."
                 onChange={(e) => setBatchCount(Math.max(1, Math.min(48, parseInt(e.target.value, 10) || 1)))}
                 style={{ width: 48, padding: '4px', fontSize: 11, background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)' }}
               />
@@ -438,9 +441,10 @@ export function OutputPanel() {
         </div>
 
         <div className="output-row">
-          <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }} disabled={rendering}>↓ SNAP</button>
+          <button className="big-btn" title="Quick PNG snapshot (S)." onClick={addSnapshot} style={{ flex: 2 }} disabled={rendering}>↓ SNAP</button>
           <button
             className="big-btn"
+            title="Record the canvas as WebM. Does not sample the ACCUM buffer."
             onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
             disabled={rendering}
             style={isRecording ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
@@ -476,7 +480,7 @@ export function OutputPanel() {
         )}
 
         <div className="output-row">
-          <button className="big-btn dl" onClick={() => emit(Events.EXPORT_CLEAR_SNAPSHOTS)} style={{ width: '100%' }}>✕ CLEAR</button>
+          <button className="big-btn dl" title="Delete all snapshots from this session." onClick={() => emit(Events.EXPORT_CLEAR_SNAPSHOTS)} style={{ width: '100%' }}>✕ CLEAR</button>
         </div>
 
         {snapshots.length > 0 && (

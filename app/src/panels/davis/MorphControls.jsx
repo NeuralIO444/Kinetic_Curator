@@ -7,6 +7,7 @@ export function MorphControls({ morphEvolve, morphDurationMs, morphing }) {
         <span className="davis-label" style={{ margin: 0 }}>MORPH EVOLVE</span>
         <button
           className={`chip-btn ${morphEvolve ? 'active' : ''}`}
+          title="Ease layout changes over DURATION instead of hard-jumping. Seed and palette still snap."
           onClick={() => emit(Events.DAVIS_MORPH, { enabled: !morphEvolve })}
           style={morphEvolve ? { borderColor: '#c084fc', color: '#c084fc' } : {}}
         >
@@ -17,6 +18,7 @@ export function MorphControls({ morphEvolve, morphDurationMs, morphing }) {
         <span className="davis-label">DURATION</span>
         <input
           type="range" min={300} max={4000} step={100} value={morphDurationMs || 1200}
+          title="How long a morph takes."
           onChange={e => emit(Events.DAVIS_MORPH_DURATION, { duration: Number(e.target.value) })}
         />
         <span className="davis-readout">{((morphDurationMs || 1200) / 1000).toFixed(1)}s</span>

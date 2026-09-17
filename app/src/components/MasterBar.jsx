@@ -431,7 +431,7 @@ export function MasterBar() {
             + SAVE
           </button>
         </div>
-        <button className="run-btn" onClick={() => dispatch({ type: A.SET_RUNNING, payload: !running })}>
+        <button className="run-btn" title="Play / pause the live loop (Space)" onClick={() => dispatch({ type: A.SET_RUNNING, payload: !running })}>
           {running ? '■ STOP' : '▶ RUN'}
         </button>
       </div>

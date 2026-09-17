@@ -52,6 +52,7 @@ export class ErrorBoundary extends Component {
           </div>
           <button
             className="micro-btn"
+            title="Clear the error and try rendering again"
             onClick={retry}
           >
             ↻ RETRY
