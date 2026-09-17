@@ -14,6 +14,38 @@ import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
 import { useAccumulationBuffer } from '../hooks/useAccumulationBuffer.js';
 import { Layer } from './canvas/Layer.jsx';
+import { isFxLayer, fxFilterId, compileFxPrimitives } from '../fx/fxFilters.js';
+import { FxFilterDefs } from '../fx/FxFilterDefs.jsx';
+
+/**
+ * Fold the layer stack bottom-up for rendering: content layers accumulate;
+ * each applied FX layer wraps the accumulator so far in
+ * <g filter="url(#fx-…)">, then accumulation continues above it.
+ * Non-applied FX layers (shed by the governor or over budget) pass their
+ * accumulated content through unwrapped.
+ */
+function buildLayerStack(resolvedLayers, fxActiveIds, renderContent) {
+  const out = [];
+  let acc = [];
+  for (const rl of resolvedLayers) {
+    if (rl.isFx) {
+      if (acc.length > 0 && fxActiveIds.has(rl.layer.id)) {
+        out.push(
+          <g key={`fxwrap-${rl.layer.id}`} filter={`url(#${fxFilterId(rl.layer.id)})`} opacity={rl.layer.layerOpacity}>
+            {acc}
+          </g>,
+        );
+      } else {
+        out.push(...acc);
+      }
+      acc = [];
+    } else {
+      acc.push(renderContent(rl));
+    }
+  }
+  out.push(...acc);
+  return out;
+}
 
 function resolveLayerSource(layer, state) {
   if (layer.id === state.activeLayerId) {
@@ -69,11 +101,12 @@ export function CanvasPanel() {
     slowRender: s.slowRender,
     perfTier1: s.perfTier1,
     assetThin: s.assetThin,
+    fxShedLevel: s.fxShedLevel,
   }));
   const {
     layoutParams, weightOverrides, evolveMode, beatPulse, audioBands,
     motionSmoothing, quality, running, layers, activeLayerId, slowRender,
-    perfTier1, assetThin,
+    perfTier1, assetThin, fxShedLevel,
   } = state;
 
   const preset = getPreset(layoutParams.composition);
@@ -94,6 +127,9 @@ export function CanvasPanel() {
 
   const visibleLayers = useMemo(() => layers.filter(l => l.visible), [layers]);
   const resolvedLayers = useMemo(() => visibleLayers.map(layer => {
+    // FX layers hold no content — they wrap the accumulated stack below in
+    // a filter group. Skip the whole content-resolution path for them.
+    if (isFxLayer(layer)) return { layer, isFx: true, activeAssets: [] };
     const src = resolveLayerSource(layer, state);
     // #107 §4 tier 1: unlike driftOverlay/perfClampOverride (active layer
     // only), mirror sheds on EVERY visible layer — an inactive snapshot can
@@ -128,6 +164,38 @@ export function CanvasPanel() {
     for (const rl of resolvedLayers) for (const a of rl.activeAssets) seen.set(a.id, a);
     return [...seen.values()].sort((a, b) => getAssetCost(a) - getAssetCost(b));
   }, [resolvedLayers]);
+
+  // -- FX layer stack ------------------------------------------------------
+  // Fold bottom-up: content layers accumulate; each applied FX layer wraps
+  // the accumulator in <g filter="url(#fx-…)">, then stacking continues.
+  // Which FX layers apply: Showrunner cut 2 keeps only the first visible one
+  // (lowest = smallest wrapped subtree = cheapest); otherwise the tier's
+  // maxFxLayers budget keeps the first N bottom-up. Layers with an empty
+  // effect stack compile to nothing and pass content through unwrapped.
+  // Hidden FX layers never reach here (visibleLayers filtered them) — no
+  // filter cost, per spec.
+  const fxCtx = useMemo(() => ({
+    shedLevel: fxShedLevel || 0,
+    octaves: caps.turbulenceOctaves,
+    primBudget: caps.maxFilterPrimitives,
+    dxMod: (typeof beatPulse === 'number' ? beatPulse : 0) * 3,
+  }), [fxShedLevel, caps, beatPulse]);
+
+  const fxActive = useMemo(() => {
+    const out = [];
+    let n = 0;
+    const maxFx = caps.maxFxLayers ?? Infinity;
+    const keep = (fxShedLevel || 0) >= 2 ? 1 : maxFx;
+    for (const rl of resolvedLayers) {
+      if (!rl.isFx) continue;
+      if (n < keep && compileFxPrimitives(rl.layer.effects, fxCtx).length > 0) {
+        out.push(rl.layer);
+      }
+      n += 1;
+    }
+    return out;
+  }, [resolvedLayers, caps, fxShedLevel, fxCtx]);
+  const fxActiveIds = useMemo(() => new Set(fxActive.map((l) => l.id)), [fxActive]);
 
   const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
   const { scaleMul, alphaBoost, breathScale, breathRot, glow, effectiveScale, effectiveAlpha } = life;
@@ -189,11 +257,12 @@ export function CanvasPanel() {
               <stop offset="60%" stopColor="#fff" stopOpacity="0.25" />
               <stop offset="100%" stopColor="#fff" stopOpacity="0" />
             </radialGradient>
+            <FxFilterDefs layers={fxActive} ctx={fxCtx} />
           </defs>
           <g transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) scale(${zoom}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2}) translate(${pan.x / zoom}, ${pan.y / zoom})`}>
             <g transform={`translate(${CANVAS_W / 2}, ${CANVAS_H / 2}) rotate(${breathRot}) scale(${breathScale}) translate(${-CANVAS_W / 2}, ${-CANVAS_H / 2})`}
               style={{ transition: 'transform 0.06s linear', isolation: 'isolate' }}>
-              {resolvedLayers.map(rl => (
+              {buildLayerStack(resolvedLayers, fxActiveIds, (rl) => (
                 // #107 §3: one bad layer (a poisoned snapshot, a missing asset)
                 // must not take the other layers or the rest of the Shell down
                 // with it. `fallback={() => null}` because a DOM error card

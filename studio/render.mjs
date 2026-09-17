@@ -10,6 +10,7 @@ import { DEFAULT_LAYOUT_PARAMS } from '../app/src/data/layout-modes.js';
 import { parseProject } from '../app/src/state/projectDocument.js';
 import { blend, BLEND_FALLBACK } from './blendFallback.mjs';
 import { KERNEL_VERSION } from '../app/src/engine/kernel/version.js';
+import { fxFilterStringForLayer, fxFilterId, isFxLayer } from '../app/src/fx/fxFilters.js';
 
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
@@ -125,6 +126,11 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
   return layers
     .filter((l) => l.visible !== false)
     .map((layer) => {
+      // FX layers hold no content — they wrap the accumulated stack below in
+      // a filter group. Resolved here as a marker; renderSvg folds them in.
+      if (isFxLayer(layer)) {
+        return { id: layer.id, isFx: true, layer, layerOpacity: layer.layerOpacity ?? 1 };
+      }
       const isActive = layer.id === '__single' || layer.id === doc.activeLayerId;
       const src = isActive ? topLevelSource(doc) : (snapshots[layer.id] || topLevelSource(doc));
 
@@ -203,7 +209,44 @@ export function renderSvg(doc, opts = {}) {
   const hueFilters = new Map();
   const body = [];
 
+  // -- FX layers -----------------------------------------------------------
+  // Same fold as the live CanvasPanel (buildLayerStack), in string form.
+  // The studio is the export path: shedLevel is always 0 (the Showrunner
+  // never runs offline), but the tier's maxFxLayers budget still applies so
+  // a balanced-quality still matches what the live app showed. Uncapped
+  // final renders get FINAL_CAPS (maxFxLayers: Infinity) — full FX.
+  const fxCtx = {
+    shedLevel: 0,
+    octaves: caps.turbulenceOctaves ?? 3,
+    primBudget: caps.maxFilterPrimitives ?? Infinity,
+  };
+  const fxFilters = new Map(); // layerId -> <filter> string
+  {
+    let n = 0;
+    const maxFx = caps.maxFxLayers ?? Infinity;
+    for (const L of layers) {
+      if (!L.isFx) continue;
+      if (n < maxFx) {
+        const f = fxFilterStringForLayer(L.layer, fxCtx);
+        if (f) fxFilters.set(L.id, f);
+      }
+      n += 1;
+    }
+  }
+  let acc = [];
+  const pushAcc = (fxLayer) => {
+    if (acc.length === 0) return;
+    if (fxLayer && fxFilters.has(fxLayer.id)) {
+      const op = fxLayer.layerOpacity !== 1 ? ` opacity="${n(fxLayer.layerOpacity)}"` : '';
+      body.push(`<g filter="url(#${fxFilterId(fxLayer.id)})"${op}>${acc.join('\n')}</g>`);
+    } else {
+      body.push(...acc);
+    }
+    acc = [];
+  };
+
   for (const L of layers) {
+    if (L.isFx) { pushAcc(L.layer); continue; }
     const lp = L.layoutParams;
     const showGloss = shouldRenderGloss(doc.quality || 'balanced', lp.shading, L.items.length);
     const itemBlend = blend(lp.blendMode);
@@ -239,8 +282,9 @@ export function renderSvg(doc, opts = {}) {
       parts.push(g.join(''));
     }
     parts.push('</g>');
-    body.push(parts.join('\n'));
+    acc.push(parts.join('\n'));
   }
+  pushAcc(null);
 
   const defs = [
     '<radialGradient id="kc-gloss-grad" cx="35%" cy="30%" r="70%">'
@@ -253,6 +297,7 @@ export function renderSvg(doc, opts = {}) {
     defs.push(`<filter id="${id}" color-interpolation-filters="sRGB" x="-20%" y="-20%" width="140%" height="140%">`
       + `<feColorMatrix type="hueRotate" values="${deg}"/></filter>`);
   }
+  for (const [, f] of fxFilters) defs.push(f);
   for (const [key, id] of symbols) {
     const [assetId, ink, accent] = key.split('|');
     const svg = ASSET_BY_ID.get(assetId).svg

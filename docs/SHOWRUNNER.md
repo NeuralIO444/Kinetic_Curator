@@ -24,8 +24,8 @@ Order is the contract. One step per sustain (1.6s) + cooldown (8s) cycle:
 | 6 | Freeze motion | `slowRender`: Evolve/LFO/ACCUM/swarm paused | Auto |
 | 7 | Hard stop | Existing watchdog trip — manual resume | Manual |
 
-Cuts 1–2 are **dormant until FX layers exist** (#152): no layer has
-`kind: 'fx'` yet, and the governor never spends ladder steps on nothing.
+Cuts 1–2 are **live since #180**: FX layers (`type: 'fx'`) exist and the
+governor spends ladder steps on them — simplify, then bypass.
 
 ## Budgets (§7)
 
@@ -78,10 +78,19 @@ Showrunner degrades only the **live proxy**:
   project JSON; neither does `costScore` (deterministic from `svg`).
 - Enforced by `src/state/showrunner.selfcheck.mjs` in `npm run selfcheck`.
 
-## Extension points for the FX system (#152)
+## Extension points for the FX system (#152) — implemented in #180
 
-- Read `fxShedLevel` in the FX renderer: `1` → octaves=1/grain off,
-  `2` → skip FX layers beyond the first visible.
-- Read per-tier budgets from `getQualityCaps()`: `maxFxLayers`,
-  `maxFilterPrimitives`, `turbulenceOctaves`.
-- The governor already keys off `layer.kind === 'fx' && layer.visible`.
+The FX layer system (`docs/FX_LAYERS.md`) wires up every cut:
+
+- `fxShedLevel` is read in `CanvasPanel.jsx`'s FX fold: `1` → octaves=1 /
+  grain off (in `compileFxPrimitives`), `2` → only the first visible FX
+  layer (bottom-up) still applies.
+- Per-tier budgets from `getQualityCaps()`: `maxFxLayers` skips FX layers
+  beyond the allowance; `turbulenceOctaves` hard-clamps noise detail;
+  `maxFilterPrimitives` warns once per session instead of dropping —
+  primitive count correlates weakly with real GPU cost, so the binding
+  degradation is the shed ladder, not prim counting.
+- The studio/export path runs at `shedLevel: 0` (the Showrunner never runs
+  offline) but honors `maxFxLayers`; uncapped final renders get
+  `FINAL_CAPS` (`maxFxLayers: Infinity`) — full FX, per the proxy/final
+  invariant.
