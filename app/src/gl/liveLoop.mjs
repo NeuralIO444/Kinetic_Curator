@@ -368,8 +368,35 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
    * least two frames have rendered since the call (covers the seed-change
    * -> resolve -> rebake -> render pipeline).
    */
-  function waitForSettled(timeoutMs = 12000) {
+  /**
+   * Resolve when the static resources are ready for capture: no bake in
+   * flight and atlas cells present. Nudges the resource pipeline first so a
+   * loop that has never ticked (or one whose combos changed while paused)
+   * starts its bake instead of hanging. Uses setTimeout, not rAF, so it
+   * resolves even while the loop is paused or the tab is backgrounded.
+   * captureFrame() renders on demand, so no frame advancement is needed —
+   * unlike waitForSettled, which requires the loop to be running.
+   */
+  function waitForReady(timeoutMs = 60000) {
+    try { buildFrame(); } catch { /* real errors surface from captureFrame */ }
     return new Promise((resolve, reject) => {
+      const t0 = performance.now();
+      const check = () => {
+        if (performance.now() - t0 > timeoutMs) {
+          reject(new Error('[gl-live] ready timeout — textures never finished baking'));
+          return;
+        }
+        if (!building && cells) {
+          resolve();
+          return;
+        }
+        setTimeout(check, 100);
+      };
+      check();
+    });
+  }
+
+  function waitForSettled(timeoutMs = 12000) {    return new Promise((resolve, reject) => {
       const t0 = performance.now();
       const startFrame = frameCount;
       const check = () => {
@@ -393,6 +420,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     setAccumFrozen: (f) => { accumFrozen = !!f; },
     captureFrame,
     waitForSettled,
+    waitForReady,
     getCanvas: () => canvas,
     isBuilding: () => building,
     clearAccum() {

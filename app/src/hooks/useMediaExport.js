@@ -48,6 +48,9 @@ function download(blob, filename) {
  */
 export async function captureStill({ loopRef, resolution = 1, seedStr = '', onThumbnail, downloadFile = true }) {
   const loop = loopOrThrow(loopRef);
+  // The atlas bake can still be in flight (print desk opens right after
+  // boot): wait for resources instead of throwing like captureFrame does.
+  await loop.waitForReady();
   const width = Math.round(1000 * resolution);
   const height = Math.round(700 * resolution);
   const { pixels, width: pw, height: ph } = loop.captureFrame({ width, height });

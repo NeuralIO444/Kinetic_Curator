@@ -8,6 +8,7 @@
 // the footer. normalize.selfcheck.mjs covers the sanitizer itself; this
 // covers the store/React wiring it sits behind.
 import { test, expect } from '@playwright/test';
+import { glNodeCount, waitForLiveFrame } from './gl-helpers.js';
 
 // Raw JSON text, not an object literal: a hand-edited file really can contain
 // 1e999, which JSON.parse turns into Infinity. Building it with
@@ -46,7 +47,8 @@ test('poisoned project loads without killing the canvas', async ({ page }) => {
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1500);
 
-  const nodes = await page.locator('svg use').count();
+  await waitForLiveFrame(page);
+  const nodes = await glNodeCount(page);
   const footer = await page.locator('.footer-bar').textContent();
   console.log('[poison] nodes:', nodes, '| footer:', footer?.slice(0, 80));
 
