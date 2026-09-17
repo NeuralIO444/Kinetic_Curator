@@ -91,6 +91,12 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
   on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));
   on(Events.LAYER_SOLO, ({ id }) => dispatch({ type: 'SOLO_LAYER', id }));
+  on(Events.LAYER_ADD_FX, () => dispatch({ type: A.ADD_FX_LAYER }));
+  on(Events.FX_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_FX_LAYER, id }));
+  on(Events.FX_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.FX_EFFECT_ADD, layerId, kind }));
+  on(Events.FX_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.FX_EFFECT_REMOVE, layerId, index }));
+  on(Events.FX_EFFECT_REORDER, ({ layerId, index, delta }) => dispatch({ type: A.FX_EFFECT_REORDER, layerId, index, delta }));
+  on(Events.FX_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.FX_EFFECT_SET_PARAM, layerId, index, key, value }));
 
   on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
   on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));

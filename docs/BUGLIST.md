@@ -15,6 +15,8 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **Quality caps are per layer** | Each layer clamps against the quality preset independently, so N layers can draw N x `maxCount`. Deliberate: `usePerformanceGovernor` already steps quality down on FPS drop, and a shared budget would thin every layer as you add more. Decided in #93. |
 | **Evolve targets the active layer** | Evolve/morph act on whichever layer is selected, not the whole stack. |
 | **Life/breath is global** | Audio reactivity and the breath LFO are computed once for the canvas from the active layer's params, then applied to every layer. |
+| **FX filters excluded from determinism** | `feTurbulence` differs between browsers and resvg — the exact grain/displace/tear pattern varies subtly across renderers. Effect structure (kinds, order, params) is deterministic and round-trips exactly. See `docs/FX_LAYERS.md`. |
+| **FX filter region is the viewport** | Displacement pushing pixels outside the canvas is clipped. Unbounded filter regions are a silent frame-rate killer, so this is a clamp, not a tier. |
 
 ## Residual / watch
 

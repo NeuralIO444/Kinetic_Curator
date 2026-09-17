@@ -139,6 +139,12 @@ export function useApp(selector) {
       case A.SET_LAYER_OPACITY: return store.setLayerOpacity(action.id, action.opacity);
       case 'DUPLICATE_LAYER': return store.duplicateLayer(action.id);
       case 'SOLO_LAYER': return store.soloLayer(action.id);
+      case A.ADD_FX_LAYER: return store.addFxLayer();
+      case A.SET_SELECTED_FX_LAYER: return store.setSelectedFxLayer(action.id);
+      case A.FX_EFFECT_ADD: return store.fxEffectAdd(action.layerId, action.kind);
+      case A.FX_EFFECT_REMOVE: return store.fxEffectRemove(action.layerId, action.index);
+      case A.FX_EFFECT_REORDER: return store.fxEffectReorder(action.layerId, action.index, action.delta);
+      case A.FX_EFFECT_SET_PARAM: return store.fxEffectSetParam(action.layerId, action.index, action.key, action.value);
       case A.SAVE_USER_PALETTE: return store.saveUserPalette(action.name);
       case A.DELETE_USER_PALETTE: return store.deleteUserPalette(action.id);
       case A.RENAME_USER_PALETTE: return store.renameUserPalette(action.id, action.name);

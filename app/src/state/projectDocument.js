@@ -1,6 +1,7 @@
 import { captureSnapshot } from './slices/layersSlice.js';
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeOverlay } from '../assets/overlay.js';
+import { sanitizeFxEffects } from '../fx/fxFilters.js';
 
 export const PROJECT_VERSION = 1;
 export const AUTOSAVE_KEY = 'kc:project:v1';
@@ -18,6 +19,41 @@ function normalizeSnapshots(raw) {
     };
   }
   return out;
+}
+
+/**
+ * Normalize the layer list on load. Content layers pass through; FX layers
+ * get their effect stacks sanitized (unknown kinds dropped, params clamped)
+ * so a hand-edited or older document can never crash the filter compiler.
+ * Also repairs activeLayerId: FX layers are never the content-active layer,
+ * so a doc pointing at one falls back to the first content layer.
+ */
+export function normalizeLayers(rawLayers, rawActiveId) {
+  if (!Array.isArray(rawLayers) || rawLayers.length === 0) {
+    return { layers: null, activeLayerId: typeof rawActiveId === 'string' ? rawActiveId : null };
+  }
+  const layers = [];
+  for (const l of rawLayers) {
+    if (!l || typeof l !== 'object' || typeof l.id !== 'string') continue;
+    const type = l.type === 'fx' ? 'fx' : 'content';
+    const layer = {
+      id: l.id,
+      name: typeof l.name === 'string' ? l.name : 'Layer',
+      type,
+      visible: l.visible !== false,
+      layerBlendMode: typeof l.layerBlendMode === 'string' ? l.layerBlendMode : 'normal',
+      layerOpacity: Number.isFinite(l.layerOpacity) ? Math.min(1, Math.max(0, l.layerOpacity)) : 1,
+    };
+    if (type === 'fx') layer.effects = sanitizeFxEffects(l.effects);
+    layers.push(layer);
+  }
+  if (layers.length === 0) return { layers: null, activeLayerId: null };
+  let activeLayerId = typeof rawActiveId === 'string' ? rawActiveId : null;
+  const active = layers.find((l) => l.id === activeLayerId);
+  if (!active || active.type === 'fx') {
+    activeLayerId = (layers.find((l) => l.type === 'content') || layers[0]).id;
+  }
+  return { layers, activeLayerId };
 }
 
 export function serializeProject(state) {
@@ -71,8 +107,7 @@ export function parseProject(raw) {
         assetWeightOverrides: raw.assetWeightOverrides || null,
         paletteOverrides: raw.paletteOverrides || null,
         customAssets: sanitizeOverlay(raw.customAssets),
-        layers: Array.isArray(raw.layers) ? raw.layers : null,
-        activeLayerId: raw.activeLayerId || null,
+        ...normalizeLayers(raw.layers, raw.activeLayerId),
         layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
       },
     };
@@ -107,8 +142,7 @@ export function parseProject(raw) {
           ? raw.paletteOverrides
           : null,
       customAssets: sanitizeOverlay(raw.customAssets),
-      layers: Array.isArray(raw.layers) ? raw.layers : null,
-      activeLayerId: typeof raw.activeLayerId === 'string' ? raw.activeLayerId : null,
+      ...normalizeLayers(raw.layers, raw.activeLayerId),
       layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
     },
   };
