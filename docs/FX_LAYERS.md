@@ -40,6 +40,9 @@ is the single source of truth for the compiler, the panel UI, and this doc.
 | `displace {scale, seed}` | `feTurbulence type="fractalNoise"` → `feDisplacementMap` | 2 |
 | `tear {bands, amount}` | stretched `feTurbulence` (high Y frequency, near-zero X) → `feComponentTransfer` flattens the Y channel to exactly 0.5 via `feFuncG` → `feDisplacementMap` with `scale = amount × 4` — strictly horizontal shear | 3 |
 | `grain {amount}` | `feTurbulence` → `feColorMatrix` (noise → alpha, RGB zeroed) → `feComposite operator="in"` against `SourceAlpha` (grain masked to artwork — no filter-region box on transparent areas) → `feComposite operator="over"` | 4 |
+| `blur {radius}` | `feGaussianBlur stdDeviation={radius}` on the source. One primitive — cheapest effect in the stack | 1 |
+| `scanlines {density, amount}` | anisotropic `feTurbulence` (near-zero X frequency, high Y) → `feColorMatrix` (noise → alpha, RGB zeroed) → `feComposite operator="in"` against `SourceAlpha` → `feComposite operator="over"` — CRT banding, alpha-masked like grain | 4 |
+| `posterize {levels}` | `feComponentTransfer` with `feFuncR/G/B type="discrete"` (alpha channel untouched) | 1 |
 
 Hard rules:
 
@@ -91,7 +94,7 @@ deterministic and round-trips exactly through project JSON.
 
 ## Export audit (resvg, via `studio/render.mjs`)
 
-Tested 2026-09-16 with `@resvg/resvg-js`: a project with all four effects
+Tested 2026-09-16 with `@resvg/resvg-js`: a project with all seven effects
 was rendered to SVG via the studio path and rasterized at 1000×700, plus
 isolated per-effect variants diffed against a no-FX baseline.
 
@@ -101,10 +104,14 @@ isolated per-effect variants diffed against a no-FX baseline.
 | `displace` | ✅ survives — warped edges, mean abs diff 10.87 |
 | `tear` | ✅ survives — horizontal band shear, strictly x-only, mean abs diff 14.12 |
 | `grain` | ✅ survives — film grain over source, alpha-masked to the artwork (2026-09-16 fix: earlier build painted grain across the whole filter region, visible as a box on transparent backgrounds) |
+| `blur` | ✅ survives — soft edges, 6040 px changed vs baseline |
+| `scanlines` | ✅ survives — horizontal banding over artwork, alpha-masked (no filter-region box) |
+| `posterize` | ✅ survives — stepped tones, alpha untouched |
 
 No silent mismatches: every primitive used (`feTurbulence`,
 `feDisplacementMap`, `feColorMatrix`, `feOffset`, `feBlend mode="screen"`,
-`feComposite operator="over"`, `feComponentTransfer`/`feFuncG`) is
+`feComposite operator="over"`/`operator="in"`, `feGaussianBlur`,
+`feComponentTransfer`/`feFuncG`/`feFuncR/G/B discrete`) is
 supported by resvg. `feBlend screen` is used instead of SVG2
 `plus-lighter` (already a documented resvg gap — see BUGLIST). Unknown
 effect kinds and hidden FX layers are correctly absent from export.

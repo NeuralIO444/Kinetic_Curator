@@ -228,4 +228,30 @@ ok('project JSON round-trips fx layers exactly', () => {
   assert.equal(before, after);
 });
 
+ok('blur: single feGaussianBlur, radius passes through', () => {
+  const prims = compileFxPrimitives([{ kind: 'blur', params: { radius: 6 } }]);
+  assert.deepEqual(prims.map((p) => p.prim), ['feGaussianBlur']);
+  assert.equal(prims[0].attrs.stdDeviation, 6);
+  assert.equal(prims[0].attrs.in, 'SourceGraphic');
+});
+ok('scanlines: anisotropic noise, alpha-masked, octaves shed like other turbulence', () => {
+  const prims = compileFxPrimitives([{ kind: 'scanlines', params: { density: 0.35, amount: 0.5 } }]);
+  assert.deepEqual(prims.map((p) => p.prim), ['feTurbulence', 'feColorMatrix', 'feComposite', 'feComposite']);
+  assert.equal(prims[2].attrs.operator, 'in'); // alpha-aware: no filter-region box
+  assert.equal(prims[2].attrs.in2, 'SourceAlpha');
+  assert.equal(prims[3].attrs.operator, 'over');
+  const shed = compileFxPrimitives([{ kind: 'scanlines', params: { density: 0.35, amount: 0.5 } }], { shedLevel: 1, octaves: 3 });
+  assert.equal(shed[0].attrs.numOctaves, 1);
+  assert.ok(shed.length > 0); // scanlines survive shed 1 (unlike grain)
+});
+ok('posterize: discrete component transfer, alpha untouched', () => {
+  const prims = compileFxPrimitives([{ kind: 'posterize', params: { levels: 4 } }]);
+  assert.deepEqual(prims.map((p) => p.prim), ['feComponentTransfer']);
+  assert.deepEqual(prims[0].children.map((c) => c.prim), ['feFuncR', 'feFuncG', 'feFuncB']);
+  for (const c of prims[0].children) {
+    assert.equal(c.attrs.type, 'discrete');
+    assert.equal(c.attrs.tableValues, '0 0.333 0.667 1');
+  }
+});
+
 console.log(`fxFilters.selfcheck: OK (${n} cases)`);

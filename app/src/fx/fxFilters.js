@@ -53,6 +53,28 @@ export const FX_EFFECT_DEFS = {
       amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.4, hint: 'Grain opacity' },
     },
   },
+  blur: {
+    label: 'Blur',
+    hint: 'Gaussian blur on the source. One primitive — the cheapest effect in the stack.',
+    params: {
+      radius: { label: 'Radius', min: 0, max: 40, step: 0.5, def: 6, hint: 'Blur radius in pixels' },
+    },
+  },
+  scanlines: {
+    label: 'Scanlines',
+    hint: 'CRT scanline banding: fine horizontal dark lines over the artwork. Turbulence-based, so the Showrunner clamps its detail under load.',
+    params: {
+      density: { label: 'Density', min: 0.05, max: 1, step: 0.05, def: 0.35, hint: 'Line frequency — higher = finer lines' },
+      amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.5, hint: 'Line darkness' },
+    },
+  },
+  posterize: {
+    label: 'Posterize',
+    hint: 'Reduce each channel to a fixed number of tonal steps. Flat poster look, one primitive.',
+    params: {
+      levels: { label: 'Levels', min: 2, max: 8, step: 1, def: 4, hint: 'Tonal steps per channel' },
+    },
+  },
 };
 
 export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
@@ -168,12 +190,47 @@ function buildGrain(params, ctx, rid) {
   ];
 }
 
-const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain };
+function buildBlur(params) {
+  return [
+    { prim: 'feGaussianBlur', attrs: { in: 'SourceGraphic', stdDeviation: r3(Math.max(0, params.radius)) } },
+  ];
+}
+
+function buildScanlines(params, ctx, rid) {
+  // Showrunner cut 1 (and the turbulenceOctaves budget) clamp noise detail.
+  const octaves = ctx.shedLevel >= 1 ? 1 : Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
+  // Noise varies along Y (bands across the height), near-constant along X:
+  // fine horizontal dark lines. Alpha-masked to the source like grain.
+  const n = rid(), la = rid(), lam = rid();
+  const fy = r3(Math.max(0.01, params.density));
+  const k = r3(Math.max(0, Math.min(1, params.amount)));
+  return [
+    { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: `0.01 ${fy}`, numOctaves: octaves, seed: 11, result: n } },
+    { prim: 'feColorMatrix', attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: la } },
+    { prim: 'feComposite', attrs: { in: la, in2: 'SourceAlpha', operator: 'in', result: lam } },
+    { prim: 'feComposite', attrs: { in: lam, in2: 'SourceGraphic', operator: 'over' } },
+  ];
+}
+
+function buildPosterize(params) {
+  const levels = Math.max(2, Math.min(8, Math.round(params.levels)));
+  const table = Array.from({ length: levels }, (_, i) => r3(i / (levels - 1))).join(' ');
+  const func = (prim) => ({ prim, attrs: { type: 'discrete', tableValues: table } });
+  return [
+    {
+      prim: 'feComponentTransfer', attrs: { in: 'SourceGraphic' },
+      children: [func('feFuncR'), func('feFuncG'), func('feFuncB')],
+    },
+  ];
+}
+
+const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain, blur: buildBlur, scanlines: buildScanlines, posterize: buildPosterize };
 
 /**
  * Compile an effects array into filter primitives.
  * ctx: { octaves, shedLevel, dxMod, primBudget }
- *  - shedLevel >= 1: grain effects are dropped (Showrunner cut 1).
+ *  - shedLevel >= 1: grain effects are dropped (Showrunner cut 1); turbulence
+ *    detail (displace, tear, scanlines) is forced to 1 octave.
  *  - primBudget: soft ceiling — exceeding it warns (see docs/FX_LAYERS.md
  *    for why this warns instead of dropping: the binding degradation is
  *    the shed ladder, not prim counting).
