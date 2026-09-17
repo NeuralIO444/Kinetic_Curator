@@ -51,6 +51,26 @@ export function countSubpaths(svg) {
   return tags ? tags.length : 0;
 }
 
+/**
+ * Showrunner asset cost score (§6): a cheap static proxy for rasterization
+ * cost, computed once at ingest — never per frame.
+ *
+ *   cost = subpaths × (1 + groupDepth/8)
+ *
+ * Subpaths drive the per-frame SVG node count; nesting depth drives
+ * transform/group overhead. The score is intentionally simple: it is a
+ * triage signal for cheap-first ordering and cost-aware thinning, not a
+ * benchmark.
+ */
+export function assetCostScore(svg) {
+  const subpaths = countSubpaths(svg);
+  const depth = gDepth(svg);
+  return Math.round(subpaths * (1 + depth / 8));
+}
+
+/** Score above which ingest emits a (non-blocking) cost warning. */
+export const COST_WARNING_THRESHOLD = 600;
+
 export function overlayId(base) {
   const slug = String(base || 'motif').replace(/^user:/, '').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40);
   return `user:${slug}`;
@@ -74,6 +94,7 @@ export function ingestSvg(raw, { id, category = 'fragments', weight = 'medium' }
   svg = svg.replace(ACCENT_HEX, 'var(--accent)');
   const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '').trim() || svg;
   const paths = countSubpaths(inner);
+  const costScore = assetCostScore(inner);
 
   return {
     ok: true,
@@ -85,6 +106,10 @@ export function ingestSvg(raw, { id, category = 'fragments', weight = 'medium' }
       compound: paths > 1,
       source: 'ingest',
       svg: inner,
+      costScore,
+      // Non-blocking heads-up: a pathological asset won't refuse ingest,
+      // but the operator deserves to know it may cost frames.
+      costWarning: costScore > COST_WARNING_THRESHOLD || undefined,
     },
   };
 }

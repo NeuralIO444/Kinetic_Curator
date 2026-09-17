@@ -1,22 +1,22 @@
-// usePerformanceGovernor — auto-protects interactivity when FPS tanks
+// usePerformanceGovernor — the Showrunner's enforcement arm.
 //
-// Strategy:
-// - Track a short window of low-FPS samples
-// - If sustained low FPS while quality is higher than 'performance',
-//   step quality down one level (high → balanced → performance)
-// - Optionally clamp count further if already on performance
-// - Never fights a user who manually chose 'performance'
-// - #107 §4: quality/count only shrink what gets drawn. Two tiers below that:
-//     tier 1 (FPS < 16 sustained 2s): shed ACCUM/gloss/mirror render-only,
-//       across every visible layer. Auto-clears the instant FPS recovers —
-//       no sustain needed, a false-positive resume just costs one frame.
-//     tier 2 (FPS ~0 sustained, or a critical render-error elsewhere): a hard
-//       stop via tripWatchdog — running/evolve off, does not auto-resume.
-//   Recovery for tier 1 and the tier-2 `slowRender` flag is immediate; only
-//   `running`/`evolveMode` require a manual resume (panic-key precedent).
-// - #107 §5: the last-resort count clamp below is a render-only overlay
-//   (perfClampOverride), not a layoutParams write — see the comment at that
-//   branch for why.
+// Auto-protects interactivity when FPS tanks. Strategy:
+// - Track a short window of low-FPS samples; act only on sustained dips
+//   with a cooldown between steps (never thrash on spikes).
+// - Shed load in a DEFINED ORDER — the cut list. Order is the contract:
+//     cut 1: FX simplify (turbulence octaves → 1, grain off)
+//     cut 2: FX bypass (keep first visible FX layer only)
+//     cut 3: quality tier step HIGH → BALANCED → PERF
+//     cut 4: mirror/gloss/ACCUM shed (independent perfTier1 mechanism, lower FPS floor)
+//     cut 5: cost-aware asset thinning (drop highest-cost assets first)
+//     cut 5b: render-only count clamp below the PERF floor (existing)
+//     cut 6: freeze motion via slowRender (a still instrument beats a dead one)
+//     cut 7: watchdog hard stop (existing tier 2, manual resume)
+// - Every cut is a render-only overlay: it never writes layoutParams, never
+//   serializes into project JSON, and auto-clears on recovery — except the
+//   hard stop, which needs manual resume (panic-key precedent, #107).
+// - Cuts 1–2 are dormant until a layer with kind 'fx' exists (#152); the
+//   guard keeps the ladder from spending steps on nothing.
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
@@ -36,11 +36,16 @@ export function usePerformanceGovernor() {
   const slowRender = useStore(s => s.slowRender);
   const perfTier1 = useStore(s => s.perfTier1);
   const perfClampOverride = useStore(s => s.perfClampOverride);
+  const layers = useStore(s => s.layers);
+  const fxShedLevel = useStore(s => s.fxShedLevel);
+  const assetThin = useStore(s => s.assetThin);
   const setQuality = useStore(s => s.setQuality);
   const setSlowRender = useStore(s => s.setSlowRender);
   const setPerfTier1 = useStore(s => s.setPerfTier1);
   const tripWatchdog = useStore(s => s.tripWatchdog);
   const setPerfClampOverride = useStore(s => s.setPerfClampOverride);
+  const setFxShedLevel = useStore(s => s.setFxShedLevel);
+  const setAssetThin = useStore(s => s.setAssetThin);
   const layoutParams = useStore(s => s.layoutParams);
 
   const lowSinceRef = useRef(null);
@@ -99,13 +104,20 @@ export function usePerformanceGovernor() {
     }
   }, [fps, autoQuality, perfTier1, setPerfTier1]);
 
+  // The cut list: ordered, one step per sustain+cooldown cycle.
   useEffect(() => {
-    // The premise for a density clamp is "still struggling at the lowest
-    // quality tier" — once any of that stops holding, drop it immediately
-    // rather than leaving a render-only cut in place with nothing left to
-    // clear it (#107 §5).
-    if (!autoQuality || fps >= LOW_FPS || quality !== 'performance') {
+    const healthy = !autoQuality || fps >= LOW_FPS;
+
+    // Recovery: render-only cuts auto-clear the moment the premise stops
+    // holding. frameLock is a user choice and is never auto-cleared here.
+    // (The count clamp keeps its original nuance: its premise is "still
+    // struggling at the lowest tier", so it also clears on tier change.)
+    if (healthy || quality !== 'performance') {
       if (perfClampOverride) setPerfClampOverride(null);
+    }
+    if (healthy) {
+      if (fxShedLevel > 0) setFxShedLevel(0);
+      if (assetThin) setAssetThin(false);
     }
 
     if (!autoQuality) {
@@ -131,20 +143,44 @@ export function usePerformanceGovernor() {
 
     if (!sustained || !cooled) return;
 
-    // Step quality down
-    if (quality === 'high') {
-      setQuality('balanced');
+    const step = (label) => {
       lastActionRef.current = now;
       lowSinceRef.current = null;
-      console.info('[Kinetic] Auto quality → balanced (FPS sustained below', LOW_FPS, ')');
+      console.info('[Kinetic] Showrunner cut:', label, '(FPS sustained below', LOW_FPS + ')');
+    };
+
+    // Cuts 1–2: FX shedding comes FIRST. A filter chain re-renders every
+    // frame while anything beneath it animates, so FX is the steepest cost
+    // per unit of visual change (the Resolume "effect stack" lesson).
+    // Dormant until kind:'fx' layers exist (#152) — the guard keeps the
+    // ladder from spending steps on nothing.
+    const fxActive = layers.filter((l) => l.kind === 'fx' && l.visible !== false).length;
+    if (fxActive > 0 && fxShedLevel < 2) {
+      const next = fxShedLevel + 1;
+      setFxShedLevel(next);
+      step(next === 1
+        ? 'FX simplify — turbulence to 1 octave, grain off'
+        : 'FX bypass — first visible FX layer only');
       return;
     }
 
+    // Cut 3: quality tier step (placement + particle budgets).
+    if (quality === 'high') {
+      setQuality('balanced');
+      step('quality → BALANCED');
+      return;
+    }
     if (quality === 'balanced') {
       setQuality('performance');
-      lastActionRef.current = now;
-      lowSinceRef.current = null;
-      console.info('[Kinetic] Auto quality → performance (FPS sustained below', LOW_FPS, ')');
+      step('quality → PERF');
+      return;
+    }
+
+    // Cut 5: cost-aware asset thinning. (Cut 4 — mirror/gloss/ACCUM — is
+    // the independent perfTier1 mechanism at its own lower FPS floor.)
+    if (!assetThin) {
+      setAssetThin(true);
+      step('asset thinning — highest-cost assets drop first');
       return;
     }
 
@@ -157,9 +193,18 @@ export function usePerformanceGovernor() {
     if (effectiveCount > 120) {
       const next = Math.max(80, Math.floor(effectiveCount * 0.7));
       setPerfClampOverride({ count: next, mirror: false });
-      lastActionRef.current = now;
-      lowSinceRef.current = null;
-      console.info('[Kinetic] Performance clamp (live only): count →', next, ', mirror off');
+      step(`count clamp (live only) → ${next}`);
+      return;
     }
-  }, [fps, quality, autoQuality, setQuality, layoutParams.count, perfClampOverride, setPerfClampOverride]);
+
+    // Cut 6: freeze motion. Reuses the tested slowRender path (pauses
+    // evolve/ambient-drift/ACCUM/swarm); it auto-clears on recovery in the
+    // critical effect above. A still instrument beats a dead one.
+    if (!slowRender) {
+      setSlowRender(true);
+      step('motion frozen (slowRender)');
+    }
+  }, [fps, quality, autoQuality, setQuality, layoutParams.count, perfClampOverride,
+    setPerfClampOverride, layers, fxShedLevel, setFxShedLevel, assetThin,
+    setAssetThin, slowRender, setSlowRender]);
 }

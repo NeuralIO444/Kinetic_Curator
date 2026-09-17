@@ -6,6 +6,7 @@ import { AssetSpriteSheet } from '../components/AssetSpriteSheet.jsx';
 import { MaterialSheet } from '../components/MaterialSheet.jsx';
 import { getQualityCaps, shouldRenderGloss } from '../data/quality.js';
 import { clampCount } from '../engine/buildPlacements.js';
+import { getAssetCost } from '../assets/cost.js';
 import { resolvePalette } from '../data/palettes.js';
 import { getPreset } from '../data/presets.js';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
@@ -67,11 +68,12 @@ export function CanvasPanel() {
     perfClampOverride: s.perfClampOverride,
     slowRender: s.slowRender,
     perfTier1: s.perfTier1,
+    assetThin: s.assetThin,
   }));
   const {
     layoutParams, weightOverrides, evolveMode, beatPulse, audioBands,
     motionSmoothing, quality, running, layers, activeLayerId, slowRender,
-    perfTier1,
+    perfTier1, assetThin,
   } = state;
 
   const preset = getPreset(layoutParams.composition);
@@ -100,18 +102,31 @@ export function CanvasPanel() {
       ? { ...src.layoutParams, mirror: false }
       : src.layoutParams;
     const palette = resolvePalette(src.paletteId, src.paletteOverrides, state.userPalettes);
-    const activeAssets = assets
+    let activeAssets = assets
       .filter(a => src.enabledAssets[a.id])
       .map(a => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
+    // Showrunner cut 5: cost-aware thinning. When the governor engages it,
+    // the most expensive assets drop first (highest costScore), instead of
+    // thinning uniformly — the visual loss per frame saved is minimized.
+    // Render-only: enabledAssets in the project are untouched.
+    if (assetThin && activeAssets.length > 1) {
+      const ranked = [...activeAssets].sort((a, b) => getAssetCost(b) - getAssetCost(a));
+      const drop = Math.max(1, Math.ceil(ranked.length * 0.25));
+      const dropped = new Set(ranked.slice(0, drop).map(a => a.id));
+      activeAssets = activeAssets.filter(a => !dropped.has(a.id));
+    }
     const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
     const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
     return { layer, ...src, layoutParams, palette, activeAssets, safeCount, safeParticles };
-  }), [visibleLayers, state, assets, weightOverrides, caps, perfTier1]);
+  }), [visibleLayers, state, assets, weightOverrides, caps, perfTier1, assetThin]);
 
+  // Cheap-first sprite order (§6): the sprite sheet renders its cache in
+  // cost order, so if anything downstream ever has to drop a sprite, the
+  // expensive ones are already at the tail.
   const spriteAssets = useMemo(() => {
     const seen = new Map();
     for (const rl of resolvedLayers) for (const a of rl.activeAssets) seen.set(a.id, a);
-    return [...seen.values()];
+    return [...seen.values()].sort((a, b) => getAssetCost(a) - getAssetCost(b));
   }, [resolvedLayers]);
 
   const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
