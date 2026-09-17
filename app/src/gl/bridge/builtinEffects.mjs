@@ -12,7 +12,8 @@
 
 import { FULL_VS, EFFECT_FS, EFFECT_IDS } from '../shaders.mjs';
 
-const UNIFORMS = {
+/** Declared upload set for the builtin 'effect' program — also the harness audit list. */
+export const UNIFORMS = {
   u_src: { kind: 'sampler', unit: 0 },
   u_aux: { kind: 'sampler', unit: 1 },
   u_effect: { kind: 'int' },

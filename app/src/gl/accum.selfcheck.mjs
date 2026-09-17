@@ -24,6 +24,7 @@ import {
   mirrorFlowVec,
   createEchoState,
   mirrorAccumStep,
+  ACCUM_PROGRAMS,
 } from './accum.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolveLayers } from '../../../studio/render.mjs';
@@ -388,6 +389,41 @@ ok('mirror: echoes mix past frames, echoes = 0 is a no-op', () => {
   assert.equal(s2[4], 0, 'step 2: untouched texel stays dark');
   // Missing state with taps > 0 is a loud error, not silent wrongness.
   assert.throws(() => mirrorAccumStep({ accum: silent, frame: dotAt(0), w: w4, h: h4, params }), /echo state/);
+});
+
+// --- harness coverage: every ACCUM program is audit-registered ---------------
+// The #193 second pass routes all eight ACCUM programs (fade/feed/echo/
+// copy/over/down/blur/add) through the checked compile/link builders and
+// the uniform audit in createAccum. The real compile needs a GL context
+// (covered in the debug harness's in-page suite); here in Node we prove
+// the audit table is complete and honest: every uniform each shader
+// declares is in its program's upload list — the exact direction the
+// checked audit throws on.
+const parseShaderUniforms = (src) => {
+  const names = [];
+  const re = /uniform\s+\w+\s+(\w+)\s*;/g;
+  let m;
+  while ((m = re.exec(src || ''))) names.push(m[1]);
+  return names;
+};
+
+ok('harness: ACCUM_PROGRAMS covers all eight GPU programs', () => {
+  const keys = Object.keys(ACCUM_PROGRAMS).sort();
+  assert.deepEqual(keys, ['add', 'blur', 'copy', 'down', 'echo', 'fade', 'feed', 'over']);
+  for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
+    assert.equal(typeof def.fs, 'string', `${name}: has shader source`);
+    assert.ok(def.fs.includes('void main'), `${name}: source is a shader`);
+    assert.ok(Array.isArray(def.uniforms) && def.uniforms.length > 0, `${name}: has an upload list`);
+    assert.equal(typeof def.file, 'string', `${name}: names its file for errors`);
+  }
+});
+
+ok('harness: every uniform each ACCUM shader declares is in its upload list', () => {
+  for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
+    const declared = parseShaderUniforms(def.fs);
+    const missing = declared.filter((u) => !def.uniforms.includes(u));
+    assert.deepEqual(missing, [], `accum-${name}: declared-but-never-set [${missing}]`);
+  }
 });
 
 // --- browser: GPU recipe vs JS mirror ---------------------------------------

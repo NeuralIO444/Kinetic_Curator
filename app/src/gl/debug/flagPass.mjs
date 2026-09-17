@@ -15,7 +15,7 @@
  * readPixels of the output lines up 1:1 with the uploaded texture rows.
  */
 
-import { buildProgramChecked, checkGlError } from './diagnostics.mjs';
+import { buildProgramChecked, auditProgramChecked, checkGlError } from './diagnostics.mjs';
 
 export const FLAG_VIEWS = Object.freeze({
   NAN: 'nan',
@@ -77,6 +77,10 @@ export function createFlagPass(gl) {
     name: 'flagPass',
     vsFile: 'flagPass.vs.glsl',
     fsFile: 'flagPass.fs.glsl',
+  });
+  auditProgramChecked(gl, prog, ['u_src', 'u_view'], {
+    name: 'flagPass',
+    file: 'flagPass.fs.glsl',
   });
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);

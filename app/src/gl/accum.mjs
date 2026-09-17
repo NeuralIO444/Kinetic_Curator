@@ -49,7 +49,7 @@
  */
 
 import { FULL_VS, COPY_FS } from './shaders.mjs';
-import { buildProgramChecked } from './debug/diagnostics.mjs';
+import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
 
 export const ACCUM_VERSION = 1;
 
@@ -183,7 +183,7 @@ export function sanitizeAccumEchoes(v) {
 
 // --- GLSL -----------------------------------------------------------------
 
-const FADE_FS = `#version 300 es
+export const FADE_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
 uniform float u_keep;
@@ -224,7 +224,7 @@ void main() {
 // field (no textures). The hash is integer-based so the JS mirror can
 // reproduce it exactly (float sin-hashes diverge between GPU float32 and
 // JS float64). Skipped on the CPU side at flow = 0 — exact old behavior.
-const FEED_FS = `#version 300 es
+export const FEED_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
 uniform float u_flow;   // max UV displacement; 0 = off (pass skipped)
@@ -265,7 +265,7 @@ void main() {
 // Phase B3 — echoes. Mixes the live frame with ring-buffer taps:
 // tap i holds the frame from i+1 steps ago (delays 1..K). Additive
 // ghosts — the live frame stays at weight 1.0.
-const ECHO_FS = `#version 300 es
+export const ECHO_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;   // live frame
 uniform sampler2D u_t0;
@@ -286,7 +286,7 @@ void main() {
   o = vec4(acc.rgb, min(acc.a, 1.0));
 }`;
 
-const OVER_FS = `#version 300 es
+export const OVER_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;   // new frame
 uniform sampler2D u_dst;   // faded accum
@@ -299,7 +299,7 @@ void main() {
 }`;
 
 // 4x4 box downsample via texelFetch (filtering-independent, exact).
-const DOWN_FS = `#version 300 es
+export const DOWN_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
 in vec2 v_cuv;
@@ -317,7 +317,7 @@ void main() {
 
 // Separable gaussian, same kernel convention as the builtin blur effect
 // (EFFECT_FS): w0 = 1/sqrt(2pi)/sigma, R = ceil(3*sigma), normalized.
-const BLUR_FS = `#version 300 es
+export const BLUR_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
 uniform vec2 u_texel;    // 1/w, 1/h of the write target in device px
@@ -343,7 +343,7 @@ void main() {
   o = acc / wsum;
 }`;
 
-const ADD_FS = `#version 300 es
+export const ADD_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_base;    // full-res accum
 uniform sampler2D u_bloom;   // quarter-res blurred light (NEAREST)
@@ -371,6 +371,23 @@ void main() {
   vec3 glow = sampleBloom(v_cuv);
   o = vec4(base.rgb + u_amount * u_tint * glow, base.a);
 }`;
+
+/**
+ * Every ACCUM GPU program in one table — the single source of truth for
+ * what createAccum builds and what the debug harness audits (#193 second
+ * pass). `uniforms` is the exact set each pass's setup callback uploads;
+ * the checked audit throws if the shader declares anything outside it.
+ */
+export const ACCUM_PROGRAMS = {
+  fade: { fs: FADE_FS, file: 'accum.mjs:FADE_FS', uniforms: ['u_src', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'] },
+  feed: { fs: FEED_FS, file: 'accum.mjs:FEED_FS', uniforms: ['u_src', 'u_flow'] },
+  echo: { fs: ECHO_FS, file: 'accum.mjs:ECHO_FS', uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps'] },
+  copy: { fs: COPY_FS, file: 'shaders.mjs:COPY_FS', uniforms: ['u_src'] },
+  over: { fs: OVER_FS, file: 'accum.mjs:OVER_FS', uniforms: ['u_src', 'u_dst'] },
+  down: { fs: DOWN_FS, file: 'accum.mjs:DOWN_FS', uniforms: ['u_src'] },
+  blur: { fs: BLUR_FS, file: 'accum.mjs:BLUR_FS', uniforms: ['u_src', 'u_texel', 'u_sigma', 'u_vertical'] },
+  add: { fs: ADD_FS, file: 'accum.mjs:ADD_FS', uniforms: ['u_base', 'u_bloom', 'u_bloomSize', 'u_amount', 'u_tint'] },
+};
 
 // --- targets ---------------------------------------------------------------
 
@@ -668,15 +685,18 @@ export function createAccum(gl, bridge, { width, height }) {
   const progs = {};
   const locs = {};
   const build = () => {
-    const defs = {
-      fade: FADE_FS, feed: FEED_FS, echo: ECHO_FS, copy: COPY_FS,
-      over: OVER_FS, down: DOWN_FS, blur: BLUR_FS, add: ADD_FS,
-    };
-    for (const [name, fs] of Object.entries(defs)) {
-      progs[name] = buildProgramChecked(gl, FULL_VS, fs, {
+    for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
+      progs[name] = buildProgramChecked(gl, FULL_VS, def.fs, {
         name: `accum-${name}`,
         vsFile: 'accum.mjs:FULL_VS',
-        fsFile: `accum.mjs:${name.toUpperCase()}_FS`,
+        fsFile: def.file,
+      });
+      // Uniform gate (#193 second pass): the shader may only declare
+      // uniforms its pass uploads. A mismatch throws here — naming the
+      // pass and file — instead of failing silently mid-render.
+      auditProgramChecked(gl, progs[name], def.uniforms, {
+        name: `accum-${name}`,
+        file: def.file,
       });
       const L = {};
       const U = (n) => gl.getUniformLocation(progs[name], n);

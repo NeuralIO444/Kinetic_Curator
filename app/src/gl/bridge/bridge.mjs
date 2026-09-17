@@ -32,7 +32,7 @@
  * Phase-1 builtins declare pad: 0, so the static-frame path is unchanged.
  */
 
-import { buildProgramChecked } from '../debug/diagnostics.mjs';
+import { buildProgramChecked, auditProgramChecked } from '../debug/diagnostics.mjs';
 
 export const BRIDGE_VERSION = 1;
 
@@ -127,6 +127,14 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
       name,
       vsFile: def.file ? `${def.file}:vs` : undefined,
       fsFile: def.file ? `${def.file}:fs` : undefined,
+    });
+    // Uniform gate (#193 second pass): every uniform the shader declares
+    // must be in the program's declared upload set — a shader that
+    // declares a uniform nobody sets fails here, naming the program and
+    // file, instead of rendering wrong downstream.
+    auditProgramChecked(gl, program, Object.keys(def.uniforms || {}), {
+      name,
+      file: def.file,
     });
     stats.programsCompiled++;
     return { program, name, locations: new Map() };

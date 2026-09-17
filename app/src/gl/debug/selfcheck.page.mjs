@@ -8,6 +8,7 @@ import {
   compileShaderChecked,
   buildProgramChecked,
   auditUniforms,
+  auditProgramChecked,
   checkGlError,
   diagnosticsLog,
   ShaderCompileError,
@@ -31,6 +32,16 @@ import {
   chunksUsedBy,
 } from '../effects/chunks.mjs';
 import { refHash12, refVnoise } from '../effects/chunkReference.mjs';
+// Shipped-shader coverage (#193 second pass): every program the app
+// compiles goes through the checked builders + uniform audit here, so a
+// compile/link/audit regression fails the suite with the effect, file,
+// and line on the failure.
+import { RENDERER_PROGRAMS } from '../renderer.mjs';
+import { ACCUM_PROGRAMS } from '../accum.mjs';
+import { UNIFORMS as BUILTIN_EFFECT_UNIFORMS } from '../bridge/builtinEffects.mjs';
+import { FULL_VS, EFFECT_FS } from '../shaders.mjs';
+import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
+import { TEMPLATE_VS, uniformDecls } from '../effects/template.mjs';
 
 const failures = [];
 const lines = [];
@@ -370,6 +381,69 @@ void main() {
       'direct chunk uses'
     );
     eq(chunksUsedBy('void main() {}').length, 0, 'no chunk uses');
+  });
+
+  // ---- shipped shader coverage (#193 second pass) ----
+  // Every program the app ships: compile + link through the checked
+  // builders, then the uniform audit against the same upload lists
+  // production uses (RENDERER_PROGRAMS / ACCUM_PROGRAMS / the bridge's
+  // declared uniform sets). A failure throws with the effect, file, and
+  // line — the log() wrapper records it as a failed case.
+  for (const def of RENDERER_PROGRAMS) {
+    log(`coverage: renderer/${def.name} compiles + audits clean`, () => {
+      const p = buildProgramChecked(gl, def.vs, def.fs, {
+        name: `coverage-${def.name}`, vsFile: def.vsFile, fsFile: def.fsFile,
+      });
+      try {
+        auditProgramChecked(gl, p, def.uniforms, { name: `coverage-${def.name}`, file: 'shaders.mjs' });
+      } finally {
+        gl.deleteProgram(p);
+      }
+    });
+  }
+  for (const [pname, def] of Object.entries(ACCUM_PROGRAMS)) {
+    log(`coverage: accum-${pname} compiles + audits clean`, () => {
+      const p = buildProgramChecked(gl, FULL_VS, def.fs, {
+        name: `accum-${pname}`, vsFile: 'accum.mjs:FULL_VS', fsFile: def.file,
+      });
+      try {
+        auditProgramChecked(gl, p, def.uniforms, { name: `accum-${pname}`, file: def.file });
+      } finally {
+        gl.deleteProgram(p);
+      }
+    });
+  }
+  log('coverage: bridge builtin effect program compiles + audits clean', () => {
+    const p = buildProgramChecked(gl, FULL_VS, EFFECT_FS, {
+      name: 'effect', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:EFFECT_FS',
+    });
+    try {
+      auditProgramChecked(gl, p, Object.keys(BUILTIN_EFFECT_UNIFORMS), {
+        name: 'effect', file: 'shaders.mjs:EFFECT_FS',
+      });
+    } finally {
+      gl.deleteProgram(p);
+    }
+  });
+  for (const [kind, def] of FX_SHADER_EFFECTS) {
+    log(`coverage: fx/${kind} compiles + audits clean`, () => {
+      const p = buildProgramChecked(gl, TEMPLATE_VS, injectCommon(def.fs), {
+        name: `fx/${kind}`, vsFile: 'template.mjs:TEMPLATE_VS', fsFile: def.file,
+      });
+      try {
+        auditProgramChecked(gl, p, Object.keys(uniformDecls(def.descriptor)), {
+          name: `fx/${kind}`, file: def.file,
+        });
+      } finally {
+        gl.deleteProgram(p);
+      }
+    });
+  }
+  log('coverage: flagPass compiles + audits clean', () => {
+    // createFlagPass builds through buildProgramChecked + the checked
+    // audit internally — constructing it here exercises both.
+    const fp = createFlagPass(gl);
+    fp.dispose();
   });
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
