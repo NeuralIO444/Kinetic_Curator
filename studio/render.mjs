@@ -14,7 +14,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ASSETS } from '../app/src/data/assets/index.js';
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
-import { bakeSwarmItems } from '../app/src/engine/kernel/bake/index.js';
+import { bakeSwarmItems, ensureSwarmWasm } from '../app/src/engine/kernel/bake/index.js';
 import { resolvePalette } from '../app/src/data/palettes.js';
 import { getRenderCaps, shouldRenderGloss } from '../app/src/data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../app/src/data/layout-modes.js';
@@ -25,6 +25,13 @@ import { fxFilterStringForLayer, fxFilterId, isFxLayer } from '../app/src/fx/fxF
 
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
+
+// #175 — start loading the Rust/wasm swarm fast path as soon as this module
+// loads. Bakes transparently fall back to the JS engine until it resolves
+// (or if it fails). Await whenSwarmWasmReady() before rendering when the
+// fast path matters (benchmarks, exports).
+const swarmWasmReady = ensureSwarmWasm();
+export function whenSwarmWasmReady() { return swarmWasmReady; }
 const ASSET_SIZE = 100;
 const HALF = ASSET_SIZE / 2;
 
@@ -378,6 +385,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(2);
   }
   const doc = loadProject(args._[0]);
+  // #175 — warm up the wasm fast path before the first bake (falls back to
+  // JS transparently if the module is unavailable).
+  await whenSwarmWasmReady();
   // The repro report (#106 item 4): everything needed to explain, later, how
   // this edition was produced — and in particular every place the renderer
   // silently substituted something. studio.py embeds it in the sidecar.

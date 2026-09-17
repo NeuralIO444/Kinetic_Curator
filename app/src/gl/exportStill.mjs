@@ -49,7 +49,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
-import { resolveLayers } from '../../../studio/render.mjs';
+import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderExportViaGL, closeGlDriver } from './parity/glDriver.mjs';
 import { writePngFile } from './png.mjs';
@@ -162,6 +162,7 @@ export async function renderExport({
   }
   const d = seed != null ? { ...doc, seed: seed >>> 0 } : doc;
   const caps = getRenderCaps(d.quality || 'balanced', !!uncapped);
+  await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
   const resolvedLayers = resolveLayers(d, {
     caps,
     ramp: ramp || null,
