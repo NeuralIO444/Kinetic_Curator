@@ -216,19 +216,32 @@ export const createGlobalSlice = (set) => ({
     const result = removeFromOverlay(id, state.customAssets);
     if (!result.ok) return { ingestError: result.error };
     const enabled = { ...state.enabledAssets };
+    const overrides = { ...(state.assetWeightOverrides || {}) };
     delete enabled[id];
-    return { customAssets: result.overlay, enabledAssets: enabled, ingestError: null };
+    delete overrides[id];
+    return { customAssets: result.overlay, enabledAssets: enabled, assetWeightOverrides: overrides, ingestError: null };
   }),
 
   renameCustomAsset: (id, name) => set((state) => {
     const result = renameOverlayAsset(id, name, state.customAssets);
     if (!result.ok) return { ingestError: result.error };
     const enabled = { ...state.enabledAssets };
+    const overrides = { ...(state.assetWeightOverrides || {}) };
     if (result.from !== result.to) {
-      enabled[result.to] = enabled[result.from];
-      delete enabled[result.from];
+      // Propagate the rename to every id-keyed map so no stale reference
+      // to the old id survives (#134: overrides used to be left behind,
+      // silently resetting the renamed asset's weight and persisting the
+      // dead id into saved project documents).
+      if (result.from in enabled) {
+        enabled[result.to] = enabled[result.from];
+        delete enabled[result.from];
+      }
+      if (result.from in overrides) {
+        overrides[result.to] = overrides[result.from];
+        delete overrides[result.from];
+      }
     }
-    return { customAssets: result.overlay, enabledAssets: enabled, ingestError: null };
+    return { customAssets: result.overlay, enabledAssets: enabled, assetWeightOverrides: overrides, ingestError: null };
   }),
 
   replaceCustomAsset: (id, svg) => set((state) => {
