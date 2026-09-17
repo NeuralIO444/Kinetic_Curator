@@ -1,3 +1,5 @@
+> **Historical roadmap (12-bundle plan, pre-0.8).** Superseded by the shipped work. Kept for the record.
+
 # Kinetic Curator — Session Roadmap
 
 > 12 bundles · each ≈ 1 session · ordered by dependency

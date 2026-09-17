@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — WebGL export spine (2026-09-17)
+
+The live tab stays a React/SVG preview instrument; every stills path now
+renders through the WebGL2 GPU pipeline. Parity between the two is proven by
+a headless selfcheck on fixed seeds (Matt's bar: under 10% pixel difference
+is a pass — this is art, not rocket science).
+
+- **Phase 0** — GL scene contract (`docs/GL_CONTRACT.md`) + parity harness, wired into `npm run selfcheck`.
+- **Phase 1** — texture-atlas asset rendering on WebGL2.
+- **JS↔GL bridge** — `app/src/gl/bridge/` ships JS state into GL textures.
+- **Shader debug harness** — dev-only GLSL tooling (compile diagnostics, flag pass, tap points, printf strip, GPU timer); Shader Lab panel lazy-loads behind `import.meta.env.DEV`.
+- **Effect-authoring template** + shared GLSL chunk library — one effect = one fragment shader + one param descriptor.
+- **Phase 2** — GPU FX library: rgbSplit, displace, tear, grain, blur, scanlines, posterize, invert, solarize, edge as GLSL passes.
+- **Phase 3** — layer compositing + mattes on the GPU.
+- **Phase 4** — GPU accumulation (ping-pong textures) + bloom / halation / blur-over-time optics.
+- **Phase 5** — finals via GPU readback (`app/src/gl/exportStill.mjs`): 1×–8K PNG + JSON sidecar, off-store — the old flip-then-restore mechanism is deleted. resvg retired from finals; the SVG emitter is now a dev-only parity reference.
+- **Phase 6** — SVG renderer removed from the shipped bundle; governor retuned (resolution sheds before effects — see `docs/SHOWRUNNER.md`); `maxFxLayers` budgets retired; shed states are always reported, never silent.
+- **Quality pillars (#168)** — one kernel, one seed; finals off-store; caps hold; substitutions recorded in the sidecar.
+- **Moth bodies remainder (#109)** — second blend ladder + u-driven paint.
+- **Organism contacts (#167)** — radius, repel, bounce, swap, breed through one integrator (no second physics engine).
+- **Overlay QA (#134)** — ingest/overlay selfchecks wired into the normal selfcheck command.
+- **VORTEX RWB preset (#178)** — kaleidoscopic red/white/blue ribbons (fibonacci + soft blobs + displacement; see `docs/VORTEX_RWB.md`).
+- **KILN COLUMNS preset (#179)** — lathe-like organic stacks on a dusty matte palette (see `docs/KILN_COLUMNS.md`).
+
 ## 0.9.0 — 2026-09-15
 
 ### Kernel v1 (sleeper math backend)

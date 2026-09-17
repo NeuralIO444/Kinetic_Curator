@@ -4,8 +4,10 @@ The exact data interface the WebGL backend consumes. This document is the
 normative spec; `app/src/gl/sceneContract.js` is the implementation and
 `app/src/gl/sceneContract.selfcheck.mjs` is the executable verification.
 
-**Status:** v1. No GL rendering code exists yet — this phase defines the
-contract and the parity harness only.
+**Status:** v1, live. Phases 0–6 all shipped 2026-09-17; the WebGL2 backend
+is the finals/export renderer and this contract is the interface it consumes.
+The SVG emitter (`studio/render.mjs`) survives in-repo only as the dev-only
+parity reference the harness diffs against.
 
 ## Decisions baked in
 

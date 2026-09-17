@@ -1,3 +1,5 @@
+> **Direction spec (2026-09-15).** The core thesis — *realtime is the product; pause, then render high-res* — still holds, and the WebGL2 export spine (2026-09-17) is its direct descendant. Details below are the original reasoning, kept as written.
+
 # Kinetic Curator — next generation spec
 
 Target, in the artist's words: **realtime performance is the core; pause, then

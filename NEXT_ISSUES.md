@@ -56,7 +56,30 @@ Primary tracks:
 3. **#107 Live harden** — state firewall, life drift out of document state, fail-soft canvas (share normalize with #106).
 4. **#109 Moth Bodies** — second ladder + paint `u` (after columns are stable).
 
-Closed while building the epics (reference): #90 true-res ACCUM offline; #91 Curator real-hits follow-up may still need ops labels. Residual notes in [docs/BUGLIST.md](docs/BUGLIST.md).
+## WebGL export spine — shipped 2026-09-17
+
+The WebGL work order (labels `order:01`–`order:19`) replaced the SVG/resvg
+finals path with a WebGL2 GPU pipeline. All phases merged to main; the SVG
+emitter is now a dev-only parity reference.
+
+| # | Phase | Outcome |
+|---|--------|---------|
+| #186 | Phase 0 — contracts + parity harness | **Shipped** (`docs/GL_CONTRACT.md`, `app/src/gl/parity/`) |
+| #187 | Phase 1 — texture-atlas asset rendering | **Shipped** |
+| #193 | Shader debug harness | **Shipped** (`docs/SHADER_DEBUG.md`, dev-only) |
+| #194 | JS↔GL bridge | **Shipped** |
+| #195 | Effect-authoring template | **Shipped** |
+| #196 | Shared GLSL chunk library | **Shipped** |
+| #188 | Phase 2 — GPU FX library (10 effects) | **Shipped** |
+| #189 | Phase 3 — layer compositing + mattes | **Shipped** (#154 absorbed — do not build separately) |
+| #190 | Phase 4 — GPU accumulation + bloom | **Shipped** (#169 absorbed — do not build separately) |
+| #191 | Phase 5 — finals via GPU readback (1×–8K) | **Shipped** (#176 absorbed — do not build separately) |
+| #192 | Phase 6 — SVG retirement + governor retune | **Shipped** |
+
+Absorbed (closed, do-not-build-separately): #154 (into Phase 3), #169 (into
+Phase 4), #176 (into Phase 5). Remaining live issues: #175 (swarm bake 30ms
+budget), #177 (UX polish), #172 (print desk), #114 (Asset Studio),
+#103/#104/#158 (independent backlog).
 
 ## Possible follow-ups (not filed)
 

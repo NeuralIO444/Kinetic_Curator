@@ -1,21 +1,31 @@
 # studio — headless render farm
 
 Backend A of [`docs/BACKEND_V2_PLAN.md`](../docs/BACKEND_V2_PLAN.md) §3.A ([#74](https://github.com/NeuralIO444/Kinetic_Curator/issues/74)).
-Renders project JSON to PNG/MP4 offline, no browser.
+Renders project JSON to PNG/MP4 offline (headless Chromium — no visible browser, no tab).
 
 ```
-project.json → node render.mjs (the app's real JS kernel) → SVG → resvg → PNG → ffmpeg → MP4
+project.json → app/src/gl/exportStill.mjs (WebGL2, headless Chromium) → PNG → ffmpeg → MP4
 ```
 
-`render.mjs` imports `app/src/engine/buildPlacements.js` directly. **No geometry
-math is reimplemented here or in Python** — that is the rule in §2.1, and the
-golden-hash fixture (`app/src/engine/goldenPlacement.selfcheck.mjs`) depends on it.
+The stills path is the **same GPU pipeline** the app uses for finals:
+project → `resolveLayers` → `buildSceneContract` → offscreen WebGL2 render →
+readback. **No geometry math is reimplemented here or in Python** — that is
+the rule in §2.1, and the golden-hash fixture
+(`app/src/engine/goldenPlacement.selfcheck.mjs`) depends on it. Since #191
+(#192), resvg is retired from finals: the SVG emitter (`studio/render.mjs`)
+stays in-repo only as the dev-only parity reference the GPU harness diffs
+against, and its `resolveLayers()` remains the shared layer plumbing the GL
+path uses.
 
 ## Install
 
 ```sh
-brew install resvg ffmpeg     # native binaries; the CLI does the rasterising/encoding
+brew install ffmpeg            # video assembly only
+cd app && npx playwright install chromium   # the GPU render paths run headless Chromium
 ```
+
+If Chromium is missing, `render`/`batch`/`video` **refuse** (non-zero exit)
+rather than rendering a different recipe.
 
 Python is stdlib-only, so `python3 studio/studio.py …` works as-is. `uv run`
 also works if you prefer a pinned interpreter:
@@ -55,11 +65,10 @@ python3 studio/studio.py video my.project.json -o out.mp4 \
 `video --accum` and `batch --accum` exit non-zero. ACCUM is a still stack.
 Video is `--motion`. Live WEBM in the tab does not record the ACCUM buffer.
 
-`render.mjs` is usable on its own if you only want the SVG:
-
-```sh
-node studio/render.mjs my.project.json --out out.svg --seed 42 --uncapped
-```
+> `studio/render.mjs` is **not** an export path anymore. `node
+> studio/render.mjs my.project.json --out out.svg` emits the dev-only SVG
+> parity reference (#192) — for diffing against the GPU candidate, not for
+> shipped output. Shipped output is raster-only via the GPU readback path.
 
 ### Video motion
 
@@ -82,29 +91,26 @@ letterboxes with `preserveAspectRatio="xMidYMid meet"`; the background rect is
 deliberately oversized so it fills the bars. Use a scale factor (`--res 4`) to
 keep the canvas ratio exactly.
 
-## Fidelity vs. the browser
+## Fidelity vs. the live tab
 
-Verified against the live app (same project, both rendered at 1000×700): identical
-layer count, identical item count, identical per-colour item histogram, ~0.4%
-difference in painted-pixel coverage and 0.018 L1 distance on the RGB histogram.
+The GPU export and the live preview share one kernel and one scene contract;
+the parity harness (`app/src/gl/parity/`, wired into `npm run selfcheck`)
+diffs them on fixed seeds. Known, intentional differences:
 
-Known, intentional differences:
-
-| | Browser | Here |
+| | Live tab | GPU export |
 |---|---|---|
-| `--ink` / `--accent` | CSS custom properties | baked into a deduped `<symbol>` per (asset, ink, accent) — resvg has no `var()` |
-| `filter: hue-rotate()` | CSS filter | `<feColorMatrix type="hueRotate">` |
-| `mix-blend-mode: plus-lighter` | supported | mapped to `screen`; SVG2/resvg has no `plus-lighter` |
-| `font-family: ui-monospace` | SF Mono | `--monospace` flag, default **Menlo** (resvg's own default is Courier New) |
-| rasteriser | Canvas2D | resvg — antialiasing differs at shape edges |
+| Gradient materials (plate / wash / stipple) | rendered | **not rendered** — the GL backend has no gradient shading; studio stills warn on stderr when a project uses one, and the sidecar keeps the authored value on record (#168) |
+| `mix-blend-mode: plus-lighter` | supported | mapped to `screen` (matches the SVG reference substitution; recorded in the sidecar, #96) |
+| FX grain / displace / tear | `feTurbulence` | GPU noise — same structure, subtly different pattern (excluded from the determinism contract, like audio/LFO) |
+| rasteriser | Canvas2D/SVG | WebGL2 — antialiasing differs at shape edges |
 
 ## Not covered
 
-- **`swarm` / `hype` modes.** Those are a live particle sim (`useSwarmTick`,
-  driven by `Date.now()`), not a placement function; there is nothing
-  deterministic to re-derive offline. Such layers fall back to
-  `buildPlacements`, which is *not* what the browser draws for them.
-- **ACCUM movies / batch trails.** `render --accum` restacks N SVG frames into
+- **Swarm without a bake.** `swarm` / `hype` layers replay deterministically
+  when the project carries a particle bake (`bakeSwarmItems`, #63); an
+  unbaked swarm layer has nothing deterministic to re-derive and falls back
+  to `buildPlacements`.
+- **ACCUM movies / batch trails.** `render --accum` restacks N GPU frames into
   one still. `video` and `batch` refuse `--accum` (#137). Live WEBM does not
   sample the tab buffer.
 - **Audio / beat / evolve modulation** — live-only state, absent from the
@@ -113,6 +119,6 @@ Known, intentional differences:
 ## Check
 
 ```sh
-node studio/selfcheck.mjs      # asserts the emitter agrees with the kernel
-cd app && npm run selfcheck    # golden hash — must stay green, unchanged
+node studio/selfcheck.mjs      # asserts the parity reference agrees with the kernel
+cd app && npm run selfcheck    # golden hash + GL parity — must stay green, unchanged
 ```

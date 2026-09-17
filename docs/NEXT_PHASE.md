@@ -1,3 +1,5 @@
+> **Superseded (2026-09-17).** The WebGL export spine (Phases 0–6) landed after this was written and retired the SVG/resvg finals path. See `CHANGELOG.md` (Unreleased) and `NEXT_ISSUES.md`. Kept as a dated snapshot.
+
 # Next phase — kernel & backend engineering
 
 **Date:** 2026-09-16  

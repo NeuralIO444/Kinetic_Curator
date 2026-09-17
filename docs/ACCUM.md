@@ -8,6 +8,11 @@ shader passes.
 
 ## Migration status (explicit, per #169's share-or-refuse rule)
 
+> 2026-09-17 (#192): Phase 6 deliberately did **not** move the live loop to
+> the GPU — the interactive canvas stays React/SVG. The two recipes below
+> remain intentionally different; this document records the difference
+> instead of hiding it. A live WebGL loop is a separate work order.
+
 - **`studio.py render --accum`** runs the GPU recipe below via
   `app/src/gl/accumStill.mjs`. If Chromium/WebGL is unavailable it **refuses**
   (exit 3) rather than falling back to a different recipe.

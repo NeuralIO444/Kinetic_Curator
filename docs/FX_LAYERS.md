@@ -19,15 +19,22 @@ Adjustment-layer-style SVG filter effects for the layer stack. Implements #180 (
 
 ## Render wiring
 
-Both the live app and the offline studio fold the stack bottom-up with the
-same rule: content layers accumulate; each applied FX layer wraps the
-accumulator in `<g filter="url(#fx-{layerId})">`, then stacking continues
-above it.
+Two recipes, one chaining rule (effect stacks execute top-down: the first
+effect reads the layer source, each later effect reads the previous effect's
+output — #185, frozen as data in `docs/GL_CONTRACT.md`):
 
-- Live: `CanvasPanel.jsx` → `buildLayerStack()`; one `<filter>` per active
-  FX layer rendered by `FxFilterDefs` into `<defs>`.
-- Studio: `studio/render.mjs` — string version of the same fold, filters
-  from `fxFilterStringForLayer()`.
+- **Live app** (React/SVG canvas): folds the stack bottom-up; each applied FX
+  layer wraps the accumulator in `<g filter="url(#fx-{layerId})">`, compiled
+  from `FX_EFFECT_DEFS` by `app/src/fx/fxFilters.js` (`CanvasPanel.jsx` →
+  `buildLayerStack()`; one `<filter>` per active FX layer rendered by
+  `FxFilterDefs` into `<defs>`).
+- **Finals / exports** (WebGL2): the same `effects` arrays compile to GLSL
+  passes (`app/src/gl/effects/`) — one FBO pair + one filter pass per wrap.
+  The GPU recipe is the shipped one.
+- **Legacy SVG studio emitter** (`studio/render.mjs`): the string version of
+  the same fold, now a **dev-only parity reference** (#192) — the parity
+  harness diffs the GPU candidate against it; it is never imported by the
+  shipped bundle.
 
 ## Filter compiler (`app/src/fx/fxFilters.js`)
 
@@ -97,6 +104,11 @@ exact grain/displace/tear pattern varies subtly across renderers. Effect
 deterministic and round-trips exactly through project JSON.
 
 ## Export audit (resvg, via `studio/render.mjs`)
+
+> Historical record — tested 2026-09-16, when the SVG studio emitter was the
+> export recipe. Since #192 the shipped export recipe is the GPU FX chain;
+> this table covers the legacy SVG recipe only and is kept as the audit
+> trail.
 
 Tested 2026-09-16 with `@resvg/resvg-js`: a project with all ten effects
 was rendered to SVG via the studio path and rasterized at 1000×700, plus

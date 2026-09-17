@@ -1,10 +1,10 @@
 # Kinetic Curator
 
-A modern generative art engine and live visual performance tool built with React, Vite, and SVG. Inspired by the workflow of Joshua Davis and the generative algorithms of the demoscene, Kinetic Curator allows artists to build "curated chaos"—intricate, mathematically driven compositions that react to live audio and evolve autonomously.
+A generative art engine and live visual performance tool built with React, Vite, and WebGL2. Inspired by the workflow of Joshua Davis and the generative algorithms of the demoscene, Kinetic Curator allows artists to build "curated chaos"—intricate, mathematically driven compositions that react to live audio and evolve autonomously. The live tab is a fast React/SVG preview instrument; finals, editions, and trail stills render through a WebGL2 GPU pipeline with a pixel-parity harness proving the two agree.
 
-![UI Overview](docs/ui_audit_1778535473448.webp)
+![Vortex RWB preset render](docs/vortex-rwb-final.png)
 
-**Current release: [0.9.0](CHANGELOG.md)** — Kernel v1 complete (K0–K5: index-stable RNG, instanced noise, sampler registry, scalar fields, particle bake, colour channel) + colour authoring, multi-layer compositing, organisms/bodies, asset ingest, studio offline farm, and staged-eval / SoA performance work.
+**Current release: [0.9.0](CHANGELOG.md)** — kernel v1 + colour authoring, multi-layer compositing, organisms, asset ingest, and the studio farm. Since 0.9.0 the export spine went GPU: WebGL2 renderer, GPU FX library, GPU accumulation, and 4K/8K stills via GPU readback (see [CHANGELOG unreleased](CHANGELOG.md)).
 
 ## Core Philosophy: "Curated Chaos"
 
@@ -32,7 +32,13 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 
 ## Features
 
-- **Live SVG engine** — React + SVG nodes across layout modes (Fibonacci, Grid, CA, Orbit, Flow, Swarm, Stratified, …).
+- **Live preview instrument** — React + SVG canvas across layout modes (Fibonacci, Grid, CA, Orbit, Flow, Swarm, Stratified, …). Fast to play; finals render on the GPU.
+- **WebGL2 export engine** — the shipped stills path: scene → GPU textures → 4K/8K PNG via readback. The SVG emitter survives in-repo only as the dev parity reference.
+- **Pixel parity** — a headless harness diffs the GPU render against the SVG reference on fixed seeds, wired into `npm run selfcheck`.
+- **GPU FX library** — 10 effects (rgbSplit, displace, tear, grain, blur, scanlines, posterize, invert, solarize, edge) as GLSL passes, chained per FX layer.
+- **GPU accumulation** — HYPE-style trail buffer on GPU ping-pong textures with bloom, halation, and blur-over-time optics.
+- **Showrunner governor** — sheds load in a defined order (resolution scaling first, then quality, asset thinning, count clamp, motion freeze). Shed states are reported, never silent.
+- **Render quality pillars** — one kernel, one seed; finals render off-store with no live-state mutation; caps hold; substitutions are recorded in the sidecar, never hidden.
 - **Multi-layer compositing** — add / reorder / show-hide layers; per-layer blend + opacity; active layer drives LAYOUT / ASSETS / DAVIS edits.
 - **Audio reactivity** — mic or file drives scale, opacity, and evolve-on-beat.
 - **Davis mode** — time/beat Evolve, morph transitions, phrase clocks, continuous LFO life.
@@ -41,12 +47,13 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 - **Colour authoring** — full palette reveal, slot edit / locks, `paletteShift`, user palette library (save / switch / import-export), harmony schemes + shuffle.
 - **Organisms / bodies** — moth-style hype organisms, bilateral wings, drop→petal ladders, flap-phase behaviour, material defs.
 - **Asset ingest** — paste / drop SVG into overlay; sanitised user assets; duplicate → project overlay.
+- **Presets** — shipped looks including KILN COLUMNS (lathe-like organic stacks on dusty matte) and VORTEX RWB (kaleidoscopic red/white/blue ribbons), plus the classic set.
 - **Export**
-  - SNAP / **RENDER FINAL** (optional UNCAPPED)
-  - **BATCH ×N** — sequential seeds → PNG + JSON sidecar (max 48 in-browser)
+  - SNAP / **RENDER FINAL** (matches the live preview; denser UNCAPPED finals come from the GPU export path)
+  - **BATCH ×N** — sequential seeds → PNG + JSON sidecar (max 48 in-browser; big runs go through `studio.py batch`)
   - **ACCUM** trails (LAYOUT toggle) + CLEAR ACCUM
   - WebM record · project import/export · autosave
-- **Studio (offline)** — headless render farm (`studio/`): Node kernel → SVG → resvg → PNG/MP4; true-res ACCUM; batch editions; Curator CLIP taste model (rank / more-like-this); generative asset expansion (gated); geometry blend + asset audit.
+- **Studio (offline)** — headless render farm (`studio/`): WebGL2 GPU readback stills at any resolution (1×–8K) + PNG sidecar; true-res ACCUM trails; batch editions; video (per-frame GPU renders → ffmpeg MP4); Curator CLIP taste model (rank / more-like-this); generative asset expansion (gated); geometry blend + asset audit.
 - **Perf** — quality caps, gloss LOD, enabled-only symbol sheet, stable placement keys, SoA placement fill, staged eval + dirty-flag cache (geometry skipped on pure life/modulation frames).
 
 ## Technology Stack
@@ -54,9 +61,11 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 - **Framework:** React 19 + Vite 8
 - **State:** Zustand slices + `useApp` dispatch facade + typed event bus
 - **Engine:** Pure kernel (`engine/kernel/*`: rng, noise, sample, field, color, bake) + `buildPlacements` + staged eval cache
+- **Live render:** React/SVG canvas (fast preview instrument)
+- **Finals render:** WebGL2 GPU pipeline (`app/src/gl/*`: texture-atlas assets, GLSL FX, layer compositing, GPU accumulation + bloom, GPU-readback stills) with a dev-only SVG parity reference
 - **Styling:** CSS custom properties (dark creative-tool UI)
-- **Export:** Canvas API + MediaRecorder; offline via `studio/` (resvg + ffmpeg)
-- **CI:** ESLint, `npm run selfcheck` (golden placement SHA + kernel / field / color / bake / harmony / organisms / stagedEval / perf checks), Playwright smoke
+- **Export:** GPU readback → PNG + JSON sidecar; offline farm via `studio/` (headless Chromium + WebGL2); video via ffmpeg
+- **CI:** ESLint, `npm run selfcheck` (golden placement SHA + kernel / field / color / bake / harmony / organisms / stagedEval / perf / GL parity / shader / governor checks), Playwright smoke
 
 ## Installation & Setup (local)
 
@@ -82,13 +91,25 @@ Open **http://localhost:5173**.
 
 ### Offline studio
 
+Stills and editions render on the GPU (headless Chromium + WebGL2) — same
+pipeline the app uses for finals, at any resolution up to 8K. If Chromium is
+missing the commands refuse rather than rendering a different recipe.
+
 ```bash
-# requires resvg + ffmpeg on PATH
+# one still at 8K (+ JSON sidecar)
 python3 studio/studio.py render my.project.json -o out.png --res 7680x4320 --sidecar
-python3 studio/studio.py video my.project.json -o out.mp4 --res 2
+
+# ACCUM trail still (not a movie)
+python3 studio/studio.py render my.project.json -o trails.png --accum --steps 24
+
+# 500 editions, one PNG + one JSON sidecar each
+python3 studio/studio.py batch my.project.json -o editions/ --count 500 --start-seed 0 --res 2
+
+# fixed-timestep frame sequence → MP4 (needs ffmpeg)
+python3 studio/studio.py video my.project.json -o out.mp4 --fps 30 --duration 4 --res 1920x1080
 ```
 
-See [studio/README.md](studio/README.md) for batch, ACCUM, Curator, and generative-asset commands.
+Needs: `ffmpeg` on PATH for video, and `cd app && npx playwright install chromium` for the GPU render paths.
 
 ## Public deployment
 
@@ -110,9 +131,16 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 ## Architecture & Further Reading
 
 - [Architecture](docs/architecture.md)
-- [Kernel v1 plan](docs/KERNEL_V1_PLAN.md) (incl. v2 SoA / staged-eval addendum)
-- [Backend v2 plan](docs/BACKEND_V2_PLAN.md) (studio render farm, Curator, geometry, genassets)
-- [Next phase — kernel & backend](docs/NEXT_PHASE.md) (swarm SoA, studio harden, live survivability)
+- [GL scene contract](docs/GL_CONTRACT.md) — the exact interface the WebGL2 backend consumes
+- [WebGL Phase 6](docs/WEBGL_PHASE6.md) — SVG retirement + governor retune notes
+- [Shader debug harness](docs/SHADER_DEBUG.md) — dev-only GLSL tooling
+- [FX layers](docs/FX_LAYERS.md) — the 10-effect stack, SVG live recipe + GPU export recipe
+- [ACCUM on GPU](docs/ACCUM.md) — the trail recipe (bloom / halation / blur-over-time)
+- [Showrunner](docs/SHOWRUNNER.md) — the realtime performance governor
+- [Render quality](docs/QUALITY.md) — the quality pillars: one kernel, one seed, honest exports
+- [KILN COLUMNS](docs/KILN_COLUMNS.md) / [VORTEX RWB](docs/VORTEX_RWB.md) — shipped preset notes
+- [Kernel v1 plan](docs/KERNEL_V1_PLAN.md) (historical — kernel v1 shipped in 0.9.0)
+- [Backend v2 plan](docs/BACKEND_V2_PLAN.md) (historical — the studio farm shipped)
 - [Known limitations / buglist](docs/BUGLIST.md)
 - [Changelog](CHANGELOG.md)
 - [Kinetic Manifesto](docs/manifesto.md)

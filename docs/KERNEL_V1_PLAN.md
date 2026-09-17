@@ -1,3 +1,5 @@
+> **Historical plan — Kernel v1 shipped in 0.9.0 (2026-09-15).** This document is the planning record, kept for reference; the shipped behavior is in the code and `docs/architecture.md`.
+
 # Kernel v1 — Hardcore math backend (sleeper)
 
 **Status:** Planned  
