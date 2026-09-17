@@ -51,6 +51,14 @@ export const PALETTES = [
     ink: '#224655',
     swatches: ['#7496a1', '#4d7182', '#d9d4d3', '#224655', '#a27a84', '#e95f63'],
   },
+  {
+    id: 'vortex-rwb',
+    name: 'VORTEX RWB',
+    era: 'Ribbon vortex study · 2026',
+    bg: '#f2f3f8',
+    ink: '#8c1f2e',
+    swatches: ['#da4a5b', '#f2f3f8', '#4595f0', '#f2f3f8', '#da4a5b'],
+  },
 ];
 
 /**

@@ -150,6 +150,17 @@ export const COMPOSITION_PRESETS = [
       lifeDrift: 0.04, displacement: 0, behave: 'cruise',
     },
   },
+  {
+    id: 'vortex-rwb', name: 'VORTEX RWB', group: 'classic',
+    desc: 'Ribbon-vortex study — marbled RWB bands warped by Perlin displacement, mirrored. Still image; see docs/VORTEX_RWB.md.',
+    categories: ['organic'], paletteShift: 'band',
+    params: {
+      mode: 'fibonacci', count: 640, scale: [1.3, 2.2], rotate: [0, 0], alpha: [80, 100],
+      zTiers: 3, jitter: 18, density: 100, bleed: true, recolor: true, mirror: true, overlap: true,
+      blendMode: 'normal',
+      lifeDrift: 0.04, displacement: 130, noiseFreq: 0.006, behave: 'cruise',
+    },
+  },
 ];
 
 export function getPreset(id) {
