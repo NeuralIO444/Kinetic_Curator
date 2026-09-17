@@ -57,7 +57,12 @@ window.__kcAccumProbe = (p) => {
   const frameTexs = [];
   try {
     accum.begin(p.bg || '#000000');
-    const params = accumRecipeParams({ fade: p.fade ?? 0.88, optics: p.optics ?? 0 });
+    const params = accumRecipeParams({
+      fade: p.fade ?? 0.88,
+      optics: p.optics ?? 0,
+      tunnel: p.tunnel ?? 0,
+      prism: p.prism ?? 0,
+    });
     for (const bytes of p.frames) {
       const t = texFrom(bytes, w, h);
       frameTexs.push(t);

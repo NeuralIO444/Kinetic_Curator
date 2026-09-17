@@ -51,6 +51,33 @@ not a second engine. Everything is off by default: the recipe only runs when
 the scene contract carries `accum.enabled`; a null `contract.accum` means a
 plain `renderScene` with zero new passes.
 
+## Phase A — feedback: TUNNEL + PRISM (light-tunnels + chromatic drift)
+
+Step 1 (fade) samples the buffer through an affine feedback transform
+before decaying. Two amounts, both 0/off by default — the FEEDBACK sliders
+next to GLOW (`layoutParams.accumulationTunnel`,
+`layoutParams.accumulationPrism`):
+
+- **TUNNEL** 0..1 — per-frame zoom + spin about the canvas center, so motion
+  spirals into light-tunnels. Zoom = 1 + 0.01·t per frame (27% over a
+  24-frame still at full), spin = 0.01·t rad/frame (~14° over the still).
+- **PRISM** 0..1 — radial RGB channel separation (chromatic drift). Red is
+  sampled slightly outward, blue slightly inward, green stays centered:
+  white trails split into rainbow fringes that widen with trail age. Push =
+  0.001·pr UV per frame — tasteful below ~0.4, bold rainbows at long fades
+  near 1 (fringe width ≈ push/(1−keep)).
+
+At 0 both skip the transform branch entirely — exactly the old sample, no
+float drift through the affine math (the optics no-op precedent). The
+feedback textures are bridge-owned NEAREST ping-pong, so sub-texel shifts
+quantize: the effect reads at still sizes (≥~500px) and is exact there —
+GPU-vs-JS-mirror cross-checked in `accum.selfcheck.mjs`.
+
+`studio.py render --accum` accepts `--tunnel` / `--prism` (or reads the
+sliders from the project doc). The in-app RENDER ACCUM button captures the
+live 2D buffer, so tunnel/prism are still-side only — the live canvas keeps
+the legacy 2D path until the live WebGL loop lands (#224).
+
 ## The documented light-feel
 
 The acceptance bar for a trail still:

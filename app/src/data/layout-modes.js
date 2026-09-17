@@ -63,6 +63,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulation: false,
   accumulationFade: 0.88,
   accumulationOptics: 0, // #190: bloom + halation + blur-over-time amount (GLOW slider)
+  accumulationTunnel: 0, // Phase A: feedback zoom/spin amount (TUNNEL slider)
+  accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
 
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
@@ -132,6 +134,8 @@ export const PARAM_SPEC = {
   wind: { min: 0, max: 3 },
   accumulationFade: { min: 0.5, max: 0.99 },
   accumulationOptics: { min: 0, max: 1 },
+  accumulationTunnel: { min: 0, max: 1 },
+  accumulationPrism: { min: 0, max: 1 },
   audioModDepth: { min: 0, max: 1 },
   audioScaleMod: { min: 0, max: 1 },
   audioAlphaMod: { min: 0, max: 1 },

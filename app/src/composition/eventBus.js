@@ -42,6 +42,7 @@ export const Events = {
   DAVIS_RESET_PHRASE: 'davis:resetPhrase',
   DAVIS_FAVORITE: 'davis:favorite',
   DAVIS_FAVORITE_REMOVE: 'davis:favoriteRemove',
+  ACCUM_GESTURE: 'accum:gesture', // Phase A: { action: 'freeze'|'clear'|'swell', value? }
   LAYOUT_PARAM: 'layout:param',
   LAYOUT_PRESET: 'layout:preset',
   LAYOUT_LOCK: 'layout:lock',

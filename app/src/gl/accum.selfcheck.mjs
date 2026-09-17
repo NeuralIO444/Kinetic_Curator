@@ -15,6 +15,8 @@ import {
   ACCUM_VERSION,
   accumRecipeParams,
   sanitizeAccumOptics,
+  sanitizeAccumTunnel,
+  sanitizeAccumPrism,
   mirrorAccumStep,
 } from './accum.mjs';
 import { buildSceneContract } from './sceneContract.js';
@@ -59,6 +61,30 @@ ok('sanitizeAccumOptics clamps to 0..1', () => {
   assert.equal(sanitizeAccumOptics(undefined), 0);
 });
 
+ok('recipe params: Phase A feedback defaults to off (identity transform)', () => {
+  const d = accumRecipeParams();
+  assert.equal(d.tunnelZoom, 1, 'zoom 1 = no-op');
+  assert.equal(d.tunnelSpin, 0, 'spin 0 = no-op');
+  assert.equal(d.prismUv, 0, 'prism 0 = no-op');
+  const p = accumRecipeParams({ tunnel: 1, prism: 1 });
+  assert.ok(p.tunnelZoom > 1 && p.tunnelSpin > 0 && p.prismUv > 0);
+  const half = accumRecipeParams({ tunnel: 0.5, prism: 0.5 });
+  assert.ok(half.tunnelZoom < p.tunnelZoom && half.tunnelSpin < p.tunnelSpin && half.prismUv < p.prismUv,
+    'feedback amounts scale with the sliders');
+  assert.deepEqual(accumRecipeParams({ tunnel: 2, prism: -1 }).tunnelZoom, p.tunnelZoom, 'tunnel clamps at 1');
+  assert.equal(accumRecipeParams({ tunnel: 2, prism: -1 }).prismUv, 0, 'prism clamps at 0');
+});
+
+ok('sanitizeAccumTunnel / sanitizeAccumPrism clamp to 0..1', () => {
+  for (const fn of [sanitizeAccumTunnel, sanitizeAccumPrism]) {
+    assert.equal(fn(0.5), 0.5);
+    assert.equal(fn(7), 1);
+    assert.equal(fn(-2), 0);
+    assert.equal(fn(NaN), 0);
+    assert.equal(fn(undefined), 0);
+  }
+});
+
 const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const caps = getRenderCaps('balanced', false);
 function fixtureDoc() {
@@ -78,9 +104,17 @@ ok('contract carries sanitized accum.optics (additive, no version bump)', () => 
   assert.equal(c.accum.enabled, true);
   assert.equal(c.accum.fade, 0.9);
   assert.equal(c.accum.optics, 0.5);
+  assert.equal(c.accum.tunnel, 0, 'tunnel defaults to 0/off');
+  assert.equal(c.accum.prism, 0, 'prism defaults to 0/off');
   assert.equal(c.accum.background, '#112233');
   const cl = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, optics: 9 } });
   assert.equal(cl.accum.optics, 1, 'optics clamps at the contract boundary');
+  const fb = buildSceneContract({
+    doc, resolvedLayers: rl, caps,
+    accum: { enabled: true, tunnel: 0.4, prism: 9 },
+  });
+  assert.equal(fb.accum.tunnel, 0.4, 'tunnel rides the contract');
+  assert.equal(fb.accum.prism, 1, 'prism clamps at the contract boundary');
   const off = buildSceneContract({ doc, resolvedLayers: rl, caps });
   assert.equal(off.accum, null, 'no accum -> null (renderer stays on the plain path)');
 });
@@ -116,6 +150,65 @@ ok('mirror: optics 0 blooms nothing', () => {
   assert.deepEqual(px(out, 4, 4)[0], 1);
 });
 
+const fbParams = (over) => ({ ...accumRecipeParams({ fade: 1, optics: 0 }), ...over });
+
+ok('mirror: tunnel zoom pulls a soft mark toward center', () => {
+  // NEAREST feedback + sub-texel per-step shifts mean a single hard texel
+  // is a fixed point at small canvas sizes (the effect is resolution-
+  // dependent — real at still sizes). So: a soft 5x5 blob, centroid metric,
+  // exaggerated zoom through the real code path.
+  const w2 = 32, h2 = 32, n2 = w2 * h2 * 4;
+  const blob = new Float64Array(n2);
+  for (let y = 14; y <= 18; y++) {
+    for (let x = 22; x <= 26; x++) {
+      const o = (y * w2 + x) * 4;
+      blob[o] = 1; blob[o + 1] = 0.5; blob[o + 2] = 0.25; blob[o + 3] = 1;
+    }
+  }
+  const centroidX = (buf) => {
+    let s = 0, sx = 0;
+    for (let y = 0; y < h2; y++) {
+      for (let x = 0; x < w2; x++) {
+        const v = buf[(y * w2 + x) * 4];
+        s += v; sx += v * x;
+      }
+    }
+    return sx / s;
+  };
+  const c0 = centroidX(blob);
+  const params = fbParams({ tunnelZoom: 1.2, tunnelSpin: 0 });
+  let acc = blob;
+  for (let i = 0; i < 5; i++) {
+    acc = mirrorAccumStep({ accum: acc, frame: new Float64Array(n2), w: w2, h: h2, params });
+  }
+  const c1 = centroidX(acc);
+  let total = 0;
+  for (let i = 0; i < n2; i += 4) total += acc[i];
+  assert.ok(c1 < c0 - 2, `tunnel pulls the mark toward center: ${c0.toFixed(2)} -> ${c1.toFixed(2)}`);
+  assert.ok(total > 1, `the mark survives the loop (total ${total.toFixed(2)})`);
+  // Control: tunnel = 0 leaves the blob exactly where it was.
+  const still = mirrorAccumStep({ accum: blob, frame: new Float64Array(n2), w: w2, h: h2, params: fbParams({}) });
+  assert.ok(Math.abs(centroidX(still) - c0) < 1e-9, 'no tunnel -> no migration');
+});
+
+ok('mirror: prism separates the RGB channels radially', () => {
+  // 16x1 strip, white dot at x=10, prismUv = 0.1: r samples outward
+  // (+pr), g at center, b inward (-pr) — peaks land at x=8 / 10 / 12.
+  const w2 = 16, h2 = 1, n2 = w2 * h2 * 4;
+  const dot = new Float64Array(n2);
+  dot[10 * 4] = 1; dot[10 * 4 + 1] = 1; dot[10 * 4 + 2] = 1; dot[10 * 4 + 3] = 1;
+  const params = fbParams({ prismUv: 0.1 });
+  const out = mirrorAccumStep({ accum: dot, frame: new Float64Array(n2), w: w2, h: h2, params });
+  const close = (v, e) => Math.abs(v - e) < 1e-9;
+  assert.ok(close(out[8 * 4], 0.99), 'red fringes outward (x=8)');
+  assert.ok(close(out[10 * 4 + 1], 0.99), 'green stays centered (x=10)');
+  assert.ok(close(out[12 * 4 + 2], 0.99), 'blue fringes inward (x=12)');
+  // prism = 0: no separation, the dot is unchanged.
+  const plain = mirrorAccumStep({ accum: dot, frame: new Float64Array(n2), w: w2, h: h2, params: fbParams({}) });
+  assert.ok(close(plain[10 * 4], 0.99));
+  assert.equal(plain[8 * 4], 0, 'no prism -> no red fringe');
+});
+
 // --- browser: GPU recipe vs JS mirror ---------------------------------------
 
 async function runBrowserTests() {
@@ -130,17 +223,17 @@ async function runBrowserTests() {
     const f64Of = (bytes) => Float64Array.from(bytes, (v) => v / 255);
     const LSB = 1 / 255;
 
-    const runProbe = async ({ w = 12, h = 12, bg = '#000000', fade = 0.9, optics = 0, frames }) => {
+    const runProbe = async ({ w = 12, h = 12, bg = '#000000', fade = 0.9, optics = 0, tunnel = 0, prism = 0, frames }) => {
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
-        w, h, bg, fade, optics, frames: frames.map(bytesOf),
+        w, h, bg, fade, optics, tunnel, prism, frames: frames.map(bytesOf),
       });
       return { gpu: f64Of(res.pixels), w: res.width, h: res.height };
     };
-    const mirrorSeq = ({ w, h, bg, fade, optics, frames }) => {
+    const mirrorSeq = ({ w, h, bg, fade, optics, tunnel = 0, prism = 0, frames }) => {
       const bgV = [0, 1, 2].map((i) => parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16) / 255);
       let acc = new Float64Array(w * h * 4);
       for (let i = 0; i < w * h; i++) { acc[i * 4] = bgV[0]; acc[i * 4 + 1] = bgV[1]; acc[i * 4 + 2] = bgV[2]; acc[i * 4 + 3] = 1; }
-      const params = accumRecipeParams({ fade, optics });
+      const params = accumRecipeParams({ fade, optics, tunnel, prism });
       for (const f of frames) acc = mirrorAccumStep({ accum: acc, frame: f, w, h, params });
       return acc;
     };
@@ -212,6 +305,50 @@ async function runBrowserTests() {
       const { gpu } = await runProbe({ w, h, fade: 0, optics: 0, frames });
       const at = (x, y) => gpu[(y * w + x) * 4];
       assert.equal(at(6, 6), 0, 'keep=0 erases the previous frame');
+    });
+
+    await okAsync('probe: tunnel feedback spirals inward (GPU = mirror)', async () => {
+      // 256px: the recipe's per-frame zoom (1%/frame at tunnel = 1) moves
+      // ~0.65px/frame at this radius — above the NEAREST visibility floor.
+      const w = 256, h = 256;
+      // 6x6 block east of center; 15 fade-only frames at tunnel = 1.
+      const frames = [whiteBlock(w, h, 190, 125, 6)];
+      for (let i = 0; i < 14; i++) frames.push(new Float64Array(w * h * 4));
+      const { gpu } = await runProbe({ w, h, fade: 1, optics: 0, tunnel: 1, frames });
+      const ref = mirrorSeq({ w, h, bg: '#000000', fade: 1, optics: 0, tunnel: 1, frames });
+      closeTo(gpu, ref, 6 * LSB, 'tunnel sequence');
+      const cx = (buf) => {
+        let s = 0, sx = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const v = buf[(y * w + x) * 4]; s += v; sx += v * x;
+        }
+        return sx / s;
+      };
+      assert.ok(cx(gpu) < 192.5 - 8, `tunnel pulls the block toward center: centroid x ${cx(gpu).toFixed(1)} (was 192.5)`);
+    });
+
+    await okAsync('probe: prism splits channels radially (GPU = mirror)', async () => {
+      // 512px: the recipe's per-frame prism push (0.001 UV at prism = 1)
+      // moves ~0.5px/frame — just above the NEAREST visibility floor.
+      const w = 512, h = 512;
+      // 3x3 dot east of center; 8 fade-only frames at prism = 1.
+      const frames = [whiteBlock(w, h, 400, 256, 3)];
+      for (let i = 0; i < 7; i++) frames.push(new Float64Array(w * h * 4));
+      const { gpu } = await runProbe({ w, h, fade: 1, optics: 0, prism: 1, frames });
+      const ref = mirrorSeq({ w, h, bg: '#000000', fade: 1, optics: 0, prism: 1, frames });
+      closeTo(gpu, ref, 6 * LSB, 'prism sequence');
+      const peakX = (buf, c) => {
+        let bx = 0, bv = -1;
+        for (let x = 0; x < w; x++) {
+          let s = 0;
+          for (let y = 252; y < 262; y++) s += buf[(y * w + x) * 4 + c];
+          if (s > bv) { bv = s; bx = x; }
+        }
+        return bx;
+      };
+      const rx = peakX(gpu, 0), gx = peakX(gpu, 1), bx = peakX(gpu, 2);
+      assert.ok(rx < gx && gx < bx, `channels separate radially: r@${rx} g@${gx} b@${bx}`);
+      assert.ok(bx - rx >= 4, `separation is visible: r/b spread ${bx - rx}px`);
     });
 
     await okAsync('e2e: renderAccumViaGL trail still on a corpus doc with motion', async () => {

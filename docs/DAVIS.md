@@ -11,6 +11,7 @@ Homage to Joshua Davis’s *practice*: a generative composition-machine. Hand as
 | CLOCK AUDIO | Needs Stimulus audio. Subtitle `waiting for beat` if armed and silent. |
 | CLOCK METRO | Internal pulse at BPM. No mic. |
 | Hits | Archive. Farm prints editions. |
+| ACCUM gestures | Appear when ACCUM is on. FREEZE holds the trail buffer mid-air (toggles to THAW); CLEAR wipes it to the background; SWELL breathes FADE up and back over ~2.4s. They play the live 2D buffer (`useAccumulationBuffer`), not the GPU still recipe. |
 
 CA wrap only paints when layout mode is Cellular. INTERVAL is inert on BEAT.
 

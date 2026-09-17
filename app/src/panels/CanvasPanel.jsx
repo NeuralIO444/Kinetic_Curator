@@ -13,6 +13,7 @@ import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewpor
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { useCanvasLife } from '../hooks/useCanvasLife.js';
 import { useAccumulationBuffer } from '../hooks/useAccumulationBuffer.js';
+import { on, Events } from '../composition/eventBus.js';
 import { Layer } from './canvas/Layer.jsx';
 import { isFxLayer, fxFilterId, compileFxPrimitives } from '../fx/fxFilters.js';
 import { FxFilterDefs } from '../fx/FxFilterDefs.jsx';
@@ -218,7 +219,7 @@ export function CanvasPanel() {
   const activeCount = layerCounts[activeLayerId] || 0;
   const activeSafeCount = resolvedLayers.find(rl => rl.layer.id === activeLayerId)?.safeCount ?? 0;
   const showGloss = shouldRenderGloss(quality, layoutParams.shading, activeCount) && !perfTier1;
-  const { clear: clearAccum } = useAccumulationBuffer({
+  const { clear: clearAccum, setFrozen: setAccumFrozen, swell: swellAccum } = useAccumulationBuffer({
     svgRef, accumRef, enabled: accumOn,
     fade: layoutParams.accumulationFade ?? 0.88,
     background: activePalette.bg,
@@ -228,6 +229,15 @@ export function CanvasPanel() {
     // every perf dip. `running` already just skips the frame's work.
     running: running && !slowRender,
   });
+
+  // Phase A gestures (Davis panel PERFORM): FREEZE / CLEAR / SWELL act on
+  // the live accum buffer owned by this panel's hook.
+  useEffect(() => on(Events.ACCUM_GESTURE, (p) => {
+    if (!p || typeof p !== 'object') return;
+    if (p.action === 'clear') clearAccum();
+    else if (p.action === 'freeze') setAccumFrozen(p.value);
+    else if (p.action === 'swell') swellAccum();
+  }), [clearAccum, setAccumFrozen, swellAccum]);
 
   useEffect(() => {
     if (typeof dispatch === 'function') dispatch({ type: 'SET_NODE_COUNT', payload: totalNodeCount });
