@@ -296,3 +296,33 @@ export async function renderViaGL(contract, opts = {}) {
   const res = await evaluateChunked(page, '__kcRender', buildRenderPayload(contract, opts));
   return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height };
 }
+
+/**
+ * Render a scene contract through WebGL with chunked readback (#191).
+ *
+ * Same pixels as renderViaGL, but the page returns them in 16MB base64
+ * pieces instead of one giant string: an 8K readback (~177MB base64) would
+ * not survive the ~100MB page.evaluate result limit that motivated the
+ * chunked payload ferry above. The export entrypoint
+ * (app/src/gl/exportStill.mjs) uses this; the parity path keeps renderViaGL.
+ *
+ * @param {object} contract scene contract v1
+ * @param {object} opts { width, height, bg }
+ * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
+ */
+export async function renderExportViaGL(contract, opts = {}) {
+  const page = await ensurePage();
+  const { width, height, chunks } = await evaluateChunked(page, '__kcExportBegin', buildRenderPayload(contract, opts));
+  try {
+    const parts = new Array(chunks);
+    for (let i = 0; i < chunks; i++) {
+      const { pixelsB64 } = await page.evaluate(([idx]) => window.__kcExportChunk(idx), [i]);
+      parts[i] = Buffer.from(pixelsB64, 'base64');
+    }
+    return { pixels: Buffer.concat(parts), width, height };
+  } finally {
+    // Release the page-side stash even on failure — an 8K buffer held
+    // across exports is how a long batch leaks 132MB per edition.
+    await page.evaluate(() => window.__kcExportEnd()).catch(() => {});
+  }
+}

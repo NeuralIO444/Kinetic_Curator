@@ -7,7 +7,7 @@ One kernel, one seed, 60 Hz. Live stays 1×. Print is a *still*.
 | | Live tab | Print |
 |---|---|---|
 | Size | 1000×700 | `--res` scale or WxH |
-| Raster | Canvas2D | resvg |
+| Raster | Canvas2D | WebGL2 readback (#191) |
 | ACCUM | Pixel buffer in the tab | `studio.py render --accum` |
 | WEBM | Tab only; not the ACCUM buffer | — |
 
@@ -21,6 +21,8 @@ ffmpeg -y -i /tmp/hi.png -vf scale=1000:700:flags=box print.png
 ```
 
 `--res 2` is 2000×1400 (2× the 1000×700 canvas). `print_still.sh` wraps that.
+Since #191 the farm still comes from GPU readback
+(`app/src/gl/exportStill.mjs`), not resvg — same command, new renderer.
 
 Do not SSAA the live canvas.
 
@@ -28,12 +30,11 @@ Do not SSAA the live canvas.
 
 `_render` on the sidecar JSON is the honest list. Known mappings:
 
-- `plus-lighter` → `screen` (resvg)
+- `plus-lighter` → `screen` (kept in the GL contract to match the SVG reference, #96)
 - `var(--ink)` / `var(--accent)` → baked hex
-- `ui-monospace` → `--monospace` (default Menlo)
 
 If a filter cannot map, refuse or note it. Do not invent a second rasteriser.
 
 ## Not quality
 
-New layout modes, extra CA rules, a second physics engine, 16-bit PNG (resvg is 8-bit).
+New layout modes, extra CA rules, a second physics engine, 16-bit PNG (the export writer is 8-bit RGBA).
