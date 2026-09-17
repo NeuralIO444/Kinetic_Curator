@@ -59,6 +59,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
 
   accumulation: false,
   accumulationFade: 0.88,
+  accumulationOptics: 0, // #190: bloom + halation + blur-over-time amount (GLOW slider)
 
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
@@ -119,6 +120,7 @@ export const PARAM_SPEC = {
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   accumulationFade: { min: 0.5, max: 0.99 },
+  accumulationOptics: { min: 0, max: 1 },
   audioModDepth: { min: 0, max: 1 },
   audioScaleMod: { min: 0, max: 1 },
   audioAlphaMod: { min: 0, max: 1 },

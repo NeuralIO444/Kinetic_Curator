@@ -31,8 +31,8 @@ const resolvedLayers = resolveLayers(projectDoc, { caps });
 const scene = buildSceneContract({ doc: projectDoc, resolvedLayers, caps, accum });
 ```
 
-`accum` is `{ enabled, fade, background }` (from `useAccumulationBuffer`
-params) or `null`. The builder is pure and deterministic: same inputs →
+`accum` is `{ enabled, fade, optics, background }` (from `useAccumulationBuffer`
+params plus the #190 GLOW slider) or `null`. The builder is pure and deterministic: same inputs →
 byte-identical JSON (`serializeSceneContract`).
 
 ## Shape (v1)
@@ -84,7 +84,7 @@ byte-identical JSON (`serializeSceneContract`).
   ],
   textRuns: [],                     // reserved for the Phase 1 glyph atlas.
                                     // Text is currently baked into stamp assets.
-  accum: null | { enabled, fade: 0..0.99, background: '#rrggbb' },
+  accum: null | { enabled, fade: 0..0.99, optics: 0..1, background: '#rrggbb' },
   provenance: { contractVersion, caps }
 }
 ```

@@ -55,6 +55,43 @@ window.__kcRender = async (payload) => {
 };
 
 /**
+ * ACCUM trail still (#190). payload:
+ *   { width, height, bg, fade, optics,
+ *     atlasB64, atlasW, atlasH, atlasMips, cells, grainLuts,
+ *     frames: [{ contract, wrapBoxes }] }   // atlas shared across frames
+ * Runs the whole sequence through the shared recipe (accum.mjs) and returns
+ * the final buffer as top-first RGBA bytes.
+ */
+window.__kcAccum = async (payload) => {
+  if (!renderer) renderer = createRenderer(canvas);
+  const atlasPx = b64ToU8(payload.atlasB64);
+  const atlasMips = (payload.atlasMips || []).map((m) => ({
+    pixels: b64ToU8(m.b64), width: m.w, height: m.h,
+  }));
+  const grainLuts = {};
+  for (const [id, lut] of Object.entries(payload.grainLuts || {})) {
+    grainLuts[id] = { pixels: b64ToU8(lut.b64), width: lut.w, height: lut.h };
+  }
+  const atlas = { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips };
+  const frames = payload.frames.map((f) => ({
+    width: payload.width,
+    height: payload.height,
+    bg: payload.bg,
+    contract: f.contract,
+    cells: payload.cells,
+    atlas,
+    grainLuts,
+    wrapBoxes: f.wrapBoxes || {},
+  }));
+  const { pixels, width, height } = renderer.renderAccumSequence(frames, {
+    fade: payload.fade,
+    optics: payload.optics,
+    background: payload.bg,
+  });
+  return { pixelsB64: u8ToB64(pixels), width, height };
+};
+
+/**
  * Perf probe (#189 acceptance: 3 stacked FX layers hold 60fps).
  * Uploads the atlas once, warms up, then times `iters` renderScene calls
  * (targets are allocated/freed per call, as in renderScene today). Includes

@@ -1,5 +1,9 @@
 // useAccumulationBuffer — HYPE BitmapCanvas-style trails (#28)
-// Persistent offscreen canvas: each frame fade previous pixels, then composite live SVG.
+// LEGACY SVG-live path. The GPU ACCUM recipe (app/src/gl/accum.mjs, #190)
+// is the single source of truth for WebGL/export; this 2D-canvas feedback
+// path stays for the SVG live canvas until the live loop migrates to WebGL.
+// It is intentionally NOT the GPU recipe (it fades alpha via destination-in;
+// the GPU recipe fades light via rgb *= keep). See docs/ACCUM.md.
 // History lives in the pixel buffer only — export must read this canvas when ACCUM is on.
 
 import { useEffect, useRef, useCallback } from 'react';

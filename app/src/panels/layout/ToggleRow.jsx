@@ -41,6 +41,29 @@ export function ToggleRow({ layoutParams }) {
           />
         </label>
       )}
+      {layoutParams.accumulation && (
+        <label
+          className="tg"
+          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
+          title="ACCUM optics: bloom + halation + blur-over-time on the trail buffer (0 = off)"
+        >
+          GLOW
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={layoutParams.accumulationOptics ?? 0}
+            onChange={(e) =>
+              emit(Events.LAYOUT_PARAM, {
+                key: 'accumulationOptics',
+                value: parseFloat(e.target.value),
+              })
+            }
+            style={{ width: 64 }}
+          />
+        </label>
+      )}
       <select
         value={layoutParams.blendMode}
         onChange={e => emit(Events.LAYOUT_PARAM, { key: 'blendMode', value: e.target.value })}

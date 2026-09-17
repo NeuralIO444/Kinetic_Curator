@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC ACCUM probe</title></head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { FULL_VS, COPY_FS } from '../shaders.mjs';
+import { buildProgramChecked } from '../debug/diagnostics.mjs';
+import { createBridge } from '../bridge/bridge.mjs';
+import { createAccum, accumRecipeParams } from '../accum.mjs';
+
+// Shader-level probe for the Phase 4 ACCUM recipe (#190): runs the full
+// feedback loop on caller-supplied synthetic frames and reads the final
+// buffer back. Lets the selfcheck verify the GPU recipe against the JS
+// mirror (mirrorAccumStep) exactly, without a scene.
+//
+// window.__kcAccumProbe(p) -> { pixels, width, height }
+//   p = { w, h, bg: '#rrggbb', fade, optics,
+//         frames: [ [r,g,b,a …] … ] }   // premultiplied bytes, bottom-first
+// Returns bottom-first RGBA bytes (COPY_FS, no flip), matching upload order.
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', {
+  alpha: false, antialias: false, depth: false, stencil: false,
+});
+if (!gl) throw new Error('[probe] WebGL2 not available');
+if (!gl.getExtension('EXT_color_buffer_float')) {
+  throw new Error('[probe] EXT_color_buffer_float not available');
+}
+
+const resProg = buildProgramChecked(gl, FULL_VS, COPY_FS, {
+  name: 'accum-probe-resolve',
+  vsFile: 'shaders.mjs:FULL_VS',
+  fsFile: 'shaders.mjs:COPY_FS',
+});
+const u_src = gl.getUniformLocation(resProg, 'u_src');
+
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+function texFrom(bytes, w, h) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(bytes));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+
+window.__kcAccumProbe = (p) => {
+  const w = p.w, h = p.h;
+  const bridge = createBridge(gl, canvas, { width: w, height: h, dpr: 1 });
+  const accum = createAccum(gl, bridge, { width: w, height: h });
+  const frameTexs = [];
+  try {
+    accum.begin(p.bg || '#000000');
+    const params = accumRecipeParams({ fade: p.fade ?? 0.88, optics: p.optics ?? 0 });
+    for (const bytes of p.frames) {
+      const t = texFrom(bytes, w, h);
+      frameTexs.push(t);
+      accum.step(t, params);
+    }
+    // Resolve the 16F accum buffer to RGBA8 without flipping (COPY_FS).
+    const outT = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, outT);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outT, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.viewport(0, 0, w, h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(resProg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, accum.texture().tex);
+    gl.uniform1i(u_src, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.disableVertexAttribArray(0);
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const err = gl.getError();
+    gl.deleteTexture(outT);
+    gl.deleteFramebuffer(fb);
+    if (err !== gl.NO_ERROR) throw new Error(`[probe] GL error 0x${err.toString(16)}`);
+    return { pixels: Array.from(px), width: w, height: h };
+  } finally {
+    for (const t of frameTexs) gl.deleteTexture(t);
+    accum.dispose();
+    bridge.dispose();
+  }
+};
+window.__kcReady = true;
+</script>
+</body>
+</html>

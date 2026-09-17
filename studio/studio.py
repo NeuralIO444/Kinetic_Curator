@@ -15,9 +15,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 RENDER_MJS = HERE / "render.mjs"
+ACCUM_STILL_MJS = HERE / ".." / "app" / "src" / "gl" / "accumStill.mjs"
 CANVAS_W, CANVAS_H = 1000, 700
 DEFAULT_MONOSPACE = "Menlo"
 DEFAULT_ACCUM_FADE = 0.88
+DEFAULT_ACCUM_OPTICS = 0.0
 
 # ── Resource ceilings (#106 item 2) ────────────────────────────────────────
 # A render farm runs unattended on whatever a project file says. Without
@@ -119,6 +121,14 @@ def clamp_fade(fade) -> float:
     return max(0.0, min(0.99, n))
 
 
+def clamp_optics(optics) -> float:
+    try:
+        n = float(optics)
+    except (TypeError, ValueError):
+        return DEFAULT_ACCUM_OPTICS
+    return max(0.0, min(1.0, n))
+
+
 def project_fade(project: Path, override) -> float:
     if override is not None:
         return clamp_fade(override)
@@ -127,6 +137,17 @@ def project_fade(project: Path, override) -> float:
         return clamp_fade((doc.get("layoutParams") or {}).get("accumulationFade"))
     except Exception:
         return DEFAULT_ACCUM_FADE
+
+
+def project_optics(project: Path, override) -> float:
+    """The GLOW slider (layoutParams.accumulationOptics), or --optics."""
+    if override is not None:
+        return clamp_optics(override)
+    try:
+        doc = json.loads(project.read_text())
+        return clamp_optics((doc.get("layoutParams") or {}).get("accumulationOptics"))
+    except Exception:
+        return DEFAULT_ACCUM_OPTICS
 
 
 class RenderError(RuntimeError):
@@ -260,29 +281,13 @@ def sidecar(project: Path, seed, size, uncapped, extra=None, normalized=None) ->
     return doc
 
 
-def composite_accum(frames: list[Path], out_png: Path, fade: float) -> None:
-    ffmpeg = which("ffmpeg")
-    keep = clamp_fade(fade)
-    work = out_png.with_suffix(".accum-buf.png")
-    shutil.copyfile(frames[0], work)
-    for nxt in frames[1:]:
-        tmp = out_png.with_suffix(".accum-next.png")
-        subprocess.run([
-            ffmpeg, "-y", "-i", str(work), "-i", str(nxt),
-            "-filter_complex",
-            f"[0:v]format=rgba,colorchannelmixer=aa={keep:.4f}[f];[f][1:v]overlay=format=auto",
-            "-frames:v", "1", str(tmp),
-        ], check=True, capture_output=True, timeout=FFMPEG_TIMEOUT_S)
-        shutil.move(str(tmp), str(work))
-    shutil.move(str(work), str(out_png))
-
-
 def cmd_render(a) -> None:
     size = parse_res(a.res)
     out = Path(a.out)
     if getattr(a, "accum", False):
         cmd_accum(a, size, out)
         return
+    which("resvg")
     render_one(Path(a.project), out, size, seed=a.seed, uncapped=a.uncapped,
                background=a.background, monospace=a.monospace)
     if a.sidecar:
@@ -292,29 +297,69 @@ def cmd_render(a) -> None:
 
 
 def cmd_accum(a, size, out: Path) -> None:
+    """Trail still via the SHARED ACCUM recipe (#190, #169).
+
+    The feedback loop (fade, blur-over-time, bloom, halation) lives in
+    app/src/gl/accum.mjs and runs on the GPU in headless Chromium. studio.py
+    must not reimplement it: per #169's rule the export shares the recipe or
+    refuses. The old ffmpeg colorchannelmixer composite was a second recipe
+    and is gone.
+    """
     project = Path(a.project)
+    if not project.is_file():
+        sys.exit(
+            f"project not found: {project}\n"
+            "In the app: OUTPUT → save project, then pass that file path."
+        )
     steps = max(2, int(a.steps))
-    fps = max(1, int(a.fps))
     fade = project_fade(project, a.fade)
-    tmp = Path(tempfile.mkdtemp(prefix="kc-accum-"))
-    frames = []
+    optics = project_optics(project, a.optics)
+    cmd = [
+        "node", str(ACCUM_STILL_MJS), str(project),
+        "--out", str(out),
+        "--steps", str(steps),
+        "--fade", repr(fade),
+        "--optics", repr(optics),
+        "--res", f"{size[0]}x{size[1]}",
+    ]
+    if a.seed is not None:
+        cmd += ["--seed", str(a.seed)]
+    if a.uncapped:
+        cmd += ["--uncapped"]
+    if a.background:
+        cmd += ["--background", a.background]
+    for r in a.ramp or []:
+        cmd += ["--ramp", r]
+    if a.motion:
+        cmd += ["--motion", a.motion]
     try:
-        for i in range(steps):
-            png = tmp / f"f{i:04d}.png"
-            render_one(project, png, size, seed=a.seed, uncapped=a.uncapped,
-                       background=a.background, time=i / fps,
-                       progress=i / max(1, steps - 1), ramps=a.ramp,
-                       motion=a.motion, monospace=a.monospace)
-            frames.append(png)
-            if (i + 1) % 5 == 0 or i + 1 == steps:
-                print(f"  accum frame {i + 1}/{steps}", flush=True)
-        composite_accum(frames, out, fade)
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        proc = subprocess.run(cmd, capture_output=True, timeout=RENDER_TIMEOUT_S)
+    except subprocess.TimeoutExpired as exc:
+        raise RenderError(f"accumStill.mjs exceeded {RENDER_TIMEOUT_S}s for {project}") from exc
+    err = proc.stderr.decode("utf-8", "replace") if proc.stderr else ""
+    if err:
+        sys.stderr.write(err)
+        sys.stderr.flush()
+    if proc.returncode == 3:
+        # Headless Chromium missing: refuse --accum rather than rendering a
+        # different recipe. The guidance is already on stderr.
+        raise RenderError(
+            "refusing --accum: the shared GPU recipe needs headless Chromium "
+            "(cd app && npx playwright install chromium)",
+            returncode=3, stderr=err.strip()[-2000:],
+        )
+    if proc.returncode != 0:
+        raise RenderError(
+            f"accumStill.mjs exited {proc.returncode} for {project}",
+            returncode=proc.returncode,
+            stderr=err.strip()[-2000:],
+        )
     if a.sidecar:
         out.with_suffix(".json").write_text(json.dumps(sidecar(
             project, a.seed, size, a.uncapped,
-            extra={"accum": True, "steps": steps, "fade": fade, "fps": fps},
+            extra={"accum": True, "steps": steps, "fade": fade,
+                   "optics": optics,
+                   "renderer": "app/src/gl (WebGL2) shared ACCUM recipe"},
         ), indent=2))
     print(out)
 
@@ -353,6 +398,7 @@ def read_manifest(path: Path) -> dict:
 
 
 def cmd_batch(a) -> None:
+    which("resvg")
     size = parse_res(a.res)
     outdir = Path(a.out)
     outdir.mkdir(parents=True, exist_ok=True)
@@ -468,6 +514,7 @@ def cmd_video(a) -> None:
     if a.motion == "list":
         subprocess.run(["node", str(RENDER_MJS), "--motion", "list"], check=True)
         return
+    which("resvg")
     size = parse_res(a.res)
     project = Path(a.project)
     frames_n = max(1, round(a.duration * a.fps))
@@ -500,7 +547,8 @@ def cmd_video(a) -> None:
 
 def main(argv=None) -> None:
     which("node")
-    which("resvg")
+    # resvg is checked per-command: `render --accum` uses the shared GPU recipe
+    # and does not need it.
 
     p = argparse.ArgumentParser(prog="studio", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -523,6 +571,8 @@ def main(argv=None) -> None:
     sp.add_argument("--steps", type=int, default=24)
     sp.add_argument("--fps", type=int, default=30)
     sp.add_argument("--fade", type=float, default=None)
+    sp.add_argument("--optics", type=float, default=None,
+                    help="ACCUM optics amount 0..1 (GLOW slider: bloom + halation + blur-over-time)")
     sp.add_argument("--ramp", action="append", default=[])
     sp.add_argument("--motion", default="auto")
     sp.set_defaults(func=cmd_render)

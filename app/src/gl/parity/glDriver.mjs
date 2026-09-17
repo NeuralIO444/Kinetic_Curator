@@ -26,6 +26,71 @@ const atlasCache = new Map();
 
 const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript' };
 
+// Single page.evaluate arguments much past ~100MB never arrive ("Target page,
+// context or browser has been closed"). Combo-heavy scenes bake 3000px+
+// atlases whose base64 (+mipmaps) exceeds that, so large strings are ferried
+// in 16MB pieces and reassembled in the page before the render call.
+const XFER_PIECE = 16 * 1024 * 1024;
+
+function splitLargeStrings(payload) {
+  const chunks = new Map();
+  const walk = (v) => {
+    if (typeof v === 'string' && v.length > XFER_PIECE) {
+      const key = `c${chunks.size}`;
+      const pieces = [];
+      for (let i = 0; i < v.length; i += XFER_PIECE) pieces.push(v.slice(i, i + XFER_PIECE));
+      chunks.set(key, pieces);
+      return { __chunk: key };
+    }
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') {
+      const o = {};
+      for (const [k, val] of Object.entries(v)) o[k] = walk(val);
+      return o;
+    }
+    return v;
+  };
+  return { slim: walk(payload), chunks };
+}
+
+async function evaluateChunked(pg, fnName, payload) {
+  const { slim, chunks } = splitLargeStrings(payload);
+  if (chunks.size === 0) {
+    return pg.evaluate(([name, arg]) => window[name](arg), [fnName, slim]);
+  }
+  const ids = [];
+  for (const [key, pieces] of chunks) {
+    const id = `${fnName}:${key}`;
+    ids.push([id, key]);
+    await pg.evaluate(([i]) => { (window.__kcXfer = window.__kcXfer || {})[i] = []; }, [id]);
+    for (const piece of pieces) {
+      await pg.evaluate(([i, pc]) => { window.__kcXfer[i].push(pc); }, [id, piece]);
+    }
+  }
+  try {
+    return await pg.evaluate(([name, arg, refs]) => {
+      const store = window.__kcXfer || {};
+      const byKey = Object.fromEntries(refs.map(([id, key]) => [key, id]));
+      const walk = (v) => {
+        if (Array.isArray(v)) return v.map(walk);
+        if (v && typeof v === 'object') {
+          if (typeof v.__chunk === 'string') return store[byKey[v.__chunk]].join('');
+          const o = {};
+          for (const [k, val] of Object.entries(v)) o[k] = walk(val);
+          return o;
+        }
+        return v;
+      };
+      return window[name](walk(arg));
+    }, [fnName, slim, ids]);
+  } finally {
+    const idsOnly = ids.map(([id]) => id);
+    await pg.evaluate((list) => {
+      if (window.__kcXfer) for (const id of list) delete window.__kcXfer[id];
+    }, idsOnly).catch(() => {});
+  }
+}
+
 async function ensurePage() {
   if (page) return page;
   server = http.createServer(async (req, res) => {
@@ -162,6 +227,65 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
 }
 
 /**
+ * Render an ACCUM trail still through WebGL (#190): each frame contract is
+ * rendered in turn and fed through the shared ACCUM recipe (accum.mjs) in
+ * the page. One atlas is baked from the union of asset combos across frames.
+ *
+ * @param {Array<object>} frameContracts scene contracts v1, one per frame
+ * @param {object} opts { width, height, bg, fade, optics }
+ * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
+ */
+export async function renderAccumViaGL(frameContracts, { width = 400, height = 280, bg = '#0a0a0a', fade = 0.88, optics = 0 } = {}) {
+  if (!frameContracts.length) throw new Error('[gl] renderAccumViaGL: no frame contracts');
+  const page = await ensurePage();
+  const combos = [];
+  const seen = new Set();
+  for (const contract of frameContracts) {
+    for (const it of contract.instances) {
+      const key = comboKey(it.asset, it.tint, it.accent);
+      if (!seen.has(key)) {
+        seen.add(key);
+        combos.push({ asset: it.asset, ink: it.tint, accent: it.accent });
+      }
+    }
+  }
+  const atlas = getAtlas(combos);
+  const cells = {};
+  for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1 };
+  const needsGrain = frameContracts.some((contract) =>
+    (contract.fxWraps || []).some((wrap) => {
+      const layer = contract.layers.find((l) => l.id === wrap.fxLayerId);
+      return layer?.fx?.some((f) => f.kind === 'grain');
+    })
+  );
+  const grainLuts = {};
+  if (needsGrain) {
+    const lut = bakeGrainLut(width, height);
+    for (const contract of frameContracts) {
+      for (const wrap of contract.fxWraps || []) {
+        const layer = contract.layers.find((l) => l.id === wrap.fxLayerId);
+        if (layer?.fx?.some((f) => f.kind === 'grain') && !grainLuts[wrap.fxLayerId]) {
+          grainLuts[wrap.fxLayerId] = { b64: b64(lut.pixels), w: lut.width, h: lut.height };
+        }
+      }
+    }
+  }
+  const payload = {
+    width, height, bg, fade, optics,
+    cells,
+    atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
+    atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
+    grainLuts,
+    frames: frameContracts.map((contract) => ({
+      contract,
+      wrapBoxes: computeWrapBoxes(contract, atlas.cells),
+    })),
+  };
+  const res = await evaluateChunked(page, '__kcAccum', payload);
+  return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height };
+}
+
+/**
  * Render a scene contract through WebGL.
  * @param {object} contract scene contract v1
  * @param {object} opts { width, height, bg }
@@ -169,6 +293,6 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
  */
 export async function renderViaGL(contract, opts = {}) {
   const page = await ensurePage();
-  const res = await page.evaluate((p) => window.__kcRender(p), buildRenderPayload(contract, opts));
+  const res = await evaluateChunked(page, '__kcRender', buildRenderPayload(contract, opts));
   return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height };
 }
