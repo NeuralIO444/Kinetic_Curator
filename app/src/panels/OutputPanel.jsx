@@ -17,6 +17,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { QualityRow } from './output/QualityRow.jsx';
 import { RenderFinalBlock } from './output/RenderFinalBlock.jsx';
+import { PrintDeskBlock } from './output/PrintDeskBlock.jsx';
 import { BatchEditionBlock } from './output/BatchEditionBlock.jsx';
 import { SnapRecordRow } from './output/SnapRecordRow.jsx';
 import { DataExportRow } from './output/DataExportRow.jsx';
@@ -59,6 +60,12 @@ export function OutputPanel() {
   const [batchProgress, setBatchProgress] = useState(null);
   const cancelBatchRef = useRef(false);
   const watchdogGenRef = useRef(watchdogTripGen);
+  // #172: print desk modal, lazy-loaded like Asset Studio (AssetPoolPanel).
+  const [PrintDesk, setPrintDesk] = useState(null);
+  const openPrintDesk = async () => {
+    const mod = await import('./PrintDeskModal.jsx');
+    setPrintDesk(() => mod.PrintDeskModal);
+  };
 
   const accumOn = !!layoutParams.accumulation;
 
@@ -91,6 +98,8 @@ export function OutputPanel() {
           batchActive={!!batchProgress}
         />
 
+        <PrintDeskBlock rendering={rendering} onOpen={openPrintDesk} />
+
         <BatchEditionBlock
           svgRef={svgRef} palette={palette} seed={seed} layoutParams={layoutParams}
           quality={quality} paletteId={paletteId} exportResolution={exportResolution}
@@ -120,6 +129,7 @@ export function OutputPanel() {
 
         <SnapshotGallery snapshots={snapshots} />
       </div>
+      {PrintDesk && <PrintDesk onClose={() => setPrintDesk(null)} />}
     </div>
   );
 }
