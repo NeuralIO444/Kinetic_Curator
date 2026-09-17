@@ -42,6 +42,7 @@ import { UNIFORMS as BUILTIN_EFFECT_UNIFORMS } from '../bridge/builtinEffects.mj
 import { FULL_VS, EFFECT_FS } from '../shaders.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
 import { TEMPLATE_VS, uniformDecls } from '../effects/template.mjs';
+import { runAllSweeps } from './sweepEffects.mjs';
 
 const failures = [];
 const lines = [];
@@ -446,6 +447,45 @@ void main() {
     fp.dispose();
   });
 
+  // ---- uniform sweeps (backend hardening 1/6) ----
+  {
+    const sweep = runSweepsOn(gl);
+    for (const line of sweep.lines) lines.push(line);
+    for (const f of sweep.failures) failures.push(f);
+  }
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { lines, failures };
+}
+
+/**
+ * The uniform-sweep section on its own, for focused runs
+ * (`npm run selfcheck:sweep`). Same code path as the full suite's tail.
+ */
+export function runSweepSection() {
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2');
+  return runSweepsOn(gl);
+}
+
+/** Sweep section on an existing context (used by runAll's tail). */
+function runSweepsOn(gl) {
+  const lines = [];
+  const failures = [];
+  // Per-effect parameter sweeps: normal/zero/max/boundary (contract cases,
+  // asserted) plus negative/extreme (hostile cases, characterized). Each
+  // effect renders through the checked builders into a float target and is
+  // scanned with the flag views: no NaN/Inf, in-[0,1] output, and
+  // parameter-zero provably a no-op. A WebGL2-less environment prints the
+  // loud skip inside runAllSweeps instead of failing.
+  try {
+    const sweep = runAllSweeps(gl);
+    for (const line of sweep.lines) lines.push(line);
+    for (const f of sweep.failures) failures.push(f);
+  } catch (e) {
+    failures.push('sweep-harness');
+    lines.push(`  [FAIL] sweep harness threw: ${(e && e.message) || e}`);
+  }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   return { lines, failures };
 }

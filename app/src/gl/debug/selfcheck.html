@@ -3,9 +3,11 @@
 <head><meta charset="utf-8"><title>gl debug selfcheck</title></head>
 <body>
 <script type="module">
-import { runAll } from './selfcheck.page.mjs';
+import { runAll, runSweepSection } from './selfcheck.page.mjs';
 try {
-  const { lines, failures } = runAll();
+  // ?only=sweep runs just the uniform-sweep section (npm run selfcheck:sweep).
+  const only = new URLSearchParams(location.search).get('only');
+  const { lines, failures } = only === 'sweep' ? runSweepSection() : runAll();
   window.__kcDebugResult = { ok: failures.length === 0, lines, failures };
 } catch (e) {
   window.__kcDebugResult = { ok: false, lines: [], failures: ['harness'], error: String((e && e.stack) || e) };
