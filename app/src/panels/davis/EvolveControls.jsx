@@ -142,17 +142,18 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, aut
         <span className="davis-label">INTERVAL</span>
         <input type="range" min={200} max={10000} step={100} value={evolveInterval}
           disabled={evolveSource !== 'time'}
+          title={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}
           onChange={e => emit(Events.DAVIS_EVOLVE, { interval: Number(e.target.value) })} />
         <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
       </div>
 
       <div className="davis-interval-row" style={{ marginTop: '8px' }} title="Snapshot a hit after Evolve, not after phrase wrap.">
         <span className="davis-label">AUTO-SNAP</span>
-        <input type="checkbox" checked={autoSnapshot} onChange={e => emit(Events.DAVIS_EVOLVE, { autoSnapshot: e.target.checked })} />
+        <input type="checkbox" checked={autoSnapshot} title="Snapshot a hit after Evolve, not after phrase wrap." onChange={e => emit(Events.DAVIS_EVOLVE, { autoSnapshot: e.target.checked })} />
       </div>
       <div className="davis-interval-row" style={{ marginTop: '4px' }} title="CSS ease on morph only. Does not smooth the life LFO.">
         <span className="davis-label">SMOOTHING</span>
-        <input type="checkbox" checked={motionSmoothing} onChange={e => emit(Events.DAVIS_EVOLVE, { motionSmoothing: e.target.checked })} />
+        <input type="checkbox" checked={motionSmoothing} title="CSS ease on morph only. Does not smooth the life LFO." onChange={e => emit(Events.DAVIS_EVOLVE, { motionSmoothing: e.target.checked })} />
       </div>
     </>
   );
