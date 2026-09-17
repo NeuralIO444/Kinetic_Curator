@@ -55,6 +55,9 @@ byte-identical JSON (`serializeSceneContract`).
       visible: true,                // resolved layers are pre-filtered
       opacity: 0..1,                // layerOpacity
       blend: <blend mode>,          // layerBlendMode; 'normal' for fx layers
+      matte: { sourceId, mode: 'alpha'|'luma', invert } | null,
+                                    // #154 re-plan (#189): mask texture sampled
+                                    // in the composite shader; null = no matte
       // content layers only:
       layout: { blendMode, hueRotate },
       // fx layers only:
@@ -105,6 +108,18 @@ byte-identical JSON (`serializeSceneContract`).
    on upload; the reference path bakes them into per-combination symbols.
 6. **Filter output is outside the determinism contract** (as in
    `fxFilters.js`). FX scenes use the relaxed parity policy.
+7. **Layer mattes** (#154 re-plan, #189). `layer.matte` is a mask texture,
+   not an SVG mask: the backend renders the matte source layer's raw group
+   content (instances over transparent, opacity baked in; the source's own
+   blend mode and matte are ignored) into a mask target, then samples it in
+   the composite shader. The layer's alpha is multiplied by the mask value —
+   mask alpha for `mode: 'alpha'`, sRGB relative luminance
+   (0.2126/0.7152/0.0722) for `mode: 'luma'` — optionally inverted. A matte
+   whose source is missing, is not a content layer, or closes a cycle
+   (self-matte, A↔B, longer loops) is ignored and the layer renders
+   normally (fail closed). On FX layers the matte masks the wrap result at
+   composite time. The SVG reference path has no matte implementation, so
+   mattes are verified by exact shader-math probes, not SVG cross-checks.
 
 ## Parity harness
 
@@ -112,7 +127,7 @@ byte-identical JSON (`serializeSceneContract`).
 
 | File | Role |
 |---|---|
-| `corpus.mjs` | 5 fixed scenes (geometry baseline, multi-blend, 2-deep FX chain, 3-deep FX chain, invert wrap+opacity), each with a diff policy |
+| `corpus.mjs` | 6 fixed scenes (geometry baseline, multi-blend, 2-deep FX chain, 3-deep FX chain, invert wrap+opacity, 3-stack FX wraps), each with a diff policy |
 | `reference.mjs` | Scene → SVG (`studio/render.mjs`) → RGBA via resvg |
 | `candidate.mjs` | GL-side interface stub — throws until Phase 1 (#187) |
 | `diff.mjs` | Pixel diff with documented tolerance policy |

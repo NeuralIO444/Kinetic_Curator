@@ -143,6 +143,39 @@ export const CORPUS = [
       },
     }),
   },
+  {
+    id: 'fx-stack-3',
+    description: 'Stacked FX layers (invert / posterize / rgbSplit) with blend modes — multi-wrap compositing (#189). Under balanced caps the 3rd FX layer sheds (maxFxLayers 2), exercising the unwrapped pass-through; the 60fps probe scene.',
+    policy: 'default',
+    width: 400,
+    doc: doc({
+      // bg is the active layer: its count comes from the doc-level
+      // layoutParams, not its snapshot. Small counts keep the baked atlas
+      // under the harness ferry limit (a 44-combo atlas produced a 108MB
+      // payload and killed page.evaluate).
+      layoutParams: lp({ count: 10 }),
+      layers: [
+        { id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+        fxLayer('fx1', [{ kind: 'invert', params: {} }]),
+        { id: 'mid', name: 'Mid', type: 'content', visible: true, layerBlendMode: 'multiply', layerOpacity: 0.8 },
+        fxLayer('fx2', [{ kind: 'posterize', params: { levels: 4 } }]),
+        { id: 'top', name: 'Top', type: 'content', visible: true, layerBlendMode: 'screen', layerOpacity: 0.6 },
+        fxLayer('fx3', [{ kind: 'rgbSplit', params: { dx: 2 } }]),
+      ],
+      layerSnapshots: {
+        // Small counts keep the baked atlas under the harness ferry limit
+        // (a 44-combo atlas produced a 108MB payload and killed evaluate).
+        mid: {
+          seed: 99, paletteId: 'praystation', paletteOverrides: null,
+          layoutParams: lp({ count: 8 }), caGrid: null, enabledAssets,
+        },
+        top: {
+          seed: 7, paletteId: 'praystation', paletteOverrides: null,
+          layoutParams: lp({ count: 8 }), caGrid: null, enabledAssets,
+        },
+      },
+    }),
+  },
 ];
 
 export function getScene(id) {

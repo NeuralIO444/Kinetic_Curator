@@ -16,7 +16,7 @@ const okAsync = async (name, fn) => { await fn(); n++; console.log(`  [ok] ${nam
 ok('corpus: unique ids, valid policies, parseable docs', () => {
   const ids = CORPUS.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length, 'scene ids unique');
-  assert.ok(CORPUS.length >= 5, 'corpus covers baseline + blends + FX chains');
+  assert.ok(CORPUS.length >= 6, 'corpus covers baseline + blends + FX chains + FX stack');
   for (const scene of CORPUS) {
     assert.ok(POLICIES[scene.policy], `scene ${scene.id}: known policy`);
     assert.ok(scene.description && scene.description.length > 10);
@@ -60,7 +60,7 @@ await okAsync('runner CLI: self-parity over the full corpus exits 0', async () =
     encoding: 'utf8',
     timeout: 180000,
   });
-  assert.ok(out.includes('5/5 scenes pass'), `expected 5/5 pass, got:\n${out}`);
+  assert.ok(out.includes('6/6 scenes pass'), `expected 6/6 pass, got:\n${out}`);
 });
 
 await okAsync('runner CLI: --candidate gl runs (Phase 1 ready)', async () => {

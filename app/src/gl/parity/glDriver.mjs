@@ -42,7 +42,15 @@ async function ensurePage() {
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
-  browser = await chromium.launch();
+  try {
+    browser = await chromium.launch();
+  } catch (e) {
+    // Launch failed (e.g. no Playwright browser installed in CI): don't
+    // leak the just-opened server or the caller's process hangs forever.
+    await new Promise((resolve) => server.close(resolve));
+    server = null;
+    throw e;
+  }
   page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${port}/parity/glHarness.html`);
   await page.waitForFunction('window.__kcReady === true', null, { timeout: 30000 });
@@ -54,6 +62,23 @@ export async function closeGlDriver() {
   try { await browser?.close(); } catch { /* noop */ }
   try { server?.close(); } catch { /* noop */ }
   page = browser = server = null;
+}
+
+/**
+ * Open a raw harness page (e.g. /parity/compositeProbe.html) for
+ * shader-level tests. The shared server/browser are reused; each call
+ * opens a fresh page the caller must close.
+ *
+ * @param {string} pagePath URL path under src/gl, e.g. '/parity/compositeProbe.html'
+ * @returns {Promise<{page, port, close}>}
+ */
+export async function openHarnessPage(pagePath) {
+  await ensurePage(); // boots the shared server + browser
+  const port = server.address().port;
+  const probe = await browser.newPage();
+  await probe.goto(`http://127.0.0.1:${port}${pagePath}`);
+  await probe.waitForFunction('window.__kcReady === true', null, { timeout: 30000 });
+  return { page: probe, port, close: () => probe.close().catch(() => {}) };
 }
 
 function b64(buf) { return Buffer.from(buf).toString('base64'); }
@@ -101,14 +126,10 @@ function getAtlas(combos) {
 }
 
 /**
- * Render a scene contract through WebGL.
- * @param {object} contract scene contract v1
- * @param {object} opts { width, height, bg }
- * @returns {Promise<{pixels: Buffer, width: number, height: number}>}
+ * Build the page payload for a scene contract (atlas + grain LUTs + wrap
+ * boxes), shared by renderViaGL and the perf probe.
  */
-export async function renderViaGL(contract, opts = {}) {
-  const width = opts.width || 400, height = opts.height || 280, bg = opts.bg || '#0a0a0a';
-  const page = await ensurePage();
+export function buildRenderPayload(contract, { width = 400, height = 280, bg = '#0a0a0a' } = {}) {
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
   const atlas = getAtlas(combos);
   const cells = {};
@@ -132,11 +153,22 @@ export async function renderViaGL(contract, opts = {}) {
       grainLuts[wrap.fxLayerId] = { b64: lutB64, w: lutW, h: lutH };
     }
   }
-  const res = await page.evaluate((p) => window.__kcRender(p), {
+  return {
     width, height, bg, contract, cells, wrapBoxes,
     atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
     atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
     grainLuts,
-  });
+  };
+}
+
+/**
+ * Render a scene contract through WebGL.
+ * @param {object} contract scene contract v1
+ * @param {object} opts { width, height, bg }
+ * @returns {Promise<{pixels: Buffer, width: number, height: number}>}
+ */
+export async function renderViaGL(contract, opts = {}) {
+  const page = await ensurePage();
+  const res = await page.evaluate((p) => window.__kcRender(p), buildRenderPayload(contract, opts));
   return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height };
 }

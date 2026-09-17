@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC composite probe</title></head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { FULL_VS, COMPOSITE_FS } from '../shaders.mjs';
+import { buildProgramChecked } from '../debug/diagnostics.mjs';
+
+// Shader-level probe for the Phase 3 composite path (#189): runs COMPOSITE_FS
+// on tiny RGBA8 textures with caller-supplied bytes and reads the pixels
+// back. Lets the selfcheck verify matte math exactly, without a scene.
+//
+// window.__kcComposite(p) -> { pixels, width, height }
+//   p = { w, h,
+//         src:  [r,g,b,a …] premultiplied bytes, row-major (row 0 = v 0),
+//         dst:  [r,g,b,a …],
+//         mask: [r,g,b,a …] | null,
+//         blend: int id (see BLEND_IDS), opacity: 0..1,
+//         maskMode: 0 = alpha | 1 = luma, maskInvert: bool }
+// Returns bottom-first RGBA bytes (readPixels order), matching upload order.
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', {
+  alpha: false, antialias: false, depth: false, stencil: false,
+});
+if (!gl) throw new Error('[probe] WebGL2 not available');
+
+const prog = buildProgramChecked(gl, FULL_VS, COMPOSITE_FS, {
+  name: 'composite-probe',
+  vsFile: 'shaders.mjs:FULL_VS',
+  fsFile: 'shaders.mjs:COMPOSITE_FS',
+});
+const U = (n) => gl.getUniformLocation(prog, n);
+const loc = {
+  u_src: U('u_src'), u_dst: U('u_dst'), u_blend: U('u_blend'),
+  u_opacity: U('u_opacity'), u_clip: U('u_clip'), u_clipOn: U('u_clipOn'),
+  u_mask: U('u_mask'), u_maskOn: U('u_maskOn'),
+  u_maskMode: U('u_maskMode'), u_maskInvert: U('u_maskInvert'),
+};
+
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+function texFrom(bytes, w, h) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(bytes));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+
+window.__kcComposite = (p) => {
+  const w = p.w, h = p.h;
+  const srcT = texFrom(p.src, w, h);
+  const dstT = texFrom(p.dst, w, h);
+  const maskT = p.mask ? texFrom(p.mask, w, h) : dstT; // sampler must stay valid
+  const outT = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, outT);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outT, 0);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.viewport(0, 0, w, h);
+  gl.disable(gl.BLEND);
+  gl.useProgram(prog);
+  const bind = (unit, t) => {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    return unit;
+  };
+  gl.uniform1i(loc.u_src, bind(0, srcT));
+  gl.uniform1i(loc.u_dst, bind(1, dstT));
+  gl.uniform1i(loc.u_blend, p.blend);
+  gl.uniform1f(loc.u_opacity, p.opacity);
+  gl.uniform1f(loc.u_clipOn, 0);
+  gl.uniform1i(loc.u_mask, bind(2, maskT));
+  gl.uniform1f(loc.u_maskOn, p.mask ? 1 : 0);
+  gl.uniform1i(loc.u_maskMode, p.maskMode === 1 ? 1 : 0);
+  gl.uniform1f(loc.u_maskInvert, p.maskInvert ? 1 : 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.disableVertexAttribArray(0);
+
+  const px = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  const err = gl.getError();
+
+  gl.deleteTexture(srcT); gl.deleteTexture(dstT);
+  if (p.mask) gl.deleteTexture(maskT);
+  gl.deleteTexture(outT); gl.deleteFramebuffer(fb);
+  if (err !== gl.NO_ERROR) throw new Error(`[probe] GL error 0x${err.toString(16)}`);
+  return { pixels: Array.from(px), width: w, height: h };
+};
+window.__kcReady = true;
+</script>
+</body>
+</html>

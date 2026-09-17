@@ -13,6 +13,20 @@ export const BLEND_IDS = Object.freeze({
   difference: 10, exclusion: 11, hue: 12, saturation: 13, color: 14, luminosity: 15,
 });
 
+/**
+ * GL blend id for a contract blend name (#189).
+ *
+ * resvg has no `plus-lighter`, so the SVG reference path falls back to
+ * `screen` (studio/blendFallback.mjs, #96) — and the contract records the
+ * authored mode (docs/GL_CONTRACT.md). The GL backend applies the same
+ * substitution so live and export agree; anything else unknown falls
+ * back to `normal` (never null — callers must not throw on data).
+ */
+export function blendIdFor(mode) {
+  if (mode === 'plus-lighter') return BLEND_IDS.screen;
+  return BLEND_IDS[mode] ?? BLEND_IDS.normal;
+}
+
 export const EFFECT_IDS = Object.freeze({
   invert: 0, rgbSplit: 1, grain: 2, blurH: 3, blurV: 4, posterize: 5,
 });
@@ -65,7 +79,9 @@ void main() {
 /**
  * Layer/wrap compositing: CSS blend modes + group opacity, straight-sRGB
  * math per compositing-1, premultiplied in/out. Optional bbox clip
- * (SVG filter region).
+ * (SVG filter region). Optional layer matte (#189): a mask texture sampled
+ * at the same UV; the source's alpha is multiplied by the mask value
+ * (mask alpha for mode 0, sRGB luminance for mode 1), optionally inverted.
  */
 export const COMPOSITE_FS = `#version 300 es
 precision highp float;
@@ -75,10 +91,17 @@ uniform int u_blend;
 uniform float u_opacity;
 uniform vec4 u_clip;    // x0,y0,x1,y1 canvas units, y-down
 uniform float u_clipOn;
+uniform sampler2D u_mask;   // matte source group texture (#189)
+uniform float u_maskOn;
+uniform int u_maskMode;     // 0 = alpha, 1 = luma
+uniform float u_maskInvert;
 in vec2 v_cuv;
 out vec4 o;
 
 vec3 unpre(vec3 c, float a) { return a > 1e-6 ? c / a : vec3(0.0); }
+
+// sRGB relative luminance — the "luma" of a layer matte (#154 re-plan).
+float sLum(vec3 c) { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
 
 float lum(vec3 c) { return 0.3 * c.r + 0.59 * c.g + 0.11 * c.b; }
 vec3 clipColor(vec3 c) {
@@ -159,6 +182,12 @@ vec3 blendF(vec3 cb, vec3 cs, int m) {
 void main() {
   vec2 tuv = v_cuv;   // FBO textures share the renderer's y-up memory layout
   vec4 S = texture(u_src, tuv);
+  if (u_maskOn > 0.5) {
+    vec4 M = texture(u_mask, tuv);   // premultiplied mask group texture
+    float m = u_maskMode == 1 ? sLum(unpre(M.rgb, M.a)) : M.a;
+    if (u_maskInvert > 0.5) m = 1.0 - m;
+    S.rgb *= m; S.a *= m;
+  }
   vec4 D = texture(u_dst, tuv);
   if (u_clipOn > 0.5) {
     vec2 cp = v_cuv * vec2(1000.0, 700.0);
