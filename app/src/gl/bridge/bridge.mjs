@@ -160,6 +160,10 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
    * edge padding. Pass: { mode, params: (params, ctx) -> [4 numbers] }.
    * ctx carries the write target size ({ width, height }) for
    * resolution-dependent params (e.g. blur sigma).
+   *
+   * Template effects (#195) use { uniforms } instead: a function
+   * (step, { read, wTarget, time }) -> { uname: value } returning the
+   * full uniform map for the pass (u_tex/u_res/u_time/u_<param>).
    */
   function defineEffect(kind, def) {
     if (!programDefs.has(def.program)) {
@@ -222,10 +226,10 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
    * @param {string} layerId
    * @param {object} readTarget one of layer(layerId).t0/t1 holding the folded content
    * @param {Array<{kind, params, aux}>} steps plain snapshot — no React
-   * @param {object} opts { clip: [x0,y0,x1,y1]|null }
+   * @param {object} opts { clip: [x0,y0,x1,y1]|null, time: seconds for u_time }
    * @returns the target holding the final texture (bridge-owned)
    */
-  function runChain(layerId, readTarget, steps, { clip = null } = {}) {
+  function runChain(layerId, readTarget, steps, { clip = null, time = 0 } = {}) {
     if (lost) throw new Error('[bridge] context lost — chain paused');
     const L = layer(layerId);
     if (!steps.length) return readTarget;
@@ -249,15 +253,21 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
         gl.viewport(0, 0, wTarget.w, wTarget.h);
         gl.disable(gl.BLEND);
         gl.useProgram(rec.program);
-        uploadUniforms(rec, programDefs.get(def.program), {
-          u_src: read.tex,
-          u_aux: step.aux || read.tex,
-          u_effect: pass.mode,
-          u_p: pass.params(step.params || {}, { width: wTarget.w, height: wTarget.h }),
-          u_texel: [1 / wTarget.w, 1 / wTarget.h],
-          u_res: [wTarget.w, wTarget.h],
-          ...(clip ? { u_clip: clip, u_clipOn: 1 } : { u_clipOn: 0 }),
-        }, cache);
+        const progDef = programDefs.get(def.program);
+        // Template passes (#195) supply their own uniform map from the
+        // param descriptor; legacy passes use the builtin u_* set.
+        const values = typeof pass.uniforms === 'function'
+          ? pass.uniforms(step, { read, wTarget, time })
+          : {
+            u_src: read.tex,
+            u_aux: step.aux || read.tex,
+            u_effect: pass.mode,
+            u_p: pass.params(step.params || {}, { width: wTarget.w, height: wTarget.h }),
+            u_texel: [1 / wTarget.w, 1 / wTarget.h],
+            u_res: [wTarget.w, wTarget.h],
+            ...(clip ? { u_clip: clip, u_clipOn: 1 } : { u_clipOn: 0 }),
+          };
+        uploadUniforms(rec, progDef, values, cache);
         drawFullscreen();
         read = wTarget;
         write = padded
