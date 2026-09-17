@@ -139,6 +139,17 @@ export const COMPOSITION_PRESETS = [
       lifeDrift: 0.16, displacement: 8, behave: 'orbit',
     },
   },
+  {
+    id: 'kiln-columns', name: 'KILN COLUMNS', group: 'classic',
+    desc: 'Stacked organic melt — vertical rails, per-segment color drift, dusty matte palette. Finish: set the layer blend to soft-light.',
+    categories: ['organic'], paletteShift: 'zone',
+    params: {
+      mode: 'rails', count: 520, scale: [0.8, 2.0], rotate: [-14, 14], alpha: [45, 85],
+      zTiers: 4, jitter: 26, density: 110, bleed: false, recolor: true, mirror: false, overlap: true,
+      blendMode: 'soft-light',
+      lifeDrift: 0.04, displacement: 0, behave: 'cruise',
+    },
+  },
 ];
 
 export function getPreset(id) {

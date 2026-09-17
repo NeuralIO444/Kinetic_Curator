@@ -110,7 +110,8 @@
 .fps-bar.mid  .fps-bar-fill { background: #ffd400; }
 .fps-bar.bad  .fps-bar-fill { background: #ff2d6f; }
 
-.palette-switch { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.palette-switch { display: inline-flex; align-items: center; gap: 3px; flex-wrap: nowrap; }
+.palette-save-btn { flex-shrink: 0; }
 .palette-switch-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; margin-right: 3px; }
 .palette-chip {
   display: inline-flex; align-items: center; gap: 5px;
@@ -215,6 +216,46 @@
   color: var(--ink);
   border-color: var(--accent2);
 }
+.palette-nav-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 3px;
+  cursor: pointer;
+}
+.palette-nav-btn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+.palette-nav-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.palette-sw-viewport {
+  display: inline-flex;
+  overflow: hidden;
+  width: 49px; /* 5 swatch cells (9px) + 4 gaps (1px) */
+}
+.palette-sw-track {
+  display: inline-flex;
+  gap: 1px;
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+.palette-chip-viewport {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  max-width: 470px; /* ~4 palette chips; arrows carousel the rest */
+}
+.palette-chip-viewport::-webkit-scrollbar { display: none; }
+.palette-chip-track {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
 
 .run-btn {
   background: var(--accent); color: #000; border: none;
@@ -277,6 +318,7 @@
     flex-wrap: wrap;
     gap: var(--sp-2);
   }
+  .palette-switch { flex-wrap: wrap; }
   .master-left .logo { margin-right: auto; }
   .grid {
     grid-template-columns: 1fr !important;
