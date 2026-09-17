@@ -1,10 +1,14 @@
 // PrintDeskModal — print desk (#172). A modal on OUTPUT for *print*, not live.
 //
-// The desk renders a frozen 1×/2× still of the current composition (the same
-// still RENDER FINAL captures — the live GL frame, including ACCUM trails —
-// via the loop's GPU readback), shows it as a PNG preview at 1000×700, and
-// lets the operator stack the ffmpeg allow-list post filters (chips, one
-// amount each, off by default).
+// The desk's source still comes from the live WebGL loop's GPU-readback
+// capture path (#249): captureStill() → loop.captureFrame() →
+// live.readback() in app/src/gl/liveLoop.mjs. It renders a frozen 1×/2×
+// still of the current composition (the same still RENDER FINAL captures —
+// the live GL frame, including ACCUM trails), shows it as a PNG preview at
+// 1000×700, and lets the operator stack the ffmpeg allow-list post filters
+// (chips, one amount each, off by default). There is no other still source;
+// the old resvg/render.mjs offline path is Node-only farm tooling and is
+// never consulted by the app.
 //
 // APPLY runs the stack on the *source still* → preview PNG. The sidecar
 // (`_render` + `post`) lists the stack with the exact ffmpeg filtergraph so
@@ -111,8 +115,9 @@ export function PrintDeskModal({ onClose }) {
     setSidecar(null);
     setStale(false);
     try {
-      // Same capture RENDER FINAL uses: the live GL frame (trail buffer when
-      // ACCUM is on) at 1×/2×.
+      // The desk's only still source: the live WebGL loop's GPU-readback
+      // capture path (#249) — the same capture RENDER FINAL uses. The live
+      // GL frame (trail buffer when ACCUM is on) at 1×/2×.
       const { blob } = await captureStill({
         loopRef: glLoopRef,
         resolution,
@@ -176,8 +181,8 @@ export function PrintDeskModal({ onClose }) {
       width,
       height,
       renderer: accumOn
-        ? 'app still export (live GL ACCUM trail buffer); farm equivalent: studio.py render --accum'
-        : 'app still export (live GL frame); farm equivalent: studio.py render',
+        ? 'live WebGL loop GPU readback (captureStill -> loop.captureFrame, #249); farm equivalent: studio.py render --accum'
+        : 'live WebGL loop GPU readback (captureStill -> loop.captureFrame, #249); farm equivalent: studio.py render',
       timestamp: new Date().toISOString(),
     },
     post: {
