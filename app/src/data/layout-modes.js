@@ -32,6 +32,9 @@ export function isOrganismMode(mode) {
 export const SYMMETRY_MODES = ['none', 'bilateral', 'stamp'];
 export const BEHAVE_MODES = BEHAVE_IDS;
 
+/** #167 — onContact response per overlapping pair. */
+export const CONTACT_MODES = ['none', 'bounce', 'swap', 'stick', 'die', 'breed'];
+
 export const PALETTE_SHIFTS = ['auto', 'band', 'zone', 'split'];
 
 export const BLEND_MODES = [
@@ -76,6 +79,14 @@ export const DEFAULT_LAYOUT_PARAMS = {
   symmetry: 'none',
   behave: 'cruise',
   material: 'plate',
+
+  // #167 — organism contacts. contactRadius 0 disables the contact pass
+  // entirely (the swarm is then bit-identical to the pre-contact engine).
+  contactRadius: 0,
+  contactRestitution: 0.5,
+  contactRepel: 0,
+  contactMode: 'none',
+  collideMask: 0xffffffff,
 
   audioModDepth: 0.65,
   audioScaleMod: 0.45,
@@ -125,6 +136,14 @@ export const PARAM_SPEC = {
   audioScaleMod: { min: 0, max: 1 },
   audioAlphaMod: { min: 0, max: 1 },
   lifeDrift: { min: 0, max: 1 },
+  // #167 — contact disc radius in px (0 = contacts off), bounce 0–1,
+  // personal-space force gain, and the 32-bit layer-interaction mask.
+  // No sliders expose these yet — the spec is the trust boundary (#107),
+  // the UI half is a follow-up.
+  contactRadius: { min: 0, max: 120 },
+  contactRestitution: { min: 0, max: 1 },
+  contactRepel: { min: 0, max: 5 },
+  collideMask: { min: 0, max: 0xffffffff, int: true },
 };
 
 /** Bounds for each end of the dual-slider ranges. */
@@ -167,6 +186,7 @@ const ENUM_SPEC = {
   paletteShift: PALETTE_SHIFTS,
   symmetry: SYMMETRY_MODES,
   behave: BEHAVE_MODES,
+  contactMode: CONTACT_MODES,
 };
 
 /** True when `value` is a number we can meaningfully clamp. */
@@ -264,6 +284,7 @@ export function normalizeLayoutParams(partial) {
   next.paletteShift = pickEnum(next.paletteShift, PALETTE_SHIFTS, 'auto');
   next.symmetry = pickEnum(next.symmetry, SYMMETRY_MODES, 'none');
   next.behave = pickEnum(next.behave, BEHAVE_MODES, 'cruise');
+  next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
 
   return next;
 }
