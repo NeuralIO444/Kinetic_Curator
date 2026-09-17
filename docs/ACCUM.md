@@ -51,6 +51,13 @@ ping-pong, NEAREST):
    gaussian blur, add back: `accum.rgb += 0.55 × optics × blurred`.
 6. **Halation** (#169) — the same downsampled buffer blurred *wider*, added
    back with a red/warm bias: `accum.rgb += 0.45 × optics × (1.0, 0.6, 0.35) × blurredWide`.
+   The reference look is the full 3σ gaussian kernel the JS mirror evaluates
+   (#226): halation σ runs 11→33px on the quarter-res buffer, whose 3σ radius
+   (up to 99 taps) exceeds the blur shader's 64-tap loop, so the GPU
+   subdivides wide sigmas into multiple passes at σ/√n
+   (`blurPassSigmas`) — repeated gaussians convolve back to the full kernel.
+   The old truncated-at-64 kernel (narrower, weaker glow at high optics) was
+   the artifact, not the look.
 
 One amount drives steps 3/5/6: **optics** 0..1 — the GLOW slider next to
 FADE in the toggle row (`layoutParams.accumulationOptics`, default 0).

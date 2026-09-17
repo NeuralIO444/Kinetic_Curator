@@ -24,6 +24,8 @@ import {
   mirrorFlowVec,
   createEchoState,
   mirrorAccumStep,
+  mirrorGaussBlur,
+  blurPassSigmas,
   ACCUM_PROGRAMS,
 } from './accum.mjs';
 import { buildSceneContract } from './sceneContract.js';
@@ -275,6 +277,60 @@ ok('mirror: optics 0 blooms nothing', () => {
   const out = mirrorAccumStep({ accum, frame, w: W, h: H, params: accumRecipeParams({ fade: 1, optics: 0 }) });
   assert.deepEqual(px(out, 6, 4), [0, 0, 0, 0], 'no bleed two pixels away at optics 0');
   assert.deepEqual(px(out, 4, 4)[0], 1);
+});
+
+ok('halation parity: GPU subdivision matches the reference 3σ kernel (#226)', () => {
+  // Reference look (Matt's call: no need to match SVG, we are in new
+  // territory): the full 3σ gaussian the JS mirror evaluates — the wide warm
+  // halation #169 designed. The GPU's old truncated-at-64-taps kernel was
+  // the artifact; blurInto now subdivides wide sigmas into multiple passes
+  // at σ/√n so the GPU evaluates the same full kernel.
+  //
+  // 1. Subdivision math: per-pass sigmas convolve back to the full sigma,
+  //    and every pass fits the shader's 64-tap loop.
+  for (const sigma of [5, 9, 11, 13.5, 22, 33]) {
+    const passes = blurPassSigmas(sigma);
+    assert.ok(passes.length >= 1, `sigma ${sigma}: at least one pass`);
+    assert.ok(passes.every((s) => Math.ceil(3 * s) <= 64),
+      `sigma ${sigma}: every pass fits 64 taps`);
+    const total = Math.sqrt(passes.reduce((a, s) => a + s * s, 0));
+    assert.ok(Math.abs(total - sigma) < 1e-9,
+      `sigma ${sigma}: passes convolve back to ${sigma}, got ${total}`);
+  }
+  assert.deepEqual(blurPassSigmas(0), [], 'no-op sigma -> no passes');
+  assert.equal(blurPassSigmas(5).length, 1, 'small sigma stays a single pass');
+  assert.equal(blurPassSigmas(33).length, 3, 'halation max sigma subdivides into 3 passes');
+  // 2. Image level: the GPU's subdivided stack (repeated mirrorGaussBlur at
+  //    the sub-sigmas) equals the mirror's single full-kernel pass. A 1D-ish
+  //    strip keeps it cheap; the comparison is interior-only (margin = 3σ)
+  //    because clamped edges legitimately differ between single and
+  //    repeated passes.
+  const w = 256, h = 3;
+  const src = new Float64Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4;
+      const v = 0.5 + 0.5 * Math.sin(x * 0.11) * Math.cos(x * 0.031);
+      src[o] = v; src[o + 1] = v * 0.7; src[o + 2] = v * 0.4; src[o + 3] = 1;
+    }
+  }
+  src[100 * 4] = 1; // impulse: exercises the kernel tails
+  for (const sigma of [22, 33]) { // bloom max … halation max (the subdivided range)
+    const ref = mirrorGaussBlur(src, w, h, sigma);
+    let cur = src;
+    for (const s of blurPassSigmas(sigma)) cur = mirrorGaussBlur(cur, w, h, s);
+    const margin = Math.ceil(3 * sigma) + 1;
+    let maxDiff = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = margin; x < w - margin; x++) {
+        const o = (y * w + x) * 4;
+        for (let c = 0; c < 3; c++) maxDiff = Math.max(maxDiff, Math.abs(ref[o + c] - cur[o + c]));
+      }
+    }
+    // The residual is the 3σ tail mass each sub-kernel drops — invisible
+    // (measured ~1e-3 vs the probe's 4-LSB ≈ 1.6e-2 bar), not a mismatch.
+    assert.ok(maxDiff < 5e-3, `sigma ${sigma}: subdivided stack matches reference kernel, max interior diff ${maxDiff.toExponential(2)}`);
+  }
 });
 
 const fbParams = (over) => ({ ...accumRecipeParams({ fade: 1, optics: 0 }), ...over });
