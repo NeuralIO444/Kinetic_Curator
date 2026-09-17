@@ -31,15 +31,20 @@ import { Shell } from './composition/Shell.jsx';
  * indicator design later; this badge is the stopgap.
  */
 function ShedBadge() {
-  const gov = useStore(s => ({
-    renderScale: s.renderScale,
-    perfTier1: s.perfTier1,
-    assetThin: s.assetThin,
-    perfClampOverride: s.perfClampOverride,
-    slowRender: s.slowRender,
-    lastWatchdogReason: s.lastWatchdogReason,
-  }));
-  const summary = shedSummary({ ...gov, watchdogTripped: !!gov.lastWatchdogReason });
+  // NOTE: select primitives individually. An object-literal selector with
+  // zustand's useStore returns a fresh object per getSnapshot() call, which
+  // React reads as "snapshot changed every render" → infinite loop
+  // (React #185 took the whole app down in CI).
+  const renderScale = useStore(s => s.renderScale);
+  const perfTier1 = useStore(s => s.perfTier1);
+  const assetThin = useStore(s => s.assetThin);
+  const perfClampOverride = useStore(s => s.perfClampOverride);
+  const slowRender = useStore(s => s.slowRender);
+  const lastWatchdogReason = useStore(s => s.lastWatchdogReason);
+  const summary = shedSummary({
+    renderScale, perfTier1, assetThin, perfClampOverride, slowRender,
+    watchdogTripped: !!lastWatchdogReason,
+  });
   if (!summary) return null;
   return (
     <span
