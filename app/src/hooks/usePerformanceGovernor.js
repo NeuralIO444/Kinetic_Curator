@@ -26,6 +26,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import { nextGovernorCut } from './governorCuts.js';
+import { recordGovernorEvent } from '../gl/governorEventLog.mjs';
 
 const LOW_FPS = 32;
 const CRITICAL_FPS = 10; // ~0 FPS: the tab is barely getting frames at all
@@ -61,12 +62,20 @@ export function usePerformanceGovernor() {
   useEffect(() => {
     if (!autoQuality) {
       criticalSinceRef.current = null;
-      if (slowRender) setSlowRender(false);
+      if (slowRender) {
+        setSlowRender(false);
+        // Event-log only: the cut cleared (governor disabled).
+        recordGovernorEvent({ type: 'restore', cutKind: 'slowRender', label: 'motion unfrozen', detail: 'autoQuality off' });
+      }
       return;
     }
     if (fps >= LOW_FPS) {
       criticalSinceRef.current = null;
-      if (slowRender) setSlowRender(false);
+      if (slowRender) {
+        setSlowRender(false);
+        // Event-log only: the cut cleared (FPS recovered).
+        recordGovernorEvent({ type: 'restore', cutKind: 'slowRender', label: 'motion unfrozen', fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 } });
+      }
       return;
     }
     if (fps >= CRITICAL_FPS) {
@@ -80,6 +89,12 @@ export function usePerformanceGovernor() {
     }
     if (!slowRender && now - criticalSinceRef.current >= CRITICAL_SUSTAIN_MS) {
       tripWatchdog('fps-critical');
+      // Event-log only: step 7 of the shed ladder fired.
+      recordGovernorEvent({
+        type: 'shed', cutKind: 'watchdog', label: 'watchdog hard stop',
+        fps: { at: fps, threshold: CRITICAL_FPS, sustainedMs: CRITICAL_SUSTAIN_MS },
+        detail: `FPS ${fps} < ${CRITICAL_FPS} sustained ${CRITICAL_SUSTAIN_MS / 1000}s`,
+      });
       console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS, ')');
     }
   }, [fps, autoQuality, slowRender, tripWatchdog, setSlowRender]);
@@ -90,12 +105,23 @@ export function usePerformanceGovernor() {
   useEffect(() => {
     if (!autoQuality) {
       tier1SinceRef.current = null;
-      if (perfTier1) setPerfTier1(false);
+      if (perfTier1) {
+        setPerfTier1(false);
+        // Event-log only: the cut cleared (governor disabled).
+        recordGovernorEvent({ type: 'restore', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM restored', detail: 'autoQuality off' });
+      }
       return;
     }
     if (fps >= TIER1_FPS) {
       tier1SinceRef.current = null;
-      if (perfTier1) setPerfTier1(false);
+      if (perfTier1) {
+        setPerfTier1(false);
+        // Event-log only: the cut cleared (FPS recovered).
+        recordGovernorEvent({
+          type: 'restore', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM restored',
+          fps: { at: fps, threshold: TIER1_FPS, sustainedMs: 0 },
+        });
+      }
       return;
     }
     const now = Date.now();
@@ -105,6 +131,12 @@ export function usePerformanceGovernor() {
     }
     if (!perfTier1 && now - tier1SinceRef.current >= TIER1_SUSTAIN_MS) {
       setPerfTier1(true);
+      // Event-log only: step 3 of the shed ladder fired.
+      recordGovernorEvent({
+        type: 'shed', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM off',
+        fps: { at: fps, threshold: TIER1_FPS, sustainedMs: TIER1_SUSTAIN_MS },
+        detail: `FPS ${fps} < ${TIER1_FPS} sustained ${TIER1_SUSTAIN_MS / 1000}s`,
+      });
       console.info('[Kinetic] Perf tier1: ACCUM/gloss/mirror off (FPS below', TIER1_FPS, ')');
     }
   }, [fps, autoQuality, perfTier1, setPerfTier1]);
@@ -118,11 +150,32 @@ export function usePerformanceGovernor() {
     // "still struggling at the lowest tier", so it also clears on tier
     // change.)
     if (healthy || quality !== 'performance') {
-      if (perfClampOverride) setPerfClampOverride(null);
+      if (perfClampOverride) {
+        setPerfClampOverride(null);
+        // Event-log only: the cut cleared (recovery or tier change).
+        recordGovernorEvent({
+          type: 'restore', cutKind: 'countClamp', label: 'count clamp released',
+          fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 },
+        });
+      }
     }
     if (healthy) {
-      if (renderScale < 1) setRenderScale(1);
-      if (assetThin) setAssetThin(false);
+      if (renderScale < 1) {
+        setRenderScale(1);
+        // Event-log only: the cut cleared (FPS recovered).
+        recordGovernorEvent({
+          type: 'restore', cutKind: 'renderScale', label: 'resolution → 100%',
+          fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 },
+        });
+      }
+      if (assetThin) {
+        setAssetThin(false);
+        // Event-log only: the cut cleared (FPS recovered).
+        recordGovernorEvent({
+          type: 'restore', cutKind: 'assetThin', label: 'asset thinning released',
+          fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 },
+        });
+      }
     }
 
     if (!autoQuality) {
@@ -166,6 +219,12 @@ export function usePerformanceGovernor() {
       case 'slowRender': setSlowRender(true); break;
       default: break;
     }
+    // Event-log only: steps 1–2 / 4–6 of the shed ladder fire here.
+    recordGovernorEvent({
+      type: 'shed', cutKind: cut.kind, label: cut.label,
+      fps: { at: fps, threshold: LOW_FPS, sustainedMs: SUSTAIN_MS },
+      detail: `FPS ${fps} < ${LOW_FPS} sustained ${SUSTAIN_MS / 1000}s`,
+    });
     lastActionRef.current = now;
     lowSinceRef.current = null;
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', LOW_FPS + ')');

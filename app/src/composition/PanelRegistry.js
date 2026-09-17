@@ -14,6 +14,11 @@ const ShaderLabPanel = import.meta.env.DEV
   ? lazy(() => import('../panels/ShaderLabPanel.jsx').then((m) => ({ default: m.ShaderLabPanel })))
   : null;
 
+// Governor X-ray (hardening 5/6) is dev-only: same lazy-chunk pattern.
+const GovernorXrayPanel = import.meta.env.DEV
+  ? lazy(() => import('../panels/GovernorXrayPanel.jsx').then((m) => ({ default: m.GovernorXrayPanel })))
+  : null;
+
 export const PANEL_REGISTRY = [
   { id: 'canvas',   title: 'CANVAS',   icon: '◆', component: CanvasPanel,    zone: 'primary' },
   { id: 'layout',   title: 'LAYOUT',   icon: '■', component: LayoutPanel,    zone: 'secondary' },
@@ -27,6 +32,12 @@ export const PANEL_REGISTRY = [
 if (import.meta.env.DEV && ShaderLabPanel) {
   PANEL_REGISTRY.push(
     { id: 'shaderlab', title: 'SHADER LAB', icon: '◈', component: ShaderLabPanel, zone: 'secondary' },
+  );
+}
+
+if (import.meta.env.DEV && GovernorXrayPanel) {
+  PANEL_REGISTRY.push(
+    { id: 'xray', title: 'X-RAY', icon: '◉', component: GovernorXrayPanel, zone: 'secondary' },
   );
 }
 
