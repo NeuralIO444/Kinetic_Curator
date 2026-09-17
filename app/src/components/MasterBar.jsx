@@ -16,24 +16,47 @@ function CompactSwatches({ swatches }) {
   );
 }
 
-/** Editable strip: all swatches + BG + INK (#51 / #52) */
+/** Editable strip: sliding window of 5 swatches + pinned BG + INK (#51 / #52).
+ *  Palettes with more than 5 swatches get ‹ › arrows to slide the window. */
+const SWATCH_WIN = 5;
 function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onReset, onLock }) {
   const swatches = palette.swatches || [];
+  const [start, setStart] = useState(0);
+  const maxStart = Math.max(0, swatches.length - SWATCH_WIN);
+  const s = Math.min(start, maxStart);
+  const overflow = swatches.length > SWATCH_WIN;
+  const slide = (d) => (e) => {
+    e.stopPropagation();
+    setStart(Math.max(0, Math.min(maxStart, s + d)));
+  };
   return (
     <span className="palette-active-strip" aria-label={`${palette.name} palette editor`}>
+      {overflow && (
+        <button
+          type="button"
+          className="palette-nav-btn"
+          title="Previous swatches"
+          disabled={s <= 0}
+          onClick={slide(-1)}
+        >
+          ‹
+        </button>
+      )}
       <span className="palette-active-swatches">
-        {swatches.map((s, i) => (
+        {swatches.slice(s, s + SWATCH_WIN).map((sw, vi) => {
+          const i = s + vi;
+          return (
           <span key={i} className={`palette-sw-cell ${locks?.[i] ? 'locked' : ''}`}>
             <label
               className="palette-sw-edit"
-              title={`S${i + 1} ${s} — click to edit`}
+              title={`S${i + 1} ${sw} — click to edit`}
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="palette-chip-sw palette-sw-full" style={{ background: s }} />
+              <span className="palette-chip-sw palette-sw-full" style={{ background: sw }} />
               <input
                 type="color"
                 className="palette-color-input"
-                value={s}
+                value={sw}
                 onChange={(e) => onSwatch(i, e.target.value)}
                 onClick={(e) => e.stopPropagation()}
               />
@@ -48,8 +71,20 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
               {locks?.[i] ? '▪' : ''}
             </button>
           </span>
-        ))}
+          );
+        })}
       </span>
+      {overflow && (
+        <button
+          type="button"
+          className="palette-nav-btn"
+          title="Next swatches"
+          disabled={s >= maxStart}
+          onClick={slide(1)}
+        >
+          ›
+        </button>
+      )}
       <label
         className="palette-meta-sw palette-sw-edit"
         style={{ background: palette.bg }}
@@ -275,6 +310,7 @@ export function MasterBar() {
                   title={`${p.name} · edit swatches · switch palette clears customs`}
                 >
                   <ActivePaletteStrip
+                    key={palette.id}
                     palette={palette}
                     dirty={!!palette.dirty}
                     locks={paletteLocks}
