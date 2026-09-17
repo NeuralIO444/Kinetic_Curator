@@ -1,5 +1,6 @@
 // #107 §6 — a document the app cannot read must never be silently applied.
 import { test, expect } from '@playwright/test';
+import { waitForLiveFrame } from './gl-helpers.js';
 
 async function boot(page, autosaveRaw) {
   const errors = [];
@@ -24,8 +25,7 @@ test('unreadable autosave is quarantined, defaults boot, MasterBar says so', asy
   const errors = await boot(page, '{ this is not json');
 
   // The canvas must be up on factory defaults, not blank.
-  const nodes = await page.locator('svg use').count();
-  expect(nodes, 'should boot factory defaults with a live canvas').toBeGreaterThan(0);
+  await waitForLiveFrame(page);
 
   // The operator must be told, or they will believe the set is being saved.
   await expect(page.locator('.master-bar')).toContainText(/RESTORE FAILED/);
@@ -51,7 +51,7 @@ test('a good autosave still restores and shows no warning', async ({ page }) => 
     },
   });
   const errors = await boot(page, doc);
-  expect(await page.locator('svg use').count()).toBeGreaterThan(0);
+  await waitForLiveFrame(page);
   await expect(page.locator('.footer-bar')).toContainText(/grid/);
   await expect(page.locator('.master-bar')).not.toContainText(/RESTORE FAILED|UNSAVED/);
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);

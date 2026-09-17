@@ -7,7 +7,7 @@ import { resolutionLabel } from '../../data/quality.js';
 // effect (#107 §5) also needs to flip it when a render dies mid-batch, so
 // the ref has to be created where that effect lives, not in here.
 export function BatchEditionBlock({
-  svgRef, palette, seed, layoutParams, quality, paletteId, exportResolution,
+  glLoopRef, palette, seed, layoutParams, quality, paletteId, exportResolution,
   accumOn, rendering, setRendering, batchProgress, setBatchProgress,
   cancelBatchRef, onDone,
 }) {
@@ -27,11 +27,10 @@ export function BatchEditionBlock({
     emit(Events.EXPORT_BATCH_PAUSE, true);
     try {
       const results = await renderBatch({
-        svgNode: svgRef.current,
+        loopRef: glLoopRef,
         count: batchCount,
         startSeed: seed,
         resolution: exportResolution,
-        background: palette.bg,
         setSeed: (s) => emit(Events.EXPORT_SEED, s),
         getSidecar: () => ({
           layout: { ...layoutParams },
@@ -53,10 +52,12 @@ export function BatchEditionBlock({
         },
         shouldCancel: () => cancelBatchRef.current,
       });
-      // Batch walks the live seed; put it back where the user had it.
-      emit(Events.EXPORT_SEED, startSeed);
-      onDone(`Batch done · ${results.length} files`);
-      setTimeout(() => onDone(null), 3000);
+      if (results.cancelled) {
+        emit(Events.EXPORT_SEED, startSeed);
+        onDone(`Batch stopped after ${results.done}`);
+      } else {
+        onDone(`Batch complete: ${results.done} stills`);
+      }
     } catch (e) {
       console.warn('[BATCH]', e);
       emit(Events.EXPORT_SEED, startSeed);
@@ -101,7 +102,7 @@ export function BatchEditionBlock({
             fontWeight: 700,
             letterSpacing: '0.06em',
           }}
-          title={accumOn ? 'Batch uses SVG path — turn ACCUM off' : 'Render N sequential seeds as PNG + JSON sidecar'}
+          title={accumOn ? 'Batch needs ACCUM off — trails would bleed across seeds' : 'Render N sequential seeds as PNG + JSON sidecar'}
         >
           {batchProgress
             ? `BATCH ${batchProgress.done}/${batchProgress.total}…`
@@ -117,11 +118,6 @@ export function BatchEditionBlock({
             STOP
           </button>
         )}
-      </div>
-      <div className="output-hint" style={{ marginTop: 6 }}>
-        {accumOn
-          ? 'Batch disabled while ACCUM is on (buffer is continuous time, not per-seed).'
-          : 'Downloads kc-edition-###-sXXXXXX.png + JSON. Max 48.'}
       </div>
     </div>
   );

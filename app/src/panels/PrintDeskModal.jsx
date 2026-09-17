@@ -1,10 +1,10 @@
 // PrintDeskModal — print desk (#172). A modal on OUTPUT for *print*, not live.
 //
 // The desk renders a frozen 1×/2× still of the current composition (the same
-// still RENDER FINAL would capture — SVG path in the browser; the farm's
-// `studio.py render` GPU readback is the print-master equivalent), shows it
-// as a PNG preview at 1000×700, and lets the operator stack the ffmpeg
-// allow-list post filters (chips, one amount each, off by default).
+// still RENDER FINAL captures — the live GL frame, including ACCUM trails —
+// via the loop's GPU readback), shows it as a PNG preview at 1000×700, and
+// lets the operator stack the ffmpeg allow-list post filters (chips, one
+// amount each, off by default).
 //
 // APPLY runs the stack on the *source still* → preview PNG. The sidecar
 // (`_render` + `post`) lists the stack with the exact ffmpeg filtergraph so
@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { RangeRow } from '../components/RangeRow.jsx';
-import { exportSnapshot } from '../hooks/useMediaExport.js';
+import { captureStill } from '../hooks/useMediaExport.js';
 import {
   POST_CHIPS,
   applyPostStack,
@@ -70,7 +70,7 @@ function freshChips() {
 }
 
 export function PrintDeskModal({ onClose }) {
-  const { palette, svgRef, accumRef } = useApp();
+  const { palette, glLoopRef } = useApp();
   const { state } = useApp((s) => ({
     seed: s.seed,
     layoutParams: s.layoutParams,
@@ -111,27 +111,14 @@ export function PrintDeskModal({ onClose }) {
     setSidecar(null);
     setStale(false);
     try {
-      let blob;
-      if (accumOn && accumRef?.current) {
-        // exportAccumulationCanvas auto-downloads; the desk needs the blob
-        // without a download, so capture the buffer directly.
-        const src = accumRef.current;
-        const out = document.createElement('canvas');
-        out.width = Math.round(src.width * resolution);
-        out.height = Math.round(src.height * resolution);
-        const ctx = out.getContext('2d');
-        if (palette.bg) { ctx.fillStyle = palette.bg; ctx.fillRect(0, 0, out.width, out.height); }
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(src, 0, 0, out.width, out.height);
-        blob = await new Promise((res2, rej) => out.toBlob(
-          (b) => (b ? res2(b) : rej(new Error('still encode failed'))), 'image/png'));
-      } else {
-        if (!svgRef?.current) throw new Error('live canvas not ready — close and reopen the desk');
-        const r = await exportSnapshot(svgRef.current, resolution, seedStr, palette.bg, null,
-          { downloadFile: false });
-        blob = r.blob;
-      }
+      // Same capture RENDER FINAL uses: the live GL frame (trail buffer when
+      // ACCUM is on) at 1×/2×.
+      const { blob } = await captureStill({
+        loopRef: glLoopRef,
+        resolution,
+        seedStr,
+        downloadFile: false,
+      });
       const pixels = await blobToPixels(blob);
       const url = trackUrl(URL.createObjectURL(blob));
       setSource((prev) => {
@@ -189,8 +176,8 @@ export function PrintDeskModal({ onClose }) {
       width,
       height,
       renderer: accumOn
-        ? 'app still export (ACCUM buffer capture); farm equivalent: studio.py render --accum'
-        : 'app still export (live composition rasterized); farm equivalent: studio.py render',
+        ? 'app still export (live GL ACCUM trail buffer); farm equivalent: studio.py render --accum'
+        : 'app still export (live GL frame); farm equivalent: studio.py render',
       timestamp: new Date().toISOString(),
     },
     post: {

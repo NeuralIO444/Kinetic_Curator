@@ -21,7 +21,15 @@
  *
  * Animated params (life/beat) are buffer updates by construction: per-frame
  * work is instance-buffer upload + draw calls, never placement rebuilds.
- * (Static-frame parity is this phase's acceptance; the live loop lands later.)
+ *
+ * Two entry points share one core (createRendererBase):
+ * - createRenderer(canvas): one-shot stills/exports (renderScene,
+ *   renderAccumSequence). Allocates frame targets per render.
+ * - createLiveRenderer(canvas): the live instrument (issue #224, PERFORM).
+ *   Persistent GL resources across frames (atlas, grain LUTs, frame targets,
+ *   ACCUM feedback); renders through the same renderFrameInto() core as
+ *   stills, presents to the visible canvas, and exposes GPU readback for
+ *   capture. One instrument, one pipeline.
  */
 
 import {
@@ -183,8 +191,9 @@ for (const def of RENDERER_PROGRAMS) {
   registerCostTier(`renderer/${def.key}`, def.cost);
 }
 
-export function createRenderer(canvas) {  const gl = canvas.getContext('webgl2', {
-    alpha: false, antialias: false, depth: false, stencil: false,
+function createRendererBase(canvas, { alpha = false } = {}) {
+  const gl = canvas.getContext('webgl2', {
+    alpha, antialias: false, depth: false, stencil: false,
     premultipliedAlpha: false, preserveDrawingBuffer: false,
   });
   if (!gl) throw new Error('[gl] WebGL2 not available');
@@ -545,6 +554,32 @@ export function createRenderer(canvas) {  const gl = canvas.getContext('webgl2',
     return pixels;
   }
 
+
+  function disposeBase() {
+    bridge.dispose();
+    for (const p of [quadProg, compProg, resProg, copyProg]) gl.deleteProgram(p);
+    gl.deleteBuffer(fullVbo); gl.deleteBuffer(cornerVbo); gl.deleteBuffer(instVbo);
+  }
+
+  return {
+    gl, canvas, bridge, progs, U, bindTex, drawFullscreen,
+    composite, drawInstances, instanceData, renderLayerInstances,
+    uploadStatic, freeStatic, allocFrameTargets, freeFrameTargets,
+    renderFrameInto, resolveTargetToBytes, disposeBase,
+  };
+}
+
+/**
+ * createRenderer(canvas) — one-shot stills/exports. Unchanged API:
+ * renderScene(payload) and renderAccumSequence(frames, opts), each
+ * allocating frame targets per render.
+ */
+export function createRenderer(canvas) {
+  const b = createRendererBase(canvas, { alpha: false });
+  const {
+    gl, bridge, uploadStatic, freeStatic,
+    allocFrameTargets, freeFrameTargets, renderFrameInto, resolveTargetToBytes,
+  } = b;
   /**
    * @param {object} payload
    * @returns {{pixels: Uint8Array, width: number, height: number}} bottom-first RGBA
@@ -617,10 +652,129 @@ export function createRenderer(canvas) {  const gl = canvas.getContext('webgl2',
   }
 
   function dispose() {
-    bridge.dispose();
-    for (const p of [quadProg, compProg, resProg, copyProg]) gl.deleteProgram(p);
-    gl.deleteBuffer(fullVbo); gl.deleteBuffer(cornerVbo); gl.deleteBuffer(instVbo);
+    b.disposeBase();
   }
 
   return { renderScene, renderAccumSequence, dispose };
 }
+
+
+/**
+ * createLiveRenderer(canvas) — the live instrument's GPU session (#224).
+ *
+ * Persistent resources: atlas texture, grain LUT textures, ping-pong frame
+ * targets, ACCUM feedback pair. Targets re-allocate only when the render
+ * size changes (governor renderScale). Rendering runs through the same
+ * renderFrameInto() core as stills, so what plays is what renders.
+ *
+ * Frame flow per tick:
+ *   renderFrame(payload) -> present(target)      // to the visible canvas
+ *   readback(target, w, h)                       // GPU pixels for capture
+ * Capture never touches preserveDrawingBuffer: readback resolves into the
+ * persistent outT FBO, then readPixels — the visible canvas can stay
+ * preserveDrawingBuffer:false.
+ */
+export function createLiveRenderer(canvas) {
+  const b = createRendererBase(canvas, { alpha: true });
+  const { gl, bridge } = b;
+
+  let T = null;
+  let TW = 0, TH = 0;
+  let atlasTex = null;
+  let grainTexs = {};
+  let accum = null;
+
+  function ensureTargets(w, h) {
+    if (T && w === TW && h === TH) return;
+    if (T) b.freeFrameTargets(T);
+    T = b.allocFrameTargets(w, h);
+    TW = w; TH = h;
+    // Resizing the canvas clears it; the loop re-renders every frame, so
+    // this costs one frame on renderScale changes only.
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    bridge.resize(w, h, 1);
+    if (accum) accum.resize(w, h);
+  }
+
+  function setAtlas(pixels, w, h, mipmaps) {
+    if (atlasTex) gl.deleteTexture(atlasTex);
+    atlasTex = uploadTexture(gl, pixels, w, h, {
+      mipmaps: mipmaps && mipmaps.length ? mipmaps : null,
+    });
+  }
+
+  function setGrainLuts(luts) {
+    for (const t of Object.values(grainTexs)) gl.deleteTexture(t);
+    grainTexs = {};
+    for (const [k, lut] of Object.entries(luts || {})) {
+      grainTexs[k] = uploadTexture(gl, lut.pixels, lut.width, lut.height, { nearest: true });
+    }
+  }
+
+  /**
+   * Render one frame into the persistent targets.
+   * payload: { width, height, bg, contract, cells, wrapBoxes, transparent? } —
+   *   contract instances are in logical 1000x700 scene units regardless of
+   *   width/height (governor renderScale only changes output resolution).
+   * Returns the target holding the composited frame.
+   */
+  function renderFrame(payload, { transparent = false } = {}) {
+    if (!atlasTex) throw new Error('[gl-live] atlas not uploaded — call setAtlas first');
+    ensureTargets(payload.width, payload.height);
+    return b.renderFrameInto(payload, T, { atlasTex, grainLuts: grainTexs }, { transparent });
+  }
+
+  /** Present a composited target to the visible canvas (Y-flip resolve). */
+  function present(target) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.disable(gl.BLEND);
+    gl.useProgram(b.progs.resolve);
+    gl.uniform1i(b.U(b.progs.resolve, 'u_src'), b.bindTex(0, target.tex));
+    b.drawFullscreen(b.progs.resolve);
+  }
+
+  /**
+   * GPU readback of a composited target: resolves through RESOLVE_FS into
+   * the persistent outT (top-first), then readPixels. Safe with
+   * preserveDrawingBuffer:false — never reads the default framebuffer.
+   */
+  function readback(target, w, h) {
+    return b.resolveTargetToBytes(target, T, w, h);
+  }
+
+  /** Lazily create (and keep) the ACCUM feedback pair at the render size. */
+  function ensureAccum(w, h) {
+    ensureTargets(w, h);
+    if (!accum) accum = createAccum(gl, bridge, { width: w, height: h });
+    return accum;
+  }
+
+  function dropAccum() {
+    if (accum) {
+      accum.dispose();
+      accum = null;
+    }
+  }
+
+  function dispose() {
+    dropAccum();
+    if (atlasTex) gl.deleteTexture(atlasTex);
+    for (const t of Object.values(grainTexs)) gl.deleteTexture(t);
+    if (T) b.freeFrameTargets(T);
+    b.disposeBase();
+  }
+
+  return {
+    setAtlas, setGrainLuts,
+    hasAtlas: () => !!atlasTex,
+    renderFrame, present, readback,
+    ensureAccum, dropAccum,
+    getGL: () => gl,
+    getBridge: () => bridge,
+    dispose,
+  };
+}
+
+export { accumRecipeParams, applyAudioEnvelope };

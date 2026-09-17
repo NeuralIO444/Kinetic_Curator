@@ -3,11 +3,11 @@ import { captureStill, useVideoRecorder } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
 
 export function SnapRecordRow({
-  svgRef, accumRef, palette, seed, layoutParams, exportResolution,
+  glCanvasRef, glLoopRef, palette, seed, layoutParams, exportResolution,
   accumOn, isRecording, rendering,
 }) {
   useVideoRecorder({
-    svgRef,
+    canvasRef: glCanvasRef,
     isRecording,
     seedStr: seed.toString(16),
     fps: 15,
@@ -15,8 +15,8 @@ export function SnapRecordRow({
 
   const addSnapshot = () => {
     captureStill({
-      accumOn, accumRef, svgNode: svgRef.current,
-      resolution: exportResolution, seedStr: seed.toString(16), background: palette.bg,
+      loopRef: glLoopRef,
+      resolution: exportResolution, seedStr: seed.toString(16),
       onThumbnail: (thumb) => {
         emit(Events.EXPORT_SNAPSHOT, {
           seed,
@@ -36,8 +36,8 @@ export function SnapRecordRow({
       <button
         className="big-btn"
         onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
-        disabled={rendering || (accumOn && !isRecording)}
-        title={accumOn && !isRecording ? 'REC is disabled while ACCUM is on: the recorder captures the SVG layer, not the accumulation buffer' : 'Record live output to WEBM'}
+        disabled={rendering}
+        title="Record the live canvas to WEBM — what plays is what records, ACCUM included"
         style={isRecording ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
       >
         {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}

@@ -15,8 +15,14 @@
 //    compare against values far enough apart that ambient layoutParams drift
 //    cannot account for the difference.
 import { test, expect } from '@playwright/test';
+import { glNodeCount, waitForLiveFrame } from './gl-helpers.js';
 
-const nodeCount = (page) => page.locator('svg use').count();
+// The GL loop reports node count through the CanvasPanel pill. Poll for a
+// nonzero count so we never read a pre-first-frame zero.
+const nodeCount = async (page) => {
+  await waitForLiveFrame(page);
+  return glNodeCount(page);
+};
 
 /** Set a range input to an exact value and let React commit it. */
 async function setRange(page, slider, value) {
