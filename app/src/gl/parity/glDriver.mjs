@@ -42,7 +42,15 @@ async function ensurePage() {
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
-  browser = await chromium.launch();
+  try {
+    browser = await chromium.launch();
+  } catch (e) {
+    // Launch failed (e.g. no Playwright browser installed in CI): don't
+    // leak the just-opened server or the caller's process hangs forever.
+    await new Promise((resolve) => server.close(resolve));
+    server = null;
+    throw e;
+  }
   page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${port}/parity/glHarness.html`);
   await page.waitForFunction('window.__kcReady === true', null, { timeout: 30000 });
