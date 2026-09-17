@@ -18,6 +18,7 @@ import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
 import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
+import { routeBeat } from './state/beatArbiter.js';
 import { useStore } from './state/store.js';
 import { shedSummary } from './hooks/governorCuts.js';
 import * as A from './state/actions.js';
@@ -106,10 +107,6 @@ function AppInner() {
 
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [helpTab, setHelpTab] = useState('help');
-  const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
-  useEffect(() => {
-    evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
-  }, [state.evolveMode, state.evolveSource]);
 
   useEffect(() => {
     // #107 §4: an automatic trigger, not a manual one — pauses under
@@ -194,13 +191,15 @@ function AppInner() {
     if (denied) piped({ type: A.SET_AUDIO_ENABLED, payload: false });
   }, [piped]);
   const onBeat = useCallback(() => {
+    // beatPulse still drives the readouts (phrase pip, meters); the actual
+    // consumers are routed through the beat arbiter so one attack is one
+    // ordered spike — phrase (the clock) resolves first, evolve (the gate)
+    // fires on the post-phrase state. #104: beat collisions.
     piped({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
-    // #107 §4/§5: same automatic-trigger pause as the time-source interval
-    // above — slowRender and batchPaused each independently gate this.
     const s = useStore.getState();
-    if (evolveRef.current.mode && evolveRef.current.source === 'beat' && !s.slowRender && !s.batchPaused) {
-      piped({ type: A.TRIGGER_EVOLVE });
-    }
+    const { tickPhrase, fireEvolve } = routeBeat(s);
+    if (tickPhrase) s.tickPhraseBeat();
+    if (fireEvolve) s.triggerEvolve();
   }, [piped]);
   useAudioInput({
     enabled: state.audioEnabled,

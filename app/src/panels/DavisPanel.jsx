@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { EvolveControls } from './davis/EvolveControls.jsx';
+import { BeatRouter } from './davis/BeatRouter.jsx';
 import { MorphControls } from './davis/MorphControls.jsx';
 import { PhraseControls } from './davis/PhraseControls.jsx';
 import { FavoritesList } from './davis/FavoritesList.jsx';
@@ -14,6 +15,7 @@ export function DavisPanel() {
     evolveTarget: s.evolveTarget,
     evolveInterval: s.evolveInterval,
     autoSnapshot: s.autoSnapshot,
+    beatRoute: s.beatRoute,
     motionSmoothing: s.motionSmoothing,
     favorites: s.favorites,
     seed: s.seed,
@@ -32,7 +34,7 @@ export function DavisPanel() {
     audioBands: s.audioBands,
   }));
   const {
-    evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot,
+    evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot, beatRoute,
     motionSmoothing, favorites, seed, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
     phraseClock, phraseBpm,
@@ -54,6 +56,9 @@ export function DavisPanel() {
   const metro = phraseClock === 'metro';
   const rms = audioBands?.rms || 0;
   const noAttack = phraseEnabled && !metro && audioEnabled && phraseBeat === 0 && rms > 0.2;
+  // Beat collision is live when both consumers are armed on the same attack:
+  // evolve on SOURCE=BEAT and the phrase on CLOCK=AUDIO.
+  const beatCollision = evolveMode && evolveSource === 'beat' && phraseEnabled && (phraseClock || 'audio') === 'audio';
   // Phase A gesture: local FREEZE toggle state (the hook resets on ACCUM
   // toggle, and this row unmounts with it, so the two stay in sync).
   const [accumFrozen, setAccumFrozen] = useState(false);
@@ -87,6 +92,8 @@ export function DavisPanel() {
             autoSnapshot={autoSnapshot}
             motionSmoothing={motionSmoothing}
           />
+
+          {beatCollision && <BeatRouter beatRoute={beatRoute || 'both'} />}
 
           <MorphControls
             morphEvolve={morphEvolve}

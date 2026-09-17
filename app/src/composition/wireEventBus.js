@@ -25,6 +25,7 @@ export function wireEventBus(rawDispatch) {
     if (p.source !== undefined) return dispatch({ type: A.SET_EVOLVE_SOURCE, payload: p.source });
     if (p.interval !== undefined) return dispatch({ type: A.SET_EVOLVE_INTERVAL, payload: p.interval });
     if (p.autoSnapshot !== undefined) return dispatch({ type: A.SET_AUTO_SNAPSHOT, payload: p.autoSnapshot });
+    if (p.beatRoute !== undefined) return dispatch({ type: A.SET_BEAT_ROUTE, payload: p.beatRoute });
     if (p.motionSmoothing !== undefined) return dispatch({ type: A.SET_MOTION_SMOOTHING, payload: p.motionSmoothing });
     return dispatch({ type: A.TRIGGER_EVOLVE });
   });
