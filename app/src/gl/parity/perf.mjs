@@ -9,9 +9,10 @@
 // would persist targets and skip readPixels.
 //
 //   node src/gl/parity/perf.mjs [sceneId] [iters] [width] [quality]
-// The quality override exists so the probe can exercise a full 3-wrap FX
-// stack: the corpus scenes are 'balanced' (maxFxLayers 2, the third wrap is
-// shed like the SVG reference), while 'high' allows 3.
+// The quality override exists to exercise the full 3-wrap FX stack at
+// different tiers; since #192 all tiers composite every FX wrap (maxFxLayers
+// retired as a budget), so the override now only changes count/particle
+// density between tiers.
 import { getScene } from './corpus.mjs';
 import { buildSceneContract } from '../sceneContract.js';
 import { resolveLayers } from '../../../../studio/render.mjs';

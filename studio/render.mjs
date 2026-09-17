@@ -1,5 +1,16 @@
 #!/usr/bin/env node
 // studio/render.mjs — project JSON -> standalone SVG, offline.
+//
+// #192: the SVG *export* role is retired — shipped output is raster-only
+// (studio.py render → GPU readback PNG). renderSvg() stays in-repo as the
+// DEV-ONLY parity reference: app/src/gl/parity/reference.mjs imports it to
+// pixel-diff the WebGL candidate against. It must never be imported by the
+// shipped app bundle (vite) — see gl/phase6.selfcheck.mjs, which asserts the
+// production import graph has no path to it.
+//
+// resolveLayers() below is shared plumbing (the GL path uses it to resolve
+// layers before building the scene contract); it is not SVG rendering and
+// stays in normal use.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ASSETS } from '../app/src/data/assets/index.js';
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
@@ -211,12 +222,10 @@ export function renderSvg(doc, opts = {}) {
 
   // -- FX layers -----------------------------------------------------------
   // Same fold as the live CanvasPanel (buildLayerStack), in string form.
-  // The studio is the export path: shedLevel is always 0 (the Showrunner
-  // never runs offline), but the tier's maxFxLayers budget still applies so
-  // a balanced-quality still matches what the live app showed. Uncapped
-  // final renders get FINAL_CAPS (maxFxLayers: Infinity) — full FX.
+  // #192: no FX culling anywhere — effects compile at full fidelity from
+  // the tier's turbulenceOctaves budget. (This module is the dev-only parity
+  // reference now; shipped stills come from the GPU path.)
   const fxCtx = {
-    shedLevel: 0,
     octaves: caps.turbulenceOctaves ?? 3,
     primBudget: caps.maxFilterPrimitives ?? Infinity,
   };

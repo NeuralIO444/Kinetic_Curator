@@ -3,23 +3,29 @@
 // Auto-protects interactivity when FPS tanks. Strategy:
 // - Track a short window of low-FPS samples; act only on sustained dips
 //   with a cooldown between steps (never thrash on spikes).
-// - Shed load in a DEFINED ORDER — the cut list. Order is the contract:
-//     cut 1: FX simplify (turbulence octaves → 1, grain off)
-//     cut 2: FX bypass (keep first visible FX layer only)
-//     cut 3: quality tier step HIGH → BALANCED → PERF
-//     cut 4: mirror/gloss/ACCUM shed (independent perfTier1 mechanism, lower FPS floor)
-//     cut 5: cost-aware asset thinning (drop highest-cost assets first)
-//     cut 5b: render-only count clamp below the PERF floor (existing)
+// - Shed load in a DEFINED ORDER — the cut list. Order is the contract
+//   (see ./governorCuts.js, pure and unit-tested):
+//     cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
+//     cut 2: quality tier step HIGH → BALANCED → PERF
+//     cut 3: mirror/gloss/ACCUM shed (independent perfTier1 mechanism, lower FPS floor)
+//     cut 4: cost-aware asset thinning (drop highest-cost assets first)
+//     cut 5: render-only count clamp below the PERF floor
 //     cut 6: freeze motion via slowRender (a still instrument beats a dead one)
 //     cut 7: watchdog hard stop (existing tier 2, manual resume)
 // - Every cut is a render-only overlay: it never writes layoutParams, never
 //   serializes into project JSON, and auto-clears on recovery — except the
 //   hard stop, which needs manual resume (panic-key precedent, #107).
-// - Cuts 1–2 are dormant until a layer with kind 'fx' exists (#152); the
-//   guard keeps the ladder from spending steps on nothing.
+// - Phase 6 (#192): the old cuts 1–2 (FX simplify / FX bypass — the
+//   fxShedLevel ladder) are REMOVED. GPU FX compositing has 10–50x headroom,
+//   and the ladder caused the silent-cull trap: an FX layer shown in the UI
+//   while its wrap was culled. The primary shed is dynamic resolution
+//   scaling — pixels drop before anything visible is cut. If the governor
+//   ever sheds, the UI says so: see ShedBadge in App.jsx (#177 owns the
+//   full indicator design later).
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
+import { nextGovernorCut } from './governorCuts.js';
 
 const LOW_FPS = 32;
 const CRITICAL_FPS = 10; // ~0 FPS: the tab is barely getting frames at all
@@ -36,16 +42,15 @@ export function usePerformanceGovernor() {
   const slowRender = useStore(s => s.slowRender);
   const perfTier1 = useStore(s => s.perfTier1);
   const perfClampOverride = useStore(s => s.perfClampOverride);
-  const layers = useStore(s => s.layers);
-  const fxShedLevel = useStore(s => s.fxShedLevel);
   const assetThin = useStore(s => s.assetThin);
+  const renderScale = useStore(s => s.renderScale);
   const setQuality = useStore(s => s.setQuality);
   const setSlowRender = useStore(s => s.setSlowRender);
   const setPerfTier1 = useStore(s => s.setPerfTier1);
   const tripWatchdog = useStore(s => s.tripWatchdog);
   const setPerfClampOverride = useStore(s => s.setPerfClampOverride);
-  const setFxShedLevel = useStore(s => s.setFxShedLevel);
   const setAssetThin = useStore(s => s.setAssetThin);
+  const setRenderScale = useStore(s => s.setRenderScale);
   const layoutParams = useStore(s => s.layoutParams);
 
   const lowSinceRef = useRef(null);
@@ -109,14 +114,14 @@ export function usePerformanceGovernor() {
     const healthy = !autoQuality || fps >= LOW_FPS;
 
     // Recovery: render-only cuts auto-clear the moment the premise stops
-    // holding. frameLock is a user choice and is never auto-cleared here.
-    // (The count clamp keeps its original nuance: its premise is "still
-    // struggling at the lowest tier", so it also clears on tier change.)
+    // holding. (The count clamp keeps its original nuance: its premise is
+    // "still struggling at the lowest tier", so it also clears on tier
+    // change.)
     if (healthy || quality !== 'performance') {
       if (perfClampOverride) setPerfClampOverride(null);
     }
     if (healthy) {
-      if (fxShedLevel > 0) setFxShedLevel(0);
+      if (renderScale < 1) setRenderScale(1);
       if (assetThin) setAssetThin(false);
     }
 
@@ -143,68 +148,28 @@ export function usePerformanceGovernor() {
 
     if (!sustained || !cooled) return;
 
-    const step = (label) => {
-      lastActionRef.current = now;
-      lowSinceRef.current = null;
-      console.info('[Kinetic] Showrunner cut:', label, '(FPS sustained below', LOW_FPS + ')');
-    };
+    const cut = nextGovernorCut({
+      renderScale,
+      quality,
+      assetThin,
+      perfClampOverride,
+      effectiveCount: layoutParams.count,
+      slowRender,
+    });
+    if (!cut) return; // ladder exhausted — hold; the watchdog is separate
 
-    // Cuts 1–2: FX shedding comes FIRST. A filter chain re-renders every
-    // frame while anything beneath it animates, so FX is the steepest cost
-    // per unit of visual change (the Resolume "effect stack" lesson).
-    // Dormant until kind:'fx' layers exist (#152) — the guard keeps the
-    // ladder from spending steps on nothing.
-    const fxActive = layers.filter((l) => l.kind === 'fx' && l.visible !== false).length;
-    if (fxActive > 0 && fxShedLevel < 2) {
-      const next = fxShedLevel + 1;
-      setFxShedLevel(next);
-      step(next === 1
-        ? 'FX simplify — turbulence to 1 octave, grain off'
-        : 'FX bypass — first visible FX layer only');
-      return;
+    switch (cut.kind) {
+      case 'renderScale': setRenderScale(cut.scale); break;
+      case 'quality': setQuality(cut.quality); break;
+      case 'assetThin': setAssetThin(true); break;
+      case 'countClamp': setPerfClampOverride({ count: cut.count, mirror: false }); break;
+      case 'slowRender': setSlowRender(true); break;
+      default: break;
     }
-
-    // Cut 3: quality tier step (placement + particle budgets).
-    if (quality === 'high') {
-      setQuality('balanced');
-      step('quality → BALANCED');
-      return;
-    }
-    if (quality === 'balanced') {
-      setQuality('performance');
-      step('quality → PERF');
-      return;
-    }
-
-    // Cut 5: cost-aware asset thinning. (Cut 4 — mirror/gloss/ACCUM — is
-    // the independent perfTier1 mechanism at its own lower FPS floor.)
-    if (!assetThin) {
-      setAssetThin(true);
-      step('asset thinning — highest-cost assets drop first');
-      return;
-    }
-
-    // Already on performance — the caps at that tier are the floor for what
-    // the live canvas draws; if FPS is still on the floor too, cut further
-    // via a render-only overlay rather than layoutParams itself. That field
-    // is what a "FINAL · UNCAPPED" export restores to once it is done, and a
-    // live-only performance cut must never be what a snapshot inherits.
-    const effectiveCount = perfClampOverride?.count ?? layoutParams.count;
-    if (effectiveCount > 120) {
-      const next = Math.max(80, Math.floor(effectiveCount * 0.7));
-      setPerfClampOverride({ count: next, mirror: false });
-      step(`count clamp (live only) → ${next}`);
-      return;
-    }
-
-    // Cut 6: freeze motion. Reuses the tested slowRender path (pauses
-    // evolve/ambient-drift/ACCUM/swarm); it auto-clears on recovery in the
-    // critical effect above. A still instrument beats a dead one.
-    if (!slowRender) {
-      setSlowRender(true);
-      step('motion frozen (slowRender)');
-    }
+    lastActionRef.current = now;
+    lowSinceRef.current = null;
+    console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', LOW_FPS + ')');
   }, [fps, quality, autoQuality, setQuality, layoutParams.count, perfClampOverride,
-    setPerfClampOverride, layers, fxShedLevel, setFxShedLevel, assetThin,
-    setAssetThin, slowRender, setSlowRender]);
+    setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
+    slowRender, setSlowRender]);
 }

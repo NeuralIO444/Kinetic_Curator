@@ -66,15 +66,18 @@ export const createGlobalSlice = (set) => ({
    */
   stageTimings: {},
   /**
-   * Showrunner cut 1–2: FX filter shedding, render-only overlay.
-   *   0 — no FX cut
-   *   1 — simplify: turbulence octaves → 1, grain off (cheapest primitives cut first)
-   *   2 — bypass: skip FX layers beyond the first visible one
-   * The FX renderer (#152) reads this; until FX layers exist no layer has
-   * kind 'fx' and these cuts are dormant but wired. Auto-clears on recovery,
-   * like perfTier1. Never serialized.
+   * Showrunner cut 1: dynamic resolution scaling (#192), render-only overlay.
+   *   1    — full resolution
+   *   0.75 — first shed step
+   *   0.5  — second shed step
+   *   0.33 — deepest shed step before quality tiers move
+   * Render scale drops before anything visible is cut: GPU FX compositing
+   * has 10–50x headroom, so the old FX cut ladder (fxShedLevel) is retired
+   * and FX layers are never culled. Auto-clears to 1 on recovery.
+   * Never serialized. The live app surfaces it via ShedBadge (#177 owns the
+   * full indicator design); the GL render paths scale width/height by it.
    */
-  fxShedLevel: 0,
+  renderScale: 1,
   /**
    * Showrunner cut 5: cost-aware asset thinning, render-only overlay.
    * When on, layers drop highest-cost-score assets first instead of
@@ -136,7 +139,10 @@ export const createGlobalSlice = (set) => ({
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
   setStageTimings: (stages) => set({ stageTimings: { ...stages } }),
-  setFxShedLevel: (level) => set({ fxShedLevel: Math.max(0, Math.min(2, level | 0)) }),
+  setRenderScale: (scale) => {
+    const s = Number(scale);
+    set({ renderScale: Number.isFinite(s) && s > 0 ? Math.min(1, s) : 1 });
+  },
   setAssetThin: (on) => set({ assetThin: !!on }),
   setFrameLock: (on) => set({ frameLock: !!on }),
   /**

@@ -2,7 +2,8 @@
 // Showrunner invariants: the governor degrades only the live proxy.
 // - Showrunner/store-governor state never serializes into project JSON.
 // - RENDER FINAL · UNCAPPED bypasses every cut (getRenderCaps(q, true) === FINAL_CAPS).
-// - Per-tier budgets exist and step down in order high ≥ balanced ≥ performance.
+// - Per-tier budgets exist and step down in order high ≥ balanced ≥ performance
+//   (maxFxLayers retired as a budget in #192: Infinity on every live tier).
 // - Asset cost scores grow with complexity; pathological ingest warns but passes.
 
 import assert from 'node:assert';
@@ -20,7 +21,7 @@ const state = {
   quality: 'high',
   // Live-only governor state, as the store would hold it mid-performance:
   fps: 24,
-  fxShedLevel: 2,
+  renderScale: 0.5,
   assetThin: true,
   frameLock: true,
   perfTier1: true,
@@ -29,7 +30,7 @@ const state = {
   stageTimings: { kernel: 12.5 },
 };
 const doc = serializeProject(state);
-for (const key of ['fps', 'fxShedLevel', 'assetThin', 'frameLock', 'perfTier1', 'slowRender', 'perfClampOverride', 'stageTimings']) {
+for (const key of ['fps', 'renderScale', 'assetThin', 'frameLock', 'perfTier1', 'slowRender', 'perfClampOverride', 'stageTimings']) {
   assert.ok(!(key in doc), `showrunner key leaked into project doc: ${key}`);
 }
 const round = parseProject(JSON.parse(JSON.stringify(doc)));
@@ -42,11 +43,17 @@ for (const q of ['high', 'balanced', 'performance']) {
 assert.notDeepStrictEqual(getRenderCaps('performance', false), FINAL_CAPS, 'live PERF must stay governed');
 
 // 3. Budgets exist per tier and step down in order.
-const budgetKeys = ['maxCount', 'maxParticles', 'maxFxLayers', 'maxFilterPrimitives', 'maxAssetsPerLayer', 'turbulenceOctaves'];
+const budgetKeys = ['maxCount', 'maxParticles', 'maxFilterPrimitives', 'maxAssetsPerLayer', 'turbulenceOctaves'];
 for (const k of budgetKeys) {
   const vals = ['high', 'balanced', 'performance'].map((t) => QUALITY_PRESETS[t][k]);
   assert.ok(vals.every(Number.isFinite), `${k} missing a tier budget`);
   assert.ok(vals[0] >= vals[1] && vals[1] >= vals[2], `${k} not ordered high≥balanced≥performance`);
+}
+// #192: maxFxLayers retired as a tier budget — GPU compositing headroom made
+// per-tier FX-layer caps pointless, and they caused the silent-cull trap.
+// All live tiers allow unbounded FX wraps (same as FINAL_CAPS).
+for (const t of ['high', 'balanced', 'performance']) {
+  assert.strictEqual(QUALITY_PRESETS[t].maxFxLayers, Infinity, `${t}.maxFxLayers must be retired (Infinity)`);
 }
 // Filter regions clamp to the viewport at every tier — a clamp, not a tier.
 assert.strictEqual(MAX_FILTER_REGION, 1.0);

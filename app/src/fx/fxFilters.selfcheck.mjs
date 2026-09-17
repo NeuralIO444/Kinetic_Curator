@@ -75,13 +75,17 @@ ok('grain: noise alpha composited over source', () => {
   assert.equal(prims[3].attrs.operator, 'over');
   assert.equal(prims[3].attrs.in2, 'SourceGraphic');
 });
-ok('shedLevel 1: grain dropped, turbulence octaves forced to 1', () => {
-  const withGrain = compileFxPrimitives([{ kind: 'grain', params: { amount: 0.4 } }], { shedLevel: 1 });
-  assert.equal(withGrain.length, 0);
-  const disp = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7 } }], { shedLevel: 1, octaves: 3 });
-  assert.equal(disp[0].attrs.numOctaves, 1);
-  const rgb = compileFxPrimitives([{ kind: 'rgbSplit', params: { dx: 3 } }], { shedLevel: 1 });
-  assert.equal(rgb.length, 7); // non-grain effects survive, simplified only where turbulence is involved
+ok('#192: no FX culling — grain compiles, octaves come from the tier budget', () => {
+  // The old shedLevel mechanism is retired: every sanitized effect compiles
+  // at full fidelity, and the governor sheds resolution instead.
+  const withGrain = compileFxPrimitives([{ kind: 'grain', params: { amount: 0.4 } }], {});
+  assert.equal(withGrain.length, 4);
+  const disp = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7 } }], { octaves: 3 });
+  assert.equal(disp[0].attrs.numOctaves, 3);
+  const disp1 = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7 } }], { octaves: 1 });
+  assert.equal(disp1[0].attrs.numOctaves, 1); // tier budget still clamps noise detail
+  const rgb = compileFxPrimitives([{ kind: 'rgbSplit', params: { dx: 3 } }], {});
+  assert.equal(rgb.length, 7);
 });
 ok('unknown kinds fail closed mid-stack', () => {
   const prims = compileFxPrimitives([
@@ -271,9 +275,9 @@ ok('scanlines: anisotropic noise, alpha-masked, octaves shed like other turbulen
   assert.equal(prims[2].attrs.operator, 'in'); // alpha-aware: no filter-region box
   assert.equal(prims[2].attrs.in2, 'SourceAlpha');
   assert.equal(prims[3].attrs.operator, 'over');
-  const shed = compileFxPrimitives([{ kind: 'scanlines', params: { density: 0.35, amount: 0.5 } }], { shedLevel: 1, octaves: 3 });
-  assert.equal(shed[0].attrs.numOctaves, 1);
-  assert.ok(shed.length > 0); // scanlines survive shed 1 (unlike grain)
+  const tier1 = compileFxPrimitives([{ kind: 'scanlines', params: { density: 0.35, amount: 0.5 } }], { octaves: 3 });
+  assert.equal(tier1[0].attrs.numOctaves, 3); // #192: no shed simplification
+  assert.ok(tier1.length > 0);
 });
 ok('posterize: discrete component transfer, alpha untouched', () => {
   const prims = compileFxPrimitives([{ kind: 'posterize', params: { levels: 4 } }]);

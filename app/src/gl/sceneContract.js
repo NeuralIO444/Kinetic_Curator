@@ -87,18 +87,28 @@ function toInstance(item, layerId, itemBlend) {
 
 /**
  * Precompute the buildLayerStack fold: FX layers wrap the content
- * accumulated below them. Returns ordered wrap groups; each group names
- * the FX layer, its filter id, its opacity, and the content layer ids it
- * wraps (bottom-up). Content layers above the topmost FX layer, or with
- * no FX layer below them, are not wrapped.
+ * accumulated below them. Returns { wraps, shedFxLayerIds }: ordered wrap
+ * groups (each names the FX layer, its filter id, its opacity, and the
+ * content layer ids it wraps, bottom-up), plus the ids of any FX layer
+ * that did NOT get a wrap. Content layers above the topmost FX layer, or
+ * with no FX layer below them, are not wrapped.
  *
  * Mirrors studio/render.mjs exactly, including the shed rules: the tier's
  * maxFxLayers budget drops FX layers past the budget, and a layer whose
  * effects sanitize to nothing produces no filter (fxFilterStringForLayer
  * returns null) — both pass content through unwrapped (no wrap entry).
+ *
+ * #192: the shed is REPORTED, never silent. Every FX layer that loses its
+ * wrap lands in shedFxLayerIds and the contract carries it as
+ * `shed.fxLayerIds` — the silent-cull trap (an FX layer shown in the UI
+ * while culled) must not survive in any form. With maxFxLayers retired as
+ * a tier budget (all live tiers are Infinity), this is empty in normal
+ * operation; it stays wired so a future cap can never go silent again.
+ * Additive: does not bump GL_CONTRACT_VERSION.
  */
 function buildFxWraps(resolvedLayers, caps) {
   const wraps = [];
+  const shedFxLayerIds = [];
   const maxFx = caps?.maxFxLayers ?? Infinity;
   let acc = [];
   let fxIndex = 0;
@@ -112,6 +122,10 @@ function buildFxWraps(resolvedLayers, caps) {
           opacity: clamp01(rl.layerOpacity ?? 1),
           contentLayerIds: acc.map((l) => l.id),
         });
+      } else if (fx.length > 0) {
+        // Over budget (or nothing below to wrap): the wrap is shed, and
+        // the layer id is reported so the shed can never be silent.
+        shedFxLayerIds.push(rl.id);
       }
       acc = [];
       fxIndex += 1;
@@ -119,7 +133,7 @@ function buildFxWraps(resolvedLayers, caps) {
       acc.push(rl);
     }
   }
-  return wraps;
+  return { wraps, shedFxLayerIds };
 }
 
 /**
@@ -192,7 +206,14 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     },
     layers,
     compositeOrder: layers.map((l) => l.id), // bottom -> top; backend draws in this order
-    fxWraps: buildFxWraps(resolvedLayers, caps),
+    ...(() => {
+      const { wraps, shedFxLayerIds } = buildFxWraps(resolvedLayers, caps);
+      return {
+        fxWraps: wraps,
+        // #192: reported shed — never silent. Empty in normal operation.
+        shed: { fxLayerIds: shedFxLayerIds },
+      };
+    })(),
     instances, // draw order = array order within each layer's slice
     textRuns: [], // reserved for Phase 1 glyph atlas; text is baked into stamp assets today
     accum: accum && accum.enabled
@@ -228,6 +249,11 @@ export function assertSceneContract(scene) {
   if (!Array.isArray(scene.instances)) fail('instances must be an array');
   if (!Array.isArray(scene.textRuns)) fail('textRuns must be an array');
   if (!Array.isArray(scene.fxWraps)) fail('fxWraps must be an array');
+  // #192: the reported shed is part of the validated shape — an FX layer
+  // that loses its wrap must always be named here, never silent.
+  if (!scene.shed || !Array.isArray(scene.shed.fxLayerIds)) {
+    fail('shed.fxLayerIds must be an array');
+  }
   const layerIds = new Set();
   for (const l of scene.layers) {
     if (!l.id || layerIds.has(l.id)) fail(`duplicate or missing layer id: ${l.id}`);

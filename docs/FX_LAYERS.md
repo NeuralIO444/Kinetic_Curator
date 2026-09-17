@@ -63,32 +63,30 @@ Hard rules:
 
 ## Showrunner integration
 
-The FX system is what the Showrunner's dormant FX cuts were waiting for
-(see `docs/SHOWRUNNER.md`):
-
-- **Cut 1 (simplify):** `shedLevel >= 1` forces all `feTurbulence`
-  `numOctaves` to 1 and drops `grain` effects entirely.
-- **Cut 2 (bypass):** only the first visible FX layer (bottom-up — the
-  smallest wrapped subtree, cheapest to keep) still applies.
-- **Budgets:** `turbulenceOctaves` hard-clamps noise detail;
-  `maxFxLayers` skips FX layers beyond the tier's allowance (first N
-  bottom-up). `maxFilterPrimitives` is a **warning, not a drop**: primitive
-  count correlates weakly with real GPU cost (a 7-prim channel split is
-  cheaper than one big turbulence+displacement at 4K), so exceeding it logs
-  once per session. The binding degradation is the shed ladder.
-- The studio/export path runs at `shedLevel: 0` — the Showrunner never runs
-  offline — but honors `maxFxLayers`, so a balanced-quality still matches
-  the live app. Uncapped final renders get `FINAL_CAPS`
-  (`maxFxLayers: Infinity`): full FX, per the proxy/final invariant.
+> #192 (WebGL Phase 6) retired the Showrunner's FX cut ladder and the
+> per-tier `maxFxLayers` budgets. FX layers are never culled or simplified
+> in normal operation — the old silent-cull trap (an FX layer shown in the
+> UI while its wrap was shed) is dead. What remains:
+>
+> - **Budgets:** `turbulenceOctaves` hard-clamps noise detail;
+>   `maxFilterPrimitives` is a **warning, not a drop**: primitive count
+>   correlates weakly with real GPU cost (a 7-prim channel split is cheaper
+>   than one big turbulence+displacement at 4K), so exceeding it logs once
+>   per session.
+> - The governor's primary shed is now **dynamic resolution scaling**
+>   (`renderScale` 1 → 0.75 → 0.5 → 0.33); see `docs/SHOWRUNNER.md` and
+>   `src/hooks/governorCuts.js`. If it ever sheds, the ShedBadge in the app
+>   footer says so (full indicator design lands in #177).
+> - `buildSceneContract` still *reports* any FX wrap it drops as
+>   `shed.fxLayerIds` — a future cap can never go silent again.
 
 ## Performance
 
-Stacking FX layers is the steepest per-frame cost in the app: each filter
-re-rasterizes its entire wrapped subtree every frame while content
-animates. One FX layer with the default stack is fine on most hardware;
-three or more with turbulence effects will push the governor into its FX
-cuts on integrated GPUs. Prefer fewer, lower FX layers over many small
-ones — a topmost FX layer re-rasterizes everything below it.
+On the GL backend, stacking FX layers costs one extra FBO pair + one
+filter pass per wrap — GPU headroom is 10–50x the old SVG filter path, so
+the governor no longer touches FX. On the legacy live SVG canvas each
+filter still re-rasterizes its wrapped subtree every frame while content
+animates; the resolution shed protects that path.
 
 ## Determinism
 

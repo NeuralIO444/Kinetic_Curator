@@ -1,8 +1,23 @@
 // Quality presets — soft ceilings for interactive performance.
-// Showrunner budgets (§7): each tier now carries per-subsystem ceilings so
+// Showrunner budgets (§7): each tier carries per-subsystem ceilings so
 // the governor can shed the right thing instead of only stepping density.
-// New keys: maxFxLayers, maxFilterPrimitives, maxAssetsPerLayer,
+//
+// Phase 6 (#192): `maxFxLayers` is retired as a tier budget. FX compositing
+// runs on the GPU (one extra FBO pair + one filter pass per wrap), so the
+// per-tier FX-layer caps that culled stacked FX on the SVG path no longer
+// buy anything — all live tiers allow unbounded FX wraps, like FINAL_CAPS.
+// The tier budgets that remain are placement/particle counts (CPU-side
+// kernel + atlas upload work), filter-primitive counts, and the per-layer
+// asset budget. New keys: maxFilterPrimitives, maxAssetsPerLayer,
 // turbulenceOctaves. FINAL_CAPS stays the ungoverned "cinematic" tier.
+//
+// Governor shed order (see hooks/governorCuts.js): dynamic resolution
+// scale first, then quality tier step, then mirror/gloss/ACCUM (perfTier1),
+// then asset thinning, then a render-only count clamp, then motion freeze,
+// then the watchdog. FX layers are NEVER culled — that was the silent-cull
+// trap (#103 P1, #192): an FX layer shown in the UI while its wrap was
+// shed. buildSceneContract still *reports* any shed wraps (contract.shed)
+// so a future cap can never go silent again.
 
 export const QUALITY_PRESETS = {
   high: {
@@ -13,7 +28,7 @@ export const QUALITY_PRESETS = {
     maxParticles: 350,
     allowMirror: true,
     allowGloss: true,
-    maxFxLayers: 3,
+    maxFxLayers: Infinity, // #192: retired as a budget — GPU composites all FX wraps
     maxFilterPrimitives: 8,
     maxAssetsPerLayer: 96,
     turbulenceOctaves: 3,
@@ -27,7 +42,7 @@ export const QUALITY_PRESETS = {
     maxParticles: 200,
     allowMirror: true,
     allowGloss: true,
-    maxFxLayers: 2,
+    maxFxLayers: Infinity, // #192: retired as a budget — GPU composites all FX wraps
     maxFilterPrimitives: 6,
     maxAssetsPerLayer: 48,
     turbulenceOctaves: 2,
@@ -41,7 +56,7 @@ export const QUALITY_PRESETS = {
     maxParticles: 100,
     allowMirror: false,
     allowGloss: false,
-    maxFxLayers: 1,
+    maxFxLayers: Infinity, // #192: retired as a budget — GPU composites all FX wraps
     maxFilterPrimitives: 4,
     maxAssetsPerLayer: 24,
     turbulenceOctaves: 1,

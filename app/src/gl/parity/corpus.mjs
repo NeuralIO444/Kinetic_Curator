@@ -145,7 +145,7 @@ export const CORPUS = [
   },
   {
     id: 'fx-stack-3',
-    description: 'Stacked FX layers (invert / posterize / rgbSplit) with blend modes — multi-wrap compositing (#189). Under balanced caps the 3rd FX layer sheds (maxFxLayers 2), exercising the unwrapped pass-through; the 60fps probe scene.',
+    description: 'Stacked FX layers (invert / posterize / rgbSplit) with blend modes — multi-wrap compositing (#189). Since #192 retires maxFxLayers as a budget, all 3 FX wraps apply on both reference and candidate; the 60fps probe scene.',
     policy: 'default',
     width: 400,
     doc: doc({
