@@ -169,7 +169,9 @@ ok('unknown effect kinds fail closed', () => {
   const gl = makeMockGl();
   const bridge = makeBridge(gl);
   const L = bridge.layer('fx1');
-  assert.throws(() => bridge.runChain('fx1', L.t0, [{ kind: 'displace', params: {} }]), /unknown effect kind/);
+  // NOTE: 'displace' used to be the unknown-kind probe; it is a real
+  // template effect since Phase 2 (#188).
+  assert.throws(() => bridge.runChain('fx1', L.t0, [{ kind: 'notAnEffect', params: {} }]), /unknown effect kind/);
 });
 
 ok('defineEffect rejects unregistered programs', () => {

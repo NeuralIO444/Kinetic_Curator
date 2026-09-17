@@ -26,6 +26,7 @@ import {
 import { buildProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
+import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 
 // All program builds go through the debug harness (#193): a compile/link
 // failure throws naming the program, source file, and line number.
@@ -103,6 +104,7 @@ export function createRenderer(canvas) {
   // once, uniform uploads are dirty-checked, targets are bridge-owned.
   const bridge = createBridge(gl, canvas, { width: 2, height: 2, dpr: 1 });
   registerBuiltinEffects(bridge);
+  registerFxShaders(bridge, gl); // Phase-2 template effects (#188): displace, tear, scanlines, solarize, edge
 
   const U = (p, n) => gl.getUniformLocation(p, n);
 
@@ -325,15 +327,17 @@ export function createRenderer(canvas) {
         // Effect passes run unclipped (SVG primitives see the unclipped
         // input; only the final filter output is region-clipped). The clip
         // is applied once, on the wrap->main composite below.
-        // The chain runs through the JS↔GL bridge (#194) as a plain
-        // snapshot: kind/params per effect, grain LUT as aux texture.
-        const steps = (layer.fx || []).map((fx) => {
-          let aux = null;
-          if (fx.kind === 'grain') {
-            aux = grainLuts[wrap.fxLayerId];
+        // The chain runs through the JS↔GL bridge (#194) via the #188 GL
+        // compiler: sanitized (unknown kinds dropped, params clamped),
+        // grain LUT wired as aux. Template effects (#195) need zero
+        // runner changes per effect.
+        const steps = compileFxShaders(layer.fx || [], {
+          auxFor: (kind) => {
+            if (kind !== 'grain') return null;
+            const aux = grainLuts[wrap.fxLayerId];
             if (!aux) throw new Error(`[gl] missing grain LUT for wrap ${wrap.fxLayerId}`);
-          }
-          return { kind: fx.kind, params: fx.params || {}, aux };
+            return aux;
+          },
         });
         const afterFx = bridge.runChain(layerId, wRead, steps);
         composite(compProg, compU, afterFx.tex, mRead, mWrite, BLEND_IDS.normal, wrap.opacity, clip);
