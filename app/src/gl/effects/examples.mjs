@@ -62,12 +62,11 @@ uniform float u_time;
 uniform float u_amount;
 in vec2 v_cuv;
 out vec4 o;
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7)) + u_time * 13.7) * 43758.5453);
-}
+// kc_hash12 comes from the shared chunk library (common.glsl), injected by
+// registerTemplateEffect — effects never implement their own hash.
 void main() {
   vec4 c = texture(u_tex, v_cuv);
-  float g = hash(v_cuv * u_res) - 0.5;
+  float g = kc_hash12(v_cuv * u_res + u_time * 13.7) - 0.5;
   o = vec4(c.rgb + g * u_amount, c.a);
 }
 `;
