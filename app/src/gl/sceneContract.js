@@ -22,7 +22,7 @@
  */
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
-import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism } from './accum.mjs';
+import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 
 export const GL_CONTRACT_VERSION = 1;
 
@@ -143,7 +143,7 @@ function buildFxWraps(resolvedLayers, caps) {
  * @param {object} args.doc — project document (seed, quality, layers…)
  * @param {Array} args.resolvedLayers — resolveLayers(doc, {caps}) output
  * @param {object} [args.caps] — render caps (recorded for provenance)
- * @param {object|null} [args.accum] — { enabled, fade, optics, tunnel, prism, background } or null
+ * @param {object|null} [args.accum] — { enabled, fade, optics, tunnel, prism, flow, echoes, background } or null
  * @returns versioned, JSON-serializable scene object
  */
 const warnedMaterials = new Set();
@@ -259,6 +259,8 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
           optics: sanitizeAccumOptics(accum.optics ?? 0), // #190: bloom/halation/blur-over-time amount
           tunnel: sanitizeAccumTunnel(accum.tunnel ?? 0), // Phase A: feedback zoom/spin amount
           prism: sanitizeAccumPrism(accum.prism ?? 0), // Phase A: chromatic drift amount
+          flow: sanitizeAccumFlow(accum.flow ?? 0), // Phase B2: flow-advected feedback amount
+          echoes: sanitizeAccumEchoes(accum.echoes ?? 0), // Phase B3: echo tap count
           background: hexColor(accum.background, '#000000'),
         }
       : null,

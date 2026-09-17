@@ -17,6 +17,12 @@ import {
   sanitizeAccumOptics,
   sanitizeAccumTunnel,
   sanitizeAccumPrism,
+  sanitizeAccumFlow,
+  sanitizeAccumEchoes,
+  sanitizeAudioSample,
+  applyAudioEnvelope,
+  mirrorFlowVec,
+  createEchoState,
   mirrorAccumStep,
 } from './accum.mjs';
 import { buildSceneContract } from './sceneContract.js';
@@ -85,6 +91,122 @@ ok('sanitizeAccumTunnel / sanitizeAccumPrism clamp to 0..1', () => {
   }
 });
 
+ok('recipe params: Phase B flow/echoes default to off', () => {
+  const d = accumRecipeParams();
+  assert.equal(d.flowUv, 0, 'flow 0 = FEED pass skipped');
+  assert.equal(d.echoTaps, 0, 'echoes 0 = no ring, no mix');
+  assert.deepEqual(d.echoWeights, [], 'no weights at 0 taps');
+  const p = accumRecipeParams({ flow: 1, echoes: 2 });
+  assert.ok(p.flowUv > 0, 'flow maps to a UV displacement');
+  assert.equal(p.echoTaps, 2);
+  assert.deepEqual(p.echoWeights, [0.5, 0.35], 'tap weights decay with age');
+  assert.equal(accumRecipeParams({ flow: 7 }).flowUv, p.flowUv, 'flow clamps at 1');
+  assert.equal(accumRecipeParams({ echoes: 9 }).echoTaps, 4, 'echoes clamp at 4');
+  assert.equal(accumRecipeParams({ echoes: -1 }).echoTaps, 0, 'echoes clamp at 0');
+});
+
+ok('recipe params: B3 resolution gate caps taps at >=2K widths', () => {
+  assert.equal(accumRecipeParams({ echoes: 4, echoWidth: 1000 }).echoTaps, 4, 'below 2K: 4 taps');
+  assert.equal(accumRecipeParams({ echoes: 4, echoWidth: 2048 }).echoTaps, 3, 'at 2K: capped to 3');
+  assert.equal(accumRecipeParams({ echoes: 4, echoWidth: 7680 }).echoTaps, 3, 'at 8K: capped to 3');
+  assert.equal(accumRecipeParams({ echoes: 2, echoWidth: 7680 }).echoTaps, 2, 'below the cap is untouched');
+});
+
+ok('sanitizeAccumFlow / sanitizeAccumEchoes', () => {
+  assert.equal(sanitizeAccumFlow(0.5), 0.5);
+  assert.equal(sanitizeAccumFlow(7), 1);
+  assert.equal(sanitizeAccumFlow(NaN), 0);
+  assert.equal(sanitizeAccumEchoes(2.6), 3, 'echoes round to taps');
+  assert.equal(sanitizeAccumEchoes(9), 4);
+  assert.equal(sanitizeAccumEchoes(-1), 0);
+  assert.equal(sanitizeAccumEchoes(undefined), 0);
+});
+
+ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () => {
+  const base = accumRecipeParams({ fade: 0.9, optics: 0.5, tunnel: 0.5, prism: 0.5 });
+  const silent = applyAudioEnvelope(base, { rms: 0, flux: 0, beatPulse: 0 });
+  assert.deepEqual(silent, base, 'silence returns the params unchanged');
+  const loud = applyAudioEnvelope(base, { rms: 1, flux: 0, beatPulse: 0 });
+  assert.ok(loud.keep > base.keep && loud.keep <= 0.99, 'kick punches trails longer');
+  assert.ok(loud.optics > base.optics && loud.optics <= 1, 'glow swells');
+  assert.ok(loud.tunnelZoom > base.tunnelZoom, 'tunnel scales with loudness');
+  assert.ok(loud.tunnelSpin > base.tunnelSpin, 'spin scales with loudness');
+  assert.ok(loud.prismUv > base.prismUv, 'prism scales with loudness');
+  // Gestures are distinct: flux (transients) punches keep but not optics,
+  // beatPulse (on-the-one) swells optics but not keep.
+  const transient = applyAudioEnvelope(base, { rms: 0, flux: 1, beatPulse: 0 });
+  assert.ok(transient.keep > base.keep, 'flux alone punches keep');
+  assert.equal(transient.optics, base.optics, 'flux alone leaves optics alone');
+  const onTheOne = applyAudioEnvelope(base, { rms: 0, flux: 0, beatPulse: 1 });
+  assert.ok(onTheOne.optics > base.optics, 'beatPulse alone swells optics');
+  assert.equal(onTheOne.keep, base.keep, 'beatPulse alone leaves keep alone');
+  assert.ok(loud.keep > transient.keep, 'full RMS punches harder than flux alone');
+  assert.equal(applyAudioEnvelope(base, { rms: 1 }).keep, Math.min(0.99, 0.9 + 0.08 * 1), 'keep math is exact');
+  // Optics is one amount: every derived glow field recomputes from the
+  // modulated value, so audio genuinely swells the blur/bloom/halation.
+  const glowBase = accumRecipeParams({ fade: 0.9, optics: 0.2 });
+  const glowLoud = applyAudioEnvelope(glowBase, { rms: 1, flux: 0, beatPulse: 0 });
+  assert.equal(glowLoud.optics, 0.5, 'optics modulates');
+  assert.equal(glowLoud.bloomAmount, 0.55 * 0.5, 'bloomAmount recomputes from modulated optics');
+  assert.equal(glowLoud.halationSigma, 22.0 * (0.5 + 0.5), 'halationSigma recomputes');
+  assert.equal(glowLoud.frameBlurSigma, 5.0 * 0.5, 'frameBlurSigma recomputes');
+});
+
+ok('sanitizeAudioSample clamps rms, flux, beatPulse', () => {
+  assert.deepEqual(sanitizeAudioSample({ rms: 0.5, flux: 0.2, beatPulse: 0.9 }), { rms: 0.5, flux: 0.2, beatPulse: 0.9 });
+  assert.deepEqual(sanitizeAudioSample({ rms: 7, flux: -1, beatPulse: 'x' }), { rms: 1, flux: 0, beatPulse: 0 });
+  assert.deepEqual(sanitizeAudioSample({}), { rms: 0, flux: 0, beatPulse: 0 });
+});
+
+ok('audioEnvelope: loads kc-audio-envelope/1, samples rms/flux/beatPulse', async () => {
+  const { loadAudioEnvelope, sampleEnvelope } = await import('./audioEnvelope.mjs');
+  const { writeFileSync } = await import('node:fs');
+  const sidecar = {
+    schema: 'kc-audio-envelope/1', source: 't.mp3', sr: 22050, hop_length: 512,
+    fps: 43.066, duration: 2, tempo_bpm: 120,
+    frames: [
+      { t: 0, rms: 0, flux: 0, beat_phase: 0 },
+      { t: 1, rms: 1, flux: 0.5, beat_phase: 0.5 },
+      { t: 2, rms: 0, flux: 1, beat_phase: 0 },
+    ],
+    beats: [0, 0.5, 1.0, 1.5],
+    downbeats: [],
+  };
+  writeFileSync('/tmp/kc-audioenv-selfcheck.json', JSON.stringify(sidecar));
+  const env = loadAudioEnvelope('/tmp/kc-audioenv-selfcheck.json');
+  assert.ok(env && env.samples.length === 3, 'loads 3 frames');
+  assert.deepEqual(env.beats, [0, 0.5, 1, 1.5], 'beats kept');
+  const mid = sampleEnvelope(env, 0.5);
+  assert.ok(Math.abs(mid.rms - 0.5) < 1e-9, 'rms interpolates linearly');
+  assert.ok(Math.abs(mid.flux - 0.25) < 1e-9, 'flux interpolates linearly');
+  assert.ok(mid.beat_phase === 0 || mid.beat_phase === 0.5, 'beat_phase nearest-sample');
+  const onBeat = sampleEnvelope(env, 1.0);
+  assert.equal(onBeat.beatPulse, 1, 'beatPulse fires 1.0 at the beat');
+  const offBeat = sampleEnvelope(env, 1.25);
+  assert.ok(Math.abs(offBeat.beatPulse - 0.5) < 1e-9, 'beatPulse decays over the interval');
+  const before = sampleEnvelope(env, 0);
+  assert.equal(before.beatPulse, 1, 'beat at t=0 fires');
+  const noBeats = sampleEnvelope({ samples: env.samples, beats: [], tempoBpm: 0 }, 1.0);
+  assert.equal(noBeats.beatPulse, 0, 'no beats -> no pulse');
+});
+
+ok('audioEnvelope: malformed/missing sidecar is a null no-op; legacy sketch accepted', async () => {
+  const { loadAudioEnvelope } = await import('./audioEnvelope.mjs');
+  const { writeFileSync } = await import('node:fs');
+  assert.equal(loadAudioEnvelope('/tmp/kc-audioenv-does-not-exist.json'), null, 'missing file -> null');
+  writeFileSync('/tmp/kc-audioenv-bad.json', '{not json');
+  assert.equal(loadAudioEnvelope('/tmp/kc-audioenv-bad.json'), null, 'bad JSON -> null');
+  writeFileSync('/tmp/kc-audioenv-noframes.json', JSON.stringify({ schema: 'kc-audio-envelope/1' }));
+  assert.equal(loadAudioEnvelope('/tmp/kc-audioenv-noframes.json'), null, 'no frames -> null');
+  // Legacy pre-research sketch: bare array of {t, rms, beat}.
+  writeFileSync('/tmp/kc-audioenv-legacy.json', JSON.stringify([
+    { t: 0, rms: 0.2, beat: 1 }, { t: 1, rms: 0.4, beat: 0 },
+  ]));
+  const legacy = loadAudioEnvelope('/tmp/kc-audioenv-legacy.json');
+  assert.ok(legacy && legacy.samples.length === 2, 'legacy array loads');
+  assert.equal(legacy.samples[0].flux, 0, 'legacy has no flux');
+});
+
 const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const caps = getRenderCaps('balanced', false);
 function fixtureDoc() {
@@ -106,15 +228,19 @@ ok('contract carries sanitized accum.optics (additive, no version bump)', () => 
   assert.equal(c.accum.optics, 0.5);
   assert.equal(c.accum.tunnel, 0, 'tunnel defaults to 0/off');
   assert.equal(c.accum.prism, 0, 'prism defaults to 0/off');
+  assert.equal(c.accum.flow, 0, 'flow defaults to 0/off');
+  assert.equal(c.accum.echoes, 0, 'echoes defaults to 0/off');
   assert.equal(c.accum.background, '#112233');
   const cl = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, optics: 9 } });
   assert.equal(cl.accum.optics, 1, 'optics clamps at the contract boundary');
   const fb = buildSceneContract({
     doc, resolvedLayers: rl, caps,
-    accum: { enabled: true, tunnel: 0.4, prism: 9 },
+    accum: { enabled: true, tunnel: 0.4, prism: 9, flow: 0.7, echoes: 2.6 },
   });
   assert.equal(fb.accum.tunnel, 0.4, 'tunnel rides the contract');
   assert.equal(fb.accum.prism, 1, 'prism clamps at the contract boundary');
+  assert.equal(fb.accum.flow, 0.7, 'flow rides the contract');
+  assert.equal(fb.accum.echoes, 3, 'echoes round at the contract boundary');
   const off = buildSceneContract({ doc, resolvedLayers: rl, caps });
   assert.equal(off.accum, null, 'no accum -> null (renderer stays on the plain path)');
 });
@@ -209,6 +335,61 @@ ok('mirror: prism separates the RGB channels radially', () => {
   assert.equal(plain[8 * 4], 0, 'no prism -> no red fringe');
 });
 
+ok('mirror: flow = 0 is a no-op, flow > 0 advects', () => {
+  // The flow field is deterministic: same UV -> same vector, twice.
+  const v1 = mirrorFlowVec(0.3, 0.7);
+  const v2 = mirrorFlowVec(0.3, 0.7);
+  assert.deepEqual(v1, v2, 'flow field is deterministic');
+  assert.ok(Number.isFinite(v1[0]) && Number.isFinite(v1[1]), 'finite vector');
+  assert.ok(Math.abs(v1[0]) <= 1 && Math.abs(v1[1]) <= 1, 'bounded displacement');
+  // Non-trivial: the field varies across the canvas (not a constant wind).
+  const v3 = mirrorFlowVec(0.8, 0.2);
+  assert.ok(Math.abs(v1[0] - v3[0]) > 1e-6 || Math.abs(v1[1] - v3[1]) > 1e-6, 'field varies spatially');
+  // flow = 0: the buffer is untouched (skipped pass, not an identity warp).
+  const w3 = 8, h3 = 8, n3 = w3 * h3 * 4;
+  const blob = new Float64Array(n3);
+  for (let i = 0; i < n3; i++) blob[i] = (i * 7919) % 97 / 97; // deterministic junk
+  const fb0 = fbParams({ flowUv: 0 }); // keep = 0.99 (fade: 1 clamps)
+  const still = mirrorAccumStep({ accum: blob, frame: new Float64Array(n3), w: w3, h: h3, params: fb0 });
+  for (let i = 0; i < n3; i += 4) {
+    assert.ok(Math.abs(still[i] - blob[i] * fb0.keep) < 1e-12, 'flow 0: rgb only fades');
+  }
+  // flow > 0 on a uniform field: advection of a constant is the constant.
+  const flat = new Float64Array(n3).fill(0.5);
+  flat.forEach((_, i) => { if (i % 4 === 3) flat[i] = 1; });
+  const adv = mirrorAccumStep({ accum: flat, frame: new Float64Array(n3), w: w3, h: h3, params: fbParams({ flowUv: 0.03 }) });
+  for (let i = 0; i < n3; i += 4) {
+    assert.ok(Math.abs(adv[i] - 0.5 * 0.99) < 1e-9, `uniform field advects to itself, then fades (i=${i})`);
+  }
+});
+
+ok('mirror: echoes mix past frames, echoes = 0 is a no-op', () => {
+  const w4 = 4, h4 = 4, n4 = w4 * h4 * 4;
+  const dotAt = (x) => {
+    const f = new Float64Array(n4);
+    f[x * 4] = 1; f[x * 4 + 1] = 1; f[x * 4 + 2] = 1; f[x * 4 + 3] = 1;
+    return f;
+  };
+  const silent = new Float64Array(n4);
+  const params = { ...accumRecipeParams({ fade: 1, optics: 0 }), echoTaps: 2, echoWeights: [0.5, 0.35] };
+  // echoes = 0: identical to the old path even with a state object around.
+  const noEcho = mirrorAccumStep({ accum: silent, frame: dotAt(0), w: w4, h: h4, params: fbParams({}), echo: createEchoState() });
+  assert.equal(noEcho[0], 1, 'live frame lands at full weight');
+  assert.equal(noEcho[4], 0, 'no ghost without echoes');
+  // With echoes: step 1 has no history yet (no taps valid) — the live
+  // frame lands alone. Step 2 mixes the previous frame as tap 0.
+  const echo = createEchoState();
+  const s1 = mirrorAccumStep({ accum: silent, frame: dotAt(0), w: w4, h: h4, params, echo });
+  assert.equal(s1[0], 1, 'step 1: live frame only');
+  assert.equal(s1[4], 0, 'step 1: no ghost yet');
+  const s2 = mirrorAccumStep({ accum: silent, frame: dotAt(8), w: w4, h: h4, params, echo });
+  assert.equal(s2[8 * 4], 1, 'step 2: new live frame at full weight');
+  assert.ok(Math.abs(s2[0] - 0.5 * 1) < 1e-12, `step 2: tap 0 ghost at 0.5, got ${s2[0]}`);
+  assert.equal(s2[4], 0, 'step 2: untouched texel stays dark');
+  // Missing state with taps > 0 is a loud error, not silent wrongness.
+  assert.throws(() => mirrorAccumStep({ accum: silent, frame: dotAt(0), w: w4, h: h4, params }), /echo state/);
+});
+
 // --- browser: GPU recipe vs JS mirror ---------------------------------------
 
 async function runBrowserTests() {
@@ -223,18 +404,25 @@ async function runBrowserTests() {
     const f64Of = (bytes) => Float64Array.from(bytes, (v) => v / 255);
     const LSB = 1 / 255;
 
-    const runProbe = async ({ w = 12, h = 12, bg = '#000000', fade = 0.9, optics = 0, tunnel = 0, prism = 0, frames }) => {
+    const runProbe = async ({ w = 12, h = 12, bg = '#000000', fade = 0.9, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, frames }) => {
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
-        w, h, bg, fade, optics, tunnel, prism, frames: frames.map(bytesOf),
+        w, h, bg, fade, optics, tunnel, prism, flow, echoes, echoWidth: w, audio,
+        frames: frames.map(bytesOf),
       });
       return { gpu: f64Of(res.pixels), w: res.width, h: res.height };
     };
-    const mirrorSeq = ({ w, h, bg, fade, optics, tunnel = 0, prism = 0, frames }) => {
+    const mirrorSeq = ({ w, h, bg, fade, optics, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, frames }) => {
       const bgV = [0, 1, 2].map((i) => parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16) / 255);
       let acc = new Float64Array(w * h * 4);
       for (let i = 0; i < w * h; i++) { acc[i * 4] = bgV[0]; acc[i * 4 + 1] = bgV[1]; acc[i * 4 + 2] = bgV[2]; acc[i * 4 + 3] = 1; }
-      const params = accumRecipeParams({ fade, optics, tunnel, prism });
-      for (const f of frames) acc = mirrorAccumStep({ accum: acc, frame: f, w, h, params });
+      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w });
+      const echo = createEchoState();
+      let i = 0;
+      for (const f of frames) {
+        const params = audio ? applyAudioEnvelope(base, audio[i] || {}) : base;
+        acc = mirrorAccumStep({ accum: acc, frame: f, w, h, params, echo });
+        i++;
+      }
       return acc;
     };
     const closeTo = (gpu, ref, tol, what) => {
@@ -349,6 +537,79 @@ async function runBrowserTests() {
       const rx = peakX(gpu, 0), gx = peakX(gpu, 1), bx = peakX(gpu, 2);
       assert.ok(rx < gx && gx < bx, `channels separate radially: r@${rx} g@${gx} b@${bx}`);
       assert.ok(bx - rx >= 4, `separation is visible: r/b spread ${bx - rx}px`);
+    });
+
+    await okAsync('probe: flow advects the buffer (GPU = mirror on smooth content)', async () => {
+      // The noise hash is integer-exact on both sides, but the displacement
+      // is float32 vs float64 — so parity runs on a smooth blob (neighbor
+      // flips cost little) rather than a hard dot.
+      const w = 256, h = 256;
+      const blob = (w, h) => {
+        const f = new Float64Array(w * h * 4);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const dx = (x - w / 2) / (w / 8), dy = (y - h / 2) / (h / 8);
+            const v = Math.exp(-(dx * dx + dy * dy));
+            const o = (y * w + x) * 4;
+            f[o] = v; f[o + 1] = v; f[o + 2] = v; f[o + 3] = 1;
+          }
+        }
+        return f;
+      };
+      const frames = [blob(w, h)];
+      for (let i = 0; i < 7; i++) frames.push(new Float64Array(w * h * 4));
+      const { gpu } = await runProbe({ w, h, fade: 1, optics: 0, flow: 1, frames });
+      const ref = mirrorSeq({ w, h, bg: '#000000', fade: 1, optics: 0, flow: 1, frames });
+      closeTo(gpu, ref, 8 * LSB, 'flow sequence');
+      // Behavioral: flow actually moves light (vs the no-flow run).
+      const { gpu: still } = await runProbe({ w, h, fade: 1, optics: 0, flow: 0, frames });
+      let diff = 0;
+      for (let i = 0; i < gpu.length; i += 4) diff = Math.max(diff, Math.abs(gpu[i] - still[i]));
+      assert.ok(diff > 0.02, `flow displaces the blob (max Δ ${diff.toFixed(3)})`);
+      // Conservation-ish: the forward warp is not divergence-free, so it
+      // dissipates a few %/step at max flow (part of the billow look) — but
+      // it must never CREATE light.
+      const sum = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i]; return s; };
+      assert.ok(sum(gpu) <= sum(still) * 1.02, `flow never creates light (gpu=${sum(gpu).toFixed(1)} still=${sum(still).toFixed(1)})`);
+    });
+
+    await okAsync('probe: echoes leave discrete ghosts (GPU = mirror)', async () => {
+      const w = 12, h = 12;
+      // Dots march right across three frames; tap 0 should ghost the
+      // previous frame's dot at half weight behind the live one.
+      // fade = 0 (keep = 0) so the fade trail doesn't drown the ghosts —
+      // this probe isolates the echo mix, not the feedback loop.
+      const frames = [whiteDot(w, h, 2, 6), whiteDot(w, h, 5, 6), whiteDot(w, h, 8, 6)];
+      const { gpu } = await runProbe({ w, h, fade: 0, optics: 0, echoes: 2, frames });
+      const ref = mirrorSeq({ w, h, bg: '#000000', fade: 0, optics: 0, echoes: 2, frames });
+      closeTo(gpu, ref, 4 * LSB, 'echo sequence');
+      const at = (x) => gpu[(6 * w + x) * 4];
+      assert.ok(at(8) > 0.9, `live dot at full weight, got ${at(8).toFixed(3)}`);
+      assert.ok(at(5) > 0.3 && at(5) < 0.7, `tap-0 ghost at ~0.5 behind it, got ${at(5).toFixed(3)}`);
+      assert.ok(at(2) > 0.1 && at(2) < at(5), `tap-1 ghost dimmer still, got ${at(2).toFixed(3)}`);
+      assert.equal(at(10), 0, 'no light ahead of the motion');
+    });
+
+    await okAsync('probe: audio envelope modulates per-frame params (GPU = mirror)', async () => {
+      const w = 12, h = 12;
+      // One dot, then silence: with a loud envelope the trail survives
+      // longer (keep punched up); with silence it decays to the base keep.
+      const frames = [whiteDot(w, h, 6, 6)];
+      for (let i = 0; i < 5; i++) frames.push(new Float64Array(w * h * 4));
+      const loudAudio = frames.map(() => ({ rms: 1, flux: 0, beat_phase: 0, beatPulse: 0 }));
+      const quietAudio = frames.map(() => ({ rms: 0, flux: 0, beat_phase: 0, beatPulse: 0 }));
+      const { gpu: loud } = await runProbe({ w, h, fade: 0.5, optics: 0, audio: loudAudio, frames });
+      const { gpu: quiet } = await runProbe({ w, h, fade: 0.5, optics: 0, audio: quietAudio, frames });
+      const ref = mirrorSeq({ w, h, bg: '#000000', fade: 0.5, optics: 0, audio: loudAudio, frames });
+      closeTo(loud, ref, 3 * LSB, 'audio-modulated sequence');
+      // Total light (not the center pixel): the audio-swollen optics blurs
+      // the incoming dot (energy-conserving), so the center dims while the
+      // trail as a whole survives longer on the punched-up keep.
+      const total = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i]; return s; };
+      assert.ok(total(loud) > total(quiet) * 1.5, `loud envelope keeps brighter trails (${total(loud).toFixed(3)} vs ${total(quiet).toFixed(3)})`);
+      // Silence envelope == no envelope at all (the no-audio path untouched).
+      const { gpu: noEnv } = await runProbe({ w, h, fade: 0.5, optics: 0, frames });
+      closeTo(quiet, noEnv, 1e-9, 'silent envelope is identity');
     });
 
     await okAsync('e2e: renderAccumViaGL trail still on a corpus doc with motion', async () => {
