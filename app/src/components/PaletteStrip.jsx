@@ -1,13 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
-// PaletteStrip — the palette chip row, back at the top of the app.
-// Split out of MasterBar (PR #347 follow-up): the tape/status bar lives
-// below the view, the color swatches live in their own 38px strip above it.
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
 import { MIX_DEFAULT } from '../gl/paletteMix.mjs';
+
+const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
+const COLOR_MODE_HINT = {
+  FADE: 'Whole picture melts. Slider is seconds.',
+  WASH: 'Color soaks from the front marks back through the trail. Same slider. Feel lands next.',
+  INJECT: 'New swatch dyes the field; agents pick it up as they pass. Same slider. Feel lands next.',
+};
+const CHIP_CAP = 4;
 
 function CompactSwatches({ swatches }) {
   return (
@@ -68,29 +73,21 @@ export function PaletteStrip() {
   const { dispatch, palette, palettes, paletteLocks } = useApp();
   const paletteMixSeconds = useStore((s) => s.paletteMixSeconds) ?? MIX_DEFAULT;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
-  const CHIP_WIN = 4;
+  const [colorMode, setColorMode] = useState('FADE');
+  const visible = (palettes || []).slice(0, CHIP_CAP);
   const chipTrackRef = useRef(null);
   const activeChipRef = useRef(null);
-  const [canChipPrev, setCanChipPrev] = useState(false);
-  const [canChipNext, setCanChipNext] = useState(false);
-  const chipOverflow = palettes.length > CHIP_WIN;
-  const syncChipNav = (t) => {
-    if (!t) return;
-    setCanChipPrev(t.scrollLeft > 4);
-    setCanChipNext(t.scrollLeft < t.scrollWidth - t.clientWidth - 4);
-  };
-  const handleChipTrackScroll = (e) => syncChipNav(e.currentTarget);
-  const handleChipSlide = (e, dir) => {
-    const track = e.currentTarget.parentElement?.querySelector('.palette-chip-track');
-    if (!track) return;
-    const first = track.querySelector(':scope > *');
-    const step = first ? first.getBoundingClientRect().width + 3 : 120;
-    track.scrollBy({ left: dir * step, behavior: 'smooth' });
-  };
+
   useEffect(() => {
     activeChipRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    syncChipNav(chipTrackRef.current);
   }, [palette.id]);
+
+  const cycleColorMode = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const i = COLOR_MODES.indexOf(colorMode);
+    setColorMode(COLOR_MODES[(i + 1) % COLOR_MODES.length]);
+  };
 
   return (
     <div className="palette-strip">
@@ -102,14 +99,11 @@ export function PaletteStrip() {
           <span className="logo-version">v0.9.0</span>
         </span>
       </div>
-      <div className="palette-switch">
+      <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex' }}>
         <span className="palette-switch-label">PALETTE</span>
-        {chipOverflow && (
-          <button type="button" className="palette-nav-btn" title="Previous palettes" disabled={!canChipPrev} onClick={(e) => handleChipSlide(e, -1)}>‹</button>
-        )}
-        <div className="palette-chip-viewport">
-          <div ref={chipTrackRef} className="palette-chip-track" onScroll={handleChipTrackScroll}>
-        {palettes.map(p => {
+        <div className="palette-chip-viewport" style={{ flex: '0 1 auto', minWidth: 0 }}>
+          <div ref={chipTrackRef} className="palette-chip-track">
+        {visible.map(p => {
           const active = p.id === palette.id;
           if (active) {
             return (
@@ -126,9 +120,6 @@ export function PaletteStrip() {
                   onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
                 />
                 {p.name}
-                {p.user && (
-                  <button type="button" className="palette-del-btn" title={`Delete ${p.name}`} onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}>×</button>
-                )}
               </div>
             );
           }
@@ -138,27 +129,29 @@ export function PaletteStrip() {
                 <CompactSwatches swatches={p.swatches || []} />
                 {p.name}
               </button>
-              {p.user && (
-                <button type="button" className="palette-del-btn" title={`Delete ${p.name}`} onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}>×</button>
-              )}
             </span>
           );
         })}
           </div>
         </div>
-        {chipOverflow && (
-          <button type="button" className="palette-nav-btn" title="Next palettes" disabled={!canChipNext} onClick={(e) => handleChipSlide(e, 1)}>›</button>
-        )}
         <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
           {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
         </select>
         <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
-        <button type="button" className="palette-save-btn" title="Save palette" onClick={() => emit(Events.PALETTE_SAVE, {})}>+ SAVE</button>
         <label
           className="palette-mix"
-          title="FADE — how long a palette switch takes (0–8s). 0s cuts."
+          style={{ marginLeft: 'auto', flexShrink: 0 }}
+          title={COLOR_MODE_HINT[colorMode]}
         >
-          <span className="palette-mix-label">FADE</span>
+          <button
+            type="button"
+            className="palette-mix-label"
+            onClick={cycleColorMode}
+            title={COLOR_MODE_HINT[colorMode]}
+            style={{ background: 'transparent', border: 0, padding: 0, color: 'inherit', letterSpacing: '0.1em', fontSize: 9, cursor: 'pointer', minWidth: '4.6em', textAlign: 'left' }}
+          >
+            {colorMode}
+          </button>
           <input
             type="range"
             className="single-slider palette-mix-slider"
@@ -168,9 +161,9 @@ export function PaletteStrip() {
             value={paletteMixSeconds}
             onChange={(e) => dispatch({ type: A.SET_PALETTE_MIX, payload: Number(e.target.value) })}
             onClick={(e) => e.stopPropagation()}
-            aria-label="Palette crossfade time in seconds"
+            aria-label="Palette color time in seconds"
           />
-          <span className="range-readout palette-mix-readout">
+          <span className="range-readout palette-mix-readout" style={{ display: 'inline-block', width: '3.6em', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
             {Number(paletteMixSeconds).toFixed(1)}s
           </span>
         </label>
