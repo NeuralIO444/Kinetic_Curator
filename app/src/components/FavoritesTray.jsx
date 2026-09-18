@@ -8,7 +8,7 @@ const MAX_VISIBLE = 12;
  * Floating Favorites / Hits setlist (#8 / #35).
  * Ordered tray: 1–9 recall, Enter/Space = next, morph-to, reorder.
  */
-export function FavoritesTray({ onHelp }) {
+export function FavoritesTray() {
   const { state } = useApp((s) => ({
     favorites: s.favorites,
     seed: s.seed,
@@ -85,9 +85,6 @@ export function FavoritesTray({ onHelp }) {
         <span className="favorites-tray-label">HITS</span>
         <span className="favorites-tray-hint">
           F to save · Enter advances setlist
-          {typeof onHelp === 'function' && (
-            <> · <button type="button" className="micro-btn" onClick={onHelp} title="Open the help sheet (?)">? help</button></>
-          )}
         </span>
       </div>
     );
@@ -104,9 +101,6 @@ export function FavoritesTray({ onHelp }) {
     >
       <span className="favorites-tray-label">HITS</span>
       {state.morphing && <span className="favorites-tray-hint" style={{ color: 'var(--accent)' }}>MORPH…</span>}
-      {typeof onHelp === 'function' && (
-        <button type="button" className="micro-btn" onClick={onHelp} title="Open the help sheet (?)">? help</button>
-      )}
       <div className="favorites-tray-chips">
         {visible.map((f, i) => {
           const isCurrent = f.seed === state.seed;
