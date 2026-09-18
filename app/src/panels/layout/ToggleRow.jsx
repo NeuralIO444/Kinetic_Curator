@@ -1,12 +1,17 @@
-// Toggle row: bleed / mirror / overlap / accum / blend
+// Toggle row: bleed / mirror / overlap / accum
+// #310: blendMode and paletteShift leave performer sight — they stay in state
+// and presets/voices still set them, but the selects are gone. (SHADING was
+// already voice-only via #268.) The engine contract falls back to 'normal'
+// for blendMode, so the hidden select changes nothing about the render.
+// ACCUM GLOW was demoted too, but Matt's #319 review restored it as a live
+// knob (remapped range from #317).
 import { emit, Events } from '../../composition/eventBus.js';
-import { BLEND_MODES, PALETTE_SHIFTS } from '../../data/layout-modes.js';
 import { getTaper } from '../../components/taper.js'; // #274: shared slider curves
 
 // #273/#274: response curves at the panel→state boundary. Stored params stay
 // in physical units; only the slider position is remapped.
 const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
-const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #308 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
+const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #317 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
 
 // #268: RECOLOR removed — nothing in the GL renderer ever read it. A
 // control that moves and changes nothing is worse than no control.
@@ -117,28 +122,11 @@ export function ToggleRow({ layoutParams }) {
           </label>
         </div>
       )}
-      <select
-        value={layoutParams.blendMode}
-        onChange={e => emit(Events.LAYOUT_PARAM, { key: 'blendMode', value: e.target.value })}
-        className="tg blend-mode-select"
-        title="Blend mode"
-      >
-        {BLEND_MODES.map(mode => (
-          <option key={mode} value={mode}>{mode.toUpperCase()}</option>
-        ))}
-      </select>
+      {/* #310: the blendMode select is hidden but the state stays — sceneContract
+          reads layoutParams.blendMode and falls back to 'normal'; presets and
+          voices still set it. The paletteShift select left for the same reason. */}
       {/* #268: SHADING removed — the GL renderer renders everything flat;
           the only consumer was the retired SVG layer. */}
-      <select
-        value={layoutParams.paletteShift ?? 'auto'}
-        onChange={e => emit(Events.LAYOUT_PARAM, { key: 'paletteShift', value: e.target.value })}
-        className="tg blend-mode-select"
-        title="How palette colors are distributed across shapes. AUTO follows the composition preset."
-      >
-        {PALETTE_SHIFTS.map(s => (
-          <option key={s} value={s}>COLOR: {s.toUpperCase()}</option>
-        ))}
-      </select>
     </div>
   );
 }

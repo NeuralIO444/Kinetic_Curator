@@ -34,18 +34,16 @@ export function StimulusPanel() {
   const alphaMod = layoutParams.audioAlphaMod ?? 0.25;
   const life = layoutParams.lifeDrift ?? 0.35;
 
+  // #310: the audio source row is collapsed setup — the AUDIO toggle stays
+  // in performer sight, mic/file/monitor/gain live behind SETUP.
+  const [setupOpen, setSetupOpen] = useState(false);
+
   return (
     <div className="panel panel-stimulus">
       <PanelHeader tag="P06" title="STIMULI" subtitle={audioEnabled ? 'active' : 'idle'} />
       <div className="stim-body">
           <div className="stim-toggle-row">
-            <button
-              className="stim-toggle"
-              disabled
-              title="Camera capture is not wired — motionEnergy is unused. See #105."
-            >
-              🎥 VIDEO (soon)
-            </button>
+            {/* #310: VIDEO (soon) removed — dead control, nothing reads motionEnergy. */}
             <button
               className={`stim-toggle ${audioEnabled ? 'on' : ''}`}
               style={audioEnabled ? { background: '#00d9ff', borderColor: '#00d9ff' } : {}}
@@ -53,14 +51,24 @@ export function StimulusPanel() {
             >
               🎤 AUDIO {audioEnabled ? 'ON' : 'OFF'}
             </button>
+            <button
+              className={`stim-toggle ${setupOpen ? 'on' : ''}`}
+              onClick={() => setSetupOpen(o => !o)}
+              title="Audio setup: source mic/file, monitor, gain"
+              aria-expanded={setupOpen}
+            >
+              ⚙ SETUP {setupOpen ? '▾' : '▸'}
+            </button>
           </div>
 
-          <SourceControls
-            audioSource={audioSource}
-            audioGain={audioGain}
-            audioMonitor={audioMonitor}
-            devices={devices}
-          />
+          {setupOpen && (
+            <SourceControls
+              audioSource={audioSource}
+              audioGain={audioGain}
+              audioMonitor={audioMonitor}
+              devices={devices}
+            />
+          )}
 
           <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} audioEnabled={audioEnabled} />
 

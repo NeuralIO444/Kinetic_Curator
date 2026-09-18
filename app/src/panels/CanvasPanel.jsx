@@ -24,6 +24,7 @@ export function CanvasPanel() {
   const audioBands = useStore(s => s.audioBands);
   const running = useStore(s => s.running);
   const nodeCount = useStore(s => s.nodeCount);
+  const canvasBg = useStore(s => s.canvasBg);
   const accumOn = !!layoutParams.accumulation;
   // #268: the pill must read the EFFECTIVE state — the loop computes
   // accumulation as setting AND not-shed (liveLoop buildFrame). Under LOAD
@@ -43,9 +44,6 @@ export function CanvasPanel() {
     viewRef.current.pan = viewport.pan;
     viewRef.current.attractor = viewport.attractorRef;
   });
-
-  const [bgMode, setBgMode] = useState('palette');
-  const cycleBg = () => setBgMode(m => (m === 'palette' ? 'transparent' : m === 'transparent' ? 'white' : 'palette'));
 
   const [glError, setGlError] = useState(null);
 
@@ -68,7 +66,7 @@ export function CanvasPanel() {
       setGlError(e.message || String(e));
       return;
     }
-    loop.setBgMode(bgMode);
+    loop.setBgMode(canvasBg);
     glLoopRef.current = loop;
     loop.start();
     return () => {
@@ -78,9 +76,11 @@ export function CanvasPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // #310: BG cycle moved to OUTPUT; the state lives in the store and this
+  // effect keeps the live loop in sync.
   useEffect(() => {
-    if (glLoopRef.current) glLoopRef.current.setBgMode(bgMode);
-  }, [bgMode, glLoopRef]);
+    if (glLoopRef.current) glLoopRef.current.setBgMode(canvasBg);
+  }, [canvasBg, glLoopRef]);
 
   // Phase A gestures (Davis panel PERFORM): FREEZE / CLEAR / SWELL act on
   // the live GL loop's ACCUM session. #268: SWELL was emitted but nothing
@@ -96,25 +96,23 @@ export function CanvasPanel() {
 
   const preset = getPreset(layoutParams.composition);
   let bgStyle = { background: activePalette.bg };
-  if (bgMode === 'white') bgStyle.background = '#ffffff';
-  else if (bgMode === 'transparent') bgStyle.background = 'transparent';
+  if (canvasBg === 'white') bgStyle.background = '#ffffff';
+  else if (canvasBg === 'transparent') bgStyle.background = 'transparent';
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
       <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · GL LIVE · ${layers.length} layer${layers.length > 1 ? 's' : ''}`}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button className="chip-btn" onClick={cycleBg} title="Toggle Background">BG: {bgMode.toUpperCase()}</button>
+          {/* #310: BG cycle moved to OUTPUT. CLEAR ACCUM removed — GHOST
+              STATION's gesture row is canonical. */}
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
-          {accumOn && (
-            <button className="chip-btn" onClick={() => glLoopRef.current?.clearAccum()} title="Clear the ACCUM trail buffer" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>CLEAR ACCUM</button>
-          )}
           <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>
           {accumEffective && <span className="meter-pill" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>ACCUM</span>}
           {accumOn && !accumEffective && <span className="meter-pill" title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery." style={{ color: '#ffb454' }}>ACCUM HELD</span>}
           <span className="meter-pill" title="Instances drawn this frame">{nodeCount} NODES</span>
         </div>
       </PanelHeader>
-      <div className={`canvas-wrap ${bgMode === 'transparent' ? 'checkerboard' : ''}`} ref={canvasRef} style={{ position: 'relative' }}>
+      <div className={`canvas-wrap ${canvasBg === 'transparent' ? 'checkerboard' : ''}`} ref={canvasRef} style={{ position: 'relative' }}>
         <div className="canvas-bg" style={bgStyle} />
         <div className="canvas-rulers" />
         {glError ? (

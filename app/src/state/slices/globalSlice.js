@@ -19,6 +19,26 @@ ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
 
 const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
 
+// #310: GRID/LIST is a remembered preference, not a live toggle. The last
+// choice survives sessions in its own localStorage key.
+const POOL_VIEW_KEY = 'kc:pool-view:v1';
+function readPoolView() {
+  try {
+    const v = localStorage.getItem(POOL_VIEW_KEY);
+    return v === 'grid' || v === 'list' ? v : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+function persistPoolView(view) {
+  try {
+    localStorage.setItem(POOL_VIEW_KEY, view);
+  } catch {
+    // private window / quota — the session value still works, it just won't
+    // be remembered. Deliberately silent.
+  }
+}
+
 function findAsset(id, overlay) {
   return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
 }
@@ -172,7 +192,16 @@ export const createGlobalSlice = (set) => ({
   persistStatus: 'ok',
   search: '',
   catFilter: 'all',
-  poolView: 'grid',
+  poolView: readPoolView(),
+  /**
+   * #310: the canvas background cycle moved from the CanvasPanel header to
+   * OUTPUT. The state lives here (not panel-local) so both panels share it;
+   * the live loop picks it up via the CanvasPanel effect below.
+   */
+  canvasBg: 'palette',
+  cycleCanvasBg: () => set((state) => ({
+    canvasBg: state.canvasBg === 'palette' ? 'transparent' : state.canvasBg === 'transparent' ? 'white' : 'palette',
+  })),
 
   setPersistStatus: (persistStatus) => set({ persistStatus }),
   setRunning: (running) => set((state) => {
@@ -293,7 +322,10 @@ export const createGlobalSlice = (set) => ({
   setEnabledAssets: (map) => set({ enabledAssets: { ...map } }),
   setSearch: (search) => set({ search }),
   setCatFilter: (filter) => set({ catFilter: filter }),
-  setPoolView: (view) => set({ poolView: view }),
+  setPoolView: (view) => {
+    persistPoolView(view);
+    return set({ poolView: view });
+  },
 
   duplicateAsset: (id) => set((state) => {
     const src = findAsset(id, sanitizeOverlay(state.customAssets));
@@ -403,6 +435,9 @@ export const createGlobalSlice = (set) => ({
       paletteId: doc.paletteId || state.paletteId,
       // #103 Track B — a dangling quality key must never reach the caps lookup.
       quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
+      // #310: AUTO left performer sight, but the governor still reads the
+      // flag — the document carries the hidden default.
+      autoQuality: doc.autoQuality !== false,
       // #264 — a fresh document owns its quality; any governor shed claim ends here.
       qualityShedFrom: null,
       layoutParams: normalizeLayoutParams(doc.layoutParams),

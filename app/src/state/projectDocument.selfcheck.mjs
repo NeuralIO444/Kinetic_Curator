@@ -30,7 +30,13 @@ const round = parseProject(doc);
 assert.ok(round.ok);
 assert.strictEqual(round.doc.seed, 0x1a4f);
 assert.strictEqual(round.doc.quality, 'performance');
+assert.strictEqual(round.doc.autoQuality, true, 'autoQuality defaults on when absent');
 assert.deepStrictEqual(round.doc.layoutParams, filled);
+
+// #310: autoQuality rides the document so the hidden default survives sets.
+const noAuto = parseProject({ ...doc, autoQuality: false });
+assert.ok(noAuto.ok);
+assert.strictEqual(noAuto.doc.autoQuality, false);
 
 const legacy = parseProject({
   seed: '1a4f',

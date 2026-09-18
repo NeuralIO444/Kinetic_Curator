@@ -1,9 +1,11 @@
-// RangeRow — slider with lock, dice, click-to-type readout, optional hint tooltip
+// RangeRow — slider with lock, click-to-type readout, optional hint tooltip
+// #310: per-parameter dice buttons are cut — RANDOMIZE UNLOCKED (bar) +
+// locks + the sub-seed mutate cover the need. The onRandomize prop is gone.
 import { useState, useRef, useEffect } from 'react';
 import { getTaper } from './taper.js';
 
 export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange, readout,
-  defaultValue, locked, onToggleLock, onRandomize, hint, taper, taperOpts, disabled, disabledReason }) {
+  defaultValue, locked, onToggleLock, hint, taper, taperOpts, disabled, disabledReason }) {
   // #274: an optional response curve. The slider works in 0..1 space and the
   // taper maps it to physical units at the panel→state boundary; stored
   // params stay physical, so the same stored value renders identically.
@@ -75,9 +77,6 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
         ) : (
           <span className="range-readout" onClick={startEdit} title="Click to type value">{readout ?? value}</span>
         )}
-        {onRandomize && (
-          <button className="dice-btn" onClick={onRandomize} title="Randomize" disabled={locked || disabled}>🎲</button>
-        )}
       </div>
     </div>
   );
@@ -85,7 +84,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
 
 export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
   onChangeLow, onChangeHigh, readout, defaultLow, defaultHigh,
-  locked, onToggleLock, onRandomize, hint }) {
+  locked, onToggleLock, hint }) {
   const [editing, setEditing] = useState(false);
   const [editLow, setEditLow] = useState('');
   const [editHigh, setEditHigh] = useState('');
@@ -165,9 +164,6 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
           </span>
         ) : (
           <span className="range-readout" onClick={startEdit} title="Click to type value">{readout ?? `${low}–${high}`}</span>
-        )}
-        {onRandomize && (
-          <button className="dice-btn" onClick={onRandomize} title="Randomize" disabled={locked}>🎲</button>
         )}
       </div>
     </div>

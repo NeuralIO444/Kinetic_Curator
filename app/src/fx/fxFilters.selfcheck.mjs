@@ -4,6 +4,8 @@
 import assert from 'node:assert';
 import {
   FX_EFFECT_DEFS,
+  FX_EFFECT_KINDS,
+  FX_MENU_KINDS,
   sanitizeFxEffects,
   defaultFxEffects,
   defaultFxParams,
@@ -37,6 +39,16 @@ ok('sanitize on non-array returns []', () => {
   assert.deepEqual(sanitizeFxEffects('nope'), []);
 });
 
+ok('#310: add-menu is curated to 4, roster stays renderable', () => {
+  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert']);
+  assert.ok(!FX_EFFECT_KINDS.includes('blur'), 'blur is cut from the roster');
+  for (const k of FX_MENU_KINDS) assert.ok(FX_EFFECT_KINDS.includes(k), `${k} stays in the roster`);
+  // The five demoted effects stay renderable: they compile, they just leave the menu.
+  for (const k of ['grain', 'scanlines', 'posterize', 'solarize', 'edge']) {
+    assert.ok(FX_EFFECT_KINDS.includes(k), `${k} stays renderable`);
+    assert.ok(!FX_MENU_KINDS.includes(k), `${k} leaves the add-menu`);
+  }
+});
 // --- compiler recipes -------------------------------------------------------
 ok('rgbSplit compiles to 7 prims in recipe order', () => {
   const prims = compileFxPrimitives([{ kind: 'rgbSplit', params: { dx: 3 } }]);
@@ -114,17 +126,17 @@ ok('stack chains top-down: later effects read earlier output', () => {
 });
 ok('three-deep chain threads every stage', () => {
   const prims = compileFxPrimitives([
-    { kind: 'blur', params: { radius: 6 } },
+    { kind: 'posterize', params: { levels: 4 } },
     { kind: 'rgbSplit', params: { dx: 3 } },
     { kind: 'grain', params: { amount: 0.4 } },
   ]);
   assert.equal(prims.length, 12); // 1 + 7 + 4
-  const blurOut = prims[0].attrs.result;
-  assert.ok(blurOut);
-  assert.equal(prims[1].attrs.in, blurOut); // rgbSplit reads blurred source
+  const postOut = prims[0].attrs.result;
+  assert.ok(postOut);
+  assert.equal(prims[1].attrs.in, postOut); // rgbSplit reads posterized source
   const splitOut = prims[7].attrs.result;
   assert.ok(splitOut);
-  assert.equal(prims[11].attrs.in2, splitOut); // grain over split-of-blur
+  assert.equal(prims[11].attrs.in2, splitOut); // grain over split-of-posterize
 });
 ok('primBudget warns but never drops (binding degradation is the shed ladder)', () => {
   const prims = compileFxPrimitives([{ kind: 'rgbSplit', params: { dx: 3 } }], { primBudget: 4 });
@@ -263,11 +275,13 @@ ok('project JSON round-trips fx layers exactly', () => {
   assert.equal(before, after);
 });
 
-ok('blur: single feGaussianBlur, radius passes through', () => {
+ok('#310: blur fails closed — the roster entry is gone', () => {
+  // #308 retired gaussian blur on the GPU path; #310 cut the roster entry.
+  // A chain carrying kind 'blur' (e.g. an old project doc) compiles to
+  // nothing: unknown kinds are skipped, never crash the render.
   const prims = compileFxPrimitives([{ kind: 'blur', params: { radius: 6 } }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feGaussianBlur']);
-  assert.equal(prims[0].attrs.stdDeviation, 6);
-  assert.equal(prims[0].attrs.in, 'SourceGraphic');
+  assert.deepEqual(prims, []);
+  assert.deepEqual(sanitizeFxEffects([{ kind: 'blur', params: { radius: 6 } }]), []);
 });
 ok('scanlines: anisotropic noise, alpha-masked, octaves shed like other turbulence', () => {
   const prims = compileFxPrimitives([{ kind: 'scanlines', params: { density: 0.35, amount: 0.5 } }]);

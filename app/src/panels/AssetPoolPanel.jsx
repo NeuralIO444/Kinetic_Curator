@@ -92,8 +92,8 @@ export function AssetPoolPanel() {
         <div className="header-tools">
           <button className="chip-btn" title="Motif kit — overlay only" onClick={() => openStudio(null)}>NEW</button>
           <button className="chip-btn" title="Import SVG into project overlay" onClick={() => fileRef.current?.click()}>IMPORT</button>
-          <button className={`chip-btn ${poolView === 'grid' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'grid')}>GRID</button>
-          <button className={`chip-btn ${poolView === 'list' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_POOL_VIEW, 'list')}>LIST</button>
+          {/* #310: GRID/LIST is a remembered preference now (persisted across
+              sessions) — no live toggle. poolView still drives the layout. */}
         </div>
       </PanelHeader>
       {ingestError && <div style={{ color: 'var(--accent)', fontSize: 11, padding: '4px 10px' }}>INGEST: {ingestError}</div>}

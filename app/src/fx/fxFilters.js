@@ -59,20 +59,6 @@ export const FX_EFFECT_DEFS = {
       amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.4, hint: 'Grain opacity' },
     },
   },
-  blur: {
-    label: 'Blur',
-    hint: 'Gaussian blur on the source. One primitive — the cheapest effect in the stack.',
-    params: {
-      // #225 honest-blur contract: the WebGL shader caps its tap loop at
-      // 64, so wide radii are subdivided into up to 4 (H,V) pass pairs at
-      // σ/√n — the full gaussian is always delivered, never a truncated
-      // kernel. Past the 4-pair ceiling the radius is clamped to the honest
-      // max for the render width (a smaller true gaussian); the ceiling
-      // tightens if the governor sheds renderScale. Max 40 is fully
-      // delivered at the live loop's full render scale (width 1000).
-      radius: { label: 'Radius', min: 0, max: 40, step: 0.5, def: 6, hint: 'Blur radius in pixels — delivered as a true gaussian at every setting' },
-    },
-  },
   scanlines: {
     label: 'Scanlines',
     hint: 'CRT scanline banding: fine horizontal dark lines over the artwork.',
@@ -106,6 +92,16 @@ export const FX_EFFECT_DEFS = {
 };
 
 export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
+
+/**
+ * #310 — the FX add-menu is curated to four visible effects: RGB Split,
+ * Displace, Tear, Invert. The other five roster effects (grain, scanlines,
+ * posterize, solarize, edge) stay fully renderable — they compile on the
+ * SVG studio path and the GL chain alike — but they leave the add-menu.
+ * Nothing cut or demoted returns unless a performer reaches for it mid-set
+ * and it is not there, or Matt's eyes miss it on the demo.
+ */
+export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert'];
 
 export function isFxLayer(layer) {
   return !!layer && layer.type === 'fx';
@@ -218,12 +214,9 @@ function buildGrain(params, ctx, rid, src, srcAlpha) {
   ];
 }
 
-function buildBlur(params, ctx, rid, src) {
-  return [
-    { prim: 'feGaussianBlur', attrs: { in: src, stdDeviation: r3(Math.max(0, params.radius)) } },
-  ];
-}
-
+// #310: buildBlur removed with the roster entry — #308 retired gaussian
+// blur on the GPU path, so the SVG studio builder went with it. A chain
+// carrying kind 'blur' now fails closed (unknown kind: skipped) everywhere.
 function buildScanlines(params, ctx, rid, src, srcAlpha) {
   // The turbulenceOctaves tier budget clamps noise detail (#192: no FX cuts).
   const octaves = Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
@@ -281,7 +274,7 @@ function buildEdge(params, ctx, rid, src) {
   ];
 }
 
-const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain, blur: buildBlur, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
+const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
 
 /**
  * Compile an effects array into filter primitives.
