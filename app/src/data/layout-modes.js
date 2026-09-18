@@ -67,7 +67,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   noiseSpeed: 0.5,
   displacement: 0,
   particleCount: 150,
-  swarmCohesion: 1.5,
+  swarmCohesion: 0.6, // #272: retuned to the honest slider max (was 1.5, past the 'one blob' threshold)
   gravityWells: 1.0,
   damping: 0.95,
 

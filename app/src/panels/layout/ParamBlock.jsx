@@ -91,8 +91,8 @@ export function ParamBlock({ layoutParams, lockedParams }) {
 
       <div className="param-subheader">🧬 SWARM PHYSIC FORCES</div>
       <RangeRow label="PARTICLES" value={layoutParams.particleCount} min={10} max={500} step={5}
-        hint="Particle count in swarm mode"
-        disabled={!isSwarm} disabledReason="Swarm mode only"
+        hint="Particle count in swarm mode — organism count in hype mode"
+        disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"
         onChange={v => set('particleCount', v)} defaultValue={d('particleCount', DEFAULT_LAYOUT_PARAMS.particleCount)}
         locked={lockedParams.particleCount} onToggleLock={() => lock('particleCount')}
         onRandomize={() => rand('particleCount')} />
@@ -104,7 +104,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         onRandomize={() => rand('swarmCohesion')} />
       <RangeRow label="GRAVITY" value={layoutParams.gravityWells} min={0} max={5.0} step={0.1}
         hint="Mouse attractor strength — only pulls while your cursor is over the canvas"
-        disabled={!isSwarm} disabledReason="Swarm mode only"
+        disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"
         onChange={v => set('gravityWells', v)} defaultValue={d('gravityWells', DEFAULT_LAYOUT_PARAMS.gravityWells)}
         locked={lockedParams.gravityWells} onToggleLock={() => lock('gravityWells')}
         onRandomize={() => rand('gravityWells')} />
@@ -124,7 +124,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         onRandomize={() => rand('body')} />
       <RangeRow label="FLAP" value={layoutParams.flap ?? 0.35} min={0} max={1} step={0.05}
         hint="Wing beat amplitude on bilateral attachments"
-        disabled={!bilateral} disabledReason="Needs bilateral symmetry (wings are only built for bilateral)"
+        disabled={!(isHype && bilateral)} disabledReason="Needs hype mode + bilateral symmetry (wings are only built for bilateral organisms)"
         onChange={v => set('flap', v)} defaultValue={d('flap', DEFAULT_LAYOUT_PARAMS.flap)}
         locked={lockedParams.flap} onToggleLock={() => lock('flap')}
         onRandomize={() => rand('flap')} />
