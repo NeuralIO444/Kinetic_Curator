@@ -5,6 +5,9 @@
  * #340 4 content tracks; dimmed = present, unarmed, zero cost.
  * #341 4 FX slots; same pattern.
  * #342 TAPE FULL pre-flight before arm. Never mutes an already-live track.
+ *
+ * Byte numbers are spike estimates (one 8MB working set per armed slot).
+ * Swap for measuredCosts sums when #298 lands — do not edit quality.js here.
  */
 import {
   MAX_TRACKS,
@@ -19,16 +22,14 @@ export const TRACK_LABELS = Object.freeze(['KC-1', 'KC-2', 'KC-3', 'KC-4']);
 export const MAX_FX_SLOTS = 4;
 export const FX_LABELS = Object.freeze(['FX-1', 'FX-2', 'FX-3', 'FX-4']);
 
-/** Presenter names only — quality ids stay high/balanced/performance. */
 export const BUDGET_CEILINGS = Object.freeze({
   FULL: { qualityId: 'high', bytes: 48 * 1024 * 1024 },
   SHOW: { qualityId: 'balanced', bytes: 24 * 1024 * 1024 },
   LEAN: { qualityId: 'performance', bytes: 8 * 1024 * 1024 },
 });
 
-/** Fixed working-set estimate for one armed content track at 1080p. */
-export const TRACK_BASE_BYTES = 1920 * 1080 * 8; // one RGBA16F target
-export const FX_BASE_BYTES = 1920 * 1080 * 8; // one extra composite target
+export const TRACK_BASE_BYTES = 8 * 1024 * 1024;
+export const FX_BASE_BYTES = 8 * 1024 * 1024;
 
 export function trackLabel(id) {
   return TRACK_LABELS[id] || `KC-${(id | 0) + 1}`;
@@ -44,11 +45,7 @@ export function normalizeFxSlots(raw) {
   const slots = [];
   for (let i = 0; i < MAX_FX_SLOTS; i++) {
     const s = list[i] && typeof list[i] === 'object' ? list[i] : {};
-    slots.push({
-      id: i,
-      armed: !!s.armed,
-      label: FX_LABELS[i],
-    });
+    slots.push({ id: i, armed: !!s.armed, label: FX_LABELS[i] });
   }
   return { slots };
 }
@@ -69,7 +66,6 @@ export function armedFxCount(fx) {
   return normalizeFxSlots(fx).slots.filter((s) => s.armed).length;
 }
 
-/** Virtual slots cost nothing. */
 export function slotCostBytes(armed) {
   return armed ? TRACK_BASE_BYTES : 0;
 }
@@ -101,9 +97,7 @@ export function canArmTrack(graph, fx, trackId, ceiling = 'SHOW') {
     return { ok: false, reason: 'TAPE FULL', detail: 'no such track' };
   }
   if (g.tracks[id].armed) return { ok: true, already: true, reason: null };
-  const next = {
-    tracks: g.tracks.map((t) => (t.id === id ? { ...t, armed: true } : t)),
-  };
+  const next = { tracks: g.tracks.map((t) => (t.id === id ? { ...t, armed: true } : t)) };
   const used = workingSetBytes(next, fx);
   const cap = ceilingOf(ceiling);
   if (used > cap.bytes) {
@@ -125,9 +119,7 @@ export function canArmFx(graph, fx, fxId, ceiling = 'SHOW') {
     return { ok: false, reason: 'TAPE FULL', detail: 'no such FX slot' };
   }
   if (f.slots[id].armed) return { ok: true, already: true, reason: null };
-  const next = {
-    slots: f.slots.map((s) => (s.id === id ? { ...s, armed: true } : s)),
-  };
+  const next = { slots: f.slots.map((s) => (s.id === id ? { ...s, armed: true } : s)) };
   const used = workingSetBytes(graph, next);
   const cap = ceilingOf(ceiling);
   if (used > cap.bytes) {
@@ -145,43 +137,34 @@ export function canArmFx(graph, fx, fxId, ceiling = 'SHOW') {
 export function armTrack(graph, fx, trackId, ceiling = 'SHOW') {
   const gate = canArmTrack(graph, fx, trackId, ceiling);
   const g = normalizeTrackGraph(graph);
-  if (!gate.ok) return { ...gate, graph: g };
-  if (gate.already) return { ...gate, graph: g };
+  if (!gate.ok || gate.already) return { ...gate, graph: g };
   const id = trackId | 0;
   return {
     ...gate,
-    graph: {
-      ...g,
-      tracks: g.tracks.map((t) => (t.id === id ? { ...t, armed: true } : t)),
-    },
+    graph: { ...g, tracks: g.tracks.map((t) => (t.id === id ? { ...t, armed: true } : t)) },
   };
 }
 
 export function armFx(graph, fx, fxId, ceiling = 'SHOW') {
   const gate = canArmFx(graph, fx, fxId, ceiling);
   const f = normalizeFxSlots(fx);
-  if (!gate.ok) return { ...gate, fx: f };
-  if (gate.already) return { ...gate, fx: f };
+  if (!gate.ok || gate.already) return { ...gate, fx: f };
   const id = fxId | 0;
   return {
     ...gate,
-    fx: {
-      slots: f.slots.map((s) => (s.id === id ? { ...s, armed: true } : s)),
-    },
+    fx: { slots: f.slots.map((s) => (s.id === id ? { ...s, armed: true } : s)) },
   };
 }
 
 export function addControlState(graph) {
-  const n = armedTrackCount(graph);
-  if (n >= MAX_TRACKS) {
+  if (armedTrackCount(graph) >= MAX_TRACKS) {
     return { enabled: false, reason: '4 tracks — the tape is full' };
   }
   return { enabled: true, reason: null };
 }
 
 export function addFxControlState(fx) {
-  const n = armedFxCount(fx);
-  if (n >= MAX_FX_SLOTS) {
+  if (armedFxCount(fx) >= MAX_FX_SLOTS) {
     return { enabled: false, reason: '4 FX — the tape is full' };
   }
   return { enabled: true, reason: null };
