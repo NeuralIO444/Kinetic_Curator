@@ -8,6 +8,14 @@ import { MorphControls } from './davis/MorphControls.jsx';
 import { PhraseControls } from './davis/PhraseControls.jsx';
 import { FavoritesList } from './davis/FavoritesList.jsx';
 
+/** #305 — the four sub-seed streams, in the seed control area. */
+const SUB_SEED_STREAMS = [
+  { id: 'spatial', label: 'SPATIAL', hint: 'positions, density, attributes, swarm motion' },
+  { id: 'color', label: 'COLOR', hint: 'palette slot assignment' },
+  { id: 'asset', label: 'ASSET', hint: 'which asset each placement gets' },
+  { id: 'noise', label: 'NOISE', hint: 'fBm displacement warp' },
+];
+
 export function DavisPanel() {
   const { state } = useApp(s => ({
     evolveMode: s.evolveMode,
@@ -18,6 +26,7 @@ export function DavisPanel() {
     beatRoute: s.beatRoute,
     favorites: s.favorites,
     seed: s.seed,
+    seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
     phraseEnabled: s.phraseEnabled,
     phraseLength: s.phraseLength,
@@ -34,10 +43,9 @@ export function DavisPanel() {
   }));
   const {
     evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot, beatRoute,
-    favorites, seed, layoutParams,
+    favorites, seed, seedOffsets, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
-    phraseClock, phraseBpm,
-    morphEvolve, morphDurationMs, morphing, audioEnabled,
+    phraseClock, phraseBpm, morphEvolve, morphDurationMs, morphing, audioEnabled,
     beatPulse, audioBands,
   } = state;
   const { palette } = useApp();
@@ -46,6 +54,8 @@ export function DavisPanel() {
     action: 'add',
     favorite: {
       seed,
+      // #305 — the recipe is only deterministic with the stream offsets.
+      seedOffsets: { ...(seedOffsets || {}) },
       timestamp: new Date().toISOString().slice(11, 19),
       config: { layout: { ...layoutParams }, palette: { id: palette.id } },
     },
@@ -120,6 +130,28 @@ export function DavisPanel() {
             </button>
             <button className="big-btn" onClick={saveFavorite}>FAVORITE</button>
             <button className="big-btn" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>NEW SEED</button>
+          </div>
+
+          {/* #305 — mutate one sub-seed stream. Same seed control area, no
+              new panel: re-roll one stream's dice while the master seed and
+              the other three streams stay locked. Highlighted = mutated. */}
+          <div className="davis-actions" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}
+            title="Sub-seed streams: re-roll one stream without touching the others">
+            {SUB_SEED_STREAMS.map(({ id, label, hint }) => {
+              const off = (seedOffsets?.[id] || 0) >>> 0;
+              return (
+                <button key={id} className={`micro-btn ${off ? 'active' : ''}`}
+                  title={`${label} — ${hint}. Re-roll this stream's offset${off ? ` (now 0x${off.toString(16)})` : ' (locked to master seed)'}`}
+                  onClick={() => emit(Events.DAVIS_MUTATE_STREAM, { group: id })}>
+                  {label}
+                </button>
+              );
+            })}
+            <button className="micro-btn"
+              title="Lock every stream back to the master seed (all offsets zero)"
+              onClick={() => emit(Events.DAVIS_MUTATE_STREAM, { reset: true })}>
+              ↺
+            </button>
           </div>
 
           {accumOn && (

@@ -86,6 +86,8 @@ export function useApp(selector) {
       case A.SET_AUTO_QUALITY: return store.setAutoQuality(payload);
       case A.SET_SEED: return store.setSeed(payload);
       case A.BUMP_SEED: return store.bumpSeed();
+      case A.MUTATE_SEED_OFFSET: return store.mutateSeedOffset(action.group);
+      case A.RESET_SEED_OFFSETS: return store.resetSeedOffsets();
       case A.SET_PALETTE_ID: return store.setPaletteId(payload);
       case A.SET_PALETTE_SWATCH: return store.setPaletteSwatch(action.index, action.hex);
       case A.SET_PALETTE_BG: return store.setPaletteBg(payload);

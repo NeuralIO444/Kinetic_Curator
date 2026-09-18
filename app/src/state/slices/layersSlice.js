@@ -2,14 +2,16 @@ import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { initialEnabledAssets } from './globalSlice.js';
 import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS } from '../../fx/fxFilters.js';
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
+import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 
 function makeLayerId() {
   return `layer-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`;
 }
 
-function freshSnapshot(seed) {
+function freshSnapshot(seed, seedOffsets) {
   return {
     seed: seed >>> 0,
+    seedOffsets: normalizeSeedOffsets(seedOffsets),
     paletteId: 'praystation',
     paletteOverrides: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
@@ -22,6 +24,7 @@ function freshSnapshot(seed) {
 export function captureSnapshot(state) {
   return {
     seed: state.seed,
+    seedOffsets: normalizeSeedOffsets(state.seedOffsets),
     paletteId: state.paletteId,
     paletteOverrides: state.paletteOverrides,
     layoutParams: state.layoutParams,
@@ -71,7 +74,7 @@ export const createLayersSlice = (set) => ({
     const isFx = isFxLayer(src);
     const snap = isFx ? null : (id === state.activeLayerId
       ? captureSnapshot(state)
-      : (state.layerSnapshots[id] || freshSnapshot(state.seed)));
+      : (state.layerSnapshots[id] || freshSnapshot(state.seed, state.seedOffsets)));
     const copy = {
       id: nid,
       name: `${src.name} copy`,
@@ -118,7 +121,7 @@ export const createLayersSlice = (set) => ({
     // FX layers are never the content-active layer (see setActiveLayer) —
     // prefer a content layer so the invariant survives the deletion.
     const nextActive = layers.find((l) => !isFxLayer(l)) || layers[0];
-    const nextSnapshot = snapshots[nextActive.id] || freshSnapshot(state.seed);
+    const nextSnapshot = snapshots[nextActive.id] || freshSnapshot(state.seed, state.seedOffsets);
     delete snapshots[nextActive.id];
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
@@ -137,7 +140,7 @@ export const createLayersSlice = (set) => ({
     // (no seed/palette/layoutParams). The panel edits their effect stack via
     // selectedFxLayerId instead.
     if (!target || isFxLayer(target)) return {};
-    const snapshot = state.layerSnapshots[id] || freshSnapshot(state.seed);
+    const snapshot = state.layerSnapshots[id] || freshSnapshot(state.seed, state.seedOffsets);
     return {
       activeLayerId: id,
       layerSnapshots: {

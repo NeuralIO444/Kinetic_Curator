@@ -5,6 +5,7 @@ import { sanitizeOverlay } from '../assets/overlay.js';
 // keep working; the implementations live in the cycle-free module.
 import { normalizeSnapshots, normalizeLayers } from './projectNormalize.js';
 export { normalizeSnapshots, normalizeLayers };
+import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
@@ -20,6 +21,9 @@ export function serializeProject(state) {
   const doc = {
     version: PROJECT_VERSION,
     seed: state.seed >>> 0,
+    // #305 — sub-seed stream offsets persist like the seed itself; a kept
+    // render's recipe is only deterministic with these attached.
+    seedOffsets: normalizeSeedOffsets(state.seedOffsets),
     paletteId: state.paletteId,
     layoutParams: normalizeLayoutParams(state.layoutParams),
     enabledAssets: { ...state.enabledAssets },
@@ -61,6 +65,7 @@ export function parseProject(raw) {
       doc: {
         version: PROJECT_VERSION,
         seed: seed >>> 0,
+        seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
         paletteId: raw.paletteId || raw.palette || 'praystation',
         layoutParams: normalizeLayoutParams(raw.layoutParams || raw.layout),
         // #103 Track B — validate asset maps against the registry; a hostile
@@ -92,6 +97,7 @@ export function parseProject(raw) {
     doc: {
       version: PROJECT_VERSION,
       seed: seed >>> 0,
+      seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
       paletteId: typeof raw.paletteId === 'string' ? raw.paletteId : 'praystation',
       layoutParams: normalizeLayoutParams(raw.layoutParams),
       // #103 Track B — validate asset maps against the registry; a hostile

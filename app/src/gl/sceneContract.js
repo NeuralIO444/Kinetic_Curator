@@ -23,6 +23,7 @@
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
+import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 
 export const GL_CONTRACT_VERSION = 1;
 
@@ -247,6 +248,9 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     version: GL_CONTRACT_VERSION,
     canvas: { w: CONTRACT_CANVAS.w, h: CONTRACT_CANVAS.h },
     seed: Number(doc.seed) >>> 0,
+    // Sub-seed stream offsets (#305): part of the render recipe, so a kept
+    // render replays bit-identically. Absent in older callers → zeros.
+    seedOffsets: normalizeSeedOffsets(doc.seedOffsets),
     quality: String(doc.quality || 'balanced'),
     atlas: {
       // Phase 1 fills uv rects when assets are baked to the texture atlas.

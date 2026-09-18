@@ -39,6 +39,9 @@ export function wireEventBus(rawDispatch) {
     if (p.bpm !== undefined) dispatch({ type: A.SET_PHRASE_BPM, payload: p.bpm });
   });
   on(Events.DAVIS_RESET_PHRASE, () => dispatch({ type: A.RESET_PHRASE }));
+  on(Events.DAVIS_MUTATE_STREAM, (p) => dispatch(p && p.reset
+    ? { type: A.RESET_SEED_OFFSETS }
+    : { type: A.MUTATE_SEED_OFFSET, group: p && p.group }));
   on(Events.DAVIS_FAVORITE, (fav) => {
     if (fav.action === 'recall') return dispatch({ type: A.RECALL_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'add' && fav.favorite) return dispatch({ type: A.ADD_FAVORITE, favorite: fav.favorite });

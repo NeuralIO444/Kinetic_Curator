@@ -4,12 +4,13 @@
 // (applyProject). globalSlice ← projectDocument would close an import
 // cycle (projectDocument → slices/layersSlice → globalSlice), so the
 // shared helpers live here: this module imports only leaf modules
-// (data/layout-modes, data/assets, data/quality, fx/fxFilters) and is safe
-// to import from anywhere.
+// (data/layout-modes, data/assets, data/quality, fx/fxFilters,
+// engine/kernel/rng → engine/prng) and is safe to import from anywhere.
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeFxEffects } from '../fx/fxFilters.js';
 import { ASSETS } from '../data/assets/index.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
+import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 
 /** #103 Track B — the live loop resolves every layer per frame; cap hostile docs. */
 export const MAX_LAYERS = 16;
@@ -85,6 +86,7 @@ export function normalizeSnapshots(raw) {
     // parameter locks and the CA grid.
     out[id] = {
       seed: Number.isFinite(snap.seed) ? snap.seed >>> 0 : 0,
+      seedOffsets: normalizeSeedOffsets(snap.seedOffsets),
       paletteId: typeof snap.paletteId === 'string' ? snap.paletteId : 'praystation',
       paletteOverrides: snap.paletteOverrides ?? null,
       layoutParams: normalizeLayoutParams(snap.layoutParams),
