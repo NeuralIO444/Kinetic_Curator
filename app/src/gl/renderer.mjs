@@ -682,7 +682,7 @@ export function createRenderer(canvas) {
    * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb' }
    * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
    */
-  function renderAccumSequence(frames, { fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, background = '#000000' } = {}) {
+  function renderAccumSequence(frames, { fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, swell = 1, background = '#000000' } = {}) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
     const { width: w, height: h, contract } = frames[0];
     if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
@@ -707,7 +707,8 @@ export function createRenderer(canvas) {
         // Transparent: accum.begin() owns the opaque project background.
         const frameT = renderFrameInto(payload, T, uploaded, { transparent: true });
         // B1: per-frame audio envelope modulates the recipe params.
-        const params = audio ? applyAudioEnvelope(base, audio[i] || {}) : base;
+        // #306: swell scales the glow gesture only (the washout control).
+        const params = audio ? applyAudioEnvelope(base, audio[i] || {}, { swell }) : base;
         accum.step(frameT.tex, params);
         i++;
       }

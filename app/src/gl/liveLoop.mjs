@@ -443,6 +443,11 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       },
       audioBands: s.audioBands,
       audioOn: !!s.audioEnabled,
+      // #306: the audio→glow fader (STIMULI panel) — scales only the glow
+      // gesture of the envelope mapping, so loud passages can't wash out
+      // the render at high optics. The headroom-relative form (#303) is
+      // untouched.
+      audioSwell: s.layoutParams.audioSwell ?? 1,
       glow: life.glow ?? 0,
       paused: !s.running,
       // #278 — eased dissolve factor for this frame (null when no dissolve
@@ -536,7 +541,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       const frame = buildFrame();
       if (!frame) return; // static bake in flight — hold last frame
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, glow, paused, mix } = frame;
+      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, paused, mix } = frame;
 
       if (paused) return; // hold the last presented frame
 
@@ -588,11 +593,13 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
               const target = renderMixedFrame(payload, true, mix);
               const bands = audioBands || { rms: 0, beatPulse: 0 };
               // Silence is a true no-op: the envelope passes params through at 0.
+              // #306: the bands are already shaped by the ballistics follower
+              // (useAudioInput); swell scales the glow gesture only.
               const rp = applyAudioEnvelope(accumRecipeParams(accumParams), {
                 rms: audioOn ? bands.rms || 0 : 0,
                 flux: 0,
                 beatPulse: audioOn ? bands.beatPulse || 0 : 0,
-              });
+              }, { swell: audioSwell ?? 1 });
               // #309: the frame is backing-store sized; the pair is logical.
               accumObj.step(target.tex, rp, { width: target.w, height: target.h });
               live.presentUpscaled(accumObj.texture());

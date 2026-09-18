@@ -166,15 +166,26 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
  *
  * Modulation (documented in docs/ACCUM.md):
  *   keep   += 0.08*rms + 0.04*flux            (clamped <= 0.99)
- *   optics += (1 - optics) * (0.3*rms + 0.1*beatPulse)   (headroom-relative)
+ *   optics += (1 - optics) * swell * (0.3*rms + 0.1*beatPulse)   (headroom-relative)
  *   tunnel / prism amounts scale x (1 + 2*rms + flux + beatPulse)
+ *
+ * `swell` (0..1, default 1, third arg) is the audio→glow fader: it scales
+ * only the glow gesture, so a performer can tame the washout a loud
+ * passage causes at high optics without touching the slider. swell = 0
+ * means audio never moves the glow; the keep/tunnel/prism gestures are
+ * unaffected. The headroom-relative form (#303) is untouched — audio
+ * swells toward the slider's ceiling, never past it.
  */
-export function applyAudioEnvelope(p, a = {}) {
+export function applyAudioEnvelope(p, a = {}, opts = {}) {
   const { rms, flux, beatPulse } = sanitizeAudioSample(a);
   const r = rms;
   const x = flux;
   const b = beatPulse;
   if (r <= 0 && x <= 0 && b <= 0) return { ...p };
+  // #306: swell scales the audio contribution to the glow only. clamp01
+  // coerces garbage (NaN, non-numeric) to 0, so a bad caller mutes the glow
+  // gesture rather than exploding it.
+  const swell = clamp01(opts.swell ?? 1);
   const stretch = 1 + 2 * r + x + b;
   return {
     ...p,
@@ -183,9 +194,10 @@ export function applyAudioEnvelope(p, a = {}) {
     // toward the slider's ceiling instead of adding past it, so loud audio
     // can never peg GLOW at 1. The gesture keeps its full strength at
     // optics = 0 and tapers as the slider rises; the slider keeps authority.
+    // #306: multiplied by swell — the performer's washout control.
     // Optics is one amount driving the glow system: recompute every
     // derived field so the glow genuinely swells with the music.
-    ...opticsDerived(clamp01(p.optics + (1 - p.optics) * (0.3 * r + 0.1 * b))),
+    ...opticsDerived(clamp01(p.optics + (1 - p.optics) * swell * (0.3 * r + 0.1 * b))),
     tunnelZoom: 1 + (p.tunnelZoom - 1) * stretch,
     tunnelSpin: p.tunnelSpin * stretch,
     prismUv: p.prismUv * stretch,

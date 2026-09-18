@@ -7,8 +7,21 @@
 // mic connection mid-performance.
 
 import { useRef, useEffect } from 'react';
+import {
+  createBallisticsState,
+  resetBallistics,
+  processBallistics,
+  sanitizeBallistics,
+} from '../gl/audioBallistics.mjs';
 
-export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBands, onBeat, onDenied }) {
+// #306: audio ballistics — the raw analyser output is shaped through an
+// envelope follower (attack/release) + response curve before it reaches any
+// reactivity consumer (scale/alpha/glow, ACCUM envelope). Beat detection
+// stays on the RAW rms so the clock keeps its snap; everything the eye sees
+// goes through the shaped envelope. Silence decays to exact zeros, so the
+// no-op contracts downstream are preserved.
+
+export function useAudioInput({ enabled, source, gain, monitor, ballistics, onStimulus, onBands, onBeat, onDenied }) {
   const ctxRef = useRef(null);
   const analyserRef = useRef(null);
   const sourceRef = useRef(null);
@@ -17,11 +30,17 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
   const rafRef = useRef(null);
   const runningRef = useRef(false);
   const prevRmsRef = useRef(0);
+  // #306: one follower per audio session — created once, reset on every
+  // graph start so the envelope never resumes from a stale session.
+  const followerRef = useRef(createBallisticsState());
+  const lastTsRef = useRef(0);
 
   const cbRef = useRef({ onStimulus, onBands, onBeat, onDenied });
   const gainRef = useRef(gain);
   useEffect(() => { cbRef.current = { onStimulus, onBands, onBeat, onDenied }; });
   useEffect(() => { gainRef.current = gain; }, [gain]);
+  const ballisticsRef = useRef(ballistics);
+  useEffect(() => { ballisticsRef.current = ballistics; }, [ballistics]);
   // Set in the catch block below, cleared on a successful start. Guards the
   // early-return clear just below: the denial handler itself flips `enabled`
   // back to false (SET_AUDIO_ENABLED false), which would otherwise re-run
@@ -37,6 +56,9 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
     }
 
     let cancelled = false;
+    // #306: the envelope follower lives for the whole effect; copying the
+    // ref once keeps the cleanup honest (react-hooks/exhaustive-deps).
+    const follower = followerRef.current;
 
     const analyze = () => {
       if (!runningRef.current) return;
@@ -65,10 +87,22 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
       const treble = (len - midEnd) > 0 ? trebleSum / (len - midEnd) : 0;
 
       const cb = cbRef.current;
-      cb.onStimulus?.(rms);
-      cb.onBands?.({ bass, mid, treble, rms });
+      // #306: shape the envelope before anything downstream sees it. The
+      // follower state lives across rAF ticks; dt comes from wall clock.
+      const now = performance.now();
+      const dtMs = lastTsRef.current > 0 ? now - lastTsRef.current : 16.7;
+      lastTsRef.current = now;
+      const shaped = processBallistics(
+        follower,
+        { bass, mid, treble, rms },
+        dtMs,
+        sanitizeBallistics(ballisticsRef.current)
+      );
+      cb.onStimulus?.(shaped.rms);
+      cb.onBands?.(shaped);
 
-      // Beat detection: sharp rms spike
+      // Beat detection: sharp rms spike — on the RAW rms, so the clock
+      // keeps its snap regardless of the follower's attack setting.
       if (rms - prevRmsRef.current > 0.15) cb.onBeat?.();
       prevRmsRef.current = rms;
 
@@ -118,6 +152,9 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
         gainNodeRef.current = gainNode;
         analyserRef.current = analyser;
         runningRef.current = true;
+        // #306: fresh session, fresh envelope — never resume from stale values.
+        resetBallistics(follower);
+        lastTsRef.current = 0;
 
         deniedRef.current = false;
         cbRef.current.onDenied?.(false);
@@ -133,6 +170,9 @@ export function useAudioInput({ enabled, source, gain, monitor, onStimulus, onBa
       cancelled = true;
       runningRef.current = false;
       prevRmsRef.current = 0;
+      // #306: session over — drop the envelope so a re-enable starts silent.
+      resetBallistics(follower);
+      lastTsRef.current = 0;
 
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);

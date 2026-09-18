@@ -2,6 +2,7 @@
 
 import { BEHAVE_IDS } from '../engine/organisms/behave.js';
 import { COMPOSITION_PRESETS } from './presets.js';
+import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 
 export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
@@ -90,8 +91,16 @@ export const DEFAULT_LAYOUT_PARAMS = {
   audioModDepth: 0.65,
   audioScaleMod: 0.45,
   audioAlphaMod: 0.25,
+  // #306: audio ballistics — envelope follower + response curve + glow fader.
+  audioAttackMs: 25,
+  audioDecayMs: 320,
+  audioResponse: 'exponential',
+  audioSwell: 1,
   lifeDrift: 0.35,
 };
+
+/** #306 — audio envelope response-curve shapes. */
+export const AUDIO_RESPONSE_IDS = BALLISTICS_CURVES;
 
 export const MODE_IDS = LAYOUT_MODES.map((m) => m.id);
 // #268: SHADING_MODES / MATERIAL_IDS removed — the GL renderer renders
@@ -136,6 +145,10 @@ export const PARAM_SPEC = {
   audioModDepth: { min: 0, max: 1 },
   audioScaleMod: { min: 0, max: 1 },
   audioAlphaMod: { min: 0, max: 1 },
+  // #306: envelope follower time constants (ms), glow swell fader.
+  audioAttackMs: { min: 0, max: 2000 },
+  audioDecayMs: { min: 0, max: 5000 },
+  audioSwell: { min: 0, max: 1 },
   lifeDrift: { min: 0, max: 1 },
   // #167 — contact disc radius in px (0 = contacts off), bounce 0–1,
   // personal-space force gain, and the 32-bit layer-interaction mask.
@@ -186,6 +199,7 @@ const ENUM_SPEC = {
   symmetry: SYMMETRY_MODES,
   behave: BEHAVE_MODES,
   contactMode: CONTACT_MODES,
+  audioResponse: AUDIO_RESPONSE_IDS, // #306
 };
 
 /** True when `value` is a number we can meaningfully clamp. */
@@ -300,6 +314,7 @@ export function normalizeLayoutParams(partial) {
   next.symmetry = pickEnum(next.symmetry, SYMMETRY_MODES, 'none');
   next.behave = pickEnum(next.behave, BEHAVE_MODES, 'cruise');
   next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
+  next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
 
   return next;
 }
