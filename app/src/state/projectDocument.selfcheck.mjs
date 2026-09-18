@@ -78,6 +78,56 @@ assert.ok(!bad.ok);
 const badSeed = parseProject({ version: 1, seed: 'nope' });
 assert.ok(!badSeed.ok);
 
+// ── #305 — sub-seed stream offsets round-trip ────────────────────────────
+// Offsets serialize with the project and restore on parse; legacy docs
+// without them normalize to the identity (all zeros), so old renders are
+// bit-identical. Hostile values normalize to uint32 / zero.
+const withOffsets = serializeProject({
+  ...state,
+  seedOffsets: { spatial: 0xdeadbeef, color: 42, asset: 0, noise: 0xffffffff },
+});
+assert.deepStrictEqual(
+  withOffsets.seedOffsets,
+  { spatial: 0xdeadbeef, color: 42, asset: 0, noise: 0xffffffff },
+  'seedOffsets must serialize',
+);
+const rtOffsets = parseProject(withOffsets);
+assert.ok(rtOffsets.ok);
+assert.deepStrictEqual(
+  rtOffsets.doc.seedOffsets,
+  { spatial: 0xdeadbeef, color: 42, asset: 0, noise: 0xffffffff },
+  'seedOffsets must round-trip intact',
+);
+const legacyOffsets = parseProject({ version: 1, seed: 1, layoutParams: {} });
+assert.ok(legacyOffsets.ok);
+assert.deepStrictEqual(
+  legacyOffsets.doc.seedOffsets,
+  { spatial: 0, color: 0, asset: 0, noise: 0 },
+  'legacy docs normalize missing offsets to zeros',
+);
+const hostileOffsets = parseProject({
+  version: 1, seed: 1, layoutParams: {},
+  seedOffsets: { spatial: 'nope', color: 1.5, asset: -3, noise: null, bogus: 7 },
+});
+assert.ok(hostileOffsets.ok);
+assert.deepStrictEqual(
+  hostileOffsets.doc.seedOffsets,
+  { spatial: 0, color: 1, asset: 0xffffffff - 2, noise: 0 },
+  'hostile offsets normalize to uint32 (garbage → zero), unknown keys dropped',
+);
+useStore.getState().applyProject(rtOffsets.doc);
+assert.deepStrictEqual(
+  useStore.getState().seedOffsets,
+  { spatial: 0xdeadbeef, color: 42, asset: 0, noise: 0xffffffff },
+  'applyProject must restore offsets',
+);
+useStore.getState().applyProject(legacyOffsets.doc);
+assert.deepStrictEqual(
+  useStore.getState().seedOffsets,
+  { spatial: 0, color: 0, asset: 0, noise: 0 },
+  'applyProject of a legacy doc must zero offsets',
+);
+
 // ── #103 Track B — hostile-project hygiene audit ─────────────────────────
 // Each hostile doc must parse to safe defaults and apply without throwing,
 // without store bloat, leaving a playable canvas.

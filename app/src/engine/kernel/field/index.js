@@ -111,8 +111,8 @@ export function combineFields(a, b) {
  *
  * @returns {{x:number,y:number,accepted:boolean}} normalized 0..1
  */
-export function sampleFieldPoint(field, seed, index, { attempts = 24, channel = 'field' } = {}) {
-  const rng = rngForIndex(seed, channel, index);
+export function sampleFieldPoint(field, seed, index, { attempts = 24, channel = 'field', seedOffsets = null } = {}) {
+  const rng = rngForIndex(seed, channel, index, seedOffsets);
   let bestX = 0.5;
   let bestY = 0.5;
   let bestV = -1;

@@ -90,6 +90,7 @@ export function computeGeometrySoA({
   mode, count, seed, jitter, density, zTiers, bleed,
   canvasW, canvasH, caGrid,
   displacement = 0, noiseFreq = 0.005, noiseSpeed = 0.5,
+  seedOffsets = null,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -103,7 +104,7 @@ export function computeGeometrySoA({
   const sample = getSampler(mode);
 
   const noise = displacement > 0
-    ? createNoise(hashU32(seed, CH.noise, 0))
+    ? createNoise(hashU32(seed, CH.noise, 0, seedOffsets))
     : null;
   const nt = noise ? (seed & 0xffff) * 0.02 * noiseSpeed : 0;
 
@@ -114,16 +115,17 @@ export function computeGeometrySoA({
     i: 0, count, w: effectiveW, h: effectiveH,
     rng: null, jitter: jitter || 0, seed,
     caGrid: mode === 'ca' ? caGrid : null,
+    seedOffsets,
   };
 
   const tDenom = count > 1 ? count - 1 : 0;
 
   let n = 0;
   for (let i = 0; i < cap; i++) {
-    if (density < 100 && hashU01(seed, CH.dens, i) * 100 > density) continue;
+    if (density < 100 && hashU01(seed, CH.dens, i, seedOffsets) * 100 > density) continue;
 
     ctx.i = i;
-    ctx.rng = rngForIndex(seed, CH.geo, i);
+    ctx.rng = rngForIndex(seed, CH.geo, i, seedOffsets);
     const pos = sample(ctx);
 
     let px = pos.x;
@@ -149,9 +151,9 @@ export function computeGeometrySoA({
     soa.index[n] = i;
     soa.zTier[n] = zTier;
     soa.depth[n] = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
-    soa.uScale[n] = hashU01(seed, CH.attr, i * 3);
-    soa.uRot[n] = hashU01(seed, CH.attr, i * 3 + 1);
-    soa.uAlpha[n] = hashU01(seed, CH.attr, i * 3 + 2);
+    soa.uScale[n] = hashU01(seed, CH.attr, i * 3, seedOffsets);
+    soa.uRot[n] = hashU01(seed, CH.attr, i * 3 + 1, seedOffsets);
+    soa.uAlpha[n] = hashU01(seed, CH.attr, i * 3 + 2, seedOffsets);
     n++;
   }
 
@@ -206,13 +208,16 @@ export function computePlacementsSoA(params, out) {
  * The inputs stage A+B reads. buildPlacements compares this array
  * element-wise to decide whether cached geometry is still valid, so it must
  * list every parameter computeGeometrySoA destructures — objects by
- * identity (caGrid), everything else by value.
+ * identity (caGrid), everything else by value. The sub-seed offsets ride as
+ * four scalars (#305): a mutate is a new number, never a mutated object.
  */
 export function geometrySignature(p) {
+  const o = p.seedOffsets || {};
   return [
     p.mode, p.count, p.seed, p.jitter, p.density, p.zTiers, p.bleed,
     p.canvasW, p.canvasH, p.caGrid,
     p.displacement, p.noiseFreq, p.noiseSpeed,
+    o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }
 

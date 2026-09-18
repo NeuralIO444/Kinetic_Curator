@@ -31,6 +31,7 @@ export function OutputPanel() {
     isRecording: s.isRecording,
     rendering: s.isRendering,
     seed: s.seed,
+    seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
     quality: s.quality,
     autoQuality: s.autoQuality,
@@ -49,7 +50,7 @@ export function OutputPanel() {
     watchdogTripGen: s.watchdogTripGen,
   }));
   const {
-    snapshots, exportResolution, isRecording, seed, layoutParams,
+    snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
     userPalettes, favorites, rendering, watchdogTripGen,
@@ -109,7 +110,8 @@ export function OutputPanel() {
         />
 
         <SnapRecordRow
-          glCanvasRef={glCanvasRef} glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
+          glCanvasRef={glCanvasRef} glLoopRef={glLoopRef} palette={palette} seed={seed} seedOffsets={seedOffsets}
+          layoutParams={layoutParams}
           exportResolution={exportResolution} accumOn={accumOn} isRecording={isRecording} rendering={rendering}
         />
 

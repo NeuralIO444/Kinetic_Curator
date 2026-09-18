@@ -4,7 +4,7 @@ import { captureStill, useVideoRecorder } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
 
 export function SnapRecordRow({
-  glCanvasRef, glLoopRef, palette, seed, layoutParams, exportResolution,
+  glCanvasRef, glLoopRef, palette, seed, seedOffsets, layoutParams, exportResolution,
   accumOn, isRecording, rendering,
 }) {
   useVideoRecorder({
@@ -29,6 +29,8 @@ export function SnapRecordRow({
         const up = info && info.upscaledFrom;
         emit(Events.EXPORT_SNAPSHOT, {
           seed,
+          // #305 — the recipe is only deterministic with the stream offsets.
+          seedOffsets: { ...(seedOffsets || {}) },
           format: 'PNG',
           resolution: `${resolutionLabel(exportResolution)}${accumOn ? ' · ACCUM' : ''}${up ? ` · upscaled ${up.width}×${up.height}→${exportResolution}x` : ''}`,
           timestamp: new Date().toISOString().slice(11, 19),

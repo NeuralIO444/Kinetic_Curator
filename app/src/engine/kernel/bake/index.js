@@ -26,6 +26,7 @@
 
 import { ParticleSystem } from '../../particles.js';
 import { ensureSwarmWasm, getSwarmWasm, runSwarmWasm, resolveWasmParams, wasmBakeEligible, wasmForcedOff } from './swarmWasm.mjs';
+import { noiseSeedFor } from '../rng.js';
 
 // Re-exported so the studio render path can preload the wasm fast path
 // without importing the loader module directly.
@@ -53,6 +54,7 @@ export const BAKE_DT_MS = 1000 / 60;
  * @param {number}   [opts.dt=BAKE_DT_MS]
  * @param {{x:number,y:number}|null} [opts.attractor=null]
  * @param {number}   [opts.maxParticles] quality cap gating breed() growth
+ * @param {object}   [opts.seedOffsets] sub-seed stream offsets (#305)
  * @param {'auto'|'js'|'wasm'} [opts.engine='auto'] bake engine. 'auto'
  *   uses the Rust/wasm fast path (#175) when it has been preloaded (see
  *   ensureSwarmWasm, called by the studio render path) and the config is in
@@ -64,6 +66,7 @@ export const BAKE_DT_MS = 1000 / 60;
  */
 export function bakeParticles({
   seed,
+  seedOffsets = null,
   count,
   layoutParams,
   activeAssets,
@@ -77,7 +80,7 @@ export function bakeParticles({
   engine = 'auto',
 }) {
   const sys = new ParticleSystem();
-  sys.init(count, canvasW, canvasH, activeAssets, palette, seed);
+  sys.init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets);
 
   // #167 — the quality cap rides on the params so contact breed() can gate
   // population growth; the bake stays a pure function of its inputs.
@@ -99,7 +102,9 @@ export function bakeParticles({
         time0: BAKE_TIME_ORIGIN,
         dt,
         params16: resolveWasmParams(params, canvasW, canvasH),
-        seed,
+        // #305 — the wasm noise init must see the same derived seed as the
+        // JS path's createNoise; zero offsets → exactly `seed || 444`.
+        seed: noiseSeedFor(seed, seedOffsets),
       });
       ranWasm = true;
     } else if (engine === 'wasm') {
@@ -112,7 +117,7 @@ export function bakeParticles({
     for (let s = 0; s < steps; s++) {
       // Fixed timestep from a fixed origin — the one thing that makes this
       // reproducible. The live loop passes Date.now() here.
-      sys.update(params, activeAssets, palette, seed, BAKE_TIME_ORIGIN + s * dt, attractor);
+      sys.update(params, activeAssets, palette, seed, BAKE_TIME_ORIGIN + s * dt, attractor, seedOffsets);
     }
   }
   return sys.getItems(activeAssets);

@@ -40,6 +40,7 @@ export const Events = {
   DAVIS_MORPH_DURATION: 'davis:morphDuration',
   DAVIS_PHRASE: 'davis:phrase',
   DAVIS_RESET_PHRASE: 'davis:resetPhrase',
+  DAVIS_MUTATE_STREAM: 'davis:mutateStream', // #305: { group } | { reset: true }
   DAVIS_FAVORITE: 'davis:favorite',
   DAVIS_FAVORITE_REMOVE: 'davis:favoriteRemove',
   ACCUM_GESTURE: 'accum:gesture', // Phase A: { action: 'freeze'|'clear'|'swell', value? }

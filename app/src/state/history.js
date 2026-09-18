@@ -45,6 +45,7 @@ export function captureUndoEntry(state, kind = UNDO_KIND_EDIT) {
     kind,
     layerId: state.activeLayerId,
     seed: state.seed,
+    seedOffsets: deep(state.seedOffsets),
     paletteId: state.paletteId,
     paletteOverrides: deep(state.paletteOverrides),
     layoutParams: deep(state.layoutParams),
@@ -139,6 +140,7 @@ export function entryApplies(entry, activeLayerId) {
 export function editRestoreFields(entry) {
   return {
     seed: entry.seed,
+    seedOffsets: entry.seedOffsets ?? { spatial: 0, color: 0, asset: 0, noise: 0 },
     paletteId: entry.paletteId,
     paletteOverrides: entry.paletteOverrides ?? null,
     layoutParams: entry.layoutParams,

@@ -128,10 +128,10 @@ function caFieldFor(caGrid) {
  * Rejection sampling makes position a function of (seed, i, field) only.
  */
 function ca(ctx) {
-  const { i, w, h, rng, jitter, caGrid, seed } = ctx;
+  const { i, w, h, rng, jitter, caGrid, seed, seedOffsets } = ctx;
   if (!caGrid) return random(ctx);
   const field = caFieldFor(caGrid);
-  const p = sampleFieldPoint(field, seed, i, { channel: 'ca' });
+  const p = sampleFieldPoint(field, seed, i, { channel: 'ca', seedOffsets });
   return {
     x: p.x * w + (rng() - 0.5) * jitter,
     y: p.y * h + (rng() - 0.5) * jitter,

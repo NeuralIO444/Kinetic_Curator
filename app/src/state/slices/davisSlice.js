@@ -4,6 +4,7 @@ import { genId } from '../id.js';
 import { tickPhraseBeat } from '../phraseTick.js';
 import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
+import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 
 export const createDavisSlice = (set) => ({
   evolveMode: false,
@@ -26,6 +27,8 @@ export const createDavisSlice = (set) => ({
   morphStart: 0,
   morphPendingSeed: null,
   morphPendingPalette: null,
+  // #305 — a morph-to-favorite lands the favorite's stream offsets with its seed.
+  morphPendingSeedOffsets: null,
 
   phraseEnabled: false,
   phraseLength: 8,
@@ -54,8 +57,10 @@ export const createDavisSlice = (set) => ({
     morphFrom: null,
     morphTo: null,
     ...(state.morphPendingSeed != null ? { seed: state.morphPendingSeed } : {}),
+    ...(state.morphPendingSeedOffsets ? { seedOffsets: state.morphPendingSeedOffsets } : {}),
     ...(state.morphPendingPalette ? { paletteId: state.morphPendingPalette } : {}),
     morphPendingSeed: null,
+    morphPendingSeedOffsets: null,
     morphPendingPalette: null,
   })),
 
@@ -131,6 +136,7 @@ export const createDavisSlice = (set) => ({
           morphTo: to,
           morphStart: performance.now(),
           morphPendingSeed: null,
+          morphPendingSeedOffsets: null,
           morphPendingPalette: null,
           lastEvolveTs: ts,
         };
@@ -163,14 +169,19 @@ export const createDavisSlice = (set) => ({
   }),
   recallFavorite: (fav) => set({
     seed: fav.seed,
+    // #305 — a kept recipe replays its stream offsets too.
+    seedOffsets: normalizeSeedOffsets(fav.seedOffsets),
     ...(fav.config?.layout ? { layoutParams: { ...fav.config.layout } } : {}),
     ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
   }),
   morphToFavorite: (fav) => set((state) => {
     const target = fav.config?.layout;
+    // #305 — old favorites carry no offsets → zeros, like a fresh project.
+    const favOffsets = normalizeSeedOffsets(fav.seedOffsets);
     if (!target || typeof target !== 'object') {
       return {
         seed: fav.seed,
+        seedOffsets: favOffsets,
         ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
       };
     }
@@ -189,6 +200,7 @@ export const createDavisSlice = (set) => ({
     if (Object.keys(to).length === 0) {
       return {
         seed: fav.seed,
+        seedOffsets: favOffsets,
         layoutParams: { ...state.layoutParams, ...target },
         ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
       };
@@ -202,6 +214,7 @@ export const createDavisSlice = (set) => ({
       morphTo: to,
       morphStart: performance.now(),
       morphPendingSeed: fav.seed,
+      morphPendingSeedOffsets: favOffsets,
       morphPendingPalette: fav.config?.palette.id || null,
     };
   }),

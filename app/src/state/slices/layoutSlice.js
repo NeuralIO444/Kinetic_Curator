@@ -4,9 +4,17 @@ import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRe
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
+import { SEED_OFFSET_GROUPS, defaultSeedOffsets, normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 
 export const createLayoutSlice = (set) => ({
   seed: 0xa17e9b21,
+  /**
+   * Sub-seed stream offsets (#305): { spatial, color, asset, noise }, each a
+   * uint32 delta mixed into its stream's channel hash. A performer re-rolls
+   * one stream while the master seed's other channels stay locked. Zero is
+   * the identity — saved and restored exactly like the seed itself.
+   */
+  seedOffsets: defaultSeedOffsets(),
   paletteId: 'praystation',
   /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
   paletteOverrides: null,
@@ -44,6 +52,39 @@ export const createLayoutSlice = (set) => ({
     ...pushToUndo(state, true),
     seed: (state.seed ^ ((Math.random() * 0xffffffff) | 0)) >>> 0,
   })),
+  /**
+   * Re-roll one sub-seed stream (#305): the named stream gets a fresh random
+   * offset while the master seed and the other three streams stay locked.
+   * Undoable, like every other seed edit.
+   */
+  mutateSeedOffset: (group) => set((state) => {
+    if (!SEED_OFFSET_GROUPS.includes(group)) return {};
+    return {
+      ...pushToUndo(state, true),
+      seedOffsets: {
+        ...normalizeSeedOffsets(state.seedOffsets),
+        [group]: ((Math.random() * 0xffffffff) | 0) >>> 0,
+      },
+    };
+  }),
+  /** Set one stream's offset explicitly (project load, recipe recall). */
+  setSeedOffset: (group, value) => set((state) => {
+    if (!SEED_OFFSET_GROUPS.includes(group)) return {};
+    const v = Number(value);
+    if (!Number.isFinite(v)) return {};
+    const cur = normalizeSeedOffsets(state.seedOffsets);
+    if ((v >>> 0) === cur[group]) return {};
+    return {
+      ...pushToUndo(state, true),
+      seedOffsets: { ...cur, [group]: v >>> 0 },
+    };
+  }),
+  /** Lock every stream back to the master seed (all offsets zero). */
+  resetSeedOffsets: () => set((state) => {
+    const cur = normalizeSeedOffsets(state.seedOffsets);
+    if (SEED_OFFSET_GROUPS.every((g) => cur[g] === 0)) return {};
+    return { ...pushToUndo(state, true), seedOffsets: defaultSeedOffsets() };
+  }),
   // Switching catalog id clears overrides (AC6)
   setPaletteId: (id) => set((state) => ({
     ...pushToUndo(state, true),
