@@ -91,6 +91,14 @@ export function PaletteStrip() {
 
   return (
     <div className="palette-strip">
+      <div className="kc-logo" title="KINETIC_CURATOR v0.9.0">
+        <span className="logo-mark">◈</span>
+        <span className="kc-name kc-compact">KC-1</span>
+        <span className="kc-name kc-full">
+          <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
+          <span className="logo-version">v0.9.0</span>
+        </span>
+      </div>
       <div className="palette-switch">
         <span className="palette-switch-label">PALETTE</span>
         {chipOverflow && (

@@ -39,12 +39,6 @@ export function MasterBar() {
   return (
     <div className="master-bar">
       <div className="master-left">
-        <div className="logo">
-          <span className="logo-mark">◈</span>
-          <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
-          <span className="logo-version">v0.9.0</span>
-        </div>
-
         {state.isRecording ? (
           <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
             title="Recording the live canvas to WEBM">

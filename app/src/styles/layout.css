@@ -90,7 +90,7 @@
    (PR #347 follow-up); the tape/status bar stays below it. */
 .palette-strip {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   padding: 0 10px;
   background: var(--panel-2);
@@ -99,6 +99,37 @@
   min-height: 0;
   overflow: hidden;
 }
+
+/* KC-1 compact badge — blooms into the full name on hover. */
+.kc-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+  flex-shrink: 0;
+}
+.kc-name {
+  white-space: nowrap;
+  overflow: hidden;
+}
+.kc-compact {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  max-width: 60px;
+  opacity: 1;
+  transition: max-width 220ms ease, opacity 180ms ease;
+}
+.kc-full {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 0;
+  opacity: 0;
+  transition: max-width 260ms ease, opacity 200ms ease 40ms;
+}
+.kc-logo:hover .kc-compact { max-width: 0; opacity: 0; }
+.kc-logo:hover .kc-full { max-width: 260px; opacity: 1; }
 .logo { display: flex; align-items: center; gap: 6px; }
 .logo-mark { color: var(--accent); font-size: 15px; line-height: 1; }
 .logo-text { font-weight: 800; letter-spacing: 0.08em; font-size: 12px; }
