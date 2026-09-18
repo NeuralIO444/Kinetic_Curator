@@ -265,6 +265,24 @@ export function normalizeLayoutParams(partial) {
       : DEFAULT_LAYOUT_PARAMS[key].slice();
   }
 
+  // #274: legacy fade migration — accumulationFade was stored as a keep
+  // multiplier (0..1) before the half-life change. Any value in (0, 1) in a
+  // saved project is a legacy keep (the new slider minimum is 1, so the
+  // ranges don't overlap); convert to half-life frames so old projects keep
+  // their look: halfLife = -1 / log2(keep). Exactly 1 is left alone — it's
+  // the new half-life minimum, and a legacy keep of exactly 1 ("never
+  // fade") is a degenerate edge not worth a version bump. Runs before the
+  // PARAM_SPEC clamp.
+  {
+    const v = next.accumulationFade;
+    const n = typeof v === 'number' ? v
+      : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+    if (Number.isFinite(n) && n > 0 && n < 1) {
+      const hl = -1 / Math.log2(n);
+      next.accumulationFade = Math.min(40, Math.max(1, hl));
+    }
+  }
+
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);
   }
