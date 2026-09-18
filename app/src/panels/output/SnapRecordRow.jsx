@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { captureStill, useVideoRecorder } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
@@ -13,21 +14,33 @@ export function SnapRecordRow({
     fps: 15,
   });
 
+  // #267: captureStill retries internally via waitForReady while textures
+  // bake; a genuine failure surfaces here instead of being swallowed — the
+  // button must never silently do nothing.
+  const [snapError, setSnapError] = useState(null);
+  const errTimer = useRef(null);
   const addSnapshot = () => {
+    setSnapError(null);
+    if (errTimer.current) clearTimeout(errTimer.current);
     captureStill({
       loopRef: glLoopRef,
       resolution: exportResolution, seedStr: seed.toString(16),
-      onThumbnail: (thumb) => {
+      onThumbnail: (thumb, info) => {
+        const up = info && info.upscaledFrom;
         emit(Events.EXPORT_SNAPSHOT, {
           seed,
           format: 'PNG',
-          resolution: `${resolutionLabel(exportResolution)}${accumOn ? ' · ACCUM' : ''}`,
+          resolution: `${resolutionLabel(exportResolution)}${accumOn ? ' · ACCUM' : ''}${up ? ` · upscaled ${up.width}×${up.height}→${exportResolution}x` : ''}`,
           timestamp: new Date().toISOString().slice(11, 19),
           config: { layout: { ...layoutParams }, palette: { id: palette.id } },
           thumb,
         });
       },
-    }).catch(() => {});
+    }).catch((e) => {
+      console.error('[snap] capture failed:', e);
+      setSnapError(e && e.message ? e.message : String(e));
+      errTimer.current = setTimeout(() => setSnapError(null), 6000);
+    });
   };
 
   return (
@@ -42,6 +55,11 @@ export function SnapRecordRow({
       >
         {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}
       </button>
+      {snapError && (
+        <div style={{ color: '#ff5d7a', fontSize: 11, marginTop: 6 }} role="alert">
+          SNAP failed: {snapError}
+        </div>
+      )}
     </div>
   );
 }

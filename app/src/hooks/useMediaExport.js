@@ -92,14 +92,17 @@ export async function captureStill({ loopRef, resolution = 1, seedStr = '', onTh
   // #270: refuse the export before any GPU allocation on iOS if it would
   // exceed the mobile texture budget. PrintDeskModal surfaces e.message.
   guardExportMemory(width, height, resolution);
-  const { pixels, width: pw, height: ph } = loop.captureFrame({ width, height });
+  // #267: captureFrame discloses when an ACCUM still was upscaled from the
+  // live render size instead of rendered true-size — surfaced in the print
+  // desk label and the snapshot record so it's never sold as a true 2×.
+  const { pixels, width: pw, height: ph, upscaledFrom } = loop.captureFrame({ width, height });
   const canvas = pixelsToCanvas(pixels, pw, ph);
   const thumb = drawThumbnail(canvas);
-  if (onThumbnail) onThumbnail(thumb);
+  if (onThumbnail) onThumbnail(thumb, { upscaledFrom: upscaledFrom || null });
   const blob = await new Promise((res, rej) =>
     canvas.toBlob((b) => (b ? res(b) : rej(new Error('still encode failed'))), 'image/png'));
   if (downloadFile) download(blob, `kinetic-curator-${seedStr}-${resolution}x.png`);
-  return { blob, thumb, width: pw, height: ph };
+  return { blob, thumb, width: pw, height: ph, upscaledFrom: upscaledFrom || null };
 }
 
 /**

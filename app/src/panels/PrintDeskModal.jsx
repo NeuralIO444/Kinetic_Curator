@@ -4,7 +4,10 @@
 // capture path (#249): captureStill() → loop.captureFrame() →
 // live.readback() in app/src/gl/liveLoop.mjs. It renders a frozen 1×/2×
 // still of the current composition (the same still RENDER FINAL captures —
-// the live GL frame, including ACCUM trails), shows it as a PNG preview at
+// the live GL frame, including ACCUM trails). #267: an ACCUM still at 2× is
+// upscaled from the live render size (the trail buffer only exists there)
+// and the desk labels the upscale honestly instead of selling a true 2×.
+// It shows the still as a PNG preview at
 // 1000×700, and lets the operator stack the ffmpeg allow-list post filters
 // (chips, one amount each, off by default). There is no other still source;
 // the old resvg/render.mjs offline path is Node-only farm tooling and is
@@ -86,7 +89,7 @@ export function PrintDeskModal({ onClose }) {
   const [res, setRes] = useState(2);
   const [phase, setPhase] = useState('working'); // working | ready
   const [applying, setApplying] = useState(false);
-  const [source, setSource] = useState(null);   // { url, blob, pixels, width, height }
+  const [source, setSource] = useState(null);   // { url, blob, pixels, width, height, upscaledFrom }
   const [preview, setPreview] = useState(null); // { url, blob } — null means showing source
   const [chips, setChips] = useState(freshChips);
   const [sidecar, setSidecar] = useState(null);
@@ -118,7 +121,9 @@ export function PrintDeskModal({ onClose }) {
       // The desk's only still source: the live WebGL loop's GPU-readback
       // capture path (#249) — the same capture RENDER FINAL uses. The live
       // GL frame (trail buffer when ACCUM is on) at 1×/2×.
-      const { blob } = await captureStill({
+      // #267: captureStill discloses when an ACCUM still was upscaled from
+      // the live render size — the desk labels it instead of selling a 2×.
+      const { blob, upscaledFrom } = await captureStill({
         loopRef: glLoopRef,
         resolution,
         seedStr,
@@ -132,7 +137,7 @@ export function PrintDeskModal({ onClose }) {
           if (i >= 0) urlsRef.current.splice(i, 1);
           URL.revokeObjectURL(prev.url);
         }
-        return { url, blob, pixels, width: pixels.width, height: pixels.height };
+        return { url, blob, pixels, width: pixels.width, height: pixels.height, upscaledFrom: upscaledFrom || null };
       });
     } catch (e) {
       setError(e.message || String(e));
@@ -300,6 +305,12 @@ export function PrintDeskModal({ onClose }) {
                 ⟳
               </button>
             </div>
+            {source && source.upscaledFrom && (
+              <div style={{ fontSize: 10, color: '#ffb454', marginBottom: 4 }}
+                title="The ACCUM trail buffer only exists at the live render size — this still was upscaled from it, not rendered true-size.">
+                ↑ upscaled from {source.upscaledFrom.width}×{source.upscaledFrom.height} live render
+              </div>
+            )}
             <div style={sectLabel}>POST · allow-list</div>
             {POST_CHIPS.map((c) => {
               const cs = chips[c.id];

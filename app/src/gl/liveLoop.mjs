@@ -567,17 +567,20 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
 
     if (accumOn && accumActive && accumObj) {
       // Capture the actual feedback image at live size, then upscale in 2D.
+      // #267: the trail buffer only exists at the live render size, so this
+      // upscale is disclosed to the caller (upscaledFrom) instead of being
+      // sold as a true 2× — the print desk labels it honestly.
       const tex = accumObj.texture();
       const livePixels = live.readback(tex, payload.width, payload.height);
-      return upscaleIfNeeded(livePixels, payload.width, payload.height, width, height);
+      const up = upscaleIfNeeded(livePixels, payload.width, payload.height, width, height);
+      const upscaled = up.width !== payload.width || up.height !== payload.height;
+      return { ...up, upscaledFrom: upscaled ? { width: payload.width, height: payload.height } : null };
     }
-    const target = live.renderFrame(
-      { ...payload, width, height },
-      // #270: export resolution is exact — no display-DPR multiplier here.
-      { transparent, dprScale: 1 },
-    );
-    const pixels = live.readback(target, width, height);
-    return { pixels, width, height };
+    // #267: offscreen targets at the capture size — the live canvas is never
+    // resized, so no flash and no mid-stream resolution jump for recordings.
+    // #270: export resolution is exact — no display-DPR multiplier here.
+    const pixels = live.renderFrameOffscreen({ ...payload, width, height }, { transparent });
+    return { pixels, width, height, upscaledFrom: null };
   }
 
   function upscaleIfNeeded(pixels, sw, sh, dw, dh) {
