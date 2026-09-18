@@ -20,7 +20,7 @@ const TARGETS = [
 const MODES = ['on', 'quiet', 'off'];
 const MODE_LABEL = { on: 'ON', quiet: 'QUIET', off: 'OFF' };
 
-export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, autoSnapshot, motionSmoothing }) {
+export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, autoSnapshot }) {
   // Shimmer "whisper" prototype: scores load once per session. Absent file
   // or junk content = {} = zero shimmer, real no-op, no errors.
   const [scores, setScores] = useState(null);
@@ -151,10 +151,8 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, aut
         <span className="davis-label">AUTO-SNAP</span>
         <input type="checkbox" checked={autoSnapshot} title="Snapshot a hit after Evolve, not after phrase wrap." onChange={e => emit(Events.DAVIS_EVOLVE, { autoSnapshot: e.target.checked })} />
       </div>
-      <div className="davis-interval-row" style={{ marginTop: '4px' }} title="CSS ease on morph only. Does not smooth the life LFO.">
-        <span className="davis-label">SMOOTHING</span>
-        <input type="checkbox" checked={motionSmoothing} title="CSS ease on morph only. Does not smooth the life LFO." onChange={e => emit(Events.DAVIS_EVOLVE, { motionSmoothing: e.target.checked })} />
-      </div>
+      {/* #268: SMOOTHING removed — its only consumer was the retired SVG
+          layer's CSS transition; it never touched the GL loop. */}
     </>
   );
 }

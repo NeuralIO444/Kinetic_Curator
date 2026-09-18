@@ -69,7 +69,7 @@ export function LayersPanel() {
       <PanelHeader tag="P08" title="LAYERS" subtitle={`${layers.length} layer${layers.length > 1 ? 's' : ''}`}>
         <button className="chip-btn" title="Add a content layer (generative artwork)"
           onClick={() => emit(Events.LAYER_ADD)}>+ ADD LAYER</button>
-        <button className="chip-btn" title="Add an FX layer — applies SVG filter effects to everything below it, like an adjustment layer"
+        <button className="chip-btn" title="Add an FX layer — applies GL shader effects to everything below it, like an adjustment layer"
           onClick={() => emit(Events.LAYER_ADD_FX)}>+ ADD FX</button>
       </PanelHeader>
       <div className="panel-body layer-list">

@@ -14,7 +14,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'radial', 'stamps'], paletteShift: 'band',
     params: {
       mode: 'fibonacci', count: 240, scale: [0.4, 1.5], rotate: [-55, 55], alpha: [40, 96],
-      zTiers: 4, jitter: 12, density: 82, bleed: false, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 12, density: 82, bleed: false, mirror: false, overlap: true,
       lifeDrift: 0.18, noiseSpeed: 0.2, displacement: 8, flap: 0.12, wind: 0.2, behave: 'cruise',
     },
   },
@@ -24,7 +24,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['linework', 'organic', 'dots'], paletteShift: 'split',
     params: {
       mode: 'swarm', count: 220, scale: [0.3, 1.15], rotate: [-40, 40], alpha: [36, 88],
-      zTiers: 5, jitter: 20, density: 84, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 5, jitter: 20, density: 84, bleed: true, mirror: false, overlap: true,
       particleCount: 180, swarmCohesion: 1.2, damping: 0.97, gravityWells: 0.6,
       lifeDrift: 0.22, displacement: 18, behave: 'flock',
     },
@@ -35,7 +35,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['radial', 'organic', 'stamps'], paletteShift: 'band',
     params: {
       mode: 'radial', count: 180, scale: [0.45, 1.4], rotate: [-30, 30], alpha: [44, 98],
-      zTiers: 4, jitter: 10, density: 74, bleed: false, recolor: true, mirror: true, overlap: true,
+      zTiers: 4, jitter: 10, density: 74, bleed: false, mirror: true, overlap: true,
       lifeDrift: 0.08, displacement: 4, behave: 'cruise',
     },
   },
@@ -45,7 +45,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['geometric', 'linework', 'floral'], paletteShift: 'zone',
     params: {
       mode: 'grid', count: 200, scale: [0.35, 1.0], rotate: [-18, 18], alpha: [36, 88],
-      zTiers: 4, jitter: 8, density: 80, bleed: false, recolor: true, mirror: true, overlap: true,
+      zTiers: 4, jitter: 8, density: 80, bleed: false, mirror: true, overlap: true,
       lifeDrift: 0.04, displacement: 0, behave: 'cruise',
     },
   },
@@ -55,7 +55,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['geometric', 'linework', 'crystalline'], paletteShift: 'zone',
     params: {
       mode: 'grid', count: 280, scale: [0.28, 1.35], rotate: [-90, 90], alpha: [22, 70],
-      zTiers: 5, jitter: 16, density: 92, bleed: true, recolor: true, mirror: true, overlap: true,
+      zTiers: 5, jitter: 16, density: 92, bleed: true, mirror: true, overlap: true,
       lifeDrift: 0.06, displacement: 6, behave: 'cruise',
     },
   },
@@ -65,7 +65,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'radial', 'biosynthetic'], paletteShift: 'band',
     params: {
       mode: 'radial', count: 200, scale: [0.5, 1.7], rotate: [-35, 35], alpha: [34, 92],
-      zTiers: 5, jitter: 10, density: 70, bleed: false, recolor: true, mirror: true, overlap: true,
+      zTiers: 5, jitter: 10, density: 70, bleed: false, mirror: true, overlap: true,
       lifeDrift: 0.28, noiseSpeed: 0.18, displacement: 10, behave: 'cruise',
     },
   },
@@ -75,7 +75,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['geometric', 'fragments', 'scanlines'], paletteShift: 'split',
     params: {
       mode: 'swarm', count: 260, scale: [0.22, 1.1], rotate: [-70, 70], alpha: [24, 82],
-      zTiers: 6, jitter: 28, density: 94, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 6, jitter: 28, density: 94, bleed: true, mirror: false, overlap: true,
       particleCount: 240, swarmCohesion: 0.7, damping: 0.90, gravityWells: 1.4,
       lifeDrift: 0.3, displacement: 28, behave: 'scatter',
     },
@@ -86,7 +86,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['geometric', 'crystalline', 'fragments'], paletteShift: 'split',
     params: {
       mode: 'ca', count: 160, scale: [0.28, 1.05], rotate: [-80, 80], alpha: [34, 90],
-      zTiers: 4, jitter: 10, density: 80, bleed: false, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 10, density: 80, bleed: false, mirror: false, overlap: true,
       lifeDrift: 0.2, displacement: 12, behave: 'scatter',
     },
   },
@@ -96,7 +96,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'geometric', 'biosynthetic'], paletteShift: 'band',
     params: {
       mode: 'ca', count: 200, scale: [0.4, 1.3], rotate: [-20, 20], alpha: [48, 100],
-      zTiers: 4, jitter: 6, density: 68, bleed: false, recolor: true, mirror: true, overlap: true,
+      zTiers: 4, jitter: 6, density: 68, bleed: false, mirror: true, overlap: true,
       lifeDrift: 0.14, displacement: 4, behave: 'cruise',
     },
   },
@@ -106,7 +106,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['radial', 'organic', 'stamps'], paletteShift: 'zone',
     params: {
       mode: 'orbit', count: 360, scale: [0.42, 1.4], rotate: [-100, 100], alpha: [30, 90],
-      zTiers: 3, jitter: 3, density: 90, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 3, jitter: 3, density: 90, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.1, displacement: 0, behave: 'orbit',
     },
   },
@@ -116,7 +116,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['geometric', 'fragments', 'stamps'], paletteShift: 'split',
     params: {
       mode: 'abacus', count: 300, scale: [0.38, 1.1], rotate: [-4, 4], alpha: [38, 95],
-      zTiers: 4, jitter: 3, density: 90, bleed: false, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 3, density: 90, bleed: false, mirror: false, overlap: true,
       lifeDrift: 0.06, displacement: 0, behave: 'cruise',
     },
   },
@@ -126,7 +126,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'fragments', 'biosynthetic'], paletteShift: 'band',
     params: {
       mode: 'flow', count: 220, scale: [0.48, 1.5], rotate: [-60, 60], alpha: [38, 95],
-      zTiers: 5, jitter: 24, density: 78, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 5, jitter: 24, density: 78, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.24, noiseSpeed: 0.35, displacement: 40, behave: 'scatter',
     },
   },
@@ -136,7 +136,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'crystalline', 'radial'], paletteShift: 'band',
     params: {
       mode: 'orbit', count: 340, scale: [0.38, 1.35], rotate: [-70, 70], alpha: [32, 92],
-      zTiers: 4, jitter: 6, density: 86, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 6, density: 86, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.16, displacement: 8, behave: 'orbit',
     },
   },
@@ -146,7 +146,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic'], paletteShift: 'zone',
     params: {
       mode: 'rails', count: 520, scale: [0.8, 2.0], rotate: [-14, 14], alpha: [45, 85],
-      zTiers: 4, jitter: 26, density: 110, bleed: false, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 26, density: 110, bleed: false, mirror: false, overlap: true,
       blendMode: 'soft-light',
       lifeDrift: 0.04, displacement: 0, behave: 'cruise',
     },
@@ -157,7 +157,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic'], paletteShift: 'band',
     params: {
       mode: 'fibonacci', count: 640, scale: [1.3, 2.2], rotate: [0, 0], alpha: [80, 100],
-      zTiers: 3, jitter: 18, density: 100, bleed: true, recolor: true, mirror: true, overlap: true,
+      zTiers: 3, jitter: 18, density: 100, bleed: true, mirror: true, overlap: true,
       blendMode: 'normal',
       lifeDrift: 0.04, displacement: 130, noiseFreq: 0.006, behave: 'cruise',
     },
@@ -172,7 +172,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'dots'], paletteShift: 'split',
     params: {
       mode: 'swarm', count: 300, scale: [0.3, 0.9], rotate: [-30, 30], alpha: [50, 100],
-      zTiers: 5, jitter: 16, density: 88, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 5, jitter: 16, density: 88, bleed: true, mirror: false, overlap: true,
       particleCount: 280, swarmCohesion: 1.5, damping: 0.96, gravityWells: 0.4,
       lifeDrift: 0.12, displacement: 10, behave: 'flock',
     },
@@ -183,7 +183,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'biosynthetic', 'dots'], paletteShift: 'zone',
     params: {
       mode: 'hype', count: 240, scale: [0.5, 1.4], rotate: [-70, 70], alpha: [40, 100],
-      zTiers: 4, jitter: 14, density: 85, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 14, density: 85, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.2, displacement: 20, behave: 'scatter',
     },
   },
@@ -193,7 +193,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'dots'], paletteShift: 'band',
     params: {
       mode: 'ca', count: 400, scale: [0.25, 0.7], rotate: [-20, 20], alpha: [60, 100],
-      zTiers: 3, jitter: 6, density: 92, bleed: false, recolor: true, mirror: true, overlap: true,
+      zTiers: 3, jitter: 6, density: 92, bleed: false, mirror: true, overlap: true,
       lifeDrift: 0.1, displacement: 4, behave: 'cruise',
     },
   },
@@ -203,7 +203,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['linework', 'organic'], paletteShift: 'band',
     params: {
       mode: 'flow', count: 420, scale: [0.4, 1.2], rotate: [-45, 45], alpha: [36, 92],
-      zTiers: 4, jitter: 12, density: 90, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 12, density: 90, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.1, noiseSpeed: 0.25, displacement: 30, behave: 'cruise',
     },
   },
@@ -213,7 +213,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['dots'], paletteShift: 'split',
     params: {
       mode: 'noise', count: 500, scale: [0.2, 0.8], rotate: [-90, 90], alpha: [28, 80],
-      zTiers: 5, jitter: 20, density: 95, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 5, jitter: 20, density: 95, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.08, displacement: 120, noiseFreq: 0.01, behave: 'scatter',
     },
   },
@@ -223,7 +223,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['geometric', 'linework'], paletteShift: 'zone',
     params: {
       mode: 'layers', count: 320, scale: [0.6, 1.8], rotate: [-10, 10], alpha: [50, 95],
-      zTiers: 6, jitter: 8, density: 96, bleed: false, recolor: true, mirror: true, overlap: true,
+      zTiers: 6, jitter: 8, density: 96, bleed: false, mirror: true, overlap: true,
       lifeDrift: 0.05, displacement: 0, behave: 'cruise',
     },
   },
@@ -233,7 +233,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['linework', 'geometric'], paletteShift: 'zone',
     params: {
       mode: 'rails', count: 260, scale: [0.3, 1.0], rotate: [-90, 90], alpha: [50, 100],
-      zTiers: 4, jitter: 10, density: 88, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 4, jitter: 10, density: 88, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.06, displacement: 6, behave: 'cruise',
     },
   },
@@ -243,7 +243,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['radial', 'organic'], paletteShift: 'band',
     params: {
       mode: 'radial', count: 360, scale: [0.5, 1.6], rotate: [-35, 35], alpha: [44, 98],
-      zTiers: 4, jitter: 10, density: 86, bleed: true, recolor: true, mirror: true, overlap: true,
+      zTiers: 4, jitter: 10, density: 86, bleed: true, mirror: true, overlap: true,
       lifeDrift: 0.22, displacement: 14, behave: 'cruise',
     },
   },
@@ -253,7 +253,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['radial', 'dots'], paletteShift: 'split',
     params: {
       mode: 'orbit', count: 300, scale: [0.3, 1.1], rotate: [-100, 100], alpha: [34, 90],
-      zTiers: 3, jitter: 4, density: 90, bleed: true, recolor: true, mirror: false, overlap: true,
+      zTiers: 3, jitter: 4, density: 90, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.1, displacement: 0, behave: 'orbit',
     },
   },
@@ -263,7 +263,7 @@ export const COMPOSITION_PRESETS = [
     categories: ['organic', 'floral', 'dots'], paletteShift: 'band',
     params: {
       mode: 'stratified', count: 380, scale: [0.3, 1.0], rotate: [-25, 25], alpha: [48, 98],
-      zTiers: 5, jitter: 8, density: 90, bleed: false, recolor: true, mirror: true, overlap: true,
+      zTiers: 5, jitter: 8, density: 90, bleed: false, mirror: true, overlap: true,
       lifeDrift: 0.14, displacement: 6, behave: 'cruise',
     },
   },

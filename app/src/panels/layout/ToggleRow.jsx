@@ -1,8 +1,10 @@
-// Toggle row: bleed / recolor / mirror / overlap / accum / blend / shading
+// Toggle row: bleed / mirror / overlap / accum / blend
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES, PALETTE_SHIFTS } from '../../data/layout-modes.js';
 
-const TOGGLES = ['bleed', 'recolor', 'mirror', 'overlap', 'accumulation'];
+// #268: RECOLOR removed — nothing in the GL renderer ever read it. A
+// control that moves and changes nothing is worse than no control.
+const TOGGLES = ['bleed', 'mirror', 'overlap', 'accumulation'];
 
 export function ToggleRow({ layoutParams }) {
   return (
@@ -119,15 +121,8 @@ export function ToggleRow({ layoutParams }) {
           <option key={mode} value={mode}>{mode.toUpperCase()}</option>
         ))}
       </select>
-      <select
-        value={layoutParams.shading}
-        onChange={e => emit(Events.LAYOUT_PARAM, { key: 'shading', value: e.target.value })}
-        className="tg blend-mode-select"
-        title="Shading"
-      >
-        <option value="flat">SHADING: FLAT</option>
-        <option value="gloss">SHADING: GLOSS</option>
-      </select>
+      {/* #268: SHADING removed — the GL renderer renders everything flat;
+          the only consumer was the retired SVG layer. */}
       <select
         value={layoutParams.paletteShift ?? 'auto'}
         onChange={e => emit(Events.LAYOUT_PARAM, { key: 'paletteShift', value: e.target.value })}

@@ -1,7 +1,6 @@
 // Parameter block — RangeRows with tooltips (#14)
 import { RangeRow, DualRangeRow } from '../../components/RangeRow.jsx';
 import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES } from '../../data/layout-modes.js';
-import { MATERIALS } from '../../engine/materials.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
@@ -137,12 +136,8 @@ export function ParamBlock({ layoutParams, lockedParams }) {
           <button key={s} type="button" className={`chip-btn ${(layoutParams.behave || 'cruise') === s ? 'active' : ''}`} onClick={() => set('behave', s)}>{s.toUpperCase()}</button>
         ))}
       </div>
-      <div className="davis-source-row" style={{ marginTop: 6 }}>
-        <span className="davis-label">MATERIAL</span>
-        {MATERIALS.map((m) => (
-          <button key={m.id} type="button" className={`chip-btn ${(layoutParams.material || 'plate') === m.id ? 'active' : ''}`} onClick={() => set('material', m.id)}>{m.id.toUpperCase()}</button>
-        ))}
-      </div>
+      {/* #268: MATERIAL removed — the GL backend renders every instance
+          flat; the buttons changed nothing in the live instrument. */}
     </div>
   );
 }

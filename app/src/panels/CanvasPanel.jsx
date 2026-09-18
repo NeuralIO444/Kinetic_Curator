@@ -25,6 +25,11 @@ export function CanvasPanel() {
   const running = useStore(s => s.running);
   const nodeCount = useStore(s => s.nodeCount);
   const accumOn = !!layoutParams.accumulation;
+  // #268: the pill must read the EFFECTIVE state — the loop computes
+  // accumulation as setting AND not-shed (liveLoop buildFrame). Under LOAD
+  // SHED the setting stays on while the buffer is actually off.
+  const perfTier1 = useStore(s => s.perfTier1);
+  const accumEffective = accumOn && !perfTier1;
 
   const viewport = useCanvasViewport();
   const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
@@ -77,15 +82,16 @@ export function CanvasPanel() {
     if (glLoopRef.current) glLoopRef.current.setBgMode(bgMode);
   }, [bgMode, glLoopRef]);
 
-  // Phase A gestures (Davis panel PERFORM): FREEZE / CLEAR act on the live
-  // GL loop's ACCUM session. SWELL drives the accumulationFade layout param
-  // over the event bus, so it needs no panel handling.
+  // Phase A gestures (Davis panel PERFORM): FREEZE / CLEAR / SWELL act on
+  // the live GL loop's ACCUM session. #268: SWELL was emitted but nothing
+  // listened — it now breathes the trail length out and back over ~2s.
   useEffect(() => on(Events.ACCUM_GESTURE, (p) => {
     if (!p || typeof p !== 'object') return;
     const loop = glLoopRef.current;
     if (!loop) return;
     if (p.action === 'clear') loop.clearAccum();
     else if (p.action === 'freeze') loop.setAccumFrozen(p.value);
+    else if (p.action === 'swell') loop.swellAccum();
   }), [glLoopRef]);
 
   const preset = getPreset(layoutParams.composition);
@@ -103,7 +109,8 @@ export function CanvasPanel() {
             <button className="chip-btn" onClick={() => glLoopRef.current?.clearAccum()} title="Clear the ACCUM trail buffer" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>CLEAR ACCUM</button>
           )}
           <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>
-          {accumOn && <span className="meter-pill" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>ACCUM</span>}
+          {accumEffective && <span className="meter-pill" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>ACCUM</span>}
+          {accumOn && !accumEffective && <span className="meter-pill" title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery." style={{ color: '#ffb454' }}>ACCUM HELD</span>}
           <span className="meter-pill" title="Instances drawn this frame">{nodeCount} NODES</span>
         </div>
       </PanelHeader>
@@ -124,7 +131,7 @@ export function CanvasPanel() {
             onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />
         )}
         <span className="canvas-corner tl">0,0</span>
-        <span className="canvas-corner tr">{layoutParams.mode}{accumOn ? ' · ACCUM' : ''}</span>
+        <span className="canvas-corner tr">{layoutParams.mode}{accumEffective ? ' · ACCUM' : accumOn ? ' · ACCUM HELD' : ''}</span>
         <span className="canvas-corner bl">{preset.name}</span>
         <span className="canvas-corner br">{CANVAS_W}×{CANVAS_H}</span>
       </div>
