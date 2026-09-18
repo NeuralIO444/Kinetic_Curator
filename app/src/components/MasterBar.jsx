@@ -18,11 +18,8 @@ function CompactSwatches({ swatches }) {
   );
 }
 
-/** Editable strip: sliding window of 5 swatches + pinned BG + INK (#51 / #52).
- *  Palettes with more than 5 swatches get ‹ › arrows fixed on each side;
- *  the swatch track physically slides one cell per click. */
 const SWATCH_WIN = 5;
-const SWATCH_STEP = 10; // 9px cell + 1px gap
+const SWATCH_STEP = 10;
 function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onReset, onLock }) {
   const swatches = palette.swatches || [];
   const [start, setStart] = useState(0);
@@ -35,59 +32,33 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
   };
   const cell = (sw, i) => (
     <span key={i} className={`palette-sw-cell ${locks?.[i] ? 'locked' : ''}`}>
-      <label
-        className="palette-sw-edit"
-        title={`S${i + 1} ${sw} — click to edit`}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <label className="palette-sw-edit" title={`S${i + 1} ${sw} — click to edit`} onClick={(e) => e.stopPropagation()}>
         <span className="palette-chip-sw palette-sw-full" style={{ background: sw }} />
-        <input
-          type="color"
-          className="palette-color-input"
-          value={sw}
-          onChange={(e) => onSwatch(i, e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-        />
+        <input type="color" className="palette-color-input" value={sw} onChange={(e) => onSwatch(i, e.target.value)} onClick={(e) => e.stopPropagation()} />
       </label>
-      <button
-        type="button"
-        className="palette-lock-pip"
-        title={locks?.[i] ? `S${i + 1} locked — harmony and shuffle skip it` : `Lock S${i + 1}`}
-        aria-pressed={!!locks?.[i]}
-        onClick={(e) => { e.stopPropagation(); onLock(i); }}
-      >
+      <button type="button" className="palette-lock-pip" title={locks?.[i] ? `S${i + 1} locked` : `Lock S${i + 1}`} aria-pressed={!!locks?.[i]} onClick={(e) => { e.stopPropagation(); onLock(i); }}>
         {locks?.[i] ? '▪' : ''}
       </button>
     </span>
   );
   return (
     <span className="palette-active-strip" aria-label={`${palette.name} palette editor`}>
-      {overflow && (
-        <button type="button" className="palette-nav-btn" title="Previous swatches" disabled={s <= 0} onClick={slide(-1)}>‹</button>
-      )}
+      {overflow && (<button type="button" className="palette-nav-btn" title="Previous swatches" disabled={s <= 0} onClick={slide(-1)}>‹</button>)}
       {overflow ? (
-        <span className="palette-sw-viewport" aria-hidden={false}>
-          <span className="palette-sw-track" style={{ transform: `translateX(${-s * SWATCH_STEP}px)` }}>
-            {swatches.map(cell)}
-          </span>
-        </span>
+        <span className="palette-sw-viewport"><span className="palette-sw-track" style={{ transform: `translateX(${-s * SWATCH_STEP}px)` }}>{swatches.map(cell)}</span></span>
       ) : (
         <span className="palette-active-swatches">{swatches.map(cell)}</span>
       )}
-      {overflow && (
-        <button type="button" className="palette-nav-btn" title="Next swatches" disabled={s >= maxStart} onClick={slide(1)}>›</button>
-      )}
-      <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.bg }} title={`BG ${palette.bg} — click to edit`} onClick={(e) => e.stopPropagation()}>
+      {overflow && (<button type="button" className="palette-nav-btn" title="Next swatches" disabled={s >= maxStart} onClick={slide(1)}>›</button>)}
+      <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.bg }} title={`BG ${palette.bg}`} onClick={(e) => e.stopPropagation()}>
         <span className="palette-meta-label">BG</span>
         <input type="color" className="palette-color-input" value={palette.bg} onChange={(e) => onBg(e.target.value)} onClick={(e) => e.stopPropagation()} />
       </label>
-      <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.ink }} title={`INK ${palette.ink} — click to edit`} onClick={(e) => e.stopPropagation()}>
+      <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.ink }} title={`INK ${palette.ink}`} onClick={(e) => e.stopPropagation()}>
         <span className="palette-meta-label">INK</span>
         <input type="color" className="palette-color-input" value={palette.ink} onChange={(e) => onInk(e.target.value)} onClick={(e) => e.stopPropagation()} />
       </label>
-      {dirty && (
-        <button type="button" className="palette-reset-btn" title="Reset to catalog colors (clears overrides)" onClick={(e) => { e.stopPropagation(); onReset(); }}>↺</button>
-      )}
+      {dirty && (<button type="button" className="palette-reset-btn" title="Reset to catalog colors" onClick={(e) => { e.stopPropagation(); onReset(); }}>↺</button>)}
     </span>
   );
 }
@@ -95,13 +66,14 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
 export function MasterBar() {
   const { dispatch, palette, history, palettes, paletteLocks } = useApp();
   const { state } = useApp(s => ({
-    running: s.running, fps: s.fps, seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
+    running: s.running, fps: s.fps, stageTimings: s.stageTimings, governorShedFps: s.governorShedFps,
+    seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
     isRecording: s.isRecording, persistStatus: s.persistStatus, frameLock: s.frameLock,
     setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, glContext: s.glContext,
   }));
   const {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
-    frameLock = false, audioDenied = false, glContext = 'ok',
+    frameLock = false, audioDenied = false, glContext = 'ok', governorShedFps = 28,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
   const CHIP_WIN = 4;
@@ -130,6 +102,20 @@ export function MasterBar() {
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
+  // #297: headroom needle — effective frame rate the governor watches
+  const gpuFrameMs = Number(state.stageTimings?.gpuFrame) || 0;
+  const effFps = gpuFrameMs > 0 ? Math.min(fps, 1000 / gpuFrameMs) : fps;
+  const shedFloor = Number(governorShedFps) || 28;
+  const needlePct = Math.max(0, Math.min(100, (effFps / 60) * 100));
+  const headroomFps = effFps - shedFloor;
+  const needleState = headroomFps <= 0 ? 'bad' : headroomFps <= 7 ? 'warn' : 'quiet';
+  const headroomTitle = `Effective frame rate ${effFps.toFixed(1)} fps — the worse of display fps and GPU-implied fps. ` +
+    `The governor sheds below ${shedFloor} fps: the needle shows the shed coming. ` +
+    (needleState === 'quiet'
+      ? 'Comfortably above the shed floor.'
+      : needleState === 'warn'
+        ? 'Headroom is thinning — a shed may be approaching.'
+        : 'At or below the shed floor — the governor is shedding or about to.');
   const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
   const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.balanced;
 
@@ -144,7 +130,7 @@ export function MasterBar() {
 
         {state.isRecording ? (
           <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
-            title="Recording the live canvas to WEBM — what plays is what records, ACCUM included">
+            title="Recording the live canvas to WEBM">
             <span className="status-dot beat-flash" style={{ background: '#ff2d6f', animationIterationCount: 'infinite' }} />
             REC WEBM
           </div>
@@ -157,9 +143,7 @@ export function MasterBar() {
 
         {persistStatus !== 'ok' && (
           <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
-            title={persistStatus === 'quarantined'
-              ? 'Last autosave could not be read. Started from defaults; the file is kept at kc:project:quarantine.'
-              : 'Autosave is failing (storage full or blocked). This session will not be restored.'}>
+            title={persistStatus === 'quarantined' ? 'Last autosave could not be read.' : 'Autosave is failing.'}>
             <span className="status-dot" style={{ background: '#ffb000' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
           </div>
@@ -170,9 +154,7 @@ export function MasterBar() {
             style={glContext === 'lost'
               ? { background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }
               : { background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
-            title={glContext === 'lost'
-              ? 'GPU context lost — the live loop is holding frames. It recovers automatically when the context is restored; reload only if this never clears.'
-              : 'GPU context restored — rebuilding the renderer and rebaking textures. Clears automatically when the scene is back.'}>
+            title={glContext === 'lost' ? 'GPU context lost' : 'GPU context restored — rebuilding'}>
             <span className="status-dot" style={{ background: glContext === 'lost' ? '#ff2d6f' : '#ffb000' }} />
             {glContext === 'lost' ? 'GL CONTEXT LOST' : 'GL RESTORING'}
           </div>
@@ -180,7 +162,7 @@ export function MasterBar() {
 
         {audioDenied && (
           <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
-            title="Browser denied mic access. Turning AUDIO back on will retry.">
+            title="Browser denied mic access.">
             <span className="status-dot" style={{ background: '#ffb000' }} />
             MIC BLOCKED
           </div>
@@ -188,10 +170,11 @@ export function MasterBar() {
 
         <TapeCounter />
 
-        <div className="meter">
+        <div className="meter" title={headroomTitle}>
           <span className="meter-label">FPS</span>
           <div className={`fps-bar ${fpsClass}`}>
             <span className="fps-bar-fill" style={{ width: `${fpsWidth}%` }} />
+            <span className={`fps-needle ${needleState}`} style={{ left: `${needlePct}%` }} />
           </div>
           <span className="meter-value">{Number(fps).toFixed(1)}</span>
         </div>
@@ -209,20 +192,16 @@ export function MasterBar() {
         <button
           className={`undo-btn ${frameLock ? '' : 'disabled'}`}
           onClick={() => state.setFrameLock(!frameLock)}
-          title="Frame-lock show mode: gate the UI life tick to a locked 30fps — smoother than a fluctuating 40-60. The GL loop runs free. User choice, never auto-cleared."
+          title="Frame-lock show mode: gate the UI life tick to a locked 30fps."
           style={{ fontSize: '10px', letterSpacing: '0.06em' }}
         >
           30FPS{frameLock ? '' : ' · OFF'}
         </button>
 
-        {/* #296: the one performer-facing governor knob — the chosen budget
-            ceiling (FULL / SHOW / LEAN). Modeled on the frame-lock: tactile,
-            deliberately chosen, never auto-cleared. Replaces the AUTO ON/OFF
-            boolean; the governor defends whatever ceiling is chosen. */}
         <BudgetKnob />
 
         <div className="undo-group">
-          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo the last parameter, layer, or palette action (Ctrl/⌘+Z)">
+          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl/⌘+Z)">
             ↶{history.undoDepth > 0 ? ` ${history.undoDepth}` : ''}
           </button>
           <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl/⌘+Shift+Z)">
@@ -242,7 +221,7 @@ export function MasterBar() {
             const active = p.id === palette.id;
             if (active) {
               return (
-                <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} title={`${p.name} · edit swatches · switch palette clears customs`}>
+                <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} title={`${p.name}`}>
                   <ActivePaletteStrip
                     key={palette.id}
                     palette={palette}
@@ -256,19 +235,19 @@ export function MasterBar() {
                   />
                   {p.name}
                   {p.user && (
-                    <button type="button" className="palette-del-btn" title={`Delete ${p.name} from your library`} onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}>×</button>
+                    <button type="button" className="palette-del-btn" title={`Delete ${p.name}`} onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}>×</button>
                   )}
                 </div>
               );
             }
             return (
               <span key={p.id} className="palette-chip-wrap">
-                <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={`${p.name} (clears custom colors)`}>
+                <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={p.name}>
                   <CompactSwatches swatches={p.swatches || []} />
                   {p.name}
                 </button>
                 {p.user && (
-                  <button type="button" className="palette-del-btn" title={`Delete ${p.name} from your library`} onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}>×</button>
+                  <button type="button" className="palette-del-btn" title={`Delete ${p.name}`} onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}>×</button>
                 )}
               </span>
             );
@@ -278,11 +257,11 @@ export function MasterBar() {
           {chipOverflow && (
             <button type="button" className="palette-nav-btn" title="Next palettes" disabled={!canChipNext} onClick={(e) => handleChipSlide(e, 1)}>›</button>
           )}
-          <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme — locked swatches are preserved" onClick={(e) => e.stopPropagation()}>
+          <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
             {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
           </select>
-          <button type="button" className="palette-save-btn" title="Regenerate unlocked swatches from the scheme, built around your locked colour" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
-          <button type="button" className="palette-save-btn" title="Save the palette on screen to your library (#55)" onClick={() => emit(Events.PALETTE_SAVE, {})}>+ SAVE</button>
+          <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
+          <button type="button" className="palette-save-btn" title="Save palette" onClick={() => emit(Events.PALETTE_SAVE, {})}>+ SAVE</button>
         </div>
         <button className="run-btn" onClick={() => dispatch({ type: A.SET_RUNNING, payload: !running })}>
           {running ? '■ STOP' : '▶ RUN'}

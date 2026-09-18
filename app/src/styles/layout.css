@@ -109,6 +109,16 @@
 .fps-bar.good .fps-bar-fill { background: #00ff88; }
 .fps-bar.mid  .fps-bar-fill { background: #ffd400; }
 .fps-bar.bad  .fps-bar-fill { background: #ff2d6f; }
+/* #297: headroom needle — the effective-fps tick on the FPS bar. Nearly
+   invisible when comfortable (TE devices don't nag); warms as the shed
+   floor approaches. */
+.fps-needle {
+  position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px;
+  background: rgba(255,255,255,0.22);
+  transition: left 0.25s, background-color 0.25s, box-shadow 0.25s;
+}
+.fps-needle.warn { background: #ffb000; box-shadow: 0 0 3px rgba(255,176,0,0.8); }
+.fps-needle.bad { background: #ff2d6f; box-shadow: 0 0 4px rgba(255,45,111,0.9); }
 
 /* #295: the budget tape — fill is measured frame cost, never decorative.
    Sprocket ticks on the track for the tape-counter read. */
