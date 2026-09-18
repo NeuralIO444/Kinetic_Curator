@@ -21,6 +21,7 @@ import { PrintDeskBlock } from './output/PrintDeskBlock.jsx';
 import { BatchEditionBlock } from './output/BatchEditionBlock.jsx';
 import { SnapRecordRow } from './output/SnapRecordRow.jsx';
 import { DataExportRow } from './output/DataExportRow.jsx';
+import { RecipeRow } from './output/RecipeRow.jsx';
 import { SnapshotGallery } from './output/SnapshotGallery.jsx';
 
 export function OutputPanel() {
@@ -121,6 +122,8 @@ export function OutputPanel() {
           layerSnapshots={layerSnapshots} userPalettes={userPalettes} favorites={favorites}
           onMessage={setMessage}
         />
+
+        <RecipeRow onMessage={setMessage} />
         {message && (
           <div className="output-hint" style={{ color: message.includes('done') || message === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>
             {message}

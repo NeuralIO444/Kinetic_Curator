@@ -58,7 +58,7 @@ function push(event) {
  * @param {object} e
  *   { type: 'shed'|'restore', cutKind, label?, fps?, detail? }
  *   - cutKind: one of CUT_KINDS.
- *   - label: human-readable cut name (e.g. "resolution → 75%").
+ *   - label: human-readable cut name (e.g. "PIXEL TRIM → 75%").
  *   - fps: { at, threshold, sustainedMs } — what the FPS window looked like
  *     when the cut fired (the cause). Restore events carry the fps at clear.
  *   - detail: free-text cause, e.g. "FPS 24 < 32 sustained 1.6s".

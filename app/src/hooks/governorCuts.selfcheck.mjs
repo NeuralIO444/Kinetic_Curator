@@ -93,11 +93,11 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // The badge shows governor-shed quality and stays silent otherwise.
   assert.deepStrictEqual(
     shedSummary({ renderScale: 1, quality: 'performance', qualityShedFrom: 'balanced' }),
-    ['quality → PERFORMANCE'],
+    ['tier → PERFORMANCE'],
   );
   assert.deepStrictEqual(
     shedSummary({ renderScale: 0.5, quality: 'performance', qualityShedFrom: 'balanced' }),
-    ['res 50%', 'quality → PERFORMANCE'],
+    ['pixel trim 50%', 'tier → PERFORMANCE'],
   );
   assert.strictEqual(
     shedSummary({ renderScale: 1, quality: 'performance', qualityShedFrom: null }),
