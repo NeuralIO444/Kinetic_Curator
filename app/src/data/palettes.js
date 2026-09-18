@@ -140,6 +140,16 @@ export const PALETTES = [
     ink: '#264653',
     swatches: ['#2a9d8f', '#e9c46a', '#e76f51', '#264653', '#f4a261'],
   },
+  // --- #284 Smoke Study voice: monochrome gray ramp on black. Data-only
+  // addition — no system change. Pairs with the smoke-study preset.
+  {
+    id: 'smoke',
+    name: 'SMOKE',
+    era: 'Smoke study · 2026',
+    bg: '#000000',
+    ink: '#e8e8e8',
+    swatches: ['#f2f2f2', '#d9d9d9', '#b3b3b3', '#8c8c8c', '#666666', '#404040'],
+  },
 ];
 
 /**

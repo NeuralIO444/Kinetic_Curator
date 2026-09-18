@@ -62,6 +62,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulationOptics: 0, // #190: bloom + halation + blur-over-time amount (GLOW slider)
   accumulationTunnel: 0, // Phase A: feedback zoom/spin amount (TUNNEL slider)
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
+  accumulationFlow: 0, // #284 Phase B2: curl advection of the trail buffer (FLOW slider)
 
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
@@ -133,6 +134,7 @@ export const PARAM_SPEC = {
   accumulationOptics: { min: 0, max: 1 },
   accumulationTunnel: { min: 0, max: 1 },
   accumulationPrism: { min: 0, max: 1 },
+  accumulationFlow: { min: 0, max: 1 }, // #284: Phase B2 curl advection amount
   audioModDepth: { min: 0, max: 1 },
   audioScaleMod: { min: 0, max: 1 },
   audioAlphaMod: { min: 0, max: 1 },

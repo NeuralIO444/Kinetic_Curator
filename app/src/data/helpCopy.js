@@ -25,6 +25,8 @@ export const HELP_TOPICS = [
   { id: 'layout-accum', group: 'Layout', title: 'ACCUM', text: 'Pixel trail buffer — trails and glow render live in the WebGL canvas. CLEAR wipes the buffer only, not the canvas.' },
   { id: 'output-webm', group: 'Output', title: 'REC WEBM', text: 'Records the live WebGL canvas to WebM — ACCUM trails included. What plays is what exports.' },
   { id: 'output-recipe', group: 'Output', title: 'RECIPE', text: 'Each snapshot has a copy button for its recipe as plain text (seed, params, sub-seed offsets). Paste it back with PASTE RECIPE to restore the exact scene.' },
+  { id: 'output-loop', group: 'Output', title: 'CAPTURE LOOP', text: 'Records a fixed-length take and exports it as a seamless looping WebM — the tail dissolves into the head so there is no visible cut.' },
+  { id: 'layout-flow', group: 'Layout', title: 'FLOW', text: 'Curl-advects the ACCUM trail buffer as it decays — trails curl like smoke instead of just fading. 0 is off.' },
 ];
 
 export const HELP_SHORTCUTS = [
