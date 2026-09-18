@@ -842,7 +842,12 @@ export function createLiveRenderer(canvas) {
   // size for the render and restored to the live geometry afterwards, so the
   // next live tick's ensureTargets is a no-op.
   let OT = null, OTW = 0, OTH = 0;
-  function renderFrameOffscreen(payload, w, h, { transparent = false } = {}) {
+  // #267: the capture size rides in the payload (width/height) — one shape
+  // for every caller, so a signature skew can't silently mis-size a capture.
+  function renderFrameOffscreen(payload, { transparent = false } = {}) {
+    const w = payload.width, h = payload.height;
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
+      throw new Error(`[gl-live] renderFrameOffscreen needs payload.width/height, got ${w}x${h}`);
     if (!atlasTex) throw new Error('[gl-live] atlas not uploaded — call setAtlas first');
     if (!OT || OTW !== w || OTH !== h) {
       if (OT) b.freeFrameTargets(OT);
