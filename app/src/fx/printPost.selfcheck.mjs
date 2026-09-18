@@ -8,6 +8,8 @@ import {
   applyPostStack,
   entryToFfmpeg,
   stackToFfmpeg,
+  stackToHuman,
+  entryToHuman,
   stackToFarmArgs,
   stackToFarmCommand,
   gradeEq,
@@ -179,6 +181,23 @@ ok('stackToFarmArgs mirrors the filtergraph flags', () => {
 ok('stackToFarmCommand builds the reproduction command', () => {
   const cmd = stackToFarmCommand([{ chip: 'SHARP', amount: 1 }], 's.png', 'p.png');
   assert.equal(cmd, 'python3 studio/print_post.py s.png --unsharp 1 -o p.png');
+});
+
+// --- human-readable summary (#277) ------------------------------------------
+ok('stackToHuman reads plain: ids, trimmed amounts, units', () => {
+  assert.equal(
+    stackToHuman([
+      { chip: 'BLUR', amount: 2 },
+      { chip: 'GRAIN', amount: 100 },
+      { chip: 'VIGNETTE', amount: 1 },
+      { chip: 'GRADE', amount: -1 },
+      { chip: 'SPLIT', amount: 4 },
+    ]),
+    'BLUR 2 px · GRAIN 100 · VIGNETTE 1 · GRADE −1 · SPLIT 4 px');
+  assert.equal(stackToHuman([{ chip: 'VIGNETTE', amount: 0.35 }]), 'VIGNETTE 0.35');
+  assert.equal(stackToHuman([{ chip: 'GRADE', amount: 0.25 }]), 'GRADE 0.25');
+  assert.equal(stackToHuman([]), '');
+  assert.throws(() => entryToHuman({ chip: 'BLOOM', amount: 1 }), /allow-list/);
 });
 
 console.log(`printPost.selfcheck: ${n} checks passed`);
