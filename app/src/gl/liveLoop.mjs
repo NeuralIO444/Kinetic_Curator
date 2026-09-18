@@ -26,6 +26,7 @@
  */
 
 import { createLiveRenderer } from './renderer.mjs';
+import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
