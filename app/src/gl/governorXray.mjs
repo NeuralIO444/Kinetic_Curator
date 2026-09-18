@@ -53,6 +53,8 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
     perfClampOverride: shed.perfClampOverride ?? null,
     slowRender: !!shed.slowRender,
     watchdogTripped: !!shed.watchdogTripped,
+    quality: shed.quality,
+    qualityShedFrom: shed.qualityShedFrom ?? null,
   };
 
   const cuts = [
@@ -65,10 +67,10 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
     {
       step: SHED_STEPS.quality, cutKind: 'quality',
       label: 'quality tier step',
-      // quality is user-settable too — the X-ray only tracks governor state,
-      // so this row is informational: the governor walks the same ladder.
-      active: false,
-      state: 'follows the cut ladder (step 2)',
+      // #264 — governor-shed quality is tracked (qualityShedFrom); a
+      // user-chosen tier is not a shed, so the row stays informational then.
+      active: s.qualityShedFrom != null && s.quality !== s.qualityShedFrom,
+      state: s.qualityShedFrom != null ? `SHED → ${s.quality}` : 'follows the cut ladder (step 2)',
     },
     {
       step: SHED_STEPS.perfTier1, cutKind: 'perfTier1',

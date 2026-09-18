@@ -27,8 +27,8 @@ import { Shell } from './composition/Shell.jsx';
 
 /**
  * ShedBadge — #192's minimal honest indicator. When the Showrunner governor
- * sheds anything (dynamic resolution scale, mirror/gloss/ACCUM, asset
- * thinning, count clamp, motion freeze, watchdog), the UI says so — the
+ * sheds anything (dynamic resolution scale, quality tier, mirror/gloss/ACCUM,
+ * asset thinning, count clamp, motion freeze, watchdog), the UI says so — the
  * silent-cull trap must not survive in any form. #177 owns the full
  * indicator design later; this badge is the stopgap.
  */
@@ -43,9 +43,11 @@ function ShedBadge() {
   const perfClampOverride = useStore(s => s.perfClampOverride);
   const slowRender = useStore(s => s.slowRender);
   const lastWatchdogReason = useStore(s => s.lastWatchdogReason);
+  const quality = useStore(s => s.quality);
+  const qualityShedFrom = useStore(s => s.qualityShedFrom);
   const summary = shedSummary({
     renderScale, perfTier1, assetThin, perfClampOverride, slowRender,
-    watchdogTripped: !!lastWatchdogReason,
+    watchdogTripped: !!lastWatchdogReason, quality, qualityShedFrom,
   });
   if (!summary) return null;
   return (

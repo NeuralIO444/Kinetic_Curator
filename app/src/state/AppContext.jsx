@@ -5,6 +5,7 @@ import * as A from './actions.js';
 import { PALETTES, resolvePalette } from '../data/palettes.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
+import { recordGovernorEvent } from '../gl/governorEventLog.mjs';
 
 const RefsContext = createContext({});
 const _emptySelector = () => null;
@@ -57,10 +58,31 @@ export function useApp(selector) {
     const store = useStore.getState();
     const { type, payload } = action;
     switch (type) {
-      case A.SET_RUNNING: return store.setRunning(payload);
+      case A.SET_RUNNING: {
+        // #264 — manual resume: Space/RUN after a watchdog hard stop is the
+        // documented resume. setRunning clears the stop itself; the restore
+        // is logged here under cutKind 'watchdog' so the flap detector
+        // pairs it with the shed.
+        const wasWatchdogStop = store.slowRenderSource === 'watchdog';
+        const result = store.setRunning(payload);
+        if (payload && wasWatchdogStop) {
+          recordGovernorEvent({
+            type: 'restore', cutKind: 'watchdog',
+            label: 'watchdog hard stop cleared (manual resume)',
+          });
+        }
+        return result;
+      }
       case A.SET_FPS: return store.setFps(payload);
       case 'SET_NODE_COUNT': return store.setNodeCount(payload);
-      case A.SET_QUALITY: return store.setQuality(payload);
+      case A.SET_QUALITY: {
+        // #264 — a manual quality choice cancels any governor quality-shed
+        // claim, so recovery never overrides the operator's own tier. (The
+        // governor sheds via the store directly, not this dispatch path.)
+        store.setQuality(payload);
+        store.setQualityShedFrom(null);
+        return;
+      }
       case A.SET_AUTO_QUALITY: return store.setAutoQuality(payload);
       case A.SET_SEED: return store.setSeed(payload);
       case A.BUMP_SEED: return store.bumpSeed();

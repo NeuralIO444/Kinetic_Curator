@@ -9,7 +9,8 @@
  *    (liveResolve.mjs — same placements + real swarm physics as the app).
  * 2. Bakes + uploads texture resources (liveAtlas.mjs) whenever the needed
  *    asset/color combos or FX grain wraps change; the last frame holds while
- *    a bake is in flight.
+ *    a bake is in flight. The atlas is resolution-independent — a governor
+ *    renderScale step rebakes only the grain LUTs, never the atlas (#265).
  * 3. Builds a v1 scene contract (sceneContract.js), applies the viewport
  *    (zoom/pan) and breath transforms to instance coordinates, and renders
  *    at the governor's renderScale into persistent GPU targets.
@@ -45,9 +46,18 @@ import {
 const CX = CANVAS_W / 2;
 const CY = CANVAS_H / 2;
 
-function staticKeyFor(combos, fxLayerIds, w, h) {
+/**
+ * #265 — the atlas is resolution-independent (asset/color combos only), so
+ * render-size changes must NOT rebake it. The grain LUTs ARE baked at the
+ * render size, so they get their own key. A renderScale shed step now
+ * rebakes only grain — not the whole sequential-SVG atlas bake.
+ */
+function atlasKeyFor(combos, fxLayerIds) {
   const ck = combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join(';');
-  return `${w}x${h}|${[...fxLayerIds].sort().join(',')}|${ck}`;
+  return `${[...fxLayerIds].sort().join(',')}|${ck}`;
+}
+function grainKeyFor(fxLayerIds, w, h) {
+  return `${w}x${h}|${[...fxLayerIds].sort().join(',')}`;
 }
 
 /**
@@ -169,7 +179,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   // cells is a plain object: "asset|tint|accent" -> {u0,v0,u1,v1}, exactly
   // what renderFrameInto's instanceData reads.
   let cells = null;
-  let staticKey = null;
+  let atlasKey = null;
+  let grainKey = null;
   let building = false;
   let buildToken = 0;
   let svgPool = null; // Map asset id -> svg fragment, rebuilt on customAssets change
@@ -315,7 +326,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     }
 
     // Static resources: atlas combos from the transformed instances, grain
-    // LUTs keyed by FX layer id (what renderFrameInto's auxFor reads).
+    // LUTs keyed by FX layer id + render size (what renderFrameInto's
+    // auxFor reads). The atlas key excludes the render size — it is
+    // resolution-independent, so a governor renderScale step rebakes grain
+    // only (#265).
     const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
     const fxLayerIds = new Set((contract.fxWraps || []).map((w) => w.fxLayerId));
 
@@ -323,9 +337,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const rw = Math.max(2, Math.round(CANVAS_W * renderScale));
     const rh = Math.max(2, Math.round(CANVAS_H * renderScale));
 
-    const key = staticKeyFor(combos, fxLayerIds, rw, rh);
-    if (key !== staticKey && !building && performance.now() >= bakeRetryAt) {
-      startStaticBuild(combos, fxLayerIds, rw, rh, key);
+    const aKey = atlasKeyFor(combos, fxLayerIds);
+    const gKey = grainKeyFor(fxLayerIds, rw, rh);
+    if ((aKey !== atlasKey || gKey !== grainKey) && !building && performance.now() >= bakeRetryAt) {
+      startStaticBuild(combos, fxLayerIds, rw, rh, aKey, gKey);
     }
     if (building || !cells) return null;
 
@@ -358,23 +373,32 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     };
   }
 
-  async function startStaticBuild(combos, fxLayerIds, rw, rh, key) {
+  async function startStaticBuild(combos, fxLayerIds, rw, rh, aKey, gKey) {
     building = true;
     const token = ++buildToken;
     try {
       const svgById = getPool(getState().customAssets);
-      const atlas = await bakeLiveAtlas(combos, svgById);
-      if (token !== buildToken) return; // superseded
-      const luts = {};
-      for (const id of fxLayerIds) {
-        luts[id] = await bakeLiveGrainLut(rw, rh);
+      // #265 — rebake only what changed: the atlas is resolution-
+      // independent, so a renderScale step skips the heavy sequential-SVG
+      // bake and only the (cheap) grain LUTs rebuild.
+      if (aKey !== atlasKey) {
+        const atlas = await bakeLiveAtlas(combos, svgById);
+        if (token !== buildToken) return; // superseded
+        live.setAtlas(atlas.pixels, atlas.width, atlas.height, atlas.mipmaps);
+        cells = Object.fromEntries(atlas.cells);
+        atlasKey = aKey;
+      }
+      if (gKey !== grainKey) {
+        const luts = {};
+        for (const id of fxLayerIds) {
+          luts[id] = await bakeLiveGrainLut(rw, rh);
+          if (token !== buildToken) return;
+        }
         if (token !== buildToken) return;
+        live.setGrainLuts(luts);
+        grainKey = gKey;
       }
       if (token !== buildToken) return;
-      live.setAtlas(atlas.pixels, atlas.width, atlas.height, atlas.mipmaps);
-      live.setGrainLuts(luts);
-      cells = Object.fromEntries(atlas.cells);
-      staticKey = key;
       bakeConsecFails = 0; // #266 — a good bake resets the failure streak
     } catch (e) {
       // #266 — the failure is deterministic until the inputs change, so

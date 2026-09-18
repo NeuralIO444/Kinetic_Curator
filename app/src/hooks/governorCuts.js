@@ -38,6 +38,66 @@
 
 import { tier1ShedIds } from '../gl/costTiers.mjs';
 
+/**
+ * #265 — when is the GPU the binding constraint? Cut 1 (resolution) may
+ * only fire when dropping pixels can buy frames back: the GPU-implied rate
+ * is below the shed floor AND at or below the rAF rate. The old predicate
+ * also required rAF fps to stay healthy — false exactly when BOTH rates
+ * were below the floor, the case where the GPU is demonstrably the
+ * bottleneck and resolution is the one cut that would buy frames back.
+ */
+export function isGpuBinding(fps, gpuFps, shedFps) {
+  return gpuFps < shedFps && gpuFps <= fps;
+}
+
+/**
+ * #264 — the restore contract, declarative. Every kind nextGovernorCut can
+ * produce MUST appear here: recovery iterates this table in REVERSE shed
+ * order, so a shed cut with no entry here is a structural impossibility —
+ * not a forgotten line in a hand-maintained block (the trap that left
+ * quality shed forever). needsRestore is pure: a state snapshot plus
+ * ctx { healthy } (the main ladder's recover condition). The hook binds
+ * the restore actions per kind.
+ *
+ * Not here by design: cut 3 (perfTier1) is the independent mechanism with
+ * its own hysteresis, and cut 7 (watchdog) is the hard stop — it needs
+ * manual resume and never auto-restores.
+ */
+export const GOVERNOR_RESTORE_CUTS = [
+  {
+    kind: 'renderScale',
+    needsRestore: (s, ctx) => ctx.healthy && Number(s.renderScale) < 1 - 1e-9,
+    restoredLabel: 'resolution → 100%',
+  },
+  {
+    kind: 'quality',
+    // #264 M1 — quality restores only when the GOVERNOR shed it
+    // (qualityShedFrom tracks the tier it stepped down from); a
+    // user-chosen tier is never "restored" over.
+    needsRestore: (s, ctx) => ctx.healthy && s.qualityShedFrom != null,
+    restoredLabel: 'quality restored',
+  },
+  {
+    kind: 'assetThin',
+    needsRestore: (s, ctx) => ctx.healthy && !!s.assetThin,
+    restoredLabel: 'asset thinning released',
+  },
+  {
+    kind: 'countClamp',
+    // The count clamp's premise is "still struggling at the lowest tier",
+    // so it also clears on tier change — the nuance the old block carried.
+    needsRestore: (s, ctx) => !!s.perfClampOverride && (ctx.healthy || s.quality !== 'performance'),
+    restoredLabel: 'count clamp released',
+  },
+  {
+    kind: 'slowRender',
+    // #264 — the auto-clear applies ONLY to the cut-6 soft freeze. The
+    // watchdog hard stop (source 'watchdog') needs manual resume.
+    needsRestore: (s, ctx) => ctx.healthy && !!s.slowRender && s.slowRenderSource === 'cut6',
+    restoredLabel: 'motion unfrozen',
+  },
+];
+
 /** Dynamic resolution ladder — the primary shed. GPU headroom means the
  *  live canvas can drop pixels before it drops anything visible. */
 export const RENDER_SCALES = [1, 0.75, 0.5, 0.33];
@@ -63,12 +123,13 @@ export function perfTier1Passes() {
  *
  * @param {object} s
  *   { renderScale, quality, assetThin, perfClampOverride, effectiveCount, slowRender, gpuSaturated }
- *   gpuSaturated: the governor's GPU-saturation signal (GPU-implied fps below
- *   the shed floor while rAF fps holds). Cut 1 (renderScale) only fires when
- *   true: if the GPU is NOT saturated, the bottleneck is main-thread JS and
- *   cutting resolution cannot recover frames — it only pixelates. Omitted
- *   (older callers, selfchecks) defaults to true: resolution still sheds
- *   first when the signal is unknown.
+ *   gpuSaturated: the governor's GPU-saturation signal — the GPU-implied
+ *   rate is the binding constraint (at/below the rAF rate and below the
+ *   shed floor, see isGpuBinding). Cut 1 (renderScale) only fires when
+ *   true: if the GPU is NOT the bottleneck, the bottleneck is main-thread
+ *   JS and cutting resolution cannot recover frames — it only pixelates.
+ *   Omitted (older callers, selfchecks) defaults to true: resolution still
+ *   sheds first when the signal is unknown.
  * @returns {{ kind: string, label: string, ... } | null} the cut to apply,
  *   or null when the ladder is exhausted (the hook then holds — the
  *   watchdog is a separate, faster mechanism).
@@ -131,6 +192,12 @@ export function shedSummary(s) {
   const out = [];
   if (Number(s.renderScale) < 1 - 1e-9) {
     out.push(`res ${Math.round(Number(s.renderScale) * 100)}%`);
+  }
+  // #264 — governor-shed quality is a shed like any other: the badge shows
+  // it. qualityShedFrom is only set by the governor's own shed, so a
+  // user-chosen tier never appears here.
+  if (s.qualityShedFrom != null && s.quality !== s.qualityShedFrom) {
+    out.push(`quality → ${String(s.quality).toUpperCase()}`);
   }
   if (s.perfTier1) out.push('mirror/gloss/ACCUM off');
   if (s.assetThin) out.push('assets thinned');

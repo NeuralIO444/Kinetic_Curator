@@ -25,7 +25,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
-import { nextGovernorCut } from './governorCuts.js';
+import { nextGovernorCut, isGpuBinding, GOVERNOR_RESTORE_CUTS } from './governorCuts.js';
 import { recordGovernorEvent } from '../gl/governorEventLog.mjs';
 
 // Hysteresis defaults (#259 — the permanent-shed-trap fix). Shed below 28,
@@ -37,6 +37,10 @@ const DEFAULT_SHED_FPS = 28;
 const DEFAULT_RECOVER_FPS = 30;
 const CRITICAL_FPS = 10; // ~0 FPS: the tab is barely getting frames at all
 const TIER1_FPS = 16; // shed ACCUM/gloss/mirror before things go fully critical
+const TIER1_RECOVER_FPS = 20; // #265 — restore ABOVE the shed floor: fps
+// hovering at 16 must not destroy and rebuild the ACCUM feedback buffer
+// every couple of seconds (the single-threshold flap #260 fixed on the
+// main ladder).
 const SUSTAIN_MS = 1600; // must stay low this long before acting
 const CRITICAL_SUSTAIN_MS = 800; // react faster — this is the worse case
 const TIER1_SUSTAIN_MS = 2000; // #107 §4 spec: 2s sustained below TIER1_FPS
@@ -58,13 +62,21 @@ export function usePerformanceGovernor() {
   // recover at/above recoverFps — never the same number (#259).
   const shedFps = Number(useStore(s => s.governorShedFps)) || DEFAULT_SHED_FPS;
   const recoverFps = Number(useStore(s => s.governorRecoverFps)) || DEFAULT_RECOVER_FPS;
-  const gpuSaturated = gpuFps < shedFps && fps >= shedFps;
+  // #265 — cut 1 (resolution) may fire when the GPU-implied rate is the
+  // binding constraint: at/below the rAF rate AND below the shed floor —
+  // including when BOTH are bad, the case where dropping pixels is what
+  // buys frames back. See isGpuBinding in governorCuts.js.
+  const gpuSaturated = isGpuBinding(fps, gpuFps, shedFps);
   const gpuNote = gpuSaturated
     ? ` (gpu-saturated: GPU frame ${gpuFrameMs.toFixed(1)}ms ≈ ${Math.round(gpuFps)}fps)`
     : '';
   const quality = useStore(s => s.quality);
+  const qualityShedFrom = useStore(s => s.qualityShedFrom);
+  const setQualityShedFrom = useStore(s => s.setQualityShedFrom);
+  const clearWatchdogReason = useStore(s => s.clearWatchdogReason);
   const autoQuality = useStore(s => s.autoQuality);
   const slowRender = useStore(s => s.slowRender);
+  const slowRenderSource = useStore(s => s.slowRenderSource);
   const perfTier1 = useStore(s => s.perfTier1);
   const perfClampOverride = useStore(s => s.perfClampOverride);
   const assetThin = useStore(s => s.assetThin);
@@ -84,23 +96,35 @@ export function usePerformanceGovernor() {
   const tier1SinceRef = useRef(null);
 
   useEffect(() => {
+    // #264 — clear a motion freeze, logging the restore under the cutKind
+    // the flap detector can pair with the shed: 'watchdog' for the hard
+    // stop, 'slowRender' for the cut-6 soft freeze. Clearing the hard stop
+    // also clears the badge's reason so the indicator can return to clean.
+    const clearFreeze = (detail) => {
+      const kind = slowRenderSource === 'watchdog' ? 'watchdog' : 'slowRender';
+      setSlowRender(false);
+      if (kind === 'watchdog') clearWatchdogReason();
+      recordGovernorEvent({
+        type: 'restore', cutKind: kind,
+        label: kind === 'watchdog' ? 'watchdog hard stop cleared' : 'motion unfrozen',
+        ...(detail ? { detail } : {}),
+        fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
+      });
+    };
     if (!autoQuality) {
       criticalSinceRef.current = null;
-      if (slowRender) {
-        setSlowRender(false);
-        // Event-log only: the cut cleared (governor disabled).
-        recordGovernorEvent({ type: 'restore', cutKind: 'slowRender', label: 'motion unfrozen', detail: 'autoQuality off' });
-      }
+      // Governor disabled: overlays clear. The cut-6 soft freeze clears via
+      // the declarative restore table (healthy covers !autoQuality); this
+      // path covers the watchdog hard stop, which the table deliberately
+      // never auto-clears.
+      if (slowRender && slowRenderSource === 'watchdog') clearFreeze('autoQuality off');
       return;
     }
+    // #264 — the watchdog hard stop NEVER auto-clears on FPS recovery; it
+    // needs manual resume (Space/RUN clears it in setRunning). Only the
+    // cut-6 soft freeze auto-clears, in the restore table below.
     if (effFps >= recoverFps) {
       criticalSinceRef.current = null;
-      if (slowRender) {
-        setSlowRender(false);
-        // Event-log only: the cut cleared (FPS recovered past the RECOVER
-        // threshold — hysteresis, #259).
-        recordGovernorEvent({ type: 'restore', cutKind: 'slowRender', label: 'motion unfrozen', fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 } });
-      }
       return;
     }
     if (effFps >= CRITICAL_FPS) {
@@ -122,11 +146,15 @@ export function usePerformanceGovernor() {
       });
       console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS + ')' + gpuNote);
     }
-  }, [effFps, gpuNote, autoQuality, slowRender, tripWatchdog, setSlowRender, recoverFps]);
+  }, [effFps, gpuNote, autoQuality, slowRender, slowRenderSource, tripWatchdog, setSlowRender, clearWatchdogReason, recoverFps]);
 
   // Tier 1 (#107 §4): a milder, self-clearing shed. Independent sustain
   // window from the critical tier above — this one fires first, at a higher
   // FPS floor, and never touches running/evolveMode.
+  // #265 — hysteresis: shed below TIER1_FPS, restore at/above
+  // TIER1_RECOVER_FPS. Between the two the governor holds — fps hovering at
+  // the floor no longer destroys and rebuilds the ACCUM feedback buffer
+  // every couple of seconds.
   useEffect(() => {
     if (!autoQuality) {
       tier1SinceRef.current = null;
@@ -137,16 +165,22 @@ export function usePerformanceGovernor() {
       }
       return;
     }
-    if (effFps >= TIER1_FPS) {
+    if (effFps >= TIER1_RECOVER_FPS) {
       tier1SinceRef.current = null;
       if (perfTier1) {
         setPerfTier1(false);
-        // Event-log only: the cut cleared (FPS recovered).
+        // Event-log only: the cut cleared (FPS recovered past the tier-1
+        // RECOVER threshold — hysteresis, #265).
         recordGovernorEvent({
           type: 'restore', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM restored',
-          fps: { at: effFps, threshold: TIER1_FPS, sustainedMs: 0 },
+          fps: { at: effFps, threshold: TIER1_RECOVER_FPS, sustainedMs: 0 },
         });
       }
+      return;
+    }
+    if (effFps >= TIER1_FPS) {
+      // Hysteresis band — hold: neither shed nor restore.
+      tier1SinceRef.current = null;
       return;
     }
     const now = Date.now();
@@ -168,40 +202,41 @@ export function usePerformanceGovernor() {
 
   // The cut list: ordered, one step per sustain+cooldown cycle.
   // Hysteresis (#259): shed below shedFps, recover at/above recoverFps.
+  // Recovery (#264) iterates GOVERNOR_RESTORE_CUTS in REVERSE shed order —
+  // every cut declares its own restore, so no cut can be forgotten the way
+  // quality was. (Cut 3/perfTier1 keeps its own effect — independent
+  // mechanism, own hysteresis; cut 7/watchdog needs manual resume.)
   useEffect(() => {
     const healthy = !autoQuality || effFps >= recoverFps;
 
-    // Recovery: render-only cuts auto-clear the moment the premise stops
-    // holding. (The count clamp keeps its original nuance: its premise is
-    // "still struggling at the lowest tier", so it also clears on tier
-    // change.)
-    if (healthy || quality !== 'performance') {
-      if (perfClampOverride) {
-        setPerfClampOverride(null);
-        // Event-log only: the cut cleared (recovery or tier change).
-        recordGovernorEvent({
-          type: 'restore', cutKind: 'countClamp', label: 'count clamp released',
-          fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
-        });
+    const snap = {
+      renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
+      slowRender, slowRenderSource,
+    };
+    for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
+      if (!cut.needsRestore(snap, { healthy })) continue;
+      switch (cut.kind) {
+        case 'renderScale': setRenderScale(1); break;
+        case 'quality':
+          // #264 M1 — restore the tier the governor stepped down from,
+          // then release the claim. A manual quality change clears
+          // qualityShedFrom via SET_QUALITY, so this never overrides the
+          // operator's own tier.
+          setQuality(qualityShedFrom);
+          setQualityShedFrom(null);
+          break;
+        case 'assetThin': setAssetThin(false); break;
+        case 'countClamp': setPerfClampOverride(null); break;
+        case 'slowRender': setSlowRender(false); break;
+        default: break;
       }
-    }
-    if (healthy) {
-      if (renderScale < 1) {
-        setRenderScale(1);
-        // Event-log only: the cut cleared (FPS recovered past RECOVER).
-        recordGovernorEvent({
-          type: 'restore', cutKind: 'renderScale', label: 'resolution → 100%',
-          fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
-        });
-      }
-      if (assetThin) {
-        setAssetThin(false);
-        // Event-log only: the cut cleared (FPS recovered past RECOVER).
-        recordGovernorEvent({
-          type: 'restore', cutKind: 'assetThin', label: 'asset thinning released',
-          fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
-        });
-      }
+      // Event-log only: the cut cleared (FPS recovered past RECOVER —
+      // hysteresis, #259; countClamp also clears on tier change).
+      recordGovernorEvent({
+        type: 'restore', cutKind: cut.kind,
+        label: cut.kind === 'quality' ? `quality restored → ${qualityShedFrom}` : cut.restoredLabel,
+        fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
+      });
     }
 
     if (!autoQuality) {
@@ -240,7 +275,13 @@ export function usePerformanceGovernor() {
 
     switch (cut.kind) {
       case 'renderScale': setRenderScale(cut.scale); break;
-      case 'quality': setQuality(cut.quality); break;
+      case 'quality':
+        // #264 — record the tier being stepped down from, once per shed
+        // episode, so recovery restores exactly it (never the operator's
+        // manual tier — that clears the claim via SET_QUALITY).
+        if (qualityShedFrom == null) setQualityShedFrom(quality);
+        setQuality(cut.quality);
+        break;
       case 'assetThin': setAssetThin(true); break;
       case 'countClamp': setPerfClampOverride({ count: cut.count, mirror: false }); break;
       case 'slowRender': setSlowRender(true, 'cut6'); break;
@@ -255,7 +296,7 @@ export function usePerformanceGovernor() {
     lastActionRef.current = now;
     lowSinceRef.current = null;
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', shedFps + ')' + gpuNote);
-  }, [effFps, gpuNote, quality, autoQuality, setQuality, layoutParams.count, perfClampOverride,
+  }, [effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, autoQuality, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
-    slowRender, setSlowRender, shedFps, recoverFps, gpuSaturated]);
+    slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }
