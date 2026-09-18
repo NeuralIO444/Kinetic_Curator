@@ -110,6 +110,18 @@
 .fps-bar.mid  .fps-bar-fill { background: #ffd400; }
 .fps-bar.bad  .fps-bar-fill { background: #ff2d6f; }
 
+/* #295: the budget tape — fill is measured frame cost, never decorative.
+   Sprocket ticks on the track for the tape-counter read. */
+.tape-bar {
+  position: relative; display: inline-block; width: 64px; height: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--line);
+  background-image: repeating-linear-gradient(90deg, transparent 0 5px, rgba(255,255,255,0.09) 5px 6px);
+}
+.tape-bar-fill { display: block; height: 100%; background: var(--dim); transition: width 0.25s; }
+/* Shed events "click" the counter over to the new stage name. */
+.tape-click { display: inline-block; animation: tape-click 0.4s ease-out; }
+@keyframes tape-click { 0% { opacity: 0.2; transform: translateY(1px); } 100% { opacity: 1; transform: none; } }
+
 .palette-switch { display: inline-flex; align-items: center; gap: 3px; flex-wrap: nowrap; }
 .palette-save-btn { flex-shrink: 0; }
 .palette-switch-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; margin-right: 3px; }

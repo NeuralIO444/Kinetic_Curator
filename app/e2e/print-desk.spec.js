@@ -41,8 +41,13 @@ test('print desk: still renders, BLUR chip applies, preview posts', async ({ pag
   // Header subtitle flips to "posted" once the preview PNG lands.
   await expect(page.locator('header', { hasText: 'PRINT DESK' })).toContainText(/posted/, { timeout: 30_000 });
 
-  // The ffmpeg filtergraph for the stack is shown (travels in the sidecar).
-  await expect(page.locator('div', { hasText: 'gblur=sigma=2' }).last()).toBeVisible();
+  // The human-readable stack summary is visible by default (#277) …
+  await expect(page.locator('.print-human')).toContainText(/BLUR 2/);
+
+  // … while the raw ffmpeg filtergraph hides behind the PIPELINE toggle —
+  // open it before asserting the string (it travels in the sidecar).
+  await page.locator('.print-desk details summary', { hasText: 'PIPELINE' }).click();
+  await expect(page.locator('.print-desk details', { hasText: 'gblur=sigma=2' })).toBeVisible();
 
   // Preview img is a fresh PNG (not the source blob).
   const src = await preview.getAttribute('src');
