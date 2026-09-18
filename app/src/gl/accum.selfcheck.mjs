@@ -26,6 +26,8 @@ import {
   mirrorAccumStep,
   mirrorGaussBlur,
   blurPassSigmas,
+  drainGlErrors,
+  createAccum,
   ACCUM_PROGRAMS,
 } from './accum.mjs';
 import { buildSceneContract } from './sceneContract.js';
@@ -483,6 +485,131 @@ ok('harness: every uniform each ACCUM shader declares is in its upload list', ()
 });
 
 // --- browser: GPU recipe vs JS mirror ---------------------------------------
+
+// --- regression: sticky GL errors must not freeze the live loop -------------
+// WebGL errors are sticky flags. A benign error raised by earlier non-ACCUM
+// work in the frame (content render, timer queries) stays queued until
+// something calls getError(). step() used to throw on ANY pending error,
+// which the live tick (no fault isolation for the ACCUM branch) turned into
+// a permanently frozen canvas: "as soon as i turn accum it freezes".
+// createAccum().step() must drain stale errors on entry so its post-step
+// check only reflects its own passes. Driven against a recording mock GL
+// (no browser needed).
+function makeMockGL() {
+  let ids = 1;
+  const C = {
+    TEXTURE_2D: 0x0DE1, TEXTURE0: 0x84C0, FRAMEBUFFER: 0x8D40,
+    COLOR_ATTACHMENT0: 0x8CE0, FRAMEBUFFER_COMPLETE: 0x8CD5,
+    RGBA16F: 0x881A, RGBA: 0x1908, HALF_FLOAT: 0x140B, NEAREST: 0x2600,
+    CLAMP_TO_EDGE: 0x812F, TEXTURE_MIN_FILTER: 0x2801, TEXTURE_MAG_FILTER: 0x2800,
+    TEXTURE_WRAP_S: 0x2802, TEXTURE_WRAP_T: 0x2803, COLOR_BUFFER_BIT: 0x4000,
+    TRIANGLES: 0x0004, ARRAY_BUFFER: 0x8892, STATIC_DRAW: 0x88E4, FLOAT: 0x1406,
+    BLEND: 0x0BE2, VERTEX_SHADER: 0x8B31, FRAGMENT_SHADER: 0x8B30,
+    COMPILE_STATUS: 0x8B81, LINK_STATUS: 0x8B82, ACTIVE_UNIFORMS: 0x8B86,
+    NO_ERROR: 0, INVALID_OPERATION: 0x0502,
+  };
+  let activeUnit = 0;
+  const gl = {
+    ...C,
+    _errorQueue: [],
+    createTexture: () => ids++, deleteTexture() {},
+    bindTexture(t, id) { if (t === C.TEXTURE_2D) this._bound = id; },
+    activeTexture(u) { activeUnit = u - C.TEXTURE0; },
+    texParameteri() {},
+    texImage2D() {},
+    createFramebuffer: () => ids++, deleteFramebuffer() {},
+    bindFramebuffer() {},
+    framebufferTexture2D() {},
+    checkFramebufferStatus: () => C.FRAMEBUFFER_COMPLETE,
+    createBuffer: () => ids++, deleteBuffer() {},
+    bindBuffer() {}, bufferData() {},
+    createShader: () => ids++, shaderSource() {}, compileShader() {},
+    getShaderParameter: () => true, getShaderInfoLog: () => '', deleteShader() {},
+    createProgram: () => ids++, attachShader() {}, linkProgram() {},
+    getProgramParameter: (p, q) => (q === C.LINK_STATUS ? true : 0),
+    getProgramInfoLog: () => '', deleteProgram() {},
+    getActiveUniform: () => null, getUniformLocation: () => ({}),
+    useProgram() {}, viewport() {}, disable() {}, clearColor() {}, clear() {},
+    enableVertexAttribArray() {}, vertexAttribPointer() {}, disableVertexAttribArray() {},
+    uniform1i() {}, uniform1f() {}, uniform2f() {}, uniform3f() {}, uniform4f() {},
+    drawArrays() {},
+    getError() { return this._errorQueue.length ? this._errorQueue.shift() : C.NO_ERROR; },
+  };
+  return gl;
+}
+
+function makeMockBridge(gl) {
+  // Minimal bridge surface createAccum uses: lost flag + layer() targets.
+  const layers = new Map();
+  const allocTarget = (w, h) => {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+      throw new Error('[mock-bridge] framebuffer incomplete');
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { tex, fb, w, h };
+  };
+  return {
+    lost: false,
+    layer(id) {
+      if (!layers.has(id)) layers.set(id, { t0: allocTarget(64, 40), t1: allocTarget(64, 40) });
+      return layers.get(id);
+    },
+  };
+}
+
+ok('regression: drainGlErrors clears a sticky queue', () => {
+  const gl = makeMockGL();
+  gl._errorQueue.push(0x0502, 0x0501, 0x0500);
+  drainGlErrors(gl);
+  assert.equal(gl.getError(), gl.NO_ERROR, 'queue drained');
+  // cap: never spins forever
+  gl._errorQueue.push(...new Array(100).fill(0x0502));
+  drainGlErrors(gl, 4);
+  assert.equal(gl._errorQueue.length, 96, 'drain respects the cap');
+});
+
+ok('regression: step() survives a pre-existing sticky GL error', () => {
+  const gl = makeMockGL();
+  const bridge = makeMockBridge(gl);
+  const accum = createAccum(gl, bridge, { width: 64, height: 40 });
+  accum.begin('#101010');
+  const frameTex = gl.createTexture();
+  const p = accumRecipeParams({ fade: 0.88, optics: 0, tunnel: 0, prism: 0 });
+  // A benign error from earlier non-ACCUM work in the frame (e.g. a timer
+  // query quirk on ANGLE): step() must drain it, not throw on it.
+  gl._errorQueue.push(gl.INVALID_OPERATION);
+  const tgt = accum.step(frameTex, p);
+  assert.ok(tgt && tgt.tex, 'step returns a target despite the stale error');
+  assert.equal(gl.getError(), gl.NO_ERROR, 'no error left pending');
+  accum.dispose();
+});
+
+ok('regression: step() still throws on an error from its own passes', () => {
+  const gl = makeMockGL();
+  const bridge = makeMockBridge(gl);
+  const accum = createAccum(gl, bridge, { width: 64, height: 40 });
+  accum.begin('#101010');
+  const frameTex = gl.createTexture();
+  const p = accumRecipeParams({ fade: 0.88, optics: 0, tunnel: 0, prism: 0 });
+  // Poison getError so the post-step check sees an error: the invariant
+  // (real ACCUM-pass failures are loud) must survive the drain fix.
+  // The drain consumes the first call; the post-step check is the second.
+  let calls = 0;
+  gl.getError = () => (++calls <= 1 ? gl.NO_ERROR : gl.INVALID_OPERATION);
+  assert.throws(() => accum.step(frameTex, p), /GL error after step/,
+    'genuine pass error still throws');
+  accum.dispose();
+});
 
 async function runBrowserTests() {
   const { openHarnessPage, renderAccumViaGL, renderViaGL, closeGlDriver } = await import('./parity/glDriver.mjs');
