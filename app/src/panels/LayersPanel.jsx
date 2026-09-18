@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
+import { useStore } from '../state/store.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { BLEND_MODES } from '../data/layout-modes.js';
@@ -64,6 +65,7 @@ export function LayersPanel() {
     selectedFxLayerId: s.selectedFxLayerId,
   }));
   const { layers, activeLayerId, selectedFxLayerId } = state;
+  const setLayerPatch = useStore((s) => s.setLayerPatch);
   const contentCount = layers.filter((l) => !isFxLayer(l)).length;
   const fxCount = layers.filter(isFxLayer).length;
   const ghosts = [];
@@ -71,10 +73,12 @@ export function LayersPanel() {
 
   let contentOrdinal = 0;
   const ordinals = new Map();
+  const contentTargets = [];
   for (const l of layers) {
     if (!isFxLayer(l)) {
       contentOrdinal += 1;
       ordinals.set(l.id, contentOrdinal);
+      contentTargets.push({ id: l.id, n: contentOrdinal });
     }
   }
 
@@ -109,6 +113,7 @@ export function LayersPanel() {
           const isFxSelected = layer.id === selectedFxLayerId;
           const soloed = layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
           const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
+          const patch = layer.patch || { mode: 'off', to: 0 };
           return (
             <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''}`}>
               <div className="layer-row-main">
@@ -166,6 +171,31 @@ export function LayersPanel() {
                 />
                 <span className="layer-opacity-readout">{Math.round(layer.layerOpacity * 100)}%</span>
               </div>
+              {!fx && (
+                <div className="layer-row-composite" title="PATCH — how this track talks to another. FEED does not pull on canvas yet.">
+                  <span className="fx-param-readout" style={{ width: 'auto' }}>PATCH</span>
+                  <select
+                    className="tg blend-mode-select"
+                    value={patch.mode}
+                    onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to: patch.to })}
+                  >
+                    <option value="off">OFF</option>
+                    <option value="mod">MOD</option>
+                    <option value="field">FIELD</option>
+                    <option value="feed">FEED</option>
+                  </select>
+                  <select
+                    className="tg blend-mode-select"
+                    value={String(patch.to)}
+                    disabled={patch.mode === 'off'}
+                    onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: Number(e.target.value) })}
+                  >
+                    {contentTargets.map((t) => (
+                      <option key={t.id} value={t.n - 1} disabled={t.id === layer.id}>KC-{t.n}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {fx && isFxSelected && <FxEffectEditor layer={layer} />}
             </div>
           );
