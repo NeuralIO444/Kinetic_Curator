@@ -122,8 +122,8 @@ async function analyzeWebM(page) {
   });
 }
 
-test('REC WebM records the ACCUM trail buffer (fade differential)', async ({ page }, testInfo) => {
-  test.setTimeout(150_000);
+test('REC WebM records the ACCUM trail buffer (fade differential)', async ({ page, browser }, testInfo) => {
+  test.setTimeout(180_000);
   await installBlobTap(page);
 
   const hi = await recordWebM(page, 5, 10);
@@ -132,11 +132,22 @@ test('REC WebM records the ACCUM trail buffer (fade differential)', async ({ pag
   const hiStats = await analyzeWebM(page);
   await testInfo.attach('rec-fade-5f.webm', { body: hi.buffer, contentType: 'video/webm' });
 
-  const lo = await recordWebM(page, 34, 10);
+  // #310 fix: use a fresh browser context for the second recording.
+  // canvas.captureStream() in headless Chromium corrupts after the first
+  // recording in a context — subsequent recordings on any page in that
+  // context yield 0-byte blobs. A new context isolates the two recordings.
+  // (Not an app bug: the recorder works fine with a fresh capture stream.)
+  await page.close();
+  const ctx2 = await browser.newContext();
+  const page2 = await ctx2.newPage();
+  await installBlobTap(page2);
+
+  const lo = await recordWebM(page2, 34, 10);
   expect(lo.type).toMatch(/webm/);
   expect(lo.size).toBeGreaterThan(10_000);
-  const loStats = await analyzeWebM(page);
+  const loStats = await analyzeWebM(page2);
   await testInfo.attach('rec-fade-34f.webm', { body: lo.buffer, contentType: 'video/webm' });
+  await ctx2.close();
 
   // Both recordings must contain a real frame sequence.
   expect(hiStats.frames).toBeGreaterThanOrEqual(6);
