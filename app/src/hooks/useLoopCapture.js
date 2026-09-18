@@ -28,7 +28,12 @@
  * sim runs on the live clock (Date.now drives the noise field), so two
  * captures of the same seed are not bit-identical — the LENGTH and the
  * SEAM are deterministic, the pixels are a performance. Audio-reactive
- * voices capture "what plays", same as REC.
+ * voices capture "what plays", same as REC. The recorder runs in real
+ * time: on hardware that renders below the capture fps (e.g. software GL,
+ * where a frame can take ~1s) the take stretches with the wall clock — the
+ * video is never truncated, but it is only exactly N seconds when the
+ * machine keeps up. The e2e asserts the strict length on capable hardware
+ * and recorder honesty (never longer than the take) everywhere else.
  */
 
 export const LOOP_CAPTURE_FPS = 30;
