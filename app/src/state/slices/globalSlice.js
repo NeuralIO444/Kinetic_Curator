@@ -49,6 +49,15 @@ export const createGlobalSlice = (set) => ({
    */
   slowRenderSource: null,
   /**
+   * The quality tier the governor's cut 2 stepped DOWN from (#264). null
+   * when quality was not governor-shed — a user-chosen tier is never
+   * "restored" over. The governor records this on its first quality shed
+   * of an episode and restores to it on recovery; a manual quality change
+   * (SET_QUALITY) or a fresh project load clears it. Session-only, never
+   * serialized — like slowRenderSource, it is live governor overlay state.
+   */
+  qualityShedFrom: null,
+  /**
    * Set for the duration of a batch export (#107 §5). Deliberately separate
    * from slowRender/perfTier1 above — those are owned by usePerformanceGovernor
    * and auto-clear on live FPS, which would fight a pause that must hold for
@@ -154,7 +163,20 @@ export const createGlobalSlice = (set) => ({
   poolView: 'grid',
 
   setPersistStatus: (persistStatus) => set({ persistStatus }),
-  setRunning: (running) => set({ running }),
+  setRunning: (running) => set((state) => {
+    // #264 — manual resume contract: anything that sets running=true
+    // (Space, the RUN button) after a watchdog hard stop clears the stop
+    // outright — slowRender, its source, and the badge's reason. The cut-6
+    // soft freeze is NOT cleared here; it auto-clears on FPS recovery in
+    // the governor hook.
+    const resumeWatchdog = !!running && state.slowRenderSource === 'watchdog';
+    return {
+      running,
+      ...(resumeWatchdog
+        ? { slowRender: false, slowRenderSource: null, lastWatchdogReason: null }
+        : {}),
+    };
+  }),
   setFps: (fps) => set({ fps }),
   setNodeCount: (count) => set({ nodeCount: count }),
   setQuality: (quality) => set((state) => {
@@ -171,6 +193,10 @@ export const createGlobalSlice = (set) => ({
     slowRender: slow,
     slowRenderSource: slow ? (source || 'cut6') : null,
   }),
+  /** #264 — the governor records the tier its quality shed stepped from. */
+  setQualityShedFrom: (tier) => set({ qualityShedFrom: tier }),
+  /** #264 — lets the badge return to clean once a watchdog stop is gone. */
+  clearWatchdogReason: () => set({ lastWatchdogReason: null }),
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
   setStageTimings: (stages) => set({ stageTimings: { ...stages } }),
@@ -361,6 +387,8 @@ export const createGlobalSlice = (set) => ({
       paletteId: doc.paletteId || state.paletteId,
       // #103 Track B — a dangling quality key must never reach the caps lookup.
       quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
+      // #264 — a fresh document owns its quality; any governor shed claim ends here.
+      qualityShedFrom: null,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
       ingestError: null,

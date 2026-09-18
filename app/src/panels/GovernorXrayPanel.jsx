@@ -72,6 +72,8 @@ export function GovernorXrayPanel() {
   const perfClampOverride = useStore((s) => s.perfClampOverride);
   const slowRender = useStore((s) => s.slowRender);
   const lastWatchdogReason = useStore((s) => s.lastWatchdogReason);
+  const quality = useStore((s) => s.quality);
+  const qualityShedFrom = useStore((s) => s.qualityShedFrom);
 
   const [eventsVersion, setEventsVersion] = useState(0);
 
@@ -89,7 +91,9 @@ export function GovernorXrayPanel() {
     perfClampOverride,
     slowRender,
     watchdogTripped: !!lastWatchdogReason,
-  }), [perfTier1, renderScale, assetThin, perfClampOverride, slowRender, lastWatchdogReason]);
+    quality,
+    qualityShedFrom,
+  }), [perfTier1, renderScale, assetThin, perfClampOverride, slowRender, lastWatchdogReason, quality, qualityShedFrom]);
 
   const { cuts, passes } = useMemo(
     () => buildXray({ tiers: allCostTiers(), measuredMs: MEASURED_COSTS, shed }),
