@@ -163,6 +163,7 @@ export function MasterBar() {
     setFrameLock: s.setFrameLock,
     audioDenied: s.audioDenied,
     glContext: s.glContext,
+    paletteMixSeconds: s.paletteMixSeconds,
   }));
   // Default to 'ok' rather than showing the warning for an undefined value:
   // this selector is explicit, so a field missing from it reads as undefined,
@@ -172,6 +173,7 @@ export function MasterBar() {
     slowRender = false, slowRenderSource = null, perfTier1 = false, frameLock = false, audioDenied = false,
     renderFault = false, renderFaultReason = null,
     glContext = 'ok',
+    paletteMixSeconds = 2,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -494,6 +496,28 @@ export function MasterBar() {
           >
             + SAVE
           </button>
+          {/* #278 — VJ MIX: palette-switch crossfade time. Adjacent to the
+              palette switcher by design (no new panel). 0s = hard cut. */}
+          <label
+            className="palette-mix"
+            title="VJ MIX — how long a palette switch takes to crossfade into the running animation (0–8s). 0s cuts instantly like before."
+          >
+            <span className="palette-mix-label">MIX</span>
+            <input
+              type="range"
+              className="single-slider palette-mix-slider"
+              min={0}
+              max={8}
+              step={0.5}
+              value={paletteMixSeconds}
+              onChange={(e) => dispatch({ type: A.SET_PALETTE_MIX, payload: Number(e.target.value) })}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Palette crossfade time in seconds"
+            />
+            <span className="range-readout">
+              {Number.isInteger(paletteMixSeconds) ? `${paletteMixSeconds}s` : `${Number(paletteMixSeconds).toFixed(1)}s`}
+            </span>
+          </label>
         </div>
         <button className="run-btn" onClick={() => dispatch({ type: A.SET_RUNNING, payload: !running })}>
           {running ? '■ STOP' : '▶ RUN'}

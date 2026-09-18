@@ -57,6 +57,9 @@ export class ParticleSystem {
     // `die` recycles into and `breed` consumes from.
     this._dead = [];
     this._breedSeq = 0;
+    // #278 — signature of the palette swatch set colors were last resolved
+    // from. init() sets it; update() re-resolves on change (see below).
+    this._colorSig = null;
     // Authored population from the last init — tracked separately from the
     // runtime population (this.n), which `breed` grows past the authored
     // count. update() re-inits only when the authored count changes, so
@@ -188,6 +191,8 @@ export class ParticleSystem {
     // breed sequence, and the freelist belong to the old population.
     this._dead = [];
     this._breedSeq = 0;
+    // #278 — colors were just (re)assigned from this swatch set.
+    this._colorSig = swatches.join('|');
   }
 
   /**
@@ -480,6 +485,24 @@ export class ParticleSystem {
     const targetCount = layoutParams.particleCount || 100;
     if (this._authoredCount !== targetCount) {
       this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed);
+    }
+    // #278 — palette clicks never recolored the live swarm: colors were
+    // baked at init() and update() never revisited them. Re-resolve
+    // per-particle colors when the swatch set changes (content-compare —
+    // the loop hands a fresh palette object every frame, so identity would
+    // miss every time). In-place over the existing array: no allocation,
+    // no GC churn. Breeding tints written between switches survive until
+    // the next switch, at which point the new palette takes over —
+    // matching the still-layer path, where colors re-resolve every frame.
+    {
+      const swatches = palette?.swatches || ['#ffffff'];
+      const sig = swatches.join('|');
+      if (this._colorSig !== sig) {
+        this._colorSig = sig;
+        const n = this.n;
+        const cols = this.color;
+        for (let i = 0; i < n; i++) cols[i] = swatches[i % swatches.length];
+      }
     }
     if (!this._noise) this._noise = createNoise(seed || 444);
     const noise = this._noise;
