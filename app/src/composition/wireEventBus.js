@@ -16,6 +16,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYOUT_PRESET, (preset) => dispatch({ type: A.APPLY_PRESET, preset }));
   on(Events.LAYOUT_LOCK, ({ key }) => dispatch({ type: A.TOGGLE_PARAM_LOCK, key }));
   on(Events.LAYOUT_RANDOMIZE, (p) => dispatch(p.type === 'unlocked' ? { type: A.RANDOMIZE_UNLOCKED } : { type: A.RANDOMIZE_PARAM, key: p.key }));
+  on(Events.LAYOUT_CURATE, () => dispatch({ type: A.CURATE_UNLOCKED }));
 
   on(Events.DAVIS_EVOLVE, (p) => {
     if (p.mode !== undefined) return dispatch({ type: A.SET_EVOLVE_MODE, payload: !!p.mode });

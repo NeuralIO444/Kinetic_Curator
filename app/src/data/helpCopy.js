@@ -9,7 +9,7 @@ export const HELP_TOPICS = [
   { id: 'davis-favorite', group: 'Ghost Station', title: 'FAVORITE', text: 'Save the current seed as a hit (F).' },
   { id: 'davis-new-seed', group: 'Ghost Station', title: 'NEW SEED', text: 'Jump to a fresh random seed (N).' },
   { id: 'davis-morph', group: 'Ghost Station', title: 'MORPH EVOLVE', text: 'Ease layout changes over DURATION instead of hard-jumping. Seed and palette still snap.' },
-  { id: 'layout-randomize', group: 'Layout', title: 'RANDOMIZE', text: 'Re-roll every unlocked param. Locked ones keep their values.' },
+  { id: 'layout-randomize', group: 'Layout', title: 'CURATOR', text: 'Re-roll every unlocked param and keep the taste model\'s pick. Until the MLX curator is trained, it\'s an honest dice roll — the bar says so.' },
   { id: 'layout-mode', group: 'Layout', title: 'MODE', text: 'How placements are arranged. Cellular enables the Ghost Station CA wrap mode.' },
   { id: 'layout-blend', group: 'Layout', title: 'BLEND', text: 'How shapes mix where they overlap.' },
   { id: 'output-render', group: 'Output', title: 'RENDER FINAL', text: 'Save the current frame as PNG at the chosen resolution.' },

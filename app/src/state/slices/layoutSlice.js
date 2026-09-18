@@ -2,6 +2,7 @@ import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams } from '../../data/layout-m
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, trimUndoStack, UNDO_KIND_LAYERS } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
+import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, defaultSeedOffsets, normalizeSeedOffsets } from '../../engine/kernel/rng.js';
@@ -289,6 +290,25 @@ export const createLayoutSlice = (set) => ({
     }
     if (!changed) return {};
     return { ...pushToUndo(state, true), layoutParams: rp };
+  }),
+
+  curateUnlocked: () => set((state) => {
+    // The Curator: roll CURATE_CANDIDATES scenes over the unlocked params and
+    // keep the engine's pick. No trained engine on file yet -> honest dice
+    // roll; the bar says so (see curator/curate.js). Locked params are never
+    // touched, same as randomizeUnlocked.
+    const curator = getActiveCurator();
+    const candidates = [];
+    for (let n = 0; n < CURATE_CANDIDATES; n++) {
+      const rp = { ...state.layoutParams };
+      for (const key of RANDOMIZABLE_KEYS) {
+        if (!state.lockedParams[key]) rp[key] = randomizeKey(key);
+      }
+      candidates.push(rp);
+    }
+    const { index } = pickCurated(candidates, curator);
+    if (index < 0) return {};
+    return { ...pushToUndo(state, true), layoutParams: candidates[index] };
   }),
 
   // Entries are tagged with the layerId they were captured for (#92) and the
