@@ -21,48 +21,8 @@ import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import { routeBeat } from './state/beatArbiter.js';
 import { useStore } from './state/store.js';
-import { shedSummary } from './hooks/governorCuts.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
-
-/**
- * ShedBadge — #192's minimal honest indicator. When the Showrunner governor
- * sheds anything (dynamic resolution scale, quality tier, mirror/gloss/ACCUM,
- * asset thinning, count clamp, motion freeze, watchdog), the UI says so — the
- * silent-cull trap must not survive in any form. #177 owns the full
- * indicator design later; this badge is the stopgap.
- */
-function ShedBadge() {
-  // NOTE: select primitives individually. An object-literal selector with
-  // zustand's useStore returns a fresh object per getSnapshot() call, which
-  // React reads as "snapshot changed every render" → infinite loop
-  // (React #185 took the whole app down in CI).
-  const renderScale = useStore(s => s.renderScale);
-  const perfTier1 = useStore(s => s.perfTier1);
-  const assetThin = useStore(s => s.assetThin);
-  const perfClampOverride = useStore(s => s.perfClampOverride);
-  const slowRender = useStore(s => s.slowRender);
-  const lastWatchdogReason = useStore(s => s.lastWatchdogReason);
-  const quality = useStore(s => s.quality);
-  const qualityShedFrom = useStore(s => s.qualityShedFrom);
-  const summary = shedSummary({
-    renderScale, perfTier1, assetThin, perfClampOverride, slowRender,
-    watchdogTripped: !!lastWatchdogReason, quality, qualityShedFrom,
-  });
-  if (!summary) return null;
-  return (
-    <span
-      className="shed-badge"
-      title={`Showrunner shed active: ${summary.join('; ')}. Auto-clears on recovery (watchdog needs manual resume).`}
-      style={{
-        color: '#ffb454', border: '1px solid #ffb454', borderRadius: 4,
-        padding: '0 6px', fontSize: 11, whiteSpace: 'nowrap',
-      }}
-    >
-      ⚠ shed · {summary.join(' · ')}
-    </span>
-  );
-}
 
 const COLUMN_FRACTIONS = [0.62, 0.38];
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
@@ -248,7 +208,6 @@ function AppInner() {
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {state.layoutParams.mode} · seed:{state.seed.toString(16)}
-          <ShedBadge />
           <button type="button" className="micro-btn" title="Settings — no second prefs store"
             style={{ opacity: 0.45 }} onClick={() => { setHelpTab('settings'); setShowHotkeys(true); }}>⚙</button>
           <button type="button" className="micro-btn" title="Help"

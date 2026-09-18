@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 // MasterBar — top toolbar
 import { useApp } from '../state/AppContext.jsx';
+import { TapeCounter } from './TapeCounter.jsx';
 import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
@@ -151,14 +152,8 @@ export function MasterBar() {
     seed: s.seed,
     nodeCount: s.nodeCount,
     quality: s.quality,
-    autoQuality: s.autoQuality,
     isRecording: s.isRecording,
     persistStatus: s.persistStatus,
-    slowRender: s.slowRender,
-    slowRenderSource: s.slowRenderSource,
-    perfTier1: s.perfTier1,
-    renderFault: s.renderFault,
-    renderFaultReason: s.renderFaultReason,
     frameLock: s.frameLock,
     setFrameLock: s.setFrameLock,
     audioDenied: s.audioDenied,
@@ -169,8 +164,7 @@ export function MasterBar() {
   // and a pill that fails open would cry UNSAVED on every boot.
   const {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
-    slowRender = false, slowRenderSource = null, perfTier1 = false, frameLock = false, audioDenied = false,
-    renderFault = false, renderFaultReason = null,
+    frameLock = false, audioDenied = false,
     glContext = 'ok',
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
@@ -278,73 +272,13 @@ export function MasterBar() {
           </div>
         )}
 
-        {/* #107 §4: the watchdog tripped (tier 2 — FPS ~0, or a critical
-            render-error) — running/evolve are OFF and do not resume on their
-            own, otherwise this looks like the app just stopped for no
-            reason and the operator waits for a recovery that never comes.
-            Shown ONLY for the actual watchdog trip (#259): governor cut 6
-            (motion freeze) gets its own auto-clearing indicator below. */}
-        {slowRender && slowRenderSource === 'watchdog' && (
-          <div
-            className="status-pill"
-            style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
-            title="Watchdog tripped: running and evolve are off and will not resume on their own. Press space or ▶ RUN to resume."
-          >
-            <span className="status-dot" style={{ background: '#ff2d6f' }} />
-            PERF PAUSED
-          </div>
-        )}
-
-        {/* #259: governor cut 6 — motion frozen to protect frame rate.
-            Self-clearing (the governor unfreezes when FPS recovers past the
-            recover threshold), so this must never claim the watchdog
-            tripped. */}
-        {slowRender && slowRenderSource !== 'watchdog' && (
-          <div
-            className="status-pill"
-            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
-            title="Governor froze motion to protect frame rate — clears automatically when FPS recovers."
-          >
-            <span className="status-dot" style={{ background: '#ffb000' }} />
-            MOTION HELD
-          </div>
-        )}
-
-        {/* #266: a deterministic per-frame fault (frame building /
-            rendering / presenting throwing on consecutive ticks) or a
-            deterministic atlas-bake failure. Sticky — the canvas holds the
-            last good frame while the pill is up, so without this the app
-            would look alive while silently stopped presenting. Red like
-            PERF PAUSED (a hard-stop-class failure), not amber like the
-            self-clearing governor indicators. Clears only after a sustained
-            run of clean frames, or a reload. */}
-        {renderFault && (
-          <div
-            className="status-pill"
-            style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
-            title={renderFaultReason
-              ? `Render fault: ${renderFaultReason}. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.`
-              : 'Render fault: a deterministic per-frame failure stopped presenting. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.'}
-          >
-            <span className="status-dot" style={{ background: '#ff2d6f' }} />
-            RENDER FAULT
-          </div>
-        )}
-
-        {/* #107 §4 tier 1: a milder, self-clearing shed (FPS < 16 sustained
-            2s) — ACCUM/gloss/mirror are off across every visible layer.
-            Suppressed once tier 2 has tripped: PERF PAUSED above already
-            covers that, and this would just be a redundant second pill. */}
-        {perfTier1 && !slowRender && (
-          <div
-            className="status-pill"
-            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
-            title="FPS is sustained below 16. ACCUM, gloss and mirror are off across all visible layers — clears automatically once FPS recovers."
-          >
-            <span className="status-dot" style={{ background: '#ffb000' }} />
-            LOAD SHED
-          </div>
-        )}
+        {/* #295: the governor's one budget readout — the tape counter.
+            It merges the old PERF PAUSED / MOTION HELD / RENDER FAULT /
+            LOAD SHED pills, the footer ShedBadge, and the Q meter's AUTO
+            state into a single PLAY readout. The honest semantics are kept,
+            not softened: hard stops stay red and explicit, self-clearing
+            sheds stay amber. */}
+        <TapeCounter />
 
         <div className="meter">
           <span className="meter-label">FPS</span>
@@ -362,7 +296,6 @@ export function MasterBar() {
         <div className="meter" title={q.description}>
           <span className="meter-label">Q</span>
           <span className="meter-value" style={{ letterSpacing: '0.06em' }}>{q.label}</span>
-          {state.autoQuality && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: 4 }}>AUTO</span>}
         </div>
 
         {/* Showrunner frame-lock: a user-chosen 30fps show mode, not a
