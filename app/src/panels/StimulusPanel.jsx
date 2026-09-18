@@ -33,6 +33,11 @@ export function StimulusPanel() {
   const scaleMod = layoutParams.audioScaleMod ?? 0.45;
   const alphaMod = layoutParams.audioAlphaMod ?? 0.25;
   const life = layoutParams.lifeDrift ?? 0.35;
+  // #306: envelope ballistics — deepen the existing reactivity controls.
+  const attackMs = layoutParams.audioAttackMs ?? 25;
+  const decayMs = layoutParams.audioDecayMs ?? 320;
+  const response = layoutParams.audioResponse ?? 'exponential';
+  const swell = layoutParams.audioSwell ?? 1;
 
   // #310: the audio source row is collapsed setup — the AUDIO toggle stays
   // in performer sight, mic/file/monitor/gain live behind SETUP.
@@ -70,7 +75,7 @@ export function StimulusPanel() {
             />
           )}
 
-          <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} audioEnabled={audioEnabled} />
+          <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} attackMs={attackMs} decayMs={decayMs} response={response} swell={swell} audioEnabled={audioEnabled} />
 
           <MeterBlock audioBands={audioBands} beatPulse={beatPulse} />
       </div>

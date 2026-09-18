@@ -13,6 +13,12 @@
  *     [--seed N] [--uncapped] [--background #rrggbb]
  *     [--ramp param=from:to ...] [--motion auto]
  *     [--tunnel 0] [--prism 0] [--flow 0] [--echoes 0] [--audio env.json]
+ *     [--attack-ms 0] [--decay-ms 0] [--response linear] [--swell 1]
+ *
+ * --attack-ms / --decay-ms / --response shape the audio envelope through the
+ * #306 ballistics follower before it modulates the recipe (defaults are the
+ * identity: raw sidecar values hit the mapping unchanged, exactly as before).
+ * --swell scales only the audio→glow gesture (the washout control).
  *
  * Frames vary with progress (i/(steps-1)) and the motion/ramp inputs, exactly
  * like studio.py's old per-frame loop — the placements move, the ACCUM
@@ -34,6 +40,12 @@ import { writePngFile } from './png.mjs';
 // ~3.6GB pixel buffer → OOM on an unattended batch tool.
 import { parseRes } from './exportStill.mjs';
 import { loadAudioEnvelope, sampleEnvelope } from './audioEnvelope.mjs';
+import {
+  createBallisticsState,
+  processBallistics,
+  sanitizeBallistics,
+  BALLISTICS_CURVES,
+} from './audioBallistics.mjs';
 import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
 import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
@@ -45,6 +57,9 @@ function parseArgs(argv) {
   const out = {
     project: null, out: null, steps: 24, fps: 30, fade: 0.88, optics: 0,
     tunnel: 0, prism: 0, flow: 0, echoes: 0, audio: null,
+    // #306: still-path ballistics default to the identity — existing renders
+    // are byte-identical unless these flags are passed.
+    attackMs: 0, decayMs: 0, response: 'linear', swell: 1,
     res: '1', seed: null, uncapped: false, background: null, ramps: [], motion: 'auto',
   };
   const rest = [];
@@ -65,6 +80,16 @@ function parseArgs(argv) {
     else if (a === '--flow') out.flow = num('--flow');
     else if (a === '--echoes') out.echoes = num('--echoes');
     else if (a === '--audio') out.audio = argv[++i];
+    else if (a === '--attack-ms') out.attackMs = num('--attack-ms');
+    else if (a === '--decay-ms') out.decayMs = num('--decay-ms');
+    else if (a === '--response') {
+      const v = argv[++i];
+      if (!BALLISTICS_CURVES.includes(v)) {
+        throw new Error(`bad --response ${v} (expected one of ${BALLISTICS_CURVES.join(', ')})`);
+      }
+      out.response = v;
+    }
+    else if (a === '--swell') out.swell = num('--swell');
     else if (a === '--res') out.res = argv[++i];
     else if (a === '--seed') out.seed = num('--seed') | 0;
     else if (a === '--uncapped') out.uncapped = true;
@@ -163,16 +188,32 @@ async function main(argv) {
 
   const frames = [];
   const audioFrames = audioEnv ? [] : null;
+  // #306: one follower shapes the sidecar envelope before the mapping.
+  // Identity defaults (attack/decay 0, linear) pass the raw samples through
+  // exactly; beat_phase is never shaped — the follower would smear it.
+  const ballistics = createBallisticsState();
+  const ballParams = sanitizeBallistics({
+    attackMs: args.attackMs, releaseMs: args.decayMs, curve: args.response,
+  });
+  let prevT = 0;
+  const stepMs = (duration / Math.max(1, args.steps - 1)) * 1000;
   try {
     for (let i = 0; i < args.steps; i++) {
       const progress = i / Math.max(1, args.steps - 1);
+      const t = progress * duration;
       const resolvedLayers = resolveLayers(doc, { caps, ramp, motion, progress });
       frames.push(buildSceneContract({
         doc, resolvedLayers, caps,
         accum: { enabled: true, fade: args.fade, optics: args.optics, tunnel: args.tunnel, prism: args.prism, flow: args.flow, echoes: args.echoes, background },
       }));
       if (audioEnv) {
-        audioFrames.push(sampleEnvelope(audioEnv, progress * duration));
+        const raw = sampleEnvelope(audioEnv, t);
+        const dtMs = i === 0 ? stepMs : (t - prevT) * 1000;
+        prevT = t;
+        const shaped = processBallistics(
+          ballistics, { rms: raw.rms, flux: raw.flux, beatPulse: raw.beatPulse }, dtMs, ballParams
+        );
+        audioFrames.push({ ...raw, ...shaped });
       }
       if ((i + 1) % 5 === 0 || i + 1 === args.steps) {
         console.log(`  accum frame ${i + 1}/${args.steps}`);
@@ -181,7 +222,7 @@ async function main(argv) {
     const { pixels, width, height } = await renderAccumViaGL(frames, {
       width: w, height: h, bg: background, fade: args.fade, optics: args.optics,
       tunnel: args.tunnel, prism: args.prism, flow: args.flow, echoes: args.echoes,
-      audio: audioFrames,
+      audio: audioFrames, swell: args.swell,
     });
     await writePngFile(args.out, pixels, width, height);
     console.log(args.out);

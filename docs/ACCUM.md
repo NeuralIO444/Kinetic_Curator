@@ -147,23 +147,42 @@ linearly, `beat_phase` takes the nearest sample (avoids 0↔1 wrap
 artifacts), and `beatPulse` is derived from `beats[]`: fires 1.0 at each
 beat, decays linearly over one beat interval, 0 before the first beat.
 
+**Ballistics** (#306, `audioBallistics.mjs`): the raw envelope never reaches
+the mapping directly. Each sample first passes through an envelope follower
+— attack and decay time constants (one-pole, per channel) — and then a
+response curve: `linear` (unchanged), `exponential` (x² — suppresses
+low-level jitter, loud hits land with weight; the live default),
+`logarithmic` (lifts quiet swells so subtle music stays visible), or
+`peak-hold` (snaps to the peak instantly, falls off linearly at
+1/decayMs per ms — punchy attacks, smooth decays). This is what turns
+jittery transient-snapping into a heavy, fluid weight on driven
+scale/rotation. The live instrument reads attack/decay/curve from the
+STIMULI panel (ENVELOPE); the studio still path takes
+`--attack-ms` / `--decay-ms` / `--response` (defaults are the identity, so
+existing renders are unchanged). Silence decays to exact zeros, so the
+no-audio contract below holds on every path.
+
 **Modulation** — three distinct gestures, one per signal:
 
 - `rms` (the swell): `keep += 0.08 * rms` (≤ 0.99),
-  `optics += (1 - optics) * 0.3 * rms` — headroom-relative, so loud audio
-  swells the glow toward the slider's ceiling instead of pegging it at 1.
+  `optics += (1 - optics) * swell * 0.3 * rms` — headroom-relative, so loud
+  audio swells the glow toward the slider's ceiling instead of pegging it
+  at 1.
 - `flux` (the transient hit): `keep += 0.04 * flux` — hits punch the
   trails longer without swelling the glow.
-- `beatPulse` (the on-the-one): `optics += (1 - optics) * 0.1 * beatPulse` —
+- `beatPulse` (the on-the-one): `optics += (1 - optics) * swell * 0.1 * beatPulse` —
   glow pops on the beat without lengthening trails, and never pegs.
 - tunnel zoom/spin and prism amounts scale × `(1 + 2*rms + flux + beatPulse)`.
 - Silence (all zeros) returns the params unchanged — the no-audio path is
   exactly the old recipe.
-- The optics swing is deliberately gentle: bloom is an additive per-frame
-  feedback (`accum.rgb += bloomAmount * blurred`), so big optics swings
-  ratchet bright content toward white over a long sequence. Audio swells
-  the glow you dial in — it can't peg the slider — but if a loud passage
-  still blows out the highlights, back off the base `--optics`.
+- **SWELL** (0–1, default 1) is the audio→glow fader: it scales only the
+  glow gesture. The known limitation — loud audio washing out the render
+  at high glow — is now a control, not just a caution: bloom is an
+  additive per-frame feedback (`accum.rgb += bloomAmount * blurred`), so
+  big optics swings ratchet bright content toward white over a long
+  sequence. If a loud passage blows out the highlights, pull SWELL down
+  (0 = the music never touches the glow) instead of touching the GLOW
+  slider. In the still path this is the `--swell` flag.
 
 A missing or malformed sidecar warns on stderr and is a real no-op (renders
 without audio); the pre-research sketch (bare `[{t, rms, beat}]`) is still
