@@ -28,6 +28,7 @@ import {
   applyPostStack,
   sanitizeStack,
   stackToFfmpeg,
+  stackToHuman,
   stackToFarmCommand,
 } from '../fx/printPost.js';
 
@@ -171,6 +172,7 @@ export function PrintDeskModal({ onClose }) {
     .filter((c) => chips[c.id].on)
     .map((c) => ({ chip: c.id, amount: chips[c.id].amount }));
   const filtergraph = stackToFfmpeg(stack);
+  const humanStack = stackToHuman(stack); // desk readout: plain words, no ffmpeg jargon (#277)
   const anyOn = stack.length > 0;
 
   const setChip = (id, patch) => {
@@ -253,7 +255,7 @@ export function PrintDeskModal({ onClose }) {
 
   return (
     <div style={veil} onClick={cancel} role="presentation">
-      <div style={sheet} onClick={(e) => e.stopPropagation()}>
+      <div className="print-desk" style={sheet} onClick={(e) => e.stopPropagation()}>
         <header style={head}>
           <span>PRINT DESK</span>
           <span style={{ color: 'var(--dim)', fontSize: 9 }}>
@@ -327,15 +329,22 @@ export function PrintDeskModal({ onClose }) {
                     {c.id}
                   </button>
                   {cs.on && (
+                    // #277: no taper prop — every chip amount is linear-perceptual
+                    // (sigma, unsharp amount, grain alls, falloff, eq triple, px
+                    // shift all scale linearly with visible change), so the
+                    // honest linear default from #274 already gives equal
+                    // travel = equal visible change. Stored amounts stay
+                    // physical; the pipeline never sees the slider.
                     <RangeRow
-                      label=""
+                      label={c.id}
                       value={cs.amount}
                       min={c.min}
                       max={c.max}
                       step={c.step}
+                      defaultValue={c.def}
                       onChange={(v) => setChip(c.id, { amount: v })}
                       readout={`${cs.amount}${c.unit ? ` ${c.unit}` : ''}`}
-                      hint={`${c.hint} — amount ${c.min}…${c.max}`}
+                      hint={`${c.hint} — amount ${c.min}…${c.max} (double-click resets to ${c.def})`}
                     />
                   )}
                 </div>
@@ -356,17 +365,32 @@ export function PrintDeskModal({ onClose }) {
             >
               {applying ? 'APPLYING…' : stale && sidecar ? '↻ RE-APPLY' : '▶ APPLY'}
             </button>
-            {filtergraph && (
+            {anyOn && (
               <div
-                title="Exact ffmpeg filtergraph for this stack — travels in the sidecar; studio/print_post.py runs it on the farm"
-                style={{ fontFamily: 'monospace', fontSize: 9, color: 'var(--dim)', marginTop: 6, wordBreak: 'break-all' }}
+                className="print-human"
+                title="The stack as applied — preview matches these amounts"
+                style={{ fontSize: 10, color: 'var(--ink)', marginTop: 8, letterSpacing: '0.06em', fontWeight: 700 }}
               >
-                {filtergraph}
+                {humanStack}
               </div>
             )}
+            {filtergraph && (
+              <details style={pipeDetails}>
+                <summary style={pipeSummary} title="Raw ffmpeg filtergraph for this stack — travels in the sidecar; studio/print_post.py runs it on the farm">
+                  PIPELINE
+                </summary>
+                <div
+                  style={{ fontFamily: 'monospace', fontSize: 9, color: 'var(--dim)', marginTop: 4, wordBreak: 'break-all' }}
+                >
+                  {filtergraph}
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--dim)', marginTop: 4, letterSpacing: '0.04em' }}>
+                  <span style={{ fontFamily: 'monospace' }}>studio/print_post.py</span> runs this filtergraph on the farm. It is the print master.
+                </div>
+              </details>
+            )}
             <div style={{ fontSize: 9, color: 'var(--dim)', marginTop: 6, letterSpacing: '0.04em' }}>
-              Preview is client-side. The farm run
-              (<span style={{ fontFamily: 'monospace' }}>print_post.py</span>) is the print master.
+              Screen preview only. The farm run is the print master — that is what prints.
             </div>
           </div>
         </div>
@@ -412,4 +436,9 @@ const workingVeil = {
 };
 const side = { width: 230, flex: '0 0 auto', display: 'flex', flexDirection: 'column' };
 const sectLabel = { fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', margin: '6px 0 4px' };
+const pipeDetails = { marginTop: 6, borderTop: '1px solid var(--line)', paddingTop: 4 };
+const pipeSummary = {
+  fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: 'var(--dim)',
+  cursor: 'pointer', userSelect: 'none', listStyle: 'none',
+};
 const foot = { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line)', flex: '0 0 auto' };

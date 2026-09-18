@@ -278,6 +278,32 @@ export function stackToFfmpeg(stack) {
   return sanitizeStack(stack).map(entryToFfmpeg).join(',');
 }
 
+/**
+ * The stack as a human-readable summary for the desk readout (#277).
+ * Terse TE style: "GRAIN 100 · VIGNETTE 1 · GRADE −1". The raw filtergraph
+ * stays the pipeline contract (sidecar + farm); this is presentation only —
+ * it never feeds the pipeline, so the APPLY flow is untouched.
+ */
+export function stackToHuman(stack) {
+  return sanitizeStack(stack).map(entryToHuman).join(' · ');
+}
+
+/** One sanitized entry → "CHIP amount unit" (units where the chip defines one). */
+export function entryToHuman({ chip, amount }) {
+  chipDef(chip); // fail-closed like the ffmpeg path
+  const d = chipDef(chip);
+  return `${d.id} ${fmtAmount(amount)}${d.unit ? ` ${d.unit}` : ''}`;
+}
+
+/** Trim float noise (0.3500 → 0.35, 2 → 2); negatives read as − (#277). */
+function fmtAmount(v) {
+  let s = String(Math.round(v * 10000) / 10000);
+  if (s.includes('.')) s = s.replace(/\.?0+$/, '');
+  if (s === '-0') s = '0';
+  if (s.startsWith('-')) s = '−' + s.slice(1);
+  return s;
+}
+
 /** print_post.py argv fragment for the stack (mirrors entryToFfmpeg). */
 export function stackToFarmArgs(stack) {
   const args = [];

@@ -1,6 +1,24 @@
+import { useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
+import {
+  encodeRecipe,
+  copyTextToClipboard,
+  recipeFieldsFromKept,
+} from '../../state/recipes.js';
 
 export function SnapshotGallery({ snapshots }) {
+  // #307 — per-snapshot copy feedback: '✓ COPIED' for 1.5s, or the failure
+  // label when the clipboard write didn't go through.
+  const [copiedId, setCopiedId] = useState(null);
+
+  const copyRecipe = async (s) => {
+    const text = encodeRecipe(recipeFieldsFromKept(s));
+    const ok = await copyTextToClipboard(text);
+    const tag = ok ? s.id : `fail:${s.id}`;
+    setCopiedId(tag);
+    setTimeout(() => setCopiedId((cur) => (cur === tag ? null : cur)), 1500);
+  };
+
   return (
     <>
       <div className="output-row">
@@ -19,6 +37,13 @@ export function SnapshotGallery({ snapshots }) {
               <div className="snap-meta">
                 <span>{s.seed.toString(16)}</span>
                 <span>{s.resolution}</span>
+                <button
+                  className="micro-btn"
+                  onClick={() => copyRecipe(s)}
+                  title="Copy this kept render's recipe as plain text (kc-recipe/1) — paste it back with PASTE RECIPE to restore the exact scene"
+                >
+                  {copiedId === s.id ? '✓ COPIED' : copiedId === `fail:${s.id}` ? 'COPY FAILED' : '⧉ RECIPE'}
+                </button>
               </div>
             </div>
           ))}
