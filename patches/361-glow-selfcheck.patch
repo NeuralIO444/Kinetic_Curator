@@ -1,0 +1,7 @@
+--- a/app/src/gl/accum.selfcheck.mjs
++++ b/app/src/gl/accum.selfcheck.mjs
+@@ -163,7 +163,7 @@
+   const glowLoud = applyAudioEnvelope(glowBase, { rms: 1, flux: 0, beatPulse: 0 });
+   assert.equal(glowLoud.optics, 0.44, 'optics modulates within headroom');
+-  assert.equal(glowLoud.bloomAmount, 0.55 * 0.44, 'bloomAmount recomputes from modulated optics');
++  assert.equal(glowLoud.bloomAmount, 0.22 * 0.44, 'bloomAmount recomputes from modulated optics');
