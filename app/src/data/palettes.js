@@ -258,6 +258,16 @@ export const PALETTES = [
     swatches: ['#123a5c', '#1d5a8a', '#0d2a44', '#3a7ca5', '#16425f', '#2a6a9a'],
     leak: 0.3, // blueprint wash drifts
   },
+  // --- #284 Smoke Study voice: monochrome gray ramp on black. Data-only
+  // addition — no system change. Pairs with the smoke-study preset.
+  {
+    id: 'smoke',
+    name: 'SMOKE',
+    era: 'Smoke study · 2026',
+    bg: '#000000',
+    ink: '#e8e8e8',
+    swatches: ['#f2f2f2', '#d9d9d9', '#b3b3b3', '#8c8c8c', '#666666', '#404040'],
+  },
 ];
 
 /**

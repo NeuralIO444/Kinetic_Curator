@@ -20,6 +20,7 @@ import { RenderFinalBlock } from './output/RenderFinalBlock.jsx';
 import { PrintDeskBlock } from './output/PrintDeskBlock.jsx';
 import { BatchEditionBlock } from './output/BatchEditionBlock.jsx';
 import { SnapRecordRow } from './output/SnapRecordRow.jsx';
+import { LoopCaptureBlock } from './output/LoopCaptureBlock.jsx';
 import { DataExportRow } from './output/DataExportRow.jsx';
 import { RecipeRow } from './output/RecipeRow.jsx';
 import { SnapshotGallery } from './output/SnapshotGallery.jsx';
@@ -118,6 +119,10 @@ export function OutputPanel() {
           glCanvasRef={glCanvasRef} glLoopRef={glLoopRef} palette={palette} seed={seed} seedOffsets={seedOffsets}
           layoutParams={layoutParams}
           exportResolution={exportResolution} accumOn={accumOn} isRecording={isRecording} rendering={rendering}
+        />
+
+        <LoopCaptureBlock
+          glLoopRef={glLoopRef} seed={seed} rendering={rendering} setRendering={setRendering}
         />
 
         <DataExportRow

@@ -121,6 +121,26 @@ export function ToggleRow({ layoutParams }) {
               style={{ width: 64 }}
             />
           </label>
+          <label
+            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            title="FLOW: curl-advects the trail buffer itself as it decays — trails curl like smoke instead of just fading (0 = off)"
+          >
+            FLOW
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={layoutParams.accumulationFlow ?? 0}
+              onChange={(e) =>
+                emit(Events.LAYOUT_PARAM, {
+                  key: 'accumulationFlow',
+                  value: parseFloat(e.target.value),
+                })
+              }
+              style={{ width: 64 }}
+            />
+          </label>
         </div>
       )}
       {/* #310: the blendMode select is hidden but the state stays — sceneContract

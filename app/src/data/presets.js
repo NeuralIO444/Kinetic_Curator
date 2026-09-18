@@ -228,6 +228,27 @@ export const COMPOSITION_PRESETS = [
       accumulation: true, accumulationFade: 12,
     },
   },
+  // --- #284 Smoke Study voice: the flow-field voice. A voice, not an engine —
+  // every knob below already existed; the only new UI is the FLOW slider.
+  // Pairs with the SMOKE catalog palette (applied on click via paletteId).
+  {
+    id: 'smoke-study', name: 'SMOKE STUDY', group: 'showcase',
+    desc: 'Flow-field smoke — 400 hairline particles on a slow noise field, curl-advected ACCUM trails, monochrome. Built for Loop Capture.',
+    categories: ['dots'], paletteShift: 'band',
+    // Palette + asset pool pair as one voice: monochrome SMOKE palette and
+    // tiny dots only, so the preset is one click, not a setup chore.
+    paletteId: 'smoke',
+    assetIds: ['dot_single_01', 'dot_speckle_01'],
+    params: {
+      mode: 'swarm', count: 400, scale: [0.12, 0.35], rotate: [-20, 20], alpha: [10, 35],
+      zTiers: 3, jitter: 8, density: 90, bleed: true, mirror: false, overlap: true,
+      particleCount: 400, swarmCohesion: 0, damping: 0.98, gravityWells: 0,
+      noiseFreq: 0.003, noiseSpeed: 0.15, wind: 1,
+      lifeDrift: 0.1, displacement: 0, behave: 'cruise',
+      accumulation: true, accumulationFade: 17, accumulationOptics: 0.15,
+      accumulationTunnel: 0, accumulationPrism: 0, accumulationFlow: 0.3,
+    },
+  },
 ];
 
 export function getPreset(id) {
