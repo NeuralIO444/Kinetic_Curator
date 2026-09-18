@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 // MasterBar — top toolbar
 import { useApp } from '../state/AppContext.jsx';
+import { BudgetKnob } from './BudgetKnob.jsx';
 import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
@@ -361,7 +362,7 @@ export function MasterBar() {
 
         <div className="meter" title={q.description}>
           <span className="meter-label">Q</span>
-          <span className="meter-value" style={{ letterSpacing: '0.06em' }}>{q.label}</span>
+          <span className="meter-value" style={{ letterSpacing: '0.06em' }}>{q.budget || q.label}</span>
           {state.autoQuality && <span style={{ fontSize: '9px', opacity: 0.6, marginLeft: 4 }}>AUTO</span>}
         </div>
 
@@ -377,6 +378,12 @@ export function MasterBar() {
         >
           30FPS{frameLock ? '' : ' · OFF'}
         </button>
+
+        {/* #296: the one performer-facing governor knob — the chosen budget
+            ceiling (FULL / SHOW / LEAN). Modeled on the frame-lock: tactile,
+            deliberately chosen, never auto-cleared. Replaces the AUTO ON/OFF
+            boolean; the governor defends whatever ceiling is chosen. */}
+        <BudgetKnob />
 
         <div className="undo-group">
           <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo the last parameter, layer, or palette action (Ctrl/⌘+Z)">
