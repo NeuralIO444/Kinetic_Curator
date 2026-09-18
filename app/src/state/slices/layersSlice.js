@@ -4,6 +4,9 @@ import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS } from '..
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 
+export const MAX_CONTENT_TRACKS = 4;
+export const MAX_FX_TRACKS = 4;
+
 function makeLayerId() {
   return `layer-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`;
 }
@@ -34,7 +37,6 @@ export function captureSnapshot(state) {
   };
 }
 
-/** Display name for a content row. Stored "Layer N" (old projects) maps to KC-N. */
 export function displayLayerName(layer, contentOrdinal) {
   if (!layer) return '';
   if (isFxLayer(layer)) return layer.name;
@@ -55,10 +57,11 @@ export const createLayersSlice = (set) => ({
   selectedFxLayerId: null,
 
   addLayer: () => set((state) => {
+    const content = state.layers.filter((l) => !isFxLayer(l)).length;
+    if (content >= MAX_CONTENT_TRACKS) return {};
     const id = makeLayerId();
     const snapshot = freshSnapshot((Math.random() * 0xffffffff) | 0);
-    const n = state.layers.filter((l) => !isFxLayer(l)).length + 1;
-    const name = `KC-${n}`;
+    const name = `KC-${content + 1}`;
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: [...state.layers, { id, name, visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
@@ -74,8 +77,10 @@ export const createLayersSlice = (set) => ({
   duplicateLayer: (id) => set((state) => {
     const src = state.layers.find((l) => l.id === id);
     if (!src) return {};
-    const nid = makeLayerId();
     const isFx = isFxLayer(src);
+    if (!isFx && state.layers.filter((l) => !isFxLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
+    if (isFx && state.layers.filter(isFxLayer).length >= MAX_FX_TRACKS) return {};
+    const nid = makeLayerId();
     const snap = isFx ? null : (id === state.activeLayerId
       ? captureSnapshot(state)
       : (state.layerSnapshots[id] || freshSnapshot(state.seed, state.seedOffsets)));
@@ -117,7 +122,6 @@ export const createLayersSlice = (set) => ({
     const snapshots = { ...state.layerSnapshots };
     delete snapshots[id];
     const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;
-
     if (id !== state.activeLayerId) {
       return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, selectedFxLayerId };
     }
@@ -179,8 +183,9 @@ export const createLayersSlice = (set) => ({
   })),
 
   addFxLayer: () => set((state) => {
-    const id = makeLayerId();
     const fxCount = state.layers.filter(isFxLayer).length;
+    if (fxCount >= MAX_FX_TRACKS) return {};
+    const id = makeLayerId();
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: [

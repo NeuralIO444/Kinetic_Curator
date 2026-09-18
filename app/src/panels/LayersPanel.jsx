@@ -4,7 +4,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { BLEND_MODES } from '../data/layout-modes.js';
 import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../fx/fxFilters.js';
-import { displayLayerName } from '../state/slices/layersSlice.js';
+import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../state/slices/layersSlice.js';
 
 function FxEffectEditor({ layer }) {
   const [addKind, setAddKind] = useState(FX_MENU_KINDS[0]);
@@ -64,6 +64,10 @@ export function LayersPanel() {
     selectedFxLayerId: s.selectedFxLayerId,
   }));
   const { layers, activeLayerId, selectedFxLayerId } = state;
+  const contentCount = layers.filter((l) => !isFxLayer(l)).length;
+  const fxCount = layers.filter(isFxLayer).length;
+  const ghosts = [];
+  for (let n = contentCount + 1; n <= MAX_CONTENT_TRACKS; n++) ghosts.push(n);
 
   let contentOrdinal = 0;
   const ordinals = new Map();
@@ -76,13 +80,28 @@ export function LayersPanel() {
 
   return (
     <div className="panel panel-layers">
-      <PanelHeader tag="P08" title="LAYERS" subtitle={`${layers.length} layer${layers.length > 1 ? 's' : ''}`}>
-        <button className="chip-btn" title="Add a content layer (generative artwork)"
+      <PanelHeader tag="P08" title="LAYERS" subtitle={`${contentCount} / ${MAX_CONTENT_TRACKS} tracks`}>
+        <button className="chip-btn" title={contentCount >= MAX_CONTENT_TRACKS ? 'The board holds 4 tracks. Shed one.' : 'Arm the next track'}
+          disabled={contentCount >= MAX_CONTENT_TRACKS}
           onClick={() => emit(Events.LAYER_ADD)}>+ ADD LAYER</button>
-        <button className="chip-btn" title="Add an FX layer — applies GL shader effects to everything below it, like an adjustment layer"
+        <button className="chip-btn" title={fxCount >= MAX_FX_TRACKS ? 'The board holds 4 FX. Shed one.' : 'Add an FX layer'}
+          disabled={fxCount >= MAX_FX_TRACKS}
           onClick={() => emit(Events.LAYER_ADD_FX)}>+ ADD FX</button>
       </PanelHeader>
       <div className="panel-body layer-list">
+        {ghosts.slice().reverse().map((n) => (
+          <div
+            key={`ghost-kc-${n}`}
+            className="layer-row"
+            style={{ opacity: 0.35 }}
+            title={`Tap to arm KC-${n}`}
+            onClick={() => emit(Events.LAYER_ADD)}
+          >
+            <div className="layer-row-main">
+              <button className="layer-name" type="button">KC-{n}</button>
+            </div>
+          </div>
+        ))}
         {[...layers].reverse().map((layer, ri) => {
           const i = layers.length - 1 - ri;
           const fx = isFxLayer(layer);
