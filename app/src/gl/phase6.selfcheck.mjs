@@ -189,8 +189,10 @@ const contractOf = (d) => {
   const scene2 = contractOf(doc({ layoutParams: doc2lp, layers: doc2layers }));
   assert.ok(scene2.layers.length >= 1, 'doc 2 builds a contract');
 
-  // D3: 200-layer array (accepted at parse — #103's suggested hard cap is a
-  // documented gap) stays bounded through the GL path by per-layer caps.
+  // D3: 200 layers through the raw contract path (no parse normalization)
+  // stay bounded by per-layer caps. At the parse/apply boundary #103 now
+  // caps documents at MAX_LAYERS (16) — covered by projectDocument.selfcheck;
+  // this asserts the un-normalized contract path stays bounded regardless.
   const many = [];
   for (let i = 0; i < 200; i++) many.push(contentLayer(`l${i}`));
   const t0 = Date.now();

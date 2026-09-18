@@ -2,6 +2,9 @@
 import assert from 'node:assert';
 import { serializeProject, parseProject, PROJECT_VERSION } from './projectDocument.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
+import { sanitizeQuality, MAX_LAYERS } from './projectNormalize.js';
+import { ASSETS } from '../data/assets/index.js';
+import { useStore } from './store.js';
 
 const state = {
   seed: 0x1a4f,
@@ -74,5 +77,48 @@ assert.ok(!bad.ok);
 
 const badSeed = parseProject({ version: 1, seed: 'nope' });
 assert.ok(!badSeed.ok);
+
+// ── #103 Track B — hostile-project hygiene audit ─────────────────────────
+// Each hostile doc must parse to safe defaults and apply without throwing,
+// without store bloat, leaving a playable canvas.
+
+// 200-layer hostile doc → truncated to the cap on parse.
+const manyLayers = Array.from({ length: 200 }, (_, i) => ({ id: `l${i}`, name: `L${i}`, type: 'content' }));
+const capped = parseProject({ version: 1, seed: 1, layers: manyLayers, activeLayerId: 'l0' });
+assert.ok(capped.ok, 'hostile 200-layer doc must still parse');
+assert.strictEqual(capped.doc.layers.length, MAX_LAYERS, 'layers truncated to cap on parse');
+
+// 100k-key enabledAssets hostile doc → only known ids survive.
+const hostileAssets = {};
+for (let i = 0; i < 100000; i++) hostileAssets[`evil-${i}`] = true;
+hostileAssets[ASSETS[0].id] = false;
+const hostile = parseProject({
+  version: 1, seed: 1,
+  enabledAssets: hostileAssets,
+  assetWeightOverrides: { ...hostileAssets, [ASSETS[1].id]: 3 },
+});
+assert.ok(hostile.ok, 'hostile asset-map doc must still parse');
+assert.ok(Object.keys(hostile.doc.enabledAssets).length < 500, 'enabledAssets collapsed to known ids');
+assert.strictEqual(hostile.doc.enabledAssets[ASSETS[0].id], false, 'known ids keep their values');
+assert.ok(!('evil-99999' in hostile.doc.enabledAssets), 'hostile keys dropped');
+assert.deepStrictEqual(
+  Object.keys(hostile.doc.assetWeightOverrides).sort(), [ASSETS[0].id, ASSETS[1].id].sort(),
+  'weight overrides filtered to known ids',
+);
+assert.strictEqual(hostile.doc.assetWeightOverrides[ASSETS[1].id], 3);
+
+// Unknown quality → fallback; a dangling key must never reach the caps lookup.
+const badQ = parseProject({ version: 1, seed: 1, quality: 'ultra-mega' });
+assert.ok(badQ.ok);
+assert.strictEqual(badQ.doc.quality, 'balanced', 'unknown quality falls back on parse');
+assert.strictEqual(sanitizeQuality('high'), 'high', 'known quality passes through');
+
+// Apply path: same guarantees, no throw, no bloat, playable canvas.
+useStore.getState().applyProject({ ...capped.doc, quality: 'ultra-mega', enabledAssets: hostileAssets });
+const applied = useStore.getState();
+assert.ok(applied.layers.length <= MAX_LAYERS, 'layers truncated on apply');
+assert.strictEqual(applied.quality, 'balanced', 'unknown quality falls back on apply');
+assert.ok(Object.keys(applied.enabledAssets).length < 500, 'enabledAssets bounded on apply');
+assert.ok(Number.isFinite(applied.seed), 'applied doc stays playable');
 
 console.log('projectDocument.selfcheck: OK');

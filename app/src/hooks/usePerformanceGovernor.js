@@ -38,6 +38,20 @@ const COOLDOWN_MS = 8000; // don't auto-step again for a while
 
 export function usePerformanceGovernor() {
   const fps = useStore(s => s.fps);
+  const stageTimings = useStore(s => s.stageTimings);
+  // #103 Track A — GPU-implied frame rate. Under vsync the rAF cadence lies:
+  // the GPU can be saturated (fill-rate, ACCUM ping-pong) while FPS reads 60.
+  // The live loop reports per-tick GPU time into stageTimings ('gpuFrame',
+  // rolling-average ms); the governor runs its sustain windows against the
+  // effective rate so a GPU-bound instrument sheds before it cliffs. Absent
+  // (no live loop, no samples yet) this reduces exactly to fps.
+  const gpuFrameMs = Number(stageTimings?.gpuFrame) || 0;
+  const gpuFps = gpuFrameMs > 0 ? 1000 / gpuFrameMs : Infinity;
+  const effFps = Math.round(Math.min(fps, gpuFps) * 10) / 10;
+  const gpuSaturated = gpuFps < LOW_FPS && fps >= LOW_FPS;
+  const gpuNote = gpuSaturated
+    ? ` (gpu-saturated: GPU frame ${gpuFrameMs.toFixed(1)}ms ≈ ${Math.round(gpuFps)}fps)`
+    : '';
   const quality = useStore(s => s.quality);
   const autoQuality = useStore(s => s.autoQuality);
   const slowRender = useStore(s => s.slowRender);
@@ -69,16 +83,16 @@ export function usePerformanceGovernor() {
       }
       return;
     }
-    if (fps >= LOW_FPS) {
+    if (effFps >= LOW_FPS) {
       criticalSinceRef.current = null;
       if (slowRender) {
         setSlowRender(false);
         // Event-log only: the cut cleared (FPS recovered).
-        recordGovernorEvent({ type: 'restore', cutKind: 'slowRender', label: 'motion unfrozen', fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 } });
+        recordGovernorEvent({ type: 'restore', cutKind: 'slowRender', label: 'motion unfrozen', fps: { at: effFps, threshold: LOW_FPS, sustainedMs: 0 } });
       }
       return;
     }
-    if (fps >= CRITICAL_FPS) {
+    if (effFps >= CRITICAL_FPS) {
       criticalSinceRef.current = null;
       return;
     }
@@ -92,12 +106,12 @@ export function usePerformanceGovernor() {
       // Event-log only: step 7 of the shed ladder fired.
       recordGovernorEvent({
         type: 'shed', cutKind: 'watchdog', label: 'watchdog hard stop',
-        fps: { at: fps, threshold: CRITICAL_FPS, sustainedMs: CRITICAL_SUSTAIN_MS },
-        detail: `FPS ${fps} < ${CRITICAL_FPS} sustained ${CRITICAL_SUSTAIN_MS / 1000}s`,
+        fps: { at: effFps, threshold: CRITICAL_FPS, sustainedMs: CRITICAL_SUSTAIN_MS },
+        detail: `FPS ${effFps} < ${CRITICAL_FPS} sustained ${CRITICAL_SUSTAIN_MS / 1000}s${gpuNote}`,
       });
-      console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS, ')');
+      console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS + ')' + gpuNote);
     }
-  }, [fps, autoQuality, slowRender, tripWatchdog, setSlowRender]);
+  }, [effFps, gpuNote, autoQuality, slowRender, tripWatchdog, setSlowRender]);
 
   // Tier 1 (#107 §4): a milder, self-clearing shed. Independent sustain
   // window from the critical tier above — this one fires first, at a higher
@@ -112,14 +126,14 @@ export function usePerformanceGovernor() {
       }
       return;
     }
-    if (fps >= TIER1_FPS) {
+    if (effFps >= TIER1_FPS) {
       tier1SinceRef.current = null;
       if (perfTier1) {
         setPerfTier1(false);
         // Event-log only: the cut cleared (FPS recovered).
         recordGovernorEvent({
           type: 'restore', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM restored',
-          fps: { at: fps, threshold: TIER1_FPS, sustainedMs: 0 },
+          fps: { at: effFps, threshold: TIER1_FPS, sustainedMs: 0 },
         });
       }
       return;
@@ -134,16 +148,16 @@ export function usePerformanceGovernor() {
       // Event-log only: step 3 of the shed ladder fired.
       recordGovernorEvent({
         type: 'shed', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM off',
-        fps: { at: fps, threshold: TIER1_FPS, sustainedMs: TIER1_SUSTAIN_MS },
-        detail: `FPS ${fps} < ${TIER1_FPS} sustained ${TIER1_SUSTAIN_MS / 1000}s`,
+        fps: { at: effFps, threshold: TIER1_FPS, sustainedMs: TIER1_SUSTAIN_MS },
+        detail: `FPS ${effFps} < ${TIER1_FPS} sustained ${TIER1_SUSTAIN_MS / 1000}s${gpuNote}`,
       });
-      console.info('[Kinetic] Perf tier1: ACCUM/gloss/mirror off (FPS below', TIER1_FPS, ')');
+      console.info('[Kinetic] Perf tier1: ACCUM/gloss/mirror off (FPS below', TIER1_FPS + ')' + gpuNote);
     }
-  }, [fps, autoQuality, perfTier1, setPerfTier1]);
+  }, [effFps, gpuNote, autoQuality, perfTier1, setPerfTier1]);
 
   // The cut list: ordered, one step per sustain+cooldown cycle.
   useEffect(() => {
-    const healthy = !autoQuality || fps >= LOW_FPS;
+    const healthy = !autoQuality || effFps >= LOW_FPS;
 
     // Recovery: render-only cuts auto-clear the moment the premise stops
     // holding. (The count clamp keeps its original nuance: its premise is
@@ -155,7 +169,7 @@ export function usePerformanceGovernor() {
         // Event-log only: the cut cleared (recovery or tier change).
         recordGovernorEvent({
           type: 'restore', cutKind: 'countClamp', label: 'count clamp released',
-          fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 },
+          fps: { at: effFps, threshold: LOW_FPS, sustainedMs: 0 },
         });
       }
     }
@@ -165,7 +179,7 @@ export function usePerformanceGovernor() {
         // Event-log only: the cut cleared (FPS recovered).
         recordGovernorEvent({
           type: 'restore', cutKind: 'renderScale', label: 'resolution → 100%',
-          fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 },
+          fps: { at: effFps, threshold: LOW_FPS, sustainedMs: 0 },
         });
       }
       if (assetThin) {
@@ -173,7 +187,7 @@ export function usePerformanceGovernor() {
         // Event-log only: the cut cleared (FPS recovered).
         recordGovernorEvent({
           type: 'restore', cutKind: 'assetThin', label: 'asset thinning released',
-          fps: { at: fps, threshold: LOW_FPS, sustainedMs: 0 },
+          fps: { at: effFps, threshold: LOW_FPS, sustainedMs: 0 },
         });
       }
     }
@@ -185,7 +199,7 @@ export function usePerformanceGovernor() {
 
     const now = Date.now();
 
-    if (fps >= LOW_FPS) {
+    if (effFps >= LOW_FPS) {
       lowSinceRef.current = null;
       return;
     }
@@ -222,13 +236,13 @@ export function usePerformanceGovernor() {
     // Event-log only: steps 1–2 / 4–6 of the shed ladder fire here.
     recordGovernorEvent({
       type: 'shed', cutKind: cut.kind, label: cut.label,
-      fps: { at: fps, threshold: LOW_FPS, sustainedMs: SUSTAIN_MS },
-      detail: `FPS ${fps} < ${LOW_FPS} sustained ${SUSTAIN_MS / 1000}s`,
+      fps: { at: effFps, threshold: LOW_FPS, sustainedMs: SUSTAIN_MS },
+      detail: `FPS ${effFps} < ${LOW_FPS} sustained ${SUSTAIN_MS / 1000}s${gpuNote}`,
     });
     lastActionRef.current = now;
     lowSinceRef.current = null;
-    console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', LOW_FPS + ')');
-  }, [fps, quality, autoQuality, setQuality, layoutParams.count, perfClampOverride,
+    console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', LOW_FPS + ')' + gpuNote);
+  }, [effFps, gpuNote, quality, autoQuality, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
     slowRender, setSlowRender]);
 }

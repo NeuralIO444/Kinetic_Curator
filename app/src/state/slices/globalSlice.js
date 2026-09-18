@@ -5,7 +5,13 @@ import {
   sanitizeOverlay, duplicateIntoOverlay, ingestIntoOverlay,
   removeFromOverlay, renameOverlayAsset, replaceOverlayAsset,
 } from '../../assets/overlay.js';
-import { normalizeSnapshots } from '../projectNormalize.js';
+import {
+  normalizeSnapshots,
+  sanitizeEnabledAssets,
+  sanitizeAssetWeightOverrides,
+  sanitizeQuality,
+  MAX_LAYERS,
+} from '../projectNormalize.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
@@ -283,18 +289,23 @@ export const createGlobalSlice = (set) => ({
     const next = {
       seed: doc.seed >>> 0,
       paletteId: doc.paletteId || state.paletteId,
-      quality: doc.quality || state.quality,
+      // #103 Track B — a dangling quality key must never reach the caps lookup.
+      quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
       ingestError: null,
     };
     if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
       const enabled = { ...initialEnabledAssets };
-      for (const [id, on] of Object.entries(doc.enabledAssets)) enabled[id] = !!on;
+      // #103 Track B — apply-path defense in depth: collapse hostile maps to
+      // known asset ids (+ the doc's own sanitized custom assets) before they
+      // reach the store.
+      const clean = sanitizeEnabledAssets(doc.enabledAssets, next.customAssets);
+      for (const [id, on] of Object.entries(clean || {})) enabled[id] = !!on;
       next.enabledAssets = enabled;
     }
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
-      next.assetWeightOverrides = { ...doc.assetWeightOverrides };
+      next.assetWeightOverrides = { ...sanitizeAssetWeightOverrides(doc.assetWeightOverrides) };
     } else {
       // The serializer omits the field when empty — without this, loading a
       // clean project over a session with overrides kept the old weights.
@@ -302,7 +313,9 @@ export const createGlobalSlice = (set) => ({
     }
     next.paletteOverrides = doc.paletteOverrides ?? null;
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
-      next.layers = doc.layers;
+      // #103 Track B — bound on the apply path too; the live loop resolves
+      // every layer per frame.
+      next.layers = doc.layers.slice(0, MAX_LAYERS);
       next.activeLayerId = doc.activeLayerId;
       next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots);
       next.historyUndoStack = [];
