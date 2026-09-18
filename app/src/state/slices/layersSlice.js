@@ -1,6 +1,7 @@
 import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { initialEnabledAssets } from './globalSlice.js';
 import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS } from '../../fx/fxFilters.js';
+import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 
 function makeLayerId() {
   return `layer-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`;
@@ -51,6 +52,8 @@ export const createLayersSlice = (set) => ({
     const snapshot = freshSnapshot((Math.random() * 0xffffffff) | 0);
     const name = `Layer ${state.layers.length + 1}`;
     return {
+      // #223: layer actions are undoable — capture the pre-add document.
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: [...state.layers, { id, name, visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
       layerSnapshots: {
         ...state.layerSnapshots,
@@ -81,8 +84,9 @@ export const createLayersSlice = (set) => ({
     const i = state.layers.findIndex((l) => l.id === id);
     const layers = [...state.layers];
     layers.splice(i + 1, 0, copy);
-    if (isFx) return { layers, selectedFxLayerId: nid };
+    if (isFx) return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, selectedFxLayerId: nid };
     return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers,
       layerSnapshots: { ...state.layerSnapshots, [nid]: structuredClone(snap) },
     };
@@ -90,10 +94,12 @@ export const createLayersSlice = (set) => ({
 
   soloLayer: (id) => set((state) => {
     const othersHidden = state.layers.every((l) => l.id === id || !l.visible);
+    const push = pushToUndo(state, true, UNDO_KIND_LAYERS);
     if (othersHidden) {
-      return { layers: state.layers.map((l) => ({ ...l, visible: true })) };
+      return { ...push, layers: state.layers.map((l) => ({ ...l, visible: true })) };
     }
     return {
+      ...push,
       layers: state.layers.map((l) => ({ ...l, visible: l.id === id })),
     };
   }),
@@ -107,7 +113,7 @@ export const createLayersSlice = (set) => ({
     const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;
 
     if (id !== state.activeLayerId) {
-      return { layers, layerSnapshots: snapshots, selectedFxLayerId };
+      return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, selectedFxLayerId };
     }
     // FX layers are never the content-active layer (see setActiveLayer) —
     // prefer a content layer so the invariant survives the deletion.
@@ -115,6 +121,7 @@ export const createLayersSlice = (set) => ({
     const nextSnapshot = snapshots[nextActive.id] || freshSnapshot(state.seed);
     delete snapshots[nextActive.id];
     return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers,
       layerSnapshots: snapshots,
       activeLayerId: nextActive.id,
@@ -147,22 +154,27 @@ export const createLayersSlice = (set) => ({
     if (i < 0 || j < 0 || j >= state.layers.length) return {};
     const layers = [...state.layers];
     [layers[i], layers[j]] = [layers[j], layers[i]];
-    return { layers };
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
   }),
 
   toggleLayerVisible: (id) => set((state) => ({
+    ...pushToUndo(state, true, UNDO_KIND_LAYERS),
     layers: state.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
   })),
 
   renameLayer: (id, name) => set((state) => ({
+    ...pushToUndo(state, true, UNDO_KIND_LAYERS),
     layers: state.layers.map((l) => (l.id === id ? { ...l, name } : l)),
   })),
 
   setLayerBlendMode: (id, layerBlendMode) => set((state) => ({
+    ...pushToUndo(state, true, UNDO_KIND_LAYERS),
     layers: state.layers.map((l) => (l.id === id ? { ...l, layerBlendMode } : l)),
   })),
 
   setLayerOpacity: (id, layerOpacity) => set((state) => ({
+    // Slider-driven: debounced, one entry per drag (#223).
+    ...pushToUndo(state, false, UNDO_KIND_LAYERS),
     layers: state.layers.map((l) => (l.id === id ? { ...l, layerOpacity } : l)),
   })),
 
@@ -174,6 +186,7 @@ export const createLayersSlice = (set) => ({
     const id = makeLayerId();
     const fxCount = state.layers.filter(isFxLayer).length;
     return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: [
         ...state.layers,
         {
@@ -195,39 +208,47 @@ export const createLayersSlice = (set) => ({
     return { selectedFxLayerId: l && isFxLayer(l) ? id : null };
   }),
 
-  /** Effect-stack CRUD below — all fail closed on bad ids/indices. */  fxEffectAdd: (layerId, kind) => set((state) => {
+  /** Effect-stack CRUD below — all fail closed on bad ids/indices. */
+  // No-op guard: a bounds-checked action that changes nothing pushes no
+  // entry, or Ctrl+Z would stop lining up with what the operator did.
+  fxEffectAdd: (layerId, kind) => set((state) => {
     const params = defaultFxParams(kind);
     if (!params) return {};
     return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: state.layers.map((l) => (l.id === layerId && isFxLayer(l)
         ? { ...l, effects: [...(l.effects || []), { kind, params }] }
         : l)),
     };
   }),
 
-  fxEffectRemove: (layerId, index) => set((state) => ({
-    layers: state.layers.map((l) => {
+  fxEffectRemove: (layerId, index) => set((state) => {
+    const layers = state.layers.map((l) => {
       if (l.id !== layerId || !isFxLayer(l)) return l;
       const effects = [...(l.effects || [])];
       if (index < 0 || index >= effects.length) return l;
       effects.splice(index, 1);
       return { ...l, effects };
-    }),
-  })),
+    });
+    if (JSON.stringify(layers) === JSON.stringify(state.layers)) return {};
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
+  }),
 
-  fxEffectReorder: (layerId, index, delta) => set((state) => ({
-    layers: state.layers.map((l) => {
+  fxEffectReorder: (layerId, index, delta) => set((state) => {
+    const layers = state.layers.map((l) => {
       if (l.id !== layerId || !isFxLayer(l)) return l;
       const effects = [...(l.effects || [])];
       const j = index + delta;
       if (index < 0 || index >= effects.length || j < 0 || j >= effects.length) return l;
       [effects[index], effects[j]] = [effects[j], effects[index]];
       return { ...l, effects };
-    }),
-  })),
+    });
+    if (JSON.stringify(layers) === JSON.stringify(state.layers)) return {};
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
+  }),
 
-  fxEffectSetParam: (layerId, index, key, value) => set((state) => ({
-    layers: state.layers.map((l) => {
+  fxEffectSetParam: (layerId, index, key, value) => set((state) => {
+    const layers = state.layers.map((l) => {
       if (l.id !== layerId || !isFxLayer(l)) return l;
       const effects = [...(l.effects || [])];
       const fx = effects[index];
@@ -238,6 +259,9 @@ export const createLayersSlice = (set) => ({
       const clamped = Number.isFinite(v) ? Math.min(pdef.max, Math.max(pdef.min, v)) : pdef.def;
       effects[index] = { ...fx, params: { ...fx.params, [key]: clamped } };
       return { ...l, effects };
-    }),
-  })),
+    });
+    if (JSON.stringify(layers) === JSON.stringify(state.layers)) return {};
+    // Slider-driven: debounced, one entry per drag (#223).
+    return { ...pushToUndo(state, false, UNDO_KIND_LAYERS), layers };
+  }),
 });

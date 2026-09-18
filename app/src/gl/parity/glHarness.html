@@ -24,7 +24,7 @@ const u8ToB64 = (u8) => {
 
 /**
  * payload: { width, height, bg, contract, cells, atlasB64, atlasW, atlasH,
- *            grainLuts: {id:{b64,w,h}}, wrapBoxes: {id:[x0,y0,x1,y1]} }
+ *            grainLuts: {id:{b64,w,h}} }
  * returns { pixelsB64, width, height } — pixels are top-first RGBA bytes.
  */
 function renderArgs(payload) {
@@ -44,7 +44,6 @@ function renderArgs(payload) {
     cells: payload.cells,
     atlas: { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips },
     grainLuts,
-    wrapBoxes: payload.wrapBoxes || {},
   };
 }
 
@@ -59,7 +58,7 @@ window.__kcRender = async (payload) => {
  *   { width, height, bg, fade, optics, tunnel, prism, flow, echoes,
  *     audioFrames: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
  *     atlasB64, atlasW, atlasH, atlasMips, cells, grainLuts,
- *     frames: [{ contract, wrapBoxes }] }   // atlas shared across frames
+ *     frames: [{ contract }] }   // atlas shared across frames
  * Runs the whole sequence through the shared recipe (accum.mjs) and returns
  * the final buffer as top-first RGBA bytes.
  */
@@ -82,7 +81,6 @@ window.__kcAccum = async (payload) => {
     cells: payload.cells,
     atlas,
     grainLuts,
-    wrapBoxes: f.wrapBoxes || {},
   }));
   const { pixels, width, height } = renderer.renderAccumSequence(frames, {
     fade: payload.fade,

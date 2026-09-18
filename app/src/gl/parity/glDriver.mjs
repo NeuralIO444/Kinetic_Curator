@@ -148,38 +148,6 @@ export async function openHarnessPage(pagePath) {
 
 function b64(buf) { return Buffer.from(buf).toString('base64'); }
 
-/** Transform a point by an instance transform (canvas units). */
-function xform(x, y, it) {
-  const sx = (x - 50) * it.scaleX, sy = (y - 50) * it.scaleY;
-  const th = it.rotation * Math.PI / 180, c = Math.cos(th), s = Math.sin(th);
-  return [it.x + sx * c - sy * s, it.y + sx * s + sy * c];
-}
-
-/**
- * Union of transformed ink bboxes per fx-wrap (SVG objectBoundingBox region).
- * @returns {Record<string, [x0,y0,x1,y1]|null>}
- */
-export function computeWrapBoxes(contract, cells) {
-  const boxes = {};
-  for (const wrap of contract.fxWraps || []) {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const lid of wrap.contentLayerIds || []) {
-      const layer = contract.layers.find((l) => l.id === lid);
-      for (const it of layer?.instances || []) {
-        const cell = cells.get(comboKey(it.asset, it.tint, it.accent));
-        const ink = cell?.ink || [0, 0, 100, 100];
-        for (const [px, py] of [[ink[0], ink[1]], [ink[2], ink[1]], [ink[0], ink[3]], [ink[2], ink[3]]]) {
-          const [wx, wy] = xform(px, py, it);
-          if (wx < x0) x0 = wx; if (wx > x1) x1 = wx;
-          if (wy < y0) y0 = wy; if (wy > y1) y1 = wy;
-        }
-      }
-    }
-    boxes[wrap.fxLayerId] = x1 >= x0 ? [x0, y0, x1, y1] : null;
-  }
-  return boxes;
-}
-
 function getAtlas(combos) {
   const key = combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join('|');
   let a = atlasCache.get(key);
@@ -199,7 +167,6 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
   const atlas = getAtlas(combos);
   const cells = {};
   for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1 };
-  const wrapBoxes = computeWrapBoxes(contract, atlas.cells);
   // One grain LUT per render: the reference turbulence is region-independent
   // (filter region only clips), so a single full-canvas bake serves every wrap.
   let lutB64 = null, lutW = 0, lutH = 0;
@@ -219,7 +186,7 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
     }
   }
   return {
-    width, height, bg, contract, cells, wrapBoxes,
+    width, height, bg, contract, cells,
     atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
     atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
     grainLuts,
@@ -279,7 +246,6 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
     grainLuts,
     frames: frameContracts.map((contract) => ({
       contract,
-      wrapBoxes: computeWrapBoxes(contract, atlas.cells),
     })),
   };
   const res = await evaluateChunked(page, '__kcAccum', payload);

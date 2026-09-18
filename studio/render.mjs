@@ -229,6 +229,18 @@ export function renderSvg(doc, opts = {}) {
   const hueFilters = new Map();
   const body = [];
 
+  // #227: the background rect is the bottom of the body, so FX layers wrap
+  // it too — "everything below" includes the canvas, like an adjustment
+  // layer over the background. Oversized ±50% (not the old 5x): it fills
+  // letterbox bars at sane aspects AND the breath transform it now sits
+  // inside can never uncover an edge — while staying small enough not to
+  // trip a resvg panic on huge negative-coord geometry inside the isolated
+  // group (geom.rs unwrap; the 5x rect crashed resvg here).
+  const bg = background === 'none' ? null : (background || layers[0]?.palette?.bg || '#000000');
+  if (bg) {
+    body.push(`<rect x="${-CANVAS_W / 2}" y="${-CANVAS_H / 2}" width="${CANVAS_W * 2}" height="${CANVAS_H * 2}" fill="${safePaint(bg)}"/>`);
+  }
+
   // -- FX layers -----------------------------------------------------------
   // Same fold as the live CanvasPanel (buildLayerStack), in string form.
   // #192: no FX culling anywhere — effects compile at full fidelity from
@@ -253,10 +265,16 @@ export function renderSvg(doc, opts = {}) {
   }
   let acc = [];
   const pushAcc = (fxLayer) => {
-    if (acc.length === 0) return;
     if (fxLayer && fxFilters.has(fxLayer.id)) {
+      if (acc.length === 0 && body.length === 0) return; // transparent canvas, nothing below at all
       const op = fxLayer.layerOpacity !== 1 ? ` opacity="${n(fxLayer.layerOpacity)}"` : '';
-      body.push(`<g filter="url(#${fxFilterId(fxLayer.id)})"${op}>${acc.join('\n')}</g>`);
+      // #227: the filter wraps EVERYTHING below — the body accumulated so
+      // far (background rect first, then lower layers and lower FX wraps)
+      // plus the pending segment — so an upper FX layer adjusts the output
+      // of lower FX layers, like an adjustment layer.
+      const inner = [...body, ...acc].join('\n');
+      body.length = 0;
+      body.push(`<g filter="url(#${fxFilterId(fxLayer.id)})"${op}>${inner}</g>`);
     } else {
       body.push(...acc);
     }
@@ -324,7 +342,6 @@ export function renderSvg(doc, opts = {}) {
     defs.push(`<symbol id="${id}" viewBox="0 0 ${ASSET_SIZE} ${ASSET_SIZE}" overflow="visible">${svg}</symbol>`);
   }
 
-  const bg = background === 'none' ? null : (background || layers[0]?.palette?.bg || '#000000');
   const W = width || CANVAS_W;
   const H = height || CANVAS_H;
 
@@ -333,7 +350,6 @@ export function renderSvg(doc, opts = {}) {
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `
     + `width="${W}" height="${H}" viewBox="0 0 ${CANVAS_W} ${CANVAS_H}" preserveAspectRatio="xMidYMid meet">`,
     `<defs>${defs.join('')}</defs>`,
-    bg ? `<rect x="${-CANVAS_W * 2}" y="${-CANVAS_H * 2}" width="${CANVAS_W * 5}" height="${CANVAS_H * 5}" fill="${safePaint(bg)}"/>` : '',
     `<g transform="translate(${CANVAS_W / 2},${CANVAS_H / 2}) rotate(${n(breathRot)}) scale(${n(breathScale)}) translate(${-CANVAS_W / 2},${-CANVAS_H / 2})" style="isolation:isolate">`,
     ...body,
     '</g>',
