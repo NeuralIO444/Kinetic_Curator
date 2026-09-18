@@ -148,6 +148,8 @@ export function MasterBar() {
   const { state } = useApp(s => ({
     running: s.running,
     fps: s.fps,
+    stageTimings: s.stageTimings,
+    governorShedFps: s.governorShedFps,
     seed: s.seed,
     nodeCount: s.nodeCount,
     quality: s.quality,
@@ -171,7 +173,7 @@ export function MasterBar() {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
     slowRender = false, slowRenderSource = null, perfTier1 = false, frameLock = false, audioDenied = false,
     renderFault = false, renderFaultReason = null,
-    glContext = 'ok',
+    glContext = 'ok', governorShedFps = 28,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -203,6 +205,26 @@ export function MasterBar() {
 
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
+  // #297: headroom needle — the effective frame rate the governor watches
+  // (the worse of rAF fps and the GPU-implied rate from the live loop's
+  // per-tick GPU timing), as a tick on the FPS bar. Quiet when comfortably
+  // above the shed floor; warms as the shed approaches, so the performer
+  // sees it coming instead of being surprised. Read-only: no governor
+  // behavior changes, no predictive cuts. The shed floor is read live so a
+  // GOV TUNE override moves the needle's warning with it.
+  const gpuFrameMs = Number(state.stageTimings?.gpuFrame) || 0;
+  const effFps = gpuFrameMs > 0 ? Math.min(fps, 1000 / gpuFrameMs) : fps;
+  const shedFloor = Number(governorShedFps) || 28;
+  const needlePct = Math.max(0, Math.min(100, (effFps / 60) * 100));
+  const headroomFps = effFps - shedFloor;
+  const needleState = headroomFps <= 0 ? 'bad' : headroomFps <= 7 ? 'warn' : 'quiet';
+  const headroomTitle = `Effective frame rate ${effFps.toFixed(1)} fps — the worse of display fps and GPU-implied fps. ` +
+    `The governor sheds below ${shedFloor} fps: the needle shows the shed coming. ` +
+    (needleState === 'quiet'
+      ? 'Comfortably above the shed floor.'
+      : needleState === 'warn'
+        ? 'Headroom is thinning — a shed may be approaching.'
+        : 'At or below the shed floor — the governor is shedding or about to.');
   const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
   const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.balanced;
 
@@ -346,10 +368,11 @@ export function MasterBar() {
           </div>
         )}
 
-        <div className="meter">
+        <div className="meter" title={headroomTitle}>
           <span className="meter-label">FPS</span>
           <div className={`fps-bar ${fpsClass}`}>
             <span className="fps-bar-fill" style={{ width: `${fpsWidth}%` }} />
+            <span className={`fps-needle ${needleState}`} style={{ left: `${needlePct}%` }} />
           </div>
           <span className="meter-value">{Number(fps).toFixed(1)}</span>
         </div>
