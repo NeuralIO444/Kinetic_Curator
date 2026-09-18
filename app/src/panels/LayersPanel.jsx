@@ -4,11 +4,9 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { BLEND_MODES } from '../data/layout-modes.js';
 import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../fx/fxFilters.js';
+import { displayLayerName } from '../state/slices/layersSlice.js';
 
 function FxEffectEditor({ layer }) {
-  // #310: the add-menu is curated to 4 visible effects (RGB Split, Displace,
-  // Tear, Invert); the other five roster effects stay renderable but leave
-  // the menu. Blur is cut from the roster entirely (#308/#310).
   const [addKind, setAddKind] = useState(FX_MENU_KINDS[0]);
   const effects = layer.effects || [];
   return (
@@ -67,6 +65,15 @@ export function LayersPanel() {
   }));
   const { layers, activeLayerId, selectedFxLayerId } = state;
 
+  let contentOrdinal = 0;
+  const ordinals = new Map();
+  for (const l of layers) {
+    if (!isFxLayer(l)) {
+      contentOrdinal += 1;
+      ordinals.set(l.id, contentOrdinal);
+    }
+  }
+
   return (
     <div className="panel panel-layers">
       <PanelHeader tag="P08" title="LAYERS" subtitle={`${layers.length} layer${layers.length > 1 ? 's' : ''}`}>
@@ -82,6 +89,7 @@ export function LayersPanel() {
           const isActive = layer.id === activeLayerId;
           const isFxSelected = layer.id === selectedFxLayerId;
           const soloed = layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
+          const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
           return (
             <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''}`}>
               <div className="layer-row-main">
@@ -107,7 +115,7 @@ export function LayersPanel() {
                   title={fx
                     ? 'Click to edit this layer\u2019s effect stack'
                     : 'Click to make this the active layer (LAYOUT/ASSETS/DAVIS edit it)'}>
-                  {layer.name}{isActive && !fx ? ' · editing' : ''}{isFxSelected && fx ? ' · editing fx' : ''}
+                  {label}{isActive && !fx ? ' · editing' : ''}{isFxSelected && fx ? ' · editing fx' : ''}
                 </button>
                 <button className="micro-btn" title={fx ? 'Duplicate FX layer + effect stack' : 'Duplicate layer + snapshot'}
                   onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
