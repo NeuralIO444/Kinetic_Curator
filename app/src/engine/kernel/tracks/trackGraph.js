@@ -1,9 +1,10 @@
 /**
- * TrackGraph — KC-1 coupling kernel (#343 MOD / #344 FIELD / #345 FEED).
- *
- * FEED encoding is curl (see feedOps.js). Delay-1: sample field, then push.
+ * TrackGraph — KC-1 coupling kernel.
+ * FEED encoding is curl. Delay-1: sample field, then push.
+ * FIELD is short-range 1/d² on the swarm counting-sort grid.
  */
 import { lumaToFlow as encodeLuma } from './feedOps.js';
+import { buildPointHash, forNeighbors, FIELD_RADIUS, FIELD_SOFT } from './fieldHash.js';
 
 export const MAX_TRACKS = 4;
 export const PATCH_MODES = Object.freeze(['off', 'mod', 'field', 'feed']);
@@ -95,13 +96,11 @@ export function liveEdges(graph) {
 export function scheduleFrame(graph) {
   const g = normalizeTrackGraph(graph);
   const live = liveEdges(g);
-  const cyclic = hasCycle(live);
-  const feeds = activePatches(g).filter((p) => p.mode === 'feed');
   return {
     order: g.tracks.map((t) => t.id),
     live,
-    feeds,
-    cyclic,
+    feeds: activePatches(g).filter((p) => p.mode === 'feed'),
+    cyclic: hasCycle(live),
     feedPolicy: FEED_POLICY,
   };
 }
@@ -121,10 +120,7 @@ export function motionMetrics(points) {
     energy += vx * vx + vy * vy;
   }
   return {
-    cx: sx / n,
-    cy: sy / n,
-    vx: svx / n,
-    vy: svy / n,
+    cx: sx / n, cy: sy / n, vx: svx / n, vy: svy / n,
     speed: Math.hypot(svx / n, svy / n),
     agitation: Math.sqrt(energy / n),
     density: n / MAX_TRACKS,
@@ -153,16 +149,23 @@ export function applyField(targetPts, sourcePts, patch) {
   const src = Array.isArray(sourcePts) ? sourcePts : [];
   if (!src.length) return targetPts.map((q) => ({ ...q }));
   const gain = 0.002 * p.strength * p.polarity;
+  const r2 = FIELD_RADIUS * FIELD_RADIUS;
+  const hash = buildPointHash(src);
   return targetPts.map((q) => {
-    let ax = 0, ay = 0;
-    for (const s of src) {
-      const dx = (Number(s.x) || 0) - (Number(q.x) || 0);
-      const dy = (Number(s.y) || 0) - (Number(q.y) || 0);
-      const d2 = dx * dx + dy * dy + 1e-4;
-      ax += dx / d2;
-      ay += dy / d2;
-    }
-    return { ...q, x: (Number(q.x) || 0) + ax * gain, y: (Number(q.y) || 0) + ay * gain };
+    const qx = Number(q.x) || 0;
+    const qy = Number(q.y) || 0;
+    let ax = 0;
+    let ay = 0;
+    forNeighbors(hash, qx, qy, FIELD_RADIUS, (s) => {
+      const dx = (Number(s.x) || 0) - qx;
+      const dy = (Number(s.y) || 0) - qy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r2) return;
+      const den = d2 + FIELD_SOFT;
+      ax += dx / den;
+      ay += dy / den;
+    });
+    return { ...q, x: qx + ax * gain, y: qy + ay * gain };
   });
 }
 
