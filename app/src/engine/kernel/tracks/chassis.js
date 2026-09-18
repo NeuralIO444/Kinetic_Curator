@@ -1,16 +1,14 @@
 /**
  * KC-1 chassis (#339–#342) — data only.
- *
- * Product calls 2026-09-18:
- *   labels KC-1…KC-4; dimmed rows tap-to-arm; TAPE FULL names the room;
- *   LEAN slot counts not frozen (placeholder bytes until #298);
- *   FEED delay-1 until two-track picture exists.
+ * One tape: tapeState() = workingSetBytes + live-edge cycle.
  */
 import {
   MAX_TRACKS,
   normalizeTrackGraph,
   feedTextureBytes,
   activePatches,
+  liveEdges,
+  hasCycle,
 } from './trackGraph.js';
 
 export { MAX_TRACKS };
@@ -45,7 +43,6 @@ function ceilingOf(name) {
   return BUDGET_CEILINGS[ceilingKey(name)];
 }
 
-/** How many 8MB slots this ceiling buys. Placeholder until #298. */
 export function slotsHeld(ceiling, unitBytes = TRACK_BASE_BYTES) {
   const cap = ceilingOf(ceiling);
   return Math.max(0, Math.floor(cap.bytes / unitBytes));
@@ -98,15 +95,35 @@ export function fxSlotCostBytes(armed) {
   return armed ? FX_BASE_BYTES : 0;
 }
 
+export function feedExtraBytes(graph, frameW = 1920, frameH = 1080) {
+  const g = normalizeTrackGraph(graph);
+  const feeds = activePatches(g).filter((p) => p.mode === 'feed');
+  return feeds.length * feedTextureBytes(frameW, frameH);
+}
+
 export function workingSetBytes(graph, fx, { frameW = 1920, frameH = 1080 } = {}) {
   const g = normalizeTrackGraph(graph);
   const f = normalizeFxSlots(fx);
   let bytes = 0;
   for (const t of g.tracks) if (t.armed) bytes += TRACK_BASE_BYTES;
   for (const s of f.slots) if (s.armed) bytes += FX_BASE_BYTES;
-  const feeds = activePatches(g).filter((p) => p.mode === 'feed');
-  bytes += feeds.length * feedTextureBytes(frameW, frameH);
+  bytes += feedExtraBytes(g, frameW, frameH);
   return bytes;
+}
+
+/** Product tape. trackGraph.tapePreflight stays feed+cycle for the kernel. */
+export function tapeState(graph, fx, { frameW = 1920, frameH = 1080, ceiling = 'SHOW' } = {}) {
+  const used = workingSetBytes(graph, fx, { frameW, frameH });
+  const cap = ceilingOf(ceiling);
+  const cyclic = hasCycle(liveEdges(graph));
+  const extraFeed = feedExtraBytes(graph, frameW, frameH);
+  return {
+    used,
+    budget: cap.bytes,
+    extraFeed,
+    cyclic,
+    tapeFull: used > cap.bytes || cyclic,
+  };
 }
 
 export function canArmTrack(graph, fx, trackId, ceiling = 'SHOW') {
@@ -117,18 +134,17 @@ export function canArmTrack(graph, fx, trackId, ceiling = 'SHOW') {
   }
   if (g.tracks[id].armed) return { ok: true, already: true, reason: null };
   const next = { tracks: g.tracks.map((t) => (t.id === id ? { ...t, armed: true } : t)) };
-  const used = workingSetBytes(next, fx);
-  const cap = ceilingOf(ceiling);
-  if (used > cap.bytes) {
+  const tape = tapeState(next, fx, { ceiling });
+  if (tape.tapeFull) {
     return {
       ok: false,
       reason: 'TAPE FULL',
-      detail: missingRoomCopy(ceiling, 'track'),
-      used,
-      budget: cap.bytes,
+      detail: tape.cyclic ? boardFullCopy('track') : missingRoomCopy(ceiling, 'track'),
+      used: tape.used,
+      budget: tape.budget,
     };
   }
-  return { ok: true, reason: null, used, budget: cap.bytes };
+  return { ok: true, reason: null, used: tape.used, budget: tape.budget };
 }
 
 export function canArmFx(graph, fx, fxId, ceiling = 'SHOW') {
@@ -139,18 +155,17 @@ export function canArmFx(graph, fx, fxId, ceiling = 'SHOW') {
   }
   if (f.slots[id].armed) return { ok: true, already: true, reason: null };
   const next = { slots: f.slots.map((s) => (s.id === id ? { ...s, armed: true } : s)) };
-  const used = workingSetBytes(graph, next);
-  const cap = ceilingOf(ceiling);
-  if (used > cap.bytes) {
+  const tape = tapeState(graph, next, { ceiling });
+  if (tape.tapeFull) {
     return {
       ok: false,
       reason: 'TAPE FULL',
-      detail: missingRoomCopy(ceiling, 'FX'),
-      used,
-      budget: cap.bytes,
+      detail: tape.cyclic ? boardFullCopy('fx') : missingRoomCopy(ceiling, 'FX'),
+      used: tape.used,
+      budget: tape.budget,
     };
   }
-  return { ok: true, reason: null, used, budget: cap.bytes };
+  return { ok: true, reason: null, used: tape.used, budget: tape.budget };
 }
 
 export function armTrack(graph, fx, trackId, ceiling = 'SHOW') {

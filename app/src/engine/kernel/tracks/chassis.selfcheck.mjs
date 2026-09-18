@@ -1,11 +1,12 @@
-// KC-1 chassis #339–#342. Node-only.
+// KC-1 chassis. One tape = workingSetBytes + live-edge cycle.
 import assert from 'node:assert';
-import { normalizeTrackGraph } from './trackGraph.js';
+import { normalizeTrackGraph, feedTextureBytes } from './trackGraph.js';
 import {
   TRACK_LABELS, FX_LABELS, MAX_TRACKS, MAX_FX_SLOTS, TRACK_BASE_BYTES,
   dimmedTracks, dimmedFx, armedTrackCount, armedFxCount, slotCostBytes,
   workingSetBytes, canArmTrack, canArmFx, armTrack, armFx,
   addControlState, addFxControlState, trackLabel, missingRoomCopy, boardFullCopy,
+  tapeState, feedExtraBytes,
 } from './chassis.js';
 
 assert.deepStrictEqual(TRACK_LABELS, ['KC-1', 'KC-2', 'KC-3', 'KC-4']);
@@ -22,6 +23,37 @@ assert.strictEqual(boardFullCopy('track'), 'The board holds 4 tracks. Shed one.'
   assert.strictEqual(dimmedTracks(g).length, 3);
   assert.strictEqual(slotCostBytes(false), 0);
   assert.strictEqual(workingSetBytes(g, {}), TRACK_BASE_BYTES);
+  const tape = tapeState(g, {}, { ceiling: 'SHOW' });
+  assert.strictEqual(tape.used, TRACK_BASE_BYTES);
+  assert.strictEqual(tape.extraFeed, 0);
+  assert.strictEqual(tape.cyclic, false);
+  assert.strictEqual(tape.tapeFull, false);
+}
+
+{
+  const g = normalizeTrackGraph({
+    tracks: [
+      { armed: true, patch: { mode: 'feed', to: 1 } },
+      { armed: true, patch: { mode: 'off' } },
+    ],
+  });
+  const extra = feedTextureBytes(1920, 1080);
+  assert.strictEqual(feedExtraBytes(g), extra);
+  assert.strictEqual(workingSetBytes(g, {}), TRACK_BASE_BYTES * 2 + extra);
+  assert.strictEqual(tapeState(g, {}).extraFeed, extra);
+  assert.strictEqual(tapeState(g, {}).cyclic, false);
+}
+
+{
+  const g = normalizeTrackGraph({
+    tracks: [
+      { armed: true, patch: { mode: 'mod', to: 1 } },
+      { armed: true, patch: { mode: 'mod', to: 0 } },
+    ],
+  });
+  const tape = tapeState(g, {}, { ceiling: 'FULL' });
+  assert.strictEqual(tape.cyclic, true);
+  assert.strictEqual(tape.tapeFull, true);
 }
 
 assert.strictEqual(armedFxCount({}), 0);
