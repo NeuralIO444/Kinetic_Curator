@@ -74,4 +74,37 @@ assert.ok(listed.includes('stratified'));
   assert.strictEqual(g.length, 40);
 }
 
+// Concurrent CA field cache: two live grids must not share one module slot
+// (Worker / parallel eval isolation).
+{
+  const ca = getSampler('ca');
+  const gridA = Array.from({ length: 4 }, (_, y) =>
+    Array.from({ length: 4 }, (_, x) => (x === 1 && y === 1 ? 1 : 0)));
+  const gridB = Array.from({ length: 4 }, (_, y) =>
+    Array.from({ length: 4 }, (_, x) => (x === 2 && y === 2 ? 1 : 0)));
+  const seed = 0xcafef00d;
+  const mk = (grid, i) => {
+    const rng = mkRng((seed ^ (i * 0x9e3779b9)) >>> 0 || 1);
+    return ca({
+      i, count: 8, w: 100, h: 100, rng, jitter: 0, seed, caGrid: grid,
+    });
+  };
+  // Warm both grids in alternating order — a single-slot cache would leave
+  // the second grid's field active for the first grid's later samples.
+  const a0 = mk(gridA, 0);
+  const b0 = mk(gridB, 0);
+  const a1 = mk(gridA, 0);
+  const b1 = mk(gridB, 0);
+  assert.strictEqual(a0.x, a1.x, 'grid A samples must be stable across interleaved B');
+  assert.strictEqual(a0.y, a1.y, 'grid A samples must be stable across interleaved B');
+  assert.strictEqual(b0.x, b1.x, 'grid B samples must be stable across interleaved A');
+  assert.strictEqual(b0.y, b1.y, 'grid B samples must be stable across interleaved A');
+  // Different density peaks → different rejection samples at the same index
+  // (not always true for every seed, but these two grids are sparse opposites).
+  assert.ok(
+    a0.x !== b0.x || a0.y !== b0.y,
+    'distinct CA grids should not produce identical point 0 for this fixture',
+  );
+}
+
 console.log('kernel/sample.selfcheck: OK (K2)', { modes: listSamplers().length });

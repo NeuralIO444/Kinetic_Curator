@@ -109,14 +109,19 @@ function rails(ctx) {
 // Field cache keyed by grid identity: stepGrid() returns a new array each
 // tick, so identity is exactly the right key — one blur per grid, not one
 // per placement (the old aliveCells() call was O(n) inside an O(n) loop).
-let _caFieldGrid = null;
-let _caField = null;
+//
+// WeakMap (not a single module slot) so concurrent evaluate() / Worker
+// callers with different grids cannot stomp each other. GC drops entries
+// when a grid is no longer referenced.
+const _caFieldByGrid = new WeakMap();
 function caFieldFor(caGrid) {
-  if (_caFieldGrid !== caGrid) {
-    _caFieldGrid = caGrid;
-    _caField = makeCaField(caGrid, { softness: 1 });
+  if (!caGrid) return null;
+  let field = _caFieldByGrid.get(caGrid);
+  if (!field) {
+    field = makeCaField(caGrid, { softness: 1 });
+    _caFieldByGrid.set(caGrid, field);
   }
-  return _caField;
+  return field;
 }
 
 /**
