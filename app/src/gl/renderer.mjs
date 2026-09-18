@@ -133,6 +133,33 @@ function uploadTexture(gl, pixels, w, h, { mipmap = false, nearest = false, mipm
   return tex;
 }
 
+/**
+ * Standard hue-rotation matrix about the sRGB luminance (gray) axis —
+ * the same matrix SVG's feColorMatrix type="hueRotate" uses, so the GL
+ * layer path matches the SVG reference (studio/render.mjs).
+ *
+ * @param {number} deg rotation in degrees (the LAYOUT panel slider unit)
+ * @returns {Float32Array} 3x3 in column-major order for uniformMatrix3fv
+ * Identity (exactly) when deg is 0 or a multiple of 360.
+ */
+export function hueRotateMatrix(deg) {
+  const rad = ((Number(deg) || 0) % 360) * Math.PI / 180;
+  const c = Math.cos(rad), s = Math.sin(rad);
+  // Row-major SVG hueRotate matrix...
+  const r00 = 0.213 + c * 0.787 - s * 0.213;
+  const r01 = 0.715 - c * 0.715 - s * 0.715;
+  const r02 = 0.072 - c * 0.072 + s * 0.928;
+  const r10 = 0.213 - c * 0.213 + s * 0.143;
+  const r11 = 0.715 + c * 0.285 + s * 0.140;
+  const r12 = 0.072 - c * 0.072 - s * 0.283;
+  const r20 = 0.213 - c * 0.213 - s * 0.787;
+  const r21 = 0.715 - c * 0.715 + s * 0.715;
+  const r22 = 0.072 + c * 0.928 + s * 0.072;
+  // ...stored column-major for uniformMatrix3fv.
+  return new Float32Array([r00, r10, r20, r01, r11, r21, r02, r12, r22]);
+}
+const HUE_IDENTITY = hueRotateMatrix(0); // exact identity: cos=1, sin=0
+
 const hexToRgb = (hex) => {
   const h = hex.replace('#', '');
   const v = h.length <= 4
@@ -167,7 +194,8 @@ export const RENDERER_PROGRAMS = [
     key: 'composite', name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS,
     vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COMPOSITE_FS',
     uniforms: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn',
-      'u_mask', 'u_maskOn', 'u_maskMode', 'u_maskInvert'],
+      'u_mask', 'u_maskOn', 'u_maskMode', 'u_maskInvert',
+      'u_hueOn', 'u_hueMat'], // hueRotate (#262)
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -256,8 +284,10 @@ function createRendererBase(canvas, { alpha = false } = {}) {
    * Composite srcTex over dstTex (ping-pong): reads dstRead, writes dstWrite.
    * blend: blend id from blendIdFor(); opacity: group opacity; clip: [x0,y0,x1,y1] or null.
    * mask: { tex, mode: 'alpha'|'luma', invert } or null — a layer matte (#189).
+   * hueRotate: degrees from layer.layout.hueRotate (0 = off) — hue-rotation
+   *   color matrix in the shader (#262).
    */
-  function composite(prog, u, srcTex, dstRead, dstWrite, blend, opacity, clip, mask = null) {
+  function composite(prog, u, srcTex, dstRead, dstWrite, blend, opacity, clip, mask = null, hueRotate = 0) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstWrite.fb);
     gl.viewport(0, 0, dstWrite.w, dstWrite.h);
     gl.disable(gl.BLEND);
@@ -277,6 +307,11 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     gl.uniform1f(u.u_maskOn, mask ? 1 : 0);
     gl.uniform1i(u.u_maskMode, mask && mask.mode === 'luma' ? 1 : 0);
     gl.uniform1f(u.u_maskInvert, mask && mask.invert ? 1 : 0);
+    // Hue rotation (#262): branch-gated in the shader so hueRotate=0 is
+    // pixel-identical to the pre-#262 path (identity matrix, no arithmetic).
+    const hue = Number(hueRotate) || 0;
+    gl.uniform1f(u.u_hueOn, hue ? 1 : 0);
+    gl.uniformMatrix3fv(u.u_hueMat, false, hue ? hueRotateMatrix(hue) : HUE_IDENTITY);
     drawFullscreen(prog);
   }
   const compU = {
@@ -285,6 +320,7 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     u_clip: U(compProg, 'u_clip'), u_clipOn: U(compProg, 'u_clipOn'),
     u_mask: U(compProg, 'u_mask'), u_maskOn: U(compProg, 'u_maskOn'),
     u_maskMode: U(compProg, 'u_maskMode'), u_maskInvert: U(compProg, 'u_maskInvert'),
+    u_hueOn: U(compProg, 'u_hueOn'), u_hueMat: U(compProg, 'u_hueMat'),
   };
 
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
@@ -456,13 +492,13 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     const compositeLayerTo = (layer, instances, dRead, dWrite) => {
-      if (layer.layout && layer.layout.hueRotate) {
-        throw new Error('[gl] layer hueRotate is not implemented in Phase 1');
-      }
+      // hueRotate (#262): implemented in the composite shader via the
+      // SVG feColorMatrix hue-rotation matrix; 0 is pixel-identical to off.
+      const hueRotate = (layer.layout && layer.layout.hueRotate) || 0;
       renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h);
       composite(
         compProg, compU, layerT.tex, dRead, dWrite,
-        blendIdFor(layer.blend), layer.opacity, null, maskFor(layer.id)
+        blendIdFor(layer.blend), layer.opacity, null, maskFor(layer.id), hueRotate
       );
     };
 
