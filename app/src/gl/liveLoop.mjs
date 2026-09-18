@@ -292,23 +292,20 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const life = lifeRef?.current || {};
     const layoutParams = s.layoutParams || {};
 
-    // #278 — VJ MIX: detect palette changes once per frame and drive the
-    // crossfade state machine. On a fresh 'start' the outgoing deck is
-    // snapshotted from the last presented frame BEFORE anything renders
-    // the incoming palette; a retargeted switch re-uses the original held
-    // frame (DJ re-base) so rapid switches converge without stacking.
-    const mixEv = paletteMix.update({
-      id: s.paletteId,
-      overrides: s.paletteOverrides,
-      userPalettes: s.userPalettes,
-      mixSeconds: s.paletteMixSeconds,
-      now: performance.now(),
-      canDissolve: frameCount > 0 && !!lastFrameTarget && !contextDown,
-      bakeReady: !building && !!cells,
-    });
-    if (mixEv.kind === 'start' && !mixEv.retarget) {
-      if (!live.snapshotHoldFrame(lastFrameTarget)) paletteMix.cancel();
-    }
+    // #278 — VJ MIX: disabled for e2e bisect (debug branch only).
+    const mixEv = { kind: 'none' };
+    // const mixEv = paletteMix.update({
+    //   id: s.paletteId,
+    //   overrides: s.paletteOverrides,
+    //   userPalettes: s.userPalettes,
+    //   mixSeconds: s.paletteMixSeconds,
+    //   now: performance.now(),
+    //   canDissolve: frameCount > 0 && !!lastFrameTarget && !contextDown,
+    //   bakeReady: !building && !!cells,
+    // });
+    // if (mixEv.kind === 'start' && !mixEv.retarget) {
+    //   if (!live.snapshotHoldFrame(lastFrameTarget)) paletteMix.cancel();
+    // }
 
     const resolved = resolver.resolveLayers({
       layers: s.layers,
