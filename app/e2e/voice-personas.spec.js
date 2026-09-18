@@ -4,13 +4,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Mode personas', () => {
   test.beforeEach(async ({ page }) => {
+    // Suppress the first-run overlay before first paint (#37 pattern).
+    // NOTE: the shelf clear must NOT live in the init script — it re-runs on
+    // every navigation, which would wipe a captured voice on page.reload().
     await page.addInitScript(() => {
-      try {
-        localStorage.setItem('kc:first-run-seen', '1');
-        localStorage.removeItem('kc:user-voices:v1');
-      } catch { /* ignore */ }
+      try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
     });
     await page.goto('/');
+    await page.evaluate(() => {
+      try { localStorage.removeItem('kc:user-voices:v1'); } catch { /* ignore */ }
+    });
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
     const layoutTab = page.getByRole('tab', { name: /layout/i });
     await layoutTab.click();

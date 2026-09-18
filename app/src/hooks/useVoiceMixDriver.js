@@ -21,7 +21,9 @@ export function useVoiceMixDriver() {
         s.commitVoiceMix();
         return;
       }
-      s.setVoiceMixT(t);
+      // advanceVoiceMix (not setVoiceMixT): the driver's own writes must not
+      // pause the auto-advance it is driving.
+      s.advanceVoiceMix(t);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);

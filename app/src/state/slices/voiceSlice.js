@@ -160,7 +160,7 @@ export const createVoiceSlice = (set) => ({
         t: 0,
         durationMs,
         auto: true,
-        startedAt: Date.now(),
+        startedAt: performance.now(),
         targetVoiceId: voiceId,
         targetName: def.displayName || def.name || voiceId,
       },
@@ -177,12 +177,25 @@ export const createVoiceSlice = (set) => ({
     return { voiceMix: { ...mix, t: nt, auto: false } };
   }),
 
+  /**
+   * Driver tick — advances the MIX position without touching `auto`.
+   * The driver calls this (not setVoiceMixT) so its own writes don't
+   * pause the auto-advance it is driving.
+   */
+  advanceVoiceMix: (t) => set((state) => {
+    const mix = state.voiceMix;
+    if (!mix) return {};
+    const nt = Math.min(1, Math.max(0, Number(t) || 0));
+    if (Math.abs(nt - mix.t) < 0.001) return {};
+    return { voiceMix: { ...mix, t: nt } };
+  }),
+
   /** Resume the auto-advance from the scrubbed position. */
   resumeVoiceMix: () => set((state) => {
     const mix = state.voiceMix;
     if (!mix || mix.auto) return {};
     return {
-      voiceMix: { ...mix, auto: true, startedAt: Date.now() - mix.t * mix.durationMs },
+      voiceMix: { ...mix, auto: true, startedAt: performance.now() - mix.t * mix.durationMs },
     };
   }),
 

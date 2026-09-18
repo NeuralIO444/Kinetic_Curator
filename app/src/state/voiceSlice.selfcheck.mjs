@@ -75,11 +75,22 @@ assert.deepStrictEqual(api.userVoices, [], 'empty shelf in node (no localStorage
 assert.strictEqual(api.voiceMix, null);
 assert.strictEqual(api.activeVoiceId, null);
 
-// Capture the + chip flow.
+// Capture the + chip flow (from a non-default mode so we can tell the
+// captured state apart from defaults).
+state.layoutParams = { ...state.layoutParams, mode: 'grid' };
 api.captureUserVoice();
 assert.strictEqual(state.userVoices.length, 1);
 assert.strictEqual(state.userVoices[0].name, 'VOICE 01');
-assert.strictEqual(state.userVoices[0].state.params.mode, 'fibonacci', 'captures current mode');
+assert.strictEqual(state.userVoices[0].state.params.mode, 'grid', 'captures current mode');
+
+// Loading a USER voice targets the captured state, not defaults.
+const uvId = state.userVoices[0].id;
+api.loadVoice(uvId);
+assert.ok(state.voiceMix, 'user mix opens');
+assert.strictEqual(state.voiceMix.to.params.mode, 'grid', 'user voice target is the captured state');
+assert.strictEqual(state.voiceMix.targetVoiceId, uvId);
+api.cancelVoiceMix();
+state.layoutParams = { ...state.layoutParams, mode: 'fibonacci' };
 
 // Load a flagship: opens a mix, does not touch committed state.
 api.loadVoice('swarm');
@@ -97,6 +108,12 @@ assert.strictEqual(state.voiceMix.t, 0.5);
 assert.strictEqual(state.voiceMix.auto, false);
 api.resumeVoiceMix();
 assert.strictEqual(state.voiceMix.auto, true);
+
+// Driver ticks advance t WITHOUT pausing auto (regression: the driver used
+// to call setVoiceMixT and immediately pause itself).
+api.advanceVoiceMix(0.6);
+assert.strictEqual(state.voiceMix.t, 0.6);
+assert.strictEqual(state.voiceMix.auto, true, 'driver tick preserves auto');
 
 // Commit lands the full voice state in one step.
 api.commitVoiceMix();
