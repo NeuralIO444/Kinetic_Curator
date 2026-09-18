@@ -157,6 +157,8 @@ export function MasterBar() {
     slowRender: s.slowRender,
     slowRenderSource: s.slowRenderSource,
     perfTier1: s.perfTier1,
+    renderFault: s.renderFault,
+    renderFaultReason: s.renderFaultReason,
     frameLock: s.frameLock,
     setFrameLock: s.setFrameLock,
     audioDenied: s.audioDenied,
@@ -167,6 +169,7 @@ export function MasterBar() {
   const {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
     slowRender = false, slowRenderSource = null, perfTier1 = false, frameLock = false, audioDenied = false,
+    renderFault = false, renderFaultReason = null,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -283,6 +286,27 @@ export function MasterBar() {
           >
             <span className="status-dot" style={{ background: '#ffb000' }} />
             MOTION HELD
+          </div>
+        )}
+
+        {/* #266: a deterministic per-frame fault (frame building /
+            rendering / presenting throwing on consecutive ticks) or a
+            deterministic atlas-bake failure. Sticky — the canvas holds the
+            last good frame while the pill is up, so without this the app
+            would look alive while silently stopped presenting. Red like
+            PERF PAUSED (a hard-stop-class failure), not amber like the
+            self-clearing governor indicators. Clears only after a sustained
+            run of clean frames, or a reload. */}
+        {renderFault && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+            title={renderFaultReason
+              ? `Render fault: ${renderFaultReason}. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.`
+              : 'Render fault: a deterministic per-frame failure stopped presenting. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.'}
+          >
+            <span className="status-dot" style={{ background: '#ff2d6f' }} />
+            RENDER FAULT
           </div>
         )}
 
