@@ -745,10 +745,14 @@ export function createLiveRenderer(canvas) {
   let grainTexs = {};
   let accum = null;
 
+  // #267: last live geometry, so offscreen captures can restore the
+  // bridge to exactly the live size after rendering at capture size.
+  let liveW = 0, liveH = 0, liveDpr = 1;
   function ensureTargets(w, h, dprScale = 1) {
     // Backing-store (pixel) size: logical render size × dprScale. The CSS
     // layout size never changes — only canvas.width/height (the backing
     // store) and the render targets follow.
+    liveW = w; liveH = h; liveDpr = dprScale;
     const bw = Math.max(2, Math.round(w * dprScale));
     const bh = Math.max(2, Math.round(h * dprScale));
     if (T && bw === TW && bh === TH) return;
@@ -830,18 +834,54 @@ export function createLiveRenderer(canvas) {
     }
   }
 
+  // #267: dedicated offscreen targets for captures. A capture renders the
+  // scene contract at the requested size into its own target set — the live
+  // canvas and the shared live targets T are never touched, so the visible
+  // canvas can't flash and a running WebM recording never sees a mid-stream
+  // resolution jump. The bridge (FX-layer FBOs) is resized to the capture
+  // size for the render and restored to the live geometry afterwards, so the
+  // next live tick's ensureTargets is a no-op.
+  let OT = null, OTW = 0, OTH = 0;
+  // #267: the capture size rides in the payload (width/height) — one shape
+  // for every caller, so a signature skew can't silently mis-size a capture.
+  function renderFrameOffscreen(payload, { transparent = false } = {}) {
+    const w = payload.width, h = payload.height;
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
+      throw new Error(`[gl-live] renderFrameOffscreen needs payload.width/height, got ${w}x${h}`);
+    if (!atlasTex) throw new Error('[gl-live] atlas not uploaded — call setAtlas first');
+    if (!OT || OTW !== w || OTH !== h) {
+      if (OT) b.freeFrameTargets(OT);
+      OT = b.allocFrameTargets(w, h);
+      OTW = w; OTH = h;
+    }
+    bridge.resize(w, h, 1);
+    try {
+      // u_canvas stays 1000×700 (scene layout units) — the extra pixels are
+      // pure sharpness, same trick governor renderScale uses below 1x.
+      const mRead = b.renderFrameInto(
+        { ...payload, width: w, height: h }, OT,
+        { atlasTex, grainLuts: grainTexs }, { transparent });
+      return b.resolveTargetToBytes(mRead, OT, w, h);
+    } finally {
+      // A capture can only run after the first live frame (waitForReady), so
+      // liveW is set — the guard is belt-and-braces against a 0-size alloc.
+      if (liveW > 0 && liveH > 0) bridge.resize(liveW, liveH, liveDpr);
+    }
+  }
+
   function dispose() {
     dropAccum();
     if (atlasTex) gl.deleteTexture(atlasTex);
     for (const t of Object.values(grainTexs)) gl.deleteTexture(t);
     if (T) b.freeFrameTargets(T);
+    if (OT) b.freeFrameTargets(OT);
     b.disposeBase();
   }
 
   return {
     setAtlas, setGrainLuts,
     hasAtlas: () => !!atlasTex,
-    renderFrame, present, readback,
+    renderFrame, renderFrameOffscreen, present, readback,
     ensureAccum, dropAccum,
     getGL: () => gl,
     getBridge: () => bridge,

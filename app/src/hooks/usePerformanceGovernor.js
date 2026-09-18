@@ -89,6 +89,10 @@ export function usePerformanceGovernor() {
   const setAssetThin = useStore(s => s.setAssetThin);
   const setRenderScale = useStore(s => s.setRenderScale);
   const layoutParams = useStore(s => s.layoutParams);
+  // #263 — while a context restore is in flight the FPS reading is
+  // meaningless (no frames present during the rebake); don't let the
+  // watchdog trip on the new session before it has drawn anything.
+  const glContext = useStore(s => s.glContext);
 
   const lowSinceRef = useRef(null);
   const lastActionRef = useRef(0);
@@ -123,6 +127,13 @@ export function usePerformanceGovernor() {
     // #264 — the watchdog hard stop NEVER auto-clears on FPS recovery; it
     // needs manual resume (Space/RUN clears it in setRunning). Only the
     // cut-6 soft freeze auto-clears, in the restore table below.
+    // #263 — a context restore is in flight (glContext 'lost'/'restoring'):
+    // FPS is meaningless while the new session rebakes, so hold the
+    // watchdog instead of tripping on the session before it draws.
+    if (glContext !== 'ok') {
+      criticalSinceRef.current = null;
+      return;
+    }
     if (effFps >= recoverFps) {
       criticalSinceRef.current = null;
       return;
@@ -146,7 +157,7 @@ export function usePerformanceGovernor() {
       });
       console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS + ')' + gpuNote);
     }
-  }, [effFps, gpuNote, autoQuality, slowRender, slowRenderSource, tripWatchdog, setSlowRender, clearWatchdogReason, recoverFps]);
+  }, [effFps, gpuNote, autoQuality, slowRender, slowRenderSource, tripWatchdog, setSlowRender, clearWatchdogReason, recoverFps, glContext]);
 
   // Tier 1 (#107 §4): a milder, self-clearing shed. Independent sustain
   // window from the critical tier above — this one fires first, at a higher

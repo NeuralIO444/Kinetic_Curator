@@ -138,7 +138,7 @@ function AppInner() {
           loopRef: glLoopRef,
           resolution: state.exportResolution,
           seedStr: state.seed.toString(16),
-        }).catch(() => {});
+        }).catch((e) => console.warn('[auto-snapshot] capture failed:', e));
         lastSnapRef.current = now;
       }
     }
@@ -163,7 +163,7 @@ function AppInner() {
             },
           });
         },
-      }).catch(() => {});
+      }).catch((e) => console.error('[snap] hotkey capture failed:', e));
     },
     'f': () => piped({
       type: A.ADD_FAVORITE,
