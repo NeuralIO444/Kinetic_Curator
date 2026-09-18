@@ -1,6 +1,6 @@
 /**
  * Host for the eval worker. Node-only (worker_threads).
- * Live loop stays on-thread — KERNEL_V1_PLAN: a postMessage hop is a frame.
+ * Live loop stays on-thread — a postMessage hop is a frame.
  */
 import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 export const EVAL_WORKER_ABI = 'eval.worker.v1';
 
 const WORKER_PATH = join(dirname(fileURLToPath(import.meta.url)), 'evalWorker.mjs');
+const CALL_MS = 15000;
 
 export function createEvalHost() {
   const worker = new Worker(WORKER_PATH);
@@ -20,18 +21,26 @@ export function createEvalHost() {
     const wait = pending.get(msg.id);
     if (!wait) return;
     pending.delete(msg.id);
+    clearTimeout(wait.timer);
     if (msg.type === 'error') wait.reject(new Error(msg.message));
     else wait.resolve(msg);
   });
   worker.on('error', (err) => {
-    for (const wait of pending.values()) wait.reject(err);
+    for (const wait of pending.values()) {
+      clearTimeout(wait.timer);
+      wait.reject(err);
+    }
     pending.clear();
   });
 
   function send(payload) {
     const id = nextId++;
     return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`eval worker timeout (${payload.type} #${id})`));
+      }, CALL_MS);
+      pending.set(id, { resolve, reject, timer });
       worker.postMessage({ ...payload, id });
     });
   }

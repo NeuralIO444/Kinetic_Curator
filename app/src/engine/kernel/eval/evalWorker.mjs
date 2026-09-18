@@ -1,7 +1,6 @@
 /**
  * Eval worker (#108 item 5).
- * Node worker_threads entry. Browser Worker can import the same evaluate().
- * Staged-eval cache lives here so the host does not shuttle SoA each call.
+ * Node worker_threads entry. Staged-eval cache lives here.
  */
 import { parentPort } from 'node:worker_threads';
 import { evaluate } from '../evalContext.js';
@@ -18,7 +17,7 @@ function sessionOf(id) {
 parentPort.on('message', (msg) => {
   if (!msg || typeof msg !== 'object') return;
   if (msg.type === 'ping') {
-    parentPort.postMessage({ type: 'pong', abi: EVAL_WORKER_ABI });
+    parentPort.postMessage({ type: 'pong', id: msg.id, abi: EVAL_WORKER_ABI });
     return;
   }
   if (msg.type === 'reset') {
