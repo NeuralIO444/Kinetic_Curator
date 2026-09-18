@@ -14,6 +14,42 @@ function loopOrThrow(loopRef) {
   return loop;
 }
 
+// #270: iOS jetsam guard. A no-ACCUM still export allocates all seven
+// frame targets at once (six RGBA16F + the RGBA8 resolve): w*h*8B*7 ≈
+// 582MB at 4x (4000×2800) — uncomfortably close to the ~700MB budget that
+// has jetsam-killed Safari tabs on older iPhones. Estimate BEFORE
+// committing GPU memory and refuse with an honest message instead of
+// crashing the tab. 1x/2x (~157MB) stay well under the budget.
+// ACCUM-on captures read back the live-size feedback texture, so they
+// never hit this path — the guard only runs the re-render branch below.
+const EXPORT_TEXTURE_BUDGET_BYTES = 512 * 1024 * 1024; // mobile safety ceiling
+const FRAME_TARGET_COUNT = 7; // layerT, scratchT, blendT, maskT, mainA, mainB, outT
+
+export function estimateExportTextureBytes(width, height) {
+  return Math.round(width) * Math.round(height) * 8 * FRAME_TARGET_COUNT;
+}
+
+export function isIOSDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+function guardExportMemory(width, height, resolution) {
+  if (!isIOSDevice()) return; // desktop GPU budgets are far larger
+  const bytes = estimateExportTextureBytes(width, height);
+  if (bytes > EXPORT_TEXTURE_BUDGET_BYTES) {
+    const mb = Math.round(bytes / (1024 * 1024));
+    throw new Error(
+      `[capture] ${resolution}× export refused on iOS: it would allocate ~${mb}MB of GPU textures at once, ` +
+        `over the ${EXPORT_TEXTURE_BUDGET_BYTES / (1024 * 1024)}MB mobile safety budget ` +
+        `(iOS jetsam kills Safari tabs near ~700MB). Use 2× on this device.`
+    );
+  }
+}
+
 function pixelsToCanvas(pixels, w, h) {
   const c = document.createElement('canvas');
   c.width = w;
@@ -53,6 +89,9 @@ export async function captureStill({ loopRef, resolution = 1, seedStr = '', onTh
   await loop.waitForReady();
   const width = Math.round(1000 * resolution);
   const height = Math.round(700 * resolution);
+  // #270: refuse the export before any GPU allocation on iOS if it would
+  // exceed the mobile texture budget. PrintDeskModal surfaces e.message.
+  guardExportMemory(width, height, resolution);
   const { pixels, width: pw, height: ph } = loop.captureFrame({ width, height });
   const canvas = pixelsToCanvas(pixels, pw, ph);
   const thumb = drawThumbnail(canvas);

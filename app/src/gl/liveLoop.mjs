@@ -395,7 +395,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     }
     const target = live.renderFrame(
       { ...payload, width, height },
-      { transparent },
+      // #270: export resolution is exact — no display-DPR multiplier here.
+      { transparent, dprScale: 1 },
     );
     const pixels = live.readback(target, width, height);
     return { pixels, width, height };

@@ -678,7 +678,27 @@ export function createRenderer(canvas) {
  * Capture never touches preserveDrawingBuffer: readback resolves into the
  * persistent outT FBO, then readPixels — the visible canvas can stay
  * preserveDrawingBuffer:false.
+ *
+ * #270 — DPR: the scene contract is always in logical 1000×700 scene units
+ * (drawInstances maps via u_canvas, so render size and scene units are
+ * decoupled — the same trick governor renderScale uses below 1x). The live
+ * canvas backing store renders at liveDisplayScale() (capped at 2 for perf)
+ * while the CSS layout size is untouched, so retina displays get real
+ * pixels, not a CSS upscale. Capture exports pass dprScale: 1 explicitly —
+ * export resolution is the caller's choice, never the display's.
  */
+
+/**
+ * #270: live canvas display scale. min(devicePixelRatio, 2) — 3x phone
+ * panels get 2x (perf), desktop retina gets its native 2x. Pure function
+ * of window.devicePixelRatio; call per frame so moving the window across
+ * monitors with different DPR re-resolves (ensureTargets reallocs).
+ */
+export function liveDisplayScale() {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  return Math.max(1, Math.min(dpr, 2));
+}
+
 export function createLiveRenderer(canvas) {
   const b = createRendererBase(canvas, { alpha: true });
   const { gl, bridge } = b;
@@ -689,17 +709,24 @@ export function createLiveRenderer(canvas) {
   let grainTexs = {};
   let accum = null;
 
-  function ensureTargets(w, h) {
-    if (T && w === TW && h === TH) return;
+  function ensureTargets(w, h, dprScale = 1) {
+    // Backing-store (pixel) size: logical render size × dprScale. The CSS
+    // layout size never changes — only canvas.width/height (the backing
+    // store) and the render targets follow.
+    const bw = Math.max(2, Math.round(w * dprScale));
+    const bh = Math.max(2, Math.round(h * dprScale));
+    if (T && bw === TW && bh === TH) return;
     if (T) b.freeFrameTargets(T);
-    T = b.allocFrameTargets(w, h);
-    TW = w; TH = h;
+    T = b.allocFrameTargets(bw, bh);
+    TW = bw; TH = bh;
     // Resizing the canvas clears it; the loop re-renders every frame, so
     // this costs one frame on renderScale changes only.
-    if (canvas.width !== w) canvas.width = w;
-    if (canvas.height !== h) canvas.height = h;
-    bridge.resize(w, h, 1);
-    if (accum) accum.resize(w, h);
+    if (canvas.width !== bw) canvas.width = bw;
+    if (canvas.height !== bh) canvas.height = bh;
+    // The bridge allocates its FBOs at W×DPR internally (targetSize), so
+    // passing the DPR here keeps its layers in sync with the targets.
+    bridge.resize(w, h, dprScale);
+    if (accum) accum.resize(bw, bh);
   }
 
   function setAtlas(pixels, w, h, mipmaps) {
@@ -722,12 +749,16 @@ export function createLiveRenderer(canvas) {
    * payload: { width, height, bg, contract, cells, transparent? } —
    *   contract instances are in logical 1000x700 scene units regardless of
    *   width/height (governor renderScale only changes output resolution).
+   * dprScale multiplies the backing-store size only (live display path);
+   * capture exports pass dprScale: 1 to keep export resolution exact.
    * Returns the target holding the composited frame.
    */
-  function renderFrame(payload, { transparent = false } = {}) {
+  function renderFrame(payload, { transparent = false, dprScale = liveDisplayScale() } = {}) {
     if (!atlasTex) throw new Error('[gl-live] atlas not uploaded — call setAtlas first');
-    ensureTargets(payload.width, payload.height);
-    return b.renderFrameInto(payload, T, { atlasTex, grainLuts: grainTexs }, { transparent });
+    ensureTargets(payload.width, payload.height, dprScale);
+    // Draw at backing-store size; u_canvas stays 1000×700 so the scene
+    // layout is identical — the extra pixels are pure sharpness.
+    return b.renderFrameInto({ ...payload, width: TW, height: TH }, T, { atlasTex, grainLuts: grainTexs }, { transparent });
   }
 
   /** Present a composited target to the visible canvas (Y-flip resolve). */
@@ -750,9 +781,9 @@ export function createLiveRenderer(canvas) {
   }
 
   /** Lazily create (and keep) the ACCUM feedback pair at the render size. */
-  function ensureAccum(w, h) {
-    ensureTargets(w, h);
-    if (!accum) accum = createAccum(gl, bridge, { width: w, height: h });
+  function ensureAccum(w, h, dprScale = liveDisplayScale()) {
+    ensureTargets(w, h, dprScale);
+    if (!accum) accum = createAccum(gl, bridge, { width: TW, height: TH });
     return accum;
   }
 
