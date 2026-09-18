@@ -54,7 +54,13 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
 
   // COUNT is a stage-A input: if the geometry cache went stale, changing it
   // would not move the node count. Node count cannot be faked by animation.
-  const count = page.locator('input[type="range"]').first();
+  // Scope the lookup through the layout panel's COUNT label, not bare
+  // document order: the master bar now hosts its own input[type=range]
+  // (the #278 palette MIX slider), which sorts first in the DOM and broke
+  // the old .first() lookup.
+  const count = page.locator('.param-block .range-row', {
+    has: page.locator('.range-label', { hasText: /^COUNT$/ }),
+  }).locator('input[type="range"]');
   await expect(count).toBeVisible();
 
   await setRange(page, count, 700);
