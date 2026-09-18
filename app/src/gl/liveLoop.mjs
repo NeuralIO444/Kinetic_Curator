@@ -35,6 +35,7 @@ import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
+import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
 import {
@@ -207,6 +208,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   let accumActive = false;
   let accumFrozen = false;
   let lastAccumOn = false;
+  // #309 velocity smear: per-instance position history (layer|key) for the
+  // frame-to-frame displacement attached as vx/vy. Cleared whenever the
+  // ACCUM session ends so re-enabling starts at zero velocity.
+  let velPrev = new Map();
   // #268 SWELL: breathe the trail length out and back over ~2s. A timestamp,
   // not a flag — the envelope derives from wall-clock in buildFrame, so the
   // gesture can't stick if a frame is dropped mid-swell.
@@ -227,6 +232,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     try { live.dropAccum(); } catch { /* already torn down */ }
     accumObj = null;
     accumActive = false;
+    velPrev.clear(); // #309: the retry starts at zero velocity
     accumRetryAt = performance.now() + 2000;
     const now = performance.now();
     if (now - lastAccumErrTs > 5000) {
@@ -350,6 +356,16 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       it.scaleX *= sizeMul;
       it.scaleY *= sizeMul;
       it.rotation += life.breathRot || 0;
+    }
+
+    // #309 velocity smear: per-frame displacement in final rendered scene
+    // units, attached as vx/vy for the trail system (QUAD_VS stretches each
+    // quad along its own motion). Only while an ACCUM session is active —
+    // plain rendering never sees vx/vy and is unchanged. Gated on
+    // accumActive (not just accumOn) so the enable tick starts at zero
+    // velocity instead of diffing against a stale session's history.
+    if (!!layoutParams.accumulation && !s.perfTier1 && accumActive) {
+      attachVelocities(contract.instances, velPrev);
     }
 
     // Static resources: atlas combos from the transformed instances, grain
@@ -505,9 +521,17 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
           lastAccumOn = true;
           if (frozen && accumObj) {
             // FREEZE: hold the feedback image, skip render + step.
-            live.present(accumObj.texture());
+            // #309: the pair is half-res — present upscaled.
+            live.presentUpscaled(accumObj.texture());
           } else if (accumObj) {
             try {
+              // #309: a dprScale change rebuilds the feedback pair at the
+              // new ratio — re-begin it so trails restart cleanly.
+              const fresh = live.ensureAccum(payload.width, payload.height);
+              if (fresh !== accumObj) {
+                accumObj = fresh;
+                accumObj.begin(bgCss);
+              }
               const target = live.renderFrame(payload, { transparent: true });
               const bands = audioBands || { rms: 0, beatPulse: 0 };
               // Silence is a true no-op: the envelope passes params through at 0.
@@ -516,8 +540,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
                 flux: 0,
                 beatPulse: audioOn ? bands.beatPulse || 0 : 0,
               });
-              accumObj.step(target.tex, rp);
-              live.present(accumObj.texture());
+              // #309: the frame is backing-store sized; the pair is logical.
+              accumObj.step(target.tex, rp, { width: target.w, height: target.h });
+              live.presentUpscaled(accumObj.texture());
             } catch (e) {
               noteAccumFault(e);
               // Fall back to plain rendering so the canvas keeps moving.
@@ -534,6 +559,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
             live.dropAccum();
             accumObj = null;
             accumActive = false;
+            velPrev.clear(); // #309: the next session starts at zero velocity
             // #268: the session ended — reset the loop's own frozen flag
             // (not the frame's read-only copy), or re-enabling ACCUM shows
             // no trails while the panel reads inactive (two-press FREEZE trap).

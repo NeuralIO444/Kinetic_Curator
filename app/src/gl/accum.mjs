@@ -12,13 +12,24 @@
  *
  * Recipe — per frame, on premultiplied 16F textures, opaque buffer:
  *
- *   0. Echoes (Phase B3): a ring buffer of past frames is mixed into the
+ * #309: the feedback pair runs at HALF resolution (logical size on the
+ * retina/live path — bridge.layer('__accum__', { div: dprScale })). The
+ * incoming frame is resampled down to the pair's size first (manual
+ * bilinear, exact for any dprScale), and the returned target is upscaled
+ * for presentation by the caller (renderer.presentUpscaled / the live
+ * loop). Echo taps, weights, and the mix are untouched.
+ *
+ *   0. (pre) Resample (#309) — a backing-store-sized frame is resampled
+ *      down to the pair's size first (manual bilinear, exact for any
+ *      dprScale). Skipped when the frame already matches the pair
+ *      (resDiv = 1: stills/export).
+ *   1. Echoes (Phase B3): a ring buffer of past frames is mixed into the
  *      incoming frame — tap i holds the frame from i+1 steps ago, additive
  *      ghosts. Skipped at echoes = 0 (no ring, no mix pass).
- *   1. Feed (Phase B2): flow-advected feedback — the buffer is sampled at
+ *   2. Feed (Phase B2): flow-advected feedback — the buffer is sampled at
  *      uv + flow(uv) * strength through a small in-shader noise field, so
  *      trails curl as they decay. Skipped at flow = 0 (exact old buffer).
- *   2. Fade/decay + feedback: accum.rgb *= keep (keep = fade, 0..0.99),
+ *   3. Fade/decay + feedback: accum.rgb *= keep (keep = fade, 0..0.99),
  *      sampled through the Phase A feedback transform — per-frame zoom +
  *      spin (TUNNEL, light-tunnels) and radial RGB channel separation
  *      (PRISM). All amounts 0/off by default: the transform is skipped and
@@ -395,6 +406,32 @@ void main() {
   o = vec4(base.rgb + u_amount * u_tint * glow * gate, base.a);
 }`;
 
+// Frame resample for #309: the feedback pair runs at logical size, but the
+// incoming frame can be backing-store sized (live retina path). This pass
+// brings the frame down to the write target's size with manual bilinear
+// sampling (texelFetch — exact regardless of the source texture's filter
+// mode, and exact for any downsample factor, including fractional
+// dprScale). At an integer factor of 2 it reduces to the 2x2 box average.
+// Coordinates are clamped before texelFetch (out-of-range is UB).
+export const RESAMPLE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform vec2 u_srcSize;   // source size in px
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec2 st = v_cuv * u_srcSize - vec2(0.5);
+  vec2 f = fract(st);
+  ivec2 b = ivec2(floor(st));
+  ivec2 lo = ivec2(0);
+  ivec2 hi = ivec2(u_srcSize) - ivec2(1);
+  vec4 s00 = texelFetch(u_src, clamp(b, lo, hi), 0);
+  vec4 s10 = texelFetch(u_src, clamp(b + ivec2(1, 0), lo, hi), 0);
+  vec4 s01 = texelFetch(u_src, clamp(b + ivec2(0, 1), lo, hi), 0);
+  vec4 s11 = texelFetch(u_src, clamp(b + ivec2(1, 1), lo, hi), 0);
+  o = mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
+}`;
+
 /**
  * Every ACCUM GPU program in one table — the single source of truth for
  * what createAccum builds and what the debug harness audits (#193 second
@@ -438,6 +475,12 @@ export const ACCUM_PROGRAMS = {
   // pass in this instrument anymore.
   glow: { fs: GLOW_FS, file: 'accum.mjs:GLOW_FS', uniforms: ['u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.6, notes: 'mip-chain bloom + stipple + chroma; one pass per tier (bloom, halation); shed with ACCUM' } },
+  // #309: backing-store frame -> logical-size feedback pair, one fullscreen
+  // pass, only in the live retina path (resDiv > 1). Tier 0 structural
+  // plumbing — shedding it alone would break the recipe (frame/pair size
+  // mismatch), so it lives and dies with the chain itself.
+  resample: { fs: RESAMPLE_FS, file: 'accum.mjs:RESAMPLE_FS', uniforms: ['u_src', 'u_srcSize'],
+    cost: { tier: 0, memoryBytes: FRAME_16F, timeMs: 0.3, notes: 'structural ACCUM plumbing (frame resample to feedback-pair size); never shed alone' } },
 };
 
 for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
@@ -832,12 +875,19 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
 /**
  * @param {WebGL2RenderingContext} gl
  * @param {object} bridge the JS↔GL bridge (owns the feedback ping-pong)
- * @param {object} size { width, height } canvas px
+ * @param {object} size { width, height } canvas px — the LOGICAL size the
+ *   feedback pair runs at. opts.resDiv (default 1): the incoming frame is
+ *   resDiv× larger per axis (live retina path: pass the dprScale the bridge
+ *   was resized with); step() resamples the frame down to the pair's size
+ *   before the recipe. Stills/export paths pass resDiv 1 (frame already
+ *   logical-sized) and skip the resample.
  */
-export function createAccum(gl, bridge, { width, height }) {
+export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
   if (bridge.lost) throw new Error('[accum] context lost — recreate after restore');
   let W = Math.max(4, Math.round(width));
   let H = Math.max(4, Math.round(height));
+  // Resolution divisor of the incoming frame vs the feedback pair (#309).
+  const RD = Math.max(1, resDiv);
 
   const progs = {};
   const locs = {};
@@ -860,7 +910,8 @@ export function createAccum(gl, bridge, { width, height }) {
       for (const u of ['u_src', 'u_dst', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
         'u_flow',
         'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps',
-        'u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint']) {
+        'u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint',
+        'u_srcSize']) {
         L[u] = U(u);
       }
       locs[name] = L;
@@ -874,24 +925,27 @@ export function createAccum(gl, bridge, { width, height }) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-  // Bridge-owned feedback ping-pong (the ACCUM buffer itself).
-  let L = bridge.layer(ACCUM_LAYER_ID);
-  // Accum-owned scratch: the mipmapped glow target + the B3 echo mix target.
-  // (The old full-res and quarter-res blur scratch is gone with the blur
-  // passes — #308.)
+  // Bridge-owned feedback ping-pong (the ACCUM buffer itself) — runs at
+  // logical size (div = RD), the trail system of #309.
+  let L = bridge.layer(ACCUM_LAYER_ID, { div: RD });
+  // Accum-owned scratch: frame resample + the mipmapped glow target + the
+  // B3 echo mix target. (The old full-res and quarter-res blur scratch is
+  // gone with the blur passes — #308.)
   let scratch = null;
   const allocScratch = () => {
     const gw = Math.max(1, Math.floor(W / GLOW_DIV));
     const gh = Math.max(1, Math.floor(H / GLOW_DIV));
     scratch = {
-      em: makeTarget(gl, W, H), // B3 echo mix target (full-res)
+      rs: makeTarget(gl, W, H), // #309: frame -> pair-size resample target
+      em: makeTarget(gl, W, H), // B3 echo mix target
       gm: makeGlowTarget(gl, gw, gh), // mip-chain bloom source (RGBA8)
       gw, gh,
     };
   };
   allocScratch();
 
-  // B3 echo ring: accum-owned full-res 16F targets holding past frames.
+  // B3 echo ring: accum-owned targets holding past frames (at the pair's
+  // logical size — the echo taps, weights, and mix are untouched by #309).
   // Tap i = frame from i+1 steps ago (delays 1..K).
   let echoRing = [];
   let echoHead = 0; // next slot to write
@@ -960,7 +1014,7 @@ export function createAccum(gl, bridge, { width, height }) {
     /** Clear the feedback buffer to the background color (opaque). */
     begin(background = '#000000') {
       if (bridge.lost) throw new Error('[accum] context lost — chain paused');
-      L = bridge.layer(ACCUM_LAYER_ID);
+      L = bridge.layer(ACCUM_LAYER_ID, { div: RD });
       cur = L.t0;
       echoHead = 0;
       echoCount = 0; // B3: the ring holds no valid frames after CLEAR
@@ -976,32 +1030,53 @@ export function createAccum(gl, bridge, { width, height }) {
 
     /**
      * Run one frame of the recipe.
-     * @param {WebGLTexture} frameTex full-res 16F premultiplied frame
+     * @param {WebGLTexture} frameTex 16F premultiplied frame (resDiv× the
+     *   pair's size when resDiv > 1; pair-sized otherwise)
      * @param {object} params from accumRecipeParams()
+     * @param {object} [frameSize] { width, height } actual frame px (only
+     *   needed when resDiv > 1 and the frame isn't exactly W*RD × H*RD,
+     *   e.g. fractional dprScale rounding)
      * @returns the target holding the current accum image (bridge-owned)
      */
-    step(frameTex, params) {
+    step(frameTex, params, frameSize) {
       const p = params;
       // Drain stale errors first so the post-step check below only reflects
       // this step's own passes (see drainGlErrors).
       drainGlErrors(gl);
+      // #309: the feedback pair runs at logical size. A backing-store-sized
+      // frame (live retina path, RD > 1) is resampled down to the pair's
+      // size first — manual bilinear, exact for any dprScale. The echo ring,
+      // blur, and composite all run on the pair-sized frame (echo taps,
+      // weights, and the mix shader are untouched).
+      let frameIn = frameTex;
+      if (RD > 1) {
+        const fw = frameSize?.width || W * RD;
+        const fh = frameSize?.height || H * RD;
+        pass('resample', scratch.rs, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, frameTex));
+          gl.uniform2f(u.u_srcSize, fw, fh);
+        });
+        frameIn = scratch.rs.tex;
+      }
+      // The live frame (post-resample) pushed into the ring: taps hold
+      // past FRAMES, never the echo mix.
+      const ringSrc = frameIn;
       // 0. echoes (B3) — mix the live frame with the ring's past taps
       // FIRST, then push the incoming frame: K targets hold exactly K
       // past-frame taps (delays 1..K). Skipped at echoTaps = 0: the live
       // frame feeds the composite directly (exact old behavior).
-      let frameIn = frameTex;
       if (p.echoTaps > 0) {
         ensureEcho(p.echoTaps);
         const K = echoRing.length;
         const taps = Math.min(echoCount, p.echoTaps);
         if (taps > 0) {
           pass('echo', scratch.em, (u, bind) => {
-            gl.uniform1i(u.u_src, bind(0, frameTex));
+            gl.uniform1i(u.u_src, bind(0, frameIn));
             for (let i = 0; i < 4; i++) {
               // Tap i = frame from i+1 steps ago (ring holds past frames only).
               const slot = i < taps
                 ? echoRing[(echoHead - 1 - i + 2 * K) % K].tex
-                : frameTex; // unused sampler: any valid texture
+                : frameIn; // unused sampler: any valid texture
               gl.uniform1i(u[`u_t${i}`], bind(1 + i, slot));
             }
             const wv = p.echoWeights;
@@ -1011,7 +1086,7 @@ export function createAccum(gl, bridge, { width, height }) {
           frameIn = scratch.em.tex;
         }
         pass('copy', echoRing[echoHead], (u, bind) => {
-          gl.uniform1i(u.u_src, bind(0, frameTex));
+          gl.uniform1i(u.u_src, bind(0, ringSrc));
         });
         echoHead = (echoHead + 1) % K;
         echoCount = Math.min(echoCount + 1, K);
@@ -1082,16 +1157,16 @@ export function createAccum(gl, bridge, { width, height }) {
     resize(width, height) {
       W = Math.max(4, Math.round(width));
       H = Math.max(4, Math.round(height));
-      for (const t of [scratch.em, scratch.gm]) deleteTarget(gl, t);
+      for (const t of [scratch.rs, scratch.em, scratch.gm]) deleteTarget(gl, t);
       allocScratch();
       freeEcho(); // B3: ring targets are sized to the canvas
       // Bridge-owned feedback targets resize via bridge.resize (caller-owned).
-      L = bridge.layer(ACCUM_LAYER_ID);
+      L = bridge.layer(ACCUM_LAYER_ID, { div: RD });
       cur = L.t0;
     },
 
     dispose() {
-      for (const t of [scratch.em, scratch.gm]) deleteTarget(gl, t);
+      for (const t of [scratch.rs, scratch.em, scratch.gm]) deleteTarget(gl, t);
       scratch = null;
       freeEcho();
       for (const p of Object.values(progs)) gl.deleteProgram(p);
@@ -1115,4 +1190,5 @@ export const ACCUM_PASS_SOURCES = Object.freeze({
   over: OVER_FS,
   down: DOWN_FS,
   glow: GLOW_FS,
+  resample: RESAMPLE_FS,
 });

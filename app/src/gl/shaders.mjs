@@ -41,6 +41,8 @@ layout(location=1) in vec4 a_inst0;
 layout(location=2) in vec4 a_inst1;
 layout(location=3) in vec4 a_inst2;
 uniform vec2 u_canvas;
+uniform vec2 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
+                        // per-frame velocity, y = max stretch factor
 out vec2 v_uv;
 out float v_opacity;
 void main() {
@@ -53,6 +55,17 @@ void main() {
   float th = radians(a_inst1.x);
   float co = cos(th), si = sin(th);
   vec2 rr = vec2(c.x * co - c.y * si, c.x * si + c.y * co);  // SVG rotate(), y-down
+  // #309 velocity smear: per-frame displacement (scene units) rides in
+  // a_inst2.zw. The quad stretches along its own motion direction — the
+  // trail system lives on the objects, zero fullscreen passes. At rest
+  // (v = 0) this is exactly the old path.
+  vec2 smv = a_inst2.zw;
+  float sms = length(smv);
+  if (sms > 1e-4) {
+    vec2 smd = smv / sms;
+    float smk = min(sms * u_smear.x, u_smear.y);
+    rr += smd * (dot(rr, smd) * smk);
+  }
   vec2 world = a_inst0.xy + rr;
   gl_Position = vec4(world.x / u_canvas.x * 2.0 - 1.0, 1.0 - world.y / u_canvas.y * 2.0, 0.0, 1.0);
   v_uv = vec2(mix(a_inst1.z, a_inst2.x, a_corner.x), mix(a_inst1.w, a_inst2.y, a_corner.y));
@@ -291,4 +304,30 @@ in vec2 v_cuv;
 out vec4 o;
 void main() {
   o = texture(u_src, v_cuv);
+}`;
+
+/**
+ * Upscale a smaller source into the write target (#309: the half-res ACCUM
+ * feedback pair is presented at backing size through this). Manual bilinear
+ * via texelFetch — exact regardless of the source texture's filter mode
+ * (the ACCUM targets are NEAREST). At an integer factor of 2 this is the
+ * standard smooth upscale; the pair's softness is the point, not a bug.
+ */
+export const UPSCALE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform vec2 u_srcSize;   // source size in px
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec2 st = v_cuv * u_srcSize - vec2(0.5);
+  vec2 f = fract(st);
+  ivec2 b = ivec2(floor(st));
+  ivec2 lo = ivec2(0);
+  ivec2 hi = ivec2(u_srcSize) - ivec2(1);
+  vec4 s00 = texelFetch(u_src, clamp(b, lo, hi), 0);
+  vec4 s10 = texelFetch(u_src, clamp(b + ivec2(1, 0), lo, hi), 0);
+  vec4 s01 = texelFetch(u_src, clamp(b + ivec2(0, 1), lo, hi), 0);
+  vec4 s11 = texelFetch(u_src, clamp(b + ivec2(1, 1), lo, hi), 0);
+  o = mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
 }`;

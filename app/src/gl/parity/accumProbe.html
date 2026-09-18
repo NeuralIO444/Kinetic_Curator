@@ -16,9 +16,12 @@ import { createAccum, accumRecipeParams, applyAudioEnvelope } from '../accum.mjs
 //
 // window.__kcAccumProbe(p) -> { pixels, width, height }
 //   p = { w, h, bg: '#rrggbb', fade, optics, tunnel, prism,
-//         flow, echoes, echoWidth,
+//         flow, echoes, echoWidth, resDiv,
 //         audio: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
 //         frames: [ [r,g,b,a …] … ] }   // premultiplied bytes, bottom-first
+// resDiv (default 1): the feedback pair runs at w×h while the incoming
+// frames are w*resDiv × h*resDiv (#309 half-res feedback) — the resample
+// pass brings them down to the pair size first.
 // Returns bottom-first RGBA bytes (COPY_FS, no flip), matching upload order.
 const canvas = document.getElementById('c');
 const gl = canvas.getContext('webgl2', {
@@ -54,8 +57,14 @@ function texFrom(bytes, w, h) {
 
 window.__kcAccumProbe = (p) => {
   const w = p.w, h = p.h;
-  const bridge = createBridge(gl, canvas, { width: w, height: h, dpr: 1 });
-  const accum = createAccum(gl, bridge, { width: w, height: h });
+  const resDiv = p.resDiv || 1;
+  // #309: the bridge resizes its targets at W×DPR internally, so a DPR of
+  // resDiv with the pair's div=resDiv keeps the pair at the logical w×h
+  // while frames arrive at backing size.
+  const bridge = createBridge(gl, canvas, { width: w, height: h, dpr: resDiv });
+  const accum = createAccum(gl, bridge, { width: w, height: h, resDiv });
+  const fw = Math.max(1, Math.round(w * resDiv));
+  const fh = Math.max(1, Math.round(h * resDiv));
   const frameTexs = [];
   try {
     accum.begin(p.bg || '#000000');
@@ -71,7 +80,7 @@ window.__kcAccumProbe = (p) => {
     const audio = p.audio || null;
     let i = 0;
     for (const bytes of p.frames) {
-      const t = texFrom(bytes, w, h);
+      const t = texFrom(bytes, fw, fh);
       frameTexs.push(t);
       // B1: per-frame audio envelope modulates the recipe params.
       const params = audio ? applyAudioEnvelope(base, audio[i] || {}) : base;
@@ -79,7 +88,7 @@ window.__kcAccumProbe = (p) => {
       // the probe can check tight GPU/mirror parity with the gate off and
       // statistical parity with it on.
       if (p.stipple !== undefined && p.stipple !== null) params.stipple = p.stipple;
-      accum.step(t, params);
+      accum.step(t, params, { width: fw, height: fh });
       i++;
     }
     // Resolve the 16F accum buffer to RGBA8 without flipping (COPY_FS).
