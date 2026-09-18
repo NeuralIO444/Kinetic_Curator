@@ -66,13 +66,12 @@ assert.strictEqual(emptyTrack(2).armed, false);
 }
 
 {
-  const src = [{ x: 1, y: 0.5 }];
+  const src = [{ x: 0.2, y: 0.5 }];
   const dst = [{ x: 0, y: 0.5 }];
   assert.ok(applyField(dst, src, { mode: 'field', strength: 2, polarity: 1 })[0].x > dst[0].x);
   assert.ok(applyField(dst, src, { mode: 'field', strength: 2, polarity: -1 })[0].x < dst[0].x);
 }
 
-// Curl of an X-ramp: u=0, v=-∂ψ/∂x < 0 → sample moves -y, not +x.
 {
   const w = 8;
   const h = 8;
