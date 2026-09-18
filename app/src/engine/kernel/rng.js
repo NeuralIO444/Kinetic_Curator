@@ -101,6 +101,14 @@ function hashChannel(s) {
  * the master seed (offset 0). The named density-sampling channels ('field',
  * 'ca') place points, so they ride the spatial stream.
  */
+/** Named (string) sampling channels → seed-offset group.
+ *  Add new density/sampler channels here so they pick up the spatial stream
+ *  (or another group) instead of silently locking to offset 0. */
+export const STRING_CHANNEL_GROUPS = Object.freeze({
+  field: 'spatial',
+  ca: 'spatial',
+});
+
 const OFFSET_GROUP_OF = new Map([
   [CH.dens, 'spatial'],
   [CH.geo, 'spatial'],
@@ -109,8 +117,7 @@ const OFFSET_GROUP_OF = new Map([
   [CH.asset, 'asset'],
   [CH.color, 'color'],
   [CH.noise, 'noise'],
-  [hashChannel('field'), 'spatial'],
-  [hashChannel('ca'), 'spatial'],
+  ...Object.entries(STRING_CHANNEL_GROUPS).map(([name, group]) => [hashChannel(name), group]),
 ]);
 
 /**
@@ -123,12 +130,12 @@ function offsetForChannel(ch, offsets) {
   const group = OFFSET_GROUP_OF.get(ch);
   if (!group) return 0;
   const v = Number(offsets[group]);
-  return Number.isFinite(v) ? v | 0 : 0;
+  return Number.isFinite(v) ? (v >>> 0) : 0;
 }
 
 /**
  * Public form of offsetForChannel: takes the (number|string) channel.
- * @returns {number} the int32 offset (0 = identity)
+ * @returns {number} the uint32 offset (0 = identity)
  */
 export function channelSeedOffset(channel, offsets) {
   const ch = typeof channel === 'number' ? channel | 0 : hashChannel(String(channel));
