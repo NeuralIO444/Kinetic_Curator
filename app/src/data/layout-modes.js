@@ -59,7 +59,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
 
   accumulation: false,
   accumulationFade: 5.4, // #274: trail half-life in frames (was keep 0.88)
-  accumulationOptics: 0, // #190: bloom + halation + blur-over-time amount (GLOW slider)
+  accumulationOptics: 0, // #190: bloom + halation + stipple-diffusion amount (GLOW slider) (#308: no gaussian blur)
   accumulationTunnel: 0, // Phase A: feedback zoom/spin amount (TUNNEL slider)
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
 

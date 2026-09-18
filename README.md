@@ -36,7 +36,7 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 - **Stills through the same GPU** — exports render through the live renderer: scene → GPU textures → 4K/8K PNG via readback, PNG + JSON sidecar. The old SVG emitter survives in-repo only as the dev-only parity reference — nothing in the production import graph reaches it.
 - **Pixel parity** — a headless harness diffs the GPU render against the SVG parity reference on fixed seeds, wired into `npm run selfcheck`. The bar: under 10% pixel difference is a pass — this is art, not rocket science.
 - **GPU FX library** — 10 effects (rgbSplit, displace, tear, grain, blur, scanlines, posterize, invert, solarize, edge) as GLSL passes, chained per FX layer. Every effect declares a cost tier at registration, measured against real GPU cost and CI-gated.
-- **ACCUM feedback** — HYPE-style trails on GPU ping-pong textures: trails decay like phosphor (light fades toward black), with bloom, halation, and blur-over-time optics. FREEZE holds the feedback image; CLEAR re-seeds. Audio-reactive glow, flow-advected trails, and multi-tap echoes arrive when audio is live — silence is a true no-op.
+- **ACCUM feedback** — HYPE-style trails on GPU ping-pong textures: trails decay like phosphor (light fades toward black), with bloom, halation, and stipple-diffusion optics. FREEZE holds the feedback image; CLEAR re-seeds. Audio-reactive glow, flow-advected trails, and multi-tap echoes arrive when audio is live — silence is a true no-op.
 - **Showrunner governor** — the enforcer: measured cost tiers, and a fixed shed ladder — resolution scaling first, then quality, asset thinning, count clamp, motion freeze. Every shed is a render-only overlay, auto-clears on recovery, and is always reported — never silent.
 - **Render quality pillars** — one kernel, one seed; finals render off-store with no live-state mutation; caps hold; substitutions are recorded in the sidecar, never hidden.
 - **Multi-layer compositing** — add / reorder / show-hide layers; per-layer blend + opacity; active layer drives LAYOUT / ASSETS / DAVIS edits.
@@ -135,7 +135,7 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 - [WebGL Phase 6](docs/WEBGL_PHASE6.md) — SVG retirement + governor retune notes
 - [Shader debug harness](docs/SHADER_DEBUG.md) — dev-only GLSL tooling
 - [FX layers](docs/FX_LAYERS.md) — adjustment-layer-style FX layers: the 10-effect GLSL stack + the effect-authoring template
-- [ACCUM on GPU](docs/ACCUM.md) — the trail recipe (bloom / halation / blur-over-time)
+- [ACCUM on GPU](docs/ACCUM.md) — the trail recipe (bloom / halation / stipple diffusion)
 - [Showrunner](docs/SHOWRUNNER.md) — the realtime performance governor
 - [Render quality](docs/QUALITY.md) — the quality pillars: one kernel, one seed, honest exports
 - [KILN COLUMNS](docs/KILN_COLUMNS.md) / [VORTEX RWB](docs/VORTEX_RWB.md) — shipped preset notes

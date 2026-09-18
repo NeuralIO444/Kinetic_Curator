@@ -343,8 +343,7 @@ export function runEffectSweep(gl, lab, def) {
         nNoop++;
         // Byte render: RGBA8 -> RGBA8. noop demands bit-exact identity;
         // near: N allows up to N LSBs of rounding drift (documented per
-        // effect — e.g. accum-blur@0 is (s*w0)/w0, whose no-op is the
-        // structural skip in createAccum.step, not the shader).
+        // effect in the sweep table).
         const budget = c.noop ? 0 : c.near;
         apply(gl, locs, c, lab, { out: lab.t8, tmp: lab.t16b });
         checkGlError(gl, `sweep:${def.id}:${c.name}:noop`);

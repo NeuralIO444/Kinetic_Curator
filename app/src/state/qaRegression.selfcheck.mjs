@@ -208,21 +208,19 @@ ok('PALETTE_IDS tracks the palette catalog', () => {
   assert.ok(PALETTE_IDS.includes('vortex-rwb'), 'vortex-rwb in cycle');
 });
 
-// --- blur radius 0 is identity on GL, matching SVG stdDeviation=0 (#QA-H4) ---
-ok('GL blur sigma is 0 at radius 0 (no phantom blur)', () => {
+// --- gaussian blur is gone from the GPU path (#308) ---
+// The old QA-H4 block pinned blur-radius pass behavior; #308 removed gaussian
+// blur by design, so the regression is now the opposite: the 'blur' kind is
+// no longer registered as a builtin, and the FX roster's Blur entry dies on
+// the GPU path until #310 cuts it from the UI.
+ok('gaussian blur is gone from the GPU builtins (#308)', () => {
   const defs = {};
   registerBuiltinEffects({
     registerProgram() {},
     defineEffect: (kind, def) => { defs[kind] = def; },
   });
-  // #225: blur passes are a function of (stepParams, { width, height }).
-  // Radius 0 is now a true no-op (zero passes), stronger than sigma 0.
-  const passesAt = (p, w) => defs.blur.passes(p, { width: w, height: 700 });
-  assert.deepEqual(passesAt({ radius: 0 }, 1000), [], 'radius 0 → no passes (true no-op)');
-  const six = passesAt({ radius: 6 }, 1000);
-  assert.equal(six.length, 2, 'radius 6 → one (H,V) pair');
-  assert.ok(six[0].params({ radius: 6 }, { width: 1000 })[0] > 0, 'radius 6 still blurs');
-  assert.deepEqual(passesAt({}, 1000), [], 'missing radius → no passes');
+  assert.ok(!('blur' in defs), 'blur is not a registered builtin effect');
+  assert.ok(!defs.blur?.passes, 'no blur pass machinery survives');
 });
 
 console.log(`\nqaRegression: ${n} checks passed`);

@@ -18,10 +18,11 @@
  *   3. vec_math       — count of dot/normalize/length/cross/mix/clamp/pow/
  *                        exp/log/sin/cos/tan/asin/acos/atan calls. ALU weight.
  *   4. loop_count     — count of `for (` loops. Loops usually mean repeated
- *                        texture fetches (blur taps, echo taps).
+ *                        texture fetches (echo taps).
  *   5. branch_count   — count of `if (` branches. Divergence / discarded work.
  *   6. pass_count     — declared static metadata: fullscreen passes the
- *                        effect needs (blur = 2 separable passes, rest = 1).
+ *                        effect needs (1 for every builtin since #308 removed
+ *                        blur's 2 separable passes).
  *   7. param_count    — declared static metadata: per-effect params mapped
  *                        into uniforms (proxy for how "driven" the pass is).
  *

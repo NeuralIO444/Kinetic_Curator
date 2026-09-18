@@ -19,6 +19,7 @@ under 10% pixel difference is a pass — this is art, not rocket science).
 - **Phase 2** — GPU FX library: rgbSplit, displace, tear, grain, blur, scanlines, posterize, invert, solarize, edge as GLSL passes.
 - **Phase 3** — layer compositing + mattes on the GPU.
 - **Phase 4** — GPU accumulation (ping-pong textures) + bloom / halation / blur-over-time optics.
+- **Glow system, no gaussian blur (#308)** — the instrument's gaussian blur is gone: ACCUM optics now run mip-chain bloom + stipple diffusion + a slight chromatic RGB offset. The FX roster's Blur entry is dead on the GPU path until #310 cuts it from the UI.
 - **Phase 5** — finals via GPU readback (`app/src/gl/exportStill.mjs`): 1×–8K PNG + JSON sidecar, off-store — the old flip-then-restore mechanism is deleted. resvg retired from finals; the SVG emitter is now a dev-only parity reference.
 - **Phase 6** — SVG renderer removed from the shipped bundle; governor retuned (resolution sheds before effects — see `docs/SHOWRUNNER.md`); `maxFxLayers` budgets retired; shed states are always reported, never silent.
 - **Quality pillars (#168)** — one kernel, one seed; finals off-store; caps hold; substitutions recorded in the sidecar.
