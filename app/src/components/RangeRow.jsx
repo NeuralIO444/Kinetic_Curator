@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { getTaper } from './taper.js';
 
 export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange, readout,
-  defaultValue, locked, onToggleLock, onRandomize, hint, taper, taperOpts }) {
+  defaultValue, locked, onToggleLock, onRandomize, hint, taper, taperOpts, disabled, disabledReason }) {
   // #274: an optional response curve. The slider works in 0..1 space and the
   // taper maps it to physical units at the panel→state boundary; stored
   // params stay physical, so the same stored value renders identically.
@@ -14,12 +14,12 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
   const inputRef = useRef(null);
 
   const handleDoubleClick = () => {
-    if (locked) return;
+    if (locked || disabled) return;
     if (defaultValue !== undefined) onChange(defaultValue);
   };
 
   const startEdit = () => {
-    if (locked) return;
+    if (locked || disabled) return;
     setEditValue(String(value));
     setEditing(true);
   };
@@ -29,7 +29,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
   }, [editing]);
 
   const commitEdit = () => {
-    if (locked) { setEditing(false); return; }
+    if (locked || disabled) { setEditing(false); return; }
     const n = Number(editValue);
     if (!isNaN(n)) onChange(Math.max(min, Math.min(max, n)));
     setEditing(false);
@@ -37,9 +37,14 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
 
   const labelTitle = [hint, defaultValue !== undefined ? `Double-click to reset (${defaultValue})` : null]
     .filter(Boolean).join(' · ') || undefined;
+  // #272: mode-gated controls stay visible but inert, with the reason in the
+  // tooltip — a control that silently does nothing is a lie; a disabled one
+  // with a reason is a label.
+  const title = [hint, disabled && disabledReason ? `Disabled — ${disabledReason}` : null]
+    .filter(Boolean).join(' · ') || undefined;
 
   return (
-    <div className={`range-row ${locked ? 'range-locked' : ''}`} title={hint}>
+    <div className={`range-row ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled' : ''}`} title={title}>
       <div className="range-label-group">
         {onToggleLock && (
           <button className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>
@@ -57,8 +62,8 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
         value={t ? t.toSlider(value) : value}
         onChange={e => onChange(t ? t.toParam(Number(e.target.value)) : Number(e.target.value))}
         onDoubleClick={handleDoubleClick}
-        disabled={locked}
-        title={hint}
+        disabled={locked || disabled}
+        title={title}
       />
       <div className="range-right">
         {editing ? (
@@ -71,7 +76,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
           <span className="range-readout" onClick={startEdit} title="Click to type value">{readout ?? value}</span>
         )}
         {onRandomize && (
-          <button className="dice-btn" onClick={onRandomize} title="Randomize" disabled={locked}>🎲</button>
+          <button className="dice-btn" onClick={onRandomize} title="Randomize" disabled={locked || disabled}>🎲</button>
         )}
       </div>
     </div>

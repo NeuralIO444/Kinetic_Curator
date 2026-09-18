@@ -25,7 +25,7 @@ export const COMPOSITION_PRESETS = [
     params: {
       mode: 'swarm', count: 220, scale: [0.3, 1.15], rotate: [-40, 40], alpha: [36, 88],
       zTiers: 5, jitter: 20, density: 84, bleed: true, mirror: false, overlap: true,
-      particleCount: 180, swarmCohesion: 1.2, damping: 0.97, gravityWells: 0.6,
+      particleCount: 180, swarmCohesion: 0.6, damping: 0.97, gravityWells: 0.6,
       lifeDrift: 0.22, displacement: 18, behave: 'flock',
     },
   },
@@ -76,7 +76,7 @@ export const COMPOSITION_PRESETS = [
     params: {
       mode: 'swarm', count: 260, scale: [0.22, 1.1], rotate: [-70, 70], alpha: [24, 82],
       zTiers: 6, jitter: 28, density: 94, bleed: true, mirror: false, overlap: true,
-      particleCount: 240, swarmCohesion: 0.7, damping: 0.90, gravityWells: 1.4,
+      particleCount: 240, swarmCohesion: 0.6, damping: 0.90, gravityWells: 1.4,
       lifeDrift: 0.3, displacement: 28, behave: 'scatter',
     },
   },
@@ -173,7 +173,7 @@ export const COMPOSITION_PRESETS = [
     params: {
       mode: 'swarm', count: 300, scale: [0.3, 0.9], rotate: [-30, 30], alpha: [50, 100],
       zTiers: 5, jitter: 16, density: 88, bleed: true, mirror: false, overlap: true,
-      particleCount: 280, swarmCohesion: 1.5, damping: 0.96, gravityWells: 0.4,
+      particleCount: 280, swarmCohesion: 0.6, damping: 0.96, gravityWells: 0.4,
       lifeDrift: 0.12, displacement: 10, behave: 'flock',
     },
   },

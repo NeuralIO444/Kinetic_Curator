@@ -12,6 +12,8 @@
   text-transform: uppercase;
 }
 .range-row { display: grid; grid-template-columns: 62px 1fr 120px; align-items: center; gap: 6px; min-height: 28px; }
+.range-disabled { opacity: 0.38; }
+.range-disabled .range-label { text-decoration: line-through; }
 .range-label { font-size: 9px; letter-spacing: 0.1em; color: var(--dim); }
 .range-readout { font-size: 10px; color: var(--ink); text-align: right; }
 

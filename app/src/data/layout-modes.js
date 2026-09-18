@@ -67,7 +67,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   noiseSpeed: 0.5,
   displacement: 0,
   particleCount: 150,
-  swarmCohesion: 1.5,
+  swarmCohesion: 0.6, // #272: retuned to the honest slider max (was 1.5, past the 'one blob' threshold)
   gravityWells: 1.0,
   damping: 0.95,
 
@@ -115,7 +115,7 @@ export const COMPOSITION_IDS = COMPOSITION_PRESETS.map((p) => p.id);
 export const PARAM_SPEC = {
   count: { min: 10, max: 800 },
   jitter: { min: 0, max: 200 },
-  density: { min: 10, max: 120 },
+  density: { min: 10, max: 100 }, // #272: capped at 100
   zTiers: { min: 1, max: 12, int: true },
   hueRotate: { min: 0, max: 360 },
   noiseFreq: { min: 0.001, max: 0.03 },

@@ -62,7 +62,7 @@ export function StimulusPanel() {
             devices={devices}
           />
 
-          <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} />
+          <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} audioEnabled={audioEnabled} />
 
           <MeterBlock audioBands={audioBands} beatPulse={beatPulse} />
       </div>
