@@ -10,6 +10,7 @@
 //
 // Field mapping:
 //   ctx.seed    -> seed
+//   ctx.seedOffsets -> seedOffsets (sub-seed stream offsets, #305)
 //   ctx.layout  -> layoutParams, canvasW, canvasH, caGrid (layout.caGrid may
 //                  be null/undefined for non-`ca` modes, same as today)
 //   ctx.palette -> palette
@@ -33,11 +34,12 @@
 import { buildPlacements } from '../buildPlacements.js';
 
 export function evaluate(ctx) {
-  const { seed, layout, palette, assets, caps, buffers } = ctx;
+  const { seed, seedOffsets, layout, palette, assets, caps, buffers } = ctx;
   const { layoutParams, canvasW, canvasH, caGrid } = layout;
   return buildPlacements({
     layoutParams,
     seed,
+    seedOffsets,
     activeAssets: assets,
     palette,
     caGrid,

@@ -17,7 +17,7 @@ const ACCENT_OFFSET = 3;
 /**
  * Assign the fill and accent for one placement.
  *
- * @param {{seed:number, index:number, t:number}} ctx
+ * @param {{seed:number, index:number, t:number, seedOffsets?:object}} ctx
  * @param {{swatches:string[]}} palette  already resolved
  * @param {string} strategy  'band' | 'zone' | 'split' | other → random
  * @returns {{color:string, accent:string, slot:number}}
@@ -33,7 +33,7 @@ export function assignColor(ctx, palette, strategy) {
     strategy,
     t: ctx.t,
     index: ctx.index,
-    rng: colorRngForIndex(ctx.seed, ctx.index),
+    rng: colorRngForIndex(ctx.seed, ctx.index, ctx.seedOffsets),
   });
 
   // Derive the accent from the SLOT, not from indexOf(color). A palette may

@@ -62,9 +62,11 @@ export function createLiveResolver() {
       st = { system: new ParticleSystem(), initKey: null, phraseGen: -1 };
       swarmState.set(layerId, st);
     }
-    const initKey = [ctx.mode, ctx.seed, ctx.safeParticles, CANVAS_W, CANVAS_H].join('|');
+    const initKey = [ctx.mode, ctx.seed, ctx.safeParticles, CANVAS_W, CANVAS_H,
+      ctx.seedOffsets?.spatial || 0, ctx.seedOffsets?.color || 0,
+      ctx.seedOffsets?.asset || 0, ctx.seedOffsets?.noise || 0].join('|');
     if (st.initKey !== initKey) {
-      st.system.init(ctx.safeParticles, CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed);
+      st.system.init(ctx.safeParticles, CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets);
       st.initKey = initKey;
     }
     if (st.phraseGen !== ctx.phraseWrapGen) {
@@ -76,7 +78,7 @@ export function createLiveResolver() {
     if (!ctx.slowRender) {
       st.system.update(
         { ...ctx.layoutParams, maxParticles: ctx.caps?.maxParticles },
-        ctx.activeAssets, ctx.palette, ctx.seed, Date.now(), ctx.attractor,
+        ctx.activeAssets, ctx.palette, ctx.seed, Date.now(), ctx.attractor, ctx.seedOffsets,
       );
     }
     let items = st.system.getItems(ctx.activeAssets).map((item) => {
@@ -112,7 +114,7 @@ export function createLiveResolver() {
    * Resolve visible layers to placements.
    *
    * @param {object} input — live store fields + animated life values:
-   *   layers, activeLayerId, layerSnapshots, seed, paletteId, paletteOverrides,
+   *   layers, activeLayerId, layerSnapshots, seed, seedOffsets, paletteId, paletteOverrides,
    *   userPalettes, layoutParams, caGrid, enabledAssets, assetWeightOverrides,
    *   customAssets, quality, driftOverlay, perfClampOverride, perfTier1,
    *   assetThin, slowRender, scaleMul, alphaBoost, effectiveScale,
@@ -139,9 +141,12 @@ export function createLiveResolver() {
       const snap = input.layerSnapshots?.[layer.id];
       // #107 §2/§5: ambient drift + governor density clamp live in ephemeral
       // overlay slots — merged for render only, active layer only.
+      // Sub-seed offsets ride with the seed: an inactive layer's snapshot
+      // carries its own (#305), falling back to the live global offsets.
       const src = isActive
         ? {
             seed: input.seed,
+            seedOffsets: input.seedOffsets,
             paletteId: input.paletteId,
             paletteOverrides: input.paletteOverrides,
             layoutParams: (input.driftOverlay || input.perfClampOverride)
@@ -152,6 +157,7 @@ export function createLiveResolver() {
           }
         : (snap || {
             seed: input.seed,
+            seedOffsets: input.seedOffsets,
             paletteId: input.paletteId,
             paletteOverrides: input.paletteOverrides,
             layoutParams: input.layoutParams,
@@ -180,11 +186,15 @@ export function createLiveResolver() {
       // empty system instead of RangeError from new Array(-50).
       const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), caps.maxParticles);
       const seed = (src.seed ?? 0) >>> 0;
+      // Snapshots from older documents have no seedOffsets — fall back to the
+      // live global offsets so an old project still resolves deterministically.
+      const seedOffsets = src.seedOffsets ?? input.seedOffsets ?? null;
 
       let items;
       if (isLiveSwarmMode(layoutParams.mode)) {
         items = swarmItems(layer.id, {
           mode: layoutParams.mode, safeParticles, activeAssets, palette, seed,
+          seedOffsets,
           layoutParams, caps, scaleMul: input.scaleMul ?? 1, alphaBoost: input.alphaBoost ?? 0,
           slowRender: !!input.slowRender, attractor: input.attractor ?? null,
           phraseWrapGen: input.phraseWrapGen || 0,
@@ -193,6 +203,7 @@ export function createLiveResolver() {
         items = buildPlacements({
           layoutParams,
           seed,
+          seedOffsets,
           activeAssets,
           palette,
           caGrid: src.caGrid ?? null,

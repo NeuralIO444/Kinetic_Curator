@@ -51,6 +51,7 @@ function AppInner() {
     audioMonitor: s.audioMonitor,
     running: s.running,
     seed: s.seed,
+    seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
     enabled: s.enabledAssets,
     isFullscreen: s.isFullscreen,
@@ -115,6 +116,7 @@ function AppInner() {
             type: A.ADD_SNAPSHOT,
             snapshot: {
               seed: state.seed,
+              seedOffsets: { ...(state.seedOffsets || {}) },
               format: 'PNG',
               resolution: state.exportResolution === 1 ? '1000x700@1x' : state.exportResolution === 2 ? '1000x700@2x' : '1000x700@4x',
               timestamp: new Date().toISOString().slice(11, 19),

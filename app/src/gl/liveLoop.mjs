@@ -287,6 +287,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       activeLayerId: s.activeLayerId,
       layerSnapshots: s.layerSnapshots,
       seed: s.seed,
+      seedOffsets: s.seedOffsets,
       paletteId: s.paletteId,
       paletteOverrides: s.paletteOverrides,
       userPalettes: s.userPalettes,
@@ -320,7 +321,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     }
 
     const contract = buildSceneContract({
-      doc: { seed: s.seed, quality: s.quality, layers: s.layers },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned

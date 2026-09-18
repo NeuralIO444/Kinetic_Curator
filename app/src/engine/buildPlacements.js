@@ -81,6 +81,7 @@ export function clampCount(count, mirror, caps) {
 export function buildPlacements({
   layoutParams,
   seed,
+  seedOffsets = null,
   activeAssets,
   palette,
   caGrid = null,
@@ -107,6 +108,7 @@ export function buildPlacements({
     mode: layoutParams.mode,
     count: safeCount,
     seed,
+    seedOffsets,
     jitter: layoutParams.jitter,
     density: layoutParams.density,
     zTiers: layoutParams.zTiers,
@@ -136,7 +138,11 @@ export function buildPlacements({
   // ride on the geometry cache plus their own inputs.
   // geoHit is required: the bind arrays are indexed by slot, and a geometry
   // change can alter both n and which source index sits in each slot.
-  const bindSig = [activeAssets, palette, strategy, seed];
+  // The sub-seed offsets ride as scalars (#305): a mutate changes a number,
+  // never object identity, so Object.is comparison stays sound.
+  const so = seedOffsets || {};
+  const bindSig = [activeAssets, palette, strategy, seed,
+    so.spatial || 0, so.color || 0, so.asset || 0, so.noise || 0];
   const bindHit = cache && geoHit && sameSignature(cache.bindSig, bindSig);
 
   let assetIds;
@@ -155,11 +161,11 @@ export function buildPlacements({
     for (let k = 0; k < soa.n; k++) {
       const index = soa.index[k];
       const asset = pickWeightedIndexStable(
-        activeAssets, weights, totalWeight, seed, index,
+        activeAssets, weights, totalWeight, seed, index, seedOffsets,
       );
       // K5 (#64): colour comes from the kernel's colour channel only.
       const { color, accent } = assignColor(
-        { seed, index, t: soa.t[k] }, palette, strategy,
+        { seed, index, t: soa.t[k], seedOffsets }, palette, strategy,
       );
       assetIds[k] = asset.id;
       colors[k] = color;

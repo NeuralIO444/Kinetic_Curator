@@ -12,6 +12,7 @@ import {
   sanitizeQuality,
   MAX_LAYERS,
 } from '../projectNormalize.js';
+import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 
 const initialEnabledAssets = {};
 ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
@@ -397,6 +398,8 @@ export const createGlobalSlice = (set) => ({
   applyProject: (doc) => set((state) => {
     const next = {
       seed: doc.seed >>> 0,
+      // #305 — sub-seed offsets restore with the seed; absent → zeros.
+      seedOffsets: normalizeSeedOffsets(doc.seedOffsets),
       paletteId: doc.paletteId || state.paletteId,
       // #103 Track B — a dangling quality key must never reach the caps lookup.
       quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
@@ -441,6 +444,7 @@ export const createGlobalSlice = (set) => ({
       const activeSnap = next.layerSnapshots[doc.activeLayerId];
       if (activeSnap) {
         next.seed = activeSnap.seed >>> 0;
+        next.seedOffsets = normalizeSeedOffsets(activeSnap.seedOffsets ?? doc.seedOffsets);
         next.paletteId = activeSnap.paletteId || next.paletteId;
         next.paletteOverrides = activeSnap.paletteOverrides ?? null;
         next.layoutParams = normalizeLayoutParams(activeSnap.layoutParams);

@@ -49,6 +49,9 @@ function safePaint(c) {
 function topLevelSource(doc) {
   return {
     seed: doc.seed,
+    // #305 — project docs now carry the sub-seed stream offsets; they are
+    // part of the render recipe just like the seed.
+    seedOffsets: doc.seedOffsets,
     paletteId: doc.paletteId,
     paletteOverrides: doc.paletteOverrides,
     layoutParams: doc.layoutParams,
@@ -166,6 +169,7 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
       const items = isSwarm
         ? bakeSwarmItems({
           seed: src.seed >>> 0,
+          seedOffsets: src.seedOffsets,
           count: Math.min(layoutParams.particleCount || 150, caps.maxParticles),
           // #167 — the quality cap gates contact breed() population growth.
           maxParticles: caps.maxParticles,
@@ -179,6 +183,7 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
         : buildPlacements({
           layoutParams,
           seed: src.seed >>> 0,
+          seedOffsets: src.seedOffsets,
           activeAssets,
           palette,
           caGrid: src.caGrid ?? null,
@@ -434,6 +439,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.stdout.write(JSON.stringify({
       kernelVersion: KERNEL_VERSION,
       seed: doc.seed,
+      seedOffsets: doc.seedOffsets,
       paletteId: doc.paletteId,
       quality: doc.quality || 'balanced',
       uncapped: !!args.uncapped,

@@ -27,7 +27,7 @@
  */
 
 import { createNoise } from './noise.js';
-import { CH, hashU01, rngForIndex } from './kernel/rng.js';
+import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
 import { resolveBehave, orbitForce } from './organisms/behave.js';
@@ -137,10 +137,13 @@ export class ParticleSystem {
     this.phase.fill(0, 0, this.n);
   }
 
-  init(count, canvasW, canvasH, activeAssets, palette, seed) {
+  init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null) {
     this.canvasW = canvasW;
     this.canvasH = canvasH;
-    this._noise = createNoise(seed || 444);
+    // #305 — zero offsets → exactly the old `seed || 444`; a noise offset
+    // re-rolls the flow field while the other streams stay locked.
+    this._noiseSeed = noiseSeedFor(seed, seedOffsets);
+    this._noise = createNoise(this._noiseSeed);
     if (!activeAssets || activeAssets.length === 0) {
       this.n = 0;
       this._authoredCount = 0;
@@ -157,7 +160,8 @@ export class ParticleSystem {
     for (let i = 0; i < count; i++) {
       // Draw order here is load-bearing: r() is a sequential stream, so the
       // six draws below must stay in this order to reproduce a given seed.
-      const r = rngForIndex(seed >>> 0, CH.dyn, i);
+      // The dyn channel rides the spatial sub-seed stream (#305).
+      const r = rngForIndex(seed >>> 0, CH.dyn, i, seedOffsets);
       const x = MARGIN + r() * Math.max(1, canvasW - MARGIN * 2);
       const y = MARGIN + r() * Math.max(1, canvasH - MARGIN * 2);
       const mass = r() * 0.8 + 0.4;
@@ -297,7 +301,7 @@ export class ParticleSystem {
   _contactPass(ctx) {
     const {
       radius, restitution, repel, mode, umask, breedCap, seed, organism,
-      minScale, maxScale, minAlpha, maxAlpha,
+      minScale, maxScale, minAlpha, maxAlpha, seedOffsets,
     } = ctx;
     const n0 = this.n;
     if (n0 < 2 || !(radius > 0)) return;
@@ -402,6 +406,7 @@ export class ParticleSystem {
               const cs = this._breed(
                 i, j, seed, breedCap,
                 minScale, maxScale, minAlpha, maxAlpha,
+                seedOffsets,
               );
               if (cs >= 0) newborn.add(cs);
             }
@@ -429,7 +434,7 @@ export class ParticleSystem {
    * hashU01(seed, CH.dyn, …) keyed by a per-system breed sequence:
    * deterministic per seed and history.
    */
-  _breed(i, j, seed, breedCap, minScale, maxScale, minAlpha, maxAlpha) {
+  _breed(i, j, seed, breedCap, minScale, maxScale, minAlpha, maxAlpha, seedOffsets = null) {
     let cs;
     if (this._dead.length > 0) {
       cs = this._dead.pop();
@@ -441,10 +446,10 @@ export class ParticleSystem {
     }
     const seq = this._breedSeq;
     this._breedSeq += 1;
-    const r1 = hashU01(seed, CH.dyn, 7919 + seq * 4);
-    const r2 = hashU01(seed, CH.dyn, 7920 + seq * 4);
-    const r3 = hashU01(seed, CH.dyn, 7921 + seq * 4);
-    const r4 = hashU01(seed, CH.dyn, 7922 + seq * 4);
+    const r1 = hashU01(seed, CH.dyn, 7919 + seq * 4, seedOffsets);
+    const r2 = hashU01(seed, CH.dyn, 7920 + seq * 4, seedOffsets);
+    const r3 = hashU01(seed, CH.dyn, 7921 + seq * 4, seedOffsets);
+    const r4 = hashU01(seed, CH.dyn, 7922 + seq * 4, seedOffsets);
     const m1 = this.mass[i]; const m2 = this.mass[j];
     const tm = m1 + m2;
     const mx = (this.x[i] + this.x[j]) / 2;
@@ -474,14 +479,20 @@ export class ParticleSystem {
     return cs;
   }
 
-  update(layoutParams, activeAssets, palette, seed, time, attractor) {
+  update(layoutParams, activeAssets, palette, seed, time, attractor, seedOffsets = null) {
     if (this.n === 0) return;
     this._layout = layoutParams;
     const targetCount = layoutParams.particleCount || 100;
     if (this._authoredCount !== targetCount) {
-      this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed);
+      this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed, seedOffsets);
     }
-    if (!this._noise) this._noise = createNoise(seed || 444);
+    // #305 — a mutated noise offset re-rolls the flow field live; otherwise
+    // the field is created once (same identity as the old `seed || 444`).
+    const ns = noiseSeedFor(seed, seedOffsets);
+    if (!this._noise || this._noiseSeed !== ns) {
+      this._noise = createNoise(ns);
+      this._noiseSeed = ns;
+    }
     const noise = this._noise;
     const {
       noiseFreq = 0.005, noiseSpeed = 0.5, swarmCohesion = 1.5,
@@ -642,6 +653,7 @@ export class ParticleSystem {
         // slots and never grows n.
         breedCap: Number.isFinite(maxParticles) ? maxParticles : this.n,
         seed: seed >>> 0,
+        seedOffsets,
         organism,
         minScale, maxScale, minAlpha, maxAlpha,
       });
