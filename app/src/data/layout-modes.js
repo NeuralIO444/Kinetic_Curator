@@ -19,10 +19,15 @@ export const LAYOUT_MODES = [
   { id: 'ca',        name: 'cellular',   glyph: 'ca'     },
   { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
+  // #280 — murmuration is a curated voice, not a new engine: it runs on the
+  // swarm engine (see isLiveSwarmMode below) with its own palette + motion
+  // character. Kept out of the stub list so it never falls back to a bare
+  // sampler.
+  { id: 'murmuration', name: 'murmuration', glyph: 'deep' },
 ];
 
 export function isLiveSwarmMode(mode) {
-  return mode === 'swarm' || mode === 'hype';
+  return mode === 'swarm' || mode === 'hype' || mode === 'murmuration';
 }
 
 export function isOrganismMode(mode) {

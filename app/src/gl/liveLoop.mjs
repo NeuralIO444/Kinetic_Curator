@@ -32,6 +32,7 @@ import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade s
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolvePalette } from '../data/palettes.js';
+import { resolveLiveRenderState } from '../data/voices.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
@@ -296,7 +297,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   function buildFrame() {
     const s = getState();
     const life = lifeRef?.current || {};
-    const layoutParams = s.layoutParams || {};
+    // #280: during a voice MIX the loop renders the interpolated blend,
+    // not the raw committed state — no hard jumps on voice switches.
+    const voiceState = resolveLiveRenderState(s);
+    const layoutParams = voiceState.layoutParams || {};
 
     // #278 — VJ MIX: detect palette changes once per frame and drive the
     // crossfade state machine. On a fresh 'start' the outgoing deck is
@@ -322,8 +326,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       layerSnapshots: s.layerSnapshots,
       seed: s.seed,
       seedOffsets: s.seedOffsets,
-      paletteId: s.paletteId,
-      paletteOverrides: s.paletteOverrides,
+      paletteId: voiceState.paletteId,
+      paletteOverrides: voiceState.paletteOverrides,
       userPalettes: s.userPalettes,
       layoutParams,
       caGrid: s.caGrid,
@@ -415,7 +419,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     }
     if (building || !cells) return null;
 
-    const activePalette = resolvePalette(s.paletteId, s.paletteOverrides, s.userPalettes);
+    const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
     const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : activePalette.bg;
 
     return {
@@ -805,7 +809,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     clearAccum() {
       if (accumObj && accumActive) {
         const s = getState();
-        const activePalette = resolvePalette(s.paletteId, s.paletteOverrides, s.userPalettes);
+        const voiceState = resolveLiveRenderState(s);
+        const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
         accumObj.begin(bgMode === 'white' ? '#ffffff' : activePalette.bg);
       }
     },

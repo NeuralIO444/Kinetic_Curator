@@ -14,7 +14,9 @@ export function ParamBlock({ layoutParams, lockedParams }) {
   // #272: physics controls are mode-gated. A slider that does nothing in the
   // current mode stays visible but inert, with a one-line reason — honest.
   const mode = layoutParams.mode;
-  const isSwarm = mode === 'swarm';
+  // #280: murmuration is a voice over the swarm engine — it gets the swarm
+  // physics sliders, not the moth ones.
+  const isSwarm = mode === 'swarm' || mode === 'murmuration';
   const isHype = mode === 'hype';
   const bilateral = (layoutParams.symmetry ?? 'none') === 'bilateral';
 
