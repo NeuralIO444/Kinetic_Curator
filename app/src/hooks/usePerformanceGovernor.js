@@ -110,7 +110,7 @@ export function usePerformanceGovernor() {
       if (kind === 'watchdog') clearWatchdogReason();
       recordGovernorEvent({
         type: 'restore', cutKind: kind,
-        label: kind === 'watchdog' ? 'watchdog hard stop cleared' : 'motion unfrozen',
+        label: kind === 'watchdog' ? 'watchdog hard stop cleared' : 'freeze frame off — motion back',
         ...(detail ? { detail } : {}),
         fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
       });
@@ -172,7 +172,7 @@ export function usePerformanceGovernor() {
       if (perfTier1) {
         setPerfTier1(false);
         // Event-log only: the cut cleared (governor disabled).
-        recordGovernorEvent({ type: 'restore', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM restored', detail: 'autoQuality off' });
+        recordGovernorEvent({ type: 'restore', cutKind: 'perfTier1', label: 'shine back on', detail: 'autoQuality off' });
       }
       return;
     }
@@ -183,7 +183,7 @@ export function usePerformanceGovernor() {
         // Event-log only: the cut cleared (FPS recovered past the tier-1
         // RECOVER threshold — hysteresis, #265).
         recordGovernorEvent({
-          type: 'restore', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM restored',
+          type: 'restore', cutKind: 'perfTier1', label: 'shine back on',
           fps: { at: effFps, threshold: TIER1_RECOVER_FPS, sustainedMs: 0 },
         });
       }
@@ -203,7 +203,7 @@ export function usePerformanceGovernor() {
       setPerfTier1(true);
       // Event-log only: step 3 of the shed ladder fired.
       recordGovernorEvent({
-        type: 'shed', cutKind: 'perfTier1', label: 'mirror/gloss/ACCUM off',
+        type: 'shed', cutKind: 'perfTier1', label: 'SHINE OFF',
         fps: { at: effFps, threshold: TIER1_FPS, sustainedMs: TIER1_SUSTAIN_MS },
         detail: `FPS ${effFps} < ${TIER1_FPS} sustained ${TIER1_SUSTAIN_MS / 1000}s${gpuNote}`,
       });
@@ -245,7 +245,7 @@ export function usePerformanceGovernor() {
       // hysteresis, #259; countClamp also clears on tier change).
       recordGovernorEvent({
         type: 'restore', cutKind: cut.kind,
-        label: cut.kind === 'quality' ? `quality restored → ${qualityShedFrom}` : cut.restoredLabel,
+        label: cut.kind === 'quality' ? `tier restored → ${qualityShedFrom}` : cut.restoredLabel,
         fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
       });
     }

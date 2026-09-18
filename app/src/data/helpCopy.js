@@ -24,6 +24,7 @@ export const HELP_TOPICS = [
   { id: 'davis-evolve-beat', group: 'Ghost Station', title: 'SOURCE BEAT', text: 'Evolve on the same attack as phrase AUDIO. Press EVOLVE to arm.' },
   { id: 'layout-accum', group: 'Layout', title: 'ACCUM', text: 'Pixel trail buffer — trails and glow render live in the WebGL canvas. CLEAR wipes the buffer only, not the canvas.' },
   { id: 'output-webm', group: 'Output', title: 'REC WEBM', text: 'Records the live WebGL canvas to WebM — ACCUM trails included. What plays is what exports.' },
+  { id: 'output-recipe', group: 'Output', title: 'RECIPE', text: 'Each snapshot has a copy button for its recipe as plain text (seed, params, sub-seed offsets). Paste it back with PASTE RECIPE to restore the exact scene.' },
 ];
 
 export const HELP_SHORTCUTS = [
