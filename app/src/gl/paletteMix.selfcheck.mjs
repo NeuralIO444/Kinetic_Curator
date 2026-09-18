@@ -1,0 +1,159 @@
+// paletteMix.selfcheck.mjs — VJ MIX crossfade state machine (#278).
+//
+// Node-only: the machine is pure (no GL), so the whole lifecycle — cut,
+// dissolve, arming, retarget, cancel — is unit-tested here.
+
+import assert from 'node:assert';
+import {
+  MIX_MIN, MIX_MAX, MIX_DEFAULT,
+  sanitizeMixSeconds, mixEase, createPaletteMix,
+} from './paletteMix.mjs';
+
+function base(over = {}) {
+  return {
+    id: 'praystation', overrides: null, userPalettes: null,
+    mixSeconds: 2, now: 1000, canDissolve: true, bakeReady: true,
+    ...over,
+  };
+}
+
+// sanitizeMixSeconds
+assert.strictEqual(sanitizeMixSeconds(2), 2);
+assert.strictEqual(sanitizeMixSeconds(0), 0);
+assert.strictEqual(sanitizeMixSeconds(8), 8);
+assert.strictEqual(sanitizeMixSeconds(-3), MIX_MIN);
+assert.strictEqual(sanitizeMixSeconds(99), MIX_MAX);
+assert.strictEqual(sanitizeMixSeconds(2.5), 2.5);
+assert.strictEqual(sanitizeMixSeconds(NaN), MIX_DEFAULT);
+assert.strictEqual(sanitizeMixSeconds('nope'), MIX_DEFAULT);
+assert.strictEqual(sanitizeMixSeconds(undefined), MIX_DEFAULT);
+
+// mixEase — smootherstep: 0→0, 1→1, monotonic, eased midpoint
+assert.strictEqual(mixEase(0), 0);
+assert.strictEqual(mixEase(1), 1);
+assert.strictEqual(mixEase(-5), 0);
+assert.strictEqual(mixEase(9), 1);
+const mid = mixEase(0.5);
+assert.ok(mid > 0 && mid < 1, 'midpoint inside (0,1)');
+assert.ok(Math.abs(mid - 0.5) < 1e-9, 'smootherstep is symmetric at 0.5');
+let prev = -1;
+for (let i = 0; i <= 20; i++) {
+  const v = mixEase(i / 20);
+  assert.ok(v >= prev, 'monotonic');
+  prev = v;
+}
+
+// First sighting with no previous frame → hard cut, never a dissolve.
+{
+  const m = createPaletteMix();
+  const ev = m.update(base({ canDissolve: false }));
+  assert.strictEqual(ev.kind, 'cut');
+  assert.strictEqual(m.isDissolving(), false);
+  assert.deepStrictEqual(m.update(base({ now: 2000 })), { kind: 'none' });
+}
+
+// MIX = 0 → hard cut even when a previous frame exists.
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false }));
+  const ev = m.update(base({ id: 'v01d', mixSeconds: 0, now: 2000 }));
+  assert.strictEqual(ev.kind, 'cut');
+  assert.strictEqual(m.isDissolving(), false);
+}
+
+// Full dissolve lifecycle: start → mix progresses eased → done.
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false, now: 0 }));
+  const start = m.update(base({ id: 'v01d', now: 1000 }));
+  assert.strictEqual(start.kind, 'start');
+  assert.strictEqual(start.dur, 2);
+  assert.strictEqual(start.retarget, false);
+  assert.strictEqual(m.isDissolving(), true);
+  let ev = m.update(base({ id: 'v01d', now: 1500 }));
+  assert.strictEqual(ev.kind, 'mix');
+  assert.strictEqual(ev.t, 0, 'clock starts when the bake lands, not at switch time');
+  ev = m.update(base({ id: 'v01d', now: 2000 }));
+  assert.strictEqual(ev.kind, 'mix');
+  assert.ok(Math.abs(ev.t - mixEase(0.25)) < 1e-9, 't eased from dissolve start');
+  ev = m.update(base({ id: 'v01d', now: 3499 }));
+  assert.strictEqual(ev.kind, 'mix');
+  assert.ok(ev.t < 1 && ev.t > 0.999, 'nearly done but not done');
+  ev = m.update(base({ id: 'v01d', now: 3500 }));
+  assert.strictEqual(ev.kind, 'done');
+  assert.strictEqual(m.isDissolving(), false);
+  assert.deepStrictEqual(m.update(base({ id: 'v01d', now: 4000 })), { kind: 'none' });
+}
+
+// Arming: the dissolve waits for the incoming palette's atlas bake.
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false, now: 0 }));
+  m.update(base({ id: 'v01d', now: 1000, bakeReady: false }));
+  const ev = m.update(base({ id: 'v01d', now: 5000, bakeReady: false }));
+  assert.strictEqual(ev.kind, 'arming');
+  assert.strictEqual(m.isDissolving(), true);
+  // The clock starts when the bake lands, not at switch time.
+  const go = m.update(base({ id: 'v01d', now: 9000, bakeReady: true }));
+  assert.strictEqual(go.kind, 'mix');
+  assert.strictEqual(go.t, 0);
+  const done = m.update(base({ id: 'v01d', now: 11000, bakeReady: true }));
+  assert.strictEqual(done.kind, 'done');
+}
+
+// Rapid successive switch retargets: keeps the ORIGINAL held frame, just
+// retargets the incoming palette — converges, never stacks.
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false, now: 0 }));
+  m.update(base({ id: 'v01d', now: 1000 }));
+  m.update(base({ id: 'v01d', now: 1500 }));
+  const re = m.update(base({ id: 'hydra', now: 1600 }));
+  assert.strictEqual(re.kind, 'start');
+  assert.strictEqual(re.retarget, true);
+  assert.strictEqual(m.isDissolving(), true);
+  // Retarget re-arms: the new incoming palette's bake must land first.
+  const rearm = m.update(base({ id: 'hydra', now: 3600 }));
+  assert.strictEqual(rearm.kind, 'mix');
+  assert.strictEqual(rearm.t, 0);
+  const done = m.update(base({ id: 'hydra', now: 5600 }));
+  assert.strictEqual(done.kind, 'done');
+}
+
+// Swatch edits (overrides identity change) trigger a dissolve too — the
+// loop's canDissolve already encodes "a snapshottable frame exists".
+{
+  const m = createPaletteMix();
+  const o1 = { swatches: ['#ff0000'] };
+  m.update(base({ canDissolve: false, now: 0 }));
+  m.update(base({ now: 1000 }));
+  const ev = m.update(base({ overrides: o1, now: 2000 }));
+  assert.strictEqual(ev.kind, 'start');
+  assert.strictEqual(ev.retarget, false);
+  assert.strictEqual(m.isDissolving(), true);
+}
+
+// cancel() abandons the dissolve: the next update hard-cuts, never
+// compositing against a dead hold target (context loss path).
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false, now: 0 }));
+  m.update(base({ id: 'v01d', now: 1000 }));
+  m.cancel();
+  assert.strictEqual(m.isDissolving(), false);
+  const ev = m.update(base({ id: 'hydra', now: 2000 }));
+  assert.strictEqual(ev.kind, 'start');
+  assert.strictEqual(ev.retarget, false, 'cancel cleared the dissolve, so this is fresh');
+}
+
+// Identity compare: same references → no spurious dissolve.
+{
+  const m = createPaletteMix();
+  const o = { swatches: ['#ff0000'] };
+  m.update(base({ canDissolve: false, now: 0 }));
+  m.update(base({ overrides: o, now: 1000, canDissolve: false }));
+  assert.deepStrictEqual(m.update(base({ overrides: o, now: 2000 })), { kind: 'none' });
+  assert.strictEqual(m.isDissolving(), false);
+}
+
+console.log('[selfcheck] paletteMix OK');

@@ -5,6 +5,7 @@ import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, defaultSeedOffsets, normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 
 export const createLayoutSlice = (set) => ({
   seed: 0xa17e9b21,
@@ -43,6 +44,12 @@ export const createLayoutSlice = (set) => ({
    */
   perfClampOverride: null,
   motionSmoothing: true,
+  /**
+   * VJ MIX (#278): palette-switch crossfade duration in seconds, 0–8.
+   * 0 = hard cut (the old behavior). A feel preference like
+   * motionSmoothing — deliberately outside the project document.
+   */
+  paletteMixSeconds: 2,
   caGrid: null,
   historyUndoStack: [],
   historyRedoStack: [],
@@ -241,6 +248,8 @@ export const createLayoutSlice = (set) => ({
   }),
 
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
+  /** VJ MIX (#278): palette-switch crossfade seconds, clamped 0–8. */
+  setPaletteMixSeconds: (seconds) => set({ paletteMixSeconds: sanitizeMixSeconds(seconds) }),
   stepCaGrid: () => set((state) => ({
     caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28),
   })),

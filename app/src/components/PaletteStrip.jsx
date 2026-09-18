@@ -64,6 +64,8 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
 
 export function PaletteStrip() {
   const { dispatch, palette, palettes, paletteLocks } = useApp();
+  const { state } = useApp(s => ({ paletteMixSeconds: s.paletteMixSeconds }));
+  const paletteMixSeconds = state.paletteMixSeconds ?? 2;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
   const CHIP_WIN = 4;
   const chipTrackRef = useRef(null);
@@ -151,6 +153,28 @@ export function PaletteStrip() {
         </select>
         <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
         <button type="button" className="palette-save-btn" title="Save palette" onClick={() => emit(Events.PALETTE_SAVE, {})}>+ SAVE</button>
+        {/* #278 — VJ MIX: palette-switch crossfade time. Adjacent to the
+            palette switcher by design (no new panel). 0s = hard cut. */}
+        <label
+          className="palette-mix"
+          title="VJ MIX — how long a palette switch takes to crossfade into the running animation (0–8s). 0s cuts instantly like before."
+        >
+          <span className="palette-mix-label">MIX</span>
+          <input
+            type="range"
+            className="single-slider palette-mix-slider"
+            min={0}
+            max={8}
+            step={0.5}
+            value={paletteMixSeconds}
+            onChange={(e) => dispatch({ type: A.SET_PALETTE_MIX, payload: Number(e.target.value) })}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Palette crossfade time in seconds"
+          />
+          <span className="range-readout">
+            {Number.isInteger(paletteMixSeconds) ? `${paletteMixSeconds}s` : `${Number(paletteMixSeconds).toFixed(1)}s`}
+          </span>
+        </label>
       </div>
     </div>
   );
