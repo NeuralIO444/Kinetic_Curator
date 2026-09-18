@@ -73,7 +73,6 @@ function AppInner() {
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [helpTab, setHelpTab] = useState('help');
   const [tourOpen, setTourOpen] = useState(false);
-  const openHelp = useCallback(() => { setHelpTab('help'); setShowHotkeys(true); }, []);
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
   useEffect(() => {
     evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
@@ -207,7 +206,7 @@ function AppInner() {
         />
       </ErrorBoundary>
       <MasterBar />
-      <FavoritesTray onHelp={openHelp} />
+      <FavoritesTray />
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
