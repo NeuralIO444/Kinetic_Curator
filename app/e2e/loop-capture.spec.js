@@ -44,7 +44,11 @@ async function installBlobTap(page) {
 }
 
 test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, testInfo) => {
-  test.setTimeout(120_000);
+  // Software GL (SwiftShader, CI) renders each captured frame on the CPU
+  // (~1s/frame): a 2s take is 90 grabbed frames, so the wall clock is
+  // minutes while the exported video is still exactly 2s at 30fps.
+  // On a real GPU this finishes in seconds.
+  test.setTimeout(360_000);
   await installBlobTap(page);
 
   await page.goto('/Kinetic_Curator/', { waitUntil: 'domcontentloaded' });
@@ -65,8 +69,9 @@ test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, 
   await page.waitForTimeout(2000); // let trails build up
   await page.getByRole('button', { name: /^2s$/ }).click();
   await page.getByRole('button', { name: /CAPTURE LOOP/ }).click();
-  // 2s loop + 1s dissolve lead-in, plus encode/finalize headroom.
-  await page.waitForFunction(() => window.__webmBlobs.length > 0, null, { timeout: 30_000 });
+  // 2s loop + 1s dissolve lead-in, plus encode/finalize headroom —
+  // generous on software GL (see above).
+  await page.waitForFunction(() => window.__webmBlobs.length > 0, null, { timeout: 300_000 });
 
   const rec = await page.evaluate(async () => {
     const blob = window.__webmBlobs[window.__webmBlobs.length - 1];
