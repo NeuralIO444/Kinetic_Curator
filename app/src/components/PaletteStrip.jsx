@@ -59,15 +59,13 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
         <span className="palette-meta-label">INK</span>
         <input type="color" className="palette-color-input" value={palette.ink} onChange={(e) => onInk(e.target.value)} onClick={(e) => e.stopPropagation()} />
       </label>
-      {dirty && (<button type="button" className="palette-reset-btn" title="Reset to catalog colors" onClick={(e) => { e.stopPropagation(); onReset(); }}>↺</button>)}
+      {dirty && (<button type="button" className="palette-reset-btn" title="Reset to catalog colors" onClick={(e) => { e.stopPropagation(); onReset(); }}>↻</button>)}
     </span>
   );
 }
 
 export function PaletteStrip() {
   const { dispatch, palette, palettes, paletteLocks } = useApp();
-  // useApp() with no selector sets `state` to null (_emptySelector).
-  // Reading state.paletteMixSeconds threw and .app never committed — e2e red.
   const paletteMixSeconds = useStore((s) => s.paletteMixSeconds) ?? MIX_DEFAULT;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
   const CHIP_WIN = 4;
@@ -172,8 +170,8 @@ export function PaletteStrip() {
             onClick={(e) => e.stopPropagation()}
             aria-label="Palette crossfade time in seconds"
           />
-          <span className="range-readout">
-            {Number.isInteger(paletteMixSeconds) ? `${paletteMixSeconds}s` : `${Number(paletteMixSeconds).toFixed(1)}s`}
+          <span className="range-readout palette-mix-readout">
+            {Number(paletteMixSeconds).toFixed(1)}s
           </span>
         </label>
       </div>
