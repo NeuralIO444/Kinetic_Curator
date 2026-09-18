@@ -1,6 +1,6 @@
 // node src/engine/buildPlacements.selfcheck.mjs
 import assert from 'node:assert';
-import { buildPlacements, pickWeighted, clampCount } from './buildPlacements.js';
+import { buildPlacements, pickWeighted, clampCount, MAX_ABSOLUTE_COUNT } from './buildPlacements.js';
 import { mkRng } from './prng.js';
 
 const assets = [
@@ -54,6 +54,13 @@ const capsPerf = {
 assert.strictEqual(clampCount(999, false, capsPerf), 180);
 assert.strictEqual(clampCount(999, true, capsPerf), 140);
 assert.strictEqual(clampCount(50, false, capsBalanced), 50);
+
+// --- #269: absolute count ceiling, independent of caps ---
+const noCaps = { maxCount: 1e9, maxCountMirrored: 1e9 };
+assert.strictEqual(clampCount(1e7, false, noCaps), MAX_ABSOLUTE_COUNT, 'hostile count clamped, not OOM');
+assert.strictEqual(clampCount(1e7, true, noCaps), MAX_ABSOLUTE_COUNT, 'ceiling holds on the mirror path');
+assert.strictEqual(clampCount(999, false, capsPerf), 180, 'caps still bind below the ceiling');
+assert.strictEqual(clampCount(800, false, { maxCount: 800, maxCountMirrored: 800 }), 800, 'richest tier unaffected');
 
 // --- same inputs → same items ---
 const opts = {

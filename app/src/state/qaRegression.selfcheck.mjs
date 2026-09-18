@@ -67,6 +67,19 @@ ok('normalizeSnapshots fills seed/paletteId/enabledAssets on sparse snapshots', 
   assert.deepStrictEqual(normalizeSnapshots(null), {});
 });
 
+// --- Hostile caGrid is rejected, not bloat-persisted (#269) ---
+ok('normalizeSnapshots rejects oversized/ragged caGrid', () => {
+  const big = Array.from({ length: 1000 }, () => new Array(1000).fill(0));
+  const out = normalizeSnapshots({
+    l1: { caGrid: big },
+    l2: { caGrid: [[1], 'nope'] },
+    l3: { caGrid: [[9]] },
+  });
+  assert.strictEqual(out.l1.caGrid, null, '1000x1000 rejected');
+  assert.strictEqual(out.l2.caGrid, null, 'ragged rejected');
+  assert.deepStrictEqual(out.l3.caGrid, [[9]], 'real grid kept');
+});
+
 // --- normalizeLayers: dedupe, all-FX rejection, FX never content-active (#QA-9) ---
 ok('normalizeLayers dedupes ids, rejects all-FX docs, never FX-activates', () => {
   const dup = normalizeLayers([

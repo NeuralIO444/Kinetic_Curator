@@ -14,6 +14,24 @@ import { QUALITY_PRESETS } from '../data/quality.js';
 /** #103 Track B — the live loop resolves every layer per frame; cap hostile docs. */
 export const MAX_LAYERS = 16;
 
+/**
+ * #269 — cap hostile CA grids from project snapshots. Real grids are 40×28
+ * (davisSlice); a 1000×1000 grid otherwise survives parsing, bloating every
+ * undo snapshot (~2 MB each) and stalling first render on the blur cache in
+ * registry.js. Oversized or ragged grids are rejected to null — CA mode then
+ * degrades to random sampling via the `if (!caGrid) return random(ctx)`
+ * fallback in the CA sampler.
+ */
+export const MAX_CA_GRID_DIM = 256;
+
+function sanitizeCaGrid(raw) {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_CA_GRID_DIM) return null;
+  for (const row of raw) {
+    if (!Array.isArray(row) || row.length === 0 || row.length > MAX_CA_GRID_DIM) return null;
+  }
+  return raw;
+}
+
 const KNOWN_ASSET_IDS = new Set(ASSETS.map((a) => a.id));
 
 /**
@@ -71,7 +89,7 @@ export function normalizeSnapshots(raw) {
       paletteOverrides: snap.paletteOverrides ?? null,
       layoutParams: normalizeLayoutParams(snap.layoutParams),
       lockedParams: snap.lockedParams && typeof snap.lockedParams === 'object' ? snap.lockedParams : {},
-      caGrid: Array.isArray(snap.caGrid) ? snap.caGrid : null,
+      caGrid: sanitizeCaGrid(snap.caGrid),
       enabledAssets: snap.enabledAssets && typeof snap.enabledAssets === 'object' ? { ...snap.enabledAssets } : {},
     };
   }

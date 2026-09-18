@@ -171,8 +171,10 @@ export function computeGeometrySoA({
 export function applyAttributes(soa, { scale, rotate, alpha }) {
   const scale0 = scale[0];
   const scaleD = scale[1] - scale[0];
-  const rot0 = rotate[0];
-  const rotD = rotate[1] - rotate[0];
+  // #269 — null guard: a raw caller (or corrupt snapshot) with rotate:null
+  // must degrade to zero rotation, not TypeError and freeze the frame loop.
+  const rot0 = rotate?.[0] ?? 0;
+  const rotD = (rotate?.[1] ?? rot0) - rot0;
   const alpha0 = alpha[0];
   const alphaD = alpha[1] - alpha[0];
 
