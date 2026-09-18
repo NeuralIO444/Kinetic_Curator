@@ -15,6 +15,19 @@ import { useStore } from '../state/store.js';
 const stageSamples = new Map();
 
 /**
+ * Module-level ring of recent rAF frame deltas (ms), written by the meter
+ * tick below. Exposed for the dev-only GOV TUNE panel's frame-time
+ * histogram — the FPS average lies (one 200ms hitch vanishes inside a 60fps
+ * average), the histogram doesn't. Bounded at 240 (~4s at 60fps).
+ */
+const frameDeltas = [];
+
+/** Snapshot copy of the recent frame deltas, oldest → newest. */
+export function getFrameDeltas() {
+  return [...frameDeltas];
+}
+
+/**
  * Report one timed sample for a pipeline stage (e.g. 'kernel').
  * Cheap: a Map write. Aggregation + store sync happen in the meter tick.
  */
@@ -66,6 +79,9 @@ export function useFpsMeter(enabled = true) {
       const deltas = deltasRef.current;
       deltas.push(delta);
       if (deltas.length > 120) deltas.shift(); // ~2s window at 60fps
+      // Mirror into the module-level ring for the GOV TUNE histogram.
+      frameDeltas.push(delta);
+      if (frameDeltas.length > 240) frameDeltas.shift();
 
       const elapsed = now - lastReportRef.current;
 

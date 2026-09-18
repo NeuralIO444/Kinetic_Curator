@@ -39,6 +39,16 @@ export const createGlobalSlice = (set) => ({
    */
   slowRender: false,
   /**
+   * Which mechanism set slowRender — the honest-pill discriminator (#259).
+   *   null       — motion not frozen
+   *   'cut6'     — governor cut 6: motion frozen to protect frame rate,
+   *                auto-clears when FPS recovers
+   *   'watchdog' — cut 7 hard stop (tripWatchdog): needs manual resume
+   * MasterBar used to show "PERF PAUSED / Watchdog tripped" for both; cut 6
+   * gets its own auto-clearing indicator now.
+   */
+  slowRenderSource: null,
+  /**
    * Set for the duration of a batch export (#107 §5). Deliberately separate
    * from slowRender/perfTier1 above — those are owned by usePerformanceGovernor
    * and auto-clear on live FPS, which would fight a pause that must hold for
@@ -81,6 +91,19 @@ export const createGlobalSlice = (set) => ({
    * thinning uniformly. Never serialized.
    */
   assetThin: false,
+  /**
+   * Governor hysteresis thresholds (#259 — the permanent-shed-trap fix).
+   * Shed when effective FPS < governorShedFps; recover when >=
+   * governorRecoverFps. These MUST stay apart: the trap was one shared
+   * threshold (32) sitting above a machine's sustainable rate (29.9 on a
+   * 30Hz-locked loop), so the governor walked the whole ladder and could
+   * never recover. The setters enforce shed < recover — the trap is
+   * unrepresentable by construction.
+   * Session-only, never serialized (machine-specific, like frameLock).
+   * Live-overridable from the dev-only GOV TUNE panel.
+   */
+  governorShedFps: 28,
+  governorRecoverFps: 30,
   /**
    * Showrunner frame-lock show mode: a USER choice, not a degradation.
    * When on, the life/breathing tick (the dominant per-frame re-render
@@ -131,7 +154,10 @@ export const createGlobalSlice = (set) => ({
   }),
   setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
-  setSlowRender: (slow) => set({ slowRender: slow }),
+  setSlowRender: (slow, source) => set({
+    slowRender: slow,
+    slowRenderSource: slow ? (source || 'cut6') : null,
+  }),
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
   setStageTimings: (stages) => set({ stageTimings: { ...stages } }),
@@ -140,6 +166,25 @@ export const createGlobalSlice = (set) => ({
     set({ renderScale: Number.isFinite(s) && s > 0 ? Math.min(1, s) : 1 });
   },
   setAssetThin: (on) => set({ assetThin: !!on }),
+  /**
+   * Live governor threshold overrides (GOV TUNE panel). Clamped to 1–120
+   * and to each other: shed must stay strictly below recover, or the
+   * permanent-shed trap returns.
+   */
+  setGovernorShedFps: (v) => set((state) => ({
+    governorShedFps: Math.min(
+      Math.max(1, Math.round(Number(v) || state.governorShedFps)),
+      120,
+      state.governorRecoverFps - 1,
+    ),
+  })),
+  setGovernorRecoverFps: (v) => set((state) => ({
+    governorRecoverFps: Math.max(
+      Math.min(120, Math.round(Number(v) || state.governorRecoverFps)),
+      1,
+      state.governorShedFps + 1,
+    ),
+  })),
   setFrameLock: (on) => set({ frameLock: !!on }),
   /**
    * Tier 2 of the watchdog (#107 §4): FPS ~ 0 sustained, or a critical
@@ -151,6 +196,7 @@ export const createGlobalSlice = (set) => ({
    */
   tripWatchdog: (reason) => set((state) => ({
     slowRender: true,
+    slowRenderSource: 'watchdog',
     running: false,
     evolveMode: false,
     perfTier1: true,

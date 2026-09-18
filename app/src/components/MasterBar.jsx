@@ -155,6 +155,7 @@ export function MasterBar() {
     isRecording: s.isRecording,
     persistStatus: s.persistStatus,
     slowRender: s.slowRender,
+    slowRenderSource: s.slowRenderSource,
     perfTier1: s.perfTier1,
     frameLock: s.frameLock,
     setFrameLock: s.setFrameLock,
@@ -165,7 +166,7 @@ export function MasterBar() {
   // and a pill that fails open would cry UNSAVED on every boot.
   const {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
-    slowRender = false, perfTier1 = false, frameLock = false, audioDenied = false,
+    slowRender = false, slowRenderSource = null, perfTier1 = false, frameLock = false, audioDenied = false,
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -256,8 +257,10 @@ export function MasterBar() {
         {/* #107 §4: the watchdog tripped (tier 2 — FPS ~0, or a critical
             render-error) — running/evolve are OFF and do not resume on their
             own, otherwise this looks like the app just stopped for no
-            reason and the operator waits for a recovery that never comes. */}
-        {slowRender && (
+            reason and the operator waits for a recovery that never comes.
+            Shown ONLY for the actual watchdog trip (#259): governor cut 6
+            (motion freeze) gets its own auto-clearing indicator below. */}
+        {slowRender && slowRenderSource === 'watchdog' && (
           <div
             className="status-pill"
             style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
@@ -265,6 +268,21 @@ export function MasterBar() {
           >
             <span className="status-dot" style={{ background: '#ff2d6f' }} />
             PERF PAUSED
+          </div>
+        )}
+
+        {/* #259: governor cut 6 — motion frozen to protect frame rate.
+            Self-clearing (the governor unfreezes when FPS recovers past the
+            recover threshold), so this must never claim the watchdog
+            tripped. */}
+        {slowRender && slowRenderSource !== 'watchdog' && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title="Governor froze motion to protect frame rate — clears automatically when FPS recovers."
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            MOTION HELD
           </div>
         )}
 
