@@ -48,6 +48,7 @@ export const Events = {
   LAYOUT_PRESET: 'layout:preset',
   LAYOUT_LOCK: 'layout:lock',
   LAYOUT_RANDOMIZE: 'layout:randomize',
+  LAYOUT_CURATE: 'layout:curate',
   AUDIO_TOGGLE: 'audio:toggle',
   AUDIO_GAIN: 'audio:gain',
   AUDIO_SOURCE: 'audio:source',

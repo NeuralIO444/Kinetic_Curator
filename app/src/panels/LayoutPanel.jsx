@@ -6,7 +6,7 @@ import { PresetBrowser } from './layout/PresetBrowser.jsx';
 import { ModeGrid } from './layout/ModeGrid.jsx';
 import { ParamBlock } from './layout/ParamBlock.jsx';
 import { ToggleRow } from './layout/ToggleRow.jsx';
-import { RandomizeBar } from './layout/RandomizeBar.jsx';
+import { CuratorBar } from './layout/CuratorBar.jsx';
 
 export function LayoutPanel() {
   const { state } = useApp(s => ({
@@ -25,7 +25,7 @@ export function LayoutPanel() {
       <div className="panel-body">
         <PresetBrowser composition={layoutParams.composition} />
         <ModeGrid mode={layoutParams.mode} />
-        <RandomizeBar lockCount={lockCount} />
+        <CuratorBar lockCount={lockCount} />
         <ParamBlock layoutParams={layoutParams} lockedParams={lockedParams} />
         <ToggleRow layoutParams={layoutParams} />
       </div>
