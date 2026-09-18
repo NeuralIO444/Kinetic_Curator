@@ -119,6 +119,19 @@ export const createGlobalSlice = (set) => ({
   /** Last string passed to tripWatchdog(reason) — surfaced for debugging why
    * the session is paused (e.g. 'fps-critical' vs a render-error label). */
   lastWatchdogReason: null,
+  /**
+   * RENDER FAULT (#266): a deterministic per-frame fault in the live loop
+   * (frame building / rendering / presenting throwing on consecutive ticks)
+   * or a deterministic atlas-bake failure. The loop sets this sticky — the
+   * canvas keeps the last good frame, so without the pill the app would
+   * look alive while silently stopped presenting. It clears only on an
+   * honest recovery (RENDER_FAULT_RECOVERY consecutive clean frames) or a
+   * reload — never on a single good frame.
+   * renderFaultReason carries a one-line diagnosis for the pill tooltip.
+   * Never serialized (session-only, like fps).
+   */
+  renderFault: false,
+  renderFaultReason: null,
   webcamEnabled: false,
 
   enabledAssets: initialEnabledAssets,
@@ -204,6 +217,17 @@ export const createGlobalSlice = (set) => ({
     lastWatchdogReason: reason,
   })),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
+  /**
+   * RENDER FAULT setter (#266). Written only on transitions by the live
+   * loop (never per frame — no re-render storm). Setting `on` while the
+   * fault is already active updates the diagnosis; clearing requires an
+   * explicit `false`, which also drops the reason so a stale diagnosis
+   * can't linger after recovery.
+   */
+  setRenderFault: (on, reason) => set({
+    renderFault: !!on,
+    renderFaultReason: on ? (reason || 'render-error') : null,
+  }),
 
   toggleAsset: (id) => set((state) => ({
     enabledAssets: { ...state.enabledAssets, [id]: !state.enabledAssets[id] },

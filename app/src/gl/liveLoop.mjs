@@ -35,6 +35,12 @@ import { mergePool } from '../assets/overlay.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
+import {
+  createRenderFaultTracker,
+  RENDER_FAULT_FAILS,
+  frameFaultReason,
+  bakeFaultReason,
+} from './renderFault.mjs';
 
 const CX = CANVAS_W / 2;
 const CY = CANVAS_H / 2;
@@ -111,6 +117,25 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
 
   let lastErrTs = 0;
   let lastNodeCount = -1;
+
+  // #266 — deterministic render-fault tracking. A single transient throw is
+  // not a fault: the RENDER FAULT pill trips only after consecutive failed
+  // ticks, and clears only after a sustained run of clean presents (or a
+  // reload). The store write happens only on transitions — the loop never
+  // re-renders React per frame.
+  const renderFault = createRenderFaultTracker((on, reason) => {
+    try { getState().setRenderFault(on, reason); } catch { /* store gone */ }
+  });
+
+  // #266 — atlas-bake failure state. A deterministic bake failure (e.g. an
+  // unrasterizable custom asset) used to retry on the very next tick with a
+  // bare console.error: an infinite rebuild loop with unthrottled spam and a
+  // permanent blank canvas. Now the log is throttled, retries back off
+  // exponentially, and after RENDER_FAULT_FAILS consecutive failures the
+  // fault surfaces as a sticky RENDER FAULT pill.
+  let bakeConsecFails = 0;
+  let bakeRetryAt = 0;
+  let lastBakeErrTs = 0;
 
   function setBgMode(m) {
     bgMode = m === 'transparent' ? 'transparent' : m === 'white' ? 'white' : 'palette';
@@ -216,7 +241,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const rh = Math.max(2, Math.round(CANVAS_H * renderScale));
 
     const key = staticKeyFor(combos, fxLayerIds, rw, rh);
-    if (key !== staticKey && !building) {
+    if (key !== staticKey && !building && performance.now() >= bakeRetryAt) {
       startStaticBuild(combos, fxLayerIds, rw, rh, key);
     }
     if (building || !cells) return null;
@@ -267,8 +292,23 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       live.setGrainLuts(luts);
       cells = Object.fromEntries(atlas.cells);
       staticKey = key;
+      bakeConsecFails = 0; // #266 — a good bake resets the failure streak
     } catch (e) {
-      console.error('[gl-live] static build failed:', e);
+      // #266 — the failure is deterministic until the inputs change, so
+      // retrying every tick just floods the console: throttle the log,
+      // back off exponentially, and surface it as a sticky RENDER FAULT
+      // pill after a few consecutive failures instead of a permanent blank
+      // canvas with no signal.
+      bakeConsecFails++;
+      bakeRetryAt = performance.now() + Math.min(8000, 250 * 2 ** (bakeConsecFails - 1));
+      const now = performance.now();
+      if (now - lastBakeErrTs > 5000) {
+        console.error('[gl-live] static build failed:', e);
+        lastBakeErrTs = now;
+      }
+      if (bakeConsecFails >= RENDER_FAULT_FAILS) {
+        renderFault.noteExternalFault(bakeFaultReason(e));
+      }
     } finally {
       if (token === buildToken) building = false;
     }
@@ -366,8 +406,15 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
         }
       }
       frameCount++;
+      // #266 — the tick presented cleanly; counts toward honest recovery.
+      // Ticks that return early (bake in flight / paused) never reach here,
+      // so they neither trip nor clear the fault — only real presents count.
+      renderFault.noteCleanPresent();
     } catch (e) {
       // Never let a bad frame kill the loop; throttle the noise.
+      // #266 — track consecutive failures so a deterministic fault surfaces
+      // as a RENDER FAULT pill instead of a silently frozen canvas.
+      renderFault.noteFrameFailure(frameFaultReason(e));
       const now = performance.now();
       if (now - lastErrTs > 1000) {
         console.error('[gl-live] frame error:', e);
