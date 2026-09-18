@@ -162,6 +162,7 @@ export function MasterBar() {
     frameLock: s.frameLock,
     setFrameLock: s.setFrameLock,
     audioDenied: s.audioDenied,
+    glContext: s.glContext,
   }));
   // Default to 'ok' rather than showing the warning for an undefined value:
   // this selector is explicit, so a field missing from it reads as undefined,
@@ -170,6 +171,7 @@ export function MasterBar() {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
     slowRender = false, slowRenderSource = null, perfTier1 = false, frameLock = false, audioDenied = false,
     renderFault = false, renderFaultReason = null,
+    glContext = 'ok',
   } = state;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
 
@@ -239,6 +241,25 @@ export function MasterBar() {
           >
             <span className="status-dot" style={{ background: '#ffb000' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
+          </div>
+        )}
+
+        {/* #263: WebGL context down or rebuilding — the canvas cannot
+            render while the GPU session is gone, and before this fix it
+            sat black with no explanation. Red while down, amber while the
+            session is cold-restarting and textures are rebaking. */}
+        {glContext !== 'ok' && (
+          <div
+            className="status-pill"
+            style={glContext === 'lost'
+              ? { background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }
+              : { background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title={glContext === 'lost'
+              ? 'GPU context lost — the live loop is holding frames. It recovers automatically when the context is restored; reload only if this never clears.'
+              : 'GPU context restored — rebuilding the renderer and rebaking textures. Clears automatically when the scene is back.'}
+          >
+            <span className="status-dot" style={{ background: glContext === 'lost' ? '#ff2d6f' : '#ffb000' }} />
+            {glContext === 'lost' ? 'GL CONTEXT LOST' : 'GL RESTORING'}
           </div>
         )}
 

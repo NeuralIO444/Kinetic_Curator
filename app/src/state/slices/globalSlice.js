@@ -112,6 +112,17 @@ export const createGlobalSlice = (set) => ({
    * Never serialized (it is a machine-specific choice, not composition).
    */
   frameLock: false,
+  /**
+   * Live-GL context health (#263): 'ok' | 'lost' | 'restoring'.
+   *   'lost'      — the GPU context went down (webglcontextlost); the live
+   *                 loop holds frames instead of drawing black forever.
+   *   'restoring' — the context came back; the renderer is being
+   *                 cold-restarted and textures are rebaking.
+   * Clears to 'ok' when the post-restore rebake lands. MasterBar shows a
+   * fault pill for either non-ok state so the outage is never silent.
+   * Session-only, never serialized — it describes this tab's GPU session.
+   */
+  glContext: 'ok',
   /** Bumped by every tripWatchdog() call — lets a subscriber (OutputPanel's
    * in-flight export restore) react to a NEW trip instead of a boolean it
    * has already seen. */
@@ -199,6 +210,8 @@ export const createGlobalSlice = (set) => ({
     ),
   })),
   setFrameLock: (on) => set({ frameLock: !!on }),
+  /** Live-GL context health signal (#263) — one of 'ok' | 'lost' | 'restoring'. */
+  setGlContext: (v) => set({ glContext: v === 'lost' ? 'lost' : v === 'restoring' ? 'restoring' : 'ok' }),
   /**
    * Tier 2 of the watchdog (#107 §4): FPS ~ 0 sustained, or a critical
    * render-error (top-level Shell boundary only). Unlike tier 1, this is a

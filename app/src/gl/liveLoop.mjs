@@ -63,8 +63,91 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
-  const live = createLiveRenderer(canvas);
+  let live = createLiveRenderer(canvas);
   const resolver = createLiveResolver();
+
+  // #263 — WebGL context loss. The browser fires webglcontextlost when the
+  // GPU session dies (tab backgrounded too long, driver hiccup, GPU reset);
+  // every GL object in the session is dead from that moment, and drawing
+  // with the stale handles wedges the canvas black forever. While the
+  // context is down the loop holds frames (rAF keeps spinning so the
+  // restore is picked up immediately) and the store's glContext flag
+  // drives the MasterBar fault pill — no more silent black.
+  //
+  // On webglcontextrestored the whole renderer is cold-restarted through
+  // the single init path (base programs + VBOs, bridge, targets,
+  // textures): surgically restoring each handle would need a parallel
+  // restore path per resource that drifts out of sync with init. The
+  // static resources are then rebaked, which re-uploads the atlas and
+  // grain textures onto the new session; targets reallocate lazily via
+  // ensureTargets and the loop resumes presenting without a reload.
+  let contextDown = false;
+  let restoringSession = false;
+  const setGlContextSafe = (v) => {
+    try {
+      const s = getState();
+      if (s && typeof s.setGlContext === 'function') s.setGlContext(v);
+    } catch { /* store gone */ }
+  };
+  const restartGlSession = () => {
+    // Detach the dead session's bridge listeners. Do NOT call live.dispose():
+    // the context loss already invalidated every GL handle, and deleting
+    // those dead handles on the restored context crashes SwiftShader's GPU
+    // process (observed as a spontaneous second webglcontextlost). The JS
+    // wrappers are garbage-collected; the browser reclaims the dead GL
+    // objects with the lost context.
+    try { live.getBridge().dispose(); } catch { /* best-effort */ }
+    live = createLiveRenderer(canvas);
+    // Orphan any bake in flight against the dead session — its token
+    // checkpoints bail at the next await boundary; the null staticKey
+    // below makes the next tick start a fresh bake onto the new session.
+    buildToken++;
+    building = false;
+    cells = null;
+    staticKey = null;
+    accumObj = null;
+    accumActive = false;
+    accumRetryAt = 0;
+    gpuTimer = null;
+    // #266: a fresh GPU session — don't carry the dead session's bake
+    // failure streak / retry backoff into the rebake.
+    bakeConsecFails = 0;
+    bakeRetryAt = 0;
+    contextDown = false;
+    restoringSession = true;
+    setGlContextSafe('restoring');
+  };
+  // Synchronous half of the loss path: webglcontextlost is dispatched
+  // asynchronously, so a tick can land in the gap between the loss and
+  // the event — drawing into the dead session then throws (e.g.
+  // "framebuffer incomplete" from the target completeness check).
+  // Poll isContextLost() in the tick and flag it immediately; the real
+  // event still arrives afterwards and preventDefaults normally.
+  const flagContextLost = () => {
+    if (contextDown) return;
+    contextDown = true;
+    setGlContextSafe('lost');
+  };
+  const onCtxLost = (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    flagContextLost();
+  };
+  const onCtxRestored = () => {
+    // The bridge recompiles its own programs via its own listener; the
+    // cold restart below rebuilds everything else. Guard against a stray
+    // restore with no preceding loss (e.g. listener attached mid-session).
+    if (!contextDown && !restoringSession) return;
+    try {
+      restartGlSession();
+    } catch (e) {
+      console.error('[gl-live] context restore failed:', e);
+      contextDown = true;
+      restoringSession = false;
+      setGlContextSafe('lost');
+    }
+  };
+  canvas.addEventListener('webglcontextlost', onCtxLost);
+  canvas.addEventListener('webglcontextrestored', onCtxRestored);
 
   // #103 Track A — per-tick GPU frame timing for the governor. Timer query
   // when EXT_disjoint_timer_query_webgl2 exists, CPU-wall fallback otherwise
@@ -317,6 +400,14 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   function tick() {
     if (!running) return;
     rafId = requestAnimationFrame(tick);
+    // #263: GPU session down — hold frames (and keep rAF spinning so the
+    // restore is picked up immediately). The glContext flag drives the
+    // MasterBar fault pill while we hold. isContextLost() is polled
+    // synchronously to cover the gap before webglcontextlost is dispatched.
+    if (contextDown || live.getGL().isContextLost()) {
+      flagContextLost();
+      return;
+    }
     try {
       const frame = buildFrame();
       if (!frame) return; // static bake in flight — hold last frame
@@ -410,6 +501,15 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       // Ticks that return early (bake in flight / paused) never reach here,
       // so they neither trip nor clear the fault — only real presents count.
       renderFault.noteCleanPresent();
+      // #263: the first clean present after a context restore proves the
+      // new session is actually drawing — only now does the scene count as
+      // back, so the GL RESTORING pill clears here, not at bake completion.
+      // (If the context dropped again mid-restore, hold the pill for the
+      // new outage.)
+      if (restoringSession && !contextDown) {
+        restoringSession = false;
+        setGlContextSafe('ok');
+      }
     } catch (e) {
       // Never let a bad frame kill the loop; throttle the noise.
       // #266 — track consecutive failures so a deterministic fault surfaces
@@ -429,6 +529,13 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
    * independent of the live renderScale (1x/2x/4x stills).
    */
   function captureFrame({ width = CANVAS_W, height = CANVAS_H } = {}) {
+    // #263: never hand back black pixels from a dead GPU session — the
+    // caller surfaces this instead of a silently blank export.
+    // isContextLost() covers the gap before webglcontextlost dispatches.
+    if (contextDown || live.getGL().isContextLost()) {
+      flagContextLost();
+      throw new Error('[gl-live] GPU context lost — capture unavailable until the context is restored');
+    }
     if (building) throw new Error('[gl-live] textures baking — wait a moment and retry');
     const frame = buildFrame();
     if (!frame) throw new Error('[gl-live] textures baking — wait a moment and retry');
@@ -478,6 +585,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
 
   function dispose() {
     stop();
+    canvas.removeEventListener('webglcontextlost', onCtxLost);
+    canvas.removeEventListener('webglcontextrestored', onCtxRestored);
     resolver.dispose();
     live.dispose();
   }

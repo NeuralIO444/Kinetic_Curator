@@ -276,9 +276,22 @@ const registry = new Map(); // kind -> { descriptor, decls, rec, file, warnings 
  *
  * Static audit failures throw (fail closed at load, naming the effect);
  * runtime audit warnings are recorded in the registry + diagnostics log.
+ *
+ * The module registry is process-wide, but bridges are per-renderer: when
+ * the kind is already known, a bridge that doesn't have it yet (#263 —
+ * cold restart after context loss) legitimately adopts the descriptor and
+ * recompiles the program on its own session. Re-registering onto the SAME
+ * bridge is still a fail-closed authoring error.
  */
 export function registerTemplateEffect(bridge, gl, kind, { fs, descriptor, file } = {}) {
-  if (registry.has(kind)) throw new Error(`[gl-template] effect "${kind}" is already registered`);
+  const known = registry.get(kind);
+  if (known) {
+    if (typeof bridge.hasEffect === 'function' && bridge.hasEffect(kind)) {
+      throw new Error(`[gl-template] effect "${kind}" is already registered`);
+    }
+    wireTemplateEffect(bridge, gl, kind, known);
+    return known.descriptor;
+  }
   if (typeof fs !== 'string' || !fs.includes('void main')) {
     throw new Error(`[gl-template] effect "${kind}": fs must be a fragment shader source`);
   }
@@ -291,7 +304,26 @@ export function registerTemplateEffect(bridge, gl, kind, { fs, descriptor, file 
       `extra in shader: [${staticAudit.extraInShader.join(', ')}]`
     );
   }
-  const decls = uniformDecls(d);
+  const entry = {
+    descriptor: d,
+    decls: uniformDecls(d),
+    fs,
+    file: file || `effect:${kind}`,
+    rec: null,
+    warnings: [],
+  };
+  wireTemplateEffect(bridge, gl, kind, entry);
+  registry.set(kind, entry);
+  return d;
+}
+
+/**
+ * Compile the template program on this bridge's GL session and define the
+ * effect pass. Called once per (bridge, kind) — the module registry above
+ * remembers the validated descriptor so a fresh bridge can re-wire it.
+ */
+function wireTemplateEffect(bridge, gl, kind, entry) {
+  const { descriptor: d, decls, fs, file } = entry;
   const programName = `fx/${kind}`;
   // The shared chunk library (common.glsl) is injected into every template
   // effect before compile — effects call kc_* helpers instead of redefining
@@ -300,7 +332,7 @@ export function registerTemplateEffect(bridge, gl, kind, { fs, descriptor, file 
   // file (chunk block -> common.glsl lines, body -> effect source lines).
   const rec = bridge.registerProgram(programName, TEMPLATE_VS, injectCommon(fs), {
     uniforms: decls,
-    file: file || `effect:${kind}`,
+    file,
   });
   bridge.defineEffect(kind, {
     program: programName,
@@ -328,10 +360,11 @@ export function registerTemplateEffect(bridge, gl, kind, { fs, descriptor, file 
   if (runtime.neverSet.length) warnings.push(`declared-but-never-set: ${runtime.neverSet.join(', ')}`);
   if (runtime.undeclared.length) warnings.push(`set-but-not-declared: ${runtime.undeclared.join(', ')}`);
   for (const w of warnings) {
-    diagnosticsLog.record({ kind: 'template-audit', name: kind, file: file || `effect:${kind}`, ok: false, log: w });
+    diagnosticsLog.record({ kind: 'template-audit', name: kind, file, ok: false, log: w });
   }
-  registry.set(kind, { descriptor: d, decls, rec, file: file || `effect:${kind}`, warnings });
-  return d;
+  entry.rec = rec;
+  entry.warnings = warnings;
+  return rec;
 }
 
 export function getTemplateEffect(kind) {
