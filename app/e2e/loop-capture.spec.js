@@ -109,6 +109,13 @@ test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, 
       }, { once: true });
       video.onerror = () => { clearTimeout(to); rej(new Error('webm decode failed')); };
     });
+    // The duration seek above parks the playhead at the end; rewind before
+    // counting frames or play() ends immediately with a single callback.
+    await new Promise((res) => {
+      const to = setTimeout(res, 5_000);
+      video.addEventListener('seeked', () => { clearTimeout(to); res(); }, { once: true });
+      video.currentTime = 0;
+    });
     let frames = 0;
     await new Promise((res) => {
       const onFrame = () => {
