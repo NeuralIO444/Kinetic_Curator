@@ -193,7 +193,6 @@ function AppInner() {
 
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
-      <MasterBar />
       <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} onTour={() => { setShowHotkeys(false); setTourOpen(true); }} />
       <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
@@ -205,6 +204,7 @@ function AppInner() {
           dividerProps={dividerProps}
         />
       </ErrorBoundary>
+      <MasterBar />
       <FavoritesTray onHelp={openHelp} />
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>

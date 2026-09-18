@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-// MasterBar — top toolbar
+// MasterBar — bottom toolbar (tape readout, FPS, budget), below the view
 import { useApp } from '../state/AppContext.jsx';
 import { TapeCounter } from './TapeCounter.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
