@@ -1,20 +1,18 @@
 /**
  * TrackGraph — KC-1 coupling kernel (#343 MOD / #344 FIELD / #345 FEED).
  *
- * Engine-only. No React, no GL, no MasterBar. A track is a slot id 0..3.
- * PATCH is performer state and serializes; OFF is today's single-track path.
- *
- * FEED policy (this spike): 1-frame delayed. Same-frame render order stays
- * the authored track list. Cycles are stored but marked invalid so the
- * tape can refuse them instead of time-traveling.
+ * FEED encoding is curl (see feedOps.js). Delay-1: sample field, then push.
  */
+import { lumaToFlow as encodeLuma } from './feedOps.js';
 
 export const MAX_TRACKS = 4;
 export const PATCH_MODES = Object.freeze(['off', 'mod', 'field', 'feed']);
 export const FEED_POLICY = 'delay-1';
-
-/** Quarter-res FEED source (issue #345 — perf honesty). */
 export const FEED_SCALE = 0.25;
+
+export function lumaToFlow(luma, w, h, op) {
+  return encodeLuma(luma, w, h, op);
+}
 
 export function clampTrackId(n) {
   const v = Number(n);
@@ -68,7 +66,6 @@ export function activePatches(graph) {
   return g.tracks.map((t) => t.patch).filter((p) => p.mode !== 'off' && g.tracks[p.from].armed);
 }
 
-/** Directed edges for cycle detection (any non-off mode). */
 export function patchEdges(graph) {
   return activePatches(graph).map((p) => ({ from: p.from, to: p.to, mode: p.mode }));
 }
@@ -77,7 +74,7 @@ export function hasCycle(edges) {
   const adj = new Map();
   for (let i = 0; i < MAX_TRACKS; i++) adj.set(i, []);
   for (const e of edges) adj.get(e.from).push(e.to);
-  const state = new Map(); // 0 unseen, 1 open, 2 done
+  const state = new Map();
   function dfs(n) {
     const s = state.get(n) || 0;
     if (s === 1) return true;
@@ -91,10 +88,6 @@ export function hasCycle(edges) {
   return false;
 }
 
-/**
- * Same-frame schedule. FEED edges do not constrain this-frame order
- * (delay-1). MOD/FIELD still form a DAG that must be acyclic.
- */
 export function liveEdges(graph) {
   return patchEdges(graph).filter((e) => e.mode !== 'feed');
 }
@@ -113,7 +106,6 @@ export function scheduleFrame(graph) {
   };
 }
 
-/** Motion metrics already implied by the live loop — sidechain for MOD. */
 export function motionMetrics(points) {
   const pts = Array.isArray(points) ? points : [];
   const n = pts.length;
@@ -128,16 +120,12 @@ export function motionMetrics(points) {
     svy += vy;
     energy += vx * vx + vy * vy;
   }
-  const cx = sx / n;
-  const cy = sy / n;
-  const vx = svx / n;
-  const vy = svy / n;
   return {
-    cx,
-    cy,
-    vx,
-    vy,
-    speed: Math.hypot(vx, vy),
+    cx: sx / n,
+    cy: sy / n,
+    vx: svx / n,
+    vy: svy / n,
+    speed: Math.hypot(svx / n, svy / n),
     agitation: Math.sqrt(energy / n),
     density: n / MAX_TRACKS,
   };
@@ -159,10 +147,6 @@ function clamp01(x) {
   return Math.max(0, Math.min(1, x));
 }
 
-/**
- * FIELD: source points attract/repel target points in the same unit square.
- * Naive O(n*m) — spike only; live path should reuse swarm spatial hash.
- */
 export function applyField(targetPts, sourcePts, patch) {
   const p = normalizePatch(patch);
   if (p.mode !== 'field') return targetPts.map((q) => ({ ...q }));
@@ -180,32 +164,6 @@ export function applyField(targetPts, sourcePts, patch) {
     }
     return { ...q, x: (Number(q.x) || 0) + ax * gain, y: (Number(q.y) || 0) + ay * gain };
   });
-}
-
-/**
- * Encode a packed luma grid (row-major, values 0..1) as an RG flow field
- * via central differences. A is unused. Size is w*h.
- */
-export function lumaToFlow(luma, w, h) {
-  const width = w | 0;
-  const height = h | 0;
-  const flow = new Float32Array(width * height * 2);
-  if (!width || !height) return { flow, w: width, h: height };
-  const at = (x, y) => {
-    const xx = Math.max(0, Math.min(width - 1, x));
-    const yy = Math.max(0, Math.min(height - 1, y));
-    return luma[yy * width + xx] || 0;
-  };
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const dx = (at(x + 1, y) - at(x - 1, y)) * 0.5;
-      const dy = (at(x, y + 1) - at(x, y - 1)) * 0.5;
-      const i = (y * width + x) * 2;
-      flow[i] = dx;
-      flow[i + 1] = dy;
-    }
-  }
-  return { flow, w: width, h: height };
 }
 
 export function sampleFlow(field, u, v) {
@@ -237,7 +195,6 @@ export function applyFeed(targetPts, field, patch) {
   });
 }
 
-/** RGBA16F bytes at FEED_SCALE of a logical frame. */
 export function feedTextureBytes(frameW, frameH) {
   const w = Math.max(1, Math.round((frameW || 0) * FEED_SCALE));
   const h = Math.max(1, Math.round((frameH || 0) * FEED_SCALE));

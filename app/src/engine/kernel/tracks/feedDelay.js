@@ -1,20 +1,16 @@
 /**
  * 1-frame FEED ring (#345).
  *
- * Live loop writes this-frame luma after the track composites, then the
- * *next* frame samples the previous luma as flow. Frame 0 has no history,
- * so the field is zero and applyFeed is a no-op — same as OFF.
- *
- * No GL. The live renderer can later upload `field.flow` as RG16F.
+ * Contract: field() THEN push(). Push-then-field is same-frame and forbidden
+ * by the selfcheck. Frame 0 field is zeros (OFF).
  */
-import { MAX_TRACKS } from './trackGraph.js';
-import { lumaToFlow } from './trackGraph.js';
+import { MAX_TRACKS, lumaToFlow } from './trackGraph.js';
 
 export function createFeedDelay(w, h) {
   const width = Math.max(1, w | 0);
   const height = Math.max(1, h | 0);
   const prev = Array.from({ length: MAX_TRACKS }, () => new Float32Array(width * height));
-  const ready = new Uint8Array(MAX_TRACKS); // 1 after the first push
+  const ready = new Uint8Array(MAX_TRACKS);
 
   return {
     w: width,
@@ -29,7 +25,6 @@ export function createFeedDelay(w, h) {
       for (let i = n; i < dst.length; i++) dst[i] = 0;
       ready[id] = 1;
     },
-    /** Previous-frame flow, or a zero field before the first push. */
     field(trackId) {
       const id = trackId | 0;
       if (id < 0 || id >= MAX_TRACKS || !ready[id]) {
