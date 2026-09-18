@@ -34,4 +34,16 @@ for (let i = 0; i < 20; i++) {
 const curl = a.curl2(10, 20, 0);
 assert.ok(Number.isFinite(curl.x) && Number.isFinite(curl.y));
 
+// Octave pin: placement uses 3; fBm default is 4 — both must be finite and
+// same-seed identity holds at the placement octave count.
+{
+  const n = createNoise(0xcafe);
+  const o3 = n.fBm3D(0.5, 0.25, 0.1, 3);
+  const o4 = n.fBm3D(0.5, 0.25, 0.1, 4);
+  assert.ok(Number.isFinite(o3) && Number.isFinite(o4));
+  assert.notStrictEqual(o3, o4, 'octave count must change the field');
+  const n2 = createNoise(0xcafe);
+  assert.strictEqual(n2.fBm3D(0.5, 0.25, 0.1, 3), o3);
+}
+
 console.log('kernel/noise.selfcheck: OK (K1)');
