@@ -1,1 +1,449 @@
-PLACEHOLDER_WILL_REPLACE
+import { useState, useRef, useEffect } from 'react';
+// MasterBar — top toolbar
+import { useApp } from '../state/AppContext.jsx';
+import { BudgetKnob } from './BudgetKnob.jsx';
+import { TapeCounter } from './TapeCounter.jsx';
+import * as A from '../state/actions.js';
+import { emit, Events } from '../composition/eventBus.js';
+import { QUALITY_PRESETS } from '../data/quality.js';
+import { SCHEME_IDS } from '../engine/harmony.js';
+
+function CompactSwatches({ swatches }) {
+  return (
+    <span className="palette-chip-swatches">
+      {swatches.slice(0, 5).map((s, i) => (
+        <span key={i} className="palette-chip-sw" style={{ background: s }} title={s} />
+      ))}
+    </span>
+  );
+}
+
+/** Editable strip: sliding window of 5 swatches + pinned BG + INK (#51 / #52).
+ *  Palettes with more than 5 swatches get ‹ › arrows fixed on each side;
+ *  the swatch track physically slides one cell per click. */
+const SWATCH_WIN = 5;
+const SWATCH_STEP = 10; // 9px cell + 1px gap
+function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onReset, onLock }) {
+  const swatches = palette.swatches || [];
+  const [start, setStart] = useState(0);
+  const maxStart = Math.max(0, swatches.length - SWATCH_WIN);
+  const s = Math.min(start, maxStart);
+  const overflow = swatches.length > SWATCH_WIN;
+  const slide = (d) => (e) => {
+    e.stopPropagation();
+    setStart(Math.max(0, Math.min(maxStart, s + d)));
+  };
+  const cell = (sw, i) => (
+    <span key={i} className={`palette-sw-cell ${locks?.[i] ? 'locked' : ''}`}>
+      <label
+        className="palette-sw-edit"
+        title={`S${i + 1} ${sw} — click to edit`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="palette-chip-sw palette-sw-full" style={{ background: sw }} />
+        <input
+          type="color"
+          className="palette-color-input"
+          value={sw}
+          onChange={(e) => onSwatch(i, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </label>
+      <button
+        type="button"
+        className="palette-lock-pip"
+        title={locks?.[i] ? `S${i + 1} locked — harmony and shuffle skip it` : `Lock S${i + 1}`}
+        aria-pressed={!!locks?.[i]}
+        onClick={(e) => { e.stopPropagation(); onLock(i); }}
+      >
+        {locks?.[i] ? '▪' : ''}
+      </button>
+    </span>
+  );
+  return (
+    <span className="palette-active-strip" aria-label={`${palette.name} palette editor`}>
+      {overflow && (
+        <button
+          type="button"
+          className="palette-nav-btn"
+          title="Previous swatches"
+          disabled={s <= 0}
+          onClick={slide(-1)}
+        >
+          ‹
+        </button>
+      )}
+      {overflow ? (
+        <span className="palette-sw-viewport" aria-hidden={false}>
+          <span
+            className="palette-sw-track"
+            style={{ transform: `translateX(${-s * SWATCH_STEP}px)` }}
+          >
+            {swatches.map(cell)}
+          </span>
+        </span>
+      ) : (
+        <span className="palette-active-swatches">
+          {swatches.map(cell)}
+        </span>
+      )}
+      {overflow && (
+        <button
+          type="button"
+          className="palette-nav-btn"
+          title="Next swatches"
+          disabled={s >= maxStart}
+          onClick={slide(1)}
+        >
+          ›
+        </button>
+      )}
+      <label
+        className="palette-meta-sw palette-sw-edit"
+        style={{ background: palette.bg }}
+        title={`BG ${palette.bg} — click to edit`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="palette-meta-label">BG</span>
+        <input
+          type="color"
+          className="palette-color-input"
+          value={palette.bg}
+          onChange={(e) => onBg(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </label>
+      <label
+        className="palette-meta-sw palette-sw-edit"
+        style={{ background: palette.ink }}
+        title={`INK ${palette.ink} — click to edit`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="palette-meta-label">INK</span>
+        <input
+          type="color"
+          className="palette-color-input"
+          value={palette.ink}
+          onChange={(e) => onInk(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </label>
+      {dirty && (
+        <button
+          type="button"
+          className="palette-reset-btn"
+          title="Reset to catalog colors (clears overrides)"
+          onClick={(e) => {
+            e.stopPropagation();
+            onReset();
+          }}
+        >
+          ↺
+        </button>
+      )}
+    </span>
+  );
+}
+
+export function MasterBar() {
+  const { dispatch, palette, history, palettes, paletteLocks } = useApp();
+  const { state } = useApp(s => ({
+    running: s.running,
+    fps: s.fps,
+    seed: s.seed,
+    nodeCount: s.nodeCount,
+    quality: s.quality,
+    autoQuality: s.autoQuality,
+    isRecording: s.isRecording,
+    persistStatus: s.persistStatus,
+    slowRender: s.slowRender,
+    slowRenderSource: s.slowRenderSource,
+    perfTier1: s.perfTier1,
+    renderFault: s.renderFault,
+    renderFaultReason: s.renderFaultReason,
+    frameLock: s.frameLock,
+    setFrameLock: s.setFrameLock,
+    audioDenied: s.audioDenied,
+    glContext: s.glContext,
+  }));
+  // Default to 'ok' rather than showing the warning for an undefined value:
+  // this selector is explicit, so a field missing from it reads as undefined,
+  // and a pill that fails open would cry UNSAVED on every boot.
+  const {
+    running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
+    slowRender = false, slowRenderSource = null, perfTier1 = false, frameLock = false, audioDenied = false,
+    renderFault = false, renderFaultReason = null,
+    glContext = 'ok',
+  } = state;
+  const [harmonyScheme, setHarmonyScheme] = useState('analogous');
+
+  // Palette-chip carousel: ~4 chips visible, ‹ › arrows slide the track.
+  const CHIP_WIN = 4;
+  const chipTrackRef = useRef(null);
+  const activeChipRef = useRef(null);
+  const [canChipPrev, setCanChipPrev] = useState(false);
+  const [canChipNext, setCanChipNext] = useState(false);
+  const chipOverflow = palettes.length > CHIP_WIN;
+  const syncChipNav = (t) => {
+    if (!t) return;
+    setCanChipPrev(t.scrollLeft > 4);
+    setCanChipNext(t.scrollLeft < t.scrollWidth - t.clientWidth - 4);
+  };
+  const handleChipTrackScroll = (e) => syncChipNav(e.currentTarget);
+  const handleChipSlide = (e, dir) => {
+    const track = e.currentTarget.parentElement?.querySelector('.palette-chip-track');
+    if (!track) return;
+    const first = track.querySelector(':scope > *');
+    const step = first ? first.getBoundingClientRect().width + 3 : 120;
+    track.scrollBy({ left: dir * step, behavior: 'smooth' });
+  };
+  // Keep the active palette chip in view when switching.
+  useEffect(() => {
+    activeChipRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    syncChipNav(chipTrackRef.current);
+  }, [palette.id]);
+
+  const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
+  const fpsWidth = Math.min(100, (fps / 60) * 100);
+  const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
+  const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.balanced;
+
+  return (
+    <div className="master-bar">
+      <div className="master-left">
+        <div className="logo">
+          <span className="logo-mark">◈</span>
+          <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
+          <span className="logo-version">v0.9.0</span>
+        </div>
+
+        {state.isRecording ? (
+          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+            title="Recording the live canvas to WEBM — what plays is what records, ACCUM included">
+            <span className="status-dot beat-flash" style={{ background: '#ff2d6f', animationIterationCount: 'infinite' }} />
+            REC WEBM
+          </div>
+        ) : (
+          <div className="status-pill" title={running ? 'Live loop is running — Space pauses' : 'Live loop is paused — Space resumes'}>
+            <span className={`status-dot ${running ? 'live' : ''}`} />
+            {running ? 'LIVE' : 'PAUSED'}
+          </div>
+        )}
+
+        {persistStatus !== 'ok' && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title={persistStatus === 'quarantined'
+              ? 'Last autosave could not be read. Started from defaults; the file is kept at kc:project:quarantine.'
+              : 'Autosave is failing (storage full or blocked). This session will not be restored.'}
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
+          </div>
+        )}
+
+        {glContext !== 'ok' && (
+          <div
+            className="status-pill"
+            style={glContext === 'lost'
+              ? { background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }
+              : { background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title={glContext === 'lost'
+              ? 'GPU context lost — the live loop is holding frames. It recovers automatically when the context is restored; reload only if this never clears.'
+              : 'GPU context restored — rebuilding the renderer and rebaking textures. Clears automatically when the scene is back.'}
+          >
+            <span className="status-dot" style={{ background: glContext === 'lost' ? '#ff2d6f' : '#ffb000' }} />
+            {glContext === 'lost' ? 'GL CONTEXT LOST' : 'GL RESTORING'}
+          </div>
+        )}
+
+        {audioDenied && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title="Browser denied mic access. Turning AUDIO back on will retry."
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            MIC BLOCKED
+          </div>
+        )}
+
+        {slowRender && slowRenderSource === 'watchdog' && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+            title="Watchdog tripped: running and evolve are off and will not resume on their own. Press space or ▶ RUN to resume."
+          >
+            <span className="status-dot" style={{ background: '#ff2d6f' }} />
+            PERF PAUSED
+          </div>
+        )}
+
+        {slowRender && slowRenderSource !== 'watchdog' && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title="Governor froze motion to protect frame rate — clears automatically when FPS recovers."
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            MOTION HELD
+          </div>
+        )}
+
+        {renderFault && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+            title={renderFaultReason
+              ? `Render fault: ${renderFaultReason}. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.`
+              : 'Render fault: a deterministic per-frame failure stopped presenting. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.'}
+          >
+            <span className="status-dot" style={{ background: '#ff2d6f' }} />
+            RENDER FAULT
+          </div>
+        )}
+
+        {perfTier1 && !slowRender && (
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title="FPS is sustained below 16. ACCUM, gloss and mirror are off across all visible layers — clears automatically once FPS recovers."
+          >
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            LOAD SHED
+          </div>
+        )}
+
+        <TapeCounter />
+
+        <div className="meter">
+          <span className="meter-label">FPS</span>
+          <div className={`fps-bar ${fpsClass}`}>
+            <span className="fps-bar-fill" style={{ width: `${fpsWidth}%` }} />
+          </div>
+          <span className="meter-value">{Number(fps).toFixed(1)}</span>
+        </div>
+
+        <div className="meter" title="Live placement / instance count">
+          <span className="meter-label">NODES</span>
+          <span className={`meter-value ${nodeClass}`}>{nodeCount}</span>
+        </div>
+
+        <div className="meter" title={q.description}>
+          <span className="meter-label">Q</span>
+          <span className="meter-value" style={{ letterSpacing: '0.06em' }}>{q.budget || q.label}</span>
+        </div>
+
+        <button
+          className={`undo-btn ${frameLock ? '' : 'disabled'}`}
+          onClick={() => state.setFrameLock(!frameLock)}
+          title="Frame-lock show mode: gate the UI life tick to a locked 30fps — smoother than a fluctuating 40-60. The GL loop runs free. User choice, never auto-cleared."
+          style={{ fontSize: '10px', letterSpacing: '0.06em' }}
+        >
+          30FPS{frameLock ? '' : ' · OFF'}
+        </button>
+
+        {/* #296: the one performer-facing governor knob — the chosen budget
+            ceiling (FULL / SHOW / LEAN). Modeled on the frame-lock: tactile,
+            deliberately chosen, never auto-cleared. Replaces the AUTO ON/OFF
+            boolean; the governor defends whatever ceiling is chosen. */}
+        <BudgetKnob />
+
+        <div className="undo-group">
+          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo the last parameter, layer, or palette action (Ctrl/⌘+Z)">
+            ↶{history.undoDepth > 0 ? ` ${history.undoDepth}` : ''}
+          </button>
+          <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl/⌘+Shift+Z)">
+            ↷{history.redoDepth > 0 ? ` ${history.redoDepth}` : ''}
+          </button>
+        </div>
+      </div>
+      <div className="master-right">
+        <div className="palette-switch">
+          <span className="palette-switch-label">PALETTE</span>
+          {chipOverflow && (
+            <button type="button" className="palette-nav-btn" title="Previous palettes"
+              disabled={!canChipPrev} onClick={(e) => handleChipSlide(e, -1)}>‹</button>
+          )}
+          <div className="palette-chip-viewport">
+            <div ref={chipTrackRef} className="palette-chip-track" onScroll={handleChipTrackScroll}>
+          {palettes.map(p => {
+            const active = p.id === palette.id;
+            if (active) {
+              return (
+                <div
+                  key={p.id}
+                  ref={activeChipRef}
+                  className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`}
+                  title={`${p.name} · edit swatches · switch palette clears customs`}
+                >
+                  <ActivePaletteStrip
+                    key={palette.id}
+                    palette={palette}
+                    dirty={!!palette.dirty}
+                    locks={paletteLocks}
+                    onLock={(i) => emit(Events.PALETTE_LOCK, { index: i })}
+                    onSwatch={(i, hex) =>
+                      dispatch({ type: A.SET_PALETTE_SWATCH, index: i, hex })
+                    }
+                    onBg={(hex) => dispatch({ type: A.SET_PALETTE_BG, hex })}
+                    onInk={(hex) => dispatch({ type: A.SET_PALETTE_INK, hex })}
+                    onReset={() => dispatch({ type: A.RESET_PALETTE_OVERRIDES })}
+                  />
+                </div>
+              );
+            }
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className="palette-chip"
+                title={p.name}
+                onClick={() => dispatch({ type: A.SET_PALETTE, id: p.id })}
+              >
+                <CompactSwatches swatches={p.swatches || []} />
+                <span className="palette-chip-name">{p.name}</span>
+              </button>
+            );
+          })}
+            </div>
+          </div>
+          {chipOverflow && (
+            <button type="button" className="palette-nav-btn" title="Next palettes"
+              disabled={!canChipNext} onClick={(e) => handleChipSlide(e, 1)}>›</button>
+          )}
+        </div>
+
+        <div className="harmony-row" title="Harmony scheme for the next palette shuffle">
+          <select
+            className="harmony-select"
+            value={harmonyScheme}
+            onChange={(e) => setHarmonyScheme(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {SCHEME_IDS.map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="undo-btn"
+            title="Shuffle palette via the chosen harmony scheme (respects locked swatches)"
+            onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}
+          >
+            HARMONY
+          </button>
+        </div>
+
+        <button
+          className={`run-btn ${running ? 'running' : ''}`}
+          onClick={() => emit(Events.TOGGLE_RUNNING)}
+          title={running ? 'Pause the live loop (Space)' : 'Run the live loop (Space)'}
+        >
+          {running ? '■ STOP' : '▶ RUN'}
+        </button>
+      </div>
+    </div>
+  );
+}
