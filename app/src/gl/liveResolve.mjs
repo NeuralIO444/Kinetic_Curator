@@ -126,7 +126,9 @@ export function createLiveResolver() {
     const out = [];
     const aliveIds = new Set();
 
-    for (const layer of (input.layers || []).filter((l) => l.visible !== false)) {
+    // #269 — null guard: a hostile/erroneous layers:[null] skips the bad
+    // layer instead of throwing on layer.id and freezing the frame loop.
+    for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
       // FX layers hold no content — marker only, like resolveLayers().
       if (isFxLayer(layer)) {
@@ -174,7 +176,9 @@ export function createLiveResolver() {
       }
 
       const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
-      const safeParticles = Math.min(layoutParams.particleCount || 150, caps.maxParticles);
+      // #269 — floor at 0: a negative particleCount (e.g. -50) degrades to an
+      // empty system instead of RangeError from new Array(-50).
+      const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), caps.maxParticles);
       const seed = (src.seed ?? 0) >>> 0;
 
       let items;

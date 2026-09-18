@@ -124,3 +124,36 @@ test('known asset ids resolve (pool sanity)', () => {
   assert.ok(ASSETS.length > 0);
   assert.ok(ASSETS.every((a) => typeof a.id === 'string'));
 });
+
+test('#269: null layers are skipped, not thrown', () => {
+  const r = createLiveResolver();
+  const out = r.resolveLayers(baseInput({
+    layers: [null, { id: 'lyr-a', name: 'A', visible: true }],
+  }));
+  assert.equal(out.length, 1);
+  assert.equal(out[0].id, 'lyr-a');
+  assert.ok(out[0].items.length > 0);
+  r.dispose();
+});
+
+test('#269: rotate:null degrades to zero rotation', () => {
+  const r = createLiveResolver();
+  const out = r.resolveLayers(baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 40, rotate: null },
+  }));
+  const content = out.find((l) => l.id === 'lyr-a');
+  assert.ok(content.items.length > 0);
+  for (const it of content.items) assert.equal(it.rotation, 0);
+  r.dispose();
+});
+
+test('#269: negative particleCount floors to 0 instead of RangeError', () => {
+  const r = createLiveResolver();
+  const out = r.resolveLayers(baseInput({
+    layers: [{ id: 'lyr-s', name: 'S', visible: true }],
+    activeLayerId: 'lyr-s',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: -50 },
+  }));
+  assert.equal(out[0].items.length, 0);
+  r.dispose();
+});

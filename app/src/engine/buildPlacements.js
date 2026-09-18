@@ -58,11 +58,21 @@ function sameSignature(a, b) {
   return true;
 }
 
+/**
+ * #269 — absolute placement ceiling, defense-in-depth. clampCount trusted the
+ * caller's count via caps alone, so a hostile/erroneous count of 1e7
+ * allocated until the V8 heap died — uncatchable. The richest tier (FINAL)
+ * tops out at maxCount 800 and mirror doubles items to ~1600, so 4096 leaves
+ * real headroom while no raw caller can OOM the process. Clamp, don't throw;
+ * valid inputs are unaffected.
+ */
+export const MAX_ABSOLUTE_COUNT = 4096;
+
 export function clampCount(count, mirror, caps) {
   const maxForMirror = mirror
     ? (caps.maxCountMirrored ?? caps.maxCount ?? 420)
     : (caps.maxCount ?? 420);
-  return Math.min(Math.max(1, Number(count) || 1), maxForMirror);
+  return Math.min(MAX_ABSOLUTE_COUNT, Math.max(1, Number(count) || 1), maxForMirror);
 }
 
 /**
