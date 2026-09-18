@@ -298,12 +298,14 @@ export const createLayoutSlice = (set) => ({
     // roll; the bar says so (see curator/curate.js). Locked params are never
     // touched, same as randomizeUnlocked.
     const curator = getActiveCurator();
+    const unlocked = RANDOMIZABLE_KEYS.filter((key) => !state.lockedParams[key]);
+    // Everything locked: no-op — no candidate differs from current state, so
+    // push no undo entry (same guard as randomizeUnlocked).
+    if (unlocked.length === 0) return {};
     const candidates = [];
     for (let n = 0; n < CURATE_CANDIDATES; n++) {
       const rp = { ...state.layoutParams };
-      for (const key of RANDOMIZABLE_KEYS) {
-        if (!state.lockedParams[key]) rp[key] = randomizeKey(key);
-      }
+      for (const key of unlocked) rp[key] = randomizeKey(key);
       candidates.push(rp);
     }
     const { index } = pickCurated(candidates, curator);
