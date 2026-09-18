@@ -1,6 +1,12 @@
 // Toggle row: bleed / mirror / overlap / accum / blend
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES, PALETTE_SHIFTS } from '../../data/layout-modes.js';
+import { getTaper } from '../../components/taper.js'; // #274: shared slider curves
+
+// #273/#274: response curves at the panel→state boundary. Stored params stay
+// in physical units; only the slider position is remapped.
+const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
+const glowTaper = getTaper('power', { min: 0, max: 1, exp: 2 });
 
 // #268: RECOLOR removed — nothing in the GL renderer ever read it. A
 // control that moves and changes nothing is worse than no control.
@@ -24,19 +30,19 @@ export function ToggleRow({ layoutParams }) {
         <label
           className="tg"
           style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
-          title="Trail persistence (higher = longer exposure)"
+          title="Trail persistence in frames of half-life (1 = strobe, 40 = long exposure)"
         >
           FADE
           <input
             type="range"
-            min={0.5}
-            max={0.98}
+            min={0}
+            max={1}
             step={0.01}
-            value={layoutParams.accumulationFade ?? 0.88}
+            value={fadeTaper.toSlider(layoutParams.accumulationFade ?? 5.4)}
             onChange={(e) =>
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationFade',
-                value: parseFloat(e.target.value),
+                value: fadeTaper.toParam(parseFloat(e.target.value)),
               })
             }
             style={{ width: 64 }}
@@ -47,7 +53,7 @@ export function ToggleRow({ layoutParams }) {
         <label
           className="tg"
           style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
-          title="ACCUM optics: bloom + halation + blur-over-time on the trail buffer (0 = off)"
+          title="ACCUM optics: bloom + halation + blur-over-time on the trail buffer (0 = off). Effective glow = slider² — full travel is usable; audio can't peg it."
         >
           GLOW
           <input
@@ -55,11 +61,11 @@ export function ToggleRow({ layoutParams }) {
             min={0}
             max={1}
             step={0.01}
-            value={layoutParams.accumulationOptics ?? 0}
+            value={glowTaper.toSlider(layoutParams.accumulationOptics ?? 0)}
             onChange={(e) =>
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationOptics',
-                value: parseFloat(e.target.value),
+                value: glowTaper.toParam(parseFloat(e.target.value)),
               })
             }
             style={{ width: 64 }}

@@ -36,9 +36,13 @@ export function useCanvasLife({ running, layoutParams, beatPulse, audioBands }) 
   const bands = audioBands || { bass: 0, mid: 0, treble: 0, rms: 0 };
   const pulse = beatPulse || 0;
 
+  // #273: STIMULUS DEPTH applies once. (It used to scale the audio term by
+  // depth *and* the whole gesture by depth again — quadratic, so the default
+  // 0.65 felt dead and 1.0 blew up ~1.6x.) The outer * depth stays so
+  // depth = 0 remains a true no-op.
   const scaleMul = 1 + (
     pulse * 0.38 * scaleModAmt +
-    (bands.bass * 0.55 + bands.rms * 0.35) * 0.28 * depth
+    (bands.bass * 0.55 + bands.rms * 0.35) * 0.28
   ) * depth;
 
   const alphaBoost = pulse * 18 * alphaModAmt * depth;

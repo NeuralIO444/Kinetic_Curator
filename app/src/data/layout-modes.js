@@ -58,7 +58,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   paletteShift: 'auto',
 
   accumulation: false,
-  accumulationFade: 0.88,
+  accumulationFade: 5.4, // #274: trail half-life in frames (was keep 0.88)
   accumulationOptics: 0, // #190: bloom + halation + blur-over-time amount (GLOW slider)
   accumulationTunnel: 0, // Phase A: feedback zoom/spin amount (TUNNEL slider)
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
@@ -129,7 +129,7 @@ export const PARAM_SPEC = {
   flap: { min: 0, max: 1 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
-  accumulationFade: { min: 0.5, max: 0.99 },
+  accumulationFade: { min: 1, max: 40 }, // #274: half-life frames
   accumulationOptics: { min: 0, max: 1 },
   accumulationTunnel: { min: 0, max: 1 },
   accumulationPrism: { min: 0, max: 1 },
@@ -263,6 +263,24 @@ export function normalizeLayoutParams(partial) {
       ? [clampNum(v[0], spec, DEFAULT_LAYOUT_PARAMS[key][0]),
         clampNum(v[1], spec, DEFAULT_LAYOUT_PARAMS[key][1])]
       : DEFAULT_LAYOUT_PARAMS[key].slice();
+  }
+
+  // #274: legacy fade migration — accumulationFade was stored as a keep
+  // multiplier (0..1) before the half-life change. Any value in (0, 1) in a
+  // saved project is a legacy keep (the new slider minimum is 1, so the
+  // ranges don't overlap); convert to half-life frames so old projects keep
+  // their look: halfLife = -1 / log2(keep). Exactly 1 is left alone — it's
+  // the new half-life minimum, and a legacy keep of exactly 1 ("never
+  // fade") is a degenerate edge not worth a version bump. Runs before the
+  // PARAM_SPEC clamp.
+  {
+    const v = next.accumulationFade;
+    const n = typeof v === 'number' ? v
+      : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+    if (Number.isFinite(n) && n > 0 && n < 1) {
+      const hl = -1 / Math.log2(n);
+      next.accumulationFade = Math.min(40, Math.max(1, hl));
+    }
   }
 
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {

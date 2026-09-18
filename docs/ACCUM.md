@@ -41,7 +41,8 @@ ping-pong, NEAREST):
 1. **Feed** (Phase B2) — flow-advected feedback: the buffer is sampled at
    `uv + flowVec(uv) * strength` through an in-shader value-noise field, so
    trails curl as they decay. Skipped at flow = 0 (exact old buffer).
-2. **Fade/decay** — `accum.rgb *= keep` (keep = FADE, 0..0.99), sampled
+2. **Fade/decay** — `accum.rgb *= keep` (keep = 0.5^(1/FADE), where FADE
+   is the slider's trail half-life in frames, 1..40 — #274 taper), sampled
    through the Phase A feedback transform (tunnel zoom/spin, prism drift).
 3. **Blur-over-time** (#169) — the incoming frame is blurred with a small
    separable gaussian (σ = 5px × optics) *before* compositing, so old marks
@@ -148,20 +149,21 @@ beat, decays linearly over one beat interval, 0 before the first beat.
 
 **Modulation** — three distinct gestures, one per signal:
 
-- `rms` (the swell): `keep += 0.08 * rms` (≤ 0.99), `optics += 0.3 * rms`
-  (≤ 1).
+- `rms` (the swell): `keep += 0.08 * rms` (≤ 0.99),
+  `optics += (1 - optics) * 0.3 * rms` — headroom-relative, so loud audio
+  swells the glow toward the slider's ceiling instead of pegging it at 1.
 - `flux` (the transient hit): `keep += 0.04 * flux` — hits punch the
   trails longer without swelling the glow.
-- `beatPulse` (the on-the-one): `optics += 0.1 * beatPulse` — glow pops
-  on the beat without lengthening trails.
+- `beatPulse` (the on-the-one): `optics += (1 - optics) * 0.1 * beatPulse` —
+  glow pops on the beat without lengthening trails, and never pegs.
 - tunnel zoom/spin and prism amounts scale × `(1 + 2*rms + flux + beatPulse)`.
 - Silence (all zeros) returns the params unchanged — the no-audio path is
   exactly the old recipe.
 - The optics swing is deliberately gentle: bloom is an additive per-frame
   feedback (`accum.rgb += bloomAmount * blurred`), so big optics swings
-  ratchet bright content toward white over a long sequence. If a loud
-  passage still blows out the highlights, back off the base `--optics` —
-  audio swells the glow you dial in, it doesn't replace it.
+  ratchet bright content toward white over a long sequence. Audio swells
+  the glow you dial in — it can't peg the slider — but if a loud passage
+  still blows out the highlights, back off the base `--optics`.
 
 A missing or malformed sidecar warns on stderr and is a real no-op (renders
 without audio); the pre-research sketch (bare `[{t, rms, beat}]`) is still
