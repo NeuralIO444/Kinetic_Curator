@@ -68,4 +68,28 @@ assert.notDeepStrictEqual(
   'a different timestep must change the trajectory',
 );
 
+// --- #287 grazers stamp in the palette bg (the ACCUM over-composite then
+// erases beneath them — the deposit/erode loop needs no new pass) ------------
+{
+  const bgPalette = { ...palette, bg: '#123456' };
+  const grazed = bakeSwarmItems({
+    ...base,
+    engine: 'js',
+    layoutParams: { ...base.layoutParams, graze: 1 },
+    palette: bgPalette,
+  });
+  assert.ok(grazed.length > 0, 'expected baked items');
+  assert.ok(grazed.every((i) => i.graze === true), 'graze 1 -> every item is a grazer');
+  assert.ok(grazed.every((i) => i.color === '#123456' && i.accent === '#123456'),
+    'grazer items are stamped in the palette bg');
+  const calm = bakeSwarmItems({
+    ...base,
+    engine: 'js',
+    layoutParams: { ...base.layoutParams, graze: 0 },
+    palette: bgPalette,
+  });
+  assert.ok(calm.every((i) => i.graze === false), 'graze 0 -> no grazers');
+  assert.ok(calm.every((i) => i.color !== '#123456'), 'no bg stamping at graze 0');
+}
+
 console.log('kernel/bake.selfcheck: OK (K4)', { particles: a.length, steps: base.steps });

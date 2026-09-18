@@ -76,6 +76,8 @@ window.__kcAccumProbe = (p) => {
       flow: p.flow ?? 0,
       echoes: p.echoes ?? 0,
       echoWidth: p.echoWidth ?? p.w,
+      // #287 fade-to-paper: the fade target follows the probe background.
+      background: p.bg || '#000000',
     });
     const audio = p.audio || null;
     let i = 0;

@@ -3,7 +3,7 @@
  * Adding a profile is a row in BEHAVE, not a new force type.
  */
 
-export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter'];
+export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter', 'mold'];
 
 export const BEHAVE = {
   cruise: {
@@ -49,6 +49,24 @@ export const BEHAVE = {
     wind: 0.18,
     orbit: 0,
     attract: 0.15,
+  },
+  // #287 — mold: a slow colony that lays scent trails and climbs them.
+  // chemotaxis is the scent-gradient gain read by the force pass in
+  // particles.js (mold only); deposit is the per-step scent amount each
+  // agent leaves behind — the colony sustains itself through scent
+  // feeding while a lone cast tires.
+  mold: {
+    sep: 2.2,
+    ali: 0.15,
+    coh: 0.55,
+    sepR: 48,
+    aliR: 40,
+    cohR: 64,
+    wind: 0.08,
+    orbit: 0,
+    attract: 0.1,
+    chemotaxis: 0.15,
+    deposit: 0.06,
   },
 };
 

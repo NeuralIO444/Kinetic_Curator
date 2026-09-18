@@ -300,6 +300,43 @@ ok('mirror: optics 0 blooms nothing', () => {
   assert.deepEqual(px(out, 4, 4)[0], 1);
 });
 
+// #287 fade-to-paper: on a light ground the fade lerps toward the paper,
+// not black. Paper #f2ecdd, a white trail mark, keep 0.8:
+// faded = paper * 0.2 + white * 0.8 — still light, not 0.8-gray.
+ok('mirror: fade falls toward the paper on light grounds (#287)', () => {
+  const paper = [0xf2 / 255, 0xec / 255, 0xdd / 255];
+  const params = accumRecipeParams({ fade: 0.8, optics: 0, background: '#f2ecdd' });
+  assert.deepEqual(params.bg, paper, 'recipe params carry the parsed background');
+  const accum = f64(0);
+  for (let i = 0; i < N4; i += 4) { accum[i] = 1; accum[i + 1] = 1; accum[i + 2] = 1; accum[i + 3] = 1; }
+  const out = mirrorAccumStep({ accum, frame: f64(0), w: W, h: H, params });
+  const [r, g, b, a] = px(out, 0, 0);
+  const want = paper.map((c) => c * 0.2 + 1 * 0.8);
+  assert.ok(Math.abs(r - want[0]) < 1e-12 && Math.abs(g - want[1]) < 1e-12 && Math.abs(b - want[2]) < 1e-12,
+    `expected fade toward paper ${want}, got ${r},${g},${b}`);
+  assert.ok(r > 0.95, `light ground must stay light, got ${r}`);
+  assert.equal(a, 1, 'alpha is not faded');
+  // Many steps: the mark settles exactly onto the paper, never below it.
+  let cur = out;
+  for (let k = 0; k < 200; k++) cur = mirrorAccumStep({ accum: cur, frame: f64(0), w: W, h: H, params });
+  const [r2, g2, b2] = px(cur, 0, 0);
+  assert.ok(Math.abs(r2 - paper[0]) < 1e-6 && Math.abs(g2 - paper[1]) < 1e-6 && Math.abs(b2 - paper[2]) < 1e-6,
+    `200 steps should settle on the paper, got ${r2},${g2},${b2}`);
+});
+
+// #287 — the default black ground keeps the legacy `rgb *= keep` exactly.
+ok('mirror: fade on the default black ground is unchanged (#287)', () => {
+  const params = accumRecipeParams({ fade: 0.8, optics: 0 });
+  assert.deepEqual(params.bg, [0, 0, 0]);
+  const accum = f64(0);
+  const o = 3 * 4;
+  accum[o] = 1; accum[o + 1] = 0.5; accum[o + 2] = 0.25; accum[o + 3] = 1;
+  const out = mirrorAccumStep({ accum, frame: f64(0), w: W, h: H, params });
+  const [r, g, b] = px(out, 3, 0);
+  assert.ok(Math.abs(r - 0.8) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.2) < 1e-12,
+    `black-ground fade must stay rgb *= keep, got ${r},${g},${b}`);
+});
+
 ok('glow system: no gaussian survives anywhere in the ACCUM path (#308)', () => {
   // The module's whole contract: the blur passes are deleted (not
   // optimized, not hidden behind a quality flag), the audit table carries
@@ -778,7 +815,7 @@ async function runBrowserTests() {
       const bgV = [0, 1, 2].map((i) => parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16) / 255);
       let acc = new Float64Array(w * h * 4);
       for (let i = 0; i < w * h; i++) { acc[i * 4] = bgV[0]; acc[i * 4 + 1] = bgV[1]; acc[i * 4 + 2] = bgV[2]; acc[i * 4 + 3] = 1; }
-      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w });
+      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w, background: bg });
       if (stipple !== null && stipple !== undefined) base.stipple = stipple;
       const echo = createEchoState();
       let i = 0;

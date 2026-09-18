@@ -38,6 +38,22 @@ assert.strictEqual(bi.getItems(assets).length, 40 + 80, 'spore + two wings');
 assert.ok(bi.getItems(assets).some((it) => it._mirrored && it.role === 'wing'));
 assert.ok(bi.getItems(assets).every((it) => typeof it.u === 'number' && it.u >= 0 && it.u <= 1));
 
+// #287 — radial fans: an N-fold fan of alternating-mirror wings around the
+// heading, reusing the moth blend ladders. physics count unchanged.
+for (const [sym, folds] of [['radial-4', 4], ['radial-6', 6], ['radial-8', 8]]) {
+  const fan = run('hype', sym, 2);
+  assert.strictEqual(fan.physicsCount(), 40, `${sym} does not multiply the SoA`);
+  const items = fan.getItems(assets);
+  assert.strictEqual(items.length, 40 * (2 + folds), `${sym}: 2 segments + ${folds} fan arms`);
+  const wings = items.filter((it) => it.role === 'wing');
+  assert.strictEqual(wings.length, 40 * folds);
+  const mirrored = wings.filter((w) => w._mirrored).length;
+  assert.strictEqual(mirrored, 40 * (folds / 2), `${sym}: odd arms mirror, even arms do not`);
+  assert.ok(wings.every((w) => typeof w.ladderId === 'string'), `${sym} reuses MOTH_LADDERS`);
+  const keys = new Set(wings.map((w) => w.key));
+  assert.strictEqual(keys.size, 40 * folds, `${sym}: fan keys unique`);
+}
+
 // #108 swarm SoA: state lives in parallel typed arrays, so these read
 // columns over [0, n) rather than an array of Particle objects.
 const rows = (sys) => Array.from({ length: sys.physicsCount() }, (_, i) => i);
