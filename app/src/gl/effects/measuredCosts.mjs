@@ -10,27 +10,25 @@
  * GPU re-measures them.
  *
  * method: { w: 512, h: 512, warmup: 8, batches: 3, drawsPerBatch: 30, stat: 'median', params: 'max-contract-case' }
- * measuredAt: '2026-09-17T18:58:32.924Z'
+ * measuredAt: '2026-09-18T07:45:46.673Z'
  */
-export const MEASURED_AT = '2026-09-17T18:58:32.924Z';
+export const MEASURED_AT = '2026-09-18T07:45:46.673Z';
 export const MEASURE_METHOD = { w: 512, h: 512, warmup: 8, batches: 3, drawsPerBatch: 30, stat: 'median', params: 'max-contract-case' };
 export const MEASURED_COSTS = {
-  'accum/add': { ms: 18.8667, method: 'wall', draws: 90 },
-  'accum/blur': { ms: 595.5333, method: 'wall', draws: 90 },
-  'accum/copy': { ms: 8.7667, method: 'wall', draws: 90 },
-  'accum/down': { ms: 3.5, method: 'wall', draws: 90 },
-  'accum/echo': { ms: 16.2667, method: 'wall', draws: 90 },
-  'accum/fade': { ms: 16, method: 'wall', draws: 90 },
-  'accum/feed': { ms: 23.1, method: 'wall', draws: 90 },
-  'accum/over': { ms: 10, method: 'wall', draws: 90 },
-  'builtin/blur': { ms: 590.5, method: 'wall', draws: 90 },
-  'builtin/grain': { ms: 25.2333, method: 'wall', draws: 90 },
-  'builtin/invert': { ms: 24.8667, method: 'wall', draws: 90 },
-  'builtin/posterize': { ms: 24.8667, method: 'wall', draws: 90 },
-  'builtin/rgbSplit': { ms: 26.0333, method: 'wall', draws: 90 },
-  'fx/displace': { ms: 30.7333, method: 'wall', draws: 90 },
-  'fx/edge': { ms: 23.2667, method: 'wall', draws: 90 },
-  'fx/scanlines': { ms: 19.5667, method: 'wall', draws: 90 },
-  'fx/solarize': { ms: 10.5, method: 'wall', draws: 90 },
-  'fx/tear': { ms: 12.8667, method: 'wall', draws: 90 },
+  'accum/copy': { ms: 10.7, method: 'wall', draws: 90 },
+  'accum/down': { ms: 11.8333, method: 'wall', draws: 90 },
+  'accum/echo': { ms: 19.9, method: 'wall', draws: 90 },
+  'accum/fade': { ms: 17.8667, method: 'wall', draws: 90 },
+  'accum/feed': { ms: 23.5, method: 'wall', draws: 90 },
+  'accum/glow': { ms: 39.6333, method: 'wall', draws: 90 },
+  'accum/over': { ms: 10.4333, method: 'wall', draws: 90 },
+  'builtin/grain': { ms: 16.5, method: 'wall', draws: 90 },
+  'builtin/invert': { ms: 16.4667, method: 'wall', draws: 90 },
+  'builtin/posterize': { ms: 15.9667, method: 'wall', draws: 90 },
+  'builtin/rgbSplit': { ms: 17.8667, method: 'wall', draws: 90 },
+  'fx/displace': { ms: 32.6333, method: 'wall', draws: 90 },
+  'fx/edge': { ms: 26.6, method: 'wall', draws: 90 },
+  'fx/scanlines': { ms: 21.2667, method: 'wall', draws: 90 },
+  'fx/solarize': { ms: 13.2667, method: 'wall', draws: 90 },
+  'fx/tear': { ms: 13.4, method: 'wall', draws: 90 },
 };

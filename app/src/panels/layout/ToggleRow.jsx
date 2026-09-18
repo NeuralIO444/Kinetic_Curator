@@ -6,7 +6,7 @@ import { getTaper } from '../../components/taper.js'; // #274: shared slider cur
 // #273/#274: response curves at the panel→state boundary. Stored params stay
 // in physical units; only the slider position is remapped.
 const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
-const glowTaper = getTaper('power', { min: 0, max: 1, exp: 2 });
+const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #308 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
 
 // #268: RECOLOR removed — nothing in the GL renderer ever read it. A
 // control that moves and changes nothing is worse than no control.

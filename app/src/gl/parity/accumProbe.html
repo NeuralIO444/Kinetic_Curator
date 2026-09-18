@@ -75,6 +75,10 @@ window.__kcAccumProbe = (p) => {
       frameTexs.push(t);
       // B1: per-frame audio envelope modulates the recipe params.
       const params = audio ? applyAudioEnvelope(base, audio[i] || {}) : base;
+      // Test hook (#308): a stipple override isolates the stipple gate so
+      // the probe can check tight GPU/mirror parity with the gate off and
+      // statistical parity with it on.
+      if (p.stipple !== undefined && p.stipple !== null) params.stipple = p.stipple;
       accum.step(t, params);
       i++;
     }

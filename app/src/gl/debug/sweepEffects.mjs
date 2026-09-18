@@ -26,11 +26,13 @@
  * Where the zero-no-op lives, per effect (the house pattern is "off means
  * off, provably" — flow=0 skips exactly, silence is a no-op):
  * - shader identity: displace/scale=0, tear/amount=0, scanlines/amount=0,
- *   grain/amount=0, blur/radius=0, feed/flow=0, fade/(keep=1,tz=1,ts=0,prism=0),
- *   echo/ntaps=0, add/amount=0, copy — byte-exact (noop: true).
- * - structural skip: accum-blur at sigma<=1e-3 never runs (createAccum.step
- *   guards `p.frameBlurSigma > 1e-3`); the sweep asserts near-identity
- *   (near: 1 LSB) at sigma=0 and documents the skip.
+ *   grain/amount=0, glow/amount=0, feed/flow=0, fade/(keep=1,tz=1,ts=0,prism=0),
+ *   echo/ntaps=0, copy — byte-exact (noop: true).
+ *   (#308: the instrument has no gaussian blur — the builtin blur and the
+ *   accum blur/add sweep entries were deleted with the blur passes. The
+ *   glow pass has a sweep entry (accum/glow: mip-chain bloom + stipple +
+ *   chromatic offset, measured for the cost-tier gate) and is also covered
+ *   by the GPU-vs-mirror parity checks in accum.selfcheck.mjs.)
  * - N/A (always-on, binary): solarize, edge, invert — off means dropped
  *   from the chain, so there is no zero-param identity to prove.
  * - rgbSplit at dx=0 is NOT a no-op (the screen-alpha recombine
@@ -42,8 +44,8 @@
  *   included) for contract cases; raw direct upload for hostile cases.
  * - builtins: the u_p packers from registerBuiltinEffects
  *   (builtinEffects.mjs) — invert [0,0,0,0], rgbSplit [dx/1000,0,0,0],
- *   grain [amount,0,0,0], blur [radius*(w/1000),0,0,0], posterize
- *   [levels,0,0,0]; u_clipOn=0, u_aux=input except grain's LUT.
+ *   grain [amount,0,0,0], posterize [levels,0,0,0]; u_clipOn=0,
+ *   u_aux=input except grain's LUT.
  * - ACCUM: the setup callbacks in createAccum (accum.mjs).
  */
 
@@ -51,7 +53,7 @@ import { FULL_VS, EFFECT_FS } from '../shaders.mjs';
 import { TEMPLATE_VS, uniformDecls, uploadUniformsFor } from '../effects/template.mjs';
 import { injectCommon } from '../effects/chunks.mjs';
 import { buildProgramChecked, auditProgramChecked } from './diagnostics.mjs';
-import { UNIFORMS as BUILTIN_UNIFORMS, clampBlurSigma, blurSubPassSigmas } from '../bridge/builtinEffects.mjs';
+import { UNIFORMS as BUILTIN_UNIFORMS } from '../bridge/builtinEffects.mjs';
 import { ACCUM_PROGRAMS } from '../accum.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
 import { createSweepLab, runEffectSweep, locMap } from './sweep.mjs';
@@ -91,6 +93,29 @@ function grainLutTexture(gl, w, h) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return tex;
+}
+
+/**
+ * Mipmapped warm aux texture (#308): stand-in for the ACCUM glow target —
+ * RGBA8 with a full mip chain (LINEAR_MIPMAP_LINEAR), the format GLOW_FS
+ * samples with textureLod. Solid warm gray so every mip level is finite
+ * and the sweep's byte-exact no-op case (amount=0) holds.
+ */
+function glowTexture(gl, size) {
+  const bytes = new Uint8Array(size * size * 4);
+  for (let k = 0; k < bytes.length; k += 4) {
+    bytes[k] = 200; bytes[k + 1] = 160; bytes[k + 2] = 120; bytes[k + 3] = 255;
+  }
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+  gl.generateMipmap(gl.TEXTURE_2D);
   gl.bindTexture(gl.TEXTURE_2D, null);
   return tex;
 }
@@ -161,7 +186,6 @@ const S = (unit) => ({ kind: 'sampler', unit });
 /**
  * One builtin-FX sweep entry. `mode` is the EFFECT_FS u_effect id;
  * `pack(c, lab)` returns u_p exactly as registerBuiltinEffects packs it.
- * Multi-pass effects (blur) override apply.
  */
 function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
   const decls = BUILTIN_UNIFORMS;
@@ -201,53 +225,6 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
   };
 }
 
-/** Builtin blur: (H,V) separable pass pairs, like the bridge chain (#225). */
-function builtinBlurDef() {
-  const base = builtinEffectDef('blur', 3, (c, lab) => [
-    c.params.sigmaDirect !== undefined ? c.params.sigmaDirect : (c.params.radius || 0) * (lab.w / 1000),
-    0, 0, 0,
-  ]);
-  const origBuild = base.build;
-  base.build = (gl) => {
-    const built = origBuild(gl);
-    const { program, locs } = built;
-    const decls = BUILTIN_UNIFORMS;
-    return {
-      program,
-      locs,
-      apply: (glA, locsA, c, lab, targets) => {
-        // Mirrors the bridge's honest-blur stack (#225): clamp to the
-        // ceiling, subdivide into (H,V) pairs at σ/√n so the harness tests
-        // the production path. A zero sigma is one identity pass so the
-        // noop case still lands byte-exact output in `out`.
-        const raw = c.params.sigmaDirect !== undefined
-          ? c.params.sigmaDirect
-          : (c.params.radius || 0) * (lab.w / 1000);
-        const subs = blurSubPassSigmas(clampBlurSigma(raw));
-        let src = lab.input.tex;
-        const renderPair = (s) => {
-          for (const [mode, target] of [[3, targets.tmp], [4, targets.out]]) {
-            lab.render(program, target, locsA, decls, {
-              u_src: src,
-              u_aux: lab.input.tex,
-              u_effect: mode,
-              u_p: [s, 0, 0, 0],
-              u_texel: [1 / target.w, 1 / target.h],
-              u_clip: [0, 0, 0, 0],
-              u_clipOn: 0,
-            });
-            src = target.tex;
-          }
-        };
-        if (subs.length) for (const s of subs) renderPair(s);
-        else renderPair(0);
-      },
-      dispose: built.dispose,
-    };
-  };
-  return base;
-}
-
 /* ------------------------------------------------------------------ */
 /* ACCUM passes                                                        */
 /* ------------------------------------------------------------------ */
@@ -269,7 +246,9 @@ function accumDef(name, decls, values, { hdr = false, multi = null } = {}) {
       const aux = {
         gray: solidTexture(gl, 32, 32, 128, 128, 128, 255),
         clear: solidTexture(gl, 32, 32, 0, 0, 0, 0),
-        bloom: solidTexture(gl, 8, 8, 200, 160, 120, 255),
+        // (#308) mipmapped stand-in for the ACCUM glow target, for the glow
+        // sweep entry's u_glow sampler.
+        glow: glowTexture(gl, 64),
       };
       const single = (glA, locsA, c, lab, targets) => {
         lab.render(program, targets.out, locsA, decls, values(c, lab, aux));
@@ -288,17 +267,6 @@ function accumDef(name, decls, values, { hdr = false, multi = null } = {}) {
     },
     hdr,
   };
-}
-
-// Separable H/V driver shared by accum/blur's two passes.
-function accumBlurApply(glA, locsA, c, lab, targets, program, decls, values, aux) {
-  for (const [vertical, target] of [[0, targets.tmp], [1, targets.out]]) {
-    lab.render(program, target, locsA, decls, values(c, lab, aux, {
-      src: target === targets.tmp ? lab.input.tex : targets.tmp.tex,
-      vertical,
-      w: target.w, h: target.h,
-    }));
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -390,16 +358,6 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
-    ...builtinBlurDef(),
-    cases: [
-      C('defaults', { radius: 6 }),
-      C('zero → no-op', { radius: 0 }, { noop: true }),
-      C('max', { radius: 40 }, { costly: true }),
-      C('small', { radius: 0.5 }),
-      H('hostile deep-loop sigma', { sigmaDirect: 25 }),
-    ],
-  },
-  {
     ...builtinEffectDef('posterize', 5, (c) => [c.params.levels ?? 4, 0, 0, 0]),
     cases: [
       C('defaults', { levels: 4 }),
@@ -466,44 +424,6 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
-    ...accumDef('blur',
-      { u_src: S(0), u_texel: { kind: 'vec2' }, u_sigma: { kind: 'float' }, u_vertical: { kind: 'float' } },
-      (c, lab, aux, pass) => ({
-        u_src: pass.src, u_texel: [1 / pass.w, 1 / pass.h],
-        u_sigma: c.params.sigma, u_vertical: pass.vertical,
-      }),
-      { multi: accumBlurApply }),
-    cases: [
-      // sigma=0: the recipe SKIPS the pass (createAccum.step guards
-      // frameBlurSigma > 1e-3), so the no-op is structural. At shader
-      // level sigma floors to 1e-3: (s*w0)/w0 — near-identity within 1 LSB.
-      C('zero → near-identity (pass skipped in recipe)', { sigma: 0 }, { near: 1 }),
-      C('frame blur scale', { sigma: 5 }),
-      C('bloom scale', { sigma: 13.5 }),
-      C('halation scale', { sigma: 33 }, { costly: true }),
-      H('hostile negative sigma', { sigma: -5 }),
-    ],
-  },
-  {
-    ...accumDef('add',
-      {
-        u_base: S(0), u_bloom: S(1), u_bloomSize: { kind: 'vec2' },
-        u_amount: { kind: 'float' }, u_tint: { kind: 'vec3' },
-      },
-      (c, lab, aux) => ({
-        u_base: lab.input.tex, u_bloom: aux.bloom, u_bloomSize: [8, 8],
-        u_amount: c.params.amount, u_tint: [1.0, 0.6, 0.35],
-      }),
-      { hdr: true }),
-    cases: [
-      // amount=0: base.rgb + 0 is exactly base (IEEE: x+0==x).
-      C('zero → no-op', { amount: 0 }, { noop: true }),
-      C('bloom scale', { amount: 0.55 }),
-      C('max', { amount: 1 }, { costly: true }),
-      H('hostile negative amount', { amount: -0.5 }),
-    ],
-  },
-  {
     ...accumDef('copy', { u_src: S(0) }, (c, lab) => ({ u_src: lab.input.tex })),
     cases: [
       // Identity control: proves the sweep machinery itself is bit-exact.
@@ -518,10 +438,39 @@ export const SWEEP_EFFECTS = [
   },
   {
     ...accumDef('down', { u_src: S(0) }, (c, lab) => ({ u_src: lab.input.tex })),
-    // Production shape: the downsample pass box-filters 4x4 source blocks,
-    // so it renders quarter-resolution (32 -> 8) into the lab's t16q.
+    // Production shape (#308): the downsample pass box-filters 8x8 source
+    // blocks (GLOW_DIV) via texelFetch into the glow target's base level.
+    // The lab renders it into the quarter-res t16q target (32 -> 8), so the
+    // outer blocks read past the 32px source edge and return 0 — harmless
+    // for the finiteness/range scan, which is all this entry asserts.
     outSize: 8,
-    cases: [C('4x4 box downsample', {}, { costly: true })],
+    cases: [C('8x8 box downsample', {}, { costly: true })],
+  },
+  {
+    ...accumDef('glow',
+      {
+        u_base: S(0), u_glow: S(1), u_glowSize: { kind: 'vec2' },
+        u_lod: { kind: 'float' }, u_stipple: { kind: 'float' },
+        u_chromaTexels: { kind: 'float' }, u_amount: { kind: 'float' },
+        u_tint: { kind: 'vec3' },
+      },
+      (c, lab, aux) => ({
+        u_base: lab.input.tex, u_glow: aux.glow, u_glowSize: [64, 64],
+        u_lod: c.params.lod ?? 1, u_stipple: c.params.stipple ?? 0.5,
+        u_chromaTexels: c.params.chromaTexels ?? 1,
+        u_amount: c.params.amount ?? 0.55, u_tint: [1.0, 0.6, 0.35],
+      }),
+      // hdr: amount=1 over a bright input exceeds 1.0 by design (bloom adds light).
+      { hdr: true }),
+    // Production shape (#308): the glow target is canvas/8 RGBA8 with a full
+    // mip chain; lod 1 ≈ canvas/16. amount=0 is a provable no-op
+    // (base + 0·tint·glow·gate is exactly base, IEEE).
+    cases: [
+      C('defaults', {}),
+      C('zero → no-op', { amount: 0 }, { noop: true }),
+      C('max', { amount: 1, stipple: 1, chromaTexels: 1.5, lod: 3 }, { costly: true }),
+      H('hostile negative amount', { amount: -0.5 }),
+    ],
   },
 ];
 

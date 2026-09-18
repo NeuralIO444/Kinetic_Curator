@@ -28,8 +28,11 @@ export function blendIdFor(mode) {
 }
 
 export const EFFECT_IDS = Object.freeze({
-  invert: 0, rgbSplit: 1, grain: 2, blurH: 3, blurV: 4, posterize: 5,
+  invert: 0, rgbSplit: 1, grain: 2, posterize: 5,
 });
+// NOTE (#308): the instrument has no gaussian blur — the blurH/blurV ids
+// are gone, not reserved. posterize keeps id 5 (ids are explicit, nothing
+// renumbers).
 
 /** Instanced textured quads. Per-instance: (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0). */
 export const QUAD_VS = `#version 300 es
@@ -226,7 +229,6 @@ uniform sampler2D u_src;
 uniform sampler2D u_aux;
 uniform int u_effect;
 uniform vec4 u_p;
-uniform vec2 u_texel;   // 1/w, 1/h of the source in device px
 uniform vec4 u_clip;
 uniform float u_clipOn;
 in vec2 v_cuv;
@@ -256,27 +258,6 @@ void main() {
     vec4 nz = texture(u_aux, vec2(v_cuv.x, 1.0 - v_cuv.y));  // LUT bake is top-first, NEAREST
     float gA = u_p.x * nz.a * s.a;
     o = vec4(s.rgb * (1.0 - gA), gA + s.a * (1.0 - gA));
-  } else if (u_effect == 3 || u_effect == 4) { // separable gaussian blur
-    float sigma = u_p.x;                      // device px
-    if (sigma <= 0.0) {
-      o = s; // radius 0 is identity (matches SVG stdDeviation=0); sigma=0
-             // would divide by zero in the kernel weights below.
-    } else {
-    // vertical pass moves in texture-v (y-up): negate for canvas y-down
-    vec2 stepv = u_effect == 3 ? vec2(u_texel.x, 0.0) : vec2(0.0, -u_texel.y);
-    int R = int(ceil(sigma * 3.0));
-    float w0 = 0.3989422804014327 / sigma;    // 1/sqrt(2pi)/sigma
-    vec4 acc = s * w0;
-    float wsum = w0;
-    for (int i = 1; i <= 64; i++) {
-      if (i > R) break;
-      float w = w0 * exp(-float(i * i) / (2.0 * sigma * sigma));
-      vec2 off = stepv * float(i);
-      acc += (texture(u_src, tuv + off) + texture(u_src, tuv - off)) * w;
-      wsum += 2.0 * w;
-    }
-    o = acc / wsum;
-    }
   } else if (u_effect == 5) {                 // posterize: discrete table in straight space
     float levels = u_p.x;
     vec3 cs = unpre(s.rgb, s.a);

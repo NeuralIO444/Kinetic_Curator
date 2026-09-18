@@ -11,8 +11,8 @@
 //     over-samples the hot region but keeps full-range coverage
 //   - effectSources + declaredCostTiers: the two tables cover each other
 //     exactly (assertSourcesCoverDeclared)
-//   - extractFeatures.mjs: 7 features in FEATURE_NAMES order, blur costs 2
-//     passes, EFFECT_FS shaders share source features
+//   - extractFeatures.mjs: 7 features in FEATURE_NAMES order, every builtin
+//     costs 1 pass (#308: blur is gone), EFFECT_FS shaders share source features
 import assert from 'node:assert';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -132,18 +132,20 @@ assert.equal(FEATURE_NAMES.length, 7, '7 documented features');
 const feats = extractAllFeatures();
 assert.ok(feats.size >= 20, 'features for every effect');
 const invert = feats.get('invert');
-const blur = feats.get('blur');
+// (#308: blur is gone — the builtin EFFECT_FS feature-parity probe now uses
+// grain, the other surviving single-pass builtin with a mapped param.)
+const grain = feats.get('grain');
 assert.equal(invert.length, 7, 'vector length matches FEATURE_NAMES');
-assert.deepEqual(invert.slice(0, 5), blur.slice(0, 5), 'builtin effects share EFFECT_FS -> same source features');
-assert.ok(blur[5] === 2 && invert[5] === 1, 'pass_count: blur=2, invert=1');
-assert.ok(invert[6] === 0 && blur[6] === 1, 'param_count: invert=0, blur=1');
+assert.deepEqual(invert.slice(0, 5), grain.slice(0, 5), 'builtin effects share EFFECT_FS -> same source features');
+assert.ok(grain[5] === 1 && invert[5] === 1, 'pass_count: grain=1, invert=1');
+assert.ok(invert[6] === 0 && grain[6] === 1, 'param_count: invert=0, grain=1');
 const echo = feats.get('accum-echo');
 assert.ok(echo[1] >= 4, `accum-echo has >=4 texture reads (multi-tap), got ${echo[1]}`);
 
 // scoring math: weights align with features, boundaries map score -> tier
 const fakeModel = { weights: [0, 0, 0, 0, 0, 1, 0], intercept: 0 };
 assert.equal(linearScore(invert, fakeModel), 1, 'linear score = intercept + w.x');
-assert.equal(linearScore(blur, fakeModel), 2);
+assert.equal(linearScore(grain, fakeModel), 1);
 assert.equal(scoreToTier(0.5, [1, 2, 3]), 0);
 assert.equal(scoreToTier(2.5, [1, 2, 3]), 2);
 assert.equal(scoreToTier(9, [1, 2, 3]), 3);
