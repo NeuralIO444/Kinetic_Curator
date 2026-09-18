@@ -13,10 +13,13 @@ export function MorphControls({ morphEvolve, morphDurationMs, morphing }) {
           {morphEvolve ? 'ON' : 'OFF'}
         </button>
       </div>
-      <div className="davis-interval-row">
+      <div className="davis-interval-row" style={morphEvolve ? undefined : { opacity: 0.4 }}
+        title={morphEvolve ? 'Seconds for layout targets to ease in.' : 'Dead while MORPH EVOLVE is off. It only shapes the ease.'}>
         <span className="davis-label">DURATION</span>
         <input
           type="range" min={300} max={4000} step={100} value={morphDurationMs || 1200}
+          disabled={!morphEvolve}
+          title={morphEvolve ? 'Seconds for layout targets to ease in.' : 'Dead while MORPH EVOLVE is off. It only shapes the ease.'}
           onChange={e => emit(Events.DAVIS_MORPH_DURATION, { duration: Number(e.target.value) })}
         />
         <span className="davis-readout">{((morphDurationMs || 1200) / 1000).toFixed(1)}s</span>

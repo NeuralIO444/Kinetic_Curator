@@ -1,4 +1,8 @@
-// usePhraseLoop — phrase clock. Audio rising edge or internal metro.
+// usePhraseLoop — phrase clock. Arms the origin seed on enable; ticks on the
+// internal metro. AUDIO-clock ticks no longer ride the beatPulse rising edge:
+// App.jsx `onBeat` routes every mic attack through the beat arbiter
+// (`app/src/state/beatArbiter.js`), which ticks the phrase directly — one
+// attack, one ordered spike, no re-render race. beatPulse is readout-only now.
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 
@@ -8,10 +12,7 @@ export function usePhraseLoop() {
   const phraseMode = useStore(s => s.phraseMode);
   const phraseClock = useStore(s => s.phraseClock || 'audio');
   const phraseBpm = useStore(s => s.phraseBpm || 120);
-  const beatPulse = useStore(s => s.beatPulse);
-  const audioEnabled = useStore(s => s.audioEnabled);
 
-  const prevPulseRef = useRef(0);
   const armedRef = useRef(false);
 
   useEffect(() => {
@@ -31,13 +32,4 @@ export function usePhraseLoop() {
     }, 60000 / bpm);
     return () => clearInterval(id);
   }, [phraseEnabled, phraseClock, phraseBpm, phraseLength, phraseMode]);
-
-  useEffect(() => {
-    if (!phraseEnabled || phraseClock === 'metro' || !audioEnabled) return;
-    const prev = prevPulseRef.current;
-    prevPulseRef.current = beatPulse;
-    if (beatPulse > prev + 0.2 && beatPulse > 0.3) {
-      useStore.getState().tickPhraseBeat();
-    }
-  }, [beatPulse, phraseEnabled, audioEnabled, phraseClock, phraseLength, phraseMode]);
 }
