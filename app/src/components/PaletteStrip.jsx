@@ -75,7 +75,6 @@ export function PaletteStrip() {
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
   const [colorMode, setColorMode] = useState('FADE');
   const visible = (palettes || []).slice(0, CHIP_CAP);
-  const chipTrackRef = useRef(null);
   const activeChipRef = useRef(null);
 
   useEffect(() => {
@@ -89,6 +88,36 @@ export function PaletteStrip() {
     setColorMode(COLOR_MODES[(i + 1) % COLOR_MODES.length]);
   };
 
+  const chips = visible.map((p) => {
+    const active = p.id === palette.id;
+    if (active) {
+      return (
+        <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} title={`${p.name}`}>
+          <ActivePaletteStrip
+            key={palette.id}
+            palette={palette}
+            dirty={!!palette.dirty}
+            locks={paletteLocks}
+            onLock={(i) => emit(Events.PALETTE_LOCK, { index: i })}
+            onSwatch={(i, hex) => dispatch({ type: A.SET_PALETTE_SWATCH, index: i, hex })}
+            onBg={(hex) => dispatch({ type: A.SET_PALETTE_BG, payload: hex })}
+            onInk={(hex) => dispatch({ type: A.SET_PALETTE_INK, payload: hex })}
+            onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
+          />
+          {p.name}
+        </div>
+      );
+    }
+    return (
+      <span key={p.id} className="palette-chip-wrap">
+        <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={p.name}>
+          <CompactSwatches swatches={p.swatches || []} />
+          {p.name}
+        </button>
+      </span>
+    );
+  });
+
   return (
     <div className="palette-strip">
       <div className="kc-logo" title="KINETIC_CURATOR v0.9.0">
@@ -99,74 +128,42 @@ export function PaletteStrip() {
           <span className="logo-version">v0.9.0</span>
         </span>
       </div>
-      <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex' }}>
+      <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}>
         <span className="palette-switch-label">PALETTE</span>
-        <div className="palette-chip-viewport" style={{ flex: '0 1 auto', minWidth: 0 }}>
-          <div ref={chipTrackRef} className="palette-chip-track">
-        {visible.map(p => {
-          const active = p.id === palette.id;
-          if (active) {
-            return (
-              <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} title={`${p.name}`}>
-                <ActivePaletteStrip
-                  key={palette.id}
-                  palette={palette}
-                  dirty={!!palette.dirty}
-                  locks={paletteLocks}
-                  onLock={(i) => emit(Events.PALETTE_LOCK, { index: i })}
-                  onSwatch={(i, hex) => dispatch({ type: A.SET_PALETTE_SWATCH, index: i, hex })}
-                  onBg={(hex) => dispatch({ type: A.SET_PALETTE_BG, payload: hex })}
-                  onInk={(hex) => dispatch({ type: A.SET_PALETTE_INK, payload: hex })}
-                  onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
-                />
-                {p.name}
-              </div>
-            );
-          }
-          return (
-            <span key={p.id} className="palette-chip-wrap">
-              <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={p.name}>
-                <CompactSwatches swatches={p.swatches || []} />
-                {p.name}
-              </button>
-            </span>
-          );
-        })}
-          </div>
-        </div>
         <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
           {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
         </select>
         <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
-        <label
-          className="palette-mix"
-          style={{ marginLeft: 'auto', flexShrink: 0 }}
-          title={COLOR_MODE_HINT[colorMode]}
-        >
-          <button
-            type="button"
-            className="palette-mix-label"
-            onClick={cycleColorMode}
-            title={COLOR_MODE_HINT[colorMode]}
-            style={{ background: 'transparent', border: 0, padding: 0, color: 'inherit', letterSpacing: '0.1em', fontSize: 9, cursor: 'pointer', minWidth: '4.6em', textAlign: 'left' }}
-          >
-            {colorMode}
-          </button>
-          <input
-            type="range"
-            className="single-slider palette-mix-slider"
-            min={0}
-            max={8}
-            step={0.5}
-            value={paletteMixSeconds}
-            onChange={(e) => dispatch({ type: A.SET_PALETTE_MIX, payload: Number(e.target.value) })}
-            onClick={(e) => e.stopPropagation()}
-            aria-label="Palette color time in seconds"
-          />
-          <span className="range-readout palette-mix-readout" style={{ display: 'inline-block', width: '3.6em', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-            {Number(paletteMixSeconds).toFixed(1)}s
-          </span>
-        </label>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
+            {chips}
+          </div>
+          <label className="palette-mix" style={{ flexShrink: 0 }} title={COLOR_MODE_HINT[colorMode]}>
+            <button
+              type="button"
+              className="palette-mix-label"
+              onClick={cycleColorMode}
+              title={COLOR_MODE_HINT[colorMode]}
+              style={{ background: 'transparent', border: 0, padding: 0, color: 'inherit', letterSpacing: '0.1em', fontSize: 9, cursor: 'pointer', minWidth: '4.6em', textAlign: 'left' }}
+            >
+              {colorMode}
+            </button>
+            <input
+              type="range"
+              className="single-slider palette-mix-slider"
+              min={0}
+              max={8}
+              step={0.5}
+              value={paletteMixSeconds}
+              onChange={(e) => dispatch({ type: A.SET_PALETTE_MIX, payload: Number(e.target.value) })}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Palette color time in seconds"
+            />
+            <span className="range-readout palette-mix-readout" style={{ display: 'inline-block', width: '3.6em', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+              {Number(paletteMixSeconds).toFixed(1)}s
+            </span>
+          </label>
+        </div>
       </div>
     </div>
   );
