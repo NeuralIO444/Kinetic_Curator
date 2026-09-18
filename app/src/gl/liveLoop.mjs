@@ -90,9 +90,13 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     } catch { /* store gone */ }
   };
   const restartGlSession = () => {
-    // Best-effort teardown of the dead session (also detaches the old
-    // bridge's canvas listeners so a second loss can't double-fire).
-    try { live.dispose(); } catch { /* lost-context teardown is best-effort */ }
+    // Detach the dead session's bridge listeners. Do NOT call live.dispose():
+    // the context loss already invalidated every GL handle, and deleting
+    // those dead handles on the restored context crashes SwiftShader's GPU
+    // process (observed as a spontaneous second webglcontextlost). The JS
+    // wrappers are garbage-collected; the browser reclaims the dead GL
+    // objects with the lost context.
+    try { live.getBridge().dispose(); } catch { /* best-effort */ }
     live = createLiveRenderer(canvas);
     // Orphan any bake in flight against the dead session — its token
     // checkpoints bail at the next await boundary; the null staticKey
