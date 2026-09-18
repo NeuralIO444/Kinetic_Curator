@@ -1,11 +1,15 @@
 # Changelog
 
-## Unreleased — WebGL export spine (2026-09-17)
+## Unreleased — one WebGL instrument (2026-09-17)
 
-The live tab stays a React/SVG preview instrument; every stills path now
-renders through the WebGL2 GPU pipeline. Parity between the two is proven by
-a headless selfcheck on fixed seeds (Matt's bar: under 10% pixel difference
-is a pass — this is art, not rocket science).
+The SVG split is gone: the live canvas renders through the same WebGL2 GPU
+pipeline as the exported stills — one instrument, no preview/final mismatch.
+The old SVG emitter survives in-repo only as the dev-only parity reference,
+excluded from the shipped bundle (enforced by `gl/phase6.selfcheck.mjs`).
+Parity is still proven by a headless selfcheck on fixed seeds (Matt's bar:
+under 10% pixel difference is a pass — this is art, not rocket science).
+
+- **Live WebGL loop (#224)** — the visible canvas renders through the same GPU pipeline as stills (`app/src/gl/liveLoop.mjs`): real GPU pixels for PNG captures, same scene contract the export path consumes.
 
 - **Phase 0** — GL scene contract (`docs/GL_CONTRACT.md`) + parity harness, wired into `npm run selfcheck`.
 - **Phase 1** — texture-atlas asset rendering on WebGL2.

@@ -1,10 +1,10 @@
 # Kinetic Curator
 
-A generative art engine and live visual performance tool built with React, Vite, and WebGL2. Inspired by the workflow of Joshua Davis and the generative algorithms of the demoscene, Kinetic Curator allows artists to build "curated chaos"—intricate, mathematically driven compositions that react to live audio and evolve autonomously. The live tab is a fast React/SVG preview instrument; finals, editions, and trail stills render through a WebGL2 GPU pipeline with a pixel-parity harness proving the two agree.
+A generative art instrument for live visual performance, built with React, Vite, and WebGL2. Inspired by the workflow of Joshua Davis and the generative algorithms of the demoscene, Kinetic Curator is for "curated chaos"—intricate, mathematically driven compositions that react to live audio and evolve autonomously. One WebGL2 renderer drives the live canvas and the exported stills alike: what plays is what renders.
 
 ![Vortex RWB preset render](docs/vortex-rwb-final.png)
 
-**Current release: [0.9.0](CHANGELOG.md)** — kernel v1 + colour authoring, multi-layer compositing, organisms, asset ingest, and the studio farm. Since 0.9.0 the export spine went GPU: WebGL2 renderer, GPU FX library, GPU accumulation, and 4K/8K stills via GPU readback (see [CHANGELOG unreleased](CHANGELOG.md)).
+**Current release: [0.9.0](CHANGELOG.md)** — kernel v1 + colour authoring, multi-layer compositing, organisms, asset ingest, and the studio farm. Since 0.9.0 the whole instrument went fully GPU: the live WebGL loop (#224) retired the old SVG split — one renderer, no preview/final mismatch. The SVG emitter survives in-repo only as the dev-only parity reference, excluded from the shipped bundle (see [CHANGELOG unreleased](CHANGELOG.md)).
 
 ## Core Philosophy: "Curated Chaos"
 
@@ -32,16 +32,17 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 
 ## Features
 
-- **Live preview instrument** — React + SVG canvas across layout modes (Fibonacci, Grid, CA, Orbit, Flow, Swarm, Stratified, …). Fast to play; finals render on the GPU.
-- **WebGL2 export engine** — the shipped stills path: scene → GPU textures → 4K/8K PNG via readback. The SVG emitter survives in-repo only as the dev parity reference.
-- **Pixel parity** — a headless harness diffs the GPU render against the SVG reference on fixed seeds, wired into `npm run selfcheck`.
-- **GPU FX library** — 10 effects (rgbSplit, displace, tear, grain, blur, scanlines, posterize, invert, solarize, edge) as GLSL passes, chained per FX layer.
-- **GPU accumulation** — HYPE-style trail buffer on GPU ping-pong textures with bloom, halation, and blur-over-time optics.
-- **Showrunner governor** — sheds load in a defined order (resolution scaling first, then quality, asset thinning, count clamp, motion freeze). Shed states are reported, never silent.
+- **Live instrument** — one WebGL2 render loop across layout modes (Fibonacci, Grid, CA, Orbit, Flow, Swarm, Stratified, …). The visible canvas renders through the same GPU pipeline as exported stills (`gl/liveLoop.mjs`), so what plays is what renders.
+- **Stills through the same GPU** — exports render through the live renderer: scene → GPU textures → 4K/8K PNG via readback, PNG + JSON sidecar. The old SVG emitter survives in-repo only as the dev-only parity reference — nothing in the production import graph reaches it.
+- **Pixel parity** — a headless harness diffs the GPU render against the SVG parity reference on fixed seeds, wired into `npm run selfcheck`. The bar: under 10% pixel difference is a pass — this is art, not rocket science.
+- **GPU FX library** — 10 effects (rgbSplit, displace, tear, grain, blur, scanlines, posterize, invert, solarize, edge) as GLSL passes, chained per FX layer. Every effect declares a cost tier at registration, measured against real GPU cost and CI-gated.
+- **ACCUM feedback** — HYPE-style trails on GPU ping-pong textures: trails decay like phosphor (light fades toward black), with bloom, halation, and blur-over-time optics. FREEZE holds the feedback image; CLEAR re-seeds. Audio-reactive glow, flow-advected trails, and multi-tap echoes arrive when audio is live — silence is a true no-op.
+- **Showrunner governor** — the enforcer: measured cost tiers, and a fixed shed ladder — resolution scaling first, then quality, asset thinning, count clamp, motion freeze. Every shed is a render-only overlay, auto-clears on recovery, and is always reported — never silent.
 - **Render quality pillars** — one kernel, one seed; finals render off-store with no live-state mutation; caps hold; substitutions are recorded in the sidecar, never hidden.
 - **Multi-layer compositing** — add / reorder / show-hide layers; per-layer blend + opacity; active layer drives LAYOUT / ASSETS / DAVIS edits.
 - **Audio reactivity** — mic or file drives scale, opacity, and evolve-on-beat.
 - **Davis mode** — time/beat Evolve, morph transitions, phrase clocks, continuous LFO life.
+- **Behave modes** — named organism steering (cruise, flock, orbit, scatter): weight profiles over one shared particle integrator. Adding a profile is a row in a table, not a new force type.
 - **Hits setlist** — ordered favorites, 1–9 recall, Enter advances, morph layout A→B.
 - **Weights** — per-asset H/M/L + category bulk mix before weighted pick.
 - **Colour authoring** — full palette reveal, slot edit / locks, `paletteShift`, user palette library (save / switch / import-export), harmony schemes + shuffle.
@@ -49,7 +50,7 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 - **Asset ingest** — paste / drop SVG into overlay; sanitised user assets; duplicate → project overlay.
 - **Presets** — shipped looks including KILN COLUMNS (lathe-like organic stacks on dusty matte) and VORTEX RWB (kaleidoscopic red/white/blue ribbons), plus the classic set.
 - **Export**
-  - SNAP / **RENDER FINAL** (matches the live preview; denser UNCAPPED finals come from the GPU export path)
+  - SNAP / **RENDER FINAL** (matches the live canvas; UNCAPPED densifies then restores live caps)
   - **BATCH ×N** — sequential seeds → PNG + JSON sidecar (max 48 in-browser; big runs go through `studio.py batch`)
   - **ACCUM** trails (LAYOUT toggle) + CLEAR ACCUM
   - WebM record · project import/export · autosave
@@ -61,8 +62,7 @@ Kinetic Curator is not a blank canvas; it is a synthesis engine. You curate the 
 - **Framework:** React 19 + Vite 8
 - **State:** Zustand slices + `useApp` dispatch facade + typed event bus
 - **Engine:** Pure kernel (`engine/kernel/*`: rng, noise, sample, field, color, bake) + `buildPlacements` + staged eval cache
-- **Live render:** React/SVG canvas (fast preview instrument)
-- **Finals render:** WebGL2 GPU pipeline (`app/src/gl/*`: texture-atlas assets, GLSL FX, layer compositing, GPU accumulation + bloom, GPU-readback stills) with a dev-only SVG parity reference
+- **Render:** one WebGL2 GPU pipeline (`app/src/gl/*`): the live canvas loop, texture-atlas assets, GLSL FX, layer compositing, GPU accumulation + bloom, and GPU-readback stills. The SVG emitter survives in-repo only as the dev-only parity reference — `gl/phase6.selfcheck.mjs` proves nothing in the production import graph reaches it.
 - **Styling:** CSS custom properties (dark creative-tool UI)
 - **Export:** GPU readback → PNG + JSON sidecar; offline farm via `studio/` (headless Chromium + WebGL2); video via ffmpeg
 - **CI:** ESLint, `npm run selfcheck` (golden placement SHA + kernel / field / color / bake / harmony / organisms / stagedEval / perf / GL parity / shader / governor checks), Playwright smoke
@@ -134,7 +134,7 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 - [GL scene contract](docs/GL_CONTRACT.md) — the exact interface the WebGL2 backend consumes
 - [WebGL Phase 6](docs/WEBGL_PHASE6.md) — SVG retirement + governor retune notes
 - [Shader debug harness](docs/SHADER_DEBUG.md) — dev-only GLSL tooling
-- [FX layers](docs/FX_LAYERS.md) — the 10-effect stack, SVG live recipe + GPU export recipe
+- [FX layers](docs/FX_LAYERS.md) — adjustment-layer-style FX layers: the 10-effect GLSL stack + the effect-authoring template
 - [ACCUM on GPU](docs/ACCUM.md) — the trail recipe (bloom / halation / blur-over-time)
 - [Showrunner](docs/SHOWRUNNER.md) — the realtime performance governor
 - [Render quality](docs/QUALITY.md) — the quality pillars: one kernel, one seed, honest exports
