@@ -1,15 +1,17 @@
 // Toggle row: bleed / mirror / overlap / accum
-// #310: blendMode, ACCUM GLOW (accumulationOptics), and paletteShift leave
-// performer sight — they stay in state and presets/voices still set them,
-// but the selects/sliders are gone. (SHADING was already voice-only via
-// #268.) The engine contract falls back to 'normal' for blendMode, so the
-// hidden select changes nothing about the render.
+// #310: blendMode and paletteShift leave performer sight — they stay in state
+// and presets/voices still set them, but the selects are gone. (SHADING was
+// already voice-only via #268.) The engine contract falls back to 'normal'
+// for blendMode, so the hidden select changes nothing about the render.
+// ACCUM GLOW was demoted too, but Matt's #319 review restored it as a live
+// knob (remapped range from #317).
 import { emit, Events } from '../../composition/eventBus.js';
 import { getTaper } from '../../components/taper.js'; // #274: shared slider curves
 
 // #273/#274: response curves at the panel→state boundary. Stored params stay
 // in physical units; only the slider position is remapped.
 const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
+const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #317 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
 
 // #268: RECOLOR removed — nothing in the GL renderer ever read it. A
 // control that moves and changes nothing is worse than no control.
@@ -46,6 +48,29 @@ export function ToggleRow({ layoutParams }) {
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationFade',
                 value: fadeTaper.toParam(parseFloat(e.target.value)),
+              })
+            }
+            style={{ width: 64 }}
+          />
+        </label>
+      )}
+      {layoutParams.accumulation && (
+        <label
+          className="tg"
+          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
+          title="ACCUM optics: bloom + halation + blur-over-time on the trail buffer (0 = off). Effective glow = slider² — full travel is usable; audio can't peg it."
+        >
+          GLOW
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={glowTaper.toSlider(layoutParams.accumulationOptics ?? 0)}
+            onChange={(e) =>
+              emit(Events.LAYOUT_PARAM, {
+                key: 'accumulationOptics',
+                value: glowTaper.toParam(parseFloat(e.target.value)),
               })
             }
             style={{ width: 64 }}
