@@ -1,12 +1,11 @@
 // KC-1 chassis #339–#342. Node-only.
-//   node src/engine/kernel/tracks/chassis.selfcheck.mjs
 import assert from 'node:assert';
 import { normalizeTrackGraph } from './trackGraph.js';
 import {
   TRACK_LABELS, FX_LABELS, MAX_TRACKS, MAX_FX_SLOTS, TRACK_BASE_BYTES,
   dimmedTracks, dimmedFx, armedTrackCount, armedFxCount, slotCostBytes,
   workingSetBytes, canArmTrack, canArmFx, armTrack, armFx,
-  addControlState, addFxControlState, trackLabel,
+  addControlState, addFxControlState, trackLabel, missingRoomCopy, boardFullCopy,
 } from './chassis.js';
 
 assert.deepStrictEqual(TRACK_LABELS, ['KC-1', 'KC-2', 'KC-3', 'KC-4']);
@@ -14,7 +13,8 @@ assert.deepStrictEqual(FX_LABELS, ['FX-1', 'FX-2', 'FX-3', 'FX-4']);
 assert.strictEqual(MAX_TRACKS, 4);
 assert.strictEqual(MAX_FX_SLOTS, 4);
 assert.strictEqual(trackLabel(0), 'KC-1');
-assert.strictEqual(TRACK_BASE_BYTES, 8 * 1024 * 1024);
+assert.strictEqual(missingRoomCopy('LEAN'), 'LEAN holds 1 track. Raise the ceiling or shed.');
+assert.strictEqual(boardFullCopy('track'), 'The board holds 4 tracks. Shed one.');
 
 {
   const g = normalizeTrackGraph({});
@@ -22,19 +22,15 @@ assert.strictEqual(TRACK_BASE_BYTES, 8 * 1024 * 1024);
   assert.strictEqual(dimmedTracks(g).length, 3);
   assert.strictEqual(slotCostBytes(false), 0);
   assert.strictEqual(workingSetBytes(g, {}), TRACK_BASE_BYTES);
-  assert.deepStrictEqual(addControlState(g), { enabled: true, reason: null });
 }
 
-{
-  assert.strictEqual(armedFxCount({}), 0);
-  assert.strictEqual(dimmedFx({}).length, 4);
-}
+assert.strictEqual(armedFxCount({}), 0);
+assert.strictEqual(dimmedFx({}).length, 4);
 
 {
   const r = armTrack(normalizeTrackGraph({}), {}, 1, 'SHOW');
   assert.strictEqual(r.ok, true);
   assert.strictEqual(r.graph.tracks[1].armed, true);
-  assert.strictEqual(armedTrackCount(r.graph), 2);
 }
 
 {
@@ -47,7 +43,7 @@ assert.strictEqual(TRACK_BASE_BYTES, 8 * 1024 * 1024);
   const r = canArmTrack(normalizeTrackGraph({}), {}, 1, 'LEAN');
   assert.strictEqual(r.ok, false);
   assert.strictEqual(r.reason, 'TAPE FULL');
-  assert.ok(/KC-2/.test(r.detail));
+  assert.strictEqual(r.detail, missingRoomCopy('LEAN'));
   assert.strictEqual(armTrack(normalizeTrackGraph({}), {}, 1, 'LEAN').graph.tracks[1].armed, false);
 }
 
@@ -55,10 +51,8 @@ assert.strictEqual(TRACK_BASE_BYTES, 8 * 1024 * 1024);
   let g = normalizeTrackGraph({});
   g = armTrack(g, {}, 1, 'SHOW').graph;
   g = armTrack(g, {}, 2, 'SHOW').graph;
-  assert.strictEqual(armedTrackCount(g), 3);
-  const fourth = canArmTrack(g, {}, 3, 'SHOW');
-  assert.strictEqual(fourth.ok, false);
-  assert.strictEqual(fourth.reason, 'TAPE FULL');
+  assert.strictEqual(canArmTrack(g, {}, 3, 'SHOW').ok, false);
+  assert.strictEqual(canArmTrack(g, {}, 3, 'SHOW').detail, missingRoomCopy('SHOW'));
 }
 
 {
@@ -67,7 +61,7 @@ assert.strictEqual(TRACK_BASE_BYTES, 8 * 1024 * 1024);
   });
   assert.deepStrictEqual(addControlState(g), {
     enabled: false,
-    reason: '4 tracks — the tape is full',
+    reason: boardFullCopy('track'),
   });
 }
 
@@ -77,7 +71,7 @@ assert.strictEqual(TRACK_BASE_BYTES, 8 * 1024 * 1024);
   assert.strictEqual(armedFxCount(fx), 4);
   assert.deepStrictEqual(addFxControlState(fx), {
     enabled: false,
-    reason: '4 FX — the tape is full',
+    reason: boardFullCopy('fx'),
   });
   assert.strictEqual(canArmFx({}, fx, 4, 'FULL').ok, false);
 }

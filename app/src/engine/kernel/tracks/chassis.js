@@ -1,13 +1,10 @@
 /**
  * KC-1 chassis (#339–#342) — data only.
  *
- * #339 branding constants (UI still owns the paint).
- * #340 4 content tracks; dimmed = present, unarmed, zero cost.
- * #341 4 FX slots; same pattern.
- * #342 TAPE FULL pre-flight before arm. Never mutes an already-live track.
- *
- * Byte numbers are spike estimates (one 8MB working set per armed slot).
- * Swap for measuredCosts sums when #298 lands — do not edit quality.js here.
+ * Product calls 2026-09-18:
+ *   labels KC-1…KC-4; dimmed rows tap-to-arm; TAPE FULL names the room;
+ *   LEAN slot counts not frozen (placeholder bytes until #298);
+ *   FEED delay-1 until two-track picture exists.
  */
 import {
   MAX_TRACKS,
@@ -37,6 +34,33 @@ export function trackLabel(id) {
 
 export function fxLabel(id) {
   return FX_LABELS[id] || `FX-${(id | 0) + 1}`;
+}
+
+function ceilingKey(name) {
+  const key = String(name || 'SHOW').toUpperCase();
+  return BUDGET_CEILINGS[key] ? key : 'SHOW';
+}
+
+function ceilingOf(name) {
+  return BUDGET_CEILINGS[ceilingKey(name)];
+}
+
+/** How many 8MB slots this ceiling buys. Placeholder until #298. */
+export function slotsHeld(ceiling, unitBytes = TRACK_BASE_BYTES) {
+  const cap = ceilingOf(ceiling);
+  return Math.max(0, Math.floor(cap.bytes / unitBytes));
+}
+
+export function missingRoomCopy(ceiling, unit = 'track') {
+  const n = Math.min(MAX_TRACKS, slotsHeld(ceiling));
+  const noun = n === 1 ? unit : `${unit}s`;
+  return `${ceilingKey(ceiling)} holds ${n} ${noun}. Raise the ceiling or shed.`;
+}
+
+export function boardFullCopy(kind = 'track') {
+  const n = kind === 'fx' ? MAX_FX_SLOTS : MAX_TRACKS;
+  const noun = kind === 'fx' ? 'FX' : 'tracks';
+  return `The board holds ${n} ${noun}. Shed one.`;
 }
 
 export function normalizeFxSlots(raw) {
@@ -85,16 +109,11 @@ export function workingSetBytes(graph, fx, { frameW = 1920, frameH = 1080 } = {}
   return bytes;
 }
 
-function ceilingOf(name) {
-  const key = String(name || 'SHOW').toUpperCase();
-  return BUDGET_CEILINGS[key] || BUDGET_CEILINGS.SHOW;
-}
-
 export function canArmTrack(graph, fx, trackId, ceiling = 'SHOW') {
   const g = normalizeTrackGraph(graph);
   const id = trackId | 0;
   if (id < 0 || id >= MAX_TRACKS) {
-    return { ok: false, reason: 'TAPE FULL', detail: 'no such track' };
+    return { ok: false, reason: 'TAPE FULL', detail: boardFullCopy('track') };
   }
   if (g.tracks[id].armed) return { ok: true, already: true, reason: null };
   const next = { tracks: g.tracks.map((t) => (t.id === id ? { ...t, armed: true } : t)) };
@@ -104,7 +123,7 @@ export function canArmTrack(graph, fx, trackId, ceiling = 'SHOW') {
     return {
       ok: false,
       reason: 'TAPE FULL',
-      detail: `${trackLabel(id)} exceeds ${String(ceiling).toUpperCase()} ceiling`,
+      detail: missingRoomCopy(ceiling, 'track'),
       used,
       budget: cap.bytes,
     };
@@ -116,7 +135,7 @@ export function canArmFx(graph, fx, fxId, ceiling = 'SHOW') {
   const f = normalizeFxSlots(fx);
   const id = fxId | 0;
   if (id < 0 || id >= MAX_FX_SLOTS) {
-    return { ok: false, reason: 'TAPE FULL', detail: 'no such FX slot' };
+    return { ok: false, reason: 'TAPE FULL', detail: boardFullCopy('fx') };
   }
   if (f.slots[id].armed) return { ok: true, already: true, reason: null };
   const next = { slots: f.slots.map((s) => (s.id === id ? { ...s, armed: true } : s)) };
@@ -126,7 +145,7 @@ export function canArmFx(graph, fx, fxId, ceiling = 'SHOW') {
     return {
       ok: false,
       reason: 'TAPE FULL',
-      detail: `${fxLabel(id)} exceeds ${String(ceiling).toUpperCase()} ceiling`,
+      detail: missingRoomCopy(ceiling, 'FX'),
       used,
       budget: cap.bytes,
     };
@@ -158,14 +177,14 @@ export function armFx(graph, fx, fxId, ceiling = 'SHOW') {
 
 export function addControlState(graph) {
   if (armedTrackCount(graph) >= MAX_TRACKS) {
-    return { enabled: false, reason: '4 tracks — the tape is full' };
+    return { enabled: false, reason: boardFullCopy('track') };
   }
   return { enabled: true, reason: null };
 }
 
 export function addFxControlState(fx) {
   if (armedFxCount(fx) >= MAX_FX_SLOTS) {
-    return { enabled: false, reason: '4 FX — the tape is full' };
+    return { enabled: false, reason: boardFullCopy('fx') };
   }
   return { enabled: true, reason: null };
 }
