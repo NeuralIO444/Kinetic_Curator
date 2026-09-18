@@ -3,10 +3,13 @@ import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { BLEND_MODES } from '../data/layout-modes.js';
-import { FX_EFFECT_DEFS, FX_EFFECT_KINDS, isFxLayer } from '../fx/fxFilters.js';
+import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../fx/fxFilters.js';
 
 function FxEffectEditor({ layer }) {
-  const [addKind, setAddKind] = useState(FX_EFFECT_KINDS[0]);
+  // #310: the add-menu is curated to 4 visible effects (RGB Split, Displace,
+  // Tear, Invert); the other five roster effects stay renderable but leave
+  // the menu. Blur is cut from the roster entirely (#308/#310).
+  const [addKind, setAddKind] = useState(FX_MENU_KINDS[0]);
   const effects = layer.effects || [];
   return (
     <div className="fx-editor" title="Effect stack — applies top-to-bottom to everything below this layer">
@@ -45,7 +48,7 @@ function FxEffectEditor({ layer }) {
       <div className="fx-add-row">
         <select className="tg" value={addKind} title="Effect to add to the stack"
           onChange={(e) => setAddKind(e.target.value)}>
-          {FX_EFFECT_KINDS.map((k) => (
+          {FX_MENU_KINDS.map((k) => (
             <option key={k} value={k} title={FX_EFFECT_DEFS[k].hint}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>
           ))}
         </select>

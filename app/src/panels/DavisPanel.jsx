@@ -6,7 +6,8 @@ import { EvolveControls } from './davis/EvolveControls.jsx';
 import { BeatRouter } from './davis/BeatRouter.jsx';
 import { MorphControls } from './davis/MorphControls.jsx';
 import { PhraseControls } from './davis/PhraseControls.jsx';
-import { FavoritesList } from './davis/FavoritesList.jsx';
+// #310: FavoritesList removed from the panel — the bottom tray is canonical.
+// (FavoritesList.jsx stays in the tree, unreferenced.)
 
 /** #305 — the four sub-seed streams, in the seed control area. */
 const SUB_SEED_STREAMS = [
@@ -22,9 +23,7 @@ export function DavisPanel() {
     evolveSource: s.evolveSource,
     evolveTarget: s.evolveTarget,
     evolveInterval: s.evolveInterval,
-    autoSnapshot: s.autoSnapshot,
     beatRoute: s.beatRoute,
-    favorites: s.favorites,
     seed: s.seed,
     seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
@@ -42,8 +41,8 @@ export function DavisPanel() {
     audioBands: s.audioBands,
   }));
   const {
-    evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot, beatRoute,
-    favorites, seed, seedOffsets, layoutParams,
+    evolveMode, evolveSource, evolveTarget, evolveInterval, beatRoute,
+    seed, seedOffsets, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
     phraseClock, phraseBpm, morphEvolve, morphDurationMs, morphing, audioEnabled,
     beatPulse, audioBands,
@@ -98,7 +97,6 @@ export function DavisPanel() {
             evolveTarget={evolveTarget}
             evolveSource={evolveSource}
             evolveInterval={evolveInterval}
-            autoSnapshot={autoSnapshot}
           />
 
           {beatCollision && <BeatRouter beatRoute={beatRoute || 'both'} />}
@@ -173,8 +171,6 @@ export function DavisPanel() {
               </button>
             </div>
           )}
-
-          <FavoritesList favorites={favorites} />
       </div>
     </div>
   );

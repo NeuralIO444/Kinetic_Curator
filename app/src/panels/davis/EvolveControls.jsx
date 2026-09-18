@@ -17,14 +17,14 @@ const TARGETS = [
   { value: 'all', label: 'ALL', hint: 'Evolve jumps every parameter.' },
 ];
 
-const MODES = ['on', 'quiet', 'off'];
-const MODE_LABEL = { on: 'ON', quiet: 'QUIET', off: 'OFF' };
-
-export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, autoSnapshot }) {
+export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
   // Shimmer "whisper" prototype: scores load once per session. Absent file
   // or junk content = {} = zero shimmer, real no-op, no errors.
   const [scores, setScores] = useState(null);
-  const [mode, setMode] = useState('on'); // on = whisper, quiet = listen-only, off = dark
+  // #310: SHIMMER is a hidden default — the row is gone and the whisper
+  // stays ON. The other modes ('quiet','off') are out of performer sight;
+  // nothing reaches for them mid-set.
+  const mode = 'on';
   const [listening, setListening] = useState(false); // SHIFT held
 
   useEffect(() => {
@@ -74,12 +74,6 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, aut
     emit(Events.DAVIS_EVOLVE, { target: value });
   };
 
-  const cycleMode = () => {
-    const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
-    setMode(next);
-    logShimmer({ event: 'mode', mode: next });
-  };
-
   const rowClass = [
     'davis-source-row',
     'shimmer-row',
@@ -117,16 +111,8 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, aut
         })}
       </div>
 
-      <div className="davis-source-row" title="Shimmer readout: ON whispers, QUIET only answers while you hold SHIFT, OFF goes dark.">
-        <span className="davis-label">SHIMMER</span>
-        <button className="chip-btn" onClick={cycleMode} aria-pressed={mode !== 'off'}>
-          {MODE_LABEL[mode]}
-        </button>
-        {listening && mode !== 'off' && (
-          <span className="davis-readout" aria-hidden="true">listening</span>
-        )}
-      </div>
-
+      {/* #310: SHIMMER row removed — the whisper stays ON as a hidden default.
+          AUTO-SNAP removed the same way (hidden default: off). */}
       <div className="davis-source-row">
         <span className="davis-label">SOURCE</span>
         <button className={`chip-btn ${evolveSource === 'time' ? 'active' : ''}`}
@@ -147,10 +133,6 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval, aut
         <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
       </div>
 
-      <div className="davis-interval-row" style={{ marginTop: '8px' }} title="Snapshot a hit after Evolve, not after phrase wrap.">
-        <span className="davis-label">AUTO-SNAP</span>
-        <input type="checkbox" checked={autoSnapshot} title="Snapshot a hit after Evolve, not after phrase wrap." onChange={e => emit(Events.DAVIS_EVOLVE, { autoSnapshot: e.target.checked })} />
-      </div>
       {/* #268: SMOOTHING removed — its only consumer was the retired SVG
           layer's CSS transition; it never touched the GL loop. */}
     </>

@@ -44,6 +44,7 @@ export const Events = {
   DAVIS_FAVORITE: 'davis:favorite',
   DAVIS_FAVORITE_REMOVE: 'davis:favoriteRemove',
   ACCUM_GESTURE: 'accum:gesture', // Phase A: { action: 'freeze'|'clear'|'swell', value? }
+  CANVAS_BG_CYCLE: 'canvas:bgCycle', // #310: BG cycle lives in OUTPUT now
   LAYOUT_PARAM: 'layout:param',
   LAYOUT_PRESET: 'layout:preset',
   LAYOUT_LOCK: 'layout:lock',

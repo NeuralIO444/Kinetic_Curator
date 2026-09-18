@@ -141,6 +141,7 @@ export function useApp(selector) {
       case A.SET_SLOW_RENDER: return store.setSlowRender(payload);
       case A.SET_BATCH_PAUSED: return store.setBatchPaused(payload);
       case A.TOGGLE_FULLSCREEN: return store.toggleFullscreen();
+      case A.CYCLE_CANVAS_BG: return store.cycleCanvasBg();
       case A.ADD_SNAPSHOT: return store.addSnapshot(action.snapshot);
       case A.REMOVE_SNAPSHOT: return store.removeSnapshot(action.id);
       case A.CLEAR_SNAPSHOTS: return store.clearSnapshots();

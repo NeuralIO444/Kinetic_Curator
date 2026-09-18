@@ -42,6 +42,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.DAVIS_MUTATE_STREAM, (p) => dispatch(p && p.reset
     ? { type: A.RESET_SEED_OFFSETS }
     : { type: A.MUTATE_SEED_OFFSET, group: p && p.group }));
+  on(Events.CANVAS_BG_CYCLE, () => dispatch({ type: A.CYCLE_CANVAS_BG })); // #310: BG cycle moved to OUTPUT
   on(Events.DAVIS_FAVORITE, (fav) => {
     if (fav.action === 'recall') return dispatch({ type: A.RECALL_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'add' && fav.favorite) return dispatch({ type: A.ADD_FAVORITE, favorite: fav.favorite });

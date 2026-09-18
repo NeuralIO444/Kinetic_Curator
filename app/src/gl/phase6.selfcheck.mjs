@@ -167,9 +167,11 @@ const contractOf = (d) => {
   assert.equal(FINAL_CAPS.maxFxLayers, Infinity);
 
   // 6 FX layers at the strictest live tier: every wrap applies, shed is empty.
+  // (#310: 'blur' replaced by 'grain' — blur is cut from the roster and an
+  // fx layer whose stack sanitizes to empty gets no wrap.)
   const layers = [contentLayer('bg')];
   for (let i = 1; i <= 6; i++) {
-    layers.push(fxLayer(`fx${i}`, ['invert', 'posterize', 'rgbSplit', 'blur', 'solarize', 'edge'][i - 1]));
+    layers.push(fxLayer(`fx${i}`, ['invert', 'posterize', 'rgbSplit', 'grain', 'solarize', 'edge'][i - 1]));
     layers.push(contentLayer(`c${i}`));
   }
   const scene = contractOf(doc({ quality: 'performance', layers }));

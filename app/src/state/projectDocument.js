@@ -28,6 +28,9 @@ export function serializeProject(state) {
     layoutParams: normalizeLayoutParams(state.layoutParams),
     enabledAssets: { ...state.enabledAssets },
     quality: state.quality || 'balanced',
+    // #310: the AUTO toggle left performer sight, but the governor still
+    // reads autoQuality — the document carries it so a set's choice survives.
+    autoQuality: state.autoQuality !== false,
   };
   if (state.assetWeightOverrides && Object.keys(state.assetWeightOverrides).length > 0) {
     doc.assetWeightOverrides = { ...state.assetWeightOverrides };
@@ -72,6 +75,7 @@ export function parseProject(raw) {
         // 100k-key map collapses to the known set instead of bloating the store.
         enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
         quality: sanitizeQuality(raw.quality),
+        autoQuality: raw.autoQuality !== false,
         assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides),
         paletteOverrides: raw.paletteOverrides || null,
         customAssets,
@@ -104,6 +108,7 @@ export function parseProject(raw) {
       // 100k-key map collapses to the known set instead of bloating the store.
       enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
       quality: sanitizeQuality(raw.quality),
+      autoQuality: raw.autoQuality !== false,
       assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides),
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'

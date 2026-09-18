@@ -49,12 +49,13 @@ export function OutputPanel() {
     userPalettes: s.userPalettes,
     favorites: s.favorites,
     watchdogTripGen: s.watchdogTripGen,
+    canvasBg: s.canvasBg,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
     quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
-    userPalettes, favorites, rendering, watchdogTripGen,
+    userPalettes, favorites, rendering, watchdogTripGen, canvasBg,
   } = state;
   const setRendering = (v) => emit(Events.EXPORT_RENDERING, v);
 
@@ -89,7 +90,10 @@ export function OutputPanel() {
 
   return (
     <div className="panel panel-output">
-      <PanelHeader tag="P05" title="OUTPUT" subtitle={`${snapshots.length} snaps`} />
+      <PanelHeader tag="P05" title="OUTPUT" subtitle={`${snapshots.length} snaps`}>
+        {/* #310: canvas background cycle lives here now (was CANVAS header) */}
+        <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
+      </PanelHeader>
       <div className="panel-body output-body">
         <QualityRow quality={quality} autoQuality={autoQuality} />
 

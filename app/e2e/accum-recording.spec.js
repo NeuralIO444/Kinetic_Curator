@@ -11,7 +11,8 @@
 // recorded stream carries the live trail buffer — not just that
 // captureStream() was called.
 //
-// The governor's AUTO quality is switched off for this test: on software GL
+// The governor's AUTO quality is switched off for this test (seeded off in
+// the project doc — the toggle left performer sight in #310): on software GL
 // (SwiftShader, CI runners) the watchdog would hard-stop the render loop,
 // which is the app working as designed, not what this test measures.
 
@@ -22,6 +23,9 @@ const docFor = (fade) =>
   JSON.stringify({
     version: 1,
     seed: 4242,
+    // #310: the AUTO quality toggle left performer sight, so the test seeds
+    // the hidden default off in the document instead of clicking it.
+    autoQuality: false,
     layoutParams: { mode: 'swarm', count: 60, accumulation: true, accumulationFade: fade },
   });
 
@@ -49,12 +53,12 @@ async function seedDoc(page, fade) {
   await page.locator('.app').waitFor({ timeout: 30_000 });
 }
 
-// Drives the real UI: OUTPUT tab -> AUTO off -> REC -> wait -> STOP -> blob.
+// Drives the real UI: OUTPUT tab -> REC -> wait -> STOP -> blob.
+// (AUTO is seeded off in the project doc — see docFor.)
 async function recordWebM(page, fade, secs) {
   await seedDoc(page, fade);
   await page.getByRole('tab', { name: /output/i }).click();
   await page.locator('.panel-output').waitFor({ timeout: 10_000 });
-  await page.getByRole('button', { name: /AUTO/ }).click();
   await page.waitForTimeout(3000); // let trails build up
   await page.getByRole('button', { name: /REC WEBM/ }).click();
   await page.waitForTimeout(secs * 1000);

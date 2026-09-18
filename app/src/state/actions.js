@@ -47,6 +47,7 @@ export const RESET_PHRASE       = 'RESET_PHRASE';
 export const SET_SLOW_RENDER     = 'SET_SLOW_RENDER';
 export const SET_BATCH_PAUSED    = 'SET_BATCH_PAUSED';
 export const TOGGLE_FULLSCREEN   = 'TOGGLE_FULLSCREEN';
+export const CYCLE_CANVAS_BG    = 'CYCLE_CANVAS_BG'; // #310: BG cycle moved to OUTPUT
 export const ADD_SNAPSHOT      = 'ADD_SNAPSHOT';
 export const REMOVE_SNAPSHOT   = 'REMOVE_SNAPSHOT';
 export const CLEAR_SNAPSHOTS   = 'CLEAR_SNAPSHOTS';

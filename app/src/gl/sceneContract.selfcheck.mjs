@@ -86,10 +86,10 @@ ok('fx stack recorded top-down, sanitized (#185 semantics frozen)', () => {
   // unknown kinds are dropped by the builder, never crash the contract
   const dirty = fixtureDoc();
   dirty.layers[1].effects.push({ kind: 'vaporwave', params: {} });
-  dirty.layers[1].effects.push({ kind: 'blur', params: { radius: 999 } }); // clamped
+  // #310: blur is cut from the roster — an old chain carrying it fails closed
+  dirty.layers[1].effects.push({ kind: 'blur', params: { radius: 999 } });
   const s2 = build(dirty);
-  assert.deepEqual(s2.layers[1].fx.map((e) => e.kind), ['rgbSplit', 'grain', 'blur']);
-  assert.equal(s2.layers[1].fx[2].params.radius, 40);
+  assert.deepEqual(s2.layers[1].fx.map((e) => e.kind), ['rgbSplit', 'grain']);
 });
 
 ok('fxWraps captures the buildLayerStack fold', () => {
