@@ -109,12 +109,13 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     try { live.getBridge().dispose(); } catch { /* best-effort */ }
     live = createLiveRenderer(canvas);
     // Orphan any bake in flight against the dead session — its token
-    // checkpoints bail at the next await boundary; the null staticKey
+    // checkpoints bail at the next await boundary; nulling the bake keys
     // below makes the next tick start a fresh bake onto the new session.
     buildToken++;
     building = false;
     cells = null;
-    staticKey = null;
+    atlasKey = null;
+    grainKey = null;
     accumObj = null;
     accumActive = false;
     accumRetryAt = 0;
@@ -126,6 +127,20 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     contextDown = false;
     restoringSession = true;
     setGlContextSafe('restoring');
+    // A fresh GPU session — don't carry the dead session's watchdog hard
+    // stop into the rebake. The pause belonged to the old session's
+    // performance; without a resume the tick's paused early-return would
+    // wedge the restore forever (the "GL RESTORING" pill never clears).
+    // setRunning(true) clears the watchdog stop per the #264 manual-resume
+    // contract; the governor re-evaluates the new session and re-trips
+    // honestly if it's still slow. A deliberate user pause (running=false
+    // with no watchdog stop) is left alone.
+    try {
+      const st = getState();
+      if (st && st.slowRenderSource === 'watchdog' && typeof st.setRunning === 'function') {
+        st.setRunning(true);
+      }
+    } catch { /* store gone */ }
   };
   // Synchronous half of the loss path: webglcontextlost is dispatched
   // asynchronously, so a tick can land in the gap between the loss and
