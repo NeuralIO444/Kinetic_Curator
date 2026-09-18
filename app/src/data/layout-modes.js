@@ -115,7 +115,7 @@ export const COMPOSITION_IDS = COMPOSITION_PRESETS.map((p) => p.id);
 export const PARAM_SPEC = {
   count: { min: 10, max: 800 },
   jitter: { min: 0, max: 200 },
-  density: { min: 10, max: 120 },
+  density: { min: 10, max: 100 }, // #272: capped at 100
   zTiers: { min: 1, max: 12, int: true },
   hueRotate: { min: 0, max: 360 },
   noiseFreq: { min: 0.001, max: 0.03 },

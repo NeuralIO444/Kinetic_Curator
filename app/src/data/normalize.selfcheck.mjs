@@ -177,7 +177,7 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
   // …and so must a hand-authored project using the extremes of each slider.
   const extremes = {
     ...DEFAULT_LAYOUT_PARAMS,
-    count: 800, jitter: 200, density: 120, zTiers: 12, displacement: 250,
+    count: 800, jitter: 200, density: 100, zTiers: 12, displacement: 250, // #272: capped at 100
     noiseFreq: 0.03, noiseSpeed: 3.0, particleCount: 500, damping: 0.99,
     wind: 3, body: 7, flap: 1, tight: 0.95,
     scale: [0.1, 3.0], rotate: [-180, 180], alpha: [0, 100],
