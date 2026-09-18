@@ -129,13 +129,16 @@ export function motionMetrics(points) {
 
 export function applyMod(knobs, metrics, patch) {
   const p = normalizePatch(patch);
-  if (p.mode !== 'mod') return { ...knobs };
+  if (p.mode !== 'mod') return { ...(knobs && typeof knobs === 'object' ? knobs : {}) };
   const m = metrics || motionMetrics([]);
   const k = knobs && typeof knobs === 'object' ? { ...knobs } : {};
   const amt = p.strength * p.polarity;
-  if (Number.isFinite(k.glow)) k.glow = clamp01((k.glow ?? 0) + m.agitation * amt * 0.25);
-  if (Number.isFinite(k.fade)) k.fade = clamp01((k.fade ?? 0) + m.speed * amt * 0.15);
-  if (Number.isFinite(k.displace)) k.displace = Math.max(0, (k.displace ?? 0) + m.agitation * amt * 8);
+  const glow0 = Number.isFinite(Number(k.glow)) ? Number(k.glow) : 0;
+  const fade0 = Number.isFinite(Number(k.fade)) ? Number(k.fade) : 0;
+  const dis0 = Number.isFinite(Number(k.displace)) ? Number(k.displace) : 0;
+  k.glow = clamp01(glow0 + m.agitation * amt * 0.25);
+  k.fade = clamp01(fade0 + m.speed * amt * 0.15);
+  k.displace = Math.max(0, dis0 + m.agitation * amt * 8);
   return k;
 }
 
