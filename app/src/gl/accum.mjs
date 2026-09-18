@@ -486,6 +486,22 @@ export function blurPassSigmas(sigma) {
   return Array.from({ length: n }, () => sub);
 }
 
+/**
+ * Drain any pending (sticky) GL errors. WebGL errors are sticky flags, not
+ * exceptions: an error raised by earlier non-ACCUM work in the same frame
+ * (content render, timer queries) stays queued until something calls
+ * getError(). step()'s post-pass check must only reflect the ACCUM passes
+ * themselves — without this drain, a benign upstream error is misattributed
+ * to ACCUM, step() throws every frame, and the live loop (which has no other
+ * fault isolation for the ACCUM branch) freezes on the last presented frame.
+ * The queue is finite; the cap is pure paranoia.
+ */
+export function drainGlErrors(gl, maxDrain = 16) {
+  for (let i = 0; i < maxDrain; i++) {
+    if (gl.getError() === gl.NO_ERROR) break;
+  }
+}
+
 function gaussKernel(sigma) {
   const R = Math.ceil(sigma * 3);
   const w0 = 0.3989422804014327 / sigma;
@@ -917,6 +933,9 @@ export function createAccum(gl, bridge, { width, height }) {
      */
     step(frameTex, params) {
       const p = params;
+      // Drain stale errors first so the post-step check below only reflects
+      // this step's own passes (see drainGlErrors).
+      drainGlErrors(gl);
       // 0. echoes (B3) — mix the live frame with the ring's past taps
       // FIRST, then push the incoming frame: K targets hold exactly K
       // past-frame taps (delays 1..K). Skipped at echoTaps = 0: the live

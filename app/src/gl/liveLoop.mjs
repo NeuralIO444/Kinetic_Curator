@@ -91,6 +91,23 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   let accumActive = false;
   let accumFrozen = false;
   let lastAccumOn = false;
+  // Fault isolation: a persistent ACCUM failure must never freeze the live
+  // canvas. On fault the session is torn down, the frame falls back to plain
+  // rendering, and re-enable is deferred by a short cooldown (avoids a
+  // per-frame shader-recompile storm when enable itself is what throws).
+  let accumRetryAt = 0;
+  let lastAccumErrTs = 0;
+  const noteAccumFault = (e) => {
+    try { live.dropAccum(); } catch { /* already torn down */ }
+    accumObj = null;
+    accumActive = false;
+    accumRetryAt = performance.now() + 2000;
+    const now = performance.now();
+    if (now - lastAccumErrTs > 5000) {
+      console.error('[gl-live] ACCUM fault — falling back to plain render:', e);
+      lastAccumErrTs = now;
+    }
+  };
 
   let lastErrTs = 0;
   let lastNodeCount = -1;
@@ -285,25 +302,46 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       try {
         if (accumOn) {
           if (!accumActive) {
-            accumObj = live.ensureAccum(payload.width, payload.height);
-            accumObj.begin(bgCss);
-            accumActive = true;
+            // Enable can fail (GL error during compile/begin). A persistent
+            // ACCUM fault must never freeze the live canvas: tear down, fall
+            // back to plain rendering, and retry after a short cooldown so a
+            // hard failure can't turn into a per-frame recompile storm.
+            if (performance.now() >= accumRetryAt) {
+              try {
+                accumObj = live.ensureAccum(payload.width, payload.height);
+                accumObj.begin(bgCss);
+                accumActive = true;
+              } catch (e) {
+                noteAccumFault(e);
+              }
+            }
           }
           lastAccumOn = true;
-          if (accumFrozen) {
+          if (accumFrozen && accumObj) {
             // FREEZE: hold the feedback image, skip render + step.
             live.present(accumObj.texture());
+          } else if (accumObj) {
+            try {
+              const target = live.renderFrame(payload, { transparent: true });
+              const bands = audioBands || { rms: 0, beatPulse: 0 };
+              // Silence is a true no-op: the envelope passes params through at 0.
+              const rp = applyAudioEnvelope(accumRecipeParams(accumParams), {
+                rms: audioOn ? bands.rms || 0 : 0,
+                flux: 0,
+                beatPulse: audioOn ? bands.beatPulse || 0 : 0,
+              });
+              accumObj.step(target.tex, rp);
+              live.present(accumObj.texture());
+            } catch (e) {
+              noteAccumFault(e);
+              // Fall back to plain rendering so the canvas keeps moving.
+              const target = live.renderFrame(payload, { transparent });
+              live.present(target);
+            }
           } else {
-            const target = live.renderFrame(payload, { transparent: true });
-            const bands = audioBands || { rms: 0, beatPulse: 0 };
-            // Silence is a true no-op: the envelope passes params through at 0.
-            const rp = applyAudioEnvelope(accumRecipeParams(accumParams), {
-              rms: audioOn ? bands.rms || 0 : 0,
-              flux: 0,
-              beatPulse: audioOn ? bands.beatPulse || 0 : 0,
-            });
-            accumObj.step(target.tex, rp);
-            live.present(accumObj.texture());
+            // ACCUM unavailable this frame (enable failed or cooling down).
+            const target = live.renderFrame(payload, { transparent });
+            live.present(target);
           }
         } else {
           if (lastAccumOn) {
