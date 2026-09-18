@@ -19,8 +19,8 @@ import assert from 'node:assert';
 import {
   normalizeLayoutParams, DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, RANGE_SPEC,
   MODE_IDS, BLEND_MODES, PALETTE_SHIFTS, SYMMETRY_MODES, BEHAVE_MODES,
-  MATERIAL_IDS, SHADING_MODES, COMPOSITION_IDS,
-} from './layout-modes.js';
+  COMPOSITION_IDS,
+} from './layout-modes.js'; // #268: MATERIAL_IDS/SHADING_MODES removed
 import { buildPlacements } from '../engine/buildPlacements.js';
 
 const ASSETS = [{ id: 'a', weight: 'heavy' }, { id: 'b', weight: 'medium' }];
@@ -105,14 +105,14 @@ for (const [label, patch] of POISON) {
   // 3. Every enum is one of the allowed values.
   for (const [key, allowed] of [
     ['mode', MODE_IDS], ['composition', COMPOSITION_IDS], ['blendMode', BLEND_MODES],
-    ['shading', SHADING_MODES], ['material', MATERIAL_IDS], ['paletteShift', PALETTE_SHIFTS],
-    ['symmetry', SYMMETRY_MODES], ['behave', BEHAVE_MODES],
+    ['paletteShift', PALETTE_SHIFTS],
+    ['symmetry', SYMMETRY_MODES], ['behave', BEHAVE_MODES], // #268: shading/material removed
   ]) {
     assert.ok(allowed.includes(lp[key]), `${label}: ${key}="${lp[key]}" not in allow-list`);
   }
 
   // 4. Booleans are booleans — 'false' is truthy, and used to stay a string.
-  for (const key of ['bleed', 'recolor', 'mirror', 'overlap', 'accumulation']) {
+  for (const key of ['bleed', 'mirror', 'overlap', 'accumulation']) { // #268: recolor removed
     assert.strictEqual(typeof lp[key], 'boolean', `${label}: ${key} must be boolean`);
   }
 

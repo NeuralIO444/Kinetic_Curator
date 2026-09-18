@@ -16,7 +16,6 @@ export function DavisPanel() {
     evolveInterval: s.evolveInterval,
     autoSnapshot: s.autoSnapshot,
     beatRoute: s.beatRoute,
-    motionSmoothing: s.motionSmoothing,
     favorites: s.favorites,
     seed: s.seed,
     layoutParams: s.layoutParams,
@@ -35,7 +34,7 @@ export function DavisPanel() {
   }));
   const {
     evolveMode, evolveSource, evolveTarget, evolveInterval, autoSnapshot, beatRoute,
-    motionSmoothing, favorites, seed, layoutParams,
+    favorites, seed, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
     phraseClock, phraseBpm,
     morphEvolve, morphDurationMs, morphing, audioEnabled,
@@ -90,7 +89,6 @@ export function DavisPanel() {
             evolveSource={evolveSource}
             evolveInterval={evolveInterval}
             autoSnapshot={autoSnapshot}
-            motionSmoothing={motionSmoothing}
           />
 
           {beatCollision && <BeatRouter beatRoute={beatRoute || 'both'} />}

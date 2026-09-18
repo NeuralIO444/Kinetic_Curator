@@ -354,7 +354,7 @@ export function MasterBar() {
           <span className="meter-value">{Number(fps).toFixed(1)}</span>
         </div>
 
-        <div className="meter" title="Live placement / SVG node count">
+        <div className="meter" title="Live placement / instance count">
           <span className="meter-label">NODES</span>
           <span className={`meter-value ${nodeClass}`}>{nodeCount}</span>
         </div>
@@ -372,7 +372,7 @@ export function MasterBar() {
         <button
           className={`undo-btn ${frameLock ? '' : 'disabled'}`}
           onClick={() => state.setFrameLock(!frameLock)}
-          title="Frame-lock show mode: gate the live loop to a locked 30fps (user choice, never auto-cleared)"
+          title="Frame-lock show mode: gate the UI life tick to a locked 30fps — smoother than a fluctuating 40-60. The GL loop runs free. User choice, never auto-cleared."
           style={{ fontSize: '10px', letterSpacing: '0.06em' }}
         >
           30FPS{frameLock ? '' : ' · OFF'}

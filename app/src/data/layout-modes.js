@@ -1,7 +1,6 @@
 // Layout mode definitions — single source of truth
 
 import { BEHAVE_IDS } from '../engine/organisms/behave.js';
-import { MATERIALS } from '../engine/materials.js';
 import { COMPOSITION_PRESETS } from './presets.js';
 
 export const LAYOUT_MODES = [
@@ -52,11 +51,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   jitter: 24,
   density: 78,
   bleed: false,
-  recolor: true,
   mirror: false,
   overlap: true,
   blendMode: 'normal',
-  shading: 'flat',
   hueRotate: 0,
   paletteShift: 'auto',
 
@@ -97,8 +94,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
 };
 
 export const MODE_IDS = LAYOUT_MODES.map((m) => m.id);
-export const SHADING_MODES = ['flat', 'gloss'];
-export const MATERIAL_IDS = MATERIALS.map((m) => m.id);
+// #268: SHADING_MODES / MATERIAL_IDS removed — the GL renderer renders
+// everything flat; the controls are gone, so the params are gone too.
 export const COMPOSITION_IDS = COMPOSITION_PRESETS.map((p) => p.id);
 
 /**
@@ -158,7 +155,7 @@ export const RANGE_SPEC = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'recolor', 'mirror', 'overlap', 'accumulation'];
+const BOOL_KEYS = ['bleed', 'mirror', 'overlap', 'accumulation']; // #268: recolor removed
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -185,8 +182,6 @@ const ENUM_SPEC = {
   mode: MODE_IDS,
   composition: COMPOSITION_IDS,
   blendMode: BLEND_MODES,
-  shading: SHADING_MODES,
-  material: MATERIAL_IDS,
   paletteShift: PALETTE_SHIFTS,
   symmetry: SYMMETRY_MODES,
   behave: BEHAVE_MODES,
@@ -283,8 +278,6 @@ export function normalizeLayoutParams(partial) {
   next.mode = pickEnum(next.mode, MODE_IDS, DEFAULT_LAYOUT_PARAMS.mode);
   next.composition = pickEnum(next.composition, COMPOSITION_IDS, DEFAULT_LAYOUT_PARAMS.composition);
   next.blendMode = pickEnum(next.blendMode, BLEND_MODES, 'normal');
-  next.shading = pickEnum(next.shading, SHADING_MODES, 'flat');
-  next.material = pickEnum(next.material, MATERIAL_IDS, DEFAULT_LAYOUT_PARAMS.material);
   next.paletteShift = pickEnum(next.paletteShift, PALETTE_SHIFTS, 'auto');
   next.symmetry = pickEnum(next.symmetry, SYMMETRY_MODES, 'none');
   next.behave = pickEnum(next.behave, BEHAVE_MODES, 'cruise');

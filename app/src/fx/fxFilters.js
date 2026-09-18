@@ -8,10 +8,11 @@
  * effect reads SourceGraphic, and each later effect reads the previous
  * effect's output, so the stack compounds like an adjustment-layer chain.
  * (Before chaining, every effect read SourceGraphic independently and only
- * the last effect's output was visible.) Two renderers exist:
- *   - FxFilterDefs (./FxFilterDefs.jsx) for the live React app
- *   - renderFxFilterString() for the offline studio path (studio/render.mjs)
- * Both consume the same primitive list, so live and export agree.
+ * the last effect's output was visible.) The live instrument renders FX
+ * through the GL chain (gl/bridge) and the offline studio path uses
+ * renderFxFilterString() (studio/render.mjs). Both consume the same
+ * primitive list, so live and export agree.
+ * (#268: the retired SVG FxFilterDefs.jsx is deleted.)
  *
  * Hard rules:
  * - Unknown effect kinds fail closed: skipped, never crash the render.
@@ -53,7 +54,7 @@ export const FX_EFFECT_DEFS = {
   },
   grain: {
     label: 'Grain',
-    hint: 'Animated film grain composited over the source. First thing the Showrunner sheds under load.',
+    hint: 'Animated film grain composited over the source.',
     params: {
       amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.4, hint: 'Grain opacity' },
     },
@@ -74,7 +75,7 @@ export const FX_EFFECT_DEFS = {
   },
   scanlines: {
     label: 'Scanlines',
-    hint: 'CRT scanline banding: fine horizontal dark lines over the artwork. Turbulence-based, so the Showrunner clamps its detail under load.',
+    hint: 'CRT scanline banding: fine horizontal dark lines over the artwork.',
     params: {
       density: { label: 'Density', min: 0.05, max: 1, step: 0.05, def: 0.35, hint: 'Line frequency — higher = finer lines' },
       amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.5, hint: 'Line darkness' },

@@ -166,8 +166,8 @@ const warnedMaterials = new Set();
  * (#168, "live and studio agree or refuse").
  *
  * The GL backend renders every instance flat: gradient materials (plate /
- * wash / stipple, app/src/engine/materials.js) exist only in the live SVG
- * layer (Layer.jsx paints wing-role assets with the material gradient).
+ * wash / stipple, app/src/engine/materials.js) only ever existed in the
+ * retired SVG layer — the live instrument has no gradient shading.
  * A studio export of a project using a non-flat material therefore renders
  * the wings flatter than the live tab. Real gradient shading in the shaders
  * is a Phase-6-scale job, so this issue discloses instead of refusing: warn

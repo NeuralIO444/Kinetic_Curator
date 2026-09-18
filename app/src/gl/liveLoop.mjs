@@ -206,6 +206,16 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   let accumActive = false;
   let accumFrozen = false;
   let lastAccumOn = false;
+  // #268 SWELL: breathe the trail length out and back over ~2s. A timestamp,
+  // not a flag — the envelope derives from wall-clock in buildFrame, so the
+  // gesture can't stick if a frame is dropped mid-swell.
+  let swellStart = 0;
+  const swellEnvelope = () => {
+    if (!swellStart) return 0;
+    const p = (performance.now() - swellStart) / 2000;
+    if (p >= 1) { swellStart = 0; return 0; }
+    return Math.sin(Math.PI * p);
+  };
   // Fault isolation: a persistent ACCUM failure must never freeze the live
   // canvas. On fault the session is torn down, the frame falls back to plain
   // rendering, and re-enable is deferred by a short cooldown (avoids a
@@ -376,7 +386,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       accumOn: !!layoutParams.accumulation && !s.perfTier1,
       accumFrozen,
       accumParams: {
-        fade: layoutParams.accumulationFade,
+        // #268: SWELL breathes the fade toward near-infinite trails and back.
+        fade: layoutParams.accumulationFade + swellEnvelope() * (0.995 - (layoutParams.accumulationFade ?? 0.88)),
         optics: layoutParams.accumulationOptics,
         tunnel: layoutParams.accumulationTunnel,
         prism: layoutParams.accumulationPrism,
@@ -518,6 +529,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
             live.dropAccum();
             accumObj = null;
             accumActive = false;
+            // #268: the session ended — the loop's frozen copy must reset with
+            // it, or re-enabling ACCUM shows no trails while the panel reads
+            // inactive (the two-press FREEZE trap).
+            accumFrozen = false;
           }
           lastAccumOn = false;
           const target = live.renderFrame(payload, { transparent });
@@ -688,6 +703,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     start, stop, dispose,
     setBgMode,
     setAccumFrozen: (f) => { accumFrozen = !!f; },
+    swellAccum: () => { swellStart = performance.now(); },
     captureFrame,
     waitForSettled,
     waitForReady,
