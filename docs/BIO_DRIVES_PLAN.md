@@ -100,3 +100,43 @@ Matt, September 17, 2026: Oxman gives the creatures their behavior; Haeckel give
 - **Plate palettes** — aged-lithograph treatment: warm paper blacks, ink sepia, faded cyanotype.
 
 Filed as a comment on #287; implementation approach to be researched as a planning pass.
+
+## 6. A pinch of Haeckel — implementation approach
+
+*Grounded in main: `SYMMETRY_MODES` in `app/src/data/layout-modes.js`, `_organismItems` in `app/src/engine/particles.js`, asset contract in `app/src/data/assets/`, `COST_WARNING_THRESHOLD = 600` (Showrunner), palette schema `{id, name, era, bg, ink, swatches}` in `app/src/data/palettes.js`, existing `grid` layout mode, and the empty experimental categories awaiting #281's 48 assets.*
+
+### 6.1 Radial symmetry as a creature trait — the symmetry fan
+- **Ground truth:** `lp.symmetry` is already a layout param with enum `['none','bilateral','stamp']`. `_organismItems` consumes only `'bilateral'` (emits a mirrored wing-ladder pair); `'stamp'` is consumed by `liveResolve.mjs` as a mirror flag. No new concept is needed — the enum wants one more value.
+- **Approach:** extend the enum with `radial-4 / radial-6 / radial-8` (fold counts that read: 4 = cross/medusa, 6 = radiolarian, 8 = sunburst) and generalize the bilateral wing-emit block into an N-item fan: N appendage items around the head at heading + 2πk/N, same `reach`/`amp` flap math, alternating `_mirrored` on odd k for Haeckel's alternating chirality. ~10 lines; the existing `MOTH_LADDERS` round-robin is reused, so no new ladder content is required.
+- **Trait, not type:** fold count is a layout param, so voices pin it (`symmetry: 'radial-6'`, `body: 1` for a medusa bell, `body: 4` for a segmented radiolarian). The spine keeps trailing behind the head — for radial organisms it reads as the bell's wake. No new organism mode, no new panel; it appears wherever `symmetry` already appears.
+- **Cost:** items per organism go from `bodyLen+2` to `bodyLen+N` — the governor's existing count/asset shed ladder covers it; recommend voices pair high fold counts with lower particle counts. The cost model should log the fan multiplier (TE half of the manifesto).
+- **Unlocks:** the radiolarian/medusa/sunburst organism family — symmetry × any appendage asset × any spine length. The *combination* with the Haeckel shelf (§6.2) is the organism; neither half is a feature alone.
+
+### 6.2 Ornamental asset shelf — authored, not generated
+- **Ground truth:** the asset contract is `{id, category, tags, weight, density, scale, rotate, svg}` with mandatory `var(--ink)`/`var(--accent)` palette tokens, baked into WebGL atlas textures. The asset-library plan's build-up workflow is: freehand pen in Studio → SVG paste from Illustrator/Figma → promote standout user overlays to canon. Canon sits at ~200 with #281 authoring 48 for the four empty experimental shelves.
+- **Approach:** author **16–24 Haeckel assets** across the *existing* categories — `radial` (radiolarian plates, medusa bells, iris lattices) and `linework` (hairline lattice skeletons, spicule fans). No new category: the four experimental shelves are already empty and awaiting #281; a fifth shelf is kitchen sink. Hand-drawn wobble strokes in Studio fit the plates' engraved linework best; each asset stays inside the 600-point cost budget (hairlines and token fills are cheap — the governor sheds costliest-first, so these survive).
+- **Unlocks:** the *costumes* for the symmetry fan — the trait (§6.1) dresses organisms in these. Also feeds specimen plates (§6.3) and the print desk.
+
+### 6.3 Specimen-plate voices — taxonomic but breathing
+- **Approach:** voice presets, **not** a layout mode. A specimen plate = existing `grid` layout + radial-symmetry organisms + Haeckel shelf + plate palette (§6.4) + slow params. No new engine, no new surface.
+- **The Oxman-gate tension, answered honestly:** Haeckel's plates are still because they're *printed*; ours are *performed*. The composition is taxonomic (generous negative space, dark ground, ordered grid) while every specimen stays alive in time: slow drift and rotation, BREATH swell from the bio-drives, deep ACCUM fade so each organism sits in a halo of its own recent history, pigment leak tinting neighbors over minutes. Stillness is the composition; growth is the organism. A plate that truly froze would fail the gate — these don't.
+- **Governor composition:** voices are pure params, so count/grid/cost all ride the existing shed ladder. Recommend the plate voices ship with conservative counts (specimens are detailed; the governor sheds costliest assets first).
+- **Unlocks:** the plate voice family — and the static sibling belongs to the print desk (contact sheets), not the live instrument.
+
+### 6.4 Plate palettes — data only
+- **Approach:** three new entries in `data/palettes.js`, zero engine change:
+  - **SEPIA PLATE** — warm paper-black ground, ink sepia, umber/ochre/bone swatches.
+  - **LITHOGRAPH** — the inverted plate: warm paper ground, dark ink marks (palettes carry `bg`, so a light-ground voice is expressible today).
+  - **CYANOTYPE** — deep prussian-blue ground, pale blue-white swatches.
+- **Verification note:** light-ground plates interact with ACCUM fade (fade-to-black vs fade-to-paper) — flag for the builder to verify the fade target follows the palette bg, not a blocker.
+
+### 6.5 Cut
+- **A new `haeckel` asset category.** Cut — `radial` and `linework` already mean this; a fifth shelf while four sit empty is the junk drawer Matt capped.
+- **A dedicated `plate` layout mode.** Cut — `grid` plus params already expresses the arrangement. A static arrangement mode is a stamp, not a system; it would fail the Oxman gate it was meant to serve.
+- **Taxonomic figure captions** ("Fig. 12", plate numbers) on the live canvas. Cut — that's a caption/label system, a new surface for print-desk territory. Park for print, not live.
+
+### 6.6 Sequencing (with the bio-drives, after fix phases and #284)
+1. Symmetry fan + plate palettes (tiny; the fan is ~10 lines, palettes are data).
+2. Haeckel shelf authorship (parallelizable with #281's asset authoring — same hands, same contract).
+3. Specimen-plate voices (each ships demonstrating fan × shelf × palette, or it didn't earn its keep).
+4. Bio-drives mechanisms land on the same organisms afterward — a breathing, hungry, leaking radiolarian is the payoff both plans are building toward.
