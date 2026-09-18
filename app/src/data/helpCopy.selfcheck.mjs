@@ -78,8 +78,9 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
   assert.ok(appSrc.includes('<TourOverlay'), 'App.jsx must render TourOverlay');
   assert.ok(appSrc.includes('onTour={() => setTourOpen(true)}'),
     'FirstRunOverlay must get the tour entry');
-  assert.ok(appSrc.includes('<FavoritesTray onHelp={openHelp}'),
-    'FavoritesTray must get onHelp');
+  // The footer's '?' is the single help entry (the tray's '? help' was removed 2026-09-18 as a duplicate).
+  assert.ok(appSrc.includes('title="Help"'),
+    'footer needs the single `?` help entry');
 
   const firstRunSrc = read('components/FirstRunOverlay.jsx');
   assert.ok(firstRunSrc.includes('TAKE THE TOUR'), 'first-run card needs a tour button');
@@ -90,7 +91,7 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
     '? overlay must read the single helpCopy.js map');
 
   const traySrc = read('components/FavoritesTray.jsx');
-  assert.ok(traySrc.includes('? help'), 'HITS line needs the `? help` footer hint');
+  assert.ok(!traySrc.includes('? help'), 'tray must not duplicate the footer `?` help entry');
 
   const masterSrc = read('components/MasterBar.jsx');
   assert.ok(masterSrc.includes("title={running ? 'Live loop is running"),
