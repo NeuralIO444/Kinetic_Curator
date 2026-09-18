@@ -4,6 +4,8 @@
 // module owns the ORDER of cuts. The order is the contract:
 //
 //   cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
+//          gated on the gpuSaturated signal (#259): fires only when the GPU
+//          is the bottleneck — otherwise it only pixelates.
 //   cut 2: quality tier step high → balanced → performance
 //   cut 3: mirror/gloss/ACCUM shed (perfTier1 — independent, lower FPS floor)
 //   cut 4: cost-aware asset thinning
@@ -60,16 +62,25 @@ export function perfTier1Passes() {
  * Decide the next governor cut, given the current governor state.
  *
  * @param {object} s
- *   { renderScale, quality, assetThin, perfClampOverride, effectiveCount, slowRender }
+ *   { renderScale, quality, assetThin, perfClampOverride, effectiveCount, slowRender, gpuSaturated }
+ *   gpuSaturated: the governor's GPU-saturation signal (GPU-implied fps below
+ *   the shed floor while rAF fps holds). Cut 1 (renderScale) only fires when
+ *   true: if the GPU is NOT saturated, the bottleneck is main-thread JS and
+ *   cutting resolution cannot recover frames — it only pixelates. Omitted
+ *   (older callers, selfchecks) defaults to true: resolution still sheds
+ *   first when the signal is unknown.
  * @returns {{ kind: string, label: string, ... } | null} the cut to apply,
  *   or null when the ladder is exhausted (the hook then holds — the
  *   watchdog is a separate, faster mechanism).
  */
 export function nextGovernorCut(s) {
+  const gpuSaturated = s.gpuSaturated !== false; // unknown signal: shed as before
   const scale = Number(s.renderScale);
   // Cut 1: dynamic resolution scaling. Unknown/NaN scale snaps to full.
+  // Skipped outright when the GPU is not the bottleneck (#259): pixels
+  // drop only when dropping pixels can buy frames back.
   const cur = Number.isFinite(scale) && scale > 0 ? scale : 1;
-  const next = RENDER_SCALES.find((step) => step < cur - 1e-9);
+  const next = gpuSaturated ? RENDER_SCALES.find((step) => step < cur - 1e-9) : undefined;
   if (next !== undefined) {
     return {
       kind: 'renderScale',

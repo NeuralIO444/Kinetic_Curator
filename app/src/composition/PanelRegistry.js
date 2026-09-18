@@ -19,6 +19,11 @@ const GovernorXrayPanel = import.meta.env.DEV
   ? lazy(() => import('../panels/GovernorXrayPanel.jsx').then((m) => ({ default: m.GovernorXrayPanel })))
   : null;
 
+// Governor tuning surface (#259) is dev-only: same lazy-chunk pattern.
+const GovernorTunePanel = import.meta.env.DEV
+  ? lazy(() => import('../panels/GovernorTunePanel.jsx').then((m) => ({ default: m.GovernorTunePanel })))
+  : null;
+
 export const PANEL_REGISTRY = [
   { id: 'canvas',   title: 'CANVAS',   icon: '◆', component: CanvasPanel,    zone: 'primary' },
   { id: 'layout',   title: 'LAYOUT',   icon: '■', component: LayoutPanel,    zone: 'secondary' },
@@ -38,6 +43,12 @@ if (import.meta.env.DEV && ShaderLabPanel) {
 if (import.meta.env.DEV && GovernorXrayPanel) {
   PANEL_REGISTRY.push(
     { id: 'xray', title: 'X-RAY', icon: '◉', component: GovernorXrayPanel, zone: 'secondary' },
+  );
+}
+
+if (import.meta.env.DEV && GovernorTunePanel) {
+  PANEL_REGISTRY.push(
+    { id: 'govtune', title: 'GOV TUNE', icon: '◐', component: GovernorTunePanel, zone: 'secondary' },
   );
 }
 

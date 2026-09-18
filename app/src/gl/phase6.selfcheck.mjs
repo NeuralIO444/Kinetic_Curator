@@ -88,7 +88,45 @@ const APP_SRC = path.resolve(HERE, '..');
   console.log('[selfcheck] B shed honesty OK —', sum.join(' · '));
 }
 
-// ---------------------------------------------------------------- helpers
+// ---------------------------------------------------------------- C. gpuSaturated gate (#259)
+// Cut 1 (renderScale) fires only when the GPU is the bottleneck. If the GPU
+// is NOT saturated, the bottleneck is main-thread JS and cutting resolution
+// cannot buy frames back — it only pixelates — so the ladder skips straight
+// to quality. Omitted gpuSaturated (older callers) defaults to the old
+// behavior: resolution sheds first.
+{
+  const base = {
+    renderScale: 1, quality: 'high', assetThin: false,
+    perfClampOverride: null, effectiveCount: 400, slowRender: false,
+  };
+  // GPU saturated: resolution sheds first (unchanged contract).
+  let cut = nextGovernorCut({ ...base, gpuSaturated: true });
+  assert.equal(cut.kind, 'renderScale', 'saturated GPU: first cut must be renderScale');
+  // GPU NOT saturated: skip resolution, go to quality.
+  cut = nextGovernorCut({ ...base, gpuSaturated: false });
+  assert.equal(cut.kind, 'quality', 'unsaturated GPU: first cut must be quality, not renderScale');
+  assert.equal(cut.quality, 'balanced');
+  // Walk the whole ladder with an unsaturated GPU: renderScale never fires.
+  const kinds = [];
+  let s = { ...base, gpuSaturated: false };
+  for (let i = 0; i < 12; i++) {
+    const c = nextGovernorCut(s);
+    if (!c) break;
+    kinds.push(c.kind);
+    if (c.kind === 'renderScale') s.renderScale = c.scale;
+    else if (c.kind === 'quality') s.quality = c.quality;
+    else if (c.kind === 'assetThin') s.assetThin = true;
+    else if (c.kind === 'countClamp') s.perfClampOverride = { count: c.count, mirror: false };
+    else if (c.kind === 'slowRender') s.slowRender = true;
+  }
+  assert.ok(!kinds.includes('renderScale'), `unsaturated GPU: renderScale must never fire, got: ${kinds.join(',')}`);
+  assert.deepEqual(
+    kinds,
+    ['quality', 'quality', 'assetThin', 'countClamp', 'countClamp', 'countClamp', 'countClamp', 'slowRender'],
+    `unsaturated ladder order wrong: ${kinds.join(',')}`
+  );
+  console.log('[selfcheck] C gpuSaturated gate OK —', kinds.join(' → '));
+}
 const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, ...over });
 const contentLayer = (id) => ({
