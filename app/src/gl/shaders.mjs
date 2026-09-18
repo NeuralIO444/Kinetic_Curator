@@ -95,6 +95,8 @@ uniform sampler2D u_mask;   // matte source group texture (#189)
 uniform float u_maskOn;
 uniform int u_maskMode;     // 0 = alpha, 1 = luma
 uniform float u_maskInvert;
+uniform float u_hueOn;      // 1 when layer.layout.hueRotate is nonzero (#262)
+uniform mat3 u_hueMat;      // SVG feColorMatrix type="hueRotate" matrix (#262)
 in vec2 v_cuv;
 out vec4 o;
 
@@ -197,6 +199,11 @@ void main() {
   }
   S.rgb *= u_opacity; S.a *= u_opacity;      // group opacity
   vec3 cs = unpre(S.rgb, S.a);
+  // hueRotate (#262): rotation about the sRGB gray axis, applied to the
+  // straight source color before blending — matches the SVG reference's
+  // feColorMatrix type="hueRotate". Branched so hueRotate=0 keeps the
+  // pre-#262 code path pixel-identical.
+  if (u_hueOn > 0.5) cs = u_hueMat * cs;
   vec3 cb = unpre(D.rgb, D.a);
   float as_ = S.a, ab = D.a;
   vec3 b = blendF(cb, cs, u_blend);

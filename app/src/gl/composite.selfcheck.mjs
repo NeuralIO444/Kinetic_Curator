@@ -2,8 +2,9 @@
 //
 // Node-only: blendIdFor mapping (including the plus-lighter → screen #96
 // substitution the SVG reference applies), sanitizeMatte via
-// buildSceneContract, the resolveLayerMattes cycle guard, and
-// assertSceneContract matte validation.
+// buildSceneContract, the resolveLayerMattes cycle guard,
+// assertSceneContract matte validation, and the hueRotateMatrix color
+// matrix (#262: identity at 0, luminance-preserving, known rotation).
 //
 // Browser (skipped when the Playwright browser is absent): exact matte
 // shader math through compositeProbe.html (alpha / luma / invert / none),
@@ -18,7 +19,7 @@
 // fx-stack-3 corpus scene against the SVG reference.
 import assert from 'node:assert';
 import { blendIdFor, BLEND_IDS } from './shaders.mjs';
-import { resolveLayerMattes, RENDERER_PROGRAMS } from './renderer.mjs';
+import { resolveLayerMattes, RENDERER_PROGRAMS, hueRotateMatrix } from './renderer.mjs';
 import { buildSceneContract, assertSceneContract, sanitizeMatte } from './sceneContract.js';
 
 let n = 0;
@@ -167,6 +168,48 @@ ok('harness: every uniform each renderer shader declares is in its upload list',
     const declared = [...parse(def.vs), ...parse(def.fs)];
     const missing = declared.filter((u) => !def.uniforms.includes(u));
     assert.deepEqual(missing, [], `${def.name}: declared-but-never-set [${missing}]`);
+  }
+});
+
+// --- hueRotateMatrix (#262): the SVG feColorMatrix hue-rotation matrix ----
+const applyMat3 = (m, c) => [ // column-major mat3 * vec3
+  m[0] * c[0] + m[3] * c[1] + m[6] * c[2],
+  m[1] * c[0] + m[4] * c[1] + m[7] * c[2],
+  m[2] * c[0] + m[5] * c[1] + m[8] * c[2],
+];
+const srgbLum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+
+ok('hueRotateMatrix: exact identity at 0 and 360', () => {
+  const ident = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  assert.deepEqual([...hueRotateMatrix(0)], ident, 'hueRotate=0 uploads an exact identity');
+  assert.deepEqual([...hueRotateMatrix(360)], ident, '360 wraps to identity');
+  assert.deepEqual([...hueRotateMatrix(-360)], ident, '-360 wraps to identity');
+});
+
+ok('hueRotateMatrix: preserves gray and (approx) luminance; rotates hues', () => {
+  // 120 degrees maps pure red onto the green column of the matrix.
+  const got = applyMat3([...hueRotateMatrix(120)], [1, 0, 0]);
+  const want = [-0.3649634110, 0.4433416327, -0.3620619928]; // SVG feColorMatrix type="hueRotate" @120
+  for (let i = 0; i < 3; i++) {
+    assert.ok(Math.abs(got[i] - want[i]) < 1e-5, `120deg red channel ${i}: ${got[i]} vs ${want[i]}`);
+  }
+  assert.ok(got[1] > 0.4 && got[0] < 0 && got[2] < 0, 'red visibly shifts toward green');
+  const colors = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.8, 0.2, 0.5], [0.1, 0.9, 0.3], [0.4, 0.4, 0.4]];
+  for (let deg = 0; deg < 360; deg += 15) {
+    const m = [...hueRotateMatrix(deg)];
+    for (const c of colors) {
+      const r = applyMat3(m, c);
+      // Rec.709 luminance is near-preserved: worst observed drift is ~6e-4
+      // (0.15 of a byte) — not a dramatic change, matching the SVG reference
+      // (feColorMatrix type="hueRotate") by construction.
+      const d = Math.abs(srgbLum(r) - srgbLum(c));
+      assert.ok(d < 1e-3, `lum drift at ${deg}deg on [${c}]: ${d}`);
+    }
+  }
+  // Gray stays gray at any angle.
+  for (const deg of [30, 90, 180, 270]) {
+    const r = applyMat3([...hueRotateMatrix(deg)], [0.5, 0.5, 0.5]);
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs(r[i] - 0.5) < 1e-6, `gray @${deg}deg ch${i}`);
   }
 });
 
