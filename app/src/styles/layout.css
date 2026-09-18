@@ -181,6 +181,10 @@
 .palette-switch { display: inline-flex; align-items: center; gap: 3px; flex-wrap: nowrap; }
 .palette-save-btn { flex-shrink: 0; }
 .palette-switch-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; margin-right: 3px; }
+/* #278 — VJ MIX slider: lives inside the palette switcher, no new panel. */
+.palette-mix { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; flex-shrink: 0; }
+.palette-mix-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; }
+.palette-mix-slider { width: 90px; }
 .palette-chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 5px;

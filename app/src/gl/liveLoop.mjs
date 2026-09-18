@@ -28,6 +28,7 @@
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
+import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -77,6 +78,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
 
   let live = createLiveRenderer(canvas);
   const resolver = createLiveResolver();
+  // #278 — VJ MIX: palette crossfade state machine (pure) + the last
+  // presented frame's target (the outgoing deck snapshot source).
+  const paletteMix = createPaletteMix();
+  let lastFrameTarget = null;
 
   // #263 — WebGL context loss. The browser fires webglcontextlost when the
   // GPU session dies (tab backgrounded too long, driver hiccup, GPU reset);
@@ -122,6 +127,11 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     accumActive = false;
     accumRetryAt = 0;
     gpuTimer = null;
+    // #278 — the old GPU session is dead, including any held dissolve deck:
+    // cancel the mix so the next palette update hard-cuts instead of
+    // compositing against a dead target.
+    lastFrameTarget = null;
+    paletteMix.cancel();
     // #266: a fresh GPU session — don't carry the dead session's bake
     // failure streak / retry backoff into the rebake.
     bakeConsecFails = 0;
@@ -288,6 +298,24 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const life = lifeRef?.current || {};
     const layoutParams = s.layoutParams || {};
 
+    // #278 — VJ MIX: detect palette changes once per frame and drive the
+    // crossfade state machine. On a fresh 'start' the outgoing deck is
+    // snapshotted from the last presented frame BEFORE anything renders
+    // the incoming palette; a retargeted switch re-uses the original held
+    // frame (DJ re-base) so rapid switches converge without stacking.
+    const mixEv = paletteMix.update({
+      id: s.paletteId,
+      overrides: s.paletteOverrides,
+      userPalettes: s.userPalettes,
+      mixSeconds: s.paletteMixSeconds,
+      now: performance.now(),
+      canDissolve: frameCount > 0 && !!lastFrameTarget && !contextDown,
+      bakeReady: !building && !!cells,
+    });
+    if (mixEv.kind === 'start' && !mixEv.retarget) {
+      if (!live.snapshotHoldFrame(lastFrameTarget)) paletteMix.cancel();
+    }
+
     const resolved = resolver.resolveLayers({
       layers: s.layers,
       activeLayerId: s.activeLayerId,
@@ -417,6 +445,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       audioOn: !!s.audioEnabled,
       glow: life.glow ?? 0,
       paused: !s.running,
+      // #278 — eased dissolve factor for this frame (null when no dissolve
+      // is running: render + present the incoming palette directly).
+      mix: mixEv.kind === 'mix' ? mixEv.t : null,
     };
   }
 
@@ -468,6 +499,28 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     }
   }
 
+  // #278 — VJ MIX render helper. Renders the incoming palette, then
+  // dissolves it over the held outgoing deck while a palette crossfade
+  // runs. The mixed frame feeds ACCUM / present exactly like a normal
+  // frame, so trails stay coherent and the governor sees honest per-frame
+  // cost. Defined once per loop (not per tick): no per-frame allocation.
+  function renderMixedFrame(payload, useTransparent, mix) {
+    const toTarget = live.renderFrame(payload, { transparent: useTransparent });
+    let outTarget = toTarget;
+    if (typeof mix === 'number') {
+      const { target: mixed, resized } = live.mixWithHold(toTarget, mix);
+      if (resized) {
+        // Deck targets reallocated mid-dissolve (render size changed) —
+        // the held frame is blank; cancel rather than dissolve black.
+        paletteMix.cancel();
+      } else {
+        outTarget = mixed;
+      }
+    }
+    lastFrameTarget = outTarget;
+    return outTarget;
+  }
+
   function tick() {
     if (!running) return;
     rafId = requestAnimationFrame(tick);
@@ -483,7 +536,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       const frame = buildFrame();
       if (!frame) return; // static bake in flight — hold last frame
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, glow, paused } = frame;
+      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, glow, paused, mix } = frame;
 
       if (paused) return; // hold the last presented frame
 
@@ -532,7 +585,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
                 accumObj = fresh;
                 accumObj.begin(bgCss);
               }
-              const target = live.renderFrame(payload, { transparent: true });
+              const target = renderMixedFrame(payload, true, mix);
               const bands = audioBands || { rms: 0, beatPulse: 0 };
               // Silence is a true no-op: the envelope passes params through at 0.
               const rp = applyAudioEnvelope(accumRecipeParams(accumParams), {
@@ -546,12 +599,12 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
             } catch (e) {
               noteAccumFault(e);
               // Fall back to plain rendering so the canvas keeps moving.
-              const target = live.renderFrame(payload, { transparent });
+              const target = renderMixedFrame(payload, transparent, mix);
               live.present(target);
             }
           } else {
             // ACCUM unavailable this frame (enable failed or cooling down).
-            const target = live.renderFrame(payload, { transparent });
+            const target = renderMixedFrame(payload, transparent, mix);
             live.present(target);
           }
         } else {
@@ -566,7 +619,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
             accumFrozen = false;
           }
           lastAccumOn = false;
-          const target = live.renderFrame(payload, { transparent });
+          const target = renderMixedFrame(payload, transparent, mix);
           live.present(target);
         }
       } finally {
@@ -675,6 +728,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     stop();
     canvas.removeEventListener('webglcontextlost', onCtxLost);
     canvas.removeEventListener('webglcontextrestored', onCtxRestored);
+    paletteMix.cancel();
+    lastFrameTarget = null;
     resolver.dispose();
     live.dispose();
   }

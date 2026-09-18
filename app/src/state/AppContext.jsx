@@ -93,6 +93,7 @@ export function useApp(selector) {
       case A.SET_PALETTE_BG: return store.setPaletteBg(payload);
       case A.SET_PALETTE_INK: return store.setPaletteInk(payload);
       case A.CLEAR_PALETTE_OVERRIDES: return store.clearPaletteOverrides();
+      case A.SET_PALETTE_MIX: return store.setPaletteMixSeconds(payload);
       case A.SET_LAYOUT_PARAM: return store.setLayoutParam(action.key, action.value);
       case A.SET_LAYOUT_PARAMS: return store.setLayoutParams(payload);
       case A.APPLY_PRESET: return store.applyPreset(action.preset);

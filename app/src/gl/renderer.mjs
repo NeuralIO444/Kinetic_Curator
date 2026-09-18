@@ -631,7 +631,7 @@ function createRendererBase(canvas, { alpha = false } = {}) {
   return {
     gl, canvas, bridge, progs, U, bindTex, drawFullscreen,
     composite, drawInstances, instanceData, renderLayerInstances,
-    uploadStatic, freeStatic, allocFrameTargets, freeFrameTargets,
+    uploadStatic, freeStatic, makeTarget, allocFrameTargets, freeFrameTargets,
     renderFrameInto, resolveTargetToBytes, disposeBase,
   };
 }
@@ -896,6 +896,82 @@ export function createLiveRenderer(canvas) {
     }
   }
 
+  // #278 — VJ MIX palette crossfade decks. holdT keeps the outgoing
+  // palette's last rendered frame (snapshotted once per dissolve);
+  // mixT receives the dissolved output each frame. Both are 16F like the
+  // main ping-pong, allocated lazily at the live render size and REUSED
+  // across dissolves — no per-dissolve allocation, no per-frame allocation.
+  // (One 16F target ≈ 5.6MB at 1000×700; the pair is ~11MB.)
+  let holdT = null, mixT = null, mixW = 0, mixH = 0;
+  let compU = null;
+  const getCompU = () => {
+    if (!compU) {
+      const p = b.progs.composite;
+      compU = {
+        u_src: b.U(p, 'u_src'), u_dst: b.U(p, 'u_dst'),
+        u_blend: b.U(p, 'u_blend'), u_opacity: b.U(p, 'u_opacity'),
+        u_clip: b.U(p, 'u_clip'), u_clipOn: b.U(p, 'u_clipOn'),
+        u_mask: b.U(p, 'u_mask'), u_maskOn: b.U(p, 'u_maskOn'),
+        u_maskMode: b.U(p, 'u_maskMode'), u_maskInvert: b.U(p, 'u_maskInvert'),
+        u_hueOn: b.U(p, 'u_hueOn'), u_hueMat: b.U(p, 'u_hueMat'),
+      };
+    }
+    return compU;
+  };
+  /** Ensure the deck targets match the live render size. Returns true when (re)allocated. */
+  function ensureMixTargets(w, h) {
+    if (holdT && mixW === w && mixH === h) return false;
+    dropMixTargets();
+    holdT = b.makeTarget(gl, w, h, true);
+    mixT = b.makeTarget(gl, w, h, true);
+    mixW = w; mixH = h;
+    return true;
+  }
+  function dropMixTargets() {
+    for (const t of [holdT, mixT]) {
+      if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+    }
+    holdT = null; mixT = null; mixW = 0; mixH = 0;
+  }
+  /**
+   * Snapshot a rendered frame as the dissolve's outgoing deck. Must be
+   * called BEFORE the next renderFrameInto (which ping-pongs over the
+   * live targets). Returns false when there is nothing valid to hold.
+   */
+  function snapshotHoldFrame(srcTarget) {
+    try {
+      if (!srcTarget || !srcTarget.tex || !srcTarget.fb) return false;
+      ensureMixTargets(TW, TH);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, holdT.fb);
+      gl.viewport(0, 0, mixW, mixH);
+      gl.disable(gl.BLEND);
+      gl.useProgram(b.progs.copy);
+      gl.uniform1i(b.U(b.progs.copy, 'u_src'), b.bindTex(0, srcTarget.tex));
+      b.drawFullscreen(b.progs.copy);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Dissolve the incoming frame (srcTarget) over the held outgoing deck.
+   * t=0 shows the held frame, t=1 the incoming frame — a normal 'over'
+   * composite with opacity=t. Returns { target, resized }: resized is true
+   * when the deck targets had to be reallocated this call (the held frame
+   * is blank) — the caller must cancel the dissolve, never composite
+   * against it.
+   */
+  function mixWithHold(srcTarget, t) {
+    const resized = ensureMixTargets(TW, TH);
+    const e = Math.min(1, Math.max(0, Number(t) || 0));
+    b.composite(
+      b.progs.composite, getCompU(), srcTarget.tex, holdT, mixT,
+      blendIdFor('normal'), e, null,
+    );
+    return { target: mixT, resized };
+  }
+
   // #267: dedicated offscreen targets for captures. A capture renders the
   // scene contract at the requested size into its own target set — the live
   // canvas and the shared live targets T are never touched, so the visible
@@ -933,6 +1009,7 @@ export function createLiveRenderer(canvas) {
 
   function dispose() {
     dropAccum();
+    dropMixTargets();
     if (atlasTex) gl.deleteTexture(atlasTex);
     for (const t of Object.values(grainTexs)) gl.deleteTexture(t);
     if (T) b.freeFrameTargets(T);
@@ -945,6 +1022,7 @@ export function createLiveRenderer(canvas) {
     hasAtlas: () => !!atlasTex,
     renderFrame, renderFrameOffscreen, present, presentUpscaled, readback,
     ensureAccum, dropAccum,
+    snapshotHoldFrame, mixWithHold, dropMixTargets,
     getGL: () => gl,
     getBridge: () => bridge,
     dispose,
