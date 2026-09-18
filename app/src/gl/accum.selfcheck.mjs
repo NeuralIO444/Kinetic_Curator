@@ -151,10 +151,19 @@ ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () =>
   // modulated value, so audio genuinely swells the blur/bloom/halation.
   const glowBase = accumRecipeParams({ fade: 0.9, optics: 0.2 });
   const glowLoud = applyAudioEnvelope(glowBase, { rms: 1, flux: 0, beatPulse: 0 });
-  assert.equal(glowLoud.optics, 0.5, 'optics modulates');
-  assert.equal(glowLoud.bloomAmount, 0.55 * 0.5, 'bloomAmount recomputes from modulated optics');
-  assert.equal(glowLoud.halationSigma, 22.0 * (0.5 + 0.5), 'halationSigma recomputes');
-  assert.equal(glowLoud.frameBlurSigma, 5.0 * 0.5, 'frameBlurSigma recomputes');
+  // #273: headroom-relative — optics 0.2 + 0.8 headroom * 0.3 gesture = 0.44
+  assert.equal(glowLoud.optics, 0.44, 'optics modulates within headroom');
+  assert.equal(glowLoud.bloomAmount, 0.55 * 0.44, 'bloomAmount recomputes from modulated optics');
+  assert.equal(glowLoud.halationSigma, 22.0 * (0.5 + 0.44), 'halationSigma recomputes');
+  assert.equal(glowLoud.frameBlurSigma, 5.0 * 0.44, 'frameBlurSigma recomputes');
+  // Audio can never peg GLOW: loud rms + beatPulse on a high slider swells
+  // toward the ceiling instead of clamping at 1; the slider keeps authority.
+  const highGlow = applyAudioEnvelope(accumRecipeParams({ optics: 0.8 }), { rms: 1, flux: 0, beatPulse: 1 });
+  assert.ok(Math.abs(highGlow.optics - 0.88) < 1e-12, 'loud audio on optics 0.8 -> 0.88, not pegged');
+  const maxGlow = applyAudioEnvelope(accumRecipeParams({ optics: 1 }), { rms: 1, flux: 0, beatPulse: 1 });
+  assert.equal(maxGlow.optics, 1, 'optics 1 stays 1, never exceeds the slider');
+  const lowGlow = applyAudioEnvelope(accumRecipeParams({ optics: 0 }), { rms: 1, flux: 0, beatPulse: 0 });
+  assert.ok(Math.abs(lowGlow.optics - 0.3) < 1e-12, 'gesture keeps full strength at optics 0');
 });
 
 ok('sanitizeAudioSample clamps rms, flux, beatPulse', () => {

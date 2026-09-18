@@ -130,7 +130,7 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
  *
  * Modulation (documented in docs/ACCUM.md):
  *   keep   += 0.08*rms + 0.04*flux            (clamped <= 0.99)
- *   optics += 0.3*rms + 0.1*beatPulse         (clamped <= 1)
+ *   optics += (1 - optics) * (0.3*rms + 0.1*beatPulse)   (headroom-relative)
  *   tunnel / prism amounts scale x (1 + 2*rms + flux + beatPulse)
  */
 export function applyAudioEnvelope(p, a = {}) {
@@ -143,9 +143,13 @@ export function applyAudioEnvelope(p, a = {}) {
   return {
     ...p,
     keep: Math.min(0.99, p.keep + 0.08 * r + 0.04 * x),
+    // #273: optics modulation is headroom-relative — audio swells the glow
+    // toward the slider's ceiling instead of adding past it, so loud audio
+    // can never peg GLOW at 1. The gesture keeps its full strength at
+    // optics = 0 and tapers as the slider rises; the slider keeps authority.
     // Optics is one amount driving blur + bloom + halation: recompute every
     // derived field so the glow genuinely swells with the music.
-    ...opticsDerived(Math.min(1, p.optics + 0.3 * r + 0.1 * b)),
+    ...opticsDerived(clamp01(p.optics + (1 - p.optics) * (0.3 * r + 0.1 * b))),
     tunnelZoom: 1 + (p.tunnelZoom - 1) * stretch,
     tunnelSpin: p.tunnelSpin * stretch,
     prismUv: p.prismUv * stretch,
