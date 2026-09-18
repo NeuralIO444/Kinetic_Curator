@@ -147,10 +147,15 @@ def under(base: Path, *parts: str) -> Path:
 
 
 def clamp_fade(fade) -> float:
+    # #274: accumulationFade is stored as trail half-life in frames (1-40).
+    # Values > 1 are half-life frames -> keep = 0.5^(1/hl); values <= 1 are
+    # legacy keep factors from pre-#274 project docs (max was 0.99).
     try:
         n = float(fade)
     except (TypeError, ValueError):
         return DEFAULT_ACCUM_FADE
+    if n > 1:
+        return max(0.0, min(0.99, 0.5 ** (1.0 / n)))
     return max(0.0, min(0.99, n))
 
 

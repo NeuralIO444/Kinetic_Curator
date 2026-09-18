@@ -386,8 +386,11 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       accumOn: !!layoutParams.accumulation && !s.perfTier1,
       accumFrozen,
       accumParams: {
-        // #268: SWELL breathes the fade toward near-infinite trails and back.
-        fade: layoutParams.accumulationFade + swellEnvelope() * (0.995 - (layoutParams.accumulationFade ?? 0.88)),
+        // #274: fade is trail half-life in frames — convert to keep at the
+        // boundary. #268: SWELL breathes the half-life toward 40 frames and
+        // back on a timestamped envelope, so it can't stick at full swell.
+        fade: halfLifeToKeep((layoutParams.accumulationFade ?? 5.4)
+          + swellEnvelope() * (40 - (layoutParams.accumulationFade ?? 5.4))),
         optics: layoutParams.accumulationOptics,
         tunnel: layoutParams.accumulationTunnel,
         prism: layoutParams.accumulationPrism,
@@ -529,9 +532,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
             live.dropAccum();
             accumObj = null;
             accumActive = false;
-            // #268: the session ended — the loop's frozen copy must reset with
-            // it, or re-enabling ACCUM shows no trails while the panel reads
-            // inactive (the two-press FREEZE trap).
+            // #268: the session ended — reset the loop's own frozen flag
+            // (not the frame's read-only copy), or re-enabling ACCUM shows
+            // no trails while the panel reads inactive (two-press FREEZE trap).
             accumFrozen = false;
           }
           lastAccumOn = false;

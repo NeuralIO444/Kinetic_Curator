@@ -1,8 +1,14 @@
 // RangeRow — slider with lock, dice, click-to-type readout, optional hint tooltip
 import { useState, useRef, useEffect } from 'react';
+import { getTaper } from './taper.js';
 
 export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange, readout,
-  defaultValue, locked, onToggleLock, onRandomize, hint }) {
+  defaultValue, locked, onToggleLock, onRandomize, hint, taper, taperOpts }) {
+  // #274: an optional response curve. The slider works in 0..1 space and the
+  // taper maps it to physical units at the panel→state boundary; stored
+  // params stay physical, so the same stored value renders identically.
+  // Click-to-type and double-click reset still speak physical units.
+  const t = taper ? getTaper(taper, { min, max, ...(taperOpts || {}) }) : null;
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef(null);
@@ -47,9 +53,9 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
       <input
         type="range"
         className="single-slider"
-        min={min} max={max} step={step}
-        value={value}
-        onChange={e => onChange(Number(e.target.value))}
+        min={t ? 0 : min} max={t ? 1 : max} step={t ? 0.01 : step}
+        value={t ? t.toSlider(value) : value}
+        onChange={e => onChange(t ? t.toParam(Number(e.target.value)) : Number(e.target.value))}
         onDoubleClick={handleDoubleClick}
         disabled={locked}
         title={hint}

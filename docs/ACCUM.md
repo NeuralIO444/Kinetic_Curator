@@ -41,7 +41,8 @@ ping-pong, NEAREST):
 1. **Feed** (Phase B2) — flow-advected feedback: the buffer is sampled at
    `uv + flowVec(uv) * strength` through an in-shader value-noise field, so
    trails curl as they decay. Skipped at flow = 0 (exact old buffer).
-2. **Fade/decay** — `accum.rgb *= keep` (keep = FADE, 0..0.99), sampled
+2. **Fade/decay** — `accum.rgb *= keep` (keep = 0.5^(1/FADE), where FADE
+   is the slider's trail half-life in frames, 1..40 — #274 taper), sampled
    through the Phase A feedback transform (tunnel zoom/spin, prism drift).
 3. **Blur-over-time** (#169) — the incoming frame is blurred with a small
    separable gaussian (σ = 5px × optics) *before* compositing, so old marks

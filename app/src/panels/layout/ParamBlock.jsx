@@ -64,8 +64,9 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         readout={`${layoutParams.hueRotate}°`} onChange={v => set('hueRotate', v)} defaultValue={0} />
 
       <div className="param-subheader">🌪️ TURBULENCE & DISPLACEMENT</div>
-      <RangeRow label="NOISE FREQ" value={layoutParams.noiseFreq} min={0.001} max={0.03} step={0.001}
-        hint="Spatial frequency of the fractal noise field"
+      <RangeRow label="NOISE FREQ" value={layoutParams.noiseFreq} min={0.001} max={0.03}
+        taper="exponential"
+        hint="Exponential response — the low end is where the long wavelengths live"
         onChange={v => set('noiseFreq', v)} defaultValue={d('noiseFreq', DEFAULT_LAYOUT_PARAMS.noiseFreq)}
         locked={lockedParams.noiseFreq} onToggleLock={() => lock('noiseFreq')}
         onRandomize={() => rand('noiseFreq')} />
@@ -74,8 +75,9 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         onChange={v => set('noiseSpeed', v)} defaultValue={d('noiseSpeed', DEFAULT_LAYOUT_PARAMS.noiseSpeed)}
         locked={lockedParams.noiseSpeed} onToggleLock={() => lock('noiseSpeed')}
         onRandomize={() => rand('noiseSpeed')} />
-      <RangeRow label="DISPLACE" value={layoutParams.displacement} min={0} max={250} step={1}
-        hint="Fractal noise warping of placement positions"
+      <RangeRow label="DISPLACE" value={layoutParams.displacement} min={0} max={250}
+        taper="softKnee" taperOpts={{ knee: 120, max: 250 }}
+        hint="Soft-capped around 120 — the top end is reachable deliberately, in the last quarter of travel"
         onChange={v => set('displacement', v)} defaultValue={d('displacement', DEFAULT_LAYOUT_PARAMS.displacement)}
         locked={lockedParams.displacement} onToggleLock={() => lock('displacement')}
         onRandomize={() => rand('displacement')} />

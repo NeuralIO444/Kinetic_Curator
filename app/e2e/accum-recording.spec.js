@@ -3,9 +3,10 @@
 // What this proves (and how): two REAL WebM recordings are made through the
 // app's own REC button (canvas.captureStream -> MediaRecorder -> blob), then
 // decoded frame-by-frame in the page. The ONLY difference between the two
-// recordings is the ACCUM fade parameter (0.88 vs 0.98). The ACCUM feedback
-// recipe multiplies the trail buffer by `fade` every step, so bright trails
-// visibly decay frame-to-frame at 0.88 and barely change at 0.98. A large
+// recordings is the ACCUM fade parameter — trail half-life in frames
+// (#274 taper: 5 vs 34 frames). The ACCUM feedback recipe multiplies the
+// trail buffer by keep = 0.5^(1/halfLife) every step, so bright trails
+// visibly decay frame-to-frame at 5 frames and barely change at 34. A large
 // differential in mean consecutive-frame difference therefore proves the
 // recorded stream carries the live trail buffer — not just that
 // captureStream() was called.
@@ -121,24 +122,24 @@ test('REC WebM records the ACCUM trail buffer (fade differential)', async ({ pag
   test.setTimeout(150_000);
   await installBlobTap(page);
 
-  const hi = await recordWebM(page, 0.88, 10);
+  const hi = await recordWebM(page, 5, 10);
   expect(hi.type).toMatch(/webm/);
   expect(hi.size).toBeGreaterThan(10_000);
   const hiStats = await analyzeWebM(page);
-  await testInfo.attach('rec-fade-0.88.webm', { body: hi.buffer, contentType: 'video/webm' });
+  await testInfo.attach('rec-fade-5f.webm', { body: hi.buffer, contentType: 'video/webm' });
 
-  const lo = await recordWebM(page, 0.98, 10);
+  const lo = await recordWebM(page, 34, 10);
   expect(lo.type).toMatch(/webm/);
   expect(lo.size).toBeGreaterThan(10_000);
   const loStats = await analyzeWebM(page);
-  await testInfo.attach('rec-fade-0.98.webm', { body: lo.buffer, contentType: 'video/webm' });
+  await testInfo.attach('rec-fade-34f.webm', { body: lo.buffer, contentType: 'video/webm' });
 
   // Both recordings must contain a real frame sequence.
   expect(hiStats.frames).toBeGreaterThanOrEqual(6);
   expect(loStats.frames).toBeGreaterThanOrEqual(6);
 
   // The trail buffer's per-frame fade is the dominant frame-to-frame change
-  // at 0.88; at 0.98 the same trails barely decay. Only the ACCUM fade
+  // at 5 frames; at 34 the same trails barely decay. Only the ACCUM fade
   // differs between the two recordings, so this differential is the trail
   // buffer's signature inside the recorded stream.
   expect(hiStats.meanDiff).toBeGreaterThan(5);

@@ -58,7 +58,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   paletteShift: 'auto',
 
   accumulation: false,
-  accumulationFade: 0.88,
+  accumulationFade: 5.4, // #274: trail half-life in frames (was keep 0.88)
   accumulationOptics: 0, // #190: bloom + halation + blur-over-time amount (GLOW slider)
   accumulationTunnel: 0, // Phase A: feedback zoom/spin amount (TUNNEL slider)
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
@@ -129,7 +129,7 @@ export const PARAM_SPEC = {
   flap: { min: 0, max: 1 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
-  accumulationFade: { min: 0.5, max: 0.99 },
+  accumulationFade: { min: 1, max: 40 }, // #274: half-life frames
   accumulationOptics: { min: 0, max: 1 },
   accumulationTunnel: { min: 0, max: 1 },
   accumulationPrism: { min: 0, max: 1 },
