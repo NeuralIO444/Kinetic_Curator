@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "seed": 13,
+  "paletteId": "neon-brood",
+  "layoutParams": {
+    "mode": "hype",
+    "count": 240,
+    "scale": [
+      0.5,
+      1.4
+    ],
+    "rotate": [
+      -70,
+      70
+    ],
+    "alpha": [
+      40,
+      100
+    ],
+    "zTiers": 4,
+    "jitter": 14,
+    "density": 85,
+    "bleed": true,
+    "recolor": true,
+    "mirror": false,
+    "overlap": true,
+    "lifeDrift": 0.2,
+    "displacement": 20,
+    "behave": "scatter",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "org_blob_01": true,
+    "org_blob_02": true,
+    "dot_field_01": true,
+    "dot_confetti_02": true
+  },
+  "layers": [
+    {
+      "id": "neon-brood-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "neon-brood-main"
+}

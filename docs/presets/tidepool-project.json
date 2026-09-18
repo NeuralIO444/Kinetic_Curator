@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "seed": 123,
+  "paletteId": "tidepool",
+  "layoutParams": {
+    "mode": "stratified",
+    "count": 380,
+    "scale": [
+      0.3,
+      1
+    ],
+    "rotate": [
+      -25,
+      25
+    ],
+    "alpha": [
+      48,
+      98
+    ],
+    "zTiers": 5,
+    "jitter": 8,
+    "density": 90,
+    "bleed": false,
+    "recolor": true,
+    "mirror": true,
+    "overlap": true,
+    "lifeDrift": 0.14,
+    "displacement": 6,
+    "behave": "cruise",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "org_petal_03": true,
+    "flora_sprig_01": true,
+    "flora_bud_01": true,
+    "dot_field_05": true
+  },
+  "layers": [
+    {
+      "id": "tidepool-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "tidepool-main"
+}

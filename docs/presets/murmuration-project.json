@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "seed": 7,
+  "paletteId": "murmuration",
+  "layoutParams": {
+    "mode": "swarm",
+    "count": 300,
+    "scale": [
+      0.3,
+      0.9
+    ],
+    "rotate": [
+      -30,
+      30
+    ],
+    "alpha": [
+      50,
+      100
+    ],
+    "zTiers": 5,
+    "jitter": 16,
+    "density": 88,
+    "bleed": true,
+    "recolor": true,
+    "mirror": false,
+    "overlap": true,
+    "particleCount": 280,
+    "swarmCohesion": 1.5,
+    "damping": 0.96,
+    "gravityWells": 0.4,
+    "lifeDrift": 0.12,
+    "displacement": 10,
+    "behave": "flock",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "org_blob_04": true,
+    "org_blob_05": true,
+    "dot_single_01": true,
+    "dot_confetti_01": true
+  },
+  "layers": [
+    {
+      "id": "murmuration-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "murmuration-main"
+}
