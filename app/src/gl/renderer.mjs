@@ -33,11 +33,12 @@
  */
 
 import {
-  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, RESOLVE_FS, COPY_FS,
+  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, RESOLVE_FS, COPY_FS, UPSCALE_FS,
   blendIdFor,
 } from './shaders.mjs';
 import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
+import { attachVelocities } from './velocitySmear.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
@@ -186,7 +187,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -213,11 +214,30 @@ export const RENDERER_PROGRAMS = [
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
+  {
+    // #309: presents the half-res ACCUM feedback pair at backing size
+    // (manual bilinear upscale). Tier 0 structural plumbing, never shed.
+    key: 'upscale', name: 'upscale', vs: FULL_VS, fs: UPSCALE_FS,
+    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:UPSCALE_FS',
+    uniforms: ['u_src', 'u_srcSize'],
+    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed' },
+  },
 ];
 
 for (const def of RENDERER_PROGRAMS) {
   registerCostTier(`renderer/${def.key}`, def.cost);
 }
+
+/**
+ * #309 velocity smear amount (QUAD_VS u_smear = (k, max)): each scene-unit
+ * of per-frame velocity stretches the instance 6% along its own motion
+ * direction, capped at 2x length. Zero velocity is exactly the old path.
+ * Fixed recipe constants — no panel, no controls (issue #309 is NEEDS HIS
+ * EYES; Matt judges the amount on the live canvas).
+ */
+export const SMEAR_K = 0.06;
+export const SMEAR_MAX = 1.0;
 
 function createRendererBase(canvas, { alpha = false } = {}) {
   const gl = canvas.getContext('webgl2', {
@@ -331,6 +351,7 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
+    gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);
@@ -354,9 +375,13 @@ function createRendererBase(canvas, { alpha = false } = {}) {
   const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
 
   function instanceData(instances, cells, alphaScale = 1) {
-    // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0).
-    // The trailing pad keeps attribute 3's vec4 fetch inside the buffer —
-    // ANGLE/Metal raises INVALID_OPERATION for out-of-bounds attrib reads.
+    // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+    // (u1,v1,vx,vy). The last two floats carried padding zeros; #309 puts
+    // the per-frame velocity there (scene units/frame, 0 for static
+    // instances) — QUAD_VS stretches the quad along its own motion. The
+    // stride is unchanged, so attribute 3's vec4 fetch stays inside the
+    // buffer (ANGLE/Metal raises INVALID_OPERATION for out-of-bounds
+    // attrib reads).
     // alphaScale folds a group opacity into per-instance alpha (mask bakes, #189).
     const out = new Float32Array(instances.length * 12);
     instances.forEach((it, i) => {
@@ -368,6 +393,7 @@ function createRendererBase(canvas, { alpha = false } = {}) {
       out[o + 4] = it.rotation; out[o + 5] = it.opacity * alphaScale;
       out[o + 6] = cell.u0; out[o + 7] = cell.v0;
       out[o + 8] = cell.u1; out[o + 9] = cell.v1;
+      out[o + 10] = it.vx || 0; out[o + 11] = it.vy || 0;
     });
     return out;
   }
@@ -669,11 +695,15 @@ export function createRenderer(canvas) {
     try {
       accum.begin(background);
       const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w });
+      // #309 velocity smear: per-frame displacement per instance, attached
+      // as vx/vy — the stills/export path smears exactly like the live loop.
+      const velPrev = new Map();
       let i = 0;
       for (const payload of frames) {
         if (payload.contract.version !== 1) {
           throw new Error(`[gl] unsupported contract version ${payload.contract.version}`);
         }
+        attachVelocities(payload.contract.instances, velPrev);
         // Transparent: accum.begin() owns the opaque project background.
         const frameT = renderFrameInto(payload, T, uploaded, { transparent: true });
         // B1: per-frame audio envelope modulates the recipe params.
@@ -766,7 +796,9 @@ export function createLiveRenderer(canvas) {
     // The bridge allocates its FBOs at W×DPR internally (targetSize), so
     // passing the DPR here keeps its layers in sync with the targets.
     bridge.resize(w, h, dprScale);
-    if (accum) accum.resize(bw, bh);
+    // #309: the ACCUM feedback pair runs at LOGICAL size (resDiv), so it
+    // resizes with the logical dimensions, not the backing store.
+    if (accum) accum.resize(w, h);
   }
 
   function setAtlas(pixels, w, h, mipmaps) {
@@ -812,6 +844,28 @@ export function createLiveRenderer(canvas) {
   }
 
   /**
+   * Present a smaller target — the half-res ACCUM feedback pair (#309) —
+   * to the visible canvas. The pair is NEAREST-filtered, so it is upscaled
+   * with the manual-bilinear upscale pass (soft, not blocky) into a
+   * backing-size scratch target, then presented through the normal Y-flip
+   * resolve path. T.mainA is the scratch: renderFrameInto() overwrites it
+   * every frame, so there is no cross-frame state.
+   */
+  function presentUpscaled(target) {
+    if (!T) { present(target); return; } // degenerate: no live targets yet
+    const up = b.progs.upscale;
+    const dst = T.mainA;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb);
+    gl.viewport(0, 0, dst.w, dst.h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(up);
+    gl.uniform1i(b.U(up, 'u_src'), b.bindTex(0, target.tex));
+    gl.uniform2f(b.U(up, 'u_srcSize'), target.w, target.h);
+    b.drawFullscreen(up);
+    present(dst);
+  }
+
+  /**
    * GPU readback of a composited target: resolves through RESOLVE_FS into
    * the persistent outT (top-first), then readPixels. Safe with
    * preserveDrawingBuffer:false — never reads the default framebuffer.
@@ -821,9 +875,17 @@ export function createLiveRenderer(canvas) {
   }
 
   /** Lazily create (and keep) the ACCUM feedback pair at the render size. */
+  let accumDprScale = 1; // the dprScale the feedback pair was built for
   function ensureAccum(w, h, dprScale = liveDisplayScale()) {
+    // #309: the feedback pair runs at logical size (resDiv = dprScale). A
+    // dprScale change (window moved across monitors) rebuilds the pair at
+    // the new ratio — the caller re-begins it, so trails restart cleanly.
+    if (accum && accumDprScale !== dprScale) dropAccum();
     ensureTargets(w, h, dprScale);
-    if (!accum) accum = createAccum(gl, bridge, { width: TW, height: TH });
+    if (!accum) {
+      accum = createAccum(gl, bridge, { width: w, height: h, resDiv: dprScale });
+      accumDprScale = dprScale;
+    }
     return accum;
   }
 
@@ -881,7 +943,7 @@ export function createLiveRenderer(canvas) {
   return {
     setAtlas, setGrainLuts,
     hasAtlas: () => !!atlasTex,
-    renderFrame, renderFrameOffscreen, present, readback,
+    renderFrame, renderFrameOffscreen, present, presentUpscaled, readback,
     ensureAccum, dropAccum,
     getGL: () => gl,
     getBridge: () => bridge,

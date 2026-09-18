@@ -248,3 +248,36 @@ the recipe runs on rendered frames, never inside `evaluate()`.
 - `node src/gl/accumStill.mjs <project> --out t.png --steps 24 --flow 0.6 --echoes 2 --audio env.json`
   renders a Phase B still: flow-advected trails, 2 echo taps, audio-modulated
   fade/glow (see "Audio envelope sidecar" above for the env.json format).
+
+## #309 — half-res feedback + velocity smear (the trail system)
+
+Two changes, one idea: the trails stop being a fullscreen post-process and
+live on the objects, at half the pixels.
+
+**Half-res feedback pair.** The ACCUM ping-pong now runs at the composition
+size, not the backing-store size. On the live instrument the bridge renders
+at `dprScale` (up to 2 on retina), so the pair is half-resolution per axis —
+a quarter of the pixels for every fullscreen pass in the recipe. The
+incoming frame is resampled down to the pair's size first (manual bilinear
+in `RESAMPLE_FS`, exact for any dprScale including fractional), and the
+pair is upscaled for presentation (`UPSCALE_FS`, manual bilinear — soft,
+not blocky). Stills/exports request their size at dpr 1, so the pair is
+exactly the requested size there — no export quality change.
+
+Echoes are untouched: same taps, same weights, same mix — they just run on
+the pair-sized frame like everything else in the recipe.
+
+**Velocity smear.** Each instance's per-frame displacement (scene units) is
+tracked across frames — keyed on the contract's stable `layer|key` — and
+packed into the instance buffer's two spare floats. `QUAD_VS` stretches each
+quad along its own motion direction (6% per scene-unit of velocity, capped
+at 2x length). Zero fullscreen passes; at rest the shader is exactly the
+old path, so plain (non-ACCUM) rendering is pixel-identical. First
+sightings get zero velocity and teleports/layout jumps clamp, so there are
+no one-frame pops. The live loop and `renderAccumSequence` share the same
+bookkeeping (`src/gl/velocitySmear.mjs`), so live and export smear alike.
+
+The smear amount is a fixed recipe constant (`SMEAR_K`/`SMEAR_MAX` in
+`renderer.mjs`) — deliberately no panel, no slider. The half-res softness
+and the smear amount are the two things Matt's eyes need to judge, which is
+why the work PR is marked NEEDS HIS EYES.

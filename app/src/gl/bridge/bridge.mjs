@@ -194,14 +194,36 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     return effects.has(kind);
   }
 
-  /** Per-layer ping-pong targets (bridge-owned). Callers fold layer content into these. */
-  function layer(id) {
+  /**
+   * Per-layer ping-pong targets (bridge-owned). Callers fold layer content into these.
+   *
+   * opts.div — resolution divisor for the pair (default 1): the targets are
+   * allocated at targetSize/div instead of targetSize. #309: the ACCUM feedback
+   * pair runs at logical size, so it passes div = dprScale; every other caller
+   * omits it and keeps the old full-backing behavior. The divisor is
+   * remembered on the layer record and re-applied by resize(); a div change
+   * reallocates the pair.
+   */
+  function layer(id, { div = 1 } = {}) {
     let L = layers.get(id);
     const { w, h } = targetSize();
+    // The divisor is exact (fractional dprScale allowed): the pair lands
+    // within a pixel of targetSize/div, and the callers that need exactness
+    // (the #309 resample/upscale) read the real target size.
+    const d = Math.max(1, div || 1);
+    const lw = Math.max(1, Math.round(w / d));
+    const lh = Math.max(1, Math.round(h / d));
     const maxPad = Math.max(0, ...[...effects.values()].map((e) => e.pad || 0));
     if (!L) {
-      L = { t0: allocTarget(w, h), t1: allocTarget(w, h), padT0: null, padT1: null, pad: 0 };
+      L = { t0: allocTarget(lw, lh), t1: allocTarget(lw, lh), padT0: null, padT1: null, pad: 0, div: d };
       layers.set(id, L);
+    } else if (L.div !== d || L.t0.w !== lw || L.t0.h !== lh) {
+      // Divisor change (or a size drift resize() hasn't seen) rebuilds the pair.
+      deleteTarget(gl, L.t0);
+      deleteTarget(gl, L.t1);
+      L.t0 = allocTarget(lw, lh);
+      L.t1 = allocTarget(lw, lh);
+      L.div = d;
     }
     if (maxPad > 0 && L.pad !== maxPad) {
       if (L.padT0) { deleteTarget(gl, L.padT0); deleteTarget(gl, L.padT1); }
@@ -323,11 +345,17 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     W = width; H = height; DPR = dpr;
     const { w, h } = targetSize();
     for (const L of layers.values()) {
+      // The pair honors the layer's resolution divisor (#309: the ACCUM
+      // feedback pair lives at logical size, div = dprScale); pads stay at
+      // full backing size as before.
+      const d = Math.max(1, L.div || 1);
+      const lw = Math.max(1, Math.round(w / d));
+      const lh = Math.max(1, Math.round(h / d));
       for (const key of ['t0', 't1']) {
         const t = L[key];
-        if (t.w !== w || t.h !== h) {
+        if (t.w !== lw || t.h !== lh) {
           deleteTarget(gl, t);
-          L[key] = allocTarget(w, h);
+          L[key] = allocTarget(lw, lh);
         }
       }
       if (L.padT0) {

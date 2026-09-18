@@ -304,8 +304,9 @@ ok('glow system: no gaussian survives anywhere in the ACCUM path (#308)', () => 
   // The module's whole contract: the blur passes are deleted (not
   // optimized, not hidden behind a quality flag), the audit table carries
   // glow instead of blur/add, and no shader source mentions a sigma.
+  // resample is #309's structural half-res plumbing, not a blur.
   const keys = Object.keys(ACCUM_PASS_SOURCES).sort();
-  assert.deepEqual(keys, ['copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over']);
+  assert.deepEqual(keys, ['copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
   for (const [name, src] of Object.entries(ACCUM_PASS_SOURCES)) {
     assert.ok(!/sigma/i.test(src), `accum-${name}: no sigma in the shader source`);
     assert.ok(!/gauss/i.test(src), `accum-${name}: no gaussian in the shader source`);
@@ -555,9 +556,9 @@ const parseShaderUniforms = (src) => {
   return names;
 };
 
-ok('harness: ACCUM_PROGRAMS covers all seven GPU programs', () => {
+ok('harness: ACCUM_PROGRAMS covers all eight GPU programs', () => {
   const keys = Object.keys(ACCUM_PROGRAMS).sort();
-  assert.deepEqual(keys, ['copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over']);
+  assert.deepEqual(keys, ['copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
   for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
     assert.equal(typeof def.fs, 'string', `${name}: has shader source`);
     assert.ok(def.fs.includes('void main'), `${name}: source is a shader`);
@@ -633,6 +634,7 @@ function makeMockGL() {
 
 function makeMockBridge(gl) {
   // Minimal bridge surface createAccum uses: lost flag + layer() targets.
+  // Honors the #309 resolution divisor (pair at base/div, like the real bridge).
   const layers = new Map();
   const allocTarget = (w, h) => {
     const tex = gl.createTexture();
@@ -653,9 +655,16 @@ function makeMockBridge(gl) {
   };
   return {
     lost: false,
-    layer(id) {
-      if (!layers.has(id)) layers.set(id, { t0: allocTarget(64, 40), t1: allocTarget(64, 40) });
-      return layers.get(id);
+    layer(id, { div = 1 } = {}) {
+      const d = Math.max(1, div || 1);
+      const key = `${id}/d${d}`;
+      if (!layers.has(key)) {
+        layers.set(key, {
+          t0: allocTarget(Math.round(64 / d), Math.round(40 / d)),
+          t1: allocTarget(Math.round(64 / d), Math.round(40 / d)),
+        });
+      }
+      return layers.get(key);
     },
   };
 }
@@ -701,6 +710,48 @@ ok('regression: step() still throws on an error from its own passes', () => {
   gl.getError = () => (++calls <= 1 ? gl.NO_ERROR : gl.INVALID_OPERATION);
   assert.throws(() => accum.step(frameTex, p), /GL error after step/,
     'genuine pass error still throws');
+  accum.dispose();
+});
+
+// --- #309: half-res ACCUM feedback pair -----------------------------------
+
+ok('#309: default resDiv keeps the full-size pair (unchanged behavior)', () => {
+  const gl = makeMockGL();
+  const bridge = makeMockBridge(gl);
+  const accum = createAccum(gl, bridge, { width: 64, height: 40 });
+  accum.begin('#000000');
+  const t = accum.texture();
+  assert.equal(t.w, 64, 'pair width');
+  assert.equal(t.h, 40, 'pair height');
+  accum.dispose();
+});
+
+ok('#309: resDiv=2 allocates the feedback pair at half size', () => {
+  const gl = makeMockGL();
+  const bridge = makeMockBridge(gl);
+  const accum = createAccum(gl, bridge, { width: 64, height: 40, resDiv: 2 });
+  accum.begin('#000000');
+  const t = accum.texture();
+  assert.equal(t.w, 32, 'pair width is half');
+  assert.equal(t.h, 20, 'pair height is half');
+  // step() runs the resample pass and returns the half-size target.
+  const frameTex = gl.createTexture();
+  const p = accumRecipeParams({ fade: 0.88, optics: 0, tunnel: 0, prism: 0 });
+  const out = accum.step(frameTex, p, { width: 64, height: 40 });
+  assert.equal(out.w, 32, 'step returns the half-size target');
+  assert.equal(out.h, 20);
+  accum.dispose();
+});
+
+ok('#309: resize keeps the divisor (pair stays half-size)', () => {
+  const gl = makeMockGL();
+  const bridge = makeMockBridge(gl);
+  const accum = createAccum(gl, bridge, { width: 64, height: 40, resDiv: 2 });
+  accum.begin('#000000');
+  accum.resize(64, 40);
+  const t = accum.texture();
+  assert.equal(t.w, 32, 'pair width still half after resize');
+  assert.equal(t.h, 20, 'pair height still half after resize');
   accum.dispose();
 });
 
@@ -1000,6 +1051,84 @@ async function runBrowserTests() {
       const dim = await renderAccumViaGL(frames, { width: 200, height: 140, fade: 0.5, optics: 0 });
       const bright = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2]; return s; };
       assert.ok(bright(pixels) > bright(dim.pixels), 'higher fade keeps brighter trails');
+    });
+
+    await okAsync('#309 e2e: velocity smear stretches instances along their motion', async () => {
+      // Two frames, one instance shifted +24u in x: the second frame's
+      // instance carries velocity (24, 0) -> smk = min(24*0.06, 1) = 1,
+      // so the quad doubles along x. fade ~0 kills the trails, leaving
+      // only the smeared frame; the plain single render is the control.
+      const { getScene } = await import('./parity/corpus.mjs');
+      const { buildSceneContract: bsc } = await import('./sceneContract.js');
+      const doc = getScene('single-basic').doc;
+      const rl = resolveLayers(doc, { caps, motion: 'auto', progress: 0.5 });
+      const c1 = bsc({ doc, resolvedLayers: rl, caps, accum: { enabled: true, fade: 0.9, optics: 0, background: '#000000' } });
+      const c2 = JSON.parse(JSON.stringify(c1));
+      for (const it of c2.instances) it.x += 24;
+      const seq = await renderAccumViaGL([c1, c2], { width: 200, height: 140, bg: '#000000', fade: 0.01, optics: 0 });
+      const single = await renderViaGL(c2, { width: 200, height: 140, bg: '#000000' });
+      // Inked-pixel count: every instance carries velocity (24, 0) ->
+      // smk = min(24*0.06, 1) = 1, so each quad doubles along x and the
+      // inked area grows ~2x. (Span is the wrong metric here: the scene's
+      // 27 instances spread over the canvas dominate the bounding box.)
+      const inked = (px) => {
+        let c = 0;
+        for (let i = 0; i < px.length; i += 4) {
+          if (px[i] + px[i + 1] + px[i + 2] > 30) c++;
+        }
+        return c;
+      };
+      const iSmeared = inked(seq.pixels);
+      const iPlain = inked(single.pixels);
+      assert.ok(iPlain > 0, 'control render has ink');
+      assert.ok(iSmeared > iPlain * 1.4,
+        `smeared inked pixels ${iSmeared} vs plain ${iPlain}`);
+    });
+
+    await okAsync('#309: resDiv=2 resample is the exact 2x2 box (real GPU)', async () => {
+      // 4x4 frame, 2x2 pair: each 2x2 quadrant is a solid color, so the
+      // resampled pair must equal the quadrant colors exactly.
+      const R = [255, 0, 0, 255], G = [0, 255, 0, 255];
+      const B = [0, 0, 255, 255], Wh = [255, 255, 255, 255];
+      const frame = [
+        R, R, G, G,
+        R, R, G, G,
+        B, B, Wh, Wh,
+        B, B, Wh, Wh,
+      ].flat(); // bottom-first rows
+      const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
+        w: 2, h: 2, resDiv: 2, bg: '#000000', fade: 0.9, optics: 0,
+        tunnel: 0, prism: 0, flow: 0, echoes: 0, echoWidth: 2,
+        frames: [frame],
+      });
+      assert.equal(res.width, 2);
+      assert.equal(res.height, 2);
+      const expected = [R, G, B, Wh].flat(); // bottom-first
+      assert.equal(res.pixels.length, expected.length);
+      for (let i = 0; i < expected.length; i++) {
+        assert.ok(Math.abs(res.pixels[i] - expected[i]) <= 1,
+          `byte ${i}: got ${res.pixels[i]}, want ${expected[i]}`);
+      }
+    });
+
+    await okAsync('#309: resample preserves a solid field at fractional resDiv', async () => {
+      // A constant frame must resample to the same constant at ANY factor —
+      // guards the u_srcSize plumbing for fractional dprScale.
+      const solid = [];
+      for (let i = 0; i < 6 * 6; i++) solid.push(200, 100, 50, 255);
+      const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
+        w: 4, h: 4, resDiv: 1.5, bg: '#000000', fade: 0.9, optics: 0,
+        tunnel: 0, prism: 0, flow: 0, echoes: 0, echoWidth: 4,
+        frames: [solid],
+      });
+      assert.equal(res.width, 4);
+      assert.equal(res.height, 4);
+      for (let i = 0; i < res.pixels.length; i += 4) {
+        assert.ok(Math.abs(res.pixels[i] - 200) <= 2, `r solid at ${i / 4}`);
+        assert.ok(Math.abs(res.pixels[i + 1] - 100) <= 2, `g solid at ${i / 4}`);
+        assert.ok(Math.abs(res.pixels[i + 2] - 50) <= 2, `b solid at ${i / 4}`);
+        assert.equal(res.pixels[i + 3], 255, `a solid at ${i / 4}`);
+      }
     });
   } finally {
     await close();
