@@ -189,6 +189,11 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     effects.set(kind, { pad: 0, ...def });
   }
 
+  /** Whether this bridge already has an effect kind wired (#263). */
+  function hasEffect(kind) {
+    return effects.has(kind);
+  }
+
   /** Per-layer ping-pong targets (bridge-owned). Callers fold layer content into these. */
   function layer(id) {
     let L = layers.get(id);
@@ -380,6 +385,7 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     version: BRIDGE_VERSION,
     registerProgram,
     defineEffect,
+    hasEffect,
     layer,
     runChain,
     resize,
