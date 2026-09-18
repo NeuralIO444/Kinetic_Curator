@@ -1,14 +1,10 @@
-// User palette library (#55) — save the palette you're working on, switch
-// back to it later, move it between machines as JSON.
-//
-// Deliberately NOT part of the project document: a project records which
-// palette it used, the library is the operator's own kit that outlives any
-// one project. Lives in its own localStorage key.
+// User palette library (#55) + palette FADE seconds (#278).
+// FADE is a feel pref, not project JSON.
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
+import { sanitizeMixSeconds, MIX_DEFAULT } from '../../gl/paletteMix.mjs';
 
 export const USER_PALETTES_KEY = 'kc:user-palettes:v1';
 
-/** Accept only well-formed entries — this data can come from a file. */
 export function sanitizePalette(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const swatches = Array.isArray(raw.swatches)
@@ -48,8 +44,10 @@ function persist(list) {
 
 export const createPaletteLibrarySlice = (set, get) => ({
   userPalettes: readStored(),
+  paletteMixSeconds: MIX_DEFAULT,
 
-  /** Snapshot the palette currently on screen (catalog + overrides) as a new entry. */
+  setPaletteMixSeconds: (v) => set({ paletteMixSeconds: sanitizeMixSeconds(v) }),
+
   saveUserPalette: (name) => set((state) => {
     const base = getCatalogPalette(state.paletteId, state.userPalettes);
     const o = state.paletteOverrides;
@@ -63,8 +61,6 @@ export const createPaletteLibrarySlice = (set, get) => ({
     if (!entry) return {};
     const userPalettes = [...state.userPalettes, entry];
     persist(userPalettes);
-    // Switch to the saved entry so overrides collapse into it rather than
-    // lingering as unsaved edits on top of a catalog palette.
     return { userPalettes, paletteId: entry.id, paletteOverrides: null };
   }),
 
@@ -72,7 +68,6 @@ export const createPaletteLibrarySlice = (set, get) => ({
     const userPalettes = state.userPalettes.filter((p) => p.id !== id);
     if (userPalettes.length === state.userPalettes.length) return {};
     persist(userPalettes);
-    // Don't strand the app on a palette that no longer exists.
     const next = { userPalettes };
     if (state.paletteId === id) {
       next.paletteId = 'praystation';
@@ -88,7 +83,6 @@ export const createPaletteLibrarySlice = (set, get) => ({
     return { userPalettes };
   }),
 
-  /** Merge imported entries; same-id entries are replaced. */
   importUserPalettes: (list) => set((state) => {
     const incoming = (Array.isArray(list) ? list : [list]).map(sanitizePalette).filter(Boolean);
     if (incoming.length === 0) return {};
