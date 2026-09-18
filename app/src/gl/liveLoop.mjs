@@ -462,7 +462,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       const frame = buildFrame();
       if (!frame) return; // static bake in flight — hold last frame
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen, accumParams, audioBands, audioOn, glow, paused } = frame;
+      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, glow, paused } = frame;
 
       if (paused) return; // hold the last presented frame
 
@@ -498,7 +498,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
             }
           }
           lastAccumOn = true;
-          if (accumFrozen && accumObj) {
+          if (frozen && accumObj) {
             // FREEZE: hold the feedback image, skip render + step.
             live.present(accumObj.texture());
           } else if (accumObj) {
