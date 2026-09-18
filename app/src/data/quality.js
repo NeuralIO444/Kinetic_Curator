@@ -2,6 +2,12 @@
 // Showrunner budgets (§7): each tier carries per-subsystem ceilings so
 // the governor can shed the right thing instead of only stepping density.
 //
+// #296 — the performer-facing name for each tier is its `budget`: a
+// deliberate creative constraint (FULL / SHOW / LEAN), not a spec-sheet
+// entry. `id` and `label` are unchanged — every caps lookup, project
+// serialization, and governor comparison still keys on `id`; `budget` is
+// presentation only, read by the PLAY ceiling knob and the Q meter.
+//
 // Phase 6 (#192): `maxFxLayers` is retired as a tier budget. FX compositing
 // runs on the GPU (one extra FBO pair + one filter pass per wrap), so the
 // per-tier FX-layer caps that culled stacked FX on the SVG path no longer
@@ -23,6 +29,7 @@ export const QUALITY_PRESETS = {
   high: {
     id: 'high',
     label: 'HIGH',
+    budget: 'FULL',
     maxCount: 800,
     maxCountMirrored: 650,
     maxParticles: 350,
@@ -37,6 +44,7 @@ export const QUALITY_PRESETS = {
   balanced: {
     id: 'balanced',
     label: 'BALANCED',
+    budget: 'SHOW',
     maxCount: 420,
     maxCountMirrored: 360,
     maxParticles: 200,
@@ -51,6 +59,7 @@ export const QUALITY_PRESETS = {
   performance: {
     id: 'performance',
     label: 'PERF',
+    budget: 'LEAN',
     maxCount: 180,
     maxCountMirrored: 140,
     maxParticles: 100,
@@ -99,6 +108,14 @@ export function resolutionLabel(exportResolution) {
 
 export function getQualityCaps(qualityId) {
   return QUALITY_PRESETS[qualityId] || QUALITY_PRESETS.balanced;
+}
+
+/** #296 — the performer-facing budget name for a tier id (FULL / SHOW /
+ *  LEAN). Falls back to the tier's spec label, never to undefined — a
+ *  dangling quality key must still read as something honest. */
+export function getBudgetName(qualityId) {
+  const preset = QUALITY_PRESETS[qualityId];
+  return (preset && preset.budget) || (preset && preset.label) || 'SHOW';
 }
 
 /** Live quality caps, or FINAL_CAPS when uncapped final render is requested. */
