@@ -5,8 +5,9 @@ const STORAGE_KEY = 'kc:first-run-seen';
 /**
  * First-run “Play Me” intro overlay (#12).
  * Lightweight manifesto + one action that enables audio + Evolve.
+ * Also the front door to the guided tour (#222).
  */
-export function FirstRunOverlay({ onPlay }) {
+export function FirstRunOverlay({ onPlay, onTour }) {
   const [visible, setVisible] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) !== '1';
@@ -22,6 +23,11 @@ export function FirstRunOverlay({ onPlay }) {
     setVisible(false);
     if (play && typeof onPlay === 'function') onPlay();
   }, [onPlay]);
+
+  const startTour = useCallback(() => {
+    dismiss(false);
+    if (typeof onTour === 'function') onTour();
+  }, [dismiss, onTour]);
 
   // #107 §7: Escape is the app's one panic key — it must close this too,
   // not just the things App.jsx's central hotkey map already owns.
@@ -49,6 +55,15 @@ export function FirstRunOverlay({ onPlay }) {
           onClick={() => dismiss(true)}
         >
           ▶ PLAY ME
+        </button>
+        <button
+          type="button"
+          className="first-run-play"
+          onClick={startTour}
+          title="A 4-step guided tour: pick a recipe, move a slider, hit PLAY, render a still"
+          style={{ background: 'transparent', border: '1px solid var(--line-2)', color: 'var(--ink)' }}
+        >
+          TAKE THE TOUR
         </button>
         <button
           type="button"

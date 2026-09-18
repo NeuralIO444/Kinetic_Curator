@@ -5,6 +5,7 @@ import { MasterBar } from './components/MasterBar.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
+import { TourOverlay } from './components/TourOverlay.jsx';
 import { FavoritesTray } from './components/FavoritesTray.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
 import { useAudioInput } from './hooks/useAudioInput.js';
@@ -107,6 +108,12 @@ function AppInner() {
 
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [helpTab, setHelpTab] = useState('help');
+  const [tourOpen, setTourOpen] = useState(false);
+  const openHelp = useCallback(() => { setHelpTab('help'); setShowHotkeys(true); }, []);
+  const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
+  useEffect(() => {
+    evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
+  }, [state.evolveMode, state.evolveSource]);
 
   useEffect(() => {
     // #107 §4: an automatic trigger, not a manual one — pauses under
@@ -223,8 +230,9 @@ function AppInner() {
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
       <MasterBar />
-      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} />
-      <FirstRunOverlay onPlay={onPlayMe} />
+      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} onTour={() => { setShowHotkeys(false); setTourOpen(true); }} />
+      <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
+      <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <ErrorBoundary critical>
         <Shell
           dispatchPipe={piped}
@@ -233,7 +241,7 @@ function AppInner() {
           dividerProps={dividerProps}
         />
       </ErrorBoundary>
-      <FavoritesTray />
+      <FavoritesTray onHelp={openHelp} />
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>

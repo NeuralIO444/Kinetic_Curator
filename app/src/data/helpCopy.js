@@ -17,12 +17,13 @@ export const HELP_TOPICS = [
   { id: 'output-batch', group: 'Output', title: 'BATCH', text: 'Render N sequential seeds as PNG + JSON sidecars.' },
   { id: 'assets-import', group: 'Assets', title: 'IMPORT', text: 'Drop an SVG into the project overlay. The canon is untouched.' },
   { id: 'master-run', group: 'Master', title: 'RUN', text: 'Play / pause the live loop (Space).' },
+  { id: 'help-tour', group: 'Help', title: 'TOUR', text: 'Replay the 4-step first-run tour (preset, slider, PLAY, still) from the HELP tab.' },
   { id: 'davis-audio', group: 'Ghost Station', title: 'CLOCK AUDIO', text: 'Tick on a mic attack. Held noise is not a beat — armed · no attack.' },
   { id: 'davis-metro', group: 'Ghost Station', title: 'CLOCK METRO', text: 'Internal BPM. No mic.' },
   { id: 'davis-interval', group: 'Ghost Station', title: 'INTERVAL', text: 'Seconds between Evolve fires. Dead while SOURCE is BEAT.' },
   { id: 'davis-evolve-beat', group: 'Ghost Station', title: 'SOURCE BEAT', text: 'Evolve on the same attack as phrase AUDIO. Press EVOLVE to arm.' },
   { id: 'layout-accum', group: 'Layout', title: 'ACCUM', text: 'Pixel trail buffer. CLEAR wipes the buffer only, not the live SVG.' },
-  { id: 'output-webm', group: 'Output', title: 'REC WEBM', text: 'Captures the tab. Does not sample the ACCUM buffer. Studio --accum is the trail still.' },
+  { id: 'output-webm', group: 'Output', title: 'REC WEBM', text: 'Records the live canvas to WEBM — what plays is what records, ACCUM included.' },
 ];
 
 export const HELP_SHORTCUTS = [
