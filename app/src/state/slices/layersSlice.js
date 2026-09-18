@@ -34,28 +34,32 @@ export function captureSnapshot(state) {
   };
 }
 
+/** Display name for a content row. Stored "Layer N" (old projects) maps to KC-N. */
+export function displayLayerName(layer, contentOrdinal) {
+  if (!layer) return '';
+  if (isFxLayer(layer)) return layer.name;
+  if (typeof layer.name === 'string' && /^Layer \d+$/.test(layer.name)) {
+    return `KC-${contentOrdinal}`;
+  }
+  return layer.name;
+}
+
 const INITIAL_LAYER_ID = 'layer-1';
 
 export const createLayersSlice = (set) => ({
   layers: [
-    { id: INITIAL_LAYER_ID, name: 'Layer 1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    { id: INITIAL_LAYER_ID, name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
   ],
   activeLayerId: INITIAL_LAYER_ID,
   layerSnapshots: {},
-  /**
-   * FX-layer UI selection (which FX layer's effect stack the Layers panel is
-   * editing). Ephemeral UI state — never serialized. FX layers are never the
-   * content-active layer: setActiveLayer ignores them, so the snapshot
-   * machinery (seed/layoutParams/enabledAssets) is untouched by FX.
-   */
   selectedFxLayerId: null,
 
   addLayer: () => set((state) => {
     const id = makeLayerId();
     const snapshot = freshSnapshot((Math.random() * 0xffffffff) | 0);
-    const name = `Layer ${state.layers.length + 1}`;
+    const n = state.layers.filter((l) => !isFxLayer(l)).length + 1;
+    const name = `KC-${n}`;
     return {
-      // #223: layer actions are undoable — capture the pre-add document.
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: [...state.layers, { id, name, visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
       layerSnapshots: {
@@ -112,14 +116,11 @@ export const createLayersSlice = (set) => ({
     const layers = state.layers.filter((l) => l.id !== id);
     const snapshots = { ...state.layerSnapshots };
     delete snapshots[id];
-    // Don't leave a dangling FX-selection pointing at a deleted layer.
     const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;
 
     if (id !== state.activeLayerId) {
       return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, selectedFxLayerId };
     }
-    // FX layers are never the content-active layer (see setActiveLayer) —
-    // prefer a content layer so the invariant survives the deletion.
     const nextActive = layers.find((l) => !isFxLayer(l)) || layers[0];
     const nextSnapshot = snapshots[nextActive.id] || freshSnapshot(state.seed, state.seedOffsets);
     delete snapshots[nextActive.id];
@@ -136,9 +137,6 @@ export const createLayersSlice = (set) => ({
   setActiveLayer: (id) => set((state) => {
     if (id === state.activeLayerId) return {};
     const target = state.layers.find((l) => l.id === id);
-    // FX layers are never the content-active layer — they hold no snapshot
-    // (no seed/palette/layoutParams). The panel edits their effect stack via
-    // selectedFxLayerId instead.
     if (!target || isFxLayer(target)) return {};
     const snapshot = state.layerSnapshots[id] || freshSnapshot(state.seed, state.seedOffsets);
     return {
@@ -176,14 +174,9 @@ export const createLayersSlice = (set) => ({
   })),
 
   setLayerOpacity: (id, layerOpacity) => set((state) => ({
-    // Slider-driven: debounced, one entry per drag (#223).
     ...pushToUndo(state, false, UNDO_KIND_LAYERS),
     layers: state.layers.map((l) => (l.id === id ? { ...l, layerOpacity } : l)),
   })),
-
-  // -- FX layers -----------------------------------------------------------
-  // An FX layer holds no content snapshot — it applies an ordered stack of
-  // SVG filter effects to everything beneath it in the layer stack.
 
   addFxLayer: () => set((state) => {
     const id = makeLayerId();
@@ -211,9 +204,6 @@ export const createLayersSlice = (set) => ({
     return { selectedFxLayerId: l && isFxLayer(l) ? id : null };
   }),
 
-  /** Effect-stack CRUD below — all fail closed on bad ids/indices. */
-  // No-op guard: a bounds-checked action that changes nothing pushes no
-  // entry, or Ctrl+Z would stop lining up with what the operator did.
   fxEffectAdd: (layerId, kind) => set((state) => {
     const params = defaultFxParams(kind);
     if (!params) return {};
@@ -257,14 +247,13 @@ export const createLayersSlice = (set) => ({
       const fx = effects[index];
       if (!fx) return l;
       const pdef = FX_EFFECT_DEFS[fx.kind]?.params[key];
-      if (!pdef) return l; // unknown param: fail closed
+      if (!pdef) return l;
       const v = Number(value);
       const clamped = Number.isFinite(v) ? Math.min(pdef.max, Math.max(pdef.min, v)) : pdef.def;
       effects[index] = { ...fx, params: { ...fx.params, [key]: clamped } };
       return { ...l, effects };
     });
     if (JSON.stringify(layers) === JSON.stringify(state.layers)) return {};
-    // Slider-driven: debounced, one entry per drag (#223).
     return { ...pushToUndo(state, false, UNDO_KIND_LAYERS), layers };
   }),
 });
