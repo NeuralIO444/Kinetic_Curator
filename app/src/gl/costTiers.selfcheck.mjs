@@ -206,12 +206,13 @@ console.log('[selfcheck] E shed order unchanged — resolution ×3 → quality �
 }
 console.log('[selfcheck] E shedOrder — tier 1 first, tier 0 last');
 
-// shedSummary strings are unchanged (UI contract).
+// shedSummary strings match the #294 instrument names (UI contract — the
+// badge/pills/tape read these exact strings).
 {
   const sum = shedSummary({ renderScale: 0.5, perfTier1: true, assetThin: true, perfClampOverride: { count: 80 }, slowRender: false, watchdogTripped: false });
-  assert.ok(sum.join(' ').includes('50%') && sum.join(' ').includes('mirror/gloss/ACCUM off'),
-    'shedSummary strings unchanged');
+  assert.ok(sum.join(' ').includes('pixel trim 50%') && sum.join(' ').includes('shine off'),
+    'shedSummary strings match the instrument names');
 }
-console.log('[selfcheck] E shedSummary strings unchanged');
+console.log('[selfcheck] E shedSummary strings match the instrument names');
 
 console.log('[selfcheck] cost tiers OK — declarations valid, coverage complete, bands hold, governor registry-driven');

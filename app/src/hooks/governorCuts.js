@@ -67,7 +67,7 @@ export const GOVERNOR_RESTORE_CUTS = [
   {
     kind: 'renderScale',
     needsRestore: (s, ctx) => ctx.healthy && Number(s.renderScale) < 1 - 1e-9,
-    restoredLabel: 'resolution → 100%',
+    restoredLabel: 'PIXEL TRIM off — full pixels back',
   },
   {
     kind: 'quality',
@@ -75,26 +75,26 @@ export const GOVERNOR_RESTORE_CUTS = [
     // (qualityShedFrom tracks the tier it stepped down from); a
     // user-chosen tier is never "restored" over.
     needsRestore: (s, ctx) => ctx.healthy && s.qualityShedFrom != null,
-    restoredLabel: 'quality restored',
+    restoredLabel: 'tier restored',
   },
   {
     kind: 'assetThin',
     needsRestore: (s, ctx) => ctx.healthy && !!s.assetThin,
-    restoredLabel: 'asset thinning released',
+    restoredLabel: 'dead weight back — full cast',
   },
   {
     kind: 'countClamp',
     // The count clamp's premise is "still struggling at the lowest tier",
     // so it also clears on tier change — the nuance the old block carried.
     needsRestore: (s, ctx) => !!s.perfClampOverride && (ctx.healthy || s.quality !== 'performance'),
-    restoredLabel: 'count clamp released',
+    restoredLabel: 'crowd control lifted',
   },
   {
     kind: 'slowRender',
     // #264 — the auto-clear applies ONLY to the cut-6 soft freeze. The
     // watchdog hard stop (source 'watchdog') needs manual resume.
     needsRestore: (s, ctx) => ctx.healthy && !!s.slowRender && s.slowRenderSource === 'cut6',
-    restoredLabel: 'motion unfrozen',
+    restoredLabel: 'freeze frame off — motion back',
   },
 ];
 
@@ -146,23 +146,23 @@ export function nextGovernorCut(s) {
     return {
       kind: 'renderScale',
       scale: next,
-      label: `resolution → ${Math.round(next * 100)}% (dynamic render scale)`,
+      label: `PIXEL TRIM → ${Math.round(next * 100)}%`,
     };
   }
 
   // Cut 2: quality tier step (placement + particle budgets).
   if (s.quality === 'high') {
-    return { kind: 'quality', quality: 'balanced', label: 'quality → BALANCED' };
+    return { kind: 'quality', quality: 'balanced', label: 'TIER DROP → BALANCED' };
   }
   if (s.quality === 'balanced') {
-    return { kind: 'quality', quality: 'performance', label: 'quality → PERF' };
+    return { kind: 'quality', quality: 'performance', label: 'TIER DROP → PERF' };
   }
 
   // Cut 4: cost-aware asset thinning. (Cut 3 — mirror/gloss/ACCUM — is the
   // independent perfTier1 mechanism at its own lower FPS floor; its pass
   // coverage is perfTier1Passes(), read from the cost registry.)
   if (!s.assetThin) {
-    return { kind: 'assetThin', label: 'asset thinning — highest-cost assets drop first' };
+    return { kind: 'assetThin', label: 'DEAD WEIGHT — costliest assets cut first' };
   }
 
   // Cut 5: render-only count clamp below the PERF floor. A live-only
@@ -171,13 +171,13 @@ export function nextGovernorCut(s) {
   const eff = s.perfClampOverride?.count ?? s.effectiveCount;
   if (Number.isFinite(eff) && eff > 120) {
     const count = Math.max(80, Math.floor(eff * 0.7));
-    return { kind: 'countClamp', count, label: `count clamp (live only) → ${count}` };
+    return { kind: 'countClamp', count, label: `CROWD CONTROL → ${count} (live only)` };
   }
 
   // Cut 6: freeze motion. Reuses the tested slowRender path (pauses
   // evolve/ambient-drift/ACCUM/swarm). A still instrument beats a dead one.
   if (!s.slowRender) {
-    return { kind: 'slowRender', label: 'motion frozen (slowRender)' };
+    return { kind: 'slowRender', label: 'FREEZE FRAME — motion held' };
   }
 
   // Ladder exhausted — hold. The watchdog (cut 7) is a separate mechanism.
@@ -191,19 +191,19 @@ export function nextGovernorCut(s) {
 export function shedSummary(s) {
   const out = [];
   if (Number(s.renderScale) < 1 - 1e-9) {
-    out.push(`res ${Math.round(Number(s.renderScale) * 100)}%`);
+    out.push(`pixel trim ${Math.round(Number(s.renderScale) * 100)}%`);
   }
   // #264 — governor-shed quality is a shed like any other: the badge shows
   // it. qualityShedFrom is only set by the governor's own shed, so a
   // user-chosen tier never appears here.
   if (s.qualityShedFrom != null && s.quality !== s.qualityShedFrom) {
-    out.push(`quality → ${String(s.quality).toUpperCase()}`);
+    out.push(`tier → ${String(s.quality).toUpperCase()}`);
   }
-  if (s.perfTier1) out.push('mirror/gloss/ACCUM off');
-  if (s.assetThin) out.push('assets thinned');
-  if (s.perfClampOverride) out.push(`count →${s.perfClampOverride.count}`);
-  if (s.slowRender) out.push('motion frozen');
-  if (s.watchdogTripped) out.push('watchdog');
+  if (s.perfTier1) out.push('shine off');
+  if (s.assetThin) out.push('dead weight cut');
+  if (s.perfClampOverride) out.push(`crowd → ${s.perfClampOverride.count}`);
+  if (s.slowRender) out.push('freeze frame');
+  if (s.watchdogTripped) out.push('watchdog trip');
   return out.length ? out : null;
 }
 
