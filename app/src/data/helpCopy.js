@@ -22,8 +22,8 @@ export const HELP_TOPICS = [
   { id: 'davis-metro', group: 'Ghost Station', title: 'CLOCK METRO', text: 'Internal BPM. No mic.' },
   { id: 'davis-interval', group: 'Ghost Station', title: 'INTERVAL', text: 'Seconds between Evolve fires. Dead while SOURCE is BEAT.' },
   { id: 'davis-evolve-beat', group: 'Ghost Station', title: 'SOURCE BEAT', text: 'Evolve on the same attack as phrase AUDIO. Press EVOLVE to arm.' },
-  { id: 'layout-accum', group: 'Layout', title: 'ACCUM', text: 'Pixel trail buffer. CLEAR wipes the buffer only, not the live SVG.' },
-  { id: 'output-webm', group: 'Output', title: 'REC WEBM', text: 'Records the live canvas to WEBM — what plays is what records, ACCUM included.' },
+  { id: 'layout-accum', group: 'Layout', title: 'ACCUM', text: 'Pixel trail buffer — trails and glow render live in the WebGL canvas. CLEAR wipes the buffer only, not the canvas.' },
+  { id: 'output-webm', group: 'Output', title: 'REC WEBM', text: 'Records the live WebGL canvas to WebM — ACCUM trails included. What plays is what exports.' },
 ];
 
 export const HELP_SHORTCUTS = [
