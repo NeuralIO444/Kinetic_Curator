@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "seed": 55,
+  "paletteId": "strata",
+  "layoutParams": {
+    "mode": "layers",
+    "count": 320,
+    "scale": [
+      0.6,
+      1.8
+    ],
+    "rotate": [
+      -10,
+      10
+    ],
+    "alpha": [
+      50,
+      95
+    ],
+    "zTiers": 6,
+    "jitter": 8,
+    "density": 96,
+    "bleed": false,
+    "recolor": true,
+    "mirror": true,
+    "overlap": true,
+    "lifeDrift": 0.05,
+    "displacement": 0,
+    "behave": "cruise",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "geo_tri_01": true,
+    "geo_hex_01": true,
+    "line_solid_01": true
+  },
+  "layers": [
+    {
+      "id": "strata-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "strata-main"
+}

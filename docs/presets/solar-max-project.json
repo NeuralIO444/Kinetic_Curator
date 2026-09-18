@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "seed": 91,
+  "paletteId": "solar-max",
+  "layoutParams": {
+    "mode": "radial",
+    "count": 360,
+    "scale": [
+      0.5,
+      1.6
+    ],
+    "rotate": [
+      -35,
+      35
+    ],
+    "alpha": [
+      44,
+      98
+    ],
+    "zTiers": 4,
+    "jitter": 10,
+    "density": 86,
+    "bleed": true,
+    "recolor": true,
+    "mirror": true,
+    "overlap": true,
+    "lifeDrift": 0.22,
+    "displacement": 14,
+    "behave": "cruise",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "rad_rings_01": true,
+    "rad_radial_01": true,
+    "org_petal_02": true
+  },
+  "layers": [
+    {
+      "id": "solar-max-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "solar-max-main"
+}

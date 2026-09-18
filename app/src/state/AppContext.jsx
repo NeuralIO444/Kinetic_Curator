@@ -32,11 +32,13 @@ export function useApp(selector) {
   const redoStackLength = useStore(s => s.historyRedoStack ? s.historyRedoStack.length : 0);
   const canUndo = useStore(s => {
     const top = s.historyUndoStack && s.historyUndoStack[s.historyUndoStack.length - 1];
-    return !!top && top.layerId === s.activeLayerId;
+    // #223: 'layers' entries are structural and always apply; 'edit'
+    // entries still need their layer active (#92).
+    return !!top && (top.kind === 'layers' || top.layerId === s.activeLayerId);
   });
   const canRedo = useStore(s => {
     const top = s.historyRedoStack && s.historyRedoStack[s.historyRedoStack.length - 1];
-    return !!top && top.layerId === s.activeLayerId;
+    return !!top && (top.kind === 'layers' || top.layerId === s.activeLayerId);
   });
   const undo = useStore(s => s.undo);
   const redo = useStore(s => s.redo);
@@ -102,6 +104,7 @@ export function useApp(selector) {
       case A.SET_EVOLVE_TARGET: return store.setEvolveTarget(payload);
       case A.SET_EVOLVE_INTERVAL: return store.setEvolveInterval(payload);
       case A.SET_AUTO_SNAPSHOT: return store.setAutoSnapshot(payload);
+      case A.SET_BEAT_ROUTE: return store.setBeatRoute(payload);
       case A.TRIGGER_EVOLVE: return store.triggerEvolve();
       case A.SET_MORPH_EVOLVE: return store.setMorphEvolve(payload);
       case A.SET_MORPH_DURATION: return store.setMorphDurationMs(payload);

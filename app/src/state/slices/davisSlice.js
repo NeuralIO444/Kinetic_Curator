@@ -2,6 +2,7 @@ import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { generateLayoutTargets, MORPHABLE_KEYS, PALETTE_IDS } from '../paramUtils.js';
 import { genId } from '../id.js';
 import { tickPhraseBeat } from '../phraseTick.js';
+import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
 
 export const createDavisSlice = (set) => ({
@@ -12,6 +13,10 @@ export const createDavisSlice = (set) => ({
   autoSnapshot: false,
   lastEvolveTs: 0,
   favorites: [],
+  // Beat router: which consumers answer a mic attack when evolve SOURCE is
+  // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
+  // phrase first, then fires evolve on the post-phrase state.
+  beatRoute: 'both',
 
   morphEvolve: true,
   morphDurationMs: 1200,
@@ -38,6 +43,7 @@ export const createDavisSlice = (set) => ({
   setEvolveTarget: (target) => set({ evolveTarget: target }),
   setEvolveInterval: (interval) => set({ evolveInterval: interval }),
   setAutoSnapshot: (auto) => set({ autoSnapshot: auto }),
+  setBeatRoute: (route) => set({ beatRoute: sanitizeBeatRoute(route) }),
 
   setMorphEvolve: (v) => set({ morphEvolve: !!v }),
   setMorphDurationMs: (ms) => set({

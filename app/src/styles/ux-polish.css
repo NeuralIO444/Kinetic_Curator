@@ -193,3 +193,60 @@
 }
 
 .app-fullscreen .favorites-tray { display: none; }
+
+/* ─── First-run tour (#222) ─── */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 64px;
+  pointer-events: none;
+}
+.tour-card {
+  pointer-events: auto;
+  max-width: 340px;
+  padding: 16px 18px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+}
+.tour-step-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.tour-step-body {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.tour-dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.tour-dot {
+  width: 18px;
+  height: 3px;
+  background: var(--line-2);
+}
+.tour-dot.on { background: var(--accent); }
+.tour-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tour-skip {
+  background: transparent;
+  border: none;
+  color: var(--dimmer);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}

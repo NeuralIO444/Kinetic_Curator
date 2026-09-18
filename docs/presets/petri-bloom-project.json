@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "seed": 21,
+  "paletteId": "petri-bloom",
+  "layoutParams": {
+    "mode": "ca",
+    "count": 400,
+    "scale": [
+      0.25,
+      0.7
+    ],
+    "rotate": [
+      -20,
+      20
+    ],
+    "alpha": [
+      60,
+      100
+    ],
+    "zTiers": 3,
+    "jitter": 6,
+    "density": 92,
+    "bleed": false,
+    "recolor": true,
+    "mirror": true,
+    "overlap": true,
+    "lifeDrift": 0.1,
+    "displacement": 4,
+    "behave": "cruise",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "org_blob_03": true,
+    "org_petal_01": true,
+    "dot_field_02": true
+  },
+  "layers": [
+    {
+      "id": "petri-bloom-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "petri-bloom-main"
+}

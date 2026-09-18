@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "seed": 33,
+  "paletteId": "river-delta",
+  "layoutParams": {
+    "mode": "flow",
+    "count": 420,
+    "scale": [
+      0.4,
+      1.2
+    ],
+    "rotate": [
+      -45,
+      45
+    ],
+    "alpha": [
+      36,
+      92
+    ],
+    "zTiers": 4,
+    "jitter": 12,
+    "density": 90,
+    "bleed": true,
+    "recolor": true,
+    "mirror": false,
+    "overlap": true,
+    "lifeDrift": 0.1,
+    "noiseSpeed": 0.25,
+    "displacement": 30,
+    "behave": "cruise",
+    "blendMode": "normal"
+  },
+  "enabledAssets": {
+    "line_squiggle_01": true,
+    "line_squiggle_02": true,
+    "org_blob_04": true
+  },
+  "layers": [
+    {
+      "id": "river-delta-main",
+      "layerBlendMode": "normal",
+      "layerOpacity": 1,
+      "type": "content",
+      "visible": true
+    }
+  ],
+  "activeLayerId": "river-delta-main"
+}

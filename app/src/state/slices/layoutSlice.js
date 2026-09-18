@@ -1,6 +1,6 @@
 import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
-import { pushToUndo } from '../history.js';
+import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, trimUndoStack, UNDO_KIND_LAYERS } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
@@ -242,31 +242,26 @@ export const createLayoutSlice = (set) => ({
   }),
 
   // Entries are tagged with the layerId they were captured for (#92) and the
-  // stack is shared across layers (never reset on switch). Only ever act on
-  // the top entry if it belongs to the layer currently active — otherwise
-  // it would restore one layer's values onto a different layer, which is
-  // the exact corruption this is guarding against. A mismatched top entry
-  // means "nothing to undo/redo for this layer right now" — no-op.
+  // stack is shared across layers (never reset on switch). An 'edit' entry
+  // only ever applies when its layer is active — otherwise it would restore
+  // one layer's values onto a different layer, which is the exact corruption
+  // this is guarding against. A mismatched top entry means "nothing to
+  // undo/redo for this layer right now" — no-op, no pop. 'layers' entries
+  // (layer structure actions, #223) always apply: they hold the whole
+  // pre-action document, so every layer's content lands back on its own
+  // layer and the structure comes with it.
   undo: () => set((state) => {
     if (state.historyUndoStack.length === 0) return {};
     const previous = state.historyUndoStack[state.historyUndoStack.length - 1];
-    if (previous.layerId !== state.activeLayerId) return {};
-    const current = {
-      layerId: state.activeLayerId,
-      seed: state.seed,
-      paletteId: state.paletteId,
-      paletteOverrides: state.paletteOverrides
-        ? JSON.parse(JSON.stringify(state.paletteOverrides))
-        : null,
-      layoutParams: JSON.parse(JSON.stringify(state.layoutParams)),
-    };
+    if (!entryApplies(previous, state.activeLayerId)) return {};
+    const current = captureUndoEntry(state, previous.kind);
+    const restore = previous.kind === UNDO_KIND_LAYERS
+      ? { ...editRestoreFields(previous), ...layersRestoreFields(previous) }
+      : editRestoreFields(previous);
     return {
-      seed: previous.seed,
-      paletteId: previous.paletteId,
-      paletteOverrides: previous.paletteOverrides ?? null,
-      layoutParams: previous.layoutParams,
+      ...restore,
       historyUndoStack: state.historyUndoStack.slice(0, -1),
-      historyRedoStack: [...state.historyRedoStack, current],
+      historyRedoStack: trimUndoStack([...state.historyRedoStack, current]),
       // #107 §7: an in-flight morph's rAF loop calls setLayoutParams every
       // frame from its own morphFrom/morphTo/morphStart — left running, it
       // would overwrite what undo just restored within one frame. Cancel it.
@@ -279,22 +274,14 @@ export const createLayoutSlice = (set) => ({
   redo: () => set((state) => {
     if (state.historyRedoStack.length === 0) return {};
     const next = state.historyRedoStack[state.historyRedoStack.length - 1];
-    if (next.layerId !== state.activeLayerId) return {};
-    const current = {
-      layerId: state.activeLayerId,
-      seed: state.seed,
-      paletteId: state.paletteId,
-      paletteOverrides: state.paletteOverrides
-        ? JSON.parse(JSON.stringify(state.paletteOverrides))
-        : null,
-      layoutParams: JSON.parse(JSON.stringify(state.layoutParams)),
-    };
+    if (!entryApplies(next, state.activeLayerId)) return {};
+    const current = captureUndoEntry(state, next.kind);
+    const restore = next.kind === UNDO_KIND_LAYERS
+      ? { ...editRestoreFields(next), ...layersRestoreFields(next) }
+      : editRestoreFields(next);
     return {
-      seed: next.seed,
-      paletteId: next.paletteId,
-      paletteOverrides: next.paletteOverrides ?? null,
-      layoutParams: next.layoutParams,
-      historyUndoStack: [...state.historyUndoStack, current],
+      ...restore,
+      historyUndoStack: trimUndoStack([...state.historyUndoStack, current]),
       historyRedoStack: state.historyRedoStack.slice(0, -1),
       // #107 §7: same in-flight-morph cancellation as undo() above.
       morphing: false,

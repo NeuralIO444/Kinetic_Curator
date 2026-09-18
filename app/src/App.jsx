@@ -5,6 +5,7 @@ import { MasterBar } from './components/MasterBar.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
+import { TourOverlay } from './components/TourOverlay.jsx';
 import { FavoritesTray } from './components/FavoritesTray.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
 import { useAudioInput } from './hooks/useAudioInput.js';
@@ -18,6 +19,7 @@ import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
 import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
+import { routeBeat } from './state/beatArbiter.js';
 import { useStore } from './state/store.js';
 import { shedSummary } from './hooks/governorCuts.js';
 import * as A from './state/actions.js';
@@ -106,6 +108,8 @@ function AppInner() {
 
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [helpTab, setHelpTab] = useState('help');
+  const [tourOpen, setTourOpen] = useState(false);
+  const openHelp = useCallback(() => { setHelpTab('help'); setShowHotkeys(true); }, []);
   const evolveRef = useRef({ mode: state.evolveMode, source: state.evolveSource });
   useEffect(() => {
     evolveRef.current = { mode: state.evolveMode, source: state.evolveSource };
@@ -194,13 +198,15 @@ function AppInner() {
     if (denied) piped({ type: A.SET_AUDIO_ENABLED, payload: false });
   }, [piped]);
   const onBeat = useCallback(() => {
+    // beatPulse still drives the readouts (phrase pip, meters); the actual
+    // consumers are routed through the beat arbiter so one attack is one
+    // ordered spike — phrase (the clock) resolves first, evolve (the gate)
+    // fires on the post-phrase state. #104: beat collisions.
     piped({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
-    // #107 §4/§5: same automatic-trigger pause as the time-source interval
-    // above — slowRender and batchPaused each independently gate this.
     const s = useStore.getState();
-    if (evolveRef.current.mode && evolveRef.current.source === 'beat' && !s.slowRender && !s.batchPaused) {
-      piped({ type: A.TRIGGER_EVOLVE });
-    }
+    const { tickPhrase, fireEvolve } = routeBeat(s);
+    if (tickPhrase) s.tickPhraseBeat();
+    if (fireEvolve) s.triggerEvolve();
   }, [piped]);
   useAudioInput({
     enabled: state.audioEnabled,
@@ -224,8 +230,9 @@ function AppInner() {
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
       <MasterBar />
-      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} />
-      <FirstRunOverlay onPlay={onPlayMe} />
+      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} onTour={() => { setShowHotkeys(false); setTourOpen(true); }} />
+      <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
+      <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <ErrorBoundary critical>
         <Shell
           dispatchPipe={piped}
@@ -234,7 +241,7 @@ function AppInner() {
           dividerProps={dividerProps}
         />
       </ErrorBoundary>
-      <FavoritesTray />
+      <FavoritesTray onHelp={openHelp} />
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>

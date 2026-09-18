@@ -86,12 +86,19 @@ function toInstance(item, layerId, itemBlend) {
 }
 
 /**
- * Precompute the buildLayerStack fold: FX layers wrap the content
+ * Precompute the buildLayerStack fold: FX layers wrap the composite
  * accumulated below them. Returns { wraps, shedFxLayerIds }: ordered wrap
- * groups (each names the FX layer, its filter id, its opacity, and the
- * content layer ids it wraps, bottom-up), plus the ids of any FX layer
- * that did NOT get a wrap. Content layers above the topmost FX layer, or
- * with no FX layer below them, are not wrapped.
+ * groups (each names the FX layer, its filter id, its opacity, and the ids
+ * of ALL content layers below it, bottom-up — empty when the FX layer sits
+ * at the very bottom), plus the ids of any FX layer that did NOT get a
+ * wrap. Every FX layer with effects gets a wrap: the canvas background is
+ * below the bottom layer, so there is always something to wrap; only an
+ * over-budget FX layer lands in shedFxLayerIds (reported, never silent).
+ *
+ * #227: the renderer's wrap input is the whole composite below the FX
+ * layer — the current main image (background + every lower layer's output,
+ * including lower FX layers) with the pending segment folded over it —
+ * so each FX layer genuinely adjusts everything below it.
  *
  * Mirrors studio/render.mjs exactly, including the shed rules: the tier's
  * maxFxLayers budget drops FX layers past the budget, and a layer whose
@@ -110,27 +117,33 @@ function buildFxWraps(resolvedLayers, caps) {
   const wraps = [];
   const shedFxLayerIds = [];
   const maxFx = caps?.maxFxLayers ?? Infinity;
-  let acc = [];
+  // #227: an FX layer wraps EVERYTHING below it, so the fold tracks all
+  // content below each FX layer — not just the segment since the previous
+  // FX layer. An FX layer stacked directly above another FX layer still
+  // gets a wrap (its input is the lower FX layer's output). Every FX layer
+  // with effects gets a wrap: the canvas background is below the bottom
+  // layer, so "everything below" always includes it (the renderer seeds
+  // each wrap from the current main composite, background included).
+  let below = [];
   let fxIndex = 0;
   for (const rl of resolvedLayers) {
     if (rl.isFx) {
       const fx = sanitizeFxEffects(rl.layer?.effects);
-      if (acc.length > 0 && fxIndex < maxFx && fx.length > 0) {
+      if (fxIndex < maxFx && fx.length > 0) {
         wraps.push({
           fxLayerId: rl.id,
           filterId: `fx-${String(rl.id).replace(/[^A-Za-z0-9_-]/g, '_')}`,
           opacity: clamp01(rl.layerOpacity ?? 1),
-          contentLayerIds: acc.map((l) => l.id),
+          contentLayerIds: below.map((l) => l.id),
         });
       } else if (fx.length > 0) {
-        // Over budget (or nothing below to wrap): the wrap is shed, and
-        // the layer id is reported so the shed can never be silent.
+        // Over budget: the wrap is shed, and the layer id is reported so
+        // the shed can never be silent.
         shedFxLayerIds.push(rl.id);
       }
-      acc = [];
       fxIndex += 1;
     } else {
-      acc.push(rl);
+      below.push(rl);
     }
   }
   return { wraps, shedFxLayerIds };

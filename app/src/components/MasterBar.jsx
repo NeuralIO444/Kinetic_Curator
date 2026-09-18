@@ -210,12 +210,13 @@ export function MasterBar() {
         </div>
 
         {state.isRecording ? (
-          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}>
+          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+            title="Recording the live canvas to WEBM — what plays is what records, ACCUM included">
             <span className="status-dot beat-flash" style={{ background: '#ff2d6f', animationIterationCount: 'infinite' }} />
             REC WEBM
           </div>
         ) : (
-          <div className="status-pill">
+          <div className="status-pill" title={running ? 'Live loop is running — Space pauses' : 'Live loop is paused — Space resumes'}>
             <span className={`status-dot ${running ? 'live' : ''}`} />
             {running ? 'LIVE' : 'PAUSED'}
           </div>
@@ -315,10 +316,10 @@ export function MasterBar() {
         </button>
 
         <div className="undo-group">
-          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo">
+          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo the last parameter, layer, or palette action (Ctrl/⌘+Z)">
             ↶{history.undoDepth > 0 ? ` ${history.undoDepth}` : ''}
           </button>
-          <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo">
+          <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl/⌘+Shift+Z)">
             ↷{history.redoDepth > 0 ? ` ${history.redoDepth}` : ''}
           </button>
         </div>

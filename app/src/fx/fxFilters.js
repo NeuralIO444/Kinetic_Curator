@@ -62,7 +62,14 @@ export const FX_EFFECT_DEFS = {
     label: 'Blur',
     hint: 'Gaussian blur on the source. One primitive — the cheapest effect in the stack.',
     params: {
-      radius: { label: 'Radius', min: 0, max: 40, step: 0.5, def: 6, hint: 'Blur radius in pixels' },
+      // #225 honest-blur contract: the WebGL shader caps its tap loop at
+      // 64, so wide radii are subdivided into up to 4 (H,V) pass pairs at
+      // σ/√n — the full gaussian is always delivered, never a truncated
+      // kernel. Past the 4-pair ceiling the radius is clamped to the honest
+      // max for the render width (a smaller true gaussian); the ceiling
+      // tightens if the governor sheds renderScale. Max 40 is fully
+      // delivered at the live loop's full render scale (width 1000).
+      radius: { label: 'Radius', min: 0, max: 40, step: 0.5, def: 6, hint: 'Blur radius in pixels — delivered as a true gaussian at every setting' },
     },
   },
   scanlines: {

@@ -214,7 +214,6 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
         bg: bgCss || '#000000',
         contract,
         cells,
-        wrapBoxes: {},
       },
       transparent: !bgCss,
       bgCss: bgCss || activePalette.bg,

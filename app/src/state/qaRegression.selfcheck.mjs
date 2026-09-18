@@ -202,10 +202,14 @@ ok('GL blur sigma is 0 at radius 0 (no phantom blur)', () => {
     registerProgram() {},
     defineEffect: (kind, def) => { defs[kind] = def; },
   });
-  const params = defs.blur.passes[0].params;
-  assert.strictEqual(params({ radius: 0 }, { width: 1000 })[0], 0, 'radius 0 → sigma 0');
-  assert.ok(params({ radius: 6 }, { width: 1000 })[0] > 0, 'radius 6 still blurs');
-  assert.strictEqual(params({}, { width: 1000 })[0], 0, 'missing radius → sigma 0');
+  // #225: blur passes are a function of (stepParams, { width, height }).
+  // Radius 0 is now a true no-op (zero passes), stronger than sigma 0.
+  const passesAt = (p, w) => defs.blur.passes(p, { width: w, height: 700 });
+  assert.deepEqual(passesAt({ radius: 0 }, 1000), [], 'radius 0 → no passes (true no-op)');
+  const six = passesAt({ radius: 6 }, 1000);
+  assert.equal(six.length, 2, 'radius 6 → one (H,V) pair');
+  assert.ok(six[0].params({ radius: 6 }, { width: 1000 })[0] > 0, 'radius 6 still blurs');
+  assert.deepEqual(passesAt({}, 1000), [], 'missing radius → no passes');
 });
 
 console.log(`\nqaRegression: ${n} checks passed`);
