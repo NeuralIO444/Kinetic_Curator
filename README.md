@@ -136,6 +136,7 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 - [Shader debug harness](docs/SHADER_DEBUG.md) — dev-only GLSL tooling
 - [FX layers](docs/FX_LAYERS.md) — adjustment-layer-style FX layers: the 10-effect GLSL stack + the effect-authoring template
 - [ACCUM on GPU](docs/ACCUM.md) — the trail recipe (bloom / halation / stipple diffusion)
+- [Organic motion](docs/ORGANIC_MOTION.md) — smoother / heavier live animation (dt clock, heading springs, audio ballistics, morph dissolves)
 - [Showrunner](docs/SHOWRUNNER.md) — the realtime performance governor
 - [Render quality](docs/QUALITY.md) — the quality pillars: one kernel, one seed, honest exports
 - [KILN COLUMNS](docs/KILN_COLUMNS.md) / [VORTEX RWB](docs/VORTEX_RWB.md) — shipped preset notes
