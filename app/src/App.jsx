@@ -177,6 +177,13 @@ function AppInner() {
     source: state.audioSource,
     gain: state.audioGain,
     monitor: state.audioMonitor,
+    // #306: envelope ballistics — attack/decay + response curve shape the
+    // mic envelope before any reactivity consumer sees it.
+    ballistics: {
+      attackMs: state.layoutParams.audioAttackMs ?? 25,
+      releaseMs: state.layoutParams.audioDecayMs ?? 320,
+      curve: state.layoutParams.audioResponse ?? 'exponential',
+    },
     onStimulus: onAudioStimulus,
     onBands: onAudioBands,
     onBeat,
