@@ -40,10 +40,9 @@ export function captureSnapshot(state) {
 export function displayLayerName(layer, contentOrdinal) {
   if (!layer) return '';
   if (isFxLayer(layer)) return layer.name;
-  if (typeof layer.name === 'string' && (/^Layer \\d+/.test(layer.name) || / copy$/.test(layer.name))) {
-    return `KC-${contentOrdinal}`;
-  }
-  return layer.name;
+  const n = typeof layer.name === 'string' ? layer.name : '';
+  if (n.startsWith('Layer ') || n.endsWith(' copy')) return `KC-${contentOrdinal}`;
+  return n;
 }
 
 const INITIAL_LAYER_ID = 'layer-1';
