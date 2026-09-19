@@ -47,6 +47,8 @@ G  bufferSubData — piggyback on B or D, not its own epic
 
 Parallel tape lane (#342 PR #383, #341 FX cap) is **not** yours unless the issue is assigned. Do not mix tape work into a spine PR.
 
+**Parked until spine E:** tempo clock + SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md). Do not file or implement T0–T2 while #387 is open.
+
 ## PR rules
 
 - Branch: `feat/spine-a-dt` (letter + short slug).
