@@ -1,4 +1,4 @@
-/** liveResolve — FEED delay-1 + FIELD same-frame */
+/** liveResolve — FEED + FIELD + MOD */
 import { buildPlacements, clampCount } from '../engine/buildPlacements.js';
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
@@ -10,7 +10,7 @@ import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
-import { applyField } from '../engine/kernel/tracks/trackGraph.js';
+import { applyField, applyMod, motionMetrics } from '../engine/kernel/tracks/trackGraph.js';
 
 const HOP_MAX_PX = 4;
 
@@ -143,21 +143,27 @@ export function createLiveResolver() {
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
     const content = out.filter((e) => !e.isFx);
-    const toNorm = (it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H });
+    const toNorm = (it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H, vx: Number(it.vx) || 0, vy: Number(it.vy) || 0 });
     content.forEach((e, i) => {
       const patch = e.layer?.patch;
       if (!patch) return;
       if (patch.mode === 'field') {
         const src = content[patch.to | 0];
-        const srcPts = (src?.items || []).map(toNorm);
-        const tgt = (e.items || []).map(toNorm);
-        const pulled = applyField(tgt, srcPts, { mode: 'field', from: patch.to | 0, to: i, strength: Number(patch.strength) || 0.16 });
+        const pulled = applyField((e.items || []).map(toNorm), (src?.items || []).map(toNorm), { mode: 'field', from: patch.to | 0, to: i, strength: Number(patch.strength) || 0.16 });
         e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
       } else if (patch.mode === 'feed') {
-        const pts = (e.items || []).map(toNorm);
         const amt = (Number(patch.strength) || 0.16) * 0.05;
-        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: amt });
+        const pulled = feedLive.applyTo((e.items || []).map(toNorm), { mode: 'feed', from: patch.to | 0, to: i, strength: amt });
         e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
+      } else if (patch.mode === 'mod') {
+        const src = content[patch.to | 0];
+        const knobs = applyMod({ glow: 0, fade: 0, displace: 0 }, motionMetrics((src?.items || []).map(toNorm)), { mode: 'mod', from: patch.to | 0, to: i, strength: Number(patch.strength) || 0.16 });
+        e.items = (e.items || []).map((it) => ({
+          ...it,
+          scale: (Number(it.scale) || 1) * (1 + knobs.glow * 0.35),
+          alpha: Math.max(0, Math.min(100, (Number(it.alpha) || 100) * (1 - knobs.fade * 0.4))),
+          x: it.x + Math.min(HOP_MAX_PX, knobs.displace) * 0.15,
+        }));
       }
     });
     content.forEach((e, i) => feedLive.pushSource(i, (e.items || []).map(toNorm)));
