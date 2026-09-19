@@ -131,6 +131,7 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 ## Architecture & Further Reading
 
 - [Architecture](docs/architecture.md)
+- [KC-1 engine plan](docs/ENGINE_PLAN.md) — what is connected, what not to redo, spine A–G build order
 - [GL scene contract](docs/GL_CONTRACT.md) — the exact interface the WebGL2 backend consumes
 - [WebGL Phase 6](docs/WEBGL_PHASE6.md) — SVG retirement + governor retune notes
 - [Shader debug harness](docs/SHADER_DEBUG.md) — dev-only GLSL tooling
