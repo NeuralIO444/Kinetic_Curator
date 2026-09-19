@@ -1,20 +1,4 @@
-/**
- * liveResolve.mjs — browser-safe live layer resolution for the WebGL loop (#224).
- *
- * Mirrors studio/render.mjs's resolveLayers() (which is Node-only via its
- * node:fs import) plus the live app's render-only overlays from CanvasPanel:
- * driftOverlay / perfClampOverride merge on the active layer, the perfTier1
- * mirror shed, and cost-aware asset thinning. Output shape matches
- * resolveLayers() so buildSceneContract() consumes it unchanged.
- *
- * Swarm layers run the real ParticleSystem (same mapping as useSwarmTick);
- * still layers run buildPlacements with a per-layer persistent cache, fed
- * the audio/life-modulated scale+alpha overrides exactly like the old live
- * path did.
- *
- * Node-safe (no DOM): covered by liveResolve.selfcheck.mjs.
- */
-
+/** liveResolve — FEED hop replayed on current main */
 import { buildPlacements, clampCount } from '../engine/buildPlacements.js';
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
@@ -25,13 +9,14 @@ import { isFxLayer } from '../fx/fxFilters.js';
 import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
+import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
+
+const FEED_MAX_PX = 4;
 
 export function createLiveResolver() {
-  // One buildPlacements cache per layer (mirrors useCanvasItems' per-Layer
-  // cache — a shared cache would thrash between layers).
   const placementCaches = new Map();
-  // Live swarm physics per layer (mirrors useSwarmTick's hook instance).
   const swarmState = new Map();
+  const feedLive = createFeedLive(CANVAS_W, CANVAS_H);
 
   function prune(aliveIds) {
     for (const k of [...placementCaches.keys()]) {
@@ -44,18 +29,10 @@ export function createLiveResolver() {
 
   function cacheFor(layerId) {
     let c = placementCaches.get(layerId);
-    if (!c) {
-      c = {};
-      placementCaches.set(layerId, c);
-    }
+    if (!c) { c = {}; placementCaches.set(layerId, c); }
     return c;
   }
 
-  /**
-   * Advance one swarm layer's particle system and map to render items.
-   * Mirrors useSwarmTick's update + item mapping (accent/u/scale/alpha,
-   * overlap sort, mirror/stamp duplication).
-   */
   function swarmItems(layerId, ctx) {
     let st = swarmState.get(layerId);
     if (!st) {
@@ -73,8 +50,6 @@ export function createLiveResolver() {
       st.system.resetPhase();
       st.phraseGen = ctx.phraseWrapGen;
     }
-    // #107 §4: swarm physics pause under the governor's slowRender, not the
-    // app's `running` flag — matches useSwarmTick.
     if (!ctx.slowRender) {
       st.system.update(
         { ...ctx.layoutParams, maxParticles: ctx.caps?.maxParticles },
@@ -86,41 +61,16 @@ export function createLiveResolver() {
       const accent = swatches[(swatches.indexOf(item.color) + 3) % swatches.length] || swatches[0];
       const u = Number.isFinite(item.u) ? Math.min(1, Math.max(0, item.u)) : 0;
       const uScale = item.role === 'wing' ? 1 + u * 0.18 : 1;
-      return {
-        ...item,
-        assetId: item.asset?.id,
-        accent,
-        scale: item.scale * ctx.scaleMul * uScale,
-        alpha: Math.min(100, item.alpha + ctx.alphaBoost),
-        u,
-      };
+      return { ...item, assetId: item.asset?.id, accent, scale: item.scale * ctx.scaleMul * uScale, alpha: Math.min(100, item.alpha + ctx.alphaBoost), u };
     });
     if (!ctx.layoutParams.overlap) items = [...items].sort((a, b) => a.scale - b.scale);
     const stamp = ctx.layoutParams.mirror || ctx.layoutParams.symmetry === 'stamp';
     if (stamp && ctx.caps.allowMirror) {
-      const mirrored = items.map((item) => ({
-        ...item,
-        x: CANVAS_W - item.x,
-        rotation: -item.rotation,
-        _mirrored: true,
-        key: item.key ? `${item.key}-stamp` : undefined,
-      }));
-      items = [...items, ...mirrored];
+      items = [...items, ...items.map((item) => ({ ...item, x: CANVAS_W - item.x, rotation: -item.rotation, _mirrored: true, key: item.key ? `${item.key}-stamp` : undefined }))];
     }
     return items;
   }
 
-  /**
-   * Resolve visible layers to placements.
-   *
-   * @param {object} input — live store fields + animated life values:
-   *   layers, activeLayerId, layerSnapshots, seed, seedOffsets, paletteId, paletteOverrides,
-   *   userPalettes, layoutParams, caGrid, enabledAssets, assetWeightOverrides,
-   *   customAssets, quality, driftOverlay, perfClampOverride, perfTier1,
-   *   assetThin, slowRender, scaleMul, alphaBoost, effectiveScale,
-   *   effectiveAlpha, phraseWrapGen, attractor
-   * @returns {Array} resolveLayers-shaped entries
-   */
   function resolveLayers(input) {
     const caps = getQualityCaps(input.quality || 'balanced');
     const pool = mergePool(ASSETS, input.customAssets || []);
@@ -128,108 +78,86 @@ export function createLiveResolver() {
     const out = [];
     const aliveIds = new Set();
 
-    // #269 — null guard: a hostile/erroneous layers:[null] skips the bad
-    // layer instead of throwing on layer.id and freezing the frame loop.
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
-      // FX layers hold no content — marker only, like resolveLayers().
       if (isFxLayer(layer)) {
         out.push({ id: layer.id, isFx: true, layer, layerOpacity: layer.layerOpacity ?? 1 });
         continue;
       }
       const isActive = layer.id === input.activeLayerId;
       const snap = input.layerSnapshots?.[layer.id];
-      // #107 §2/§5: ambient drift + governor density clamp live in ephemeral
-      // overlay slots — merged for render only, active layer only.
-      // Sub-seed offsets ride with the seed: an inactive layer's snapshot
-      // carries its own (#305), falling back to the live global offsets.
       const src = isActive
         ? {
-            seed: input.seed,
-            seedOffsets: input.seedOffsets,
-            paletteId: input.paletteId,
+            seed: input.seed, seedOffsets: input.seedOffsets, paletteId: input.paletteId,
             paletteOverrides: input.paletteOverrides,
             layoutParams: (input.driftOverlay || input.perfClampOverride)
               ? { ...input.layoutParams, ...input.driftOverlay, ...input.perfClampOverride }
               : input.layoutParams,
-            caGrid: input.caGrid,
-            enabledAssets: input.enabledAssets,
+            caGrid: input.caGrid, enabledAssets: input.enabledAssets,
           }
         : (snap || {
-            seed: input.seed,
-            seedOffsets: input.seedOffsets,
-            paletteId: input.paletteId,
-            paletteOverrides: input.paletteOverrides,
-            layoutParams: input.layoutParams,
-            caGrid: input.caGrid,
-            enabledAssets: input.enabledAssets,
+            seed: input.seed, seedOffsets: input.seedOffsets, paletteId: input.paletteId,
+            paletteOverrides: input.paletteOverrides, layoutParams: input.layoutParams,
+            caGrid: input.caGrid, enabledAssets: input.enabledAssets,
           });
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
-      // #107 §4 tier 1: mirror shed applies to EVERY visible layer.
       if (input.perfTier1 && layoutParams.mirror) layoutParams.mirror = false;
-
       const palette = resolvePalette(src.paletteId, src.paletteOverrides, input.userPalettes);
       let activeAssets = pool
         .filter((a) => !src.enabledAssets || src.enabledAssets[a.id])
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
-      // Showrunner cut 4: cost-aware thinning, render-only.
       if (input.assetThin && activeAssets.length > 1) {
         const ranked = [...activeAssets].sort((a, b) => getAssetCost(b) - getAssetCost(a));
         const drop = Math.max(1, Math.ceil(ranked.length * 0.25));
         const dropped = new Set(ranked.slice(0, drop).map((a) => a.id));
         activeAssets = activeAssets.filter((a) => !dropped.has(a.id));
       }
-
       const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
-      // #269 — floor at 0: a negative particleCount (e.g. -50) degrades to an
-      // empty system instead of RangeError from new Array(-50).
       const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), caps.maxParticles);
       const seed = (src.seed ?? 0) >>> 0;
-      // Snapshots from older documents have no seedOffsets — fall back to the
-      // live global offsets so an old project still resolves deterministically.
       const seedOffsets = src.seedOffsets ?? input.seedOffsets ?? null;
 
       let items;
       if (isLiveSwarmMode(layoutParams.mode)) {
         items = swarmItems(layer.id, {
-          mode: layoutParams.mode, safeParticles, activeAssets, palette, seed,
-          seedOffsets,
+          mode: layoutParams.mode, safeParticles, activeAssets, palette, seed, seedOffsets,
           layoutParams, caps, scaleMul: input.scaleMul ?? 1, alphaBoost: input.alphaBoost ?? 0,
           slowRender: !!input.slowRender, attractor: input.attractor ?? null,
           phraseWrapGen: input.phraseWrapGen || 0,
         });
       } else {
         items = buildPlacements({
-          layoutParams,
-          seed,
-          seedOffsets,
-          activeAssets,
-          palette,
-          caGrid: src.caGrid ?? null,
-          caps,
-          canvasW: CANVAS_W,
-          canvasH: CANVAS_H,
-          scale: input.effectiveScale,
-          alpha: input.effectiveAlpha,
-          cache: cacheFor(layer.id),
+          layoutParams, seed, seedOffsets, activeAssets, palette,
+          caGrid: src.caGrid ?? null, caps, canvasW: CANVAS_W, canvasH: CANVAS_H,
+          scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
         }).items;
       }
-      // The GL backend draws instanced quads per asset id — items without
-      // one (a poisoned placement) are skipped, mirroring Layer.jsx's filter.
       items = (items || []).filter((it) => it && it.assetId);
-
-      out.push({
-        id: layer.id,
-        layoutParams,
-        palette,
-        items,
-        safeCount,
-        layerBlendMode: layer.layerBlendMode || 'normal',
-        layerOpacity: layer.layerOpacity ?? 1,
-        layer,
-      });
+      out.push({ id: layer.id, layoutParams, palette, items, safeCount, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
+    const content = out.filter((e) => !e.isFx);
+    content.forEach((e, i) => {
+      const patch = e.layer?.patch;
+      if (patch?.mode === 'feed') {
+        const pts = (e.items || []).map((it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H }));
+        const amt = (Number(patch.strength) || 0.16) * 0.05;
+        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: amt });
+        e.items = (e.items || []).map((it, k) => {
+          const q = pulled[k];
+          if (!q) return it;
+          let dx = q.x * CANVAS_W - it.x;
+          let dy = q.y * CANVAS_H - it.y;
+          const m = Math.hypot(dx, dy);
+          if (m > FEED_MAX_PX) { dx *= FEED_MAX_PX / m; dy *= FEED_MAX_PX / m; }
+          return { ...it, x: it.x + dx, y: it.y + dy };
+        });
+      }
+    });
+    content.forEach((e, i) => {
+      feedLive.pushSource(i, (e.items || []).map((it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H })));
+    });
+    feedLive.commit();
     prune(aliveIds);
     return out;
   }
@@ -237,6 +165,7 @@ export function createLiveResolver() {
   function dispose() {
     placementCaches.clear();
     swarmState.clear();
+    feedLive.reset();
   }
 
   return { resolveLayers, dispose };
