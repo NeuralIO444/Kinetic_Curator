@@ -98,9 +98,9 @@ function opticsDerived(o) {
     // The target's base level is canvas/8, so lod 1 ≈ canvas/16, lod 2 ≈
     // canvas/32, lod 3 ≈ canvas/64 — sampling a smaller mip *is* the blur,
     // built by the hardware for free.
-    bloomAmount: 0.55 * o,
+    bloomAmount: 0.22 * o,
     bloomLod: 1.0 + o, // 1.0 -> 2.0: the tight glow widens with the slider
-    halationAmount: 0.45 * o,
+    halationAmount: 0.16 * o,
     halationLod: 2.0 + o, // 2.0 -> 3.0: wider + warmer than bloom, per #169's role
     halationTint: [1.0, 0.6, 0.35], // red/warm bias, per #169
     // Stipple diffusion (#308): how pointillist the glow reads, 0..1. The
@@ -403,7 +403,8 @@ void main() {
   float h = float(ihash(uvec2(grid)) >> 16u) * 1.52587890625e-05;
   float lum = dot(glow, vec3(0.299, 0.587, 0.114));
   float gate = mix(1.0, step(h, clamp(lum * 2.0, 0.0, 1.0)), u_stipple);
-  o = vec4(base.rgb + u_amount * u_tint * glow * gate, base.a);
+  vec3 lit = base.rgb + u_amount * u_tint * glow * gate;
+  o = vec4(min(lit, vec3(1.0)), base.a);
 }`;
 
 // Frame resample for #309: the feedback pair runs at logical size, but the
@@ -861,9 +862,9 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
       const o = (y * w + x) * 4;
       const g1 = mirrorGlowSample(chain, gw, gh, u, v, x, y, g1args);
       const g2 = mirrorGlowSample(chain, gw, gh, u, v, x, y, g2args);
-      out[o] = comp[o] + p.bloomAmount * g1[0] + p.halationAmount * tr * g2[0];
-      out[o + 1] = comp[o + 1] + p.bloomAmount * g1[1] + p.halationAmount * tg * g2[1];
-      out[o + 2] = comp[o + 2] + p.bloomAmount * g1[2] + p.halationAmount * tb * g2[2];
+      out[o] = Math.min(1, comp[o] + p.bloomAmount * g1[0] + p.halationAmount * tr * g2[0]);
+      out[o + 1] = Math.min(1, comp[o + 1] + p.bloomAmount * g1[1] + p.halationAmount * tg * g2[1]);
+      out[o + 2] = Math.min(1, comp[o + 2] + p.bloomAmount * g1[2] + p.halationAmount * tb * g2[2]);
       out[o + 3] = comp[o + 3]; // the glow lifts light only; the buffer stays opaque
     }
   }

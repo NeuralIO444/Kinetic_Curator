@@ -163,7 +163,7 @@ ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () =>
   const glowLoud = applyAudioEnvelope(glowBase, { rms: 1, flux: 0, beatPulse: 0 });
   // #273: headroom-relative — optics 0.2 + 0.8 headroom * 0.3 gesture = 0.44
   assert.equal(glowLoud.optics, 0.44, 'optics modulates within headroom');
-  assert.equal(glowLoud.bloomAmount, 0.55 * 0.44, 'bloomAmount recomputes from modulated optics');
+  assert.equal(glowLoud.bloomAmount, 0.22 * 0.44, 'bloomAmount recomputes from modulated optics');
   assert.equal(glowLoud.halationLod, 2 + 0.44, 'halationLod recomputes');
   assert.equal(glowLoud.stipple, 0.44, 'stipple recomputes');
   // Audio can never peg GLOW: loud rms + beatPulse on a high slider swells
