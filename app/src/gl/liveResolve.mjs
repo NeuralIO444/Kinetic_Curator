@@ -1,4 +1,4 @@
-/** liveResolve — FEED hop replayed on current main */
+/** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount } from '../engine/buildPlacements.js';
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
@@ -10,8 +10,18 @@ import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
+import { applyField } from '../engine/kernel/tracks/trackGraph.js';
 
-const FEED_MAX_PX = 4;
+const HOP_MAX_PX = 4;
+
+function clampHop(it, q) {
+  if (!q) return it;
+  let dx = q.x * CANVAS_W - it.x;
+  let dy = q.y * CANVAS_H - it.y;
+  const m = Math.hypot(dx, dy);
+  if (m > HOP_MAX_PX) { dx *= HOP_MAX_PX / m; dy *= HOP_MAX_PX / m; }
+  return { ...it, x: it.x + dx, y: it.y + dy };
+}
 
 export function createLiveResolver() {
   const placementCaches = new Map();
@@ -19,12 +29,8 @@ export function createLiveResolver() {
   const feedLive = createFeedLive(CANVAS_W, CANVAS_H);
 
   function prune(aliveIds) {
-    for (const k of [...placementCaches.keys()]) {
-      if (!aliveIds.has(k)) placementCaches.delete(k);
-    }
-    for (const k of [...swarmState.keys()]) {
-      if (!aliveIds.has(k)) swarmState.delete(k);
-    }
+    for (const k of [...placementCaches.keys()]) if (!aliveIds.has(k)) placementCaches.delete(k);
+    for (const k of [...swarmState.keys()]) if (!aliveIds.has(k)) swarmState.delete(k);
   }
 
   function cacheFor(layerId) {
@@ -137,26 +143,24 @@ export function createLiveResolver() {
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
     const content = out.filter((e) => !e.isFx);
+    const toNorm = (it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H });
     content.forEach((e, i) => {
       const patch = e.layer?.patch;
-      if (patch?.mode === 'feed') {
-        const pts = (e.items || []).map((it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H }));
+      if (!patch) return;
+      if (patch.mode === 'field') {
+        const src = content[patch.to | 0];
+        const srcPts = (src?.items || []).map(toNorm);
+        const tgt = (e.items || []).map(toNorm);
+        const pulled = applyField(tgt, srcPts, { mode: 'field', from: patch.to | 0, to: i, strength: Number(patch.strength) || 0.16 });
+        e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
+      } else if (patch.mode === 'feed') {
+        const pts = (e.items || []).map(toNorm);
         const amt = (Number(patch.strength) || 0.16) * 0.05;
         const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: amt });
-        e.items = (e.items || []).map((it, k) => {
-          const q = pulled[k];
-          if (!q) return it;
-          let dx = q.x * CANVAS_W - it.x;
-          let dy = q.y * CANVAS_H - it.y;
-          const m = Math.hypot(dx, dy);
-          if (m > FEED_MAX_PX) { dx *= FEED_MAX_PX / m; dy *= FEED_MAX_PX / m; }
-          return { ...it, x: it.x + dx, y: it.y + dy };
-        });
+        e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
       }
     });
-    content.forEach((e, i) => {
-      feedLive.pushSource(i, (e.items || []).map((it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H })));
-    });
+    content.forEach((e, i) => feedLive.pushSource(i, (e.items || []).map(toNorm)));
     feedLive.commit();
     prune(aliveIds);
     return out;
