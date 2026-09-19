@@ -140,6 +140,43 @@ export const PALETTES = [
     ink: '#264653',
     swatches: ['#2a9d8f', '#e9c46a', '#e76f51', '#264653', '#f4a261'],
   },
+  // ── Persona palettes (curator render profiles) ──────────────────────────
+  // One palette per proving persona. Brought in by the Curator when that
+  // persona's voice is active — this is the color jump. Each is an honest
+  // interpretation of the artist's working palette, documented in
+  // app/src/curator/renderProfiles.js with its research source.
+  {
+    id: 'persona-davis',
+    name: 'OVERLAP',
+    era: 'Persona voice · after Joshua Davis',
+    bg: '#0d0d12',
+    ink: '#f5f2ea',
+    swatches: ['#c6ff00', '#ff2d78', '#00e5ff', '#ff7a1a', '#8b2fff', '#00ffa3', '#ff3b30', '#f5f2ea'],
+  },
+  {
+    id: 'persona-benjamin',
+    name: 'HARD EDGE',
+    era: 'Persona voice · after Karl Benjamin',
+    bg: '#ddd6c2',
+    ink: '#161616',
+    swatches: ['#d8361b', '#1fae9e', '#5cb531', '#f0b429', '#7b2ff7', '#7a2230', '#8a6b46', '#161616'],
+  },
+  {
+    id: 'persona-reas',
+    name: 'PROCESS FIELD',
+    era: 'Persona voice · after Casey Reas',
+    bg: '#0a0a0a',
+    ink: '#f5f5f5',
+    swatches: ['#f5f5f5', '#cfcfcf', '#9a9a9a', '#6b6b6b', '#3f3f3f'],
+  },
+  {
+    id: 'persona-haeckel',
+    name: 'SPECIMEN',
+    era: 'Persona voice · after Ernst Haeckel',
+    bg: '#f0e8d0',
+    ink: '#2a2419',
+    swatches: ['#211d15', '#7d8b6f', '#d9a7a0', '#a3804f', '#75828c', '#c9963c', '#4e5a43'],
+  },
 ];
 
 /**

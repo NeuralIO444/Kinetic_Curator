@@ -5,6 +5,8 @@
 import { useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { getActiveCurator, curatorHint } from '../../curator/curate.js';
+import { useStore } from '../../state/store.js';
+import { getRenderProfile } from '../../curator/renderProfiles.js';
 import {
   PERSONA_TASTES,
   getActivePersonaId,
@@ -20,9 +22,21 @@ export function CuratorBar({ lockCount }) {
     setActivePersona(v === 'off' ? null : v);
     setVoice(v === 'off' ? 'off' : getActivePersonaId() ?? 'off');
   };
+  const onCurate = () => {
+    emit(Events.LAYOUT_CURATE);
+    // The persona brings its palette: switch the global palette to the
+    // profile's catalog entry so the color jumps with the voice. Skipped
+    // when already there — repeat presses don't wipe swatch overrides or
+    // stack undo entries. "off" never touches the palette.
+    const profile = getRenderProfile(getActivePersonaId());
+    if (profile) {
+      const st = useStore.getState();
+      if (st.paletteId !== profile.paletteId) st.setPaletteId(profile.paletteId);
+    }
+  };
   return (
     <div className="randomize-bar">
-      <button className="randomize-btn" onClick={() => emit(Events.LAYOUT_CURATE)}>
+      <button className="randomize-btn" onClick={onCurate}>
         Curator
       </button>
       <select
@@ -34,7 +48,7 @@ export function CuratorBar({ lockCount }) {
       >
         <option value="off">voice: off</option>
         {PERSONA_TASTES.map((p) => (
-          <option key={p.id} value={p.id}>voice: {p.name.toLowerCase()}</option>
+          <option key={p.id} value={p.id}>voice: {p.alias}</option>
         ))}
       </select>
       <span className="randomize-hint">{lockCount > 0 ? `${lockCount} locked · ` : ''}{hint}</span>

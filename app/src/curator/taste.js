@@ -12,6 +12,7 @@
 // retired or kept as a cold-start fallback — the contract doesn't care.
 
 import { PERSONA_TASTES, getPersonaTaste } from './personaTastes.js';
+import { getRenderProfile, applyRenderProfile } from './renderProfiles.js';
 
 // Re-exported so UI code has a single import site for persona data.
 export { PERSONA_TASTES };
@@ -118,8 +119,15 @@ export function personaIds() {
 
 /**
  * Curator engine backed by the active persona. Implements the engine
- * contract from curate.js: pick(candidates) -> index, status() -> active.
- * personaName lets the UI hint say WHO tasted the pick.
+ * contract from curate.js: pick(candidates) -> index, status() -> active,
+ * plus shapeCandidates(candidates) — the render-profile hook. Before
+ * scoring, the persona dreams each candidate in its own visual language
+ * (palette-adjacent params, shape/edge biases, forces); then pick() ranks
+ * the shaped candidates as before. Personas WITHOUT a render profile keep
+ * the #375 behavior exactly: scoring only. personaName lets the UI hint
+ * say WHO tasted the pick — it carries the ALIAS (Matt's IP caution: real
+ * artist names never appear on the product surface; honest attribution
+ * lives in code and the persona source files only).
  */
 export function personaCurator() {
   const persona = getActivePersona();
@@ -128,9 +136,15 @@ export function personaCurator() {
   }
   return {
     name: 'persona',
-    personaName: persona.name,
+    personaName: persona.alias,
     personaId: persona.id,
     status: () => 'active',
+    shapeCandidates(candidates) {
+      if (!getRenderProfile(persona.id)) return;
+      for (let i = 0; i < candidates.length; i++) {
+        candidates[i] = applyRenderProfile(candidates[i], persona.id);
+      }
+    },
     pick: (candidates) => pickPersona(candidates, persona.id),
   };
 }

@@ -52,10 +52,24 @@ export function getActiveCurator() {
 /**
  * Pick one candidate. Returns { index, curated } — curated is false when the
  * engine declined (or misbehaved) and the pick fell back to a uniform roll.
+ *
+ * Render profiles (renderProfiles.js): before scoring, the active persona
+ * dreams each candidate in its own visual language via shapeCandidates().
+ * Shaping happens IN PLACE on this array: layoutSlice.js is a protected
+ * lane and reads candidates[index] after we return, so the shaped objects
+ * must be the ones in this array. A profile bug never breaks the button —
+ * shaping failure falls back to the unshaped candidates.
  */
 export function pickCurated(candidates, curator) {
   const n = candidates.length;
   if (n === 0) return { index: -1, curated: false };
+  if (curator && typeof curator.shapeCandidates === 'function') {
+    try {
+      curator.shapeCandidates(candidates);
+    } catch {
+      /* fall through to the unshaped candidates */
+    }
+  }
   let idx;
   try {
     idx = curator.pick(candidates);
