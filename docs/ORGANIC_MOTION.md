@@ -1,6 +1,8 @@
 # Organic motion — smoother, heavier live animation
 
-*Review of main as of 2026-09-19 (`653a66a`). Plan, not a patch. Companion to [BIO_DRIVES_PLAN.md](BIO_DRIVES_PLAN.md), [DAVIS.md](DAVIS.md), [SHOWRUNNER.md](SHOWRUNNER.md).*
+*Review of main as of 2026-09-19 (`653a66a`). Plan, not a patch. Companion to [BIO_DRIVES_PLAN.md](BIO_DRIVES_PLAN.md), [DAVIS.md](DAVIS.md), [SHOWRUNNER.md](SHOWRUNNER.md), [NOISE_AND_LAYERS.md](NOISE_AND_LAYERS.md) (the weather).
+
+The clock lives here. The field those seconds push lives in the noise/layers note.*
 
 The instrument already has a real motion stack: one WebGL loop, a SoA boid integrator, audio ballistics, voice MIX, palette dissolve, morph ease. The remaining mechanical feel is not a missing FX pass. It is **frame-rate-coupled physics**, **a single-sine life LFO**, **raw audio into scale**, and **mid-morph integer pops**.
 
@@ -55,6 +57,7 @@ Determinism is not the enemy. Hash-keyed noise and contacts can stay. Only the *
 - **Touchpoint:** `particles.js` update signature; one clock in `liveLoop.mjs` (`performance.now()`). Studio bake already thinks in step counts — live should too.
 - **Better later:** fixed 1/60 (or 1/120) inner step with an accumulator. Display frame stays pointer-responsive; sim stays deterministic. Live and `studio.py video` share a clock.
 - **Gate:** until dt is real, every easing tweak still wobbles when the governor sheds.
+- **Unlocks:** [NOISE_AND_LAYERS.md](NOISE_AND_LAYERS.md) shared-field `nt` and curl wind. Same clock.
 
 ### 2.2 Critically damped heading — bodies, not steppers
 
@@ -140,7 +143,7 @@ Atlas bake: keep drawing motion on existing combos while new ones bake, or prefe
 4. **Morph without mid-lerp integer rounding; dual-layer voice dissolves.**
 5. Soft walls, fade spawn / death, live-path smear.
 
-First PR is step 1 + 2. That alone turns a stepper flock into a heavy fluid flock without touching look or seeds.
+First PR is step 1 + 2. That alone turns a stepper flock into a heavy fluid flock without touching look or seeds. Noise/layers work ([NOISE_AND_LAYERS.md](NOISE_AND_LAYERS.md) §5) starts after step 1 — shared `nt` needs this clock.
 
 ## 5. Acceptance
 
