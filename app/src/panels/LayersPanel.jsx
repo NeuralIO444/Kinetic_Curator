@@ -82,6 +82,11 @@ export function LayersPanel() {
     }
   }
 
+  function otherTarget(layer) {
+    const hit = contentTargets.find((t) => t.id !== layer.id);
+    return hit ? hit.n - 1 : 0;
+  }
+
   return (
     <div className="panel panel-layers">
       <PanelHeader tag="P08" title="LAYERS" subtitle={`${contentCount} / ${MAX_CONTENT_TRACKS} tracks`}>
@@ -114,6 +119,8 @@ export function LayersPanel() {
           const soloed = layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
           const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
           const patch = layer.patch || { mode: 'off', to: 0 };
+          const selfIdx = (ordinals.get(layer.id) || 1) - 1;
+          const to = patch.to === selfIdx ? otherTarget(layer) : patch.to;
           return (
             <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''}`}>
               <div className="layer-row-main">
@@ -177,7 +184,7 @@ export function LayersPanel() {
                   <select
                     className="tg blend-mode-select"
                     value={patch.mode}
-                    onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to: patch.to })}
+                    onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to: otherTarget(layer) })}
                   >
                     <option value="off">OFF</option>
                     <option value="mod">MOD</option>
@@ -186,7 +193,7 @@ export function LayersPanel() {
                   </select>
                   <select
                     className="tg blend-mode-select"
-                    value={String(patch.to)}
+                    value={String(to)}
                     disabled={patch.mode === 'off'}
                     onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: Number(e.target.value) })}
                   >
