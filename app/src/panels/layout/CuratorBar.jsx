@@ -1,8 +1,9 @@
 // Curator bar — the taste-guided re-roll over unlocked params.
 // Rolls CURATE_CANDIDATES scenes, keeps the curator engine's pick.
-// The voice select chooses which persona tastes the candidates ("off" =
-// honest dice roll). The hint always says who picked.
-import { useState } from 'react';
+// The voice popup (left of the Curator button) chooses which persona
+// tastes the candidates ("off" = honest dice roll). The hint always says
+// who picked.
+import { useEffect, useRef, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { getActiveCurator, curatorHint } from '../../curator/curate.js';
 import { useStore } from '../../state/store.js';
@@ -15,13 +16,37 @@ import {
 
 export function CuratorBar({ lockCount }) {
   const [voice, setVoice] = useState(getActivePersonaId() ?? 'off');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef(null);
   const curator = getActiveCurator();
   const hint = curatorHint(curator);
-  const onVoice = (e) => {
-    const v = e.target.value;
-    setActivePersona(v === 'off' ? null : v);
-    setVoice(v === 'off' ? 'off' : getActivePersonaId() ?? 'off');
+
+  // Close the popup on outside click or Escape.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const pickVoice = (id) => {
+    setActivePersona(id === 'off' ? null : id);
+    setVoice(id === 'off' ? 'off' : getActivePersonaId() ?? 'off');
+    setMenuOpen(false);
   };
+  const activeAlias =
+    voice === 'off'
+      ? 'off'
+      : PERSONA_TASTES.find((p) => p.id === voice)?.alias ?? voice;
   const onCurate = () => {
     emit(Events.LAYOUT_CURATE);
     // The persona brings its palette: switch the global palette to the
@@ -36,21 +61,41 @@ export function CuratorBar({ lockCount }) {
   };
   return (
     <div className="randomize-bar">
-      <button className="randomize-btn" onClick={onCurate}>
-        Curator
-      </button>
-      <select
-        className="curator-voice-select"
-        value={voice}
-        onChange={onVoice}
-        title="Persona voice tasting the candidates — off means a plain dice roll"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <option value="off">voice: off</option>
-        {PERSONA_TASTES.map((p) => (
-          <option key={p.id} value={p.id}>voice: {p.alias}</option>
-        ))}
-      </select>
+      <div className="curator-left-group">
+        <div className="curator-voice-wrap" ref={wrapRef}>
+          <button
+            className="curator-voice-btn"
+            onClick={() => setMenuOpen((o) => !o)}
+            title="Persona voice tasting the candidates — off means a plain dice roll"
+          >
+            voice: {activeAlias} ▾
+          </button>
+          {menuOpen && (
+            <div className="curator-voice-menu" role="menu">
+              <button
+                role="menuitem"
+                className={voice === 'off' ? 'active' : ''}
+                onClick={() => pickVoice('off')}
+              >
+                voice: off
+              </button>
+              {PERSONA_TASTES.map((p) => (
+                <button
+                  role="menuitem"
+                  key={p.id}
+                  className={voice === p.id ? 'active' : ''}
+                  onClick={() => pickVoice(p.id)}
+                >
+                  voice: {p.alias}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button className="randomize-btn" onClick={onCurate}>
+          Curator
+        </button>
+      </div>
       <span className="randomize-hint">{lockCount > 0 ? `${lockCount} locked · ` : ''}{hint}</span>
     </div>
   );

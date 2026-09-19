@@ -103,6 +103,29 @@
 .randomize-btn:hover { background: var(--ink); color: var(--bg); }
 .randomize-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
 
+.curator-left-group { display: flex; align-items: center; gap: 6px; }
+.curator-voice-wrap { position: relative; }
+.curator-voice-btn {
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 3px 6px;
+  text-transform: uppercase; transition: all 100ms; white-space: nowrap;
+}
+.curator-voice-btn:hover { background: var(--ink); color: var(--bg); }
+.curator-voice-menu {
+  position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 50;
+  display: flex; flex-direction: column; min-width: 160px;
+  background: var(--bg); border: 1px solid var(--line-2);
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+}
+.curator-voice-menu button {
+  background: transparent; border: none; color: var(--ink);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  text-align: left; padding: 6px 8px; cursor: pointer; white-space: nowrap;
+}
+.curator-voice-menu button:hover { background: var(--ink); color: var(--bg); }
+.curator-voice-menu button.active { color: var(--accent); }
+.curator-voice-menu button.active:hover { background: var(--ink); color: var(--bg); }
+
 .lock-badge, .drift-badge {
   font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 2px;
   letter-spacing: 0.05em; text-transform: uppercase;
