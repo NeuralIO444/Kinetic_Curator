@@ -13,6 +13,12 @@
 // If a persona .md changes, re-distill by hand and update the rationale.
 // A future MLX ranker replaces this whole file; the engine contract in
 // curate.js is unchanged by that swap.
+//
+// DISPLAY POLICY (Matt's IP caution): the product surface NEVER shows real
+// artist names. `name` is the honest lineage kept in code only; `alias` is
+// the TE-style evocative label the UI shows (voice selector, "persona pick:
+// <alias>" hint). After <artist> attribution stays here in code and in the
+// persona source files — lineage documented, just not on the surface.
 
 export const TASTE_FEATURES = [
   'markDensity',    // count — how many marks
@@ -38,6 +44,7 @@ export const PERSONA_TASTES = [
   {
     id: 'davis',
     name: 'Joshua Davis',
+    alias: 'OVERLAP',
     rationale:
       'Loves maximum density with legible modules and weighted-probability richness; avoids pure noise with no authored structure.',
     weights: {
@@ -49,6 +56,7 @@ export const PERSONA_TASTES = [
   {
     id: 'molnar',
     name: 'Vera Molnár',
+    alias: 'NEAR GRID',
     rationale:
       'Organized structure with ~1% disorder: vast seas of tiny marks, near-zero chaos, pared-down vocabulary.',
     weights: {
@@ -59,6 +67,7 @@ export const PERSONA_TASTES = [
   {
     id: 'mohr',
     name: 'Manfred Mohr',
+    alias: 'MONO AXIS',
     rationale:
       'Rational exhaustive variation on one motif; disturbance of symmetry for tension but never chaos; slow structural motion.',
     weights: {
@@ -69,6 +78,7 @@ export const PERSONA_TASTES = [
   {
     id: 'benjamin',
     name: 'Karl Benjamin',
+    alias: 'HARD EDGE',
     rationale:
       'Tight ordered structure as the setting for invention; flat, calm, full fields; no gestural chaos.',
     weights: {
@@ -79,6 +89,7 @@ export const PERSONA_TASTES = [
   {
     id: 'reas',
     name: 'Casey Reas',
+    alias: 'PROCESS FIELD',
     rationale:
       'Simple elements + behaviors in continuous motion; full-surface field, no focal center, no finished state.',
     weights: {
@@ -89,6 +100,7 @@ export const PERSONA_TASTES = [
   {
     id: 'haeckel',
     name: 'Ernst Haeckel',
+    alias: 'SPECIMEN',
     rationale:
       'Perfect symmetry as organizing law; dense fine detail on a stripped void ground; only slow ornamental breathing.',
     weights: {
@@ -99,6 +111,7 @@ export const PERSONA_TASTES = [
   {
     id: 'oxman',
     name: 'Neri Oxman',
+    alias: 'GROWN',
     rationale:
       'Grown gradients varying by field logic; environmental responsiveness; never static, never assembled.',
     weights: {
@@ -109,6 +122,7 @@ export const PERSONA_TASTES = [
   {
     id: 'stock',
     name: 'Mark Stock',
+    alias: 'VORTEX',
     rationale:
       'One dominant flow event in deep negative space; real turbulence frozen at peak; fine filamentary detail.',
     weights: {
@@ -119,6 +133,7 @@ export const PERSONA_TASTES = [
   {
     id: 'anadol',
     name: 'Refik Anadol',
+    alias: 'LATENT DRIFT',
     rationale:
       'Everything in ceaseless flow; full-bleed with no center; never still, never a frozen frame.',
     weights: {
@@ -129,6 +144,7 @@ export const PERSONA_TASTES = [
   {
     id: 'menkman',
     name: 'Rosa Menkman',
+    alias: 'COMPRESSION',
     rationale:
       'Rupture as material: the accident legible, feedback in the loop, seamless polish is the enemy.',
     weights: {

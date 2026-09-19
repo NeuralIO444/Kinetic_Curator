@@ -140,6 +140,91 @@ export const PALETTES = [
     ink: '#264653',
     swatches: ['#2a9d8f', '#e9c46a', '#e76f51', '#264653', '#f4a261'],
   },
+  // ── Persona palettes (curator render profiles) ──────────────────────────
+  // One palette per proving persona. Brought in by the Curator when that
+  // persona's voice is active — this is the color jump. Each is an honest
+  // interpretation of the artist's working palette, documented in
+  // app/src/curator/renderProfiles.js with its research source.
+  {
+    id: 'persona-davis',
+    name: 'OVERLAP',
+    era: 'Persona voice · after Joshua Davis',
+    bg: '#0d0d12',
+    ink: '#f5f2ea',
+    swatches: ['#c6ff00', '#ff2d78', '#00e5ff', '#ff7a1a', '#8b2fff', '#00ffa3', '#ff3b30', '#f5f2ea'],
+  },
+  {
+    id: 'persona-benjamin',
+    name: 'HARD EDGE',
+    era: 'Persona voice · after Karl Benjamin',
+    bg: '#ddd6c2',
+    ink: '#161616',
+    swatches: ['#d8361b', '#1fae9e', '#5cb531', '#f0b429', '#7b2ff7', '#7a2230', '#8a6b46', '#161616'],
+  },
+  {
+    id: 'persona-reas',
+    name: 'PROCESS FIELD',
+    era: 'Persona voice · after Casey Reas',
+    bg: '#0a0a0a',
+    ink: '#f5f5f5',
+    swatches: ['#f5f5f5', '#cfcfcf', '#9a9a9a', '#6b6b6b', '#3f3f3f'],
+  },
+  {
+    id: 'persona-haeckel',
+    name: 'SPECIMEN',
+    era: 'Persona voice · after Ernst Haeckel',
+    bg: '#f0e8d0',
+    ink: '#2a2419',
+    swatches: ['#211d15', '#7d8b6f', '#d9a7a0', '#a3804f', '#75828c', '#c9963c', '#4e5a43'],
+  },
+  {
+    id: 'persona-molnar',
+    name: 'NEAR GRID',
+    era: 'Persona voice · after Vera Molnár',
+    bg: '#eeebe6',
+    ink: '#1a1a1a',
+    swatches: ['#d63a2f', '#e89fb8', '#4a9a52', '#e87e2e', '#f0c83a', '#7a4a9e', '#2e5fa8', '#1a1a1a'],
+  },
+  {
+    id: 'persona-mohr',
+    name: 'MONO AXIS',
+    era: 'Persona voice · after Manfred Mohr',
+    bg: '#0d0d0f',
+    ink: '#e8e8e8',
+    swatches: ['#e8e8e8', '#8f8f8f', '#3a3a3e', '#7ac74f', '#2e5fd0', '#d06090'],
+  },
+  {
+    id: 'persona-anadol',
+    name: 'LATENT DRIFT',
+    era: 'Persona voice · after Refik Anadol',
+    bg: '#14092b',
+    ink: '#f1ede6',
+    swatches: ['#d84e8c', '#7a2430', '#d9a62e', '#3aa5ba', '#e0523c', '#41c4de', '#e89ca8', '#d65f1c'],
+  },
+  {
+    id: 'persona-menkman',
+    name: 'COMPRESSION',
+    era: 'Persona voice · after Rosa Menkman',
+    bg: '#0c0c0c',
+    ink: '#eaeadf',
+    swatches: ['#eaeadf', '#7ed42e', '#d62598', '#2b4fd8', '#dce82a', '#3ec83e', '#2ed8c8'],
+  },
+  {
+    id: 'persona-oxman',
+    name: 'GROWN',
+    era: 'Persona voice · after Neri Oxman',
+    bg: '#efe9dc',
+    ink: '#5e3b1d',
+    swatches: ['#d9cfb8', '#8a5a2b', '#5e3b1d', '#c98a3a', '#f5f2ea', '#9c8b70', '#6e6250'],
+  },
+  {
+    id: 'persona-stock',
+    name: 'VORTEX',
+    era: 'Persona voice · after Mark Stock',
+    bg: '#261e17',
+    ink: '#d8d2c4',
+    swatches: ['#d8d2c4', '#e8621c', '#7a8b3f', '#a8602f', '#1f5fbf', '#3fbf6a', '#b31217', '#2c3a55'],
+  },
 ];
 
 /**

@@ -142,8 +142,8 @@ assert.deepStrictEqual(pickPersona(cands, 'bogus-persona', mulberry32(1)), -1);
   setActivePersona('davis');
   const eng = personaCurator();
   assert.strictEqual(eng.status(), 'active');
-  assert.strictEqual(eng.personaName, 'Joshua Davis');
-  assert.strictEqual(curatorHint(eng), 'persona pick: Joshua Davis');
+  assert.strictEqual(eng.personaName, 'OVERLAP'); // IP caution: surface shows the alias
+  assert.strictEqual(curatorHint(eng), 'persona pick: OVERLAP');
   // engine participates in the shared pick path as curated
   const r = pickCurated(cands, eng);
   assert.strictEqual(r.curated, true);
@@ -160,7 +160,7 @@ assert.deepStrictEqual(pickPersona(cands, 'bogus-persona', mulberry32(1)), -1);
   setActivePersona('davis'); // restore default for the app
   assert.strictEqual(getActivePersonaId(), 'davis');
   assert.strictEqual(getActiveCurator().status(), 'active');
-  assert.strictEqual(curatorHint(getActiveCurator()), 'persona pick: Joshua Davis');
+  assert.strictEqual(curatorHint(getActiveCurator()), 'persona pick: OVERLAP');
 }
 
 console.log('taste.selfcheck: ok');
