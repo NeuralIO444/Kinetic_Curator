@@ -215,11 +215,26 @@ export const createVoiceSlice = (set) => ({
     const to = mix.to;
     const next = { ...pushToUndo(state, true) };
     next.layoutParams = { ...to.params };
-    next.paletteOverrides = {
-      bg: to.palette.bg,
-      ink: to.palette.ink,
-      swatches: [...to.palette.swatches],
-    };
+    // Voices are catalog-independent (freeform colors), so they always land
+    // as an override blob — unchanged from day one. A preset mix (#284-style
+    // "morph, don't cut") instead pairs a real catalog id: `to.paletteId` set
+    // means land clean (paletteId + no override, byte-identical colors to
+    // the blend's endpoint); left undefined, this is a no-op for voices.
+    if (to.paletteId) {
+      next.paletteId = to.paletteId;
+      next.paletteOverrides = null;
+      next.paletteLocks = {};
+    } else if (to.paletteId === undefined) {
+      next.paletteOverrides = {
+        bg: to.palette.bg,
+        ink: to.palette.ink,
+        swatches: [...to.palette.swatches],
+      };
+    }
+    // to.paletteId === null: the mix didn't touch color (a preset with no
+    // palette pairing) — leave paletteId/paletteOverrides exactly as they
+    // are, so a plain composition swap doesn't freeze the current colors
+    // into a stray override.
     if (to.assets === 'all') {
       const m = {};
       for (const k of Object.keys(state.enabledAssets || {})) m[k] = true;
