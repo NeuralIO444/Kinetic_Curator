@@ -28,6 +28,7 @@ import {
   allCostTiers,
   tier1ShedIds,
   shedOrder,
+  radialFanMultiplier,
   TIER_COST_BANDS,
   COST_TIER_INFO,
 } from './costTiers.mjs';
@@ -215,5 +216,26 @@ console.log('[selfcheck] E shedOrder — tier 1 first, tier 0 last');
     'shedSummary strings match the instrument names');
 }
 console.log('[selfcheck] E shedSummary strings match the instrument names');
+
+// ---- F. radial-fan item multiplier (#287 §6.1) ---------------------------
+// Forward-compatible data only: the radial-4/6/8 enum values live in
+// unmerged PR #333, so this asserts the documented item math
+// ((bodyLen+N)/(bodyLen+2) vs the bilateral baseline) — never main's
+// SYMMETRY_MODES, which doesn't know radial yet.
+for (const s of ['none', 'bilateral', 'stamp', undefined, null, '', 'radial', 'radial-2', 'RADIAL-4', 'radial-x']) {
+  assert.strictEqual(radialFanMultiplier(s, 2), 1, `no fan for symmetry ${String(s)}`);
+}
+assert.strictEqual(radialFanMultiplier('radial-4', 2), 1.5, 'radial-4 @ body 2 → (2+4)/(2+2)');
+assert.strictEqual(radialFanMultiplier('radial-6', 2), 2, 'radial-6 @ body 2 → (2+6)/(2+2)');
+assert.strictEqual(radialFanMultiplier('radial-8', 1), 3, 'radial-8 @ body 1 (medusa bell) → (1+8)/(1+2)');
+assert.ok(Math.abs(radialFanMultiplier('radial-8', 7) - 15 / 9) < 1e-12,
+  'radial-8 @ body 7 (segmented radiolarian) → (7+8)/(7+2)');
+// bodyLen clamps to 1..7, mirroring particles.js.
+assert.strictEqual(radialFanMultiplier('radial-6', 0), radialFanMultiplier('radial-6', 1), 'body clamps low');
+assert.strictEqual(radialFanMultiplier('radial-6', 99), radialFanMultiplier('radial-6', 7), 'body clamps high');
+// Monotonic in folds at fixed body: higher fold counts cost more.
+assert.ok(radialFanMultiplier('radial-8', 3) > radialFanMultiplier('radial-6', 3)
+  && radialFanMultiplier('radial-6', 3) > radialFanMultiplier('radial-4', 3), 'monotonic in folds');
+console.log('[selfcheck] F radial-fan multiplier — (bodyLen+N)/(bodyLen+2), 1 for non-radial');
 
 console.log('[selfcheck] cost tiers OK — declarations valid, coverage complete, bands hold, governor registry-driven');
