@@ -50,7 +50,7 @@ function baseLp(over = {}) {
 function makeSystem(count, lpOver = {}, palette = PAL, seed = 1234) {
   const ps = new ParticleSystem();
   const lp = baseLp({ particleCount: count, ...lpOver });
-  ps.init(count, 1000, 700, ASSETS, palette, seed, { graze: lp.graze });
+  ps.init(count, 1000, 700, ASSETS, palette, seed, null, { graze: lp.graze });
   return { ps, lp };
 }
 
@@ -144,8 +144,11 @@ ok('pigment drifts toward the neighbours average and writes back quantized (leak
   run(ps, lp, 601, 999, LEAK_PAL);
   const changed = ps.color.filter((c, i) => c !== before[i]).length;
   assert.ok(changed > 0, `expected some quantized write-backs after 601 steps, got ${changed}`);
-  // Every written color is 4-bit quantized per channel.
-  for (const c of ps.color) {
+  // Every written color is 4-bit quantized per channel. An agent that never
+  // came within leak range of a neighbour is never written back and keeps its
+  // raw swatch, so only the changed entries are checked.
+  for (const [i, c] of ps.color.entries()) {
+    if (c === before[i]) continue;
     const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/.exec(c);
     assert.ok(m, `color not hex: ${c}`);
     for (const ch of m.slice(1)) {
@@ -250,7 +253,7 @@ ok('scent field exists only for organism casts', () => {
   assert.ok(hype.ps._scent && hype.ps._scent.kind === 'scent');
   const cloud = new ParticleSystem();
   const clp = baseLp({ mode: 'swarm', particleCount: 10 });
-  cloud.init(10, 1000, 700, ASSETS, PAL, 42, { graze: 0 });
+  cloud.init(10, 1000, 700, ASSETS, PAL, 42, null, { graze: 0 });
   for (let k = 0; k < 3; k++) cloud.update(clp, ASSETS, PAL, 42, k * 16.7, null);
   assert.equal(cloud._scent, null);
 });
