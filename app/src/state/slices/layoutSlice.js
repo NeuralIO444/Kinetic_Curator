@@ -3,11 +3,12 @@ import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, trimUndoStack, UNDO_KIND_LAYERS } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
-import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
+import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/palettes.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, defaultSeedOffsets, normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
+import { resolveVoiceState, captureLiveVoiceState } from '../../data/voices.js';
 
 export const createLayoutSlice = (set) => ({
   seed: 0xa17e9b21,
@@ -309,13 +310,39 @@ export const createLayoutSlice = (set) => ({
       }
     }
     if (!changed && state.layoutParams.composition === preset.id) return {};
+    // A preset chip morphs like a voice chip (#284): open a MIX toward the
+    // preset instead of hard-cutting. `state.layoutParams`/paletteOverrides/
+    // enabledAssets stay untouched until commit — commitVoiceMix lands them
+    // in one undo step, same as loadVoice. `to.paletteId`: a real catalog id
+    // when pairing, else null so commit leaves color state alone (see
+    // commitVoiceMix) instead of freezing the current colors into a stray
+    // override.
+    const paletteSrc = palettePatch
+      ? getCatalogPalette(palettePatch.paletteId, state.userPalettes)
+      : resolvePalette(state.paletteId, state.paletteOverrides, state.userPalettes);
+    const enabled = state.enabledAssets || {};
+    const ids = Object.keys(enabled);
+    const allOn = ids.length > 0 && ids.every((id) => !!enabled[id]);
+    const to = {
+      ...resolveVoiceState({
+        params: merged,
+        palette: paletteSrc,
+        assets: assetsPatch ? assetsPatch.enabledAssets : (allOn ? 'all' : { ...enabled }),
+        blendSeconds: 2,
+      }),
+      paletteId: palettePatch ? palettePatch.paletteId : null,
+    };
     return {
-      ...pushToUndo(state, true),
-      layoutParams: merged,
-      voiceMix: null,
-      activeVoiceId: null,
-      ...(palettePatch || {}),
-      ...(assetsPatch || {}),
+      voiceMix: {
+        from: captureLiveVoiceState(state),
+        to,
+        t: 0,
+        durationMs: Math.max(200, (to.blendSeconds || 2) * 1000),
+        auto: true,
+        startedAt: performance.now(),
+        targetVoiceId: null,
+        targetName: preset.name || preset.id,
+      },
     };
   }),
 
