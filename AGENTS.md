@@ -2,6 +2,8 @@
 
 Read this before writing code. The product spec for the current engine push is [`docs/ENGINE_PLAN.md`](docs/ENGINE_PLAN.md). That file wins if this one and a chat prompt disagree.
 
+**Embargo:** [`docs/EMBARGO.md`](docs/EMBARGO.md) — no new features until spine C is merged and Matt has played the body. Deferred labs are not tickets.
+
 Long-range layers (do not implement out of order): [`docs/path/README.md`](docs/path/README.md).
 
 ## Roles
@@ -52,6 +54,8 @@ Parallel tape lane (#342 PR #383, #341 FX cap) is **not** yours unless the issue
 **Parked until spine E:** tempo clock, slave bus, SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md) + [`docs/ROOM_REVIEW.md`](docs/ROOM_REVIEW.md) + [`docs/path/04-set-spine.md`](docs/path/04-set-spine.md). Do not file or implement T0–T2 while #387 is open.
 
 **Authoring freeze:** no new showcase / persona / bio-drive chips on the performance deck. Extra costumes are DLC/drawer. Bio-drive *engine* stays in core. See [`docs/path/06-library.md`](docs/path/06-library.md).
+
+**No labs until C is felt:** chip editor, species dish, UV scroll, HarfBuzz, synbio chrome — [`docs/CHIP_LAB.md`](docs/CHIP_LAB.md), [`docs/ASSET_LAB.md`](docs/ASSET_LAB.md), [`docs/SYNTHETIC_BIOLOGY.md`](docs/SYNTHETIC_BIOLOGY.md).
 
 ## PR rules
 
