@@ -3,6 +3,10 @@
 *Design doc — no code. September 18, 2026. Parked under the feature freeze;
 builds only on Matt's word, phase by phase.*
 
+How tracks share a *field* (shared Simplex/fBm, curl wind, live displacement,
+FEED-as-weather) is [NOISE_AND_LAYERS.md](NOISE_AND_LAYERS.md). This note is
+the tape, the caps, and the patch language. That note is the weather.
+
 ## 1. The concept
 
 **KC-1**: one layer is one complete configuration of the Kinetic Curator system.
@@ -16,7 +20,7 @@ below renames, caps, and patches that system. It invents no new architecture.
 
 ## 2. Where tracks live
 
-The existing **LAYERS panel** (`app/src/panels/LayersPanel.jsx`, tag P08, ▤,
+The existing **LAYERS panel** (`app/src/panels/LayersPanel.jsx`, tag P08, ▦,
 secondary zone) becomes the track bay. **No new panel** — the 4-surface
 consolidation (PLAY / BUILD / ASSETS / OUTPUT) is untouched, and the TE rule
 ("remove controls, keep capabilities") holds: tracks and patching are rows
@@ -93,6 +97,9 @@ panel, no new surface — two small controls per track, TE-minimal.
 
 Each flavor is its own build issue and its own PR, and each needs Matt's eyes
 before merge — coupling is felt, not unit-tested.
+
+How FIELD / FEED should share one Simplex field, and why swarm wind should
+use `curl2`, is [NOISE_AND_LAYERS.md](NOISE_AND_LAYERS.md) §2.
 
 ## 7. Icon inventory (throughout — Matt draws)
 
