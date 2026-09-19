@@ -180,18 +180,18 @@
 
 .palette-switch { display: inline-flex; align-items: center; gap: 3px; flex-wrap: nowrap; }
 .palette-save-btn { flex-shrink: 0; }
-.palette-switch-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; margin-right: 3px; }
+.palette-switch-label { color: var(--dim); font-size: 10px; letter-spacing: 0.1em; margin-right: 3px; }
 /* #278 — VJ MIX slider: lives inside the palette switcher, no new panel. */
 .palette-mix { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; flex-shrink: 0; }
 .palette-mix-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; }
 .palette-mix-slider { width: 90px; }
 .palette-chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 2px 5px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 6px;
   background: rgba(255,255,255,0.02);
   border: 1px solid var(--line);
   color: var(--dim);
-  font-size: 9px; letter-spacing: 0.06em;
+  font-size: 10px; letter-spacing: 0.06em;
   transition: all 100ms;
 }
 .palette-chip:hover { color: var(--ink); border-color: var(--line-2); }
@@ -200,7 +200,7 @@
 .palette-chip-wrap { display: inline-flex; align-items: center; }
 /* #357 — tiny key-hint numeral on each palette chip; quiet on purpose. */
 .palette-chip-num {
-  font-size: 8px;
+  font-size: 9px;
   line-height: 1;
   color: var(--dim);
   opacity: 0.55;
@@ -209,7 +209,7 @@
 }
 .palette-sw-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
 .palette-lock-pip {
-  width: 9px; height: 5px; padding: 0; line-height: 4px; font-size: 6px;
+  width: 10px; height: 6px; padding: 0; line-height: 4px; font-size: 6px;
   background: transparent; border: 1px solid var(--line); color: var(--dim);
   display: flex; align-items: center; justify-content: center;
 }
@@ -217,7 +217,7 @@
 .palette-sw-cell.locked .palette-sw-full { outline: 1px solid var(--accent2); }
 .palette-harmony-select {
   background: transparent; border: 1px solid var(--line); color: var(--dim);
-  font-size: 8px; letter-spacing: 0.04em; padding: 1px 2px; margin-left: 4px;
+  font-size: 9px; letter-spacing: 0.04em; padding: 2px 3px; margin-left: 4px;
 }
 .palette-del-btn {
   background: transparent; border: 1px solid transparent; color: var(--dim);
@@ -226,32 +226,32 @@
 .palette-del-btn:hover { color: var(--accent2); border-color: var(--accent2); }
 .palette-save-btn {
   background: transparent; border: 1px dashed var(--line-2); color: var(--dim);
-  font-size: 9px; letter-spacing: 0.06em; padding: 2px 6px; margin-left: 4px;
+  font-size: 10px; letter-spacing: 0.06em; padding: 3px 7px; margin-left: 4px;
 }
 .palette-save-btn:hover { color: var(--ink); border-color: var(--ink); }
-.palette-chip-swatches { display: inline-flex; gap: 1px; }
-.palette-chip-sw { width: 7px; height: 10px; }
+.palette-chip-swatches { display: inline-flex; gap: 2px; }
+.palette-chip-sw { width: 8px; height: 12px; }
 
 .palette-active-strip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 .palette-active-swatches {
   display: inline-flex;
-  gap: 1px;
+  gap: 2px;
 }
 .palette-sw-full {
-  width: 9px;
-  height: 12px;
+  width: 10px;
+  height: 14px;
   border: 1px solid rgba(255,255,255,0.12);
   box-sizing: border-box;
   display: block;
 }
 .palette-meta-sw {
   position: relative;
-  width: 14px;
-  height: 12px;
+  width: 16px;
+  height: 14px;
   border: 1px solid rgba(255,255,255,0.25);
   box-sizing: border-box;
   display: inline-flex;
@@ -317,11 +317,11 @@
 .palette-sw-viewport {
   display: inline-flex;
   overflow: hidden;
-  width: 49px; /* 5 swatch cells (9px) + 4 gaps (1px) */
+  width: 58px; /* 5 swatch cells (10px) + 4 gaps (2px) */
 }
 .palette-sw-track {
   display: inline-flex;
-  gap: 1px;
+  gap: 2px;
   transition: transform 180ms ease;
   will-change: transform;
 }
