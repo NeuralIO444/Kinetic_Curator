@@ -4,6 +4,7 @@ import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRe
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
+import { ASSETS } from '../../data/assets/index.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, defaultSeedOffsets, normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
@@ -280,8 +281,42 @@ export const createLayoutSlice = (set) => ({
         changed = true;
       }
     }
+    // #284: a preset may pair with a catalog palette (one-click voice — the
+    // preset chip also switches the palette, like the #220 palette pairing
+    // convention, instead of leaving the old colors on the new composition).
+    // The id must resolve to a real catalog/user entry, never the fallback.
+    let palettePatch = null;
+    if (preset.paletteId && preset.paletteId !== state.paletteId
+        && getCatalogPalette(preset.paletteId, state.userPalettes)?.id === preset.paletteId) {
+      palettePatch = { paletteId: preset.paletteId, paletteOverrides: null, paletteLocks: {} };
+      changed = true;
+    }
+    // #284: a preset may also carry its asset pool (a voice is the full
+    // look — composition + palette + assets). Only known ids are kept, and
+    // the pool only switches when at least one id resolves; undo already
+    // snapshots enabledAssets, so this stays one undo step.
+    let assetsPatch = null;
+    if (Array.isArray(preset.assetIds) && preset.assetIds.length) {
+      const known = new Set(ASSETS.map((a) => a.id));
+      for (const c of state.customAssets || []) known.add(c.id);
+      const map = {};
+      for (const id of preset.assetIds) {
+        if (typeof id === 'string' && known.has(id)) map[id] = true;
+      }
+      if (Object.keys(map).length) {
+        assetsPatch = { enabledAssets: map };
+        changed = true;
+      }
+    }
     if (!changed && state.layoutParams.composition === preset.id) return {};
-    return { ...pushToUndo(state, true), layoutParams: merged, voiceMix: null, activeVoiceId: null };
+    return {
+      ...pushToUndo(state, true),
+      layoutParams: merged,
+      voiceMix: null,
+      activeVoiceId: null,
+      ...(palettePatch || {}),
+      ...(assetsPatch || {}),
+    };
   }),
 
   toggleParamLock: (key) => set((state) => ({

@@ -444,6 +444,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
         optics: layoutParams.accumulationOptics,
         tunnel: layoutParams.accumulationTunnel,
         prism: layoutParams.accumulationPrism,
+        flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider
       },
       audioBands: s.audioBands,
       audioOn: !!s.audioEnabled,

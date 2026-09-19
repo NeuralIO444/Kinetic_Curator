@@ -31,6 +31,8 @@ export const HELP_TOPICS = [
   { id: 'output-recipe', group: 'Output', title: 'RECIPE', text: 'Each snapshot has a copy button for its recipe as plain text (seed, params, sub-seed offsets). Paste it back with PASTE RECIPE to restore the exact scene.' },
   { id: 'davis-clear', group: 'Ghost Station', title: 'CLEAR', text: 'Wipe the trail buffer to the background.' },
   { id: 'layers-blend', group: 'Layers', title: 'BLEND', text: 'How this layer composites onto the stack below.' },
+  { id: 'output-loop', group: 'Output', title: 'CAPTURE LOOP', text: 'Records a fixed-length take and exports it as a seamless looping WebM — the tail dissolves into the head so there is no visible cut.' },
+  { id: 'layout-flow', group: 'Layout', title: 'FLOW', text: 'Curl-advects the ACCUM trail buffer as it decays — trails curl like smoke instead of just fading. 0 is off.' },
 ];
 
 // #158: the single source of truth. Hover `title` attributes and the `?`
