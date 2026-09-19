@@ -47,7 +47,9 @@ G  bufferSubData — piggyback on B or D, not its own epic
 
 Parallel tape lane (#342 PR #383, #341 FX cap) is **not** yours unless the issue is assigned. Do not mix tape work into a spine PR.
 
-**Parked until spine E:** tempo clock + SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md). Do not file or implement T0–T2 while #387 is open.
+**Parked until spine E:** tempo clock, slave bus, SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md) + [`docs/ROOM_REVIEW.md`](docs/ROOM_REVIEW.md). Do not file or implement T0–T2 while #387 is open.
+
+**Authoring freeze:** no new showcase / persona / bio-drive chips on the performance deck. Extra costumes are DLC/drawer. Bio-drive *engine* stays in core.
 
 ## PR rules
 
