@@ -16,7 +16,7 @@ function read(rel) {
   return readFileSync(join(src, rel), 'utf8');
 }
 
-import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
+import { HELP_TOPICS, HELP_SHORTCUTS, helpText } from './helpCopy.js';
 
 // ── 1. The map itself: unique ids, every field a non-empty sentence ──
 {
@@ -97,6 +97,32 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
   assert.ok(masterSrc.includes("title={running ? 'Live loop is running"),
     'LIVE/PAUSED pill needs a one-line title');
   console.log('wiring: App / FirstRun / Hotkey / Tray / MasterBar all present');
+}
+
+// ── 5. #158 remainder: hover titles read the single map via helpText ──
+{
+  assert.strictEqual(typeof helpText, 'function', 'helpCopy.js must export helpText(id)');
+  for (const id of ['layout-accum', 'output-webm', 'davis-clear', 'layers-blend']) {
+    assert.ok(helpText(id).length > 0, `helpText('${id}') must resolve to a sentence`);
+  }
+  assert.strictEqual(helpText('no-such-id'), '', 'helpText on unknown id must be empty, not throw');
+  // The four remaining areas from the issue wire their hover titles through
+  // the map, so hover and the `?` overlay cannot drift.
+  const wired = {
+    'panels/layout/ToggleRow.jsx': 'layout-accum',
+    'panels/output/SnapRecordRow.jsx': 'output-webm',
+    'components/MasterBar.jsx': 'output-webm',
+    'panels/LayersPanel.jsx': 'layers-blend',
+    'panels/DavisPanel.jsx': 'davis-clear',
+  };
+  for (const [file, id] of Object.entries(wired)) {
+    const s = read(file);
+    assert.ok(s.includes("from '../../data/helpCopy.js'") || s.includes("from '../data/helpCopy.js'"),
+      `${file} must import from the single helpCopy.js map`);
+    assert.ok(s.includes('helpText('), `${file} must read hover titles via helpText()`);
+    assert.ok(s.includes(`helpText('${id}')`), `${file} must wire helpText('${id}')`);
+  }
+  console.log('single-source hover titles: 5 components wired');
 }
 
 console.log('helpCopy.selfcheck OK');

@@ -6,6 +6,7 @@ import { emit, Events } from '../composition/eventBus.js';
 import { BLEND_MODES } from '../data/layout-modes.js';
 import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../fx/fxFilters.js';
 import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../state/slices/layersSlice.js';
+import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 
 function FxEffectEditor({ layer }) {
   const [addKind, setAddKind] = useState(FX_MENU_KINDS[0]);
@@ -155,7 +156,7 @@ export function LayersPanel() {
                   <select
                     className="tg blend-mode-select"
                     value={layer.layerBlendMode}
-                    title="How this layer composites onto the stack below"
+                    title={helpText('layers-blend')}
                     onChange={(e) => emit(Events.LAYER_SET_BLEND_MODE, { id: layer.id, mode: e.target.value })}
                   >
                     {BLEND_MODES.map(mode => (

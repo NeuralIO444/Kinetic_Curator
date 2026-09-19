@@ -4,6 +4,7 @@ import { TapeCounter } from './TapeCounter.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
 import * as A from '../state/actions.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
+import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 
 export function MasterBar() {
   const { dispatch, history } = useApp();
@@ -41,7 +42,7 @@ export function MasterBar() {
       <div className="master-left">
         {state.isRecording ? (
           <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
-            title="Recording the live canvas to WEBM">
+            title={helpText('output-webm')}>
             <span className="status-dot beat-flash" style={{ background: '#ff2d6f', animationIterationCount: 'infinite' }} />
             REC WEBM
           </div>
