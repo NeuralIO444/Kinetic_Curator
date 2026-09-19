@@ -74,8 +74,11 @@ const at1 = mixVoiceState(a, b, 1);
 assert.deepStrictEqual(at1.params, b.params, 't=1 returns to');
 assert.deepStrictEqual(at1.palette, b.palette, 't=1 palette returns to');
 const mid = mixVoiceState(a, b, 0.5);
-// numeric lerp: swarm glow 0.35 → hype 0.5
-assert.strictEqual(mid.params.accumulationOptics, 0.35 + (0.5 - 0.35) * 0.5);
+// numeric lerp: swarm glow → hype glow, read from the voices themselves so the
+// #361 ACCUM glow ceiling can retune both without breaking this.
+const optA = a.params.accumulationOptics;
+const optB = b.params.accumulationOptics;
+assert.strictEqual(mid.params.accumulationOptics, optA + (optB - optA) * 0.5);
 // int params round: swarm particleCount 280 → hype 90
 assert.strictEqual(mid.params.particleCount, 185);
 // arrays lerp elementwise: scale [0.3,1.1] → [1.2,2.6]
