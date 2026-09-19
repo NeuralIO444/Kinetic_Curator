@@ -1,0 +1,66 @@
+// curate.selfcheck.mjs — the Curator engine seam: honest fallback first.
+import assert from 'node:assert';
+import {
+  CURATE_CANDIDATES,
+  nullCurator,
+  getActiveCurator,
+  pickCurated,
+  curatorHint,
+} from './curate.js';
+
+const cands = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
+// candidate count is sane
+assert.ok(Number.isInteger(CURATE_CANDIDATES) && CURATE_CANDIDATES >= 2);
+
+// null curator: untrained, declines every pick
+{
+  const c = nullCurator();
+  assert.strictEqual(c.status(), 'untrained');
+  assert.strictEqual(c.pick(cands), -1);
+}
+
+// active curator today is the null curator (no taste artifact ships yet)
+assert.strictEqual(getActiveCurator().status(), 'untrained');
+
+// fallback: engine declines -> uniform roll in range, flagged uncurated
+{
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) {
+    const r = pickCurated(cands, nullCurator());
+    assert.strictEqual(r.curated, false);
+    assert.ok(r.index >= 0 && r.index < cands.length);
+    seen.add(r.index);
+  }
+  assert.ok(seen.size > 1, 'fallback roll should vary');
+}
+
+// active stub engine: in-range pick is honored and flagged curated
+{
+  const stub = { status: () => 'active', pick: () => 3 };
+  const r = pickCurated(cands, stub);
+  assert.deepStrictEqual(r, { index: 3, curated: true });
+}
+
+// misbehaving engines degrade to the honest roll, never throw
+{
+  for (const bad of [
+    { status: () => 'active', pick: () => 99 },
+    { status: () => 'active', pick: () => -2 },
+    { status: () => 'active', pick: () => 1.5 },
+    { status: () => 'active', pick: () => { throw new Error('boom'); } },
+  ]) {
+    const r = pickCurated(cands, bad);
+    assert.strictEqual(r.curated, false);
+    assert.ok(r.index >= 0 && r.index < cands.length);
+  }
+}
+
+// empty candidates: no pick
+assert.deepStrictEqual(pickCurated([], nullCurator()), { index: -1, curated: false });
+
+// hint copy is honest in both states
+assert.strictEqual(curatorHint(nullCurator()), 'curator untrained · dice roll');
+assert.strictEqual(curatorHint({ status: () => 'active', pick: () => 0 }), 'curated pick');
+
+console.log('curate.selfcheck: ok');

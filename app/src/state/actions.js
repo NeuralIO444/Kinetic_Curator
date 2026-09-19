@@ -64,6 +64,7 @@ export const SET_MOTION_SMOOTHING = 'SET_MOTION_SMOOTHING';
 export const TOGGLE_PARAM_LOCK      = 'TOGGLE_PARAM_LOCK';
 export const RANDOMIZE_PARAM        = 'RANDOMIZE_PARAM';
 export const RANDOMIZE_UNLOCKED     = 'RANDOMIZE_UNLOCKED';
+export const CURATE_UNLOCKED        = 'CURATE_UNLOCKED';
 export const STEP_CA_GRID    = 'STEP_CA_GRID';
 export const RESET_CA_GRID   = 'RESET_CA_GRID';
 export const LOAD_PROJECT    = 'LOAD_PROJECT';

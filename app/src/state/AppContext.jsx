@@ -100,6 +100,7 @@ export function useApp(selector) {
       case A.TOGGLE_PARAM_LOCK: return store.toggleParamLock(action.key);
       case A.RANDOMIZE_PARAM: return store.randomizeParam(action.key);
       case A.RANDOMIZE_UNLOCKED: return store.randomizeUnlocked();
+      case A.CURATE_UNLOCKED: return store.curateUnlocked();
       case A.TOGGLE_ASSET: return store.toggleAsset(action.id);
       case A.SOLO_ASSET: return store.soloAsset(action.id);
       case A.TOGGLE_ALL_ASSETS: return store.toggleAllAssets(payload);
