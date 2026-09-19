@@ -33,6 +33,9 @@ function downloadLog() {
 }
 
 function EventRow({ e }) {
+  const fps = e.fps
+    ? `${e.fps.at.toFixed(0)}fps < ${e.fps.threshold}`
+    : null;
   return (
     <div style={{ display: 'flex', gap: 8, fontSize: 11, padding: '2px 0', borderBottom: '1px solid #222' }}>
       <span style={{ color: e.type === 'shed' ? '#ffb454' : '#9fe870', flexShrink: 0 }}>
@@ -41,10 +44,8 @@ function EventRow({ e }) {
       <span style={{ flexShrink: 0, color: '#8a93a6' }}>{new Date(e.t).toLocaleTimeString()}</span>
       <span style={{ flexShrink: 0 }}>step {e.step}</span>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.label}</span>
-      {e.fps && (
-        <span style={{ color: '#8a93a6', marginLeft: 'auto', flexShrink: 0 }}>
-          {e.fps.at.toFixed(0)}fps < {e.fps.threshold}
-        </span>
+      {fps && (
+        <span style={{ color: '#8a93a6', marginLeft: 'auto', flexShrink: 0 }}>{fps}</span>
       )}
     </div>
   );
@@ -107,7 +108,7 @@ export function GovernorXrayPanel() {
         <div key={r.fromName} style={{ display: 'flex', gap: 8, fontSize: 11, padding: '2px 0' }}>
           <span style={{ width: 72 }}>{r.fromName}</span>
           <span style={{ color: r.armed ? '#9fe870' : '#8a93a6' }}>{r.mode.toUpperCase()}</span>
-          <span>{r.armed ? `← ${r.toName}` : '—'}</span>
+          <span>{r.armed ? `\u2190 ${r.toName}` : '\u2014'}</span>
         </div>
       ))}
 
@@ -117,7 +118,7 @@ export function GovernorXrayPanel() {
         <span style={{ color: TIER_COLORS[2] }}> · 2 quality-scaler</span>
         <span style={{ color: TIER_COLORS[3] }}> · 3 cosmetic</span>
         <span style={{ color: TIER_COLORS[0] }}> · 0 structural</span>.
-        Measurements from {MEASURED_AT ? new Date(MEASURED_AT).toLocaleDateString() : '—'}.
+        Measurements from {MEASURED_AT ? new Date(MEASURED_AT).toLocaleDateString() : '\u2014'}.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>Governor cuts (the shed ladder)</h4>
@@ -152,10 +153,10 @@ export function GovernorXrayPanel() {
                   {p.tier} · {p.tierName}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right', color: '#8a93a6' }}>
-                  {p.declaredMs ? `${p.declaredMs}ms` : '—'}
+                  {p.declaredMs ? `${p.declaredMs}ms` : '\u2014'}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right' }}>
-                  {p.measuredMs != null ? `${p.measuredMs.toFixed(1)}ms` : '—'}
+                  {p.measuredMs != null ? `${p.measuredMs.toFixed(1)}ms` : '\u2014'}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right', color: '#8a93a6' }}>{p.memoryMB}</td>
                 <td style={{ padding: '3px 6px', color: p.shed ? '#ffb454' : '#9fe870', fontWeight: p.shed ? 'bold' : 'normal' }}>
@@ -173,7 +174,7 @@ export function GovernorXrayPanel() {
       </h4>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
         <button type="button" className="micro-btn" onClick={downloadLog} title="Download the full governor event log as JSON">
-          ⬇ export log (JSON)
+          export log (JSON)
         </button>
         <button
           type="button"
