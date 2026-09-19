@@ -135,7 +135,7 @@ export const COMPOSITION_IDS = COMPOSITION_PRESETS.map((p) => p.id);
  * A value the UI cannot produce should not survive a project load either.
  */
 export const PARAM_SPEC = {
-  count: { min: 10, max: 800 },
+  count: { min: 10, max: 800, int: true },
   jitter: { min: 0, max: 200 },
   density: { min: 10, max: 100 }, // #272: capped at 100
   zTiers: { min: 1, max: 12, int: true },
@@ -143,7 +143,10 @@ export const PARAM_SPEC = {
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   displacement: { min: 0, max: 250 },
-  particleCount: { min: 10, max: 500 },
+  // int: true — a fractional value mid-MIX reaches ParticleSystem.init as a
+  // non-integer array length (RangeError, surfaces as a RENDER FAULT). Every
+  // other count-like param (zTiers, body, collideMask) already has this.
+  particleCount: { min: 10, max: 500, int: true },
   swarmCohesion: { min: 0, max: 5.0 },
   gravityWells: { min: 0, max: 5.0 },
   damping: { min: 0.80, max: 0.99 },
