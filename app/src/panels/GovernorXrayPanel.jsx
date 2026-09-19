@@ -1,15 +1,3 @@
-// GovernorXrayPanel — dev-only X-ray guide view (backend hardening 5/6).
-//
-// The "guide" leg: the live pass chain with per-pass cost — effect name,
-// declared tier, measured cost, current shed state — so a performer learns
-// what each effect costs and the governor stops being a black box.
-//
-// Registered only when import.meta.env.DEV (see PanelRegistry) and loaded
-// via React.lazy, so production bundles never include it.
-//
-// The silent-cull trap stays dead here: a pass row shows SHED exactly when
-// the governor has it shed, never the other way round.
-
 import { useEffect, useMemo, useState } from 'react';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useStore } from '../state/store.js';
@@ -22,9 +10,8 @@ import {
   exportGovernorLogJSON,
   governorEventLogSize,
 } from '../gl/governorEventLog.mjs';
+import { isFxLayer } from '../fx/fxFilters.js';
 
-// Import the registration sites so the registry holds every declaration
-// when the X-ray builds its rows (module side-effects only — no GL needed).
 import '../gl/accum.mjs';
 import '../gl/effects/fxShaders.mjs';
 import '../gl/bridge/builtinEffects.mjs';
@@ -56,7 +43,7 @@ function EventRow({ e }) {
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.label}</span>
       {e.fps && (
         <span style={{ color: '#8a93a6', marginLeft: 'auto', flexShrink: 0 }}>
-          {e.fps.at.toFixed(0)}fps &lt; {e.fps.threshold}
+          {e.fps.at.toFixed(0)}fps < {e.fps.threshold}
         </span>
       )}
     </div>
@@ -64,8 +51,6 @@ function EventRow({ e }) {
 }
 
 export function GovernorXrayPanel() {
-  // NOTE: select primitives individually — an object-literal selector makes
-  // zustand's snapshot change every render → infinite loop (React #185).
   const renderScale = useStore((s) => s.renderScale);
   const perfTier1 = useStore((s) => s.perfTier1);
   const assetThin = useStore((s) => s.assetThin);
@@ -74,11 +59,10 @@ export function GovernorXrayPanel() {
   const lastWatchdogReason = useStore((s) => s.lastWatchdogReason);
   const quality = useStore((s) => s.quality);
   const qualityShedFrom = useStore((s) => s.qualityShedFrom);
+  const layers = useStore((s) => s.layers);
 
   const [eventsVersion, setEventsVersion] = useState(0);
 
-  // Dev-only poll: the event log is a module-level ring buffer, not store
-  // state — refresh the tail view every second while the panel is open.
   useEffect(() => {
     const id = setInterval(() => setEventsVersion((v) => v + 1), 1000);
     return () => clearInterval(id);
@@ -100,12 +84,32 @@ export function GovernorXrayPanel() {
     [shed],
   );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const events = useMemo(() => getGovernorEvents().slice(-12), [eventsVersion]);
+
+  const content = (layers || []).filter((l) => !isFxLayer(l));
+  const feedRows = content.map((l, i) => {
+    const p = l.patch || { mode: 'off', to: 0 };
+    const fromName = l.name || `KC-${i + 1}`;
+    const toName = content[p.to]?.name || `KC-${(p.to | 0) + 1}`;
+    return { fromName, toName, mode: p.mode, armed: p.mode === 'feed' };
+  });
 
   return (
     <div style={{ padding: 8, fontSize: 12, lineHeight: 1.45 }}>
       <PanelHeader tag="DEV" title="GOVERNOR X-RAY" subtitle="live pass chain · per-pass cost · shed state" />
+
+      <h4 style={{ margin: '10px 0 4px' }}>FEED hop</h4>
+      <div style={{ fontSize: 11, color: '#8a93a6', marginBottom: 6 }}>
+        Armed in PATCH. Live loop: <span style={{ color: '#ffb454' }}>NOT ON LOOP</span> — no canvas pull yet.
+      </div>
+      {feedRows.length === 0 && <div style={{ fontSize: 11, color: '#8a93a6' }}>No content tracks.</div>}
+      {feedRows.map((r) => (
+        <div key={r.fromName} style={{ display: 'flex', gap: 8, fontSize: 11, padding: '2px 0' }}>
+          <span style={{ width: 72 }}>{r.fromName}</span>
+          <span style={{ color: r.armed ? '#9fe870' : '#8a93a6' }}>{r.mode.toUpperCase()}</span>
+          <span>{r.armed ? `← ${r.toName}` : '—'}</span>
+        </div>
+      ))}
 
       <div style={{ color: '#8a93a6', margin: '8px 0', fontSize: 11 }}>
         What each effect costs, and what the governor is doing right now. Tier colors:
