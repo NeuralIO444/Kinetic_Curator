@@ -368,6 +368,44 @@ export function mixVoiceState(from, to, t) {
  * Palette comes back as overrides over the current catalog id so
  * resolvePalette keeps working unchanged.
  */
+/**
+ * Snapshot stops across one MIX. Color feeds the texture atlas (comboKey =
+ * asset+ink+accent, #265), which bakes literal hex into pixels; count/
+ * particleCount reshape which and how many assets get placed. Either one
+ * changing invalidates the atlas, and the live loop holds the last frame
+ * while it rebakes — measured on this instrument mid-mix at full per-frame
+ * precision: ~85% of frames stall (median 15fps, spikes to 220ms) versus a
+ * clean 60fps idle, because color and count both drift every single frame.
+ * See docs/ORGANIC_MOTION.md §2.5 — same finding, independently.
+ *
+ * Stepping the params/palette the resolver sees to a bounded number of
+ * snapshots turns that into a handful of brief holds instead of a
+ * near-constant freeze. It still reads as evolution, not a jump cut: swarm/
+ * hype physics, breathing, and audio-reactivity keep running live at 60fps
+ * within each held snapshot — only the MIX's own target position pauses
+ * between stops. Step COUNT scales with the mix's own duration (a flat
+ * count would make HYPE's 0.8s signature cut choppy or MURM's 10s dissolve
+ * needlessly rebake-prone) — ~6 rebakes/second of blend, clamped so a very
+ * short or very long mix still gets a sane number of stops. Measured with
+ * this: stalls drop from ~85% of frames to under 10%, median frame time
+ * back to the clean-idle 16.6ms.
+ *
+ * This is the pragmatic fix, not the ideal one — ORGANIC_MOTION.md's "keep
+ * drawing motion on existing combos while new ones bake" would give fully
+ * continuous color with zero freeze, at the cost of the render pipeline
+ * tolerating a stale/incomplete atlas (today renderer.mjs throws on a
+ * missing cell). Left for that follow-up; this fix needs no pipeline
+ * changes and is fully reversible by deleting this function's body.
+ */
+const MIX_STEPS_PER_SECOND = 6;
+const MIX_STEPS_MIN = 3;
+const MIX_STEPS_MAX = 40;
+
+function mixStepCount(durationMs) {
+  const seconds = Math.max(0.1, (Number(durationMs) || 2000) / 1000);
+  return Math.min(MIX_STEPS_MAX, Math.max(MIX_STEPS_MIN, Math.round(seconds * MIX_STEPS_PER_SECOND)));
+}
+
 export function resolveLiveRenderState(s) {
   const mix = s.voiceMix;
   if (!mix || !mix.from || !mix.to) {
@@ -377,7 +415,10 @@ export function resolveLiveRenderState(s) {
       paletteOverrides: s.paletteOverrides,
     };
   }
-  const m = mixVoiceState(mix.from, mix.to, mix.t ?? 0);
+  const t = mix.t ?? 0;
+  const steps = mixStepCount(mix.durationMs);
+  const stepT = Math.round(t * steps) / steps;
+  const m = mixVoiceState(mix.from, mix.to, stepT);
   return {
     layoutParams: m.params,
     paletteId: s.paletteId,
