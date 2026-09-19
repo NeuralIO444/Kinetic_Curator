@@ -137,6 +137,8 @@ Import the repo; `vercel.json` builds `app/` with `VITE_BASE=/`.
 - [FX layers](docs/FX_LAYERS.md) — adjustment-layer-style FX layers: the 10-effect GLSL stack + the effect-authoring template
 - [ACCUM on GPU](docs/ACCUM.md) — the trail recipe (bloom / halation / stipple diffusion)
 - [Organic motion](docs/ORGANIC_MOTION.md) — smoother / heavier live animation (dt clock, heading springs, audio ballistics, morph dissolves)
+- [Noise and layers](docs/NOISE_AND_LAYERS.md) — shared Simplex/fBm field, curl wind, KC-1 FIELD/FEED weather
+- [KC-1 tracks](docs/KC1_LAYERS.md) — 4+4 tape, patching language (OFF / MOD / FIELD / FEED)
 - [Showrunner](docs/SHOWRUNNER.md) — the realtime performance governor
 - [Render quality](docs/QUALITY.md) — the quality pillars: one kernel, one seed, honest exports
 - [KILN COLUMNS](docs/KILN_COLUMNS.md) / [VORTEX RWB](docs/VORTEX_RWB.md) — shipped preset notes
