@@ -20,7 +20,9 @@
 //
 // The governor's AUTO quality is switched off for this test: on software GL
 // (SwiftShader, CI runners) the watchdog would hard-stop the render loop,
-// which is the app working as designed, not what this test measures.
+// which is the app working as designed, not what this test measures. #310
+// cut the AUTO button, so it is switched off through the seeded project
+// document (parseProject reads autoQuality) rather than a click.
 
 import { test, expect } from '@playwright/test';
 import { Buffer } from 'node:buffer';
@@ -29,6 +31,8 @@ const docFor = () =>
   JSON.stringify({
     version: 1,
     seed: 284284,
+    // #310 cut the AUTO button; autoQuality rides the document now.
+    autoQuality: false,
     layoutParams: { mode: 'swarm', count: 60, accumulation: true, accumulationFade: 17 },
   });
 
@@ -62,10 +66,9 @@ test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, 
   await page.reload({ waitUntil: 'load' });
   await page.locator('.app').waitFor({ timeout: 30_000 });
 
-  // OUTPUT tab -> AUTO off -> 2s loop -> CAPTURE LOOP -> wait for the blob.
+  // OUTPUT tab -> 2s loop -> CAPTURE LOOP -> wait for the blob.
   await page.getByRole('tab', { name: /output/i }).click();
   await page.locator('.panel-output').waitFor({ timeout: 10_000 });
-  await page.getByRole('button', { name: /AUTO/ }).click();
   await page.waitForTimeout(2000); // let trails build up
   await page.getByRole('button', { name: /^2s$/ }).click();
   // Wall-clock the take: on software GL each grabbed frame renders on the
