@@ -4,6 +4,8 @@ How KC-1 goes from an okay agent-built VJ pile to one sentence:
 
 > Four living tracks, one wind, one tempo. You curate the DNA. The room keeps time.
 
+Product split above the layers: [TWO_PLANES.md](../TWO_PLANES.md) — **Studio** breeds a show, **Perform** plays it. One engine.
+
 Planning only. Coding agents still start at **#387 (spine A)**. These reports do not invent a parallel epic.
 
 | # | Layer | Report | Lands after |
