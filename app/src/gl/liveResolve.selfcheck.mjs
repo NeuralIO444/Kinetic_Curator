@@ -157,3 +157,52 @@ test('#269: negative particleCount floors to 0 instead of RangeError', () => {
   assert.equal(out[0].items.length, 0);
   r.dispose();
 });
+
+function modInput(patch) {
+  return baseInput({
+    layers: [
+      { id: 'lyr-a', name: 'A', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+      {
+        id: 'lyr-b', name: 'B', visible: true, layerBlendMode: 'normal', layerOpacity: 1,
+        patch,
+      },
+    ],
+    activeLayerId: 'lyr-a',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', count: 30, particleCount: 30, behave: 'scatter' },
+    layerSnapshots: {
+      'lyr-b': {
+        seed: 999,
+        paletteId: 'bone',
+        paletteOverrides: null,
+        layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 20 },
+        caGrid: null,
+        enabledAssets: null,
+      },
+    },
+  });
+}
+
+test('#343: MOD patch perturbs the target when the source track has motion', () => {
+  const off = createLiveResolver().resolveLayers(modInput(null));
+  const on = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 0, strength: 1 }));
+  const bOff = off.find((l) => l.id === 'lyr-b');
+  const bOn = on.find((l) => l.id === 'lyr-b');
+  assert.equal(bOff.items.length, bOn.items.length, 'MOD does not add/remove items, only perturbs them');
+  const changed = bOn.items.some((it, i) => {
+    const base = bOff.items[i];
+    return base && (it.scale !== base.scale || it.alpha !== base.alpha || it.x !== base.x);
+  });
+  assert.ok(changed, 'a swarm source with real motion perturbs the MOD target\'s scale/alpha/x');
+});
+
+test('#343: MOD is a no-op when strength is 0', () => {
+  const off = createLiveResolver().resolveLayers(modInput(null));
+  const zero = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 0, strength: 0 }));
+  const bOff = off.find((l) => l.id === 'lyr-b');
+  const bZero = zero.find((l) => l.id === 'lyr-b');
+  for (let i = 0; i < bOff.items.length; i++) {
+    assert.equal(bZero.items[i].scale, bOff.items[i].scale);
+    assert.equal(bZero.items[i].alpha, bOff.items[i].alpha);
+    assert.equal(bZero.items[i].x, bOff.items[i].x);
+  }
+});

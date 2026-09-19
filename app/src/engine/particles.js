@@ -998,6 +998,9 @@ export class ParticleSystem {
           // #287 — grazer flag rides the item so the instance mapping can
           // stamp grazers in the palette bg (eroders).
           graze: this.grazer[i] === 1,
+          // #343 — MOD coupling reads a source track's motionMetrics, which
+          // needs per-item velocity. Scene units/tick, same as #309's smear.
+          vx: this.vx[i], vy: this.vy[i],
         });
       }
       return items;
