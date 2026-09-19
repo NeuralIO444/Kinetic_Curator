@@ -7,6 +7,7 @@
 // knob (remapped range from #317).
 import { emit, Events } from '../../composition/eventBus.js';
 import { getTaper } from '../../components/taper.js'; // #274: shared slider curves
+import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read the single map
 
 // #273/#274: response curves at the panel→state boundary. Stored params stay
 // in physical units; only the slider position is remapped.
@@ -24,7 +25,7 @@ export function ToggleRow({ layoutParams }) {
         <button
           key={key}
           className={`tg ${layoutParams[key] ? 'tg-on' : ''}`}
-          title={key === 'accumulation' ? 'HYPE-style trails — composites into a persistent bitmap' : undefined}
+          title={key === 'accumulation' ? helpText('layout-accum') : undefined}
           onClick={() => emit(Events.LAYOUT_PARAM, { key, value: !layoutParams[key] })}
         >
           <span className="tg-box">{layoutParams[key] ? '◉' : '○'}</span>

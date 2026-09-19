@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { captureStill, useVideoRecorder } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
+import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read the single map
 
 export function SnapRecordRow({
   glCanvasRef, glLoopRef, palette, seed, seedOffsets, layoutParams, exportResolution,
@@ -52,7 +53,7 @@ export function SnapRecordRow({
         className="big-btn"
         onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
         disabled={rendering}
-        title="Record the live canvas to WEBM — what plays is what records, ACCUM included"
+        title={helpText('output-webm')}
         style={isRecording ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
       >
         {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}

@@ -6,6 +6,7 @@ import { EvolveControls } from './davis/EvolveControls.jsx';
 import { BeatRouter } from './davis/BeatRouter.jsx';
 import { MorphControls } from './davis/MorphControls.jsx';
 import { PhraseControls } from './davis/PhraseControls.jsx';
+import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -161,7 +162,7 @@ export function DavisPanel() {
               </button>
               <button className="big-btn"
                 onClick={() => emit(Events.ACCUM_GESTURE, { action: 'clear' })}
-                title="CLEAR: wipe the trail buffer to the background">
+                title={helpText('davis-clear')}>
                 CLEAR
               </button>
               <button className="big-btn"

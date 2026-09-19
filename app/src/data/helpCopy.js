@@ -25,7 +25,16 @@ export const HELP_TOPICS = [
   { id: 'layout-accum', group: 'Layout', title: 'ACCUM', text: 'Pixel trail buffer — trails and glow render live in the WebGL canvas. CLEAR wipes the buffer only, not the canvas.' },
   { id: 'output-webm', group: 'Output', title: 'REC WEBM', text: 'Records the live WebGL canvas to WebM — ACCUM trails included. What plays is what exports.' },
   { id: 'output-recipe', group: 'Output', title: 'RECIPE', text: 'Each snapshot has a copy button for its recipe as plain text (seed, params, sub-seed offsets). Paste it back with PASTE RECIPE to restore the exact scene.' },
+  { id: 'davis-clear', group: 'Ghost Station', title: 'CLEAR', text: 'Wipe the trail buffer to the background.' },
+  { id: 'layers-blend', group: 'Layers', title: 'BLEND', text: 'How this layer composites onto the stack below.' },
 ];
+
+// #158: the single source of truth. Hover `title` attributes and the `?`
+// overlay both read through this, so the two can never drift.
+const HELP_BY_ID = Object.fromEntries(HELP_TOPICS.map((t) => [t.id, t]));
+export function helpText(id) {
+  return HELP_BY_ID[id]?.text ?? '';
+}
 
 export const HELP_SHORTCUTS = [
   { key: 'SPACE', desc: 'Play / Pause' },
