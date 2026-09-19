@@ -26,7 +26,7 @@ function CompactSwatches({ swatches }) {
 }
 
 const SWATCH_WIN = 5;
-const SWATCH_STEP = 10;
+const SWATCH_STEP = 12;
 function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onReset, onLock }) {
   const swatches = palette.swatches || [];
   const [start, setStart] = useState(0);
@@ -150,15 +150,17 @@ export function PaletteStrip() {
         </span>
       </div>
       <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}>
-        <span className="palette-switch-label">PALETTE</span>
-        <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
-          {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
-        </select>
-        <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
+          <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
             {chips}
           </div>
+          <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <span className="palette-switch-label">PALETTE</span>
+            <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
+              {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
+            </select>
+            <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
+          </span>
           <label className="palette-mix" style={{ flexShrink: 0 }} title={COLOR_MODE_HINT[colorMode]}>
             <button
               type="button"
