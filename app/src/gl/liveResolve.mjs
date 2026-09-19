@@ -13,6 +13,9 @@ import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 
+const FEED_STRENGTH = 0.008;
+const FEED_MAX_PX = 4;
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -190,11 +193,18 @@ export function createLiveResolver() {
           x: (Number(it.x) || 0) / CANVAS_W,
           y: (Number(it.y) || 0) / CANVAS_H,
         }));
-        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: 0.08 });
+        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: FEED_STRENGTH });
         e.items = (e.items || []).map((it, k) => {
           const q = pulled[k];
           if (!q) return it;
-          return { ...it, x: q.x * CANVAS_W, y: q.y * CANVAS_H };
+          let dx = q.x * CANVAS_W - it.x;
+          let dy = q.y * CANVAS_H - it.y;
+          const m = Math.hypot(dx, dy);
+          if (m > FEED_MAX_PX) {
+            dx *= FEED_MAX_PX / m;
+            dy *= FEED_MAX_PX / m;
+          }
+          return { ...it, x: it.x + dx, y: it.y + dy };
         });
       }
     });
