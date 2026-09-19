@@ -40,7 +40,7 @@ export function captureSnapshot(state) {
 export function displayLayerName(layer, contentOrdinal) {
   if (!layer) return '';
   if (isFxLayer(layer)) return layer.name;
-  if (typeof layer.name === 'string' && /^Layer \d+$/.test(layer.name)) {
+  if (typeof layer.name === 'string' && (/^Layer \d+/.test(layer.name) || / copy$/.test(layer.name))) {
     return `KC-${contentOrdinal}`;
   }
   return layer.name;
@@ -97,7 +97,9 @@ export const createLayersSlice = (set) => ({
       : (state.layerSnapshots[id] || freshSnapshot(state.seed, state.seedOffsets)));
     const copy = {
       id: nid,
-      name: `${src.name} copy`,
+      name: isFx
+        ? `${src.name} copy`
+        : `KC-${state.layers.filter((l) => !isFxLayer(l)).length + 1}`,
       type: isFx ? 'fx' : 'content',
       visible: src.visible,
       layerBlendMode: src.layerBlendMode,
