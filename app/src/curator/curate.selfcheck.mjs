@@ -20,8 +20,10 @@ assert.ok(Number.isInteger(CURATE_CANDIDATES) && CURATE_CANDIDATES >= 2);
   assert.strictEqual(c.pick(cands), -1);
 }
 
-// active curator today is the null curator (no taste artifact ships yet)
-assert.strictEqual(getActiveCurator().status(), 'untrained');
+// active curator today is the persona scorer (davis by default) — the MLX
+// ranker slots in above it once the Mac Studio runbook produces a taste
+// artifact; the null curator remains the honest fallback underneath.
+assert.strictEqual(getActiveCurator().status(), 'active');
 
 // fallback: engine declines -> uniform roll in range, flagged uncurated
 {
