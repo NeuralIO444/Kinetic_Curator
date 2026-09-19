@@ -1,75 +1,200 @@
-/* audiomap.css — prototype styling. Dark, monospace, TE-adjacent. */
-.am-root {
+/* audiomap.css — prototype v2 styling.
+   Wears the real STIMULI chrome: global classes (.panel, .panel-header,
+   .stim-toggle-row, .chip-btn) come from the app stylesheets, which are
+   loaded on this route. This file is only prototype-specific glue. */
+
+.am-page {
   min-height: 100vh;
-  background: #07080d;
-  color: #e8ebf7;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  padding: 14px 16px 24px;
-  box-sizing: border-box;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
 }
-.am-top {
+
+.am-panel {
+  width: min(640px, 100%);
+  align-self: flex-start;
+}
+
+.am-proto-badge {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: #0a0c14;
+  background: var(--accent3);
+  padding: 1px 6px;
+  font-weight: 800;
+}
+
+/* — setup drawer (mirrors SourceControls box) — */
+.am-setup {
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.02);
+}
+.am-src-row { display: flex; gap: 4px; margin: 4px 0; }
+.am-src-row .chip-btn { flex: 1; padding: 4px 8px; }
+.am-hint { font-size: 9px; color: var(--dimmer); letter-spacing: 0.04em; }
+
+/* — section boxes mirror the REACTIVITY / LIFE box — */
+.am-section {
+  padding: 6px;
+  border: 1px solid var(--line-2);
+  margin-bottom: 6px;
+  background: rgba(255,255,255,0.02);
+}
+.am-section-title {
+  font-size: 9px;
+  color: var(--dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.am-title-hint { color: var(--dimmer); letter-spacing: 0.04em; font-size: 8px; }
+
+/* — ModSlider-style rows — */
+.am-modslider { margin-bottom: 6px; }
+.am-modslider:last-child { margin-bottom: 0; }
+.am-modslider-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+/* — meters — */
+.am-history-wrap { position: relative; margin-bottom: 6px; }
+.am-history {
+  width: 100%;
+  height: 96px;
+  display: block;
+  border: 1px solid var(--line-2);
+  background: #0a0a0a;
+}
+.am-legend {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  display: flex;
+  gap: 10px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.am-meter-wrap { position: relative; }
+.am-meters {
+  width: 100%;
+  height: 220px;
+  display: block;
+  border: 1px solid var(--line-2);
+  background: #0a0a0a;
+  cursor: pointer;
+}
+
+/* — tap popup — */
+.am-popup {
+  position: absolute;
+  top: 8px;
+  width: max(230px, 44%);
+  max-width: 92%;
+  background: #101423;
+  border: 1px solid var(--accent3);
+  border-radius: 4px;
+  padding: 8px;
+  z-index: 5;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.am-popup-head {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
+  gap: 4px;
 }
-.am-title { font-size: 20px; letter-spacing: 2px; font-weight: 700; }
-.am-proto {
-  font-size: 10px; letter-spacing: 1px; color: #0a0c14;
-  background: #ffd45d; padding: 2px 6px; border-radius: 3px;
-  vertical-align: middle; margin-left: 6px;
+.am-x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--dim);
+  cursor: pointer;
+  font-size: 11px;
 }
-.am-sub { font-size: 11px; color: #8a90ad; margin-top: 2px; }
-.am-src { display: flex; gap: 6px; margin-left: auto; }
-.am-src button, .am-tgt {
-  font: inherit; cursor: pointer;
-  background: #141827; color: #cfd4ea;
-  border: 1px solid #2a2f45; border-radius: 4px;
-  padding: 7px 12px; font-size: 12px; letter-spacing: 1px;
+.am-tgt {
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
 }
-.am-src button.on { background: #ffd45d; color: #0a0c14; border-color: #ffd45d; font-weight: 700; }
-.am-sliders { display: flex; gap: 14px; font-size: 11px; color: #8a90ad; letter-spacing: 1px; }
-.am-sliders label { display: flex; align-items: center; gap: 8px; }
-.am-sliders input[type="range"] { width: 110px; accent-color: #ffd45d; }
-.am-err {
-  background: #3a1620; border: 1px solid #ff5d5d; color: #ffb3b3;
-  font-size: 12px; padding: 8px 12px; border-radius: 4px; margin-bottom: 10px;
+.am-tgt em { font-style: normal; font-size: 9px; color: var(--dim); }
+.am-trim {
+  font-size: 9px;
+  color: var(--dim);
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
 }
-.am-history-wrap { position: relative; margin-bottom: 10px; }
-.am-history { width: 100%; height: 120px; display: block; border: 1px solid #1d2236; border-radius: 6px; }
-.am-legend {
-  position: absolute; top: 6px; left: 10px;
-  display: flex; gap: 12px; font-size: 10px; letter-spacing: 1px;
-}
-.am-meter-wrap { position: relative; margin-bottom: 10px; }
-.am-meters { width: 100%; height: 190px; display: block; border: 1px solid #1d2236; border-radius: 6px; cursor: pointer; }
-.am-popup {
-  position: absolute; top: 8px; width: 24%;
-  background: #101423; border: 1px solid #ffd45d; border-radius: 6px;
-  padding: 10px; z-index: 5; box-shadow: 0 8px 30px rgba(0,0,0,.6);
-  display: flex; flex-direction: column; gap: 5px;
-}
-.am-popup-head { font-size: 12px; letter-spacing: 1px; color: #ffd45d; display: flex; justify-content: space-between; align-items: center; }
-.am-x { background: none; border: none; color: #8a90ad; cursor: pointer; font-size: 12px; }
-.am-tgt { text-align: left; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.am-tgt em { font-style: normal; font-size: 10px; color: #8a90ad; }
-.am-tgt.sel { border-color: #ffd45d; color: #ffd45d; }
-.am-tgt.clear { color: #8a90ad; }
-.am-trim { font-size: 10px; color: #8a90ad; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; margin-top: 4px; }
-.am-trim input[type="range"] { flex: 1; accent-color: #ffd45d; }
+.am-trim input[type="range"] { flex: 1; accent-color: var(--accent3); }
 .am-mlx {
-  margin-top: 4px; font-size: 10px; letter-spacing: 1px; color: #5a6080;
-  border: 1px dashed #2a2f45; border-radius: 4px; padding: 8px; text-align: center;
+  margin-top: 2px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--dimmer);
+  border: 1px dashed var(--line-2);
+  border-radius: 4px;
+  padding: 7px;
+  text-align: center;
 }
-.am-mlx em { font-style: normal; color: #3f4460; }
-.am-assign { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.am-mlx em { font-style: normal; color: var(--dimmer); opacity: 0.7; }
+
+/* — assignments readout — */
+.am-assign { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
 .am-chip {
-  font-size: 11px; letter-spacing: 1px; color: #cfd4ea;
-  background: #101423; border: 1px solid #1d2236; border-radius: 20px;
-  padding: 6px 12px; display: flex; align-items: center; gap: 7px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .am-chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.am-chip b { color: #ffd45d; font-weight: 600; }
-.am-canvas { width: 100%; height: 380px; display: block; border: 1px solid #1d2236; border-radius: 6px; }
-.am-foot { margin-top: 10px; font-size: 10px; color: #5a6080; letter-spacing: .5px; }
+.am-chip b { color: var(--ink); font-weight: 600; }
+
+/* — driven output preview canvas — */
+.am-canvas {
+  width: 100%;
+  height: 320px;
+  display: block;
+  border: 1px solid var(--line-2);
+  background: #0a0a0a;
+}
+
+/* — error + footer — */.am-err {
+  background: #3a1620;
+  border: 1px solid #ff5d5d;
+  color: #ffb3b3;
+  font-size: 10px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+.am-foot { font-size: 9px; color: var(--dimmer); letter-spacing: 0.04em; padding: 2px 0 6px; }

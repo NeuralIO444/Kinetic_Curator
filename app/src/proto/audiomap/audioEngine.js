@@ -6,10 +6,11 @@
 // ─────────────────────────────────────────────────────────────
 
 export const BANDS = [
-  { id: 'bass', label: 'BASS', f0: 20, f1: 250, color: '#ff5d5d' },
-  { id: 'mid', label: 'MID', f0: 250, f1: 2000, color: '#ffd45d' },
-  { id: 'treble', label: 'TREBLE', f0: 2000, f1: 20000, color: '#5dd4ff' },
-  { id: 'rms', label: 'RMS', f0: 0, f1: 0, color: '#b48cff' }, // RMS is time-domain
+  { id: 'bass', label: 'BASS', f0: 20, f1: 250, color: '#ff2d6f' },
+  { id: 'mid', label: 'MID', f0: 250, f1: 2000, color: '#ffd400' },
+  { id: 'treble', label: 'TREBLE', f0: 2000, f1: 20000, color: '#00d9ff' },
+  { id: 'rms', label: 'RMS', f0: 0, f1: 0, color: '#00ff88' }, // RMS is time-domain
+  // colors match the real STIMULI meter strip exactly
 ];
 
 const FFT_SIZE = 2048;
