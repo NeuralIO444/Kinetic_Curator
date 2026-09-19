@@ -208,6 +208,7 @@ registerSampler('orbit', orbit);
 registerSampler('abacus', abacus);
 registerSampler('noise', grid); // grid base; displacement warps in orchestrator
 registerSampler('hype', swarm);
+registerSampler('murmuration', swarm); // #280 — voice over the swarm engine
 registerSampler('stratified', stratified);
 
 export {

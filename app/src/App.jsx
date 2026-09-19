@@ -17,6 +17,7 @@ import { useBeatDecay } from './hooks/useBeatDecay.js';
 import { useContinuousLife } from './hooks/useContinuousLife.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
+import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
 import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
@@ -68,6 +69,7 @@ function AppInner() {
   useContinuousLife();
   usePhraseLoop();
   useMorphEvolve();
+  useVoiceMixDriver();
   useProjectAutosave();
 
   const [showHotkeys, setShowHotkeys] = useState(false);

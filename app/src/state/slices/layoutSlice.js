@@ -97,6 +97,8 @@ export const createLayoutSlice = (set) => ({
   setPaletteId: (id) => set((state) => ({
     ...pushToUndo(state, true),
     paletteId: id,
+    voiceMix: null,
+    activeVoiceId: null,
     paletteOverrides: null,
   /** Swatch slots the operator pinned; harmony/shuffle leave these alone (#56). */
   paletteLocks: {},
@@ -125,6 +127,8 @@ export const createLayoutSlice = (set) => ({
     return {
       ...pushToUndo(state, true),
       paletteOverrides: matches ? null : nextOverrides,
+      voiceMix: null,
+      activeVoiceId: null,
     };
   }),
 
@@ -138,6 +142,8 @@ export const createLayoutSlice = (set) => ({
     return {
       ...pushToUndo(state, true),
       paletteOverrides: empty ? null : next,
+      voiceMix: null,
+      activeVoiceId: null,
     };
   }),
 
@@ -151,17 +157,21 @@ export const createLayoutSlice = (set) => ({
     return {
       ...pushToUndo(state, true),
       paletteOverrides: empty ? null : next,
+      voiceMix: null,
+      activeVoiceId: null,
     };
   }),
 
   clearPaletteOverrides: () => set((state) => {
     if (!state.paletteOverrides) return {};
-    return { ...pushToUndo(state, true), paletteOverrides: null };
+    return { ...pushToUndo(state, true), paletteOverrides: null, voiceMix: null, activeVoiceId: null };
   }),
 
   setPaletteOverrides: (overrides) => set((state) => ({
     ...pushToUndo(state, true),
     paletteOverrides: overrides,
+    voiceMix: null,
+    activeVoiceId: null,
   })),
 
   togglePaletteLock: (index) => set((state) => ({
@@ -203,6 +213,10 @@ export const createLayoutSlice = (set) => ({
   // Out-of-range but well-formed values clamp; structurally invalid ones
   // (NaN, null, wrong type, unknown mode) are rejected and the previous value
   // is kept. See validateLayoutParams for why those are treated differently.
+  //
+  // #280 — a manual edit during a voice MIX ends the mix and the voice chip
+  // lets go: the performer's hands have it now. (commitVoiceMix writes the
+  // keys directly, so landing a voice never trips this.)
   setLayoutParam: (key, value) => set((state) => {
     if (state.layoutParams[key] === value) return {};
     const { params, rejected } = validateLayoutParams({ ...state.layoutParams, [key]: value });
@@ -227,7 +241,7 @@ export const createLayoutSlice = (set) => ({
     if (unchanged) return {};
 
     const undoUpdate = pushToUndo(state, false);
-    const next = { ...undoUpdate, layoutParams: params };
+    const next = { ...undoUpdate, layoutParams: params, voiceMix: null, activeVoiceId: null };
     if (key === 'mode' && value === 'ca' && !state.caGrid) {
       next.caGrid = createGrid(40, 28);
     }
@@ -236,7 +250,7 @@ export const createLayoutSlice = (set) => ({
 
   setLayoutParams: (params) => set((state) => {
     const { params: safe, rejected } = validateLayoutParams({ ...state.layoutParams, ...params });
-    if (rejected.length === 0) return { layoutParams: safe };
+    if (rejected.length === 0) return { layoutParams: safe, voiceMix: null, activeVoiceId: null };
     // Partial accept: a bad key in a machine-generated batch (a morph lerp
     // that produced NaN, an evolve target off the end of a range) must not
     // discard the good keys alongside it.
@@ -245,7 +259,7 @@ export const createLayoutSlice = (set) => ({
     if (import.meta.env?.DEV) {
       console.warn('[state] rejected setLayoutParams keys:', rejected);
     }
-    return { layoutParams: kept };
+    return { layoutParams: kept, voiceMix: null, activeVoiceId: null };
   }),
 
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
@@ -267,7 +281,7 @@ export const createLayoutSlice = (set) => ({
       }
     }
     if (!changed && state.layoutParams.composition === preset.id) return {};
-    return { ...pushToUndo(state, true), layoutParams: merged };
+    return { ...pushToUndo(state, true), layoutParams: merged, voiceMix: null, activeVoiceId: null };
   }),
 
   toggleParamLock: (key) => set((state) => ({
@@ -277,6 +291,8 @@ export const createLayoutSlice = (set) => ({
   randomizeParam: (key) => set((state) => ({
     ...pushToUndo(state, true),
     layoutParams: { ...state.layoutParams, [key]: randomizeKey(key) },
+    voiceMix: null,
+    activeVoiceId: null,
   })),
 
   randomizeUnlocked: () => set((state) => {
@@ -289,7 +305,7 @@ export const createLayoutSlice = (set) => ({
       }
     }
     if (!changed) return {};
-    return { ...pushToUndo(state, true), layoutParams: rp };
+    return { ...pushToUndo(state, true), layoutParams: rp, voiceMix: null, activeVoiceId: null };
   }),
 
   curateUnlocked: () => set((state) => {
