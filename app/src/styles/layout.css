@@ -198,6 +198,15 @@
 .palette-chip.active { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,0.04); }
 .palette-chip.dirty { border-color: var(--accent2); }
 .palette-chip-wrap { display: inline-flex; align-items: center; }
+/* #357 — tiny key-hint numeral on each palette chip; quiet on purpose. */
+.palette-chip-num {
+  font-size: 8px;
+  line-height: 1;
+  color: var(--dim);
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
 .palette-sw-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
 .palette-lock-pip {
   width: 9px; height: 5px; padding: 0; line-height: 4px; font-size: 6px;

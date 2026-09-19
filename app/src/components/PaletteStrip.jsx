@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
+import { useHotkeys } from '../hooks/useHotkeys.js';
 import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
@@ -88,11 +89,13 @@ export function PaletteStrip() {
     setColorMode(COLOR_MODES[(i + 1) % COLOR_MODES.length]);
   };
 
-  const chips = visible.map((p) => {
+  const chips = visible.map((p, i) => {
     const active = p.id === palette.id;
+    const num = <span className="palette-chip-num" aria-hidden="true">{i + 1}</span>;
     if (active) {
       return (
-        <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} title={`${p.name}`}>
+        <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} title={`${p.name} — key ${i + 1}`}>
+          {num}
           <ActivePaletteStrip
             key={palette.id}
             palette={palette}
@@ -110,12 +113,30 @@ export function PaletteStrip() {
     }
     return (
       <span key={p.id} className="palette-chip-wrap">
-        <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={p.name}>
+        <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={`${p.name} — key ${i + 1}`}>
+          {num}
           <CompactSwatches swatches={p.swatches || []} />
           {p.name}
         </button>
       </span>
     );
+  });
+
+  // #357 — keys 1–4 select the visible palette chips, exactly as if clicked.
+  // The active chip is never re-selected (a click on it isn't possible either,
+  // and setPaletteId clears overrides — must not fire on the active palette).
+  // The favorites tray owns 1–9 while it has focus; let it keep them.
+  const selectChipByIndex = (e, i) => {
+    if (e.target?.closest?.('.favorites-tray')) return;
+    const p = visible[i];
+    if (!p || p.id === palette.id) return;
+    dispatch({ type: A.SET_PALETTE_ID, payload: p.id });
+  };
+  useHotkeys({
+    1: (e) => selectChipByIndex(e, 0),
+    2: (e) => selectChipByIndex(e, 1),
+    3: (e) => selectChipByIndex(e, 2),
+    4: (e) => selectChipByIndex(e, 3),
   });
 
   return (
