@@ -13,7 +13,6 @@ import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 
-const FEED_STRENGTH = 0.008;
 const FEED_MAX_PX = 4;
 
 export function createLiveResolver() {
@@ -193,7 +192,8 @@ export function createLiveResolver() {
           x: (Number(it.x) || 0) / CANVAS_W,
           y: (Number(it.y) || 0) / CANVAS_H,
         }));
-        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: FEED_STRENGTH });
+        const amt = (Number(patch.strength) || 0.16) * 0.05;
+        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: amt });
         e.items = (e.items || []).map((it, k) => {
           const q = pulled[k];
           if (!q) return it;
