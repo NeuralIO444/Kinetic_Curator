@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { shedSummary } from '../hooks/governorCuts.js';
 import { getGovernorEvents } from '../gl/governorEventLog.mjs';
+import { FRAME_BUDGET_MS, isTapeFull } from '../state/tapeBudget.js';
 
 // TapeCounter — the governor's one budget readout (#295, R1 of the
 // governor×TE roadmap). It merges the footer ShedBadge, the four
@@ -20,9 +21,6 @@ import { getGovernorEvents } from '../gl/governorEventLog.mjs';
 // The honest semantics of the old pills are kept, not softened:
 // RENDER FAULT and the watchdog hard stop stay red and explicit about
 // manual resume; self-clearing sheds stay amber and say so.
-
-/** The frame budget the tape measures against: one smooth 60fps frame. */
-const FRAME_BUDGET_MS = 1000 / 60;
 
 /** Latest shed-event label in the governor event log, or null. */
 function lastShedLabel() {
@@ -103,6 +101,25 @@ export function TapeCounter() {
       >
         <span className="status-dot" style={{ background: '#ff2d6f' }} />
         PERF PAUSED
+      </div>
+    );
+  }
+
+  // --- state 2.5: tape full (#342) — a new track/FX slot would be refused.
+  // isTapeFull, not a fillPct threshold check here: they must agree exactly
+  // with what layersSlice's arm gate decides, or the pill lies (shows full
+  // while arming still succeeds, or vice versa) — see tapeBudget.js for why
+  // it's stricter than the fps-derived fillPct shown below.
+  // Wording is a placeholder pending Matt's pass (issue #342: "PLAY readout
+  // wording = taste"); the mechanism (refuse rather than silently degrade)
+  // is what's load-bearing here. ---
+  if (isTapeFull({ stageTimings, fps })) {
+    return (
+      <div className="status-pill" style={AMBER}
+        title={`Tape full: measured frame cost ${frameMs.toFixed(1)}ms is already at ${fillPct}% of the ${FRAME_BUDGET_MS.toFixed(1)}ms (60fps) budget. A new track or FX slot is refused rather than silently degrading the render — drop the ceiling, free a track, or wait for headroom.`}
+      >
+        <span className="status-dot" style={{ background: '#ffb000' }} />
+        TAPE FULL · {fillPct}%
       </div>
     );
   }

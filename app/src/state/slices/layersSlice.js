@@ -3,6 +3,7 @@ import { initialEnabledAssets } from './globalSlice.js';
 import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS } from '../../fx/fxFilters.js';
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { isTapeFull } from '../tapeBudget.js';
 
 export const MAX_CONTENT_TRACKS = 4;
 export const MAX_FX_TRACKS = 4;
@@ -58,6 +59,11 @@ export const createLayersSlice = (set) => ({
   addLayer: () => set((state) => {
     const content = state.layers.filter((l) => !isFxLayer(l)).length;
     if (content >= MAX_CONTENT_TRACKS) return {};
+    // #342 — tape pre-flight: refuse rather than let the governor's shed
+    // ladder silently degrade the render to absorb a track the tape can't
+    // afford. isTapeFull is always visible on the PLAY readout (TapeCounter),
+    // so the refusal is never a silent dead click.
+    if (isTapeFull(state)) return {};
     const id = makeLayerId();
     const snapshot = freshSnapshot((Math.random() * 0xffffffff) | 0);
     const name = `KC-${content + 1}`;
@@ -89,6 +95,7 @@ export const createLayersSlice = (set) => ({
     const isFx = isFxLayer(src);
     if (!isFx && state.layers.filter((l) => !isFxLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
     if (isFx && state.layers.filter(isFxLayer).length >= MAX_FX_TRACKS) return {};
+    if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer/addFxLayer
     const nid = makeLayerId();
     const snap = isFx ? null : (id === state.activeLayerId ? captureSnapshot(state) : (state.layerSnapshots[id] || freshSnapshot(state.seed, state.seedOffsets)));
     const copy = {
@@ -153,6 +160,7 @@ export const createLayersSlice = (set) => ({
   addFxLayer: () => set((state) => {
     const fxCount = state.layers.filter(isFxLayer).length;
     if (fxCount >= MAX_FX_TRACKS) return {};
+    if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer
     const id = makeLayerId();
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `FX ${fxCount + 1}`, type: 'fx', visible: true, effects: defaultFxEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedFxLayerId: id };
   }),
