@@ -694,7 +694,7 @@ export function createRenderer(canvas) {
     const accum = createAccum(gl, bridge, { width: w, height: h });
     try {
       accum.begin(background);
-      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w });
+      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w, background });
       // #309 velocity smear: per-frame displacement per instance, attached
       // as vx/vy — the stills/export path smears exactly like the live loop.
       const velPrev = new Map();

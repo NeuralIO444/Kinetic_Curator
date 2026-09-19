@@ -1,6 +1,8 @@
 // Ghost Station palettes — generative-art lineage
 // Each: { id, name, era, bg, ink, swatches: [colors] }
 // `ink` = catalog-page text color when this palette is active (high contrast vs bg)
+// `leak` (#287) = pigment drift rate 0..1 — agents' colors melt toward their
+// neighbours' average. Most palettes stay 0 (colors hold); a few melt slowly.
 
 export const PALETTES = [
   {
@@ -50,6 +52,7 @@ export const PALETTES = [
     bg: '#a27a84',
     ink: '#224655',
     swatches: ['#7496a1', '#4d7182', '#d9d4d3', '#224655', '#a27a84', '#e95f63'],
+    leak: 0.5, // #287 — the melt voice: glazes run into each other
   },
   {
     id: 'vortex-rwb',
@@ -83,6 +86,7 @@ export const PALETTES = [
     bg: '#f4f1ea',
     ink: '#1d2b2a',
     swatches: ['#1d6a5a', '#e36414', '#9a031e', '#5f0f40', '#fb8b24', '#2a9d8f'],
+    leak: 0.35, // #287 — colonies bleed into the agar
   },
   {
     id: 'river-delta',
@@ -225,6 +229,35 @@ export const PALETTES = [
     ink: '#d8d2c4',
     swatches: ['#d8d2c4', '#e8621c', '#7a8b3f', '#a8602f', '#1f5fbf', '#3fbf6a', '#b31217', '#2c3a55'],
   },
+  // #287 — specimen-plate grounds for the Haeckel pinch. Light papers that
+  // the fade-to-paper ACCUM fix keeps honest (trails fall toward the paper,
+  // not black).
+  {
+    id: 'sepia-plate',
+    name: 'SEPIA PLATE',
+    era: 'Specimen plate · bio-drives · 2026',
+    bg: '#efe3cb',
+    ink: '#3a2a1a',
+    swatches: ['#5a3d22', '#8a5a2b', '#3a2a1a', '#b98a4b', '#6b4a2a', '#2a1d10'],
+    leak: 0.5, // plate inks bleed slowly into the paper
+  },
+  {
+    id: 'lithograph',
+    name: 'LITHOGRAPH',
+    era: 'Specimen plate · bio-drives · 2026',
+    bg: '#f2ecdd',
+    ink: '#1a1a1a',
+    swatches: ['#1a1a1a', '#3d3d3d', '#6b6b6b', '#8f8578', '#2a2a28', '#55504a'],
+  },
+  {
+    id: 'cyanotype',
+    name: 'CYANOTYPE',
+    era: 'Specimen plate · bio-drives · 2026',
+    bg: '#dfe8ec',
+    ink: '#123a5c',
+    swatches: ['#123a5c', '#1d5a8a', '#0d2a44', '#3a7ca5', '#16425f', '#2a6a9a'],
+    leak: 0.3, // blueprint wash drifts
+  },
 ];
 
 /**
@@ -272,6 +305,8 @@ export function resolvePalette(paletteId, overrides = null, extra = []) {
     bg,
     ink,
     swatches: [...swatches],
+    // #287 — leak is a catalog property, not a per-swatch override.
+    leak: typeof base.leak === 'number' ? base.leak : 0,
     dirty: !!(overrides && (overrides.swatches || overrides.bg || overrides.ink)),
   };
 }

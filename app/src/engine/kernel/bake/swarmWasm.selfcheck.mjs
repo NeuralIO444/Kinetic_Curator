@@ -121,12 +121,15 @@ for (const [label, args, reason] of [
   ['contacts', { layoutParams: { mode: 'swarm', contactRadius: 5 }, count: 10 }, 'contacts'],
   ['attractor', { layoutParams: { mode: 'swarm' }, attractor: { x: 1, y: 2 }, count: 10 }, 'attractor'],
   ['empty', { layoutParams: { mode: 'swarm' }, count: 0 }, 'empty'],
+  // #287 — the wasm cloud path doesn't implement the breathing scale
+  // modulation; the JS engine handles it.
+  ['breath', { layoutParams: { mode: 'swarm', breath: 0.5 }, count: 10 }, 'breath'],
 ]) {
   const r = wasmBakeEligible(args);
   assert.strictEqual(r.ok, false, `${label} must be ineligible`);
   assert.strictEqual(r.reason, reason, `${label} reason`);
 }
-console.log('[ok] scope gate routes hype/contacts/attractor/empty to JS');
+console.log('[ok] scope gate routes hype/contacts/attractor/empty/breath to JS');
 
 {
   const small = { ...base, count: 40, steps: 30 };

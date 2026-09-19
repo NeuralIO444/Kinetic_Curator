@@ -122,6 +122,9 @@ export function wasmBakeEligible({ layoutParams = {}, attractor = null, count = 
   if (!Number.isFinite(count) || count <= 0) return { ok: false, reason: 'empty' };
   if (isOrganismMode(layoutParams.mode)) return { ok: false, reason: 'organism-mode' };
   if ((layoutParams.contactRadius ?? 0) > 0) return { ok: false, reason: 'contacts' };
+  // #287 — the wasm cloud path doesn't implement the breathing scale
+  // modulation; fall back to the JS engine when breath is on.
+  if ((layoutParams.breath ?? 0) > 0) return { ok: false, reason: 'breath' };
   if (attractor) return { ok: false, reason: 'attractor' };
   return { ok: true };
 }

@@ -47,9 +47,10 @@ export function createLiveResolver() {
     }
     const initKey = [ctx.mode, ctx.seed, ctx.safeParticles, CANVAS_W, CANVAS_H,
       ctx.seedOffsets?.spatial || 0, ctx.seedOffsets?.color || 0,
-      ctx.seedOffsets?.asset || 0, ctx.seedOffsets?.noise || 0].join('|');
+      ctx.seedOffsets?.asset || 0, ctx.seedOffsets?.noise || 0,
+      ctx.layoutParams.graze || 0].join('|');
     if (st.initKey !== initKey) {
-      st.system.init(ctx.safeParticles, CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets);
+      st.system.init(ctx.safeParticles, CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, { graze: ctx.layoutParams.graze || 0 });
       st.initKey = initKey;
     }
     if (st.phraseGen !== ctx.phraseWrapGen) {
@@ -64,10 +65,22 @@ export function createLiveResolver() {
     }
     let items = st.system.getItems(ctx.activeAssets).map((item) => {
       const swatches = ctx.palette.swatches || [];
-      const accent = swatches[(swatches.indexOf(item.color) + 3) % swatches.length] || swatches[0];
+      // #287 — grazers are stamped in the palette bg: the ACCUM
+      // over-composite then erases beneath them (the deposit/erode loop).
+      // The tint is stable per asset, so the atlas bakes the bg combo once.
+      const bg = ctx.palette.bg;
+      const accent = item.graze ? bg : (swatches[(swatches.indexOf(item.color) + 3) % swatches.length] || swatches[0]);
       const u = Number.isFinite(item.u) ? Math.min(1, Math.max(0, item.u)) : 0;
       const uScale = item.role === 'wing' ? 1 + u * 0.18 : 1;
-      return { ...item, assetId: item.asset?.id, accent, scale: item.scale * ctx.scaleMul * uScale, alpha: Math.min(100, item.alpha + ctx.alphaBoost), u };
+      return {
+        ...item,
+        assetId: item.asset?.id,
+        accent,
+        color: item.graze ? bg : item.color,
+        scale: item.scale * ctx.scaleMul * uScale,
+        alpha: Math.min(100, item.alpha + ctx.alphaBoost),
+        u,
+      };
     });
     if (!ctx.layoutParams.overlap) items = [...items].sort((a, b) => a.scale - b.scale);
     const stamp = ctx.layoutParams.mirror || ctx.layoutParams.symmetry === 'stamp';

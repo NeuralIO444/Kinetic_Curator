@@ -34,7 +34,7 @@ export function isOrganismMode(mode) {
   return mode === 'hype';
 }
 
-export const SYMMETRY_MODES = ['none', 'bilateral', 'stamp'];
+export const SYMMETRY_MODES = ['none', 'bilateral', 'radial-4', 'radial-6', 'radial-8', 'stamp'];
 export const BEHAVE_MODES = BEHAVE_IDS;
 
 /** #167 — onContact response per overlapping pair. */
@@ -84,6 +84,13 @@ export const DEFAULT_LAYOUT_PARAMS = {
   symmetry: 'none',
   behave: 'cruise',
   material: 'plate',
+  // #287 bio-drives. metabolism 0 = drives off (legacy behaviour);
+  // breath 0 = no breathing swell; graze 0 = no grazers. graze is a hidden
+  // voice-level param (no slider — the spec is the trust boundary, same as
+  // the #167 contact params before their UI follow-up).
+  metabolism: 0,
+  breath: 0,
+  graze: 0,
 
   // #167 — organism contacts. contactRadius 0 disables the contact pass
   // entirely (the swarm is then bit-identical to the pre-contact engine).
@@ -143,6 +150,11 @@ export const PARAM_SPEC = {
   flap: { min: 0, max: 1 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
+  // #287 bio-drives — the two new sliders (METABOLISM, BREATH) plus the
+  // hidden voice-level grazer fraction.
+  metabolism: { min: 0, max: 2 },
+  breath: { min: 0, max: 1 },
+  graze: { min: 0, max: 1 },
   accumulationFade: { min: 1, max: 40 }, // #274: half-life frames
   accumulationOptics: { min: 0, max: 0.25 }, // #308 review: remapped — full slider travel is the usable range
   accumulationTunnel: { min: 0, max: 1 },

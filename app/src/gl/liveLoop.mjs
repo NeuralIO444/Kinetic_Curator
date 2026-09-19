@@ -599,7 +599,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
               // Silence is a true no-op: the envelope passes params through at 0.
               // #306: the bands are already shaped by the ballistics follower
               // (useAudioInput); swell scales the glow gesture only.
-              const rp = applyAudioEnvelope(accumRecipeParams(accumParams), {
+              // #287 fade-to-paper: the fade target follows the scene bg.
+              const rp = applyAudioEnvelope(accumRecipeParams({ ...accumParams, background: bgCss }), {
                 rms: audioOn ? bands.rms || 0 : 0,
                 flux: 0,
                 beatPulse: audioOn ? bands.beatPulse || 0 : 0,

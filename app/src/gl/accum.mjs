@@ -29,8 +29,12 @@
  *   2. Feed (Phase B2): flow-advected feedback — the buffer is sampled at
  *      uv + flow(uv) * strength through a small in-shader noise field, so
  *      trails curl as they decay. Skipped at flow = 0 (exact old buffer).
- *   3. Fade/decay + feedback: accum.rgb *= keep (keep = fade, 0..0.99),
- *      sampled through the Phase A feedback transform — per-frame zoom +
+ *   3. Fade/decay + feedback: accum.rgb lerps toward the palette background
+ *      (keep = fade, 0..0.99) — #287 fade-to-paper: on light grounds
+ *      trails fall toward the paper, not black. The background rides in
+ *      the recipe params (bg, parsed from the background CSS color);
+ *      black (the default) keeps the old `rgb *= keep` exactly.
+ *      Sampled through the Phase A feedback transform — per-frame zoom +
  *      spin (TUNNEL, light-tunnels) and radial RGB channel separation
  *      (PRISM). All amounts 0/off by default: the transform is skipped and
  *      the sample is exactly the old one (the optics no-op precedent).
@@ -118,7 +122,7 @@ function opticsDerived(o) {
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
  */
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0 } = {}) {
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000' } = {}) {
   const keep = Math.min(0.99, Math.max(0, Number(fade)));
   const o = clamp01(optics);
   const t = clamp01(tunnel);
@@ -128,8 +132,12 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
   // B3 resolution gate: a full-res 16F ring target is ~8 bytes/px, so at
   // >=2K widths the tap count is capped (see "Echoes" in docs/ACCUM.md).
   const gated = echoWidth >= 2048 ? Math.min(e, 3) : e;
+  // #287 fade-to-paper: the fade target, parsed from the background CSS
+  // color. Black keeps the legacy `rgb *= keep` exactly (0 * (1 - keep) = 0).
+  const bg = hexToRgb01(background);
   return {
     keep,
+    bg,
     ...opticsDerived(o),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
     // each is derived so that amount 0 is exactly the identity transform.
@@ -234,12 +242,21 @@ export function sanitizeAccumEchoes(v) {
   return Math.min(4, Math.max(0, Math.round(Number(v) || 0)));
 }
 
+/** #287 — CSS hex ('#rgb' / '#rrggbb') → [r, g, b] 0..1. Unparseable → black. */
+function hexToRgb01(hex) {
+  const m = /^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.exec(String(hex || ''));
+  if (!m) return [0, 0, 0];
+  const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+}
+
 // --- GLSL -----------------------------------------------------------------
 
 export const FADE_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
 uniform float u_keep;
+uniform vec3 u_bg;  // #287 fade-to-paper: the fade target (palette background)
 uniform float u_tunnelZoom;  // 1.0 = off
 uniform float u_tunnelSpin;  // 0.0 = off (radians per frame)
 uniform float u_prism;       // 0.0 = off (radial UV offset per channel)
@@ -269,7 +286,7 @@ void main() {
   } else {
     c = texture(u_src, tuv);
   }
-  o = vec4(c.rgb * u_keep, c.a);
+  o = vec4(mix(u_bg, c.rgb, u_keep), c.a);
 }`;
 
 // Phase B2 — flow-advected feedback. Samples the buffer at
@@ -465,7 +482,7 @@ void main() {
 const FRAME_16F = 1920 * 1080 * 8;
 export const ACCUM_PROGRAMS = {
   // Fade + tunnel/prism feedback in one pass.
-  fade: { fs: FADE_FS, file: 'accum.mjs:FADE_FS', uniforms: ['u_src', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'],
+  fade: { fs: FADE_FS, file: 'accum.mjs:FADE_FS', uniforms: ['u_src', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.8, notes: 'fade + tunnel/prism feedback; shed with ACCUM' } },
   // Flow feedback: advects the buffer through the flow field.
   feed: { fs: FEED_FS, file: 'accum.mjs:FEED_FS', uniforms: ['u_src', 'u_flow'],
@@ -804,11 +821,16 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   // is skipped and this is the exact old path.
   const faded = new Float64Array(n);
   const feedback = p.tunnelZoom !== 1 || p.tunnelSpin !== 0 || p.prismUv !== 0;
+  // #287 fade-to-paper: the fade lerps toward the palette background, not
+  // black. With the default black bg this is exactly the old `* keep`
+  // (0 * (1 - keep) = 0), so the legacy fade hashes can't move.
+  const bg0 = p.bg[0], bg1 = p.bg[1], bg2 = p.bg[2];
+  const fadeTo = (c, b) => b * (1 - p.keep) + c * p.keep;
   if (!feedback) {
     for (let i = 0; i < n; i += 4) {
-      faded[i] = fed[i] * p.keep;
-      faded[i + 1] = fed[i + 1] * p.keep;
-      faded[i + 2] = fed[i + 2] * p.keep;
+      faded[i] = fadeTo(fed[i], bg0);
+      faded[i + 1] = fadeTo(fed[i + 1], bg1);
+      faded[i + 2] = fadeTo(fed[i + 2], bg2);
       faded[i + 3] = fed[i + 3];
     }
   } else {
@@ -840,9 +862,9 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
           a = nearest(tu, tv, 3);
         }
         const o = (y * w + x) * 4;
-        faded[o] = r * p.keep;
-        faded[o + 1] = g * p.keep;
-        faded[o + 2] = b * p.keep;
+        faded[o] = fadeTo(r, bg0);
+        faded[o + 1] = fadeTo(g, bg1);
+        faded[o + 2] = fadeTo(b, bg2);
         faded[o + 3] = a;
       }
     }
@@ -920,7 +942,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       });
       const L = {};
       const U = (n) => gl.getUniformLocation(progs[name], n);
-      for (const u of ['u_src', 'u_dst', 'u_keep', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
+      for (const u of ['u_src', 'u_dst', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
         'u_flow',
         'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps',
         'u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint',
@@ -1014,12 +1036,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
-  const hexToRgb = (hex) => {
-    const m = /^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.exec(String(hex || ''));
-    if (!m) return [0, 0, 0];
-    const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
-    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-  };
+  const hexToRgb = hexToRgb01;
 
   return {
     version: ACCUM_VERSION,
@@ -1119,6 +1136,8 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       pass('fade', write, (u, bind) => {
         gl.uniform1i(u.u_src, bind(0, cur.tex));
         gl.uniform1f(u.u_keep, p.keep);
+        // #287 fade-to-paper: the fade target follows the palette bg.
+        gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
         gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
         gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
         gl.uniform1f(u.u_prism, p.prismUv);

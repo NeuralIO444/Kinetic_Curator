@@ -5,6 +5,7 @@ export const PRESET_GROUPS = [
   { id: 'rendah',  label: 'Rendah Mag' },
   { id: 'ca',      label: 'Cellular Automaton' },
   { id: 'davis',   label: 'Ghost-Lineage' },
+  { id: 'bio',     label: 'Bio-Drives' },
 ];
 
 export const COMPOSITION_PRESETS = [
@@ -131,6 +132,100 @@ export const COMPOSITION_PRESETS = [
       mode: 'orbit', count: 300, scale: [0.3, 1.1], rotate: [-100, 100], alpha: [34, 90],
       zTiers: 3, jitter: 4, density: 90, bleed: true, mirror: false, overlap: true,
       lifeDrift: 0.1, displacement: 0, behave: 'orbit',
+    },
+  },
+  // --- #287 bio-drives: Oxman behavior through the creature systems.
+  // Each preset is a voice for one drive. Palettes are paired by name in the
+  // desc — presets don't carry palettes (paletteId is separate state).
+  {
+    id: 'bio-hunger', name: 'HUNGER', group: 'bio',
+    desc: 'METABOLISM up — the cast tires, hungers, and clumps as it feeds. Pair with a dark palette.',
+    categories: ['radial'], paletteShift: 'zone',
+    params: {
+      mode: 'hype', count: 220, scale: [0.4, 1.2], rotate: [-40, 40], alpha: [50, 100],
+      zTiers: 4, jitter: 12, density: 85, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.15, noiseSpeed: 0.35, displacement: 18, behave: 'flock',
+      particleCount: 200, metabolism: 1.4, breath: 0.15, graze: 0,
+    },
+  },
+  {
+    id: 'bio-mold', name: 'MOLD BLOOM', group: 'bio',
+    desc: 'Slime-mold foraging — chemotaxis climbs its own scent trails. Slow. Pair with PETRI BLOOM.',
+    categories: ['radial', 'linework'], paletteShift: 'band',
+    params: {
+      mode: 'hype', count: 260, scale: [0.3, 0.9], rotate: [-30, 30], alpha: [55, 100],
+      zTiers: 4, jitter: 10, density: 88, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.1, noiseSpeed: 0.15, displacement: 8, behave: 'mold',
+      particleCount: 240, metabolism: 1.0, breath: 0.1, graze: 0,
+    },
+  },
+  {
+    id: 'bio-graze', name: 'GRAZERS', group: 'bio',
+    desc: 'Grazers erase — bg-stamped agents mow trails through the accumulation. Leave ACCUM on.',
+    categories: ['radial', 'linework'], paletteShift: 'band',
+    params: {
+      mode: 'hype', count: 200, scale: [0.4, 1.1], rotate: [-45, 45], alpha: [50, 100],
+      zTiers: 4, jitter: 12, density: 85, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.12, noiseSpeed: 0.3, displacement: 16, behave: 'cruise',
+      particleCount: 180, metabolism: 0.8, breath: 0.1, graze: 0.55,
+      accumulation: true, accumulationFade: 8,
+    },
+  },
+  {
+    id: 'bio-leak', name: 'PIGMENT LEAK', group: 'bio',
+    desc: 'Neighbors trade pigment as they crowd — colors bleed across the cast. Pair with KILN COLUMNS (a leak palette).',
+    categories: ['organic', 'dots'], paletteShift: 'band',
+    params: {
+      mode: 'hype', count: 240, scale: [0.35, 1.0], rotate: [-40, 40], alpha: [55, 100],
+      zTiers: 4, jitter: 10, density: 90, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.12, noiseSpeed: 0.3, displacement: 14, behave: 'flock',
+      particleCount: 220, metabolism: 1.0, breath: 0.1, graze: 0,
+    },
+  },
+  {
+    id: 'bio-breath', name: 'BREATHING', group: 'bio',
+    desc: 'The cast breathes — scale swells with each agent\u2019s energy. Tired creatures breathe shallow.',
+    categories: ['radial', 'organic'], paletteShift: 'zone',
+    params: {
+      mode: 'hype', count: 180, scale: [0.4, 1.2], rotate: [-30, 30], alpha: [50, 100],
+      zTiers: 4, jitter: 12, density: 85, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.08, noiseSpeed: 0.2, displacement: 10, behave: 'cruise',
+      particleCount: 160, metabolism: 0.6, breath: 0.9, graze: 0,
+    },
+  },
+  {
+    id: 'bio-coral', name: 'CORAL GARDEN', group: 'bio',
+    desc: 'Coral garden — mold foragers drift through Haeckel corals and plumes. Pair with CYANOTYPE.',
+    categories: ['radial', 'linework'], paletteShift: 'band',
+    params: {
+      mode: 'hype', count: 220, scale: [0.35, 1.1], rotate: [-50, 50], alpha: [50, 100],
+      zTiers: 4, jitter: 14, density: 86, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.1, noiseSpeed: 0.18, displacement: 12, behave: 'mold',
+      particleCount: 200, metabolism: 0.8, breath: 0.3, graze: 0,
+    },
+  },
+  {
+    id: 'bio-plate-litho', name: 'PLATE \u00B7 LITHO', group: 'bio',
+    desc: 'Specimen plate — Haeckel bodies pinned on a grid. Pair with LITHOGRAPH and watch the trails fall to the paper.',
+    categories: ['radial'], paletteShift: 'band',
+    params: {
+      mode: 'grid', count: 120, scale: [0.5, 1.3], rotate: [-15, 15], alpha: [60, 100],
+      zTiers: 3, jitter: 6, density: 90, bleed: false, mirror: false, overlap: false,
+      lifeDrift: 0.05, noiseSpeed: 0.12, displacement: 4,
+      metabolism: 0.2, breath: 0.2, graze: 0,
+      accumulation: true, accumulationFade: 12,
+    },
+  },
+  {
+    id: 'bio-plate-sepia', name: 'PLATE \u00B7 SEPIA', group: 'bio',
+    desc: 'Radial organisms as plate specimens — six-fold mirrored fans. Pair with SEPIA PLATE.',
+    categories: ['radial', 'linework'], paletteShift: 'band',
+    params: {
+      mode: 'hype', count: 160, scale: [0.4, 1.1], rotate: [-25, 25], alpha: [55, 100],
+      zTiers: 4, jitter: 8, density: 88, bleed: false, mirror: false, overlap: false,
+      lifeDrift: 0.06, noiseSpeed: 0.14, displacement: 6, behave: 'cruise', symmetry: 'radial-6',
+      particleCount: 144, metabolism: 0.3, breath: 0.25, graze: 0,
+      accumulation: true, accumulationFade: 12,
     },
   },
 ];

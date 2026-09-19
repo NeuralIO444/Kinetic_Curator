@@ -80,7 +80,9 @@ export function bakeParticles({
   engine = 'auto',
 }) {
   const sys = new ParticleSystem();
-  sys.init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets);
+  // #287 — the voice-level grazer fraction rides into init (and into the
+  // update() re-init path via params below).
+  sys.init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0 });
 
   // #167 — the quality cap rides on the params so contact breed() can gate
   // population growth; the bake stays a pure function of its inputs.
@@ -127,12 +129,16 @@ export function bakeParticles({
 export function bakeSwarmItems(opts) {
   const items = bakeParticles(opts);
   const swatches = opts.palette?.swatches || [];
+  // #287 — grazers are stamped in the palette bg, same as the live loop:
+  // the ACCUM over-composite erases beneath them.
+  const bg = opts.palette?.bg;
   return items.map((item) => {
     const i = swatches.indexOf(item.color);
     return {
       ...item,
       assetId: item.asset?.id,
-      accent: swatches[(i + 3) % swatches.length] || swatches[0],
+      accent: item.graze ? bg : (swatches[(i + 3) % swatches.length] || swatches[0]),
+      color: item.graze ? bg : item.color,
     };
   });
 }

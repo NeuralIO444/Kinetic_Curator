@@ -31,6 +31,29 @@ import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
 import { resolveBehave, orbitForce } from './organisms/behave.js';
+import { createScentField } from './kernel/field/scent.js';
+import { registerCostTier } from '../gl/costTiers.mjs';
+
+/**
+ * #287 bio-drives — the grazer trait lives here (per-agent, set at init
+ * from the voice-level `graze` fraction, inherited at breed). The trait's
+ * cost is the per-item tint applied in the existing instance mapping
+ * (liveResolve.mjs / bake/index.js): grazer items are stamped in the
+ * palette's background color, so the ACCUM over-composite erases beneath
+ * them — no new GPU pass, no contract change. Tier 0: the work rides an
+ * existing per-frame mapping and is never shed. (costTiers.mjs is
+ * import-safe here: zero imports, no cycle — an engine→gl import by
+ * directory only.)
+ */
+registerCostTier('engine/graze-tint', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#287 bio-drives: grazer agents tint to the palette bg in the existing ' +
+    'item→instance mapping; the ACCUM over-composite does the erasing. ' +
+    'One stable atlas combo per asset, baked once. Never shed.',
+});
 
 export const ATTRACTOR_GAIN = 8;
 const TAU = Math.PI * 2;
@@ -39,6 +62,25 @@ const MAX_SPEED_CLOUD = 8.0;
 const MAX_SPEED_MOTH = 1.65;
 const BOUNCE = 0.62;
 const MARGIN = 8;
+
+/**
+ * #287 — parse a CSS hex color ('#rgb' or '#rrggbb') to [r, g, b] 0..255.
+ * Unparseable input yields white; never throws (the leak working copy must
+ * survive user palettes).
+ */
+function hexToRgb3(hex) {
+  const h = String(hex || '').replace('#', '');
+  const v = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const n = parseInt(v, 16);
+  if (!Number.isFinite(n) || v.length !== 6) return [255, 255, 255];
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** #287 — [r, g, b] 0..255 → '#rrggbb'. */
+function rgb3ToHex(r, g, b) {
+  const q = (v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+  return `#${q(r)}${q(g)}${q(b)}`;
+}
 
 export class ParticleSystem {
   constructor() {
@@ -49,6 +91,14 @@ export class ParticleSystem {
     this._layout = null;
     this._cap = 0;
     this._allocate(0);
+    // Scent field (#287): the shared invisible substrate. Created lazily on
+    // the first organism update; it persists across init() calls (a fresh
+    // cast keeps the old ground's scent, which decays on its own), so it
+    // lives here — not in _allocate, which re-runs on population growth.
+    this._scent = null;
+    // Monotonic update counter (#287): drives the pigment write-back
+    // cadence and the curiosity hash. Never reset by init().
+    this._step = 0;
     // Cold columns — never touched by the physics inner loops.
     this.color = [];
     this.spine = [];
@@ -91,6 +141,16 @@ export class ParticleSystem {
     // (swap changes the costume, not the layer).
     this.alive = new Uint8Array(cap);
     this.cgroup = new Uint8Array(cap);
+    // #287 bio-drives — per-agent inner life. energy drains with fatigue
+    // and restores when the agent feeds (crowded or on strong scent);
+    // drive is the slow curiosity random-walk state; grazer marks agents
+    // whose instances are stamped in the palette bg (eroders); leakRgb is
+    // the drifting working copy of the agent's pigment (written back to
+    // color[] on a slow cadence so the atlas isn't churned per-frame).
+    this.energy = new Float64Array(cap);
+    this.drive = new Float64Array(cap);
+    this.grazer = new Uint8Array(cap);
+    this.leakRgb = new Float64Array(cap * 3);
     // Grid scratch, reallocated with the population.
     this._cellOf = new Int32Array(cap);
     this._order = new Int32Array(cap);
@@ -105,6 +165,12 @@ export class ParticleSystem {
     const newCap = Math.max(minCap, this._cap * 2 || 16);
     const grow = (arr) => {
       const next = new arr.constructor(newCap);
+      next.set(arr);
+      return next;
+    };
+    // #287 — leakRgb packs 3 channels per agent, so it grows 3x.
+    const grow3 = (arr) => {
+      const next = new arr.constructor(newCap * 3);
       next.set(arr);
       return next;
     };
@@ -124,6 +190,10 @@ export class ParticleSystem {
     this.assetIndex = grow(this.assetIndex);
     this.alive = grow(this.alive);
     this.cgroup = grow(this.cgroup);
+    this.energy = grow(this.energy);
+    this.drive = grow(this.drive);
+    this.grazer = grow(this.grazer);
+    this.leakRgb = grow3(this.leakRgb);
     this._cellOf = grow(this._cellOf);
     this._order = grow(this._order);
     this.color.length = newCap;
@@ -140,7 +210,7 @@ export class ParticleSystem {
     this.phase.fill(0, 0, this.n);
   }
 
-  init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null) {
+  init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null, opts = {}) {
     this.canvasW = canvasW;
     this.canvasH = canvasH;
     // #305 — zero offsets → exactly the old `seed || 444`; a noise offset
@@ -160,6 +230,9 @@ export class ParticleSystem {
     this.color = new Array(count);
     this.spine = new Array(count);
     const swatches = palette?.swatches || ['#ffffff'];
+    // #287 — voice-level grazer fraction (hidden param, 0..1). Each agent
+    // draws its grazer trait from the dyn stream, independent of position.
+    const grazeFrac = Math.min(1, Math.max(0, Number(opts.graze) || 0));
     for (let i = 0; i < count; i++) {
       // Draw order here is load-bearing: r() is a sequential stream, so the
       // six draws below must stay in this order to reproduce a given seed.
@@ -190,6 +263,17 @@ export class ParticleSystem {
       this.cgroup[i] = (i % activeAssets.length) % 32;
       this.color[i] = swatches[i % swatches.length];
       this.spine[i] = [{ x, y }];
+      // #287 bio-drives: a fresh cast starts sated and curious. The grazer
+      // draw is a separate hash (not a 7th r() draw) so the six load-bearing
+      // draws above keep their exact sequence — legacy seeds reproduce
+      // bit-identical positions.
+      this.energy[i] = 1;
+      this.drive[i] = hashU01(seed >>> 0, CH.dyn, 4096 + i);
+      this.grazer[i] = hashU01(seed >>> 0, CH.dyn, 8192 + i) < grazeFrac ? 1 : 0;
+      const [lr, lg, lb] = hexToRgb3(this.color[i]);
+      this.leakRgb[i * 3] = lr;
+      this.leakRgb[i * 3 + 1] = lg;
+      this.leakRgb[i * 3 + 2] = lb;
     }
     // A population (re)init clears all contact state: dead slots, the
     // breed sequence, and the freelist belong to the old population.
@@ -481,15 +565,27 @@ export class ParticleSystem {
     this.alive[cs] = 1;
     this.color[cs] = r3 < 0.5 ? this.color[i] : this.color[j];
     this.spine[cs] = [{ x: mx, y: my }];
+    // #287 bio-drives — inner life is heritable: energy/drive average
+    // (the child starts between its parents' states), grazer follows the
+    // collide layer's coin flip, and the pigment working copy follows the
+    // costume-inheriting parent so the drift starts from the visible color.
+    this.energy[cs] = (this.energy[i] + this.energy[j]) / 2;
+    this.drive[cs] = (this.drive[i] + this.drive[j]) / 2;
+    this.grazer[cs] = r4 < 0.5 ? this.grazer[i] : this.grazer[j];
+    const cp3 = (r3 < 0.5 ? i : j) * 3;
+    this.leakRgb[cs * 3] = this.leakRgb[cp3];
+    this.leakRgb[cs * 3 + 1] = this.leakRgb[cp3 + 1];
+    this.leakRgb[cs * 3 + 2] = this.leakRgb[cp3 + 2];
     return cs;
   }
 
   update(layoutParams, activeAssets, palette, seed, time, attractor, seedOffsets = null) {
     if (this.n === 0) return;
+    this._step += 1;
     this._layout = layoutParams;
     const targetCount = layoutParams.particleCount || 100;
     if (this._authoredCount !== targetCount) {
-      this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed, seedOffsets);
+      this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0 });
     }
     // #305 — a mutated noise offset re-rolls the flow field live; otherwise
     // the field is created once (same identity as the old `seed || 444`).
@@ -524,10 +620,23 @@ export class ParticleSystem {
       // #167 — organism contacts. radius 0 disables the pass entirely.
       contactRadius = 0, contactRestitution = 0.5, contactRepel = 0,
       contactMode = 'none', collideMask = 0xffffffff, maxParticles,
+      // #287 bio-drives. metabolism 0 = drives off (legacy behaviour).
+      metabolism = 0, breath = 0,
     } = layoutParams;
 
     const organism = isOrganismMode(layoutParams.mode);
     const profile = organism ? resolveBehave(layoutParams.behave) : null;
+    // #287 — the scent field exists only for organism casts (drives,
+    // chemotaxis, and feeding all read it). Created lazily so cloud-mode
+    // sessions never pay for it; persists across init() calls.
+    if (organism && !this._scent) this._scent = createScentField();
+    const meta = Math.min(2, Math.max(0, metabolism));
+    const drivesOn = organism && meta > 0;
+    // Chemotaxis is a mold-only sense: the profile opts in with a
+    // chemotaxis gain, and pays a deposit so the colony sustains itself.
+    const chemOn = organism && (profile.chemotaxis || 0) > 0;
+    const leak = Math.min(1, Math.max(0, Number(palette?.leak) || 0));
+    const leakOn = organism && leak > 0;
     const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
     const damp = organism ? Math.max(damping, 0.97) : damping;
     const [minScale, maxScale] = scale;
@@ -559,6 +668,11 @@ export class ParticleSystem {
     const AX = this.ax; const AY = this.ay;
     const MASS = this.mass;
     const ALIVE = this.alive;
+    // #287 — drive columns (hoisted; the force loop reads them per agent).
+    const ENERGY = this.energy; const DRIVE = this.drive;
+    const LEAKRGB = this.leakRgb;
+    const SCENT = this._scent;
+    const seedU = seed >>> 0;
 
     for (let i = 0; i < numParticles; i++) {
       // Dead slots integrate nothing and their forces are never consumed
@@ -597,6 +711,14 @@ export class ParticleSystem {
       let sepX = 0; let sepY = 0; let sepCount = 0;
       let aliX = 0; let aliY = 0; let aliCount = 0;
       let cohX = 0; let cohY = 0; let cohCount = 0;
+      // #287 LEAK — pigment drift accumulators (neighbour average, folded
+      // into the existing cohesion walk; no second traversal).
+      let leakR = 0; let leakG = 0; let leakB = 0;
+      // #287 DRIVES — hunger seeks density: the cohesion pull strengthens
+      // as energy falls. Computed before the walk so the force below uses
+      // the modulated weight.
+      const hunger = drivesOn ? 1 - ENERGY[i] : 0;
+      const cohWeff = drivesOn ? cohW * (1 + hunger * 1.6) : cohW;
       const cx = Math.floor(pxi / cellSize) - minCx;
       const cy = Math.floor(pyi / cellSize) - minCy;
       // ox outer, oy inner — the Map version's visit order. Changing it
@@ -634,7 +756,16 @@ export class ParticleSystem {
               sepX -= dx / dist; sepY -= dy / dist; sepCount++;
             }
             if (d2 > 0 && d2 < aliRadius2) { aliX += VX[j]; aliY += VY[j]; aliCount++; }
-            if (d2 > 0 && d2 < cohRadius2) { cohX += X[j]; cohY += Y[j]; cohCount++; }
+            if (d2 > 0 && d2 < cohRadius2) {
+              cohX += X[j]; cohY += Y[j]; cohCount++;
+              // #287 LEAK — fold the neighbour's pigment into the drift
+              // accumulators. Reads only; the sep/ali/coh sums above are
+              // untouched, so the legacy force hashes can't move.
+              if (leakOn) {
+                const jo3 = j * 3;
+                leakR += LEAKRGB[jo3]; leakG += LEAKRGB[jo3 + 1]; leakB += LEAKRGB[jo3 + 2];
+              }
+            }
           }
         }
       }
@@ -652,8 +783,62 @@ export class ParticleSystem {
         const steerX = cohX / cohCount - pxi;
         const steerY = cohY / cohCount - pyi;
         const mag = Math.sqrt(steerX * steerX + steerY * steerY) || 1;
-        fax += ((steerX / mag) * cohW) / m;
-        fay += ((steerY / mag) * cohW) / m;
+        fax += ((steerX / mag) * cohWeff) / m;
+        fay += ((steerY / mag) * cohWeff) / m;
+      }
+      // #287 LEAK — drift the pigment working copy toward the neighbours'
+      // average. The visible color[] is only rewritten on the slow cadence
+      // after the integration loop (atlas churn guard).
+      if (leakOn && cohCount > 0) {
+        const kk = leak * 0.004;
+        const o3 = i * 3;
+        LEAKRGB[o3] += (leakR / cohCount - LEAKRGB[o3]) * kk;
+        LEAKRGB[o3 + 1] += (leakG / cohCount - LEAKRGB[o3 + 1]) * kk;
+        LEAKRGB[o3 + 2] += (leakB / cohCount - LEAKRGB[o3 + 2]) * kk;
+      }
+      if (drivesOn) {
+        // #287 DRIVES — the slow inner life, updated in the force pass so
+        // feeding can read the neighbour count from this same walk.
+        // Fatigue: energy drains at the metabolism rate; feeding restores
+        // it — in company, and on strong colony scent (mold sustains
+        // itself; a lone cast tires across the set).
+        let e = ENERGY[i] - 0.0016 * meta;
+        if (cohCount > 0) e += 0.0012 * meta;
+        e += SCENT.sample(pxi / this.canvasW, pyi / this.canvasH) * 0.002 * meta;
+        ENERGY[i] = e < 0 ? 0 : e > 1 ? 1 : e;
+        // Curiosity: a slow deterministic random walk on the drive value.
+        // The hash key mixes the step counter so each agent wanders on its
+        // own schedule; the +104729 offset keeps it clear of the init and
+        // breed draw keys on the same channel.
+        const h = hashU01(seedU, CH.dyn, this._step * 131071 + 104729 + i);
+        let dd = DRIVE[i] + (h - 0.5) * 0.06 * meta;
+        DRIVE[i] = dd < 0 ? 0 : dd > 1 ? 1 : dd;
+        // Curious agents wander: a smooth noise-field detour scaled by the
+        // drive value and the metabolism rate.
+        if (DRIVE[i] > 0.001) {
+          const wob = noise.noise3D(pxi * noiseFreq + 500, pyi * noiseFreq + 500, nt + this.seedOffset[i] * 0.0001 + 7.3);
+          const wa = wob * TAU;
+          const wmag = DRIVE[i] * meta * 0.6;
+          fax += (Math.cos(wa) * wmag) / m;
+          fay += (Math.sin(wa) * wmag) / m;
+        }
+      }
+      // #287 MOLD — chemotaxis: climb the scent gradient. Gated to
+      // profiles that declare a chemotaxis gain (mold only).
+      if (chemOn) {
+        const g = SCENT.gradient(pxi / this.canvasW, pyi / this.canvasH);
+        fax += (g.gx * profile.chemotaxis) / m;
+        fay += (g.gy * profile.chemotaxis) / m;
+      }
+      if (drivesOn) {
+        // Fatigue damps steering authority — tired creatures respond
+        // weakly. Applied to the steering (fax minus the incoming contact
+        // impulses in AX), never to the impulses themselves.
+        const vigor = 0.45 + 0.55 * ENERGY[i];
+        const sx = fax - AX[i];
+        const sy = fay - AY[i];
+        fax = AX[i] + sx * vigor;
+        fay = AY[i] + sy * vigor;
       }
       AX[i] = fax;
       AY[i] = fay;
@@ -712,10 +897,23 @@ export class ParticleSystem {
         } else this.rotation[i] = next;
       }
       const mi = MASS[i];
-      this.scale[i] = minScale + (mi * (maxScale - minScale));
-      this.alpha[i] = minAlpha + (mi * (maxAlpha - minAlpha));
       const ph = (this.phase[i] + 0.004 * noiseSpeed) % 1;
       this.phase[i] = ph;
+      let sc = minScale + (mi * (maxScale - minScale));
+      // #287 SWELL — breathing multiplies the base scale by
+      // 1 + breath * 0.5 * energy * sin(phase + seedOffset). The 0.5 caps
+      // the swing at ±50%: the issue's bare `1 + breath * sin(...)` would
+      // collapse agents to zero scale at full breath, which reads as a
+      // glitch, not a breath. Amplitude follows the agent's energy (1 in
+      // cloud mode, where drives never run), so tired creatures breathe
+      // shallow. Phase is the flap phase, offset per agent, so the cast
+      // never breathes in lockstep. breath = 0 keeps the legacy
+      // assignment bit-identical.
+      if (breath > 0) {
+        sc *= 1 + breath * 0.5 * ENERGY[i] * Math.sin(ph * TAU + this.seedOffset[i]);
+      }
+      this.scale[i] = sc;
+      this.alpha[i] = minAlpha + (mi * (maxAlpha - minAlpha));
       const spdU = Math.max(0, Math.min(1, speed / maxSpeed));
       if (organism) {
         const flapU = 0.5 + 0.5 * Math.sin(ph * TAU + this.seedOffset[i]);
@@ -750,6 +948,38 @@ export class ParticleSystem {
       VX[i] = vxi;
       VY[i] = vyi;
     }
+
+    // #287 — scent deposit, then the field's own diffuse+decay step. The
+    // deposit amount is profile-driven: mold colonies lay trails (and so
+    // sustain themselves through scent feeding); other profiles deposit 0
+    // but the field still decays. Coordinates are normalized; the field
+    // clamps at the edges.
+    if (organism && this._scent) {
+      const dep = profile.deposit || 0;
+      if (dep > 0) {
+        const cw = this.canvasW;
+        const chh = this.canvasH;
+        for (let i = 0; i < numParticles; i++) {
+          if (!ALIVE[i]) continue;
+          this._scent.deposit(X[i] / cw, Y[i] / chh, dep);
+        }
+      }
+      this._scent.step();
+    }
+
+    // #287 LEAK — pigment write-back cadence. The drift accumulates in
+    // leakRgb every step, but color[] (the string the atlas bakes) is only
+    // rewritten every 600 steps (~10 s at 60 fps), quantized to 4 bits per
+    // channel. Quantization keeps the combo set stable so the atlas bakes
+    // once per visible shift instead of churning per frame.
+    if (leakOn && this._step % 600 === 0) {
+      const q = (v) => Math.round(Math.min(255, Math.max(0, v)) / 16) * 16;
+      for (let i = 0; i < numParticles; i++) {
+        if (!ALIVE[i]) continue;
+        const o3 = i * 3;
+        this.color[i] = rgb3ToHex(q(LEAKRGB[o3]), q(LEAKRGB[o3 + 1]), q(LEAKRGB[o3 + 2]));
+      }
+    }
   }
 
   getItems(activeAssets) {
@@ -765,6 +995,9 @@ export class ParticleSystem {
           rotation: this.rotation[i], alpha: this.alpha[i],
           asset: activeAssets[this.assetIndex[i] % activeAssets.length],
           color: this.color[i], u: this.u[i],
+          // #287 — grazer flag rides the item so the instance mapping can
+          // stamp grazers in the palette bg (eroders).
+          graze: this.grazer[i] === 1,
         });
       }
       return items;
@@ -787,13 +1020,16 @@ export class ParticleSystem {
       const palpha = this.alpha[i];
       const pu = this.u[i];
       const pcolor = this.color[i];
+      // #287 — grazer flag rides every item of a grazer organism so the
+      // instance mapping can stamp it in the palette bg (eroders).
+      const gz = this.grazer[i] === 1;
       const sp = this.spine[i] && this.spine[i].length ? this.spine[i] : [{ x: px, y: py }];
       for (let s = 0; s < bodyLen; s++) {
         const pt = sp[Math.min(s, sp.length - 1)];
         items.push({
           x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), rotation: protation,
           alpha: palpha * (1 - s * 0.08), asset, color: pcolor, u: pu,
-          key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment',
+          key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
         });
       }
       if (symmetry === 'bilateral') {
@@ -808,14 +1044,40 @@ export class ParticleSystem {
           x: px - pyh * reach, y: py + pxh * reach,
           scale: pscale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
-          ladderId,
+          ladderId, graze: gz,
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
           scale: pscale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
-          ladderId,
+          ladderId, graze: gz,
         });
+      } else {
+        // #287 — radial fans. The bilateral pair above generalizes to an
+        // N-fold fan around the heading: alternating attachments are
+        // _mirrored (the same alternating-mirror convention the fan
+        // inherits from the wing pair), ladders round-robin per arm so
+        // adjacent arms can blend different wing-open frames.
+        const rm = /^radial-(\d+)$/.exec(symmetry || '');
+        const folds = rm ? parseInt(rm[1], 10) : 0;
+        if (folds >= 3) {
+          const heading = protation * (Math.PI / 180);
+          const amp = flap * Math.sin(this.phase[i] * TAU + this.seedOffset[i]);
+          const reach = 16 + Math.abs(amp) * 20;
+          for (let k = 0; k < folds; k++) {
+            const a = heading - Math.PI / 2 + (TAU * k) / folds;
+            const mirrored = k % 2 === 1;
+            const ladderId = MOTH_LADDERS[(i + k) % MOTH_LADDERS.length].id;
+            items.push({
+              x: px + Math.cos(a) * reach, y: py + Math.sin(a) * reach,
+              scale: pscale * 0.7,
+              rotation: protation + (mirrored ? -amp * 18 : amp * 18),
+              alpha: palpha, asset, color: pcolor, u: pu,
+              key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
+              ...(mirrored ? { _mirrored: true } : null),
+            });
+          }
+        }
       }
     }
     return items;
