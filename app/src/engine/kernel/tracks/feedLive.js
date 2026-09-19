@@ -1,6 +1,4 @@
-/** One-frame FEED hop. Not imported by the live loop yet.
- *  Call tick() after KC-1 points exist, before KC-2 draws.
- */
+/** Delay-1 hop: applyTo reads last commit; pushSource stages this frame. */
 import { createFeedDelay } from './feedDelay.js';
 import { applyFeed, normalizePatch, FEED_SCALE } from './trackGraph.js';
 
@@ -8,6 +6,7 @@ export function createFeedLive(frameW = 1000, frameH = 700) {
   const w = Math.max(8, Math.round(frameW * FEED_SCALE));
   const h = Math.max(8, Math.round(frameH * FEED_SCALE));
   const delay = createFeedDelay(w, h);
+  const pending = new Map();
 
   function rasterize(points) {
     const luma = new Float32Array(w * h);
@@ -25,7 +24,7 @@ export function createFeedLive(frameW = 1000, frameH = 700) {
     h,
     delay,
     pushSource(trackId, points) {
-      delay.push(trackId, rasterize(points));
+      pending.set(trackId | 0, rasterize(points));
     },
     applyTo(targetPts, patch) {
       const p = normalizePatch(patch);
@@ -33,7 +32,12 @@ export function createFeedLive(frameW = 1000, frameH = 700) {
       if (!delay.hasHistory(p.from)) return targetPts;
       return applyFeed(targetPts, delay.field(p.from), p);
     },
+    commit() {
+      for (const [id, luma] of pending) delay.push(id, luma);
+      pending.clear();
+    },
     reset() {
+      pending.clear();
       delay.reset();
     },
   };
