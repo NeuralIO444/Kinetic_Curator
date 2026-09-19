@@ -190,7 +190,7 @@ export function createLiveResolver() {
           x: (Number(it.x) || 0) / CANVAS_W,
           y: (Number(it.y) || 0) / CANVAS_H,
         }));
-        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: 1 });
+        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: 0.08 });
         e.items = (e.items || []).map((it, k) => {
           const q = pulled[k];
           if (!q) return it;
