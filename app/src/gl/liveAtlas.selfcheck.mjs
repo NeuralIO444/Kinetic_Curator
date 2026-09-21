@@ -18,8 +18,9 @@ test('live atlas cell geometry matches the offline bake', () => {
   assert.deepEqual({ ...LIVE_CELL_UNITS }, { x0: -50, y0: -50, x1: 150, y1: 150 });
 });
 
-test('live comboKey is byte-identical to the offline comboKey', () => {
+test('Spine D: live comboKey is just the asset (R/G mask per asset)', () => {
   const args = ['moth', '#0a0a0a', '#f5f1e8'];
-  assert.equal(comboKey(...args), nodeComboKey(...args));
-  assert.equal(comboKey('a', 'b', 'c'), 'a|b|c');
+  assert.equal(comboKey(...args), 'moth');
+  assert.equal(comboKey('a', 'b', 'c'), 'a');
+  assert.notEqual(comboKey(...args), nodeComboKey(...args));
 });

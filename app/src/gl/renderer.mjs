@@ -187,7 +187,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -241,21 +241,21 @@ export const SMEAR_MAX = 1.0;
 
 export const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
 
+
 export function packInstanceData(instances, cells, alphaScale = 1) {
   // Spine B (#388): skip instances whose cells[comboKey] is missing instead
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
 
-  // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
-  // (u1,v1,vx,vy). The last two floats carry per-frame velocity (#309).
-  // Single-pass pack: allocate up to instances.length * 12 and return a
-  // zero-copy subarray view if any missing instances were skipped.
+  // 20 floats/instance (80-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,0,0).
   const maxLen = instances.length;
-  const buf = new Float32Array(maxLen * 12);
+  const buf = new Float32Array(maxLen * 20);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = instances[i];
-    const cell = cells[`${it.asset}|${it.tint}|${it.accent}`];
+    // Spine D: fallback supports both live (R/G mask per asset) and offline (baked combos)
+    const cell = cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
     if (!cell) continue; // Spine B: skip missing instance, never throw
     buf[o] = it.x; buf[o + 1] = it.y;
     buf[o + 2] = it.scaleX; buf[o + 3] = it.scaleY;
@@ -263,14 +263,18 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     buf[o + 6] = cell.u0; buf[o + 7] = cell.v0;
     buf[o + 8] = cell.u1; buf[o + 9] = cell.v1;
     buf[o + 10] = it.vx || 0; buf[o + 11] = it.vy || 0;
-    o += 12;
+    const ink = hexToRgb(it.tint);
+    const acc = hexToRgb(it.accent);
+    buf[o + 12] = ink[0]; buf[o + 13] = ink[1]; buf[o + 14] = ink[2]; buf[o + 15] = acc[0];
+    buf[o + 16] = acc[1]; buf[o + 17] = acc[2]; buf[o + 18] = 0; buf[o + 19] = 0;
+    o += 20;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
   return buf.subarray(0, o);
 }
 
-function createRendererBase(canvas, { alpha = false } = {}) {
+function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   const gl = canvas.getContext('webgl2', {
     alpha, antialias: false, depth: false, stencil: false,
     premultipliedAlpha: false, preserveDrawingBuffer: false,
@@ -383,23 +387,24 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
     gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);
+    gl.uniform1f(U(quadProg, 'u_liveTint'), isLive ? 1.0 : 0.0);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 5; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 48, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 80, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 12);
-    for (let i = 0; i <= 3; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 20);
+    for (let i = 0; i <= 5; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
 
@@ -780,7 +785,7 @@ export function liveDisplayScale() {
 }
 
 export function createLiveRenderer(canvas) {
-  const b = createRendererBase(canvas, { alpha: true });
+  const b = createRendererBase(canvas, { alpha: true, isLive: true });
   const { gl, bridge } = b;
 
   let T = null;

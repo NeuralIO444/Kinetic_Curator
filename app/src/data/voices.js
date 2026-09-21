@@ -418,14 +418,16 @@ export function resolveLiveRenderState(s) {
   const t = mix.t ?? 0;
   const steps = mixStepCount(mix.durationMs);
   const stepT = Math.round(t * steps) / steps;
-  const m = mixVoiceState(mix.from, mix.to, stepT);
+  const mStep = mixVoiceState(mix.from, mix.to, stepT);
+  // Spine D: smooth color lerp at 60fps (stills baker unaffected)
+  const mSmooth = mixVoiceState(mix.from, mix.to, t);
   return {
-    layoutParams: m.params,
+    layoutParams: mStep.params,
     paletteId: s.paletteId,
     paletteOverrides: {
-      bg: m.palette.bg,
-      ink: m.palette.ink,
-      swatches: m.palette.swatches,
+      bg: mSmooth.palette.bg,
+      ink: mSmooth.palette.ink,
+      swatches: mSmooth.palette.swatches,
     },
   };
 }

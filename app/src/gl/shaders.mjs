@@ -40,11 +40,15 @@ layout(location=0) in vec2 a_corner;
 layout(location=1) in vec4 a_inst0;
 layout(location=2) in vec4 a_inst1;
 layout(location=3) in vec4 a_inst2;
+layout(location=4) in vec4 a_inst3;
+layout(location=5) in vec4 a_inst4;
 uniform vec2 u_canvas;
 uniform vec2 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor
 out vec2 v_uv;
 out float v_opacity;
+out vec3 v_ink;
+out vec3 v_accent;
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -70,17 +74,32 @@ void main() {
   gl_Position = vec4(world.x / u_canvas.x * 2.0 - 1.0, 1.0 - world.y / u_canvas.y * 2.0, 0.0, 1.0);
   v_uv = vec2(mix(a_inst1.z, a_inst2.x, a_corner.x), mix(a_inst1.w, a_inst2.y, a_corner.y));
   v_opacity = a_inst1.y;
+  v_ink = a_inst3.xyz;
+  v_accent = vec3(a_inst3.w, a_inst4.xy);
 }`;
 
 export const QUAD_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_atlas;
+uniform float u_liveTint;
 in vec2 v_uv;
 in float v_opacity;
+in vec3 v_ink;
+in vec3 v_accent;
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
-  o = vec4(t.rgb * v_opacity, t.a * v_opacity);
+  if (u_liveTint > 0.5) {
+    // Spine D: t.r is premultiplied ink mask, t.g is premultiplied accent mask,
+    // t.b is the base grayscale mask (for hardcoded whites/blacks).
+    // The asset SVG was baked using pure red (#ff0000) for ink, green (#00ff00) for accent.
+    float inkA = max(0.0, t.r - t.b);
+    float accA = max(0.0, t.g - t.b);
+    vec3 color = inkA * v_ink + accA * v_accent + vec3(t.b);
+    o = vec4(color * v_opacity, t.a * v_opacity);
+  } else {
+    o = vec4(t.rgb * v_opacity, t.a * v_opacity);
+  }
 }`;
 
 /** Fullscreen pass: v_cuv is y-down canvas UV. */

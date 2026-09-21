@@ -27,7 +27,7 @@ export const LIVE_CELL_UNITS = Object.freeze({ x0: -50, y0: -50, x1: 150, y1: 15
 const LIVE_GUTTER = 32;
 const ALPHA_CUTOFF = 4;
 
-export const comboKey = (asset, ink, accent) => `${asset}|${ink}|${accent}`;
+export const comboKey = (asset) => asset;
 
 const subColors = (svg, ink, accent) =>
   svg
@@ -56,18 +56,17 @@ function rasterizeSvg(svgString, w, h) {
 }
 
 /**
- * Bake one asset/color combo into a cell-sized ImageData, premultiplied.
+ * Bake one asset as an R/G mask. Ink = red (#ff0000), Accent = green (#00ff00).
  * Returns { data: Uint8Array (premultiplied RGBA), ink: [x0,y0,x1,y1]|null }
- * with the ink bbox in asset units (alpha > 4/255), like the offline bake.
  */
-async function bakeCombo(assetId, ink, accent, svgById) {
+async function bakeCombo(assetId, svgById) {
   const src = svgById.get(assetId);
   if (src == null) throw new Error(`[liveAtlas] unknown asset "${assetId}"`);
   const { x0, y0, x1, y1 } = LIVE_CELL_UNITS;
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${LIVE_CELL_PX}" height="${LIVE_CELL_PX}" ` +
     `viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}">` +
-    subColors(src, ink, accent) +
+    subColors(src, '#ff0000', '#00ff00') +
     `</svg>`;
   const img = await rasterizeSvg(svg, LIVE_CELL_PX, LIVE_CELL_PX);
   const d = img.data;
@@ -76,8 +75,7 @@ async function bakeCombo(assetId, ink, accent, svgById) {
   for (let i = 0, n = LIVE_CELL_PX * LIVE_CELL_PX; i < n; i++) {
     const o = i * 4;
     const a = d[o + 3];
-    if (a === 0) continue; // stays transparent black (no alpha-bleed)
-    // Premultiply: the renderer blends premultiplied (ONE, ONE_MINUS_SRC_ALPHA).
+    if (a === 0) continue;
     out[o] = Math.round((d[o] * a) / 255);
     out[o + 1] = Math.round((d[o + 1] * a) / 255);
     out[o + 2] = Math.round((d[o + 2] * a) / 255);
@@ -129,17 +127,16 @@ function buildMipmaps(pixels, width, height) {
 }
 
 /**
- * Bake an atlas for the given combos.
- * @param {Array<{asset:string, ink:string, accent:string}>} combos
- * @param {Map<string,string>} svgById asset id -> SVG fragment (var(--ink)/var(--accent))
+ * Bake an atlas for the given assets as masks.
+ * @param {Array<{asset:string}>} combos
+ * @param {Map<string,string>} svgById asset id -> SVG fragment
  * @returns {Promise<{pixels:Uint8Array,width:number,height:number,cells:Map,mipmaps:Array}>}
- *   cells: key -> {u0,v0,u1,v1, ink:[x0,y0,x1,y1]|null}
  */
 export async function bakeLiveAtlas(combos, svgById) {
   const uniq = [];
   const seen = new Set();
   for (const c of combos) {
-    const k = comboKey(c.asset, c.ink, c.accent);
+    const k = comboKey(c.asset);
     if (!seen.has(k)) { seen.add(k); uniq.push({ ...c, key: k }); }
   }
   const stride = LIVE_CELL_PX + LIVE_GUTTER;
@@ -150,10 +147,9 @@ export async function bakeLiveAtlas(combos, svgById) {
   const pixels = new Uint8Array(width * height * 4); // transparent black gutters
   const cells = new Map();
   // Rasterize sequentially: parallel Image decodes thrash the raster pool
-  // and this already runs off the frame path (the loop holds last frame).
   for (let i = 0; i < uniq.length; i++) {
     const c = uniq[i];
-    const { data, ink } = await bakeCombo(c.asset, c.ink, c.accent, svgById);
+    const { data, ink } = await bakeCombo(c.asset, svgById);
     const cx = (i % cols) * stride;
     const cy = Math.floor(i / cols) * stride;
     for (let y = 0; y < LIVE_CELL_PX; y++) {
