@@ -427,6 +427,8 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     for (const it of instances) {
       const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
       if (b === 'normal') { batch.push(it); continue; }
+      const cell = cells ? cells[`${it.asset}|${it.tint}|${it.accent}`] : null;
+      if (!cell) continue; // Spine B (#388): cell missing, skip isolated item entirely
       flush();
       // Isolated item: draw to scratch, blend over the layer backdrop.
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fb);
