@@ -40,6 +40,7 @@ import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
+import { createBallisticsState, processBallistics, resetBallistics } from './audioBallistics.mjs';
 import {
   createRenderFaultTracker,
   RENDER_FAULT_FAILS,
@@ -83,6 +84,12 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
   let lastFrameTarget = null;
+
+  // Spine C (#389): GL-loop owned life clock, audio ballistics follower, and layered breath springs
+  const ballisticsState = createBallisticsState();
+  let loopLifeT = 0;
+  let breathScaleSmoothed = 1;
+  let breathRotSmoothed = 0;
 
   // #263 — WebGL context loss. The browser fires webglcontextlost when the
   // GPU session dies (tab backgrounded too long, driver hiccup, GPU reset);
@@ -133,6 +140,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     // compositing against a dead target.
     lastFrameTarget = null;
     paletteMix.cancel();
+    resetBallistics(ballisticsState);
+    breathScaleSmoothed = 1;
+    breathRotSmoothed = 0;
     // #266: a fresh GPU session — don't carry the dead session's bake
     // failure streak / retry backoff into the rebake.
     bakeConsecFails = 0;
@@ -308,11 +318,80 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
    */
   function buildFrame(dtSec = 1 / 60, loopTimeMs = 0) {
     const s = getState();
-    const life = lifeRef?.current || {};
     // #280: during a voice MIX the loop renders the interpolated blend,
     // not the raw committed state — no hard jumps on voice switches.
     const voiceState = resolveLiveRenderState(s);
     const layoutParams = voiceState.layoutParams || {};
+
+    // Spine C (#389): Advance life clock and audio ballistics on the GL loop clock
+    loopLifeT += dtSec;
+
+    // Process raw audio bands + beatPulse through audioBallistics
+    const audioOn = !!s.audioEnabled;
+    const rawAudio = {
+      rms: audioOn ? (s.audioBands?.rms || 0) : 0,
+      bass: audioOn ? (s.audioBands?.bass || 0) : 0,
+      mid: audioOn ? (s.audioBands?.mid || 0) : 0,
+      treble: audioOn ? (s.audioBands?.treble || 0) : 0,
+      beatPulse: audioOn ? (s.beatPulse || 0) : 0,
+    };
+    const ballisticsParams = voiceState.ballistics || s.ballistics || {};
+    const shapedAudio = processBallistics(ballisticsState, rawAudio, dtSec * 1000, ballisticsParams);
+
+    const depth = layoutParams.audioModDepth ?? 0.65;
+    const scaleModAmt = layoutParams.audioScaleMod ?? 0.45;
+    const alphaModAmt = layoutParams.audioAlphaMod ?? 0.25;
+    const lifeDrift = layoutParams.lifeDrift ?? 0.35;
+
+    // Ballistics on scaleMul / alphaBoost / glow (keep silence-is-zero contract)
+    const scaleMul = 1 + (
+      shapedAudio.beatPulse * 0.38 * scaleModAmt +
+      (shapedAudio.bass * 0.55 + shapedAudio.rms * 0.35) * 0.28
+    ) * depth;
+
+    const alphaBoost = shapedAudio.beatPulse * 18 * alphaModAmt * depth;
+
+    // Layered life LFO (incommensurate sines) from the GL loop
+    const t = loopLifeT;
+    const rawBreath =
+      0.55 * Math.sin(t * 0.73) +
+      0.30 * Math.sin(t * 1.19 + 1.7) +
+      0.15 * Math.sin(t * 0.29 + 4.1);
+
+    const targetBreathScale = 1 + rawBreath * 0.012 * lifeDrift + shapedAudio.beatPulse * 0.035 * depth;
+    const targetBreathRot = rawBreath * 0.6 * lifeDrift;
+
+    // Critically damp breathScale / breathRot (omega ≈ 8)
+    const dampFactor = 1 - Math.exp(-8 * dtSec);
+    breathScaleSmoothed += (targetBreathScale - breathScaleSmoothed) * dampFactor;
+    breathRotSmoothed += (targetBreathRot - breathRotSmoothed) * dampFactor;
+
+    const glow = Math.min(1, shapedAudio.beatPulse * 0.8 + shapedAudio.rms * 0.4) * depth;
+
+    const effectiveScale = [
+      (layoutParams.scale?.[0] ?? 0.4) * scaleMul,
+      (layoutParams.scale?.[1] ?? 1.6) * scaleMul,
+    ];
+    const effectiveAlpha = [
+      Math.min(100, (layoutParams.alpha?.[0] ?? 40) + alphaBoost * 0.4),
+      Math.min(100, (layoutParams.alpha?.[1] ?? 100) + alphaBoost),
+    ];
+
+    if (lifeRef) {
+      lifeRef.current = {
+        lifeT: loopLifeT,
+        scaleMul,
+        alphaBoost,
+        breathScale: breathScaleSmoothed,
+        breathRot: breathRotSmoothed,
+        glow,
+        effectiveScale,
+        effectiveAlpha,
+        depth,
+        bands: shapedAudio,
+        pulse: shapedAudio.beatPulse,
+      };
+    }
 
     // #278 — VJ MIX: detect palette changes once per frame and drive the
     // crossfade state machine. On a fresh 'start' the outgoing deck is
@@ -354,10 +433,11 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       // Pausing freezes the instrument: swarm physics halts (same slot the
       // governor's slowRender uses) and the tick holds the last frame.
       slowRender: s.slowRender || !s.running,
-      scaleMul: life.scaleMul ?? 1,
-      alphaBoost: life.alphaBoost ?? 0,
-      effectiveScale: life.effectiveScale,
-      effectiveAlpha: life.effectiveAlpha,
+      scaleMul,
+      alphaBoost,
+      effectiveScale,
+      effectiveAlpha,
+      motionSmoothing: s.motionSmoothing,
       phraseWrapGen: s.phraseWrapGen || 0,
       attractor: viewRef.current?.attractor?.current ?? null,
       // Spine A (#387): dt clock — loop-owned time, not Date.now().
@@ -388,8 +468,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const z = view.zoom || 1;
     const px = view.pan?.x || 0;
     const py = view.pan?.y || 0;
-    const bs = life.breathScale ?? 1;
-    const br = ((life.breathRot ?? 0) * Math.PI) / 180;
+    const bs = breathScaleSmoothed;
+    const br = ((breathRotSmoothed) * Math.PI) / 180;
     const cos = Math.cos(br);
     const sin = Math.sin(br);
     const sizeMul = bs * z;
@@ -400,9 +480,24 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       const dy = bs * (y - CY);
       it.x = CX + dx * cos - dy * sin;
       it.y = CY + dx * sin + dy * cos;
-      it.scaleX *= sizeMul;
-      it.scaleY *= sizeMul;
-      it.rotation += life.breathRot || 0;
+
+      // Spine C (#389): per-agent phase offset from seedOffset so field does not inhale as one object
+      if (it.seedOffset && lifeDrift > 0) {
+        const p = it.seedOffset * 0.001;
+        const agentRaw =
+          0.55 * Math.sin(t * 0.73 + p) +
+          0.30 * Math.sin(t * 1.19 + 1.7 + p * 1.3) +
+          0.15 * Math.sin(t * 0.29 + 4.1 + p * 0.7);
+        const agentScaleMul = 1 + (agentRaw - rawBreath) * 0.008 * lifeDrift;
+        const agentRotOffset = (agentRaw - rawBreath) * 0.3 * lifeDrift;
+        it.scaleX *= sizeMul * agentScaleMul;
+        it.scaleY *= sizeMul * agentScaleMul;
+        it.rotation += breathRotSmoothed + agentRotOffset;
+      } else {
+        it.scaleX *= sizeMul;
+        it.scaleY *= sizeMul;
+        it.rotation += breathRotSmoothed;
+      }
     }
 
     // #309 velocity smear: per-frame displacement in final rendered scene
@@ -465,14 +560,14 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
         prism: layoutParams.accumulationPrism,
         flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider
       },
-      audioBands: s.audioBands,
-      audioOn: !!s.audioEnabled,
+      audioBands: shapedAudio,
+      audioOn,
       // #306: the audio→glow fader (STIMULI panel) — scales only the glow
       // gesture of the envelope mapping, so loud passages can't wash out
       // the render at high optics. The headroom-relative form (#303) is
       // untouched.
       audioSwell: s.layoutParams.audioSwell ?? 1,
-      glow: life.glow ?? 0,
+      glow,
       paused: !s.running,
       // #278 — eased dissolve factor for this frame (null when no dissolve
       // is running: render + present the incoming palette directly).

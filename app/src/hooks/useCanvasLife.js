@@ -1,32 +1,22 @@
 // useCanvasLife — continuous breathing time + audio-driven scale/alpha/glow modulation
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useStore } from '../state/store.js';
+import { useState, useEffect, useMemo } from 'react';
 
-// Frame-lock show mode gates the life tick to ~30Hz. This tick is the
-// dominant per-frame re-render driver (breath/scale/alpha feed every Layer),
-// so halving it roughly halves React render work. A locked 30fps reads
-// smoother than a fluctuating 40–60 (the Resolume lesson).
-const FRAME_LOCK_MS = 1000 / 30;
+// Spine C (#389): Stop per-frame setLifeT. The GL liveLoop owns the
+// continuous clock, ballistics, and springs. useCanvasLife keeps a ~6Hz
+// (160ms) tick for meters only, eliminating per-frame React re-renders.
+const METER_TICK_MS = 160;
 
 export function useCanvasLife({ running, layoutParams, beatPulse, audioBands }) {
   const [lifeT, setLifeT] = useState(0);
-  const frameLock = useStore(s => s.frameLock);
-  const lastTickRef = useRef(0);
 
   useEffect(() => {
     if (!running) return;
-    let id;
-    const step = (now) => {
-      if (!frameLock || now - lastTickRef.current >= FRAME_LOCK_MS) {
-        lastTickRef.current = now;
-        setLifeT(now * 0.001);
-      }
-      id = requestAnimationFrame(step);
-    };
-    id = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(id);
-  }, [running, frameLock]);
+    const id = setInterval(() => {
+      setLifeT(performance.now() * 0.001);
+    }, METER_TICK_MS);
+    return () => clearInterval(id);
+  }, [running]);
 
   const depth = layoutParams.audioModDepth ?? 0.65;
   const scaleModAmt = layoutParams.audioScaleMod ?? 0.45;

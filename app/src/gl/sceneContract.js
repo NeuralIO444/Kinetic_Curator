@@ -83,6 +83,7 @@ function toInstance(item, layerId, itemBlend) {
     blend: KNOWN_BLENDS.has(itemBlend) ? itemBlend : 'normal',
     zTier: Number(item.zTier) || 0,
     key: String(item.key ?? ''),
+    seedOffset: Number(item.seedOffset) || 0,
   };
 }
 

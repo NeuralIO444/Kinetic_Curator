@@ -59,8 +59,9 @@ export function createLiveResolver() {
     }
     if (!ctx.slowRender) {
       // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().
+      // Spine C (#389): forward motionSmoothing for critically damped heading.
       st.system.update(
-        { ...ctx.layoutParams, maxParticles: ctx.caps?.maxParticles },
+        { ...ctx.layoutParams, maxParticles: ctx.caps?.maxParticles, motionSmoothing: ctx.motionSmoothing },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
       );
@@ -82,12 +83,13 @@ export function createLiveResolver() {
         scale: item.scale * ctx.scaleMul * uScale,
         alpha: Math.min(100, item.alpha + ctx.alphaBoost),
         u,
+        seedOffset: item.seedOffset,
       };
     });
     if (!ctx.layoutParams.overlap) items = [...items].sort((a, b) => a.scale - b.scale);
     const stamp = ctx.layoutParams.mirror || ctx.layoutParams.symmetry === 'stamp';
     if (stamp && ctx.caps.allowMirror) {
-      items = [...items, ...items.map((item) => ({ ...item, x: CANVAS_W - item.x, rotation: -item.rotation, _mirrored: true, key: item.key ? `${item.key}-stamp` : undefined }))];
+      items = [...items, ...items.map((item) => ({ ...item, x: CANVAS_W - item.x, rotation: -item.rotation, _mirrored: true, key: item.key ? `${item.key}-stamp` : undefined, seedOffset: item.seedOffset }))];
     }
     return items;
   }
@@ -149,6 +151,8 @@ export function createLiveResolver() {
           // Spine A (#387): dt clock + loop time replace Date.now().
           dtSec: input.dtSec ?? 1 / 60,
           loopTimeMs: input.loopTimeMs ?? 0,
+          // Spine C (#389): forward motionSmoothing.
+          motionSmoothing: input.motionSmoothing ?? layoutParams.motionSmoothing,
         });
       } else {
         items = buildPlacements({

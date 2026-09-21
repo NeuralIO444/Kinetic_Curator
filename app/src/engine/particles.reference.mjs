@@ -23,7 +23,8 @@ import { resolveBehave, orbitForce } from './organisms/behave.js';
 
 const ATTRACTOR_GAIN = 8;
 const TAU = Math.PI * 2;
-const MAX_TURN_DEG = 10;
+// Spine C (#389): MAX_TURN_DEG becomes deg/second. 10 deg/frame at 60 Hz = 600 deg/s.
+const MAX_TURN_DEG_PER_SEC = 600;
 const MAX_SPEED_CLOUD = 8.0;
 const MAX_SPEED_MOTH = 1.65;
 const BOUNCE = 0.62;
@@ -223,9 +224,18 @@ export class ReferenceParticleSystem {
           let dlt = next - p.rotation;
           while (dlt > 180) dlt -= 360;
           while (dlt < -180) dlt += 360;
-          if (dlt > MAX_TURN_DEG) dlt = MAX_TURN_DEG;
-          if (dlt < -MAX_TURN_DEG) dlt = -MAX_TURN_DEG;
-          p.rotation += dlt;
+          let step = dlt;
+          const motionSmoothing = layoutParams.motionSmoothing !== undefined ? layoutParams.motionSmoothing : true;
+          if (motionSmoothing !== false) {
+            const lambdaScale = typeof motionSmoothing === 'number' ? Math.max(0, motionSmoothing) : 1.0;
+            const baseLambda = profile?.lambda || (layoutParams.behave === 'scatter' ? 16 : 10);
+            const lambda = baseLambda * lambdaScale;
+            step = dlt * (1 - Math.exp(-lambda * (1 / 60)));
+          }
+          const maxTurn = MAX_TURN_DEG_PER_SEC * (1 / 60);
+          if (step > maxTurn) step = maxTurn;
+          if (step < -maxTurn) step = -maxTurn;
+          p.rotation += step;
         } else p.rotation = next;
       }
       p.scale = minScale + (p.mass * (maxScale - minScale));
