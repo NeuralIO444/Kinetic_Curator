@@ -579,10 +579,25 @@ export class ParticleSystem {
     return cs;
   }
 
-  update(layoutParams, activeAssets, palette, seed, time, attractor, seedOffsets = null) {
+  /**
+   * Spine A (#387) — dtSec: seconds since the last frame, clamped by the
+   * caller (liveLoop: 8–50 ms). Default 1/60 preserves bit-identical
+   * behaviour for the selfcheck harness and the studio bake, where the
+   * implicit step was always one frame at 60 Hz.
+   *
+   * `time` is now loop-accumulated elapsed milliseconds (not Date.now()).
+   * liveResolve passes the running clock; the selfcheck passes synthetic
+   * values — both deterministic. The ms convention matches the reference
+   * engine so the selfcheck comparison stays exact.
+   */
+  update(layoutParams, activeAssets, palette, seed, time, attractor, seedOffsets = null, dtSec = 1 / 60) {
     if (this.n === 0) return;
     this._step += 1;
     this._layout = layoutParams;
+    // dtFrames: 1.0 at 60 fps, 2.0 at 30 fps, 0.5 at 120 fps.
+    // Multiplied into every per-frame quantity so the physics integrates
+    // in real time regardless of frame rate.
+    const dtFrames = dtSec * 60;
     const targetCount = layoutParams.particleCount || 100;
     if (this._authoredCount !== targetCount) {
       this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0 });
@@ -641,6 +656,9 @@ export class ParticleSystem {
     const damp = organism ? Math.max(damping, 0.97) : damping;
     const [minScale, maxScale] = scale;
     const [minAlpha, maxAlpha] = alpha;
+    // Spine A (#387): `time` is now loop-accumulated milliseconds (not
+    // Date.now()). The conversion factor stays 0.001 so the selfcheck
+    // and the reference engine (particles.reference.mjs) agree exactly.
     const nt = time * noiseSpeed * 0.001;
     const windMul = organism ? wind * profile.wind : 1;
 
@@ -790,7 +808,8 @@ export class ParticleSystem {
       // average. The visible color[] is only rewritten on the slow cadence
       // after the integration loop (atlas churn guard).
       if (leakOn && cohCount > 0) {
-        const kk = leak * 0.004;
+        // Spine A (#387): dt-correct pigment leak rate.
+        const kk = leak * 0.004 * dtFrames;
         const o3 = i * 3;
         LEAKRGB[o3] += (leakR / cohCount - LEAKRGB[o3]) * kk;
         LEAKRGB[o3 + 1] += (leakG / cohCount - LEAKRGB[o3 + 1]) * kk;
@@ -802,16 +821,17 @@ export class ParticleSystem {
         // Fatigue: energy drains at the metabolism rate; feeding restores
         // it — in company, and on strong colony scent (mold sustains
         // itself; a lone cast tires across the set).
-        let e = ENERGY[i] - 0.0016 * meta;
-        if (cohCount > 0) e += 0.0012 * meta;
-        e += SCENT.sample(pxi / this.canvasW, pyi / this.canvasH) * 0.002 * meta;
+        // Spine A (#387): dt-correct energy/drive rates.
+        let e = ENERGY[i] - 0.0016 * meta * dtFrames;
+        if (cohCount > 0) e += 0.0012 * meta * dtFrames;
+        e += SCENT.sample(pxi / this.canvasW, pyi / this.canvasH) * 0.002 * meta * dtFrames;
         ENERGY[i] = e < 0 ? 0 : e > 1 ? 1 : e;
         // Curiosity: a slow deterministic random walk on the drive value.
         // The hash key mixes the step counter so each agent wanders on its
         // own schedule; the +104729 offset keeps it clear of the init and
         // breed draw keys on the same channel.
         const h = hashU01(seedU, CH.dyn, this._step * 131071 + 104729 + i);
-        let dd = DRIVE[i] + (h - 0.5) * 0.06 * meta;
+        let dd = DRIVE[i] + (h - 0.5) * 0.06 * meta * dtFrames;
         DRIVE[i] = dd < 0 ? 0 : dd > 1 ? 1 : dd;
         // Curious agents wander: a smooth noise-field detour scaled by the
         // drive value and the metabolism rate.
@@ -871,18 +891,25 @@ export class ParticleSystem {
     const bodyLen = Math.max(1, Math.min(7, Math.round(body || 1)));
     const follow = Math.max(0.05, Math.min(0.95, tight));
 
+    // Spine A (#387): dt-correct damping. pow(damp, 1.0) === damp
+    // exactly at 60 fps, preserving selfcheck golden hashes.
+    const dampDt = Math.pow(damp, dtFrames);
+
     for (let i = 0; i < numParticles; i++) {
       // #167 — dead particles (die) hold no state and integrate nothing.
       if (!this.alive[i]) continue;
-      let vxi = (VX[i] + AX[i]) * damp;
-      let vyi = (VY[i] + AY[i]) * damp;
+      // Spine A (#387): dt-correct integration.
+      // v_new = (v_old + a * dtFrames) * dampDt
+      let vxi = (VX[i] + AX[i] * dtFrames) * dampDt;
+      let vyi = (VY[i] + AY[i] * dtFrames) * dampDt;
       const speed = Math.sqrt(vxi * vxi + vyi * vyi);
       if (speed > maxSpeed) {
         vxi = (vxi / speed) * maxSpeed;
         vyi = (vyi / speed) * maxSpeed;
       }
-      let pxi = X[i] + vxi;
-      let pyi = Y[i] + vyi;
+      // Spine A (#387): dt-correct position step. vxi * 1.0 === vxi at 60 fps.
+      let pxi = X[i] + vxi * dtFrames;
+      let pyi = Y[i] + vyi * dtFrames;
       AX[i] = 0;
       AY[i] = 0;
       if (speed > 0.04) {
@@ -891,13 +918,16 @@ export class ParticleSystem {
           let dlt = next - this.rotation[i];
           while (dlt > 180) dlt -= 360;
           while (dlt < -180) dlt += 360;
-          if (dlt > MAX_TURN_DEG) dlt = MAX_TURN_DEG;
-          if (dlt < -MAX_TURN_DEG) dlt = -MAX_TURN_DEG;
+          // Spine A (#387): dt-correct turn cap.
+          const maxTurn = MAX_TURN_DEG * dtFrames;
+          if (dlt > maxTurn) dlt = maxTurn;
+          if (dlt < -maxTurn) dlt = -maxTurn;
           this.rotation[i] += dlt;
         } else this.rotation[i] = next;
       }
       const mi = MASS[i];
-      const ph = (this.phase[i] + 0.004 * noiseSpeed) % 1;
+      // Spine A (#387): dt-correct phase advance.
+      const ph = (this.phase[i] + 0.004 * noiseSpeed * dtFrames) % 1;
       this.phase[i] = ph;
       let sc = minScale + (mi * (maxScale - minScale));
       // #287 SWELL — breathing multiplies the base scale by
@@ -931,10 +961,14 @@ export class ParticleSystem {
         if (!sp || !sp.length) sp = [{ x: pxi, y: pyi }];
         const head = { x: pxi, y: pyi };
         const nextSpine = [head];
+        // Spine A (#387): dt-correct spine follow. The per-frame lerp
+        // fraction `follow` becomes `1 - pow(1 - follow, dtFrames)`.
+        // At dtFrames=1: 1 - pow(1 - follow, 1) === follow exactly.
+        const followDt = 1 - Math.pow(1 - follow, dtFrames);
         for (let s = 1; s < bodyLen; s++) {
           const prev = nextSpine[s - 1];
           const cur = sp[s] || sp[sp.length - 1] || head;
-          nextSpine.push({ x: cur.x + (prev.x - cur.x) * follow, y: cur.y + (prev.y - cur.y) * follow });
+          nextSpine.push({ x: cur.x + (prev.x - cur.x) * followDt, y: cur.y + (prev.y - cur.y) * followDt });
         }
         this.spine[i] = nextSpine;
       } else {

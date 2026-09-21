@@ -139,6 +139,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     bakeRetryAt = 0;
     contextDown = false;
     restoringSession = true;
+    // Spine A (#387): reset the dt clock so the first frame after
+    // restore doesn't spike from the gap during context loss.
+    prevTime = 0;
     setGlContextSafe('restoring');
     // A fresh GPU session — don't carry the dead session's watchdog hard
     // stop into the rebake. The pause belonged to the old session's
@@ -202,6 +205,13 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   let running = false;
   let bgMode = 'palette'; // palette | transparent | white
   let frameCount = 0;
+
+  // Spine A (#387) — dt clock. prevTime tracks the last frame's timestamp;
+  // loopTimeMs is the accumulated simulation time in ms (replaces Date.now()
+  // as the noise/sim clock so tab-switches don't jump the field).
+  // dtSec is clamped to [8, 50] ms → [0.008, 0.05] s.
+  let prevTime = 0;
+  let loopTimeMs = 0;
 
   // Static resources (atlas + grain LUTs), uploaded once per combo set.
   // cells is a plain object: "asset|tint|accent" -> {u0,v0,u1,v1}, exactly
@@ -293,8 +303,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
    * Resolve layers -> contract -> transformed payload, and ensure static
    * resources. Returns null when a bake is in flight (hold last frame);
    * throws on real errors (the tick catches and throttles).
+   *
+   * Spine A (#387): dtSec and loopTimeMs drive the particle physics clock.
    */
-  function buildFrame() {
+  function buildFrame(dtSec = 1 / 60, loopTimeMs = 0) {
     const s = getState();
     const life = lifeRef?.current || {};
     // #280: during a voice MIX the loop renders the interpolated blend,
@@ -348,6 +360,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       effectiveAlpha: life.effectiveAlpha,
       phraseWrapGen: s.phraseWrapGen || 0,
       attractor: viewRef.current?.attractor?.current ?? null,
+      // Spine A (#387): dt clock — loop-owned time, not Date.now().
+      dtSec,
+      loopTimeMs,
     });
 
     // Node-count instrumentation (footer readout), store-owned.
@@ -542,8 +557,21 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       flagContextLost();
       return;
     }
+    // Spine A (#387) — dt clock. Compute dtSec from the real frame delta,
+    // clamped to [8, 50] ms so a tab-switch or GC stall can't spike the
+    // physics into a single huge step. Accumulate loopTimeMs so the noise
+    // field progresses in simulation time, not wall time — a tab that was
+    // backgrounded for 30 s resumes where it left off instead of jumping.
+    const now = performance.now();
+    if (prevTime === 0) prevTime = now; // first frame after start/restore
+    const rawDtMs = now - prevTime;
+    prevTime = now;
+    const clampedDtMs = Math.max(8, Math.min(50, rawDtMs));
+    const dtSec = clampedDtMs / 1000;
+    loopTimeMs += clampedDtMs;
+
     try {
-      const frame = buildFrame();
+      const frame = buildFrame(dtSec, loopTimeMs);
       if (!frame) return; // static bake in flight — hold last frame
 
       const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, paused, mix } = frame;

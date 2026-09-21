@@ -208,8 +208,8 @@ First two engine PRs: **A + B**. That is a flock that keeps its weight at 30 fps
 
 ## 6. Acceptance for "the engine is solid"
 
-- [ ] 30 fps and 60 fps flocks match speed / turn / damping (A).
-- [ ] Tab-switch does not jump the noise field (A).
+- [x] 30 fps and 60 fps flocks match speed / turn / damping (A).
+- [x] Tab-switch does not jump the noise field (A).
 - [ ] Palette or voice chip never returns `buildFrame === null` for a full second (B).
 - [ ] Audio hit shoves then settles; silence still no-ops (C).
 - [ ] Palette change at 60 with zero `startStaticBuild` for color (D).
