@@ -148,7 +148,7 @@ export function createLiveResolver() {
           phraseWrapGen: input.phraseWrapGen || 0,
           // Spine A (#387): dt clock + loop time replace Date.now().
           dtSec: input.dtSec ?? 1 / 60,
-          loopTimeMs: input.loopTimeMs ?? Date.now(),
+          loopTimeMs: input.loopTimeMs ?? 0,
         });
       } else {
         items = buildPlacements({
