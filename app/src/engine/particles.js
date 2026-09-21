@@ -57,7 +57,8 @@ registerCostTier('engine/graze-tint', {
 
 export const ATTRACTOR_GAIN = 8;
 const TAU = Math.PI * 2;
-const MAX_TURN_DEG = 10;
+// Spine C (#389): MAX_TURN_DEG becomes deg/second. 10 deg/frame at 60 Hz = 600 deg/s.
+const MAX_TURN_DEG_PER_SEC = 600;
 const MAX_SPEED_CLOUD = 8.0;
 const MAX_SPEED_MOTH = 1.65;
 const BOUNCE = 0.62;
@@ -637,6 +638,8 @@ export class ParticleSystem {
       contactMode = 'none', collideMask = 0xffffffff, maxParticles,
       // #287 bio-drives. metabolism 0 = drives off (legacy behaviour).
       metabolism = 0, breath = 0,
+      // Spine C (#389): motionSmoothing knob wires heading spring lambda scale.
+      motionSmoothing = true,
     } = layoutParams;
 
     const organism = isOrganismMode(layoutParams.mode);
@@ -918,12 +921,22 @@ export class ParticleSystem {
           let dlt = next - this.rotation[i];
           while (dlt > 180) dlt -= 360;
           while (dlt < -180) dlt += 360;
-          // Spine A (#387): dt-correct turn cap.
-          const maxTurn = MAX_TURN_DEG * dtFrames;
-          if (dlt > maxTurn) dlt = maxTurn;
-          if (dlt < -maxTurn) dlt = -maxTurn;
-          this.rotation[i] += dlt;
-        } else this.rotation[i] = next;
+          let step = dlt;
+          // Spine C (#389): critically damped heading instead of snap / 10°-per-frame.
+          // motionSmoothing acts as the lambda scale.
+          if (motionSmoothing !== false) {
+            const lambdaScale = typeof motionSmoothing === 'number' ? Math.max(0, motionSmoothing) : 1.0;
+            const baseLambda = profile?.lambda || (layoutParams.behave === 'scatter' ? 16 : 10);
+            const lambda = baseLambda * lambdaScale;
+            step = dlt * (1 - Math.exp(-lambda * dtSec));
+          }
+          const maxTurn = MAX_TURN_DEG_PER_SEC * dtSec;
+          if (step > maxTurn) step = maxTurn;
+          if (step < -maxTurn) step = -maxTurn;
+          this.rotation[i] += step;
+        } else {
+          this.rotation[i] = next;
+        }
       }
       const mi = MASS[i];
       // Spine A (#387): dt-correct phase advance.
@@ -1035,6 +1048,8 @@ export class ParticleSystem {
           // #343 — MOD coupling reads a source track's motionMetrics, which
           // needs per-item velocity. Scene units/tick, same as #309's smear.
           vx: this.vx[i], vy: this.vy[i],
+          // Spine C (#389): per-agent phase for layered life
+          seedOffset: this.seedOffset[i],
         });
       }
       return items;
@@ -1067,6 +1082,7 @@ export class ParticleSystem {
           x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), rotation: protation,
           alpha: palpha * (1 - s * 0.08), asset, color: pcolor, u: pu,
           key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
+          seedOffset: this.seedOffset[i],
         });
       }
       if (symmetry === 'bilateral') {
@@ -1081,13 +1097,13 @@ export class ParticleSystem {
           x: px - pyh * reach, y: py + pxh * reach,
           scale: pscale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
-          ladderId, graze: gz,
+          ladderId, graze: gz, seedOffset: this.seedOffset[i],
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
           scale: pscale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
-          ladderId, graze: gz,
+          ladderId, graze: gz, seedOffset: this.seedOffset[i],
         });
       } else {
         // #287 — radial fans. The bilateral pair above generalizes to an
@@ -1111,6 +1127,7 @@ export class ParticleSystem {
               rotation: protation + (mirrored ? -amp * 18 : amp * 18),
               alpha: palpha, asset, color: pcolor, u: pu,
               key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
+              seedOffset: this.seedOffset[i],
               ...(mirrored ? { _mirrored: true } : null),
             });
           }
