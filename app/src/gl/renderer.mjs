@@ -239,6 +239,39 @@ for (const def of RENDERER_PROGRAMS) {
 export const SMEAR_K = 0.06;
 export const SMEAR_MAX = 1.0;
 
+export const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
+
+export function packInstanceData(instances, cells, alphaScale = 1) {
+  // Spine B (#388): skip instances whose cells[comboKey] is missing instead
+  // of throwing. Do not invent UVs; new combos simply do not draw until baked.
+  if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
+
+  // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // (u1,v1,vx,vy). The last two floats carry per-frame velocity (#309).
+  let validCount = 0;
+  for (let i = 0; i < instances.length; i++) {
+    const it = instances[i];
+    if (cells[comboKey(it.asset, it.tint, it.accent)]) validCount++;
+  }
+  if (validCount === 0) return new Float32Array(0);
+
+  const out = new Float32Array(validCount * 12);
+  let o = 0;
+  for (let i = 0; i < instances.length; i++) {
+    const it = instances[i];
+    const cell = cells[comboKey(it.asset, it.tint, it.accent)];
+    if (!cell) continue; // Spine B: skip missing instance, never throw
+    out[o] = it.x; out[o + 1] = it.y;
+    out[o + 2] = it.scaleX; out[o + 3] = it.scaleY;
+    out[o + 4] = it.rotation; out[o + 5] = it.opacity * alphaScale;
+    out[o + 6] = cell.u0; out[o + 7] = cell.v0;
+    out[o + 8] = cell.u1; out[o + 9] = cell.v1;
+    out[o + 10] = it.vx || 0; out[o + 11] = it.vy || 0;
+    o += 12;
+  }
+  return out;
+}
+
 function createRendererBase(canvas, { alpha = false } = {}) {
   const gl = canvas.getContext('webgl2', {
     alpha, antialias: false, depth: false, stencil: false,
@@ -372,31 +405,7 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     gl.disable(gl.BLEND);
   }
 
-  const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
-
-  function instanceData(instances, cells, alphaScale = 1) {
-    // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
-    // (u1,v1,vx,vy). The last two floats carried padding zeros; #309 puts
-    // the per-frame velocity there (scene units/frame, 0 for static
-    // instances) — QUAD_VS stretches the quad along its own motion. The
-    // stride is unchanged, so attribute 3's vec4 fetch stays inside the
-    // buffer (ANGLE/Metal raises INVALID_OPERATION for out-of-bounds
-    // attrib reads).
-    // alphaScale folds a group opacity into per-instance alpha (mask bakes, #189).
-    const out = new Float32Array(instances.length * 12);
-    instances.forEach((it, i) => {
-      const cell = cells[comboKey(it.asset, it.tint, it.accent)];
-      if (!cell) throw new Error(`[gl] no atlas cell for ${comboKey(it.asset, it.tint, it.accent)}`);
-      const o = i * 12;
-      out[o] = it.x; out[o + 1] = it.y;
-      out[o + 2] = it.scaleX; out[o + 3] = it.scaleY;
-      out[o + 4] = it.rotation; out[o + 5] = it.opacity * alphaScale;
-      out[o + 6] = cell.u0; out[o + 7] = cell.v0;
-      out[o + 8] = cell.u1; out[o + 9] = cell.v1;
-      out[o + 10] = it.vx || 0; out[o + 11] = it.vy || 0;
-    });
-    return out;
-  }
+  const instanceData = packInstanceData;
 
   /**
    * Render one content layer's instances into layerTarget (cleared first).
@@ -411,7 +420,10 @@ function createRendererBase(canvas, { alpha = false } = {}) {
     gl.clear(gl.COLOR_BUFFER_BIT);
     let batch = [];
     const flush = () => {
-      if (batch.length) drawInstances(instanceData(batch, cells, groupOpacity), atlasTex, w, h);
+      if (batch.length) {
+        const data = instanceData(batch, cells, groupOpacity);
+        if (data.length) drawInstances(data, atlasTex, w, h);
+      }
       batch = [];
     };
     for (const it of instances) {
@@ -423,7 +435,8 @@ function createRendererBase(canvas, { alpha = false } = {}) {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      drawInstances(instanceData([it], cells, groupOpacity), atlasTex, w, h);
+      const data = instanceData([it], cells, groupOpacity);
+      if (data.length) drawInstances(data, atlasTex, w, h);
       composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(b), 1, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
       gl.viewport(0, 0, w, h);

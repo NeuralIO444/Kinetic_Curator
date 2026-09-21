@@ -210,7 +210,7 @@ First two engine PRs: **A + B**. That is a flock that keeps its weight at 30 fps
 
 - [x] 30 fps and 60 fps flocks match speed / turn / damping (A).
 - [x] Tab-switch does not jump the noise field (A).
-- [ ] Palette or voice chip never returns `buildFrame === null` for a full second (B).
+- [x] Palette or voice chip never returns `buildFrame === null` for a full second (B).
 - [ ] Audio hit shoves then settles; silence still no-ops (C).
 - [ ] Palette change at 60 with zero `startStaticBuild` for color (D).
 - [ ] SNAP / studio hashes unchanged across D (stills baker still hex).

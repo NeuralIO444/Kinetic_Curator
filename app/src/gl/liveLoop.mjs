@@ -432,7 +432,11 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     if ((aKey !== atlasKey || gKey !== grainKey) && !building && performance.now() >= bakeRetryAt) {
       startStaticBuild(combos, fxLayerIds, rw, rh, aKey, gKey);
     }
-    if (building || !cells) return null;
+    // Spine B (#388): never return null just because a bake is in flight.
+    // Keep resolving + simulating + presenting last-good atlas cells.
+    // New combos simply do not draw until baked (renderer.mjs skips them).
+    // Only return null on initial boot before ANY atlas has finished baking.
+    if (!cells) return null;
 
     const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
     const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : activePalette.bg;
@@ -568,15 +572,23 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     prevTime = now;
     const clampedDtMs = Math.max(8, Math.min(50, rawDtMs));
     const dtSec = clampedDtMs / 1000;
+
+    // Spine B (#388): do not advance loopTimeMs if paused or if the frame cannot step.
+    const s = getState();
+    const paused = !s.running;
+    if (paused) return; // hold last presented frame
+
     loopTimeMs += clampedDtMs;
 
     try {
       const frame = buildFrame(dtSec, loopTimeMs);
-      if (!frame) return; // static bake in flight — hold last frame
+      if (!frame) {
+        // Cold boot: atlas not baked yet (!cells). Roll back loopTimeMs since frame did not simulate/present.
+        loopTimeMs -= clampedDtMs;
+        return;
+      }
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, paused, mix } = frame;
-
-      if (paused) return; // hold the last presented frame
+      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, mix } = frame;
 
       if (wrapEl) {
         wrapEl.style.boxShadow = glow > 0.02
