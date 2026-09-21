@@ -248,28 +248,26 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
 
   // 12 floats/instance (48-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy). The last two floats carry per-frame velocity (#309).
-  let validCount = 0;
-  for (let i = 0; i < instances.length; i++) {
-    const it = instances[i];
-    if (cells[comboKey(it.asset, it.tint, it.accent)]) validCount++;
-  }
-  if (validCount === 0) return new Float32Array(0);
-
-  const out = new Float32Array(validCount * 12);
+  // Single-pass pack: allocate up to instances.length * 12 and return a
+  // zero-copy subarray view if any missing instances were skipped.
+  const maxLen = instances.length;
+  const buf = new Float32Array(maxLen * 12);
   let o = 0;
-  for (let i = 0; i < instances.length; i++) {
+  for (let i = 0; i < maxLen; i++) {
     const it = instances[i];
-    const cell = cells[comboKey(it.asset, it.tint, it.accent)];
+    const cell = cells[`${it.asset}|${it.tint}|${it.accent}`];
     if (!cell) continue; // Spine B: skip missing instance, never throw
-    out[o] = it.x; out[o + 1] = it.y;
-    out[o + 2] = it.scaleX; out[o + 3] = it.scaleY;
-    out[o + 4] = it.rotation; out[o + 5] = it.opacity * alphaScale;
-    out[o + 6] = cell.u0; out[o + 7] = cell.v0;
-    out[o + 8] = cell.u1; out[o + 9] = cell.v1;
-    out[o + 10] = it.vx || 0; out[o + 11] = it.vy || 0;
+    buf[o] = it.x; buf[o + 1] = it.y;
+    buf[o + 2] = it.scaleX; buf[o + 3] = it.scaleY;
+    buf[o + 4] = it.rotation; buf[o + 5] = it.opacity * alphaScale;
+    buf[o + 6] = cell.u0; buf[o + 7] = cell.v0;
+    buf[o + 8] = cell.u1; buf[o + 9] = cell.v1;
+    buf[o + 10] = it.vx || 0; buf[o + 11] = it.vy || 0;
     o += 12;
   }
-  return out;
+  if (o === 0) return new Float32Array(0);
+  if (o === buf.length) return buf;
+  return buf.subarray(0, o);
 }
 
 function createRendererBase(canvas, { alpha = false } = {}) {

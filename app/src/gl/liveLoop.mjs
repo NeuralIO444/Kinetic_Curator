@@ -572,12 +572,6 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     prevTime = now;
     const clampedDtMs = Math.max(8, Math.min(50, rawDtMs));
     const dtSec = clampedDtMs / 1000;
-
-    // Spine B (#388): do not advance loopTimeMs if paused or if the frame cannot step.
-    const s = getState();
-    const paused = !s.running;
-    if (paused) return; // hold last presented frame
-
     loopTimeMs += clampedDtMs;
 
     try {
@@ -588,7 +582,13 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
         return;
       }
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, mix } = frame;
+      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, paused, mix } = frame;
+
+      if (paused) {
+        // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
+        loopTimeMs -= clampedDtMs;
+        return;
+      }
 
       if (wrapEl) {
         wrapEl.style.boxShadow = glow > 0.02
