@@ -432,7 +432,11 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     if ((aKey !== atlasKey || gKey !== grainKey) && !building && performance.now() >= bakeRetryAt) {
       startStaticBuild(combos, fxLayerIds, rw, rh, aKey, gKey);
     }
-    if (building || !cells) return null;
+    // Spine B (#388): never return null just because a bake is in flight.
+    // Keep resolving + simulating + presenting last-good atlas cells.
+    // New combos simply do not draw until baked (renderer.mjs skips them).
+    // Only return null on initial boot before ANY atlas has finished baking.
+    if (!cells) return null;
 
     const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
     const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : activePalette.bg;
@@ -572,11 +576,19 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
 
     try {
       const frame = buildFrame(dtSec, loopTimeMs);
-      if (!frame) return; // static bake in flight — hold last frame
+      if (!frame) {
+        // Cold boot: atlas not baked yet (!cells). Roll back loopTimeMs since frame did not simulate/present.
+        loopTimeMs -= clampedDtMs;
+        return;
+      }
 
       const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, paused, mix } = frame;
 
-      if (paused) return; // hold the last presented frame
+      if (paused) {
+        // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
+        loopTimeMs -= clampedDtMs;
+        return;
+      }
 
       if (wrapEl) {
         wrapEl.style.boxShadow = glow > 0.02

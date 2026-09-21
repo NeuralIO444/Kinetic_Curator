@@ -13,6 +13,7 @@ import { resolveLayers } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
+import { packInstanceData, comboKey } from './renderer.mjs';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -213,6 +214,34 @@ ok('no store/schema changes: builder consumes existing shapes only', () => {
       .every((k) => k in l), `layer ${l.id} carries only known fields`);
   }
   assert.ok(build());
+});
+
+ok('Spine B (#388): packInstanceData skips missing atlas cells without throwing', () => {
+  const instances = [
+    { asset: 'ast-a', tint: '#ff0000', accent: '#00ff00', x: 10, y: 20, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, vx: 0, vy: 0 },
+    { asset: 'ast-b', tint: '#ff0000', accent: '#00ff00', x: 30, y: 40, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, vx: 0, vy: 0 },
+    { asset: 'ast-c', tint: '#ff0000', accent: '#00ff00', x: 50, y: 60, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, vx: 0, vy: 0 },
+  ];
+  // Cells only has ast-a and ast-c; ast-b is missing (in flight bake)
+  const cells = {
+    [comboKey('ast-a', '#ff0000', '#00ff00')]: { u0: 0, v0: 0, u1: 0.5, v1: 0.5 },
+    [comboKey('ast-c', '#ff0000', '#00ff00')]: { u0: 0.5, v0: 0.5, u1: 1, v1: 1 },
+  };
+  const packed = packInstanceData(instances, cells);
+  // 2 valid instances * 12 floats = 24 floats
+  assert.equal(packed.length, 24);
+  assert.equal(packed[0], 10); // instance 0 x
+  assert.equal(packed[1], 20); // instance 0 y
+  assert.equal(packed[12], 50); // instance 2 x (instance 1 was skipped)
+  assert.equal(packed[13], 60); // instance 2 y
+
+  // Completely missing cells returns empty Float32Array, does not throw
+  const empty = packInstanceData(instances, {});
+  assert.equal(empty.length, 0);
+
+  // Null instances/cells returns empty Float32Array, does not throw
+  assert.equal(packInstanceData([], cells).length, 0);
+  assert.equal(packInstanceData(instances, null).length, 0);
 });
 
 console.log(`sceneContract.selfcheck: OK (${n} cases)`);
