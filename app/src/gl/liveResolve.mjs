@@ -58,9 +58,11 @@ export function createLiveResolver() {
       st.phraseGen = ctx.phraseWrapGen;
     }
     if (!ctx.slowRender) {
+      // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().
       st.system.update(
         { ...ctx.layoutParams, maxParticles: ctx.caps?.maxParticles },
-        ctx.activeAssets, ctx.palette, ctx.seed, Date.now(), ctx.attractor, ctx.seedOffsets,
+        ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
+        ctx.dtSec,
       );
     }
     let items = st.system.getItems(ctx.activeAssets).map((item) => {
@@ -144,6 +146,9 @@ export function createLiveResolver() {
           layoutParams, caps, scaleMul: input.scaleMul ?? 1, alphaBoost: input.alphaBoost ?? 0,
           slowRender: !!input.slowRender, attractor: input.attractor ?? null,
           phraseWrapGen: input.phraseWrapGen || 0,
+          // Spine A (#387): dt clock + loop time replace Date.now().
+          dtSec: input.dtSec ?? 1 / 60,
+          loopTimeMs: input.loopTimeMs ?? 0,
         });
       } else {
         items = buildPlacements({
