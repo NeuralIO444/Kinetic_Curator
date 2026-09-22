@@ -10,9 +10,10 @@
 //      sliders, presets, randomize, the governor, morph lerps, evolve targets
 //      — funnels through setLayoutParam/setLayoutParams, so the check lives
 //      there rather than at each call site that has to remember.
-//   2. Ambient life drift never lands in that state at all. It writes to the
-//      ephemeral driftOverlay slot, which is merged over layoutParams for
-//      render only — never persisted, never undoable.
+//   2. Ambient life drift never lands in that state at all. #425 moved it
+//      into the layer resolver — a pure function of each layer's own params
+//      and the loop clock — so there is no store slot left to leak. The
+//      tripwires below keep it that way.
 //   3. Boot either restores a document that parsed cleanly, or starts from
 //      factory defaults and says so. There is no third option where a
 //      half-understood document is applied anyway.
@@ -178,26 +179,33 @@ function makeStore() {
 }
 
 // ── §2: ambient life drift never touches document state ───────────────────
-// useContinuousLife used to sine-modulate jitter/displacement/noiseSpeed by
-// calling setLayoutParams directly on an interval, which fought the autosave
-// debounce and put machine-generated noise in the same field undo/redo
-// operate on. Drift now lands in the ephemeral driftOverlay field instead —
-// same treatment as audioBands/beatPulse — merged into the render path only.
+// #107 originally sine-modulated jitter/displacement/noiseSpeed by calling
+// setLayoutParams directly on an interval, which fought the autosave debounce
+// and put machine-generated noise in the same field undo/redo operate on.
+// #107 §2 moved it to an ephemeral store slot; #425 moved it INTO the layer
+// resolver (pure f(layer state, loop clock)) — there is no store slot left
+// at all. Tripwires: the slot and its setter must stay gone, and a real
+// lifeDrift edit must not smuggle drifted siblings into state or the doc.
 {
   const s = makeStore();
-  const before = s.lp();
-  const undoDepth = (s.get().historyUndoStack || []).length;
-  s.get().setDriftOverlay({ jitter: 999, displacement: 999, noiseSpeed: 999 });
-  assert.strictEqual(s.lp(), before, 'drift overlay must not replace layoutParams');
-  assert.strictEqual((s.get().historyUndoStack || []).length, undoDepth,
-    'drift overlay must not push an undo entry');
-  assert.deepStrictEqual(s.get().driftOverlay, { jitter: 999, displacement: 999, noiseSpeed: 999 });
+  assert.strictEqual('driftOverlay' in s.get(), false,
+    'driftOverlay slot must not exist in state');
+  assert.strictEqual(typeof s.get().setDriftOverlay, 'undefined',
+    'setDriftOverlay setter must not exist');
+
+  s.setLayoutParam('lifeDrift', 0.9);
+  assert.strictEqual(s.lp().jitter, DEFAULT_LAYOUT_PARAMS.jitter,
+    'life drift must not write jitter into document state');
+  assert.strictEqual(s.lp().displacement, DEFAULT_LAYOUT_PARAMS.displacement,
+    'life drift must not write displacement into document state');
+  assert.strictEqual(s.lp().noiseSpeed, DEFAULT_LAYOUT_PARAMS.noiseSpeed,
+    'life drift must not write noiseSpeed into document state');
 
   const { serializeProject } = await import('./projectDocument.js');
   const doc = serializeProject(s.get());
-  assert.strictEqual(doc.driftOverlay, undefined, 'drift overlay must never be persisted');
+  assert.strictEqual(doc.driftOverlay, undefined, 'no drift overlay in the persisted doc');
   assert.strictEqual(doc.layoutParams.jitter, DEFAULT_LAYOUT_PARAMS.jitter,
-    'drift overlay must not leak into the persisted layoutParams');
+    'persisted jitter must stay the authored value');
 }
 
 // ── §6: autosave is a crash-only journal ──────────────────────────────────

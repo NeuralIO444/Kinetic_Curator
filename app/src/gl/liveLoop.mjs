@@ -343,7 +343,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     // first — a one-frame pop of scale/alpha/count on every click.
     // First frame (lastActiveLayerId === null) skips this: the cache is
     // cold anyway. A genuine identity change keeps its cache and springs.
-    if (lastActiveLayerId !== null && s.activeLayerId !== lastActiveLayerId) {
+    // #425 also rides this flag into the resolver (adopt-only weather).
+    const focusSwap = lastActiveLayerId !== null && s.activeLayerId !== lastActiveLayerId;
+    if (focusSwap) {
       for (const k of Object.keys(smoothedLayoutParams)) delete smoothedLayoutParams[k];
     }
 
@@ -515,7 +517,12 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       assetWeightOverrides: s.assetWeightOverrides,
       customAssets: s.customAssets,
       quality: s.quality,
-      driftOverlay: s.driftOverlay,
+      // #425 — resolver-side life drift: per-layer locks + batch gate;
+      // slowRender below already folds !running. focusSwap tells the
+      // resolver to adopt the swapped-in seed without reseeding weather.
+      lockedParams: s.lockedParams,
+      batchPaused: s.batchPaused,
+      focusSwap,
       perfClampOverride: s.perfClampOverride,
       perfTier1: s.perfTier1,
       assetThin: s.assetThin,

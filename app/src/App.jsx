@@ -15,7 +15,6 @@ import { useColumnResize } from './hooks/useColumnResize.js';
 import { useFpsMeter } from './hooks/useFpsMeter.js';
 import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
 import { useBeatDecay } from './hooks/useBeatDecay.js';
-import { useContinuousLife } from './hooks/useContinuousLife.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
@@ -67,7 +66,6 @@ function AppInner() {
   useFpsMeter(true);
   usePerformanceGovernor();
   useBeatDecay();
-  useContinuousLife();
   usePhraseLoop();
   useMorphEvolve();
   useVoiceMixDriver();

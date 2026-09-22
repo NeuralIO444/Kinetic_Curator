@@ -196,6 +196,10 @@ test('Spine F: live displacement offset breathes with loopTimeMs; slowRender/sti
       displacement: 60,
       noiseSpeed: 0.5,
       noiseFreq: 0.005,
+      // #425: this test isolates the WARP (loopTimeMs), like every other
+      // determinism corpus (parity/sceneContract/phase6) — pin life drift
+      // off so placement isn't breathing underneath the comparison.
+      lifeDrift: 0,
     },
     loopTimeMs: 0,
     slowRender: false,
@@ -209,6 +213,7 @@ test('Spine F: live displacement offset breathes with loopTimeMs; slowRender/sti
       displacement: 60,
       noiseSpeed: 0.5,
       noiseFreq: 0.005,
+      lifeDrift: 0,
     },
     loopTimeMs: 2000,
     slowRender: false,
@@ -222,6 +227,7 @@ test('Spine F: live displacement offset breathes with loopTimeMs; slowRender/sti
       displacement: 60,
       noiseSpeed: 0.5,
       noiseFreq: 0.005,
+      lifeDrift: 0,
     },
     loopTimeMs: 2000,
     slowRender: true, // Still / paused / offline render mode

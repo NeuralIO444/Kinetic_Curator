@@ -27,6 +27,32 @@ function clampHop(it, q) {
   return { ...it, x: it.x + dx, y: it.y + dy };
 }
 
+/**
+ * #425 — ambient life drift (#107), computed per layer inside the resolver:
+ * a pure function of the layer's own params, its own locks, and the shared
+ * loop clock. setActiveLayer makes snapshot and top-level equal for both
+ * layers at the swap boundary, so every layer's rendered values are
+ * identical before and after a focus click — the old active-layer-only
+ * driftOverlay clicked the breathing over to the other layer in one frame.
+ * Cadence (80ms tick, +0.04 phase) and magnitudes match the original
+ * useContinuousLife ticker exactly; the caller gates on slowRender /
+ * batchPaused, which is where life used to pause too.
+ */
+function applyLifeDrift(lp, locked, loopTimeMs) {
+  const depth = lp.lifeDrift ?? 0.35;
+  if (depth <= 0.01) return;
+  const t = Math.floor(loopTimeMs / 80) * 0.04;
+  if (!locked.jitter) {
+    lp.jitter = Math.max(0, Math.min(200, Math.round(lp.jitter + Math.sin(t * 0.7) * 12 * depth)));
+  }
+  if (!locked.displacement) {
+    lp.displacement = Math.max(0, Math.min(250, Math.round(lp.displacement + Math.sin(t * 0.45 + 1.2) * 18 * depth)));
+  }
+  if (!locked.noiseSpeed) {
+    lp.noiseSpeed = Math.max(0.1, Math.min(3, +(lp.noiseSpeed + Math.sin(t * 0.3 + 0.5) * 0.25 * depth).toFixed(2)));
+  }
+}
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -128,8 +154,16 @@ export function createLiveResolver() {
     // Spine F (#392): Single shared world noise owned by the resolver.
     const projectSeed = (input.seed ?? 0) >>> 0;
     if (!worldNoise || worldNoiseSeed !== projectSeed) {
-      worldNoise = createNoise(projectSeed || 444);
-      worldNoiseSeed = projectSeed;
+      if (input.focusSwap && worldNoise) {
+        // #425 — a layer focus swap changes the top-level seed (every layer
+        // carries its own), but must not reseed the shared weather: adopt
+        // the seed and keep the field. Genuine reseeds (shuffle) arrive
+        // with focusSwap false and still recreate.
+        worldNoiseSeed = projectSeed;
+      } else {
+        worldNoise = createNoise(projectSeed || 444);
+        worldNoiseSeed = projectSeed;
+      }
     }
 
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
@@ -144,8 +178,8 @@ export function createLiveResolver() {
         ? {
             seed: input.seed, seedOffsets: input.seedOffsets, paletteId: input.paletteId,
             paletteOverrides: input.paletteOverrides,
-            layoutParams: (input.driftOverlay || input.perfClampOverride)
-              ? { ...input.layoutParams, ...input.driftOverlay, ...input.perfClampOverride }
+            layoutParams: input.perfClampOverride
+              ? { ...input.layoutParams, ...input.perfClampOverride }
               : input.layoutParams,
             caGrid: input.caGrid, enabledAssets: input.enabledAssets,
           }
@@ -157,6 +191,16 @@ export function createLiveResolver() {
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
       if (input.perfTier1 && layoutParams.mirror) layoutParams.mirror = false;
+      // #425 — life drift per layer (see applyLifeDrift): own base, own
+      // lifeDrift, own locks — top-level for the active layer, the snapshot
+      // for the rest. Life pauses the same two ways it used to: slowRender
+      // (which folds !running) and batch exports.
+      if (!input.slowRender && !input.batchPaused) {
+        const locks = isActive
+          ? (input.lockedParams || {})
+          : (snap ? (snap.lockedParams || {}) : (input.lockedParams || {}));
+        applyLifeDrift(layoutParams, locks, input.loopTimeMs ?? 0);
+      }
       const palette = resolvePalette(src.paletteId, src.paletteOverrides, input.userPalettes);
       let activeAssets = pool
         .filter((a) => !src.enabledAssets || src.enabledAssets[a.id])
