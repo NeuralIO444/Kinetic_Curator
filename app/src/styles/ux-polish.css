@@ -37,6 +37,22 @@
 .panel-tab:focus-visible { outline-offset: -3px; }
 .panel-tab-icon { font-size: 11px; line-height: 1; }
 .panel-tab-label { font-size: 8px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* #248 Phase 1 — drawer trigger (ASSETS): same look as a tab, but not one;
+   sits below the tablist, opens an overlay instead of switching content. */
+.panel-drawer-triggers {
+  display: flex; flex-shrink: 0; gap: 0;
+  border: 1px solid var(--line); border-top: none; background: var(--panel-2);
+}
+.panel-drawer-trigger {
+  flex: 1 1 0; min-width: 0; min-height: 28px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  background: transparent; border: none; color: var(--dim);
+  cursor: pointer; transition: color 100ms, background 100ms;
+}
+.panel-drawer-trigger:hover { color: var(--ink); background: rgba(255,255,255,0.03); }
+.panel-drawer-trigger .panel-tab-icon { font-size: 11px; }
+.panel-drawer-trigger .panel-tab-label { font-size: 8px; font-weight: 700; }
+
 .panel-tab-content {
   flex: 1 1 auto;
   min-height: 0;
