@@ -21,6 +21,7 @@ Standing bars: 4 tabs at the end state, nothing deleted (moved only), no new con
 | First-run tour, built portable on purpose | `app/src/data/tour.js`, `TourOverlay.jsx` (#222) | Header comment: "Pure data + helpers — no components, so the tour stays portable to the planned PLAY/BUILD/ASSETS/OUTPUT consolidation." `tab` fields are ids (`'layout'`, `'output'`, `null`), not hardcoded titles — cheap to repoint. Step 3's `body` text says "the DAVIS tab" in prose — that needs a copy edit, not a data-shape change. |
 | Lazy full-screen modal pattern (drawer precedent) | `AssetPoolPanel.jsx` → `AssetStudioModal.jsx` (already lazy-loaded from inside the panel), `OutputPanel.jsx` → `PrintDeskModal.jsx` | The codebase already has the exact interaction the issue wants for ASSETS ("open it, grab an asset, close it") — it's just one level too shallow (still opened from inside a tab, not from persistent chrome). Reuse this lazy-import + local-state-toggle pattern for the ASSETS drawer trigger; do not invent a new overlay primitive. |
 | `#341` FX 4-cap ghost-slot UX | `LayersPanel.jsx` (`fxGhosts`/`ghosts` arrays) | Shipped 2026-09-22 (`feat(layers): FX 4-cap ghost slots`). The BUILD-absorbs-LAYERS phase inherits this as-is — do not touch the ghost-slot math, just relocate the file's JSX. |
+| **Phase 1 (ASSETS: tab → drawer)** | `PanelRegistry.js` (`assets` entry, `zone: 'drawer'`), `Shell.jsx`, `components/DrawerOverlay.jsx` | Shipped 2026-09-22, PR #415 (`feat(ui): ASSETS tab -> drawer (#248 Phase 1)`), landed after this plan doc was first written and never back-filled here until now. §3's Phase 1 section below is historical record of what was built, not a pending task — do not redo it. Phase 2 (BUILD absorbs LAYOUT) is the next open phase. |
 
 ---
 
@@ -84,7 +85,7 @@ Every phase: one PR, CI green (`npm run lint && npm run selfcheck && npm run bui
 
 ---
 
-### Phase 1 — ASSETS: tab → drawer
+### Phase 1 — ASSETS: tab → drawer — **SHIPPED, PR #415**
 
 **What it means:** ASSETS stops being a tab and becomes a persistent-button-triggered overlay, exactly the "open it, grab an asset, close it" pattern the issue names — reusing the lazy-modal mechanism `AssetPoolPanel.jsx` already uses internally for `AssetStudioModal`.
 
