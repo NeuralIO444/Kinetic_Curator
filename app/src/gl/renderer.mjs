@@ -319,6 +319,12 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
   const instVbo = gl.createBuffer();
+  // Spine G: capped, reused instance buffer. drawInstances is called many
+  // times a frame (normal batches, mask bakes, one isolated draw per
+  // non-normal-blend item) — bufferData() reallocates driver storage on
+  // every call; bufferSubData() into a buffer sized once (grown on demand)
+  // does not.
+  let instCapacityBytes = 0;
 
   function drawFullscreen(prog) {
     gl.bindBuffer(gl.ARRAY_BUFFER, fullVbo);
@@ -383,7 +389,15 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    if (data.byteLength > instCapacityBytes) {
+      // Grow with 2x headroom so a fluctuating count doesn't reallocate
+      // every frame near a boundary. drawArraysInstanced below uses the
+      // instance count from `data`, not the buffer's capacity, so unused
+      // tail bytes are never read.
+      instCapacityBytes = data.byteLength * 2;
+      gl.bufferData(gl.ARRAY_BUFFER, instCapacityBytes, gl.DYNAMIC_DRAW);
+    }
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
     gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);
@@ -432,7 +446,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     for (const it of instances) {
       const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
       if (b === 'normal') { batch.push(it); continue; }
-      const cell = cells ? cells[`${it.asset}|${it.tint}|${it.accent}`] : null;
+      // Spine D: same live/offline fallback packInstanceData uses (line 258)
+      // — the live atlas only ever has single-asset keys.
+      const cell = cells ? (cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset]) : null;
       if (!cell) continue; // Spine B (#388): cell missing, skip isolated item entirely
       flush();
       // Isolated item: draw to scratch, blend over the layer backdrop.
