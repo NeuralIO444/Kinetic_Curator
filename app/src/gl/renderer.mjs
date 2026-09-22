@@ -161,12 +161,21 @@ export function hueRotateMatrix(deg) {
 }
 const HUE_IDENTITY = hueRotateMatrix(0); // exact identity: cos=1, sin=0
 
+// #420: packInstanceData calls this twice per instance per frame (tint +
+// accent), and both are drawn from a bounded palette set — memoize by the
+// hex string itself. Never invalidated: a given hex string always parses
+// to the same [r,g,b], so there's nothing to go stale.
+const HEX_RGB_CACHE = new Map();
 const hexToRgb = (hex) => {
+  const cached = HEX_RGB_CACHE.get(hex);
+  if (cached) return cached;
   const h = hex.replace('#', '');
   const v = h.length <= 4
     ? h.slice(0, 3).split('').map((c) => c + c).join('')
     : h.slice(0, 6);
-  return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
+  const rgb = [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
+  HEX_RGB_CACHE.set(hex, rgb);
+  return rgb;
 };
 
 /**
