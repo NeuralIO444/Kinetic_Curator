@@ -26,7 +26,7 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       const saved = localStorage.getItem(TAB_STORAGE_KEY);
       if (saved && secondary.some((p) => p.id === saved)) return saved;
     } catch { /* ignore */ }
-    return secondary[0]?.id ?? 'layout';
+    return secondary[0]?.id ?? 'build';
   });
 
   useEffect(() => {
