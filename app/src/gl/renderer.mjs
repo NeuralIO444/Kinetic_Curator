@@ -426,7 +426,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   /**
    * Render one content layer's instances into layerTarget (cleared first).
-   * Non-normal per-item blends go through the scratch target (slow but exact).
+   * Non-normal per-item blends go through the scratch target (slow but
+   * exact) — but a CONSECUTIVE run of items sharing one blend value draws
+   * as a single scratch pass + composite, not one per item. Spine G: the
+   * scene contract assigns one blendMode per layer today (sceneContract.js
+   * toInstance), so a "run" is typically the layer's entire isolated set —
+   * e.g. the SWARM voice's ~420 screen-blended wings, previously silently
+   * skipped by the old cell-lookup bug (#408) and now, un-batched, a
+   * per-item FBO-clear/draw/composite/copy cycle 420x a frame. Safe to
+   * batch because nothing of a different blend sits between them in
+   * stacking order to reorder past.
    * groupOpacity folds into instance alpha (mask bakes; normal layers keep
    * group opacity in the composite pass, matching the SVG <g opacity>).
    */
@@ -436,37 +445,46 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     let batch = [];
-    const flush = () => {
+    const flushNormal = () => {
       if (batch.length) {
         const data = instanceData(batch, cells, groupOpacity);
         if (data.length) drawInstances(data, atlasTex, w, h);
       }
       batch = [];
     };
-    for (const it of instances) {
-      const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
-      if (b === 'normal') { batch.push(it); continue; }
-      // Spine D: same live/offline fallback packInstanceData uses (line 258)
-      // — the live atlas only ever has single-asset keys.
-      const cell = cells ? (cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset]) : null;
-      if (!cell) continue; // Spine B (#388): cell missing, skip isolated item entirely
-      flush();
-      // Isolated item: draw to scratch, blend over the layer backdrop.
+    const flushIsolatedRun = (items, blendMode) => {
+      if (!items.length) return;
+      const data = instanceData(items, cells, groupOpacity);
+      if (!data.length) return; // Spine B (#388): nothing bakeable in this run yet
+      flushNormal();
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fb);
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      const data = instanceData([it], cells, groupOpacity);
-      if (data.length) drawInstances(data, atlasTex, w, h);
-      composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(b), 1, null);
+      drawInstances(data, atlasTex, w, h);
+      composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(blendMode), 1, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
       gl.viewport(0, 0, w, h);
       gl.disable(gl.BLEND);
       gl.useProgram(copyProg);
       gl.uniform1i(U(copyProg, 'u_src'), bindTex(0, blendTmp.tex));
       drawFullscreen(copyProg);
+    };
+    let isolatedRun = [];
+    let isolatedRunBlend = null;
+    for (const it of instances) {
+      const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
+      if (b === 'normal') {
+        if (isolatedRun.length) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; isolatedRunBlend = null; }
+        batch.push(it);
+        continue;
+      }
+      if (isolatedRun.length && b !== isolatedRunBlend) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; }
+      isolatedRunBlend = b;
+      isolatedRun.push(it);
     }
-    flush();
+    if (isolatedRun.length) flushIsolatedRun(isolatedRun, isolatedRunBlend);
+    flushNormal();
   }
 
   /**
