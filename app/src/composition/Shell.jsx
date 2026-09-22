@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { panelsByZone } from './PanelRegistry.js';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
+import { DrawerOverlay } from '../components/DrawerOverlay.jsx';
 
 const TAB_STORAGE_KEY = 'kc:active-panel-tab';
 
@@ -13,6 +14,12 @@ const TAB_STORAGE_KEY = 'kc:active-panel-tab';
 export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }) {
   const primary = panelsByZone('primary');
   const secondary = panelsByZone('secondary');
+  // #248 Phase 1: drawer-zone panels (ASSETS today) aren't tabs — a
+  // persistent trigger opens them as an overlay from whichever tab is
+  // active, closing back to it. One open at a time, same as the tab strip.
+  const drawers = panelsByZone('drawer');
+  const [openDrawerId, setOpenDrawerId] = useState(null);
+  const openDrawer = drawers.find((p) => p.id === openDrawerId) ?? null;
 
   const [activeTab, setActiveTab] = useState(() => {
     try {
@@ -101,6 +108,22 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
             );
           })}
         </div>
+        {drawers.length > 0 && (
+          <div className="panel-drawer-triggers">
+            {drawers.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="panel-drawer-trigger"
+                onClick={() => setOpenDrawerId(p.id)}
+                title={`Open ${p.title}`}
+              >
+                <span className="panel-tab-icon" aria-hidden="true">{p.icon}</span>
+                <span className="panel-tab-label">{p.title}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {activePanel && (
           <div
             className="panel-tab-content"
@@ -122,6 +145,13 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
           </div>
         )}
       </div>
+      {openDrawer && (
+        <ErrorBoundary label={`panel:${openDrawer.id}`}>
+          <Suspense fallback={null}>
+            <DrawerOverlay Comp={openDrawer.component} onClose={() => setOpenDrawerId(null)} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

@@ -28,7 +28,9 @@ export const PANEL_REGISTRY = [
   { id: 'canvas',   title: 'CANVAS',   icon: '◆', component: CanvasPanel,    zone: 'primary' },
   { id: 'layout',   title: 'LAYOUT',   icon: '■', component: LayoutPanel,    zone: 'secondary' },
   { id: 'layers',   title: 'LAYERS',   icon: '▤', component: LayersPanel,    zone: 'secondary' },
-  { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'secondary' },
+  // #248 Phase 1: ASSETS is a drawer, not a tab — panelsByZone('secondary')
+  // naturally excludes it now; Shell.jsx mounts it via AssetDrawer instead.
+  { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'drawer' },
   { id: 'stimulus', title: 'STIMULI',  icon: '▸', component: StimulusPanel,  zone: 'secondary' },
   { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },
   { id: 'output',   title: 'OUTPUT',   icon: '⬇', component: OutputPanel,    zone: 'secondary' },
