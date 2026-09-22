@@ -14,6 +14,13 @@
  * identity by pairing same-asset items by nearest on-screen distance
  * within each asset group — the same shape slides to its nearest new
  * slot rather than an arbitrary one.
+ *
+ * #419: the pairing is planned ONCE at transition start (planMorph) and
+ * held for the whole MIX duration; each frame only resolves the plan's
+ * target slots against its own live item list. Re-matching every frame
+ * was O(n^2) per frame AND let near-tied pairs flip mid-flight when the
+ * breathing layout (life drift, displacement warp) shifted a target —
+ * items darted across their group instead of gliding one straight line.
  */
 
 function dist2(a, b) {
@@ -33,12 +40,16 @@ function groupByAsset(items) {
 }
 
 /**
- * Pair fromItems <-> toItems by nearest position within matching asset
- * groups (greedy, O(n^2) per group — swarm/placement counts run in the
- * hundreds, not thousands, so this stays cheap per transition frame).
- * Returns { pairs: [[fromItem, toItem], ...], onlyFrom, onlyTo }.
+ * Plan the from->to pairing ONCE at transition start (#419). Greedy
+ * nearest within each asset group (O(n^2) per group — run once per chip
+ * click, not once per frame). The target side is recorded as SLOTS
+ * { g: assetGroupKey, j: original index } rather than object refs, so
+ * every blend frame can resolve them against its own live target list:
+ * life drift and the displacement warp move targets every frame, and the
+ * pairing must not follow them.
+ * Returns { pairs: [{ f, g, j }], onlyFrom: [items], onlyTo: [{ g, j }] }.
  */
-export function matchItems(fromItems, toItems) {
+export function planMorph(fromItems, toItems) {
   const fromGroups = groupByAsset(fromItems || []);
   const toGroups = groupByAsset(toItems || []);
   const pairs = [];
@@ -47,23 +58,39 @@ export function matchItems(fromItems, toItems) {
   const allKeys = new Set([...fromGroups.keys(), ...toGroups.keys()]);
   for (const k of allKeys) {
     const fs = (fromGroups.get(k) || []).slice();
-    const ts = (toGroups.get(k) || []).slice();
+    const ts = (toGroups.get(k) || []).map((item, origIdx) => ({ item, origIdx }));
     while (fs.length && ts.length) {
       let bi = 0, bj = 0, bd = Infinity;
       for (let i = 0; i < fs.length; i++) {
         for (let j = 0; j < ts.length; j++) {
-          const d = dist2(fs[i], ts[j]);
+          const d = dist2(fs[i], ts[j].item);
           if (d < bd) { bd = d; bi = i; bj = j; }
         }
       }
-      pairs.push([fs[bi], ts[bj]]);
+      pairs.push({ f: fs[bi], g: k, j: ts[bj].origIdx });
       fs.splice(bi, 1);
       ts.splice(bj, 1);
     }
     onlyFrom.push(...fs);
-    onlyTo.push(...ts);
+    onlyTo.push(...ts.map((t) => ({ g: k, j: t.origIdx })));
   }
   return { pairs, onlyFrom, onlyTo };
+}
+
+/**
+ * Compat surface: materialize a plan into the original ref-tuple shape
+ * ([[fromItem, toItem], ...]) against the same `to` it was built from.
+ * Greedy order is unchanged, so results are identical to the pre-#419
+ * matcher.
+ */
+export function matchItems(fromItems, toItems) {
+  const plan = planMorph(fromItems, toItems);
+  const toGroups = groupByAsset(toItems || []);
+  return {
+    pairs: plan.pairs.map(({ f, g, j }) => [f, toGroups.get(g)[j]]),
+    onlyFrom: plan.onlyFrom,
+    onlyTo: plan.onlyTo.map(({ g, j }) => toGroups.get(g)[j]),
+  };
 }
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -96,13 +123,23 @@ function lerpColor(a, b, t) {
  * pair keeps the TARGET item's identity (asset, role, key, u, ...) and
  * only tweens x/y/scale/rotation/alpha/color/accent; an unmatched target
  * item fades in, an unmatched source item fades out.
+ *
+ * `plan` is the planMorph() result captured at transition start (#419):
+ * the pairing stays fixed for the whole transition while every slot
+ * resolves against THIS frame's targets, so endpoints breathe with the
+ * live layout but an item never changes target mid-flight. Omitted
+ * (tests, one-shot blends) => a fresh plan, identical to the old
+ * per-call match.
  */
-export function blendItems(fromItems, toItems, t) {
+export function blendItems(fromItems, toItems, t, plan = null) {
   if (t <= 0) return fromItems;
   if (t >= 1) return toItems;
-  const { pairs, onlyFrom, onlyTo } = matchItems(fromItems, toItems);
+  const { pairs, onlyFrom, onlyTo } = plan || planMorph(fromItems, toItems);
+  const toGroups = groupByAsset(toItems || []);
   const out = [];
-  for (const [f, to] of pairs) {
+  for (const { f, g, j } of pairs) {
+    const to = toGroups.get(g)?.[j];
+    if (!to) continue; // defensive: slot set shrank (shouldn't mid-transition)
     out.push({
       ...to,
       x: lerp(f.x, to.x, t),
@@ -115,6 +152,10 @@ export function blendItems(fromItems, toItems, t) {
     });
   }
   for (const f of onlyFrom) out.push({ ...f, alpha: (Number.isFinite(f.alpha) ? f.alpha : 100) * (1 - t) });
-  for (const to of onlyTo) out.push({ ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t });
+  for (const { g, j } of onlyTo) {
+    const to = toGroups.get(g)?.[j];
+    if (!to) continue;
+    out.push({ ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t });
+  }
   return out;
 }
