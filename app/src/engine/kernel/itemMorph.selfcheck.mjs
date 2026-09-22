@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { matchItems, blendItems } from './itemMorph.mjs';
+import { matchItems, blendItems, planMorph } from './itemMorph.mjs';
 
 let n = 0, fail = 0;
 function ok(name, fn) {
@@ -84,6 +84,67 @@ ok('blendItems shortest-path angle interpolation wraps correctly', () => {
   const [out] = blendItems(from, to, 0.5);
   // 350 -> 370(=10) is the short way: midpoint is 0, not 180.
   assert.equal(((out.rotation % 360) + 360) % 360, 0);
+});
+
+// ── #419: plan-once — pairing fixed for the transition, endpoints live ──────
+
+ok('#419: blend with a stored plan equals a fresh-plan blend on static targets', () => {
+  const from = [
+    { assetId: 'a', x: 0, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#000000', accent: '#ffffff' },
+    { assetId: 'a', x: 100, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#000000', accent: '#ffffff' },
+  ];
+  const to = [
+    { assetId: 'a', key: 'k1', x: 10, y: 5, scale: 2, rotation: 45, alpha: 100, color: '#ffffff', accent: '#000000' },
+    { assetId: 'a', key: 'k2', x: 90, y: 5, scale: 2, rotation: 45, alpha: 100, color: '#ffffff', accent: '#000000' },
+  ];
+  const plan = planMorph(from, to);
+  assert.deepEqual(blendItems(from, to, 0.5, plan), blendItems(from, to, 0.5));
+});
+
+ok('#419: stored pairing holds when a target breathes past a nearer rival', () => {
+  const from = [{ assetId: 'a', x: 0, y: 0, alpha: 100 }];
+  const toStart = [
+    { assetId: 'a', key: 'far', x: 100, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'farther', x: 200, y: 0, alpha: 100 },
+  ];
+  const plan = planMorph(from, toStart); // pairs to 'far' — nearest at plan time
+  // breathing moves 'farther' to x=10: a per-frame re-match would flip to it
+  const toBreath = [
+    { assetId: 'a', key: 'far', x: 100, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'farther', x: 10, y: 0, alpha: 100 },
+  ];
+  const [stayed] = blendItems(from, toBreath, 0.5, plan);
+  assert.equal(stayed.key, 'far', 'stored plan keeps the original target');
+  const [flipped] = blendItems(from, toBreath, 0.5); // documents the old bug
+  assert.equal(flipped.key, 'farther', 'fresh match would flip — what #419 fixes');
+});
+
+ok('#419: endpoints track LIVE targets while the plan is fixed', () => {
+  const from = [{ assetId: 'a', x: 0, y: 0, alpha: 100 }];
+  const plan = planMorph(from, [{ assetId: 'a', key: 'n', x: 100, y: 0, alpha: 100 }]);
+  const moved = [{ assetId: 'a', key: 'n', x: 300, y: 0, alpha: 100 }];
+  const [out] = blendItems(from, moved, 0.5, plan);
+  assert.equal(out.x, 150, 'aims at the current slot (150), not the start snapshot (50)');
+  assert.equal(out.key, 'n');
+});
+
+ok('#419: onlyTo fade-in resolves through a stored slot against live targets', () => {
+  const from = [{ assetId: 'a', x: 0, y: 0, alpha: 100 }];
+  const toStart = [
+    { assetId: 'a', key: 'keep', x: 10, y: 0, alpha: 100 },
+    { assetId: 'b', key: 'newB', x: 5, y: 0, alpha: 100 },
+  ];
+  const plan = planMorph(from, toStart);
+  const toBreath = [
+    { assetId: 'a', key: 'keep', x: 40, y: 0, alpha: 100 },
+    { assetId: 'b', key: 'newB', x: 60, y: 0, alpha: 100 },
+  ];
+  const out = blendItems(from, toBreath, 0.5, plan);
+  const kept = out.find((i) => i.key === 'keep');
+  const added = out.find((i) => i.key === 'newB');
+  assert.equal(kept.x, 20, 'paired slot aims at the live target (lerp 0..40)');
+  assert.ok(added, 'unmatched target still fades in via its stored slot');
+  assert.ok(Math.abs(added.alpha - 50) < 1e-9, 'alpha = 100 * t');
 });
 
 console.log(`itemMorph.selfcheck: ${fail === 0 ? 'OK' : 'FAIL'} (${n - fail}/${n})`);

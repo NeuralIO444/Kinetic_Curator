@@ -13,7 +13,7 @@ import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 import { applyField, applyMod, motionMetrics } from '../engine/kernel/tracks/trackGraph.js';
 
 import { createNoise } from '../engine/noise.js';
-import { blendItems } from '../engine/kernel/itemMorph.mjs';
+import { blendItems, planMorph } from '../engine/kernel/itemMorph.mjs';
 import { mixEase } from './paletteMix.mjs';
 
 const HOP_MAX_PX = 4;
@@ -335,7 +335,16 @@ export function createLiveResolver() {
         // New or retargeted transition: start from whatever was actually on
         // screen last frame (which may itself be mid-morph — a rapid
         // second chip click re-bases smoothly instead of snapping back).
-        morphState.set(e.id, { fromItems: prevShown.items, startMs: nowMs, dur: mixSeconds });
+        // #419: plan the pairing ONCE here. Targets breathe every frame
+        // (life drift re-places, the warp slides); re-matching per frame
+        // cost O(n^2) and flipped near-tied pairs mid-flight — items
+        // darted across their group instead of gliding one straight line.
+        morphState.set(e.id, {
+          fromItems: prevShown.items,
+          startMs: nowMs,
+          dur: mixSeconds,
+          plan: planMorph(prevShown.items, e.items),
+        });
       }
       const tr = morphState.get(e.id);
       let shown = e.items;
@@ -344,7 +353,7 @@ export function createLiveResolver() {
         if (raw >= 1) {
           morphState.delete(e.id);
         } else {
-          shown = blendItems(tr.fromItems, e.items, mixEase(Math.max(0, raw)));
+          shown = blendItems(tr.fromItems, e.items, mixEase(Math.max(0, raw)), tr.plan);
         }
       }
       lastShown.set(e.id, { sig: e.morphSig, items: shown });

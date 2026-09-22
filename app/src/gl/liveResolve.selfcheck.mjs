@@ -347,3 +347,25 @@ test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', 
   assert.notEqual(rerolled, held, 'a genuine seed change must re-roll the weather');
   r.dispose();
 });
+
+test('#419: chip morph plans once at the click, blends, then lands raw', () => {
+  const r = createLiveResolver();
+  const mk = (mode, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    mixSeconds: 0.5,
+    loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  const before = lyr(r.resolveLayers(mk('scatter', 0)));      // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk('grid', 1000)));       // chip click: plan built, t=0
+  const mid = lyr(r.resolveLayers(mk('grid', 1250)));         // t=0.5, plan in use
+  const done = lyr(r.resolveLayers(mk('grid', 1600)));        // past mixSeconds: landed
+  const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 1600)));
+
+  assert.deepEqual(start, before, 'first frame after the click still presents the old layout');
+  assert.notDeepEqual(mid, raw, 'mid-transition presents a blend, not the raw target layout');
+  assert.ok(mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
+    'planned blend produces finite positions every frame');
+  assert.deepEqual(done, raw, 'completed morph presents the raw resolved items');
+  r.dispose();
+});
