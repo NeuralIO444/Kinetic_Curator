@@ -75,12 +75,17 @@ export function createLiveResolver() {
   // nearest-same-asset, not a true cross-generator match.
   const lastShown = new Map(); // layerId -> { sig, items }
   const morphState = new Map(); // layerId -> { fromItems, startMs, dur }
+  // #432 — per-layer displacement warp phase, accumulated incrementally
+  // (integral of noiseSpeed over each frame's dt) rather than derived as
+  // speed × absolute session time. See the warp block below for why.
+  const warpPhase = new Map(); // layerId -> { base, lastMs }
 
   function prune(aliveIds) {
     for (const k of [...placementCaches.keys()]) if (!aliveIds.has(k)) placementCaches.delete(k);
     for (const k of [...swarmState.keys()]) if (!aliveIds.has(k)) swarmState.delete(k);
     for (const k of [...lastShown.keys()]) if (!aliveIds.has(k)) lastShown.delete(k);
     for (const k of [...morphState.keys()]) if (!aliveIds.has(k)) morphState.delete(k);
+    for (const k of [...warpPhase.keys()]) if (!aliveIds.has(k)) warpPhase.delete(k);
   }
 
   function cacheFor(layerId) {
@@ -252,8 +257,23 @@ export function createLiveResolver() {
         // Stills/renderFinal and slowRender pin nt to the seed slice, so golden
         // hashes remain deterministic while the live canvas breathes.
         if (!input.slowRender && layoutParams.displacement > 0) {
-          const nt0 = (seed & 0xffff) * 0.02 * (layoutParams.noiseSpeed ?? 0.5);
-          const loopTime = (input.loopTimeMs ?? 0) * 0.001;
+          // #432 — nt0 is a FIXED per-seed reference (no longer noiseSpeed-
+          // scaled: that let even the "pinned" baseline shift when speed
+          // changed). The live phase is accumulated incrementally below
+          // (integral of noiseSpeed over each frame's own dt) instead of
+          // speed × absolute session time — the old form meant any speed
+          // change (drift ticks it every 80ms, the slider, voice MIX)
+          // jumped the phase by an amount that grew the longer the tab
+          // stayed open, since the same small Δspeed multiplied an
+          // ever-larger elapsed-time term. Accumulating means a speed
+          // change only affects the phase's rate from that point on.
+          const nt0 = (seed & 0xffff) * 0.02;
+          const nowMs = input.loopTimeMs ?? 0;
+          let wp = warpPhase.get(layer.id);
+          if (!wp) { wp = { base: 0, lastMs: nowMs }; warpPhase.set(layer.id, wp); }
+          const dSec = Math.max(0, nowMs - wp.lastMs) * 0.001;
+          wp.base += dSec * (layoutParams.noiseSpeed ?? 0.5);
+          wp.lastMs = nowMs;
           const noiseFreq = layoutParams.noiseFreq ?? 0.005;
           const displacement = layoutParams.displacement;
           const domainOffsetX = (seedOffsets?.noise || 0) * 100;
@@ -262,10 +282,10 @@ export function createLiveResolver() {
 
           items = items.map((it, k) => {
             const band = isLayersMode ? ((it.index ?? k) % 5) : 0;
-            const speed = isLayersMode
-              ? (layoutParams.noiseSpeed ?? 0.5) * (0.4 + band * 0.25)
-              : (layoutParams.noiseSpeed ?? 0.5);
-            const ntLive = nt0 + loopTime * speed;
+            // bandMult is time-invariant, so scaling the already-accumulated
+            // phase by it is exactly the integral of (speed * bandMult) dt.
+            const bandMult = isLayersMode ? (0.4 + band * 0.25) : 1;
+            const ntLive = nt0 + wp.base * bandMult;
             const curDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, ntLive, 3) * displacement;
             const curDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, ntLive + 100, 3) * displacement;
             const baseDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, nt0, 3) * displacement;
@@ -378,6 +398,7 @@ export function createLiveResolver() {
     swarmState.clear();
     lastShown.clear();
     morphState.clear();
+    warpPhase.clear();
     feedLive.reset();
     worldNoise = null;
     worldNoiseSeed = null;
