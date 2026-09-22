@@ -324,9 +324,9 @@ test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', 
     layoutParams: { ...A425, lifeDrift: 0 },
     caGrid: null, enabledAssets: null, lockedParams: {},
   };
-  const aActive111 = () => r.resolveLayers(input425({
+  const aActive111 = (loopTimeMs = 1000) => r.resolveLayers(input425({
     activeLayerId: 'lyr-a', layoutParams: { ...A425, lifeDrift: 0 }, seed: 111,
-    lockedParams: {}, layerSnapshots: {}, focusSwap: false, loopTimeMs: 1000,
+    lockedParams: {}, layerSnapshots: {}, focusSwap: false, loopTimeMs,
   }));
   const clickToB = (seed, focusSwap) => r.resolveLayers(input425({
     activeLayerId: 'lyr-b',
@@ -339,7 +339,14 @@ test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', 
   }));
   const coord = (frame) => frame.find((l) => l.id === 'lyr-a').items.map((i) => `${i.x},${i.y}`).join(';');
 
-  aActive111(); // establish the field under seed 111 with A visible
+  // #432 — the warp phase is now accumulated incrementally (real elapsed
+  // loopTimeMs since the layer's last resolve), not derived fresh from the
+  // absolute loopTimeMs each call. Warm it up with real elapsed time (0ms
+  // -> 1000ms) before measuring, so curDx != baseDx below as intended —
+  // origin/held/rerolled all then measure at the SAME loopTimeMs (1000,
+  // zero further elapsed time), so the warm-started phase stays frozen
+  // across them and only the reseed under test can move the reading.
+  aActive111(0); // establish the field under seed 111 with A visible
   const origin = coord(aActive111());
   const held = coord(clickToB(222, true)); // click to B: top-level seed 111 → 222
   const rerolled = coord(clickToB(333, false)); // shuffle-class reseed: new seed, focusSwap false
