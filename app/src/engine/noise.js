@@ -132,14 +132,21 @@ function fBm3DWith(p, x, y, z, octaves = 4, lacunarity = 2.0, gain = 0.5) {
  * 2D curl of a scalar potential (approx) for divergence-free flow hints.
  * Returns { x, y } unit-ish vector from finite differences of fBm.
  */
-function curl2With(p, x, y, z, eps = 0.5) {
+function curl2With(p, x, y, z, eps = 0.5, out = null) {
   const n1 = fBm3DWith(p, x, y + eps, z, 3);
   const n2 = fBm3DWith(p, x, y - eps, z, 3);
   const n3 = fBm3DWith(p, x + eps, y, z, 3);
   const n4 = fBm3DWith(p, x - eps, y, z, 3);
+  const vx = (n1 - n2) / (2 * eps);
+  const vy = (n4 - n3) / (2 * eps);
+  if (out) {
+    out.x = vx;
+    out.y = vy;
+    return out;
+  }
   return {
-    x: (n1 - n2) / (2 * eps),
-    y: (n4 - n3) / (2 * eps),
+    x: vx,
+    y: vy,
   };
 }
 
@@ -156,7 +163,7 @@ export function createNoise(seedValue) {
     noise3D: (x, y, z) => noise3DWith(p, x, y, z),
     fBm3D: (x, y, z, octaves, lacunarity, gain) =>
       fBm3DWith(p, x, y, z, octaves, lacunarity, gain),
-    curl2: (x, y, z, eps) => curl2With(p, x, y, z, eps),
+    curl2: (x, y, z, eps, out) => curl2With(p, x, y, z, eps, out),
   };
 }
 

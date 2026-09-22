@@ -115,8 +115,14 @@ export class ReferenceParticleSystem {
     if (this.particles.length !== targetCount) {
       this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed);
     }
-    if (!this._noise) this._noise = createNoise(seed || 444);
+    if (layoutParams.noise) {
+      this._noise = layoutParams.noise;
+    } else if (!this._noise) {
+      this._noise = createNoise(seed || 444);
+    }
     const noise = this._noise;
+    const domainOffsetX = Number(layoutParams.noiseDomainOffsetX ?? layoutParams.noiseDomainOffset) || 0;
+    const domainOffsetY = Number(layoutParams.noiseDomainOffsetY ?? layoutParams.noiseDomainOffset) || 0;
     const {
       noiseFreq = 0.005, noiseSpeed = 0.5, swarmCohesion = 1.5,
       gravityWells = 1.0, damping = 0.95, scale = [0.4, 1.6], alpha = [40, 100],
@@ -131,6 +137,21 @@ export class ReferenceParticleSystem {
     const [minAlpha, maxAlpha] = alpha;
     const nt = time * noiseSpeed * 0.001;
     const windMul = organism ? wind * profile.wind : 1;
+
+    let useCurl = false;
+    if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') {
+      useCurl = true;
+    } else if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') {
+      useCurl = false;
+    } else {
+      const behave = layoutParams.behave;
+      const mode = layoutParams.mode;
+      if (behave === 'flock' || behave === 'mold' || mode === 'murmuration') {
+        useCurl = true;
+      } else {
+        useCurl = false;
+      }
+    }
 
     const sepRadius = organism ? profile.sepR : 35;
     const aliRadius = organism ? profile.aliR : 60;
@@ -147,10 +168,27 @@ export class ReferenceParticleSystem {
 
     for (let i = 0; i < numParticles; i++) {
       const p1 = this.particles[i];
-      const n = noise.noise3D(p1.x * noiseFreq, p1.y * noiseFreq, nt + p1.seedOffset * 0.0001);
-      const windAngle = n * TAU;
-      const windMag = (noise.noise3D(p1.x * noiseFreq + 200, p1.y * noiseFreq + 200, nt) + 1.0) * 0.4 * windMul;
-      p1.applyForce(Math.cos(windAngle) * windMag, Math.sin(windAngle) * windMag);
+      if (useCurl) {
+        const c = noise.curl2(
+          p1.x * noiseFreq + domainOffsetX,
+          p1.y * noiseFreq + domainOffsetY,
+          nt + p1.seedOffset * 0.0001,
+        );
+        p1.applyForce(c.x * 0.8 * windMul, c.y * 0.8 * windMul);
+      } else {
+        const n = noise.noise3D(
+          p1.x * noiseFreq + domainOffsetX,
+          p1.y * noiseFreq + domainOffsetY,
+          nt + p1.seedOffset * 0.0001,
+        );
+        const windAngle = n * TAU;
+        const windMag = (noise.noise3D(
+          p1.x * noiseFreq + 200 + domainOffsetX,
+          p1.y * noiseFreq + 200 + domainOffsetY,
+          nt,
+        ) + 1.0) * 0.4 * windMul;
+        p1.applyForce(Math.cos(windAngle) * windMag, Math.sin(windAngle) * windMag);
+      }
       if (organism && profile.orbit) {
         const o = orbitForce(p1.x, p1.y, cx0, cy0, profile.orbit);
         p1.applyForce(o.fx, o.fy);

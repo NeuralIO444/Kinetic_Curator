@@ -12,6 +12,8 @@ import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 import { applyField, applyMod, motionMetrics } from '../engine/kernel/tracks/trackGraph.js';
 
+import { createNoise } from '../engine/noise.js';
+
 const HOP_MAX_PX = 4;
 
 function clampHop(it, q) {
@@ -27,6 +29,8 @@ export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
   const feedLive = createFeedLive(CANVAS_W, CANVAS_H);
+  let worldNoise = null;
+  let worldNoiseSeed = null;
 
   function prune(aliveIds) {
     for (const k of [...placementCaches.keys()]) if (!aliveIds.has(k)) placementCaches.delete(k);
@@ -61,8 +65,16 @@ export function createLiveResolver() {
       // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().
       // Spine C (#389): forward motionSmoothing for critically damped heading.
       // Spine E: forward safeParticles as float particleCount for fade spawn/death.
+      // Spine F (#392): forward shared world noise + domain offset.
       st.system.update(
-        { ...ctx.layoutParams, particleCount: ctx.safeParticles, maxParticles: ctx.caps?.maxParticles, motionSmoothing: ctx.motionSmoothing },
+        {
+          ...ctx.layoutParams,
+          particleCount: ctx.safeParticles,
+          maxParticles: ctx.caps?.maxParticles,
+          motionSmoothing: ctx.motionSmoothing,
+          noise: ctx.noise,
+          noiseDomainOffset: ctx.noiseDomainOffset,
+        },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
       );
@@ -101,6 +113,13 @@ export function createLiveResolver() {
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     const aliveIds = new Set();
+
+    // Spine F (#392): Single shared world noise owned by the resolver.
+    const projectSeed = (input.seed ?? 0) >>> 0;
+    if (!worldNoise || worldNoiseSeed !== projectSeed) {
+      worldNoise = createNoise(projectSeed || 444);
+      worldNoiseSeed = projectSeed;
+    }
 
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
@@ -154,6 +173,9 @@ export function createLiveResolver() {
           loopTimeMs: input.loopTimeMs ?? 0,
           // Spine C (#389): forward motionSmoothing.
           motionSmoothing: input.motionSmoothing ?? layoutParams.motionSmoothing,
+          // Spine F (#392): shared world noise + domain offset from seedOffsets.noise
+          noise: worldNoise,
+          noiseDomainOffset: (seedOffsets?.noise || 0) * 100,
         });
       } else {
         items = buildPlacements({
@@ -161,16 +183,44 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: CANVAS_W, canvasH: CANVAS_H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
         }).items;
+
+        // Spine F (#392): Live placement warp offset pass (loop-time nt).
+        // Stills/renderFinal and slowRender pin nt to the seed slice, so golden
+        // hashes remain deterministic while the live canvas breathes.
+        if (!input.slowRender && layoutParams.displacement > 0) {
+          const nt0 = (seed & 0xffff) * 0.02 * (layoutParams.noiseSpeed ?? 0.5);
+          const loopTime = (input.loopTimeMs ?? 0) * 0.001;
+          const noiseFreq = layoutParams.noiseFreq ?? 0.005;
+          const displacement = layoutParams.displacement;
+          const domainOffsetX = (seedOffsets?.noise || 0) * 100;
+          const domainOffsetY = (seedOffsets?.noise || 0) * 100;
+          const isLayersMode = layoutParams.mode === 'layers';
+
+          items = items.map((it, k) => {
+            const band = isLayersMode ? ((it.index ?? k) % 5) : 0;
+            const speed = isLayersMode
+              ? (layoutParams.noiseSpeed ?? 0.5) * (0.4 + band * 0.25)
+              : (layoutParams.noiseSpeed ?? 0.5);
+            const ntLive = nt0 + loopTime * speed;
+            const curDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, ntLive, 3) * displacement;
+            const curDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, ntLive + 100, 3) * displacement;
+            const baseDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, nt0, 3) * displacement;
+            const baseDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, nt0 + 100, 3) * displacement;
+            return {
+              ...it,
+              x: it.x + (curDx - baseDx),
+              y: it.y + (curDy - baseDy),
+            };
+          });
+        }
       }
       items = (items || []).filter((it) => it && it.assetId);
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
     const content = out.filter((e) => !e.isFx);
     const toNorm = (it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H });
-    // #343 — MOD reads the source's motion (position + velocity); FIELD/FEED
-    // only need position. vx/vy are 0 for organism-mode items (#343 follow-up:
-    // they aren't tracked there yet), so a MOD source in hype/murmuration mode
-    // resolves valid, inert (non-reactive) knobs rather than throwing.
+    // #343 / Spine F: MOD reads the source's motion (position + velocity).
+    // Both cloud and organism tracks provide real vx/vy for motionMetrics.
     const toNormVel = (it) => ({ ...toNorm(it), vx: Number(it.vx) || 0, vy: Number(it.vy) || 0 });
     // `x || 0.16` would floor a real 0 (the slider's own "off" position) back
     // up to 0.16 — 0 is falsy, not just absent. Only fall back when the value
@@ -216,6 +266,8 @@ export function createLiveResolver() {
     placementCaches.clear();
     swarmState.clear();
     feedLive.reset();
+    worldNoise = null;
+    worldNoiseSeed = null;
   }
 
   return { resolveLayers, dispose };

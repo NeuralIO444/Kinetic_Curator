@@ -615,10 +615,16 @@ export class ParticleSystem {
     }
     // #305 — a mutated noise offset re-rolls the flow field live; otherwise
     // the field is created once (same identity as the old `seed || 444`).
-    const ns = noiseSeedFor(seed, seedOffsets);
-    if (!this._noise || this._noiseSeed !== ns) {
-      this._noise = createNoise(ns);
-      this._noiseSeed = ns;
+    // Spine F (#392): injected shared world noise from resolver.
+    if (layoutParams.noise) {
+      this._noise = layoutParams.noise;
+      this._noiseSeed = null;
+    } else {
+      const ns = noiseSeedFor(seed, seedOffsets);
+      if (!this._noise || this._noiseSeed !== ns) {
+        this._noise = createNoise(ns);
+        this._noiseSeed = ns;
+      }
     }
     // #278 — palette clicks never recolored the live swarm: colors were
     // baked at init() and update() never revisited them. Re-resolve
@@ -639,6 +645,8 @@ export class ParticleSystem {
       }
     }
     const noise = this._noise;
+    const domainOffsetX = Number(layoutParams.noiseDomainOffsetX ?? layoutParams.noiseDomainOffset ?? (seedOffsets?.noise ? seedOffsets.noise * 100 : 0)) || 0;
+    const domainOffsetY = Number(layoutParams.noiseDomainOffsetY ?? layoutParams.noiseDomainOffset ?? (seedOffsets?.noise ? seedOffsets.noise * 100 : 0)) || 0;
     const {
       noiseFreq = 0.005, noiseSpeed = 0.5, swarmCohesion = 1.5,
       gravityWells = 1.0, damping = 0.95, scale = [0.4, 1.6], alpha = [40, 100],
@@ -674,6 +682,23 @@ export class ParticleSystem {
     // and the reference engine (particles.reference.mjs) agree exactly.
     const nt = time * noiseSpeed * 0.001;
     const windMul = organism ? wind * profile.wind : 1;
+
+    // Spine F (#392): Divergence-free curl wind default for flock / murmuration / mold.
+    // Scatter, cloud swarm, and cruise HYPE keep point wind (noise3D -> angle).
+    let useCurl = false;
+    if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') {
+      useCurl = true;
+    } else if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') {
+      useCurl = false;
+    } else {
+      const behave = layoutParams.behave;
+      const mode = layoutParams.mode;
+      if (behave === 'flock' || behave === 'mold' || mode === 'murmuration') {
+        useCurl = true;
+      } else {
+        useCurl = false;
+      }
+    }
 
     const sepRadius = organism ? profile.sepR : 35;
     const aliRadius = organism ? profile.aliR : 60;
@@ -717,11 +742,32 @@ export class ParticleSystem {
       let fax = AX[i];
       let fay = AY[i];
 
-      const nval = noise.noise3D(pxi * noiseFreq, pyi * noiseFreq, nt + this.seedOffset[i] * 0.0001);
-      const windAngle = nval * TAU;
-      const windMag = (noise.noise3D(pxi * noiseFreq + 200, pyi * noiseFreq + 200, nt) + 1.0) * 0.4 * windMul;
-      fax += (Math.cos(windAngle) * windMag) / m;
-      fay += (Math.sin(windAngle) * windMag) / m;
+      if (useCurl) {
+        if (!this._curlOut) this._curlOut = { x: 0, y: 0 };
+        noise.curl2(
+          pxi * noiseFreq + domainOffsetX,
+          pyi * noiseFreq + domainOffsetY,
+          nt + this.seedOffset[i] * 0.0001,
+          0.5,
+          this._curlOut,
+        );
+        fax += (this._curlOut.x * 0.8 * windMul) / m;
+        fay += (this._curlOut.y * 0.8 * windMul) / m;
+      } else {
+        const nval = noise.noise3D(
+          pxi * noiseFreq + domainOffsetX,
+          pyi * noiseFreq + domainOffsetY,
+          nt + this.seedOffset[i] * 0.0001,
+        );
+        const windAngle = nval * TAU;
+        const windMag = (noise.noise3D(
+          pxi * noiseFreq + 200 + domainOffsetX,
+          pyi * noiseFreq + 200 + domainOffsetY,
+          nt,
+        ) + 1.0) * 0.4 * windMul;
+        fax += (Math.cos(windAngle) * windMag) / m;
+        fay += (Math.sin(windAngle) * windMag) / m;
+      }
 
       if (organism && profile.orbit) {
         const o = orbitForce(pxi, pyi, cx0, cy0, profile.orbit);
@@ -1094,12 +1140,15 @@ export class ParticleSystem {
       // instance mapping can stamp it in the palette bg (eroders).
       const gz = this.grazer[i] === 1;
       const sp = this.spine[i] && this.spine[i].length ? this.spine[i] : [{ x: px, y: py }];
+      const vx = this.vx[i];
+      const vy = this.vy[i];
       for (let s = 0; s < bodyLen; s++) {
         const pt = sp[Math.min(s, sp.length - 1)];
         items.push({
           x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), rotation: protation,
           alpha: palpha * (1 - s * 0.08), asset, color: pcolor, u: pu,
           key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
+          vx, vy,
           seedOffset: this.seedOffset[i],
         });
       }
@@ -1115,13 +1164,13 @@ export class ParticleSystem {
           x: px - pyh * reach, y: py + pxh * reach,
           scale: pscale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
-          ladderId, graze: gz, seedOffset: this.seedOffset[i],
+          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
           scale: pscale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
-          ladderId, graze: gz, seedOffset: this.seedOffset[i],
+          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
         });
       } else {
         // #287 — radial fans. The bilateral pair above generalizes to an
@@ -1145,6 +1194,7 @@ export class ParticleSystem {
               rotation: protation + (mirrored ? -amp * 18 : amp * 18),
               alpha: palpha, asset, color: pcolor, u: pu,
               key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
+              vx, vy,
               seedOffset: this.seedOffset[i],
               ...(mirrored ? { _mirrored: true } : null),
             });

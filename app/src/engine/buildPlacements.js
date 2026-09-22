@@ -208,6 +208,8 @@ export function buildPlacements({
     mapped = cache.itemPool;
     for (let k = 0; k < soa.n; k++) {
       const item = mapped[k];
+      item.x = soa.x[k];
+      item.y = soa.y[k];
       item.scale = soa.scale[k];
       item.rotation = soa.rotation[k];
       item.alpha = soa.alpha[k];
