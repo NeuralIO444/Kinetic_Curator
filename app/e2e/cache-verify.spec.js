@@ -49,12 +49,12 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1000);
 
-  await page.getByRole('tab', { name: /layout/i }).first().click();
+  await page.getByRole('tab', { name: /build/i }).first().click();
   await page.waitForTimeout(300);
 
   // COUNT is a stage-A input: if the geometry cache went stale, changing it
   // would not move the node count. Node count cannot be faked by animation.
-  // Scope the lookup through the layout panel's COUNT label, not bare
+  // Scope the lookup through the build panel's COUNT label, not bare
   // document order: the master bar now hosts its own input[type=range]
   // (the #278 palette MIX slider), which sorts first in the DOM and broke
   // the old .first() lookup.

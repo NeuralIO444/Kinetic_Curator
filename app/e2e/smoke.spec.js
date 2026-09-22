@@ -36,7 +36,7 @@ test.describe('Kinetic Curator smoke', () => {
     // Footer shows seed
     await expect(page.locator('.footer-bar')).toContainText(/seed:/i);
 
-    // Tab strip: switch to OUTPUT then LAYOUT
+    // Tab strip: switch to OUTPUT then BUILD
     const tabs = page.locator('[role="tablist"] [role="tab"]');
     await expect(tabs.first()).toBeVisible();
     const tabCount = await tabs.count();
@@ -49,9 +49,9 @@ test.describe('Kinetic Curator smoke', () => {
       await expect(page.locator('.panel-output')).toBeVisible();
     }
 
-    const layoutTab = page.getByRole('tab', { name: /layout/i });
-    if (await layoutTab.count()) {
-      await layoutTab.click();
+    const buildTab = page.getByRole('tab', { name: /build/i });
+    if (await buildTab.count()) {
+      await buildTab.click();
     } else {
       await tabs.first().click();
     }

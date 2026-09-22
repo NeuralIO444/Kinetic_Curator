@@ -2,7 +2,7 @@
 // Adding a panel = one entry here. The Shell knows nothing about features.
 import { lazy } from 'react';
 import { CanvasPanel } from '../panels/CanvasPanel.jsx';
-import { LayoutPanel } from '../panels/LayoutPanel.jsx';
+import { BuildPanel } from '../panels/BuildPanel.jsx';
 import { LayersPanel } from '../panels/LayersPanel.jsx';
 import { AssetPoolPanel } from '../panels/AssetPoolPanel.jsx';
 import { StimulusPanel } from '../panels/StimulusPanel.jsx';
@@ -26,7 +26,7 @@ const GovernorTunePanel = import.meta.env.DEV
 
 export const PANEL_REGISTRY = [
   { id: 'canvas',   title: 'CANVAS',   icon: '◆', component: CanvasPanel,    zone: 'primary' },
-  { id: 'layout',   title: 'LAYOUT',   icon: '■', component: LayoutPanel,    zone: 'secondary' },
+  { id: 'build',    title: 'BUILD',    icon: '■', component: BuildPanel,     zone: 'secondary' },
   { id: 'layers',   title: 'LAYERS',   icon: '▤', component: LayersPanel,    zone: 'secondary' },
   // #248 Phase 1: ASSETS is a drawer, not a tab — panelsByZone('secondary')
   // naturally excludes it now; Shell.jsx mounts it via AssetDrawer instead.
