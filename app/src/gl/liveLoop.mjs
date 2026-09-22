@@ -464,6 +464,14 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
           id: s.paletteId, overrides: s.paletteOverrides, userPalettes: s.userPalettes,
           mode: layoutParams.mode, behave: layoutParams.behave, assetsKey,
         });
+        // #417 — same re-baseline for the slider-spring cache. setActiveLayer
+        // spread ANOTHER layer's snapshot into the top-level params; without
+        // this, every numeric param (scale, alpha, audio depths, lifeDrift, …)
+        // would spring FROM the previous layer's values for ~150–200ms on a
+        // pure focus click — the exact glide paletteMix.resync above exists to
+        // prevent for identity. First frame (lastActiveLayerId === null) seeds
+        // the cache cold instead; a genuine identity change still springs.
+        for (const k of Object.keys(smoothedLayoutParams)) delete smoothedLayoutParams[k];
       }
       lastActiveLayerId = s.activeLayerId;
     }
