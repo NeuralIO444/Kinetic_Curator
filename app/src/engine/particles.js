@@ -228,19 +228,28 @@ export class ParticleSystem {
     if (count > this._cap) this._allocate(count);
     this.n = count;
     this._authoredCount = count;
+    this._floatCount = count;
     this.color = new Array(count);
     this.spine = new Array(count);
+    this._spawnRange(0, count, activeAssets, palette, seed, seedOffsets, opts);
+    // A population (re)init clears all contact state: dead slots, the
+    // breed sequence, and the freelist belong to the old population.
+    this._dead = [];
+    this._breedSeq = 0;
+    // #278 — colors were just (re)assigned from this swatch set.
+    this._colorSig = (palette?.swatches || ['#ffffff']).join('|');
+  }
+
+  _spawnRange(start, end, activeAssets, palette, seed, seedOffsets, opts = {}) {
     const swatches = palette?.swatches || ['#ffffff'];
-    // #287 — voice-level grazer fraction (hidden param, 0..1). Each agent
-    // draws its grazer trait from the dyn stream, independent of position.
     const grazeFrac = Math.min(1, Math.max(0, Number(opts.graze) || 0));
-    for (let i = 0; i < count; i++) {
+    for (let i = start; i < end; i++) {
       // Draw order here is load-bearing: r() is a sequential stream, so the
       // six draws below must stay in this order to reproduce a given seed.
       // The dyn channel rides the spatial sub-seed stream (#305).
       const r = rngForIndex(seed >>> 0, CH.dyn, i, seedOffsets);
-      const x = MARGIN + r() * Math.max(1, canvasW - MARGIN * 2);
-      const y = MARGIN + r() * Math.max(1, canvasH - MARGIN * 2);
+      const x = MARGIN + r() * Math.max(1, this.canvasW - MARGIN * 2);
+      const y = MARGIN + r() * Math.max(1, this.canvasH - MARGIN * 2);
       const mass = r() * 0.8 + 0.4;
       const angle = r() * TAU;
       const speed = r() * 0.55 + 0.15;
@@ -276,12 +285,6 @@ export class ParticleSystem {
       this.leakRgb[i * 3 + 1] = lg;
       this.leakRgb[i * 3 + 2] = lb;
     }
-    // A population (re)init clears all contact state: dead slots, the
-    // breed sequence, and the freelist belong to the old population.
-    this._dead = [];
-    this._breedSeq = 0;
-    // #278 — colors were just (re)assigned from this swatch set.
-    this._colorSig = swatches.join('|');
   }
 
   /**
@@ -600,8 +603,15 @@ export class ParticleSystem {
     // in real time regardless of frame rate.
     const dtFrames = dtSec * 60;
     const targetCount = layoutParams.particleCount || 100;
-    if (this._authoredCount !== targetCount) {
-      this.init(targetCount, this.canvasW, this.canvasH, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0 });
+    this._floatCount = targetCount;
+    const targetCap = Math.max(1, Math.ceil(targetCount));
+    if (this._authoredCount !== targetCap) {
+      if (targetCap > this._cap) this._ensureCapacity(targetCap);
+      if (this.n < targetCap) {
+        this._spawnRange(this.n, targetCap, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0 });
+      }
+      this.n = targetCap;
+      this._authoredCount = targetCap;
     }
     // #305 — a mutated noise offset re-rolls the flow field live; otherwise
     // the field is created once (same identity as the old `seed || 444`).
@@ -1032,14 +1042,19 @@ export class ParticleSystem {
   getItems(activeAssets) {
     if (!activeAssets || activeAssets.length === 0) return [];
     const lp = this._layout || {};
+    const frac = (this._floatCount && this._floatCount > 0) ? (this._floatCount - Math.floor(this._floatCount)) : 0;
     if (!isOrganismMode(lp.mode)) {
       // #167 — dead particles (die) render nothing.
       const items = [];
       for (let i = 0; i < this.n; i++) {
         if (!this.alive[i]) continue;
+        let alpha = this.alpha[i];
+        if (i === this.n - 1 && frac > 0.001) {
+          alpha *= frac;
+        }
         items.push({
           x: this.x[i], y: this.y[i], scale: this.scale[i],
-          rotation: this.rotation[i], alpha: this.alpha[i],
+          rotation: this.rotation[i], alpha,
           asset: activeAssets[this.assetIndex[i] % activeAssets.length],
           color: this.color[i], u: this.u[i],
           // #287 — grazer flag rides the item so the instance mapping can
@@ -1054,10 +1069,10 @@ export class ParticleSystem {
       }
       return items;
     }
-    return this._organismItems(activeAssets, lp);
+    return this._organismItems(activeAssets, lp, frac);
   }
 
-  _organismItems(activeAssets, lp) {
+  _organismItems(activeAssets, lp, frac = 0) {
     const bodyLen = Math.max(1, Math.min(7, Math.round(lp.body || 1)));
     const flap = Number.isFinite(lp.flap) ? lp.flap : 0.35;
     const symmetry = lp.symmetry || 'none';
@@ -1069,7 +1084,10 @@ export class ParticleSystem {
       const py = this.y[i];
       const pscale = this.scale[i];
       const protation = this.rotation[i];
-      const palpha = this.alpha[i];
+      let palpha = this.alpha[i];
+      if (i === this.n - 1 && frac > 0.001) {
+        palpha *= frac;
+      }
       const pu = this.u[i];
       const pcolor = this.color[i];
       // #287 — grazer flag rides every item of a grazer organism so the

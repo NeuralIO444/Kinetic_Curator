@@ -90,6 +90,8 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   let loopLifeT = 0;
   let breathScaleSmoothed = 1;
   let breathRotSmoothed = 0;
+  // Spine E: loop-clock slider springs (exp damp)
+  const smoothedLayoutParams = {};
 
   // #263 — WebGL context loss. The browser fires webglcontextlost when the
   // GPU session dies (tab backgrounded too long, driver hiccup, GPU reset);
@@ -143,6 +145,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     resetBallistics(ballisticsState);
     breathScaleSmoothed = 1;
     breathRotSmoothed = 0;
+    for (const k of Object.keys(smoothedLayoutParams)) delete smoothedLayoutParams[k];
     // #266: a fresh GPU session — don't carry the dead session's bake
     // failure streak / retry backoff into the rebake.
     bakeConsecFails = 0;
@@ -321,7 +324,46 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     // #280: during a voice MIX the loop renders the interpolated blend,
     // not the raw committed state — no hard jumps on voice switches.
     const voiceState = resolveLiveRenderState(s);
-    const layoutParams = voiceState.layoutParams || {};
+    const rawParams = voiceState.layoutParams || {};
+    const layoutParams = { ...rawParams };
+
+    // Spine E: Sliders: current → target exp damp on the loop clock.
+    // Float count; fade spawn/death. Round only when the gesture ends.
+    if (s.motionSmoothing !== false) {
+      const lambdaScale = typeof s.motionSmoothing === 'number' ? Math.max(0.1, s.motionSmoothing) : 1.0;
+      const sliderDampFactor = 1 - Math.exp(-14 * lambdaScale * dtSec);
+      for (const [k, val] of Object.entries(rawParams)) {
+        if (typeof val === 'number') {
+          const cur = smoothedLayoutParams[k];
+          if (typeof cur !== 'number') {
+            smoothedLayoutParams[k] = val;
+          } else {
+            const next = cur + (val - cur) * sliderDampFactor;
+            smoothedLayoutParams[k] = Math.abs(val - next) < 0.005 ? val : next;
+          }
+          layoutParams[k] = smoothedLayoutParams[k];
+        } else if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'number') {
+          const cur = smoothedLayoutParams[k];
+          if (!Array.isArray(cur) || cur.length !== val.length) {
+            smoothedLayoutParams[k] = [...val];
+          } else {
+            const next = new Array(val.length);
+            for (let i = 0; i < val.length; i++) {
+              const nv = cur[i] + (val[i] - cur[i]) * sliderDampFactor;
+              next[i] = Math.abs(val[i] - nv) < 0.005 ? val[i] : nv;
+            }
+            smoothedLayoutParams[k] = next;
+          }
+          layoutParams[k] = smoothedLayoutParams[k];
+        } else {
+          smoothedLayoutParams[k] = val;
+        }
+      }
+    } else {
+      for (const [k, val] of Object.entries(rawParams)) {
+        smoothedLayoutParams[k] = val;
+      }
+    }
 
     // Spine C (#389): Advance life clock and audio ballistics on the GL loop clock
     loopLifeT += dtSec;
@@ -393,19 +435,28 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       };
     }
 
-    // #278 — VJ MIX: detect palette changes once per frame and drive the
-    // crossfade state machine. On a fresh 'start' the outgoing deck is
-    // snapshotted from the last presented frame BEFORE anything renders
-    // the incoming palette; a retargeted switch re-uses the original held
-    // frame (DJ re-base) so rapid switches converge without stacking.
+    // #278 — VJ MIX: detect palette, mode, behave, and asset changes once
+    // per frame and drive the crossfade state machine.
+    // Spine E: Stub chips and mode enums ride the paletteMix state machine
+    // (hold pixels of A, live B). Duration = MIX slider or voice blendSeconds.
+    const voiceMixSec = s.voiceMix?.durationMs ? s.voiceMix.durationMs / 1000 : null;
+    const mixSeconds = voiceMixSec ?? s.paletteMixSeconds;
+    const assetsKey = Array.isArray(voiceState.assets)
+      ? voiceState.assets.join(',')
+      : (s.enabledAssets ? Object.keys(s.enabledAssets).filter((k) => s.enabledAssets[k]).sort().join(',') : '');
+
     const mixEv = paletteMix.update({
       id: s.paletteId,
       overrides: s.paletteOverrides,
       userPalettes: s.userPalettes,
-      mixSeconds: s.paletteMixSeconds,
+      mode: layoutParams.mode,
+      behave: layoutParams.behave,
+      assetsKey,
+      mixSeconds,
       now: performance.now(),
       canDissolve: frameCount > 0 && !!lastFrameTarget && !contextDown,
       bakeReady: !building && !!cells,
+      scrubT: (s.voiceMix && !s.voiceMix.auto) ? s.voiceMix.t : null,
     });
     if (mixEv.kind === 'start' && !mixEv.retarget) {
       if (!live.snapshotHoldFrame(lastFrameTarget)) paletteMix.cancel();

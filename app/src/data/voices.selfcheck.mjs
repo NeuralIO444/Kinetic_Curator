@@ -83,18 +83,19 @@ assert.strictEqual(mid.params.accumulationOptics, optA + (optB - optA) * 0.5);
 assert.strictEqual(mid.params.particleCount, 185);
 // arrays lerp elementwise: scale [0.3,1.1] → [1.2,2.6]
 assert.deepStrictEqual(mid.params.scale, [0.75, 1.85]);
-// enums dissolve at the midpoint: t<0.5 keeps from, t>=0.5 takes to
-assert.strictEqual(mixVoiceState(a, b, 0.49).params.mode, 'swarm');
+// Spine E: enums do not snap at midpoint; t=0 returns from, t>0 takes `to`
+assert.strictEqual(mixVoiceState(a, b, 0).params.mode, 'swarm');
+assert.strictEqual(mixVoiceState(a, b, 0.49).params.mode, 'hype');
 assert.strictEqual(mid.params.mode, 'hype');
 assert.strictEqual(mid.params.blendMode, 'screen'); // both screen — no-op sanity
 // palette lerps color-by-color: indigo #0a0e1a → black #000000 at t=0.5
 assert.strictEqual(mid.palette.bg, '#05070d');
 assert.strictEqual(mid.palette.swatches.length, VOICE_SWATCH_COUNT);
-// fx numbers lerp, booleans dissolve at midpoint
+// fx numbers lerp, booleans take `to` for t>0
 assert.strictEqual(mid.fx.grain, 0.3);
-assert.strictEqual(mid.fx.vignette, false); // t=0.5 takes `to` for booleans
-assert.strictEqual(mixVoiceState(a, b, 0.49).fx.vignette, true); // from=true before the dissolve
-assert.strictEqual(mixVoiceState(a, b, 0.49).fx.posterize, false);
+assert.strictEqual(mid.fx.vignette, false); // t>0 takes `to` for booleans
+assert.strictEqual(mixVoiceState(a, b, 0).fx.vignette, true); // t=0 returns `from`
+assert.strictEqual(mixVoiceState(a, b, 0.49).fx.vignette, false);
 assert.strictEqual(mid.fx.posterize, true);
 
 // sanitizeFx clamps.

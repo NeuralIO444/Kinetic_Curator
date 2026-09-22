@@ -45,12 +45,12 @@ export function createLiveResolver() {
       st = { system: new ParticleSystem(), initKey: null, phraseGen: -1 };
       swarmState.set(layerId, st);
     }
-    const initKey = [ctx.mode, ctx.seed, ctx.safeParticles, CANVAS_W, CANVAS_H,
+    const initKey = [ctx.mode, ctx.seed, CANVAS_W, CANVAS_H,
       ctx.seedOffsets?.spatial || 0, ctx.seedOffsets?.color || 0,
       ctx.seedOffsets?.asset || 0, ctx.seedOffsets?.noise || 0,
       ctx.layoutParams.graze || 0].join('|');
     if (st.initKey !== initKey) {
-      st.system.init(ctx.safeParticles, CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, { graze: ctx.layoutParams.graze || 0 });
+      st.system.init(Math.ceil(ctx.safeParticles), CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, { graze: ctx.layoutParams.graze || 0 });
       st.initKey = initKey;
     }
     if (st.phraseGen !== ctx.phraseWrapGen) {
@@ -60,8 +60,9 @@ export function createLiveResolver() {
     if (!ctx.slowRender) {
       // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().
       // Spine C (#389): forward motionSmoothing for critically damped heading.
+      // Spine E: forward safeParticles as float particleCount for fade spawn/death.
       st.system.update(
-        { ...ctx.layoutParams, maxParticles: ctx.caps?.maxParticles, motionSmoothing: ctx.motionSmoothing },
+        { ...ctx.layoutParams, particleCount: ctx.safeParticles, maxParticles: ctx.caps?.maxParticles, motionSmoothing: ctx.motionSmoothing },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
       );

@@ -301,7 +301,9 @@ function lerpParamValue(from, to, t) {
   if (isNumArray(from) && isNumArray(to) && from.length === to.length) {
     return from.map((f, i) => f + (to[i] - f) * t);
   }
-  return t < 0.5 ? from : to;
+  // Spine E: stop snapping enums at 0.5. At t=0 return `from`; for t>0 return `to`
+  // so the live target renders while the held outgoing frame dissolves over it.
+  return t <= 0 ? from : (to !== undefined ? to : from);
 }
 
 function lerpHex(a, b, t) {
@@ -322,8 +324,8 @@ function parseHex(hex) {
 
 /**
  * Blend two complete voice states. t=0 → from, t=1 → to. The palette
- * crossfades color-by-color; the params crossfade continuously and the
- * geometry mode (an enum) dissolves at the midpoint.
+ * crossfades color-by-color; the params crossfade continuously. Enums and
+ * assets take the target for t>0 while the loop's GPU hold dissolves the old frame.
  */
 export function mixVoiceState(from, to, t) {
   const tc = Math.min(1, Math.max(0, t));
@@ -347,7 +349,7 @@ export function mixVoiceState(from, to, t) {
   for (const k of Object.keys(DEFAULT_FX)) {
     const f = from.fx?.[k];
     const o = to.fx?.[k];
-    fx[k] = (typeof f === 'number' && typeof o === 'number') ? f + (o - f) * tc : (tc < 0.5 ? f : o);
+    fx[k] = (typeof f === 'number' && typeof o === 'number') ? f + (o - f) * tc : (tc <= 0 ? f : (o !== undefined ? o : f));
   }
   return {
     params,
@@ -357,7 +359,7 @@ export function mixVoiceState(from, to, t) {
       swatches,
     },
     fx,
-    assets: tc < 0.5 ? from.assets : to.assets,
+    assets: tc <= 0 ? from.assets : (to.assets || from.assets),
     blendSeconds: to.blendSeconds ?? from.blendSeconds ?? 2,
   };
 }

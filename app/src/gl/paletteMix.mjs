@@ -67,16 +67,22 @@ export function createPaletteMix() {
   let seen = null; // { id, overrides, user } — identity of the last update
   let dissolve = null; // null | { start: -1 (arming) | ms timestamp, dur }
 
-  function update({ id, overrides, userPalettes, mixSeconds, now, canDissolve, bakeReady }) {
+  function update({
+    id, overrides, userPalettes, mode, behave, assetsKey,
+    mixSeconds, now, canDissolve, bakeReady, scrubT,
+  }) {
     const changed = !seen
       || id !== seen.id
       || overrides !== seen.overrides
-      || userPalettes !== seen.user;
+      || userPalettes !== seen.user
+      || mode !== seen.mode
+      || behave !== seen.behave
+      || assetsKey !== seen.assetsKey;
     if (changed) {
       const retarget = dissolve !== null;
-      seen = { id, overrides, user: userPalettes };
+      seen = { id, overrides, user: userPalettes, mode, behave, assetsKey };
       const dur = sanitizeMixSeconds(mixSeconds);
-      if (!canDissolve || dur <= 0) {
+      if (!canDissolve || (dur <= 0 && scrubT == null)) {
         dissolve = null;
         return { kind: 'cut', retarget: false };
       }
@@ -85,11 +91,18 @@ export function createPaletteMix() {
     }
     if (dissolve) {
       if (dissolve.start < 0) {
-        // The incoming palette's atlas combos are still baking — the loop
+        // The incoming palette/mode combos are still baking — the loop
         // holds frames meanwhile, so the dissolve must not start early.
         if (!bakeReady) return { kind: 'arming' };
         dissolve.start = now;
-        return { kind: 'mix', t: 0 };
+        return { kind: 'mix', t: scrubT != null ? mixEase(scrubT) : 0 };
+      }
+      if (scrubT != null) {
+        if (scrubT >= 1) {
+          dissolve = null;
+          return { kind: 'done' };
+        }
+        return { kind: 'mix', t: mixEase(scrubT) };
       }
       const t = (now - dissolve.start) / (dissolve.dur * 1000);
       if (t >= 1) {

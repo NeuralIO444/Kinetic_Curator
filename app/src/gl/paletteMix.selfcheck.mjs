@@ -156,4 +156,38 @@ for (let i = 0; i <= 20; i++) {
   assert.strictEqual(m.isDissolving(), false);
 }
 
+// Spine E: Mode chip change triggers dissolve wipe.
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false, now: 0, mode: 'grid' }));
+  const ev = m.update(base({ now: 1000, mode: 'swarm' }));
+  assert.strictEqual(ev.kind, 'start');
+  assert.strictEqual(ev.retarget, false);
+  assert.strictEqual(m.isDissolving(), true);
+  const mix = m.update(base({ now: 2000, mode: 'swarm' }));
+  assert.strictEqual(mix.kind, 'mix');
+}
+
+// Spine E: Behave / assets change triggers dissolve wipe.
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false, now: 0, mode: 'swarm', behave: 'cruise' }));
+  const ev = m.update(base({ now: 1000, mode: 'swarm', behave: 'wander' }));
+  assert.strictEqual(ev.kind, 'start');
+  assert.strictEqual(m.isDissolving(), true);
+}
+
+// Spine E: Manual scrubT drives dissolve directly.
+{
+  const m = createPaletteMix();
+  m.update(base({ canDissolve: false, now: 0, mode: 'grid' }));
+  m.update(base({ now: 1000, mode: 'swarm', scrubT: 0 }));
+  const ev = m.update(base({ now: 1500, mode: 'swarm', scrubT: 0.5 }));
+  assert.strictEqual(ev.kind, 'mix');
+  assert.ok(Math.abs(ev.t - mixEase(0.5)) < 1e-9);
+  const done = m.update(base({ now: 2000, mode: 'swarm', scrubT: 1.0 }));
+  assert.strictEqual(done.kind, 'done');
+  assert.strictEqual(m.isDissolving(), false);
+}
+
 console.log('[selfcheck] paletteMix OK');

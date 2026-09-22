@@ -214,7 +214,7 @@ First two engine PRs: **A + B**. That is a flock that keeps its weight at 30 fps
 - [x] Audio hit shoves then settles; silence still no-ops (C).
 - [x] Palette change at 60 with zero `startStaticBuild` for color (D).
 - [ ] SNAP / studio hashes unchanged across D (stills baker still hex).
-- [ ] Grid → swarm is a picture wipe, not a sampler pop (E).
+- [x] Grid → swarm is a picture wipe, not a sampler pop (E).
 - [ ] Two swarm tracks, one project seed, share weather; offset is domain, not a second universe (F).
 - [ ] MOD from a HYPE track moves knobs (organism vx).
 - [x] `motionSmoothing` is audible on stage.

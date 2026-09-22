@@ -101,12 +101,14 @@ export function buildPlacements({
 
   const mirror = !!layoutParams.mirror;
   const safeCount = clampCount(layoutParams.count, mirror, caps);
+  const countInt = Math.ceil(safeCount);
+  const countFrac = safeCount - Math.floor(safeCount);
   const scale = scaleOverride ?? layoutParams.scale;
   const alpha = alphaOverride ?? layoutParams.alpha;
 
   const geoParams = {
     mode: layoutParams.mode,
-    count: safeCount,
+    count: countInt,
     seed,
     seedOffsets,
     jitter: layoutParams.jitter,
@@ -132,6 +134,10 @@ export function buildPlacements({
   // ── Stage C: attributes. Always runs; this is what the audio/life
   // modulation actually moves, and it is pure arithmetic over cached units.
   applyAttributes(soa, { scale, rotate: layoutParams.rotate, alpha });
+  // Spine E: float count fades the spawning/dying point's alpha
+  if (countFrac > 0.001 && soa.n > 0) {
+    soa.alpha[soa.n - 1] *= countFrac;
+  }
 
   // ── Stage D+E: asset bind + colour. Both are functions of (seed, index)
   // plus the asset pool / palette / strategy — never of the ranges — so they
