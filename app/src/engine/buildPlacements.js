@@ -8,7 +8,7 @@
 // bind) and E (colour) are skipped whenever their inputs are unchanged,
 // leaving only stage C (scale/rotate/alpha arithmetic) and the item build.
 //
-// This matters because useCanvasLife ticks lifeT every rAF frame, so
+// This matters because liveLoop ticks lifeT every rAF frame, so
 // effectiveScale/effectiveAlpha are fresh arrays on every frame while the
 // geometry params sit still — the full pipeline was re-deriving identical
 // positions, asset picks and colours 60x a second.

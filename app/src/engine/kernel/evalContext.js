@@ -23,7 +23,7 @@
 //                  placement path has no clock input of its own: per-point
 //                  time comes out of geometry (soa.t), and live per-frame
 //                  motion arrives pre-baked into layout.layoutParams'
-//                  scale/alpha ranges by the caller (useCanvasLife's
+//                  scale/alpha ranges by the caller (liveLoop's
 //                  effectiveScale/effectiveAlpha), not as a raw t. The
 //                  particle swarm (particles.js) is a separate stateful
 //                  stepper this pure-eval ABI doesn't drive. Accepting `t` in

@@ -10,7 +10,6 @@ import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
-import { useCanvasLife } from '../hooks/useCanvasLife.js';
 import { on, Events } from '../composition/eventBus.js';
 import { createLiveLoop } from '../gl/liveLoop.mjs';
 import { getPreset } from '../data/presets.js';
@@ -20,9 +19,6 @@ export function CanvasPanel() {
   const layoutParams = useStore(s => s.layoutParams);
   const layers = useStore(s => s.layers);
   const evolveMode = useStore(s => s.evolveMode);
-  const beatPulse = useStore(s => s.beatPulse);
-  const audioBands = useStore(s => s.audioBands);
-  const running = useStore(s => s.running);
   const nodeCount = useStore(s => s.nodeCount);
   const canvasBg = useStore(s => s.canvasBg);
   const accumOn = !!layoutParams.accumulation;
@@ -33,13 +29,10 @@ export function CanvasPanel() {
   const accumEffective = accumOn && !perfTier1;
 
   const viewport = useCanvasViewport();
-  const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
-  const lifeRef = useRef(life);
   // Fresh-per-frame view of the viewport for the loop (the loop reads these
   // per render tick, so they live in a ref rather than a re-subscription).
   const viewRef = useRef({ zoom: 1, pan: { x: 0, y: 0 }, attractor: null });
   useEffect(() => {
-    lifeRef.current = life;
     viewRef.current.zoom = viewport.zoom;
     viewRef.current.pan = viewport.pan;
     viewRef.current.attractor = viewport.attractorRef;
@@ -56,7 +49,6 @@ export function CanvasPanel() {
     try {
       loop = createLiveLoop(canvas, {
         getState: useStore.getState,
-        lifeRef,
         viewRef,
         wrapEl: wrap,
       });
