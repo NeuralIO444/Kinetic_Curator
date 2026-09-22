@@ -759,11 +759,31 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const dtSec = clampedDtMs / 1000;
     loopTimeMs += clampedDtMs;
 
+    // #421 — buildFrame unconditionally advances loopLifeT, ballistics, and
+    // the breath springs before either rejection path below is known. Both
+    // paths already roll loopTimeMs back on reject; snapshot these three so
+    // a rejected frame rolls back exactly as cleanly, instead of the life
+    // clock jumping through a pause and ballistics integrating audio while
+    // "frozen."
+    const preLoopLifeT = loopLifeT;
+    const preBreathScale = breathScaleSmoothed;
+    const preBreathRot = breathRotSmoothed;
+    const preBallisticsKeys = new Set(Object.keys(ballisticsState));
+    const preBallistics = { ...ballisticsState };
+    const rollBackLifeClocks = () => {
+      loopLifeT = preLoopLifeT;
+      breathScaleSmoothed = preBreathScale;
+      breathRotSmoothed = preBreathRot;
+      for (const k of Object.keys(ballisticsState)) if (!preBallisticsKeys.has(k)) delete ballisticsState[k];
+      Object.assign(ballisticsState, preBallistics);
+    };
+
     try {
       const frame = buildFrame(dtSec, loopTimeMs);
       if (!frame) {
         // Cold boot: atlas not baked yet (!cells). Roll back loopTimeMs since frame did not simulate/present.
         loopTimeMs -= clampedDtMs;
+        rollBackLifeClocks();
         return;
       }
 
@@ -772,6 +792,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
         loopTimeMs -= clampedDtMs;
+        rollBackLifeClocks();
         return;
       }
 
