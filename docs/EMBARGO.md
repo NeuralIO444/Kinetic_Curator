@@ -35,4 +35,4 @@ Planning docs in `docs/` marked **deferred** are allowed. They are not tickets.
 
 ## Allowed now
 
-Spine letters are all closed — do not reopen. #341 (FX 4-cap) is unblocked now that tape preflight (#383/#342) merged. Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
+Spine letters are all closed — do not reopen. #341 (FX 4-cap) landed as PR #412 (2026-09-22), issue closed. Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
