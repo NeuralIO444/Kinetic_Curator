@@ -2,7 +2,6 @@
 // No direct store access; emits events the shell routes.
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { PresetBrowser } from './layout/PresetBrowser.jsx';
 import { ModeGrid } from './layout/ModeGrid.jsx';
 import { ParamBlock } from './layout/ParamBlock.jsx';
 import { ToggleRow } from './layout/ToggleRow.jsx';
@@ -23,9 +22,8 @@ export function LayoutPanel() {
         {lockCount > 0 && <span className="lock-badge">🔒 {lockCount}</span>}
       </PanelHeader>
       <div className="panel-body">
-        <PresetBrowser composition={layoutParams.composition} />
         <ModeGrid mode={layoutParams.mode} />
-        <CuratorBar lockCount={lockCount} />
+        <CuratorBar lockCount={lockCount} composition={layoutParams.composition} />
         <ParamBlock layoutParams={layoutParams} lockedParams={lockedParams} />
         <ToggleRow layoutParams={layoutParams} />
       </div>

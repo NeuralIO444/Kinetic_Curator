@@ -3,6 +3,7 @@ import { KERNEL_VERSION } from './engine/kernel/version.js';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
 import { PaletteStrip } from './components/PaletteStrip.jsx';
+import { ModeStrip } from './components/ModeStrip.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
@@ -206,6 +207,7 @@ function AppInner() {
       <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <PaletteStrip />
+      <ModeStrip />
       <ErrorBoundary critical>
         <Shell
           dispatchPipe={piped}
