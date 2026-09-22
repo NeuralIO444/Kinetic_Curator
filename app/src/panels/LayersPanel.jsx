@@ -54,6 +54,10 @@ export function LayersPanel() {
   const fxCount = layers.filter(isFxLayer).length;
   const ghosts = [];
   for (let n = contentCount + 1; n <= MAX_CONTENT_TRACKS; n++) ghosts.push(n);
+  // #341 — FX slots get the same dimmed-until-reached-for treatment as
+  // content tracks: virtual, tap-to-arm, cost nothing until armed.
+  const fxGhosts = [];
+  for (let n = fxCount + 1; n <= MAX_FX_TRACKS; n++) fxGhosts.push(n);
 
   let contentOrdinal = 0;
   const ordinals = new Map();
@@ -77,6 +81,11 @@ export function LayersPanel() {
         <button className="chip-btn" disabled={fxCount >= MAX_FX_TRACKS} onClick={() => emit(Events.LAYER_ADD_FX)}>+ ADD FX</button>
       </PanelHeader>
       <div className="panel-body layer-list">
+        {fxGhosts.slice().reverse().map((n) => (
+          <div key={`ghost-fx-${n}`} className="layer-row" style={{ opacity: 0.35 }} onClick={() => emit(Events.LAYER_ADD_FX)}>
+            <div className="layer-row-main"><button className="layer-name" type="button">FX {n}</button></div>
+          </div>
+        ))}
         {ghosts.slice().reverse().map((n) => (
           <div key={`ghost-kc-${n}`} className="layer-row" style={{ opacity: 0.35 }} onClick={() => emit(Events.LAYER_ADD)}>
             <div className="layer-row-main"><button className="layer-name" type="button">KC-{n}</button></div>
