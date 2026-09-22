@@ -376,3 +376,50 @@ test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   assert.deepEqual(done, raw, 'completed morph presents the raw resolved items');
   r.dispose();
 });
+
+test('#427: adopt-on-enter — a chip into a live swarm mode starts from the prior positions, not a fresh seed scatter', () => {
+  const r = createLiveResolver();
+  // Same asset pool for both modes (a curated voice restricted to these
+  // shapes) — the scenario matchItems' nearest-same-asset pairing is meant
+  // for. A disjoint pool (e.g. default full asset set vs. murmuration's
+  // organism-only subset) has no shared identity to adopt from at all,
+  // which is a real but different case from what this test isolates.
+  const orgAssets = ASSETS.filter((a) => /^(org_|geo_tri_)/.test(a.id)).map((a) => a.id);
+  const enabledAssets = Object.fromEntries(orgAssets.map((id) => [id, true]));
+  const mk = (mode, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0 },
+    enabledAssets,
+    mixSeconds: 0, // #419's morph is orthogonal to this — isolate the init-time adopt itself
+    loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+
+  const gridItems = lyr(r.resolveLayers(mk('grid', 0)));
+  // The mode change alone changes initKey (liveResolve.mjs:swarmItems) even
+  // though the seed is untouched — this is the exact #427 trigger.
+  const swarmItems = lyr(r.resolveLayers(mk('murmuration', 16)));
+
+  assert.ok(gridItems.length > 0 && swarmItems.length > 0, 'both modes produce items to compare');
+
+  // Nearest-neighbor distance from each grid position to the swarm's
+  // landing positions: a matched (same-asset) pair should land within a
+  // few px (adopted, then one physics step of drift); an unmatched grid
+  // item (its asset ran out of fresh same-asset slots) legitimately keeps
+  // whatever fresh scatter distance it lands at. So assert on the matched
+  // majority via median, not a mean the unmatched tail would mask.
+  const nearestDist = (p, pool) => {
+    let best = Infinity;
+    for (const q of pool) {
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < best) best = d;
+    }
+    return best;
+  };
+  const dists = gridItems.map((g) => nearestDist(g, swarmItems)).sort((a, b) => a - b);
+  const median = dists[Math.floor(dists.length / 2)];
+  assert.ok(
+    median < 5,
+    `most matched items should adopt within a few px of their prior position, not scatter canvas-wide (median nearest-neighbor dist ${median.toFixed(1)}px)`,
+  );
+  r.dispose();
+});

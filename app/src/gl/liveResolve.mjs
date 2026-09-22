@@ -13,7 +13,7 @@ import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 import { applyField, applyMod, motionMetrics } from '../engine/kernel/tracks/trackGraph.js';
 
 import { createNoise } from '../engine/noise.js';
-import { blendItems, planMorph } from '../engine/kernel/itemMorph.mjs';
+import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { mixEase } from './paletteMix.mjs';
 
 const HOP_MAX_PX = 4;
@@ -105,8 +105,36 @@ export function createLiveResolver() {
       ctx.seedOffsets?.asset || 0, ctx.seedOffsets?.noise || 0,
       ctx.layoutParams.graze || 0].join('|');
     if (st.initKey !== initKey) {
+      // #427 — adopt-on-enter: capture whatever was actually on screen for
+      // this layer last frame BEFORE re-init scatters fresh positions from
+      // the seed. A mode chip click (GRID -> MURMURATION) changes `mode`,
+      // which is in initKey, so the swarm re-inits even with the seed
+      // untouched -- the old items were a structured placement or a
+      // different swarm state, the new ones are init's scatter, two
+      // unrelated distributions. itemMorph then honestly tweens toward
+      // the new scatter -- but the targets are arbitrary relative to a
+      // frame ago, so every organism used to fly canvas-wide on entry.
+      const wasShown = ctx.slowRender ? [] : (lastShown.get(layerId)?.items || []);
       st.system.init(Math.ceil(ctx.safeParticles), CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, { graze: ctx.layoutParams.graze || 0 });
       st.initKey = initKey;
+      if (wasShown.length) {
+        // Right after init every particle is alive and (for organisms)
+        // exactly one 'body' item exists per particle, both in ascending
+        // particle-index order -- array position IS the particle index
+        // here, with no ambiguity to resolve.
+        // getItems() carries `.asset` (object); matchItems groups by
+        // `.assetId` (string) — the same derivation swarmItems does below
+        // for the presented list, needed here too or every fresh item
+        // falls into one shared 'default' bucket and nothing matches.
+        const fresh = st.system.getItems(ctx.activeAssets)
+          .filter((it) => !it.role || it.role === 'body')
+          .map((it) => (it.assetId ? it : { ...it, assetId: it.asset?.id }));
+        const { pairs } = matchItems(wasShown, fresh);
+        const adopt = pairs
+          .map(([from, to]) => ({ i: fresh.indexOf(to), x: from.x, y: from.y }))
+          .filter((p) => p.i >= 0);
+        if (adopt.length) st.system.adoptPositions(adopt);
+      }
     }
     if (st.phraseGen !== ctx.phraseWrapGen) {
       st.system.resetPhase();

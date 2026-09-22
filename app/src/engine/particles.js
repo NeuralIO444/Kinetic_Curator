@@ -211,6 +211,27 @@ export class ParticleSystem {
     this.phase.fill(0, 0, this.n);
   }
 
+  /**
+   * #427 — adopt-on-enter. Called right after init() when this mode was
+   * just entered from a different layout (a mode chip click), before any
+   * physics step or getItems() read: overwrites the given particles'
+   * starting x/y (and resets their spine trail, so segments/wings don't
+   * still point at the old scattered position) to wherever they actually
+   * were on screen a frame ago. Velocity/phase/energy stay whatever init()
+   * just rolled — only position teleports are what #427 was about; motion
+   * character starting fresh for the new mode is fine. Unlisted particles
+   * (a new item-morph pairing had nothing to adopt from) keep their fresh,
+   * seed-scattered position untouched.
+   */
+  adoptPositions(pairs) { // pairs: [{ i, x, y }]
+    for (const { i, x, y } of pairs) {
+      if (i < 0 || i >= this.n) continue;
+      this.x[i] = x;
+      this.y[i] = y;
+      this.spine[i] = [{ x, y }];
+    }
+  }
+
   init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null, opts = {}) {
     this.canvasW = canvasW;
     this.canvasH = canvasH;
