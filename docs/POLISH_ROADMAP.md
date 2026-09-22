@@ -1,5 +1,7 @@
 # Kinetic_Curator — Testing & Polish Roadmap
 
+> **Superseded in part (2026-09-22).** Two things here no longer govern. (1) The feature freeze this announces was replaced by [`EMBARGO.md`](EMBARGO.md) (2026-09-19) — same intent, newer text wins. (2) The "existing auto-merge grant" named in Stage 0 is **retired**: merges now happen only on Matt's explicit word, per [`AGENTS.md`](../AGENTS.md). Stage contents are kept as the dated record.
+
 *September 17, 2026. Feature freeze is in effect: no new features. This roadmap covers testing, polishing, and refining only. New ideas go to a parking lot, not the build.*
 
 ## Stage 0 — Land the fixes (in flight, no Matt needed)
