@@ -208,6 +208,8 @@ First two engine PRs: **A + B**. That is a flock that keeps its weight at 30 fps
 
 ## 6. Acceptance for "the engine is solid"
 
+> **Annotation (2026-09-22, Matt-approved):** every box below is **code-verified** — selfcheck green (except the two GPU-dependent suites that fail pre-spine-A; see the `SPINE_REVIEW_C_F.md` errata) and QA exercised on the dev canvas. The ears/eyes-only feel rows — 30/60 flock character, wipe-not-pop, two-track shared weather, `motionSmoothing` audible — **still await Matt's play-it sign-off**, which `EMBARGO.md` records as not yet given. A tick here means "verified as far as a coding agent can verify," not Matt's sign-off.
+
 - [x] 30 fps and 60 fps flocks match speed / turn / damping (A).
 - [x] Tab-switch does not jump the noise field (A).
 - [x] Palette or voice chip never returns `buildFrame === null` for a full second (B).
