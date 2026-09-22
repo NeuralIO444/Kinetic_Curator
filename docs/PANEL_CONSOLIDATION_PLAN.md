@@ -21,7 +21,8 @@ Standing bars: 4 tabs at the end state, nothing deleted (moved only), no new con
 | First-run tour, built portable on purpose | `app/src/data/tour.js`, `TourOverlay.jsx` (#222) | Header comment: "Pure data + helpers — no components, so the tour stays portable to the planned PLAY/BUILD/ASSETS/OUTPUT consolidation." `tab` fields are ids (`'layout'`, `'output'`, `null`), not hardcoded titles — cheap to repoint. Step 3's `body` text says "the DAVIS tab" in prose — that needs a copy edit, not a data-shape change. |
 | Lazy full-screen modal pattern (drawer precedent) | `AssetPoolPanel.jsx` → `AssetStudioModal.jsx` (already lazy-loaded from inside the panel), `OutputPanel.jsx` → `PrintDeskModal.jsx` | The codebase already has the exact interaction the issue wants for ASSETS ("open it, grab an asset, close it") — it's just one level too shallow (still opened from inside a tab, not from persistent chrome). Reuse this lazy-import + local-state-toggle pattern for the ASSETS drawer trigger; do not invent a new overlay primitive. |
 | `#341` FX 4-cap ghost-slot UX | `LayersPanel.jsx` (`fxGhosts`/`ghosts` arrays) | Shipped 2026-09-22 (`feat(layers): FX 4-cap ghost slots`). The BUILD-absorbs-LAYERS phase inherits this as-is — do not touch the ghost-slot math, just relocate the file's JSX. |
-| **Phase 1 (ASSETS: tab → drawer)** | `PanelRegistry.js` (`assets` entry, `zone: 'drawer'`), `Shell.jsx`, `components/DrawerOverlay.jsx` | Shipped 2026-09-22, PR #415 (`feat(ui): ASSETS tab -> drawer (#248 Phase 1)`), landed after this plan doc was first written and never back-filled here until now. §3's Phase 1 section below is historical record of what was built, not a pending task — do not redo it. Phase 2 (BUILD absorbs LAYOUT) is the next open phase. |
+| **Phase 1 (ASSETS: tab → drawer)** | `PanelRegistry.js` (`assets` entry, `zone: 'drawer'`), `Shell.jsx`, `components/DrawerOverlay.jsx` | Shipped 2026-09-22, PR #415 (`feat(ui): ASSETS tab -> drawer (#248 Phase 1)`), landed after this plan doc was first written and never back-filled here until now. §3's Phase 1 section below is historical record of what was built, not a pending task — do not redo it. |
+| **Phase 2 (BUILD absorbs LAYOUT)** | `PanelRegistry.js` (`build` entry), `panels/BuildPanel.jsx` (new, replaces `LayoutPanel.jsx`), `panels/layout/*.jsx` (unchanged, cross-imported) | Shipped 2026-09-22, PR #443 (`feat(ui): BUILD absorbs LAYOUT (#248 Phase 2)`). `BuildPanel.jsx` keeps `className="panel panel-layout"` and the `layout/` directory name on purpose (§5 — no CSS-class-root renames). Also fixed 3 e2e specs' `/layout/i` tab selectors to `/build/i` (`smoke.spec.js`, `cache-verify.spec.js`, `voice-personas.spec.js`) since two of the three click unguarded — that would otherwise have broken CI on this PR rather than waiting for Phase 12. §3's Phase 2 section is historical record; do not redo it. Phase 3 (BUILD absorbs LAYERS) is the next open phase. |
 
 ---
 
@@ -103,7 +104,7 @@ Every phase: one PR, CI green (`npm run lint && npm run selfcheck && npm run bui
 
 ---
 
-### Phase 2 — BUILD: absorb LAYOUT
+### Phase 2 — BUILD: absorb LAYOUT — **SHIPPED, PR #443**
 
 **What it means:** The `layout` tab becomes the `build` tab, carrying all of LAYOUT's content unchanged. Because `LayoutPanel.jsx` is already a thin shell composing `ModeGrid`/`CuratorBar`/`ParamBlock`/`ToggleRow`, this is close to a rename-and-re-parent, not a rewrite.
 
