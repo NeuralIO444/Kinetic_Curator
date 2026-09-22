@@ -128,5 +128,21 @@ export function createPaletteMix() {
     dissolve = null;
   }
 
-  return { update, isDissolving, cancel };
+  /**
+   * Silently adopt {id, overrides, mode, behave, assetsKey} as "already
+   * seen", with no cut and no dissolve. For a caller-known non-visual
+   * identity swap — e.g. the live loop's active-layer editing focus
+   * changing, which swaps which layer's config populates these same top-
+   * level fields without changing anything actually on screen (the layer
+   * being left renders on from its own snapshot with the same values; the
+   * layer becoming active already had these values). Without this, the
+   * next update() sees id/mode/behave change and fires a cut or dissolve
+   * for a frame that never visually changed.
+   */
+  function resync({ id, overrides, userPalettes, mode, behave, assetsKey }) {
+    seen = { id, overrides, user: userPalettes, mode, behave, assetsKey };
+    dissolve = null;
+  }
+
+  return { update, isDissolving, cancel, resync };
 }

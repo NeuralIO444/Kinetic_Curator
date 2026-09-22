@@ -219,6 +219,15 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   let bgMode = 'palette'; // palette | transparent | white
   let frameCount = 0;
 
+  // Layer-select focus swap: activeLayerId decides which layer's config
+  // lives in the top-level seed/layoutParams/paletteId fields (layersSlice
+  // setActiveLayer). Clicking a different layer to edit its blend/opacity
+  // is a UI focus change, not a mode/palette edit — the composite is
+  // unchanged (the layer left behind keeps rendering from its own snapshot
+  // with the same values). Track it so paletteMix can be told "this is a
+  // focus swap", not have it read as a mode/palette cut or dissolve.
+  let lastActiveLayerId = null;
+
   // Spine A (#387) — dt clock. prevTime tracks the last frame's timestamp;
   // loopTimeMs is the accumulated simulation time in ms (replaces Date.now()
   // as the noise/sim clock so tab-switches don't jump the field).
@@ -444,6 +453,20 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const assetsKey = Array.isArray(voiceState.assets)
       ? voiceState.assets.join(',')
       : (s.enabledAssets ? Object.keys(s.enabledAssets).filter((k) => s.enabledAssets[k]).sort().join(',') : '');
+
+    if (s.activeLayerId !== lastActiveLayerId) {
+      // The active layer's own id/mode/behave/assets just swapped in from
+      // layersSlice's setActiveLayer — not a mode/palette edit. Re-baseline
+      // before update() sees "changed" and fires a cut/dissolve for a
+      // composite that never actually moved.
+      if (lastActiveLayerId !== null) {
+        paletteMix.resync({
+          id: s.paletteId, overrides: s.paletteOverrides, userPalettes: s.userPalettes,
+          mode: layoutParams.mode, behave: layoutParams.behave, assetsKey,
+        });
+      }
+      lastActiveLayerId = s.activeLayerId;
+    }
 
     const mixEv = paletteMix.update({
       id: s.paletteId,
