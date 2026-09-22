@@ -14,14 +14,14 @@ Long-range layers (do not implement out of order): [`docs/path/README.md`](docs/
 | **Review agent (Grok)** | Read the PR against ENGINE_PLAN + this file. Flag collisions, stamps, missing tests. | Rewrite the patch in-chat as a second implementation. |
 | **Matt** | Play it. Eyes on feel, FEED (#374), icons (#346), M3 costs (#298). Merge word. | |
 
-Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveResolve.mjs` / `particles.js` are one-writer files until the spine is through **B**.
+Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveResolve.mjs` / `particles.js` stay one-writer files for any concurrent work, spine or not — the "through B" clause is moot now (spine is through F).
 
 ## Before you open a branch
 
 1. `git pull origin main`.
 2. Read ENGINE_PLAN §0 (**already shipped — do not redo**).
-3. Take the **lowest open spine issue** only (A before B before C…). If that issue is not assigned to you, stop.
-4. One letter per PR. Do not bundle A with D.
+3. **Spines A–F (#387–#392) are closed.** There is no open spine letter to take. Lowest open, unblocked item is **#341** (FX 4-cap) — the tape preflight (#342/#383) gating it merged 2026-09-21. If it's not assigned to you, stop.
+4. One letter per PR. Do not bundle A with D. (Note: C–F did not go through this — see below.)
 
 ## Already shipped (do not re-implement)
 
@@ -37,21 +37,23 @@ Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveRes
 
 If your prompt says "wire MOD" or "stop MIX from freezing every frame," the work is done. Move on.
 
-## Spine (ENGINE_PLAN §3)
+## Spine (ENGINE_PLAN §3) — all closed as of 2026-09-21
 
 ```text
-A  dt clock                         ← current
-B  skip missing atlas cell
-C  heading spring + ballistics + life
-D  live mask tint (stills baker unchanged)
-E  mode-chip pixel dissolve + slider springs
-F  shared noise + curl wind + organism vx
-G  bufferSubData — piggyback on B or D, not its own epic
+A  dt clock                         ← merged #405, closed #387
+B  skip missing atlas cell          ← merged #406, closed #388
+C  heading spring + ballistics + life  ← closed #389 (PR #407 opened, closed unmerged — landed as a direct push to main instead)
+D  live mask tint (stills baker unchanged)  ← closed #390 (no PR — direct push)
+E  mode-chip pixel dissolve + slider springs  ← closed #391 (no PR — direct push)
+F  shared noise + curl wind + organism vx  ← closed #392 (no PR — direct push)
+G  bufferSubData — piggyback on B or D, not its own epic  ← not yet done, still fair game
 ```
 
-Parallel tape lane (#342 PR #383, #341 FX cap) is **not** yours unless the issue is assigned. Do not mix tape work into a spine PR.
+C–F were reviewed only after landing, in one batch (`docs/SPINE_REVIEW_C_F.md`), not via the per-letter PR + review-agent gate this file describes. A review pass on the merged diff turned up one live-canvas regression from D: `app/src/gl/renderer.mjs:435` skips every non-`normal`-blend layer item because the isolated-item cell lookup lacks the `cells[it.asset]` fallback that the normal-blend path (`packInstanceData`) has. See `docs/SURFACES.md` "Known regression". Worth fixing before anyone builds on top of D.
 
-**Parked until spine E:** tempo clock, slave bus, SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md) + [`docs/ROOM_REVIEW.md`](docs/ROOM_REVIEW.md) + [`docs/path/04-set-spine.md`](docs/path/04-set-spine.md). Do not file or implement T0–T2 while #387 is open.
+Tape lane (#342 PR #383) merged 2026-09-21. **#341** (FX 4-cap) is now unblocked and open — take it if assigned.
+
+**Parked pending spine E sign-off:** tempo clock, slave bus, SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md) + [`docs/ROOM_REVIEW.md`](docs/ROOM_REVIEW.md) + [`docs/path/04-set-spine.md`](docs/path/04-set-spine.md). Spine E is code-merged, but this doc doesn't record Matt's play-it sign-off — treat as still parked until he says otherwise.
 
 **Authoring freeze:** no new showcase / persona / bio-drive chips on the performance deck. Extra costumes are DLC/drawer. Bio-drive *engine* stays in core. See [`docs/path/06-library.md`](docs/path/06-library.md).
 

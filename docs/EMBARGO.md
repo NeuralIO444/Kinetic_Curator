@@ -2,15 +2,20 @@
 
 Matt, 2026-09-19. Coding agents: this file plus [AGENTS.md](../AGENTS.md) plus [ENGINE_PLAN.md](ENGINE_PLAN.md).
 
-## In flight
+**2026-09-22 update:** spines A–F (#387–#392) are all merged and closed — the "in flight" table below is stale, kept for history. The code-side condition this embargo names ("C is merged") has been met, and D/E/F landed on top of it since. What has **not** been recorded anywhere: Matt playing Night Migration at 30/60 and signing off on feel. Until that sign-off shows up in this file, treat the embargo as still standing — do not read the merged code as an implicit go-ahead.
+
+## In flight (historical — all closed)
 
 ```text
-#387 spine A  dt clock
-#388 spine B  skip missing atlas cell
-#389 spine C  heading + ballistics + life
+#387 spine A  dt clock            — closed, merged #405
+#388 spine B  skip missing atlas cell  — closed, merged #406
+#389 spine C  heading + ballistics + life  — closed (landed as direct push, not a merged PR)
+#390 spine D  live mask tint       — closed (direct push)
+#391 spine E  mode-chip dissolve + slider springs  — closed (direct push)
+#392 spine F  shared noise + curl wind + organism vx  — closed (direct push)
 ```
 
-Until **C is merged and Matt has played Night Migration at 30 and 60**, do not implement Studio labs, chip editors, species genomes, UV scroll, HarfBuzz, DLC packs, shimmer, TYPE chips, or new showcase rows.
+Until Matt has played Night Migration at 30 and 60 **and this file is updated to say so**, do not implement Studio labs, chip editors, species genomes, UV scroll, HarfBuzz, DLC packs, shimmer, TYPE chips, or new showcase rows.
 
 Planning docs in `docs/` marked **deferred** are allowed. They are not tickets.
 
@@ -30,4 +35,4 @@ Planning docs in `docs/` marked **deferred** are allowed. They are not tickets.
 
 ## Allowed now
 
-Spine letters, tape preflight (#383) if already assigned, Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
+Spine letters are all closed — do not reopen. #341 (FX 4-cap) is unblocked now that tape preflight (#383/#342) merged. Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
