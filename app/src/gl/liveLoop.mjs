@@ -336,6 +336,17 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const rawParams = voiceState.layoutParams || {};
     const layoutParams = { ...rawParams };
 
+    // #417 — layer-focus swap: wipe the slider-spring cache BEFORE the
+    // springs run so this frame seeds cold from the new layer's raw
+    // values. Detecting the swap after the springs (first version of this
+    // fix) let them ease one blended frame off the previous layer's cache
+    // first — a one-frame pop of scale/alpha/count on every click.
+    // First frame (lastActiveLayerId === null) skips this: the cache is
+    // cold anyway. A genuine identity change keeps its cache and springs.
+    if (lastActiveLayerId !== null && s.activeLayerId !== lastActiveLayerId) {
+      for (const k of Object.keys(smoothedLayoutParams)) delete smoothedLayoutParams[k];
+    }
+
     // Spine E: Sliders: current → target exp damp on the loop clock.
     // Float count; fade spawn/death. Round only when the gesture ends.
     if (s.motionSmoothing !== false) {
@@ -464,14 +475,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
           id: s.paletteId, overrides: s.paletteOverrides, userPalettes: s.userPalettes,
           mode: layoutParams.mode, behave: layoutParams.behave, assetsKey,
         });
-        // #417 — same re-baseline for the slider-spring cache. setActiveLayer
-        // spread ANOTHER layer's snapshot into the top-level params; without
-        // this, every numeric param (scale, alpha, audio depths, lifeDrift, …)
-        // would spring FROM the previous layer's values for ~150–200ms on a
-        // pure focus click — the exact glide paletteMix.resync above exists to
-        // prevent for identity. First frame (lastActiveLayerId === null) seeds
-        // the cache cold instead; a genuine identity change still springs.
-        for (const k of Object.keys(smoothedLayoutParams)) delete smoothedLayoutParams[k];
+        // #417: the slider-spring cache was already wiped at the top of
+        // this frame (focus-swap check before the springs), so
+        // layoutParams seeded cold from the new layer's raw values —
+        // identity re-baselined here, numerics re-baselined there.
       }
       lastActiveLayerId = s.activeLayerId;
     }
