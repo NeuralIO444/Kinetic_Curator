@@ -20,7 +20,7 @@ Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveRes
 
 1. `git pull origin main`.
 2. Read ENGINE_PLAN §0 (**already shipped — do not redo**).
-3. **Spines A–F (#387–#392) are closed.** There is no open spine letter to take. Lowest open, unblocked item is **#341** (FX 4-cap) — the tape preflight (#342/#383) gating it merged 2026-09-21. If it's not assigned to you, stop.
+3. **Spines A–F (#387–#392) are closed, and #341 (FX 4-cap) landed as PR #412 — there is no open spine letter and no lowest-open coding item waiting.** What's open: Matt-only feel (#374, #346, #298), parked (#221, #228), and product lanes (#248 panel consolidation, #270 mobile, #344/#345 leftovers). The #248 coding plan is [`docs/PANEL_CONSOLIDATION_PLAN.md`](docs/PANEL_CONSOLIDATION_PLAN.md) — read its open-questions section first; those need Matt's nod, not a guess. If what you're about to touch isn't assigned to you, stop.
 4. One letter per PR. Do not bundle A with D. (Note: C–F did not go through this — see below.)
 
 ## Already shipped (do not re-implement)
@@ -31,7 +31,7 @@ Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveRes
 - FIELD live pull — PR #373
 - FEED live hop — PR #370 (visual sign-off is #374, Matt only)
 - Flagship voices + MIX driver — #280
-- Audio ballistics module — #306 (not yet on visible life path; that is spine C)
+- Audio ballistics module — #306 (now on the visible life path — spine C wired it into the GL loop clock)
 - Bio-drives on the integrator — #287
 - 4 content-track cap — #340
 
@@ -46,12 +46,12 @@ C  heading spring + ballistics + life  ← closed #389 (PR #407 opened, closed u
 D  live mask tint (stills baker unchanged)  ← closed #390 (no PR — direct push)
 E  mode-chip pixel dissolve + slider springs  ← closed #391 (no PR — direct push)
 F  shared noise + curl wind + organism vx  ← closed #392 (no PR — direct push)
-G  bufferSubData — piggyback on B or D, not its own epic  ← not yet done, still fair game
+G  bufferSubData — piggyback on B or D, not its own epic  ← landed #408 (bundled with the D blend fix), 2026-09-22
 ```
 
-C–F were reviewed only after landing, in one batch (`docs/SPINE_REVIEW_C_F.md`), not via the per-letter PR + review-agent gate this file describes. A review pass on the merged diff turned up one live-canvas regression from D: `app/src/gl/renderer.mjs:435` skips every non-`normal`-blend layer item because the isolated-item cell lookup lacks the `cells[it.asset]` fallback that the normal-blend path (`packInstanceData`) has. See `docs/SURFACES.md` "Known regression". Worth fixing before anyone builds on top of D.
+C–F were reviewed only after landing, in one batch (`docs/SPINE_REVIEW_C_F.md`), not via the per-letter PR + review-agent gate this file describes. That review pass turned up one live-canvas regression from D: `app/src/gl/renderer.mjs:435` skipped every non-`normal`-blend layer item because the isolated-item cell lookup lacked the `cells[it.asset]` fallback that the normal-blend path (`packInstanceData`) has. **Fixed by #408 (merged 2026-09-22)** — the isolated path now goes through `packInstanceData`, batched per consecutive same-blend run. No longer a blocker; see `docs/SURFACES.md` for the record.
 
-Tape lane (#342 PR #383) merged 2026-09-21. **#341** (FX 4-cap) is now unblocked and open — take it if assigned.
+Tape lane (#342 PR #383) merged 2026-09-21. **#341** (FX 4-cap) landed as PR #412 and the issue is closed — do not take it.
 
 **Parked pending spine E sign-off:** tempo clock, slave bus, SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md) + [`docs/ROOM_REVIEW.md`](docs/ROOM_REVIEW.md) + [`docs/path/04-set-spine.md`](docs/path/04-set-spine.md). Spine E is code-merged, but this doc doesn't record Matt's play-it sign-off — treat as still parked until he says otherwise.
 

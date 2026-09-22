@@ -419,7 +419,7 @@ For the final bundle, the focus shifted from code to communication. The legacy P
 |------|--------|
 | `README.md` | Entirely rewritten. Now includes the modern tech stack, the "curated chaos" philosophy, hotkey references, and installation instructions for the React app. |
 | `docs/architecture.md` | [NEW] Explains the underlying rendering pipeline, the deterministic math, the Context API state tree, and the video/snapshot export engine. |
-| `docs/manifesto.md` | [NEW] Explores the aesthetic philosophy behind the tool, explaining *why* we built a generative autopilot and *how* it differs from traditional digital canvases. |
+| `docs/MANIFESTO_MVP.md` | [NEW] Explores the aesthetic philosophy behind the tool, explaining *why* we built a generative autopilot and *how* it differs from traditional digital canvases. (Original MVP-era text; later superseded by `docs/MANIFESTO.md` and kept here under its own name.) |
 
 ## Conclusion
 

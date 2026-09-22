@@ -35,4 +35,6 @@ Planning docs in `docs/` marked **deferred** are allowed. They are not tickets.
 
 ## Allowed now
 
-Spine letters are all closed — do not reopen. #341 (FX 4-cap) is unblocked now that tape preflight (#383/#342) merged. Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
+Spine letters are all closed — do not reopen. #341 (FX 4-cap) landed as PR #412 (2026-09-22), issue closed. Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
+
+**2026-09-22 (Matt-approved):** #411 (item-level morph for chip clicks) and #413 (mode/behave quick strip + presets popup) landed during the embargo and are **covered** — accepted as in-scope engine/UI mechanics, not embargoed features. This coverage is not the Night Migration sign-off: the embargo above otherwise stands until that is recorded here.
