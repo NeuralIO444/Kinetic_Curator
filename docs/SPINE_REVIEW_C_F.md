@@ -7,6 +7,15 @@
 
 ---
 
+## Errata (added 2026-09-22, second review pass)
+
+Corrections to this report — kept as a separate block rather than a silent rewrite, per the append-don't-reword trail rule:
+
+1. **Stage 1's λ formula is wrong.** The heading spring is `step = dlt × (1 − exp(−λ·dtSec))` with `λ = (profile.lambda || (behave === 'scatter' ? 16 : 10)) × motionSmoothing` (`particles.js`) — not `14 × lambdaScale`. `14` is the *slider*-spring damp constant in `liveLoop.mjs`, an unrelated mechanism.
+2. **"Selfcheck passed 100% across all 80+ suites" is machine-scoped.** Re-run on 2026-09-22: `debug.selfcheck` (accum/fade uniform audit — `u_bg` declared but never set) and `accum.selfcheck` (stipple-glow assertion) fail — and fail identically at `475f448`, the commit immediately *before* spine A, so they predate this review's range and were not caused by C–F. Every other suite passes, including every suite C–F added. Treat those two as environment/GPU-dependent until investigated.
+
+---
+
 ## Executive Summary & Verdict
 
 | Stage | Letter & Focus | Commit | Selfcheck / Verification | Verdict |
