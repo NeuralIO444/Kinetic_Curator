@@ -685,7 +685,7 @@ export class ParticleSystem {
 
     // Spine F (#392): Divergence-free curl wind default for flock / murmuration / mold.
     // Scatter, cloud swarm, and cruise HYPE keep point wind (noise3D -> angle).
-    let useCurl = false;
+    let useCurl;
     if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') {
       useCurl = true;
     } else if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') {
