@@ -14,7 +14,7 @@
 //   applyAttributes     (stage C)    scale/rotation/alpha from those units
 //
 // The split exists because of what the app actually does per frame:
-// useCanvasLife updates lifeT every rAF tick, so effectiveScale and
+// liveLoop updates lifeT every rAF tick, so effectiveScale and
 // effectiveAlpha are new arrays on every frame while the geometry params sit
 // perfectly still. Before this split that re-ran the sampler, the fBm
 // displacement, the asset pick and the colour assignment every frame to

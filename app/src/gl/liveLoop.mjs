@@ -69,12 +69,10 @@ function grainKeyFor(fxLayerIds, w, h) {
  * @param {HTMLCanvasElement} canvas — the visible canvas.
  * @param {object} opts
  *   getState: () => zustand store state (live read, no subscriptions)
- *   lifeRef: { current: { lifeT, scaleMul, alphaBoost, breathScale, breathRot,
- *     glow, effectiveScale, effectiveAlpha, depth, bands, pulse } }
  *   viewRef: { current: { zoom, pan: {x, y} } }
  *   wrapEl: element receiving the audio glow (box-shadow), optional
  */
-export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = null } = {}) {
+export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}) {
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
@@ -440,22 +438,6 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       Math.min(100, (layoutParams.alpha?.[0] ?? 40) + alphaBoost * 0.4),
       Math.min(100, (layoutParams.alpha?.[1] ?? 100) + alphaBoost),
     ];
-
-    if (lifeRef) {
-      lifeRef.current = {
-        lifeT: loopLifeT,
-        scaleMul,
-        alphaBoost,
-        breathScale: breathScaleSmoothed,
-        breathRot: breathRotSmoothed,
-        glow,
-        effectiveScale,
-        effectiveAlpha,
-        depth,
-        bands: shapedAudio,
-        pulse: shapedAudio.beatPulse,
-      };
-    }
 
     // #278 — VJ MIX: detect palette, mode, behave, and asset changes once
     // per frame and drive the crossfade state machine.

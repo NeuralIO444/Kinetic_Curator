@@ -218,7 +218,7 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 
 // ── 4. Incremental dirty-C (scale/alpha only) vs full eval ──────────────
 // Measurable as of step 4. "Dirty-C" is the live app's per-frame case:
-// useCanvasLife ticks lifeT every rAF, so effectiveScale/effectiveAlpha are
+// liveLoop ticks lifeT every rAF, so effectiveScale/effectiveAlpha are
 // new arrays each frame while every geometry input holds still.
 //
 // Ratio is incremental / full ON THIS BRANCH — not against main — so it

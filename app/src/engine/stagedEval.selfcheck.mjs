@@ -146,7 +146,7 @@ for (const [label, mutate] of STEPS) {
 
   tick({});                                  // cold: both stages run
   for (let f = 1; f <= 60; f++) {
-    // 60 frames of pure audio/life modulation — exactly what useCanvasLife
+    // 60 frames of pure audio/life modulation — exactly what liveLoop
     // produces while the operator touches nothing.
     tick({ scale: [0.4 + f * 0.001, 1.6 + f * 0.001], alpha: [40 + f * 0.01, 100] });
   }
