@@ -34,14 +34,23 @@ function clampHop(it, q) {
  * layers at the swap boundary, so every layer's rendered values are
  * identical before and after a focus click — the old active-layer-only
  * driftOverlay clicked the breathing over to the other layer in one frame.
- * Cadence (80ms tick, +0.04 phase) and magnitudes match the original
- * useContinuousLife ticker exactly; the caller gates on slowRender /
- * batchPaused, which is where life used to pause too.
+ * Magnitudes match the original useContinuousLife ticker (0.04 phase per
+ * 80ms, i.e. a continuous rate of 0.0005/ms); the caller gates on
+ * slowRender / batchPaused, which is where life used to pause too.
+ *
+ * #431 — the phase used to be quantized to an 80ms/12.5Hz tick
+ * (`Math.floor(loopTimeMs/80)*0.04`), which every layer reads off the
+ * same shared loopTimeMs: every layer's jitter/displacement/noiseSpeed
+ * stepped on the exact same frame, all at once ("stop...start" stair-
+ * stepping, plus every layer's placement geoSig invalidating together —
+ * a main-thread rebuild spike once per tick instead of spread out). Same
+ * rate, continuous instead of stepped: smooth per-frame motion, and
+ * rounding thresholds are no longer crossed in lockstep across layers.
  */
 function applyLifeDrift(lp, locked, loopTimeMs) {
   const depth = lp.lifeDrift ?? 0.35;
   if (depth <= 0.01) return;
-  const t = Math.floor(loopTimeMs / 80) * 0.04;
+  const t = loopTimeMs * 0.0005;
   if (!locked.jitter) {
     lp.jitter = Math.max(0, Math.min(200, Math.round(lp.jitter + Math.sin(t * 0.7) * 12 * depth)));
   }
