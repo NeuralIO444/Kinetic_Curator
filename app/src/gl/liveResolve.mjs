@@ -13,6 +13,8 @@ import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 import { applyField, applyMod, motionMetrics } from '../engine/kernel/tracks/trackGraph.js';
 
 import { createNoise } from '../engine/noise.js';
+import { blendItems } from '../engine/kernel/itemMorph.mjs';
+import { mixEase } from './paletteMix.mjs';
 
 const HOP_MAX_PX = 4;
 
@@ -32,9 +34,18 @@ export function createLiveResolver() {
   let worldNoise = null;
   let worldNoiseSeed = null;
 
+  // Item-level morph (chip clicks): per content layer, the last shown
+  // (post-morph) items + the signature they were shown for, and any
+  // in-flight transition. See itemMorph.mjs for why "identity" here is
+  // nearest-same-asset, not a true cross-generator match.
+  const lastShown = new Map(); // layerId -> { sig, items }
+  const morphState = new Map(); // layerId -> { fromItems, startMs, dur }
+
   function prune(aliveIds) {
     for (const k of [...placementCaches.keys()]) if (!aliveIds.has(k)) placementCaches.delete(k);
     for (const k of [...swarmState.keys()]) if (!aliveIds.has(k)) swarmState.delete(k);
+    for (const k of [...lastShown.keys()]) if (!aliveIds.has(k)) lastShown.delete(k);
+    for (const k of [...morphState.keys()]) if (!aliveIds.has(k)) morphState.delete(k);
   }
 
   function cacheFor(layerId) {
@@ -215,7 +226,16 @@ export function createLiveResolver() {
         }
       }
       items = (items || []).filter((it) => it && it.assetId);
-      out.push({ id: layer.id, layoutParams, palette, items, safeCount, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
+      // Item-morph trigger signature: the same fields that used to drive
+      // the pixel crossfade (mode/behave/palette/asset-set), scoped per
+      // layer. Deliberately excludes seed — a SHUFFLE re-roll has never
+      // dissolved, chip clicks are the only trigger.
+      const morphSig = [
+        layoutParams.mode, layoutParams.behave, src.paletteId,
+        JSON.stringify(src.paletteOverrides || null),
+        Object.keys(src.enabledAssets || {}).filter((k) => src.enabledAssets[k]).sort().join(','),
+      ].join('|');
+      out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
     const content = out.filter((e) => !e.isFx);
     const toNorm = (it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H });
@@ -258,6 +278,35 @@ export function createLiveResolver() {
     });
     content.forEach((e, i) => feedLive.pushSource(i, (e.items || []).map(toNorm)));
     feedLive.commit();
+
+    // Item-level morph: replaces the pixel crossfade for chip clicks (mode,
+    // behave, palette, asset-set). Runs after FIELD/FEED/MOD so those patch
+    // effects always see true simulated positions, never a blended
+    // in-transition frame; only the final presented item list is swapped.
+    const nowMs = input.loopTimeMs ?? 0;
+    const mixSeconds = Math.max(0, Number(input.mixSeconds) || 0);
+    for (const e of content) {
+      const prevShown = lastShown.get(e.id);
+      if (prevShown && prevShown.sig !== e.morphSig && mixSeconds > 0) {
+        // New or retargeted transition: start from whatever was actually on
+        // screen last frame (which may itself be mid-morph — a rapid
+        // second chip click re-bases smoothly instead of snapping back).
+        morphState.set(e.id, { fromItems: prevShown.items, startMs: nowMs, dur: mixSeconds });
+      }
+      const tr = morphState.get(e.id);
+      let shown = e.items;
+      if (tr) {
+        const raw = tr.dur > 0 ? (nowMs - tr.startMs) / (tr.dur * 1000) : 1;
+        if (raw >= 1) {
+          morphState.delete(e.id);
+        } else {
+          shown = blendItems(tr.fromItems, e.items, mixEase(Math.max(0, raw)));
+        }
+      }
+      lastShown.set(e.id, { sig: e.morphSig, items: shown });
+      e.items = shown;
+    }
+
     prune(aliveIds);
     return out;
   }
@@ -265,6 +314,8 @@ export function createLiveResolver() {
   function dispose() {
     placementCaches.clear();
     swarmState.clear();
+    lastShown.clear();
+    morphState.clear();
     feedLive.reset();
     worldNoise = null;
     worldNoiseSeed = null;

@@ -517,6 +517,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       // Spine A (#387): dt clock — loop-owned time, not Date.now().
       dtSec,
       loopTimeMs,
+      // Item-morph (chip clicks): same duration the pixel dissolve used to
+      // use. mixSeconds<=0 means "instant", same as before.
+      mixSeconds,
     });
 
     // Node-count instrumentation (footer readout), store-owned.
@@ -643,9 +646,18 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       audioSwell: s.layoutParams.audioSwell ?? 1,
       glow,
       paused: !s.running,
-      // #278 — eased dissolve factor for this frame (null when no dissolve
-      // is running: render + present the incoming palette directly).
-      mix: mixEv.kind === 'mix' ? mixEv.t : null,
+      // #278 — the pixel dissolve now backs only manual voice-MIX
+      // scrubbing (dragging the MIX control by hand). Auto chip-triggered
+      // transitions (mode/behave/palette/asset-set) morph at the item
+      // level instead — every particle tweens position/scale/color toward
+      // its new layout rather than two frames cross-fading (liveResolve.mjs
+      // itemMorph). paletteMix.update() above still runs unconditionally
+      // (scrub bookkeeping, isDissolving()/cancel() for other callers); we
+      // just stop reading its dissolve factor for the non-scrub case.
+      mix: !(s.voiceMix && !s.voiceMix.auto) ? null
+        : mixEv.kind === 'mix' ? mixEv.t
+        : (mixEv.kind === 'start' || mixEv.kind === 'arming') ? 0
+        : null,
     };
   }
 
