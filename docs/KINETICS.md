@@ -139,3 +139,27 @@ Character: easing by design — periodicity here is intentional, not the drift p
    already exists; zero new noise machinery). Feel fix — gated on the Night Migration
    30/60 play per `EMBARGO.md`.
 3. #444 (TRANSITIONS seam) — filed, awaiting assignment.
+
+## Design briefs
+
+One per system — contract & testable invariants, inventory (file:line + existing
+selfchecks), failure modes, blast radius (downstream / upstream / peers), guardrail
+specs, extraction plan, open questions: [`docs/kinetics/`](docs/kinetics/)
+(`clock.md`, `life.md`, `dynamics.md`, `fields.md`, `tracks.md`, `transitions.md`).
+(Brief-internal cites to *this* file's line numbers for §Conventions may be off by a
+few lines — captured before the FLOW correction; sections are the durable handle.)
+
+## Guardrails — decided (Matt, 2026-09-23): tiers A + B + C
+
+- **A · Assertions** — the per-brief selfcheck proposals: order-at-landing,
+  resolver-time monotonicity, hop ≤ 4 px, knob ranges, determinism goldens,
+  freeze matrix, phase continuity, index identity, one-replan invariant,
+  clock-domain table.
+- **B · Runtime tripwires, existing infra only** — physics finite-throw → labeled
+  renderFault pill, NaN harden at knob application sites, `diagnosticsLog.record`
+  notes. `governorEventLog` is **not** a general log (it throws on non-shed types).
+- **C · ORDER-CONTRACT tripwire** — in `buildSceneContract` (non-one-writer): flag
+  any one-frame same-set item reorder via throttled `renderFault.noteExternalFault`.
+  The generic z-fight diagnoser: covers the #444, #451, and #457 classes.
+
+Findings from this design pass: **#450–#458** (plus still-open #444, #441, #438, #422).
