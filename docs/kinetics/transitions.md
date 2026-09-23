@@ -17,9 +17,12 @@ Inputs: `fromItems` (= `lastShown`, previous presentation verbatim), `toItems`
 
 **Testable invariants**
 
-- **I1 (easing monotone):** eased t = `mixEase(raw)` ∈ [0,1] is monotonic, ends
-  exactly 0 at raw≤0 and 1 at raw≥1 (`paletteMix.mjs:36-39`, asserted in
-  paletteMix.selfcheck:39-44).
+- **I1 (easing monotone):** eased t ∈ [0,1] is monotonic, ends exactly 0 at
+  raw≤0 and 1 at raw≥1. **#465 split the curves by role:** the item morph
+  eases with `morphEase` (expoOut — snappy arrival, exact endpoints, no
+  overshoot; `paletteMix.mjs:56-61`, asserted at paletteMix.selfcheck:211-230),
+  the palette dissolve keeps `mixEase` (smootherstep; `paletteMix.mjs:36-39`,
+  asserted at paletteMix.selfcheck:39-44).
 - **I2 (ORDER ≡ raw at landing — MISSING #419 assertion):** for any frame with
   t∈(0,1), the outputs derived from `toItems` appear in `toItems` relative order,
   fade-outs (`onlyFrom`) appended after; at landing (state deleted) presented order

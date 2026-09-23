@@ -38,3 +38,5 @@ Planning docs in `docs/` marked **deferred** are allowed. They are not tickets.
 Spine letters are all closed — do not reopen. #341 (FX 4-cap) landed as PR #412 (2026-09-22), issue closed. Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
 
 **2026-09-22 (Matt-approved):** #411 (item-level morph for chip clicks) and #413 (mode/behave quick strip + presets popup) landed during the embargo and are **covered** — accepted as in-scope engine/UI mechanics, not embargoed features. This coverage is not the Night Migration sign-off: the embargo above otherwise stands until that is recorded here.
+
+**2026-09-23 (Matt, "465 go"):** #465 (morph arrival ease — `morphEase`, expoOut, swapped in at the single item-morph call site in `liveResolve.mjs`; palette dissolve untouched) is **covered** — a scoped feel-tuning exception, ordered only after #466 landed so the curve swap could not mask the two-clock jitter, per the issue's own sequencing gate. Not the Night Migration sign-off; the embargo above otherwise stands.

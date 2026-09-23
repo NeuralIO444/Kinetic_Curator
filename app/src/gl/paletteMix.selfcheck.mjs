@@ -7,7 +7,7 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
   MIX_MIN, MIX_MAX, MIX_DEFAULT,
-  sanitizeMixSeconds, mixEase, createPaletteMix,
+  sanitizeMixSeconds, mixEase, morphEase, createPaletteMix,
 } from './paletteMix.mjs';
 
 function base(over = {}) {
@@ -207,5 +207,26 @@ for (let i = 0; i <= 20; i++) {
   assert.ok(!call.includes('performance.now()'),
     'no wall clock in the dissolve tick (#453: two time domains)');
 }
+
+// #465 — morphEase (expoOut): snappy morph arrival. Endpoints EXACT
+// (f(1) === 1 matters: the landing frame IS the target, no residue),
+// clamped input, monotone inside [0,1] (TRANSITIONS invariant I1), and it
+// gets out ahead of smootherstep so the tail never reads stop-then-pop.
+assert.strictEqual(typeof morphEase, 'function');
+assert.strictEqual(morphEase(0), 0);
+assert.strictEqual(morphEase(1), 1, 'exact landing — no 0.999 residue');
+assert.strictEqual(morphEase(-5), 0);
+assert.strictEqual(morphEase(9), 1);
+{
+  let prevE = -1;
+  for (let i = 0; i <= 40; i++) {
+    const v = morphEase(i / 40);
+    assert.ok(v >= prevE, 'morphEase monotone');
+    assert.ok(v >= 0 && v <= 1, 'morphEase stays in [0,1] (I1 — no overshoot)');
+    prevE = v;
+  }
+}
+assert.ok(morphEase(0.5) > mixEase(0.5), 'expoOut arrives ahead of smootherstep mid-flight');
+assert.ok(Math.abs(morphEase(0.9) - 1) < 0.003, '99.7%+ arrived by raw=0.9 — sub-percent landing residual');
 
 console.log('[selfcheck] paletteMix OK');
