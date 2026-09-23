@@ -53,6 +53,14 @@ export function useCanvasViewport() {
   const updateAttractor = useCallback((e) => {
     if (dragRef.current.active) return;
     const rect = e.currentTarget.getBoundingClientRect();
+    // #454 — a zero-size rect (mid-layout, or the canvas mid-unmount) makes
+    // CANVAS_W / rect.width divide to Infinity, and Infinity - Infinity
+    // downstream (particles.js's swarm attraction) is NaN; the speed clamp
+    // can't bound NaN (every NaN comparison is false), so it enters
+    // velocity and every subsequent position integrates to NaN. Treat a
+    // degenerate rect as "no attractor this frame" instead of feeding the
+    // physics a poisoned value.
+    if (!(rect.width > 0) || !(rect.height > 0)) { attractorRef.current = null; return; }
     const x = (e.clientX - rect.left) * (CANVAS_W / rect.width);
     const y = (e.clientY - rect.top) * (CANVAS_H / rect.height);
     attractorRef.current = { x: (x - pan.x) / zoom, y: (y - pan.y) / zoom };

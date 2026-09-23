@@ -10,7 +10,7 @@ import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
-import { applyField, applyMod, motionMetrics } from '../engine/kernel/tracks/trackGraph.js';
+import { applyField, applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
 
 import { createNoise } from '../engine/noise.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
@@ -79,6 +79,27 @@ export function createLiveResolver() {
   // (integral of noiseSpeed over each frame's dt) rather than derived as
   // speed × absolute session time. See the warp block below for why.
   const warpPhase = new Map(); // layerId -> { base, lastMs }
+  // #457 — PATCH (MOD/FIELD/FEED) targets a stable layer id (patch.to,
+  // validated in layersSlice.js), but trackGraph.js's applyMod/applyField
+  // and feedLive's delay buffer are numeric-slot APIs (FEED's fixed-size
+  // Float32Array-per-slot needs a small bounded int, not a string key).
+  // feedSlots is the adapter: each layer id gets ONE stable numeric slot
+  // for as long as it exists, assigned once and reused every frame --
+  // unlike an ordinal recomputed from content[]'s current visible-only
+  // position, hide/solo/reorder/remove of OTHER layers never changes it.
+  const feedSlots = new Map(); // layerId -> slot [0, MAX_TRACKS)
+  const feedSlotFree = [];
+  let feedSlotNext = 0;
+  function slotFor(layerId) {
+    let slot = feedSlots.get(layerId);
+    if (slot !== undefined) return slot;
+    slot = feedSlotFree.length ? feedSlotFree.pop() : feedSlotNext++;
+    // Defensive only: MAX_CONTENT_TRACKS (layersSlice.js) already caps
+    // concurrent content layers at MAX_TRACKS, so this never fires today.
+    if (slot >= MAX_TRACKS) slot %= MAX_TRACKS;
+    feedSlots.set(layerId, slot);
+    return slot;
+  }
 
   function prune(aliveIds, documentIds) {
     for (const k of [...placementCaches.keys()]) if (!aliveIds.has(k)) placementCaches.delete(k);
@@ -94,6 +115,9 @@ export function createLiveResolver() {
     // (gone from the document entirely, so absent from documentIds too)
     // should free this entry.
     for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
+    for (const k of [...feedSlots.keys()]) {
+      if (!aliveIds.has(k)) { feedSlotFree.push(feedSlots.get(k)); feedSlots.delete(k); }
+    }
   }
 
   function cacheFor(layerId) {
@@ -315,7 +339,20 @@ export function createLiveResolver() {
           if (!wp) { wp = { base: 0, lastMs: nowMs }; warpPhase.set(layer.id, wp); }
           const dSec = Math.max(0, nowMs - wp.lastMs) * 0.001;
           wp.base += dSec * (layoutParams.noiseSpeed ?? 0.5);
-          wp.lastMs = nowMs;
+          // #460 — high-water mark, not a raw assignment: a backward jump
+          // (a rejected/rolled-back frame, #421-style) must not walk
+          // lastMs down to match. Without this, the clamp above correctly
+          // refuses to rewind wp.base on THAT call, but lastMs still drops
+          // to the lower value -- so once the clock climbs back past the
+          // old high point, the next call's dSec is measured from the
+          // lower dropped-to point instead of from where real progress
+          // last actually happened, over-crediting elapsed time by the
+          // size of the dip. A sustained pause re-ticks buildFrame every
+          // frame with jittery clampedDtMs (liveLoop.mjs, [8,50]ms,
+          // tracks real wall-clock frame timing), so this repeats every
+          // tick the jitter dips below the high point -- a slow leak, not
+          // a one-time bounded error.
+          wp.lastMs = Math.max(wp.lastMs, nowMs);
           const noiseFreq = layoutParams.noiseFreq ?? 0.005;
           const displacement = layoutParams.displacement;
           const domainOffsetX = (seedOffsets?.noise || 0) * 100;
@@ -364,25 +401,29 @@ export function createLiveResolver() {
       const n = Number(patch.strength);
       return Number.isFinite(n) ? n : 0.16;
     };
-    content.forEach((e, i) => {
+    content.forEach((e) => {
       const patch = e.layer?.patch;
-      if (!patch) return;
+      if (!patch || !patch.to) return;
+      // #457 — patch.to is a stable layer id (layersSlice.js validates
+      // it); resolve the source by id against THIS frame's content list,
+      // not by ordinal. Hide/solo/reorder/remove of some OTHER layer
+      // never changes which layer this patch targets.
       if (patch.mode === 'field') {
-        const src = content[patch.to | 0];
+        const src = content.find((c) => c.id === patch.to);
         const srcPts = (src?.items || []).map(toNorm);
         const tgt = (e.items || []).map(toNorm);
-        const pulled = applyField(tgt, srcPts, { mode: 'field', from: patch.to | 0, to: i, strength: patchStrength(patch) });
+        const pulled = applyField(tgt, srcPts, { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) });
         e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
       } else if (patch.mode === 'feed') {
         const pts = (e.items || []).map(toNorm);
         const amt = patchStrength(patch) * 0.05;
-        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: patch.to | 0, to: i, strength: amt });
+        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: slotFor(patch.to), to: slotFor(e.id), strength: amt });
         e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
       } else if (patch.mode === 'mod') {
-        const src = content[patch.to | 0];
+        const src = content.find((c) => c.id === patch.to);
         const metrics = motionMetrics((src?.items || []).map(toNormVel));
         const knobs = applyMod({ glow: 0, fade: 0, displace: 0 }, metrics,
-          { mode: 'mod', from: patch.to | 0, to: i, strength: patchStrength(patch) });
+          { mode: 'mod', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) });
         e.items = (e.items || []).map((it) => ({
           ...it,
           scale: (Number(it.scale) || 1) * (1 + knobs.glow * 0.35),
@@ -391,7 +432,7 @@ export function createLiveResolver() {
         }));
       }
     });
-    content.forEach((e, i) => feedLive.pushSource(i, (e.items || []).map(toNorm)));
+    content.forEach((e) => feedLive.pushSource(slotFor(e.id), (e.items || []).map(toNorm)));
     feedLive.commit();
 
     // Item-level morph: replaces the pixel crossfade for chip clicks (mode,

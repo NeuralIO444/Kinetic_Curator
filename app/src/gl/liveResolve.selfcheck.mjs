@@ -187,8 +187,10 @@ function modInput(patch) {
 }
 
 test('#343: MOD patch perturbs the target when the source track has motion', () => {
+  // #457 — patch.to is a stable layer id now, not an ordinal into the
+  // visible-only content list; 'lyr-a' is this test's source layer.
   const off = createLiveResolver().resolveLayers(modInput(null));
-  const on = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 0, strength: 1 }));
+  const on = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 1 }));
   const bOff = off.find((l) => l.id === 'lyr-b');
   const bOn = on.find((l) => l.id === 'lyr-b');
   assert.equal(bOff.items.length, bOn.items.length, 'MOD does not add/remove items, only perturbs them');
@@ -199,9 +201,40 @@ test('#343: MOD patch perturbs the target when the source track has motion', () 
   assert.ok(changed, 'a swarm source with real motion perturbs the MOD target\'s scale/alpha/x');
 });
 
+test('#457: patch target resolves by stable layer id, not an ordinal into the visible-only list', () => {
+  // decoy, src, target (in that array order): src is the MOD source,
+  // target's patch stores src's ID. Pre-#457, patch.to was an ordinal into
+  // the VISIBLE-only content list — hiding the decoy (which sits BEFORE
+  // src in the stack) shifts every later layer's ordinal down by one, so
+  // whatever ordinal used to mean "src" now means a different layer (or
+  // the target itself). Resolving by id must be immune to this.
+  const layers = (decoyVisible) => [
+    { id: 'lyr-decoy', name: 'Decoy', visible: decoyVisible, layerBlendMode: 'normal', layerOpacity: 1 },
+    { id: 'lyr-src', name: 'Src', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    {
+      id: 'lyr-target', name: 'Target', visible: true, layerBlendMode: 'normal', layerOpacity: 1,
+      patch: { mode: 'mod', to: 'lyr-src', strength: 1 },
+    },
+  ];
+  const mk = (decoyVisible) => baseInput({
+    layers: layers(decoyVisible),
+    activeLayerId: 'lyr-src',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', count: 30, particleCount: 30, behave: 'scatter' },
+    layerSnapshots: {
+      'lyr-decoy': { seed: 111, paletteId: 'bone', paletteOverrides: null, layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 15 }, caGrid: null, enabledAssets: null },
+      'lyr-target': { seed: 333, paletteId: 'bone', paletteOverrides: null, layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 20 }, caGrid: null, enabledAssets: null },
+    },
+  });
+  const targetItems = (out) => out.find((l) => l.id === 'lyr-target').items;
+
+  const decoyShown = targetItems(createLiveResolver().resolveLayers(mk(true)));
+  const decoyHidden = targetItems(createLiveResolver().resolveLayers(mk(false)));
+  assert.deepEqual(decoyHidden, decoyShown, 'hiding an unrelated layer earlier in the stack must not change what the patch targets');
+});
+
 test('#343: MOD is a no-op when strength is 0', () => {
   const off = createLiveResolver().resolveLayers(modInput(null));
-  const zero = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 0, strength: 0 }));
+  const zero = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 0 }));
   const bOff = off.find((l) => l.id === 'lyr-b');
   const bZero = zero.find((l) => l.id === 'lyr-b');
   for (let i = 0; i < bOff.items.length; i++) {
@@ -507,19 +540,19 @@ test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, 
   const at500 = warp442Items(r.resolveLayers(mk(500)));
   assert.deepEqual(at500, at1000, 'a backward loopTimeMs must not rewind the warp phase');
 
-  // Resume forward past the pre-rollback high point (1000). The resolver
-  // has no way to recover true wall-clock elapsed time across a rollback
-  // -- loopTimeMs is its only clock -- so its own dSec = max(0, nowMs -
-  // wp.lastMs) formula necessarily measures elapsed time from wherever
-  // loopTimeMs last WAS (500, set by the read above), not from the
-  // pre-rollback high point (1000). This is the resolver's actual,
-  // verified behavior, not an idealized "straight path" -- asserting
-  // against the resolver's own recurrence exactly is what makes this a
-  // precise regression guard rather than a guess.
+  // Resume forward past the pre-rollback high point (1000). #460 made
+  // wp.lastMs a high-water mark (Math.max(wp.lastMs, nowMs)), not a raw
+  // assignment: the 500 reading above did NOT walk lastMs down to 500,
+  // it stayed at 1000. So resuming at 1000+DELTA measures elapsed time
+  // from the true high point (1000), not from the rollback's dip (500) --
+  // DELTA seconds of real progress, not DELTA + the 500ms dip credited
+  // twice. (Before #460, this resolved from 500, over-crediting the dip
+  // as if it were genuine elapsed time -- see #460 for why that leaks
+  // during a sustained pause specifically.)
   const DELTA = 300;
   const after = warp442Items(r.resolveLayers(mk(1000 + DELTA)));
   const nt0 = (seed & 0xffff) * 0.02;
-  const expectedBase = 1 * speed + ((1000 + DELTA - 500) / 1000) * speed;
+  const expectedBase = 1 * speed + (DELTA / 1000) * speed;
   assertWarpMatches(
     staticPos, after,
     { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
