@@ -79,8 +79,11 @@ The genuinely organic machinery (seeded simplex 3D + fBm, Kernel K1 #59):
   (`liveResolve:69`).
 - **Placement noise** — fBm displacement of every placed point (`placement.js:137-138`).
 - **Scent / FIELD density** — diffusion + advection in `kernel/field/`.
-- **Curl** — the spatial derivative feeding DYNAMICS wind; also **FLOW**, which
-  curl-advects the ACCUM trail buffer itself as it decays (#284, `accumulationFlow`).
+- **Curl** (`noise.curl2`) — the spatial derivative feeding DYNAMICS wind.
+- **FLOW** (#284, `accumulationFlow`) re-advects the ACCUM trail buffer as it decays,
+  but through a *separate* static seedless GPU value-noise field (`accum.mjs:320-329`,
+  "curl-ish" per its own comment) — it does **not** read this module. (UI copy calls
+  it "curl-advects"; treat that as shorthand, not lineage.)
 
 Character: organic — noise over *space*. The gap called out for LIFE is noise over *time*.
 
