@@ -475,7 +475,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       behave: layoutParams.behave,
       assetsKey,
       mixSeconds,
-      now: performance.now(),
+      // #453: tick on the SAME accumulator the item morph reads
+      // (liveResolve, input.loopTimeMs) — pause/hold rollbacks then freeze
+      // both animations together and their tails land on the same frame.
+      now: loopTimeMs,
       canDissolve: frameCount > 0 && !!lastFrameTarget && !contextDown,
       bakeReady: !building && !!cells,
       scrubT: (s.voiceMix && !s.voiceMix.auto) ? s.voiceMix.t : null,

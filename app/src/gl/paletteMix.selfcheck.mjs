@@ -4,6 +4,7 @@
 // dissolve, arming, retarget, cancel — is unit-tested here.
 
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import {
   MIX_MIN, MIX_MAX, MIX_DEFAULT,
   sanitizeMixSeconds, mixEase, createPaletteMix,
@@ -188,6 +189,23 @@ for (let i = 0; i <= 20; i++) {
   const done = m.update(base({ now: 2000, mode: 'swarm', scrubT: 1.0 }));
   assert.strictEqual(done.kind, 'done');
   assert.strictEqual(m.isDissolving(), false);
+}
+
+// #453 — one clock: the dissolve must tick on the SAME accumulator the
+// item morph reads (input.loopTimeMs, spine-A master clock), not the wall
+// clock. Two clocks make their tails land frames apart — the held
+// old-frame ghost snaps off while items are still easing in: the
+// end-of-morph stutter/pop found in #464's QA. Pins the wiring: red on
+// `now: performance.now()`, green on `now: loopTimeMs`.
+{
+  const src = readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8');
+  const at = src.indexOf('paletteMix.update(');
+  assert.ok(at >= 0, 'paletteMix.update call found in liveLoop.mjs');
+  const call = src.slice(at, src.indexOf('});', at));
+  assert.ok(call.includes('now: loopTimeMs'),
+    'dissolve ticks on loopTimeMs — the same clock the item morph reads');
+  assert.ok(!call.includes('performance.now()'),
+    'no wall clock in the dissolve tick (#453: two time domains)');
 }
 
 console.log('[selfcheck] paletteMix OK');
