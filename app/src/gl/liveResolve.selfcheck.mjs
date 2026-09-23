@@ -411,6 +411,42 @@ test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   r.dispose();
 });
 
+test('#451: overlap:false sorts by pre-breath baseScale — draw order does not flip on every breath crossing', () => {
+  const r = createLiveResolver();
+  const mk = (loopTimeMs) => baseInput({
+    layers: [{ id: 'lyr-s', name: 'S', visible: true }],
+    activeLayerId: 'lyr-s',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 24, overlap: false, breath: 1 },
+    loopTimeMs,
+    dtSec: 1 / 30,
+  });
+  r.resolveLayers(mk(0)); // warm-up: let spawn settle before measuring
+
+  let prevOrder = null;
+  let sawLiveScaleCross = false;
+  let orderFlips = 0;
+  for (let f = 1; f <= 90; f++) {
+    const items = r.resolveLayers(mk(f * (1000 / 30)))[0].items;
+    for (let i = 1; i < items.length; i++) {
+      assert.ok(items[i].baseScale >= items[i - 1].baseScale - 1e-9, 'items must be sorted by baseScale');
+    }
+    // seedOffset is assigned once per particle at spawn and never changes,
+    // so it's a stable identity to track array position by — the thing
+    // under test is exactly whether that position holds across frames.
+    const order = items.map((it) => it.seedOffset).join(',');
+    // Proves this scenario actually exercises a breath-driven crossing: had
+    // the live (breathing) scale been the sort key instead, this frame's
+    // order would differ from the baseScale order.
+    const liveOrder = [...items].sort((a, b) => a.scale - b.scale).map((it) => it.seedOffset).join(',');
+    if (liveOrder !== order) sawLiveScaleCross = true;
+    if (prevOrder !== null && order !== prevOrder) orderFlips++;
+    prevOrder = order;
+  }
+  assert.ok(sawLiveScaleCross, 'test setup must actually exercise a live-scale crossing (breath amplitude too low otherwise)');
+  assert.equal(orderFlips, 0, 'baseScale-sorted draw order must not flip across frames while breath oscillates');
+  r.dispose();
+});
+
 test('#427: adopt-on-enter — a chip into a live swarm mode starts from the prior positions, not a fresh seed scatter', () => {
   const r = createLiveResolver();
   // Same asset pool for both modes (a curated voice restricted to these

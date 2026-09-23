@@ -205,12 +205,22 @@ export function createLiveResolver() {
         accent,
         color: item.graze ? bg : item.color,
         scale: item.scale * ctx.scaleMul * uScale,
+        // #451 — pre-breath scale, carried through the same multipliers as
+        // the live scale so it stays comparable; used only as the overlap
+        // sort key below, never for drawing.
+        baseScale: (Number.isFinite(item.baseScale) ? item.baseScale : item.scale) * ctx.scaleMul * uScale,
         alpha: Math.min(100, item.alpha + ctx.alphaBoost),
         u,
         seedOffset: item.seedOffset,
       };
     });
-    if (!ctx.layoutParams.overlap) items = [...items].sort((a, b) => a.scale - b.scale);
+    // #451 — sort by baseScale (pre-#287-breath), not the live breathing
+    // scale: two items whose live scales cross mid-breath used to swap
+    // draw-order position every time they crossed, a one-frame z-fight with
+    // no morph or chip click involved. Sorting on the stable, non-oscillating
+    // size keeps stacking order settled unless the items' designed sizes
+    // actually differ, or a placement rebuild changes them.
+    if (!ctx.layoutParams.overlap) items = [...items].sort((a, b) => a.baseScale - b.baseScale);
     const stamp = ctx.layoutParams.mirror || ctx.layoutParams.symmetry === 'stamp';
     if (stamp && ctx.caps.allowMirror) {
       items = [...items, ...items.map((item) => ({ ...item, x: CANVAS_W - item.x, rotation: -item.rotation, _mirrored: true, key: item.key ? `${item.key}-stamp` : undefined, seedOffset: item.seedOffset }))];

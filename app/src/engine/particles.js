@@ -131,6 +131,11 @@ export class ParticleSystem {
     this.ay = new Float64Array(cap);
     this.mass = new Float64Array(cap);
     this.scale = new Float64Array(cap);
+    // #451 — scale before the #287 breath multiplier, so a sort key can
+    // rank items by their designed size without the ±50% breath swing
+    // flipping draw order every time two close-in-size items' breath
+    // phases cross. Written at every site this.scale is.
+    this.baseScale = new Float64Array(cap);
     this.rotation = new Float64Array(cap);
     this.alpha = new Float64Array(cap);
     this.phase = new Float64Array(cap);
@@ -183,6 +188,7 @@ export class ParticleSystem {
     this.ay = grow(this.ay);
     this.mass = grow(this.mass);
     this.scale = grow(this.scale);
+    this.baseScale = grow(this.baseScale);
     this.rotation = grow(this.rotation);
     this.alpha = grow(this.alpha);
     this.phase = grow(this.phase);
@@ -284,6 +290,7 @@ export class ParticleSystem {
       this.ay[i] = 0;
       this.mass[i] = mass;
       this.scale[i] = mass;
+      this.baseScale[i] = mass;
       this.rotation[i] = angle * (180 / Math.PI);
       this.alpha[i] = 0;
       this.phase[i] = 0;
@@ -579,6 +586,7 @@ export class ParticleSystem {
     this.ay[cs] = 0;
     this.mass[cs] = cm;
     this.scale[cs] = minScale + cm * (maxScale - minScale);
+    this.baseScale[cs] = this.scale[cs];
     this.rotation[cs] = Math.atan2(cvy, cvx) * (180 / Math.PI);
     this.alpha[cs] = minAlpha + cm * (maxAlpha - minAlpha);
     this.phase[cs] = 0;
@@ -1025,6 +1033,7 @@ export class ParticleSystem {
       const ph = (this.phase[i] + 0.004 * noiseSpeed * dtFrames) % 1;
       this.phase[i] = ph;
       let sc = minScale + (mi * (maxScale - minScale));
+      this.baseScale[i] = sc; // #451 — pre-breath, for order-stable sorting
       // #287 SWELL — breathing multiplies the base scale by
       // 1 + breath * 0.5 * energy * sin(phase + seedOffset). The 0.5 caps
       // the swing at ±50%: the issue's bare `1 + breath * sin(...)` would
@@ -1125,7 +1134,7 @@ export class ParticleSystem {
           alpha *= frac;
         }
         items.push({
-          x: this.x[i], y: this.y[i], scale: this.scale[i],
+          x: this.x[i], y: this.y[i], scale: this.scale[i], baseScale: this.baseScale[i],
           rotation: this.rotation[i], alpha,
           asset: activeAssets[this.assetIndex[i] % activeAssets.length],
           color: this.color[i], u: this.u[i],
@@ -1155,6 +1164,7 @@ export class ParticleSystem {
       const px = this.x[i];
       const py = this.y[i];
       const pscale = this.scale[i];
+      const pbaseScale = this.baseScale[i]; // #451 — pre-breath, for sort stability
       const protation = this.rotation[i];
       let palpha = this.alpha[i];
       if (i === this.n - 1 && frac > 0.001) {
@@ -1171,7 +1181,8 @@ export class ParticleSystem {
       for (let s = 0; s < bodyLen; s++) {
         const pt = sp[Math.min(s, sp.length - 1)];
         items.push({
-          x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), rotation: protation,
+          x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), baseScale: pbaseScale * (1 - s * 0.1),
+          rotation: protation,
           alpha: palpha * (1 - s * 0.08), asset, color: pcolor, u: pu,
           key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
           vx, vy,
@@ -1188,13 +1199,13 @@ export class ParticleSystem {
         const ladderId = MOTH_LADDERS[i % MOTH_LADDERS.length].id;
         items.push({
           x: px - pyh * reach, y: py + pxh * reach,
-          scale: pscale * 0.7, rotation: protation + amp * 18,
+          scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
           ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
-          scale: pscale * 0.7, rotation: protation - amp * 18,
+          scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
           ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
         });
@@ -1216,7 +1227,7 @@ export class ParticleSystem {
             const ladderId = MOTH_LADDERS[(i + k) % MOTH_LADDERS.length].id;
             items.push({
               x: px + Math.cos(a) * reach, y: py + Math.sin(a) * reach,
-              scale: pscale * 0.7,
+              scale: pscale * 0.7, baseScale: pbaseScale * 0.7,
               rotation: protation + (mirrored ? -amp * 18 : amp * 18),
               alpha: palpha, asset, color: pcolor, u: pu,
               key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
