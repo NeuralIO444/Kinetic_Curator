@@ -322,59 +322,74 @@ export function createLiveResolver() {
         // Spine F (#392): Live placement warp offset pass (loop-time nt).
         // Stills/renderFinal and slowRender pin nt to the seed slice, so golden
         // hashes remain deterministic while the live canvas breathes.
-        if (!input.slowRender && layoutParams.displacement > 0) {
-          // #432 — nt0 is a FIXED per-seed reference (no longer noiseSpeed-
-          // scaled: that let even the "pinned" baseline shift when speed
-          // changed). The live phase is accumulated incrementally below
-          // (integral of noiseSpeed over each frame's own dt) instead of
-          // speed × absolute session time — the old form meant any speed
-          // change (drift ticks it every 80ms, the slider, voice MIX)
-          // jumped the phase by an amount that grew the longer the tab
-          // stayed open, since the same small Δspeed multiplied an
-          // ever-larger elapsed-time term. Accumulating means a speed
-          // change only affects the phase's rate from that point on.
-          const nt0 = (seed & 0xffff) * 0.02;
+        if (layoutParams.displacement > 0) {
           const nowMs = input.loopTimeMs ?? 0;
           let wp = warpPhase.get(layer.id);
           if (!wp) { wp = { base: 0, lastMs: nowMs }; warpPhase.set(layer.id, wp); }
-          const dSec = Math.max(0, nowMs - wp.lastMs) * 0.001;
-          wp.base += dSec * (layoutParams.noiseSpeed ?? 0.5);
-          // #460 — high-water mark, not a raw assignment: a backward jump
-          // (a rejected/rolled-back frame, #421-style) must not walk
-          // lastMs down to match. Without this, the clamp above correctly
-          // refuses to rewind wp.base on THAT call, but lastMs still drops
-          // to the lower value -- so once the clock climbs back past the
-          // old high point, the next call's dSec is measured from the
-          // lower dropped-to point instead of from where real progress
-          // last actually happened, over-crediting elapsed time by the
-          // size of the dip. A sustained pause re-ticks buildFrame every
-          // frame with jittery clampedDtMs (liveLoop.mjs, [8,50]ms,
-          // tracks real wall-clock frame timing), so this repeats every
-          // tick the jitter dips below the high point -- a slow leak, not
-          // a one-time bounded error.
-          wp.lastMs = Math.max(wp.lastMs, nowMs);
-          const noiseFreq = layoutParams.noiseFreq ?? 0.005;
-          const displacement = layoutParams.displacement;
-          const domainOffsetX = (seedOffsets?.noise || 0) * 100;
-          const domainOffsetY = (seedOffsets?.noise || 0) * 100;
-          const isLayersMode = layoutParams.mode === 'layers';
+          if (input.slowRender) {
+            // #474 — a governor cut6/watchdog freeze is NOT a true pause:
+            // liveLoop.mjs only rolls loopTimeMs back for `paused` (!running);
+            // slowRender leaves it advancing in real wall-clock time while
+            // this whole block sits skipped. Left alone, wp.lastMs would
+            // still read the pre-freeze instant once the freeze lifts, so
+            // the resuming frame's dSec would lump-sum-credit the entire
+            // frozen span as warp progress in one jump. Pinning lastMs to
+            // "now" on every frozen frame keeps that next dSec small and
+            // ordinary — the same guarantee a true pause gets for free from
+            // its rollback, without spending the noise-sampling cost below
+            // on frames nothing is presenting anyway.
+            wp.lastMs = nowMs;
+          } else {
+            // #432 — nt0 is a FIXED per-seed reference (no longer noiseSpeed-
+            // scaled: that let even the "pinned" baseline shift when speed
+            // changed). The live phase is accumulated incrementally below
+            // (integral of noiseSpeed over each frame's own dt) instead of
+            // speed × absolute session time — the old form meant any speed
+            // change (drift ticks it every 80ms, the slider, voice MIX)
+            // jumped the phase by an amount that grew the longer the tab
+            // stayed open, since the same small Δspeed multiplied an
+            // ever-larger elapsed-time term. Accumulating means a speed
+            // change only affects the phase's rate from that point on.
+            const nt0 = (seed & 0xffff) * 0.02;
+            const dSec = Math.max(0, nowMs - wp.lastMs) * 0.001;
+            wp.base += dSec * (layoutParams.noiseSpeed ?? 0.5);
+            // #460 — high-water mark, not a raw assignment: a backward jump
+            // (a rejected/rolled-back frame, #421-style) must not walk
+            // lastMs down to match. Without this, the clamp above correctly
+            // refuses to rewind wp.base on THAT call, but lastMs still drops
+            // to the lower value -- so once the clock climbs back past the
+            // old high point, the next call's dSec is measured from the
+            // lower dropped-to point instead of from where real progress
+            // last actually happened, over-crediting elapsed time by the
+            // size of the dip. A sustained pause re-ticks buildFrame every
+            // frame with jittery clampedDtMs (liveLoop.mjs, [8,50]ms,
+            // tracks real wall-clock frame timing), so this repeats every
+            // tick the jitter dips below the high point -- a slow leak, not
+            // a one-time bounded error.
+            wp.lastMs = Math.max(wp.lastMs, nowMs);
+            const noiseFreq = layoutParams.noiseFreq ?? 0.005;
+            const displacement = layoutParams.displacement;
+            const domainOffsetX = (seedOffsets?.noise || 0) * 100;
+            const domainOffsetY = (seedOffsets?.noise || 0) * 100;
+            const isLayersMode = layoutParams.mode === 'layers';
 
-          items = items.map((it, k) => {
-            const band = isLayersMode ? ((it.index ?? k) % 5) : 0;
-            // bandMult is time-invariant, so scaling the already-accumulated
-            // phase by it is exactly the integral of (speed * bandMult) dt.
-            const bandMult = isLayersMode ? (0.4 + band * 0.25) : 1;
-            const ntLive = nt0 + wp.base * bandMult;
-            const curDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, ntLive, 3) * displacement;
-            const curDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, ntLive + 100, 3) * displacement;
-            const baseDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, nt0, 3) * displacement;
-            const baseDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, nt0 + 100, 3) * displacement;
-            return {
-              ...it,
-              x: it.x + (curDx - baseDx),
-              y: it.y + (curDy - baseDy),
-            };
-          });
+            items = items.map((it, k) => {
+              const band = isLayersMode ? ((it.index ?? k) % 5) : 0;
+              // bandMult is time-invariant, so scaling the already-accumulated
+              // phase by it is exactly the integral of (speed * bandMult) dt.
+              const bandMult = isLayersMode ? (0.4 + band * 0.25) : 1;
+              const ntLive = nt0 + wp.base * bandMult;
+              const curDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, ntLive, 3) * displacement;
+              const curDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, ntLive + 100, 3) * displacement;
+              const baseDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, nt0, 3) * displacement;
+              const baseDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, nt0 + 100, 3) * displacement;
+              return {
+                ...it,
+                x: it.x + (curDx - baseDx),
+                y: it.y + (curDy - baseDy),
+              };
+            });
+          }
         }
       }
       items = (items || []).filter((it) => it && it.assetId);
