@@ -143,9 +143,14 @@ export function LayerStack() {
                   <select className="tg blend-mode-select" value={patch.mode}
                     onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to: otherTarget(layer), strength: patch.strength })}>
                     <option value="off">OFF</option>
-                    <option value="mod">MOD</option>
-                    <option value="field">FIELD</option>
-                    <option value="feed">FEED</option>
+                    {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
+                        dither characters (▨▒▤), approximating the TE dot-matrix/LCD
+                        pixel-icon texture with plain Unicode text — no new asset
+                        pipeline, still the app's existing single-character convention
+                        (◆■◇▸◎⬇◈◉◐), just a chunkier sub-family for these three. */}
+                    <option value="mod">⊗ MOD</option>
+                    <option value="field">✦ FIELD</option>
+                    <option value="feed">↻ FEED</option>
                   </select>
                   <select className="tg blend-mode-select" value={to || ''} disabled={patch.mode === 'off'}
                     onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: e.target.value, strength: patch.strength })}>
