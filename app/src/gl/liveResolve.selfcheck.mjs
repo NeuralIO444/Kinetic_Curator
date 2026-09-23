@@ -527,3 +527,34 @@ test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, 
   );
   r.dispose();
 });
+
+test('#450: warpPhase persists across a layer being hidden and re-shown — no phase-reset snap', () => {
+  const seed = 999;
+  const speed = 1;
+  const layer = (visible) => ({ id: 'lyr-a', name: 'A', visible, layerBlendMode: 'normal', layerOpacity: 1 });
+  const mk = (visible, loopTimeMs) => baseInput({
+    seed, layers: [layer(visible)], layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs,
+  });
+
+  // Continuously visible: 0 -> 1000 -> 3000ms, no hide in between.
+  const rContinuous = createLiveResolver();
+  warp442Items(rContinuous.resolveLayers(mk(true, 0)));
+  warp442Items(rContinuous.resolveLayers(mk(true, 1000)));
+  const continuousAfter = warp442Items(rContinuous.resolveLayers(mk(true, 3000)));
+  rContinuous.dispose();
+
+  // Same total elapsed time, but hidden for the middle span: 0 (visible,
+  // establish) -> 1000 (visible) -> 2000 (HIDDEN -- no 'lyr-a' entry in
+  // `out` at all, prune() runs against a visible-only aliveIds that
+  // excludes it) -> 3000 (visible again). World time (loopTimeMs) keeps
+  // advancing throughout; only this one layer's visibility toggles.
+  const rHidden = createLiveResolver();
+  rHidden.resolveLayers(mk(true, 0));
+  rHidden.resolveLayers(mk(true, 1000));
+  rHidden.resolveLayers(mk(false, 2000));
+  const hiddenAfter = warp442Items(rHidden.resolveLayers(mk(true, 3000)));
+  rHidden.dispose();
+
+  assert.deepEqual(hiddenAfter, continuousAfter,
+    'hiding a layer and re-showing it later must land the warp exactly where it would be had the layer stayed visible throughout -- not reset to the phase-0 baseline');
+});

@@ -80,12 +80,20 @@ export function createLiveResolver() {
   // speed × absolute session time. See the warp block below for why.
   const warpPhase = new Map(); // layerId -> { base, lastMs }
 
-  function prune(aliveIds) {
+  function prune(aliveIds, documentIds) {
     for (const k of [...placementCaches.keys()]) if (!aliveIds.has(k)) placementCaches.delete(k);
     for (const k of [...swarmState.keys()]) if (!aliveIds.has(k)) swarmState.delete(k);
     for (const k of [...lastShown.keys()]) if (!aliveIds.has(k)) lastShown.delete(k);
     for (const k of [...morphState.keys()]) if (!aliveIds.has(k)) morphState.delete(k);
-    for (const k of [...warpPhase.keys()]) if (!aliveIds.has(k)) warpPhase.delete(k);
+    // #450 — warpPhase prunes against documentIds (every layer still in the
+    // document, hidden or not), not the visible-only aliveIds every other
+    // map here uses. World time keeps advancing while a layer is merely
+    // hidden; resetting its phase to 0 on re-show is discontinuous with
+    // where the shared noise field actually is by then — a one-frame
+    // visible snap in the displaced pixels. Only a genuinely REMOVED layer
+    // (gone from the document entirely, so absent from documentIds too)
+    // should free this entry.
+    for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
   }
 
   function cacheFor(layerId) {
@@ -192,6 +200,12 @@ export function createLiveResolver() {
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     const aliveIds = new Set();
+    // #450 — every layer id present in the document, regardless of
+    // visibility. See prune()'s warpPhase branch for why this differs
+    // from aliveIds (visible-only).
+    const documentIds = new Set(
+      (input.layers || []).filter((l) => l && typeof l === 'object' && typeof l.id === 'string').map((l) => l.id),
+    );
 
     // Spine F (#392): Single shared world noise owned by the resolver.
     const projectSeed = (input.seed ?? 0) >>> 0;
@@ -417,7 +431,7 @@ export function createLiveResolver() {
       e.items = shown;
     }
 
-    prune(aliveIds);
+    prune(aliveIds, documentIds);
     return out;
   }
 
