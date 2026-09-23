@@ -795,7 +795,12 @@ export class ParticleSystem {
         fax += o.fx / m;
         fay += o.fy / m;
       }
-      if (attractor && gravityWells > 0 && attractMul > 0) {
+      // #454 — defense in depth: the primary fix guards the attractor at
+      // its source (useCanvasViewport.js's zero-size-rect case), but a
+      // non-finite x/y here would otherwise divide dx/d to NaN below (the
+      // speed clamp further down can't bound NaN — every NaN comparison
+      // is false) and poison every particle's position permanently.
+      if (attractor && Number.isFinite(attractor.x) && Number.isFinite(attractor.y) && gravityWells > 0 && attractMul > 0) {
         const dx = attractor.x - pxi;
         const dy = attractor.y - pyi;
         const d = Math.sqrt(dx * dx + dy * dy);
