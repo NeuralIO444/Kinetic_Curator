@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
-import { EvolveControls } from './davis/EvolveControls.jsx';
-import { BeatRouter } from './davis/BeatRouter.jsx';
 import { MorphControls } from './davis/MorphControls.jsx';
 import { PhraseControls } from './davis/PhraseControls.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
@@ -21,10 +19,6 @@ const SUB_SEED_STREAMS = [
 export function DavisPanel() {
   const { state } = useApp(s => ({
     evolveMode: s.evolveMode,
-    evolveSource: s.evolveSource,
-    evolveTarget: s.evolveTarget,
-    evolveInterval: s.evolveInterval,
-    beatRoute: s.beatRoute,
     seed: s.seed,
     seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
@@ -42,7 +36,7 @@ export function DavisPanel() {
     audioBands: s.audioBands,
   }));
   const {
-    evolveMode, evolveSource, evolveTarget, evolveInterval, beatRoute,
+    evolveMode,
     seed, seedOffsets, layoutParams,
     phraseEnabled, phraseLength, phraseMode, phraseBeat,
     phraseClock, phraseBpm, morphEvolve, morphDurationMs, morphing, audioEnabled,
@@ -65,9 +59,6 @@ export function DavisPanel() {
   const metro = phraseClock === 'metro';
   const rms = audioBands?.rms || 0;
   const noAttack = phraseEnabled && !metro && audioEnabled && phraseBeat === 0 && rms > 0.2;
-  // Beat collision is live when both consumers are armed on the same attack:
-  // evolve on SOURCE=BEAT and the phrase on CLOCK=AUDIO.
-  const beatCollision = evolveMode && evolveSource === 'beat' && phraseEnabled && (phraseClock || 'audio') === 'audio';
   // Phase A gesture: local FREEZE toggle state (the hook resets on ACCUM
   // toggle, and this row unmounts with it, so the two stay in sync).
   const [accumFrozen, setAccumFrozen] = useState(false);
@@ -94,14 +85,6 @@ export function DavisPanel() {
         }
       />
       <div className="davis-body">
-          <EvolveControls
-            evolveTarget={evolveTarget}
-            evolveSource={evolveSource}
-            evolveInterval={evolveInterval}
-          />
-
-          {beatCollision && <BeatRouter beatRoute={beatRoute || 'both'} />}
-
           <MorphControls
             morphEvolve={morphEvolve}
             morphDurationMs={morphDurationMs}
