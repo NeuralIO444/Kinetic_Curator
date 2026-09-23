@@ -1,12 +1,16 @@
+// Layer stack — #248 Phase 3: BuildPanel's second section, extracted
+// verbatim from the old LayersPanel.jsx (layer rows, #341 ghost slots,
+// blend mode, opacity, PATCH row, FX effect editor). No logic changed —
+// same store selectors, same Events emissions.
 import { useState } from 'react';
-import { useApp } from '../state/AppContext.jsx';
-import { useStore } from '../state/store.js';
-import { PanelHeader } from '../components/PanelHeader.jsx';
-import { emit, Events } from '../composition/eventBus.js';
-import { BLEND_MODES } from '../data/layout-modes.js';
-import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../fx/fxFilters.js';
-import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../state/slices/layersSlice.js';
-import { helpText } from '../data/helpCopy.js';
+import { useApp } from '../../state/AppContext.jsx';
+import { useStore } from '../../state/store.js';
+import { PanelHeader } from '../../components/PanelHeader.jsx';
+import { emit, Events } from '../../composition/eventBus.js';
+import { BLEND_MODES } from '../../data/layout-modes.js';
+import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../../fx/fxFilters.js';
+import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
+import { helpText } from '../../data/helpCopy.js';
 
 function FxEffectEditor({ layer }) {
   const [addKind, setAddKind] = useState(FX_MENU_KINDS[0]);
@@ -46,7 +50,7 @@ function FxEffectEditor({ layer }) {
   );
 }
 
-export function LayersPanel() {
+export function LayerStack() {
   const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId }));
   const { layers, activeLayerId, selectedFxLayerId } = state;
   const setLayerPatch = useStore((s) => s.setLayerPatch);
@@ -75,12 +79,12 @@ export function LayersPanel() {
   }
 
   return (
-    <div className="panel panel-layers">
+    <div className="build-layer-stack">
       <PanelHeader tag="P08" title="LAYERS" subtitle={`${contentCount} / ${MAX_CONTENT_TRACKS} tracks`}>
         <button className="chip-btn" disabled={contentCount >= MAX_CONTENT_TRACKS} onClick={() => emit(Events.LAYER_ADD)}>+ ADD LAYER</button>
         <button className="chip-btn" disabled={fxCount >= MAX_FX_TRACKS} onClick={() => emit(Events.LAYER_ADD_FX)}>+ ADD FX</button>
       </PanelHeader>
-      <div className="panel-body layer-list">
+      <div className="layer-list">
         {fxGhosts.slice().reverse().map((n) => (
           <div key={`ghost-fx-${n}`} className="layer-row" style={{ opacity: 0.35 }} onClick={() => emit(Events.LAYER_ADD_FX)}>
             <div className="layer-row-main"><button className="layer-name" type="button">FX {n}</button></div>
