@@ -382,9 +382,21 @@ export function createLiveResolver() {
       // the pixel crossfade (mode/behave/palette/asset-set), scoped per
       // layer. Deliberately excludes seed — a SHUFFLE re-roll has never
       // dissolved, chip clicks are the only trigger.
+      //
+      // #455 — also deliberately excludes paletteOverrides. During an auto
+      // voice/preset MIX, resolveLiveRenderState() (voices.js) lerps bg/ink/
+      // swatches at full per-frame precision for Spine D's live GPU tint, so
+      // paletteOverrides differs on essentially every frame for the whole
+      // MIX duration. Including it here meant morphState.set() re-fired
+      // every frame: planMorph replanned O(n^2) per frame, and startMs
+      // reset each time so raw stayed ~0 and items presented the from-pose
+      // for the entire MIX, landing all at once when it finally stopped
+      // changing. paletteId alone still catches a genuine discrete palette
+      // change; the continuously-lerped override values were never meant to
+      // be a transition trigger in their own right — that's what the live
+      // tint shader already animates smoothly, independent of item-morph.
       const morphSig = [
         layoutParams.mode, layoutParams.behave, src.paletteId,
-        JSON.stringify(src.paletteOverrides || null),
         Object.keys(src.enabledAssets || {}).filter((k) => src.enabledAssets[k]).sort().join(','),
       ].join('|');
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
