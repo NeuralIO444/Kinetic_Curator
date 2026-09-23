@@ -12,7 +12,7 @@ export const HELP_TOPICS = [
   { id: 'davis-evolve', group: 'Play', title: 'EVOLVE', text: 'Re-roll the picture. TIME fires on INTERVAL; BEAT fires on a mic attack.' },
   { id: 'davis-favorite', group: 'Ghost Station', title: 'FAVORITE', text: 'Save the current seed as a hit (F).' },
   { id: 'davis-new-seed', group: 'Ghost Station', title: 'NEW SEED', text: 'Jump to a fresh random seed (N).' },
-  { id: 'davis-morph', group: 'Ghost Station', title: 'MORPH EVOLVE', text: 'Ease layout changes over DURATION instead of hard-jumping. Seed and palette still snap.' },
+  { id: 'davis-morph', group: 'Play', title: 'MORPH EVOLVE', text: 'Ease layout changes over DURATION instead of hard-jumping. Seed and palette still snap.' },
   { id: 'layout-randomize', group: 'Build', title: 'CURATOR', text: 'Re-roll every unlocked param and keep the taste model\'s pick. Until the MLX curator is trained, it\'s an honest dice roll — the bar says so.' },
   { id: 'layout-mode', group: 'Build', title: 'MODE', text: 'How placements are arranged. Cellular enables the Ghost Station CA wrap mode.' },
   { id: 'layout-blend', group: 'Build', title: 'BLEND', text: 'How shapes mix where they overlap.' },
