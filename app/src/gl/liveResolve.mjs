@@ -14,7 +14,7 @@ import { applyField, applyMod, motionMetrics } from '../engine/kernel/tracks/tra
 
 import { createNoise } from '../engine/noise.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
-import { mixEase } from './paletteMix.mjs';
+import { morphEase } from './paletteMix.mjs';
 
 const HOP_MAX_PX = 4;
 
@@ -410,7 +410,7 @@ export function createLiveResolver() {
         if (raw >= 1) {
           morphState.delete(e.id);
         } else {
-          shown = blendItems(tr.fromItems, e.items, mixEase(Math.max(0, raw)), tr.plan);
+          shown = blendItems(tr.fromItems, e.items, morphEase(Math.max(0, raw)), tr.plan);
         }
       }
       lastShown.set(e.id, { sig: e.morphSig, items: shown });

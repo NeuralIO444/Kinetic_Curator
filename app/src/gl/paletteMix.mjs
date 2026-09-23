@@ -38,6 +38,28 @@ export function mixEase(t) {
   return x * x * x * (x * (x * 6 - 15) + 10);
 }
 
+// Normalization so expoOut hits EXACTLY 1 at raw=1: (1 - 2^-10)/(1 - 2^-10)
+// cancels to 1 — without it f(1) = 1023/1024 and the landing frame would
+// carry a 0.1 % residue. Endpoints are also special-cased below.
+const EXPO_OUT_K = 1024 / 1023;
+
+/**
+ * #465 — expoOut for the ITEM MORPH (chip clicks): snappy arrival. The
+ * bulk of the travel happens early and the tail converges exponentially,
+ * so the final frames are already sub-pixel (at raw=0.9 the residual is
+ * ~0.1 % of travel, vs smootherstep's ~0.8 % — no stop-then-pop read).
+ * Input clamped; output monotone inside [0,1], f(0)=0 and f(1)=1 EXACT
+ * (TRANSITIONS invariant I1 — no overshoot, no residue). The palette
+ * DISSOLVE keeps mixEase/smootherstep: a crossfade wants the symmetric
+ * in-out, a morph wants arrival.
+ */
+export function morphEase(t) {
+  const x = Math.min(1, Math.max(0, t));
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  return (1 - Math.pow(2, -10 * x)) * EXPO_OUT_K;
+}
+
 /**
  * Create the crossfade state machine.
  *
