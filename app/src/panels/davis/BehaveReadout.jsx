@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
-import { resolveBehave, resolveWindMode } from '../../engine/organisms/behave.js';
+import { resolveEffectiveBehave, resolveWindMode, BEHAVE_OVERRIDE_FIELDS } from '../../engine/organisms/behave.js';
 import { isOrganismMode } from '../../data/layout-modes.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
-// #479 — Option A: a read-only readout of the steering weights actually
-// driving motion right now. Clicking a BEHAVE chip visibly changes the
-// animation, but nothing showed the values behind it — this is the
-// diagnosis ask verbatim, zero feel risk, no persistence/edit questions.
+// #479 — Option A shipped a read-only readout; this is Option B, per Matt's
+// Night Migration sign-off (2026-09-23) unfreezing Stage 1: the same block
+// becomes a real per-layer editor. Every field an operator hasn't touched
+// still shows (and drives motion with) the table row — editing one sets a
+// `layoutParams.behaveX` override (null = no override), which round-trips
+// through the project doc the same as every other layoutParams field, no
+// separate persistence path needed.
 const FIELDS = [
   ['sep', 'SEP'], ['ali', 'ALI'], ['coh', 'COH'],
   ['sepR', 'SEP R'], ['aliR', 'ALI R'], ['cohR', 'COH R'],
   ['wind', 'WIND'], ['attract', 'ATTRACT'],
 ];
+const overrideKey = (key) => `behave${key[0].toUpperCase()}${key.slice(1)}`;
 
 // The BEHAVE chip lives in BUILD's ParamBlock, this readout lives in DAVIS —
 // different tabs, so DavisPanel (and this component) unmounts and remounts
@@ -23,7 +28,7 @@ let lastKnown = null; // { behave, profile, windMode }
 export function BehaveReadout({ layoutParams }) {
   const behave = layoutParams.behave || 'cruise';
   const organism = isOrganismMode(layoutParams.mode);
-  const profile = resolveBehave(behave);
+  const profile = resolveEffectiveBehave(layoutParams);
   // #479 — the one hidden non-table change: FLOCK/MOLD also flip wind
   // point -> curl, invisible anywhere in the UI until now.
   const windMode = resolveWindMode(layoutParams);
@@ -66,6 +71,12 @@ export function BehaveReadout({ layoutParams }) {
 
   if (!organism) return null;
 
+  const hasAnyOverride = BEHAVE_OVERRIDE_FIELDS.some((key) => layoutParams[overrideKey(key)] != null);
+  const setOverride = (key, value) => emit(Events.LAYOUT_PARAM, { key: overrideKey(key), value });
+  const resetAll = () => {
+    for (const key of BEHAVE_OVERRIDE_FIELDS) emit(Events.LAYOUT_PARAM, { key: overrideKey(key), value: null });
+  };
+
   // No JS timer clears the flash: the CSS animation plays once and holds
   // its end state (animation-fill-mode: forwards in panels.css), so the
   // color settles back to normal on its own. `key` includes the generation
@@ -73,21 +84,38 @@ export function BehaveReadout({ layoutParams }) {
   // fresh DOM node and the animation restarts from 0%, rather than being a
   // no-op because the 'flash' class was already present from last time.
   const fieldKey = (key) => (flash?.fields.has(key) ? `${key}-flash-${flash.gen}` : key);
-  const fieldClass = (key) => `behave-field${flash?.fields.has(key) ? ' flash' : ''}`;
+  const fieldClass = (key, overridden) =>
+    `behave-field${flash?.fields.has(key) ? ' flash' : ''}${overridden ? ' overridden' : ''}`;
 
   return (
     <div className="davis-source-row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}
-      title="Read-only: the resolved BEHAVE steering profile actually driving motion right now">
+      title="The resolved BEHAVE steering profile actually driving motion — edit a field to override this layer's table row; RESET clears every override back to the chip's default.">
       <span className="davis-label">PROFILE</span>
       <div className="behave-readout">
-        {FIELDS.map(([key, label]) => (
-          <span key={fieldKey(key)} className={fieldClass(key)}>
-            {label} <b>{Number(profile[key] ?? 0).toFixed(2)}</b>
-          </span>
-        ))}
-        <span key={fieldKey('wind-mode')} className={fieldClass('wind-mode')}>
+        {FIELDS.map(([key, label]) => {
+          const overridden = layoutParams[overrideKey(key)] != null;
+          return (
+            <label key={fieldKey(key)} className={fieldClass(key, overridden)}
+              title={overridden ? `${label}: edited for this layer, overriding the ${behave} table row` : `${label}: at the ${behave} table row's default`}>
+              {label}{' '}
+              <input
+                type="number" step="0.01"
+                className="behave-field-input"
+                value={Number(profile[key] ?? 0).toFixed(2)}
+                onChange={(e) => setOverride(key, e.target.value === '' ? null : Number(e.target.value))}
+              />
+            </label>
+          );
+        })}
+        <span key={fieldKey('wind-mode')} className={fieldClass('wind-mode', false)}>
           WIND KERNEL <b>{windMode.toUpperCase()}</b>
         </span>
+        {hasAnyOverride && (
+          <button type="button" className="micro-btn" onClick={resetAll}
+            title="Clear every BEHAVE override on this layer — back to the chip's table row">
+            RESET
+          </button>
+        )}
       </div>
     </div>
   );
