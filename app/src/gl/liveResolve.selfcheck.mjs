@@ -540,19 +540,19 @@ test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, 
   const at500 = warp442Items(r.resolveLayers(mk(500)));
   assert.deepEqual(at500, at1000, 'a backward loopTimeMs must not rewind the warp phase');
 
-  // Resume forward past the pre-rollback high point (1000). The resolver
-  // has no way to recover true wall-clock elapsed time across a rollback
-  // -- loopTimeMs is its only clock -- so its own dSec = max(0, nowMs -
-  // wp.lastMs) formula necessarily measures elapsed time from wherever
-  // loopTimeMs last WAS (500, set by the read above), not from the
-  // pre-rollback high point (1000). This is the resolver's actual,
-  // verified behavior, not an idealized "straight path" -- asserting
-  // against the resolver's own recurrence exactly is what makes this a
-  // precise regression guard rather than a guess.
+  // Resume forward past the pre-rollback high point (1000). #460 made
+  // wp.lastMs a high-water mark (Math.max(wp.lastMs, nowMs)), not a raw
+  // assignment: the 500 reading above did NOT walk lastMs down to 500,
+  // it stayed at 1000. So resuming at 1000+DELTA measures elapsed time
+  // from the true high point (1000), not from the rollback's dip (500) --
+  // DELTA seconds of real progress, not DELTA + the 500ms dip credited
+  // twice. (Before #460, this resolved from 500, over-crediting the dip
+  // as if it were genuine elapsed time -- see #460 for why that leaks
+  // during a sustained pause specifically.)
   const DELTA = 300;
   const after = warp442Items(r.resolveLayers(mk(1000 + DELTA)));
   const nt0 = (seed & 0xffff) * 0.02;
-  const expectedBase = 1 * speed + ((1000 + DELTA - 500) / 1000) * speed;
+  const expectedBase = 1 * speed + (DELTA / 1000) * speed;
   assertWarpMatches(
     staticPos, after,
     { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },

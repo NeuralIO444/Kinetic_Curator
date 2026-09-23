@@ -325,7 +325,20 @@ export function createLiveResolver() {
           if (!wp) { wp = { base: 0, lastMs: nowMs }; warpPhase.set(layer.id, wp); }
           const dSec = Math.max(0, nowMs - wp.lastMs) * 0.001;
           wp.base += dSec * (layoutParams.noiseSpeed ?? 0.5);
-          wp.lastMs = nowMs;
+          // #460 — high-water mark, not a raw assignment: a backward jump
+          // (a rejected/rolled-back frame, #421-style) must not walk
+          // lastMs down to match. Without this, the clamp above correctly
+          // refuses to rewind wp.base on THAT call, but lastMs still drops
+          // to the lower value -- so once the clock climbs back past the
+          // old high point, the next call's dSec is measured from the
+          // lower dropped-to point instead of from where real progress
+          // last actually happened, over-crediting elapsed time by the
+          // size of the dip. A sustained pause re-ticks buildFrame every
+          // frame with jittery clampedDtMs (liveLoop.mjs, [8,50]ms,
+          // tracks real wall-clock frame timing), so this repeats every
+          // tick the jitter dips below the high point -- a slow leak, not
+          // a one-time bounded error.
+          wp.lastMs = Math.max(wp.lastMs, nowMs);
           const noiseFreq = layoutParams.noiseFreq ?? 0.005;
           const displacement = layoutParams.displacement;
           const domainOffsetX = (seedOffsets?.noise || 0) * 100;
