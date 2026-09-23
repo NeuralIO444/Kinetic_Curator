@@ -16,6 +16,17 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 export const MAX_LAYERS = 16;
 
 /**
+ * #456 — mirrors `slices/layersSlice.js`'s `MAX_CONTENT_TRACKS`. Not imported
+ * from there: layersSlice → globalSlice → this module is an existing cycle
+ * this file's own header comment calls out, so the value is duplicated
+ * rather than imported. The UI enforces the cap at creation time only; a
+ * hand-edited or legacy document can still carry more content tracks than
+ * the cap allows, which would otherwise silently violate the tape-budget/
+ * governor contract that assumes it holds.
+ */
+export const MAX_CONTENT_TRACKS = 4;
+
+/**
  * #269 — cap hostile CA grids from project snapshots. Real grids are 40×28
  * (davisSlice); a 1000×1000 grid otherwise survives parsing, bloating every
  * undo snapshot (~2 MB each) and stalling first render on the blur cache in
@@ -113,12 +124,20 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   // layer per frame, so a 200-layer document is a perf cliff, not a project.
   const layers = [];
   const seen = new Set();
+  let contentCount = 0;
   for (const l of rawLayers) {
     if (layers.length >= MAX_LAYERS) break;
     if (!l || typeof l !== 'object' || typeof l.id !== 'string') continue;
     if (seen.has(l.id)) continue; // duplicate IDs collide in React keys and the snapshot map
-    seen.add(l.id);
     const type = l.type === 'fx' ? 'fx' : 'content';
+    // #456 — the 4-content-track cap is a creation-time UI check only; a
+    // document can still carry more. Skip the overflow rather than truncate
+    // by raw array position, same "degrade, don't crash" posture as MAX_LAYERS.
+    if (type === 'content') {
+      if (contentCount >= MAX_CONTENT_TRACKS) continue;
+      contentCount++;
+    }
+    seen.add(l.id);
     const layer = {
       id: l.id,
       name: typeof l.name === 'string' ? l.name : 'Layer',
@@ -127,13 +146,34 @@ export function normalizeLayers(rawLayers, rawActiveId) {
       layerBlendMode: typeof l.layerBlendMode === 'string' ? l.layerBlendMode : 'normal',
       layerOpacity: Number.isFinite(l.layerOpacity) ? Math.min(1, Math.max(0, l.layerOpacity)) : 1,
     };
-    if (type === 'fx') layer.effects = sanitizeFxEffects(l.effects);
+    if (type === 'fx') {
+      layer.effects = sanitizeFxEffects(l.effects);
+    } else {
+      // #456 — patches were dropped entirely on load (never copied from the
+      // raw doc into the normalized layer). `to` is a stable layer id
+      // (#457) that must be validated once every surviving layer's id is
+      // known, so that pass runs below after this loop finishes.
+      const mode = ['off', 'mod', 'field', 'feed'].includes(l.patch?.mode) ? l.patch.mode : 'off';
+      const strength = Number.isFinite(l.patch?.strength) ? Math.min(1, Math.max(0, l.patch.strength)) : 0.16;
+      const to = typeof l.patch?.to === 'string' ? l.patch.to : null;
+      layer.patch = { mode, to, strength };
+    }
     layers.push(layer);
   }
   if (layers.length === 0) return { layers: null, activeLayerId: null };
   // FX layers are never the content-active layer; a document with no content
   // layer at all is degenerate — treat it as invalid like an empty list.
   if (!layers.some((l) => l.type === 'content')) return { layers: null, activeLayerId: null };
+  // #456 — a patch target that no longer exists (dropped by the cap above,
+  // a stale/self id, or an id pointing at an FX layer) goes inert (`to:
+  // null`) rather than pointing at nothing; `liveResolve.mjs` already no-ops
+  // on a missing target, so this doesn't need to also force `mode: 'off'`.
+  for (const l of layers) {
+    if (l.type !== 'content' || !l.patch || l.patch.to === null) continue;
+    const validTarget = l.patch.to !== l.id
+      && layers.some((o) => o.id === l.patch.to && o.type === 'content');
+    if (!validTarget) l.patch = { ...l.patch, to: null };
+  }
   let activeLayerId = typeof rawActiveId === 'string' ? rawActiveId : null;
   const active = layers.find((l) => l.id === activeLayerId);
   if (!active || active.type === 'fx') {
