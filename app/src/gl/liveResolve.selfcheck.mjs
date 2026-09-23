@@ -411,6 +411,34 @@ test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   r.dispose();
 });
 
+test('#471: a seed change alone now glides through item-morph, not a hard snap', () => {
+  // Mirrors the #419 test exactly, substituting seed for mode as the
+  // changing field — EVOLVE's seed target used to write a new seed
+  // directly with no morph anywhere (the one pure-snap path); folding
+  // seed into morphSig routes it through the same blendItems/morphEase
+  // glide every other chip-triggered field already gets.
+  const r = createLiveResolver();
+  const mk = (seed, loopTimeMs) => baseInput({
+    seed,
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 24, lifeDrift: 0 },
+    mixSeconds: 0.5,
+    loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  const before = lyr(r.resolveLayers(mk(1111, 0)));       // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk(2222, 1000)));     // seed change (EVOLVE-style): plan built, t=0
+  const mid = lyr(r.resolveLayers(mk(2222, 1250)));       // t=0.5, plan in use
+  const done = lyr(r.resolveLayers(mk(2222, 1600)));      // past mixSeconds: landed
+  const raw = lyr(createLiveResolver().resolveLayers(mk(2222, 1600)));
+
+  assert.deepEqual(start, before, 'first frame after a seed change still presents the old placement');
+  assert.notDeepEqual(mid, raw, 'mid-transition presents a blend, not the raw new-seed placement');
+  assert.ok(mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
+    'planned blend produces finite positions every frame');
+  assert.deepEqual(done, raw, 'completed morph presents the raw resolved items at the new seed');
+  r.dispose();
+});
+
 test('#451: overlap:false sorts by pre-breath baseScale — draw order does not flip on every breath crossing', () => {
   const r = createLiveResolver();
   const mk = (loopTimeMs) => baseInput({

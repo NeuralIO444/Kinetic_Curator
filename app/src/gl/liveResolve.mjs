@@ -420,8 +420,18 @@ export function createLiveResolver() {
       // change; the continuously-lerped override values were never meant to
       // be a transition trigger in their own right — that's what the live
       // tint shader already animates smoothly, independent of item-morph.
+      // #471 — seed rides the sig too, per Matt's mechanism-A pick: EVOLVE's
+      // seed target used to write `seed + 1` directly with no morph
+      // anywhere (buildPlacements/liveResolve recompute on the spot, every
+      // item's position AND asset-cell assignment re-rolling in one
+      // frame). Folding seed into morphSig routes every seed change
+      // through the same blendItems/morphEase glide the mode/behave/
+      // palette/asset-set fields already get — one canonical transition
+      // path instead of seed being the one pure-snap field. This also
+      // means a manual seed edit or +1 now eases the same way; that's the
+      // mechanism's own named tradeoff, not an oversight.
       const morphSig = [
-        layoutParams.mode, layoutParams.behave, src.paletteId,
+        layoutParams.mode, layoutParams.behave, src.paletteId, seed,
         Object.keys(src.enabledAssets || {}).filter((k) => src.enabledAssets[k]).sort().join(','),
       ].join('|');
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
