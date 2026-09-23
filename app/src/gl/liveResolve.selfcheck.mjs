@@ -244,6 +244,22 @@ test('#343: MOD is a no-op when strength is 0', () => {
   }
 });
 
+// #509 phase 1 — MOD steering carries to the next tick through the
+// transient map (record this tick, applied in the following update spread).
+// Plumbing proof only: the steering effect itself is pinned in
+// particles.selfcheck (identity byte-identical, active bends).
+test('#509: MOD steering record/apply loop runs without breaking the pipeline', () => {
+  const r = createLiveResolver();
+  const t1 = r.resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 1 }));
+  const t2 = r.resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 1 }));
+  const b1 = t1.find((l) => l.id === 'lyr-b');
+  const b2 = t2.find((l) => l.id === 'lyr-b');
+  assert.strictEqual(b2.items.length, b1.items.length, 'steering never adds/removes items');
+  for (const it of b2.items) {
+    assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'steered tick stays finite');
+  }
+});
+
 // ── #425: focus swaps are a total non-event ────────────────────────────────
 // Two layers with deliberately different bases, depths and locks. setActiveLayer
 // guarantees snapshot == top-level for BOTH layers at the swap boundary, so if

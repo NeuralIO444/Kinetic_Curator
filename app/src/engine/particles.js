@@ -724,9 +724,18 @@ export class ParticleSystem {
     const sepRadius = organism ? profile.sepR : 35;
     const aliRadius = organism ? profile.aliR : 60;
     const cohRadius = organism ? profile.cohR : 70;
-    const sepW = organism ? profile.sep : 1.8;
-    const aliW = organism ? profile.ali : 1.0;
-    const cohW = organism ? profile.coh : swarmCohesion;
+    // #509 phase 1 — MOD steering: transient per-layer multipliers from a
+    // MOD patch (see modSteerByLayer in liveResolve.mjs). Identity by
+    // default; folded into whichever weight source is live (table or
+    // slider) so drives-hunger below still composes. Never serialized
+    // (layoutParams spread only — the store never sees modSteer).
+    const steer = layoutParams.modSteer || null;
+    const steerAli = steer && Number.isFinite(Number(steer.ali)) ? Number(steer.ali) : 1;
+    const steerCoh = steer && Number.isFinite(Number(steer.coh)) ? Number(steer.coh) : 1;
+    const steerSep = steer && Number.isFinite(Number(steer.sep)) ? Number(steer.sep) : 1;
+    const sepW = (organism ? profile.sep : 1.8) * steerSep;
+    const aliW = (organism ? profile.ali : 1.0) * steerAli;
+    const cohW = (organism ? profile.coh : swarmCohesion) * steerCoh;
     const attractMul = organism ? profile.attract : 1;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
