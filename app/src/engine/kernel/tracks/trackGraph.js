@@ -138,6 +138,23 @@ export function applyMod(knobs, metrics, patch) {
   k.glow = clamp01(glow0 + m.agitation * amt * 0.25);
   k.fade = clamp01(fade0 + m.speed * amt * 0.15);
   k.displace = Math.max(0, dis0 + m.agitation * amt * 8);
+  // #509 phase 1 — MOD steering: the source's motion retunes the target's
+  // steering weights. Multipliers (identity at rest) so strength 0 or a
+  // still source is exactly neutral; clamped [0,3] so a hot source bends
+  // the flock without inverting or exploding it. The motion gate ramps
+  // 0→1 across the still boundary (0.05 px/tick, same as the diagnostic's
+  // isSourceStill) so density — presence, not motion — can never bend a
+  // target off a motionless source.
+  const motionGate = Math.min(1, (m.speed + m.agitation) / 0.05);
+  const samt = amt * motionGate;
+  const steer = (base, drive) => {
+    const b = Number.isFinite(Number(base)) ? Number(base) : 1;
+    const v = b * (1 + drive * samt * 0.5);
+    return Number.isFinite(v) ? Math.max(0, Math.min(3, v)) : 1;
+  };
+  k.ali = steer(k.ali, m.agitation);
+  k.coh = steer(k.coh, m.speed);
+  k.sep = steer(k.sep, m.density);
   return k;
 }
 

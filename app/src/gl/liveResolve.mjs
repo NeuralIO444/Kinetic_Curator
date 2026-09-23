@@ -75,6 +75,11 @@ export function createLiveResolver() {
   // nearest-same-asset, not a true cross-generator match.
   const lastShown = new Map(); // layerId -> { sig, items }
   const morphState = new Map(); // layerId -> { fromItems, startMs, dur }
+  // #509 phase 1 — MOD steering: transient per-target multipliers computed
+  // in this tick's MOD block, applied at the NEXT tick's update spread
+  // (16ms lag, same order as FEED's delay-1). Module state, never the
+  // store — steering is render-only overlay, not document state.
+  const modSteerByLayer = new Map(); // layerId -> { ali, coh, sep }
   // #432 — per-layer displacement warp phase, accumulated incrementally
   // (integral of noiseSpeed over each frame's dt) rather than derived as
   // speed × absolute session time. See the warp block below for why.
@@ -106,6 +111,7 @@ export function createLiveResolver() {
     for (const k of [...swarmState.keys()]) if (!aliveIds.has(k)) swarmState.delete(k);
     for (const k of [...lastShown.keys()]) if (!aliveIds.has(k)) lastShown.delete(k);
     for (const k of [...morphState.keys()]) if (!aliveIds.has(k)) morphState.delete(k);
+    for (const k of [...modSteerByLayer.keys()]) if (!aliveIds.has(k)) modSteerByLayer.delete(k);
     // #450 — warpPhase prunes against documentIds (every layer still in the
     // document, hidden or not), not the visible-only aliveIds every other
     // map here uses. World time keeps advancing while a layer is merely
@@ -185,6 +191,9 @@ export function createLiveResolver() {
           motionSmoothing: ctx.motionSmoothing,
           noise: ctx.noise,
           noiseDomainOffset: ctx.noiseDomainOffset,
+          // #509 phase 1 — last tick's MOD steering for this layer (undefined
+          // = identity; particles.js defaults). Spread-only, never stored.
+          modSteer: modSteerByLayer.get(layerId),
         },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
@@ -450,6 +459,13 @@ export function createLiveResolver() {
     };
     content.forEach((e) => {
       const patch = e.layer?.patch;
+      // #509 phase 1 — steering only lives while a MOD patch points at a
+      // live target: anything else (off/field/feed/unpointed) clears it so
+      // no stale bend survives a mode change or hide.
+      if (!patch || !patch.to || patch.mode !== 'mod') {
+        modSteerByLayer.delete(e.id);
+        if (!patch || !patch.to) return;
+      }
       if (!patch || !patch.to) return;
       // #457 — patch.to is a stable layer id (layersSlice.js validates
       // it); resolve the source by id against THIS frame's content list,
@@ -471,6 +487,10 @@ export function createLiveResolver() {
         const metrics = motionMetrics((src?.items || []).map(toNormVel));
         const knobs = applyMod({ glow: 0, fade: 0, displace: 0 }, metrics,
           { mode: 'mod', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) });
+        // #509 phase 1 — steer the NEXT tick (see modSteerByLayer): the
+        // force pass already ran this tick, so these multipliers land in the
+        // following update spread — one frame of lag, same as FEED's delay.
+        modSteerByLayer.set(e.id, { ali: knobs.ali, coh: knobs.coh, sep: knobs.sep });
         e.items = (e.items || []).map((it) => ({
           ...it,
           scale: (Number(it.scale) || 1) * (1 + knobs.glow * 0.35),

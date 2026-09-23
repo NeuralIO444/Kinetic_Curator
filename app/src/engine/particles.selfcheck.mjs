@@ -147,6 +147,32 @@ for (const [name, args] of CASES) {
   assert.ok(Array.from(sys.phase.subarray(0, sys.n)).every((p) => p === 0), 'resetPhase must clear');
 }
 
+// #509 phase 1 — MOD steering: identity is byte-identical, active bends.
+// modSteer rides the update spread (like the live resolver sends it), never
+// normalized state — attached post-normalize, mirroring liveResolve.
+{
+  const run = (steer, steps = 30) => {
+    const sys = new ParticleSystem();
+    const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 60 });
+    if (steer) lp.modSteer = steer;
+    sys.init(60, 1000, 700, assets, palette, 0x1a4f);
+    for (let s = 0; s < steps; s++) sys.update(lp, assets, palette, 0x1a4f, 1_000_000 + s * 16, null);
+    return sys.getItems(assets);
+  };
+  const base = run(null);
+  const ident = run({ ali: 1, coh: 1, sep: 1 });
+  assert.strictEqual(ident.length, base.length, 'steer identity keeps item count');
+  for (let i = 0; i < base.length; i++) {
+    assert.ok(Object.is(ident[i].x, base[i].x) && Object.is(ident[i].y, base[i].y),
+      `identity steer must be byte-identical (item ${i})`);
+  }
+  const bent = run({ ali: 2, coh: 2, sep: 0.5 });
+  assert.strictEqual(bent.length, base.length, 'active steer keeps item count');
+  assert.ok(bent.some((it, i) => !Object.is(it.x, base[i].x) || !Object.is(it.y, base[i].y)),
+    'active steering must move particles off the unsteered path');
+  for (const it of bent) assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'steered positions stay finite');
+}
+
 // #454 — a non-finite attractor (a zero-size canvas rect divides to
 // Infinity upstream in useCanvasViewport.js) must not poison the swarm.
 // dx/d = Infinity/Infinity = NaN in the attraction force, and the speed
