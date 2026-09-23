@@ -6,6 +6,7 @@ import { BuildPanel } from '../panels/BuildPanel.jsx';
 import { AssetPoolPanel } from '../panels/AssetPoolPanel.jsx';
 import { StimulusPanel } from '../panels/StimulusPanel.jsx';
 import { DavisPanel } from '../panels/DavisPanel.jsx';
+import { PlayPanel } from '../panels/PlayPanel.jsx';
 import { OutputPanel } from '../panels/OutputPanel.jsx';
 
 // Shader Lab (#193) is dev-only: lazy chunk, never registered in prod builds.
@@ -31,6 +32,10 @@ export const PANEL_REGISTRY = [
   { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'drawer' },
   { id: 'stimulus', title: 'STIMULI',  icon: '▸', component: StimulusPanel,  zone: 'secondary' },
   { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },
+  // #248 Phase 4: PLAY is new, registered alongside davis/stimulus while
+  // they still hold content — expected mid-migration tab-count bulge
+  // (PANEL_CONSOLIDATION_PLAN.md §2.8), not a violation of the 4-tab cap.
+  { id: 'play',     title: 'PLAY',     icon: '◎', component: PlayPanel,     zone: 'secondary' },
   { id: 'output',   title: 'OUTPUT',   icon: '⬇', component: OutputPanel,    zone: 'secondary' },
 ];
 
