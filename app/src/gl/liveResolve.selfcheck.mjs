@@ -561,6 +561,39 @@ test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, 
   r.dispose();
 });
 
+test('#474: warpPhase does not lump-sum-credit a slowRender freeze once it lifts', () => {
+  const seed = 5151;
+  const r = createLiveResolver();
+  const speed = 1;
+  const mk = (loopTimeMs, slowRender) => baseInput({
+    seed, layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs, slowRender: !!slowRender,
+  });
+
+  const staticPos = warp442Items(r.resolveLayers(mk(0)));  // wp.base = 0 -> static ref
+  warp442Items(r.resolveLayers(mk(1000)));                 // 1s elapsed, wp.base = 1 * speed
+
+  // A long governor cut6/watchdog freeze: liveLoop.mjs only rolls
+  // loopTimeMs back for a true pause (!running); slowRender leaves it
+  // advancing in real wall-clock time while this whole warp block sits
+  // skipped for as long as the freeze lasts.
+  warp442Items(r.resolveLayers(mk(61_000, true))); // 60s "frozen"
+
+  // The freeze lifts. Pre-fix, dSec = (61000+DELTA - 1000) * 0.001 would
+  // credit the entire 60s freeze as warp progress in one jump on this
+  // frame. Post-fix, only the small DELTA since the freeze lifted counts —
+  // identical in shape to the #442 backward-loopTimeMs resume case.
+  const DELTA = 300;
+  const after = warp442Items(r.resolveLayers(mk(61_000 + DELTA, false)));
+  const nt0 = (seed & 0xffff) * 0.02;
+  const expectedBase = 1 * speed + (DELTA / 1000) * speed;
+  assertWarpMatches(
+    staticPos, after,
+    { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
+    'resuming after a slowRender freeze must not credit the frozen span as warp progress',
+  );
+  r.dispose();
+});
+
 test('#450: warpPhase persists across a layer being hidden and re-shown — no phase-reset snap', () => {
   const seed = 999;
   const speed = 1;
