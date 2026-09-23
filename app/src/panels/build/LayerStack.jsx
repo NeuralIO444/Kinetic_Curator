@@ -160,8 +160,18 @@ export function LayerStack() {
                   </select>
                   {patch.mode === 'feed' && (
                     <input type="range" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                      title={`FEED amount ${(Number(patch.strength) || 0.16).toFixed(2)}`}
+                      title={helpText('layers-patch-feed')}
                       onChange={(e) => setLayerPatch(layer.id, { mode: 'feed', to, strength: Number(e.target.value) })} />
+                  )}
+                  {patch.mode === 'mod' && (
+                    <input type="range" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                      title={helpText('layers-patch-mod')}
+                      onChange={(e) => setLayerPatch(layer.id, { mode: 'mod', to, strength: Number(e.target.value) })} />
+                  )}
+                  {patch.mode === 'field' && (
+                    <input type="range" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                      title={helpText('layers-patch-field')}
+                      onChange={(e) => setLayerPatch(layer.id, { mode: 'field', to, strength: Number(e.target.value) })} />
                   )}
                 </div>
               )}
