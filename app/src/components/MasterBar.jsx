@@ -2,6 +2,7 @@
 import { useApp } from '../state/AppContext.jsx';
 import { TapeCounter } from './TapeCounter.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
+import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import * as A from '../state/actions.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
@@ -13,6 +14,7 @@ export function MasterBar() {
     seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
     isRecording: s.isRecording, persistStatus: s.persistStatus, frameLock: s.frameLock,
     setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, glContext: s.glContext,
+    layers: s.layers,
   }));
   const {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
@@ -36,6 +38,15 @@ export function MasterBar() {
         : 'At or below the shed floor — the governor is shedding or about to.');
   const nodeClass = nodeCount > 700 ? 'bad' : nodeCount > 450 ? 'mid' : 'good';
   const q = QUALITY_PRESETS[quality] || QUALITY_PRESETS.balanced;
+  // #485 R4 — registry-driven FX-stack weight (bench ms, attribution only).
+  // Neutral by design: no invented bands — the needle keeps the warn job and
+  // the tape fill stays the only live truth.
+  const fxKinds = activeFxKinds(state.layers);
+  const fxCost = sceneFxCost(fxKinds);
+  const fxTitle = `FX-stack weight ≈ ${fxCost.totalMs.toFixed(1)}ms bench (${fxCost.count} fx` +
+    `${fxCost.shedFirstMs > 0 ? ` · ${fxCost.shedFirstMs.toFixed(1)}ms shed-first` : ''}` +
+    `${fxCost.unknown.length ? ` · unknown: ${fxCost.unknown.join(',')}` : ''}). ` +
+    `512²-bench estimates from the cost registry + measured costs — attribution, not frame math.`;
 
   return (
     <div className="master-bar">
@@ -94,6 +105,11 @@ export function MasterBar() {
         <div className="meter" title="Live placement / instance count">
           <span className="meter-label">NODES</span>
           <span className={`meter-value ${nodeClass}`}>{nodeCount}</span>
+        </div>
+
+        <div className="meter" title={fxTitle}>
+          <span className="meter-label">FX MS</span>
+          <span className="meter-value">{fxCost.count > 0 ? fxCost.totalMs.toFixed(0) : '—'}</span>
         </div>
 
         <div className="meter" title={q.description}>
