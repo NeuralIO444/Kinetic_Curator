@@ -147,6 +147,26 @@ for (const [name, args] of CASES) {
   assert.ok(Array.from(sys.phase.subarray(0, sys.n)).every((p) => p === 0), 'resetPhase must clear');
 }
 
+// #454 — a non-finite attractor (a zero-size canvas rect divides to
+// Infinity upstream in useCanvasViewport.js) must not poison the swarm.
+// dx/d = Infinity/Infinity = NaN in the attraction force, and the speed
+// clamp further down can't bound NaN (every NaN comparison is false), so
+// without a guard this corrupts every particle's position permanently.
+// The fix guards at both ends: the hook never constructs a non-finite
+// attractor (a zero-size rect degrades to null), and particles.js itself
+// ignores a non-finite attractor defensively. This test exercises the
+// particles.js guard directly, regardless of what upstream sends it.
+{
+  for (const attractor of [{ x: Infinity, y: Infinity }, { x: NaN, y: 300 }, { x: -Infinity, y: -Infinity }]) {
+    const items = run(ParticleSystem, 'swarm', 60, 30, attractor);
+    assert.ok(items.length > 0, 'a non-finite attractor must not empty the swarm');
+    for (const it of items) {
+      assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y),
+        `non-finite attractor ${JSON.stringify(attractor)} must not poison item positions (got x=${it.x}, y=${it.y})`);
+    }
+  }
+}
+
 console.log('particles.selfcheck: OK (#108 swarm SoA — behaviour identical to pre-SoA engine)', {
   cases: CASES.length,
 });
