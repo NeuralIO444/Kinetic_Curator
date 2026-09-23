@@ -73,9 +73,13 @@ export function LayerStack() {
       contentTargets.push({ id: l.id, n: contentOrdinal });
     }
   }
+  // #457 — the target is a stable layer id, not an ordinal: an ordinal
+  // silently retargets when hide/solo/reorder/remove elsewhere in the
+  // stack changes what sits at that position (liveResolve.mjs resolves
+  // patch.to the same way).
   function otherTarget(layer) {
     const hit = contentTargets.find((t) => t.id !== layer.id);
-    return hit ? hit.n - 1 : 0;
+    return hit ? hit.id : null;
   }
 
   return (
@@ -102,9 +106,8 @@ export function LayerStack() {
           const isFxSelected = layer.id === selectedFxLayerId;
           const soloed = layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
           const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
-          const patch = layer.patch || { mode: 'off', to: 0, strength: 0.16 };
-          const selfIdx = (ordinals.get(layer.id) || 1) - 1;
-          const to = patch.to === selfIdx ? otherTarget(layer) : patch.to;
+          const patch = layer.patch || { mode: 'off', to: null, strength: 0.16 };
+          const to = (!patch.to || patch.to === layer.id) ? otherTarget(layer) : patch.to;
           return (
             <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''}`}>
               <div className="layer-row-main">
@@ -144,10 +147,10 @@ export function LayerStack() {
                     <option value="field">FIELD</option>
                     <option value="feed">FEED</option>
                   </select>
-                  <select className="tg blend-mode-select" value={String(to)} disabled={patch.mode === 'off'}
-                    onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: Number(e.target.value), strength: patch.strength })}>
+                  <select className="tg blend-mode-select" value={to || ''} disabled={patch.mode === 'off'}
+                    onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: e.target.value, strength: patch.strength })}>
                     {contentTargets.map((t) => (
-                      <option key={t.id} value={t.n - 1} disabled={t.id === layer.id}>KC-{t.n}</option>
+                      <option key={t.id} value={t.id} disabled={t.id === layer.id}>KC-{t.n}</option>
                     ))}
                   </select>
                   {patch.mode === 'feed' && (

@@ -50,7 +50,7 @@ const INITIAL_LAYER_ID = 'layer-1';
 
 export const createLayersSlice = (set) => ({
   layers: [
-    { id: INITIAL_LAYER_ID, name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: 1, strength: 0.16 } },
+    { id: INITIAL_LAYER_ID, name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } },
   ],
   activeLayerId: INITIAL_LAYER_ID,
   layerSnapshots: {},
@@ -69,7 +69,7 @@ export const createLayersSlice = (set) => ({
     const name = `KC-${content + 1}`;
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
-      layers: [...state.layers, { id, name, visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: 0, strength: 0.16 } }],
+      layers: [...state.layers, { id, name, visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }],
       layerSnapshots: { ...state.layerSnapshots, [state.activeLayerId]: captureSnapshot(state) },
       activeLayerId: id,
       ...snapshot,
@@ -80,7 +80,15 @@ export const createLayersSlice = (set) => ({
     const target = state.layers.find((l) => l.id === id);
     if (!target || isFxLayer(target)) return {};
     const mode = ['off', 'mod', 'field', 'feed'].includes(patch?.mode) ? patch.mode : 'off';
-    const to = Math.max(0, Math.min(MAX_CONTENT_TRACKS - 1, patch?.to | 0));
+    // #457 — target by stable layer id, not an ordinal into whatever is
+    // CURRENTLY visible: an ordinal silently retargets to a different
+    // track the instant hide/solo/reorder/remove changes what sits at
+    // that position elsewhere in the stack. An invalid/self/dangling id
+    // falls back to the previous target rather than guessing a new one.
+    const candidateTo = typeof patch?.to === 'string' ? patch.to : null;
+    const to = candidateTo && candidateTo !== id && state.layers.some((l) => l.id === candidateTo && !isFxLayer(l))
+      ? candidateTo
+      : (target.patch?.to ?? null);
     const prev = target.patch || {};
     const strength = Math.max(0, Math.min(1, Number(patch?.strength ?? prev.strength ?? 0.16)));
     return {
@@ -105,7 +113,7 @@ export const createLayersSlice = (set) => ({
       visible: src.visible,
       layerBlendMode: src.layerBlendMode,
       layerOpacity: src.layerOpacity,
-      patch: src.patch ? { ...src.patch } : { mode: 'off', to: 0, strength: 0.16 },
+      patch: src.patch ? { ...src.patch } : { mode: 'off', to: null, strength: 0.16 },
     };
     if (isFx) copy.effects = structuredClone(src.effects || defaultFxEffects());
     const i = state.layers.findIndex((l) => l.id === id);

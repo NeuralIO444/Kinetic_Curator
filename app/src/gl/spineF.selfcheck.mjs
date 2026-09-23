@@ -160,9 +160,11 @@ test('Spine F: MOD patch coupled to HYPE organism track perturbs target knobs', 
     loopTimeMs: 200,
   });
 
+  // #457 — patch.to is a stable layer id now, not an ordinal into the
+  // visible-only content list; 'lyr-hype' is this test's source layer.
   const off = r.resolveLayers(makeInput(null));
-  const on = r.resolveLayers(makeInput({ mode: 'mod', to: 0, strength: 1 }));
-  const zero = r.resolveLayers(makeInput({ mode: 'mod', to: 0, strength: 0 }));
+  const on = r.resolveLayers(makeInput({ mode: 'mod', to: 'lyr-hype', strength: 1 }));
+  const zero = r.resolveLayers(makeInput({ mode: 'mod', to: 'lyr-hype', strength: 0 }));
 
   const targetOff = off.find((l) => l.id === 'lyr-target');
   const targetOn = on.find((l) => l.id === 'lyr-target');
