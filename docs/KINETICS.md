@@ -138,7 +138,7 @@ Character: easing by design — periodicity here is intentional, not the drift p
 2. LIFE drift: three fixed sines → seeded fBm time channels (per-project `worldNoise`
    already exists; zero new noise machinery). Feel fix — gated on the Night Migration
    30/60 play per `EMBARGO.md`.
-3. #444 (TRANSITIONS seam) — filed, awaiting assignment.
+3. #444 (TRANSITIONS seam) — fixed by PR #464 (2026-09-23); kept for history.
 
 ## Design briefs
 
@@ -162,4 +162,6 @@ few lines — captured before the FLOW correction; sections are the durable hand
   any one-frame same-set item reorder via throttled `renderFault.noteExternalFault`.
   The generic z-fight diagnoser: covers the #444, #451, and #457 classes.
 
-Findings from this design pass: **#450–#458** (plus still-open #444, #441, #438, #422).
+Findings from this design pass: **#450–#458** — all open, triage comments added
+2026-09-23. (#444 fixed by #464, #441 by #462, #438 by #448, #422 split to #480
+and closed — all 2026-09-23.)
