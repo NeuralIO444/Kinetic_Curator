@@ -211,8 +211,9 @@ console.log('[selfcheck] E shedOrder — tier 1 first, tier 0 last');
 // shedSummary strings match the #294 instrument names (UI contract — the
 // badge/pills/tape read these exact strings).
 {
-  const sum = shedSummary({ renderScale: 0.5, perfTier1: true, assetThin: true, perfClampOverride: { count: 80 }, slowRender: false, watchdogTripped: false });
-  assert.ok(sum.join(' ').includes('pixel trim 50%') && sum.join(' ').includes('shine off'),
+  const sum = shedSummary({ renderScale: 0.5, perfTier1: true, assetThin: true, perfClampOverride: { count: 80 }, slowRender: false, watchdogTripped: true });
+  assert.ok(sum.join(' ').includes('pixel trim 50%') && sum.join(' ').includes('shine off')
+    && sum.join(' ').includes('crowd control → 80') && sum.join(' ').includes('watchdog — hard stop'),
     'shedSummary strings match the instrument names');
 }
 console.log('[selfcheck] E shedSummary strings match the instrument names');

@@ -201,9 +201,9 @@ export function shedSummary(s) {
   }
   if (s.perfTier1) out.push('shine off');
   if (s.assetThin) out.push('dead weight cut');
-  if (s.perfClampOverride) out.push(`crowd → ${s.perfClampOverride.count}`);
+  if (s.perfClampOverride) out.push(`crowd control → ${s.perfClampOverride.count}`);
   if (s.slowRender) out.push('freeze frame');
-  if (s.watchdogTripped) out.push('watchdog trip');
+  if (s.watchdogTripped) out.push('watchdog — hard stop');
   return out.length ? out : null;
 }
 
