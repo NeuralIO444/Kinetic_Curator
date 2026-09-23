@@ -765,17 +765,33 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // a rejected frame rolls back exactly as cleanly, instead of the life
     // clock jumping through a pause and ballistics integrating audio while
     // "frozen."
+    // #441 — disclosed sibling of #421: the slider-spring cache
+    // (smoothedLayoutParams) has the exact same "advances unconditionally"
+    // shape (both its focus-swap reset and its per-frame exp-damp ease run
+    // before either rejection path is known) and wasn't named in #421.
+    // Triaged: real — while paused, the spring keeps easing toward the
+    // live slider value every rejected tick (rAF keeps ticking; only the
+    // clock/presentation roll back), so a slider dragged during even a
+    // quarter-second pause has already fully "caught up" by the time you
+    // resume — the whole point of the ease (a smooth ramp, not a snap) is
+    // silently skipped. Same shallow-copy-and-restore shape as
+    // ballisticsState below (array-valued params are reassigned to a new
+    // array on change, never mutated in place, so a shallow copy is safe).
     const preLoopLifeT = loopLifeT;
     const preBreathScale = breathScaleSmoothed;
     const preBreathRot = breathRotSmoothed;
     const preBallisticsKeys = new Set(Object.keys(ballisticsState));
     const preBallistics = { ...ballisticsState };
+    const preSmoothedKeys = new Set(Object.keys(smoothedLayoutParams));
+    const preSmoothed = { ...smoothedLayoutParams };
     const rollBackLifeClocks = () => {
       loopLifeT = preLoopLifeT;
       breathScaleSmoothed = preBreathScale;
       breathRotSmoothed = preBreathRot;
       for (const k of Object.keys(ballisticsState)) if (!preBallisticsKeys.has(k)) delete ballisticsState[k];
       Object.assign(ballisticsState, preBallistics);
+      for (const k of Object.keys(smoothedLayoutParams)) if (!preSmoothedKeys.has(k)) delete smoothedLayoutParams[k];
+      Object.assign(smoothedLayoutParams, preSmoothed);
     };
 
     try {
