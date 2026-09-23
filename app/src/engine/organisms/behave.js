@@ -74,6 +74,21 @@ export function resolveBehave(id) {
   return BEHAVE[id] || BEHAVE.cruise;
 }
 
+/**
+ * #479 — which wind kernel a swarm uses (divergence-free curl vs point-angle
+ * noise). Factored out of particles.js's inline if/else so the DAVIS
+ * read-only readout can show it without re-deriving or drifting from the
+ * engine's own logic. An explicit windMode/windType always wins; otherwise
+ * it's a hidden per-behave/mode default — flock, mold, and murmuration ride
+ * curl, everything else stays point. Pure and side-effect free.
+ */
+export function resolveWindMode(layoutParams) {
+  if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') return 'curl';
+  if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') return 'point';
+  const { behave, mode } = layoutParams;
+  return (behave === 'flock' || behave === 'mold' || mode === 'murmuration') ? 'curl' : 'point';
+}
+
 /** Weak pull around plate center — Haeckel grid, not a drain. */
 export function orbitForce(x, y, cx, cy, gain) {
   if (!gain) return { fx: 0, fy: 0 };
