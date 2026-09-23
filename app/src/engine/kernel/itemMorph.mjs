@@ -134,28 +134,45 @@ function lerpColor(a, b, t) {
 export function blendItems(fromItems, toItems, t, plan = null) {
   if (t <= 0) return fromItems;
   if (t >= 1) return toItems;
-  const { pairs, onlyFrom, onlyTo } = plan || planMorph(fromItems, toItems);
+  const { pairs, onlyFrom } = plan || planMorph(fromItems, toItems);
   const toGroups = groupByAsset(toItems || []);
-  const out = [];
+
+  // #444 — draw order in the renderer is item-ARRAY order (no z-sort), so
+  // the presented array's order must already match toItems' own order:
+  // resolving a pair's target by object reference lets this loop below
+  // walk toItems directly instead of plan-group order (matched pairs
+  // first, then fades) — the old order that silently flipped to raw
+  // resolver order the instant the transition completed and `shown`
+  // fell through to `e.items`, a one-frame landing z-fight.
+  const matchedFrom = new Map(); // toItem (by reference) -> its matched fromItem
   for (const { f, g, j } of pairs) {
     const to = toGroups.get(g)?.[j];
     if (!to) continue; // defensive: slot set shrank (shouldn't mid-transition)
-    out.push({
-      ...to,
-      x: lerp(f.x, to.x, t),
-      y: lerp(f.y, to.y, t),
-      scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, t),
-      rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, t),
-      alpha: lerp(Number.isFinite(f.alpha) ? f.alpha : 100, Number.isFinite(to.alpha) ? to.alpha : 100, t),
-      color: lerpColor(f.color, to.color, t),
-      accent: lerpColor(f.accent, to.accent, t),
-    });
+    matchedFrom.set(to, f);
   }
+
+  const out = [];
+  for (const to of (toItems || [])) {
+    const f = matchedFrom.get(to);
+    if (f) {
+      out.push({
+        ...to,
+        x: lerp(f.x, to.x, t),
+        y: lerp(f.y, to.y, t),
+        scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, t),
+        rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, t),
+        alpha: lerp(Number.isFinite(f.alpha) ? f.alpha : 100, Number.isFinite(to.alpha) ? to.alpha : 100, t),
+        color: lerpColor(f.color, to.color, t),
+        accent: lerpColor(f.accent, to.accent, t),
+      });
+    } else {
+      out.push({ ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t }); // unmatched target: fades in
+    }
+  }
+  // Unmatched source items fade out, appended LAST: at t -> 1 these are
+  // near-zero alpha and vanish entirely on the completion frame (t >= 1
+  // returns toItems verbatim, above), so their trailing position here
+  // never perturbs the landing order the loop above just established.
   for (const f of onlyFrom) out.push({ ...f, alpha: (Number.isFinite(f.alpha) ? f.alpha : 100) * (1 - t) });
-  for (const { g, j } of onlyTo) {
-    const to = toGroups.get(g)?.[j];
-    if (!to) continue;
-    out.push({ ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t });
-  }
   return out;
 }

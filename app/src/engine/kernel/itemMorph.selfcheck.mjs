@@ -113,10 +113,19 @@ ok('#419: stored pairing holds when a target breathes past a nearer rival', () =
     { assetId: 'a', key: 'far', x: 100, y: 0, alpha: 100 },
     { assetId: 'a', key: 'farther', x: 10, y: 0, alpha: 100 },
   ];
-  const [stayed] = blendItems(from, toBreath, 0.5, plan);
-  assert.equal(stayed.key, 'far', 'stored plan keeps the original target');
-  const [flipped] = blendItems(from, toBreath, 0.5); // documents the old bug
-  assert.equal(flipped.key, 'farther', 'fresh match would flip — what #419 fixes');
+  // #444 reordered blendItems' output to toItems' own array order (draw
+  // order matters, no z-sort), so array position no longer distinguishes
+  // matched-vs-unmatched -- find by key (identity) instead, and tell
+  // matched from unmatched by x: a matched item lerps toward its target
+  // (x=50 here), an unmatched (onlyTo fade-in) item stays at the raw
+  // target x (100), only its alpha scales.
+  const stored = blendItems(from, toBreath, 0.5, plan);
+  const storedFar = stored.find((i) => i.key === 'far');
+  assert.equal(storedFar.x, 50, 'stored plan keeps matching "far" (lerped x=50), not an unmatched fade-in (would stay at x=100)');
+
+  const fresh = blendItems(from, toBreath, 0.5); // documents the old bug: no stored plan re-matches every frame
+  const freshFarther = fresh.find((i) => i.key === 'farther');
+  assert.equal(freshFarther.x, 5, 'fresh match would flip to "farther" (lerped x=5) — what #419 fixes');
 });
 
 ok('#419: endpoints track LIVE targets while the plan is fixed', () => {
@@ -145,6 +154,33 @@ ok('#419: onlyTo fade-in resolves through a stored slot against live targets', (
   assert.equal(kept.x, 20, 'paired slot aims at the live target (lerp 0..40)');
   assert.ok(added, 'unmatched target still fades in via its stored slot');
   assert.ok(Math.abs(added.alpha - 50) < 1e-9, 'alpha = 100 * t');
+});
+
+ok('#444: mid-blend output order matches toItems order (draw order is array order, no z-sort) — no landing-frame reorder', () => {
+  // Two asset groups so both an onlyFrom (group a: 2 sources, 1 target)
+  // and an onlyTo (group b: 1 source, 2 targets) exist simultaneously,
+  // deliberately arranged so toItems' own order (bFar, aKeep, bNear)
+  // differs from match/group order (group a resolves before group b).
+  const from = [
+    { assetId: 'a', key: 'fKeep', x: 1, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'fGone', x: 50, y: 0, alpha: 100 }, // -> onlyFrom (only 1 'a' target)
+    { assetId: 'b', key: 'bFrom', x: 1, y: 0, alpha: 100 },
+  ];
+  const to = [
+    { assetId: 'b', key: 'bFar', x: 500, y: 0, alpha: 100 }, // -> onlyTo (bNear is nearer to bFrom)
+    { assetId: 'a', key: 'aKeep', x: 2, y: 0, alpha: 100 },
+    { assetId: 'b', key: 'bNear', x: 2, y: 0, alpha: 100 },
+  ];
+  const out = blendItems(from, to, 0.5);
+  const outKeys = out.map((i) => i.key);
+  // Matched pairs AND onlyTo fade-ins together must appear in toItems'
+  // own order — the render order the completion frame (t >= 1, raw
+  // toItems) will present, so nothing visibly reshuffles landing.
+  assert.deepEqual(outKeys.slice(0, to.length), to.map((i) => i.key),
+    'matched + fade-in items must appear in toItems order, not plan/match-group order');
+  // Unmatched source fade-outs (onlyFrom) trail after every toItems-
+  // ordered item — they vanish entirely on the completion frame anyway.
+  assert.deepEqual(outKeys.slice(to.length), ['fGone'], 'onlyFrom fade-outs land after every toItems-ordered item');
 });
 
 console.log(`itemMorph.selfcheck: ${fail === 0 ? 'OK' : 'FAIL'} (${n - fail}/${n})`);
