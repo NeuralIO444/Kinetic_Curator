@@ -30,7 +30,7 @@ import { createNoise } from './noise.js';
 import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
-import { resolveBehave, orbitForce } from './organisms/behave.js';
+import { resolveBehave, resolveWindMode, orbitForce } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
 
@@ -706,20 +706,9 @@ export class ParticleSystem {
 
     // Spine F (#392): Divergence-free curl wind default for flock / murmuration / mold.
     // Scatter, cloud swarm, and cruise HYPE keep point wind (noise3D -> angle).
-    let useCurl;
-    if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') {
-      useCurl = true;
-    } else if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') {
-      useCurl = false;
-    } else {
-      const behave = layoutParams.behave;
-      const mode = layoutParams.mode;
-      if (behave === 'flock' || behave === 'mold' || mode === 'murmuration') {
-        useCurl = true;
-      } else {
-        useCurl = false;
-      }
-    }
+    // #479 — factored into resolveWindMode() (organisms/behave.js) so the
+    // DAVIS readout can show it without duplicating this derivation.
+    const useCurl = resolveWindMode(layoutParams) === 'curl';
 
     const sepRadius = organism ? profile.sepR : 35;
     const aliRadius = organism ? profile.aliR : 60;

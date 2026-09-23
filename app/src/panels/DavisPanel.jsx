@@ -4,6 +4,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { MorphControls } from './davis/MorphControls.jsx';
 import { PhraseControls } from './davis/PhraseControls.jsx';
+import { BehaveReadout } from './davis/BehaveReadout.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
@@ -104,6 +105,8 @@ export function DavisPanel() {
             beatPulse={beatPulse || 0}
             rms={rms}
           />
+
+          <BehaveReadout layoutParams={layoutParams} />
 
           <div className="davis-actions">
             <button className={`big-btn ${evolveMode ? 'active' : ''}`}
