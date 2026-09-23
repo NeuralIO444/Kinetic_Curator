@@ -66,6 +66,8 @@ Harness-measured at 512×512, worst-case params — absolute ms are headless-har
 
 Each item refines the existing governor. Nothing here is a new feature, a new tab, or a new panel — everything lives in the existing MasterBar/PLAY/OUTPUT surfaces.
 
+**Tracking (2026-09-23):** R1 → #483, R2 → #482, R3 → #484, R4 → #485. R5 was already tracked as #298. R6 is evidence-gated on R5 and has no issue yet.
+
 ### R1. One budget readout — the tape counter
 Merge the ShedBadge, the four pills, and the Q meter's AUTO state into a single PLAY readout: one BUDGET meter in the MasterBar showing the current constraint state with the existing honest pills' semantics. The footer badge and the scattered pills retire into it. This is G1 fixed, and it's pure presentation — the ladder, thresholds, and event log don't change. (Coordinates with #177, which owns the full indicator design — this is the polish pass on that design, not a competing one.)
 
