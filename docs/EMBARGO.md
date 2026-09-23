@@ -4,6 +4,8 @@ Matt, 2026-09-19. Coding agents: this file plus [AGENTS.md](../AGENTS.md) plus [
 
 **2026-09-22 update:** spines A–F (#387–#392) are all merged and closed — the "in flight" table below is stale, kept for history. The code-side condition this embargo names ("C is merged") has been met, and D/E/F landed on top of it since. What has **not** been recorded anywhere: Matt playing Night Migration at 30/60 and signing off on feel. Until that sign-off shows up in this file, treat the embargo as still standing — do not read the merged code as an implicit go-ahead.
 
+**2026-09-23 (Matt): Night Migration sign-off given — embargo lifted.** Matt confirmed the 30/60 feel is good; this is the sign-off this file has been waiting on since 2026-09-19. `docs/ROADMAP_V1.md` Stage 1 ("v0.10 · PLAY") work is unfrozen from this point: #471 (evolve seed-jitter fix, mechanism A) and #479 Option B (editable BEHAVE weights, per-layer, persisted) plus the swarmCohesion dim-fix proceed as real Stage 1 work, not one-off scoped exceptions like #465 needed. The deferred pile below stays deferred — this sign-off unfreezes Stage 1's own scope, not everything in `docs/` marked deferred; Studio labs, chip editors, species genomes, UV scroll, HarfBuzz, DLC packs, shimmer, TYPE chips, and new showcase rows still wait for a later stage or Matt's own re-ordering of this pile.
+
 ## In flight (historical — all closed)
 
 ```text
