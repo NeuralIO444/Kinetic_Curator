@@ -5,10 +5,11 @@ import { getGovernorEvents } from '../gl/governorEventLog.mjs';
 import { FRAME_BUDGET_MS, isTapeFull } from '../state/tapeBudget.js';
 
 // TapeCounter — the governor's one budget readout (#295, R1 of the
-// governor×TE roadmap). It merges the footer ShedBadge, the four
-// MasterBar pills (PERF PAUSED / MOTION HELD / RENDER FAULT / LOAD SHED)
-// and the Q meter's AUTO state into a single PLAY readout: the budget as
-// tape on a reel.
+// governor×TE roadmap; #483 confirms the merge is complete). It merged the
+// footer ShedBadge and the four MasterBar pills
+// (PERF PAUSED / MOTION HELD / RENDER FAULT / LOAD SHED) plus the Q
+// meter's AUTO state into a single PLAY readout: the budget as tape
+// on a reel. The badge and the separate pills are retired.
 //
 // Fill = measured frame cost against a 60fps frame budget — the live
 // patrol's GPU frame timing (stageTimings.gpuFrame, the same signal the
