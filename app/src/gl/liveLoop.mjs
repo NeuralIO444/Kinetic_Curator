@@ -953,7 +953,26 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       throw new Error('[gl-live] GPU context lost — capture unavailable until the context is restored');
     }
     if (building) throw new Error('[gl-live] textures baking — wait a moment and retry');
-    const frame = buildFrame();
+    // #452 — buildFrame() with no args defaulted BOTH dtSec (1/60) and
+    // loopTimeMs (0). The loopTimeMs=0 default is a non-monotonic time
+    // sample: the resolver's warpPhase accumulator stores lastMs from real
+    // frames, so a 0 reads as a large NEGATIVE elapsed delta (clamped to 0,
+    // but only after the phase has effectively rewound relative to what's
+    // on screen); an in-flight chip-morph's raw = (nowMs - startMs) / dur
+    // goes negative too, clamping to 0 and presenting the morph's START
+    // pose instead of wherever it actually is. Both fire even while
+    // paused, since capture doesn't require the loop to be running.
+    // Passing the CURRENT loopTimeMs fixes both. dtSec: 0 (not the
+    // default 1/60) makes this a true peek at present state rather than
+    // an extra, uncounted physics/spring/ballistics step outside the
+    // normal tick() cadence — every per-frame accumulator in this file
+    // (breath springs, ballistics, the slider-spring cache) is driven
+    // proportionally to dtSec, so 0 is an exact no-op for all of them,
+    // and the resolver's own warpPhase no-ops the same way when nowMs
+    // exactly equals its own lastMs (dSec = max(0, nowMs - lastMs) * 0.001
+    // -- proven in #442's own regression test). No snapshot/rollback
+    // needed: nothing here has anything left to roll back.
+    const frame = buildFrame(0, loopTimeMs);
     if (!frame) throw new Error('[gl-live] textures baking — wait a moment and retry');
     const { payload, transparent, accumOn } = frame;
 
