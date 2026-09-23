@@ -33,6 +33,9 @@ export const HELP_TOPICS = [
   { id: 'layers-blend', group: 'Build', title: 'BLEND', text: 'How this layer composites onto the stack below.' },
   { id: 'output-loop', group: 'Output', title: 'CAPTURE LOOP', text: 'Records a fixed-length take and exports it as a seamless looping WebM — the tail dissolves into the head so there is no visible cut.' },
   { id: 'layout-flow', group: 'Build', title: 'FLOW', text: 'Curl-advects the ACCUM trail buffer as it decays — trails curl like smoke instead of just fading. 0 is off.' },
+  { id: 'layers-patch-mod', group: 'Build', title: 'MOD', text: 'Source motion shoves this track — glow, fade, nudge. A still source drives nothing; strength sets how hard it pushes when things move.' },
+  { id: 'layers-patch-field', group: 'Build', title: 'FIELD', text: 'Pulls this track toward the source track\u2019s shape. Strength sets how hard each frame tugs — the hop never lands past 4px.' },
+  { id: 'layers-patch-feed', group: 'Build', title: 'FEED', text: 'Blends this track toward where the source was a frame ago. Strength is blend per frame — 0.16 breathes, 1.00 smears.' },
 ];
 
 // #158: the single source of truth. Hover `title` attributes and the `?`
