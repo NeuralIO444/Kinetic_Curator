@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { shedSummary } from '../hooks/governorCuts.js';
+import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import { getGovernorEvents } from '../gl/governorEventLog.mjs';
 import { FRAME_BUDGET_MS, isTapeFull } from '../state/tapeBudget.js';
 
@@ -51,6 +52,7 @@ export function TapeCounter() {
     renderFault: s.renderFault,
     renderFaultReason: s.renderFaultReason,
     autoQuality: s.autoQuality,
+    layers: s.layers,
   }));
   const {
     fps = 0, stageTimings, renderScale = 1, quality = 'balanced',
@@ -79,6 +81,14 @@ export function TapeCounter() {
   const frameMs = gpuMs > 0 ? gpuMs : (fps > 0 ? 1000 / fps : 0);
   const fillRatio = frameMs > 0 ? frameMs / FRAME_BUDGET_MS : 0;
   const fillPct = Math.round(fillRatio * 100);
+
+  // #485 R4 — registry-driven FX-stack weight (bench ms, attribution only).
+  const fxKinds = activeFxKinds(state.layers);
+  const fxCost = sceneFxCost(fxKinds);
+  const fxNote = fxCost.count > 0
+    ? ` FX stack ≈ ${fxCost.totalMs.toFixed(1)}ms bench (${fxCost.count} fx` +
+      `${fxCost.shedFirstMs > 0 ? `, ${fxCost.shedFirstMs.toFixed(1)}ms shed-first` : ''}).`
+    : '';
 
   // --- state 1: render fault (hard-stop class, red, explicit) ---
   if (renderFault) {
@@ -132,7 +142,7 @@ export function TapeCounter() {
     const stageName = eventLabel || summary[summary.length - 1].toUpperCase();
     return (
       <div className="status-pill" style={AMBER}
-        title={`Showrunner shed active: ${summary.join('; ')}. Auto-clears on recovery (watchdog needs manual resume). Tape fill: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : '—'} vs ${FRAME_BUDGET_MS.toFixed(1)}ms budget.`}
+        title={`Showrunner shed active: ${summary.join('; ')}.${fxNote} Auto-clears on recovery (watchdog needs manual resume). Tape fill: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : '—'} vs ${FRAME_BUDGET_MS.toFixed(1)}ms budget.`}
       >
         <span className="status-dot" style={{ background: '#ffb000' }} />
         <span key={stageName} className="tape-click">{stageName}</span>
@@ -147,7 +157,7 @@ export function TapeCounter() {
   // --- state 4: clean — the tape, fill only, sitting quiet ---
   return (
     <div className="status-pill"
-      title={`Budget tape: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : 'no data yet'} vs a ${FRAME_BUDGET_MS.toFixed(1)}ms (60fps) frame budget. Fill is live-measured, never decorative.${autoQuality ? ' Governor armed — defending the budget.' : ' Governor off — nothing is defended (AUTO is off).'}`}
+      title={`Budget tape: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : 'no data yet'} vs a ${FRAME_BUDGET_MS.toFixed(1)}ms (60fps) frame budget.${fxNote} Fill is live-measured, never decorative.${autoQuality ? ' Governor armed — defending the budget.' : ' Governor off — nothing is defended (AUTO is off).'}`}
     >
       <span className="status-dot" style={{ background: autoQuality ? '#00ff88' : '#5a5a5a' }} />
       <span className="meter-label">TAPE</span>
