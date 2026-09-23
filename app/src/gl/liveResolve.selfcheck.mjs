@@ -411,6 +411,40 @@ test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   r.dispose();
 });
 
+test('#455: a continuously-lerped paletteOverrides during an auto-MIX must not retrigger the item-morph every frame', () => {
+  const r = createLiveResolver();
+  // A tint value that differs on literally every call, same shape voices.js
+  // produces every frame while an auto voice/preset MIX is in flight.
+  const lerpOverrides = (ms) => ({
+    bg: `#${(ms % 256).toString(16).padStart(2, '0')}0000`,
+    ink: '#ffffff',
+    swatches: ['#112233'],
+  });
+  const mk = (mode, loopTimeMs, paletteOverrides) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    mixSeconds: 0.5,
+    loopTimeMs,
+    paletteOverrides,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+
+  r.resolveLayers(mk('scatter', 0, null));               // baseline, sig recorded
+  r.resolveLayers(mk('grid', 1000, lerpOverrides(1000))); // chip click: plan built, t=0
+
+  // A live auto-MIX driving paletteOverrides every frame while mode/behave/
+  // assets hold steady at their post-click values — before the fix, each of
+  // these looked like a brand-new transition and reset startMs, so raw
+  // never advanced and every frame presented ~the from-pose.
+  for (let ms = 1050; ms <= 1450; ms += 50) {
+    r.resolveLayers(mk('grid', ms, lerpOverrides(ms)));
+  }
+  const done = lyr(r.resolveLayers(mk('grid', 1600, lerpOverrides(1600))));
+  const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 1600, lerpOverrides(1600))));
+
+  assert.deepEqual(done, raw, 'the morph must land on schedule despite paletteOverrides changing every frame');
+  r.dispose();
+});
+
 test('#427: adopt-on-enter — a chip into a live swarm mode starts from the prior positions, not a fresh seed scatter', () => {
   const r = createLiveResolver();
   // Same asset pool for both modes (a curated voice restricted to these
