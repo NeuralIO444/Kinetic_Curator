@@ -20,8 +20,8 @@
 //   and the ladder caused the silent-cull trap: an FX layer shown in the UI
 //   while its wrap was culled. The primary shed is dynamic resolution
 //   scaling — pixels drop before anything visible is cut. If the governor
-//   ever sheds, the UI says so: see ShedBadge in App.jsx (#177 owns the
-//   full indicator design later).
+//   ever sheds, the UI says so: see TapeCounter in MasterBar.jsx (the
+//   merged readout — #295 built it, #177/#483 own the design).
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
