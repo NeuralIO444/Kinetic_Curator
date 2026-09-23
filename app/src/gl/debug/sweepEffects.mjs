@@ -374,9 +374,15 @@ export const SWEEP_EFFECTS = [
   // ---- ACCUM passes ----
   {
     ...accumDef('fade',
-      { u_src: S(0), u_keep: { kind: 'float' }, u_tunnelZoom: { kind: 'float' }, u_tunnelSpin: { kind: 'float' }, u_prism: { kind: 'float' } },
+      { u_src: S(0), u_keep: { kind: 'float' }, u_bg: { kind: 'vec3' }, u_tunnelZoom: { kind: 'float' }, u_tunnelSpin: { kind: 'float' }, u_prism: { kind: 'float' } },
       (c, lab) => ({
-        u_src: lab.input.tex, u_keep: c.params.keep, u_tunnelZoom: c.params.tz,
+        u_src: lab.input.tex, u_keep: c.params.keep,
+        // #287 fade-to-paper target — production sources this from the
+        // palette bg (accum.mjs's real 'fade' pass); the sweep has no
+        // palette, so a fixed stand-in is enough to satisfy the uniform
+        // audit and give the keep<1 cases a real fade destination.
+        u_bg: [0, 0, 0],
+        u_tunnelZoom: c.params.tz,
         u_tunnelSpin: c.params.ts, u_prism: c.params.prism,
       })),
     cases: [
