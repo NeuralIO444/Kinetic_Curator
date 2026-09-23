@@ -113,9 +113,12 @@ ok('#419: stored pairing holds when a target breathes past a nearer rival', () =
     { assetId: 'a', key: 'far', x: 100, y: 0, alpha: 100 },
     { assetId: 'a', key: 'farther', x: 10, y: 0, alpha: 100 },
   ];
-  const [stayed] = blendItems(from, toBreath, 0.5, plan);
+  // #444: emission is raw to-order now, so position no longer encodes
+  // pairing — find the PAIRED item instead: a blend holds target alpha
+  // (lerp 100..100 = 100), an unmatched fade-in sits at 100*t = 50.
+  const stayed = blendItems(from, toBreath, 0.5, plan).find((i) => i.alpha === 100);
   assert.equal(stayed.key, 'far', 'stored plan keeps the original target');
-  const [flipped] = blendItems(from, toBreath, 0.5); // documents the old bug
+  const flipped = blendItems(from, toBreath, 0.5).find((i) => i.alpha === 100);
   assert.equal(flipped.key, 'farther', 'fresh match would flip — what #419 fixes');
 });
 
@@ -145,6 +148,39 @@ ok('#419: onlyTo fade-in resolves through a stored slot against live targets', (
   assert.equal(kept.x, 20, 'paired slot aims at the live target (lerp 0..40)');
   assert.ok(added, 'unmatched target still fades in via its stored slot');
   assert.ok(Math.abs(added.alpha - 50) < 1e-9, 'alpha = 100 * t');
+});
+
+// ── #444: emission order — the blend must land on raw to-order ──────────────
+// Draw order is array order (packInstanceData never re-sorts), and the
+// completion frame drops the blend and presents raw e.items (liveResolve).
+// If the blend emits in asset-group order, that handoff flips stacking in
+// ONE frame — the visible z-fight at the end of every chip change. Required
+// shape at every interior t: first |to| entries = raw toItems order (matched
+// blends keep target identity, unmatched fade in), fade-outs trailing (they
+// are ~0 alpha at completion and vanish with the transition).
+
+ok('#444: blend emits to-items in raw order, fade-outs trailing (every t)', () => {
+  const from = [
+    { assetId: 'a', key: 'fromA', x: 0, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'fromA2', x: 40, y: 0, alpha: 100 },
+    { assetId: 'c', key: 'fromC', x: 80, y: 0, alpha: 100 },
+  ];
+  const to = [
+    { assetId: 'b', key: 'B1', x: 10, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'A1', x: 20, y: 0, alpha: 100 },
+    { assetId: 'b', key: 'B2', x: 30, y: 0, alpha: 100 },
+  ];
+  const plan = planMorph(from, to); // group order [a, c, b] ≠ raw to order [b, a, b]
+  const toKeys = to.map((i) => i.key);
+  for (const t of [0.25, 0.5, 0.999]) {
+    const out = blendItems(from, to, t, plan);
+    assert.deepEqual(out.slice(0, to.length).map((i) => i.key), toKeys,
+      `first ${to.length} entries at t=${t} must be raw to-order`);
+    for (const o of out.slice(to.length)) {
+      assert.ok(!toKeys.includes(o.key),
+        `trailing entry ${o.key} at t=${t} must be a fade-out, not a to-item`);
+    }
+  }
 });
 
 console.log(`itemMorph.selfcheck: ${fail === 0 ? 'OK' : 'FAIL'} (${n - fail}/${n})`);

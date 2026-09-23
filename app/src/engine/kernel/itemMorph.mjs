@@ -130,32 +130,50 @@ function lerpColor(a, b, t) {
  * live layout but an item never changes target mid-flight. Omitted
  * (tests, one-shot blends) => a fresh plan, identical to the old
  * per-call match.
+ *
+ * #444: EMISSION ORDER = raw toItems order first, fade-outs appended last.
+ * Draw order is array order (packInstanceData never re-sorts), and the
+ * completion frame drops the blend and presents raw e.items — so the last
+ * blend frame must already be in raw order or asset stacking flips in one
+ * frame (the z-fight at the end of every chip change). Emitting pairs
+ * group-by-group (allKeys = from-group keys first) reorders every time the
+ * group order differs from the raw to order. Trailing fade-outs are ~0
+ * alpha by then and vanish with the transition.
  */
 export function blendItems(fromItems, toItems, t, plan = null) {
   if (t <= 0) return fromItems;
   if (t >= 1) return toItems;
-  const { pairs, onlyFrom, onlyTo } = plan || planMorph(fromItems, toItems);
-  const toGroups = groupByAsset(toItems || []);
-  const out = [];
+  const { pairs, onlyFrom } = plan || planMorph(fromItems, toItems);
+  const toList = toItems || [];
+  const toGroups = groupByAsset(toList);
+  const idxOf = new Map(toList.map((it, i) => [it, i]));
+  const partner = new Array(toList.length).fill(null); // to-index -> matched from-item
   for (const { f, g, j } of pairs) {
     const to = toGroups.get(g)?.[j];
     if (!to) continue; // defensive: slot set shrank (shouldn't mid-transition)
-    out.push({
-      ...to,
-      x: lerp(f.x, to.x, t),
-      y: lerp(f.y, to.y, t),
-      scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, t),
-      rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, t),
-      alpha: lerp(Number.isFinite(f.alpha) ? f.alpha : 100, Number.isFinite(to.alpha) ? to.alpha : 100, t),
-      color: lerpColor(f.color, to.color, t),
-      accent: lerpColor(f.accent, to.accent, t),
-    });
+    const i = idxOf.get(to);
+    if (i === undefined || partner[i]) continue; // defensive: unresolvable / duplicate ref
+    partner[i] = f;
+  }
+  const out = [];
+  for (let i = 0; i < toList.length; i++) {
+    const to = toList[i];
+    const f = partner[i];
+    if (f) {
+      out.push({
+        ...to,
+        x: lerp(f.x, to.x, t),
+        y: lerp(f.y, to.y, t),
+        scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, t),
+        rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, t),
+        alpha: lerp(Number.isFinite(f.alpha) ? f.alpha : 100, Number.isFinite(to.alpha) ? to.alpha : 100, t),
+        color: lerpColor(f.color, to.color, t),
+        accent: lerpColor(f.accent, to.accent, t),
+      });
+    } else {
+      out.push({ ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t }); // unmatched target fades in (#444: in raw position)
+    }
   }
   for (const f of onlyFrom) out.push({ ...f, alpha: (Number.isFinite(f.alpha) ? f.alpha : 100) * (1 - t) });
-  for (const { g, j } of onlyTo) {
-    const to = toGroups.get(g)?.[j];
-    if (!to) continue;
-    out.push({ ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t });
-  }
   return out;
 }
