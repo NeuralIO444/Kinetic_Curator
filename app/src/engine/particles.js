@@ -30,7 +30,7 @@ import { createNoise } from './noise.js';
 import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
-import { resolveBehave, resolveWindMode, orbitForce } from './organisms/behave.js';
+import { resolveEffectiveBehave, resolveWindMode, orbitForce } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
 
@@ -690,7 +690,10 @@ export class ParticleSystem {
     } = layoutParams;
 
     const organism = isOrganismMode(layoutParams.mode);
-    const profile = organism ? resolveBehave(layoutParams.behave) : null;
+    // #479 Option B — table row + any per-layer overrides, shared with the
+    // DAVIS readout/editor via resolveEffectiveBehave() so the two can
+    // never disagree on what "effective" means.
+    const profile = organism ? resolveEffectiveBehave(layoutParams) : null;
     // #287 — the scent field exists only for organism casts (drives,
     // chemotaxis, and feeding all read it). Created lazily so cloud-mode
     // sessions never pay for it; persists across init() calls.

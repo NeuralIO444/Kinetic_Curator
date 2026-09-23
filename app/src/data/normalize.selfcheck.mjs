@@ -17,7 +17,7 @@
 
 import assert from 'node:assert';
 import {
-  normalizeLayoutParams, DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, RANGE_SPEC,
+  normalizeLayoutParams, validateLayoutParams, DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, RANGE_SPEC,
   MODE_IDS, BLEND_MODES, PALETTE_SHIFTS, SYMMETRY_MODES, BEHAVE_MODES,
   COMPOSITION_IDS,
 } from './layout-modes.js'; // #268: MATERIAL_IDS/SHADING_MODES removed
@@ -67,6 +67,11 @@ const POISON = [
   ['symmetry unknown', { symmetry: 'nope' }],
   ['behave unknown', { behave: 'nope' }],
 
+  // #479 Option B — BEHAVE overrides are the first nullable PARAM_SPEC
+  // fields; a hostile non-null value must still fall back to null (their
+  // real default), not survive as garbage or silently clamp to a bound.
+  ['behave overrides hostile', { behaveSep: Infinity, behaveCoh: 'evil', behaveAttract: [], behaveWind: NaN }],
+
   // Shapes that are not what the reader expects.
   ['scale not an array', { scale: 'big' }],
   ['scale too short', { scale: [1] }],
@@ -83,8 +88,13 @@ for (const [label, patch] of POISON) {
 
   const lp = normalizeLayoutParams(raw);
 
-  // 1. Every spec'd scalar is finite and inside its bounds.
+  // 1. Every spec'd scalar is finite and inside its bounds — except the
+  // #479 Option B BEHAVE overrides, whose own default is null ("no
+  // override"), a legitimate value clampNum preserves on purpose, not a
+  // hole. Null there is correct; anything else still must be finite +
+  // in-bounds like every other spec'd field.
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
+    if (DEFAULT_LAYOUT_PARAMS[key] === null && lp[key] === null) continue;
     assert.ok(Number.isFinite(lp[key]), `${label}: ${key} is not finite (${lp[key]})`);
     assert.ok(
       lp[key] >= spec.min && lp[key] <= spec.max,
@@ -195,6 +205,32 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
 {
   const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, scale: [1.6, 0.4] });
   assert.deepStrictEqual(lp.scale, [1.6, 0.4], 'reversed range must survive');
+}
+
+// #479 Option B — BEHAVE override round-trip and validation.
+{
+  // A real, in-bounds override survives normalize untouched.
+  const withOverride = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, behaveSep: 5.5 });
+  assert.strictEqual(withOverride.behaveSep, 5.5, 'a valid override must survive normalize');
+  // Out-of-bounds clamps like every other spec'd field, not falls back to null.
+  const clamped = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, behaveSep: 999 });
+  assert.strictEqual(clamped.behaveSep, PARAM_SPEC.behaveSep.max, 'an out-of-range override clamps, not falls back to null');
+  // A fresh project (no overrides set) normalizes to null for every one — an
+  // unedited layer must be indistinguishable from before #479 existed.
+  const fresh = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS });
+  for (const key of ['behaveSep', 'behaveAli', 'behaveCoh', 'behaveSepR', 'behaveAliR', 'behaveCohR', 'behaveWind', 'behaveOrbit', 'behaveAttract']) {
+    assert.strictEqual(fresh[key], null, `${key} must default to null (no override)`);
+  }
+  // validateLayoutParams (the live-edit path, stricter than normalize) must
+  // accept a null RESET write for a nullable field...
+  const reset = validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, behaveSep: 3, behaveCoh: null });
+  assert.ok(!reset.rejected.includes('behaveCoh'), 'a null RESET write on a nullable field must not be rejected');
+  assert.strictEqual(reset.params.behaveCoh, null, 'the reset field must actually clear to null');
+  assert.strictEqual(reset.params.behaveSep, 3, 'a sibling real override in the same write is untouched');
+  // ...but null must still reject for a field whose own default is a real
+  // number — this must not have become a blanket "null is always fine".
+  const badNull = validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, count: null });
+  assert.ok(badNull.rejected.includes('count'), 'null must still reject for a non-nullable field (count)');
 }
 
 // Every scalar default must have a spec entry. This is the test that catches

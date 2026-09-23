@@ -167,6 +167,39 @@ for (const [name, args] of CASES) {
   }
 }
 
+// #479 Option B — per-layer BEHAVE steering-weight overrides.
+{
+  const steps = 40;
+  // An unedited layer (behave set, no override fields touched) must be
+  // bit-identical to how the table row always behaved — the null sentinel
+  // is a true no-op, not just "close enough".
+  const plainCruise = run(ParticleSystem, 'hype', 20, steps, null, { behave: 'cruise' });
+  const explicitNullCruise = run(ParticleSystem, 'hype', 20, steps, null, {
+    behave: 'cruise', behaveSep: null, behaveCoh: null,
+  });
+  for (let i = 0; i < plainCruise.length; i++) {
+    assert.ok(Object.is(plainCruise[i].x, explicitNullCruise[i].x) && Object.is(plainCruise[i].y, explicitNullCruise[i].y),
+      `item ${i}: an explicit null override must be bit-identical to no override at all`);
+  }
+  // Overriding sep/coh must visibly change the resulting motion — the
+  // whole point of #479 Option B (a chip alone can't do this; only the
+  // table row could, until now).
+  const overridden = run(ParticleSystem, 'hype', 20, steps, null, {
+    behave: 'cruise', behaveSep: 5.9, behaveCoh: 1.8,
+  });
+  const moved = overridden.some((it, i) =>
+    Math.abs(it.x - plainCruise[i].x) > 1e-6 || Math.abs(it.y - plainCruise[i].y) > 1e-6);
+  assert.ok(moved, 'a BEHAVE weight override must visibly change swarm motion vs the unedited table row');
+  // Cloud (non-organism) modes never read the profile at all -- an override
+  // must be silently inert there, same as swarmCohesion already is for hype.
+  const cloudPlain = run(ParticleSystem, 'swarm', 20, steps, null);
+  const cloudOverridden = run(ParticleSystem, 'swarm', 20, steps, null, { behaveSep: 5.9, behaveCoh: 1.8 });
+  for (let i = 0; i < cloudPlain.length; i++) {
+    assert.ok(Object.is(cloudPlain[i].x, cloudOverridden[i].x) && Object.is(cloudPlain[i].y, cloudOverridden[i].y),
+      `item ${i}: BEHAVE overrides must be inert in cloud/swarm mode (organism-only)`);
+  }
+}
+
 console.log('particles.selfcheck: OK (#108 swarm SoA — behaviour identical to pre-SoA engine)', {
   cases: CASES.length,
 });
