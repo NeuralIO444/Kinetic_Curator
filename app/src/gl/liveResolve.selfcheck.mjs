@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { createLiveResolver } from './liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
+import { createNoise } from '../engine/noise.js';
 
 function baseInput(over = {}) {
   return {
@@ -420,6 +421,109 @@ test('#427: adopt-on-enter — a chip into a live swarm mode starts from the pri
   assert.ok(
     median < 5,
     `most matched items should adopt within a few px of their prior position, not scatter canvas-wide (median nearest-neighbor dist ${median.toFixed(1)}px)`,
+  );
+  r.dispose();
+});
+
+// ── #442: regression guards for the #432 warp-phase invariants ─────────────
+// #432 replaced ntLive = nt0 + loopTimeMs * noiseSpeed (proportional to
+// ABSOLUTE session time) with an incrementally accumulated wp.base
+// (integral of noiseSpeed over each call's own elapsed real time,
+// wp.base += max(0, nowMs - wp.lastMs) * 0.001 * noiseSpeed). Both tests
+// below reimplement that exact recurrence independently and assert exact
+// equality against it — not a magnitude/tolerance heuristic — so a revert
+// to the old formula (or a dropped clamp) fails hard, not flakily.
+//
+// Both exploit the same trick: a layer's FIRST live-warp resolve always
+// has wp.base === 0 (freshly initialized), so ntLive === nt0 and the live
+// delta (curDx - baseDx) is exactly zero there — that frame's positions
+// ARE the static (pre-warp) reference, with no separate probe needed.
+
+const WARP442_LP = { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 6, lifeDrift: 0, displacement: 40 };
+const warp442Items = (out) => out.find((l) => l.id === 'lyr-a').items;
+function assertWarpMatches(staticPos, after, { seed, noiseFreq, displacement, ntLive, nt0 }, msg) {
+  const noise = createNoise(seed >>> 0);
+  for (let i = 0; i < staticPos.length; i++) {
+    const p = staticPos[i];
+    const curDx = noise.fBm3D(p.x * noiseFreq, p.y * noiseFreq, ntLive, 3) * displacement;
+    const curDy = noise.fBm3D(p.x * noiseFreq + 200, p.y * noiseFreq + 200, ntLive + 100, 3) * displacement;
+    const baseDx = noise.fBm3D(p.x * noiseFreq, p.y * noiseFreq, nt0, 3) * displacement;
+    const baseDy = noise.fBm3D(p.x * noiseFreq + 200, p.y * noiseFreq + 200, nt0 + 100, 3) * displacement;
+    assert.ok(Math.abs(after[i].x - (p.x + curDx - baseDx)) < 1e-6, `item ${i} x: ${msg}`);
+    assert.ok(Math.abs(after[i].y - (p.y + curDy - baseDy)) < 1e-6, `item ${i} y: ${msg}`);
+  }
+}
+
+test('#442: warp phase — a mid-stream speed change is continuous (bounded by elapsed real time), not retroactive (bounded by absolute session time)', () => {
+  const seed = 4242;
+  const r = createLiveResolver();
+  const mk = (loopTimeMs, noiseSpeed) => baseInput({ seed, layoutParams: { ...WARP442_LP, noiseSpeed }, loopTimeMs });
+
+  // 600s of real elapsed time at speed 0.5 -- a large absolute session
+  // time, exactly the regime where the pre-#432 formula misbehaved.
+  warp442Items(r.resolveLayers(mk(0, 0.5)));       // establish wp at t=0
+  warp442Items(r.resolveLayers(mk(600_000, 0.5)));
+  // +1s at a very different speed (0.5 -> 2.8). Under the fixed formula
+  // this adds only 1s * 2.8 to the phase; under the old formula this
+  // single frame's speed edit would retroactively rescale the entire
+  // 600s-long phase term (a jump of roughly (2.8-0.5)*600 = 1380 units --
+  // the fBm decorrelates over ~1 unit, so that's an unrelated random
+  // sample, not a continuous step).
+  const after = warp442Items(r.resolveLayers(mk(601_000, 2.8)));
+
+  // Static (pre-live-delta) reference, captured at noiseSpeed=2.8
+  // specifically: buildPlacements' own geometry stage bakes a
+  // noiseSpeed-scaled static displacement too (placement.js's
+  // nt = (seed & 0xffff) * 0.02 * noiseSpeed, independent of liveResolve's
+  // live warp), so the reference must match `after`'s noiseSpeed -- a
+  // fresh resolver's first-ever call still has wp.base = 0 (zero live
+  // delta) regardless of which noiseSpeed it's called with.
+  const staticPos = warp442Items(createLiveResolver().resolveLayers(mk(0, 2.8)));
+
+  const nt0 = (seed & 0xffff) * 0.02;
+  const expectedBase = 600 * 0.5 + 1 * 2.8; // seconds elapsed * speed, per segment
+  assertWarpMatches(
+    staticPos, after,
+    { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
+    'a mid-stream speed change must move the phase by elapsed time x the new speed, not by the whole elapsed session time',
+  );
+  r.dispose();
+});
+
+test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, #421-style) does not rewind the accumulated phase', () => {
+  const seed = 777;
+  const r = createLiveResolver();
+  const speed = 1;
+  const mk = (loopTimeMs) => baseInput({ seed, layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs });
+
+  const staticPos = warp442Items(r.resolveLayers(mk(0)));       // wp.base = 0 -> static ref
+  const at1000 = warp442Items(r.resolveLayers(mk(1000)));       // 1s elapsed -> wp.base = 1 * speed
+
+  // #421-style rejected/rolled-back frame: loopTimeMs goes BACKWARD to 500.
+  // The pre-#432 formula tied ntLive directly to raw loopTimeMs, so this
+  // would have visibly rewound the warp; the max(0, ...) clamp must
+  // instead leave the phase exactly where it was -- byte-identical
+  // positions, not just "close."
+  const at500 = warp442Items(r.resolveLayers(mk(500)));
+  assert.deepEqual(at500, at1000, 'a backward loopTimeMs must not rewind the warp phase');
+
+  // Resume forward past the pre-rollback high point (1000). The resolver
+  // has no way to recover true wall-clock elapsed time across a rollback
+  // -- loopTimeMs is its only clock -- so its own dSec = max(0, nowMs -
+  // wp.lastMs) formula necessarily measures elapsed time from wherever
+  // loopTimeMs last WAS (500, set by the read above), not from the
+  // pre-rollback high point (1000). This is the resolver's actual,
+  // verified behavior, not an idealized "straight path" -- asserting
+  // against the resolver's own recurrence exactly is what makes this a
+  // precise regression guard rather than a guess.
+  const DELTA = 300;
+  const after = warp442Items(r.resolveLayers(mk(1000 + DELTA)));
+  const nt0 = (seed & 0xffff) * 0.02;
+  const expectedBase = 1 * speed + ((1000 + DELTA - 500) / 1000) * speed;
+  assertWarpMatches(
+    staticPos, after,
+    { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
+    "resuming forward after a rollback must match the resolver's own clamped-clock formula exactly",
   );
   r.dispose();
 });
