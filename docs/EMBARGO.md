@@ -17,7 +17,7 @@ Matt, 2026-09-19. Coding agents: this file plus [AGENTS.md](../AGENTS.md) plus [
 #392 spine F  shared noise + curl wind + organism vx  — closed (direct push)
 ```
 
-Until Matt has played Night Migration at 30 and 60 **and this file is updated to say so**, do not implement Studio labs, chip editors, species genomes, UV scroll, HarfBuzz, DLC packs, shimmer, TYPE chips, or new showcase rows.
+**2026-09-23 (Matt):** the `shimmer/` prototype readout mounted in `EvolveControls.jsx` is **accepted as-is** — it stays. This line amends the deferred pile below: what stays deferred is the shimmer *sidecar/stage*, not the mounted prototype.
 
 Planning docs in `docs/` marked **deferred** are allowed. They are not tickets.
 
