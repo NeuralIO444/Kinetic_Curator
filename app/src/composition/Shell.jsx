@@ -14,9 +14,10 @@ const TAB_STORAGE_KEY = 'kc:active-panel-tab';
 export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }) {
   const primary = panelsByZone('primary');
   const secondary = panelsByZone('secondary');
-  // #248 Phase 1: drawer-zone panels (ASSETS today) aren't tabs — a
-  // persistent trigger opens them as an overlay from whichever tab is
-  // active, closing back to it. One open at a time, same as the tab strip.
+  // #248 Phase 1 mechanism, kept generic: drawer-zone panels open as an
+  // overlay from whichever tab is active, closing back to it, one at a
+  // time. No panel claims the zone since #467 moved ASSETS back into the
+  // strip — this block renders nothing until one does.
   const drawers = panelsByZone('drawer');
   const [openDrawerId, setOpenDrawerId] = useState(null);
   const openDrawer = drawers.find((p) => p.id === openDrawerId) ?? null;

@@ -27,9 +27,10 @@ const GovernorTunePanel = import.meta.env.DEV
 export const PANEL_REGISTRY = [
   { id: 'canvas',   title: 'CANVAS',   icon: '◆', component: CanvasPanel,    zone: 'primary' },
   { id: 'build',    title: 'BUILD',    icon: '■', component: BuildPanel,     zone: 'secondary' },
-  // #248 Phase 1: ASSETS is a drawer, not a tab — panelsByZone('secondary')
-  // naturally excludes it now; Shell.jsx mounts it via AssetDrawer instead.
-  { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'drawer' },
+  // #467: ASSETS is a tab again — Matt's play-test reversal of #248 Phase 1
+  // (the quiet ◇ drawer trigger was too hidden for a panel this visited).
+  // The drawer mechanism in Shell.jsx stays, idle until a panel claims it.
+  { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'secondary' },
   { id: 'stimulus', title: 'STIMULI',  icon: '▸', component: StimulusPanel,  zone: 'secondary' },
   { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },
   // #248 Phase 4: PLAY is new, registered alongside davis/stimulus while
