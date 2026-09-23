@@ -15,7 +15,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
-import { QualityRow } from './output/QualityRow.jsx';
 import { RenderFinalBlock } from './output/RenderFinalBlock.jsx';
 import { PrintDeskBlock } from './output/PrintDeskBlock.jsx';
 import { BatchEditionBlock } from './output/BatchEditionBlock.jsx';
@@ -54,7 +53,7 @@ export function OutputPanel() {
   }));
   const {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
-    quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
+    quality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
     userPalettes, favorites, rendering, watchdogTripGen, canvasBg,
   } = state;
@@ -96,7 +95,7 @@ export function OutputPanel() {
         <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
       </PanelHeader>
       <div className="panel-body output-body">
-        <QualityRow quality={quality} autoQuality={autoQuality} />
+        {/* Gate 2026-09-23: QualityRow (null since #310) unmounted — BudgetKnob is the control. */}
 
         <RenderFinalBlock
           glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
