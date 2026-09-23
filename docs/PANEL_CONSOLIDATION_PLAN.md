@@ -21,7 +21,7 @@ Standing bars: 4 tabs at the end state, nothing deleted (moved only), no new con
 | First-run tour, built portable on purpose | `app/src/data/tour.js`, `TourOverlay.jsx` (#222) | Header comment: "Pure data + helpers — no components, so the tour stays portable to the planned PLAY/BUILD/ASSETS/OUTPUT consolidation." `tab` fields are ids (`'layout'`, `'output'`, `null`), not hardcoded titles — cheap to repoint. Step 3's `body` text says "the DAVIS tab" in prose — that needs a copy edit, not a data-shape change. |
 | Lazy full-screen modal pattern (drawer precedent) | `AssetPoolPanel.jsx` → `AssetStudioModal.jsx` (already lazy-loaded from inside the panel), `OutputPanel.jsx` → `PrintDeskModal.jsx` | The codebase already has the exact interaction the issue wants for ASSETS ("open it, grab an asset, close it") — it's just one level too shallow (still opened from inside a tab, not from persistent chrome). Reuse this lazy-import + local-state-toggle pattern for the ASSETS drawer trigger; do not invent a new overlay primitive. |
 | `#341` FX 4-cap ghost-slot UX | `LayersPanel.jsx` (`fxGhosts`/`ghosts` arrays) | Shipped 2026-09-22 (`feat(layers): FX 4-cap ghost slots`). The BUILD-absorbs-LAYERS phase inherits this as-is — do not touch the ghost-slot math, just relocate the file's JSX. |
-| **Phase 1 (ASSETS: tab → drawer)** | `PanelRegistry.js` (`assets` entry, `zone: 'drawer'`), `Shell.jsx`, `components/DrawerOverlay.jsx` | Shipped 2026-09-22, PR #415 (`feat(ui): ASSETS tab -> drawer (#248 Phase 1)`), landed after this plan doc was first written and never back-filled here until now. §3's Phase 1 section below is historical record of what was built, not a pending task — do not redo it. |
+| **Phase 1 (ASSETS: tab → drawer)** | `PanelRegistry.js` (`assets` entry, `zone: 'drawer'`), `Shell.jsx`, `components/DrawerOverlay.jsx` | Shipped 2026-09-22, PR #415 (`feat(ui): ASSETS tab -> drawer (#248 Phase 1)`), landed after this plan doc was first written and never back-filled here until now. §3's Phase 1 section below is historical record of what was built, not a pending task — do not redo it. **REVERSED 2026-09-23 (#467, Matt's play-test call): ASSETS is a tab again; the drawer mechanism stays, idle.** |
 | **Phase 2 (BUILD absorbs LAYOUT)** | `PanelRegistry.js` (`build` entry), `panels/BuildPanel.jsx` (new, replaces `LayoutPanel.jsx`), `panels/layout/*.jsx` (unchanged, cross-imported) | Shipped 2026-09-22, PR #443 (`feat(ui): BUILD absorbs LAYOUT (#248 Phase 2)`). `BuildPanel.jsx` keeps `className="panel panel-layout"` and the `layout/` directory name on purpose (§5 — no CSS-class-root renames). Also fixed 3 e2e specs' `/layout/i` tab selectors to `/build/i` (`smoke.spec.js`, `cache-verify.spec.js`, `voice-personas.spec.js`) since two of the three click unguarded — that would otherwise have broken CI on this PR rather than waiting for Phase 12. §3's Phase 2 section is historical record; do not redo it. |
 | **Phase 3 (BUILD absorbs LAYERS)** | `panels/build/LayerStack.jsx` (new, replaces `LayersPanel.jsx`), `BuildPanel.jsx` (mounts it as a second section), `PanelRegistry.js` (`layers` entry removed) | Shipped 2026-09-22, PR #445 (`feat(ui): BUILD absorbs LAYERS (#248 Phase 3)`). `LayerStack.jsx`'s own `PanelHeader` (tag `P08`) is reused as the section divider — same component, no new section-heading CSS. Also fixed `helpCopy.selfcheck.mjs`'s wiring-check file-path map (pointed at the now-deleted `panels/LayersPanel.jsx`) to `panels/build/LayerStack.jsx`. §3's Phase 3 section is historical record; do not redo it. |
 | **Phase 4 (PLAY: create the panel; EVOLVE + beat router)** | `panels/PlayPanel.jsx` (new), `PanelRegistry.js` (`play` entry, alongside still-live `davis`/`stimulus`), `panels/DavisPanel.jsx` (trimmed) | Shipped 2026-09-22, PR #447 (`feat(ui): PLAY panel — EVOLVE chips + shimmer + beat router (#248 Phase 4)`). `EvolveControls.jsx`/`BeatRouter.jsx` stay in `panels/davis/`, cross-imported. `PlayPanel.jsx` computes its own `beatCollision` from a state slice split across DAVIS+PLAY — verified live that the cross-panel gate still works. `tour.js` step 3's now-half-stale "DAVIS tab" body text left alone on purpose (its accurate fix only holds once Phase 5 lands too; that's still Phase 12's job). §3's Phase 4 section is historical record; do not redo it. Phase 5 (PLAY: move MORPH EVOLVE + PHRASE LOOP) is the next open phase. |
@@ -88,7 +88,7 @@ Every phase: one PR, CI green (`npm run lint && npm run selfcheck && npm run bui
 
 ---
 
-### Phase 1 — ASSETS: tab → drawer — **SHIPPED, PR #415**
+### Phase 1 — ASSETS: tab → drawer — **SHIPPED, PR #415 → REVERSED by #467 (Matt, 2026-09-23)**
 
 **What it means:** ASSETS stops being a tab and becomes a persistent-button-triggered overlay, exactly the "open it, grab an asset, close it" pattern the issue names — reusing the lazy-modal mechanism `AssetPoolPanel.jsx` already uses internally for `AssetStudioModal`.
 
@@ -257,14 +257,14 @@ Every phase: one PR, CI green (`npm run lint && npm run selfcheck && npm run bui
 - `PanelRegistry.js`: remove the `davis` entry (it should already be `stimulus`-free from Phase 8).
 - Delete `DavisPanel.jsx` and `StimulusPanel.jsx`. Grep the whole `app/src` tree for any remaining import of either before deleting — a stray reference (e.g. from a stale test fixture) is exactly the "dead reference" risk `ARCHITECTURE_PLAN.md` Phase 5 calls out for a similar cut.
 - `davis/FavoritesList.jsx` stays (still dead, still unreferenced, not this plan's problem to resolve — note it again so nobody "helpfully" wires it back in during the grep pass).
-- Confirm `panelsByZone('secondary')` now returns exactly `build`, `play`, `output` (3) — CANVAS is primary, ASSETS is the drawer, that's the issue's 4-panel map in full.
+- Confirm `panelsByZone('secondary')` now returns exactly `build`, `play`, `output`, `assets` (4 — the 4-tab cap counts ASSETS as a tab again after #467; `davis`/`stimulus` removed as planned) — CANVAS is primary, and the map is BUILD/PLAY/ASSETS/OUTPUT in full.
 - Tick the new "4-tab cap" `docs/DECISIONS.md` entry from Phase 0 as satisfied (docs-only hunk in this same PR, matching ENGINE_PLAN's own convention of ticking acceptance boxes in the landing PR).
 
 **Touches:** `PanelRegistry.js`, delete `DavisPanel.jsx`, delete `StimulusPanel.jsx`, `docs/DECISIONS.md` (tick).
 
 **Do NOT:** delete `davis/`/`stimulus/` subcomponent files that were *moved* (they should already be relocated under `PlayPanel.jsx`'s ownership by now, e.g. renamed into a `play/` directory in whichever earlier phase did the move — if any phase left them in the old directory importing cross-tree into `PlayPanel.jsx`, this is the phase to finally relocate the files themselves, since it's now safe with nothing else pointing at the old directory).
 
-**Acceptance:** Tab strip is exactly CANVAS (primary) + BUILD + PLAY + OUTPUT (secondary) + an ASSETS drawer trigger. No file in `app/src` imports `DavisPanel.jsx` or `StimulusPanel.jsx`. `npm run build` produces no dead-import warnings. CI green (lint + selfcheck + build + e2e).
+**Acceptance:** Tab strip is exactly CANVAS (primary) + BUILD + PLAY + ASSETS + OUTPUT (secondary) — ASSETS restored as a tab by #467, no drawer trigger in the strip. No file in `app/src` imports `DavisPanel.jsx` or `StimulusPanel.jsx`. `npm run build` produces no dead-import warnings. CI green (lint + selfcheck + build + e2e).
 
 ---
 
@@ -325,12 +325,12 @@ Land strictly in this order, one merged PR before the next branch opens — same
 
 ## 6. Acceptance for "the consolidation is done" (issue #248's own bar, operationalized)
 
-- [ ] All 7 old panels' controls are reachable from PLAY / BUILD / ASSETS (drawer) / OUTPUT — cross-check every row in §1's control-cluster table against its new home.
+- [ ] All 7 old panels' controls are reachable from PLAY / BUILD / ASSETS / OUTPUT (ASSETS a tab again, #467) — cross-check every row in §1's control-cluster table against its new home.
 - [ ] Hotkeys (`Space`, `S`, `F`, `G`, `E`, `N`, `?`, `⌘Z`, `⌘⇧Z`) fire identically post-consolidation (they're wired at `App.jsx`, unaffected by panel moves, but verify after Phase 6 specifically since `F`/`N`/`E` target controls that moved).
 - [ ] Governor shed readout is honest inside PLAY: no PLAY control shows as active while the governor has actually shed its effect (Phase 10).
 - [ ] `docs/DECISIONS.md` exists with the 4-tab-cap, cost-tier-contract, and taste-v1 entries (Phase 0), plus the cutover tick (Phase 11).
 - [ ] `.github/PULL_REQUEST_TEMPLATE.md` has the Loop section; every phase's PR uses it.
-- [ ] `panelsByZone('secondary')` returns exactly `build`, `play`, `output`; ASSETS is a drawer, not a tab; CANVAS remains primary and untouched.
+- [ ] `panelsByZone('secondary')` returns exactly `build`, `play`, `output`, `assets`; ASSETS is a tab (#467 reversed Phase 1); CANVAS remains primary and untouched.
 - [ ] `?` overlay and hover-title copy have no stray references to GHOST STATION / STIMULI / LAYOUT / LAYERS as tabs (Phase 12).
 - [ ] First-run tour's 4 steps target PLAY/BUILD/OUTPUT correctly (Phase 12).
 - [ ] `FavoritesList.jsx` is still dead and still unreferenced (nobody "fixed" it along the way).
