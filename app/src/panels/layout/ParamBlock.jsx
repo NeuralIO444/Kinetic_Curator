@@ -1,6 +1,6 @@
 // Parameter block — RangeRows with tooltips (#14)
 import { RangeRow, DualRangeRow } from '../../components/RangeRow.jsx';
-import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES, isOrganismMode } from '../../data/layout-modes.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
@@ -18,6 +18,9 @@ export function ParamBlock({ layoutParams, lockedParams }) {
   // physics sliders, not the moth ones.
   const isSwarm = mode === 'swarm' || mode === 'murmuration';
   const isHype = mode === 'hype';
+  // #479 micro-fix: COHESION is already dimmed off-swarm (#272), but on hype
+  // the reason named the mode gate, not the authority — the BEHAVE table's
+  // coh wins there (particles.js: cohW = organism ? profile.coh : ...).
   const bilateral = (layoutParams.symmetry ?? 'none') === 'bilateral';
   // #287 — flap drives bilateral wings and the radial-N fans alike.
   const radial = (layoutParams.symmetry ?? 'none').startsWith('radial-');
@@ -79,7 +82,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         locked={lockedParams.particleCount} onToggleLock={() => lock('particleCount')} />
       <RangeRow label="COHESION" value={layoutParams.swarmCohesion} min={0} max={0.6} step={0.05}
         hint="How strongly particles steer toward the center of their local flock (past ~0.6 the flock is one blob)"
-        disabled={!isSwarm} disabledReason="Swarm mode only"
+        disabled={!isSwarm} disabledReason={isOrganismMode(mode) ? "BEHAVE table drives cohesion in hype mode" : "Swarm mode only"}
         onChange={v => set('swarmCohesion', v)} defaultValue={d('swarmCohesion', DEFAULT_LAYOUT_PARAMS.swarmCohesion)}
         locked={lockedParams.swarmCohesion} onToggleLock={() => lock('swarmCohesion')} />
       <RangeRow label="GRAVITY" value={layoutParams.gravityWells} min={0} max={5.0} step={0.1}
