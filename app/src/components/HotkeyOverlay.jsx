@@ -23,7 +23,7 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
         <div className="davis-source-row" style={{ margin: '8px 0' }}>
           {['help', 'keys', 'settings'].map((id) => (
             <button key={id} className={`chip-btn ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
-              {id.toUpperCase()}
+              {id}
             </button>
           ))}
         </div>

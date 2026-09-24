@@ -36,7 +36,7 @@ export const PANEL_REGISTRY = [
   // #248 Phase 4: PLAY is new, registered alongside davis/stimulus while
   // they still hold content — expected mid-migration tab-count bulge
   // (PANEL_CONSOLIDATION_PLAN.md §2.8), not a violation of the 4-tab cap.
-  { id: 'play',     title: 'PLAY',     icon: '◎', component: PlayPanel,     zone: 'secondary' },
+  { id: 'play',     title: 'PLAY',     icon: '▶', component: PlayPanel,     zone: 'secondary' },
   { id: 'pipeline', title: 'PIPELINE', icon: '⇌', component: PipelinePanel,  zone: 'secondary' },
 ];
 

@@ -130,13 +130,13 @@ export function ParamBlock({ layoutParams, lockedParams }) {
       <div className="davis-source-row" style={{ marginTop: 6 }}>
         <span className="davis-label">SYMMETRY</span>
         {SYMMETRY_MODES.map((s) => (
-          <button key={s} type="button" className={`chip-btn ${(layoutParams.symmetry || 'none') === s ? 'active' : ''}`} onClick={() => set('symmetry', s)}>{s.toUpperCase()}</button>
+          <button key={s} type="button" className={`chip-btn chip-symmetry ${(layoutParams.symmetry || 'none') === s ? 'active' : ''}`} onClick={() => set('symmetry', s)}>{s.toUpperCase()}</button>
         ))}
       </div>
       <div className="davis-source-row" style={{ marginTop: 6 }}>
         <span className="davis-label">BEHAVE</span>
         {BEHAVE_MODES.map((s) => (
-          <button key={s} type="button" className={`chip-btn ${(layoutParams.behave || 'cruise') === s ? 'active' : ''}`} onClick={() => set('behave', s)}>{s.toUpperCase()}</button>
+          <button key={s} type="button" className={`chip-btn chip-behave ${(layoutParams.behave || 'cruise') === s ? 'active' : ''}`} onClick={() => set('behave', s)}>{s.toUpperCase()}</button>
         ))}
       </div>
       {/* #287 — METABOLISM: the first of the two new sliders. Speed of the

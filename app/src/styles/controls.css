@@ -101,7 +101,7 @@
   transition: all 100ms;
 }
 .randomize-btn:hover { background: var(--ink); color: var(--bg); }
-.randomize-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: uppercase; }
+.randomize-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: lowercase; }
 
 .curator-left-group { display: flex; align-items: center; gap: 6px; }
 .curator-voice-wrap { position: relative; }

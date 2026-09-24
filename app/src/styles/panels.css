@@ -20,7 +20,7 @@
 .panel-subtitle { color: var(--dim); font-size: 10px; }
 .panel-header-right { display: flex; align-items: center; gap: 6px; }
 .header-tools { display: inline-flex; gap: 3px; align-items: center; }
-.meter-pill { font-size: 9px; padding: 1px 5px; border: 1px solid var(--line); color: var(--dim); }
+.meter-pill { font-size: 9px; padding: 1px 5px; border: 1px solid var(--line); color: var(--dim); text-transform: lowercase; }
 .panel-body { padding: 8px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 
 .chip-btn {
@@ -33,6 +33,20 @@
 }
 .chip-btn:hover { color: var(--ink); border-color: var(--ink); }
 .chip-btn.active { color: var(--bg); background: var(--ink); border-color: var(--ink); }
+
+/* #536: chip-identity fixed shapes */
+.chip-btn.chip-behave {
+  border-radius: 9999px;
+  padding: 1px 7px;
+}
+.chip-btn.chip-behave.active {
+  color: var(--bg);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.chip-btn.chip-symmetry {
+  border-radius: 2px;
+}
 
 /* ─── Preset + Mode ─── */
 .preset-groups { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
@@ -175,7 +189,7 @@
 .stim-toggle.on { color: #000; font-weight: 700; }
 .stim-meters { display: grid; grid-template-columns: 1fr; gap: 3px; margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.25); border: 1px solid var(--line); }
 .stim-meter-row { display: grid; grid-template-columns: 52px 1fr 32px; align-items: center; gap: 6px; font-size: 9px; }
-.stim-meter-label { color: var(--dim); letter-spacing: 0.08em; text-transform: uppercase; }
+.stim-meter-label { color: var(--dim); letter-spacing: 0.08em; text-transform: lowercase; }
 .stim-meter-track { position: relative; height: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--line); }
 .stim-meter-fill { position: absolute; top: 0; left: 0; height: 100%; transition: width 0.1s; }
 
@@ -184,7 +198,7 @@
 .panel-davis .davis-body { padding: 8px; }
 .davis-body { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .davis-source-row, .davis-interval-row { display: flex; align-items: center; gap: 6px; font-size: 10px; }
-.davis-label { color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; width: 52px; font-size: 9px; }
+.davis-label { color: var(--dim); text-transform: lowercase; letter-spacing: 0.08em; width: 52px; font-size: 9px; }
 .davis-interval-row input[type=range] { flex: 1; min-width: 0; }
 .davis-readout { color: var(--ink); min-width: 32px; text-align: right; font-size: 10px; }
 .davis-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px; }
@@ -258,7 +272,7 @@
 .fx-effect-head { display: flex; align-items: center; gap: 4px; }
 .fx-effect-name { flex: 1; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #cdbfff; }
 .fx-param { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-.fx-param label { font-size: 9px; color: var(--dim); width: 52px; text-transform: uppercase; letter-spacing: 0.05em; }
+.fx-param label { font-size: 9px; color: var(--dim); width: 52px; text-transform: lowercase; letter-spacing: 0.05em; }
 .fx-param input[type=range] { flex: 1; }
 .fx-param-readout { font-size: 9px; color: var(--dim); width: 40px; text-align: right; }
 /* #507 — inline PATCH diagnostic line under each patched layer row. */
