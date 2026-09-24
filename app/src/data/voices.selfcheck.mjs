@@ -12,6 +12,13 @@ import {
 } from './voices.js';
 import { DEFAULT_LAYOUT_PARAMS, MODE_IDS, validateLayoutParams } from './layout-modes.js';
 
+// #515: HYPE read as rattle, not pulse — its life LFO was the hottest of the three
+// flagships (0.5). Retuned to 0.3; raise it deliberately, with a play-test.
+{
+  const life = (id) => resolveVoiceState(FLAGSHIP_VOICES.find((v) => v.id === id)).params.lifeDrift;
+  assert.ok(life('hype') <= 0.3, `HYPE lifeDrift ${life('hype')} must not exceed 0.3`);
+}
+
 // Three flagships, each a COMPLETE state.
 assert.strictEqual(FLAGSHIP_VOICES.length, 3);
 assert.deepStrictEqual(FLAGSHIP_VOICE_IDS, ['swarm', 'hype', 'murmuration']);

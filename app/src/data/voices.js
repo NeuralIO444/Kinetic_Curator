@@ -15,6 +15,10 @@
 //     assets:  'all' | { [assetId]: boolean },
 //   }
 //
+// Motion knobs: `jitter` is placement-static (baked once per layout, it cannot
+// shimmer); `lifeDrift` is the per-frame shimmer/breath scale (liveLoop) — tune
+// a chip's liveliness with lifeDrift, not jitter.
+//
 // The fx chain is authored data: glow/fade/tunnel/prism ride on the
 // accumulation params the live engine already understands (accumulationOptics
 // etc.), so those ARE wired. Grain / vignette / posterize / edge / contrast
@@ -167,7 +171,7 @@ export const FLAGSHIP_VOICES = [
       audioModDepth: 0.8,
       audioScaleMod: 0.6,
       audioAlphaMod: 0.3,
-      lifeDrift: 0.5,
+      lifeDrift: 0.3, // #515: was 0.5 — read as rattle, not pulse
     },
     fx: { grain: 0, vignette: false, posterize: true, edge: true, glow: 0.5, contrast: 1.25 },
     assets: 'all',
