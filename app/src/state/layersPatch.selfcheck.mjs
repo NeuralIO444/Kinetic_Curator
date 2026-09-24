@@ -70,3 +70,21 @@ const patchOf = (id) => useStore.getState().layers.find((l) => l.id === id).patc
   assert.deepStrictEqual(s.layers.map((l) => l.id), [kc], 'FX track still removable');
   console.log('[selfcheck] layersPatch last-content-track guard');
 }
+
+// Removing a track clears other layers' patch.to that pointed at it (same rule
+// as projectNormalize on load: to -> null, mode unchanged). Unrelated targets stay.
+{
+  useStore.setState(useStore.getInitialState());
+  useStore.setState({
+    layers: ['kc-a', 'kc-b', 'kc-c'].map((id, i) => ({ id, name: `KC-${i + 1}`, visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } })),
+    activeLayerId: 'kc-a',
+  });
+  const { setLayerPatch, removeLayer } = useStore.getState();
+  setLayerPatch('kc-a', { mode: 'field', to: 'kc-b', strength: 0.5 });
+  setLayerPatch('kc-c', { mode: 'mod', to: 'kc-a', strength: 0.5 });
+  removeLayer('kc-b');
+  assert.strictEqual(patchOf('kc-a').to, null, 'patch to a removed track is cleared');
+  assert.strictEqual(patchOf('kc-a').mode, 'field', 'mode is left alone');
+  assert.strictEqual(patchOf('kc-c').to, 'kc-a', 'patch to a surviving track is untouched');
+  console.log('[selfcheck] layersPatch removal clears dead target');
+}

@@ -134,7 +134,9 @@ export const createLayersSlice = (set) => ({
     const target = state.layers.find((l) => l.id === id);
     if (!target) return {};
     if (!isFxLayer(target) && state.layers.filter((l) => !isFxLayer(l)).length <= 1) return {}; // last content track stays
-    const layers = state.layers.filter((l) => l.id !== id);
+    // Clear patch.to pointing at the removed track (same rule as projectNormalize on load).
+    const layers = state.layers.filter((l) => l.id !== id)
+      .map((l) => (l.patch?.to === id ? { ...l, patch: { ...l.patch, to: null } } : l));
     const snapshots = { ...state.layerSnapshots };
     delete snapshots[id];
     const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;
