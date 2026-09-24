@@ -264,22 +264,48 @@ export const FLAGSHIP_VOICES = [
 ];
 
 /**
- * Stub voices — vibe direction only, voiced later. Chips keep the current
- * bare mode-switch behavior. `id` is the layout mode id.
+ * Stub voices (#517) — a vibe plus a small `motion` block of layout-param deltas
+ * (rule: static modes = low drift + low flow; flow modes = mid flow + an honest
+ * behave). A stub chip rides the preset MIX road (loadStubMode): numbers glide,
+ * enums cut at t>0, colors and assets are left alone. `id` is the layout mode id.
  */
 export const STUB_VOICES = [
-  { id: 'random',     name: 'random',    glyph: 'rand',   vibe: 'Static Bloom: channel-surfing between accidents. Confetti TV.' },
-  { id: 'grid',       name: 'grid',      glyph: 'grid',   vibe: 'Control Room: brutalist order. Swiss grid, every node in its cell.' },
-  { id: 'fibonacci',  name: 'fibonacci', glyph: 'phi',    vibe: 'Nautilus: golden-spiral growth. Sacred geometry, slow reveal.' },
-  { id: 'radial',     name: 'radial',    glyph: 'rad',    vibe: 'Radar: sonar pings and target locks. Military calm.' },
-  { id: 'noise',      name: 'noise warp', glyph: 'noise',  vibe: 'Bad Reception: warped broadcast, signal decay. Analog horror.' },
-  { id: 'stratified', name: 'stratified', glyph: 'strat', vibe: 'Sediment: geological layers. Deep time, compressed.' },
-  { id: 'flow',       name: 'flow',      glyph: 'flow',   vibe: 'River: current lines drifting downstream. Hydrology.' },
-  { id: 'rails',      name: 'rails',     glyph: 'rail',   vibe: 'Transit Map: commuter lines, schedule adherence. Urban systems.' },
-  { id: 'layers',     name: 'layers',    glyph: 'z',      vibe: 'Z-Stack: depth slices, parallax archaeology. Core samples.' },
-  { id: 'ca',         name: 'cellular',  glyph: 'ca',     vibe: 'Petri Dish: cellular colonies on agar. Wet biology.' },
-  { id: 'orbit',      name: 'orbit',     glyph: 'orbit',  vibe: 'Planetarium: gravitational ballet. Moons and patience.' },
-  { id: 'abacus',     name: 'abacus',    glyph: 'abacus', vibe: 'Counting House: beads on wires. Arithmetic made visible.' },
+  { id: 'random',     name: 'random',    glyph: 'rand',   vibe: 'Static Bloom: channel-surfing between accidents. Confetti TV.',
+    motion: { lifeDrift: 0.3, noiseSpeed: 0.6, behave: 'scatter' },
+  },
+  { id: 'grid',       name: 'grid',      glyph: 'grid',   vibe: 'Control Room: brutalist order. Swiss grid, every node in its cell.',
+    motion: { lifeDrift: 0.08, noiseSpeed: 0.1 },
+  },
+  { id: 'fibonacci',  name: 'fibonacci', glyph: 'phi',    vibe: 'Nautilus: golden-spiral growth. Sacred geometry, slow reveal.',
+    motion: { lifeDrift: 0.2, noiseSpeed: 0.2 },
+  },
+  { id: 'radial',     name: 'radial',    glyph: 'rad',    vibe: 'Radar: sonar pings and target locks. Military calm.',
+    motion: { lifeDrift: 0.12, noiseSpeed: 0.15 },
+  },
+  { id: 'noise',      name: 'noise warp', glyph: 'noise',  vibe: 'Bad Reception: warped broadcast, signal decay. Analog horror.',
+    motion: { lifeDrift: 0.3, noiseSpeed: 0.9, behave: 'scatter' },
+  },
+  { id: 'stratified', name: 'stratified', glyph: 'strat', vibe: 'Sediment: geological layers. Deep time, compressed.',
+    motion: { lifeDrift: 0.1, noiseSpeed: 0.1 },
+  },
+  { id: 'flow',       name: 'flow',      glyph: 'flow',   vibe: 'River: current lines drifting downstream. Hydrology.',
+    motion: { lifeDrift: 0.25, noiseSpeed: 0.7, wind: 1.2 },
+  },
+  { id: 'rails',      name: 'rails',     glyph: 'rail',   vibe: 'Transit Map: commuter lines, schedule adherence. Urban systems.',
+    motion: { lifeDrift: 0.08, noiseSpeed: 0.1 },
+  },
+  { id: 'layers',     name: 'layers',    glyph: 'z',      vibe: 'Z-Stack: depth slices, parallax archaeology. Core samples.',
+    motion: { lifeDrift: 0.1, noiseSpeed: 0.15 },
+  },
+  { id: 'ca',         name: 'cellular',  glyph: 'ca',     vibe: 'Petri Dish: cellular colonies on agar. Wet biology.',
+    motion: { lifeDrift: 0.15, noiseSpeed: 0.2 },
+  },
+  { id: 'orbit',      name: 'orbit',     glyph: 'orbit',  vibe: 'Planetarium: gravitational ballet. Moons and patience.',
+    motion: { lifeDrift: 0.2, noiseSpeed: 0.35, behave: 'orbit' },
+  },
+  { id: 'abacus',     name: 'abacus',    glyph: 'abacus', vibe: 'Counting House: beads on wires. Arithmetic made visible.',
+    motion: { lifeDrift: 0.08, noiseSpeed: 0.1 },
+  },
 ];
 
 export const FLAGSHIP_VOICE_IDS = FLAGSHIP_VOICES.map((v) => v.id);

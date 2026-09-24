@@ -43,12 +43,14 @@ test.describe('Mode personas', () => {
     await expect(page.locator('.canvas-corner.tr').first()).toContainText(/swarm/i, { timeout: 10_000 });
   });
 
-  test('stub tiles switch mode with no MIX (current behavior)', async ({ page }) => {
+  test('stub tiles ride the MIX road and land the mode (#517)', async ({ page }) => {
     await page.locator('.mode-grid .mode-tile', { hasText: 'grid' }).click();
+    // Same morph-don't-cut road as a preset: the MIX bar appears, names the chip, then commits.
+    const mixBar = page.locator('.mix-bar');
+    await expect(mixBar).toBeVisible({ timeout: 5_000 });
+    await expect(mixBar).toContainText(/grid/i);
+    await expect(mixBar).toBeHidden({ timeout: 15_000 });
     await expect(page.locator('.mode-grid .mode-tile.active', { hasText: 'grid' })).toBeVisible();
-    // No crossfade for stubs — the MIX bar never appears
-    await page.waitForTimeout(800);
-    await expect(page.locator('.mix-bar')).toHaveCount(0);
     await expect(page.locator('.canvas-corner.tr').first()).toContainText(/grid/i, { timeout: 10_000 });
   });
 

@@ -7,14 +7,18 @@
 import { useStore } from '../state/store.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { LAYOUT_MODES, BEHAVE_MODES } from '../data/layout-modes.js';
+import { STUB_VOICES } from '../data/voices.js';
 
 const MODE_FAVORITES = LAYOUT_MODES.slice(0, 4);
+const STUB_IDS = new Set(STUB_VOICES.map((v) => v.id));
 
 export function ModeStrip() {
   const mode = useStore((s) => s.layoutParams.mode);
   const behave = useStore((s) => s.layoutParams.behave || 'cruise');
 
-  const setMode = (id) => emit(Events.LAYOUT_PARAM, { key: 'mode', value: id });
+  const loadStubMode = useStore((s) => s.loadStubMode);
+  // #517: stub modes ride the MIX road; anything else is a bare mode switch.
+  const setMode = (id) => (STUB_IDS.has(id) ? loadStubMode(id) : emit(Events.LAYOUT_PARAM, { key: 'mode', value: id }));
   const setBehave = (id) => emit(Events.LAYOUT_PARAM, { key: 'behave', value: id });
 
   return (

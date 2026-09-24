@@ -1,15 +1,14 @@
 // Voice row (#280) — curated mode personas + the performer's own shelf.
 //
 // Three flagship voices (SWARM / HYPE / MURM) load complete curated states
-// through a MIX crossfade. The twelve stub modes keep their current bare
-// mode-switch behavior until they are voiced. The row ends with the + chip:
+// through a MIX crossfade. The twelve stub modes (#517) ride the same MIX road
+// with a small motion block (loadStubMode). The row ends with the + chip:
 // tap to capture the live state as a user voice (VOICE 01, …), long-press a
 // user chip to overwrite it, double-click to rename, × to delete (confirm).
 import { useRef, useState } from 'react';
 import { useStore } from '../../state/store.js';
 import { FLAGSHIP_VOICES, STUB_VOICES } from '../../data/voices.js';
 import { MAX_USER_VOICES } from '../../state/slices/voiceSlice.js';
-import { emit, Events } from '../../composition/eventBus.js';
 import { MixBar } from './MixBar.jsx';
 
 const LONG_PRESS_MS = 650;
@@ -109,6 +108,7 @@ export function ModeGrid({ mode }) {
   const userVoices = useStore((s) => s.userVoices);
   const activeVoiceId = useStore((s) => s.activeVoiceId);
   const loadVoice = useStore((s) => s.loadVoice);
+  const loadStubMode = useStore((s) => s.loadStubMode);
   const captureUserVoice = useStore((s) => s.captureUserVoice);
   const renameUserVoice = useStore((s) => s.renameUserVoice);
   const overwriteUserVoice = useStore((s) => s.overwriteUserVoice);
@@ -138,7 +138,7 @@ export function ModeGrid({ mode }) {
           <button
             key={m.id}
             className={`mode-tile${mode === m.id ? ' active' : ''}`}
-            onClick={() => emit(Events.LAYOUT_PARAM, { key: 'mode', value: m.id })}
+            onClick={() => loadStubMode(m.id)}
             title={m.vibe}
           >
             <span style={{ fontSize: '11px' }}>{m.glyph}</span>

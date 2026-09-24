@@ -8,7 +8,49 @@ import { ASSETS } from '../../data/assets/index.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, defaultSeedOffsets, normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
-import { resolveVoiceState, captureLiveVoiceState } from '../../data/voices.js';
+import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES } from '../../data/voices.js';
+
+/**
+ * Open a MIX toward `merged` layout params (#284 morph-don't-cut). Live state
+ * stays untouched until commitVoiceMix lands it in one undo step. Shared by
+ * applyPreset and loadStubMode (#517).
+ */
+function openParamsMix(state, merged, { palettePatch = null, assetsPatch = null, name }) {
+  // A preset chip morphs like a voice chip (#284): open a MIX toward the
+  // preset instead of hard-cutting. `state.layoutParams`/paletteOverrides/
+  // enabledAssets stay untouched until commit — commitVoiceMix lands them
+  // in one undo step, same as loadVoice. `to.paletteId`: a real catalog id
+  // when pairing, else null so commit leaves color state alone (see
+  // commitVoiceMix) instead of freezing the current colors into a stray
+  // override.
+  const paletteSrc = palettePatch
+    ? getCatalogPalette(palettePatch.paletteId, state.userPalettes)
+    : resolvePalette(state.paletteId, state.paletteOverrides, state.userPalettes);
+  const enabled = state.enabledAssets || {};
+  const ids = Object.keys(enabled);
+  const allOn = ids.length > 0 && ids.every((id) => !!enabled[id]);
+  const to = {
+    ...resolveVoiceState({
+      params: merged,
+      palette: paletteSrc,
+      assets: assetsPatch ? assetsPatch.enabledAssets : (allOn ? 'all' : { ...enabled }),
+      blendSeconds: 2,
+    }),
+    paletteId: palettePatch ? palettePatch.paletteId : null,
+  };
+  return {
+    voiceMix: {
+      from: captureLiveVoiceState(state),
+      to,
+      t: 0,
+      durationMs: Math.max(200, (to.blendSeconds || 2) * 1000),
+      auto: true,
+      startedAt: performance.now(),
+      targetVoiceId: null,
+      targetName: name,
+    },
+  };
+}
 
 export const createLayoutSlice = (set) => ({
   seed: 0xa17e9b21,
@@ -309,40 +351,23 @@ export const createLayoutSlice = (set) => ({
       }
     }
     if (!changed && state.layoutParams.composition === preset.id) return {};
-    // A preset chip morphs like a voice chip (#284): open a MIX toward the
-    // preset instead of hard-cutting. `state.layoutParams`/paletteOverrides/
-    // enabledAssets stay untouched until commit — commitVoiceMix lands them
-    // in one undo step, same as loadVoice. `to.paletteId`: a real catalog id
-    // when pairing, else null so commit leaves color state alone (see
-    // commitVoiceMix) instead of freezing the current colors into a stray
-    // override.
-    const paletteSrc = palettePatch
-      ? getCatalogPalette(palettePatch.paletteId, state.userPalettes)
-      : resolvePalette(state.paletteId, state.paletteOverrides, state.userPalettes);
-    const enabled = state.enabledAssets || {};
-    const ids = Object.keys(enabled);
-    const allOn = ids.length > 0 && ids.every((id) => !!enabled[id]);
-    const to = {
-      ...resolveVoiceState({
-        params: merged,
-        palette: paletteSrc,
-        assets: assetsPatch ? assetsPatch.enabledAssets : (allOn ? 'all' : { ...enabled }),
-        blendSeconds: 2,
-      }),
-      paletteId: palettePatch ? palettePatch.paletteId : null,
-    };
-    return {
-      voiceMix: {
-        from: captureLiveVoiceState(state),
-        to,
-        t: 0,
-        durationMs: Math.max(200, (to.blendSeconds || 2) * 1000),
-        auto: true,
-        startedAt: performance.now(),
-        targetVoiceId: null,
-        targetName: preset.name || preset.id,
-      },
-    };
+    return openParamsMix(state, merged, { palettePatch, assetsPatch, name: preset.name || preset.id });
+  }),
+
+  /** #517 — a stub chip (bare mode + a small motion block) rides the same MIX road as a preset. */
+  loadStubMode: (id) => set((state) => {
+    const stub = STUB_VOICES.find((v) => v.id === id);
+    if (!stub) return {};
+    const merged = { ...state.layoutParams };
+    let changed = false;
+    for (const [k, v] of Object.entries({ mode: stub.id, ...stub.motion })) {
+      if (!state.lockedParams[k] && merged[k] !== v) {
+        merged[k] = v;
+        changed = true;
+      }
+    }
+    if (!changed) return {};
+    return openParamsMix(state, merged, { name: stub.name });
   }),
 
   toggleParamLock: (key) => set((state) => ({
