@@ -43,6 +43,7 @@ const count0 = S().layers.length;
 S().addLayer();
 const layerB = S().activeLayerId;
 assert.notStrictEqual(layerB, layerA, 'addLayer must switch to a new layer id');
+assert.strictEqual(S().layers.find((l) => l.id === layerB).type, 'content', 'addLayer sets type: content like the initial layer and duplicateLayer');
 assert.strictEqual(S().layers.length, count0 + 1);
 assert.strictEqual(topKind(), UNDO_KIND_LAYERS, 'addLayer must push a layers entry');
 assert.ok(S().historyUndoStack.at(-1).bytes > 0, 'entries carry their estimated size');
