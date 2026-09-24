@@ -6,22 +6,21 @@
 
 ---
 
-## Stage 0 — v0.9.x · NOW *(where this research lives)*
+## Stage 0 — v0.9.x · DONE *(location as of 2026-09-24 morning)*
 
-- Engine spines A–G shipped; KINETICS bug queue cleared (#450–#458 fixed, #422 → #480 residue, #478 flake margined).
-- Governor R1–R4 landed (#482–#485): merged readout, named stages, budget knob, FX-weight tape.
-- Tracks lanes landed: PATCH sliders (#506), inline diagnostic (#507), MOD steering + shared scent (#509 phases 1–2), gate dead-list cuts, cohesion dim reason.
-- **Render/biology audit (2026-09-23, wired-vs-dead bar):** all six bio-drives mechanisms LIVE (call chains traced); render inventoried (single core, CPU integration, 16F accum → 8-bit clamp, divisors in use, full-frame uploads). WebGL2 capability research feeds Stages 1–4 + Beyond.
-- Open and ordered: #471-A (jitter), #479-B (BEHAVE weights), #503 (ballistics shaping), #484 (R3 close word), #480 (env), Matt-only feel/hardware.
-- Filed, unstarted: motion factors #515–#519, EF rack #520, MIDI/OSC #228 (scope first).
+- Engine spines A–G shipped; KINETICS queue cleared; #422 → #480 (closed); #478 margined.
+- Governor R1–R4 landed; #482–#485 closed.
+- Tracks + matrix landed: PATCH sliders/diagnostic (#506/#507 closed), MOD steering + shared scent + matrix UI (#509 closed), gate cuts, cohesion dim reason.
+- #471-A (seed in `morphSig`) + #479-B (per-layer behave overrides) landed and verified on main.
+- #248 consolidation CLOSED; Matt-only feel/hardware closed (#346, #298, #270); MIDI/OSC proposal #228 closed.
+- In flight (other lane): PRs #523/#525/#527 (layers/patch hygiene).
+- **Render/biology audit (2026-09-23, wired-vs-dead bar):** all six bio-drives mechanisms LIVE (call chains traced); render inventoried. WebGL2 capability research feeds Stages 1–4 + Beyond.
 
-## Stage 1 — v0.10 · PLAY *(feel + board clean)*
+## Stage 1 — v0.10 · PLAY *(feel — the remaining work)*
 
-- #471 (jitter glide) + #479 B (editable BEHAVE weights, per-layer, persisted).
-- #503 ballistics shaping decision (single-vs-double) + lookup already cleaned.
 - **Motion factors #515–#519** (retune → flagship values → stub MIX road → persona biases → curated assets).
 - **EF rack #520** (EF-4 exclusivity → post-accum seam → families → rack UI).
-- Matt-only feel set: #346 icons, #298 M3 calibration.
+- #503 ballistics shaping decision (single-vs-double; lookup already cleaned).
 - **Render fidelity (zero sim risk):** half-float accum path audit → ACES-approx + dither final pass (`RESOLVE_FS` bare clamp today); instanced sub-range uploads (remainder after spine G).
 - *Exit:* you play it and nothing feels wrong.
 
@@ -45,7 +44,7 @@
 
 ## Stage 4 — v1.0 · RELEASE
 
-- **#248 completion** — four-tab end-state (BUILD · PLAY · ASSETS · OUTPUT), DAVIS/STIMULI homage sections landed per the hybrid pick, helpCopy/tour text final, DECISIONS.md ticks.
+- **#248 consolidation CLOSED 2026-09-23** — four-tab end-state shipped (Phase 5 PLAY absorbs MORPH/PHRASE landed); DAVIS/STIMULI homage kept per the hybrid pick; helpCopy/tour text final.
 - Community surface: share links + examples page; embed/remix only if Stage 2 proved demand.
 - Disaster recovery story (export everything / import everything round-trip honest).
 - Docs/examples layer (gap B.9) at the level a release implies.
