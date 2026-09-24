@@ -53,3 +53,20 @@ const patchOf = (id) => useStore.getState().layers.find((l) => l.id === id).patc
   assert.strictEqual(patchOf('kc-a').to, 'kc-b', 'dangling target falls back to previous');
   console.log('[selfcheck] layersPatch mode + target guards');
 }
+
+// Removing the last content track is refused: the fallback would otherwise
+// make an FX track the active layer (FX is never active — projectNormalize
+// enforces the same on load). FX tracks and non-last content tracks still go.
+{
+  useStore.setState(useStore.getInitialState());
+  useStore.getState().addFxLayer();
+  const [kc, fx] = useStore.getState().layers.map((l) => l.id);
+  useStore.getState().removeLayer(kc);
+  let s = useStore.getState();
+  assert.strictEqual(s.layers.length, 2, 'last content track cannot be removed');
+  assert.strictEqual(s.activeLayerId, kc, 'active layer stays the content track');
+  s.removeLayer(fx);
+  s = useStore.getState();
+  assert.deepStrictEqual(s.layers.map((l) => l.id), [kc], 'FX track still removable');
+  console.log('[selfcheck] layersPatch last-content-track guard');
+}
