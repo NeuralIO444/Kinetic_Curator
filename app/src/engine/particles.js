@@ -30,7 +30,7 @@ import { createNoise } from './noise.js';
 import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
-import { resolveBehave, orbitForce } from './organisms/behave.js';
+import { resolveEffectiveBehave, resolveWindMode, orbitForce } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
 
@@ -131,6 +131,11 @@ export class ParticleSystem {
     this.ay = new Float64Array(cap);
     this.mass = new Float64Array(cap);
     this.scale = new Float64Array(cap);
+    // #451 — scale before the #287 breath multiplier, so a sort key can
+    // rank items by their designed size without the ±50% breath swing
+    // flipping draw order every time two close-in-size items' breath
+    // phases cross. Written at every site this.scale is.
+    this.baseScale = new Float64Array(cap);
     this.rotation = new Float64Array(cap);
     this.alpha = new Float64Array(cap);
     this.phase = new Float64Array(cap);
@@ -183,6 +188,7 @@ export class ParticleSystem {
     this.ay = grow(this.ay);
     this.mass = grow(this.mass);
     this.scale = grow(this.scale);
+    this.baseScale = grow(this.baseScale);
     this.rotation = grow(this.rotation);
     this.alpha = grow(this.alpha);
     this.phase = grow(this.phase);
@@ -209,6 +215,27 @@ export class ParticleSystem {
 
   resetPhase() {
     this.phase.fill(0, 0, this.n);
+  }
+
+  /**
+   * #427 — adopt-on-enter. Called right after init() when this mode was
+   * just entered from a different layout (a mode chip click), before any
+   * physics step or getItems() read: overwrites the given particles'
+   * starting x/y (and resets their spine trail, so segments/wings don't
+   * still point at the old scattered position) to wherever they actually
+   * were on screen a frame ago. Velocity/phase/energy stay whatever init()
+   * just rolled — only position teleports are what #427 was about; motion
+   * character starting fresh for the new mode is fine. Unlisted particles
+   * (a new item-morph pairing had nothing to adopt from) keep their fresh,
+   * seed-scattered position untouched.
+   */
+  adoptPositions(pairs) { // pairs: [{ i, x, y }]
+    for (const { i, x, y } of pairs) {
+      if (i < 0 || i >= this.n) continue;
+      this.x[i] = x;
+      this.y[i] = y;
+      this.spine[i] = [{ x, y }];
+    }
   }
 
   init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null, opts = {}) {
@@ -263,6 +290,7 @@ export class ParticleSystem {
       this.ay[i] = 0;
       this.mass[i] = mass;
       this.scale[i] = mass;
+      this.baseScale[i] = mass;
       this.rotation[i] = angle * (180 / Math.PI);
       this.alpha[i] = 0;
       this.phase[i] = 0;
@@ -558,6 +586,7 @@ export class ParticleSystem {
     this.ay[cs] = 0;
     this.mass[cs] = cm;
     this.scale[cs] = minScale + cm * (maxScale - minScale);
+    this.baseScale[cs] = this.scale[cs];
     this.rotation[cs] = Math.atan2(cvy, cvx) * (180 / Math.PI);
     this.alpha[cs] = minAlpha + cm * (maxAlpha - minAlpha);
     this.phase[cs] = 0;
@@ -661,11 +690,21 @@ export class ParticleSystem {
     } = layoutParams;
 
     const organism = isOrganismMode(layoutParams.mode);
-    const profile = organism ? resolveBehave(layoutParams.behave) : null;
+    // #479 Option B — table row + any per-layer overrides, shared with the
+    // DAVIS readout/editor via resolveEffectiveBehave() so the two can
+    // never disagree on what "effective" means.
+    const profile = organism ? resolveEffectiveBehave(layoutParams) : null;
     // #287 — the scent field exists only for organism casts (drives,
     // chemotaxis, and feeding all read it). Created lazily so cloud-mode
     // sessions never pay for it; persists across init() calls.
-    if (organism && !this._scent) this._scent = createScentField();
+    // #509 phase 2 — the resolver may pass one SHARED field
+    // (layoutParams.scentField, spread-only like modSteer, never stored):
+    // every organism layer then deposits into and reads the same ground,
+    // which is the whole point (stigmergy across layers). The shared field
+    // is stepped once per tick by the resolver — never here — so per-layer
+    // updates must not step it (N layers would decay N× and order-depend).
+    const sharedScent = layoutParams.scentField || null;
+    if (!sharedScent && organism && !this._scent) this._scent = createScentField();
     const meta = Math.min(2, Math.max(0, metabolism));
     const drivesOn = organism && meta > 0;
     // Chemotaxis is a mold-only sense: the profile opts in with a
@@ -685,27 +724,25 @@ export class ParticleSystem {
 
     // Spine F (#392): Divergence-free curl wind default for flock / murmuration / mold.
     // Scatter, cloud swarm, and cruise HYPE keep point wind (noise3D -> angle).
-    let useCurl = false;
-    if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') {
-      useCurl = true;
-    } else if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') {
-      useCurl = false;
-    } else {
-      const behave = layoutParams.behave;
-      const mode = layoutParams.mode;
-      if (behave === 'flock' || behave === 'mold' || mode === 'murmuration') {
-        useCurl = true;
-      } else {
-        useCurl = false;
-      }
-    }
+    // #479 — factored into resolveWindMode() (organisms/behave.js) so the
+    // DAVIS readout can show it without duplicating this derivation.
+    const useCurl = resolveWindMode(layoutParams) === 'curl';
 
     const sepRadius = organism ? profile.sepR : 35;
     const aliRadius = organism ? profile.aliR : 60;
     const cohRadius = organism ? profile.cohR : 70;
-    const sepW = organism ? profile.sep : 1.8;
-    const aliW = organism ? profile.ali : 1.0;
-    const cohW = organism ? profile.coh : swarmCohesion;
+    // #509 phase 1 — MOD steering: transient per-layer multipliers from a
+    // MOD patch (see modSteerByLayer in liveResolve.mjs). Identity by
+    // default; folded into whichever weight source is live (table or
+    // slider) so drives-hunger below still composes. Never serialized
+    // (layoutParams spread only — the store never sees modSteer).
+    const steer = layoutParams.modSteer || null;
+    const steerAli = steer && Number.isFinite(Number(steer.ali)) ? Number(steer.ali) : 1;
+    const steerCoh = steer && Number.isFinite(Number(steer.coh)) ? Number(steer.coh) : 1;
+    const steerSep = steer && Number.isFinite(Number(steer.sep)) ? Number(steer.sep) : 1;
+    const sepW = (organism ? profile.sep : 1.8) * steerSep;
+    const aliW = (organism ? profile.ali : 1.0) * steerAli;
+    const cohW = (organism ? profile.coh : swarmCohesion) * steerCoh;
     const attractMul = organism ? profile.attract : 1;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
@@ -727,7 +764,7 @@ export class ParticleSystem {
     // #287 — drive columns (hoisted; the force loop reads them per agent).
     const ENERGY = this.energy; const DRIVE = this.drive;
     const LEAKRGB = this.leakRgb;
-    const SCENT = this._scent;
+    const SCENT = sharedScent || this._scent;
     const seedU = seed >>> 0;
 
     for (let i = 0; i < numParticles; i++) {
@@ -774,7 +811,12 @@ export class ParticleSystem {
         fax += o.fx / m;
         fay += o.fy / m;
       }
-      if (attractor && gravityWells > 0 && attractMul > 0) {
+      // #454 — defense in depth: the primary fix guards the attractor at
+      // its source (useCanvasViewport.js's zero-size-rect case), but a
+      // non-finite x/y here would otherwise divide dx/d to NaN below (the
+      // speed clamp further down can't bound NaN — every NaN comparison
+      // is false) and poison every particle's position permanently.
+      if (attractor && Number.isFinite(attractor.x) && Number.isFinite(attractor.y) && gravityWells > 0 && attractMul > 0) {
         const dx = attractor.x - pxi;
         const dy = attractor.y - pyi;
         const d = Math.sqrt(dx * dx + dy * dy);
@@ -999,6 +1041,7 @@ export class ParticleSystem {
       const ph = (this.phase[i] + 0.004 * noiseSpeed * dtFrames) % 1;
       this.phase[i] = ph;
       let sc = minScale + (mi * (maxScale - minScale));
+      this.baseScale[i] = sc; // #451 — pre-breath, for order-stable sorting
       // #287 SWELL — breathing multiplies the base scale by
       // 1 + breath * 0.5 * energy * sin(phase + seedOffset). The 0.5 caps
       // the swing at ±50%: the issue's bare `1 + breath * sin(...)` would
@@ -1057,17 +1100,25 @@ export class ParticleSystem {
     // sustain themselves through scent feeding); other profiles deposit 0
     // but the field still decays. Coordinates are normalized; the field
     // clamps at the edges.
-    if (organism && this._scent) {
+    // deposit amount is profile-driven: mold colonies lay trails (and so
+    // sustain themselves through scent feeding); other profiles deposit 0
+    // but the field still decays. Coordinates are normalized; the field
+    // clamps at the edges. Shared or own — deposits land in the field the
+    // reads above sampled (SCENT), so cross-layer trails actually meet.
+    const depositField = sharedScent || this._scent;
+    if (organism && depositField) {
       const dep = profile.deposit || 0;
       if (dep > 0) {
         const cw = this.canvasW;
         const chh = this.canvasH;
         for (let i = 0; i < numParticles; i++) {
           if (!ALIVE[i]) continue;
-          this._scent.deposit(X[i] / cw, Y[i] / chh, dep);
+          depositField.deposit(X[i] / cw, Y[i] / chh, dep);
         }
       }
-      this._scent.step();
+      // #509 phase 2 — shared fields step once per tick at the resolver
+      // (all deposits landed); own fields step here as before.
+      if (!sharedScent) depositField.step();
     }
 
     // #287 LEAK — pigment write-back cadence. The drift accumulates in
@@ -1099,7 +1150,7 @@ export class ParticleSystem {
           alpha *= frac;
         }
         items.push({
-          x: this.x[i], y: this.y[i], scale: this.scale[i],
+          x: this.x[i], y: this.y[i], scale: this.scale[i], baseScale: this.baseScale[i],
           rotation: this.rotation[i], alpha,
           asset: activeAssets[this.assetIndex[i] % activeAssets.length],
           color: this.color[i], u: this.u[i],
@@ -1129,6 +1180,7 @@ export class ParticleSystem {
       const px = this.x[i];
       const py = this.y[i];
       const pscale = this.scale[i];
+      const pbaseScale = this.baseScale[i]; // #451 — pre-breath, for sort stability
       const protation = this.rotation[i];
       let palpha = this.alpha[i];
       if (i === this.n - 1 && frac > 0.001) {
@@ -1145,7 +1197,8 @@ export class ParticleSystem {
       for (let s = 0; s < bodyLen; s++) {
         const pt = sp[Math.min(s, sp.length - 1)];
         items.push({
-          x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), rotation: protation,
+          x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), baseScale: pbaseScale * (1 - s * 0.1),
+          rotation: protation,
           alpha: palpha * (1 - s * 0.08), asset, color: pcolor, u: pu,
           key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
           vx, vy,
@@ -1162,13 +1215,13 @@ export class ParticleSystem {
         const ladderId = MOTH_LADDERS[i % MOTH_LADDERS.length].id;
         items.push({
           x: px - pyh * reach, y: py + pxh * reach,
-          scale: pscale * 0.7, rotation: protation + amp * 18,
+          scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
           ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
-          scale: pscale * 0.7, rotation: protation - amp * 18,
+          scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
           ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
         });
@@ -1190,7 +1243,7 @@ export class ParticleSystem {
             const ladderId = MOTH_LADDERS[(i + k) % MOTH_LADDERS.length].id;
             items.push({
               x: px + Math.cos(a) * reach, y: py + Math.sin(a) * reach,
-              scale: pscale * 0.7,
+              scale: pscale * 0.7, baseScale: pbaseScale * 0.7,
               rotation: protation + (mirrored ? -amp * 18 : amp * 18),
               alpha: palpha, asset, color: pcolor, u: pu,
               key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,

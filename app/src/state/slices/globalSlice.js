@@ -111,8 +111,8 @@ export const createGlobalSlice = (set) => ({
    * Render scale drops before anything visible is cut: GPU FX compositing
    * has 10–50x headroom, so the old FX cut ladder (fxShedLevel) is retired
    * and FX layers are never culled. Auto-clears to 1 on recovery.
-   * Never serialized. The live app surfaces it via ShedBadge (#177 owns the
-   * full indicator design); the GL render paths scale width/height by it.
+   * Never serialized. The live app surfaces it via TapeCounter (the merged
+   * readout — #295 built it, #483 confirms it); the GL render paths scale width/height by it.
    */
   renderScale: 1,
   /**

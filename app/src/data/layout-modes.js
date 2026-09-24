@@ -84,6 +84,21 @@ export const DEFAULT_LAYOUT_PARAMS = {
   wind: 1,
   symmetry: 'none',
   behave: 'cruise',
+  // #479 Option B — per-layer BEHAVE steering-weight overrides. null means
+  // "no override, use the behave.js table row for the current chip" — the
+  // same default-preserving sentinel clampNum already gives every other
+  // optional numeric field (see clampNum's null-handling comment below).
+  // Never randomized/morphed: these are direct physics tuning, not part of
+  // RANDOMIZABLE_KEYS/MORPHABLE_KEYS in paramUtils.js.
+  behaveSep: null,
+  behaveAli: null,
+  behaveCoh: null,
+  behaveSepR: null,
+  behaveAliR: null,
+  behaveCohR: null,
+  behaveWind: null,
+  behaveOrbit: null,
+  behaveAttract: null,
   material: 'plate',
   // #287 bio-drives. metabolism 0 = drives off (legacy behaviour);
   // breath 0 = no breathing swell; graze 0 = no grazers. graze is a hidden
@@ -154,6 +169,18 @@ export const PARAM_SPEC = {
   flap: { min: 0, max: 1 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
+  // #479 Option B — BEHAVE override bounds, generous headroom over the
+  // table's own observed ranges (behave.js: sep 1.8-4.2, ali 0-1.0,
+  // coh 0-1.35, radii 20-80, wind 0.08-0.35, orbit 0-0.55, attract 0.1-1).
+  behaveSep: { min: 0, max: 6 },
+  behaveAli: { min: 0, max: 2 },
+  behaveCoh: { min: 0, max: 2 },
+  behaveSepR: { min: 0, max: 150 },
+  behaveAliR: { min: 0, max: 150 },
+  behaveCohR: { min: 0, max: 150 },
+  behaveWind: { min: 0, max: 1 },
+  behaveOrbit: { min: 0, max: 1 },
+  behaveAttract: { min: 0, max: 2 },
   // #287 bio-drives — the two new sliders (METABOLISM, BREATH) plus the
   // hidden voice-level grazer fraction.
   metabolism: { min: 0, max: 2 },
@@ -255,7 +282,15 @@ export function validateLayoutParams(partial) {
     if (UNSAFE_KEYS.has(key)) { rejected.push(key); continue; }
     const value = src[key];
     if (PARAM_SPEC[key]) {
-      if (!isNumericish(value)) rejected.push(key);
+      // #479 Option B — a field whose OWN default is null (the 9 BEHAVE
+      // overrides) treats null as a legitimate value ("no override"), not
+      // garbage: a RESET action writes null to clear an override, and that
+      // write must not be silently rejected back to whatever the override
+      // last was. Every other numeric field's default is a real number, so
+      // this doesn't loosen validation for count/jitter/etc. — null there
+      // still rejects exactly as before.
+      const nullable = DEFAULT_LAYOUT_PARAMS[key] === null;
+      if (!(nullable && value === null) && !isNumericish(value)) rejected.push(key);
     } else if (RANGE_SPEC[key]) {
       const usable = Array.isArray(value) && value.length >= 2
         && isNumericish(value[0]) && isNumericish(value[1]);

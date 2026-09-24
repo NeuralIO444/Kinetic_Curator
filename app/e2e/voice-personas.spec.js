@@ -15,8 +15,8 @@ test.describe('Mode personas', () => {
       try { localStorage.removeItem('kc:user-voices:v1'); } catch { /* ignore */ }
     });
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
-    const layoutTab = page.getByRole('tab', { name: /layout/i });
-    await layoutTab.click();
+    const buildTab = page.getByRole('tab', { name: /build/i });
+    await buildTab.click();
     await expect(page.locator('.voice-row')).toBeVisible({ timeout: 10_000 });
   });
 
@@ -63,7 +63,7 @@ test.describe('Mode personas', () => {
     // Shelf survives a reload
     await page.reload();
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
-    await page.getByRole('tab', { name: /layout/i }).click();
+    await page.getByRole('tab', { name: /build/i }).click();
     await expect(page.locator('.voice-chip.user', { hasText: 'VOICE 01' })).toBeVisible({ timeout: 10_000 });
   });
 

@@ -923,7 +923,17 @@ async function runBrowserTests() {
       const { gpu: smooth } = await runProbe({ w, h, fade: 1, optics: 1, stipple: 0, frames });
       let gateDelta = 0;
       for (let i = 0; i < gpu.length; i++) gateDelta = Math.max(gateDelta, Math.abs(gpu[i] - smooth[i]));
-      assert.ok(gateDelta > 0.02, `the stipple gate visibly breaks up the glow (max Δ ${gateDelta.toFixed(3)})`);
+      // #480 — this floor was 0.02, calibrated against CI's SwiftShader
+      // software renderer. A real Apple GPU (confirmed: Mac Studio, M2 Max)
+      // measures a deterministic, reproducible 0.012 here every run — real
+      // hardware trilinear/mip filtering is smoother than software
+      // rasterization, so the same gate produces a genuinely smaller (but
+      // still real) max-pixel delta, not a broken effect. 2.5 LSB sits
+      // comfortably below both this machine's 0.012 and CI's >0.02, while
+      // staying far above float noise, so the assertion still proves the
+      // gate visibly does something on either renderer. Matt's call
+      // (2026-09-23), not a silent tolerance weakening — see #480.
+      assert.ok(gateDelta > 2.5 * LSB, `the stipple gate visibly breaks up the glow (max Δ ${gateDelta.toFixed(4)})`);
     });
 
     await okAsync('probe: fade 0 kills trails', async () => {

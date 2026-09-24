@@ -3,6 +3,7 @@ import { KERNEL_VERSION } from './engine/kernel/version.js';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
 import { PaletteStrip } from './components/PaletteStrip.jsx';
+import { ModeStrip } from './components/ModeStrip.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
@@ -14,7 +15,6 @@ import { useColumnResize } from './hooks/useColumnResize.js';
 import { useFpsMeter } from './hooks/useFpsMeter.js';
 import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
 import { useBeatDecay } from './hooks/useBeatDecay.js';
-import { useContinuousLife } from './hooks/useContinuousLife.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
@@ -66,7 +66,6 @@ function AppInner() {
   useFpsMeter(true);
   usePerformanceGovernor();
   useBeatDecay();
-  useContinuousLife();
   usePhraseLoop();
   useMorphEvolve();
   useVoiceMixDriver();
@@ -206,6 +205,7 @@ function AppInner() {
       <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <PaletteStrip />
+      <ModeStrip />
       <ErrorBoundary critical>
         <Shell
           dispatchPipe={piped}

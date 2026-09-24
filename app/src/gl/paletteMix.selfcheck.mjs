@@ -4,9 +4,10 @@
 // dissolve, arming, retarget, cancel — is unit-tested here.
 
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import {
   MIX_MIN, MIX_MAX, MIX_DEFAULT,
-  sanitizeMixSeconds, mixEase, createPaletteMix,
+  sanitizeMixSeconds, mixEase, morphEase, createPaletteMix,
 } from './paletteMix.mjs';
 
 function base(over = {}) {
@@ -189,5 +190,43 @@ for (let i = 0; i <= 20; i++) {
   assert.strictEqual(done.kind, 'done');
   assert.strictEqual(m.isDissolving(), false);
 }
+
+// #453 — one clock: the dissolve must tick on the SAME accumulator the
+// item morph reads (input.loopTimeMs, spine-A master clock), not the wall
+// clock. Two clocks make their tails land frames apart — the held
+// old-frame ghost snaps off while items are still easing in: the
+// end-of-morph stutter/pop found in #464's QA. Pins the wiring: red on
+// `now: performance.now()`, green on `now: loopTimeMs`.
+{
+  const src = readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8');
+  const at = src.indexOf('paletteMix.update(');
+  assert.ok(at >= 0, 'paletteMix.update call found in liveLoop.mjs');
+  const call = src.slice(at, src.indexOf('});', at));
+  assert.ok(call.includes('now: loopTimeMs'),
+    'dissolve ticks on loopTimeMs — the same clock the item morph reads');
+  assert.ok(!call.includes('performance.now()'),
+    'no wall clock in the dissolve tick (#453: two time domains)');
+}
+
+// #465 — morphEase (expoOut): snappy morph arrival. Endpoints EXACT
+// (f(1) === 1 matters: the landing frame IS the target, no residue),
+// clamped input, monotone inside [0,1] (TRANSITIONS invariant I1), and it
+// gets out ahead of smootherstep so the tail never reads stop-then-pop.
+assert.strictEqual(typeof morphEase, 'function');
+assert.strictEqual(morphEase(0), 0);
+assert.strictEqual(morphEase(1), 1, 'exact landing — no 0.999 residue');
+assert.strictEqual(morphEase(-5), 0);
+assert.strictEqual(morphEase(9), 1);
+{
+  let prevE = -1;
+  for (let i = 0; i <= 40; i++) {
+    const v = morphEase(i / 40);
+    assert.ok(v >= prevE, 'morphEase monotone');
+    assert.ok(v >= 0 && v <= 1, 'morphEase stays in [0,1] (I1 — no overshoot)');
+    prevE = v;
+  }
+}
+assert.ok(morphEase(0.5) > mixEase(0.5), 'expoOut arrives ahead of smootherstep mid-flight');
+assert.ok(Math.abs(morphEase(0.9) - 1) < 0.003, '99.7%+ arrived by raw=0.9 — sub-percent landing residual');
 
 console.log('[selfcheck] paletteMix OK');

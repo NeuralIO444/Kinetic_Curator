@@ -10,8 +10,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
-import { useCanvasLife } from '../hooks/useCanvasLife.js';
-import { on, Events } from '../composition/eventBus.js';
+import { on, emit, Events } from '../composition/eventBus.js';
 import { createLiveLoop } from '../gl/liveLoop.mjs';
 import { getPreset } from '../data/presets.js';
 
@@ -20,9 +19,6 @@ export function CanvasPanel() {
   const layoutParams = useStore(s => s.layoutParams);
   const layers = useStore(s => s.layers);
   const evolveMode = useStore(s => s.evolveMode);
-  const beatPulse = useStore(s => s.beatPulse);
-  const audioBands = useStore(s => s.audioBands);
-  const running = useStore(s => s.running);
   const nodeCount = useStore(s => s.nodeCount);
   const canvasBg = useStore(s => s.canvasBg);
   const accumOn = !!layoutParams.accumulation;
@@ -33,13 +29,10 @@ export function CanvasPanel() {
   const accumEffective = accumOn && !perfTier1;
 
   const viewport = useCanvasViewport();
-  const life = useCanvasLife({ running, layoutParams, beatPulse, audioBands });
-  const lifeRef = useRef(life);
   // Fresh-per-frame view of the viewport for the loop (the loop reads these
   // per render tick, so they live in a ref rather than a re-subscription).
   const viewRef = useRef({ zoom: 1, pan: { x: 0, y: 0 }, attractor: null });
   useEffect(() => {
-    lifeRef.current = life;
     viewRef.current.zoom = viewport.zoom;
     viewRef.current.pan = viewport.pan;
     viewRef.current.attractor = viewport.attractorRef;
@@ -56,7 +49,6 @@ export function CanvasPanel() {
     try {
       loop = createLiveLoop(canvas, {
         getState: useStore.getState,
-        lifeRef,
         viewRef,
         wrapEl: wrap,
       });
@@ -105,7 +97,9 @@ export function CanvasPanel() {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* #310: BG cycle moved to PIPELINE. CLEAR ACCUM removed — GHOST
               STATION's gesture row is canonical. */}
+          {/* BG cycle lives beside RESET VIEW (canvas belongs with canvas). */}
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
+          <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
           <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>
           {accumEffective && <span className="meter-pill" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>ACCUM</span>}
           {accumOn && !accumEffective && <span className="meter-pill" title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery." style={{ color: '#ffb454' }}>ACCUM HELD</span>}

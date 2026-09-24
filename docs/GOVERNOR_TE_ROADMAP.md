@@ -66,6 +66,8 @@ Harness-measured at 512×512, worst-case params — absolute ms are headless-har
 
 Each item refines the existing governor. Nothing here is a new feature, a new tab, or a new panel — everything lives in the existing MasterBar/PLAY/OUTPUT surfaces.
 
+**Tracking (2026-09-23):** R1 → #483, R2 → #482, R3 → #484, R4 → #485. R5 was already tracked as #298. R6 is evidence-gated on R5 and has no issue yet.
+
 ### R1. One budget readout — the tape counter
 Merge the ShedBadge, the four pills, and the Q meter's AUTO state into a single PLAY readout: one BUDGET meter in the MasterBar showing the current constraint state with the existing honest pills' semantics. The footer badge and the scattered pills retire into it. This is G1 fixed, and it's pure presentation — the ladder, thresholds, and event log don't change. (Coordinates with #177, which owns the full indicator design — this is the polish pass on that design, not a competing one.)
 
@@ -78,11 +80,11 @@ The 30FPS frame-lock is the template. Add exactly one knob beside it: a chosen p
 ### R4. Show the tape running out — budget depletion in the PLAY readout
 Extend the existing FPS meter with a headroom readout driven by the cost registry + measured costs: how much of the chosen budget the current scene costs, so the performer sees the shed coming instead of being surprised by it. Refinement of the existing meter, not a new panel; the dev-only X-ray stays dev-only. (G3.)
 
-### R5. Real-machine cost calibration
-Run `measure-costs` on the M3 Mac Studio and re-bless `measuredCosts.mjs`; run the MLX cost-model runbook for the weights. Process, not code — but it may re-rank the shed order on the performance hardware and it settles the blur-first question in §2 with data instead of harness ratios. Do this before any ladder-step tuning.
+### R5. Real-machine cost calibration — **DONE, #298 (2026-09-23)**
+Ran `measure-costs` on a real Mac Studio (M2 Max — the machine this work is actually performed on; docs elsewhere say "M3", confirmed with Matt this is the intended machine). Re-blessed `measuredCosts.mjs`. Both old and new measurements use `method: 'wall'` (CI's SwiftShader has no hardware timer queries either), so it's a fair comparison: real GPU numbers land ~30–100x faster than the old CI-measured values, and no effect dominates (highest is only ~1.56x the lowest). The MLX cost-model runbook (learned weights, §3 of `MLX_HARNESS_RUNBOOK.md`) is a separate, larger undertaking — not run here; `predict_cost_tier` stays a loud CI skip until it is.
 
-### R6. (After R5, only if the data says so) A blur-first intermediate cut
-If M3 measurement confirms blur/octaves dominate on real silicon, add one ladder step between the resolution floor and the quality-tier drop that sheds blur radii / turbulence octaves directly — the most expensive knob gets its own deliberate step instead of riding the tier. This is ladder refinement, not a new mechanism; if the data doesn't support it, kill it.
+### R6. A blur-first intermediate cut — **MOOT, settled by R5's data**
+The premise was "if M3 measurement confirms blur/octaves dominate, give the most expensive knob its own shed step." R5's real-hardware measurement found no effect dominates at all (max ratio ~1.56x, nowhere near the ~25-30x the CI-harness numbers once suggested) — but more fundamentally, gaussian blur was removed from the effect roster entirely by #308 (mip-bloom + stipple + chromatic offset replaced it) before this calibration ever ran. There is no blur effect left for a blur-specific shed step to target. Nothing to build; not reopened.
 
 ---
 
@@ -99,4 +101,4 @@ If M3 measurement confirms blur/octaves dominate on real silicon, add one ladder
 
 ## Sequencing
 
-R2 (naming) → R1 (one readout) → R3 (the knob) → R4 (depletion meter) → R5 (M3 calibration, Matt's runbook) → R6 (only on data). R2–R4 are pure presentation/polish and compose with PR #285's restoration work; R5 is Matt's machine time; R6 is the only item that touches ladder behavior, and it's gated on measurement.
+R2 (naming) → R1 (one readout) → R3 (the knob) → R4 (depletion meter) → R5 (real-machine calibration) → R6 (only on data). **All six are done or settled as of 2026-09-23** — R1–R4 shipped (#482–#485), R5 shipped (#298), R6 settled moot by R5's data (no blur effect left to target). This roadmap's governor-refinement scope is complete.

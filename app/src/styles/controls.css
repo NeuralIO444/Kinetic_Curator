@@ -125,6 +125,7 @@
 .curator-voice-menu button:hover { background: var(--ink); color: var(--bg); }
 .curator-voice-menu button.active { color: var(--accent); }
 .curator-voice-menu button.active:hover { background: var(--ink); color: var(--bg); }
+.curator-voice-menu.preset-menu { min-width: 260px; max-height: 60vh; overflow-y: auto; padding: 8px; }
 
 .lock-badge, .drift-badge {
   font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 2px;

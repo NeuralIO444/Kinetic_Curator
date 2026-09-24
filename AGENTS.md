@@ -14,14 +14,14 @@ Long-range layers (do not implement out of order): [`docs/path/README.md`](docs/
 | **Review agent (Grok)** | Read the PR against ENGINE_PLAN + this file. Flag collisions, stamps, missing tests. | Rewrite the patch in-chat as a second implementation. |
 | **Matt** | Play it. Eyes on feel, FEED (#374), icons (#346), M3 costs (#298). Merge word. | |
 
-Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveResolve.mjs` / `particles.js` are one-writer files until the spine is through **B**.
+Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveResolve.mjs` / `particles.js` stay one-writer files for any concurrent work, spine or not — the "through B" clause is moot now (spine is through F).
 
 ## Before you open a branch
 
 1. `git pull origin main`.
 2. Read ENGINE_PLAN §0 (**already shipped — do not redo**).
-3. Take the **lowest open spine issue** only (A before B before C…). If that issue is not assigned to you, stop.
-4. One letter per PR. Do not bundle A with D.
+3. **Spines A–F (#387–#392) are closed, and #341 (FX 4-cap) landed as PR #412 — there is no open spine letter and no lowest-open coding item waiting.** What's open: Matt-only feel (#374, #346, #298), parked (#221, #228), and product lanes (#248 panel consolidation, #270 mobile, #344/#345 leftovers). The #248 coding plan is [`docs/PANEL_CONSOLIDATION_PLAN.md`](docs/PANEL_CONSOLIDATION_PLAN.md) — read its open-questions section first; those need Matt's nod, not a guess. If what you're about to touch isn't assigned to you, stop.
+4. One letter per PR. Do not bundle A with D. (Note: C–F did not go through this — see below.)
 
 ## Already shipped (do not re-implement)
 
@@ -31,27 +31,29 @@ Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveRes
 - FIELD live pull — PR #373
 - FEED live hop — PR #370 (visual sign-off is #374, Matt only)
 - Flagship voices + MIX driver — #280
-- Audio ballistics module — #306 (not yet on visible life path; that is spine C)
+- Audio ballistics module — #306 (now on the visible life path — spine C wired it into the GL loop clock)
 - Bio-drives on the integrator — #287
 - 4 content-track cap — #340
 
 If your prompt says "wire MOD" or "stop MIX from freezing every frame," the work is done. Move on.
 
-## Spine (ENGINE_PLAN §3)
+## Spine (ENGINE_PLAN §3) — all closed as of 2026-09-21
 
 ```text
-A  dt clock                         ← current
-B  skip missing atlas cell
-C  heading spring + ballistics + life
-D  live mask tint (stills baker unchanged)
-E  mode-chip pixel dissolve + slider springs
-F  shared noise + curl wind + organism vx
-G  bufferSubData — piggyback on B or D, not its own epic
+A  dt clock                         ← merged #405, closed #387
+B  skip missing atlas cell          ← merged #406, closed #388
+C  heading spring + ballistics + life  ← closed #389 (PR #407 opened, closed unmerged — landed as a direct push to main instead)
+D  live mask tint (stills baker unchanged)  ← closed #390 (no PR — direct push)
+E  mode-chip pixel dissolve + slider springs  ← closed #391 (no PR — direct push)
+F  shared noise + curl wind + organism vx  ← closed #392 (no PR — direct push)
+G  bufferSubData — piggyback on B or D, not its own epic  ← landed #408 (bundled with the D blend fix), 2026-09-22
 ```
 
-Parallel tape lane (#342 PR #383, #341 FX cap) is **not** yours unless the issue is assigned. Do not mix tape work into a spine PR.
+C–F were reviewed only after landing, in one batch (`docs/SPINE_REVIEW_C_F.md`), not via the per-letter PR + review-agent gate this file describes. That review pass turned up one live-canvas regression from D: `app/src/gl/renderer.mjs:435` skipped every non-`normal`-blend layer item because the isolated-item cell lookup lacked the `cells[it.asset]` fallback that the normal-blend path (`packInstanceData`) has. **Fixed by #408 (merged 2026-09-22)** — the isolated path now goes through `packInstanceData`, batched per consecutive same-blend run. No longer a blocker; see `docs/SURFACES.md` for the record.
 
-**Parked until spine E:** tempo clock, slave bus, SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md) + [`docs/ROOM_REVIEW.md`](docs/ROOM_REVIEW.md) + [`docs/path/04-set-spine.md`](docs/path/04-set-spine.md). Do not file or implement T0–T2 while #387 is open.
+Tape lane (#342 PR #383) merged 2026-09-21. **#341** (FX 4-cap) landed as PR #412 and the issue is closed — do not take it.
+
+**Parked pending spine E sign-off:** tempo clock, slave bus, SYSTEMS/VOICES/PRESETS split. Spec: [`docs/TEMPO_AND_CHIPS.md`](docs/TEMPO_AND_CHIPS.md) + [`docs/ROOM_REVIEW.md`](docs/ROOM_REVIEW.md) + [`docs/path/04-set-spine.md`](docs/path/04-set-spine.md). Spine E is code-merged, but this doc doesn't record Matt's play-it sign-off — treat as still parked until he says otherwise.
 
 **Authoring freeze:** no new showcase / persona / bio-drive chips on the performance deck. Extra costumes are DLC/drawer. Bio-drive *engine* stays in core. See [`docs/path/06-library.md`](docs/path/06-library.md).
 

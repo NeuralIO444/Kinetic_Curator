@@ -27,17 +27,9 @@ export const createLayoutSlice = (set) => ({
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
   /**
-   * Render-only overlay for ambient "life" drift (#107 §2): null, or a
-   * partial { jitter?, displacement?, noiseSpeed? } that the canvas merges
-   * over layoutParams for display. Deliberately outside the firewall below —
-   * it never reaches layoutParams, undo, or autosave, same treatment as
-   * audioBands/beatPulse. See useContinuousLife.
-   */
-  driftOverlay: null,
-  /**
    * Render-only overlay for the performance governor's last-resort density
    * cut (#107 §5): null, or a partial { count?, mirror? } merged over
-   * layoutParams for display, same mechanism as driftOverlay above. The
+   * layoutParams for display, never touching undo or autosave. The
    * governor used to call setLayoutParam('count', ...) directly, which
    * permanently shrank the authored value — so a "FINAL · UNCAPPED" export
    * restoring "what count was before the render" restored the *degraded*
@@ -201,14 +193,15 @@ export const createLayoutSlice = (set) => ({
     };
   }),
 
-  setDriftOverlay: (overlay) => set({ driftOverlay: overlay }),
   setPerfClampOverride: (overlay) => set({ perfClampOverride: overlay }),
 
   // ── State firewall (#107 §1) ─────────────────────────────────────────────
   // Every layoutParams write in the app funnels through these two setters —
   // sliders, presets, randomize, the governor, morph lerps and evolve
   // targets. (Ambient drift used to be a seventh writer here; #107 §2 moved
-  // it to driftOverlay above so it never touches this state at all.)
+  // it out to an overlay slot and #425 moved it into the layer resolver —
+  // it is a pure function of each layer's own state now, with no store
+  // slot left that could ever touch this state.)
   // Validating here rather than at each call site is both the smaller diff
   // and the one that cannot be forgotten by the next writer.
   //

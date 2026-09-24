@@ -89,7 +89,7 @@ app/src/
 - ✅ Output panel shows snapshot/export buttons
 - ✅ Stimulus + Davis panels collapse/expand correctly
 
-![Verified UI rendering](file:///Users/mattciaglia/.gemini/antigravity/brain/dc608ad4-f544-4b76-863b-3a06c6510287/.system_generated/click_feedback/click_feedback_1778537891938.png)
+*(screenshot "Verified UI rendering" unavailable — source image was in an agent temp dir that has since been cleaned)*
 
 ## What's Next
 
@@ -260,7 +260,7 @@ Focused on progressive disclosure and visual hierarchy to make the UI less overw
 - ✅ Browser subagent successfully dragged the canvas bottom handle and verified height increased.
 - ✅ Video recording attached below showing UI interactions.
 
-![Bundle 4 Testing](/Users/mattciaglia/.gemini/antigravity/brain/dc608ad4-f544-4b76-863b-3a06c6510287/bundle_4_test_1778540803371.webp)
+*(screenshot "Bundle 4 Testing" unavailable — source image was in an agent temp dir that has since been cleaned)*
 
 ---
 
@@ -297,7 +297,7 @@ Transformed the canvas preview from a static image into a fully interactive work
 - ✅ Browser subagent verified the `BG:` button properly cycles background styles (palette → transparent → white).
 - ✅ Video recording attached below showing the UI interactions.
 
-![Bundle 5 Testing](/Users/mattciaglia/.gemini/antigravity/brain/dc608ad4-f544-4b76-863b-3a06c6510287/bundle_5_test_1778541712654.webp)
+*(screenshot "Bundle 5 Testing" unavailable — source image was in an agent temp dir that has since been cleaned)*
 
 ---
 
@@ -334,7 +334,7 @@ The audio engine was completely overhauled. We moved from flat meters to a rich,
 - ✅ Browser subagent successfully expanded the Stimulus panel and verified the presence of the Device dropdown, File upload, Gain slider, Monitor toggle, and the new Waveform canvas.
 - ✅ Video recording attached below showing UI interactions.
 
-![Bundle 6 Testing](/Users/mattciaglia/.gemini/antigravity/brain/dc608ad4-f544-4b76-863b-3a06c6510287/bundle_6_test_1778542526950.webp)
+*(screenshot "Bundle 6 Testing" unavailable — source image was in an agent temp dir that has since been cleaned)*
 
 ---
 
@@ -370,7 +370,7 @@ The Output panel was upgraded from a static history log into a functional export
 - ✅ Verified the `MediaRecorder` finalized the WEBM blob and triggered a download upon stopping.
 - ✅ Video recording attached below showing the UI interactions.
 
-![Bundle 7 Testing](/Users/mattciaglia/.gemini/antigravity/brain/dc608ad4-f544-4b76-863b-3a06c6510287/bundle_7_test_1778543166905.webp)
+*(screenshot "Bundle 7 Testing" unavailable — source image was in an agent temp dir that has since been cleaned)*
 
 ---
 
@@ -403,7 +403,7 @@ The `DAVIS MODE` panel has been upgraded from a visual placeholder to a fully-fl
 - ✅ Browser subagent successfully expanded the Davis panel, started the engine, and verified that the Seed changed automatically after 2 seconds.
 - ✅ Video recording attached below showing the UI interactions.
 
-![Bundle 8 Testing](/Users/mattciaglia/.gemini/antigravity/brain/dc608ad4-f544-4b76-863b-3a06c6510287/bundle_8_test_1778543777107.webp)
+*(screenshot "Bundle 8 Testing" unavailable — source image was in an agent temp dir that has since been cleaned)*
 
 ---
 
@@ -419,7 +419,7 @@ For the final bundle, the focus shifted from code to communication. The legacy P
 |------|--------|
 | `README.md` | Entirely rewritten. Now includes the modern tech stack, the "curated chaos" philosophy, hotkey references, and installation instructions for the React app. |
 | `docs/architecture.md` | [NEW] Explains the underlying rendering pipeline, the deterministic math, the Context API state tree, and the video/snapshot export engine. |
-| `docs/manifesto.md` | [NEW] Explores the aesthetic philosophy behind the tool, explaining *why* we built a generative autopilot and *how* it differs from traditional digital canvases. |
+| `docs/MANIFESTO_MVP.md` | [NEW] Explores the aesthetic philosophy behind the tool, explaining *why* we built a generative autopilot and *how* it differs from traditional digital canvases. (Original MVP-era text; later superseded by `docs/MANIFESTO.md` and kept here under its own name.) |
 
 ## Conclusion
 

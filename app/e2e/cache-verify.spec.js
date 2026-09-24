@@ -49,12 +49,12 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1000);
 
-  await page.getByRole('tab', { name: /layout/i }).first().click();
+  await page.getByRole('tab', { name: /build/i }).first().click();
   await page.waitForTimeout(300);
 
   // COUNT is a stage-A input: if the geometry cache went stale, changing it
   // would not move the node count. Node count cannot be faked by animation.
-  // Scope the lookup through the layout panel's COUNT label, not bare
+  // Scope the lookup through the build panel's COUNT label, not bare
   // document order: the master bar now hosts its own input[type=range]
   // (the #278 palette MIX slider), which sorts first in the DOM and broke
   // the old .first() lookup.
@@ -71,10 +71,21 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   const restored = await nodeCount(page);
   console.log(`[cache] COUNT 700 -> ${high} nodes, 60 -> ${low}, back to 700 -> ${restored}`);
 
+  // #478: this measures live governor-shed node count, which responds to
+  // real wall-clock frame rate. Under concurrent CI load the governor sheds
+  // COUNT=700 harder than COUNT=60, narrowing the ratio toward ~1.8x on a
+  // loaded runner (observed 3-11% short of a 2x bar across 4 failures) even
+  // though a fresh local build clears it by 6.6x. A real stale-cache bug —
+  // the thing this test exists to catch — doesn't produce a narrowed ratio;
+  // a swallowed edit means `high` never moves off whatever was last cached,
+  // so the ratio reads close to 1x, nowhere near either bar. 1.5x keeps a
+  // wide margin below every CI-load ratio seen so far while staying just as
+  // decisive against the real failure mode.
+  const MARGIN = 1.5;
   expect(high, 'COUNT=700 should place many more shapes than COUNT=60')
-    .toBeGreaterThan(low * 2);
+    .toBeGreaterThan(low * MARGIN);
   expect(restored, 'returning COUNT to 700 should restore the high node count')
-    .toBeGreaterThan(low * 2);
+    .toBeGreaterThan(low * MARGIN);
 
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);
 });

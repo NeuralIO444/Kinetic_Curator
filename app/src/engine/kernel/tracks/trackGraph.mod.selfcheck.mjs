@@ -7,7 +7,7 @@ import { applyMod, motionMetrics, normalizePatch } from './trackGraph.js';
 
 const patch = (over = {}) =>
   normalizePatch({ from: 0, to: 1, mode: 'mod', strength: 1, polarity: 1, ...over });
-const knobs0 = () => ({ glow: 0, fade: 0, displace: 0 });
+const knobs0 = () => ({ glow: 0, fade: 0, displace: 0, ali: 1, coh: 1, sep: 1 });
 
 // --- motionMetrics -----------------------------------------------------
 assert.deepStrictEqual(
@@ -34,6 +34,8 @@ assert.deepStrictEqual(applyMod(knobs0(), m, patch({ mode: 'off' })), knobs0(), 
 assert.deepStrictEqual(applyMod(knobs0(), m, patch({ mode: 'field' })), knobs0(), 'field mode: not applyMod\'s to touch');
 
 // --- applyMod: strength 0 is a no-op, even with real source motion -----
+// (Extended #509 phase 1: the steering multipliers must also read exactly
+// identity here — neutrality is the no-op contract, now covering steering.)
 const zeroed = applyMod(knobs0(), m, patch({ strength: 0 }));
 assert.deepStrictEqual(zeroed, knobs0(), 'strength 0: knobs unchanged regardless of source motion');
 
@@ -43,6 +45,29 @@ assert.ok(driven.glow > 0, 'agitated source raises target glow');
 assert.ok(driven.displace > 0, 'agitated source raises target displace');
 const still2 = applyMod(knobs0(), motionMetrics([{ x: 0.5, y: 0.5, vx: 0, vy: 0 }]), patch());
 assert.deepStrictEqual(still2, knobs0(), 'a motionless source drives nothing');
+
+// --- applyMod: MOD steering (#509 phase 1) -------------------------------
+// Agitation bends alignment, speed bends cohesion, density bends separation.
+// Multipliers (identity at rest) so the force pass can scale weights blind.
+const steerDriven = applyMod(knobs0(), m, patch());
+assert.ok(steerDriven.ali > 1, 'agitated source raises target alignment');
+assert.ok(steerDriven.coh > 1, 'moving source raises target cohesion');
+assert.ok(steerDriven.sep >= 1, 'source density never inverts separation');
+// Linearity: doubling strength doubles each steering delta (shape proof,
+// not constant-pinning — the frozen gains stay frozen). Gentle metrics so
+// the [0,3] clamp stays out of the way (the clamp has its own block below).
+const gentle = motionMetrics([{ x: 0.5, y: 0.5, vx: 0.5, vy: 0 }]);
+const half = applyMod(knobs0(), gentle, patch({ strength: 0.5 }));
+const full = applyMod(knobs0(), gentle, patch({ strength: 1 }));
+for (const k of ['ali', 'coh', 'sep']) {
+  const dHalf = half[k] - 1, dFull = full[k] - 1;
+  assert.ok(Math.abs(dFull - 2 * dHalf) < 1e-9, `steering ${k} scales linearly with strength`);
+}
+// Clamp [0,3]: extreme sources bend, never invert or explode.
+const wild = applyMod(knobs0(), motionMetrics([{ x: 0.5, y: 0.5, vx: 500, vy: 500 }]), patch({ strength: 4 }));
+for (const k of ['ali', 'coh', 'sep']) {
+  assert.ok(wild[k] >= 0 && wild[k] <= 3, `steering ${k} stays in [0,3] under an extreme source`);
+}
 
 // --- applyMod: polarity flips the sign of the push ----------------------
 const posK = { glow: 0.5, fade: 0.5, displace: 2 };

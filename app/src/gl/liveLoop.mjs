@@ -69,12 +69,10 @@ function grainKeyFor(fxLayerIds, w, h) {
  * @param {HTMLCanvasElement} canvas — the visible canvas.
  * @param {object} opts
  *   getState: () => zustand store state (live read, no subscriptions)
- *   lifeRef: { current: { lifeT, scaleMul, alphaBoost, breathScale, breathRot,
- *     glow, effectiveScale, effectiveAlpha, depth, bands, pulse } }
  *   viewRef: { current: { zoom, pan: {x, y} } }
  *   wrapEl: element receiving the audio glow (box-shadow), optional
  */
-export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = null } = {}) {
+export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}) {
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
@@ -219,6 +217,15 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
   let bgMode = 'palette'; // palette | transparent | white
   let frameCount = 0;
 
+  // Layer-select focus swap: activeLayerId decides which layer's config
+  // lives in the top-level seed/layoutParams/paletteId fields (layersSlice
+  // setActiveLayer). Clicking a different layer to edit its blend/opacity
+  // is a UI focus change, not a mode/palette edit — the composite is
+  // unchanged (the layer left behind keeps rendering from its own snapshot
+  // with the same values). Track it so paletteMix can be told "this is a
+  // focus swap", not have it read as a mode/palette cut or dissolve.
+  let lastActiveLayerId = null;
+
   // Spine A (#387) — dt clock. prevTime tracks the last frame's timestamp;
   // loopTimeMs is the accumulated simulation time in ms (replaces Date.now()
   // as the noise/sim clock so tab-switches don't jump the field).
@@ -327,6 +334,19 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const rawParams = voiceState.layoutParams || {};
     const layoutParams = { ...rawParams };
 
+    // #417 — layer-focus swap: wipe the slider-spring cache BEFORE the
+    // springs run so this frame seeds cold from the new layer's raw
+    // values. Detecting the swap after the springs (first version of this
+    // fix) let them ease one blended frame off the previous layer's cache
+    // first — a one-frame pop of scale/alpha/count on every click.
+    // First frame (lastActiveLayerId === null) skips this: the cache is
+    // cold anyway. A genuine identity change keeps its cache and springs.
+    // #425 also rides this flag into the resolver (adopt-only weather).
+    const focusSwap = lastActiveLayerId !== null && s.activeLayerId !== lastActiveLayerId;
+    if (focusSwap) {
+      for (const k of Object.keys(smoothedLayoutParams)) delete smoothedLayoutParams[k];
+    }
+
     // Spine E: Sliders: current → target exp damp on the loop clock.
     // Float count; fade spawn/death. Round only when the gesture ends.
     if (s.motionSmoothing !== false) {
@@ -377,7 +397,11 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       treble: audioOn ? (s.audioBands?.treble || 0) : 0,
       beatPulse: audioOn ? (s.beatPulse || 0) : 0,
     };
-    const ballisticsParams = voiceState.ballistics || s.ballistics || {};
+    // #503 — voice/state ballistics removed: neither field ever existed, so
+    // this always ran on processBallistics' internal defaults. Honest `{}`.
+    // (Whether the hook-path shaping in useAudioInput makes this second
+    // shaping redundant is still open on #503 — untouched here.)
+    const ballisticsParams = {};
     const shapedAudio = processBallistics(ballisticsState, rawAudio, dtSec * 1000, ballisticsParams);
 
     const depth = layoutParams.audioModDepth ?? 0.65;
@@ -419,22 +443,6 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       Math.min(100, (layoutParams.alpha?.[1] ?? 100) + alphaBoost),
     ];
 
-    if (lifeRef) {
-      lifeRef.current = {
-        lifeT: loopLifeT,
-        scaleMul,
-        alphaBoost,
-        breathScale: breathScaleSmoothed,
-        breathRot: breathRotSmoothed,
-        glow,
-        effectiveScale,
-        effectiveAlpha,
-        depth,
-        bands: shapedAudio,
-        pulse: shapedAudio.beatPulse,
-      };
-    }
-
     // #278 — VJ MIX: detect palette, mode, behave, and asset changes once
     // per frame and drive the crossfade state machine.
     // Spine E: Stub chips and mode enums ride the paletteMix state machine
@@ -445,6 +453,24 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       ? voiceState.assets.join(',')
       : (s.enabledAssets ? Object.keys(s.enabledAssets).filter((k) => s.enabledAssets[k]).sort().join(',') : '');
 
+    if (s.activeLayerId !== lastActiveLayerId) {
+      // The active layer's own id/mode/behave/assets just swapped in from
+      // layersSlice's setActiveLayer — not a mode/palette edit. Re-baseline
+      // before update() sees "changed" and fires a cut/dissolve for a
+      // composite that never actually moved.
+      if (lastActiveLayerId !== null) {
+        paletteMix.resync({
+          id: s.paletteId, overrides: s.paletteOverrides, userPalettes: s.userPalettes,
+          mode: layoutParams.mode, behave: layoutParams.behave, assetsKey,
+        });
+        // #417: the slider-spring cache was already wiped at the top of
+        // this frame (focus-swap check before the springs), so
+        // layoutParams seeded cold from the new layer's raw values —
+        // identity re-baselined here, numerics re-baselined there.
+      }
+      lastActiveLayerId = s.activeLayerId;
+    }
+
     const mixEv = paletteMix.update({
       id: s.paletteId,
       overrides: s.paletteOverrides,
@@ -453,7 +479,10 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       behave: layoutParams.behave,
       assetsKey,
       mixSeconds,
-      now: performance.now(),
+      // #453: tick on the SAME accumulator the item morph reads
+      // (liveResolve, input.loopTimeMs) — pause/hold rollbacks then freeze
+      // both animations together and their tails land on the same frame.
+      now: loopTimeMs,
       canDissolve: frameCount > 0 && !!lastFrameTarget && !contextDown,
       bakeReady: !building && !!cells,
       scrubT: (s.voiceMix && !s.voiceMix.auto) ? s.voiceMix.t : null,
@@ -477,7 +506,12 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       assetWeightOverrides: s.assetWeightOverrides,
       customAssets: s.customAssets,
       quality: s.quality,
-      driftOverlay: s.driftOverlay,
+      // #425 — resolver-side life drift: per-layer locks + batch gate;
+      // slowRender below already folds !running. focusSwap tells the
+      // resolver to adopt the swapped-in seed without reseeding weather.
+      lockedParams: s.lockedParams,
+      batchPaused: s.batchPaused,
+      focusSwap,
       perfClampOverride: s.perfClampOverride,
       perfTier1: s.perfTier1,
       assetThin: s.assetThin,
@@ -494,6 +528,9 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       // Spine A (#387): dt clock — loop-owned time, not Date.now().
       dtSec,
       loopTimeMs,
+      // Item-morph (chip clicks): same duration the pixel dissolve used to
+      // use. mixSeconds<=0 means "instant", same as before.
+      mixSeconds,
     });
 
     // Node-count instrumentation (footer readout), store-owned.
@@ -620,9 +657,18 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       audioSwell: s.layoutParams.audioSwell ?? 1,
       glow,
       paused: !s.running,
-      // #278 — eased dissolve factor for this frame (null when no dissolve
-      // is running: render + present the incoming palette directly).
-      mix: mixEv.kind === 'mix' ? mixEv.t : null,
+      // #278 — the pixel dissolve now backs only manual voice-MIX
+      // scrubbing (dragging the MIX control by hand). Auto chip-triggered
+      // transitions (mode/behave/palette/asset-set) morph at the item
+      // level instead — every particle tweens position/scale/color toward
+      // its new layout rather than two frames cross-fading (liveResolve.mjs
+      // itemMorph). paletteMix.update() above still runs unconditionally
+      // (scrub bookkeeping, isDissolving()/cancel() for other callers); we
+      // just stop reading its dissolve factor for the non-scrub case.
+      mix: !(s.voiceMix && !s.voiceMix.auto) ? null
+        : mixEv.kind === 'mix' ? mixEv.t
+        : (mixEv.kind === 'start' || mixEv.kind === 'arming') ? 0
+        : null,
     };
   }
 
@@ -720,11 +766,47 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
     const dtSec = clampedDtMs / 1000;
     loopTimeMs += clampedDtMs;
 
+    // #421 — buildFrame unconditionally advances loopLifeT, ballistics, and
+    // the breath springs before either rejection path below is known. Both
+    // paths already roll loopTimeMs back on reject; snapshot these three so
+    // a rejected frame rolls back exactly as cleanly, instead of the life
+    // clock jumping through a pause and ballistics integrating audio while
+    // "frozen."
+    // #441 — disclosed sibling of #421: the slider-spring cache
+    // (smoothedLayoutParams) has the exact same "advances unconditionally"
+    // shape (both its focus-swap reset and its per-frame exp-damp ease run
+    // before either rejection path is known) and wasn't named in #421.
+    // Triaged: real — while paused, the spring keeps easing toward the
+    // live slider value every rejected tick (rAF keeps ticking; only the
+    // clock/presentation roll back), so a slider dragged during even a
+    // quarter-second pause has already fully "caught up" by the time you
+    // resume — the whole point of the ease (a smooth ramp, not a snap) is
+    // silently skipped. Same shallow-copy-and-restore shape as
+    // ballisticsState below (array-valued params are reassigned to a new
+    // array on change, never mutated in place, so a shallow copy is safe).
+    const preLoopLifeT = loopLifeT;
+    const preBreathScale = breathScaleSmoothed;
+    const preBreathRot = breathRotSmoothed;
+    const preBallisticsKeys = new Set(Object.keys(ballisticsState));
+    const preBallistics = { ...ballisticsState };
+    const preSmoothedKeys = new Set(Object.keys(smoothedLayoutParams));
+    const preSmoothed = { ...smoothedLayoutParams };
+    const rollBackLifeClocks = () => {
+      loopLifeT = preLoopLifeT;
+      breathScaleSmoothed = preBreathScale;
+      breathRotSmoothed = preBreathRot;
+      for (const k of Object.keys(ballisticsState)) if (!preBallisticsKeys.has(k)) delete ballisticsState[k];
+      Object.assign(ballisticsState, preBallistics);
+      for (const k of Object.keys(smoothedLayoutParams)) if (!preSmoothedKeys.has(k)) delete smoothedLayoutParams[k];
+      Object.assign(smoothedLayoutParams, preSmoothed);
+    };
+
     try {
       const frame = buildFrame(dtSec, loopTimeMs);
       if (!frame) {
         // Cold boot: atlas not baked yet (!cells). Roll back loopTimeMs since frame did not simulate/present.
         loopTimeMs -= clampedDtMs;
+        rollBackLifeClocks();
         return;
       }
 
@@ -733,6 +815,7 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
         loopTimeMs -= clampedDtMs;
+        rollBackLifeClocks();
         return;
       }
 
@@ -874,7 +957,26 @@ export function createLiveLoop(canvas, { getState, lifeRef, viewRef, wrapEl = nu
       throw new Error('[gl-live] GPU context lost — capture unavailable until the context is restored');
     }
     if (building) throw new Error('[gl-live] textures baking — wait a moment and retry');
-    const frame = buildFrame();
+    // #452 — buildFrame() with no args defaulted BOTH dtSec (1/60) and
+    // loopTimeMs (0). The loopTimeMs=0 default is a non-monotonic time
+    // sample: the resolver's warpPhase accumulator stores lastMs from real
+    // frames, so a 0 reads as a large NEGATIVE elapsed delta (clamped to 0,
+    // but only after the phase has effectively rewound relative to what's
+    // on screen); an in-flight chip-morph's raw = (nowMs - startMs) / dur
+    // goes negative too, clamping to 0 and presenting the morph's START
+    // pose instead of wherever it actually is. Both fire even while
+    // paused, since capture doesn't require the loop to be running.
+    // Passing the CURRENT loopTimeMs fixes both. dtSec: 0 (not the
+    // default 1/60) makes this a true peek at present state rather than
+    // an extra, uncounted physics/spring/ballistics step outside the
+    // normal tick() cadence — every per-frame accumulator in this file
+    // (breath springs, ballistics, the slider-spring cache) is driven
+    // proportionally to dtSec, so 0 is an exact no-op for all of them,
+    // and the resolver's own warpPhase no-ops the same way when nowMs
+    // exactly equals its own lastMs (dSec = max(0, nowMs - lastMs) * 0.001
+    // -- proven in #442's own regression test). No snapshot/rollback
+    // needed: nothing here has anything left to roll back.
+    const frame = buildFrame(0, loopTimeMs);
     if (!frame) throw new Error('[gl-live] textures baking — wait a moment and retry');
     const { payload, transparent, accumOn } = frame;
 

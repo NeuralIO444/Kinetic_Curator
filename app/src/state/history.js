@@ -76,6 +76,7 @@ function entrySignature(entry) {
     entry.lockedParams,
     entry.caGrid,
     entry.enabledAssets,
+    entry.seedOffsets,
     entry.layers,
     entry.activeLayerId,
     entry.layerSnapshots,
@@ -121,7 +122,9 @@ export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT) {
     return {};
   }
 
-  lastPushTime = now;
+  // Only slider ticks arm the debounce; a forced (structural) push resets it so the
+  // next drag starts a fresh step instead of being swallowed by the last push.
+  lastPushTime = force ? 0 : now;
   return {
     historyUndoStack: trimUndoStack([...undoStack, current]),
     historyRedoStack: [],

@@ -188,6 +188,26 @@
 .davis-interval-row input[type=range] { flex: 1; min-width: 0; }
 .davis-readout { color: var(--ink); min-width: 32px; text-align: right; font-size: 10px; }
 .davis-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px; }
+
+/* #479 — BEHAVE steering-weight editor: resolved values, editable per
+   field, with a brief flash on whichever fields changed since the last
+   chip click, and an accent tint on any field this layer has overridden. */
+.behave-readout { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; font-size: 10px; color: var(--dim); font-family: var(--mono); }
+.behave-readout .behave-field { white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; cursor: default; }
+.behave-field-input {
+  width: 3.6em;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  padding: 1px 3px;
+}
+.behave-field-input:hover, .behave-field-input:focus { border-color: var(--accent); outline: none; }
+.behave-readout .behave-field.overridden .behave-field-input { border-color: var(--accent); color: var(--accent); }
+@keyframes behaveFlash { 0% { color: #00ff88; } 100% { color: inherit; } }
+.behave-readout .behave-field.flash,
+.behave-readout .behave-field.flash .behave-field-input { animation: behaveFlash 900ms ease-out forwards; }
 .davis-hint {
   padding: 4px 6px;
   background: rgba(255,255,255,0.02);
@@ -241,6 +261,11 @@
 .fx-param label { font-size: 9px; color: var(--dim); width: 52px; text-transform: uppercase; letter-spacing: 0.05em; }
 .fx-param input[type=range] { flex: 1; }
 .fx-param-readout { font-size: 9px; color: var(--dim); width: 40px; text-align: right; }
+/* #507 — inline PATCH diagnostic line under each patched layer row. */
+/* #507 — inline PATCH diagnostic line under each patched layer row. */
+.patch-diag { font-size: 9px; color: var(--dim); padding: 1px 0 0 2px; white-space: nowrap; }
+/* #509 phase 3 — matrix overview block (config render, same readout style). */
+.patch-matrix { padding: 2px 0 2px 2px; }
 .fx-add-row { display: flex; gap: 4px; align-items: center; }
 .fx-add-row select { flex: 1; }
 

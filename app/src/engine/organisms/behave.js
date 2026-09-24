@@ -74,6 +74,46 @@ export function resolveBehave(id) {
   return BEHAVE[id] || BEHAVE.cruise;
 }
 
+/** #479 Option B — which table fields a per-layer override can replace. */
+export const BEHAVE_OVERRIDE_FIELDS = [
+  'sep', 'ali', 'coh', 'sepR', 'aliR', 'cohR', 'wind', 'orbit', 'attract',
+];
+
+/**
+ * #479 Option B — the table row for `layoutParams.behave`, with any
+ * per-layer overrides (`layoutParams.behaveSep`, `behaveAli`, ...) applied
+ * on top. null (the field's default — no override) falls through to the
+ * table's own value, so an unedited layer is identical to before overrides
+ * existed. Shared by particles.js (the one-writer for the actual physics)
+ * and the DAVIS readout/editor, so the two can never drift on what
+ * "effective" means. chemotaxis/deposit/lambda are not overridable —
+ * table-only, same as before this existed.
+ */
+export function resolveEffectiveBehave(layoutParams) {
+  const row = resolveBehave(layoutParams.behave);
+  const out = { ...row };
+  for (const key of BEHAVE_OVERRIDE_FIELDS) {
+    const override = layoutParams[`behave${key[0].toUpperCase()}${key.slice(1)}`];
+    if (override != null) out[key] = override;
+  }
+  return out;
+}
+
+/**
+ * #479 — which wind kernel a swarm uses (divergence-free curl vs point-angle
+ * noise). Factored out of particles.js's inline if/else so the DAVIS
+ * read-only readout can show it without re-deriving or drifting from the
+ * engine's own logic. An explicit windMode/windType always wins; otherwise
+ * it's a hidden per-behave/mode default — flock, mold, and murmuration ride
+ * curl, everything else stays point. Pure and side-effect free.
+ */
+export function resolveWindMode(layoutParams) {
+  if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') return 'curl';
+  if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') return 'point';
+  const { behave, mode } = layoutParams;
+  return (behave === 'flock' || behave === 'mold' || mode === 'murmuration') ? 'curl' : 'point';
+}
+
 /** Weak pull around plate center — Haeckel grid, not a drain. */
 export function orbitForce(x, y, cx, cy, gain) {
   if (!gain) return { fx: 0, fy: 0 };

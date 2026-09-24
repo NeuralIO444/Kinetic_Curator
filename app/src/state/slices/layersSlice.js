@@ -38,19 +38,23 @@ export function captureSnapshot(state) {
   };
 }
 
-export function displayLayerName(layer, contentOrdinal) {
+// Auto names (baked KC-n / FX n, 'Layer N', copies) carry no information the
+// position doesn't, and go stale when a delete shifts the stack.
+const AUTO_LAYER_NAME = /^(?:KC-\d+|FX \d+|Layer(?: \d+)?)$|\scopy$/;
+
+/** Positional label (KC-n / FX n) — the one naming source; a real rename shows as 'KC-n · name'. */
+export function displayLayerName(layer, ordinal) {
   if (!layer) return '';
-  if (isFxLayer(layer)) return layer.name;
-  const n = typeof layer.name === 'string' ? layer.name : '';
-  if (n.startsWith('Layer ') || n.endsWith(' copy')) return `KC-${contentOrdinal}`;
-  return n;
+  const base = isFxLayer(layer) ? `FX ${ordinal}` : `KC-${ordinal}`;
+  const n = typeof layer.name === 'string' ? layer.name.trim() : '';
+  return !n || AUTO_LAYER_NAME.test(n) ? base : `${base} · ${n}`;
 }
 
 const INITIAL_LAYER_ID = 'layer-1';
 
 export const createLayersSlice = (set) => ({
   layers: [
-    { id: INITIAL_LAYER_ID, name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: 1, strength: 0.16 } },
+    { id: INITIAL_LAYER_ID, name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } },
   ],
   activeLayerId: INITIAL_LAYER_ID,
   layerSnapshots: {},
@@ -69,7 +73,7 @@ export const createLayersSlice = (set) => ({
     const name = `KC-${content + 1}`;
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
-      layers: [...state.layers, { id, name, visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: 0, strength: 0.16 } }],
+      layers: [...state.layers, { id, name, type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }],
       layerSnapshots: { ...state.layerSnapshots, [state.activeLayerId]: captureSnapshot(state) },
       activeLayerId: id,
       ...snapshot,
@@ -80,7 +84,15 @@ export const createLayersSlice = (set) => ({
     const target = state.layers.find((l) => l.id === id);
     if (!target || isFxLayer(target)) return {};
     const mode = ['off', 'mod', 'field', 'feed'].includes(patch?.mode) ? patch.mode : 'off';
-    const to = Math.max(0, Math.min(MAX_CONTENT_TRACKS - 1, patch?.to | 0));
+    // #457 — target by stable layer id, not an ordinal into whatever is
+    // CURRENTLY visible: an ordinal silently retargets to a different
+    // track the instant hide/solo/reorder/remove changes what sits at
+    // that position elsewhere in the stack. An invalid/self/dangling id
+    // falls back to the previous target rather than guessing a new one.
+    const candidateTo = typeof patch?.to === 'string' ? patch.to : null;
+    const to = candidateTo && candidateTo !== id && state.layers.some((l) => l.id === candidateTo && !isFxLayer(l))
+      ? candidateTo
+      : (target.patch?.to ?? null);
     const prev = target.patch || {};
     const strength = Math.max(0, Math.min(1, Number(patch?.strength ?? prev.strength ?? 0.16)));
     return {
@@ -105,7 +117,7 @@ export const createLayersSlice = (set) => ({
       visible: src.visible,
       layerBlendMode: src.layerBlendMode,
       layerOpacity: src.layerOpacity,
-      patch: src.patch ? { ...src.patch } : { mode: 'off', to: 0, strength: 0.16 },
+      patch: src.patch ? { ...src.patch } : { mode: 'off', to: null, strength: 0.16 },
     };
     if (isFx) copy.effects = structuredClone(src.effects || defaultFxEffects());
     const i = state.layers.findIndex((l) => l.id === id);
@@ -123,8 +135,12 @@ export const createLayersSlice = (set) => ({
   }),
 
   removeLayer: (id) => set((state) => {
-    if (state.layers.length <= 1) return {};
-    const layers = state.layers.filter((l) => l.id !== id);
+    const target = state.layers.find((l) => l.id === id);
+    if (!target) return {};
+    if (!isFxLayer(target) && state.layers.filter((l) => !isFxLayer(l)).length <= 1) return {}; // last content track stays
+    // Clear patch.to pointing at the removed track (same rule as projectNormalize on load).
+    const layers = state.layers.filter((l) => l.id !== id)
+      .map((l) => (l.patch?.to === id ? { ...l, patch: { ...l.patch, to: null } } : l));
     const snapshots = { ...state.layerSnapshots };
     delete snapshots[id];
     const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;

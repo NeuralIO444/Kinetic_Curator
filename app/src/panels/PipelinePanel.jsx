@@ -15,7 +15,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
-import { QualityRow } from './pipeline/QualityRow.jsx';
 import { RenderFinalBlock } from './pipeline/RenderFinalBlock.jsx';
 import { PrintDeskBlock } from './pipeline/PrintDeskBlock.jsx';
 import { BatchEditionBlock } from './pipeline/BatchEditionBlock.jsx';
@@ -50,13 +49,12 @@ export function PipelinePanel() {
     userPalettes: s.userPalettes,
     favorites: s.favorites,
     watchdogTripGen: s.watchdogTripGen,
-    canvasBg: s.canvasBg,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
-    quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
+    quality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
-    userPalettes, favorites, rendering, watchdogTripGen, canvasBg,
+    userPalettes, favorites, rendering, watchdogTripGen,
   } = state;
   const setRendering = (v) => emit(Events.EXPORT_RENDERING, v);
 
@@ -91,10 +89,7 @@ export function PipelinePanel() {
 
   return (
     <div className="panel panel-pipeline">
-      <PanelHeader tag="P05" title="PIPELINE" subtitle={`${snapshots.length} snaps`}>
-        {/* #310: canvas background cycle lives here now (was CANVAS header) */}
-        <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
-      </PanelHeader>
+      <PanelHeader tag="P05" title="PIPELINE" subtitle={`${snapshots.length} snaps`} />
       <div className="panel-body pipeline-body">
         {/* ── IN: import, load, paste ── */}
         <div className="pipeline-section-label">IN</div>
@@ -108,9 +103,8 @@ export function PipelinePanel() {
           onMessage={setMessage}
         />
 
-        {/* ── PROCESS: quality, render, post ── */}
+        {/* ── PROCESS: render, post ── */}
         <div className="pipeline-section-label">PROCESS</div>
-        <QualityRow quality={quality} autoQuality={autoQuality} />
 
         <RenderFinalBlock
           glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}

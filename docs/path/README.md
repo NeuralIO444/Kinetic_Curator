@@ -6,7 +6,7 @@ How KC-1 goes from an okay agent-built VJ pile to one sentence:
 
 Product split above the layers: [TWO_PLANES.md](../TWO_PLANES.md) — **Studio** breeds a show, **Perform** plays it. One engine.
 
-Planning only. Coding agents still start at **#387 (spine A)**. These reports do not invent a parallel epic.
+Planning only. **2026-09-22: spines A–F (#387–#392) are closed** — coding agents start from the current queue in [AGENTS.md](../../AGENTS.md), not at #387. These reports do not invent a parallel epic.
 
 | # | Layer | Report | Lands after |
 |---|--------|--------|-------------|

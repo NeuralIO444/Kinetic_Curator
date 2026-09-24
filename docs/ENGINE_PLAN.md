@@ -67,13 +67,13 @@ Open on `main` when this was written:
 
 `NEXT_PHASE.md` is superseded (2026-09-17) and still points at Kernel v2 EvalContext / studio harden. Those are **not** why chips jump. Do not reopen #108 step 6 to fix feel.
 
-Known follow-ups already named in shipped code, **not filed as issues**:
+Known follow-ups already named in shipped code, **not filed as issues** — all five were absorbed by the spine; verified done 2026-09-22:
 
-- MOD from hype/organism tracks is inert (`vx/vy` not on `_organismItems`).
-- Renderer throws on missing atlas cell (#381 commit message).
-- `motionSmoothing` is never read.
-- `curl2` is unused.
-- Ballistics not on `useCanvasLife` visible scale/alpha.
+- MOD from hype/organism tracks is inert (`vx/vy` not on `_organismItems`). **Done, spine F** — `_organismItems()` carries real `vx/vy`.
+- Renderer throws on missing atlas cell (#381 commit message). **Done, spine B / #406** — skip missing cell; never hold or throw.
+- `motionSmoothing` is never read. **Done, spine C** — scales the heading-spring λ.
+- `curl2` is unused. **Done, spine F** — default wind for flock / murmuration / mold.
+- Ballistics not on `useCanvasLife` visible scale/alpha. **Done, spine C** — ballistics run on the GL loop clock; `useCanvasLife` itself was then **deleted by #418 (2026-09-22)** as a dead pathway.
 
 ## 3. The spine (build this, in this order)
 
@@ -208,17 +208,19 @@ First two engine PRs: **A + B**. That is a flock that keeps its weight at 30 fps
 
 ## 6. Acceptance for "the engine is solid"
 
+> **Annotation (2026-09-22, Matt-approved):** every box below is **code-verified** — selfcheck green (except the two GPU-dependent suites that fail pre-spine-A; see the `SPINE_REVIEW_C_F.md` errata) and QA exercised on the dev canvas. The ears/eyes-only feel rows — 30/60 flock character, wipe-not-pop, two-track shared weather, `motionSmoothing` audible — **still await Matt's play-it sign-off**, which `EMBARGO.md` records as not yet given. A tick here means "verified as far as a coding agent can verify," not Matt's sign-off.
+
 - [x] 30 fps and 60 fps flocks match speed / turn / damping (A).
 - [x] Tab-switch does not jump the noise field (A).
 - [x] Palette or voice chip never returns `buildFrame === null` for a full second (B).
 - [x] Audio hit shoves then settles; silence still no-ops (C).
 - [x] Palette change at 60 with zero `startStaticBuild` for color (D).
-- [ ] SNAP / studio hashes unchanged across D (stills baker still hex).
+- [x] SNAP / studio hashes unchanged across D (stills baker still hex).
 - [x] Grid → swarm is a picture wipe, not a sampler pop (E).
 - [x] Two swarm tracks, one project seed, share weather; offset is domain, not a second universe (F).
 - [x] MOD from a HYPE track moves knobs (organism vx).
 - [x] `motionSmoothing` is audible on stage.
-- [ ] No new panel. Tape / governor model unchanged unless smear becomes a pass.
+- [x] No new panel. Tape / governor model unchanged unless smear becomes a pass.
 
 ## 7. File map (ownership)
 
@@ -234,7 +236,7 @@ First two engine PRs: **A + B**. That is a flock that keeps its weight at 30 fps
 | `gl/renderer.mjs` | Skip missing cell, pooled upload |
 | `gl/paletteMix.mjs` | State machine to reuse for mode chips |
 | `data/voices.js` | Stop stepping hex after D; stop enum snap after E |
-| `hooks/useCanvasLife.js` | Meters only after C |
+| `hooks/useCanvasLife.js` | **deleted by #418 (2026-09-22)** — was "meters only after C"; life/ballistics are loop-owned now |
 | `gl/audioBallistics.mjs` | Already the follower |
 | `state/slices/layoutSlice.js` | `motionSmoothing` becomes live |
 | `state/slices/layersSlice.js` | Caps / patch rows — no new type |

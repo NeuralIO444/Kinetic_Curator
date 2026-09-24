@@ -11,8 +11,8 @@ const DEBOUNCE_MS = 500;
 // General safety net: any sustained stream of edits (a held slider, a fast
 // evolve interval) would otherwise reset this debounce forever and autosave
 // would never fire. A maxWait cap guarantees a write eventually.
-// (Ambient life drift no longer touches layoutParams at all — #107 §2 moved
-// it to the driftOverlay slot — so it is not what this guards against.)
+// (Ambient life drift no longer touches layoutParams at all — #425 moved
+// it into the layer resolver — so it is not what this guards against.)
 const MAX_WAIT_MS = 4000;
 const RESTORED_FLAG = 'kc:project:restored-session';
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## Current — Stage 0/1 (2026-09-23)
+
+Night Migration 30/60 sign-off recorded — embargo lifted for Stage 1 (`docs/EMBARGO.md`).
+
+- **Engine spines A–G** — dt clock, atlas-cell skip, heading spring + ballistics + life, live mask tint, mode-chip dissolve + slider springs, shared noise + curl wind, bufferSubData.
+- **Governor R1–R4** — one tape readout, instrument-named shed stages, FULL/SHOW/LEAN budget knob, registry-driven FX-stack weight.
+- **Tracks** — PATCH strength sliders + inline live readout, stable-id targets, patch round-trip + 4-track cap on load, MOD steering (source motion retunes weights), one shared scent field, patch matrix overview.
+- **Gate cuts** — `materials.js`, `glyphAtlas.mjs`, null `QualityRow` mount removed; shimmer prototype accepted, sidecar still deferred.
+- **Roadmap + research** — `docs/ROADMAP_V1.md` (staged to v1.0), `docs/BENCHMARK_REPORT.md`, render/biology 1–8 opportunities placed.
+- Open and ordered: evolve jitter (#471), BEHAVE weights (#479), ballistics shaping (#503), motion factors (#515–#519), EF rack (#520).
+
 ## Unreleased — one WebGL instrument (2026-09-17)
 
 The SVG split is gone: the live canvas renders through the same WebGL2 GPU

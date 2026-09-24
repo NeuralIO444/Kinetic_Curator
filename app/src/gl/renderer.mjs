@@ -161,12 +161,21 @@ export function hueRotateMatrix(deg) {
 }
 const HUE_IDENTITY = hueRotateMatrix(0); // exact identity: cos=1, sin=0
 
+// #420: packInstanceData calls this twice per instance per frame (tint +
+// accent), and both are drawn from a bounded palette set — memoize by the
+// hex string itself. Never invalidated: a given hex string always parses
+// to the same [r,g,b], so there's nothing to go stale.
+const HEX_RGB_CACHE = new Map();
 const hexToRgb = (hex) => {
+  const cached = HEX_RGB_CACHE.get(hex);
+  if (cached) return cached;
   const h = hex.replace('#', '');
   const v = h.length <= 4
     ? h.slice(0, 3).split('').map((c) => c + c).join('')
     : h.slice(0, 6);
-  return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
+  const rgb = [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
+  HEX_RGB_CACHE.set(hex, rgb);
+  return rgb;
 };
 
 /**
@@ -319,6 +328,12 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
   const instVbo = gl.createBuffer();
+  // Spine G: capped, reused instance buffer. drawInstances is called many
+  // times a frame (normal batches, mask bakes, one isolated draw per
+  // non-normal-blend item) — bufferData() reallocates driver storage on
+  // every call; bufferSubData() into a buffer sized once (grown on demand)
+  // does not.
+  let instCapacityBytes = 0;
 
   function drawFullscreen(prog) {
     gl.bindBuffer(gl.ARRAY_BUFFER, fullVbo);
@@ -383,7 +398,15 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    if (data.byteLength > instCapacityBytes) {
+      // Grow with 2x headroom so a fluctuating count doesn't reallocate
+      // every frame near a boundary. drawArraysInstanced below uses the
+      // instance count from `data`, not the buffer's capacity, so unused
+      // tail bytes are never read.
+      instCapacityBytes = data.byteLength * 2;
+      gl.bufferData(gl.ARRAY_BUFFER, instCapacityBytes, gl.DYNAMIC_DRAW);
+    }
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
     gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);
@@ -412,7 +435,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   /**
    * Render one content layer's instances into layerTarget (cleared first).
-   * Non-normal per-item blends go through the scratch target (slow but exact).
+   * Non-normal per-item blends go through the scratch target (slow but
+   * exact) — but a CONSECUTIVE run of items sharing one blend value draws
+   * as a single scratch pass + composite, not one per item. Spine G: the
+   * scene contract assigns one blendMode per layer today (sceneContract.js
+   * toInstance), so a "run" is typically the layer's entire isolated set —
+   * e.g. the SWARM voice's ~420 screen-blended wings, previously silently
+   * skipped by the old cell-lookup bug (#408) and now, un-batched, a
+   * per-item FBO-clear/draw/composite/copy cycle 420x a frame. Safe to
+   * batch because nothing of a different blend sits between them in
+   * stacking order to reorder past.
    * groupOpacity folds into instance alpha (mask bakes; normal layers keep
    * group opacity in the composite pass, matching the SVG <g opacity>).
    */
@@ -422,35 +454,46 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     let batch = [];
-    const flush = () => {
+    const flushNormal = () => {
       if (batch.length) {
         const data = instanceData(batch, cells, groupOpacity);
         if (data.length) drawInstances(data, atlasTex, w, h);
       }
       batch = [];
     };
-    for (const it of instances) {
-      const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
-      if (b === 'normal') { batch.push(it); continue; }
-      const cell = cells ? cells[`${it.asset}|${it.tint}|${it.accent}`] : null;
-      if (!cell) continue; // Spine B (#388): cell missing, skip isolated item entirely
-      flush();
-      // Isolated item: draw to scratch, blend over the layer backdrop.
+    const flushIsolatedRun = (items, blendMode) => {
+      if (!items.length) return;
+      const data = instanceData(items, cells, groupOpacity);
+      if (!data.length) return; // Spine B (#388): nothing bakeable in this run yet
+      flushNormal();
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fb);
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      const data = instanceData([it], cells, groupOpacity);
-      if (data.length) drawInstances(data, atlasTex, w, h);
-      composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(b), 1, null);
+      drawInstances(data, atlasTex, w, h);
+      composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(blendMode), 1, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
       gl.viewport(0, 0, w, h);
       gl.disable(gl.BLEND);
       gl.useProgram(copyProg);
       gl.uniform1i(U(copyProg, 'u_src'), bindTex(0, blendTmp.tex));
       drawFullscreen(copyProg);
+    };
+    let isolatedRun = [];
+    let isolatedRunBlend = null;
+    for (const it of instances) {
+      const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
+      if (b === 'normal') {
+        if (isolatedRun.length) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; isolatedRunBlend = null; }
+        batch.push(it);
+        continue;
+      }
+      if (isolatedRun.length && b !== isolatedRunBlend) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; }
+      isolatedRunBlend = b;
+      isolatedRun.push(it);
     }
-    flush();
+    if (isolatedRun.length) flushIsolatedRun(isolatedRun, isolatedRunBlend);
+    flushNormal();
   }
 
   /**

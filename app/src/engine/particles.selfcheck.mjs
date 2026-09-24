@@ -29,6 +29,7 @@
 import assert from 'node:assert';
 import { ParticleSystem } from './particles.js';
 import { ReferenceParticleSystem } from './particles.reference.mjs';
+import { createScentField } from './kernel/field/scent.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 
 const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
@@ -145,6 +146,112 @@ for (const [name, args] of CASES) {
   assert.ok(Array.from(sys.phase.subarray(0, sys.n)).some((p) => p !== 0), 'phase should advance');
   sys.resetPhase();
   assert.ok(Array.from(sys.phase.subarray(0, sys.n)).every((p) => p === 0), 'resetPhase must clear');
+}
+
+// #509 phase 1 — MOD steering: identity is byte-identical, active bends.
+// modSteer rides the update spread (like the live resolver sends it), never
+// normalized state — attached post-normalize, mirroring liveResolve.
+{
+  const run = (steer, steps = 30) => {
+    const sys = new ParticleSystem();
+    const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 60 });
+    if (steer) lp.modSteer = steer;
+    sys.init(60, 1000, 700, assets, palette, 0x1a4f);
+    for (let s = 0; s < steps; s++) sys.update(lp, assets, palette, 0x1a4f, 1_000_000 + s * 16, null);
+    return sys.getItems(assets);
+  };
+  const base = run(null);
+  const ident = run({ ali: 1, coh: 1, sep: 1 });
+  assert.strictEqual(ident.length, base.length, 'steer identity keeps item count');
+  for (let i = 0; i < base.length; i++) {
+    assert.ok(Object.is(ident[i].x, base[i].x) && Object.is(ident[i].y, base[i].y),
+      `identity steer must be byte-identical (item ${i})`);
+  }
+  const bent = run({ ali: 2, coh: 2, sep: 0.5 });
+  assert.strictEqual(bent.length, base.length, 'active steer keeps item count');
+  assert.ok(bent.some((it, i) => !Object.is(it.x, base[i].x) || !Object.is(it.y, base[i].y)),
+    'active steering must move particles off the unsteered path');
+  for (const it of bent) assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'steered positions stay finite');
+}
+
+// #509 phase 2 — shared scent: two mold casts on one field smell each
+// other. A deposits (profile.deposit), B's chemotaxis reads it — B's path
+// must diverge from an isolated B on identical seeds. The field rides the
+// update spread (post-normalize, like the live resolver sends it).
+{
+  const runMold = (field, steps = 15) => {
+    const sys = new ParticleSystem();
+    const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', particleCount: 24 });
+    if (field) lp.scentField = field;
+    sys.init(24, 1000, 700, assets, palette, 0x1a4f);
+    for (let s = 0; s < steps; s++) {
+      sys.update(lp, assets, palette, 0x1a4f, 1_000_000 + s * 16, null);
+      if (field) field.step();
+    }
+    return sys.getItems(assets);
+  };
+  const shared = createScentField();
+  const aItems = runMold(shared);
+  assert.ok(aItems.length > 0, 'shared-field run yields items');
+  const bShared = runMold(shared);
+  const bIso = runMold(null);
+  assert.strictEqual(bShared.length, bIso.length, 'shared vs isolated keep count');
+  assert.ok(bShared.some((it, i) => !Object.is(it.x, bIso[i].x) || !Object.is(it.y, bIso[i].y)),
+    'a cast on shared ground must diverge from the identical isolated cast');
+  for (const it of bShared) assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'shared-ground positions stay finite');
+}
+
+// #454 — a non-finite attractor (a zero-size canvas rect divides to
+// Infinity upstream in useCanvasViewport.js) must not poison the swarm.
+// dx/d = Infinity/Infinity = NaN in the attraction force, and the speed
+// clamp further down can't bound NaN (every NaN comparison is false), so
+// without a guard this corrupts every particle's position permanently.
+// The fix guards at both ends: the hook never constructs a non-finite
+// attractor (a zero-size rect degrades to null), and particles.js itself
+// ignores a non-finite attractor defensively. This test exercises the
+// particles.js guard directly, regardless of what upstream sends it.
+{
+  for (const attractor of [{ x: Infinity, y: Infinity }, { x: NaN, y: 300 }, { x: -Infinity, y: -Infinity }]) {
+    const items = run(ParticleSystem, 'swarm', 60, 30, attractor);
+    assert.ok(items.length > 0, 'a non-finite attractor must not empty the swarm');
+    for (const it of items) {
+      assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y),
+        `non-finite attractor ${JSON.stringify(attractor)} must not poison item positions (got x=${it.x}, y=${it.y})`);
+    }
+  }
+}
+
+// #479 Option B — per-layer BEHAVE steering-weight overrides.
+{
+  const steps = 40;
+  // An unedited layer (behave set, no override fields touched) must be
+  // bit-identical to how the table row always behaved — the null sentinel
+  // is a true no-op, not just "close enough".
+  const plainCruise = run(ParticleSystem, 'hype', 20, steps, null, { behave: 'cruise' });
+  const explicitNullCruise = run(ParticleSystem, 'hype', 20, steps, null, {
+    behave: 'cruise', behaveSep: null, behaveCoh: null,
+  });
+  for (let i = 0; i < plainCruise.length; i++) {
+    assert.ok(Object.is(plainCruise[i].x, explicitNullCruise[i].x) && Object.is(plainCruise[i].y, explicitNullCruise[i].y),
+      `item ${i}: an explicit null override must be bit-identical to no override at all`);
+  }
+  // Overriding sep/coh must visibly change the resulting motion — the
+  // whole point of #479 Option B (a chip alone can't do this; only the
+  // table row could, until now).
+  const overridden = run(ParticleSystem, 'hype', 20, steps, null, {
+    behave: 'cruise', behaveSep: 5.9, behaveCoh: 1.8,
+  });
+  const moved = overridden.some((it, i) =>
+    Math.abs(it.x - plainCruise[i].x) > 1e-6 || Math.abs(it.y - plainCruise[i].y) > 1e-6);
+  assert.ok(moved, 'a BEHAVE weight override must visibly change swarm motion vs the unedited table row');
+  // Cloud (non-organism) modes never read the profile at all -- an override
+  // must be silently inert there, same as swarmCohesion already is for hype.
+  const cloudPlain = run(ParticleSystem, 'swarm', 20, steps, null);
+  const cloudOverridden = run(ParticleSystem, 'swarm', 20, steps, null, { behaveSep: 5.9, behaveCoh: 1.8 });
+  for (let i = 0; i < cloudPlain.length; i++) {
+    assert.ok(Object.is(cloudPlain[i].x, cloudOverridden[i].x) && Object.is(cloudPlain[i].y, cloudOverridden[i].y),
+      `item ${i}: BEHAVE overrides must be inert in cloud/swarm mode (organism-only)`);
+  }
 }
 
 console.log('particles.selfcheck: OK (#108 swarm SoA — behaviour identical to pre-SoA engine)', {

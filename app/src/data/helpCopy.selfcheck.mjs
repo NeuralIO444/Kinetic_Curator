@@ -112,7 +112,7 @@ import { HELP_TOPICS, HELP_SHORTCUTS, helpText } from './helpCopy.js';
     'panels/layout/ToggleRow.jsx': 'layout-accum',
     'panels/pipeline/SnapRecordRow.jsx': 'output-webm',
     'components/MasterBar.jsx': 'output-webm',
-    'panels/LayersPanel.jsx': 'layers-blend',
+    'panels/build/LayerStack.jsx': 'layers-blend',
     'panels/DavisPanel.jsx': 'davis-clear',
   };
   for (const [file, id] of Object.entries(wired)) {

@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { createLiveResolver } from './liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
+import { createNoise } from '../engine/noise.js';
 
 function baseInput(over = {}) {
   return {
@@ -32,7 +33,10 @@ function baseInput(over = {}) {
     assetWeightOverrides: {},
     customAssets: [],
     quality: 'balanced',
-    driftOverlay: null,
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    loopTimeMs: 0,
     perfClampOverride: null,
     perfTier1: false,
     assetThin: false,
@@ -183,8 +187,10 @@ function modInput(patch) {
 }
 
 test('#343: MOD patch perturbs the target when the source track has motion', () => {
+  // #457 — patch.to is a stable layer id now, not an ordinal into the
+  // visible-only content list; 'lyr-a' is this test's source layer.
   const off = createLiveResolver().resolveLayers(modInput(null));
-  const on = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 0, strength: 1 }));
+  const on = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 1 }));
   const bOff = off.find((l) => l.id === 'lyr-b');
   const bOn = on.find((l) => l.id === 'lyr-b');
   assert.equal(bOff.items.length, bOn.items.length, 'MOD does not add/remove items, only perturbs them');
@@ -195,9 +201,40 @@ test('#343: MOD patch perturbs the target when the source track has motion', () 
   assert.ok(changed, 'a swarm source with real motion perturbs the MOD target\'s scale/alpha/x');
 });
 
+test('#457: patch target resolves by stable layer id, not an ordinal into the visible-only list', () => {
+  // decoy, src, target (in that array order): src is the MOD source,
+  // target's patch stores src's ID. Pre-#457, patch.to was an ordinal into
+  // the VISIBLE-only content list — hiding the decoy (which sits BEFORE
+  // src in the stack) shifts every later layer's ordinal down by one, so
+  // whatever ordinal used to mean "src" now means a different layer (or
+  // the target itself). Resolving by id must be immune to this.
+  const layers = (decoyVisible) => [
+    { id: 'lyr-decoy', name: 'Decoy', visible: decoyVisible, layerBlendMode: 'normal', layerOpacity: 1 },
+    { id: 'lyr-src', name: 'Src', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    {
+      id: 'lyr-target', name: 'Target', visible: true, layerBlendMode: 'normal', layerOpacity: 1,
+      patch: { mode: 'mod', to: 'lyr-src', strength: 1 },
+    },
+  ];
+  const mk = (decoyVisible) => baseInput({
+    layers: layers(decoyVisible),
+    activeLayerId: 'lyr-src',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', count: 30, particleCount: 30, behave: 'scatter' },
+    layerSnapshots: {
+      'lyr-decoy': { seed: 111, paletteId: 'bone', paletteOverrides: null, layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 15 }, caGrid: null, enabledAssets: null },
+      'lyr-target': { seed: 333, paletteId: 'bone', paletteOverrides: null, layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 20 }, caGrid: null, enabledAssets: null },
+    },
+  });
+  const targetItems = (out) => out.find((l) => l.id === 'lyr-target').items;
+
+  const decoyShown = targetItems(createLiveResolver().resolveLayers(mk(true)));
+  const decoyHidden = targetItems(createLiveResolver().resolveLayers(mk(false)));
+  assert.deepEqual(decoyHidden, decoyShown, 'hiding an unrelated layer earlier in the stack must not change what the patch targets');
+});
+
 test('#343: MOD is a no-op when strength is 0', () => {
   const off = createLiveResolver().resolveLayers(modInput(null));
-  const zero = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 0, strength: 0 }));
+  const zero = createLiveResolver().resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 0 }));
   const bOff = off.find((l) => l.id === 'lyr-b');
   const bZero = zero.find((l) => l.id === 'lyr-b');
   for (let i = 0; i < bOff.items.length; i++) {
@@ -205,4 +242,532 @@ test('#343: MOD is a no-op when strength is 0', () => {
     assert.equal(bZero.items[i].alpha, bOff.items[i].alpha);
     assert.equal(bZero.items[i].x, bOff.items[i].x);
   }
+});
+
+// #509 phase 1 — MOD steering carries to the next tick through the
+// transient map (record this tick, applied in the following update spread).
+// Plumbing proof only: the steering effect itself is pinned in
+// particles.selfcheck (identity byte-identical, active bends).
+test('#509: MOD steering record/apply loop runs without breaking the pipeline', () => {
+  const r = createLiveResolver();
+  const t1 = r.resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 1 }));
+  const t2 = r.resolveLayers(modInput({ mode: 'mod', to: 'lyr-a', strength: 1 }));
+  const b1 = t1.find((l) => l.id === 'lyr-b');
+  const b2 = t2.find((l) => l.id === 'lyr-b');
+  assert.strictEqual(b2.items.length, b1.items.length, 'steering never adds/removes items');
+  for (const it of b2.items) {
+    assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'steered tick stays finite');
+  }
+});
+
+// #509 phase 2 — shared scent plumbing: two mold layers resolve twice on
+// one resolver without breaking the pipeline. Cross-talk itself is pinned
+// in particles.selfcheck (shared vs isolated divergence); here the proof
+// is pipeline integrity under the shared field + once-per-tick step.
+test('#509: shared scent field carries across ticks without breaking the pipeline', () => {
+  const moldLayers = () => [
+    { id: 'lyr-m1', name: 'M1', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    { id: 'lyr-m2', name: 'M2', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+  ];
+  const moldSnap = (seed) => ({
+    seed, paletteId: 'bone', paletteOverrides: null,
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', count: 12, particleCount: 12 },
+    caGrid: null, enabledAssets: null,
+  });
+  const mk = () => baseInput({
+    layers: moldLayers(),
+    activeLayerId: 'lyr-m1',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', count: 12, particleCount: 12 },
+    layerSnapshots: { 'lyr-m1': moldSnap(101), 'lyr-m2': moldSnap(202) },
+  });
+  const r = createLiveResolver();
+  const t1 = r.resolveLayers(mk());
+  const t2 = r.resolveLayers(mk());
+  for (const id of ['lyr-m1', 'lyr-m2']) {
+    const a = t1.find((l) => l.id === id);
+    const b = t2.find((l) => l.id === id);
+    assert.strictEqual(b.items.length, a.items.length, `${id}: shared field never adds/removes items`);
+    for (const it of b.items) {
+      assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), `${id}: tick-2 items stay finite`);
+    }
+  }
+});
+
+// ── #425: focus swaps are a total non-event ────────────────────────────────
+// Two layers with deliberately different bases, depths and locks. setActiveLayer
+// guarantees snapshot == top-level for BOTH layers at the swap boundary, so if
+// drift/weather are per-layer + swap-invariant, resolve must be per-layer
+// identical before and after the click.
+
+const A425 = { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 10, jitter: 40, lifeDrift: 0.4, displacement: 30 };
+const B425 = { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 10, jitter: 90, lifeDrift: 0.2 };
+const A425_LOCKS = {};
+const B425_LOCKS = { jitter: true };
+
+function input425(over = {}) {
+  return {
+    layers: [
+      { id: 'lyr-a', name: 'A', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+      { id: 'lyr-b', name: 'B', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    ],
+    seed: 111,
+    seedOffsets: null,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    caGrid: null,
+    enabledAssets: null,
+    assetWeightOverrides: {},
+    customAssets: [],
+    quality: 'balanced',
+    perfClampOverride: null,
+    perfTier1: false,
+    assetThin: false,
+    slowRender: false,
+    batchPaused: false,
+    scaleMul: 1,
+    alphaBoost: 0,
+    effectiveScale: [0.5, 1.5],
+    effectiveAlpha: [20, 100],
+    phraseWrapGen: 0,
+    attractor: null,
+    loopTimeMs: 3360, // mid-gesture phase: every sine is off its zero crossing
+    ...over,
+  };
+}
+
+test('#425: per-layer life drift is byte-identical across a focus swap', () => {
+  const r = createLiveResolver();
+  const snapOf = (params, locks, seed) => ({
+    seed, paletteId: 'bone', paletteOverrides: null, layoutParams: params,
+    caGrid: null, enabledAssets: null, lockedParams: locks,
+  });
+  // R1: A active (top-level = A), B from its snapshot.
+  const r1 = r.resolveLayers(input425({
+    activeLayerId: 'lyr-a', layoutParams: A425, seed: 111, lockedParams: A425_LOCKS,
+    layerSnapshots: { 'lyr-b': snapOf(B425, B425_LOCKS, 999) },
+    focusSwap: false,
+  }));
+  // R2: the click — top-level becomes B, A moves to its snapshot.
+  const r2 = r.resolveLayers(input425({
+    activeLayerId: 'lyr-b', layoutParams: B425, seed: 999, lockedParams: B425_LOCKS,
+    layerSnapshots: { 'lyr-a': snapOf(A425, A425_LOCKS, 111) },
+    focusSwap: true,
+  }));
+  const a1 = r1.find((l) => l.id === 'lyr-a');
+  const a2 = r2.find((l) => l.id === 'lyr-a');
+  const b1 = r1.find((l) => l.id === 'lyr-b');
+  const b2 = r2.find((l) => l.id === 'lyr-b');
+  for (const k of ['jitter', 'displacement', 'noiseSpeed']) {
+    assert.equal(a2.layoutParams[k], a1.layoutParams[k], `A's ${k} must not change on focus swap`);
+    assert.equal(b2.layoutParams[k], b1.layoutParams[k], `B's ${k} must not change on focus swap`);
+  }
+  // Per-layer correctness, not just continuity: B's locked jitter is raw in
+  // BOTH frames; A's unlocked jitter drifts from its own 40/0.4 base in both.
+  assert.equal(b1.layoutParams.jitter, B425.jitter, 'locked jitter never drifts (pre-swap)');
+  assert.equal(b2.layoutParams.jitter, B425.jitter, 'locked jitter never drifts (post-swap)');
+  assert.notEqual(a1.layoutParams.jitter, A425.jitter, "A's unlocked jitter drifts");
+  assert.notEqual(a1.layoutParams.displacement, A425.displacement, "A's unlocked displacement drifts");
+  // And with it, A's world-warped item coords: same weather + same drift →
+  // the warp must be identical across the swap (continuity of the render).
+  assert.deepEqual(
+    a2.items.map((i) => [i.x, i.y]),
+    a1.items.map((i) => [i.x, i.y]),
+    "A's warped item positions must not move on focus swap",
+  );
+  r.dispose();
+});
+
+test('#425: life drift pauses with batch exports / slowRender / low lifeDrift', () => {
+  const base = {
+    activeLayerId: 'lyr-a', layoutParams: A425, seed: 111, lockedParams: {},
+    layerSnapshots: {},
+  };
+  const jit = (over) => {
+    const r = createLiveResolver();
+    const out = r.resolveLayers(input425({ ...base, ...over }));
+    const v = out.find((l) => l.id === 'lyr-a').layoutParams.jitter;
+    r.dispose();
+    return v;
+  };
+  assert.notEqual(jit({}), A425.jitter, 'control: drift is on by default');
+  assert.equal(jit({ batchPaused: true }), A425.jitter, 'batch export pauses drift');
+  assert.equal(jit({ slowRender: true }), A425.jitter, 'slowRender pauses drift');
+  assert.equal(
+    jit({ layoutParams: { ...A425, lifeDrift: 0.01 } }),
+    A425.jitter,
+    'lifeDrift <= 0.01 turns drift off for that layer',
+  );
+});
+
+test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', () => {
+  const r = createLiveResolver();
+  const snapA = {
+    seed: 111, paletteId: 'bone', paletteOverrides: null,
+    layoutParams: { ...A425, lifeDrift: 0 },
+    caGrid: null, enabledAssets: null, lockedParams: {},
+  };
+  const aActive111 = (loopTimeMs = 1000) => r.resolveLayers(input425({
+    activeLayerId: 'lyr-a', layoutParams: { ...A425, lifeDrift: 0 }, seed: 111,
+    lockedParams: {}, layerSnapshots: {}, focusSwap: false, loopTimeMs,
+  }));
+  const clickToB = (seed, focusSwap) => r.resolveLayers(input425({
+    activeLayerId: 'lyr-b',
+    layoutParams: { ...B425, lifeDrift: 0 },
+    seed, // the swapped-in layer's different seed
+    lockedParams: {},
+    layerSnapshots: { 'lyr-a': snapA },
+    focusSwap,
+    loopTimeMs: 1000, // warp must be live (curDx != baseDx)
+  }));
+  const coord = (frame) => frame.find((l) => l.id === 'lyr-a').items.map((i) => `${i.x},${i.y}`).join(';');
+
+  // #432 — the warp phase is now accumulated incrementally (real elapsed
+  // loopTimeMs since the layer's last resolve), not derived fresh from the
+  // absolute loopTimeMs each call. Warm it up with real elapsed time (0ms
+  // -> 1000ms) before measuring, so curDx != baseDx below as intended —
+  // origin/held/rerolled all then measure at the SAME loopTimeMs (1000,
+  // zero further elapsed time), so the warm-started phase stays frozen
+  // across them and only the reseed under test can move the reading.
+  aActive111(0); // establish the field under seed 111 with A visible
+  const origin = coord(aActive111());
+  const held = coord(clickToB(222, true)); // click to B: top-level seed 111 → 222
+  const rerolled = coord(clickToB(333, false)); // shuffle-class reseed: new seed, focusSwap false
+  assert.equal(held, origin, 'focus swap must not reseed the shared weather');
+  assert.notEqual(rerolled, held, 'a genuine seed change must re-roll the weather');
+  r.dispose();
+});
+
+test('#419: chip morph plans once at the click, blends, then lands raw', () => {
+  const r = createLiveResolver();
+  const mk = (mode, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    mixSeconds: 0.5,
+    loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  const before = lyr(r.resolveLayers(mk('scatter', 0)));      // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk('grid', 1000)));       // chip click: plan built, t=0
+  const mid = lyr(r.resolveLayers(mk('grid', 1250)));         // t=0.5, plan in use
+  const done = lyr(r.resolveLayers(mk('grid', 1600)));        // past mixSeconds: landed
+  const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 1600)));
+
+  assert.deepEqual(start, before, 'first frame after the click still presents the old layout');
+  assert.notDeepEqual(mid, raw, 'mid-transition presents a blend, not the raw target layout');
+  assert.ok(mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
+    'planned blend produces finite positions every frame');
+  assert.deepEqual(done, raw, 'completed morph presents the raw resolved items');
+  r.dispose();
+});
+
+test('#471: a seed change alone now glides through item-morph, not a hard snap', () => {
+  // Mirrors the #419 test exactly, substituting seed for mode as the
+  // changing field — EVOLVE's seed target used to write a new seed
+  // directly with no morph anywhere (the one pure-snap path); folding
+  // seed into morphSig routes it through the same blendItems/morphEase
+  // glide every other chip-triggered field already gets.
+  const r = createLiveResolver();
+  const mk = (seed, loopTimeMs) => baseInput({
+    seed,
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 24, lifeDrift: 0 },
+    mixSeconds: 0.5,
+    loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  const before = lyr(r.resolveLayers(mk(1111, 0)));       // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk(2222, 1000)));     // seed change (EVOLVE-style): plan built, t=0
+  const mid = lyr(r.resolveLayers(mk(2222, 1250)));       // t=0.5, plan in use
+  const done = lyr(r.resolveLayers(mk(2222, 1600)));      // past mixSeconds: landed
+  const raw = lyr(createLiveResolver().resolveLayers(mk(2222, 1600)));
+
+  assert.deepEqual(start, before, 'first frame after a seed change still presents the old placement');
+  assert.notDeepEqual(mid, raw, 'mid-transition presents a blend, not the raw new-seed placement');
+  assert.ok(mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
+    'planned blend produces finite positions every frame');
+  assert.deepEqual(done, raw, 'completed morph presents the raw resolved items at the new seed');
+  r.dispose();
+});
+
+test('#451: overlap:false sorts by pre-breath baseScale — draw order does not flip on every breath crossing', () => {
+  const r = createLiveResolver();
+  const mk = (loopTimeMs) => baseInput({
+    layers: [{ id: 'lyr-s', name: 'S', visible: true }],
+    activeLayerId: 'lyr-s',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 24, overlap: false, breath: 1 },
+    loopTimeMs,
+    dtSec: 1 / 30,
+  });
+  r.resolveLayers(mk(0)); // warm-up: let spawn settle before measuring
+
+  let prevOrder = null;
+  let sawLiveScaleCross = false;
+  let orderFlips = 0;
+  for (let f = 1; f <= 90; f++) {
+    const items = r.resolveLayers(mk(f * (1000 / 30)))[0].items;
+    for (let i = 1; i < items.length; i++) {
+      assert.ok(items[i].baseScale >= items[i - 1].baseScale - 1e-9, 'items must be sorted by baseScale');
+    }
+    // seedOffset is assigned once per particle at spawn and never changes,
+    // so it's a stable identity to track array position by — the thing
+    // under test is exactly whether that position holds across frames.
+    const order = items.map((it) => it.seedOffset).join(',');
+    // Proves this scenario actually exercises a breath-driven crossing: had
+    // the live (breathing) scale been the sort key instead, this frame's
+    // order would differ from the baseScale order.
+    const liveOrder = [...items].sort((a, b) => a.scale - b.scale).map((it) => it.seedOffset).join(',');
+    if (liveOrder !== order) sawLiveScaleCross = true;
+    if (prevOrder !== null && order !== prevOrder) orderFlips++;
+    prevOrder = order;
+  }
+  assert.ok(sawLiveScaleCross, 'test setup must actually exercise a live-scale crossing (breath amplitude too low otherwise)');
+  assert.equal(orderFlips, 0, 'baseScale-sorted draw order must not flip across frames while breath oscillates');
+  r.dispose();
+});
+
+test('#455: a continuously-lerped paletteOverrides during an auto-MIX must not retrigger the item-morph every frame', () => {
+  const r = createLiveResolver();
+  // A tint value that differs on literally every call, same shape voices.js
+  // produces every frame while an auto voice/preset MIX is in flight.
+  const lerpOverrides = (ms) => ({
+    bg: `#${(ms % 256).toString(16).padStart(2, '0')}0000`,
+    ink: '#ffffff',
+    swatches: ['#112233'],
+  });
+  const mk = (mode, loopTimeMs, paletteOverrides) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    mixSeconds: 0.5,
+    loopTimeMs,
+    paletteOverrides,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+
+  r.resolveLayers(mk('scatter', 0, null));               // baseline, sig recorded
+  r.resolveLayers(mk('grid', 1000, lerpOverrides(1000))); // chip click: plan built, t=0
+
+  // A live auto-MIX driving paletteOverrides every frame while mode/behave/
+  // assets hold steady at their post-click values — before the fix, each of
+  // these looked like a brand-new transition and reset startMs, so raw
+  // never advanced and every frame presented ~the from-pose.
+  for (let ms = 1050; ms <= 1450; ms += 50) {
+    r.resolveLayers(mk('grid', ms, lerpOverrides(ms)));
+  }
+  const done = lyr(r.resolveLayers(mk('grid', 1600, lerpOverrides(1600))));
+  const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 1600, lerpOverrides(1600))));
+
+  assert.deepEqual(done, raw, 'the morph must land on schedule despite paletteOverrides changing every frame');
+  r.dispose();
+});
+
+test('#427: adopt-on-enter — a chip into a live swarm mode starts from the prior positions, not a fresh seed scatter', () => {
+  const r = createLiveResolver();
+  // Same asset pool for both modes (a curated voice restricted to these
+  // shapes) — the scenario matchItems' nearest-same-asset pairing is meant
+  // for. A disjoint pool (e.g. default full asset set vs. murmuration's
+  // organism-only subset) has no shared identity to adopt from at all,
+  // which is a real but different case from what this test isolates.
+  const orgAssets = ASSETS.filter((a) => /^(org_|geo_tri_)/.test(a.id)).map((a) => a.id);
+  const enabledAssets = Object.fromEntries(orgAssets.map((id) => [id, true]));
+  const mk = (mode, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0 },
+    enabledAssets,
+    mixSeconds: 0, // #419's morph is orthogonal to this — isolate the init-time adopt itself
+    loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+
+  const gridItems = lyr(r.resolveLayers(mk('grid', 0)));
+  // The mode change alone changes initKey (liveResolve.mjs:swarmItems) even
+  // though the seed is untouched — this is the exact #427 trigger.
+  const swarmItems = lyr(r.resolveLayers(mk('murmuration', 16)));
+
+  assert.ok(gridItems.length > 0 && swarmItems.length > 0, 'both modes produce items to compare');
+
+  // Nearest-neighbor distance from each grid position to the swarm's
+  // landing positions: a matched (same-asset) pair should land within a
+  // few px (adopted, then one physics step of drift); an unmatched grid
+  // item (its asset ran out of fresh same-asset slots) legitimately keeps
+  // whatever fresh scatter distance it lands at. So assert on the matched
+  // majority via median, not a mean the unmatched tail would mask.
+  const nearestDist = (p, pool) => {
+    let best = Infinity;
+    for (const q of pool) {
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < best) best = d;
+    }
+    return best;
+  };
+  const dists = gridItems.map((g) => nearestDist(g, swarmItems)).sort((a, b) => a - b);
+  const median = dists[Math.floor(dists.length / 2)];
+  assert.ok(
+    median < 5,
+    `most matched items should adopt within a few px of their prior position, not scatter canvas-wide (median nearest-neighbor dist ${median.toFixed(1)}px)`,
+  );
+  r.dispose();
+});
+
+// ── #442: regression guards for the #432 warp-phase invariants ─────────────
+// #432 replaced ntLive = nt0 + loopTimeMs * noiseSpeed (proportional to
+// ABSOLUTE session time) with an incrementally accumulated wp.base
+// (integral of noiseSpeed over each call's own elapsed real time,
+// wp.base += max(0, nowMs - wp.lastMs) * 0.001 * noiseSpeed). Both tests
+// below reimplement that exact recurrence independently and assert exact
+// equality against it — not a magnitude/tolerance heuristic — so a revert
+// to the old formula (or a dropped clamp) fails hard, not flakily.
+//
+// Both exploit the same trick: a layer's FIRST live-warp resolve always
+// has wp.base === 0 (freshly initialized), so ntLive === nt0 and the live
+// delta (curDx - baseDx) is exactly zero there — that frame's positions
+// ARE the static (pre-warp) reference, with no separate probe needed.
+
+const WARP442_LP = { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 6, lifeDrift: 0, displacement: 40 };
+const warp442Items = (out) => out.find((l) => l.id === 'lyr-a').items;
+function assertWarpMatches(staticPos, after, { seed, noiseFreq, displacement, ntLive, nt0 }, msg) {
+  const noise = createNoise(seed >>> 0);
+  for (let i = 0; i < staticPos.length; i++) {
+    const p = staticPos[i];
+    const curDx = noise.fBm3D(p.x * noiseFreq, p.y * noiseFreq, ntLive, 3) * displacement;
+    const curDy = noise.fBm3D(p.x * noiseFreq + 200, p.y * noiseFreq + 200, ntLive + 100, 3) * displacement;
+    const baseDx = noise.fBm3D(p.x * noiseFreq, p.y * noiseFreq, nt0, 3) * displacement;
+    const baseDy = noise.fBm3D(p.x * noiseFreq + 200, p.y * noiseFreq + 200, nt0 + 100, 3) * displacement;
+    assert.ok(Math.abs(after[i].x - (p.x + curDx - baseDx)) < 1e-6, `item ${i} x: ${msg}`);
+    assert.ok(Math.abs(after[i].y - (p.y + curDy - baseDy)) < 1e-6, `item ${i} y: ${msg}`);
+  }
+}
+
+test('#442: warp phase — a mid-stream speed change is continuous (bounded by elapsed real time), not retroactive (bounded by absolute session time)', () => {
+  const seed = 4242;
+  const r = createLiveResolver();
+  const mk = (loopTimeMs, noiseSpeed) => baseInput({ seed, layoutParams: { ...WARP442_LP, noiseSpeed }, loopTimeMs });
+
+  // 600s of real elapsed time at speed 0.5 -- a large absolute session
+  // time, exactly the regime where the pre-#432 formula misbehaved.
+  warp442Items(r.resolveLayers(mk(0, 0.5)));       // establish wp at t=0
+  warp442Items(r.resolveLayers(mk(600_000, 0.5)));
+  // +1s at a very different speed (0.5 -> 2.8). Under the fixed formula
+  // this adds only 1s * 2.8 to the phase; under the old formula this
+  // single frame's speed edit would retroactively rescale the entire
+  // 600s-long phase term (a jump of roughly (2.8-0.5)*600 = 1380 units --
+  // the fBm decorrelates over ~1 unit, so that's an unrelated random
+  // sample, not a continuous step).
+  const after = warp442Items(r.resolveLayers(mk(601_000, 2.8)));
+
+  // Static (pre-live-delta) reference, captured at noiseSpeed=2.8
+  // specifically: buildPlacements' own geometry stage bakes a
+  // noiseSpeed-scaled static displacement too (placement.js's
+  // nt = (seed & 0xffff) * 0.02 * noiseSpeed, independent of liveResolve's
+  // live warp), so the reference must match `after`'s noiseSpeed -- a
+  // fresh resolver's first-ever call still has wp.base = 0 (zero live
+  // delta) regardless of which noiseSpeed it's called with.
+  const staticPos = warp442Items(createLiveResolver().resolveLayers(mk(0, 2.8)));
+
+  const nt0 = (seed & 0xffff) * 0.02;
+  const expectedBase = 600 * 0.5 + 1 * 2.8; // seconds elapsed * speed, per segment
+  assertWarpMatches(
+    staticPos, after,
+    { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
+    'a mid-stream speed change must move the phase by elapsed time x the new speed, not by the whole elapsed session time',
+  );
+  r.dispose();
+});
+
+test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, #421-style) does not rewind the accumulated phase', () => {
+  const seed = 777;
+  const r = createLiveResolver();
+  const speed = 1;
+  const mk = (loopTimeMs) => baseInput({ seed, layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs });
+
+  const staticPos = warp442Items(r.resolveLayers(mk(0)));       // wp.base = 0 -> static ref
+  const at1000 = warp442Items(r.resolveLayers(mk(1000)));       // 1s elapsed -> wp.base = 1 * speed
+
+  // #421-style rejected/rolled-back frame: loopTimeMs goes BACKWARD to 500.
+  // The pre-#432 formula tied ntLive directly to raw loopTimeMs, so this
+  // would have visibly rewound the warp; the max(0, ...) clamp must
+  // instead leave the phase exactly where it was -- byte-identical
+  // positions, not just "close."
+  const at500 = warp442Items(r.resolveLayers(mk(500)));
+  assert.deepEqual(at500, at1000, 'a backward loopTimeMs must not rewind the warp phase');
+
+  // Resume forward past the pre-rollback high point (1000). #460 made
+  // wp.lastMs a high-water mark (Math.max(wp.lastMs, nowMs)), not a raw
+  // assignment: the 500 reading above did NOT walk lastMs down to 500,
+  // it stayed at 1000. So resuming at 1000+DELTA measures elapsed time
+  // from the true high point (1000), not from the rollback's dip (500) --
+  // DELTA seconds of real progress, not DELTA + the 500ms dip credited
+  // twice. (Before #460, this resolved from 500, over-crediting the dip
+  // as if it were genuine elapsed time -- see #460 for why that leaks
+  // during a sustained pause specifically.)
+  const DELTA = 300;
+  const after = warp442Items(r.resolveLayers(mk(1000 + DELTA)));
+  const nt0 = (seed & 0xffff) * 0.02;
+  const expectedBase = 1 * speed + (DELTA / 1000) * speed;
+  assertWarpMatches(
+    staticPos, after,
+    { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
+    "resuming forward after a rollback must match the resolver's own clamped-clock formula exactly",
+  );
+  r.dispose();
+});
+
+test('#474: warpPhase does not lump-sum-credit a slowRender freeze once it lifts', () => {
+  const seed = 5151;
+  const r = createLiveResolver();
+  const speed = 1;
+  const mk = (loopTimeMs, slowRender) => baseInput({
+    seed, layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs, slowRender: !!slowRender,
+  });
+
+  const staticPos = warp442Items(r.resolveLayers(mk(0)));  // wp.base = 0 -> static ref
+  warp442Items(r.resolveLayers(mk(1000)));                 // 1s elapsed, wp.base = 1 * speed
+
+  // A long governor cut6/watchdog freeze: liveLoop.mjs only rolls
+  // loopTimeMs back for a true pause (!running); slowRender leaves it
+  // advancing in real wall-clock time while this whole warp block sits
+  // skipped for as long as the freeze lasts.
+  warp442Items(r.resolveLayers(mk(61_000, true))); // 60s "frozen"
+
+  // The freeze lifts. Pre-fix, dSec = (61000+DELTA - 1000) * 0.001 would
+  // credit the entire 60s freeze as warp progress in one jump on this
+  // frame. Post-fix, only the small DELTA since the freeze lifted counts —
+  // identical in shape to the #442 backward-loopTimeMs resume case.
+  const DELTA = 300;
+  const after = warp442Items(r.resolveLayers(mk(61_000 + DELTA, false)));
+  const nt0 = (seed & 0xffff) * 0.02;
+  const expectedBase = 1 * speed + (DELTA / 1000) * speed;
+  assertWarpMatches(
+    staticPos, after,
+    { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
+    'resuming after a slowRender freeze must not credit the frozen span as warp progress',
+  );
+  r.dispose();
+});
+
+test('#450: warpPhase persists across a layer being hidden and re-shown — no phase-reset snap', () => {
+  const seed = 999;
+  const speed = 1;
+  const layer = (visible) => ({ id: 'lyr-a', name: 'A', visible, layerBlendMode: 'normal', layerOpacity: 1 });
+  const mk = (visible, loopTimeMs) => baseInput({
+    seed, layers: [layer(visible)], layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs,
+  });
+
+  // Continuously visible: 0 -> 1000 -> 3000ms, no hide in between.
+  const rContinuous = createLiveResolver();
+  warp442Items(rContinuous.resolveLayers(mk(true, 0)));
+  warp442Items(rContinuous.resolveLayers(mk(true, 1000)));
+  const continuousAfter = warp442Items(rContinuous.resolveLayers(mk(true, 3000)));
+  rContinuous.dispose();
+
+  // Same total elapsed time, but hidden for the middle span: 0 (visible,
+  // establish) -> 1000 (visible) -> 2000 (HIDDEN -- no 'lyr-a' entry in
+  // `out` at all, prune() runs against a visible-only aliveIds that
+  // excludes it) -> 3000 (visible again). World time (loopTimeMs) keeps
+  // advancing throughout; only this one layer's visibility toggles.
+  const rHidden = createLiveResolver();
+  rHidden.resolveLayers(mk(true, 0));
+  rHidden.resolveLayers(mk(true, 1000));
+  rHidden.resolveLayers(mk(false, 2000));
+  const hiddenAfter = warp442Items(rHidden.resolveLayers(mk(true, 3000)));
+  rHidden.dispose();
+
+  assert.deepEqual(hiddenAfter, continuousAfter,
+    'hiding a layer and re-showing it later must land the warp exactly where it would be had the layer stayed visible throughout -- not reset to the phase-0 baseline');
 });
