@@ -197,7 +197,7 @@ export function LayerStack() {
                 <div className="layer-row-composite" title="PATCH — FEED amount when mode is FEED">
                   <span className="fx-param-readout" style={{ width: 'auto' }}>PATCH</span>
                   <select className="tg blend-mode-select" value={patch.mode}
-                    onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to: otherTarget(layer), strength: patch.strength })}>
+                    onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to, strength: patch.strength })}>
                     <option value="off">OFF</option>
                     {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
                         dither characters (▨▒▤), approximating the TE dot-matrix/LCD
@@ -208,7 +208,7 @@ export function LayerStack() {
                     <option value="field">✦ FIELD</option>
                     <option value="feed">↻ FEED</option>
                   </select>
-                  <select className="tg blend-mode-select" value={to || ''} disabled={patch.mode === 'off'}
+                  <select className="tg blend-mode-select" value={to || ''}
                     onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: e.target.value, strength: patch.strength })}>
                     {contentTargets.map((t) => (
                       <option key={t.id} value={t.id} disabled={t.id === layer.id}>KC-{t.n}</option>
