@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
+import { invoke } from '@tauri-apps/api/tauri';
 import { RenderFinalBlock } from './pipeline/RenderFinalBlock.jsx';
 import { PrintDeskBlock } from './pipeline/PrintDeskBlock.jsx';
 import { BatchEditionBlock } from './pipeline/BatchEditionBlock.jsx';
@@ -71,6 +72,30 @@ export function PipelinePanel() {
 
   const accumOn = !!layoutParams.accumulation;
 
+  const handleTestNativeIO = async () => {
+    try {
+      // 1x1 valid PNG binary header & chunk payload (67 bytes)
+      const dummyBytes = new Uint8Array([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89,
+        0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54,
+        0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4,
+        0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+        0xAE, 0x42, 0x60, 0x82,
+      ]);
+      const bytesWritten = await invoke('write_batch_frame', {
+        data: Array.from(dummyBytes),
+        path: '/tmp/kc_native_test.png',
+      });
+      setMessage(`Native I/O OK: ${bytesWritten} bytes -> /tmp/kc_native_test.png`);
+    } catch (err) {
+      console.error('Native I/O test failed:', err);
+      setMessage(`Native I/O: ${err?.message || err}`);
+    }
+  };
+
   // #107 §4 (flip mechanism deleted in #191): a watchdog trip (tier 2 — FPS
   // ~0 or a critical render-error) mid-export must not leave the UI stuck
   // showing RENDERING — running=false alone doesn't undo that. There is no
@@ -114,6 +139,29 @@ export function PipelinePanel() {
         />
 
         <PrintDeskBlock rendering={rendering} onOpen={openPrintDesk} />
+
+        <div style={{ marginTop: '6px', marginBottom: '6px' }}>
+          <button
+            type="button"
+            className="btn btn-block btn-ghost"
+            style={{
+              fontFamily: 'var(--font-mono, monospace)',
+              fontSize: '11px',
+              border: '1px dashed var(--accent, #00ff88)',
+              color: 'var(--accent, #00ff88)',
+              padding: '6px 8px',
+              cursor: 'pointer',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+            onClick={handleTestNativeIO}
+          >
+            ⚡ TEST NATIVE DISK I/O
+          </button>
+        </div>
 
         {/* ── OUT: batch, capture, gallery ── */}
         <div className="pipeline-section-label">OUT</div>

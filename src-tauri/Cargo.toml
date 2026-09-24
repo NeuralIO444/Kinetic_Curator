@@ -1,0 +1,18 @@
+[package]
+name = "kinetic-curator"
+version = "0.9.0"
+description = "Kinetic Curator Native Container"
+authors = ["NeuralIO"]
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.8", features = [ "fs-all", "path-all" ] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
