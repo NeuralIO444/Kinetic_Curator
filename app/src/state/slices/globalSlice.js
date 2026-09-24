@@ -14,8 +14,9 @@ import {
 } from '../projectNormalize.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 
-const initialEnabledAssets = {};
-ASSETS.forEach((a) => { initialEnabledAssets[a.id] = true; });
+// HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
+const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
+const initialEnabledAssets = Object.fromEntries(DEFAULT_4_ASSETS.map((id) => [id, true]));
 
 const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
 

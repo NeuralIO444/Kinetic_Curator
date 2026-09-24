@@ -116,7 +116,12 @@ export const FLAGSHIP_VOICES = [
       lifeDrift: 0.35,
     },
     fx: { grain: 0.6, vignette: true, posterize: false, edge: false, glow: 0.35, contrast: 1.0 },
-    assets: 'all',
+    assets: {
+      dot_single_01: true,
+      org_petal_01: true,
+      org_leaf_01: true,
+      line_swoosh_01: true,
+    },
   },
   {
     id: 'hype',
@@ -174,7 +179,12 @@ export const FLAGSHIP_VOICES = [
       lifeDrift: 0.3, // #515: was 0.5 — read as rattle, not pulse
     },
     fx: { grain: 0, vignette: false, posterize: true, edge: true, glow: 0.5, contrast: 1.25 },
-    assets: 'all',
+    assets: {
+      flora_flower_01: true,
+      flora_vine_01: true,
+      line_spiral_01: true,
+      flora_sprig_01: true,
+    },
   },
   {
     id: 'murmuration',
@@ -232,7 +242,12 @@ export const FLAGSHIP_VOICES = [
       lifeDrift: 0.15,
     },
     fx: { grain: 0.3, vignette: true, posterize: false, edge: false, glow: 0.25, contrast: 1.0 },
-    assets: 'all',
+    assets: {
+      rad_orbit_01: true,
+      rad_rings_01: true,
+      hae_tendril_01: true,
+      dot_field_01: true,
+    },
   },
 ];
 

@@ -38,6 +38,8 @@ for (const v of FLAGSHIP_VOICES) {
   // fx chain has the full shape
   assert.deepStrictEqual(Object.keys(st.fx).sort(), ['contrast', 'edge', 'glow', 'grain', 'posterize', 'vignette'].sort());
   assert.ok(st.blendSeconds > 0, `${v.id} blendSeconds`);
+  // Flagships constrain to exactly 4 curated assets (HYPE Processing aesthetic)
+  assert.strictEqual(Object.keys(st.assets).length, 4, `${v.id} must constrain to exactly 4 curated assets`);
 }
 
 // Spot-check the spec values.

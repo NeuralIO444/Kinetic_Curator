@@ -286,15 +286,21 @@ export const createLayoutSlice = (set) => ({
       changed = true;
     }
     // #284: a preset may also carry its asset pool (a voice is the full
-    // look — composition + palette + assets). Only known ids are kept, and
-    // the pool only switches when at least one id resolves; undo already
-    // snapshots enabledAssets, so this stays one undo step.
+    // look — composition + palette + assets). Constrain to 4 assets (HYPE Processing aesthetic).
     let assetsPatch = null;
-    if (Array.isArray(preset.assetIds) && preset.assetIds.length) {
+    let targetAssetIds = Array.isArray(preset.assetIds) && preset.assetIds.length
+      ? preset.assetIds.slice(0, 4)
+      : null;
+    if (!targetAssetIds && Array.isArray(preset.categories) && preset.categories.length) {
+      const matching = ASSETS.filter((a) => preset.categories.includes(a.category));
+      const pool = matching.length >= 4 ? matching : ASSETS;
+      targetAssetIds = pool.slice(0, 4).map((a) => a.id);
+    }
+    if (targetAssetIds && targetAssetIds.length) {
       const known = new Set(ASSETS.map((a) => a.id));
       for (const c of state.customAssets || []) known.add(c.id);
       const map = {};
-      for (const id of preset.assetIds) {
+      for (const id of targetAssetIds) {
         if (typeof id === 'string' && known.has(id)) map[id] = true;
       }
       if (Object.keys(map).length) {

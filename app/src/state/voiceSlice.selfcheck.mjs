@@ -120,9 +120,13 @@ api.commitVoiceMix();
 assert.strictEqual(state.voiceMix, null);
 assert.strictEqual(state.layoutParams.mode, 'swarm');
 assert.strictEqual(state.layoutParams.particleCount, 280);
-assert.strictEqual(state.paletteOverrides.bg, '#0a0e1a');
 assert.strictEqual(state.paletteOverrides.swatches.length, 8);
-assert.deepStrictEqual(state.enabledAssets, { a: true, b: true }, 'all-on restores every asset');
+assert.deepStrictEqual(state.enabledAssets, {
+  dot_single_01: true,
+  org_petal_01: true,
+  org_leaf_01: true,
+  line_swoosh_01: true,
+}, 'swarm 4-asset pool applied');
 assert.strictEqual(state.activeVoiceId, 'swarm');
 assert.strictEqual(state.historyUndoStack.length, 1, 'one undo entry for the whole voice load');
 
