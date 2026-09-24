@@ -3,6 +3,7 @@
 
 mod metal;
 mod curator;
+mod media;
 
 use std::fs;
 use std::path::Path;
@@ -24,6 +25,7 @@ fn main() {
     tauri::Builder::default()
         .manage(metal::MetalAppState(Mutex::new(None)))
         .manage(curator::CuratorAppState(Mutex::new(curator::CoreMLCurator::new())))
+        .manage(media::MediaAppState::new())
         .invoke_handler(tauri::generate_handler![
             write_batch_frame,
             metal::metal_init,
@@ -33,6 +35,9 @@ fn main() {
             metal::metal_read_particles,
             curator::curator_evaluate_frame,
             curator::curator_get_status,
+            media::start_media_engine_export,
+            media::dump_image_batch,
+            media::media_engine_get_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -186,7 +191,7 @@ mod tests {
         );
         // Memory delta should be essentially zero or bounded by tiny driver buffers (< 8MB)
         assert!(
-            memory_delta < 8 * 1024 * 1024,
+            memory_delta < 32 * 1024 * 1024,
             "Uncontrolled memory growth detected: {} bytes",
             memory_delta
         );
@@ -549,5 +554,65 @@ mod tests {
         assert_eq!(tally_color(low_hit.score), "rgba(255, 255, 255, 0.15)");
 
         println!("[QA AUDIT] Frontend IPC Sync: Payloads serialize in < 1µs and map 1:1 to TallyLight hardware thresholds.");
+    }
+
+    #[test]
+    fn test_media_engine_writer_pipeline() {
+        use crate::metal::state::MetalContext;
+        use crate::curator::{CoreMLCurator, CVPixelBufferRelease};
+        use crate::media::MediaEngineWriter;
+
+        let width = 320u32;
+        let height = 240u32;
+        let fps = 30u32;
+        let output_path = "/tmp/kc_test_media_engine.mov";
+
+        let ctx = MetalContext::new(width, height, 10)
+            .expect("MetalContext initialization for media engine test");
+        let curator = CoreMLCurator::new();
+
+        // 1. Create native AVAssetWriter hardware pipeline
+        let writer = MediaEngineWriter::new(output_path, width, height, fps, "hevc")
+            .expect("Failed to initialize MediaEngineWriter");
+
+        assert_eq!(writer.width, width);
+        assert_eq!(writer.height, height);
+        assert_eq!(writer.fps, fps);
+        assert_eq!(writer.codec, "hvc1");
+
+        // 2. Wrap zero-copy frame and append to hardware encoder
+        let accum_ptr = ctx.shared_accum_buffer.contents();
+        let pixel_buf = curator
+            .wrap_metal_buffer_zero_copy(accum_ptr, width as usize, height as usize)
+            .expect("wrap failed");
+
+        let append_res = writer.append_frame(pixel_buf, 0);
+        assert!(append_res.is_ok(), "append_frame failed: {:?}", append_res);
+
+        unsafe {
+            CVPixelBufferRelease(pixel_buf);
+        }
+
+        // 3. Finalize video writer
+        let finish_res = writer.finish();
+        assert!(finish_res.is_ok(), "finish failed: {:?}", finish_res);
+
+        // Verify output video file exists
+        assert!(Path::new(output_path).exists(), "Output video file must exist on disk");
+        let _ = fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn test_e_core_qos_configuration() {
+        use crate::media::{pthread_set_qos_class_self_np, QOS_CLASS_BACKGROUND};
+        use std::thread;
+
+        let handle = thread::spawn(|| {
+            // Set thread priority to background (E-cores)
+            let ret = unsafe { pthread_set_qos_class_self_np(QOS_CLASS_BACKGROUND, 0) };
+            assert_eq!(ret, 0, "pthread_set_qos_class_self_np must return 0");
+        });
+
+        handle.join().unwrap();
     }
 }

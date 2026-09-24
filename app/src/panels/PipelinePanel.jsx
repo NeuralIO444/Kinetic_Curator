@@ -166,6 +166,72 @@ export function PipelinePanel() {
     }
   };
 
+  const [mediaProgress, setMediaProgress] = useState(null);
+  const [mediaBusy, setMediaBusy] = useState(false);
+
+  useEffect(() => {
+    let unlisten = null;
+    let cancelled = false;
+
+    async function initMediaListener() {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        if (cancelled) return;
+        unlisten = await listen('media-export-progress', (event) => {
+          setMediaProgress(event.payload);
+          if (event.payload?.finished) {
+            setTimeout(() => {
+              setMediaProgress(p => (p?.finished ? null : p));
+            }, 4000);
+          }
+        });
+      } catch {
+        // Fallback when outside Tauri desktop webview
+      }
+    }
+
+    initMediaListener();
+    return () => {
+      cancelled = true;
+      if (typeof unlisten === 'function') unlisten();
+    };
+  }, []);
+
+  const handleMediaVideoExport = async () => {
+    try {
+      setMediaBusy(true);
+      const res = await invoke('start_media_engine_export', {
+        path: '/tmp/kc_export_media_engine.mov',
+        frameCount: 60,
+        fps: 60,
+        codec: 'hevc',
+      });
+      setMessage(`Media Engine: ${res}`);
+    } catch (err) {
+      console.error('Media engine export failed:', err);
+      setMessage(`Media Export: ${err?.message || err}`);
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
+  const handleECoreBatchDump = async () => {
+    try {
+      setMediaBusy(true);
+      const res = await invoke('dump_image_batch', {
+        targetDir: '/tmp/kc_batch_export_ecore',
+        count: 60,
+        format: 'png',
+      });
+      setMessage(`E-Core Dump: ${res}`);
+    } catch (err) {
+      console.error('E-Core dump failed:', err);
+      setMessage(`E-Core Dump: ${err?.message || err}`);
+    } finally {
+      setMediaBusy(false);
+    }
+  };
+
   // #107 §4 (flip mechanism deleted in #191): a watchdog trip (tier 2 — FPS
   // ~0 or a critical render-error) mid-export must not leave the UI stuck
   // showing RENDERING — running=false alone doesn't undo that. There is no
@@ -366,6 +432,90 @@ export function PipelinePanel() {
 
         {/* ── OUT: batch, capture, gallery ── */}
         <div className="pipeline-section-label">OUT</div>
+
+        <div
+          style={{
+            marginTop: '4px',
+            marginBottom: '8px',
+            padding: '8px',
+            background: 'rgba(0, 229, 255, 0.04)',
+            border: '1px solid rgba(0, 229, 255, 0.25)',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ color: '#00e5ff', fontWeight: 600 }}>APPLE MEDIA ENGINE &amp; E-CORES</span>
+            <span style={{ color: mediaBusy || (mediaProgress && !mediaProgress.finished) ? '#00e5ff' : '#888' }}>
+              {mediaBusy || (mediaProgress && !mediaProgress.finished) ? '● STREAMING' : '○ READY'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
+            <div>VIDEO CODEC: <span style={{ color: '#fff' }}>AVAssetWriter (HEVC hvc1 / ProRes 4444)</span></div>
+            <div>BATCH QUEUE: <span style={{ color: '#00e5ff' }}>Pinned to E-Cores (QOS_CLASS_BACKGROUND)</span></div>
+            {mediaProgress && (
+              <div>
+                PROGRESS: <span style={{ color: '#00e5ff' }}>{mediaProgress.completed}/{mediaProgress.total} frames</span>{' '}
+                ({mediaProgress.fps.toFixed(1)} fps)
+              </div>
+            )}
+          </div>
+
+          {mediaProgress && (
+            <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
+              <div
+                style={{
+                  width: `${Math.min(100, Math.round((mediaProgress.completed / Math.max(1, mediaProgress.total)) * 100))}%`,
+                  height: '100%',
+                  background: '#00e5ff',
+                  transition: 'width 0.08s linear',
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                flex: 1,
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono, monospace)',
+                border: '1px solid #00e5ff',
+                background: 'rgba(0, 229, 255, 0.08)',
+                color: '#00e5ff',
+                padding: '4px 6px',
+                cursor: mediaBusy ? 'wait' : 'pointer',
+              }}
+              disabled={mediaBusy}
+              onClick={handleMediaVideoExport}
+            >
+              {mediaBusy ? 'STREAMING...' : '⚡ RECORD HEVC VIDEO'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                flex: 1,
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono, monospace)',
+                border: '1px solid #00e5ff',
+                background: 'rgba(0, 229, 255, 0.08)',
+                color: '#00e5ff',
+                padding: '4px 6px',
+                cursor: mediaBusy ? 'wait' : 'pointer',
+              }}
+              disabled={mediaBusy}
+              onClick={handleECoreBatchDump}
+            >
+              {mediaBusy ? 'DUMPING...' : '⚡ DUMP BATCH (E-CORES)'}
+            </button>
+          </div>
+        </div>
+
         <BatchEditionBlock
           glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
           quality={quality} paletteId={paletteId} exportResolution={exportResolution}

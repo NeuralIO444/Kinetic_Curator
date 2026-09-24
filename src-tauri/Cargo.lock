@@ -1648,6 +1648,7 @@ version = "0.9.0"
 dependencies = [
  "libc",
  "metal",
+ "objc",
  "serde",
  "serde_json",
  "tauri",

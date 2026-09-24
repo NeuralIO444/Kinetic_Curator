@@ -1,7 +1,7 @@
 # KC-1 Architecture: Apple Silicon Native Optimization
 
-> **Status**: Planning only. No implementation until Spine E is merged.
-> See [EMBARGO.md](EMBARGO.md) — this document narrows scope, it does not create tickets.
+> **Status**: Phase 1 (Tauri Native Shell), Phase 2 (Metal Zero-Copy UMA), Phase 3 (Core ML / ANE Curation), and Phase 4 (AVFoundation & E-Core Sequence Streaming) implemented and validated.
+> See [EMBARGO.md](EMBARGO.md).
 
 This roadmap outlines the transition from the current browser-hosted WebGL2
 architecture into a hyper-optimized, Apple Silicon-native environment. Each
