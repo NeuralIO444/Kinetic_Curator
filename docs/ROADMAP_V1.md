@@ -1,28 +1,28 @@
 # Roadmap to v1
 
-*Plan, not tickets. September 23 2026 — KC-1 v0.9.0, main `125d8ef`. Matt orders every stage; nothing here is assigned. Research input: [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) (this landed on the timeline at **v0.9.x — Stage 0**, as the direction document feeding Stages 1–4).*
+*Plan, not tickets. September 23 2026 — KC-1 v0.9.0. Matt orders every stage; nothing here is assigned. Research input: [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) (direction document feeding Stages 1–4). Track work in open issues; this doc is the map, not the ledger.*
 
-**Version answer:** we are at **0.9.0** (`app/package.json`) — pre-1.0, one selfcheck-verified engine (spines A–G merged), panel consolidation ~70% (Phase-1 reversed, DAVIS/STIMULI kept as homage), embargo standing pending the Night Migration 30/60 play.
+**Version answer:** we are at **0.9.0** (`app/package.json`) — pre-1.0, one selfcheck-verified engine (spines A–G merged), panel consolidation ~70% (Phase-1 reversed, DAVIS/STIMULI kept as homage), **embargo lifted 2026-09-23** (Night Migration 30/60 sign-off recorded in `EMBARGO.md`; Stage 1 unfrozen, deferred pile still waits).
 
 ---
 
 ## Stage 0 — v0.9.x · NOW *(where this research lives)*
 
-- Engine spines A–G shipped; board triaged (KINETICS batch commented, #422 → #480, stale refs swept).
-- **This benchmark** — comparables, gap ranking, TE + Davis verdicts → direction input for every stage below.
-- **Render/biology audit (2026-09-23, wired-vs-dead bar):** all six bio-drives mechanisms LIVE (drives, scent, mold, graze, leak, swell — call chains traced); render pipeline inventoried (single core, CPU integration, 16F accum → 8-bit clamp, divisors in use, full-frame uploads). Dead-list for wire-or-cut lives in the Stage gates below. WebGL2 capability research (transform feedback, GPU Physarum/RD, SDF, WebGPU pressure) feeds Stages 1–4 + Beyond.
-- In flight: #486 (#456 track patches), warp-phase leftovers (#474), MIX churn (#455), z-fight (#451).
-- Ordered but un-built: #471 mechanism A (evolve jitter), #479 shape B (BEHAVE weights).
+- Engine spines A–G shipped; KINETICS bug queue cleared (#450–#458 fixed, #422 → #480 residue, #478 flake margined).
+- Governor R1–R4 landed (#482–#485): merged readout, named stages, budget knob, FX-weight tape.
+- Tracks lanes landed: PATCH sliders (#506), inline diagnostic (#507), MOD steering + shared scent (#509 phases 1–2), gate dead-list cuts, cohesion dim reason.
+- **Render/biology audit (2026-09-23, wired-vs-dead bar):** all six bio-drives mechanisms LIVE (call chains traced); render inventoried (single core, CPU integration, 16F accum → 8-bit clamp, divisors in use, full-frame uploads). WebGL2 capability research feeds Stages 1–4 + Beyond.
+- Open and ordered: #471-A (jitter), #479-B (BEHAVE weights), #503 (ballistics shaping), #484 (R3 close word), #480 (env), Matt-only feel/hardware.
+- Filed, unstarted: motion factors #515–#519, EF rack #520, MIDI/OSC #228 (scope first).
 
-## Stage 1 — v0.10 · PLAY *(feel + board clean — the instrument earns its own embargo lift)*
+## Stage 1 — v0.10 · PLAY *(feel + board clean)*
 
-**Gate first:** *Matt plays Night Migration 30/60 → recorded in `EMBARGO.md` → new-feature work unfrozen.*
-
-- #471 (jitter glide) + #479 B (editable BEHAVE weights, per-layer, persisted) + the swarmCohesion dim-fix.
-- Bug queue to zero: #474, #455, #451, #478 (e2e flake tolerance).
-- Governor R1–R4 (#482–#485): one budget readout, named stages, honest knob, tape-running-out.
+- #471 (jitter glide) + #479 B (editable BEHAVE weights, per-layer, persisted).
+- #503 ballistics shaping decision (single-vs-double) + lookup already cleaned.
+- **Motion factors #515–#519** (retune → flagship values → stub MIX road → persona biases → curated assets).
+- **EF rack #520** (EF-4 exclusivity → post-accum seam → families → rack UI).
 - Matt-only feel set: #346 icons, #298 M3 calibration.
-- **Render fidelity (zero sim risk):** half-float accum path audit → ACES-approx + dither final pass (16F accumulates today, resolves through a bare 8-bit clamp with no tonemap — `RESOLVE_FS`); instanced sub-range uploads (divisors + sized-once buffers already shipped via spine G, full `bufferSubData` per frame remains).
+- **Render fidelity (zero sim risk):** half-float accum path audit → ACES-approx + dither final pass (`RESOLVE_FS` bare clamp today); instanced sub-range uploads (remainder after spine G).
 - *Exit:* you play it and nothing feels wrong.
 
 ## Stage 2 — v0.11 · SHARE *(the benchmark's #1 + #2 — the highest-leverage stage)*

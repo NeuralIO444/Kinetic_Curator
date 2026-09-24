@@ -77,15 +77,16 @@ emitter is now a dev-only parity reference.
 | #192 | Phase 6 — SVG retirement + governor retune | **Shipped** |
 
 Absorbed (closed, do-not-build-separately): #154 (into Phase 3), #169 (into
-Phase 4), #176 (into Phase 5). Remaining live issues: #175 (swarm bake 30ms
-budget), #177 (UX polish), #172 (print desk), #114 (Asset Studio),
-#103/#104/#158 (independent backlog).
+Phase 4), #176 (into Phase 5).
+
+## Status 2026-09-23 — this queue is history, not orders
+
+Everything above shipped. Current sequencing lives in [`docs/ROADMAP_V1.md`](docs/ROADMAP_V1.md); current work lives in open GitHub issues. Notes on the old tail this replaces: #177 closed, #103/#104/#158 states changed since, and the modulation matrix exists as the PATCH system (MOD/FIELD/FEED + matrix overview) — do not re-file from this file.
 
 ## Possible follow-ups (not filed)
 
 - WEBM recorder sampling the ACCUM canvas (capture graph)
 - Continuous high-res accumulation (memory cost)
 - Expose `stratified` in Layout mode UI
-- Modulation matrix (audio/LFO → layout targets)
 
 See [docs/BUGLIST.md](docs/BUGLIST.md) and [docs/NEXT_PHASE.md](docs/NEXT_PHASE.md).
