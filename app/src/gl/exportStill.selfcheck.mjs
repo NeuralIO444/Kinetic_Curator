@@ -5,7 +5,7 @@
  * - PNG writer round-trip (signature, IHDR dims, inflated rows match input).
  * - isBrowserMissingError classification.
  * - #191 acceptance: applyUncapped / restoreFromSnapshot are gone from the
- *   app export path (OutputPanel.jsx, useMediaExport.js).
+ *   app export path (PipelinePanel.jsx, useMediaExport.js).
  * - #176's before/after rule: renderExport at 1x is pixel-identical to the
  *   parity candidate (same shared render function, only the size differs),
  *   and renderExportViaGL (chunked readback) matches renderViaGL
@@ -91,7 +91,7 @@ function parsePng(buf) {
 }
 
 // ── flip-then-restore is gone (#191 acceptance) ──────────────────────────
-for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/OutputPanel.jsx']) {
+for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx']) {
   const src = readFileSync(path.join(APP, rel), 'utf8');
   check(`${rel}: no applyUncapped`, !src.includes('applyUncapped'));
   check(`${rel}: no restoreFromSnapshot`, !src.includes('restoreFromSnapshot'));

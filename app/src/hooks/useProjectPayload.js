@@ -1,7 +1,7 @@
 import { serializeProject } from '../state/projectDocument.js';
 
 /**
- * exportProject and exportHits in OutputPanel each called serializeProject
+ * exportProject and exportHits in PipelinePanel each called serializeProject
  * with the same eleven fields, built independently. One call site now.
  */
 export function buildProjectPayload({

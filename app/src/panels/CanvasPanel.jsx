@@ -76,7 +76,7 @@ export function CanvasPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // #310: BG cycle moved to OUTPUT; the state lives in the store and this
+  // #310: BG cycle moved to PIPELINE; the state lives in the store and this
   // effect keeps the live loop in sync.
   useEffect(() => {
     if (glLoopRef.current) glLoopRef.current.setBgMode(canvasBg);
@@ -103,7 +103,7 @@ export function CanvasPanel() {
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
       <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · GL LIVE · ${layers.length} layer${layers.length > 1 ? 's' : ''}`}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {/* #310: BG cycle moved to OUTPUT. CLEAR ACCUM removed — GHOST
+          {/* #310: BG cycle moved to PIPELINE. CLEAR ACCUM removed — GHOST
               STATION's gesture row is canonical. */}
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
           <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>

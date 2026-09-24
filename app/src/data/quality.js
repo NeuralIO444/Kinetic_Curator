@@ -100,7 +100,7 @@ export const GLOSS_NODE_THRESHOLD = 280;
  */
 export const MAX_FILTER_REGION = 1.0;
 
-/** Was a local const in OutputPanel.jsx; needed by every file the OUTPUT
+/** Was a local const in PipelinePanel.jsx; needed by every file the PIPELINE
  *  panel split into, so it lives here instead of being recomputed per file. */
 export function resolutionLabel(exportResolution) {
   return `1000×700@${exportResolution}x`;

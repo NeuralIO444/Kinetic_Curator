@@ -55,8 +55,8 @@ export function LoopCaptureBlock({ glLoopRef, seed, rendering, setRendering }) {
   const totalFrames = (seconds + LOOP_CAPTURE_DISSOLVE_SECONDS) * LOOP_CAPTURE_FPS;
 
   return (
-    <div className="output-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-      <div className="output-row" style={{ alignItems: 'center' }}>
+    <div className="pipeline-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+      <div className="pipeline-row" style={{ alignItems: 'center' }}>
         <span
           style={{ fontSize: 10, letterSpacing: 1, opacity: 0.7 }}
           title="Loop length in seconds. The take records a 1s lead-in first (dissolve source), then the loop body — total record time is length + 1s."

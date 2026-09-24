@@ -153,7 +153,7 @@ export const createGlobalSlice = (set) => ({
    * Session-only, never serialized — it describes this tab's GPU session.
    */
   glContext: 'ok',
-  /** Bumped by every tripWatchdog() call — lets a subscriber (OutputPanel's
+  /** Bumped by every tripWatchdog() call — lets a subscriber (PipelinePanel's
    * in-flight export restore) react to a NEW trip instead of a boolean it
    * has already seen. */
   watchdogTripGen: 0,

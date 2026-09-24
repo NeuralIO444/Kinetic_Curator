@@ -26,9 +26,9 @@ export const TOUR_STEPS = [
   },
   {
     id: 'still',
-    tab: 'output',
+    tab: 'pipeline',
     title: '4 · Render a still',
-    body: 'OUTPUT → SNAP (S) saves the frame as PNG. The PRINT desk next door stacks post chips for editions.',
+    body: 'PIPELINE → SNAP (S) saves the frame as PNG. The PRINT desk next door stacks post chips for editions.',
   },
 ];
 

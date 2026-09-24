@@ -7,7 +7,7 @@ import { LayersPanel } from '../panels/LayersPanel.jsx';
 import { AssetPoolPanel } from '../panels/AssetPoolPanel.jsx';
 import { StimulusPanel } from '../panels/StimulusPanel.jsx';
 import { DavisPanel } from '../panels/DavisPanel.jsx';
-import { OutputPanel } from '../panels/OutputPanel.jsx';
+import { PipelinePanel } from '../panels/PipelinePanel.jsx';
 
 // Shader Lab (#193) is dev-only: lazy chunk, never registered in prod builds.
 const ShaderLabPanel = import.meta.env.DEV
@@ -31,7 +31,7 @@ export const PANEL_REGISTRY = [
   { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'secondary' },
   { id: 'stimulus', title: 'STIMULI',  icon: '▸', component: StimulusPanel,  zone: 'secondary' },
   { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },
-  { id: 'output',   title: 'OUTPUT',   icon: '⬇', component: OutputPanel,    zone: 'secondary' },
+  { id: 'pipeline', title: 'PIPELINE', icon: '⇌', component: PipelinePanel,  zone: 'secondary' },
 ];
 
 if (import.meta.env.DEV && ShaderLabPanel) {

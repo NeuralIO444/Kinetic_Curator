@@ -3,8 +3,8 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import {
   serializeProject,
-  writeAutosave,
-  readAutosave,
+  writePipelineAutosave,
+  readPipelineAutosave,
 } from '../state/projectDocument.js';
 
 const DEBOUNCE_MS = 500;
@@ -30,7 +30,7 @@ export function useProjectAutosave() {
     restored.current = true;
     try {
       if (sessionStorage.getItem(RESTORED_FLAG)) return;
-      const { doc, quarantined } = readAutosave();
+      const { doc, quarantined } = readPipelineAutosave();
       if (quarantined) {
         // Boot factory defaults and say so. Never silently apply a document
         // we could not parse (#107 §6).
@@ -63,7 +63,7 @@ export function useProjectAutosave() {
       if (firstChangeAt.current == null) firstChangeAt.current = now;
       const doWrite = () => {
         firstChangeAt.current = null;
-        const res = writeAutosave(serializeProject(useStore.getState()));
+        const res = writePipelineAutosave(serializeProject(useStore.getState()));
         const store = useStore.getState();
         // Do not clear a quarantine flag on a later successful write: the
         // operator still needs to know this session did not start from their

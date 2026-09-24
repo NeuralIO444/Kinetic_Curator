@@ -12,7 +12,7 @@ export function PrintDeskBlock({ rendering, onOpen }) {
       >
         🖨 PRINT…
       </button>
-      <div className="output-hint" style={{ marginTop: 6 }}>
+      <div className="pipeline-hint" style={{ marginTop: 6 }}>
         Frozen still, post chips, PNG + sidecar. Live canvas never calls ffmpeg.
       </div>
     </div>

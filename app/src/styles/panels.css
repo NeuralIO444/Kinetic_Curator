@@ -244,10 +244,17 @@
 .fx-add-row { display: flex; gap: 4px; align-items: center; }
 .fx-add-row select { flex: 1; }
 
-/* ─── Output ─── */
-.panel-output { min-height: 0; }
-.output-body { gap: 6px; display: flex; flex-direction: column; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
-.output-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* ─── Pipeline ─── */
+.panel-pipeline { min-height: 0; }
+.pipeline-body { gap: 6px; display: flex; flex-direction: column; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+.pipeline-section-label {
+  font-family: monospace; font-size: 10px; letter-spacing: 0.15em; font-weight: 700;
+  color: var(--dim); opacity: 0.4; padding: 4px 0 1px;
+  border-top: 1px solid var(--line);
+  user-select: none;
+}
+.pipeline-section-label:first-child { border-top: none; padding-top: 0; }
+.pipeline-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .big-btn {
   padding: 5px 10px;
   background: rgba(255,255,255,0.04);
@@ -271,7 +278,7 @@
 .snap-fmt { font-size: 8px; letter-spacing: 0.1em; padding: 1px 3px; background: var(--ink); color: var(--bg); font-weight: 800; }
 .snap-meta { display: flex; flex-direction: column; padding: 2px 4px; font-size: 8px; color: var(--dim); gap: 1px; }
 .snap-meta span:first-child { color: var(--ink); }
-.output-hint {
+.pipeline-hint {
   margin-top: 4px; padding: 3px 6px;
   background: rgba(255,255,255,0.02);
   border: 1px dashed var(--line-2);
