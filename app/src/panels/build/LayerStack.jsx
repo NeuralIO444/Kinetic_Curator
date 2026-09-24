@@ -162,7 +162,7 @@ export function LayerStack() {
           const fx = isFxLayer(layer);
           const isActive = layer.id === activeLayerId;
           const isFxSelected = layer.id === selectedFxLayerId;
-          const soloed = layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
+          const soloed = !fx && layer.visible && layers.every((l) => l.id === layer.id || isFxLayer(l) || !l.visible);
           const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
           const patch = layer.patch || { mode: 'off', to: null, strength: 0.16 };
           const to = (!patch.to || patch.to === layer.id) ? otherTarget(layer) : patch.to;
@@ -174,7 +174,7 @@ export function LayerStack() {
                   <button className="micro-btn" disabled={i === 0} onClick={() => emit(Events.LAYER_REORDER, { id: layer.id, delta: -1 })}>▼</button>
                 </div>
                 <button className="micro-btn" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
-                <button className="micro-btn" onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{soloed ? 'S·' : 'S'}</button>
+                <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks' : undefined} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{soloed ? 'S·' : 'S'}</button>
                 {fx && <span className="fx-badge">FX</span>}
                 <button className="layer-name" onClick={() => emit(fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id })}>
                   {label}{isActive && !fx ? ' · editing' : ''}{isFxSelected && fx ? ' · editing fx' : ''}

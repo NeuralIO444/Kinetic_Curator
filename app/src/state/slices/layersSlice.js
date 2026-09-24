@@ -58,6 +58,7 @@ export const createLayersSlice = (set) => ({
   ],
   activeLayerId: INITIAL_LAYER_ID,
   layerSnapshots: {},
+  soloStash: null,
   selectedFxLayerId: null,
 
   addLayer: () => set((state) => {
@@ -127,11 +128,22 @@ export const createLayersSlice = (set) => ({
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: { ...state.layerSnapshots, [nid]: structuredClone(snap) } };
   }),
 
+  // Solo is among KC tracks: FX tracks are never soloed or hidden by it, and
+  // un-solo restores the visibility the user had before soloing (`soloStash`,
+  // ephemeral — not in the project doc or undo entries; without it un-solo
+  // falls back to showing every KC track).
   soloLayer: (id) => set((state) => {
-    const othersHidden = state.layers.every((l) => l.id === id || !l.visible);
+    const target = state.layers.find((l) => l.id === id);
+    if (!target || isFxLayer(target)) return {};
+    const content = state.layers.filter((l) => !isFxLayer(l));
+    const soloed = target.visible && content.every((l) => l.id === id || !l.visible);
     const push = pushToUndo(state, true, UNDO_KIND_LAYERS);
-    if (othersHidden) return { ...push, layers: state.layers.map((l) => ({ ...l, visible: true })) };
-    return { ...push, layers: state.layers.map((l) => ({ ...l, visible: l.id === id })) };
+    if (soloed) {
+      const stash = state.soloStash?.id === id ? state.soloStash.visible : null;
+      return { ...push, soloStash: null, layers: state.layers.map((l) => (isFxLayer(l) ? l : { ...l, visible: l.id === id || !stash || stash[l.id] !== false })) };
+    }
+    const visible = Object.fromEntries(content.map((l) => [l.id, l.visible]));
+    return { ...push, soloStash: { id, visible }, layers: state.layers.map((l) => (isFxLayer(l) ? l : { ...l, visible: l.id === id })) };
   }),
 
   removeLayer: (id) => set((state) => {
