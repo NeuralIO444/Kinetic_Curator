@@ -19,6 +19,8 @@ pub const QOS_CLASS_BACKGROUND: u32 = 0x09;
 
 extern "C" {
     pub fn pthread_set_qos_class_self_np(qos_class: u32, relative_priority: i32) -> i32;
+    pub fn pthread_get_qos_class_np(thread: *mut c_void, qos_class: *mut u32, relative_priority: *mut i32) -> i32;
+    pub fn pthread_self() -> *mut c_void;
 }
 
 // ── Payloads ─────────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ pub struct MediaEngineStatus {
 
 // ── Helper: NSString from Rust str ───────────────────────────────────
 
-unsafe fn ns_string(s: &str) -> *mut Object {
+pub(crate) unsafe fn ns_string(s: &str) -> *mut Object {
     let cls = class!(NSString);
     let bytes = s.as_ptr();
     let len = s.len();
