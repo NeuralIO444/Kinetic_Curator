@@ -397,7 +397,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       treble: audioOn ? (s.audioBands?.treble || 0) : 0,
       beatPulse: audioOn ? (s.beatPulse || 0) : 0,
     };
-    const ballisticsParams = voiceState.ballistics || s.ballistics || {};
+    // #503 — voice/state ballistics removed: neither field ever existed, so
+    // this always ran on processBallistics' internal defaults. Honest `{}`.
+    // (Whether the hook-path shaping in useAudioInput makes this second
+    // shaping redundant is still open on #503 — untouched here.)
+    const ballisticsParams = {};
     const shapedAudio = processBallistics(ballisticsState, rawAudio, dtSec * 1000, ballisticsParams);
 
     const depth = layoutParams.audioModDepth ?? 0.65;
