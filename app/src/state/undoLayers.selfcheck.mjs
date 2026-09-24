@@ -182,4 +182,32 @@ assert.strictEqual(S().paletteId, palBefore, 'undo restores the palette');
 S().redo();
 assert.strictEqual(S().paletteId, 'v01d', 'redo re-applies the palette');
 
+// Slider debounce clock is reset by forced pushes: a drag that starts (or
+// resumes) right after a structural change must still record its own step, while
+// ticks inside one drag keep coalescing. Deterministic clock, no sleeps.
+{
+  const realNow = Date.now;
+  let t = 1_000_000;
+  Date.now = () => t;
+  try {
+    const id = S().layers[0].id;
+    useStore.setState({ historyUndoStack: [], historyRedoStack: [] });
+    t += 5000;
+    S().toggleLayerVisible(id); // forced push
+    t += 100;
+    S().setLayerOpacity(id, 0.11); // drag begins < 800ms after it
+    assert.strictEqual(undoDepth(), 2, 'a drag right after a forced push is its own undo step');
+    t += 100;
+    S().setLayerOpacity(id, 0.12);
+    assert.strictEqual(undoDepth(), 2, 'ticks inside one drag still coalesce');
+    t += 100;
+    S().toggleLayerVisible(id); // forced push mid-drag
+    t += 100;
+    S().setLayerOpacity(id, 0.13); // drag resumes
+    assert.strictEqual(undoDepth(), 4, 'a drag resumed after a forced push records again');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 console.log('undoLayers.selfcheck: OK');
