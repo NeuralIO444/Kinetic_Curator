@@ -1,5 +1,5 @@
 // RangeRow — slider with lock, click-to-type readout, optional hint tooltip
-// #310: per-parameter dice buttons are cut — RANDOMIZE UNLOCKED (bar) +
+// #310: per-parameter dice buttons are cut — the CURATOR bar (CURATE) +
 // locks + the sub-seed mutate cover the need. The onRandomize prop is gone.
 import { useState, useRef, useEffect } from 'react';
 import { getTaper } from './taper.js';
