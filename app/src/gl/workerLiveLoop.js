@@ -13,13 +13,18 @@ import { mergePool } from '../assets/overlay.js';
 export function serializeStoreState(s) {
   if (!s) return {};
   return {
+    running: s.running !== false,
     layoutParams: s.layoutParams ? JSON.parse(JSON.stringify(s.layoutParams)) : {},
     layers: s.layers ? JSON.parse(JSON.stringify(s.layers)) : [],
+    layerSnapshots: s.layerSnapshots ? JSON.parse(JSON.stringify(s.layerSnapshots)) : {},
     activeLayerId: s.activeLayerId,
     seed: s.seed,
     seedOffsets: s.seedOffsets ? { ...s.seedOffsets } : {},
     canvasBg: s.canvasBg,
     audioInput: s.audioInput,
+    audioEnabled: s.audioEnabled,
+    audioBands: s.audioBands,
+    beatPulse: s.beatPulse,
     customAssets: s.customAssets,
     paletteId: s.paletteId,
     paletteOverrides: s.paletteOverrides,
@@ -28,6 +33,15 @@ export function serializeStoreState(s) {
     voiceState: s.voiceState,
     evolveMode: s.evolveMode,
     perfTier1: s.perfTier1,
+    enabledAssets: s.enabledAssets ? { ...s.enabledAssets } : null,
+    assetWeightOverrides: s.assetWeightOverrides ? { ...s.assetWeightOverrides } : null,
+    quality: s.quality,
+    caGrid: s.caGrid,
+    lockedParams: s.lockedParams ? { ...s.lockedParams } : null,
+    batchPaused: s.batchPaused,
+    slowRender: s.slowRender,
+    renderScale: s.renderScale,
+    motionSmoothing: s.motionSmoothing,
   };
 }
 
@@ -104,6 +118,7 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
             }
           }
 
+          const cellsObj = atlas.cells instanceof Map ? Object.fromEntries(atlas.cells) : (atlas.cells || {});
           worker.postMessage(
             {
               type: 'RECEIVE_ATLAS',
@@ -111,7 +126,7 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
               pixels: atlas.pixels,
               width: atlas.width,
               height: atlas.height,
-              cells: atlas.cells,
+              cells: cellsObj,
               mipmaps: atlas.mipmaps,
             },
             transferList

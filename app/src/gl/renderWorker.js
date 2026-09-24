@@ -116,12 +116,28 @@ function buildFrame() {
   const resolved = resolver.resolveLayers({
     layers,
     activeLayerId,
-    layoutParams: { ...layoutParams, ...smoothedLayoutParams },
+    layerSnapshots: s.layerSnapshots,
     seed: s.seed || 1,
     seedOffsets: s.seedOffsets || {},
-    loopTimeMs,
+    paletteId: voiceState.paletteId,
+    paletteOverrides: voiceState.paletteOverrides,
+    userPalettes: s.userPalettes,
+    layoutParams: { ...layoutParams, ...smoothedLayoutParams },
+    caGrid: s.caGrid,
+    enabledAssets: s.enabledAssets,
+    assetWeightOverrides: s.assetWeightOverrides,
+    customAssets: s.customAssets,
+    quality: s.quality,
+    lockedParams: s.lockedParams,
+    batchPaused: s.batchPaused,
+    perfClampOverride: s.perfClampOverride,
+    perfTier1: s.perfTier1,
+    assetThin: s.assetThin,
+    slowRender: s.slowRender || s.running === false,
+    attractor: view.attractor,
     audioBands: ballistics,
     dtSec,
+    loopTimeMs,
   });
 
   const totalInstances = resolved.reduce((acc, l) => acc + (l.items ? l.items.length : 0), 0);
@@ -201,7 +217,7 @@ function buildFrame() {
     audioOn: !!s.audioInput,
     audioSwell: swellEnvelope(),
     glow: layoutParams.glow || 0,
-    paused: !s.running,
+    paused: s.running === false || !!s.slowRender,
   };
 }
 
@@ -213,13 +229,11 @@ function renderTick() {
     const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, paused } = frame;
 
     if (!paused) {
-      live.ensureTargets(payload.width, payload.height, previewScale);
-
       if (accumOn) {
         if (!accumActive) {
           if (performance.now() >= accumRetryAt) {
             try {
-              accumObj = live.ensureAccum(payload.width, payload.height);
+              accumObj = live.ensureAccum(payload.width, payload.height, previewScale);
               accumObj.begin(bgCss);
               accumActive = true;
             } catch {
@@ -233,12 +247,12 @@ function renderTick() {
           live.presentUpscaled(accumObj.texture());
         } else if (accumObj) {
           try {
-            const fresh = live.ensureAccum(payload.width, payload.height);
+            const fresh = live.ensureAccum(payload.width, payload.height, previewScale);
             if (fresh !== accumObj) {
               accumObj = fresh;
               accumObj.begin(bgCss);
             }
-            const target = live.renderFrameInto(payload, { transparent: true });
+            const target = live.renderFrame(payload, { transparent: true, dprScale: previewScale });
             const bands = audioBands || { rms: 0, beatPulse: 0 };
             const rp = applyAudioEnvelope(accumRecipeParams({ ...accumParams, background: bgCss }), {
               rms: audioOn ? bands.rms || 0 : 0,
@@ -249,11 +263,11 @@ function renderTick() {
             accumObj.step(target.tex, rp, { width: target.w, height: target.h });
             live.presentUpscaled(accumObj.texture());
           } catch {
-            const target = live.renderFrameInto(payload, { transparent });
+            const target = live.renderFrame(payload, { transparent, dprScale: previewScale });
             live.present(target);
           }
         } else {
-          const target = live.renderFrameInto(payload, { transparent });
+          const target = live.renderFrame(payload, { transparent, dprScale: previewScale });
           live.present(target);
         }
       } else {
@@ -265,7 +279,7 @@ function renderTick() {
           accumFrozen = false;
         }
         lastAccumOn = false;
-        const target = live.renderFrameInto(payload, { transparent });
+        const target = live.renderFrame(payload, { transparent, dprScale: previewScale });
         live.present(target);
       }
     }
@@ -328,7 +342,7 @@ self.onmessage = (e) => {
 
     case 'RECEIVE_ATLAS':
       atlasKey = msg.key;
-      cells = msg.cells;
+      cells = (msg.cells instanceof Map) ? Object.fromEntries(msg.cells) : (msg.cells || {});
       building = false;
       if (live) {
         live.setAtlas(msg.pixels, msg.width, msg.height, msg.mipmaps);
