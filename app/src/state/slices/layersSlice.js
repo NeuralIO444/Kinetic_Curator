@@ -73,7 +73,7 @@ export const createLayersSlice = (set) => ({
     const name = `KC-${content + 1}`;
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
-      layers: [...state.layers, { id, name, visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }],
+      layers: [...state.layers, { id, name, type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }],
       layerSnapshots: { ...state.layerSnapshots, [state.activeLayerId]: captureSnapshot(state) },
       activeLayerId: id,
       ...snapshot,
