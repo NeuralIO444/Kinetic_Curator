@@ -2,7 +2,7 @@
 // verbatim from the old LayersPanel.jsx (layer rows, #341 ghost slots,
 // blend mode, opacity, PATCH row, FX effect editor). No logic changed —
 // same store selectors, same Events emissions.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
 import { useStore } from '../../state/store.js';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
@@ -11,6 +11,44 @@ import { BLEND_MODES } from '../../data/layout-modes.js';
 import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../../fx/fxFilters.js';
 import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
+import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS } from '../../engine/kernel/tracks/patchDiag.mjs';
+
+// #507 — inline PATCH diagnostic: one live line under each patched row
+// (TapeCounter 1Hz-poll shape). Module buffer, never the store.
+function PatchDiagLine({ layerId, patch, ordinals }) {
+  // All impure reads (module buffer, clock, formatter) live in the effect —
+  // render only reads the resulting string (react-hooks/purity).
+  const [line, setLine] = useState(null);
+  const mode = patch?.mode;
+  const to = patch?.to;
+  const strength = patch?.strength;
+  // Interval body is inline (TapeCounter shape): named updaters and
+  // effect-body setState trip set-state-in-effect; inline arrows read as
+  // deferred by construction. First paint shows nothing for ≤1s — same as
+  // the waiting state.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!patch || mode === 'off' || !to) { setLine(null); return; }
+      const sample = getPatchSample(layerId);
+      const age = patchSampleAgeMs(layerId);
+      const srcN = ordinals.get(to) ?? '?';
+      const dstN = ordinals.get(layerId) ?? '?';
+      const s = Number.isFinite(Number(strength)) ? Number(strength) : 0.16;
+      if (!sample && age > PATCH_DIAG_STALE_MS) {
+        setLine({
+          text: `KC-${srcN} → KC-${dstN} · ${String(mode).toUpperCase()} · ${s.toFixed(2)} · waiting`,
+          title: 'Patch link armed — no samples yet (loop paused or still baking)',
+        });
+        return;
+      }
+      const text = formatPatchLine({ srcN, dstN, mode, strength: strength ?? 0.16, sample, now: Date.now() });
+      setLine(text ? { text, title: 'Live patch amounts — pull/hop are post-clamp px per frame' } : null);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [layerId, patch, mode, to, strength, ordinals]);
+  if (!line) return null;
+  return <div className="patch-diag" title={line.title}>{line.text}</div>;
+}
 
 function FxEffectEditor({ layer }) {
   const [addKind, setAddKind] = useState(FX_MENU_KINDS[0]);
@@ -138,6 +176,7 @@ export function LayerStack() {
                 <span className="layer-opacity-readout">{Math.round(layer.layerOpacity * 100)}%</span>
               </div>
               {!fx && (
+                <>
                 <div className="layer-row-composite" title="PATCH — FEED amount when mode is FEED">
                   <span className="fx-param-readout" style={{ width: 'auto' }}>PATCH</span>
                   <select className="tg blend-mode-select" value={patch.mode}
@@ -174,6 +213,8 @@ export function LayerStack() {
                       onChange={(e) => setLayerPatch(layer.id, { mode: 'field', to, strength: Number(e.target.value) })} />
                   )}
                 </div>
+                <PatchDiagLine layerId={layer.id} patch={patch} ordinals={ordinals} />
+                </>
               )}
               {fx && isFxSelected && <FxEffectEditor layer={layer} />}
             </div>

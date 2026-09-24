@@ -11,6 +11,8 @@ import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 import { applyField, applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
+// #507 — inline PATCH diagnostic: record-only bulletin calls (no logic change).
+import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
@@ -476,12 +478,28 @@ export function createLiveResolver() {
         const srcPts = (src?.items || []).map(toNorm);
         const tgt = (e.items || []).map(toNorm);
         const pulled = applyField(tgt, srcPts, { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) });
-        e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
+        // #507 — mean presented hop (post-clamp px); the diagnostic line.
+        let pullSumPx = 0;
+        const fieldN = (e.items || []).length;
+        e.items = (e.items || []).map((it, k) => {
+          const next = clampHop(it, pulled[k]);
+          pullSumPx += Math.hypot(next.x - it.x, next.y - it.y);
+          return next;
+        });
+        recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx: pullSumPx / Math.max(1, fieldN) });
       } else if (patch.mode === 'feed') {
         const pts = (e.items || []).map(toNorm);
         const amt = patchStrength(patch) * 0.05;
         const pulled = feedLive.applyTo(pts, { mode: 'feed', from: slotFor(patch.to), to: slotFor(e.id), strength: amt });
-        e.items = (e.items || []).map((it, k) => clampHop(it, pulled[k]));
+        // #507 — same accumulation shape as FIELD (mean post-clamp hop px).
+        let feedSumPx = 0;
+        const feedN = (e.items || []).length;
+        e.items = (e.items || []).map((it, k) => {
+          const next = clampHop(it, pulled[k]);
+          feedSumPx += Math.hypot(next.x - it.x, next.y - it.y);
+          return next;
+        });
+        recordPatchSample(e.id, { mode: 'feed', strength: patchStrength(patch), pullPx: feedSumPx / Math.max(1, feedN) });
       } else if (patch.mode === 'mod') {
         const src = content.find((c) => c.id === patch.to);
         const metrics = motionMetrics((src?.items || []).map(toNormVel));
@@ -491,6 +509,12 @@ export function createLiveResolver() {
         // force pass already ran this tick, so these multipliers land in the
         // following update spread — one frame of lag, same as FEED's delay.
         modSteerByLayer.set(e.id, { ali: knobs.ali, coh: knobs.coh, sep: knobs.sep });
+        // #507 — MOD diagnostic rides the same knobs + metrics (no new math).
+        recordPatchSample(e.id, {
+          mode: 'mod', strength: patchStrength(patch),
+          speed: metrics.speed, agitation: metrics.agitation,
+          glow: knobs.glow, fade: knobs.fade, displace: knobs.displace,
+        });
         e.items = (e.items || []).map((it) => ({
           ...it,
           scale: (Number(it.scale) || 1) * (1 + knobs.glow * 0.35),
