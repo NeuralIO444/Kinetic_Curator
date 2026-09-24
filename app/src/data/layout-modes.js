@@ -58,6 +58,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   density: 78,
   bleed: false,
   mirror: false,
+  previewDownscale: false,
+  renderWorker: false,
   overlap: true,
   blendMode: 'normal',
   hueRotate: 0,
@@ -217,7 +219,7 @@ export const RANGE_SPEC = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'mirror', 'overlap', 'accumulation']; // #268: recolor removed
+const BOOL_KEYS = ['bleed', 'mirror', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker']; // #268: recolor removed
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);

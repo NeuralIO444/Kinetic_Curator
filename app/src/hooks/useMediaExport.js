@@ -95,7 +95,7 @@ export async function captureStill({ loopRef, resolution = 1, seedStr = '', onTh
   // #267: captureFrame discloses when an ACCUM still was upscaled from the
   // live render size instead of rendered true-size — surfaced in the print
   // desk label and the snapshot record so it's never sold as a true 2×.
-  const { pixels, width: pw, height: ph, upscaledFrom } = loop.captureFrame({ width, height });
+  const { pixels, width: pw, height: ph, upscaledFrom } = await loop.captureFrame({ width, height });
   const canvas = pixelsToCanvas(pixels, pw, ph);
   const thumb = drawThumbnail(canvas);
   if (onThumbnail) onThumbnail(thumb, { upscaledFrom: upscaledFrom || null });
