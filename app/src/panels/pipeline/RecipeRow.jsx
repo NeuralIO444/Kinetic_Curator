@@ -39,7 +39,7 @@ export function RecipeRow({ onMessage }) {
 
   return (
     <>
-      <div className="output-row">
+      <div className="pipeline-row">
         <button
           className="big-btn"
           onClick={() => (open ? close() : setOpen(true))}
@@ -71,7 +71,7 @@ export function RecipeRow({ onMessage }) {
               resize: 'vertical',
             }}
           />
-          <div className="output-row">
+          <div className="pipeline-row">
             <button className="big-btn" onClick={applyRecipe} style={{ flex: 1 }} disabled={!text.trim()}>
               APPLY RECIPE
             </button>

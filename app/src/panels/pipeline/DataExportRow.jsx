@@ -92,17 +92,17 @@ export function DataExportRow({
 
   return (
     <>
-      <div className="output-row">
+      <div className="pipeline-row">
         <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project">↓ PROJECT</button>
         <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
         <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
       </div>
-      <div className="output-row">
+      <div className="pipeline-row">
         <button className="big-btn dl" onClick={exportPalettes} style={{ flex: 1 }} title={`Export your ${(userPalettes || []).length} saved palettes`}>↓ PALETTES</button>
         <button className="big-btn" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Import palette library JSON">↑ PALETTES</button>
         <input ref={paletteInputRef} type="file" accept=".json,application/json" onChange={importPalettes} style={{ display: 'none' }} />
       </div>
-      <div className="output-row">
+      <div className="pipeline-row">
         <button
           className="big-btn dl"
           onClick={exportHits}

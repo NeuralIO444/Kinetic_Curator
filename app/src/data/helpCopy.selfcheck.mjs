@@ -110,7 +110,7 @@ import { HELP_TOPICS, HELP_SHORTCUTS, helpText } from './helpCopy.js';
   // the map, so hover and the `?` overlay cannot drift.
   const wired = {
     'panels/layout/ToggleRow.jsx': 'layout-accum',
-    'panels/output/SnapRecordRow.jsx': 'output-webm',
+    'panels/pipeline/SnapRecordRow.jsx': 'output-webm',
     'components/MasterBar.jsx': 'output-webm',
     'panels/build/LayerStack.jsx': 'layers-blend',
     'panels/DavisPanel.jsx': 'davis-clear',

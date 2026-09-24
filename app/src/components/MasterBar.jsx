@@ -1,6 +1,8 @@
 // MasterBar — bottom toolbar (tape readout, FPS, budget), below the view
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { TapeCounter } from './TapeCounter.jsx';
+import { TallyLight } from './TallyLight.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
 import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import * as A from '../state/actions.js';
@@ -14,6 +16,7 @@ export function MasterBar() {
     seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
     isRecording: s.isRecording, persistStatus: s.persistStatus, frameLock: s.frameLock,
     setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, glContext: s.glContext,
+    curatorConfidence: s.curatorConfidence, curatorActive: s.curatorActive,
     layers: s.layers,
   }));
   const {
@@ -48,6 +51,19 @@ export function MasterBar() {
     `${fxCost.unknown.length ? ` · unknown: ${fxCost.unknown.join(',')}` : ''}). ` +
     `512²-bench estimates from the cost registry + measured costs — attribution, not frame math.`;
 
+  // #33, #53: brief green SAVED flash when autosave succeeds.
+  const [showSaved, setShowSaved] = useState(false);
+  const prevPersist = useRef(persistStatus);
+  useEffect(() => {
+    if (persistStatus === 'ok' && prevPersist.current !== 'ok') {
+      setShowSaved(true);
+      const t = setTimeout(() => setShowSaved(false), 1500);
+      prevPersist.current = persistStatus;
+      return () => clearTimeout(t);
+    }
+    prevPersist.current = persistStatus;
+  }, [persistStatus]);
+
   return (
     <div className="master-bar">
       <div className="master-left">
@@ -72,6 +88,14 @@ export function MasterBar() {
           </div>
         )}
 
+        {showSaved && (
+          <div className="status-pill" style={{ background: 'rgba(0, 255, 136, 0.12)', color: '#00ff88', borderColor: '#00ff88' }}
+            title="Project autosaved to pipeline backup.">
+            <span className="status-dot" style={{ background: '#00ff88' }} />
+            SAVED
+          </div>
+        )}
+
         {glContext !== 'ok' && (
           <div className="status-pill"
             style={glContext === 'lost'
@@ -90,6 +114,8 @@ export function MasterBar() {
             MIC BLOCKED
           </div>
         )}
+
+        <TallyLight confidence={state.curatorConfidence ?? 0} active={!!state.curatorActive} />
 
         <TapeCounter />
 

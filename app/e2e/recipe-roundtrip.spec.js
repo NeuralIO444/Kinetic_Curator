@@ -19,7 +19,7 @@ test.describe('readable recipes (#307)', () => {
     await page.goto('/');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
-    const outputTab = page.getByRole('tab', { name: /output/i });
+    const outputTab = page.getByRole('tab', { name: /pipeline|output/i });
     await outputTab.click();
     await expect(page.locator('.panel-output')).toBeVisible();
 
@@ -71,7 +71,7 @@ test.describe('readable recipes (#307)', () => {
     await page.goto('/');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
-    const outputTab = page.getByRole('tab', { name: /output/i });
+    const outputTab = page.getByRole('tab', { name: /pipeline|output/i });
     await outputTab.click();
     await expect(page.locator('.panel-output')).toBeVisible();
 

@@ -1,7 +1,7 @@
 import { captureSnapshot } from './slices/layersSlice.js';
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeOverlay } from '../assets/overlay.js';
-// Re-exported so existing import sites (fxFilters.selfcheck, OutputPanel)
+// Re-exported so existing import sites (fxFilters.selfcheck, PipelinePanel)
 // keep working; the implementations live in the cycle-free module.
 import { normalizeSnapshots, normalizeLayers } from './projectNormalize.js';
 export { normalizeSnapshots, normalizeLayers };
@@ -211,4 +211,99 @@ export function readQuarantine() {
   } catch {
     return null;
   }
+}
+
+// ── Rolling pipeline autosave (#33, #53) ─────────────────────────────────
+// Writes to a primary key and rotates the previous value to a single backup
+// slot. On read, if the primary is quarantine-worthy the backup is tried as
+// a fallback before giving up. The legacy kc:project:v1 key is left intact
+// for migration — readPipelineAutosave falls through to readAutosave when
+// neither pipeline key exists.
+
+export const PIPELINE_KEY = 'kc:pipeline:v1';
+export const PIPELINE_BACKUP_KEY = 'kc:pipeline:backup';
+
+/**
+ * Rolling write: rotate current → backup, then write new.
+ * @returns {{ok: boolean, error?: string}}
+ */
+export function writePipelineAutosave(doc) {
+  const envelope = JSON.stringify({
+    version: PROJECT_VERSION,
+    savedAt: new Date().toISOString(),
+    doc,
+  });
+  try {
+    // Rotate current primary into the backup slot.
+    const prev = localStorage.getItem(PIPELINE_KEY);
+    if (prev) {
+      try {
+        localStorage.setItem(PIPELINE_BACKUP_KEY, prev);
+      } catch {
+        // Quota hit on backup — drop it silently so the primary write
+        // still has room. The backup is best-effort.
+        try { localStorage.removeItem(PIPELINE_BACKUP_KEY); } catch { /* */ }
+      }
+    }
+    localStorage.setItem(PIPELINE_KEY, envelope);
+    return { ok: true };
+  } catch (e) {
+    console.warn('[pipeline] autosave failed', e);
+    return { ok: false, error: e?.name === 'QuotaExceededError' ? 'quota' : 'blocked' };
+  }
+}
+
+/**
+ * Read with backup fallback.
+ * @returns {{doc: object|null, quarantined: boolean, fromBackup: boolean}}
+ */
+export function readPipelineAutosave() {
+  // Try primary key.
+  const primary = _tryReadKey(PIPELINE_KEY);
+  if (primary.doc) return { doc: primary.doc, quarantined: false, fromBackup: false };
+
+  // Primary was missing or quarantine-worthy — try backup.
+  if (primary.quarantined) {
+    const backup = _tryReadKey(PIPELINE_BACKUP_KEY);
+    if (backup.doc) return { doc: backup.doc, quarantined: false, fromBackup: true };
+  }
+
+  // Neither pipeline key worked — fall through to legacy kc:project:v1.
+  const legacy = readAutosave();
+  if (legacy.doc) return { doc: legacy.doc, quarantined: false, fromBackup: false };
+
+  return { doc: null, quarantined: primary.quarantined || legacy.quarantined, fromBackup: false };
+}
+
+/** Shared key-reader: parse envelope → parseProject. */
+function _tryReadKey(key) {
+  let raw;
+  try { raw = localStorage.getItem(key); } catch { return { doc: null, quarantined: false }; }
+  if (!raw) return { doc: null, quarantined: false };
+
+  let envelope;
+  try { envelope = JSON.parse(raw); } catch {
+    console.warn(`[pipeline] ${key} unparseable, quarantining`);
+    _quarantineKey(key, 'unparseable JSON');
+    return { doc: null, quarantined: true };
+  }
+
+  const candidate = envelope && typeof envelope === 'object' && envelope.doc
+    ? envelope.doc : envelope;
+  const result = parseProject(candidate);
+  if (!result.ok) {
+    _quarantineKey(key, result.error || 'failed to parse');
+    return { doc: null, quarantined: true };
+  }
+  return { doc: result.doc, quarantined: false };
+}
+
+function _quarantineKey(key, reason) {
+  try {
+    const raw = localStorage.getItem(key);
+    localStorage.setItem(QUARANTINE_KEY, JSON.stringify({
+      quarantinedAt: new Date().toISOString(), reason, source: key, raw,
+    }));
+    localStorage.removeItem(key);
+  } catch { /* storage is already unhappy */ }
 }

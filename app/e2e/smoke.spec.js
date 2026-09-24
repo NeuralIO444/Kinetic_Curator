@@ -43,7 +43,7 @@ test.describe('Kinetic Curator smoke', () => {
     expect(tabCount).toBeGreaterThanOrEqual(3);
 
     // Prefer clicking by accessible name when possible
-    const outputTab = page.getByRole('tab', { name: /output/i });
+    const outputTab = page.getByRole('tab', { name: /pipeline|output/i });
     if (await outputTab.count()) {
       await outputTab.click();
       await expect(page.locator('.panel-output')).toBeVisible();

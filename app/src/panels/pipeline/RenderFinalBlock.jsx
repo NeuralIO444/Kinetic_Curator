@@ -40,7 +40,7 @@ export function RenderFinalBlock({
   return (
     <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>RENDER · FINAL STILL</div>
-      <div className="output-row" style={{ marginBottom: 6 }}>
+      <div className="pipeline-row" style={{ marginBottom: 6 }}>
         <select
           value={exportResolution}
           onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value, 10))}
@@ -67,7 +67,7 @@ export function RenderFinalBlock({
       >
         {rendering && !batchActive ? 'RENDERING…' : accumOn ? '▶ RENDER ACCUM' : '▶ RENDER FINAL'}
       </button>
-      <div className="output-hint" style={{ marginTop: 6 }}>
+      <div className="pipeline-hint" style={{ marginTop: 6 }}>
         {accumOn
           ? 'ACCUM on — export captures the live trail buffer.'
           : 'Matches live preview. Denser 4K/8K finals: studio.py render --uncapped.'}

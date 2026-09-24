@@ -86,6 +86,8 @@
   height: 38px;
 }
 .master-left, .master-right { display: flex; align-items: center; gap: 10px; }
+.tally-light { display: flex; align-items: center; font-size: 11px; letter-spacing: 0.05em; user-select: none; }
+.tally-block { font-family: monospace; transition: none; /* HARD CUT — no easing */ }
 
 /* Palette strip — the color swatches live in their own row above the view
    (PR #347 follow-up); the tape/status bar stays below it. */
@@ -454,7 +456,7 @@
   .panel-body,
   .panel-stimulus .stim-body,
   .davis-body,
-  .output-body,
+  .pipeline-body,
   .pool-body {
     overflow-y: visible;
     max-height: none;

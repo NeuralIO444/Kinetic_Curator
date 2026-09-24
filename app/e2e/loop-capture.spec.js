@@ -67,7 +67,7 @@ test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, 
   await page.locator('.app').waitFor({ timeout: 30_000 });
 
   // OUTPUT tab -> 2s loop -> CAPTURE LOOP -> wait for the blob.
-  await page.getByRole('tab', { name: /output/i }).click();
+  await page.getByRole('tab', { name: /pipeline|output/i }).click();
   await page.locator('.panel-output').waitFor({ timeout: 10_000 });
   await page.waitForTimeout(2000); // let trails build up
   await page.getByRole('button', { name: /^2s$/ }).click();

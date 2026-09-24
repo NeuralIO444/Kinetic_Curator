@@ -7,7 +7,7 @@ import { AssetPoolPanel } from '../panels/AssetPoolPanel.jsx';
 import { StimulusPanel } from '../panels/StimulusPanel.jsx';
 import { DavisPanel } from '../panels/DavisPanel.jsx';
 import { PlayPanel } from '../panels/PlayPanel.jsx';
-import { OutputPanel } from '../panels/OutputPanel.jsx';
+import { PipelinePanel } from '../panels/PipelinePanel.jsx';
 
 // Shader Lab (#193) is dev-only: lazy chunk, never registered in prod builds.
 const ShaderLabPanel = import.meta.env.DEV
@@ -37,7 +37,7 @@ export const PANEL_REGISTRY = [
   // they still hold content — expected mid-migration tab-count bulge
   // (PANEL_CONSOLIDATION_PLAN.md §2.8), not a violation of the 4-tab cap.
   { id: 'play',     title: 'PLAY',     icon: '◎', component: PlayPanel,     zone: 'secondary' },
-  { id: 'output',   title: 'OUTPUT',   icon: '⬇', component: OutputPanel,    zone: 'secondary' },
+  { id: 'pipeline', title: 'PIPELINE', icon: '⇌', component: PipelinePanel,  zone: 'secondary' },
 ];
 
 if (import.meta.env.DEV && ShaderLabPanel) {

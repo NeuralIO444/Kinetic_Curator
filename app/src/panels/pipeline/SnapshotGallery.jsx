@@ -21,7 +21,7 @@ export function SnapshotGallery({ snapshots }) {
 
   return (
     <>
-      <div className="output-row">
+      <div className="pipeline-row">
         <button className="big-btn dl" onClick={() => emit(Events.EXPORT_CLEAR_SNAPSHOTS)} style={{ width: '100%' }}>✕ CLEAR</button>
       </div>
 
@@ -50,7 +50,7 @@ export function SnapshotGallery({ snapshots }) {
         </div>
       )}
       {snapshots.length === 0 && (
-        <div className="output-hint">Press <b>S</b> for snap · RENDER · BATCH · ACCUM for trails · PROJECT for state</div>
+        <div className="pipeline-hint">Press <b>S</b> for snap · RENDER · BATCH · ACCUM for trails · PROJECT for state</div>
       )}
     </>
   );

@@ -57,7 +57,7 @@ async function seedDoc(page, fade) {
 // (AUTO is seeded off in the project doc — see docFor.)
 async function recordWebM(page, fade, secs) {
   await seedDoc(page, fade);
-  await page.getByRole('tab', { name: /output/i }).click();
+  await page.getByRole('tab', { name: /pipeline|output/i }).click();
   await page.locator('.panel-output').waitFor({ timeout: 10_000 });
   await page.waitForTimeout(3000); // let trails build up
   await page.getByRole('button', { name: /REC WEBM/ }).click();

@@ -1,5 +1,5 @@
-// OutputPanel (P05) — thin composition shell. Split into panels/output/ to
-// match panels/layout/ and panels/davis/. This file owns only what's
+// PipelinePanel (P05) — thin composition shell. Split into panels/pipeline/
+// to match panels/layout/ and panels/davis/. This file owns only what's
 // genuinely shared across those pieces:
 //   - rendering — now store-backed (s.isRendering / EXPORT_RENDERING), not
 //     local state, so the App-level hotkey map can debounce N/E while a
@@ -15,16 +15,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
-import { RenderFinalBlock } from './output/RenderFinalBlock.jsx';
-import { PrintDeskBlock } from './output/PrintDeskBlock.jsx';
-import { BatchEditionBlock } from './output/BatchEditionBlock.jsx';
-import { SnapRecordRow } from './output/SnapRecordRow.jsx';
-import { LoopCaptureBlock } from './output/LoopCaptureBlock.jsx';
-import { DataExportRow } from './output/DataExportRow.jsx';
-import { RecipeRow } from './output/RecipeRow.jsx';
-import { SnapshotGallery } from './output/SnapshotGallery.jsx';
+import { RenderFinalBlock } from './pipeline/RenderFinalBlock.jsx';
+import { PrintDeskBlock } from './pipeline/PrintDeskBlock.jsx';
+import { BatchEditionBlock } from './pipeline/BatchEditionBlock.jsx';
+import { SnapRecordRow } from './pipeline/SnapRecordRow.jsx';
+import { LoopCaptureBlock } from './pipeline/LoopCaptureBlock.jsx';
+import { DataExportRow } from './pipeline/DataExportRow.jsx';
+import { RecipeRow } from './pipeline/RecipeRow.jsx';
+import { SnapshotGallery } from './pipeline/SnapshotGallery.jsx';
 
-export function OutputPanel() {
+export function PipelinePanel() {
   const { palette, glCanvasRef, glLoopRef } = useApp();
   const { state } = useApp(s => ({
     snapshots: s.snapshots,
@@ -88,12 +88,23 @@ export function OutputPanel() {
   }, [watchdogTripGen]);
 
   return (
-    <div className="panel panel-output">
-      <PanelHeader tag="P05" title="OUTPUT" subtitle={`${snapshots.length} snaps`}>
-        {/* BG cycle moved beside RESET VIEW in CANVAS (canvas belongs with canvas). */}
-      </PanelHeader>
-      <div className="panel-body output-body">
-        {/* Gate 2026-09-23: QualityRow (null since #310) unmounted — BudgetKnob is the control. */}
+    <div className="panel panel-pipeline panel-output">
+      <PanelHeader tag="P05" title="PIPELINE" subtitle={`${snapshots.length} snaps`} />
+      <div className="panel-body pipeline-body output-body">
+        {/* ── IN: import, load, paste ── */}
+        <div className="pipeline-section-label">IN</div>
+        <RecipeRow onMessage={setMessage} />
+        <DataExportRow
+          seed={seed} paletteId={paletteId} paletteOverrides={paletteOverrides}
+          layoutParams={layoutParams} lockedParams={lockedParams} caGrid={caGrid}
+          enabledAssets={enabledAssets} quality={quality} assetWeightOverrides={assetWeightOverrides}
+          customAssets={customAssets} layers={layers} activeLayerId={activeLayerId}
+          layerSnapshots={layerSnapshots} userPalettes={userPalettes} favorites={favorites}
+          onMessage={setMessage}
+        />
+
+        {/* ── PROCESS: render, post ── */}
+        <div className="pipeline-section-label">PROCESS</div>
 
         <RenderFinalBlock
           glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
@@ -104,6 +115,8 @@ export function OutputPanel() {
 
         <PrintDeskBlock rendering={rendering} onOpen={openPrintDesk} />
 
+        {/* ── OUT: batch, capture, gallery ── */}
+        <div className="pipeline-section-label">OUT</div>
         <BatchEditionBlock
           glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
           quality={quality} paletteId={paletteId} exportResolution={exportResolution}
@@ -122,18 +135,8 @@ export function OutputPanel() {
           glLoopRef={glLoopRef} seed={seed} rendering={rendering} setRendering={setRendering}
         />
 
-        <DataExportRow
-          seed={seed} paletteId={paletteId} paletteOverrides={paletteOverrides}
-          layoutParams={layoutParams} lockedParams={lockedParams} caGrid={caGrid}
-          enabledAssets={enabledAssets} quality={quality} assetWeightOverrides={assetWeightOverrides}
-          customAssets={customAssets} layers={layers} activeLayerId={activeLayerId}
-          layerSnapshots={layerSnapshots} userPalettes={userPalettes} favorites={favorites}
-          onMessage={setMessage}
-        />
-
-        <RecipeRow onMessage={setMessage} />
         {message && (
-          <div className="output-hint" style={{ color: message.includes('done') || message === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>
+          <div className="pipeline-hint" style={{ color: message.includes('done') || message === 'Project loaded' ? '#00ff88' : 'var(--accent)' }}>
             {message}
           </div>
         )}
