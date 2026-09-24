@@ -31,7 +31,7 @@ export function listSamplers() {
   return Object.keys(SAMPLERS);
 }
 
-// ── Legacy mode adapters (same math as placement/modes.js) ─────
+// ── Legacy mode adapters (same math as the retired placement/modes.js) ─────
 
 function random(ctx) {
   const { w, h, rng } = ctx;
