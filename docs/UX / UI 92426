@@ -1,0 +1,67 @@
+# 🛠️ UX/UI & Architecture Refactor Queue
+
+## Issue: Refactor Output Panel to "Pipeline" (I/O)
+**Labels:** `UX/UI`, `Enhancement`
+
+**Description:**
+Rename the existing Output panel to "Pipeline" within the `PanelRegistry` in Kinetic_Curator to standardize nomenclature across the NeuralIO product ecosystem.
+
+**Tasks:**
+- [ ] Consolidate JSON state saves, project imports, and PNG batch exports into this single interface.
+- [ ] Implement a silent, rolling `pipeline_autosave.json` written to `localStorage` with a single fallback backup.
+- [ ] Add a minimal, non-disruptive autosave status indicator to resolve active save state issues (#33, #53).
+
+---
+
+## Issue: Implement Hardware-Style Curation Tally Light
+**Labels:** `UX/UI`, `Feature`
+
+**Description:**
+Add a high-contrast, Teenage Engineering-inspired LED indicator to the `MasterBar` to signal high-confidence ML curation hits during live performance.
+
+**Tasks:**
+- [ ] Design a monospaced, neon green/orange `[ * ]` or segmented percentage block.
+- [ ] Ensure the animation triggers with a zero-frame hard cut (no easing) for immediate, tactile hardware feedback.
+
+---
+
+## Issue: Decouple Live Render via Offscreen Preview Canvas
+**Labels:** `Core`, `Performance`, `Bug`
+
+**Description:**
+Resolve the conflict between declarative React DOM updates and the persistent accumulation buffer (Issue #28).
+
+**Tasks:**
+- [ ] Implement a downscaled `OffscreenCanvas` specifically for the live UI preview.
+- [ ] Defer high-resolution accumulation execution entirely to a background worker to unblock the main thread.
+
+---
+---
+
+# 🗺️ Roadmap Updates (`roadmap.md`)
+
+## KC-1 Architecture: Apple Silicon Native Optimization
+
+This roadmap outlines the aggressive transition of the current web-based architecture into a hyper-optimized, Apple Silicon-native environment. The architecture is designed to maximize the unified memory and dedicated hardware blocks of modern macOS systems.
+
+### Phase 1: Native Application Layering
+* **Objective:** Escape browser memory constraints while preserving the existing TypeScript/React frontend stack.
+* **Implementation:** Wrap the frontend interface in Tauri to establish an OS-native webview.
+* **Bridge:** Develop Swift/Objective-C++ plugins via Tauri’s FFI layer, allowing the UI to communicate lightweight state directly to native macOS Core frameworks.
+
+### Phase 2: Zero-Copy Render Pipeline (Metal & Shared Storage)
+* **Objective:** Eliminate CPU-to-GPU memory copying to support massive node counts and 8K accumulation buffers.
+* **Implementation:** Replace Canvas 2D/WebGL logic with custom Metal compute kernels (MSL).
+* **Memory Allocation:** Utilize `MTLResourceStorageModeShared` to bypass transfer bottlenecks.
+* **Display Handoff:** Route the final texture map directly to an `MTKView` via the Core Video Texture Cache for zero-latency UI display.
+
+### Phase 3: Neural Engine (ANE) Curation Offloading
+* **Objective:** Run the local taste model continuously without stealing compute cycles from the generative visual loop.
+* **Implementation:** Compile the local evaluation model into a Core ML `.mlpackage`.
+* **Hardware Targeting:** Explicitly set `MLModelConfiguration.computeUnits = .cpuAndNeuralEngine`.
+* **Data Flow:** Pass candidate frames as `CVPixelBuffer` references directly from the Metal render pass into the Core ML model, bypassing file serialization completely.
+
+### Phase 4: Media Engine Sequence Streaming
+* **Objective:** Handle heavy disk I/O for batch exports without blocking the UI or generative physics.
+* **Implementation:** Route the final Pipeline batch exports through Apple’s Media Engine using VideoToolbox and AVFoundation.
+* **Disk Dumping:** Utilize Grand Central Dispatch (GCD) on system efficiency cores (E-cores) alongside `vImage` to execute multithreaded PNG/TIFF disk writes natively to the local file system.
