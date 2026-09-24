@@ -31,7 +31,7 @@ function PatchMatrix({ layers, ordinals }) {
 
 // #507 — inline PATCH diagnostic: one live line under each patched row
 // (TapeCounter 1Hz-poll shape). Module buffer, never the store.
-function PatchDiagLine({ layerId, patch, ordinals }) {
+function PatchDiagLine({ layerId, patch, srcN, dstN }) {
   // All impure reads (module buffer, clock, formatter) live in the effect —
   // render only reads the resulting string (react-hooks/purity).
   const [line, setLine] = useState(null);
@@ -44,11 +44,9 @@ function PatchDiagLine({ layerId, patch, ordinals }) {
   // the waiting state.
   useEffect(() => {
     const id = setInterval(() => {
-      if (!patch || mode === 'off' || !to) { setLine(null); return; }
+      if (!mode || mode === 'off' || !to) { setLine(null); return; }
       const sample = getPatchSample(layerId);
       const age = patchSampleAgeMs(layerId);
-      const srcN = ordinals.get(to) ?? '?';
-      const dstN = ordinals.get(layerId) ?? '?';
       const s = Number.isFinite(Number(strength)) ? Number(strength) : 0.16;
       if (!sample && age > PATCH_DIAG_STALE_MS) {
         setLine({
@@ -61,7 +59,7 @@ function PatchDiagLine({ layerId, patch, ordinals }) {
       setLine(text ? { text, title: 'Live patch amounts — pull/hop are post-clamp px per frame' } : null);
     }, 1000);
     return () => clearInterval(id);
-  }, [layerId, patch, mode, to, strength, ordinals]);
+  }, [layerId, mode, to, strength, srcN, dstN]); // primitives only: an object/Map dep restarts the timer on every render
   if (!line) return null;
   return <div className="patch-diag" title={line.title}>{line.text}</div>;
 }
@@ -230,7 +228,7 @@ export function LayerStack() {
                       onChange={(e) => setLayerPatch(layer.id, { mode: 'field', to, strength: Number(e.target.value) })} />
                   )}
                 </div>
-                <PatchDiagLine layerId={layer.id} patch={patch} ordinals={ordinals} />
+                <PatchDiagLine layerId={layer.id} patch={patch} srcN={ordinals.get(patch.to) ?? '?'} dstN={ordinals.get(layer.id) ?? '?'} />
                 </>
               )}
               {fx && isFxSelected && <FxEffectEditor layer={layer} />}
