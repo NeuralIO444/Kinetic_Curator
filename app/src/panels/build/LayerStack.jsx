@@ -116,13 +116,17 @@ export function LayerStack() {
   for (let n = fxCount + 1; n <= MAX_FX_TRACKS; n++) fxGhosts.push(n);
 
   let contentOrdinal = 0;
-  const ordinals = new Map();
+  let fxOrdinal = 0;
+  const ordinals = new Map(); // content ids -> KC-n, FX ids -> FX n (separate counters)
   const contentTargets = [];
   for (const l of layers) {
     if (!isFxLayer(l)) {
       contentOrdinal += 1;
       ordinals.set(l.id, contentOrdinal);
       contentTargets.push({ id: l.id, n: contentOrdinal });
+    } else {
+      fxOrdinal += 1;
+      ordinals.set(l.id, fxOrdinal);
     }
   }
   // #457 — the target is a stable layer id, not an ordinal: an ordinal
