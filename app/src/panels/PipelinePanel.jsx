@@ -72,6 +72,10 @@ export function PipelinePanel() {
 
   const accumOn = !!layoutParams.accumulation;
 
+  const [metalStats, setMetalStats] = useState(null);
+  const [metalDispatchTime, setMetalDispatchTime] = useState(null);
+  const [metalBusy, setMetalBusy] = useState(false);
+
   const handleTestNativeIO = async () => {
     try {
       // 1x1 valid PNG binary header & chunk payload (67 bytes)
@@ -93,6 +97,54 @@ export function PipelinePanel() {
     } catch (err) {
       console.error('Native I/O test failed:', err);
       setMessage(`Native I/O: ${err?.message || err}`);
+    }
+  };
+
+  const handleMetalInit = async () => {
+    try {
+      setMetalBusy(true);
+      const stats = await invoke('metal_init', {
+        width: 1440,
+        height: 900,
+        particleCount: 2048,
+      });
+      setMetalStats(stats);
+      setMessage(`Metal Ready: ${stats.device_name} (UMA: ${stats.has_unified_memory ? 'YES' : 'NO'})`);
+    } catch (err) {
+      console.error('Metal Init failed:', err);
+      setMessage(`Metal Error: ${err?.message || err}`);
+    } finally {
+      setMetalBusy(false);
+    }
+  };
+
+  const handleMetalStep = async () => {
+    try {
+      setMetalBusy(true);
+      const t0 = performance.now();
+      await invoke('metal_step_boids', {
+        deltaTime: 0.016,
+        maxSpeed: 60.0,
+        attractorX: 720.0,
+        attractorY: 450.0,
+        strength: 650.0,
+      });
+      const updatedStats = await invoke('metal_step_accum', {
+        fade: 0.96,
+        bgR: 0.0,
+        bgG: 0.0,
+        bgB: 0.0,
+        bgA: 1.0,
+      });
+      const dt = performance.now() - t0;
+      setMetalDispatchTime(dt.toFixed(2));
+      setMetalStats(updatedStats);
+      setMessage(`Metal Pass #${updatedStats.frame_counter} dispatched in ${dt.toFixed(2)}ms`);
+    } catch (err) {
+      console.error('Metal Step failed:', err);
+      setMessage(`Metal Step: ${err?.message || err}`);
+    } finally {
+      setMetalBusy(false);
     }
   };
 
@@ -161,6 +213,81 @@ export function PipelinePanel() {
           >
             ⚡ TEST NATIVE DISK I/O
           </button>
+        </div>
+
+        <div
+          style={{
+            marginTop: '8px',
+            marginBottom: '8px',
+            padding: '8px',
+            background: 'rgba(0, 255, 136, 0.04)',
+            border: '1px solid rgba(0, 255, 136, 0.25)',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ color: 'var(--accent, #00ff88)', fontWeight: 600 }}>METAL ZERO-COPY (UMA)</span>
+            <span style={{ color: metalStats ? '#00ff88' : '#888' }}>
+              {metalStats ? '● ACTIVE' : '○ STANDBY'}
+            </span>
+          </div>
+
+          {metalStats ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
+              <div>DEVICE: <span style={{ color: '#fff' }}>{metalStats.device_name}</span></div>
+              <div>UMA SHARED: <span style={{ color: metalStats.has_unified_memory ? '#00ff88' : '#ffaa00' }}>{metalStats.has_unified_memory ? 'YES (Coherent)' : 'NO'}</span></div>
+              <div>ACCUM PTR: <span style={{ color: '#00ff88' }}>{metalStats.accum_buffer_ptr}</span> ({((metalStats.accum_buffer_bytes) / 1048576).toFixed(2)} MB)</div>
+              <div>BOIDS PTR: <span style={{ color: '#00ff88' }}>{metalStats.boids_buffer_ptr}</span> ({((metalStats.boids_buffer_bytes) / 1024).toFixed(1)} KB)</div>
+              <div>FRAMES DISPATCHED: <span style={{ color: '#fff' }}>#{metalStats.frame_counter}</span> {metalDispatchTime ? `(${metalDispatchTime}ms)` : ''}</div>
+            </div>
+          ) : (
+            <div style={{ color: '#888', fontSize: '10px', marginBottom: '8px' }}>
+              Direct Apple Silicon hardware pipeline for zero-copy accumulation and physics compute.
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {!metalStats ? (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{
+                  flex: 1,
+                  fontSize: '10px',
+                  fontFamily: 'var(--font-mono, monospace)',
+                  border: '1px solid var(--accent, #00ff88)',
+                  color: 'var(--accent, #00ff88)',
+                  padding: '4px 6px',
+                  cursor: metalBusy ? 'wait' : 'pointer',
+                }}
+                disabled={metalBusy}
+                onClick={handleMetalInit}
+              >
+                {metalBusy ? 'INITIALIZING...' : '⚡ INIT METAL UMA'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{
+                  flex: 1,
+                  fontSize: '10px',
+                  fontFamily: 'var(--font-mono, monospace)',
+                  border: '1px solid var(--accent, #00ff88)',
+                  background: 'rgba(0, 255, 136, 0.1)',
+                  color: 'var(--accent, #00ff88)',
+                  padding: '4px 6px',
+                  cursor: metalBusy ? 'wait' : 'pointer',
+                }}
+                disabled={metalBusy}
+                onClick={handleMetalStep}
+              >
+                {metalBusy ? 'COMPUTING...' : '⚡ DISPATCH METAL PASS'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* ── OUT: batch, capture, gallery ── */}
