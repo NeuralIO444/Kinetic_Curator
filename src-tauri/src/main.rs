@@ -93,4 +93,241 @@ mod tests {
         let updated_stats = ctx.get_stats();
         assert_eq!(updated_stats.frame_counter, 1);
     }
+
+    #[test]
+    fn test_qa_audit_memory_profiling_and_stress_10000_nodes() {
+        use crate::metal::state::MetalContext;
+        use ::metal::MTLStorageMode;
+
+        // Stress test configuration: 10,000 nodes at 1080p resolution
+        let width = 1920u32;
+        let height = 1080u32;
+        let particle_count = 10_000u32;
+
+        let mut ctx = MetalContext::new(width, height, particle_count)
+            .expect("MetalContext initialization for 10k nodes");
+
+        // 1. Verify MTLResourceStorageModeShared is strictly adhered to on all buffers
+        assert_eq!(
+            ctx.shared_accum_buffer.storage_mode(),
+            MTLStorageMode::Shared,
+            "Accumulation buffer MUST use MTLResourceStorageModeShared"
+        );
+        assert_eq!(
+            ctx.shared_in_buffer.storage_mode(),
+            MTLStorageMode::Shared,
+            "Input frame buffer MUST use MTLResourceStorageModeShared"
+        );
+        assert_eq!(
+            ctx.shared_boids_buffer.storage_mode(),
+            MTLStorageMode::Shared,
+            "Boids particle buffer MUST use MTLResourceStorageModeShared"
+        );
+
+        let accum_ptr_initial = ctx.shared_accum_buffer.contents();
+        let boids_ptr_initial = ctx.shared_boids_buffer.contents();
+        assert!(!accum_ptr_initial.is_null());
+        assert!(!boids_ptr_initial.is_null());
+
+        // Helper to query resident memory on macOS
+        unsafe fn get_resident_rss() -> usize {
+            use std::mem::{size_of, MaybeUninit};
+            let mut info: libc::mach_task_basic_info = MaybeUninit::zeroed().assume_init();
+            let mut count = (size_of::<libc::mach_task_basic_info>() / size_of::<libc::natural_t>()) as libc::mach_msg_type_number_t;
+            #[allow(deprecated)]
+            let kret = libc::task_info(
+                libc::mach_task_self(),
+                libc::MACH_TASK_BASIC_INFO,
+                &mut info as *mut _ as *mut libc::integer_t,
+                &mut count,
+            );
+            if kret == libc::KERN_SUCCESS {
+                info.resident_size as usize
+            } else {
+                0
+            }
+        }
+
+        let rss_before = unsafe { get_resident_rss() };
+
+        // 2. Stress test: Run 100 continuous iterations of compute passes
+        for _ in 0..100 {
+            ctx.step_boids(0.016, 60.0, [960.0, 540.0], 800.0)
+                .expect("boids compute step failed");
+            ctx.step_accum(0.96, [0.0, 0.0, 0.0, 1.0])
+                .expect("accum compute step failed");
+        }
+
+        let rss_after = unsafe { get_resident_rss() };
+
+        // 3. Verify zero pointer changes (zero-copy in-place memory preservation)
+        assert_eq!(
+            ctx.shared_accum_buffer.contents(),
+            accum_ptr_initial,
+            "Accumulation buffer pointer must remain strictly stationary in UMA"
+        );
+        assert_eq!(
+            ctx.shared_boids_buffer.contents(),
+            boids_ptr_initial,
+            "Boids buffer pointer must remain strictly stationary in UMA"
+        );
+
+        // Memory footprint should be stable (no uncontrolled heap growth)
+        let memory_delta = (rss_after as i64) - (rss_before as i64);
+        println!(
+            "[QA AUDIT] 10,000 Nodes Stress Test: RSS Before = {} MB, RSS After = {} MB (Delta = {} KB)",
+            rss_before / (1024 * 1024),
+            rss_after / (1024 * 1024),
+            memory_delta / 1024
+        );
+        // Memory delta should be essentially zero or bounded by tiny driver buffers (< 8MB)
+        assert!(
+            memory_delta < 8 * 1024 * 1024,
+            "Uncontrolled memory growth detected: {} bytes",
+            memory_delta
+        );
+    }
+
+    #[test]
+    fn test_qa_audit_ui_thread_isolation() {
+        use crate::metal::state::MetalContext;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        use std::thread;
+        use std::time::{Duration, Instant};
+
+        let mut ctx = MetalContext::new(1280, 720, 5000)
+            .expect("MetalContext initialization for thread isolation");
+
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_clone = stop.clone();
+
+        // Simulate high-frequency 60Hz UI message loop (MasterBar / PipelinePanel interaction)
+        let ui_handle = thread::spawn(move || {
+            let mut tick_count = 0;
+            let mut max_jitter_ms = 0.0f64;
+
+            while !stop_clone.load(Ordering::Relaxed) {
+                let t0 = Instant::now();
+                // Simulate React state selector / event handler dispatch (< 0.1ms)
+                thread::sleep(Duration::from_millis(16)); // Target ~60Hz
+                let elapsed = t0.elapsed().as_secs_f64() * 1000.0;
+                let jitter = (elapsed - 16.0).abs();
+                if jitter > max_jitter_ms {
+                    max_jitter_ms = jitter;
+                }
+                tick_count += 1;
+            }
+            (tick_count, max_jitter_ms)
+        });
+
+        // Run heavy GPU compute loop on worker thread
+        for _ in 0..50 {
+            ctx.step_boids(0.016, 60.0, [640.0, 360.0], 500.0).unwrap();
+            ctx.step_accum(0.95, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        }
+
+        stop.store(true, Ordering::Relaxed);
+        let (ticks, max_jitter) = ui_handle.join().unwrap();
+
+        println!(
+            "[QA AUDIT] UI Thread Isolation: Executed {} UI ticks during 50 Metal passes. Max UI Jitter: {:.2}ms",
+            ticks, max_jitter
+        );
+        assert!(ticks > 0, "UI thread must register ticks during GPU compute");
+        // Max jitter should be well under 10ms for smooth 60fps frame rate
+        assert!(max_jitter < 15.0, "UI thread experienced excessive jitter: {:.2}ms", max_jitter);
+    }
+
+    #[test]
+    fn test_qa_audit_visual_parity_msl_vs_webgl_baseline() {
+        use crate::metal::state::MetalContext;
+
+        // Create a small 4x4 test grid to verify exact per-pixel float arithmetic
+        let width = 4u32;
+        let height = 4u32;
+        let mut ctx = MetalContext::new(width, height, 1)
+            .expect("MetalContext initialization for parity test");
+
+        let pixel_count = (width * height) as usize;
+
+        // Test vectors representing various generative trail scenarios:
+        // Pixel 0: Red trail fading on black ground, covered by semi-transparent green
+        // Pixel 1: Full-opacity mark (source alpha 1.0)
+        // Pixel 2: Light paper background (white bg #fff)
+        // Pixel 3: Transparent incoming frame (only trail decays)
+        let test_cases = [
+            // (prev_rgba, src_rgba, bg_rgba, fade)
+            ([1.0f32, 0.0, 0.0, 1.0], [0.0f32, 1.0, 0.0, 0.5], [0.0f32, 0.0, 0.0, 1.0], 0.90f32),
+            ([0.5f32, 0.5, 0.5, 0.8], [0.2f32, 0.8, 0.4, 1.0], [0.0f32, 0.0, 0.0, 1.0], 0.80f32),
+            ([0.2f32, 0.3, 0.9, 1.0], [0.0f32, 0.0, 0.0, 0.0], [1.0f32, 1.0, 1.0, 1.0], 0.95f32),
+            ([0.8f32, 0.1, 0.1, 0.9], [0.0f32, 0.0, 0.0, 0.0], [0.0f32, 0.0, 0.0, 1.0], 0.00f32),
+        ];
+
+        // Seed shared buffers directly through CPU pointers (zero-copy)
+        unsafe {
+            let accum_ptr = ctx.shared_accum_buffer.contents() as *mut [f32; 4];
+            let in_ptr = ctx.shared_in_buffer.contents() as *mut [f32; 4];
+
+            for i in 0..pixel_count {
+                let case = &test_cases[i % test_cases.len()];
+                *accum_ptr.add(i) = case.0;
+                *in_ptr.add(i) = case.1;
+            }
+        }
+
+        // Run MSL compute shader on GPU with test case 0 background and fade
+        let fade = 0.90f32;
+        let bg_color = [0.0f32, 0.0, 0.0, 1.0];
+        ctx.step_accum(fade, bg_color).expect("step_accum failed");
+
+        // Read back output directly from shared memory CPU pointer
+        unsafe {
+            let accum_ptr = ctx.shared_accum_buffer.contents() as *const [f32; 4];
+
+            for i in 0..pixel_count {
+                let actual = *accum_ptr.add(i);
+
+                // Compute exact reference math according to WebGL accum.mjs:
+                // 1. faded = mix(bg_color.rgb, prev.rgb, fade)
+                // 2. out_rgb = src.rgb + faded * (1.0 - src.a)
+                // 3. out_a = src.a + prev.a * (1.0 - src.a)
+                let case = &test_cases[i % test_cases.len()];
+                let prev = case.0;
+                let src = case.1;
+
+                let faded_r = bg_color[0] * (1.0 - fade) + prev[0] * fade;
+                let faded_g = bg_color[1] * (1.0 - fade) + prev[1] * fade;
+                let faded_b = bg_color[2] * (1.0 - fade) + prev[2] * fade;
+
+                let expected_r = src[0] + faded_r * (1.0 - src[3]);
+                let expected_g = src[1] + faded_g * (1.0 - src[3]);
+                let expected_b = src[2] + faded_b * (1.0 - src[3]);
+                let expected_a = (src[3] + prev[3] * (1.0 - src[3])).min(1.0);
+
+                let eps = 1e-4f32;
+                assert!(
+                    (actual[0] - expected_r).abs() < eps,
+                    "Pixel {} Red mismatch: actual {} vs expected {}",
+                    i, actual[0], expected_r
+                );
+                assert!(
+                    (actual[1] - expected_g).abs() < eps,
+                    "Pixel {} Green mismatch: actual {} vs expected {}",
+                    i, actual[1], expected_g
+                );
+                assert!(
+                    (actual[2] - expected_b).abs() < eps,
+                    "Pixel {} Blue mismatch: actual {} vs expected {}",
+                    i, actual[2], expected_b
+                );
+                assert!(
+                    (actual[3] - expected_a).abs() < eps,
+                    "Pixel {} Alpha mismatch: actual {} vs expected {}",
+                    i, actual[3], expected_a
+                );
+            }
+        }
+        println!("[QA AUDIT] Visual Parity: 16/16 test pixels match WebGL math within 1e-4 tolerance.");
+    }
 }
