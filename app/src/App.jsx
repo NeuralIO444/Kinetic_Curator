@@ -19,6 +19,7 @@ import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
+import { useCuratorIPC } from './hooks/useCuratorIPC.js';
 import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import { routeBeat } from './state/beatArbiter.js';
@@ -34,6 +35,8 @@ import { subscribeDispatch } from './composition/dispatchPipe.js';
 function AppInner() {
   const { dispatch: rawDispatch, history, palette, glLoopRef } = useApp();
   const piped = useMemo(() => wireEventBus(rawDispatch), [rawDispatch]);
+
+  useCuratorIPC();
 
   useEffect(() => subscribeDispatch((a) => {
     if (import.meta.env.DEV) console.debug('[pipe]', a.type);

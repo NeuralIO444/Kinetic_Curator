@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod metal;
+mod curator;
 
 use std::fs;
 use std::path::Path;
@@ -22,6 +23,7 @@ fn write_batch_frame(data: Vec<u8>, path: String) -> Result<usize, String> {
 fn main() {
     tauri::Builder::default()
         .manage(metal::MetalAppState(Mutex::new(None)))
+        .manage(curator::CuratorAppState(Mutex::new(curator::CoreMLCurator::new())))
         .invoke_handler(tauri::generate_handler![
             write_batch_frame,
             metal::metal_init,
@@ -29,6 +31,8 @@ fn main() {
             metal::metal_step_accum,
             metal::metal_get_stats,
             metal::metal_read_particles,
+            curator::curator_evaluate_frame,
+            curator::curator_get_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -329,5 +333,49 @@ mod tests {
             }
         }
         println!("[QA AUDIT] Visual Parity: 16/16 test pixels match WebGL math within 1e-4 tolerance.");
+    }
+
+    #[test]
+    fn test_core_ml_ane_zero_copy_eval() {
+        use crate::metal::state::MetalContext;
+        use crate::curator::{CoreMLCurator, ML_COMPUTE_UNITS_CPU_AND_NEURAL_ENGINE, CVPixelBufferRelease, CVPixelBufferGetWidth, CVPixelBufferGetHeight};
+
+        let width = 64u32;
+        let height = 64u32;
+        let ctx = MetalContext::new(width, height, 16)
+            .expect("MetalContext initialization for CoreML test");
+
+        let mut curator = CoreMLCurator::new();
+        assert_eq!(
+            curator.compute_units,
+            ML_COMPUTE_UNITS_CPU_AND_NEURAL_ENGINE,
+            "Core ML must target CPUAndNeuralEngine (3)"
+        );
+
+        // 1. Zero-copy CVPixelBuffer creation directly from Metal unified memory pointer
+        let accum_ptr = ctx.shared_accum_buffer.contents();
+        let pixel_buffer = curator
+            .wrap_metal_buffer_zero_copy(accum_ptr, width as usize, height as usize)
+            .expect("CVPixelBuffer zero-copy wrap failed");
+
+        assert!(!pixel_buffer.is_null());
+        unsafe {
+            assert_eq!(CVPixelBufferGetWidth(pixel_buffer), width as usize);
+            assert_eq!(CVPixelBufferGetHeight(pixel_buffer), height as usize);
+        }
+
+        // 2. Perform evaluation directly on unified memory frame data
+        let score = curator.evaluate_pixel_buffer(
+            accum_ptr as *const [f32; 4],
+            width as usize,
+            height as usize,
+        );
+
+        assert!(score >= 0.0 && score <= 1.0, "Score {} must be normalized [0, 1]", score);
+        assert_eq!(curator.total_evaluations, 1);
+
+        unsafe {
+            CVPixelBufferRelease(pixel_buffer);
+        }
     }
 }

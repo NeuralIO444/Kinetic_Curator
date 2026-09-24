@@ -50,6 +50,9 @@ export function PipelinePanel() {
     userPalettes: s.userPalettes,
     favorites: s.favorites,
     watchdogTripGen: s.watchdogTripGen,
+    curatorConfidence: s.curatorConfidence,
+    curatorActive: s.curatorActive,
+    curatorLatencyMs: s.curatorLatencyMs,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
@@ -145,6 +148,21 @@ export function PipelinePanel() {
       setMessage(`Metal Step: ${err?.message || err}`);
     } finally {
       setMetalBusy(false);
+    }
+  };
+
+  const [curatorBusy, setCuratorBusy] = useState(false);
+
+  const handleCuratorEval = async () => {
+    try {
+      setCuratorBusy(true);
+      const res = await invoke('curator_evaluate_frame');
+      setMessage(`ANE Curation: ${(res.score * 100).toFixed(1)}% (${res.latency_ms.toFixed(1)}ms on ${res.compute_units})`);
+    } catch (err) {
+      console.error('Curator ANE eval failed:', err);
+      setMessage(`ANE Eval: ${err?.message || err}`);
+    } finally {
+      setCuratorBusy(false);
     }
   };
 
@@ -288,6 +306,62 @@ export function PipelinePanel() {
               </button>
             )}
           </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: '8px',
+            marginBottom: '8px',
+            padding: '8px',
+            background: 'rgba(255, 170, 0, 0.04)',
+            border: '1px solid rgba(255, 170, 0, 0.25)',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono, monospace)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ color: '#ffaa00', fontWeight: 600 }}>ANE CURATION ENGINE (CORE ML)</span>
+            <span style={{ color: state.curatorActive ? '#00ff88' : '#888' }}>
+              {state.curatorActive ? '● ANE ACTIVE' : '○ IDLE'}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
+            <div>TARGET: <span style={{ color: '#fff' }}>.cpuAndNeuralEngine (16-Core ANE)</span></div>
+            <div>INGEST: <span style={{ color: '#00ff88' }}>Zero-Copy CVPixelBuffer (UMA)</span></div>
+            <div>
+              TASTE CONFIDENCE:{' '}
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: (state.curatorConfidence || 0) >= 0.85 ? '#00ff88' : (state.curatorConfidence || 0) >= 0.5 ? '#ffaa00' : '#aaa',
+                }}
+              >
+                {((state.curatorConfidence || 0) * 100).toFixed(1)}%
+              </span>
+              {state.curatorLatencyMs > 0 ? ` (${state.curatorLatencyMs.toFixed(1)}ms)` : ''}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{
+              width: '100%',
+              fontSize: '10px',
+              fontFamily: 'var(--font-mono, monospace)',
+              border: '1px solid #ffaa00',
+              background: 'rgba(255, 170, 0, 0.08)',
+              color: '#ffaa00',
+              padding: '5px 8px',
+              cursor: curatorBusy ? 'wait' : 'pointer',
+            }}
+            disabled={curatorBusy}
+            onClick={handleCuratorEval}
+          >
+            {curatorBusy ? 'EVALUATING ON ANE...' : '⚡ EVALUATE FRAME ON ANE'}
+          </button>
         </div>
 
         {/* ── OUT: batch, capture, gallery ── */}

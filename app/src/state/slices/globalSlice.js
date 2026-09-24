@@ -50,6 +50,11 @@ export const createGlobalSlice = (set) => ({
   quality: 'balanced',
   autoQuality: true,
   isFullscreen: false,
+  curatorConfidence: 0,
+  curatorActive: false,
+  curatorLatencyMs: 0,
+  setCuratorConfidence: (confidence, active = true, latencyMs = 0) =>
+    set({ curatorConfidence: confidence, curatorActive: active, curatorLatencyMs: latencyMs }),
   /**
    * Set by usePerformanceGovernor when FPS is sustained near zero (#107 §4).
    * Quality/count steps only shrink what gets drawn; at ~0 FPS the cost is
