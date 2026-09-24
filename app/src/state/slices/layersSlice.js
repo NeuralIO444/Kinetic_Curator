@@ -38,12 +38,16 @@ export function captureSnapshot(state) {
   };
 }
 
-export function displayLayerName(layer, contentOrdinal) {
+// Auto names (baked KC-n / FX n, 'Layer N', copies) carry no information the
+// position doesn't, and go stale when a delete shifts the stack.
+const AUTO_LAYER_NAME = /^(?:KC-\d+|FX \d+|Layer(?: \d+)?)$|\scopy$/;
+
+/** Positional label (KC-n / FX n) — the one naming source; a real rename shows as 'KC-n · name'. */
+export function displayLayerName(layer, ordinal) {
   if (!layer) return '';
-  if (isFxLayer(layer)) return layer.name;
-  const n = typeof layer.name === 'string' ? layer.name : '';
-  if (n.startsWith('Layer ') || n.endsWith(' copy')) return `KC-${contentOrdinal}`;
-  return n;
+  const base = isFxLayer(layer) ? `FX ${ordinal}` : `KC-${ordinal}`;
+  const n = typeof layer.name === 'string' ? layer.name.trim() : '';
+  return !n || AUTO_LAYER_NAME.test(n) ? base : `${base} · ${n}`;
 }
 
 const INITIAL_LAYER_ID = 'layer-1';
