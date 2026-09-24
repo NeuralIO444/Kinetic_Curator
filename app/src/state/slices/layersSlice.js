@@ -131,7 +131,9 @@ export const createLayersSlice = (set) => ({
   }),
 
   removeLayer: (id) => set((state) => {
-    if (state.layers.length <= 1) return {};
+    const target = state.layers.find((l) => l.id === id);
+    if (!target) return {};
+    if (!isFxLayer(target) && state.layers.filter((l) => !isFxLayer(l)).length <= 1) return {}; // last content track stays
     const layers = state.layers.filter((l) => l.id !== id);
     const snapshots = { ...state.layerSnapshots };
     delete snapshots[id];

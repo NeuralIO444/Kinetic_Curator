@@ -177,7 +177,7 @@ export function LayerStack() {
                   {label}{isActive && !fx ? ' · editing' : ''}{isFxSelected && fx ? ' · editing fx' : ''}
                 </button>
                 <button className="micro-btn" onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
-                <button className="micro-btn" disabled={layers.length <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
+                <button className="micro-btn" disabled={!isFxLayer(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
               </div>
               <div className="layer-row-composite">
                 {fx ? (
