@@ -19,7 +19,7 @@ async function boot(page) {
 test('print desk: still renders, BLUR chip applies, preview posts', async ({ page }) => {
   const errors = await boot(page);
 
-  const outputTab = page.getByRole('tab', { name: /output/i });
+  const outputTab = page.getByRole('tab', { name: /pipeline|output/i });
   await outputTab.click();
   await expect(page.locator('.panel-output')).toBeVisible();
 

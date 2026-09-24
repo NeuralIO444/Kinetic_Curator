@@ -88,9 +88,9 @@ export function PipelinePanel() {
   }, [watchdogTripGen]);
 
   return (
-    <div className="panel panel-pipeline">
+    <div className="panel panel-pipeline panel-output">
       <PanelHeader tag="P05" title="PIPELINE" subtitle={`${snapshots.length} snaps`} />
-      <div className="panel-body pipeline-body">
+      <div className="panel-body pipeline-body output-body">
         {/* ── IN: import, load, paste ── */}
         <div className="pipeline-section-label">IN</div>
         <RecipeRow onMessage={setMessage} />
