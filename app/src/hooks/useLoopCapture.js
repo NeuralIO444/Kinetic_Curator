@@ -109,11 +109,11 @@ function makeRecorder(stream) {
  */
 async function grabFrame(loop) {
   try {
-    return loop.captureFrame({ width: LOOP_CAPTURE_WIDTH, height: LOOP_CAPTURE_HEIGHT });
+    return await loop.captureFrame({ width: LOOP_CAPTURE_WIDTH, height: LOOP_CAPTURE_HEIGHT });
   } catch (e) {
     if (/baking/i.test(e && e.message ? e.message : '')) {
       await loop.waitForReady(15000);
-      return loop.captureFrame({ width: LOOP_CAPTURE_WIDTH, height: LOOP_CAPTURE_HEIGHT });
+      return await loop.captureFrame({ width: LOOP_CAPTURE_WIDTH, height: LOOP_CAPTURE_HEIGHT });
     }
     throw e;
   }

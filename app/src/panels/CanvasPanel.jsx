@@ -12,6 +12,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { on, emit, Events } from '../composition/eventBus.js';
 import { createLiveLoop } from '../gl/liveLoop.mjs';
+import { createWorkerLiveLoop } from '../gl/workerLiveLoop.js';
 import { getPreset } from '../data/presets.js';
 
 export function CanvasPanel() {
@@ -36,22 +37,69 @@ export function CanvasPanel() {
     viewRef.current.zoom = viewport.zoom;
     viewRef.current.pan = viewport.pan;
     viewRef.current.attractor = viewport.attractorRef;
+    if (glLoopRef.current?.isWorker) {
+      glLoopRef.current.updateView({
+        zoom: viewport.zoom,
+        pan: viewport.pan,
+        attractor: viewport.attractorRef?.current || null,
+      });
+    }
   });
+
+  // State sync to background worker when worker mode is active
+  useEffect(() => {
+    const loop = glLoopRef.current;
+    if (!loop?.isWorker) return;
+    const unsub = useStore.subscribe((state) => {
+      loop.updateState(state);
+    });
+    return unsub;
+  }, [glLoopRef]);
 
   const [glError, setGlError] = useState(null);
 
-  // Create the loop once; it reads the store directly (no per-frame React).
+  // Create the loop once; supports decoupled OffscreenCanvas worker (Issue #28)
+  // with graceful in-thread fallback.
   useEffect(() => {
     const canvas = glCanvasRef.current;
     const wrap = canvasRef.current;
     if (!canvas) return;
     let loop;
+    const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const queryWorker = queryParams?.get('worker') === '1' || (typeof localStorage !== 'undefined' && localStorage.getItem('kc:worker') === '1');
+    const queryDownscale = queryParams?.get('downscale') === '1';
+    const previewScale = (layoutParams.previewDownscale || queryDownscale) ? 0.5 : 1.0;
+    const allowWorker = !!(layoutParams.renderWorker || layoutParams.previewDownscale || queryWorker || queryDownscale);
+
     try {
-      loop = createLiveLoop(canvas, {
-        getState: useStore.getState,
-        viewRef,
-        wrapEl: wrap,
-      });
+      const canUseWorker = allowWorker
+        && typeof window !== 'undefined'
+        && typeof window.Worker !== 'undefined'
+        && typeof HTMLCanvasElement !== 'undefined'
+        && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function';
+
+      if (canUseWorker) {
+        try {
+          loop = createWorkerLiveLoop(canvas, {
+            getState: useStore.getState,
+            viewRef,
+            previewScale,
+          });
+        } catch (workerErr) {
+          console.warn('[canvas] Offscreen worker init failed, using in-thread loop:', workerErr);
+          loop = createLiveLoop(canvas, {
+            getState: useStore.getState,
+            viewRef,
+            wrapEl: wrap,
+          });
+        }
+      } else {
+        loop = createLiveLoop(canvas, {
+          getState: useStore.getState,
+          viewRef,
+          wrapEl: wrap,
+        });
+      }
     } catch (e) {
       // One-shot init failure (e.g. no WebGL2) — show the message once.
       // eslint-disable-next-line react-hooks/set-state-in-effect
