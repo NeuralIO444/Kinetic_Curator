@@ -8,30 +8,33 @@ Live: [neuralio444.github.io/Kinetic_Curator](https://neuralio444.github.io/Kine
 
 *A terrarium, not a DAW.* You curate plates, palettes, and voices. The seed and the wind do the rest.
 
-**Release on `main` (2026-09-19):** shipped as **[0.9.0](CHANGELOG.md)** kernel + the unreleased GPU instrument (live loop #224). The body is not finished. See [Now](#now-on-main).
+**Release on `main` (2026-09-23):** **[0.9.0](CHANGELOG.md)** kernel + the live GPU instrument. Engine spines A–G merged, governor R1–R4 landed, Night Migration 30/60 sign-off recorded ([docs/EMBARGO.md](docs/EMBARGO.md) — Stage 1 unfrozen). Roadmap: [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md). See [Now](#now-on-main).
 
 ## Now on main
 
-The picture already has mass (organic plates, ACCUM, flagship voices). The flock is still frame-coupled. That is the gap.
+The picture has mass and the flock keeps its own clock (dt loop, heading spring, shared wind). What plays is what renders, at one readout.
 
 **Connected and live**
 
-- One WebGL2 loop for canvas and stills (`app/src/gl/liveLoop.mjs`). SVG emitter is a dev-only parity reference.
-- Kernel v1 — index-stable placements, channel RNG, sampler registry, K3–K5.
-- PATCH on the track: OFF / MOD / FIELD / FEED (#382 / #373 / #370).
-- Voice + preset MIX stepper (~6 color/count stops/sec) — does not rebake every frame (#381 / #379).
-- Flagship voices, 4 content-track cap, H/M/L asset locker, FADE on the palette bar.
-- ACCUM trails, GPU FX (9; 4 in the add menu), showrunner shed ladder.
-- Behave profiles + bio-drives on one integrator. Audio ballistics module exists; not yet on the visible life path.
+- One WebGL2 loop for canvas and stills (`app/src/gl/liveLoop.mjs`); SVG emitter is a dev-only parity reference.
+- Kernel v1 — index-stable placements, channel RNG, sampler registry, K3–K5. SoA swarm with reference-parity goldens.
+- Engine spines A–G: dt clock, atlas-cell skip, heading spring + ballistics + life, live mask tint, mode-chip dissolve + slider springs, shared noise + curl wind, bufferSubData.
+- PATCH on the track: OFF / MOD / FIELD / FEED with per-mode strength sliders, stable-id targets, and an inline live readout under each patched row (#506 / #507).
+- Math matrix, phases 1–2: MOD steering (source motion retunes target weights) and one shared scent field across layers (#509).
+- Voice + preset MIX (stepped color, smooth palette, no rebake) with morph-ease arrival; flagship voices + curated road (motion factors #515–#519 filed).
+- Flagship voices, 4 content-track cap, track patch round-trip + cap on load, H/M/L asset locker, FADE on the palette bar.
+- ACCUM trails, GPU FX (chain compiler + template effects + cost tiers + measured costs), showrunner shed ladder behind one tape readout (budget knob, named stages, FX-stack weight).
+- Behave profiles + bio-drives (drives, scent, mold, graze, leak, swell) on one integrator. Audio ballistics shape mic input and the GL loop.
+- DAVIS panel (GHOST STATION): Evolve, morph, phrase clock, LFO life, sub-seed streams, BEHAVE readout.
 
 **Not done (do not advertise as shipped)**
 
-- Spine **A** dt clock — [#387](https://github.com/NeuralIO444/Kinetic_Curator/issues/387). Flock speed still follows FPS.
-- **B** skip-missing atlas cell. Palette slams can stall a frame.
-- **C** heading spring + ballistics + life. `motionSmoothing` is unread; heading still snaps ~10°/tick.
-- Quantized MIX wipe, shared clock, Studio/Perform split — specified, not built.
+- Evolve seed-jitter glide, editable BEHAVE weights (#471 / #479).
+- EF rack: fixed finishing chain per FX layer (EF-4 grain-exclusive), post-accum seam, new kinds (#520).
+- Shareable recipe URLs, MIDI/OSC build, mobile pass, live-output path (roadmap Stages 2–3).
+- Matt-only: icons (#346), M3 calibration (#298), iPhone pass (#270).
 
-**Embargo:** no new features until C is felt. Plan only: [docs/EMBARGO.md](docs/EMBARGO.md). Agents: [AGENTS.md](AGENTS.md) + [docs/ENGINE_PLAN.md](docs/ENGINE_PLAN.md).
+**Embargo:** lifted 2026-09-23 (Night Migration sign-off). Stage 1 unfrozen; deferred pile still waits. Plan: [docs/EMBARGO.md](docs/EMBARGO.md). Agents: [AGENTS.md](AGENTS.md) + [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md).
 
 ## Philosophy
 
@@ -53,15 +56,15 @@ Not a blank canvas. You assign palettes and instruct placement DNA. *We are not 
 - **Live instrument** — Fibonacci, Grid, CA, Orbit, Flow, Swarm, Stratified, … same GPU as exports.
 - **Stills** — GPU readback 1×–8K PNG + JSON sidecar.
 - **Parity** — `npm run selfcheck`; under 10% pixel vs the SVG reference is a pass.
-- **FX** — rgbSplit, displace, tear, grain, scanlines, posterize, invert, solarize, edge. No gaussian blur.
+- **FX** — rgbSplit, displace, tear, grain, scanlines, posterize, invert, solarize, edge (+ template effects, no runner change per effect). Chain compiler + cost tiers + measured costs.
 - **ACCUM** — phosphor trails, bloom / halation / stipple. FREEZE / CLEAR. Silence is a no-op.
-- **Governor** — shed resolution, then quality, assets, count, motion. Always reported.
-- **Tracks** — KC-1…KC-4 + FX slots; active layer drives LAYOUT / ASSETS / DAVIS.
-- **Audio** — mic or file → scale, opacity, evolve-on-beat (full shove is spine C).
-- **Davis** — Evolve, morph, phrase clock, LFO life.
+- **Governor** — one tape readout (budget knob, named shed stages, FX-stack weight). The ladder sheds pixels before visible things, FX never culled.
+- **Tracks** — KC-1…KC-4 + FX slots (tap-to-arm ghosts); patch links with live readouts; stable-id targets.
+- **Audio** — mic or file → scale, opacity, evolve-on-beat, ballistics-shaped envelopes.
+- **Davis** — Evolve, morph, phrase clock, LFO life, BEHAVE readout.
 - **Hits** — 1–9 recall, Enter advances.
 - **Colour** — slot edit / locks, library, harmony + shuffle, FADE.
-- **Organisms** — moth / petal bodies, flap, materials, named behave profiles.
+- **Organisms** — moth / petal bodies, flap, breath, named behave profiles, bio-drives (hunger, scent, mold, graze, leak).
 - **Assets** — drop SVG, tags, H/M/L, DUP. Lab / species editor is deferred.
 - **Studio farm** — `studio/studio.py` stills, ACCUM, batch, ffmpeg video, gated Curator CLIP.
 
