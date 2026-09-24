@@ -59,6 +59,12 @@ function swatches8(colors) {
  * length — Night Migration blends long, Chrome Parade cuts on the beat,
  * Deep Water dissolves over ten seconds.
  */
+// #516 motion factors — each flagship's chip idea as numbers on EXISTING params
+// (all lerped by MIX, no mixer change): drift = lifeDrift, flow = noiseSpeed,
+// windPush = wind, flockEnergy = swarmCohesion + damping + gravityWells,
+// breathSwell = breath + metabolism, audioAnswer = audioModDepth/ScaleMod/AlphaMod,
+// behaveCut = behave (an enum: cuts at t>0 by the spine-E rule). Values are
+// taste-adjustable on play.
 export const FLAGSHIP_VOICES = [
   {
     id: 'swarm',
@@ -99,6 +105,8 @@ export const FLAGSHIP_VOICES = [
       swarmCohesion: 0.6, // slider max — past this the flock is one blob (#272)
       gravityWells: 2.5,
       damping: 0.95,
+      breath: 0.3, // #516 SWARM breathes as one body
+      metabolism: 0.5,
       body: 3,
       flap: 0.35,
       tight: 0.55,
@@ -162,6 +170,8 @@ export const FLAGSHIP_VOICES = [
       swarmCohesion: 0.3,
       gravityWells: 0.5,
       damping: 0.97,
+      breath: 0.4, // #516 HYPE wings swell with the flap
+      metabolism: 0.8,
       body: 6,
       flap: 0.85,
       tight: 0.7,
@@ -225,6 +235,8 @@ export const FLAGSHIP_VOICES = [
       swarmCohesion: 0.5,
       gravityWells: 0.8,
       damping: 0.99,
+      breath: 0.5, // #516 MURM: slow, deep swell
+      metabolism: 0.3,
       body: 3,
       flap: 0.3,
       tight: 0.5,

@@ -112,4 +112,16 @@ assert.deepStrictEqual(sanitizeFx({ grain: 9, glow: -2, vignette: 1, contrast: 9
   { grain: 1, vignette: true, posterize: false, edge: false, glow: 0, contrast: 3 });
 assert.deepStrictEqual(sanitizeFx(null), sanitizeFx({}));
 
+// #516: every flagship carries a motion factor expressing its chip idea. breath /
+// metabolism were 0 on all three (bio-drives off); the numbers are taste-tuned on
+// play, so this pins that they are ON and ordered, not their exact values.
+{
+  const p = (id) => resolveVoiceState(FLAGSHIP_VOICES.find((v) => v.id === id)).params;
+  for (const id of FLAGSHIP_VOICE_IDS) {
+    assert.ok(p(id).breath > 0 && p(id).metabolism > 0, `${id} carries breath + metabolism`);
+  }
+  assert.ok(p('hype').metabolism > p('swarm').metabolism && p('swarm').metabolism > p('murmuration').metabolism, 'metabolism: HYPE > SWARM > MURM');
+  assert.ok(p('murmuration').breath > p('hype').breath && p('hype').breath > p('swarm').breath, 'breath: MURM > HYPE > SWARM');
+}
+
 console.log('voices.selfcheck: OK');
