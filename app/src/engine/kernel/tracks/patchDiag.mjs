@@ -46,6 +46,31 @@ export function isSourceStill(speed, agitation) {
 const finite = (v, fallback = 0) => (Number.isFinite(Number(v)) ? Number(v) : fallback);
 
 /**
+ * Active patch pairs for the matrix overview (#509 phase 3): every content
+ * layer with a live-pointing patch (mode on, target set, target not self).
+ * Pure render of store state — liveness itself stays in the row lines (#507).
+ */
+export function activePatchPairs(layers) {
+  const out = [];
+  for (const l of layers || []) {
+    if (!l || l.type === 'fx') continue;
+    const p = l.patch;
+    if (!p || p.mode === 'off' || !p.to || p.to === l.id) continue;
+    out.push({ srcId: p.to, dstId: l.id, mode: p.mode, strength: finite(p.strength, 0.16) });
+  }
+  return out;
+}
+
+/**
+ * One matrix row: `KC-2 → KC-1 · MOD · 0.50`. Ordinals passed in (never the
+ * store); unknown ids read '?', never throw.
+ */
+export function formatMatrixRow({ srcId, dstId, mode, strength }, ordinals) {
+  const get = (id) => (ordinals && ordinals.get(id)) ?? '?';
+  return `KC-${get(srcId)} → KC-${get(dstId)} · ${String(mode).toUpperCase()} · ${finite(strength).toFixed(2)}`;
+}
+
+/**
  * One-line readout. Strength always 2dp; names are KC-n ordinals passed in
  * (this module never touches the store). Returns null when there is no
  * sample — the panel renders nothing, never "undefined".

@@ -10,7 +10,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
-import { on, Events } from '../composition/eventBus.js';
+import { on, emit, Events } from '../composition/eventBus.js';
 import { createLiveLoop } from '../gl/liveLoop.mjs';
 import { getPreset } from '../data/presets.js';
 
@@ -97,7 +97,9 @@ export function CanvasPanel() {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* #310: BG cycle moved to OUTPUT. CLEAR ACCUM removed — GHOST
               STATION's gesture row is canonical. */}
+          {/* BG cycle lives beside RESET VIEW (canvas belongs with canvas). */}
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
+          <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
           <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>
           {accumEffective && <span className="meter-pill" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>ACCUM</span>}
           {accumOn && !accumEffective && <span className="meter-pill" title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery." style={{ color: '#ffb454' }}>ACCUM HELD</span>}

@@ -262,7 +262,10 @@
 .fx-param input[type=range] { flex: 1; }
 .fx-param-readout { font-size: 9px; color: var(--dim); width: 40px; text-align: right; }
 /* #507 — inline PATCH diagnostic line under each patched layer row. */
+/* #507 — inline PATCH diagnostic line under each patched layer row. */
 .patch-diag { font-size: 9px; color: var(--dim); padding: 1px 0 0 2px; white-space: nowrap; }
+/* #509 phase 3 — matrix overview block (config render, same readout style). */
+.patch-matrix { padding: 2px 0 2px 2px; }
 .fx-add-row { display: flex; gap: 4px; align-items: center; }
 .fx-add-row select { flex: 1; }
 

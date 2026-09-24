@@ -7,6 +7,8 @@ import {
   patchSampleAgeMs,
   isSourceStill,
   formatPatchLine,
+  activePatchPairs,
+  formatMatrixRow,
   SOURCE_STILL_SPEED,
   SOURCE_STILL_AGITATION,
   PATCH_DIAG_STALE_MS,
@@ -63,4 +65,26 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
   });
   assert.ok(!/NaN|Infinity/.test(adv), `adversarial input never prints NaN/Infinity (got ${adv})`);
   console.log('[selfcheck] patchDiag record semantics + finiteness');
+}
+
+// #509 phase 3 — matrix pairs + rows (config render, pure).
+{
+  const layers = [
+    { id: 'a', type: 'content', patch: { mode: 'mod', to: 'b', strength: 0.5 } },
+    { id: 'b', type: 'content', patch: { mode: 'off', to: null, strength: 0.16 } },
+    { id: 'f', type: 'fx', patch: { mode: 'feed', to: 'a', strength: 1 } },
+    { id: 'c', type: 'content', patch: { mode: 'feed', to: null, strength: 0.3 } },
+    { id: 'd', type: 'content', patch: { mode: 'field', to: 'd', strength: 0.3 } },
+  ];
+  const pairs = activePatchPairs(layers);
+  assert.deepStrictEqual(pairs, [{ srcId: 'b', dstId: 'a', mode: 'mod', strength: 0.5 }],
+    'only live-pointing content patches pair (fx skipped, off/null-to/self skipped)');
+  assert.deepStrictEqual(activePatchPairs(null), [], 'null layers pair nothing');
+  const ord = new Map([['a', 1], ['b', 2]]);
+  assert.strictEqual(
+    formatMatrixRow(pairs[0], ord), 'KC-2 → KC-1 · MOD · 0.50', 'matrix row format');
+  assert.strictEqual(
+    formatMatrixRow({ srcId: 'x', dstId: 'a', mode: 'feed', strength: 0 }, new Map()),
+    'KC-? → KC-? · FEED · 0.00', 'unknown ordinals read ?');
+  console.log('[selfcheck] patchDiag matrix pairs + rows');
 }
