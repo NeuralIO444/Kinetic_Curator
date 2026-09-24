@@ -11,7 +11,23 @@ import { BLEND_MODES } from '../../data/layout-modes.js';
 import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../../fx/fxFilters.js';
 import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
-import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS } from '../../engine/kernel/tracks/patchDiag.mjs';
+import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
+
+// #509 phase 3 — matrix overview: every live cross-layer link in one
+// glance. Config render of store state (re-renders with layers naturally);
+// liveness stays in the row lines (#507). No new panel, no new state.
+function PatchMatrix({ layers, ordinals }) {
+  const pairs = activePatchPairs(layers);
+  if (!pairs.length) return null;
+  return (
+    <div className="patch-matrix" title="Patch matrix — every live cross-layer link. Edit in the rows below.">
+      <span className="fx-param-readout" style={{ width: 'auto' }}>MATRIX</span>
+      {pairs.map((p) => (
+        <div key={p.dstId} className="patch-diag">{formatMatrixRow(p, ordinals)}</div>
+      ))}
+    </div>
+  );
+}
 
 // #507 — inline PATCH diagnostic: one live line under each patched row
 // (TapeCounter 1Hz-poll shape). Module buffer, never the store.
@@ -123,9 +139,10 @@ export function LayerStack() {
   return (
     <div className="build-layer-stack">
       <PanelHeader tag="P08" title="LAYERS" subtitle={`${contentCount} / ${MAX_CONTENT_TRACKS} tracks`}>
-        <button className="chip-btn" disabled={contentCount >= MAX_CONTENT_TRACKS} onClick={() => emit(Events.LAYER_ADD)}>+ ADD LAYER</button>
-        <button className="chip-btn" disabled={fxCount >= MAX_FX_TRACKS} onClick={() => emit(Events.LAYER_ADD_FX)}>+ ADD FX</button>
+        {/* Gate: header ADD buttons retired — ghost slots below are premade
+            and limited (tap-to-arm); the buttons duplicated them. */}
       </PanelHeader>
+      <PatchMatrix layers={layers} ordinals={ordinals} />
       <div className="layer-list">
         {fxGhosts.slice().reverse().map((n) => (
           <div key={`ghost-fx-${n}`} className="layer-row" style={{ opacity: 0.35 }} onClick={() => emit(Events.LAYER_ADD_FX)}>

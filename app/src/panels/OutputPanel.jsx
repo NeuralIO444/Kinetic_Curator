@@ -49,13 +49,12 @@ export function OutputPanel() {
     userPalettes: s.userPalettes,
     favorites: s.favorites,
     watchdogTripGen: s.watchdogTripGen,
-    canvasBg: s.canvasBg,
   }));
   const {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
     quality, paletteId, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
-    userPalettes, favorites, rendering, watchdogTripGen, canvasBg,
+    userPalettes, favorites, rendering, watchdogTripGen,
   } = state;
   const setRendering = (v) => emit(Events.EXPORT_RENDERING, v);
 
@@ -91,8 +90,7 @@ export function OutputPanel() {
   return (
     <div className="panel panel-output">
       <PanelHeader tag="P05" title="OUTPUT" subtitle={`${snapshots.length} snaps`}>
-        {/* #310: canvas background cycle lives here now (was CANVAS header) */}
-        <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
+        {/* BG cycle moved beside RESET VIEW in CANVAS (canvas belongs with canvas). */}
       </PanelHeader>
       <div className="panel-body output-body">
         {/* Gate 2026-09-23: QualityRow (null since #310) unmounted — BudgetKnob is the control. */}
