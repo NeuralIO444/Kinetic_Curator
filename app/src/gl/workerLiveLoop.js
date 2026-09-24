@@ -41,6 +41,7 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
   const initialView = viewRef ? viewRef.current : { zoom: 1, pan: { x: 0, y: 0 } };
 
   const offscreen = canvas.transferControlToOffscreen();
+  canvas._kcTransferred = true;
   const worker = new Worker(new URL('./renderWorker.js', import.meta.url), { type: 'module' });
 
   let disposed = false;
@@ -237,6 +238,7 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
     getCanvas: () => canvas,
     isBuilding: () => isBuilding,
     isRunning: () => running,
+    isDisposed: () => disposed,
     isWorker: true,
   };
 }

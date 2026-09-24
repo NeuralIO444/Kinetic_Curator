@@ -59,11 +59,22 @@ export function CanvasPanel() {
   const [glError, setGlError] = useState(null);
 
   // Create the loop once; supports decoupled OffscreenCanvas worker (Issue #28)
-  // with graceful in-thread fallback.
+  // with graceful in-thread fallback and StrictMode double-mount resiliency.
   useEffect(() => {
     const canvas = glCanvasRef.current;
     const wrap = canvasRef.current;
     if (!canvas) return;
+
+    // If an existing worker loop is already active on this exact canvas
+    // (e.g. React StrictMode immediate remount in dev), cancel pending cleanup and keep running.
+    if (glLoopRef.current && glLoopRef.current.isWorker && glLoopRef.current.getCanvas() === canvas && !glLoopRef.current.isDisposed()) {
+      if (glLoopRef.current._cleanupTimer) {
+        clearTimeout(glLoopRef.current._cleanupTimer);
+        glLoopRef.current._cleanupTimer = null;
+      }
+      return;
+    }
+
     let loop;
     const queryParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const queryWorker = queryParams?.get('worker') === '1' || (typeof localStorage !== 'undefined' && localStorage.getItem('kc:worker') === '1');
@@ -76,7 +87,8 @@ export function CanvasPanel() {
         && typeof window !== 'undefined'
         && typeof window.Worker !== 'undefined'
         && typeof HTMLCanvasElement !== 'undefined'
-        && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function';
+        && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function'
+        && !canvas._kcTransferred;
 
       if (canUseWorker) {
         try {
@@ -109,9 +121,20 @@ export function CanvasPanel() {
     loop.setBgMode(canvasBg);
     glLoopRef.current = loop;
     loop.start();
+
     return () => {
-      loop.dispose();
-      if (glLoopRef.current === loop) glLoopRef.current = null;
+      if (loop.isWorker) {
+        // In React 18/19 StrictMode, unmount/remount happens synchronously in dev.
+        // Delay actual worker termination by 200ms so a StrictMode remount reuses the
+        // transferred OffscreenCanvas without triggering 'Cannot transfer control from a canvas for more than one time'.
+        loop._cleanupTimer = setTimeout(() => {
+          loop.dispose();
+          if (glLoopRef.current === loop) glLoopRef.current = null;
+        }, 200);
+      } else {
+        loop.dispose();
+        if (glLoopRef.current === loop) glLoopRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
