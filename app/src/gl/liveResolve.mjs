@@ -15,6 +15,7 @@ import { applyField, applyMod, motionMetrics, MAX_TRACKS } from '../engine/kerne
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
+import { createScentField } from '../engine/kernel/field/scent.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
 
@@ -82,6 +83,11 @@ export function createLiveResolver() {
   // (16ms lag, same order as FEED's delay-1). Module state, never the
   // store — steering is render-only overlay, not document state.
   const modSteerByLayer = new Map(); // layerId -> { ali, coh, sep }
+  // #509 phase 2 — ONE scent field for every organism layer (stigmergy
+  // across layers: mold on KC-1 smells KC-2's deposits). Stepped once per
+  // tick after all layers update — never per-layer (N× decay + order
+  // dependence). Persists across ticks; decay empties it, no prune needed.
+  const sharedScent = createScentField();
   // #432 — per-layer displacement warp phase, accumulated incrementally
   // (integral of noiseSpeed over each frame's dt) rather than derived as
   // speed × absolute session time. See the warp block below for why.
@@ -196,6 +202,9 @@ export function createLiveResolver() {
           // #509 phase 1 — last tick's MOD steering for this layer (undefined
           // = identity; particles.js defaults). Spread-only, never stored.
           modSteer: modSteerByLayer.get(layerId),
+          // #509 phase 2 — the shared scent field (spread-only, never
+          // stored). All organism layers deposit into and read one ground.
+          scentField: sharedScent,
         },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
@@ -525,6 +534,11 @@ export function createLiveResolver() {
     });
     content.forEach((e) => feedLive.pushSource(slotFor(e.id), (e.items || []).map(toNorm)));
     feedLive.commit();
+    // #509 phase 2 — step the shared scent ONCE per tick, after every
+    // layer's deposits landed. Skipped under slowRender (no updates ran, so
+    // no deposits — stepping would decay a frozen field, same honesty as
+    // the paused-tick rollback).
+    if (!input.slowRender) sharedScent.step();
 
     // Item-level morph: replaces the pixel crossfade for chip clicks (mode,
     // behave, palette, asset-set). Runs after FIELD/FEED/MOD so those patch

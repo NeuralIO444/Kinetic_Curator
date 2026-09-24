@@ -29,6 +29,7 @@
 import assert from 'node:assert';
 import { ParticleSystem } from './particles.js';
 import { ReferenceParticleSystem } from './particles.reference.mjs';
+import { createScentField } from './kernel/field/scent.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 
 const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
@@ -171,6 +172,33 @@ for (const [name, args] of CASES) {
   assert.ok(bent.some((it, i) => !Object.is(it.x, base[i].x) || !Object.is(it.y, base[i].y)),
     'active steering must move particles off the unsteered path');
   for (const it of bent) assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'steered positions stay finite');
+}
+
+// #509 phase 2 — shared scent: two mold casts on one field smell each
+// other. A deposits (profile.deposit), B's chemotaxis reads it — B's path
+// must diverge from an isolated B on identical seeds. The field rides the
+// update spread (post-normalize, like the live resolver sends it).
+{
+  const runMold = (field, steps = 15) => {
+    const sys = new ParticleSystem();
+    const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', particleCount: 24 });
+    if (field) lp.scentField = field;
+    sys.init(24, 1000, 700, assets, palette, 0x1a4f);
+    for (let s = 0; s < steps; s++) {
+      sys.update(lp, assets, palette, 0x1a4f, 1_000_000 + s * 16, null);
+      if (field) field.step();
+    }
+    return sys.getItems(assets);
+  };
+  const shared = createScentField();
+  const aItems = runMold(shared);
+  assert.ok(aItems.length > 0, 'shared-field run yields items');
+  const bShared = runMold(shared);
+  const bIso = runMold(null);
+  assert.strictEqual(bShared.length, bIso.length, 'shared vs isolated keep count');
+  assert.ok(bShared.some((it, i) => !Object.is(it.x, bIso[i].x) || !Object.is(it.y, bIso[i].y)),
+    'a cast on shared ground must diverge from the identical isolated cast');
+  for (const it of bShared) assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'shared-ground positions stay finite');
 }
 
 // #454 — a non-finite attractor (a zero-size canvas rect divides to

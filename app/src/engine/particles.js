@@ -697,7 +697,14 @@ export class ParticleSystem {
     // #287 — the scent field exists only for organism casts (drives,
     // chemotaxis, and feeding all read it). Created lazily so cloud-mode
     // sessions never pay for it; persists across init() calls.
-    if (organism && !this._scent) this._scent = createScentField();
+    // #509 phase 2 — the resolver may pass one SHARED field
+    // (layoutParams.scentField, spread-only like modSteer, never stored):
+    // every organism layer then deposits into and reads the same ground,
+    // which is the whole point (stigmergy across layers). The shared field
+    // is stepped once per tick by the resolver — never here — so per-layer
+    // updates must not step it (N layers would decay N× and order-depend).
+    const sharedScent = layoutParams.scentField || null;
+    if (!sharedScent && organism && !this._scent) this._scent = createScentField();
     const meta = Math.min(2, Math.max(0, metabolism));
     const drivesOn = organism && meta > 0;
     // Chemotaxis is a mold-only sense: the profile opts in with a
@@ -757,7 +764,7 @@ export class ParticleSystem {
     // #287 — drive columns (hoisted; the force loop reads them per agent).
     const ENERGY = this.energy; const DRIVE = this.drive;
     const LEAKRGB = this.leakRgb;
-    const SCENT = this._scent;
+    const SCENT = sharedScent || this._scent;
     const seedU = seed >>> 0;
 
     for (let i = 0; i < numParticles; i++) {
@@ -1093,17 +1100,25 @@ export class ParticleSystem {
     // sustain themselves through scent feeding); other profiles deposit 0
     // but the field still decays. Coordinates are normalized; the field
     // clamps at the edges.
-    if (organism && this._scent) {
+    // deposit amount is profile-driven: mold colonies lay trails (and so
+    // sustain themselves through scent feeding); other profiles deposit 0
+    // but the field still decays. Coordinates are normalized; the field
+    // clamps at the edges. Shared or own — deposits land in the field the
+    // reads above sampled (SCENT), so cross-layer trails actually meet.
+    const depositField = sharedScent || this._scent;
+    if (organism && depositField) {
       const dep = profile.deposit || 0;
       if (dep > 0) {
         const cw = this.canvasW;
         const chh = this.canvasH;
         for (let i = 0; i < numParticles; i++) {
           if (!ALIVE[i]) continue;
-          this._scent.deposit(X[i] / cw, Y[i] / chh, dep);
+          depositField.deposit(X[i] / cw, Y[i] / chh, dep);
         }
       }
-      this._scent.step();
+      // #509 phase 2 — shared fields step once per tick at the resolver
+      // (all deposits landed); own fields step here as before.
+      if (!sharedScent) depositField.step();
     }
 
     // #287 LEAK — pigment write-back cadence. The drift accumulates in
