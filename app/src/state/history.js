@@ -76,6 +76,7 @@ function entrySignature(entry) {
     entry.lockedParams,
     entry.caGrid,
     entry.enabledAssets,
+    entry.seedOffsets,
     entry.layers,
     entry.activeLayerId,
     entry.layerSnapshots,
