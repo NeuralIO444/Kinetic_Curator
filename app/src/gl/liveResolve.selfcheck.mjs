@@ -260,6 +260,39 @@ test('#509: MOD steering record/apply loop runs without breaking the pipeline', 
   }
 });
 
+// #509 phase 2 — shared scent plumbing: two mold layers resolve twice on
+// one resolver without breaking the pipeline. Cross-talk itself is pinned
+// in particles.selfcheck (shared vs isolated divergence); here the proof
+// is pipeline integrity under the shared field + once-per-tick step.
+test('#509: shared scent field carries across ticks without breaking the pipeline', () => {
+  const moldLayers = () => [
+    { id: 'lyr-m1', name: 'M1', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    { id: 'lyr-m2', name: 'M2', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+  ];
+  const moldSnap = (seed) => ({
+    seed, paletteId: 'bone', paletteOverrides: null,
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', count: 12, particleCount: 12 },
+    caGrid: null, enabledAssets: null,
+  });
+  const mk = () => baseInput({
+    layers: moldLayers(),
+    activeLayerId: 'lyr-m1',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', count: 12, particleCount: 12 },
+    layerSnapshots: { 'lyr-m1': moldSnap(101), 'lyr-m2': moldSnap(202) },
+  });
+  const r = createLiveResolver();
+  const t1 = r.resolveLayers(mk());
+  const t2 = r.resolveLayers(mk());
+  for (const id of ['lyr-m1', 'lyr-m2']) {
+    const a = t1.find((l) => l.id === id);
+    const b = t2.find((l) => l.id === id);
+    assert.strictEqual(b.items.length, a.items.length, `${id}: shared field never adds/removes items`);
+    for (const it of b.items) {
+      assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), `${id}: tick-2 items stay finite`);
+    }
+  }
+});
+
 // ── #425: focus swaps are a total non-event ────────────────────────────────
 // Two layers with deliberately different bases, depths and locks. setActiveLayer
 // guarantees snapshot == top-level for BOTH layers at the swap boundary, so if
