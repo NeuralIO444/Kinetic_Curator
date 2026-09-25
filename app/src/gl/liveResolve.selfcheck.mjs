@@ -460,6 +460,141 @@ test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   r.dispose();
 });
 
+// ── #564: the Assets tab is a transition trigger too ───────────────────────
+// Toggling an asset off already moved morphSig (the enabled-id set changed).
+// SWAP (same id, new SVG) and a weight edit did not — so they snapped, and
+// the atlas rebaked under a fully visible canvas (#561). morphSig now carries
+// the pool's CONTENT, so both route through the director's scale swap.
+
+const userAsset = (svg) => ({
+  id: 'user:motif', category: 'fragments', weight: 'medium',
+  tags: ['overlay'], compound: false, source: 'overlay', svg,
+});
+
+/** Mid-transition, has any node dipped below the size it rests at? */
+function dipped(mid, raw) {
+  return mid.some((it, i) => raw[i] && (Number(it.scale) || 0) < (Number(raw[i].scale) || 0) * 0.9);
+}
+
+test('#564: swapping an overlay asset SVG under the same id fires the director', () => {
+  const r = createLiveResolver();
+  // Same array identity per call for a given svg, as the store hands it over.
+  const poolV1 = [userAsset('<path d="M0 0 L10 10"/>')];
+  const poolV2 = [userAsset('<circle cx="5" cy="5" r="4"/>')];
+  const mk = (customAssets, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    customAssets, mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  lyr(r.resolveLayers(mk(poolV1, 0)));                  // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk(poolV2, 1000))); // the SWAP
+  const mid = lyr(r.resolveLayers(mk(poolV2, 1250)));
+  const done = lyr(r.resolveLayers(mk(poolV2, 1600)));
+  const raw = lyr(createLiveResolver().resolveLayers(mk(poolV2, 1600)));
+
+  assert.ok(dipped(mid, raw), 'the swap shrinks nodes through it — it no longer snaps');
+  assert.ok(start.every((it) => Number.isFinite(it.x) && Number.isFinite(it.scale)),
+    'the transition produces finite items from its first frame');
+  assert.deepEqual(done, raw, 'and lands on the raw resolved items');
+  r.dispose();
+});
+
+test('#564: an asset weight edit fires the director', () => {
+  const r = createLiveResolver();
+  const mk = (assetWeightOverrides, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    assetWeightOverrides, mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  // ASSETS[0] ships 'heavy', so 'light' is a real edit, not a no-op write.
+  lyr(r.resolveLayers(mk({}, 0)));
+  lyr(r.resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1000)));
+  const mid = lyr(r.resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1250)));
+  const done = lyr(r.resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1600)));
+  const raw = lyr(createLiveResolver().resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1600)));
+
+  assert.ok(dipped(mid, raw), 'a weight edit re-rolls which asset each slot draws — it must not snap');
+  assert.deepEqual(done, raw, 'and it lands raw');
+  r.dispose();
+});
+
+test('#564: a governor asset shed is NOT a transition — different class', () => {
+  // assetThin drops the most expensive assets under load. The sig is taken
+  // BEFORE the thin on purpose: a shed must not spend a MIX-long swap wave
+  // on top of the load that caused it.
+  const r = createLiveResolver();
+  const mk = (assetThin, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    assetThin, mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  lyr(r.resolveLayers(mk(false, 0)));
+  const shed = lyr(r.resolveLayers(mk(true, 1000)));
+  const rawShed = lyr(createLiveResolver().resolveLayers(mk(true, 1000)));
+  assert.deepEqual(shed, rawShed, 'the shed presents its raw items immediately, no transition');
+  r.dispose();
+});
+
+// ── #564: the mirror / symmetry axis ────────────────────────────────────────
+// mirror (bool) and symmetry:'stamp' double the item list. The loop's slider
+// springs pass non-numeric params through raw, so a press popped half the nodes
+// in or out at full size. Both now ride morphSig and glide through the swap.
+// Only the live swarm path reads symmetry:'stamp' (static modes double on
+// mirror alone), so that test runs on a swarm mode.
+
+/** Baseline at t=0, change params at t=1000; return the mid, landed and raw frames. */
+function mirrorRun(from, to, mode = 'scatter') {
+  const r = createLiveResolver();
+  const mk = (lp, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0, ...lp },
+    mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  lyr(r.resolveLayers(mk(from, 0)));
+  lyr(r.resolveLayers(mk(to, 1000)));
+  const mid = lyr(r.resolveLayers(mk(to, 1250)));
+  const done = lyr(r.resolveLayers(mk(to, 1600)));
+  const raw = lyr(createLiveResolver().resolveLayers(mk(to, 1600)));
+  r.dispose();
+  return { mid, done, raw };
+}
+
+test('#564: toggling mirror fires the director', () => {
+  const { mid, done, raw } = mirrorRun({ mirror: false }, { mirror: true });
+  assert.ok(raw.some((it) => it._mirrored), 'mirror on really does append mirrored copies');
+  assert.ok(dipped(mid, raw), 'the new half grows in from zero — it does not pop');
+  assert.deepEqual(done, raw, 'and it lands on the raw resolved items');
+});
+
+test("#564: symmetry 'stamp' fires the director", () => {
+  const { mid, done, raw } = mirrorRun({ symmetry: 'none' }, { symmetry: 'stamp' }, 'swarm');
+  assert.ok(raw.some((it) => it._mirrored), 'stamp really does append mirrored copies');
+  assert.ok(dipped(mid, raw), 'the stamped half grows in from zero — it does not pop');
+  // Swarm physics is stateful, so a fresh resolver's frame is not bit-equal to
+  // the warmed one's — assert the landing structurally instead.
+  assert.equal(done.length, raw.length, 'and it lands on the full doubled list');
+  assert.ok(!dipped(done, raw), 'with every node back at its resting size');
+});
+
+test('#564: a governor perfTier1 clamp of mirror is NOT a transition — different class', () => {
+  // perfTier1 forces mirror off inside the resolver. The sig reads the
+  // AUTHORED mirror, so the clamp must not spend a swap wave on the load
+  // that caused it — the clamped frame presents its raw items immediately.
+  const r = createLiveResolver();
+  const mk = (perfTier1, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, mirror: true },
+    perfTier1, mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  const before = lyr(r.resolveLayers(mk(false, 0)));
+  const clamped = lyr(r.resolveLayers(mk(true, 1000)));
+  const rawClamped = lyr(createLiveResolver().resolveLayers(mk(true, 1000)));
+  assert.ok(before.some((it) => it._mirrored), 'baseline really was mirrored');
+  assert.ok(!rawClamped.some((it) => it._mirrored), 'the clamp really did drop the mirrored half');
+  assert.deepEqual(clamped, rawClamped, 'the clamp presents its raw items immediately, no transition');
+  r.dispose();
+});
+
 test('#471: a seed change alone now glides through item-morph, not a hard snap', () => {
   // Mirrors the #419 test exactly, substituting seed for mode as the
   // changing field — EVOLVE's seed target used to write a new seed

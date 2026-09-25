@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { matchItems, blendItems, planMorph } from './itemMorph.mjs';
+import { matchItems, blendItems, planMorph, nodeWindow } from './itemMorph.mjs';
+// The live loop's own easing — liveResolve feeds blendItems morphEase(raw),
+// so the #564 contract sweeps below must drive it the same way.
+import { morphEase } from '../../gl/paletteMix.mjs';
 
 let n = 0, fail = 0;
 function ok(name, fn) {
@@ -54,38 +57,54 @@ ok('blendItems boundary t>=1 returns toItems by reference', () => {
   assert.equal(blendItems(from, to, 2), to);
 });
 
-ok('blendItems interpolates position/scale/rotation at t=0.5', () => {
+// #564: t is no longer a node's own progress — every node runs its own seeded
+// window — so a matched pair is checked where the contract is absolute: it
+// leaves from the source pose and lands exactly on the target pose. Every
+// window closes by t=1 (see the wave tests below), so t=0.99 is landed.
+ok('blendItems lands position/scale/rotation/costume on the target by t->1', () => {
   const from = [{ assetId: 'a', x: 0, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#000000', accent: '#ffffff' }];
-  const to = [{ assetId: 'a', x: 100, y: 0, scale: 3, rotation: 90, alpha: 100, color: '#ffffff', accent: '#000000' }];
-  const [out] = blendItems(from, to, 0.5);
-  assert.equal(out.x, 50);
-  assert.equal(out.scale, 2);
-  assert.equal(out.rotation, 45);
-  assert.equal(out.color, '#808080');
+  const to = [{ assetId: 'b', x: 100, y: 0, scale: 3, rotation: 90, alpha: 100, color: '#ffffff', accent: '#000000' }];
+  const [out] = blendItems(from, to, 0.99);
+  assert.ok(Math.abs(out.x - 100) < 0.1, `x landed (got ${out.x})`);
+  assert.ok(Math.abs(out.scale - 3) < 0.01, `scale landed (got ${out.scale})`);
+  assert.ok(Math.abs(out.rotation - 90) < 0.1, `rotation landed (got ${out.rotation})`);
+  assert.equal(out.assetId, 'b', 'costume is the target asset');
+  assert.equal(out.color, '#ffffff', 'colour is the target colour, never a blend of the two');
 });
 
-ok('blendItems fades unmatched target item in, keeps its identity', () => {
+ok('#564: an unmatched target grows in from zero — no alpha fade', () => {
   const from = [];
-  const to = [{ assetId: 'a', x: 10, y: 0, alpha: 100, key: 'new-1' }];
-  const [out] = blendItems(from, to, 0.25);
-  assert.equal(out.key, 'new-1');
-  assert.equal(out.alpha, 25);
+  const to = [{ assetId: 'a', x: 10, y: 0, scale: 2, alpha: 100, key: 'new-1' }];
+  const { delay, dur } = nodeWindow(0, 0);
+  const [early] = blendItems(from, to, delay + dur * 0.4); // before its midpoint
+  assert.equal(early.key, 'new-1');
+  assert.equal(early.scale, 0, 'nothing on screen until its window turns over');
+  assert.equal(early.alpha, 100, 'alpha untouched — the swap is scale, not opacity');
+  const [late] = blendItems(from, to, 0.99);
+  assert.ok(Math.abs(late.scale - 2) < 0.01, `grown to full (got ${late.scale})`);
 });
 
-ok('blendItems fades unmatched source item out, keeps it on screen mid-transition', () => {
-  const from = [{ assetId: 'a', x: 10, y: 0, alpha: 100, key: 'old-1' }];
+ok('#564: an unmatched source shrinks out to zero — no alpha fade', () => {
+  const from = [{ assetId: 'a', x: 10, y: 0, scale: 2, alpha: 100, key: 'old-1' }];
   const to = [];
-  const [out] = blendItems(from, to, 0.25);
-  assert.equal(out.key, 'old-1');
-  assert.equal(out.alpha, 75);
+  const { delay, dur } = nodeWindow(0, 0); // onlyFrom windows start at index |to| = 0 here
+  const [early] = blendItems(from, to, delay + dur * 0.1);
+  assert.equal(early.key, 'old-1');
+  assert.ok(early.scale > 0 && early.scale <= 2, `still on screen early (got ${early.scale})`);
+  assert.equal(early.alpha, 100, 'alpha untouched');
+  const [late] = blendItems(from, to, delay + dur * 0.6); // past its midpoint
+  assert.equal(late.scale, 0, 'gone by the midpoint, at zero scale not zero alpha');
 });
 
 ok('blendItems shortest-path angle interpolation wraps correctly', () => {
   const from = [{ assetId: 'a', x: 0, y: 0, rotation: 350 }];
   const to = [{ assetId: 'a', x: 0, y: 0, rotation: 10 }];
-  const [out] = blendItems(from, to, 0.5);
-  // 350 -> 370(=10) is the short way: midpoint is 0, not 180.
-  assert.equal(((out.rotation % 360) + 360) % 360, 0);
+  // 350 -> 370(=10) is the short way: the blend must never pass through 180.
+  for (let t = 0.01; t < 1; t += 0.01) {
+    const [out] = blendItems(from, to, t);
+    const r = ((out.rotation % 360) + 360) % 360;
+    assert.ok(r >= 350 || r <= 10, `short way at t=${t.toFixed(2)} (got ${r})`);
+  }
 });
 
 // ── #419: plan-once — pairing fixed for the transition, endpoints live ──────
@@ -115,25 +134,29 @@ ok('#419: stored pairing holds when a target breathes past a nearer rival', () =
     { assetId: 'a', key: 'far', x: 100, y: 0, alpha: 100 },
     { assetId: 'a', key: 'farther', x: 10, y: 0, alpha: 100 },
   ];
-  // #444: emission is raw to-order now, so position no longer encodes
-  // pairing — find the PAIRED item instead: a blend holds target alpha
-  // (lerp 100..100 = 100), an unmatched fade-in sits at 100*t = 50.
-  const stayed = blendItems(from, toBreath, 0.5, plan).find((i) => i.alpha === 100);
-  assert.equal(stayed.key, 'far', 'stored plan keeps the original target');
-  const flipped = blendItems(from, toBreath, 0.5).find((i) => i.alpha === 100);
-  assert.equal(flipped.key, 'farther', 'fresh match would flip — what #419 fixes');
+  // Both targets share asset group 'a', so the pair's slot index IS the
+  // to-list index: 0 = 'far', 1 = 'farther'.
+  assert.equal(plan.pairs[0].j, 0, 'stored plan keeps the original target');
+  assert.equal(planMorph(from, toBreath).pairs[0].j, 1, 'a fresh match would flip — what #419 fixes');
+  // And the blend honours the stored plan: 'farther' is the UNMATCHED target,
+  // so it never travels — it sits on its own live slot and grows in there.
+  const rival = blendItems(from, toBreath, 0.5, plan).find((i) => i.key === 'farther');
+  assert.equal(rival.x, 10, 'unmatched rival stays on its slot, never adopted as the pair');
 });
 
 ok('#419: endpoints track LIVE targets while the plan is fixed', () => {
   const from = [{ assetId: 'a', x: 0, y: 0, alpha: 100 }];
   const plan = planMorph(from, [{ assetId: 'a', key: 'n', x: 100, y: 0, alpha: 100 }]);
   const moved = [{ assetId: 'a', key: 'n', x: 300, y: 0, alpha: 100 }];
-  const [out] = blendItems(from, moved, 0.5, plan);
-  assert.equal(out.x, 150, 'aims at the current slot (150), not the start snapshot (50)');
+  const [out] = blendItems(from, moved, 0.99); // landed: every window is closed
+  assert.ok(Math.abs(out.x - 300) < 1, `lands on the current slot (300), not the start snapshot (100) — got ${out.x}`);
   assert.equal(out.key, 'n');
+  // mid-flight it is somewhere on the line to the LIVE slot, never past it
+  const mid = blendItems(from, moved, 0.5, plan)[0];
+  assert.ok(mid.x >= 0 && mid.x <= 300, `mid-flight stays on the segment (got ${mid.x})`);
 });
 
-ok('#419: onlyTo fade-in resolves through a stored slot against live targets', () => {
+ok('#419: onlyTo grow-in resolves through a stored slot against live targets', () => {
   const from = [{ assetId: 'a', x: 0, y: 0, alpha: 100 }];
   const toStart = [
     { assetId: 'a', key: 'keep', x: 10, y: 0, alpha: 100 },
@@ -144,12 +167,12 @@ ok('#419: onlyTo fade-in resolves through a stored slot against live targets', (
     { assetId: 'a', key: 'keep', x: 40, y: 0, alpha: 100 },
     { assetId: 'b', key: 'newB', x: 60, y: 0, alpha: 100 },
   ];
-  const out = blendItems(from, toBreath, 0.5, plan);
+  const out = blendItems(from, toBreath, 0.99, plan); // landed
   const kept = out.find((i) => i.key === 'keep');
   const added = out.find((i) => i.key === 'newB');
-  assert.equal(kept.x, 20, 'paired slot aims at the live target (lerp 0..40)');
-  assert.ok(added, 'unmatched target still fades in via its stored slot');
-  assert.ok(Math.abs(added.alpha - 50) < 1e-9, 'alpha = 100 * t');
+  assert.ok(Math.abs(kept.x - 40) < 0.5, `paired slot lands on the live target 40 (got ${kept.x})`);
+  assert.ok(added, 'unmatched target still arrives via its stored slot');
+  assert.equal(added.x, 60, 'it grows in on its own live slot, it does not travel');
 });
 
 // ── #444: emission order — the blend must land on raw to-order ──────────────
@@ -202,13 +225,17 @@ ok('z-fight: matched items keep from draw-order at t->0+ and reach to-order by t
   ];
   const plan = planMorph(from, to); // P->P2, Q->Q2, R->R2 (nearest)
   const order = (t) => blendItems(from, to, t, plan).map((i) => i.key);
-  assert.deepEqual(order(0.001), ['P2', 'Q2', 'R2'], 't->0+: same stacking as from (P,Q,R)');
+  // #564: below its minimum a node still wears the SOURCE costume, so the
+  // keys at t->0+ are the from-keys — in from stacking order.
+  assert.deepEqual(order(0.001), ['P', 'Q', 'R'], 't->0+: same stacking as from (P,Q,R)');
   assert.deepEqual(order(0.9), ['R2', 'Q2', 'P2'], 'settled: raw to-order');
   assert.deepEqual(order(0.999), ['R2', 'Q2', 'P2']);
   // and it never jumps more than the ordering weight allows between adjacent frames
-  let prev = order(0.001).join();
-  const seen = new Set([prev]);
-  for (let t = 0.01; t < 0.9; t += 0.01) seen.add(order(t).join());
+  // Stacking (not costume) is what must move gradually: compare the depth
+  // order by the pairing's from-side, which the costume swap does not rename.
+  const stack = (t) => blendItems(from, to, t, plan).map((i) => i.x).join();
+  const seen = new Set();
+  for (let t = 0.001; t < 0.9; t += 0.01) seen.add(stack(t));
   assert.ok(seen.size <= 4, 'order transitions are gradual (a few swaps over the blend), not one flip');
 });
 
@@ -226,6 +253,129 @@ ok('z-fight: fade-outs trail once settled (t>=0.9), never among the settled to-i
     assert.equal(keys[0], 'kept2', `to-item first at t=${t}`);
     assert.equal(keys.length, 3);
   }
+});
+
+// ── #564 SLEIGHT-OF-HAND: the director's transition contract ────────────────
+// These are the invariants Matt named on the ticket, as runnable checks. They
+// run against the REAL pairing the live loop uses: liveResolve feeds
+// blendItems morphEase(raw), so the sweeps below do the same.
+
+const gridFrom = Array.from({ length: 24 }, (_, i) => ({
+  assetId: 'a', key: `old-${i}`, x: (i % 6) * 100, y: Math.floor(i / 6) * 100,
+  scale: 1, rotation: 0, alpha: 100, color: '#111111', accent: '#222222',
+}));
+const gridTo = Array.from({ length: 24 }, (_, i) => ({
+  assetId: 'b', key: `new-${i}`, x: (i % 6) * 100 + 30, y: Math.floor(i / 6) * 100 + 30,
+  scale: 1.5, rotation: 40, alpha: 100, color: '#eeeeee', accent: '#dddddd',
+}));
+
+/** One 60fps MIX of `mixSeconds`, exactly as liveResolve drives it. */
+function sweep(from, to, mixSeconds, seed = 0) {
+  const plan = planMorph(from, to, seed);
+  const step = 1 / (60 * mixSeconds);
+  const frames = [];
+  for (let raw = 0; raw <= 1 + 1e-9; raw += step) {
+    const t = morphEase(Math.min(1, raw));
+    frames.push(t >= 1 ? to : blendItems(from, to, t, plan));
+  }
+  return frames;
+}
+
+const costume = (it) => `${it.assetId}|${it.color}|${it.accent}`;
+
+/** Largest residual size (as a fraction of full size) on any costume-swap frame. */
+function worstSwapScale(mixSeconds, seed = 0) {
+  const frames = sweep(gridFrom, gridTo, mixSeconds, seed);
+  let worst = 0;
+  for (let f = 1; f < frames.length; f++) {
+    for (let i = 0; i < frames[f].length; i++) {
+      const now = frames[f][i], was = frames[f - 1][i];
+      if (costume(now) === costume(was)) continue;
+      worst = Math.max(worst, Math.abs(now.scale) / 1.5, Math.abs(was.scale) / 1);
+    }
+  }
+  return worst;
+}
+
+ok('#564 contract: no costume change while the node is visible', () => {
+  // The envelope is exactly 0 at the swap; a frame only lands NEAR it, so the
+  // residual is a sampling artefact bounded by how many frames the node's
+  // half-window gets. At every MIX the instrument actually plays it is deep
+  // sub-pixel. See the module header for the short-MIX ceiling.
+  for (const [mix, seed] of [[4, 0], [2, 0], [2, 99], [1, 7]]) {
+    const worst = worstSwapScale(mix, seed);
+    assert.ok(worst < 0.02,
+      `MIX ${mix}s seed ${seed}: costume flipped at ${(worst * 100).toFixed(2)}% of full size`);
+  }
+});
+
+ok('#564 known ceiling: a sub-second MIX has too few frames to hide a swap', () => {
+  // Documented, not fixed (module header): the residual must degrade with the
+  // frame budget and nothing more — if a LONGER mix ever got worse, the
+  // sampling story is wrong and the envelope is the real culprit.
+  const short = worstSwapScale(0.25);
+  const long = worstSwapScale(4);
+  assert.ok(short > long, 'fewer frames means a larger residual, not a smaller one');
+  assert.ok(long < 0.001, `a 4s MIX hides the swap completely (${long})`);
+});
+
+ok('#564 contract: never two costumes in one node — identity comes from one side', () => {
+  for (const frames of [sweep(gridFrom, gridTo, 2)]) {
+    for (const items of frames) {
+      for (const it of items) {
+        const fromSide = it.assetId === 'a' && it.color === '#111111' && it.accent === '#222222';
+        const toSide = it.assetId === 'b' && it.color === '#eeeeee' && it.accent === '#dddddd';
+        assert.ok(fromSide || toSide,
+          `node is a blend of two costumes: ${it.assetId}/${it.color}/${it.accent}`);
+      }
+    }
+  }
+});
+
+ok('#564 contract: zero held frames — every window closes by t=1', () => {
+  for (const seed of [0, 1, 7, 4096, 0xdecafbad]) {
+    for (let i = 0; i < 512; i++) {
+      const { delay, dur } = nodeWindow(i, seed);
+      assert.ok(delay >= 0 && dur > 0, `window ${i}@${seed} is real`);
+      assert.ok(delay + dur <= 1 + 1e-12, `window ${i}@${seed} closes by t=1 (${delay + dur})`);
+    }
+  }
+  // …so the last blended frame is already the target pose: the handoff to
+  // raw toItems (liveResolve drops the transition at raw>=1) pops nothing.
+  const frames = sweep(gridFrom, gridTo, 2);
+  const last = frames[frames.length - 2]; // last frame still produced by the blend
+  for (let i = 0; i < gridTo.length; i++) {
+    assert.ok(Math.hypot(last[i].x - gridTo[i].x, last[i].y - gridTo[i].y) < 0.5,
+      `node ${i} has landed before the handoff`);
+    assert.ok(Math.abs(last[i].scale - gridTo[i].scale) < 0.01, `node ${i} is full size before the handoff`);
+  }
+});
+
+ok('#564 contract: the stagger is a seeded, index-stable wave', () => {
+  const wave = (seed) => Array.from({ length: 24 }, (_, i) => nodeWindow(i, seed));
+  assert.deepEqual(wave(7), wave(7), 'same seed replays the same wave');
+  assert.notDeepEqual(wave(7), wave(8), 'a different seed is a different wave');
+  // It is a WAVE, not one flip: the midpoints must actually spread out.
+  const mids = wave(7).map(({ delay, dur }) => delay + dur / 2).sort((a, b) => a - b);
+  assert.ok(mids[mids.length - 1] - mids[0] > 0.2,
+    `swaps spread across the transition (span ${mids[mids.length - 1] - mids[0]})`);
+});
+
+ok('#564 contract: per-frame motion cap — travel happens while the node is small', () => {
+  const far = [{ assetId: 'a', x: 0, y: 0, scale: 1, alpha: 100, color: '#000000' }];
+  const farTo = [{ assetId: 'b', x: 1000, y: 0, scale: 1, alpha: 100, color: '#ffffff' }];
+  const frames = sweep(far, farTo, 2);
+  let maxRaw = 0, maxVisible = 0;
+  for (let f = 1; f < frames.length; f++) {
+    const now = frames[f][0], was = frames[f - 1][0];
+    const hop = Math.abs(now.x - was.x);
+    maxRaw = Math.max(maxRaw, hop);
+    maxVisible = Math.max(maxVisible, hop * Math.max(now.scale, was.scale));
+  }
+  // The sleight of hand: the node crosses 1000px fastest at zero scale, so
+  // the hop you can actually SEE is a fraction of the hop it makes.
+  assert.ok(maxVisible < maxRaw * 0.5, `visible hop ${maxVisible} is well under the raw hop ${maxRaw}`);
+  assert.ok(maxVisible < 25, `visible per-frame hop stays capped (${maxVisible}px of a 1000px move)`);
 });
 
 console.log(`itemMorph.selfcheck: ${fail === 0 ? 'OK' : 'FAIL'} (${n - fail}/${n})`);
