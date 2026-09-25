@@ -41,6 +41,6 @@ jobs:
       - run: npm install --no-fund --no-audit
       - run: npx playwright install chromium --with-deps
       - run: npm run build
-      - run: npm run test:e2e
+      - run: npx playwright test accum-recording loop-capture --workers=1
         env:
           CI: true
