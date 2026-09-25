@@ -32,7 +32,7 @@ const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
     count: 315, scale: [0.4, 1.6], rotate: [-90, 90], alpha: [40, 80],
     jitter: 75, displacement: 0, density: 70, zTiers: 5, noiseSpeed: 1.0,
     noiseFreq: 0.008, swarmCohesion: 2.0, gravityWells: 1.5,
-    particleCount: 150, damping: 0.94,
+    particleCount: 150, damping: 0.94, wind: 1.5, breath: 0.25, lifeDrift: 0.5, flap: 0.8,
   });
   assert.ok(approx(f.markDensity, 0.5), 'markDensity');
   assert.ok(approx(f.markSize, 0.9 / 2.9), 'markSize');
@@ -49,6 +49,11 @@ const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   assert.ok(approx(f.attractors, 1.4 / 2.9), 'attractors');
   assert.ok(approx(f.particles, 0.4), 'particles');
   assert.ok(approx(f.calm, 0.5), 'calm');
+  assert.ok(approx(f.windPush, 0.5), 'windPush');
+  assert.ok(approx(f.breathSwell, 0.25), 'breathSwell');
+  assert.ok(approx(f.drift, 0.5), 'drift');
+  assert.ok(approx(f.flowRate, 0.8), 'flowRate');
+  assert.strictEqual(Object.keys(f).length, 19, '19 features');
 }
 
 // missing/garbage keys -> neutral 0.5, never throws, never mutates
@@ -83,6 +88,16 @@ const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   assert.ok(wm.disorder < 0, 'molnar avoids disorder');
   const wd = getPersonaTaste('menkman').weights;
   assert.ok(wd.disorder > 0, 'menkman loves rupture/disorder');
+}
+
+// #518: personas score motion — near-grid wants settled, latent-drift wants flowing
+{
+  const still = { wind: 0.3, breath: 0.05, lifeDrift: 0.12, flap: 0.1 };
+  const alive = { wind: 1.8, breath: 0.6, lifeDrift: 0.85, flap: 0.8 };
+  const s = (id, c) => scoreCandidate(extractFeatures(c), getPersonaTaste(id).weights);
+  assert.ok(s('molnar', still) > s('molnar', alive), 'molnar prefers settled motion');
+  assert.ok(s('anadol', alive) > s('anadol', still), 'anadol prefers flowing motion');
+  assert.ok(s('haeckel', { ...still, breath: 0.7 }) > s('haeckel', still), 'haeckel prefers breathing');
 }
 
 // ─── pick determinism + argmax + top-3 jitter ───

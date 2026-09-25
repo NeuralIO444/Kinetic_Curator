@@ -23,6 +23,10 @@
 // rolls one per candidate. A future MLX ranker replaces the scorer, not
 // these profiles.
 //
+// Motion biases (wind / flap / breath / lifeDrift) and `behave` forces are a
+// DRAFT (#518 b): first-pass taste read off each persona's rationale, meant to
+// be tuned by ear after playing — not measurements.
+//
 // DISPLAY POLICY (Matt's IP caution): profile `name` fields keep the real
 // artist name as honest lineage IN CODE ONLY — the product surface shows
 // the TE-style alias from personaTastes.js (voice selector, "persona pick:
@@ -70,6 +74,10 @@ export const RENDER_PROFILES = [
       swarmCohesion: [0.4, 2.0],
       gravityWells: [0.5, 2.5],
       damping: [0.92, 0.97],
+      wind: [0.6, 1.6],
+      flap: [0.3, 0.7],
+      breath: [0.1, 0.5],
+      lifeDrift: [0.3, 0.7],
     },
     forces: {},
   },
@@ -114,8 +122,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [0.2, 1.0],
       gravityWells: [0.1, 1.0],
       damping: [0.94, 0.98],
+      wind: [0.2, 0.5],
+      flap: [0.05, 0.2],
+      breath: [0, 0.1],
+      lifeDrift: [0.1, 0.25],
     },
-    forces: { accumulationOptics: 0, accumulation: false },
+    forces: { accumulationOptics: 0, accumulation: false, behave: 'cruise' },
   },
   {
     id: 'reas',
@@ -155,8 +167,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [1.0, 4.0],
       gravityWells: [0.8, 3.0],
       damping: [0.90, 0.94],
+      wind: [1.0, 2.0],
+      flap: [0.4, 0.9],
+      breath: [0.2, 0.6],
+      lifeDrift: [0.5, 0.9],
     },
-    forces: { accumulation: true },
+    forces: { accumulation: true, behave: 'flock' },
   },
   {
     id: 'haeckel',
@@ -199,8 +215,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [0.2, 1.2],
       gravityWells: [0.5, 2.0],
       damping: [0.94, 0.98],
+      wind: [0.2, 0.6],
+      flap: [0.05, 0.25],
+      breath: [0.4, 0.8],
+      lifeDrift: [0.15, 0.4],
     },
-    forces: { symmetry: 'bilateral', accumulationOptics: 0 },
+    forces: { symmetry: 'bilateral', accumulationOptics: 0, behave: 'orbit' },
   },
   {
     id: 'molnar',
@@ -240,8 +260,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [0.2, 1.0],
       gravityWells: [0.1, 1.0],
       damping: [0.95, 0.98],
+      wind: [0.2, 0.5],
+      flap: [0.05, 0.2],
+      breath: [0, 0.15],
+      lifeDrift: [0.1, 0.3],
     },
-    forces: { accumulationOptics: 0, accumulation: false },
+    forces: { accumulationOptics: 0, accumulation: false, behave: 'cruise' },
   },
   {
     id: 'mohr',
@@ -280,8 +304,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [0.2, 1.0],
       gravityWells: [0.1, 1.0],
       damping: [0.95, 0.98],
+      wind: [0.2, 0.7],
+      flap: [0.05, 0.3],
+      breath: [0, 0.2],
+      lifeDrift: [0.1, 0.3],
     },
-    forces: { accumulationOptics: 0, accumulation: false },
+    forces: { accumulationOptics: 0, accumulation: false, behave: 'cruise' },
   },
   {
     id: 'anadol',
@@ -322,8 +350,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [0.2, 1.0],
       gravityWells: [0.2, 1.5],
       damping: [0.90, 0.94],
+      wind: [1.2, 2.0],
+      flap: [0.5, 0.9],
+      breath: [0.3, 0.7],
+      lifeDrift: [0.6, 0.9],
     },
-    forces: { accumulationOptics: 0.2, accumulation: true },
+    forces: { accumulationOptics: 0.2, accumulation: true, behave: 'flock' },
   },
   {
     id: 'menkman',
@@ -361,8 +393,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [0.2, 1.5],
       gravityWells: [0.1, 1.5],
       damping: [0.90, 0.95],
+      wind: [0.6, 2.0],
+      flap: [0.2, 0.9],
+      breath: [0, 0.3],
+      lifeDrift: [0.3, 0.9],
     },
-    forces: { accumulationOptics: 0, accumulation: true },
+    forces: { accumulationOptics: 0, accumulation: true, behave: 'scatter' },
   },
   {
     id: 'oxman',
@@ -401,8 +437,12 @@ export const RENDER_PROFILES = [
       swarmCohesion: [1.5, 4.0],
       gravityWells: [1.0, 3.0],
       damping: [0.95, 0.98],
+      wind: [0.6, 1.4],
+      flap: [0.3, 0.7],
+      breath: [0.4, 0.8],
+      lifeDrift: [0.4, 0.8],
     },
-    forces: { accumulationOptics: 0, symmetry: 'bilateral' },
+    forces: { accumulationOptics: 0, symmetry: 'bilateral', behave: 'mold' },
   },
   {
     id: 'stock',
@@ -447,8 +487,12 @@ export const RENDER_PROFILES = [
           swarmCohesion: [1.5, 4.0],
           gravityWells: [1.0, 3.0],
           damping: [0.93, 0.97],
+          wind: [0.4, 1.0],
+          flap: [0.1, 0.4],
+          breath: [0, 0.3],
+          lifeDrift: [0.2, 0.5],
         },
-        forces: { accumulationOptics: 0, accumulation: false },
+        forces: { accumulationOptics: 0, accumulation: false, behave: 'cruise' },
       },
       field: {
         note: 'Mode B — full-frame vorticity colormap field, edge to edge.',
@@ -467,8 +511,12 @@ export const RENDER_PROFILES = [
           swarmCohesion: [0.2, 1.2],
           gravityWells: [0.2, 1.5],
           damping: [0.90, 0.95],
+          wind: [1.2, 2.0],
+          flap: [0.3, 0.7],
+          breath: [0, 0.2],
+          lifeDrift: [0.4, 0.8],
         },
-        forces: { accumulationOptics: 0, accumulation: false },
+        forces: { accumulationOptics: 0, accumulation: false, behave: 'orbit' },
       },
     },
   },
@@ -516,7 +564,11 @@ function rollBias(key, spec, rng) {
     case 'noiseSpeed':
     case 'swarmCohesion':
     case 'gravityWells':
-    case 'damping': {
+    case 'damping':
+    case 'wind':
+    case 'flap':
+    case 'breath':
+    case 'lifeDrift': {
       const [a, b] = spec;
       return r2(a + rng() * (b - a));
     }
