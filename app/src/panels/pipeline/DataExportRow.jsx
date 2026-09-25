@@ -3,6 +3,7 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { sanitizePalette } from '../../state/slices/paletteLibrarySlice.js';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
+import { hitsFromFavorites } from '../../state/hitsExport.js';
 
 function downloadJsonBlob(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
@@ -40,12 +41,7 @@ export function DataExportRow({
     downloadJsonBlob({
       version: 1,
       project: buildProjectPayload(projectFields),
-      hits: (favorites || []).map((f) => ({
-        seed: f.seed >>> 0,
-        timestamp: f.timestamp,
-        layoutParams: f.config?.layout || null,
-        paletteId: f.config?.palette?.id || null,
-      })),
+      hits: hitsFromFavorites(favorites),
     }, 'kinetic-curator-hits.json');
   };
 

@@ -67,6 +67,9 @@ def write_hit_project(hits_export: dict, hit: dict, out_path: Path) -> None:
         base["layoutParams"] = hit["layoutParams"]
     if hit.get("paletteId"):
         base["paletteId"] = hit["paletteId"]
+    # #537 — the recipe is only reproducible with its stream offsets (#305).
+    if isinstance(hit.get("seedOffsets"), dict):
+        base["seedOffsets"] = hit["seedOffsets"]
     base.setdefault("version", 1)
     out_path.write_text(json.dumps(base, indent=2))
 
@@ -121,6 +124,15 @@ def cmd_selfcheck(_a=None) -> None:
     assert missing_hit_seeds({2, 9}, sidecars) == [9]
     assert missing_hit_seeds(set(), sidecars) == []
     assert missing_hit_seeds({1, 2, 3}, sidecars) == []
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "p.json"
+        offs = {"spatial": 1, "color": 2, "asset": 3, "noise": 4}
+        write_hit_project({"project": {"seedOffsets": {"spatial": 9}}},
+                          {"seed": 5, "seedOffsets": offs}, out)
+        assert json.loads(out.read_text())["seedOffsets"] == offs, "hit offsets ride into the render project"
+        write_hit_project({"project": {"seedOffsets": {"spatial": 9}}}, {"seed": 5}, out)
+        assert json.loads(out.read_text())["seedOffsets"] == {"spatial": 9}, "legacy hit keeps the project's own"
     print("hits_bridge selfcheck OK")
 
 
