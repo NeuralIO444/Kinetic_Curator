@@ -85,7 +85,14 @@ export function parseProject(raw) {
         version: PROJECT_VERSION,
         seed: seed >>> 0,
         seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
-        paletteId: raw.paletteId || raw.palette || 'praystation',
+        // #645 — same string guard the v1 branch uses: a corrupt legacy file
+        // with a numeric/null palette degrades to the fallback palette.
+        paletteId:
+          typeof raw.paletteId === 'string'
+            ? raw.paletteId
+            : typeof raw.palette === 'string'
+              ? raw.palette
+              : 'praystation',
         layoutParams: normalizeLayoutParams(raw.layoutParams || raw.layout),
         // #103 Track B — validate asset maps against the registry; a hostile
         // 100k-key map collapses to the known set instead of bloating the store.
