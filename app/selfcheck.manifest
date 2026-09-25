@@ -101,3 +101,4 @@ node src/data/voices.selfcheck.mjs
 node src/state/voiceSlice.selfcheck.mjs
 node src/state/stubMix.selfcheck.mjs
 node scripts/runSelfcheck.selfcheck.mjs
+node qa/report.selfcheck.mjs
