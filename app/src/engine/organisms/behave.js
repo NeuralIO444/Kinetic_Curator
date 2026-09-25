@@ -3,7 +3,7 @@
  * Adding a profile is a row in BEHAVE, not a new force type.
  */
 
-export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter', 'mold'];
+export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter', 'mold', 'seek', 'flee'];
 
 export const BEHAVE = {
   cruise: {
@@ -68,7 +68,53 @@ export const BEHAVE = {
     chemotaxis: 0.15,
     deposit: 0.06,
   },
+  // #584 — seek / flee: the only verbs that answer the hand. Both retune the
+  // attractor force the engine already has (no second attractor system):
+  // seekGain multiplies it, and flee is the SAME ROW with the sign flipped.
+  // Keeping every other field identical is deliberate — it is what makes
+  // "flee is exactly -1 x seek" a property the selfcheck can assert rather
+  // than a resemblance, so the two can never drift apart later.
+  //
+  // With no pointer there is no attractor, the existing guard skips the branch
+  // outright, and both rows relax to ordinary steering the same frame — which
+  // is the whole feel: the field leans while you are there and lets go the
+  // instant you leave. Nothing here stores the pointer, so there is nothing to
+  // keep pushing.
+  seek: {
+    sep: 2.4,
+    ali: 0.2,
+    coh: 0.2,
+    sepR: 52,
+    aliR: 44,
+    cohR: 56,
+    wind: 0.15,
+    orbit: 0,
+    attract: 1,
+    seekGain: 1.6,
+  },
+  flee: {
+    sep: 2.4,
+    ali: 0.2,
+    coh: 0.2,
+    sepR: 52,
+    aliR: 44,
+    cohR: 56,
+    wind: 0.15,
+    orbit: 0,
+    attract: 1,
+    seekGain: -1.6,
+  },
 };
+
+/**
+ * #584 — the attractor multiplier for a row. Rows that do not declare a
+ * seekGain get exactly 1, so every pre-existing verb integrates the identical
+ * attractor force it always did and no golden moves.
+ */
+export function resolveSeekGain(profile) {
+  const g = profile && profile.seekGain;
+  return Number.isFinite(g) ? g : 1;
+}
 
 export function resolveBehave(id) {
   return BEHAVE[id] || BEHAVE.cruise;
