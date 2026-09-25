@@ -86,7 +86,7 @@ export function sanitizeQuality(raw, fallback = 'balanced') {
   return typeof raw === 'string' && QUALITY_PRESETS[raw] ? raw : fallback;
 }
 
-export function normalizeSnapshots(raw) {
+export function normalizeSnapshots(raw, customAssets = []) {
   if (!raw || typeof raw !== 'object') return {};
   const out = {};
   for (const [id, snap] of Object.entries(raw)) {
@@ -95,6 +95,9 @@ export function normalizeSnapshots(raw) {
     // enabledAssets threw inside the Canvas panel's memo (src.enabledAssets
     // undefined); lockedParams/caGrid missing meant a load silently dropped
     // parameter locks and the CA grid.
+    // #635 — the snapshot's asset map gets the same hostile-input cleanup as
+    // the root map: the active snapshot wins on import, so an unsanitized map
+    // here defeated the allowlist and re-serialized into future exports.
     out[id] = {
       seed: Number.isFinite(snap.seed) ? snap.seed >>> 0 : 0,
       seedOffsets: normalizeSeedOffsets(snap.seedOffsets),
@@ -103,7 +106,7 @@ export function normalizeSnapshots(raw) {
       layoutParams: normalizeLayoutParams(snap.layoutParams),
       lockedParams: snap.lockedParams && typeof snap.lockedParams === 'object' ? snap.lockedParams : {},
       caGrid: sanitizeCaGrid(snap.caGrid),
-      enabledAssets: snap.enabledAssets && typeof snap.enabledAssets === 'object' ? { ...snap.enabledAssets } : {},
+      enabledAssets: sanitizeEnabledAssets(snap.enabledAssets, customAssets) || {},
     };
   }
   return out;
