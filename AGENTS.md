@@ -69,6 +69,7 @@ Tape lane (#342 PR #383) merged 2026-09-21. **#341** (FX 4-cap) landed as PR #41
 - Title: `feat(engine): spine A — dt clock` (letter in the title).
 - Body: issue number, files touched, what you did **not** do, how to QA on the live canvas.
 - `npm run selfcheck` green. Do not weaken a golden hash to land feel work. Spine A must hash-match at locked 60 Hz dt.
+- When you add a selfcheck suite, add it to `app/selfcheck.manifest` (one command per line) — never edit the `selfcheck` script in `package.json` directly.
 - Tick the matching checkbox in ENGINE_PLAN §6 in the same PR (docs hunk is fine).
 - No new panel. No fifth track. No Perlin rewrite. No second particle system during a dissolve.
 
