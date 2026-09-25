@@ -1,5 +1,6 @@
 // curate.selfcheck.mjs — the Curator engine seam: honest fallback first.
 import assert from 'node:assert';
+import { useStore } from '../state/store.js';
 import {
   CURATE_CANDIDATES,
   nullCurator,
@@ -64,5 +65,26 @@ assert.deepStrictEqual(pickCurated([], nullCurator()), { index: -1, curated: fal
 // hint copy is honest in both states
 assert.strictEqual(curatorHint(nullCurator()), 'curator untrained · dice roll');
 assert.strictEqual(curatorHint({ status: () => 'active', pick: () => 0 }), 'curated pick');
+
+// #518: CURATE is seeded — same (seed, offsets, press #) replays the same
+// scene; the next press differs; a different seed differs.
+{
+  const press = (seed, curatePress, seedOffsets = { spatial: 0, color: 0, asset: 0, noise: 0 }) => {
+    useStore.setState({ seed, seedOffsets, curatePress, lockedParams: {}, layoutParams: { ...useStore.getInitialState().layoutParams } });
+    useStore.getState().curateUnlocked();
+    return JSON.stringify(useStore.getState().layoutParams);
+  };
+  const a = press(4242, 0);
+  assert.strictEqual(press(4242, 0), a, 'same (seed, press #) -> identical pick');
+  assert.notStrictEqual(press(4242, 1), a, 'next press differs');
+  assert.notStrictEqual(press(4243, 0), a, 'different seed differs');
+  assert.notStrictEqual(press(4242, 0, { spatial: 7, color: 0, asset: 0, noise: 0 }), a, 'seedOffsets are honored');
+  useStore.setState({ seed: 4242, curatePress: 5 });
+  useStore.getState().curateUnlocked();
+  assert.strictEqual(useStore.getState().curatePress, 6, 'a landed press advances the counter');
+  useStore.setState({ lockedParams: Object.fromEntries(['count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers', 'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount', 'swarmCohesion', 'gravityWells', 'damping'].map((k) => [k, true])) });
+  useStore.getState().curateUnlocked();
+  assert.strictEqual(useStore.getState().curatePress, 6, 'an all-locked no-op does not advance the counter');
+}
 
 console.log('curate.selfcheck: ok');

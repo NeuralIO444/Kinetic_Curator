@@ -12,6 +12,7 @@ export const CH = Object.freeze({
   color: 5,
   noise: 6,
   dyn: 7,
+  curate: 8,
 });
 
 /**
@@ -114,6 +115,7 @@ const OFFSET_GROUP_OF = new Map([
   [CH.geo, 'spatial'],
   [CH.attr, 'spatial'],
   [CH.dyn, 'spatial'],
+  [CH.curate, 'spatial'],
   [CH.asset, 'asset'],
   [CH.color, 'color'],
   [CH.noise, 'noise'],
