@@ -467,14 +467,17 @@ export const createGlobalSlice = (set) => ({
       next.assetWeightOverrides = {};
     }
     next.paletteOverrides = doc.paletteOverrides ?? null;
+    // #639 — an import is a new document: undo must never resurrect the
+    // pre-import composition. This runs for every import, not just ones with
+    // layers (a layerless doc used to leave stale undo history behind).
+    next.historyUndoStack = [];
+    next.historyRedoStack = [];
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       // #103 Track B — bound on the apply path too; the live loop resolves
       // every layer per frame.
       next.layers = doc.layers.slice(0, MAX_LAYERS);
       next.activeLayerId = doc.activeLayerId;
       next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots);
-      next.historyUndoStack = [];
-      next.historyRedoStack = [];
       // Install the active layer's snapshot onto live state. The serializer
       // writes lockedParams/caGrid only into snapshots (never root fields),
       // so without this a load silently dropped parameter locks and the CA
