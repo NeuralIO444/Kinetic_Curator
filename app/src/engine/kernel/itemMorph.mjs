@@ -21,6 +21,32 @@
  * was O(n^2) per frame AND let near-tied pairs flip mid-flight when the
  * breathing layout (life drift, displacement warp) shifted a target —
  * items darted across their group instead of gliding one straight line.
+ *
+ * #564 SLEIGHT-OF-HAND — one director, not per-chip blends. A node never
+ * changes costume while you can see it: it scales to exactly zero at its own
+ * centre, swaps identity (asset, colour, accent, role) at the minimum, and
+ * grows back as the new thing. Each node gets its own seeded window inside
+ * the transition (nodeWindow), so the swap sweeps across the canvas as a
+ * wave instead of every node flipping on one frame. Consequences:
+ *  - colour/accent no longer interpolate. A tint lerp is a NEW ATLAS CELL
+ *    every frame (the tint is baked — see liveAtlas.mjs), which is the
+ *    rebake churn of #561. Swapping at zero scale costs one cell, not sixty.
+ *  - unmatched items no longer alpha-fade (that fade was the optical
+ *    cross-dissolve the Always Alive protocol bans): a leaver shrinks out by
+ *    its window's midpoint, a joiner grows in from it.
+ *  - every window closes at or before t=1 (delay ≤ STAGGER, dur ≥ DUR_MIN,
+ *    STAGGER + DUR_MIN + DUR_JIT === 1), so the completion frame's handoff
+ *    to raw toItems holds no frame and pops nothing.
+ *
+ * KNOWN CEILING — the swap is hidden by SAMPLING, not by a dead band: the
+ * envelope is exactly 0 at u=0.5, but a frame only lands NEAR that instant.
+ * How near is a function of how many frames the node's half-window gets, so
+ * the residual size on the swap frame scales with MIX: ~0.2% of full size at
+ * MIX 2s (the default), ~1% at 1s, ~37% at 0.25s — i.e. below roughly 0.75s
+ * a MIX no longer has the frames to hide anything and degrades toward the
+ * cut it is already asking for. Upgrade path if a sub-second MIX ever needs
+ * to be clean: hold the envelope at zero across a band around u=0.5 whose
+ * width comes from the caller's real dt, not a constant.
  */
 
 function dist2(a, b) {
@@ -49,7 +75,7 @@ function groupByAsset(items) {
  * pairing must not follow them.
  * Returns { pairs: [{ f, g, j }], onlyFrom: [items], onlyTo: [{ g, j }] }.
  */
-export function planMorph(fromItems, toItems) {
+export function planMorph(fromItems, toItems, seed = 0) {
   const fromGroups = groupByAsset(fromItems || []);
   const toGroups = groupByAsset(toItems || []);
   const pairs = [];
@@ -99,7 +125,7 @@ export function planMorph(fromItems, toItems) {
   onlyFrom.push(...leftoverFrom);
   onlyTo.push(...leftoverTo.map((t) => ({ g: t.g, j: t.origIdx })));
 
-  return { pairs, onlyFrom, onlyTo };
+  return { pairs, onlyFrom, onlyTo, seed: (seed >>> 0) };
 }
 
 /**
@@ -126,28 +152,64 @@ function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
-function hexToRgb(hex) {
-  const h = String(hex || '#000000').replace('#', '');
-  const v = h.length <= 4 ? h.slice(0, 3).split('').map((c) => c + c).join('') : h.slice(0, 6);
-  return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) || 0);
+
+// ── #564 director: the seeded swap wave ─────────────────────────────────────
+// Each node owns a window [delay, delay+dur] inside the transition's [0,1].
+// STAGGER + DUR_MIN + DUR_JIT === 1 exactly, so the latest-starting, longest-
+// running node still closes at t=1 — no node is mid-swap at the handoff.
+const STAGGER = 0.35;
+const DUR_MIN = 0.5;
+const DUR_JIT = 0.15;
+
+/** xorshift-ish avalanche on (index, seed). Index-stable: same seed, same wave. */
+function hash01(i, seed) {
+  let h = (Math.imul((i | 0) + 0x9e3779b9, 0x85ebca6b) ^ (seed | 0)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2545f491) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return h / 4294967296;
 }
-function rgbToHex([r, g, b]) {
-  const c = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
-  return `#${c(r)}${c(g)}${c(b)}`;
+
+/** The node at output index `i`: when its swap starts and how long it takes. */
+export function nodeWindow(i, seed = 0) {
+  return {
+    delay: hash01(i * 2, seed) * STAGGER,
+    dur: DUR_MIN + hash01(i * 2 + 1, seed) * DUR_JIT,
+  };
 }
-function lerpColor(a, b, t) {
-  if (!a || !b || a === b) return b || a;
-  const ca = hexToRgb(a), cb = hexToRgb(b);
-  return rgbToHex([lerp(ca[0], cb[0], t), lerp(ca[1], cb[1], t), lerp(ca[2], cb[2], t)]);
+
+/** Transition progress -> this node's own progress, clamped to its window. */
+function nodeT(t, i, seed) {
+  const { delay, dur } = nodeWindow(i, seed);
+  const u = (t - delay) / dur;
+  return u <= 0 ? 0 : (u >= 1 ? 1 : u);
 }
+
+/** Smootherstep — zero slope at both ends, so no node starts or stops with a jerk. */
+function ease(x) {
+  const c = x <= 0 ? 0 : (x >= 1 ? 1 : x);
+  return c * c * c * (c * (c * 6 - 15) + 10);
+}
+
+const shrinkEnv = (u) => 1 - ease(u * 2);      // 1 -> 0 across the window's first half
+const growEnv = (u) => ease(u * 2 - 1);        // 0 -> 1 across its second half
+/** Strict scale-to-zero at the midpoint: no bead, nothing left to see mid-swap. */
+const swapEnv = (u) => (u < 0.5 ? shrinkEnv(u) : growEnv(u));
+
+const numOr = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
 /**
  * Blend fromItems -> toItems at eased t in [0,1]. t<=0 returns fromItems
  * verbatim, t>=1 returns toItems verbatim (reference equality, so callers
- * can drop the transition once the blended list === toItems). A matched
- * pair keeps the TARGET item's identity (asset, role, key, u, ...) and
- * only tweens x/y/scale/rotation/alpha/color/accent; an unmatched target
- * item fades in, an unmatched source item fades out.
+ * can drop the transition once the blended list === toItems).
+ *
+ * #564: every node runs the director's scale swap inside its own seeded
+ * window. A matched pair travels (x/y/rotation/alpha/base scale) on its own
+ * progress u while its drawn scale rides swapEnv(u) — full size, down to
+ * exactly zero at u=0.5, back to full. Its COSTUME (asset, colour, accent,
+ * role, key) is the source item's below the minimum and the target item's
+ * above it, so the swap only ever happens at zero scale. An unmatched target
+ * grows in from the midpoint; an unmatched source shrinks out by it. Nothing
+ * alpha-fades and nothing lerps a tint.
  *
  * `plan` is the planMorph() result captured at transition start (#419):
  * the pairing stays fixed for the whole transition while every slot
@@ -164,14 +226,16 @@ function lerpColor(a, b, t) {
  * Now each item carries a depth key that slides from its from-rank to its
  * to-rank; the list is stably sorted by it. The key reaches pure to-rank by
  * t = ORDER_SETTLE, so from there the first |to| entries ARE raw to-order (and
- * fade-outs trail, ~0 alpha) — no flip at the handoff either.
+ * leavers trail, at ~0 scale since #564) — no flip at the handoff either.
  */
 const ORDER_SETTLE = 0.9;
 
 export function blendItems(fromItems, toItems, t, plan = null) {
   if (t <= 0) return fromItems;
   if (t >= 1) return toItems;
-  const { pairs, onlyFrom } = plan || planMorph(fromItems, toItems);
+  const resolved = plan || planMorph(fromItems, toItems);
+  const { pairs, onlyFrom } = resolved;
+  const seed = resolved.seed | 0;
   const toList = toItems || [];
   const toGroups = groupByAsset(toList);
   const idxOf = new Map(toList.map((it, i) => [it, i]));
@@ -193,30 +257,37 @@ export function blendItems(fromItems, toItems, t, plan = null) {
     const to = toList[i];
     const f = partner[i];
     const toRank = i / toLen;
+    const u = nodeT(t, i, seed);
     if (f) {
       const fromRank = (idxFrom.get(f) ?? i) / fromLen;
+      const g = ease(u); // travel progress — eased so the node's own move has no jerk
       out.push({
         k: (1 - w) * fromRank + w * toRank,
         o: {
-          ...to,
-          x: lerp(f.x, to.x, t),
-          y: lerp(f.y, to.y, t),
-          scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, t),
-          rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, t),
-          alpha: lerp(Number.isFinite(f.alpha) ? f.alpha : 100, Number.isFinite(to.alpha) ? to.alpha : 100, t),
-          color: lerpColor(f.color, to.color, t),
-          accent: lerpColor(f.accent, to.accent, t),
+          // #564: costume comes from ONE side, chosen at the minimum. Never a
+          // blend of the two, so a node is never a third thing that exists in
+          // neither pose (and never needs an atlas cell for one).
+          ...(u < 0.5 ? f : to),
+          x: lerp(f.x, to.x, g),
+          y: lerp(f.y, to.y, g),
+          scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, g) * swapEnv(u),
+          rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, g),
+          alpha: lerp(numOr(f.alpha, 100), numOr(to.alpha, 100), g),
         },
       });
     } else {
-      // unmatched target fades in (#444: in its raw position)
-      out.push({ k: toRank, o: { ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t } });
+      // unmatched target grows in from its window's midpoint (#444: raw position)
+      out.push({ k: toRank, o: { ...to, scale: (Number(to.scale) || 1) * growEnv(u) } });
     }
   }
-  // unmatched source fades out; its key drifts past every to-rank so it trails at settle
+  // unmatched source shrinks out by its window's midpoint; its key drifts past
+  // every to-rank so it trails at settle. Window indices continue past the
+  // to-list so a leaver and a joiner never share one node's slot in the wave.
+  let wi = toList.length;
   for (const f of onlyFrom) {
     const fromRank = (idxFrom.get(f) ?? 0) / fromLen;
-    out.push({ k: (1 - w) * fromRank + w * 2, o: { ...f, alpha: (Number.isFinite(f.alpha) ? f.alpha : 100) * (1 - t) } });
+    const u = nodeT(t, wi++, seed);
+    out.push({ k: (1 - w) * fromRank + w * 2, o: { ...f, scale: (Number(f.scale) || 1) * shrinkEnv(u) } });
   }
   // Array.prototype.sort is stable: ties keep emission order.
   out.sort((x, y) => x.k - y.k);

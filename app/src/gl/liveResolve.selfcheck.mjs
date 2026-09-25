@@ -460,6 +460,81 @@ test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   r.dispose();
 });
 
+// ── #564: the Assets tab is a transition trigger too ───────────────────────
+// Toggling an asset off already moved morphSig (the enabled-id set changed).
+// SWAP (same id, new SVG) and a weight edit did not — so they snapped, and
+// the atlas rebaked under a fully visible canvas (#561). morphSig now carries
+// the pool's CONTENT, so both route through the director's scale swap.
+
+const userAsset = (svg) => ({
+  id: 'user:motif', category: 'fragments', weight: 'medium',
+  tags: ['overlay'], compound: false, source: 'overlay', svg,
+});
+
+/** Mid-transition, has any node dipped below the size it rests at? */
+function dipped(mid, raw) {
+  return mid.some((it, i) => raw[i] && (Number(it.scale) || 0) < (Number(raw[i].scale) || 0) * 0.9);
+}
+
+test('#564: swapping an overlay asset SVG under the same id fires the director', () => {
+  const r = createLiveResolver();
+  // Same array identity per call for a given svg, as the store hands it over.
+  const poolV1 = [userAsset('<path d="M0 0 L10 10"/>')];
+  const poolV2 = [userAsset('<circle cx="5" cy="5" r="4"/>')];
+  const mk = (customAssets, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    customAssets, mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  lyr(r.resolveLayers(mk(poolV1, 0)));                  // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk(poolV2, 1000))); // the SWAP
+  const mid = lyr(r.resolveLayers(mk(poolV2, 1250)));
+  const done = lyr(r.resolveLayers(mk(poolV2, 1600)));
+  const raw = lyr(createLiveResolver().resolveLayers(mk(poolV2, 1600)));
+
+  assert.ok(dipped(mid, raw), 'the swap shrinks nodes through it — it no longer snaps');
+  assert.ok(start.every((it) => Number.isFinite(it.x) && Number.isFinite(it.scale)),
+    'the transition produces finite items from its first frame');
+  assert.deepEqual(done, raw, 'and lands on the raw resolved items');
+  r.dispose();
+});
+
+test('#564: an asset weight edit fires the director', () => {
+  const r = createLiveResolver();
+  const mk = (assetWeightOverrides, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    assetWeightOverrides, mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  // ASSETS[0] ships 'heavy', so 'light' is a real edit, not a no-op write.
+  lyr(r.resolveLayers(mk({}, 0)));
+  lyr(r.resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1000)));
+  const mid = lyr(r.resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1250)));
+  const done = lyr(r.resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1600)));
+  const raw = lyr(createLiveResolver().resolveLayers(mk({ [ASSETS[0].id]: 'light' }, 1600)));
+
+  assert.ok(dipped(mid, raw), 'a weight edit re-rolls which asset each slot draws — it must not snap');
+  assert.deepEqual(done, raw, 'and it lands raw');
+  r.dispose();
+});
+
+test('#564: a governor asset shed is NOT a transition — different class', () => {
+  // assetThin drops the most expensive assets under load. The sig is taken
+  // BEFORE the thin on purpose: a shed must not spend a MIX-long swap wave
+  // on top of the load that caused it.
+  const r = createLiveResolver();
+  const mk = (assetThin, loopTimeMs) => baseInput({
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    assetThin, mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  lyr(r.resolveLayers(mk(false, 0)));
+  const shed = lyr(r.resolveLayers(mk(true, 1000)));
+  const rawShed = lyr(createLiveResolver().resolveLayers(mk(true, 1000)));
+  assert.deepEqual(shed, rawShed, 'the shed presents its raw items immediately, no transition');
+  r.dispose();
+});
+
 test('#471: a seed change alone now glides through item-morph, not a hard snap', () => {
   // Mirrors the #419 test exactly, substituting seed for mode as the
   // changing field — EVOLVE's seed target used to write a new seed

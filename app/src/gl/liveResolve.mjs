@@ -21,6 +21,17 @@ import { morphEase } from './paletteMix.mjs';
 
 const HOP_MAX_PX = 4;
 
+/**
+ * #564 — cheap content hash (djb2-xor) for overlay SVG bodies. Only ever run
+ * when the customAssets array reference changes (the store replaces it on
+ * every Assets-tab edit), never per frame: ≤ OVERLAY_CAP (32) small strings.
+ */
+function hashStr(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 function clampHop(it, q) {
   if (!q) return it;
   let dx = q.x * CANVAS_W - it.x;
@@ -92,6 +103,14 @@ export function createLiveResolver() {
   // (integral of noiseSpeed over each frame's dt) rather than derived as
   // speed × absolute session time. See the warp block below for why.
   const warpPhase = new Map(); // layerId -> { base, lastMs }
+  // #564 — Assets-tab edits that change what a layer DRAWS without changing
+  // which ids are enabled: SWAP replaces an overlay asset's SVG under the
+  // same id, a weight edit re-rolls which asset each slot gets. Neither
+  // moved morphSig before, so both snapped — the atlas rebaked under a fully
+  // visible canvas (#561). Recomputed only when the store hands over a new
+  // customAssets array, which it does on every such edit.
+  let overlayRevSrc;
+  let overlayRevs = new Map(); // overlay asset id -> content hash
   // #457 — PATCH (MOD/FIELD/FEED) targets a stable layer id (patch.to,
   // validated in layersSlice.js), but trackGraph.js's applyMod/applyField
   // and feedLive's delay buffer are numeric-slot APIs (FEED's fixed-size
@@ -251,6 +270,12 @@ export function createLiveResolver() {
   function resolveLayers(input) {
     const caps = getQualityCaps(input.quality || 'balanced');
     const pool = mergePool(ASSETS, input.customAssets || []);
+    if (overlayRevSrc !== input.customAssets) {
+      overlayRevSrc = input.customAssets;
+      overlayRevs = new Map((input.customAssets || [])
+        .filter((a) => a && typeof a === 'object')
+        .map((a) => [String(a.id), hashStr(String(a.svg || ''))]));
+    }
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     const aliveIds = new Set();
@@ -315,6 +340,13 @@ export function createLiveResolver() {
       let activeAssets = pool
         .filter((a) => !src.enabledAssets || src.enabledAssets[a.id])
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
+      // #564 — identity of the pool this layer actually draws: which assets,
+      // at what weight, with what content. Computed BEFORE assetThin on
+      // purpose: a governor shed is a different class of change (#564's
+      // out-of-scope list) and must not fire a transition.
+      const assetSig = activeAssets
+        .map((a) => `${a.id}:${a.weight || ''}:${overlayRevs.get(a.id) || 0}`)
+        .join(',');
       if (input.assetThin && activeAssets.length > 1) {
         const ranked = [...activeAssets].sort((a, b) => getAssetCost(b) - getAssetCost(a));
         const drop = Math.max(1, Math.ceil(ranked.length * 0.25));
@@ -450,11 +482,13 @@ export function createLiveResolver() {
       // path instead of seed being the one pure-snap field. This also
       // means a manual seed edit or +1 now eases the same way; that's the
       // mechanism's own named tradeoff, not an oversight.
+      // #564 — assetSig replaces the old enabled-id join: same trigger for
+      // enable/disable (the pool is already filtered by enabledAssets), plus
+      // the weight and SVG-content edits the id set alone could not see.
       const morphSig = [
-        layoutParams.mode, layoutParams.behave, src.paletteId, seed,
-        Object.keys(src.enabledAssets || {}).filter((k) => src.enabledAssets[k]).sort().join(','),
+        layoutParams.mode, layoutParams.behave, src.paletteId, seed, assetSig,
       ].join('|');
-      out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
+      out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
     const content = out.filter((e) => !e.isFx);
     const toNorm = (it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H });
@@ -560,7 +594,9 @@ export function createLiveResolver() {
           fromItems: prevShown.items,
           startMs: nowMs,
           dur: mixSeconds,
-          plan: planMorph(prevShown.items, e.items),
+          // #564 — the director's stagger is seeded off the layer seed, so a
+          // given seed always replays the same wave across the canvas.
+          plan: planMorph(prevShown.items, e.items, e.morphSeed),
         });
       }
       const tr = morphState.get(e.id);
