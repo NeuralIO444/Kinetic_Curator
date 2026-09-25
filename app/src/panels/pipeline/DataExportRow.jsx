@@ -81,7 +81,7 @@ export function DataExportRow({
       try {
         const parsed = JSON.parse(ev.target.result);
         const list = Array.isArray(parsed) ? parsed : [parsed];
-        // #571-adjacent honesty: count what survives sanitize (same
+        // Sharp-edge honesty (#569–#571 PR): count what survives sanitize (same
         // function the store applies), not what was in the file — an
         // all-junk file must warn, never toast success.
         const valid = list.map(sanitizePalette).filter(Boolean);
