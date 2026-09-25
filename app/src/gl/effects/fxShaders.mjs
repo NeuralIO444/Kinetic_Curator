@@ -52,6 +52,7 @@ uniform sampler2D u_tex;
 uniform vec2 u_res;
 uniform float u_scale;
 uniform int u_seed;
+uniform float u_warp;
 in vec2 v_cuv;
 out vec4 o;
 void main() {
@@ -60,6 +61,19 @@ void main() {
   // v_cuv spans the 1000x700 canvas, so v_cuv*vec2(12, 8.4) reproduces the
   // user-space noise lattice at any output resolution.
   vec2 np = v_cuv * vec2(12.0, 8.4) + vec2(float(u_seed) * 17.31, float(u_seed) * 9.17);
+  // #590 — domain warp: offset the noise LOOKUP by a second, slower fbm before
+  // sampling it. The displacement then varies with its own field instead of a
+  // fixed lattice, so edges boil rather than wobble.
+  //
+  // Guarded, not multiplied: at u_warp == 0 the branch is skipped entirely and
+  // np is the identical expression it was before this existed, so warp 0 is
+  // bit-identical legacy rather than close enough. Multiplying an unused
+  // lookup by 0 would still pay for it AND risk a 0*NaN.
+  if (u_warp > 0.0) {
+    vec2 wp = np * 0.45 + vec2(31.7, 12.9);
+    vec2 w = vec2(kc_fbm(wp, 2) - 0.5, kc_fbm(wp + vec2(7.9, 3.1), 2) - 0.5);
+    np += w * u_warp * 0.12;
+  }
   float nx = kc_fbm(np, 3) - 0.5;
   float ny = kc_fbm(np + vec2(5.2, 1.3), 3) - 0.5;
   vec2 duv = vec2(nx, ny) * u_scale / vec2(1000.0, 700.0);
@@ -80,6 +94,11 @@ export const FX_DISPLACE_DESCRIPTOR = {
     seed: {
       type: 'int', label: 'Seed', min: 0, max: 99, step: 1, def: 7,
       ui: 'slider', hint: 'Noise seed — same seed, same warp',
+    },
+    // #590 — additive: default 0 is the legacy effect, bit-identical.
+    warp: {
+      type: 'float', label: 'Warp', min: 0, max: 60, step: 1, def: 0,
+      ui: 'slider', hint: 'Domain warp — bends the noise field itself, so edges boil instead of wobble. 0 is the legacy displace.',
     },
   },
 };
@@ -228,7 +247,7 @@ export const FX_EDGE_DESCRIPTOR = {
 export const FX_SHADER_EFFECTS = [
   // 2x fbm-3 noise lookups: the costliest template FX — a quality scaler.
   ['displace', { fs: FX_DISPLACE_FS, descriptor: FX_DISPLACE_DESCRIPTOR, file: 'fxShaders.mjs:displace',
-    cost: { tier: 2, memoryBytes: 1920 * 1080 * 8, timeMs: 1.2, notes: '2x fbm-3 noise; warp cost scales with octaves' } }],
+    cost: { tier: 2, memoryBytes: 1920 * 1080 * 8, timeMs: 1.6, notes: '2x fbm-3 noise, plus 2x fbm-2 when warp > 0 (branch skipped at warp 0); warp cost scales with octaves' } }],
   ['tear', { fs: FX_TEAR_FS, descriptor: FX_TEAR_DESCRIPTOR, file: 'fxShaders.mjs:tear',
     cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.5, notes: 'single noise lookup + shear' } }],
   ['scanlines', { fs: FX_SCANLINES_FS, descriptor: FX_SCANLINES_DESCRIPTOR, file: 'fxShaders.mjs:scanlines',

@@ -266,6 +266,29 @@ ok('#554: builtin u_p packers agree with the catalog sanitize — hostile values
   }
   assert.deepEqual(packFor('invert', {}), [0, 0, 0, 0]);
 });
+ok('#590: the SVG displace emits the identical legacy primitives at warp 0', () => {
+  const legacy = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7 } }], {});
+  const zero = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7, warp: 0 } }], {});
+  assert.deepStrictEqual(zero, legacy, 'warp 0 must be the legacy filter, primitive for primitive');
+  // …and warp > 0 domain-warps the NOISE: a second turbulence displaces the
+  // first, and only then does the result displace the source.
+  const warped = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7, warp: 30 } }], {});
+  const prims = warped.map((p) => p.prim);
+  assert.deepStrictEqual(prims, ['feTurbulence', 'feTurbulence', 'feDisplacementMap', 'feDisplacementMap'],
+    'warp adds a turbulence and a displacement of the noise itself');
+  assert.notStrictEqual(warped[0].attrs.seed, warped[1].attrs.seed,
+    'the warp field must not be the same noise it is warping');
+  assert.ok(warped[0].attrs.baseFrequency < warped[1].attrs.baseFrequency,
+    'the warp field must be the slower of the two, or it is just more noise');
+  // Hostile values fall back to the legacy shape rather than emitting junk.
+  for (const bad of [NaN, -5, null, undefined, 'x']) {
+    assert.deepStrictEqual(
+      compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7, warp: bad } }], {}),
+      legacy, `warp ${bad} must fall back to the legacy filter`,
+    );
+  }
+});
+
 ok('setSelectedFxLayer only accepts fx ids', () => {
   const { api, get } = driveSlice();
   api.addFxLayer();

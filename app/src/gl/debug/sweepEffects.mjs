@@ -286,6 +286,10 @@ export const SWEEP_EFFECTS = [
       C('max', { scale: 120, seed: 99 }, { costly: true }),
       C('min scale, min seed', { scale: 1, seed: 0 }),
       H('hostile negative scale', { scale: -10, seed: 7 }),
+      // #590 — domain warp.
+      C('warp mid', { scale: 24, seed: 7, warp: 30 }),
+      C('warp max', { scale: 24, seed: 7, warp: 60 }, { costly: true }),
+      H('hostile negative warp', { scale: 24, seed: 7, warp: -20 }),
     ],
   },
   {
