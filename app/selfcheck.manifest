@@ -9,6 +9,7 @@ node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
 node src/hooks/batchGate.selfcheck.mjs
 node src/panels/pipeline/SnapshotGallery.selfcheck.mjs
+node src/panels/pipeline/paletteImportCopy.selfcheck.mjs
 node src/hooks/useMediaExport.selfcheck.mjs
 node src/hooks/governorCuts.selfcheck.mjs
 node src/hooks/sceneCost.selfcheck.mjs
