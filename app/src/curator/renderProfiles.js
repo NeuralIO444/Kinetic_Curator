@@ -486,9 +486,9 @@ export function getRenderProfile(id) {
 
 const r2 = (v) => +(v.toFixed(2));
 const r4 = (v) => +(v.toFixed(4));
-const randInt = (lo, hi) => Math.floor(lo + Math.random() * (hi - lo + 1));
+const randInt = (lo, hi, rng) => Math.floor(lo + rng() * (hi - lo + 1));
 
-function rollBias(key, spec) {
+function rollBias(key, spec, rng) {
   switch (key) {
     case 'count':
     case 'jitter':
@@ -496,29 +496,29 @@ function rollBias(key, spec) {
     case 'zTiers':
     case 'displacement':
     case 'particleCount':
-      return randInt(spec[0], spec[1]);
+      return randInt(spec[0], spec[1], rng);
     case 'scale': {
       const [[a, b], [c, d]] = spec;
-      return [r2(a + Math.random() * (b - a)), r2(c + Math.random() * (d - c))];
+      return [r2(a + rng() * (b - a)), r2(c + rng() * (d - c))];
     }
     case 'rotate': {
       const [[a, b], [c, d]] = spec;
-      return [Math.floor(a + Math.random() * (b - a + 1)), Math.floor(c + Math.random() * (d - c + 1))];
+      return [Math.floor(a + rng() * (b - a + 1)), Math.floor(c + rng() * (d - c + 1))];
     }
     case 'alpha': {
       const [[a, b], [c, d]] = spec;
-      return [Math.floor(a + Math.random() * (b - a + 1)), Math.floor(c + Math.random() * (d - c + 1))];
+      return [Math.floor(a + rng() * (b - a + 1)), Math.floor(c + rng() * (d - c + 1))];
     }
     case 'noiseFreq': {
       const [a, b] = spec;
-      return r4(a + Math.random() * (b - a));
+      return r4(a + rng() * (b - a));
     }
     case 'noiseSpeed':
     case 'swarmCohesion':
     case 'gravityWells':
     case 'damping': {
       const [a, b] = spec;
-      return r2(a + Math.random() * (b - a));
+      return r2(a + rng() * (b - a));
     }
     default:
       return undefined;
@@ -532,20 +532,20 @@ function rollBias(key, spec) {
  * Profiles with `modes` (currently only stock: tube sculpture vs vorticity
  * field) roll one mode per candidate.
  */
-export function applyRenderProfile(candidate, profileId) {
+export function applyRenderProfile(candidate, profileId, rng = Math.random) {
   const profile = getRenderProfile(profileId);
   if (!profile) return candidate;
   let { biases, forces } = profile;
   if (profile.modes) {
     const keys = Object.keys(profile.modes);
-    const mode = profile.modes[keys[Math.floor(Math.random() * keys.length)]];
+    const mode = profile.modes[keys[Math.floor(rng() * keys.length)]];
     biases = mode.biases;
     forces = mode.forces;
   }
   const out = { ...candidate };
   for (const [key, spec] of Object.entries(biases)) {
     if (key in out) {
-      const v = rollBias(key, spec);
+      const v = rollBias(key, spec, rng);
       if (v !== undefined) out[key] = v;
     }
   }

@@ -139,12 +139,12 @@ export function personaCurator() {
     personaName: persona.alias,
     personaId: persona.id,
     status: () => 'active',
-    shapeCandidates(candidates) {
+    shapeCandidates(candidates, rng) {
       if (!getRenderProfile(persona.id)) return;
       for (let i = 0; i < candidates.length; i++) {
-        candidates[i] = applyRenderProfile(candidates[i], persona.id);
+        candidates[i] = applyRenderProfile(candidates[i], persona.id, rng);
       }
     },
-    pick: (candidates) => pickPersona(candidates, persona.id),
+    pick: (candidates, rng) => pickPersona(candidates, persona.id, rng),
   };
 }

@@ -6,7 +6,7 @@ import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/
 import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/palettes.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
-import { SEED_OFFSET_GROUPS, defaultSeedOffsets, normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES } from '../../data/voices.js';
 
@@ -61,6 +61,8 @@ export const createLayoutSlice = (set) => ({
    * the identity — saved and restored exactly like the seed itself.
    */
   seedOffsets: defaultSeedOffsets(),
+  /** CURATE press counter (#518) — session-only, never serialized. */
+  curatePress: 0,
   paletteId: 'praystation',
   /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
   paletteOverrides: null,
@@ -424,15 +426,19 @@ export const createLayoutSlice = (set) => ({
     // Everything locked: no-op — no candidate differs from current state, so
     // push no undo entry (same guard as randomizeUnlocked).
     if (unlocked.length === 0) return {};
+    // #518: every roll comes off one seeded stream keyed by (seed, press #), so
+    // presses differ but a given (seed, offsets, press #) replays the same pick.
+    const press = state.curatePress | 0;
+    const rng = rngForIndex(state.seed, CH.curate, press, state.seedOffsets);
     const candidates = [];
     for (let n = 0; n < CURATE_CANDIDATES; n++) {
       const rp = { ...state.layoutParams };
-      for (const key of unlocked) rp[key] = randomizeKey(key);
+      for (const key of unlocked) rp[key] = randomizeKey(key, rng);
       candidates.push(rp);
     }
-    const { index } = pickCurated(candidates, curator);
+    const { index } = pickCurated(candidates, curator, rng);
     if (index < 0) return {};
-    return { ...pushToUndo(state, true), layoutParams: candidates[index] };
+    return { ...pushToUndo(state, true), layoutParams: candidates[index], curatePress: press + 1 };
   }),
 
   // Entries are tagged with the layerId they were captured for (#92) and the

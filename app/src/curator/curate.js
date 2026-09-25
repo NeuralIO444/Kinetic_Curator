@@ -60,24 +60,24 @@ export function getActiveCurator() {
  * must be the ones in this array. A profile bug never breaks the button —
  * shaping failure falls back to the unshaped candidates.
  */
-export function pickCurated(candidates, curator) {
+export function pickCurated(candidates, curator, rng = Math.random) {
   const n = candidates.length;
   if (n === 0) return { index: -1, curated: false };
   if (curator && typeof curator.shapeCandidates === 'function') {
     try {
-      curator.shapeCandidates(candidates);
+      curator.shapeCandidates(candidates, rng);
     } catch {
       /* fall through to the unshaped candidates */
     }
   }
   let idx;
   try {
-    idx = curator.pick(candidates);
+    idx = curator.pick(candidates, rng);
   } catch {
     idx = -1;
   }
   if (!Number.isInteger(idx) || idx < 0 || idx >= n) {
-    return { index: Math.floor(Math.random() * n), curated: false };
+    return { index: Math.floor(rng() * n), curated: false };
   }
   return { index: idx, curated: true };
 }

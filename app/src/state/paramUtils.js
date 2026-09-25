@@ -9,25 +9,28 @@ export const RANDOMIZABLE_KEYS = [
 
 export const MORPHABLE_KEYS = [...RANDOMIZABLE_KEYS];
 
-const rand = (lo, hi) => lo + Math.random() * (hi - lo);
-const randInt = (lo, hi) => Math.floor(rand(lo, hi + 1));
+const rand = (lo, hi, rng) => lo + rng() * (hi - lo);
+const randInt = (lo, hi, rng) => Math.floor(rand(lo, hi + 1, rng));
 
-export function randomizeKey(key) {
+/** rng is injectable (#518): CURATE passes a seeded stream; dice buttons keep Math.random. */
+export function randomizeKey(key, rng = Math.random) {
+  const rand_ = (lo, hi) => rand(lo, hi, rng);
+  const randInt_ = (lo, hi) => randInt(lo, hi, rng);
   switch (key) {
-    case 'count':         return randInt(30, 600);
-    case 'scale':         return [+(rand(0.1, 1.0).toFixed(2)), +(rand(1.0, 3.0).toFixed(2))];
-    case 'rotate':        return [randInt(-180, 0), randInt(0, 180)];
-    case 'alpha':         return [randInt(15, 60), randInt(70, 100)];
-    case 'jitter':        return randInt(0, 150);
-    case 'density':       return randInt(20, 120);
-    case 'zTiers':        return randInt(1, 10);
-    case 'noiseFreq':     return +(rand(0.002, 0.015).toFixed(4));
-    case 'noiseSpeed':    return +(rand(0.1, 2.0).toFixed(2));
-    case 'displacement':  return randInt(0, 150);
-    case 'particleCount': return randInt(50, 300);
-    case 'swarmCohesion': return +(rand(0.2, 4.0).toFixed(2));
-    case 'gravityWells':  return +(rand(0.1, 3.0).toFixed(2));
-    case 'damping':       return +(rand(0.90, 0.98).toFixed(2));
+    case 'count':         return randInt_(30, 600);
+    case 'scale':         return [+(rand_(0.1, 1.0).toFixed(2)), +(rand_(1.0, 3.0).toFixed(2))];
+    case 'rotate':        return [randInt_(-180, 0), randInt_(0, 180)];
+    case 'alpha':         return [randInt_(15, 60), randInt_(70, 100)];
+    case 'jitter':        return randInt_(0, 150);
+    case 'density':       return randInt_(20, 120);
+    case 'zTiers':        return randInt_(1, 10);
+    case 'noiseFreq':     return +(rand_(0.002, 0.015).toFixed(4));
+    case 'noiseSpeed':    return +(rand_(0.1, 2.0).toFixed(2));
+    case 'displacement':  return randInt_(0, 150);
+    case 'particleCount': return randInt_(50, 300);
+    case 'swarmCohesion': return +(rand_(0.2, 4.0).toFixed(2));
+    case 'gravityWells':  return +(rand_(0.1, 3.0).toFixed(2));
+    case 'damping':       return +(rand_(0.90, 0.98).toFixed(2));
     default:              return undefined;
   }
 }
