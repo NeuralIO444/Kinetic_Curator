@@ -378,5 +378,93 @@ ok('#564 contract: per-frame motion cap — travel happens while the node is sma
   assert.ok(maxVisible < 25, `visible per-frame hop stays capped (${maxVisible}px of a 1000px move)`);
 });
 
+// ── #572: the pairing must stay the SAME pairing, just not O(n^3) ──────────
+// Oracle: the pre-#572 nested-loop greedy, verbatim in behaviour (global
+// nearest, first in row-major order on a tie, per asset group then a spatial
+// cross-asset pass). Fixtures use small integer coords on purpose — dense
+// distance ties are where a spatial index quietly diverges.
+function oraclePlan(fromItems, toItems) {
+  const group = (items) => {
+    const g = new Map();
+    for (const it of items) {
+      const k = it.assetId || it.role || 'default';
+      if (!g.has(k)) g.set(k, []);
+      g.get(k).push(it);
+    }
+    return g;
+  };
+  const d2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+  const greedy = (fs, ts, pairs) => {
+    while (fs.length && ts.length) {
+      let bi = 0, bj = 0, bd = Infinity;
+      for (let i = 0; i < fs.length; i++) for (let j = 0; j < ts.length; j++) {
+        const d = d2(fs[i], ts[j].item);
+        if (d < bd) { bd = d; bi = i; bj = j; }
+      }
+      pairs.push({ f: fs[bi], g: ts[bj].g, j: ts[bj].origIdx });
+      fs.splice(bi, 1); ts.splice(bj, 1);
+    }
+  };
+  const fg = group(fromItems), tg = group(toItems);
+  const pairs = [], lf = [], lt = [];
+  for (const k of new Set([...fg.keys(), ...tg.keys()])) {
+    const fs = (fg.get(k) || []).slice();
+    const ts = (tg.get(k) || []).map((item, origIdx) => ({ item, origIdx, g: k }));
+    greedy(fs, ts, pairs);
+    lf.push(...fs); lt.push(...ts);
+  }
+  greedy(lf, lt, pairs);
+  return { pairs, onlyFrom: lf, onlyTo: lt.map((t) => ({ g: t.g, j: t.origIdx })) };
+}
+
+function lcg(seed) {
+  let s = seed >>> 0;
+  return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
+}
+
+ok('#572: planMorph pairs exactly like the old O(n^3) greedy (ties, mixed assets, uneven sides)', () => {
+  const rnd = lcg(572);
+  for (let trial = 0; trial < 60; trial++) {
+    const assets = ['a', 'b', 'c'].slice(0, 1 + Math.floor(rnd() * 3));
+    const span = trial % 3 === 0 ? 4 : trial % 3 === 1 ? 40 : 1000; // tiny span = tie storm
+    const mk = (cnt) => Array.from({ length: cnt }, () => ({
+      assetId: assets[Math.floor(rnd() * assets.length)],
+      x: Math.floor(rnd() * span), y: Math.floor(rnd() * span),
+    }));
+    const from = mk(1 + Math.floor(rnd() * 40)), to = mk(1 + Math.floor(rnd() * 40));
+    const want = oraclePlan(from, to);
+    const got = planMorph(from, to, 7);
+    assert.deepEqual(got.pairs, want.pairs, `pairs, trial ${trial}`);
+    assert.deepEqual(got.onlyFrom, want.onlyFrom, `onlyFrom, trial ${trial}`);
+    assert.deepEqual(got.onlyTo, want.onlyTo, `onlyTo, trial ${trial}`);
+  }
+});
+
+ok('#572: planMorph survives empty sides, coincident points and non-finite coords', () => {
+  assert.deepEqual(planMorph([], []).pairs, []);
+  assert.equal(planMorph([{ assetId: 'a', x: 1, y: 1 }], []).onlyFrom.length, 1);
+  assert.equal(planMorph([], [{ assetId: 'a', x: 1, y: 1 }]).onlyTo.length, 1);
+  const same = Array.from({ length: 12 }, () => ({ assetId: 'a', x: 5, y: 5 }));
+  assert.equal(planMorph(same, same).pairs.length, 12);
+  const junk = [{ assetId: 'a', x: NaN, y: 3 }, { assetId: 'a', x: 1, y: Infinity }];
+  const p = planMorph(junk, junk);
+  assert.equal(p.pairs.length, 2, 'garbage coordinates still terminate with a full pairing');
+});
+
+ok('#572: an 800-count plan is one cheap pass, not a mid-set hitch', () => {
+  const rnd = lcg(800);
+  const mk = () => Array.from({ length: 800 }, () => ({
+    assetId: ['a', 'b', 'c', 'd'][Math.floor(rnd() * 4)], x: rnd() * 1920, y: rnd() * 1080,
+  }));
+  const from = mk(), to = mk();
+  planMorph(from, to); // warm
+  const t0 = performance.now();
+  const plan = planMorph(from, to);
+  const ms = performance.now() - t0;
+  assert.equal(plan.pairs.length, 800);
+  // The old loop is seconds at this size; the budget is one frame with wide slack for CI.
+  assert.ok(ms < 100, `800-count plan took ${ms.toFixed(1)}ms`);
+});
+
 console.log(`itemMorph.selfcheck: ${fail === 0 ? 'OK' : 'FAIL'} (${n - fail}/${n})`);
 if (fail) process.exit(1);
