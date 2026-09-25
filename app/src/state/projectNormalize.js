@@ -38,10 +38,18 @@ export const MAX_CA_GRID_DIM = 256;
 
 function sanitizeCaGrid(raw) {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_CA_GRID_DIM) return null;
+  const out = [];
   for (const row of raw) {
     if (!Array.isArray(row) || row.length === 0 || row.length > MAX_CA_GRID_DIM) return null;
+    // #644 — cell values must be numeric before they reach the field
+    // generator: coerce numeric strings, and replace anything non-finite
+    // (NaN, Infinity, garbage) with 0 instead of letting it poison the CA.
+    out.push(row.map((cell) => {
+      const n = typeof cell === 'number' ? cell : Number(cell);
+      return Number.isFinite(n) ? n : 0;
+    }));
   }
-  return raw;
+  return out;
 }
 
 const KNOWN_ASSET_IDS = new Set(ASSETS.map((a) => a.id));
