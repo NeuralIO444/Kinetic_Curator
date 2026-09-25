@@ -30,7 +30,7 @@ import { createNoise } from './noise.js';
 import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
-import { resolveEffectiveBehave, resolveWindMode, orbitForce } from './organisms/behave.js';
+import { resolveEffectiveBehave, resolveWindMode, orbitForce, lorenzAdvance, lorenzSeed, LORENZ_DT } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
 
@@ -156,6 +156,10 @@ export class ParticleSystem {
     this.energy = new Float64Array(cap);
     this.drive = new Float64Array(cap);
     this.grazer = new Uint8Array(cap);
+    // #583 — per-agent Lorenz state (the ride the lorenz row follows).
+    this.lorenzX = new Float64Array(cap);
+    this.lorenzY = new Float64Array(cap);
+    this.lorenzZ = new Float64Array(cap);
     this.leakRgb = new Float64Array(cap * 3);
     // Grid scratch, reallocated with the population.
     this._cellOf = new Int32Array(cap);
@@ -198,6 +202,9 @@ export class ParticleSystem {
     this.alive = grow(this.alive);
     this.cgroup = grow(this.cgroup);
     this.energy = grow(this.energy);
+    this.lorenzX = grow(this.lorenzX);
+    this.lorenzY = grow(this.lorenzY);
+    this.lorenzZ = grow(this.lorenzZ);
     this.drive = grow(this.drive);
     this.grazer = grow(this.grazer);
     this.leakRgb = grow3(this.leakRgb);
@@ -308,6 +315,18 @@ export class ParticleSystem {
       this.energy[i] = 1;
       this.drive[i] = hashU01(seed >>> 0, CH.dyn, 4096 + i);
       this.grazer[i] = hashU01(seed >>> 0, CH.dyn, 8192 + i) < grazeFrac ? 1 : 0;
+      // #583 — seed this agent's Lorenz ride, clear of the origin fixed point.
+      // Same drive-init precedent: separate hashes, so the six load-bearing
+      // placement draws above keep their exact sequence and legacy seeds
+      // still reproduce bit-identical positions.
+      {
+        const l = lorenzSeed(
+          hashU01(seed >>> 0, CH.dyn, 12288 + i),
+          hashU01(seed >>> 0, CH.dyn, 16384 + i),
+          hashU01(seed >>> 0, CH.dyn, 20480 + i),
+        );
+        this.lorenzX[i] = l.x; this.lorenzY[i] = l.y; this.lorenzZ[i] = l.z;
+      }
       const [lr, lg, lb] = hexToRgb3(this.color[i]);
       this.leakRgb[i * 3] = lr;
       this.leakRgb[i * 3 + 1] = lg;
@@ -605,6 +624,15 @@ export class ParticleSystem {
     this.energy[cs] = (this.energy[i] + this.energy[j]) / 2;
     this.drive[cs] = (this.drive[i] + this.drive[j]) / 2;
     this.grazer[cs] = r4 < 0.5 ? this.grazer[i] : this.grazer[j];
+    // #583 — a child inherits one parent's ride outright rather than the
+    // average: averaging two points on opposite lobes lands near the origin,
+    // which is the fixed point, and the child would never move again.
+    {
+      const lp = r3 < 0.5 ? i : j;
+      this.lorenzX[cs] = this.lorenzX[lp];
+      this.lorenzY[cs] = this.lorenzY[lp];
+      this.lorenzZ[cs] = this.lorenzZ[lp];
+    }
     const cp3 = (r3 < 0.5 ? i : j) * 3;
     this.leakRgb[cs * 3] = this.leakRgb[cp3];
     this.leakRgb[cs * 3 + 1] = this.leakRgb[cp3 + 1];
@@ -710,6 +738,12 @@ export class ParticleSystem {
     // Chemotaxis is a mold-only sense: the profile opts in with a
     // chemotaxis gain, and pays a deposit so the colony sustains itself.
     const chemOn = organism && (profile.chemotaxis || 0) > 0;
+    // #583 — lorenz is a lorenz-only sense, gated exactly like chemotaxis, so
+    // no other verb can reach the branch and every existing row integrates the
+    // identical force sum. (profile is null outside organism mode.)
+    const lorenzOn = organism && (profile.lorenzGain || 0) > 0;
+    const lorenzGain = lorenzOn ? profile.lorenzGain : 0;
+    const lorenzRho = lorenzOn ? profile.lorenzRho : 0;
     const leak = Math.min(1, Math.max(0, Number(palette?.leak) || 0));
     const leakOn = organism && leak > 0;
     const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
@@ -763,6 +797,7 @@ export class ParticleSystem {
     const ALIVE = this.alive;
     // #287 — drive columns (hoisted; the force loop reads them per agent).
     const ENERGY = this.energy; const DRIVE = this.drive;
+    const LZX = this.lorenzX; const LZY = this.lorenzY; const LZZ = this.lorenzZ;
     const LEAKRGB = this.leakRgb;
     const SCENT = sharedScent || this._scent;
     const seedU = seed >>> 0;
@@ -942,6 +977,23 @@ export class ParticleSystem {
           const wmag = DRIVE[i] * meta * 0.6;
           fax += (Math.cos(wa) * wmag) / m;
           fay += (Math.sin(wa) * wmag) / m;
+        }
+      }
+      // #583 LORENZ — ride the flow. The agent's own Lorenz state advances one
+      // RK2 step per frame and its VELOCITY is the steering direction, so the
+      // heading is bounded but never repeats: it circles one lobe, then flips.
+      // Normalised, because the raw derivative runs to ~200 while the whole
+      // force budget here is order 1 — the direction is the signal, the gain
+      // is the authority. State is per agent, so a flock does not ride in
+      // lockstep; it is advanced here (not in the integrator) because it is a
+      // steering input, not a position.
+      if (lorenzOn) {
+        const adv = lorenzAdvance(LZX[i], LZY[i], LZZ[i], lorenzRho, LORENZ_DT * dtFrames);
+        LZX[i] = adv.x; LZY[i] = adv.y; LZZ[i] = adv.z;
+        const mag = Math.sqrt(adv.dx * adv.dx + adv.dy * adv.dy);
+        if (mag > 1e-9) {
+          fax += ((adv.dx / mag) * lorenzGain) / m;
+          fay += ((adv.dy / mag) * lorenzGain) / m;
         }
       }
       // #287 MOLD — chemotaxis: climb the scent gradient. Gated to
