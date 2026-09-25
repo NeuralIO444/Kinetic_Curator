@@ -78,6 +78,19 @@ function download(blob, filename) {
 }
 
 /**
+ * #570 — a zero-byte file is the nastier lie (the performer sees a file and
+ * believes the take exists; no-file is honest by absence). Pure so the
+ * selfcheck covers it without DOM: throws on missing/empty blobs.
+ */
+export function assertStillBlob(blob) {
+  const size = blob && Number.isFinite(Number(blob.size)) ? Number(blob.size) : NaN;
+  if (!Number.isFinite(size) || size <= 0) {
+    throw new Error('still file is empty (0 bytes) — nothing captured');
+  }
+  return blob;
+}
+
+/**
  * Capture one still from the live GL loop at the requested resolution
  * multiple of the 1000×700 scene (1x/2x/4x). Returns { blob, thumb, width,
  * height }. With ACCUM on, the captured frame is the live feedback image.
@@ -101,6 +114,8 @@ export async function captureStill({ loopRef, resolution = 1, seedStr = '', onTh
   if (onThumbnail) onThumbnail(thumb, { upscaledFrom: upscaledFrom || null });
   const blob = await new Promise((res, rej) =>
     canvas.toBlob((b) => (b ? res(b) : rej(new Error('still encode failed'))), 'image/png'));
+  // #570 — fail loudly on the partial lie (zero-byte file) before download.
+  assertStillBlob(blob);
   if (downloadFile) download(blob, `kinetic-curator-${seedStr}-${resolution}x.png`);
   return { blob, thumb, width: pw, height: ph, upscaledFrom: upscaledFrom || null };
 }
