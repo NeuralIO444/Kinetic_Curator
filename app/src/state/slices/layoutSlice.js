@@ -7,7 +7,7 @@ import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/pale
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
-import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES } from '../../data/voices.js';
+import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES } from '../../data/voices.js';
 
 /**
  * Open a MIX toward `merged` layout params (#284 morph-don't-cut). Live state
@@ -319,13 +319,13 @@ export const createLayoutSlice = (set) => ({
     return openParamsMix(state, merged, { name: preset.name || preset.id });
   }),
 
-  /** #517 — a stub chip (bare mode + a small motion block) rides the same MIX road as a preset. Layout only: never touches assets or palette. */
+  /** #517 — a stub chip (a layout mode) rides the same MIX road as a preset. Layout axis only (#555): never touches motion, assets or palette. */
   loadStubMode: (id) => set((state) => {
     const stub = STUB_VOICES.find((v) => v.id === id);
     if (!stub) return {};
     const merged = { ...state.layoutParams };
     let changed = false;
-    for (const [k, v] of Object.entries({ mode: stub.id, ...stub.motion })) {
+    for (const [k, v] of Object.entries({ mode: stub.id })) {
       if (!state.lockedParams[k] && merged[k] !== v) {
         merged[k] = v;
         changed = true;
@@ -333,6 +333,22 @@ export const createLayoutSlice = (set) => ({
     }
     if (!changed) return {};
     return openParamsMix(state, merged, { name: stub.name });
+  }),
+
+  /** Motion axis (#555): a `behave` chip plus motion numbers, on the MIX road. Never touches layout, assets or palette. */
+  loadMotion: (id) => set((state) => {
+    const motion = MOTION_MODES.find((m) => m.id === id);
+    if (!motion) return {};
+    const merged = { ...state.layoutParams };
+    let changed = false;
+    for (const [k, v] of Object.entries(motion.params)) {
+      if (!state.lockedParams[k] && merged[k] !== v) {
+        merged[k] = v;
+        changed = true;
+      }
+    }
+    if (!changed) return {};
+    return openParamsMix(state, merged, { name: motion.name });
   }),
 
   toggleParamLock: (key) => set((state) => ({
