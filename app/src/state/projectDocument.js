@@ -17,6 +17,22 @@ export const AUTOSAVE_KEY = 'kc:project:v1';
 /** Where a document that failed to parse is kept instead of being applied (#107 §6). */
 export const QUARANTINE_KEY = 'kc:project:quarantine';
 
+const MAX_UINT32 = 0xffffffff;
+/**
+ * #642 — seeds are uint32. Oversized, negative, fractional, or non-numeric
+ * seeds reject with a clear message instead of silently truncating to 0
+ * via `>>> 0` (2**40 became seed 0 with no warning). Hex strings stay
+ * supported for legacy files.
+ */
+function coerceSeed(raw) {
+  let seed = raw;
+  if (typeof seed === 'string') seed = parseInt(seed, 16);
+  if (!Number.isInteger(seed) || seed < 0 || seed > MAX_UINT32) {
+    return { ok: false, error: `Invalid seed: ${String(raw)}` };
+  }
+  return { ok: true, seed: seed >>> 0 };
+}
+
 export function serializeProject(state) {
   const doc = {
     version: PROJECT_VERSION,
@@ -59,9 +75,9 @@ export function parseProject(raw) {
 
   const isLegacy = raw.version == null && (raw.layout || raw.palette || raw.seed != null);
   if (isLegacy) {
-    let seed = raw.seed;
-    if (typeof seed === 'string') seed = parseInt(seed, 16);
-    if (!Number.isFinite(seed)) seed = 0;
+    const seedRes = coerceSeed(raw.seed);
+    if (!seedRes.ok) return seedRes;
+    const seed = seedRes.seed;
     const customAssets = sanitizeOverlay(raw.customAssets);
     return {
       ok: true,
@@ -89,11 +105,9 @@ export function parseProject(raw) {
     return { ok: false, error: `Unsupported project version: ${raw.version}` };
   }
 
-  let seed = raw.seed;
-  if (typeof seed === 'string') seed = parseInt(seed, 16);
-  if (!Number.isFinite(seed)) {
-    return { ok: false, error: 'Invalid seed' };
-  }
+  const seedRes = coerceSeed(raw.seed);
+  if (!seedRes.ok) return seedRes;
+  const seed = seedRes.seed;
 
   const customAssets = sanitizeOverlay(raw.customAssets);
   return {
