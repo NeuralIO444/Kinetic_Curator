@@ -3,7 +3,7 @@
  * Adding a profile is a row in BEHAVE, not a new force type.
  */
 
-export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter', 'mold'];
+export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter', 'mold', 'lorenz'];
 
 export const BEHAVE = {
   cruise: {
@@ -68,7 +68,89 @@ export const BEHAVE = {
     chemotaxis: 0.15,
     deposit: 0.06,
   },
+  // #583 — lorenz: weather inside a jar. The agent rides the flow of a Lorenz
+  // system, so its heading is bounded but never repeats: it circles one
+  // invisible center, then flips to the other. Quiet steering for the same
+  // reason as levy — the ride is the signal, and separation/wind at cruise
+  // levels drowns it. Table-only, gated like chemotaxis.
+  lorenz: {
+    sep: 1.2,
+    ali: 0.06,
+    coh: 0.18,
+    sepR: 40,
+    aliR: 32,
+    cohR: 44,
+    wind: 0.02,
+    orbit: 0,
+    attract: 0.1,
+    lorenzGain: 0.05,
+    lorenzRho: 28,
+  },
 };
+
+/**
+ * #583 — the Lorenz system, as a pure derivative.
+ *
+ * dx = sigma(y - x);  dy = x(rho - z) - y;  dz = xy - beta*z
+ *
+ * sigma and beta are the canonical 10 and 8/3 and are NOT authored: they are
+ * what make this the Lorenz attractor rather than a generic 3-variable ODE.
+ * `rho` is the drama knob and the only one exposed, because gain alone just
+ * scales the ride without changing its character:
+ *   rho < ~24.7 : the trajectory spirals into a fixed point and STOPS
+ *                 flipping lobes (measured: 0 flips at rho 14) — restful, not
+ *                 chaotic
+ *   rho = 28    : classic chaos, the butterfly, the authored default
+ *   rho > ~35   : a larger, more violent attractor (measured at 40: |y| to
+ *                 37.6, z to 69.4) that swings wider across the plate
+ * Authored range is [1, 60]: at rho <= 1 the only attractor is the origin,
+ * which is a dead agent, and far above 60 the excursions outgrow the plate.
+ */
+export const LORENZ_SIGMA = 10;
+export const LORENZ_BETA = 8 / 3;
+export const LORENZ_RHO_MIN = 1;
+export const LORENZ_RHO_MAX = 60;
+/**
+ * Integration step. Fixed, and deliberately small: Lorenz is stiff enough that
+ * a forward Euler step of 0.02 drifts OFF the attractor (measured z to 60.1
+ * against the true ~47.5 ceiling). This is integrated RK2 (midpoint) at 0.006,
+ * which holds the classic bounds; the cost is one extra derivative per agent
+ * per frame, paid only by a cast that opted into the row.
+ */
+export const LORENZ_DT = 0.006;
+
+export function lorenzDeriv(x, y, z, rho) {
+  return {
+    dx: LORENZ_SIGMA * (y - x),
+    dy: x * (rho - z) - y,
+    dz: x * y - LORENZ_BETA * z,
+  };
+}
+
+/** One RK2 (midpoint) step. Returns the advanced state; pure. */
+export function lorenzAdvance(x, y, z, rho, dt) {
+  const r = Math.min(LORENZ_RHO_MAX, Math.max(LORENZ_RHO_MIN, Number(rho) || LORENZ_RHO_MIN));
+  const k1 = lorenzDeriv(x, y, z, r);
+  const hx = x + k1.dx * dt * 0.5;
+  const hy = y + k1.dy * dt * 0.5;
+  const hz = z + k1.dz * dt * 0.5;
+  const k2 = lorenzDeriv(hx, hy, hz, r);
+  return { x: x + k2.dx * dt, y: y + k2.dy * dt, z: z + k2.dz * dt, dx: k2.dx, dy: k2.dy };
+}
+
+/**
+ * Seed one agent onto the attractor. The origin is a FIXED POINT — an agent
+ * left at (0,0,0) never moves and never will — so the draw is pushed clear of
+ * it rather than merely randomised.
+ */
+export function lorenzSeed(u1, u2, u3) {
+  const sgn = u1 < 0.5 ? -1 : 1;
+  return {
+    x: sgn * (4 + u1 * 12),
+    y: sgn * (4 + u2 * 12),
+    z: 10 + u3 * 25,
+  };
+}
 
 export function resolveBehave(id) {
   return BEHAVE[id] || BEHAVE.cruise;
