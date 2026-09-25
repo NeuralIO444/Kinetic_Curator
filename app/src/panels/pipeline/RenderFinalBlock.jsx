@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { renderFinal } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
@@ -7,6 +8,9 @@ export function RenderFinalBlock({
   accumOn, rendering, setRendering, batchActive,
 }) {
   const resLabel = resolutionLabel(exportResolution);
+  // #570 — surface render failures like SNAP does (was console.warn only).
+  const [renderError, setRenderError] = useState(null);
+  const errTimer = useRef(null);
 
   const runRenderFinal = async () => {
     if (rendering) return;
@@ -32,6 +36,9 @@ export function RenderFinalBlock({
       });
     } catch (e) {
       console.warn('[RENDER]', e);
+      setRenderError(e && e.message ? e.message : String(e));
+      if (errTimer.current) clearTimeout(errTimer.current);
+      errTimer.current = setTimeout(() => setRenderError(null), 6000);
     } finally {
       setRendering(false);
     }
@@ -67,6 +74,11 @@ export function RenderFinalBlock({
       >
         {rendering && !batchActive ? 'RENDERING…' : accumOn ? '▶ RENDER ACCUM' : '▶ RENDER FINAL'}
       </button>
+      {renderError && (
+        <div className="pipeline-hint" style={{ marginTop: 6, color: '#ff2d6f' }} title={renderError}>
+          Render failed — {renderError.slice(0, 80)}
+        </div>
+      )}
       <div className="pipeline-hint" style={{ marginTop: 6 }}>
         {accumOn
           ? 'ACCUM on — export captures the live trail buffer.'

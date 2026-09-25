@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
+import { useStore } from '../../state/store.js';
 import { renderBatch } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
 
@@ -12,6 +13,9 @@ export function BatchEditionBlock({
   cancelBatchRef, onDone,
 }) {
   const [batchCount, setBatchCount] = useState(8);
+  // #569 — batch settles on frame advance; a paused loop never advances,
+  // so the run hangs ~12s then fails generic. Refuse with a reason instead.
+  const running = useStore((s) => s.running);
 
   const runBatch = async () => {
     if (rendering) return;
@@ -95,14 +99,14 @@ export function BatchEditionBlock({
           type="button"
           className="big-btn"
           onClick={runBatch}
-          disabled={rendering || accumOn}
+          disabled={rendering || accumOn || !running}
           style={{
             flex: 2,
             background: rendering && batchProgress ? 'var(--line)' : undefined,
             fontWeight: 700,
             letterSpacing: '0.06em',
           }}
-          title={accumOn ? 'Batch needs ACCUM off — trails would bleed across seeds' : 'Render N sequential seeds as PNG + JSON sidecar'}
+          title={!running ? 'Batch needs the loop running — resume with Space first (a paused loop never settles)' : accumOn ? 'Batch needs ACCUM off — trails would bleed across seeds' : 'Render N sequential seeds as PNG + JSON sidecar'}
         >
           {batchProgress
             ? `BATCH ${batchProgress.done}/${batchProgress.total}…`

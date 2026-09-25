@@ -69,8 +69,12 @@ export function PipelinePanel() {
   // #172: print desk modal, lazy-loaded like Asset Studio (AssetPoolPanel).
   const [PrintDesk, setPrintDesk] = useState(null);
   const openPrintDesk = async () => {
-    const mod = await import('./PrintDeskModal.jsx');
-    setPrintDesk(() => mod.PrintDeskModal);
+    try {
+      const mod = await import('./PrintDeskModal.jsx');
+      setPrintDesk(() => mod.PrintDeskModal);
+    } catch (e) {
+      setMessage(`Print Desk failed to load — ${e && e.message ? e.message : String(e)}`);
+    }
   };
 
   const accumOn = !!layoutParams.accumulation;

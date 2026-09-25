@@ -19,6 +19,8 @@ export function AssetPoolPanel() {
   const swapId = useRef(null);
   const [Studio, setStudio] = useState(null);
   const [studioSeed, setStudioSeed] = useState(null);
+  // #572-adjacent honesty: a failed chunk load must say so (was silent).
+  const [studioError, setStudioError] = useState(null);
   const { assets } = useApp();
   const { state } = useApp(s => ({
     enabled: s.enabledAssets,
@@ -31,9 +33,13 @@ export function AssetPoolPanel() {
   const { enabled, search, catFilter, poolView, weightOverrides, ingestError } = state;
 
   const openStudio = async (seed) => {
-    const mod = await import('./AssetStudioModal.jsx');
-    setStudio(() => mod.AssetStudioModal);
-    setStudioSeed(seed || null);
+    try {
+      const mod = await import('./AssetStudioModal.jsx');
+      setStudio(() => mod.AssetStudioModal);
+      setStudioSeed(seed || null);
+    } catch (e) {
+      setStudioError(e && e.message ? e.message : String(e));
+    }
   };
 
   const closeStudio = (saved) => {
@@ -97,6 +103,7 @@ export function AssetPoolPanel() {
         </div>
       </PanelHeader>
       {ingestError && <div style={{ color: 'var(--accent)', fontSize: 11, padding: '4px 10px' }}>INGEST: {ingestError}</div>}
+      {studioError && <div style={{ color: '#ff2d6f', fontSize: 11, padding: '4px 10px' }}>STUDIO failed to load — {studioError}</div>}
       <div className="pool-controls">
         <div className="cat-filter">
           <button className={`cat-chip ${catFilter === 'all' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_CAT_FILTER, 'all')}>
