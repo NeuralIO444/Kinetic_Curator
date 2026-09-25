@@ -3,9 +3,12 @@
 // #517: the 12 stub chips carry a motion block and ride the preset MIX road
 // (loadStubMode) instead of a bare mode switch: numbers glide, colors and the
 // asset pool are left alone (to.paletteId === null), one undo step on commit.
+// Layout chips are single-axis: neither a stub chip nor a preset ever swaps the
+// asset pool or palette (color and shape chips are their own axes).
 import assert from 'node:assert';
 import { useStore } from './store.js';
 import { STUB_VOICES } from '../data/voices.js';
+import { COMPOSITION_PRESETS as PRESETS } from '../data/presets.js';
 import { validateLayoutParams, BEHAVE_MODES } from '../data/layout-modes.js';
 
 const S = () => useStore.getState();
@@ -31,7 +34,7 @@ assert.strictEqual(m('orbit').behave, 'orbit', 'orbit chip has an honest behave'
 // ── loadStubMode: opens a MIX, touches nothing until commit ──────────────
 const id = S().layoutParams.mode === 'grid' ? 'rails' : 'grid';
 const stub = STUB_VOICES.find((v) => v.id === id);
-const before = { params: { ...S().layoutParams }, paletteId: S().paletteId, overrides: S().paletteOverrides };
+const before = { params: { ...S().layoutParams }, paletteId: S().paletteId, overrides: S().paletteOverrides, assets: { ...S().enabledAssets } };
 
 S().loadStubMode(id);
 const mix = S().voiceMix;
@@ -47,6 +50,7 @@ assert.strictEqual(S().layoutParams.mode, id);
 assert.strictEqual(S().layoutParams.noiseSpeed, stub.motion.noiseSpeed);
 assert.strictEqual(S().paletteId, before.paletteId, 'palette id survives');
 assert.deepStrictEqual(S().paletteOverrides, before.overrides, 'no stray override frozen in');
+assert.deepStrictEqual(S().enabledAssets, before.assets, 'a stub chip never swaps the asset pool');
 assert.strictEqual(S().voiceMix, null);
 
 // Same chip again: nothing changed -> no MIX.
@@ -62,6 +66,19 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
   assert.strictEqual(S().voiceMix.to.params.noiseSpeed, keep, 'a locked param does not move');
   assert.strictEqual(S().voiceMix.to.params.mode, other);
   useStore.setState({ lockedParams: {}, voiceMix: null });
+}
+
+// Presets are layout-only too, even when the data pairs a palette / categories.
+{
+  const pre = PRESETS.find((p) => p.paletteId && p.categories && p.id !== S().layoutParams.composition);
+  assert.ok(pre, 'a preset with a palette + categories pairing exists to test against');
+  const b = { paletteId: S().paletteId, assets: { ...S().enabledAssets } };
+  S().applyPreset(pre);
+  assert.ok(S().voiceMix, 'the preset opens a MIX');
+  assert.strictEqual(S().voiceMix.to.paletteId, null, 'preset does not pair a palette');
+  S().commitVoiceMix();
+  assert.strictEqual(S().paletteId, b.paletteId, 'preset leaves the palette alone');
+  assert.deepStrictEqual(S().enabledAssets, b.assets, 'preset leaves the asset pool alone');
 }
 
 // Unknown id is a no-op.
