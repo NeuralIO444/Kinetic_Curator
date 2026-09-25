@@ -33,6 +33,10 @@ assert.strictEqual(ladderFrame(0.5), Math.round(0.5 * (DEMO_LADDER_STEPS.length 
 assert.strictEqual(ladderFrame(NaN), 0);
 assert.ok(DEMO_LADDER_STEPS.every((s) => typeof s === 'string' && s.includes('<')), 'frames are SVG, not path math');
 
+// The system stores particles as SoA typed arrays (sys.x / sys.y / sys.u, live
+// range [0, physicsCount())) — the old `sys.particles` object array is gone.
+const live = (sys, key) => Array.from(sys[key].subarray(0, sys.physicsCount()));
+
 // u is a scalar the kernel sets
 const { sys, items } = run();
 assert.strictEqual(sys.physicsCount(), 16, 'bilateral does not double physics');
@@ -42,18 +46,25 @@ assert.ok(wings.every((w) => w.u >= 0 && w.u <= 1));
 assert.ok(wings.some((w) => w._mirrored));
 
 // flap + speed actually sweep u (not stuck at 0)
-const us = sys.particles.map((p) => p.u);
+const us = live(sys, 'u');
 assert.ok(Math.max(...us) - Math.min(...us) > 0.05, 'field u should vary across the flock');
 
 // same seed → same leaders
-const a = run({}, 12).sys.particles.map((p) => [+p.x.toFixed(3), +p.y.toFixed(3)]);
-const b = run({}, 12).sys.particles.map((p) => [+p.x.toFixed(3), +p.y.toFixed(3)]);
+const leaders = (sys) => live(sys, 'x').map((x, i) => [+x.toFixed(3), +live(sys, 'y')[i].toFixed(3)]);
+const a = leaders(run({}, 12).sys);
+const b = leaders(run({}, 12).sys);
+assert.ok(a.length > 0, 'the flock is not empty — the equality below must compare something');
 assert.deepStrictEqual(a, b);
 
 // dish
-for (const p of run({}, 80).sys.particles) {
-  assert.ok(p.x >= 0 && p.x <= 1000);
-  assert.ok(p.y >= 0 && p.y <= 700);
+{
+  const dish = run({}, 80).sys;
+  const xs = live(dish, 'x'), ys = live(dish, 'y');
+  assert.ok(xs.length > 0);
+  for (let i = 0; i < xs.length; i++) {
+    assert.ok(xs[i] >= 0 && xs[i] <= 1000, `x[${i}]=${xs[i]} inside the dish`);
+    assert.ok(ys[i] >= 0 && ys[i] <= 700, `y[${i}]=${ys[i]} inside the dish`);
+  }
 }
 
 // remainder A — second pair (uncomment when pair-2 is wired)
