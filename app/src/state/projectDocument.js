@@ -47,7 +47,7 @@ export function serializeProject(state) {
       ...(state.layerSnapshots || {}),
       [state.activeLayerId]: captureSnapshot(state),
     };
-    doc.layerSnapshots = normalizeSnapshots(snaps);
+    doc.layerSnapshots = normalizeSnapshots(snaps, overlay);
   }
   return doc;
 }
@@ -80,7 +80,7 @@ export function parseProject(raw) {
         paletteOverrides: raw.paletteOverrides || null,
         customAssets,
         ...normalizeLayers(raw.layers, raw.activeLayerId),
-        layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
+        layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets),
       },
     };
   }
@@ -116,7 +116,7 @@ export function parseProject(raw) {
           : null,
       customAssets,
       ...normalizeLayers(raw.layers, raw.activeLayerId),
-      layerSnapshots: normalizeSnapshots(raw.layerSnapshots),
+      layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets),
     },
   };
 }
