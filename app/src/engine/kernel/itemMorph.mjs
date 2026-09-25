@@ -156,15 +156,18 @@ function lerpColor(a, b, t) {
  * (tests, one-shot blends) => a fresh plan, identical to the old
  * per-call match.
  *
- * #444: EMISSION ORDER = raw toItems order first, fade-outs appended last.
- * Draw order is array order (packInstanceData never re-sorts), and the
- * completion frame drops the blend and presents raw e.items — so the last
- * blend frame must already be in raw order or asset stacking flips in one
- * frame (the z-fight at the end of every chip change). Emitting pairs
- * group-by-group (allKeys = from-group keys first) reorders every time the
- * group order differs from the raw to order. Trailing fade-outs are ~0
- * alpha by then and vanish with the transition.
+ * DRAW ORDER is array order (packInstanceData never re-sorts), so it must be
+ * continuous at BOTH ends of the blend or overlapping items flip stacking in one
+ * frame (a z-fight): t<=0 returns fromItems in ITS order, and the completion
+ * frame presents raw toItems (#444). Emitting in raw to-order for every t fixed
+ * the end but flipped the order on the very first blend frame of every chip click.
+ * Now each item carries a depth key that slides from its from-rank to its
+ * to-rank; the list is stably sorted by it. The key reaches pure to-rank by
+ * t = ORDER_SETTLE, so from there the first |to| entries ARE raw to-order (and
+ * fade-outs trail, ~0 alpha) — no flip at the handoff either.
  */
+const ORDER_SETTLE = 0.9;
+
 export function blendItems(fromItems, toItems, t, plan = null) {
   if (t <= 0) return fromItems;
   if (t >= 1) return toItems;
@@ -180,25 +183,42 @@ export function blendItems(fromItems, toItems, t, plan = null) {
     if (i === undefined || partner[i]) continue; // defensive: unresolvable / duplicate ref
     partner[i] = f;
   }
-  const out = [];
+  const fromList = fromItems || [];
+  const idxFrom = new Map(fromList.map((it, i) => [it, i]));
+  const fromLen = fromList.length || 1;
+  const toLen = toList.length || 1;
+  const w = Math.min(1, t / ORDER_SETTLE); // depth-key weight: 0 = from order, 1 = to order
+  const out = []; // { o: item, k: depth key }
   for (let i = 0; i < toList.length; i++) {
     const to = toList[i];
     const f = partner[i];
+    const toRank = i / toLen;
     if (f) {
+      const fromRank = (idxFrom.get(f) ?? i) / fromLen;
       out.push({
-        ...to,
-        x: lerp(f.x, to.x, t),
-        y: lerp(f.y, to.y, t),
-        scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, t),
-        rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, t),
-        alpha: lerp(Number.isFinite(f.alpha) ? f.alpha : 100, Number.isFinite(to.alpha) ? to.alpha : 100, t),
-        color: lerpColor(f.color, to.color, t),
-        accent: lerpColor(f.accent, to.accent, t),
+        k: (1 - w) * fromRank + w * toRank,
+        o: {
+          ...to,
+          x: lerp(f.x, to.x, t),
+          y: lerp(f.y, to.y, t),
+          scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, t),
+          rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, t),
+          alpha: lerp(Number.isFinite(f.alpha) ? f.alpha : 100, Number.isFinite(to.alpha) ? to.alpha : 100, t),
+          color: lerpColor(f.color, to.color, t),
+          accent: lerpColor(f.accent, to.accent, t),
+        },
       });
     } else {
-      out.push({ ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t }); // unmatched target fades in (#444: in raw position)
+      // unmatched target fades in (#444: in its raw position)
+      out.push({ k: toRank, o: { ...to, alpha: (Number.isFinite(to.alpha) ? to.alpha : 100) * t } });
     }
   }
-  for (const f of onlyFrom) out.push({ ...f, alpha: (Number.isFinite(f.alpha) ? f.alpha : 100) * (1 - t) });
-  return out;
+  // unmatched source fades out; its key drifts past every to-rank so it trails at settle
+  for (const f of onlyFrom) {
+    const fromRank = (idxFrom.get(f) ?? 0) / fromLen;
+    out.push({ k: (1 - w) * fromRank + w * 2, o: { ...f, alpha: (Number.isFinite(f.alpha) ? f.alpha : 100) * (1 - t) } });
+  }
+  // Array.prototype.sort is stable: ties keep emission order.
+  out.sort((x, y) => x.k - y.k);
+  return out.map((e) => e.o);
 }
