@@ -5,6 +5,8 @@ export const RANDOMIZABLE_KEYS = [
   'count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers',
   'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount',
   'swarmCohesion', 'gravityWells', 'damping',
+  // #518: motion factors — the curator shapes them, RANDOMIZE and Evolve roll them.
+  'wind', 'flap', 'breath', 'lifeDrift',
 ];
 
 export const MORPHABLE_KEYS = [...RANDOMIZABLE_KEYS];
@@ -31,6 +33,10 @@ export function randomizeKey(key, rng = Math.random) {
     case 'swarmCohesion': return +(rand_(0.2, 4.0).toFixed(2));
     case 'gravityWells':  return +(rand_(0.1, 3.0).toFixed(2));
     case 'damping':       return +(rand_(0.90, 0.98).toFixed(2));
+    case 'wind':          return +(rand_(0.2, 2.0).toFixed(2));
+    case 'flap':          return +(rand_(0.05, 0.9).toFixed(2));
+    case 'breath':        return +(rand_(0, 0.8).toFixed(2));
+    case 'lifeDrift':     return +(rand_(0.1, 0.9).toFixed(2));
     default:              return undefined;
   }
 }
@@ -53,6 +59,10 @@ export function generateLayoutTargets(state) {
     swarmCohesion: { min: 0.5, max: 3.5, type: 'float', isRange: false },
     gravityWells: { min: 0.1, max: 3.5, type: 'float', isRange: false },
     damping: { min: 0.90, max: 0.98, type: 'float', isRange: false },
+    wind: { min: 0.2, max: 2.0, type: 'float', isRange: false },
+    flap: { min: 0.05, max: 0.9, type: 'float', isRange: false },
+    breath: { min: 0, max: 0.8, type: 'float', isRange: false },
+    lifeDrift: { min: 0.1, max: 0.9, type: 'float', isRange: false },
   };
 
   Object.entries(params).forEach(([key, conf]) => {

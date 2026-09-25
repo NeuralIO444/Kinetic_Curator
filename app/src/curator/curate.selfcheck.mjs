@@ -1,6 +1,7 @@
 // curate.selfcheck.mjs — the Curator engine seam: honest fallback first.
 import assert from 'node:assert';
 import { useStore } from '../state/store.js';
+import { RANDOMIZABLE_KEYS } from '../state/paramUtils.js';
 import {
   CURATE_CANDIDATES,
   nullCurator,
@@ -82,7 +83,7 @@ assert.strictEqual(curatorHint({ status: () => 'active', pick: () => 0 }), 'cura
   useStore.setState({ seed: 4242, curatePress: 5 });
   useStore.getState().curateUnlocked();
   assert.strictEqual(useStore.getState().curatePress, 6, 'a landed press advances the counter');
-  useStore.setState({ lockedParams: Object.fromEntries(['count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers', 'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount', 'swarmCohesion', 'gravityWells', 'damping'].map((k) => [k, true])) });
+  useStore.setState({ lockedParams: Object.fromEntries(RANDOMIZABLE_KEYS.map((k) => [k, true])) });
   useStore.getState().curateUnlocked();
   assert.strictEqual(useStore.getState().curatePress, 6, 'an all-locked no-op does not advance the counter');
 }
