@@ -24,6 +24,7 @@ Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveRes
 2. Read ENGINE_PLAN §0 (**already shipped — do not redo**).
 3. **Spines A–F (#387–#392) are closed, and #341 (FX 4-cap) landed as PR #412 — there is no open spine letter and no lowest-open coding item waiting.** What's open: Matt-only feel (#374, #346, #298), parked (#221, #228), and product lanes (#248 panel consolidation, #270 mobile, #344/#345 leftovers). The #248 coding plan is [`docs/PANEL_CONSOLIDATION_PLAN.md`](docs/PANEL_CONSOLIDATION_PLAN.md) — read its open-questions section first; those need Matt's nod, not a guess. If what you're about to touch isn't assigned to you, stop.
 4. One letter per PR. Do not bundle A with D. (Note: C–F did not go through this — see below.)
+5. Read the issue body AND every comment on the issue before writing code. Comments carry acceptance criteria, edge cases, and recorded decisions — build them in, don't rediscover them.
 
 ## Already shipped (do not re-implement)
 
