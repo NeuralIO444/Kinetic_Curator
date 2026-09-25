@@ -460,7 +460,7 @@ export const createGlobalSlice = (set) => ({
       next.enabledAssets = enabled;
     }
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
-      next.assetWeightOverrides = { ...sanitizeAssetWeightOverrides(doc.assetWeightOverrides) };
+      next.assetWeightOverrides = { ...sanitizeAssetWeightOverrides(doc.assetWeightOverrides, next.customAssets) };
     } else {
       // The serializer omits the field when empty — without this, loading a
       // clean project over a session with overrides kept the old weights.
