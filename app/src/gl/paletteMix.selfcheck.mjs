@@ -208,10 +208,9 @@ for (let i = 0; i <= 20; i++) {
     'no wall clock in the dissolve tick (#453: two time domains)');
 }
 
-// #465 — morphEase (expoOut): snappy morph arrival. Endpoints EXACT
-// (f(1) === 1 matters: the landing frame IS the target, no residue),
-// clamped input, monotone inside [0,1] (TRANSITIONS invariant I1), and it
-// gets out ahead of smootherstep so the tail never reads stop-then-pop.
+// Always Alive Protocol — morphEase: smooth ease-in / ease-out (smootherstep).
+// Endpoints EXACT (f(1) === 1 matters: the landing frame IS the target, no residue),
+// clamped input, monotone inside [0,1] (TRANSITIONS invariant I1), zero jerk at endpoints.
 assert.strictEqual(typeof morphEase, 'function');
 assert.strictEqual(morphEase(0), 0);
 assert.strictEqual(morphEase(1), 1, 'exact landing — no 0.999 residue');
@@ -226,7 +225,8 @@ assert.strictEqual(morphEase(9), 1);
     prevE = v;
   }
 }
-assert.ok(morphEase(0.5) > mixEase(0.5), 'expoOut arrives ahead of smootherstep mid-flight');
-assert.ok(Math.abs(morphEase(0.9) - 1) < 0.003, '99.7%+ arrived by raw=0.9 — sub-percent landing residual');
+assert.strictEqual(morphEase(0.5), 0.5, 'smooth symmetric ease at midpoint');
+assert.ok(morphEase(0.1) < 0.1, 'eases in gently at the start');
+assert.ok(morphEase(0.9) > 0.9, 'eases out softly into the landing');
 
 console.log('[selfcheck] paletteMix OK');

@@ -468,15 +468,6 @@ export function mixVoiceState(from, to, t) {
  * missing cell). Left for that follow-up; this fix needs no pipeline
  * changes and is fully reversible by deleting this function's body.
  */
-const MIX_STEPS_PER_SECOND = 6;
-const MIX_STEPS_MIN = 3;
-const MIX_STEPS_MAX = 40;
-
-function mixStepCount(durationMs) {
-  const seconds = Math.max(0.1, (Number(durationMs) || 2000) / 1000);
-  return Math.min(MIX_STEPS_MAX, Math.max(MIX_STEPS_MIN, Math.round(seconds * MIX_STEPS_PER_SECOND)));
-}
-
 export function resolveLiveRenderState(s) {
   const mix = s.voiceMix;
   if (!mix || !mix.from || !mix.to) {
@@ -487,13 +478,10 @@ export function resolveLiveRenderState(s) {
     };
   }
   const t = mix.t ?? 0;
-  const steps = mixStepCount(mix.durationMs);
-  const stepT = Math.round(t * steps) / steps;
-  const mStep = mixVoiceState(mix.from, mix.to, stepT);
-  // Spine D: smooth color lerp at 60fps (stills baker unaffected)
+  // Always Alive / Spine D: smooth parameter and color lerp at 60fps (no 6-step jitter)
   const mSmooth = mixVoiceState(mix.from, mix.to, t);
   return {
-    layoutParams: mStep.params,
+    layoutParams: mSmooth.params,
     paletteId: s.paletteId,
     paletteOverrides: {
       bg: mSmooth.palette.bg,
