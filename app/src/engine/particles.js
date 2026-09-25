@@ -30,7 +30,7 @@ import { createNoise } from './noise.js';
 import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
-import { resolveEffectiveBehave, resolveWindMode, orbitForce } from './organisms/behave.js';
+import { resolveEffectiveBehave, resolveWindMode, orbitForce, resolveSeekGain } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
 
@@ -744,6 +744,10 @@ export class ParticleSystem {
     const aliW = (organism ? profile.ali : 1.0) * steerAli;
     const cohW = (organism ? profile.coh : swarmCohesion) * steerCoh;
     const attractMul = organism ? profile.attract : 1;
+    // #584 — seek/flee retune the force below rather than adding a second
+    // attractor. Rows without a seekGain resolve to 1, so nothing changes for
+    // them; flee is a negative gain, which flips the same vector.
+    const seekMul = organism ? resolveSeekGain(profile) : 1;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
     const sepRadius2 = sepRadius * sepRadius;
@@ -821,7 +825,7 @@ export class ParticleSystem {
         const dy = attractor.y - pyi;
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > 5) {
-          const forceMag = (gravityWells * attractMul * ATTRACTOR_GAIN) / Math.max(20, d * 0.05);
+          const forceMag = (gravityWells * attractMul * ATTRACTOR_GAIN * seekMul) / Math.max(20, d * 0.05);
           fax += ((dx / d) * forceMag) / m;
           fay += ((dy / d) * forceMag) / m;
         }
