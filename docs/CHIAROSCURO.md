@@ -4,15 +4,15 @@
 
 ## Principle
 
-Assets are flat paint. Bodies grow over them (spine, flap, swell), behaviors move through them (drives, graze, leak, mold), and light models them last. Nothing about light is baked; everything about light is performed. One sun, never three-point lighting.
+Assets are flat paint. Bodies grow over them (spine, flap, swell), behaviors move through them (drives, graze, leak, mold), and light models them last. Nothing about light is baked; everything about light is performed. Light is performed, not configured — it answers the same inputs as everything else (hand, beat, seed). One sun, never three-point lighting.
 
 ## The five phases (in order)
 
 1. **Sun** — position + color + intensity as uniforms; per-instance diffuse in the quad shader. Dawn side vs dusk side, following a hand or a beat.
 2. **Bevel normals** — normals derived in-shader from alpha neighbors (Sprite Lamp trick). Diffuse + tight specular on existing assets: enamel wings, wet leaves, brushed metal. Zero pipeline change.
-3. **Squash-and-stretch** — scale along velocity, preserve volume across it. Massy impacts, elongating acceleration. Two lines on already-packed velocity.
+3. **Squash-and-stretch** — scale along velocity, preserve volume across it. Massy impacts, elongating acceleration. Two lines on already-packed velocity. Deformation belongs in a lighting engine because light needs mass to model; squash-and-stretch gives flat quads the suggestion of volume that the sun and bevel then read.
 4. **Frame strips** — the wing-ladder `u` selector generalized to N-frame strips with rate: flutter cycles, pulse loops, crawl sequences. Animated assets declare frame count; static ones pay nothing.
-5. **Parallax drift** — slow camera + per-tier factor on `zTiers`. The flat stack becomes a diorama; distant tiers fall into haze.
+5. **Parallax drift** — slow camera + per-tier factor on `zTiers`. The flat stack becomes a diorama; distant tiers fall into haze. Parallax closes the engine because aerial perspective is light, not geometry — distant tiers fall into haze the way Leonardo painted it.
 
 ## Deliberately not
 
