@@ -12,6 +12,7 @@ import {
   applyRenderProfile,
 } from './renderProfiles.js';
 import { PERSONA_TASTES } from './personaTastes.js';
+import { RANDOMIZABLE_KEYS, MORPHABLE_KEYS, randomizeKey, generateLayoutTargets } from '../state/paramUtils.js';
 import { PALETTES, normalizeHex } from '../data/palettes.js';
 import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES } from '../data/layout-modes.js';
 
@@ -33,7 +34,7 @@ const ENGINE_BOUNDS = {
   swarmCohesion: [0.2, 4.0],
   gravityWells: [0.1, 3.0],
   damping: [0.90, 0.98],
-  // #518 motion keys (bounds shared with paramUtils.randomizeKey in part c).
+  // #518 motion keys (asserted against randomizeKey / Evolve below).
   wind: [0.2, 2.0],
   flap: [0.05, 0.9],
   breath: [0, 0.8],
@@ -77,6 +78,22 @@ function variants(p) {
   }
   const ids = PALETTES.map((x) => x.id);
   assert.strictEqual(new Set(ids).size, ids.length, 'palette ids unique');
+}
+
+// ─── #518: motion keys are randomizable + morphable, within the shared bounds ───
+{
+  for (const k of ['wind', 'flap', 'breath', 'lifeDrift']) {
+    assert.ok(RANDOMIZABLE_KEYS.includes(k), `${k} is randomizable`);
+    assert.ok(MORPHABLE_KEYS.includes(k), `${k} is morphable (Evolve)`);
+    const [lo, hi] = ENGINE_BOUNDS[k];
+    const targets = generateLayoutTargets({ lockedParams: {} });
+    assert.ok(targets[k] >= lo && targets[k] <= hi, `Evolve target ${k}=${targets[k]} in [${lo},${hi}]`);
+    for (let i = 0; i < 200; i++) {
+      const v = randomizeKey(k);
+      assert.ok(v >= lo && v <= hi, `randomizeKey(${k})=${v} in [${lo},${hi}]`);
+    }
+  }
+  assert.deepStrictEqual(MORPHABLE_KEYS, RANDOMIZABLE_KEYS, 'morphable = randomizable');
 }
 
 // ─── biases are subsets of engine bounds ───
