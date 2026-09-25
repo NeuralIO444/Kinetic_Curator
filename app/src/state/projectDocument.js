@@ -85,7 +85,10 @@ export function parseProject(raw) {
     };
   }
 
-  if (raw.version !== PROJECT_VERSION) {
+  // #641 — accept the version written as a numeric string ("1" means 1);
+  // genuinely unknown versions still reject with the clear message.
+  const version = typeof raw.version === 'string' ? Number(raw.version) : raw.version;
+  if (version !== PROJECT_VERSION) {
     return { ok: false, error: `Unsupported project version: ${raw.version}` };
   }
 
