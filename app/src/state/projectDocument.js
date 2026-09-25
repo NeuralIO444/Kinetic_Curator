@@ -10,6 +10,7 @@ import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
   sanitizeQuality,
+  sanitizePaletteLocks,
 } from './projectNormalize.js';
 
 export const PROJECT_VERSION = 1;
@@ -54,6 +55,12 @@ export function serializeProject(state) {
   if (state.paletteOverrides) {
     doc.paletteOverrides = JSON.parse(JSON.stringify(state.paletteOverrides));
   }
+  // #638 — palette locks pin swatches during harmony regeneration; without
+  // them a reopened piece shuffles colors the designer had pinned down.
+  const locks = sanitizePaletteLocks(state.paletteLocks);
+  if (locks && Object.keys(locks).length > 0) {
+    doc.paletteLocks = locks;
+  }
   const overlay = sanitizeOverlay(state.customAssets);
   if (overlay.length) doc.customAssets = overlay;
   if (Array.isArray(state.layers) && state.activeLayerId) {
@@ -94,6 +101,7 @@ export function parseProject(raw) {
         autoQuality: raw.autoQuality !== false,
         assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
         paletteOverrides: raw.paletteOverrides || null,
+        paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
         customAssets,
         ...normalizeLayers(raw.layers, raw.activeLayerId),
         // #637 — partial snapshots inherit the root doc's seed/palette/layout.
@@ -136,6 +144,7 @@ export function parseProject(raw) {
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
           ? raw.paletteOverrides
           : null,
+      paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
       customAssets,
       ...normalizeLayers(raw.layers, raw.activeLayerId),
       // #637 — partial snapshots inherit the root doc's seed/palette/layout.

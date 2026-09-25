@@ -38,6 +38,7 @@ export function PipelinePanel() {
     quality: s.quality,
     autoQuality: s.autoQuality,
     paletteId: s.paletteId,
+    paletteLocks: s.paletteLocks,
     enabledAssets: s.enabledAssets,
     assetWeightOverrides: s.assetWeightOverrides,
     paletteOverrides: s.paletteOverrides,
@@ -56,7 +57,7 @@ export function PipelinePanel() {
   }));
   const {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
-    quality, autoQuality, paletteId, enabledAssets, assetWeightOverrides,
+    quality, autoQuality, paletteId, paletteLocks, enabledAssets, assetWeightOverrides,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
     userPalettes, favorites, rendering, watchdogTripGen,
   } = state;
@@ -260,7 +261,7 @@ export function PipelinePanel() {
         <div className="pipeline-section-label">IN</div>
         <RecipeRow onMessage={setMessage} />
         <DataExportRow
-          seed={seed} seedOffsets={seedOffsets} paletteId={paletteId} paletteOverrides={paletteOverrides}
+          seed={seed} seedOffsets={seedOffsets} paletteId={paletteId} paletteOverrides={paletteOverrides} paletteLocks={paletteLocks}
           layoutParams={layoutParams} lockedParams={lockedParams} caGrid={caGrid}
           enabledAssets={enabledAssets} quality={quality} autoQuality={autoQuality} assetWeightOverrides={assetWeightOverrides}
           customAssets={customAssets} layers={layers} activeLayerId={activeLayerId}
