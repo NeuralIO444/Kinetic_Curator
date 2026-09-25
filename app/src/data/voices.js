@@ -264,61 +264,76 @@ export const FLAGSHIP_VOICES = [
 ];
 
 /**
- * Stub voices (#517) — a vibe plus a small `motion` block of layout-param deltas
- * (rule: static modes = low drift + low flow; flow modes = mid flow + an honest
- * behave). A stub chip rides the preset MIX road (loadStubMode): numbers glide,
- * enums cut at t>0, colors and assets are left alone. `id` is the layout mode id.
+ * Stub voices — the 12 layout tiles. Layout axis only (#555): a tile rides the
+ * MIX road (loadStubMode) to change `mode`, and never touches motion, color or
+ * shapes. `id` is the layout mode id; `assets` is this mode's curated 4-shape
+ * set, the source for the SHAPES chips.
  */
 export const STUB_VOICES = [
   { id: 'random',     name: 'random',    glyph: 'rand',   vibe: 'Static Bloom: channel-surfing between accidents. Confetti TV.',
-    motion: { lifeDrift: 0.3, noiseSpeed: 0.6, behave: 'scatter' },
     assets: ['dot_single_01', 'geo_cross_01', 'line_dash_01', 'dot_confetti_01'],
   },
   { id: 'grid',       name: 'grid',      glyph: 'grid',   vibe: 'Control Room: brutalist order. Swiss grid, every node in its cell.',
-    motion: { lifeDrift: 0.08, noiseSpeed: 0.1 },
     assets: ['geo_square_01', 'geo_hex_01', 'line_solid_01', 'geo_cross_02'],
   },
   { id: 'fibonacci',  name: 'fibonacci', glyph: 'phi',    vibe: 'Nautilus: golden-spiral growth. Sacred geometry, slow reveal.',
-    motion: { lifeDrift: 0.15, noiseSpeed: 0.2 },
     assets: ['flora_flower_01', 'line_spiral_01', 'rad_rings_01', 'flora_sprig_01'],
   },
   { id: 'radial',     name: 'radial',    glyph: 'rad',    vibe: 'Radar: sonar pings and target locks. Military calm.',
-    motion: { lifeDrift: 0.12, noiseSpeed: 0.15 },
     assets: ['rad_rings_01', 'rad_orbit_01', 'rad_target_01', 'rad_starburst_01'],
   },
   { id: 'noise',      name: 'noise warp', glyph: 'noise',  vibe: 'Bad Reception: warped broadcast, signal decay. Analog horror.',
-    motion: { lifeDrift: 0.3, noiseSpeed: 0.9, behave: 'scatter' },
     assets: ['line_squiggle_01', 'line_zigzag_01', 'line_hatch_01', 'dot_field_02'],
   },
   { id: 'stratified', name: 'stratified', glyph: 'strat', vibe: 'Sediment: geological layers. Deep time, compressed.',
-    motion: { lifeDrift: 0.1, noiseSpeed: 0.1 },
     assets: ['line_solid_01', 'line_double_01', 'geo_trapezoid_01', 'geo_parallelo_01'],
   },
   { id: 'flow',       name: 'flow',      glyph: 'flow',   vibe: 'River: current lines drifting downstream. Hydrology.',
-    motion: { lifeDrift: 0.25, noiseSpeed: 0.7, wind: 1.2 },
     assets: ['line_squiggle_02', 'line_swoosh_01', 'org_blob_01', 'hae_tendril_01'],
   },
   { id: 'rails',      name: 'rails',     glyph: 'rail',   vibe: 'Transit Map: commuter lines, schedule adherence. Urban systems.',
-    motion: { lifeDrift: 0.08, noiseSpeed: 0.1 },
     assets: ['line_solid_01', 'line_dash_02', 'geo_cross_01', 'line_arrow_01'],
   },
   { id: 'layers',     name: 'layers',    glyph: 'z',      vibe: 'Z-Stack: depth slices, parallax archaeology. Core samples.',
-    motion: { lifeDrift: 0.1, noiseSpeed: 0.15 },
     assets: ['geo_square_02', 'geo_parallelo_01', 'line_double_01', 'geo_halfcircle_01'],
   },
   { id: 'ca',         name: 'cellular',  glyph: 'ca',     vibe: 'Petri Dish: cellular colonies on agar. Wet biology.',
-    motion: { lifeDrift: 0.15, noiseSpeed: 0.2 },
     assets: ['org_blob_02', 'dot_field_01', 'org_petal_01', 'dot_single_01'],
   },
   { id: 'orbit',      name: 'orbit',     glyph: 'orbit',  vibe: 'Planetarium: gravitational ballet. Moons and patience.',
-    motion: { lifeDrift: 0.2, noiseSpeed: 0.35, behave: 'orbit' },
     assets: ['rad_orbit_01', 'rad_orbit_02', 'rad_orbit_dot_01', 'dot_single_01'],
   },
   { id: 'abacus',     name: 'abacus',    glyph: 'abacus', vibe: 'Counting House: beads on wires. Arithmetic made visible.',
-    motion: { lifeDrift: 0.08, noiseSpeed: 0.1 },
     assets: ['geo_hex_02', 'stamp_glyph_01', 'stamp_num_01', 'geo_circle_01'],
   },
 ];
+
+/**
+ * Motion chips (#555) — the animation axis. Each is a `behave` chip plus a small
+ * block of motion numbers (all lerped by MIX); none touches layout, color or
+ * shapes. The first-pass values are drafted taste — tune on play. Static modes
+ * used to get their calm from the layout tile's motion block (#517); that calm
+ * now lives here, chosen independently.
+ */
+export const MOTION_MODES = [
+  { id: 'still',   name: 'still',   vibe: 'Held breath: barely moving.',
+    params: { behave: 'cruise', lifeDrift: 0.08, noiseSpeed: 0.1, wind: 0.3, flap: 0.1, breath: 0 } },
+  { id: 'drift',   name: 'drift',   vibe: 'Slow current: everything leans the same way.',
+    params: { behave: 'cruise', lifeDrift: 0.3, noiseSpeed: 0.4, wind: 0.8, flap: 0.3, breath: 0.15 } },
+  { id: 'flow',    name: 'flow',    vibe: 'River: a steady downstream push.',
+    params: { behave: 'cruise', lifeDrift: 0.25, noiseSpeed: 0.7, wind: 1.2, flap: 0.4, breath: 0.1 } },
+  { id: 'flock',   name: 'flock',   vibe: 'One mind: tight, turning together.',
+    params: { behave: 'flock', lifeDrift: 0.35, noiseSpeed: 0.5, wind: 1.0, flap: 0.5, breath: 0.2 } },
+  { id: 'orbit',   name: 'orbit',   vibe: 'Planetarium: circling a pull point.',
+    params: { behave: 'orbit', lifeDrift: 0.2, noiseSpeed: 0.35, wind: 0.6, flap: 0.35, breath: 0.1 } },
+  { id: 'scatter', name: 'scatter', vibe: 'Static bloom: restless, no agreement.',
+    params: { behave: 'scatter', lifeDrift: 0.3, noiseSpeed: 0.6, wind: 1.0, flap: 0.6, breath: 0 } },
+  { id: 'mold',    name: 'mold',    vibe: 'Slow growth: breathing colonies.',
+    params: { behave: 'mold', lifeDrift: 0.15, noiseSpeed: 0.2, wind: 0.5, flap: 0.2, breath: 0.5 } },
+];
+
+/** A motion chip reads as active while every param it sets is at its value. */
+export const isMotionActive = (layoutParams, motion) => Object.entries(motion.params).every(([k, v]) => layoutParams?.[k] === v);
 
 export const FLAGSHIP_VOICE_IDS = FLAGSHIP_VOICES.map((v) => v.id);
 

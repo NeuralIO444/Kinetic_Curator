@@ -1,5 +1,6 @@
 // Voice row (#280) — curated mode personas + the performer's own shelf.
 //
+// Layout tiles change the arrangement only; MOTION chips change the animation only (#555).
 // Three flagship voices (SWARM / HYPE / MURM) load complete curated states
 // through a MIX crossfade. The twelve stub modes (#517) ride the same MIX road
 // with a small motion block (loadStubMode). The row ends with the + chip:
@@ -7,7 +8,7 @@
 // user chip to overwrite it, double-click to rename, × to delete (confirm).
 import { useRef, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { FLAGSHIP_VOICES, STUB_VOICES } from '../../data/voices.js';
+import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, isMotionActive } from '../../data/voices.js';
 import { MAX_USER_VOICES } from '../../state/slices/voiceSlice.js';
 import { MixBar } from './MixBar.jsx';
 
@@ -109,6 +110,8 @@ export function ModeGrid({ mode }) {
   const activeVoiceId = useStore((s) => s.activeVoiceId);
   const loadVoice = useStore((s) => s.loadVoice);
   const loadStubMode = useStore((s) => s.loadStubMode);
+  const loadMotion = useStore((s) => s.loadMotion);
+  const layoutParams = useStore((s) => s.layoutParams);
   const captureUserVoice = useStore((s) => s.captureUserVoice);
   const renameUserVoice = useStore((s) => s.renameUserVoice);
   const overwriteUserVoice = useStore((s) => s.overwriteUserVoice);
@@ -145,6 +148,23 @@ export function ModeGrid({ mode }) {
             {m.name}
           </button>
         ))}
+      </div>
+
+      <div className="voice-shelf">
+        <span className="shelf-label">MOTION</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+          {MOTION_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`chip-btn ${isMotionActive(layoutParams, m) ? 'active' : ''}`}
+              onClick={() => loadMotion(m.id)}
+              title={m.vibe}
+            >
+              {m.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="voice-shelf">
