@@ -366,8 +366,28 @@ export const createLayoutSlice = (set) => ({
         changed = true;
       }
     }
+    // HypeFramework: stub chips activate their curated 4-asset pool
+    let assetsPatch = null;
+    if (Array.isArray(stub.assets) && stub.assets.length) {
+      const known = new Set(ASSETS.map((a) => a.id));
+      for (const c of state.customAssets || []) known.add(c.id);
+      const map = {};
+      for (const assetId of stub.assets.slice(0, 4)) {
+        if (typeof assetId === 'string' && known.has(assetId)) map[assetId] = true;
+      }
+      if (Object.keys(map).length) {
+        const cur = state.enabledAssets || {};
+        const curKeys = Object.keys(cur).filter((k) => !!cur[k]);
+        const mapKeys = Object.keys(map);
+        const assetsDiff = curKeys.length !== mapKeys.length || !mapKeys.every((k) => !!cur[k]);
+        if (assetsDiff) {
+          assetsPatch = { enabledAssets: map };
+          changed = true;
+        }
+      }
+    }
     if (!changed) return {};
-    return openParamsMix(state, merged, { name: stub.name });
+    return openParamsMix(state, merged, { assetsPatch, name: stub.name });
   }),
 
   toggleParamLock: (key) => set((state) => ({
