@@ -5,6 +5,7 @@
 // legacy modes still apply their own jitter for visual parity.
 
 import { makeCaField, sampleFieldPoint } from '../field/index.js';
+import { CH, hashU01 } from '../rng.js';
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
 
@@ -55,6 +56,57 @@ function fibonacci(ctx) {
   const cx = w / 2 + Math.cos(angle) * radius;
   const cy = h / 2 + Math.sin(angle) * radius;
   return { x: cx + (rng() - 0.5) * jitter, y: cy + (rng() - 0.5) * jitter };
+}
+
+/**
+ * #586 — Truchet: every cell makes the same small decision and a maze appears
+ * that no one authored.
+ *
+ * TILE SET — two-arc Smith tiles, stated because it decides the character
+ * completely. Each cell carries TWO quarter-arcs of radius half a cell,
+ * centred on opposite corners, so every tile meets all four edge midpoints and
+ * arcs always join across a shared edge. The cell's one bit picks which
+ * diagonal pair of corners: that is the whole decision, and the winding maze is
+ * what emerges from many of them. (The alternative four-way/diagonal-slash set
+ * gives hard chevrons instead of continuous curve — a different piece.)
+ *
+ * Grid places points; Truchet ORIENTS them. `grid` drops one point in the
+ * middle of each cell; this walks points ALONG the cell's arcs, which is why
+ * it is not a duplicate of it.
+ *
+ * Orientation is drawn per CELL, off CH.geo keyed by the cell index — not from
+ * ctx.rng, which is a per-ITEM stream: several items share a cell and every one
+ * of them has to agree on which way that tile turns, or the arcs break apart.
+ */
+const TRUCHET_PER_CELL = 4;
+
+function truchet(ctx) {
+  const { i, count, w, h, rng, jitter, seed, seedOffsets } = ctx;
+  const cellCount = Math.max(1, Math.ceil(count / TRUCHET_PER_CELL));
+  const cols = Math.max(1, Math.ceil(Math.sqrt(cellCount * (w / h))));
+  const rows = Math.max(1, Math.ceil(cellCount / cols));
+  const cell = Math.floor(i / TRUCHET_PER_CELL) % (cols * rows);
+  const col = cell % cols;
+  const row = Math.floor(cell / cols);
+  const cw = w / cols;
+  const ch = h / rows;
+  // The cell's one decision.
+  const flip = hashU01(seed, CH.geo, 0x7c0000 + cell, seedOffsets) < 0.5;
+  // Which of the tile's two arcs this item rides, and how far along it.
+  const k = i % TRUCHET_PER_CELL;
+  const half = TRUCHET_PER_CELL >> 1;
+  const second = k >= half;
+  const along = ((k % half) + rng()) / half;          // 0..1 along the quarter
+  const ang = along * Math.PI * 0.5;
+  // Corner the arc is centred on, in unit-cell coords.
+  const ax = second ? (flip ? 0 : 1) : (flip ? 1 : 0);
+  const ay = second ? 1 : 0;
+  const ux = ax + (ax === 0 ? 0.5 * Math.cos(ang) : -0.5 * Math.cos(ang));
+  const uy = ay + (ay === 0 ? 0.5 * Math.sin(ang) : -0.5 * Math.sin(ang));
+  return {
+    x: (col + ux) * cw + (rng() - 0.5) * jitter,
+    y: (row + uy) * ch + (rng() - 0.5) * jitter,
+  };
 }
 
 function radial(ctx) {
@@ -198,6 +250,7 @@ function stratified(ctx) {
 registerSampler('random', random);
 registerSampler('grid', grid);
 registerSampler('fibonacci', fibonacci);
+registerSampler('truchet', truchet);
 registerSampler('radial', radial);
 registerSampler('swarm', swarm);
 registerSampler('flow', flow);
@@ -215,6 +268,7 @@ export {
   random,
   grid,
   fibonacci,
+  truchet,
   radial,
   swarm,
   flow,
