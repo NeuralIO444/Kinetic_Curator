@@ -54,6 +54,15 @@ function sanitizeCaGrid(raw) {
 
 const KNOWN_ASSET_IDS = new Set(ASSETS.map((a) => a.id));
 
+/** Ids of the document's own sanitized custom assets (`user:`-prefixed). */
+function customAssetIds(customAssets) {
+  return new Set(
+    (Array.isArray(customAssets) ? customAssets : [])
+      .map((a) => a && a.id)
+      .filter((id) => typeof id === 'string' && id.startsWith('user:')),
+  );
+}
+
 /**
  * Keep only keys the store can actually use: catalog asset ids plus the
  * document's own sanitized custom assets (ids are `user:`-prefixed and capped
@@ -62,11 +71,7 @@ const KNOWN_ASSET_IDS = new Set(ASSETS.map((a) => a.id));
  */
 export function sanitizeEnabledAssets(raw, customAssets = []) {
   if (!raw || typeof raw !== 'object') return null;
-  const customIds = new Set(
-    (Array.isArray(customAssets) ? customAssets : [])
-      .map((a) => a && a.id)
-      .filter((id) => typeof id === 'string' && id.startsWith('user:')),
-  );
+  const customIds = customAssetIds(customAssets);
   const out = {};
   for (const key of Object.keys(raw)) {
     if (KNOWN_ASSET_IDS.has(key) || customIds.has(key)) out[key] = !!raw[key];
@@ -75,17 +80,18 @@ export function sanitizeEnabledAssets(raw, customAssets = []) {
 }
 
 /**
- * Weight overrides apply to catalog assets only; unknown keys are dropped.
- * The store's weight cycle is the strings 'light'/'medium'/'heavy'
- * (globalSlice WEIGHT_CYCLE) — accept those verbatim; anything else falls
- * back to the neutral weight ('light' === SELECTION_WEIGHT 1).
+ * Weight overrides apply to catalog assets and the document's own custom
+ * assets; unknown keys are dropped. The store's weight cycle is the strings
+ * 'light'/'medium'/'heavy' (globalSlice WEIGHT_CYCLE) — accept those verbatim;
+ * anything else falls back to the neutral weight ('light' === SELECTION_WEIGHT 1).
  */
 const WEIGHT_STRINGS = new Set(['light', 'medium', 'heavy']);
-export function sanitizeAssetWeightOverrides(raw) {
+export function sanitizeAssetWeightOverrides(raw, customAssets = []) {
   if (!raw || typeof raw !== 'object') return null;
+  const customIds = customAssetIds(customAssets);
   const out = {};
   for (const key of Object.keys(raw)) {
-    if (!KNOWN_ASSET_IDS.has(key)) continue;
+    if (!KNOWN_ASSET_IDS.has(key) && !customIds.has(key)) continue;
     out[key] = WEIGHT_STRINGS.has(raw[key]) ? raw[key] : 'light';
   }
   return out;

@@ -92,7 +92,7 @@ export function parseProject(raw) {
         enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
         quality: sanitizeQuality(raw.quality),
         autoQuality: raw.autoQuality !== false,
-        assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides),
+        assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
         paletteOverrides: raw.paletteOverrides || null,
         customAssets,
         ...normalizeLayers(raw.layers, raw.activeLayerId),
@@ -126,7 +126,7 @@ export function parseProject(raw) {
       enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
       quality: sanitizeQuality(raw.quality),
       autoQuality: raw.autoQuality !== false,
-      assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides),
+      assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
           ? raw.paletteOverrides
