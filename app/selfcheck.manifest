@@ -75,6 +75,7 @@ node src/gl/bridge/bridge.selfcheck.mjs
 node src/gl/effects/template.selfcheck.mjs
 node src/gl/effects/chunks.selfcheck.mjs
 node src/gl/effects/fxShaders.selfcheck.mjs
+node src/gl/effects/oklch.selfcheck.mjs
 node src/gl/composite.selfcheck.mjs
 node src/gl/accum.selfcheck.mjs
 node src/gl/velocitySmear.selfcheck.mjs

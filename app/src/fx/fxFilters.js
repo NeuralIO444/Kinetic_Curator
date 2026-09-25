@@ -44,6 +44,17 @@ export const FX_EFFECT_DEFS = {
       seed: { label: 'Seed', min: 0, max: 99, step: 1, def: 7, hint: 'Noise seed — same seed, same warp' },
     },
   },
+  // #591 — GL grades in OKLCH; this SVG builder is an APPROXIMATION (see
+  // buildGrade). The two backends agree on intent, not on pixels.
+  grade: {
+    label: 'Grade',
+    hint: 'Colour grade in OKLCH: hue travels without losing brightness. Defaults are identity.',
+    params: {
+      hue: { label: 'Hue', min: -180, max: 180, step: 1, def: 0, hint: 'Rotate hue in degrees. L and C are untouched, so nothing dims.' },
+      chroma: { label: 'Chroma', min: 0, max: 2, step: 0.05, def: 1, hint: 'Scale colourfulness. 0 is neutral gray, 1 is unchanged.' },
+      lift: { label: 'Lift', min: 0.5, max: 1.5, step: 0.01, def: 1, hint: 'Scale perceptual lightness. 1 is unchanged.' },
+    },
+  },
   tear: {
     label: 'Tear',
     hint: 'Horizontal scanline slice-tears: banded rows shear left/right. X-only displacement (Y is flattened).',
@@ -184,6 +195,53 @@ function buildDisplace(params, ctx, rid, src) {
   ];
 }
 
+/**
+ * #591 — the SVG half of the OKLCH grade, and an honest approximation rather
+ * than a port. SVG filters have no cube root, so Oklab's non-linearity cannot
+ * be expressed: feColorMatrix is linear and its `hueRotate` is a YIQ rotation,
+ * which is the very thing OKLCH exists to replace. This chain (hueRotate +
+ * saturate + linear slope) lands in the same place for small moves and drifts
+ * from the GL result as hue and chroma grow.
+ *
+ * Kept in sync anyway, because the alternative is worse: an unknown kind is
+ * DROPPED by sanitizeFxEffects, so a GL-only grade would silently vanish from
+ * the print path — a graded canvas would print ungraded, with no warning. An
+ * approximation is visible and directionally right; silence is not. The five
+ * template effects already carry no parity scenes by design (fxShaders.mjs
+ * header), so this is a difference in degree, not in kind.
+ */
+function buildGrade(params, ctx, rid, src) {
+  const hue = Number(params.hue) || 0;
+  const chroma = Number.isFinite(Number(params.chroma)) ? Number(params.chroma) : 1;
+  const lift = Number.isFinite(Number(params.lift)) ? Number(params.lift) : 1;
+  const out = [];
+  let cur = src;
+  if (hue !== 0) {
+    const id = rid();
+    out.push({ prim: 'feColorMatrix', attrs: { in: cur, type: 'hueRotate', values: r3(hue), result: id } });
+    cur = id;
+  }
+  if (chroma !== 1) {
+    const id = rid();
+    out.push({ prim: 'feColorMatrix', attrs: { in: cur, type: 'saturate', values: r3(Math.max(0, chroma)), result: id } });
+    cur = id;
+  }
+  if (lift !== 1) {
+    const id = rid();
+    out.push({
+      prim: 'feComponentTransfer',
+      attrs: { in: cur, result: id },
+      children: ['R', 'G', 'B'].map((ch) => ({
+        prim: `feFunc${ch}`, attrs: { type: 'linear', slope: r3(lift), intercept: 0 },
+      })),
+    });
+    void id;
+  }
+  // Identity grade must still emit something the chain can hand on.
+  if (!out.length) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  return out;
+}
+
 function buildTear(params, ctx, rid, src) {
   // Stretched noise: varies along Y (bands across the height), near-constant
   // along X. Y displacement is flattened to exactly 0 via feFuncG so the
@@ -274,7 +332,7 @@ function buildEdge(params, ctx, rid, src) {
   ];
 }
 
-const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
+const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
 
 /**
  * Compile an effects array into filter primitives.

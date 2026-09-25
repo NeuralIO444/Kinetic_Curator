@@ -319,6 +319,22 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
+    ...templateEffectDef('grade'),
+    cases: [
+      // #591 — defaults are IDENTITY: hue 0, chroma 1, lift 1 must return the
+      // source unchanged, which is what `noop` asserts byte-for-byte.
+      C('identity → no-op', { hue: 0, chroma: 1, lift: 1 }, { noop: true }),
+      C('hue walk', { hue: 120, chroma: 1, lift: 1 }),
+      C('hue back', { hue: -180, chroma: 1, lift: 1 }),
+      C('desaturate', { hue: 0, chroma: 0, lift: 1 }),
+      C('max', { hue: 180, chroma: 2, lift: 1.5 }, { costly: true }),
+      C('crush lift', { hue: 0, chroma: 1, lift: 0.5 }),
+      H('hostile negative chroma', { hue: 0, chroma: -3, lift: 1 }),
+      H('hostile huge hue', { hue: 1e6, chroma: 1, lift: 1 }),
+      H('hostile zero lift', { hue: 0, chroma: 1, lift: 0 }),
+    ],
+  },
+  {
     ...templateEffectDef('edge'),
     cases: [
       // No params: always-on transform (see solarize note).

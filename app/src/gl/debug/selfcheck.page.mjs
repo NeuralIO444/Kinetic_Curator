@@ -308,7 +308,7 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
   // ---- chunk library (#196) ----
   log('chunks: library audits clean', () => {
     eq(auditChunks().errors.length, 0, 'no audit errors');
-    eq(COMMON_VERSION, 1, 'version');
+    eq(COMMON_VERSION, 2, 'version');
   });
   log('chunks: injection keeps #line mapping for chunks and effect body', () => {
     const lines = injectCommon('#version 300 es\nprecision highp float;\nvoid main() {}\n').split('\n');
