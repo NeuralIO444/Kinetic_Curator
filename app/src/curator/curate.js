@@ -82,10 +82,16 @@ export function pickCurated(candidates, curator, rng = Math.random) {
   return { index: idx, curated: true };
 }
 
-/** UI hint copy for the curator's state. Honest about who tasted the pick. */
-export function curatorHint(curator) {
-  if (curator.status() !== 'active') return 'curator untrained · dice roll';
-  if (curator.personaName) return `persona pick: ${curator.personaName}`;
-  if (curator.name === 'mlx') return 'curated pick · mlx';
-  return 'curated pick';
+/**
+ * UI hint copy for the curator's state. Honest about who tasted the pick —
+ * and, since #592, about whether the sequence had any memory behind it. A
+ * chain that silently fell back to a uniform roll would make the "the button
+ * deals phrases" story unverifiable in performance, so it is said out loud.
+ */
+export function curatorHint(curator, { chainFallback = false } = {}) {
+  const chain = chainFallback ? ' · chain: uniform' : '';
+  if (curator.status() !== 'active') return `curator untrained · dice roll${chain}`;
+  if (curator.personaName) return `persona pick: ${curator.personaName}${chain}`;
+  if (curator.name === 'mlx') return `curated pick · mlx${chain}`;
+  return `curated pick${chain}`;
 }

@@ -3,6 +3,7 @@ import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, trimUndoStack, UNDO_KIND_LAYERS } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
+import { hasChain, markovPick } from '../../curator/transitions.js';
 import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/palettes.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
@@ -58,6 +59,8 @@ export const createLayoutSlice = (set) => ({
   seedOffsets: defaultSeedOffsets(),
   /** CURATE press counter (#518) — session-only, never serialized. */
   curatePress: 0,
+  // #592 — did the last CURATE press fall back to an unconditioned roll?
+  curateChainFallback: false,
   paletteId: 'praystation',
   /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
   paletteOverrides: null,
@@ -410,14 +413,35 @@ export const createLayoutSlice = (set) => ({
     const press = state.curatePress | 0;
     const rng = rngForIndex(state.seed, CH.curate, press, state.seedOffsets);
     const candidates = [];
+    // #592 — the discrete choices are drawn from a transition chain
+    // conditioned on the value that LAST LANDED (the live layoutParams), so
+    // presses relate to each other instead of being strangers. Everything
+    // else still rolls uniform. Same rng, so the whole press stays one
+    // seeded stream and (seed, offsets, press #) still replays exactly.
+    let chainFellBack = false;
     for (let n = 0; n < CURATE_CANDIDATES; n++) {
       const rp = { ...state.layoutParams };
-      for (const key of unlocked) rp[key] = randomizeKey(key, rng);
+      for (const key of unlocked) {
+        if (hasChain(key)) {
+          const step = markovPick(key, state.layoutParams[key], rng);
+          if (step.fellBack) chainFellBack = true;
+          rp[key] = step.value;
+        } else {
+          rp[key] = randomizeKey(key, rng);
+        }
+      }
       candidates.push(rp);
     }
     const { index } = pickCurated(candidates, curator, rng);
     if (index < 0) return {};
-    return { ...pushToUndo(state, true), layoutParams: candidates[index], curatePress: press + 1 };
+    return {
+      ...pushToUndo(state, true),
+      layoutParams: candidates[index],
+      curatePress: press + 1,
+      // Honest flag: if any chain had no row for the current value this press
+      // had no memory behind it, and the bar says so.
+      curateChainFallback: chainFellBack,
+    };
   }),
 
   // Entries are tagged with the layerId they were captured for (#92) and the
