@@ -662,10 +662,12 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     }
     flushPendingPlain();
 
-    // Text runs (glyph atlas) — none in the Phase 1 corpus; fail loudly if present.
-    if (contract.textRuns && contract.textRuns.length) {
-      throw new Error('[gl] textRuns are not wired into the Phase 1 renderer yet (glyph atlas baker exists; compositing lands with live text)');
-    }
+    // #550 — LIVE-or-cut: textRuns is CUT. Nothing produces it (the glyph-atlas
+    // baker is gone; text is baked into stamp assets), and the contract keeps the
+    // field as [] for shape/hash stability. This used to throw if a run ever
+    // arrived — a mid-frame crash for a field with no producer. The renderer now
+    // never reads it; wiring live text later is a deliberate change here AND in
+    // sceneContract.js (whose selfcheck pins the field to [] so it can't drift in).
     return mRead;
   }
 

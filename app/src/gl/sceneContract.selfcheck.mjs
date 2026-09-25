@@ -171,6 +171,15 @@ ok('atlas lists referenced assets, uv reserved for Phase 1', () => {
   assert.deepEqual(s.textRuns, []);
 });
 
+ok('#550: textRuns is producerless — the contract pins it to [] whatever the doc carries', () => {
+  // A doc (or a future producer) that smuggles text runs in must not reach the
+  // renderer as anything but []: the renderer no longer throws on them, so THIS
+  // is the boundary. Wiring live text has to change this test on purpose.
+  const s = build({ ...fixtureDoc(), textRuns: [{ text: 'x' }] });
+  assert.deepEqual(s.textRuns, []);
+  assert.doesNotThrow(() => serializeSceneContract(s));
+});
+
 ok('builder is deterministic', () => {
   const a = serializeSceneContract(build());
   const b = serializeSceneContract(build());

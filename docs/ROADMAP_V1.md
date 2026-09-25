@@ -77,6 +77,6 @@
 ## Phase-gate dead-list (wire-or-cut — Matt's call per item, none rides forward)
 
 From the 2026-09-23 wired-vs-dead audit; each gate clears its own dead before advancing:
-- `engine/materials.js` (no live importer) · `gl/glyphAtlas.mjs` (baker, no callers; renderer throws on textRuns) · `QualityRow` null-mount with dead props · contact-system UI (engine live, performer-unreachable) · `voiceState.ballistics`/`s.ballistics` read-never (see #503) · `shimmer/` prototype mounted while embargo defers shimmer.
+- `engine/materials.js` (no live importer — since removed) · `gl/glyphAtlas.mjs` (baker, since removed) · `textRuns` **CUT** (#550, 2026-09-25: contract keeps `[]`, renderer no longer throws, selfcheck pins it; `motionEnergy` help stub deleted; `engine/placement.js` and `engine/color.js` audited LIVE — `buildPlacements.js` / `kernel/color` import them — and stay) · `QualityRow` null-mount with dead props · contact-system UI (engine live, performer-unreachable) · `voiceState.ballistics`/`s.ballistics` read-never (see #503) · `shimmer/` prototype mounted while embargo defers shimmer.
 
 *Open questions stay open questions — flagged, not silently resolved.*
