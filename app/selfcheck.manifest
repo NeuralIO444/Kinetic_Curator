@@ -61,6 +61,7 @@ node src/engine/stagedEval.selfcheck.mjs
 node src/engine/perf.selfcheck.mjs
 node src/state/phraseTick.selfcheck.mjs
 node src/state/beatArbiter.selfcheck.mjs
+node src/state/euclid.selfcheck.mjs
 node src/state/showrunner.selfcheck.mjs
 node src/fx/fxFilters.selfcheck.mjs
 node src/fx/printPost.selfcheck.mjs
