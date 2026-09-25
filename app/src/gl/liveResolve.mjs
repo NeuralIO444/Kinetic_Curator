@@ -485,8 +485,19 @@ export function createLiveResolver() {
       // #564 — assetSig replaces the old enabled-id join: same trigger for
       // enable/disable (the pool is already filtered by enabledAssets), plus
       // the weight and SVG-content edits the id set alone could not see.
+      // #564 — mirror / symmetry double or halve the presented item list (the
+      // stamp pass that appends the mirrored copies), and the loop's slider springs pass
+      // booleans + strings through raw, so a press used to pop half the nodes
+      // in or out at full size. They ride the sig so it goes through the scale
+      // swap instead. Read from src.layoutParams (what the player authored),
+      // NOT the local layoutParams: that one is already clamped by the
+      // governor (`perfTier1 && mirror -> false`, above), and a perf-tier
+      // drop is the same class of change as an assetThin shed — it must not
+      // spend a MIX-long swap wave on top of the load that caused it. !! so an
+      // unset mirror and an explicit false hash the same.
       const morphSig = [
         layoutParams.mode, layoutParams.behave, src.paletteId, seed, assetSig,
+        !!(src.layoutParams?.mirror), src.layoutParams?.symmetry ?? 'none',
       ].join('|');
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
