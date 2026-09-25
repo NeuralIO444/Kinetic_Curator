@@ -10,6 +10,7 @@ import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
   sanitizeQuality,
+  sanitizePaletteLocks,
   MAX_LAYERS,
 } from '../projectNormalize.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
@@ -472,6 +473,9 @@ export const createGlobalSlice = (set) => ({
     // layers (a layerless doc used to leave stale undo history behind).
     next.historyUndoStack = [];
     next.historyRedoStack = [];
+    // #638 — restore palette locks so harmony regeneration keeps building
+    // around the swatches the designer pinned.
+    next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       // #103 Track B — bound on the apply path too; the live loop resolves
       // every layer per frame.

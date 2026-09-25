@@ -102,6 +102,22 @@ export function sanitizeQuality(raw, fallback = 'balanced') {
   return typeof raw === 'string' && QUALITY_PRESETS[raw] ? raw : fallback;
 }
 
+/**
+ * Palette locks are a map of swatch index → locked flag. Keep only
+ * non-negative integer indices with a truthy lock; unlocked (false) entries
+ * are the same as absent, so they are dropped to keep documents small.
+ */
+export function sanitizePaletteLocks(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {};
+  for (const key of Object.keys(raw)) {
+    const idx = Number(key);
+    if (!Number.isInteger(idx) || idx < 0) continue;
+    if (raw[key]) out[idx] = true;
+  }
+  return out;
+}
+
 export function normalizeSnapshots(raw, customAssets = [], root = {}) {
   if (!raw || typeof raw !== 'object') return {};
   // #637 — a partial snapshot must not wipe good root values with defaults:
