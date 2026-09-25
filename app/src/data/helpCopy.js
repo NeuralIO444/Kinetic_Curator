@@ -7,7 +7,6 @@ export const HELP_TOPICS = [
   { id: 'stimuli-decay', group: 'Stimuli', title: 'decay', text: 'How fast the audio envelope falls after the hit. Long is fluid and lingering.' },
   { id: 'stimuli-response', group: 'Stimuli', title: 'response', text: 'Envelope shape — linear, exponential (heavy), logarithmic (lifts quiet swells), or peak-hold (punchy attacks, smooth falloff).' },
   { id: 'stimuli-swell', group: 'Stimuli', title: 'swell', text: 'How hard the music swells GLOW. 0 means the music never moves the glow — the washout control for loud passages at high glow.' },
-  { id: 'stimuli-video', group: 'Stimuli', title: 'video', text: 'Stub. motionEnergy is unused. Camera does not drive Ghost Station.' },
   { id: 'stimuli-audio', group: 'Stimuli', title: 'audio', text: 'Mic on. Drives reactivity and the Ghost Station AUDIO / BEAT clocks.' },
   { id: 'davis-evolve', group: 'Play', title: 'evolve', text: 'Re-roll the picture. TIME fires on INTERVAL; BEAT fires on a mic attack.' },
   { id: 'davis-favorite', group: 'Ghost Station', title: 'favorite', text: 'Save the current seed as a hit (F).' },

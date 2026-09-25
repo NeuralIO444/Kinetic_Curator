@@ -269,7 +269,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       };
     })(),
     instances, // draw order = array order within each layer's slice
-    textRuns: [], // reserved for Phase 1 glyph atlas; text is baked into stamp assets today
+    textRuns: [], // #550: CUT — no producer (glyph-atlas baker removed; text is baked into stamp assets). Kept as [] for shape/hash stability; the renderer never reads it.
     accum: accum && accum.enabled
       ? {
           enabled: true,
