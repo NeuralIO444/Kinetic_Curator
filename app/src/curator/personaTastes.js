@@ -2,7 +2,7 @@
 //
 // SOURCE OF TRUTH: ~/workspace/your_files/personas/<slug>.md (NOT in this
 // repo — they live in the user's files). This registry is a compiled,
-// hand-distilled mapping from each persona's Loves/Avoids onto the 15
+// hand-distilled mapping from each persona's Loves/Avoids onto the 19
 // measurable features in taste.js. It is an interpretation, not a
 // measurement: weights were set by reading each persona file and mapping
 // only what is actually computable from candidate params. Anything the
@@ -36,6 +36,10 @@ export const TASTE_FEATURES = [
   'attractors',     // gravityWells — structured pull points
   'particles',      // particleCount — fine particulate detail
   'calm',           // damping — how fast motion settles
+  'windPush',       // wind — ambient push on the marks (#518)
+  'breathSwell',    // breath — slow scale swell (#518)
+  'drift',          // lifeDrift — organic wander (#518)
+  'flowRate',       // flap — beat rate (#518)
 ];
 
 // weights: +loves / −avoids. Sparse on purpose — only set where the
@@ -51,6 +55,7 @@ export const PERSONA_TASTES = [
       markDensity: 1.0, coverage: 0.5, markSize: 0.5, sizeVariety: 0.6,
       rotationSpread: 0.4, disorder: -0.8, depth: 0.5, flowEnergy: 0.4,
       particles: 0.4,
+      windPush: 0.2, drift: 0.3,
     },
   },
   {
@@ -62,6 +67,7 @@ export const PERSONA_TASTES = [
     weights: {
       markDensity: 0.6, markSize: -0.8, disorder: -1.0, calm: 0.6,
       sizeVariety: -0.4, opacityVariety: -0.4,
+      windPush: -0.3, drift: -0.5,
     },
   },
   {
@@ -73,6 +79,7 @@ export const PERSONA_TASTES = [
     weights: {
       disorder: -0.7, rotationSpread: 0.3, depth: 0.3, flowEnergy: -0.3,
       calm: 0.4, markSize: -0.3,
+      windPush: -0.2, drift: -0.3,
     },
   },
   {
@@ -84,6 +91,7 @@ export const PERSONA_TASTES = [
     weights: {
       disorder: -0.8, calm: 0.4, coverage: 0.4, markDensity: 0.3,
       opacityVariety: -0.5,
+      drift: -0.5, breathSwell: -0.2,
     },
   },
   {
@@ -95,6 +103,7 @@ export const PERSONA_TASTES = [
     weights: {
       flowEnergy: 0.8, coverage: 0.6, markDensity: 0.5, markSize: -0.4,
       swarmDrive: 0.6, attractors: 0.4, calm: -0.5, opacityVariety: -0.3,
+      windPush: 0.6, drift: 0.6, flowRate: 0.4,
     },
   },
   {
@@ -106,6 +115,7 @@ export const PERSONA_TASTES = [
     weights: {
       disorder: -1.0, markDensity: 0.7, particles: 0.5, coverage: -0.6,
       sizeVariety: 0.4, flowEnergy: -0.6, calm: 0.6,
+      breathSwell: 0.7, windPush: -0.4, drift: -0.2,
     },
   },
   {
@@ -117,6 +127,7 @@ export const PERSONA_TASTES = [
     weights: {
       opacityVariety: 0.5, sizeVariety: 0.5, coverage: 0.5, flowEnergy: 0.5,
       flowWarp: 0.4, calm: -0.4, markDensity: 0.4,
+      breathSwell: 0.6, drift: 0.5, windPush: 0.3,
     },
   },
   {
@@ -128,6 +139,7 @@ export const PERSONA_TASTES = [
     weights: {
       markDensity: -0.5, particles: 0.6, flowEnergy: 0.6, flowWarp: 0.7,
       attractors: -0.5, coverage: -0.6, calm: -0.3,
+      windPush: 0.4, drift: 0.3,
     },
   },
   {
@@ -139,6 +151,7 @@ export const PERSONA_TASTES = [
     weights: {
       flowEnergy: 1.0, flowWarp: 0.8, coverage: 0.8, markDensity: 0.5,
       disorder: -0.4, calm: -0.8, particles: 0.5,
+      drift: 0.8, windPush: 0.6, flowRate: 0.6, breathSwell: 0.4,
     },
   },
   {
@@ -150,6 +163,7 @@ export const PERSONA_TASTES = [
     weights: {
       disorder: 0.8, calm: -0.6, flowEnergy: 0.5, markDensity: 0.4,
       rotationSpread: 0.4,
+      drift: 0.3, flowRate: 0.4, windPush: 0.3,
     },
   },
 ];

@@ -13,7 +13,7 @@ import {
 } from './renderProfiles.js';
 import { PERSONA_TASTES } from './personaTastes.js';
 import { PALETTES, normalizeHex } from '../data/palettes.js';
-import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES } from '../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES } from '../data/layout-modes.js';
 
 // Engine bounds, mirroring randomizeKey in app/src/state/paramUtils.js.
 // Biases must be subsets of these — a profile can narrow the engine's
@@ -33,6 +33,11 @@ const ENGINE_BOUNDS = {
   swarmCohesion: [0.2, 4.0],
   gravityWells: [0.1, 3.0],
   damping: [0.90, 0.98],
+  // #518 motion keys (bounds shared with paramUtils.randomizeKey in part c).
+  wind: [0.2, 2.0],
+  flap: [0.05, 0.9],
+  breath: [0, 0.8],
+  lifeDrift: [0.1, 0.9],
 };
 const INT_KEYS = ['count', 'jitter', 'density', 'zTiers', 'displacement', 'particleCount'];
 const PAIR_KEYS = ['scale', 'rotate', 'alpha'];
@@ -106,6 +111,7 @@ function checkBiasSubset(pid, vname, key, spec) {
         if (key === 'symmetry') assert.ok(SYMMETRY_MODES.includes(value), `${p.id}: symmetry value valid`);
         if (key === 'accumulationOptics') assert.ok(typeof value === 'number' && value >= 0 && value <= 1, `${p.id}: optics valid`);
         if (key === 'accumulation') assert.ok(typeof value === 'boolean', `${p.id}: accumulation boolean`);
+        if (key === 'behave') assert.ok(BEHAVE_MODES.includes(value), `${p.id}: behave value valid`);
       }
     }
   }
@@ -136,6 +142,7 @@ function checkValueInSpec(pid, vname, key, spec, v) {
     jitter: 24, density: 78, zTiers: 4, noiseFreq: 0.005, noiseSpeed: 0.5,
     displacement: 0, particleCount: 150, swarmCohesion: 0.6, gravityWells: 1.0,
     damping: 0.95, symmetry: 'none', accumulation: false, accumulationOptics: 0.2,
+    wind: 1, flap: 0.35, breath: 0, lifeDrift: 0.35, behave: 'cruise',
   };
   for (const p of RENDER_PROFILES) {
     const vs = variants(p);
@@ -167,6 +174,16 @@ function checkValueInSpec(pid, vname, key, spec, v) {
       }
     }
   }
+  // #518: every profile shapes all four motion keys, and personas separate on them.
+  for (const p of RENDER_PROFILES) {
+    for (const v of variants(p)) {
+      for (const k of ['wind', 'flap', 'breath', 'lifeDrift']) assert.ok(k in v.biases, `${p.id}/${v.name}: ${k} biased`);
+    }
+  }
+  const mean = (id, k) => { const [a, b] = getRenderProfile(id).biases[k]; return (a + b) / 2; };
+  assert.ok(mean('anadol', 'lifeDrift') > mean('molnar', 'lifeDrift'), 'anadol drifts more than molnar');
+  assert.ok(mean('haeckel', 'breath') > mean('benjamin', 'breath'), 'haeckel breathes more than benjamin');
+  assert.ok(mean('reas', 'wind') > mean('benjamin', 'wind'), 'reas pushes harder than benjamin');
   // Spot-check the signature moves.
   const ben = applyRenderProfile(base, 'benjamin');
   assert.strictEqual(ben.accumulationOptics, 0, 'benjamin: glow forced off');

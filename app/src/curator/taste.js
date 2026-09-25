@@ -2,7 +2,7 @@
 //
 // The MLX taste model is NOT trained yet (docs/MLX_CURATOR_RUNBOOK.md has
 // not been run on the Mac Studio), so there is no embedding ranker to call.
-// This module is the honest interim: it measures 15 real visual features
+// This module is the honest interim: it measures 19 real visual features
 // from each candidate's params — nothing rendered, nothing faked — and
 // scores them against a persona's distilled Loves/Avoids (personaTastes.js).
 //
@@ -27,7 +27,7 @@ const rangeSpan = (r, lo, hi) =>
   Array.isArray(r) && r.length >= 2 ? num(Math.abs(r[1] - r[0]), 0, hi - lo) : 0.5;
 
 /**
- * Measure 15 honest visual features from a candidate layoutParams object.
+ * Measure 19 honest visual features from a candidate layoutParams object.
  * Every feature is normalized 0..1 and computed only from values that are
  * actually in the params. Palette is NOT randomized by the Curator, so
  * there is deliberately no palette feature — that would be a fake signal.
@@ -52,6 +52,11 @@ export function extractFeatures(params) {
     attractors: num(p.gravityWells, 0.1, 3.0),
     particles: num(p.particleCount, 50, 300),
     calm: num(p.damping, 0.9, 0.98),
+    // #518 motion features — from the same keys the Motion factors drive.
+    windPush: num(p.wind, 0, 3),
+    breathSwell: num(p.breath, 0, 1),
+    drift: num(p.lifeDrift, 0, 1),
+    flowRate: num(p.flap, 0, 1), // flap = wing/tail beat rate
   };
 }
 
