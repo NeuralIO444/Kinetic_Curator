@@ -29,6 +29,25 @@ export function estimateExportTextureBytes(width, height) {
   return Math.round(width) * Math.round(height) * 8 * FRAME_TARGET_COUNT;
 }
 
+/**
+ * #569 — batch start gate (pure, unit-tested). Batch settles on frame
+ * advance; a paused loop never advances, so issuing mid-pause hangs ~12s
+ * then fails generic. Refuse with a titled reason instead. Rendering and
+ * ACCUM-off keep their existing gates. Stateless by design: refusal stores
+ * no intent, so unpausing leaves nothing orphaned — the performer simply
+ * re-issues and it fires.
+ */
+export function canStartBatch({ running, rendering, accumOn } = {}) {
+  if (rendering) return { ok: false, reason: 'Batch already running' };
+  if (accumOn) {
+    return { ok: false, reason: 'Batch needs ACCUM off — trails would bleed across seeds' };
+  }
+  if (!running) {
+    return { ok: false, reason: 'Batch needs the loop running — resume with Space first (a paused loop never settles)' };
+  }
+  return { ok: true, reason: null };
+}
+
 export function isIOSDevice() {
   if (typeof navigator === 'undefined') return false;
   return (
