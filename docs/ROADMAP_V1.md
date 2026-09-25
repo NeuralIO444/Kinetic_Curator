@@ -50,7 +50,7 @@
 
 - **#248 consolidation CLOSED 2026-09-23** — four-tab end-state shipped (Phase 5 PLAY absorbs MORPH/PHRASE landed); DAVIS/STIMULI homage kept per the hybrid pick; helpCopy/tour text final.
 - Community surface: share links + examples page; embed/remix only if Stage 2 proved demand.
-- Disaster recovery story (export everything / import everything round-trip honest).
+- Disaster recovery story (export everything / import everything round-trip honest). Open design questions carried from #537 (closed 2026-09-25 — the hits `seedOffsets` gap shipped; these did not): one export-everything bundle (project / palettes / hits / favorites are separate files today; favorites + user palettes ride nothing), and whether project JSON ever carries favorites / userPalettes (portability vs privacy). Browser-data clear is total loss (benchmark B.10).
 - Docs/examples layer (gap B.9) at the level a release implies.
 - Version bump `0.9.0 → 1.0.0`; release notes name the moat: *browser-native, deterministic, governor-honest performance visuals.*
 
@@ -77,6 +77,6 @@
 ## Phase-gate dead-list (wire-or-cut — Matt's call per item, none rides forward)
 
 From the 2026-09-23 wired-vs-dead audit; each gate clears its own dead before advancing:
-- `engine/materials.js` (no live importer) · `gl/glyphAtlas.mjs` (baker, no callers; renderer throws on textRuns) · `QualityRow` null-mount with dead props · contact-system UI (engine live, performer-unreachable) · `voiceState.ballistics`/`s.ballistics` read-never (see #503) · `shimmer/` prototype mounted while embargo defers shimmer.
+- `engine/materials.js` (no live importer — since removed) · `gl/glyphAtlas.mjs` (baker, since removed) · `textRuns` **CUT** (#550, 2026-09-25: contract keeps `[]`, renderer no longer throws, selfcheck pins it; `motionEnergy` help stub deleted; `engine/placement.js` and `engine/color.js` audited LIVE — `buildPlacements.js` / `kernel/color` import them — and stay) · `QualityRow` null-mount with dead props · contact-system UI (engine live, performer-unreachable) · `voiceState.ballistics`/`s.ballistics` read-never (see #503) · `shimmer/` prototype mounted while embargo defers shimmer.
 
 *Open questions stay open questions — flagged, not silently resolved.*
