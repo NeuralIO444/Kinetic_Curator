@@ -107,4 +107,100 @@ assert.ok(listed.includes('stratified'));
   );
 }
 
+// ── #588 lsystem ────────────────────────────────────────────────────────────
+{
+  const lsystem = getSampler('lsystem');
+  assert.ok(listSamplers().includes('lsystem'), 'lsystem must be registered');
+  const W = 1000; const H = 700;
+  const lay = (n, o = {}) => {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      out.push(lsystem({
+        i, count: n, w: W, h: H, rng: () => 0.5, jitter: 0,
+        seed: 42, seedOffsets: null, lsysDepth: 4, lsysAngle: 25, ...o,
+      }));
+    }
+    return out;
+  };
+
+  const distinct = (o) => new Set(lay(3000, o).map((q) => `${q.x.toFixed(4)},${q.y.toFixed(4)}`)).size;
+
+  // THE GOLDEN — one canonical plant, reproducible from a single seed rather
+  // than found by rolling seeds until something symmetric appears. If the rule
+  // set, the turtle, the normalisation or the branch scaling moves, this is
+  // what says so.
+  {
+    const want = [
+      [500, 672, 0], [500, 642.202632, 0],
+      [507.807605, 625.459168, 0.25], [492.192395, 625.459168, 0.25],
+      [500, 612.405264, 0], [500, 582.607896, 0],
+      [507.807605, 565.864432, 0.25], [492.192395, 565.864432, 0.25],
+    ];
+    const got = lay(8).map((q) => [+q.x.toFixed(6), +q.y.toFixed(6), +q.t.toFixed(6)]);
+    assert.deepStrictEqual(got, want, 'seed 42 / depth 4 / angle 25 is the canonical plate');
+    // …and the OTHER two rules are pinned too, or a change to either would
+    // slip past a golden that only ever exercises one of the three.
+    const first = (seed, n) => lay(n, { seed }).map((q) => [+q.x.toFixed(6), +q.y.toFixed(6), +q.t.toFixed(6)]);
+    assert.deepStrictEqual(first(2, 4), [
+      [501.17529, 672, 0], [503.284578, 667.476618, 0.25],
+      [501.17529, 663.95, 0], [499.066002, 659.426618, 0.25],
+    ], 'seed 2 pins the second rule');
+    assert.deepStrictEqual(first(101, 4), [
+      [500, 672, 0], [511.249535, 647.875295, 0.25],
+      [488.750465, 647.875295, 0.25], [500, 629.066667, 0],
+    ], 'seed 101 pins the third rule');
+    // The three seeds really do grow three different plants.
+    assert.strictEqual(new Set([2, 42, 101].map((seed) => distinct({ seed }))).size, 3,
+      'the canonical set must be three distinct rules');
+  }
+
+  // TOPOLOGY — this is the only sampler that grows a structure, so the test
+  // that matters is that the structure has branches. A plant that collapses
+  // onto a handful of coincident points still passes bounds and determinism.
+  {
+    assert.ok(distinct({ lsysDepth: 4 }) > 100, `depth 4 must be a real plant (got ${distinct({ lsysDepth: 4 })})`);
+    // Deeper forks further — growth, not just more of the same.
+    assert.ok(distinct({ lsysDepth: 5 }) > distinct({ lsysDepth: 4 }), 'depth 5 must out-branch depth 4');
+    assert.ok(distinct({ lsysDepth: 4 }) > distinct({ lsysDepth: 3 }), 'depth 4 must out-branch depth 3');
+  }
+
+  // THE CAP — depth is bounded at both ends, so a hostile or mid-MIX value
+  // cannot ask for an exponential walk.
+  {
+    assert.strictEqual(distinct({ lsysDepth: 99 }), distinct({ lsysDepth: 5 }), 'depth clamps to the cap');
+    assert.strictEqual(distinct({ lsysDepth: -3 }), distinct({ lsysDepth: 1 }), 'depth clamps at the floor');
+    for (const bad of [NaN, undefined, null, 'x', Infinity]) {
+      const q = lay(1, { lsysDepth: bad })[0];
+      assert.ok(Number.isFinite(q.x) && Number.isFinite(q.y), `depth ${bad} must still place a point`);
+    }
+    // Worst case stays inside the placement budget: the biggest rule at the
+    // deepest allowed depth, against the quality caps' maxCount of 800.
+    assert.ok(distinct({ lsysDepth: 5 }) < 4096, 'the walk must stay inside its segment budget');
+  }
+
+  // t IS THE BRANCH DEPTH — it feeds band colouring, so it has to be the
+  // fork-fork-stop arc and not an index in disguise.
+  {
+    const p = lay(600);
+    const ts = p.map((q) => q.t);
+    assert.ok(ts.every((t) => Number.isFinite(t) && t >= 0 && t <= 1), 't must be a normalised depth');
+    assert.ok(ts.includes(0), 'the trunk must be depth 0');
+    assert.ok(new Set(ts).size >= 3, 'a plant needs several branch orders');
+    assert.ok(Math.max(...ts) > 0.9, 'the deepest twigs must reach the top of the range');
+    // Not the traversal index: t must repeat as the walk returns to the trunk.
+    assert.ok(ts.slice(1).some((t, i) => t < ts[i]), 't must fall back when the turtle pops a branch');
+  }
+
+  // Bounds, determinism, and the angle actually being a knob.
+  {
+    const p = lay(400);
+    for (const q of p) {
+      assert.ok(q.x >= 0 && q.x <= W && q.y >= 0 && q.y <= H, `point ${q.x},${q.y} left the plate`);
+    }
+    assert.deepStrictEqual(lay(400), p, 'same seed, same plant');
+    assert.notDeepStrictEqual(lay(400, { lsysAngle: 40 }), p, 'the branch angle must change the plant');
+    assert.notDeepStrictEqual(lay(400, { seed: 43 }), p, 'a different seed grows a different plant');
+  }
+}
+
 console.log('kernel/sample.selfcheck: OK (K2)', { modes: listSamplers().length });

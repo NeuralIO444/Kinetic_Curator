@@ -5,6 +5,7 @@
 // legacy modes still apply their own jitter for visual parity.
 
 import { makeCaField, sampleFieldPoint } from '../field/index.js';
+import { CH, hashU01 } from '../rng.js';
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
 
@@ -143,6 +144,135 @@ function ca(ctx) {
   };
 }
 
+/**
+ * #588 — L-system growth: branching fronds that fork, fork again, and stop.
+ *
+ * No other sampler does TOPOLOGY. Every one above answers "where is point i";
+ * this one grows a structure and then reads points off it, so the points know
+ * which branch they are on.
+ *
+ * CANONICAL RULE SET — three rules, picked by a seed hash on CH.geo. They are
+ * pinned as a golden (see the selfcheck) so the plate demo is reproducible from
+ * a single seed rather than found by rolling seeds until something symmetric
+ * appears. Each is axiom "F" under one production; '+'/'-' turn, '[' / ']'
+ * push and pop the turtle.
+ *
+ * BOUND — depth is capped at LSYS_MAX_DEPTH (5). Worst case is `bush` at 5:
+ * 3,125 segments, generated ONCE per (seed, depth, angle) and cached. At most
+ * `count` of them are ever read, and count is itself capped at 800 by the
+ * quality caps, so the walk can never outgrow the placement budget. Expansion
+ * also stops early if a string would exceed the segment budget, so a future
+ * rule with a larger branching factor degrades to a shallower plant rather
+ * than to a hang.
+ *
+ * `t` is the branch nesting depth, normalised — the fork-fork-stop arc. It
+ * feeds `band` colouring directly, so branch order reads as colour, and a
+ * phrase riding t reveals growth in the order it grew.
+ */
+const LSYS_RULES = [
+  { name: 'bush', rule: 'F[+F]F[-F]F' },
+  { name: 'frond', rule: 'FF[+F][-F]' },
+  { name: 'plate', rule: 'F[+F][-F]F' },
+];
+const LSYS_MAX_DEPTH = 5;
+const LSYS_MAX_SEGMENTS = 4096;
+const LSYS_BRANCH_SCALE = 0.62;
+
+/** Expand the axiom, stopping early rather than exceeding the segment budget. */
+function lsystemString(rule, depth) {
+  let s = 'F';
+  for (let g = 0; g < depth; g++) {
+    const next = s.replace(/F/g, rule);
+    if ((next.match(/F/g) || []).length > LSYS_MAX_SEGMENTS) break;
+    s = next;
+  }
+  return s;
+}
+
+/** Walk the string with a turtle; one point per segment, plus its branch depth. */
+function lsystemWalk(str, angleDeg) {
+  const turn = angleDeg * Math.PI / 180;
+  let x = 0; let y = 0; let a = -Math.PI / 2; // grow upward
+  let depth = 0;
+  let maxDepth = 0;
+  const stack = [];
+  const xs = []; const ys = []; const ds = [];
+  for (let k = 0; k < str.length; k++) {
+    switch (str[k]) {
+      case 'F': {
+        // Segments shorten with branch depth: a LOOK choice, not a
+        // correctness one. Measured, it changes no topology at all (identical
+        // distinct-point counts either way) — it is what makes the plant read
+        // as a frond, with a trunk and finer twigs, instead of a lattice of
+        // equal-length struts.
+        const step = Math.pow(LSYS_BRANCH_SCALE, depth);
+        x += Math.cos(a) * step; y += Math.sin(a) * step;
+        xs.push(x); ys.push(y); ds.push(depth);
+        break;
+      }
+      case '+': a += turn; break;
+      case '-': a -= turn; break;
+      case '[': stack.push([x, y, a, depth]); depth++; if (depth > maxDepth) maxDepth = depth; break;
+      case ']': if (stack.length) { const p = stack.pop(); x = p[0]; y = p[1]; a = p[2]; depth = p[3]; } break;
+      default: break;
+    }
+  }
+  return { xs, ys, ds, maxDepth };
+}
+
+// Cached per (seed, depth, angle): the walk is a one-time cost, not per point.
+// A small Map rather than one slot, for the same reentrancy reason as the CA
+// field cache and the Voronoi centres.
+const _lsysCache = new Map();
+function lsystemPlant(seed, seedOffsets, depth, angleDeg) {
+  const off = (seedOffsets && seedOffsets.spatial) || 0;
+  const key = `${seed >>> 0}:${off}:${depth}:${angleDeg}`;
+  let plant = _lsysCache.get(key);
+  if (!plant) {
+    const pick = LSYS_RULES[Math.floor(hashU01(seed, CH.geo, 0x15e5, seedOffsets) * LSYS_RULES.length) % LSYS_RULES.length];
+    const walk = lsystemWalk(lsystemString(pick.rule, depth), angleDeg);
+    // Normalise the plant into the unit box, preserving aspect so a frond
+    // stays a frond rather than being stretched to fill the plate.
+    let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity;
+    for (let k = 0; k < walk.xs.length; k++) {
+      if (walk.xs[k] < minX) minX = walk.xs[k];
+      if (walk.xs[k] > maxX) maxX = walk.xs[k];
+      if (walk.ys[k] < minY) minY = walk.ys[k];
+      if (walk.ys[k] > maxY) maxY = walk.ys[k];
+    }
+    const span = Math.max(maxX - minX, maxY - minY) || 1;
+    const ox = (maxX + minX) / 2;
+    const oy = (maxY + minY) / 2;
+    const ux = new Float64Array(walk.xs.length);
+    const uy = new Float64Array(walk.ys.length);
+    const ut = new Float64Array(walk.ds.length);
+    for (let k = 0; k < walk.xs.length; k++) {
+      ux[k] = 0.5 + (walk.xs[k] - ox) / span;
+      uy[k] = 0.5 + (walk.ys[k] - oy) / span;
+      ut[k] = walk.maxDepth > 0 ? walk.ds[k] / walk.maxDepth : 0;
+    }
+    plant = { ux, uy, ut, rule: pick.name, n: ux.length };
+    if (_lsysCache.size > 8) _lsysCache.clear();
+    _lsysCache.set(key, plant);
+  }
+  return plant;
+}
+
+function lsystem(ctx) {
+  const { i, w, h, rng, jitter, seed, seedOffsets, lsysDepth, lsysAngle } = ctx;
+  const depth = Math.min(LSYS_MAX_DEPTH, Math.max(1, Math.round(Number(lsysDepth) || 4)));
+  const angle = Number.isFinite(lsysAngle) ? lsysAngle : 25;
+  const plant = lsystemPlant(seed, seedOffsets, depth, angle);
+  if (!plant.n) return random(ctx);
+  const k = i % plant.n;
+  const fit = Math.min(w, h) * 0.92;
+  return {
+    x: w / 2 + (plant.ux[k] - 0.5) * fit + (rng() - 0.5) * jitter,
+    y: h / 2 + (plant.uy[k] - 0.5) * fit + (rng() - 0.5) * jitter,
+    t: plant.ut[k],
+  };
+}
+
 function orbit(ctx) {
   const { i, count, w, h, rng, seed } = ctx;
   const planets = [
@@ -204,6 +334,7 @@ registerSampler('flow', flow);
 registerSampler('layers', layers);
 registerSampler('rails', rails);
 registerSampler('ca', ca);
+registerSampler('lsystem', lsystem);
 registerSampler('orbit', orbit);
 registerSampler('abacus', abacus);
 registerSampler('noise', grid); // grid base; displacement warps in orchestrator
@@ -221,6 +352,7 @@ export {
   layers,
   rails,
   ca,
+  lsystem,
   orbit,
   abacus,
   stratified,
