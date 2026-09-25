@@ -20,16 +20,16 @@ function downloadJsonBlob(obj, filename) {
 // onMessage: shown by the parent, the same slot batch-completion writes to —
 // matches the original single status line under this section.
 export function DataExportRow({
-  seed, paletteId, paletteOverrides, layoutParams, lockedParams, caGrid,
-  enabledAssets, quality, assetWeightOverrides, customAssets, layers,
+  seed, seedOffsets, paletteId, paletteOverrides, layoutParams, lockedParams, caGrid,
+  enabledAssets, quality, autoQuality, assetWeightOverrides, customAssets, layers,
   activeLayerId, layerSnapshots, userPalettes, favorites, onMessage,
 }) {
   const fileInputRef = useRef(null);
   const paletteInputRef = useRef(null);
 
   const projectFields = {
-    seed, paletteId, paletteOverrides, layoutParams, lockedParams, caGrid,
-    enabledAssets, quality, assetWeightOverrides, customAssets, layers,
+    seed, seedOffsets, paletteId, paletteOverrides, layoutParams, lockedParams, caGrid,
+    enabledAssets, quality, autoQuality, assetWeightOverrides, customAssets, layers,
     activeLayerId, layerSnapshots,
   };
 
