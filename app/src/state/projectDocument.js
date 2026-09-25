@@ -86,6 +86,9 @@ export function parseProject(raw) {
     if (!seedRes.ok) return seedRes;
     const seed = seedRes.seed;
     const customAssets = sanitizeOverlay(raw.customAssets);
+    const { layers, activeLayerId } = normalizeLayers(raw.layers, raw.activeLayerId);
+    // #643 — drop snapshots for layers that don't exist in the doc.
+    const layerIds = (layers || []).map((l) => l && l.id);
     return {
       ok: true,
       doc: {
@@ -110,13 +113,15 @@ export function parseProject(raw) {
         paletteOverrides: raw.paletteOverrides || null,
         paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
         customAssets,
-        ...normalizeLayers(raw.layers, raw.activeLayerId),
+        layers,
+        activeLayerId,
         // #637 — partial snapshots inherit the root doc's seed/palette/layout.
+        // #643 — drop snapshots for layers that don't exist in the doc.
         layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets, {
           seed: seed >>> 0,
           paletteId: raw.paletteId || raw.palette || 'praystation',
           layoutParams: raw.layoutParams || raw.layout,
-        }),
+        }, layerIds),
       },
     };
   }
@@ -133,6 +138,9 @@ export function parseProject(raw) {
   const seed = seedRes.seed;
 
   const customAssets = sanitizeOverlay(raw.customAssets);
+  const { layers, activeLayerId } = normalizeLayers(raw.layers, raw.activeLayerId);
+  // #643 — drop snapshots for layers that don't exist in the doc.
+  const layerIds = (layers || []).map((l) => l && l.id);
   return {
     ok: true,
     doc: {
@@ -153,13 +161,15 @@ export function parseProject(raw) {
           : null,
       paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
       customAssets,
-      ...normalizeLayers(raw.layers, raw.activeLayerId),
+      layers,
+      activeLayerId,
       // #637 — partial snapshots inherit the root doc's seed/palette/layout.
+      // #643 — drop snapshots for layers that don't exist in the doc.
       layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets, {
         seed: raw.seed,
         paletteId: raw.paletteId,
         layoutParams: raw.layoutParams,
-      }),
+      }, layerIds),
     },
   };
 }
