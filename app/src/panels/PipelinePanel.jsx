@@ -73,7 +73,7 @@ export function PipelinePanel() {
       const mod = await import('./PrintDeskModal.jsx');
       setPrintDesk(() => mod.PrintDeskModal);
     } catch (e) {
-      setMessage(`Print Desk failed to load — ${e && e.message ? e.message : String(e)}`);
+      setMessage(`Print Desk failed to load — reload the page to retry. (${e && e.message ? e.message : String(e)})`);
     }
   };
 

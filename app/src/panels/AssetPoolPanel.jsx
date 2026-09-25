@@ -19,8 +19,10 @@ export function AssetPoolPanel() {
   const swapId = useRef(null);
   const [Studio, setStudio] = useState(null);
   const [studioSeed, setStudioSeed] = useState(null);
-  // #601: a failed chunk load must say so (was silent). Cleared at the start of
-  // each open, so a retry that succeeds doesn't leave a stale banner up.
+  // #601: a failed chunk load must say so (was silent). The browser caches a failed
+  // dynamic import per URL, so a retry on the same page replays the failure with no
+  // network request — only a reload recovers, and the message says so. Cleared at the
+  // start of each open so a fresh failure replaces, rather than stacks on, the old one.
   const [studioError, setStudioError] = useState(null);
   const { assets } = useApp();
   const { state } = useApp(s => ({
@@ -105,7 +107,7 @@ export function AssetPoolPanel() {
         </div>
       </PanelHeader>
       {ingestError && <div style={{ color: 'var(--accent)', fontSize: 11, padding: '4px 10px' }}>INGEST: {ingestError}</div>}
-      {studioError && <div style={{ color: '#ff2d6f', fontSize: 11, padding: '4px 10px' }}>STUDIO failed to load — {studioError}</div>}
+      {studioError && <div style={{ color: '#ff2d6f', fontSize: 11, padding: '4px 10px' }}>STUDIO failed to load — reload the page to retry. ({studioError})</div>}
       <div className="pool-controls">
         <div className="cat-filter">
           <button className={`cat-chip ${catFilter === 'all' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_CAT_FILTER, 'all')}>
