@@ -65,6 +65,11 @@ export function DataExportRow({
         onMessage('Invalid JSON');
       }
     };
+    // #640 — a failed file read (disk error, permissions) must say so
+    // instead of failing silently.
+    reader.onerror = () => {
+      onMessage('Could not read file');
+    };
     reader.readAsText(file);
     e.target.value = '';
   };
