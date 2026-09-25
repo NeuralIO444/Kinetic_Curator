@@ -595,6 +595,49 @@ test('#564: a governor perfTier1 clamp of mirror is NOT a transition — differe
   r.dispose();
 });
 
+// ── #622: a palette press must never touch scale ────────────────────────────
+// Since #564 the morph is a scale swap, so paletteId in morphSig made every node
+// shrink to zero and regrow on a palette-only change. Colours now cut in one frame
+// (interim — the colour transitions are the Sleight v2 modes, #624/#625).
+test('#622: a palette-only change is NOT a transition — no scale swap, colours land at once', () => {
+  const r = createLiveResolver();
+  const mk = (paletteId, loopTimeMs) => baseInput({
+    paletteId,
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    mixSeconds: 2, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  const before = lyr(r.resolveLayers(mk('praystation', 0)));
+  const colors = (its) => [...new Set(its.map((it) => it.color))].sort().join(',');
+  const rawNew = lyr(createLiveResolver().resolveLayers(mk('hydra', 1000)));
+  assert.notEqual(colors(before), colors(rawNew), 'the two palettes really differ (test is not vacuous)');
+  // Every frame of what would have been the MIX presents the raw new-palette items.
+  for (const t of [1000, 1250, 1500, 2000, 3100]) {
+    const frame = lyr(r.resolveLayers(mk('hydra', t)));
+    const raw = lyr(createLiveResolver().resolveLayers(mk('hydra', t)));
+    assert.deepEqual(frame, raw, `t=${t - 1000}ms: palette change presents the raw items, no morph`);
+    assert.ok(!dipped(frame, raw), `t=${t - 1000}ms: no node below its resting size`);
+  }
+  r.dispose();
+});
+
+test('#622: mode still fires the director while palette does not', () => {
+  // The other sig fields are untouched: a mode change alongside is still a transition.
+  const r = createLiveResolver();
+  const mk = (mode, paletteId, loopTimeMs) => baseInput({
+    paletteId,
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    mixSeconds: 0.5, loopTimeMs,
+  });
+  const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
+  lyr(r.resolveLayers(mk('scatter', 'praystation', 0)));
+  lyr(r.resolveLayers(mk('grid', 'hydra', 1000)));
+  const mid = lyr(r.resolveLayers(mk('grid', 'hydra', 1250)));
+  const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 'hydra', 1250)));
+  assert.ok(dipped(mid, raw), 'a mode change (with a palette change) still shrinks nodes through the swap');
+  r.dispose();
+});
+
 test('#471: a seed change alone now glides through item-morph, not a hard snap', () => {
   // Mirrors the #419 test exactly, substituting seed for mode as the
   // changing field — EVOLVE's seed target used to write a new seed
