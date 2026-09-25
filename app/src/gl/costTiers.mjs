@@ -71,14 +71,14 @@ function isNonNegNumber(v) {
 
 /**
  * Declare an effect's cost tier at its registration site. Fail-closed:
- * duplicates, bad tiers, and non-numeric estimates throw, naming the id.
+ * bad tiers and non-numeric estimates throw, naming the id — and so does a
+ * CONFLICTING re-declaration of an id. Re-declaring an id with the identical
+ * declaration is a no-op (#551): Vite HMR re-executes the engine modules that
+ * register at import time, and that used to be a dev-time throw storm.
  */
 export function registerCostTier(id, decl = {}) {
   if (typeof id !== 'string' || !id) {
     throw new Error(`[cost-tiers] registerCostTier: id must be a non-empty string`);
-  }
-  if (registry.has(id)) {
-    throw new Error(`[cost-tiers] "${id}" is already registered — duplicate cost-tier declaration`);
   }
   const { tier, memoryBytes = 0, timeMs = 0, notes = '', memoryGate = null } = decl;
   if (!Number.isInteger(tier) || tier < 0 || tier > 3) {
@@ -95,7 +95,15 @@ export function registerCostTier(id, decl = {}) {
       throw new Error(`[cost-tiers] "${id}": memoryGate must be { minWidth: number, maxTaps: int }`);
     }
   }
-  registry.set(id, { id, tier, memoryBytes, timeMs, notes: String(notes || ''), memoryGate });
+  const next = { id, tier, memoryBytes, timeMs, notes: String(notes || ''), memoryGate };
+  const prev = registry.get(id);
+  if (prev) {
+    if (JSON.stringify(prev) !== JSON.stringify(next)) {
+      throw new Error(`[cost-tiers] "${id}" is already registered with a different declaration — duplicate cost-tier declaration`);
+    }
+    return id;
+  }
+  registry.set(id, next);
   return id;
 }
 

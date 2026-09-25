@@ -15,6 +15,8 @@ import {
   fxFilterStringForLayer,
   isFxLayer,
 } from './fxFilters.js';
+import { BUILTIN_EFFECT_DEFS } from '../gl/bridge/builtinEffects.mjs';
+import { EFFECT_IDS } from '../gl/shaders.mjs';
 import { createLayersSlice } from '../state/slices/layersSlice.js';
 import { normalizeLayers, serializeProject, parseProject } from '../state/projectDocument.js';
 
@@ -229,10 +231,40 @@ ok('effect CRUD is fail-closed', () => {
   assert.equal(get().layers[1].effects[0].params.dx, 3); // NaN -> default
   api.fxEffectSetParam(fxId, 0, 'dx', 1000);
   assert.equal(get().layers[1].effects[0].params.dx, 24); // clamped
+  // #554: the editor emits raw Number(e.target.value) per tick — the store is
+  // the sanitize point, so hostile ticks never sit in live state between frames.
+  api.fxEffectSetParam(fxId, 0, 'dx', -1000);
+  assert.equal(get().layers[1].effects[0].params.dx, 0); // clamped to min
+  api.fxEffectSetParam(fxId, 0, 'dx', Infinity);
+  assert.equal(get().layers[1].effects[0].params.dx, 3); // non-finite -> default
+  api.fxEffectSetParam(fxId, 0, 'dx', 24);
   api.fxEffectReorder(fxId, 0, 1);
   assert.equal(get().layers[1].effects[0].kind, 'grain');
   api.fxEffectRemove(fxId, 0);
   assert.equal(get().layers[1].effects.length, 2);
+});
+// #554 — the builtin u_p packers clamp for themselves (the GL harness serves
+// only src/gl, so they cannot import the catalog). This is the drift gate:
+// for every builtin knob, the packer's clamp must equal sanitizeFxEffects'.
+ok('#554: builtin u_p packers agree with the catalog sanitize — hostile values never reach the shader', () => {
+  const HOSTILE = [NaN, Infinity, -Infinity, -1e9, 1e9, 0, 1, -1, 'x', null, undefined];
+  const packFor = (kind, params) => {
+    const def = BUILTIN_EFFECT_DEFS.find((d) => d.kind === kind);
+    return def.make(EFFECT_IDS).passes[0].params(params);
+  };
+  // packed slot per knob (invert has none)
+  const KNOBS = { rgbSplit: ['dx', 1000], grain: ['amount', 1], posterize: ['levels', 1] };
+  for (const [kind, [key, scale]] of Object.entries(KNOBS)) {
+    for (const v of HOSTILE) {
+      const want = sanitizeFxEffects([{ kind, params: { [key]: v } }])[0].params[key];
+      const got = packFor(kind, { [key]: v })[0] * scale;
+      assert.ok(Number.isFinite(got), `${kind}.${key}=${String(v)} packs finite`);
+      assert.ok(Math.abs(got - want) < 1e-9, `${kind}.${key}=${String(v)}: packer ${got} !== catalog ${want}`);
+    }
+    // missing params land on the catalog default
+    assert.ok(Math.abs(packFor(kind, {})[0] * scale - FX_EFFECT_DEFS[kind].params[key].def) < 1e-9, `${kind} default`);
+  }
+  assert.deepEqual(packFor('invert', {}), [0, 0, 0, 0]);
 });
 ok('setSelectedFxLayer only accepts fx ids', () => {
   const { api, get } = driveSlice();

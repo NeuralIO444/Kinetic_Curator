@@ -18,6 +18,19 @@
  * context.
  */
 
+import { registerCostTier } from './costTiers.mjs';
+
+// #551 — declared at its definition site like every other cost-bearing piece.
+// Tier 0: CPU bookkeeping (one Map lookup per instance) plus a stretch in the
+// instanced quad's existing vertex shader; no fullscreen pass, no texture, and
+// at rest the shader is exactly the old path. Never shed.
+registerCostTier('gl/velocity-smear', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.02,
+  notes: '#309 velocity smear: per-instance vx/vy attached on the CPU, stretched in the existing QUAD_VS — zero fullscreen passes; live + stills',
+});
+
 /** Scene units per frame past which a delta is a teleport, not motion. */
 export const SMEAR_MAX_SPEED = 240;
 

@@ -26,6 +26,7 @@ import { strict as assert } from 'node:assert';
 import {
   registerCostTier,
   allCostTiers,
+  getCostTier,
   tier1ShedIds,
   shedOrder,
   radialFanMultiplier,
@@ -65,12 +66,21 @@ console.log(`[selfcheck] A declarations valid — ${decls.length} effects declar
 
 // Fail-closed: duplicates and bad tiers throw, naming the id.
 assert.throws(() => registerCostTier('accum/fade', { tier: 1 }), /already registered/,
-  'duplicate registration must throw');
+  'a CONFLICTING re-registration must throw');
+// #551: an identical re-declaration (Vite HMR re-running a module) is a no-op.
+{
+  const before = allCostTiers().length;
+  const d = getCostTier('accum/fade');
+  const { tier, memoryBytes, timeMs, notes, memoryGate } = d;
+  assert.equal(registerCostTier('accum/fade', { tier, memoryBytes, timeMs, notes, memoryGate }), 'accum/fade');
+  assert.equal(allCostTiers().length, before, 'identical re-declaration adds nothing');
+  assert.deepEqual(getCostTier('accum/fade'), d, 'and changes nothing');
+}
 assert.throws(() => registerCostTier('__selfcheck__/bad-tier', { tier: 7 }), /tier must be/,
   'out-of-range tier must throw');
 assert.throws(() => registerCostTier('__selfcheck__/neg-mem', { tier: 3, memoryBytes: -1 }), /memoryBytes/,
   'negative memoryBytes must throw');
-console.log('[selfcheck] A registration is fail-closed — duplicates/bad tiers throw');
+console.log('[selfcheck] A registration is fail-closed — conflicting duplicates/bad tiers throw; identical re-declaration is idempotent');
 
 // ---- B. coverage both ways ----------------------------------------------
 

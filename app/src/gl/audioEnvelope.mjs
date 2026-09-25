@@ -7,6 +7,11 @@
 // resamples it onto its own frame times. A missing or malformed sidecar
 // yields null here, and null is a real no-op (off-defaults rule).
 
+// #551 — cost tier: none declared, on purpose. This is the studio/stills
+// sidecar loader (node:fs, offline): a one-time file read plus per-frame scalar
+// resampling, no GPU pass and nothing in the live frame budget. The per-frame
+// scalar modulation it feeds is already declared as 'audio/modulation' (tier 0,
+// accum.mjs); a second declaration here would double-count it.
 import { existsSync, readFileSync } from "node:fs";
 
 export const AUDIO_SCHEMA = "kc-audio-envelope/1";
