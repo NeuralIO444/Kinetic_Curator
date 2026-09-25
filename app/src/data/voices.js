@@ -279,7 +279,7 @@ export const STUB_VOICES = [
     assets: ['geo_square_01', 'geo_hex_01', 'line_solid_01', 'geo_cross_02'],
   },
   { id: 'fibonacci',  name: 'fibonacci', glyph: 'phi',    vibe: 'Nautilus: golden-spiral growth. Sacred geometry, slow reveal.',
-    motion: { lifeDrift: 0.2, noiseSpeed: 0.2 },
+    motion: { lifeDrift: 0.15, noiseSpeed: 0.2 },
     assets: ['flora_flower_01', 'line_spiral_01', 'rad_rings_01', 'flora_sprig_01'],
   },
   { id: 'radial',     name: 'radial',    glyph: 'rad',    vibe: 'Radar: sonar pings and target locks. Military calm.',

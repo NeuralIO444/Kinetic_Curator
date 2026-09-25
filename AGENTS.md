@@ -4,6 +4,8 @@ Read this before writing code. The product spec for the current engine push is [
 
 **Embargo:** [`docs/EMBARGO.md`](docs/EMBARGO.md) — no new features until spine C is merged and Matt has played the body. Deferred labs are not tickets.
 
+**Physics & Animation Mandate:** [`docs/ALWAYS_ALIVE.md`](docs/ALWAYS_ALIVE.md) — The "Always Alive" Protocol.
+
 Long-range layers (do not implement out of order): [`docs/path/README.md`](docs/path/README.md).
 
 ## Roles

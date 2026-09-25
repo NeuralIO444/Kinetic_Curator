@@ -20,7 +20,7 @@ for (const v of STUB_VOICES) {
 }
 // Rule from the issue: static modes = low drift + low flow; flow modes = mid flow.
 const m = (id) => STUB_VOICES.find((v) => v.id === id).motion;
-for (const id of ['grid', 'rails', 'layers', 'abacus', 'stratified']) {
+for (const id of ['grid', 'rails', 'layers', 'abacus', 'stratified', 'ca', 'radial', 'fibonacci']) {
   assert.ok(m(id).lifeDrift <= 0.15 && m(id).noiseSpeed <= 0.2, `${id} is near-static`);
 }
 for (const id of ['flow', 'noise', 'orbit']) {
