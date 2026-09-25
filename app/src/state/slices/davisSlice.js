@@ -5,6 +5,57 @@ import { tickPhraseBeat } from '../phraseTick.js';
 import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { normalizeLayoutParams } from '../../data/layout-modes.js';
+
+// #568 — favorites are the set's curation (export-hits reads them), but they
+// lived in memory only: a reload silently emptied the tray. Same pattern as the
+// user palette library: their own kc: key, sanitized on the way back in (it is
+// a trust boundary — recallFavorite writes layout straight into the store).
+// Not in the project document on purpose: they are the performer's shelf, not
+// the composition, and the hits export format is out of scope.
+export const FAVORITES_KEY = 'kc:favorites:v1';
+const FAVORITES_MAX = 200;
+
+export function sanitizeFavorite(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const seed = Number(raw.seed);
+  if (!Number.isFinite(seed)) return null;
+  const layout = raw.config?.layout;
+  const paletteId = raw.config?.palette?.id;
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
+    seed,
+    ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'
+      ? { seedOffsets: normalizeSeedOffsets(raw.seedOffsets) } : {}),
+    timestamp: typeof raw.timestamp === 'string' ? raw.timestamp.slice(0, 32) : '',
+    config: {
+      ...(layout && typeof layout === 'object' && !Array.isArray(layout)
+        ? { layout: normalizeLayoutParams(layout) } : {}),
+      palette: { id: typeof paletteId === 'string' ? paletteId.slice(0, 80) : '' },
+    },
+  };
+}
+
+function readFavorites() {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.map(sanitizeFavorite).filter(Boolean).slice(0, FAVORITES_MAX)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistFavorites(list) {
+  try {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn('[favorites] save failed', e);
+  }
+}
 
 export const createDavisSlice = (set) => ({
   evolveMode: false,
@@ -13,7 +64,7 @@ export const createDavisSlice = (set) => ({
   evolveInterval: 2000,
   autoSnapshot: false,
   lastEvolveTs: 0,
-  favorites: [],
+  favorites: readFavorites(),
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
@@ -153,10 +204,18 @@ export const createDavisSlice = (set) => ({
     return {};
   }),
 
-  addFavorite: (fav) => set((state) => ({ favorites: [...state.favorites, { id: genId(), ...fav }] })),
-  removeFavorite: (id) => set((state) => ({
-    favorites: state.favorites.filter((f) => f.id !== id),
-  })),
+  addFavorite: (fav) => set((state) => {
+    const entry = sanitizeFavorite({ ...fav, id: genId() });
+    if (!entry) return {};
+    const favorites = [...state.favorites, entry].slice(-FAVORITES_MAX);
+    persistFavorites(favorites);
+    return { favorites };
+  }),
+  removeFavorite: (id) => set((state) => {
+    const favorites = state.favorites.filter((f) => f.id !== id);
+    persistFavorites(favorites);
+    return { favorites };
+  }),
   reorderFavorite: (id, delta) => set((state) => {
     const idx = state.favorites.findIndex((f) => f.id === id);
     if (idx < 0) return {};
@@ -165,6 +224,7 @@ export const createDavisSlice = (set) => ({
     const next = [...state.favorites];
     const [item] = next.splice(idx, 1);
     next.splice(j, 0, item);
+    persistFavorites(next);
     return { favorites: next };
   }),
   recallFavorite: (fav) => set({
