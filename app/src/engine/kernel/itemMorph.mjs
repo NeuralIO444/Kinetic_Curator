@@ -66,6 +66,115 @@ function groupByAsset(items) {
 }
 
 /**
+ * #572 — global greedy nearest pairing, without the O(n^3) rescan. The rule is
+ * the one the old nested loop implemented: repeatedly take the closest
+ * remaining (from, to) pair, first in row-major order on a distance tie, i.e.
+ * lexicographic (d, from index, to index). Returns [[fi, tj], ...] in pick
+ * order — parity with the old loop is pinned by a selfcheck oracle.
+ *
+ * Each from-item carries its nearest remaining target in a min-heap keyed
+ * (d, i). A popped entry whose target was taken meanwhile is recomputed and
+ * pushed back; keys only ever grow as targets disappear, so the first valid pop
+ * is the true global minimum. Nearest lookups walk a uniform grid ring by
+ * ring, and keep going while a ring could still tie (<=, not <) so the lowest
+ * index wins a tie exactly as before. Non-finite coordinates read as 0.
+ */
+function greedyNearest(fs, ts) {
+  const n = fs.length, m = ts.length;
+  if (!n || !m) return [];
+  const fin = (v) => (Number.isFinite(v) ? v : 0);
+  const tx = new Float64Array(m), ty = new Float64Array(m);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let j = 0; j < m; j++) {
+    const x = tx[j] = fin(ts[j].x), y = ty[j] = fin(ts[j].y);
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  const w = x1 - x0, h = y1 - y0;
+  const cell = Math.max(Math.sqrt((w * h) / m), Math.max(w, h) / m, 1);
+  const cols = Math.floor(w / cell) + 1, rows = Math.floor(h / cell) + 1;
+  const cellOf = (v, lo, cnt) => Math.min(cnt - 1, Math.max(0, Math.floor((v - lo) / cell)));
+  const grid = Array.from({ length: cols * rows }, () => []);
+  for (let j = 0; j < m; j++) grid[cellOf(ty[j], y0, rows) * cols + cellOf(tx[j], x0, cols)].push(j);
+  const taken = new Uint8Array(m);
+  const maxRing = Math.max(cols, rows);
+
+  let bestJ = -1, bestD = Infinity;
+  const scan = (c, qx, qy) => {
+    const g = grid[c];
+    for (let k = 0; k < g.length; k++) {
+      const j = g[k];
+      if (taken[j]) continue;
+      const dx = qx - tx[j], dy = qy - ty[j];
+      const d = dx * dx + dy * dy;
+      if (d < bestD || (d === bestD && j < bestJ)) { bestD = d; bestJ = j; }
+    }
+  };
+  const nearest = (qx, qy) => {
+    bestJ = -1; bestD = Infinity;
+    const cx = cellOf(qx, x0, cols), cy = cellOf(qy, y0, rows);
+    for (let r = 0; r <= maxRing; r++) {
+      if (bestJ >= 0 && (r - 1) * (r - 1) * cell * cell > bestD && r > 0) break;
+      const ya = cy - r, yb = cy + r, xa = cx - r, xb = cx + r;
+      for (let y = Math.max(0, ya); y <= Math.min(rows - 1, yb); y++) {
+        if (y === ya || y === yb) {
+          for (let x = Math.max(0, xa); x <= Math.min(cols - 1, xb); x++) scan(y * cols + x, qx, qy);
+        } else {
+          if (xa >= 0) scan(y * cols + xa, qx, qy);
+          if (xb < cols && xb !== xa) scan(y * cols + xb, qx, qy);
+        }
+      }
+    }
+    return bestJ;
+  };
+
+  // min-heap of { d, i, j }, ordered (d, i)
+  const heap = [];
+  const less = (a, b) => a.d < b.d || (a.d === b.d && a.i < b.i);
+  const push = (e) => {
+    let k = heap.push(e) - 1;
+    while (k > 0) {
+      const up = (k - 1) >> 1;
+      if (!less(heap[k], heap[up])) break;
+      [heap[k], heap[up]] = [heap[up], heap[k]];
+      k = up;
+    }
+  };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) {
+      heap[0] = last;
+      let k = 0;
+      for (;;) {
+        const l = 2 * k + 1, r = l + 1;
+        let s = k;
+        if (l < heap.length && less(heap[l], heap[s])) s = l;
+        if (r < heap.length && less(heap[r], heap[s])) s = r;
+        if (s === k) break;
+        [heap[k], heap[s]] = [heap[s], heap[k]];
+        k = s;
+      }
+    }
+    return top;
+  };
+  const fx = new Float64Array(n), fy = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    fx[i] = fin(fs[i].x); fy[i] = fin(fs[i].y);
+    const j = nearest(fx[i], fy[i]);
+    push({ d: bestD, i, j });
+  }
+
+  const picks = [];
+  while (heap.length && picks.length < m) {
+    const e = pop();
+    if (!taken[e.j]) { taken[e.j] = 1; picks.push([e.i, e.j]); continue; }
+    const j = nearest(fx[e.i], fy[e.i]);
+    if (j >= 0) push({ d: bestD, i: e.i, j });
+  }
+  return picks;
+}
+
+/**
  * Plan the from->to pairing ONCE at transition start (#419). Greedy
  * nearest within each asset group (O(n^2) per group — run once per chip
  * click, not once per frame). The target side is recorded as SLOTS
@@ -88,43 +197,28 @@ export function planMorph(fromItems, toItems, seed = 0) {
 
   // Pass 1: exact same-asset nearest matching
   for (const k of allKeys) {
-    const fs = (fromGroups.get(k) || []).slice();
+    const fs = fromGroups.get(k) || [];
     const ts = (toGroups.get(k) || []).map((item, origIdx) => ({ item, origIdx, g: k }));
-    while (fs.length && ts.length) {
-      let bi = 0, bj = 0, bd = Infinity;
-      for (let i = 0; i < fs.length; i++) {
-        for (let j = 0; j < ts.length; j++) {
-          const d = dist2(fs[i], ts[j].item);
-          if (d < bd) { bd = d; bi = i; bj = j; }
-        }
-      }
-      pairs.push({ f: fs[bi], g: k, j: ts[bj].origIdx });
-      fs.splice(bi, 1);
-      ts.splice(bj, 1);
+    const usedF = new Uint8Array(fs.length), usedT = new Uint8Array(ts.length);
+    for (const [i, j] of greedyNearest(fs, ts.map((t) => t.item))) {
+      pairs.push({ f: fs[i], g: k, j: ts[j].origIdx });
+      usedF[i] = 1; usedT[j] = 1;
     }
-    leftoverFrom.push(...fs);
-    leftoverTo.push(...ts);
+    fs.forEach((it, i) => { if (!usedF[i]) leftoverFrom.push(it); });
+    ts.forEach((t, j) => { if (!usedT[j]) leftoverTo.push(t); });
   }
 
   // Pass 2: cross-asset nearest spatial matching (Always Alive: no optical cross-fade dissolve)
   // When modes or stub chips use different asset sets, nodes physically travel across the
   // canvas to their nearest destination slot rather than dissolving in place.
-  while (leftoverFrom.length && leftoverTo.length) {
-    let bi = 0, bj = 0, bd = Infinity;
-    for (let i = 0; i < leftoverFrom.length; i++) {
-      for (let j = 0; j < leftoverTo.length; j++) {
-        const d = dist2(leftoverFrom[i], leftoverTo[j].item);
-        if (d < bd) { bd = d; bi = i; bj = j; }
-      }
-    }
-    pairs.push({ f: leftoverFrom[bi], g: leftoverTo[bj].g, j: leftoverTo[bj].origIdx });
-    leftoverFrom.splice(bi, 1);
-    leftoverTo.splice(bj, 1);
+  const usedF = new Uint8Array(leftoverFrom.length), usedT = new Uint8Array(leftoverTo.length);
+  for (const [i, j] of greedyNearest(leftoverFrom, leftoverTo.map((t) => t.item))) {
+    pairs.push({ f: leftoverFrom[i], g: leftoverTo[j].g, j: leftoverTo[j].origIdx });
+    usedF[i] = 1; usedT[j] = 1;
   }
 
-  onlyFrom.push(...leftoverFrom);
-  onlyTo.push(...leftoverTo.map((t) => ({ g: t.g, j: t.origIdx })));
-
+  onlyFrom.push(...leftoverFrom.filter((_, i) => !usedF[i]));
+  onlyTo.push(...leftoverTo.filter((_, j) => !usedT[j]).map((t) => ({ g: t.g, j: t.origIdx })));
   return { pairs, onlyFrom, onlyTo, seed: (seed >>> 0) };
 }
 
