@@ -455,8 +455,8 @@ export function createLiveResolver() {
         }
       }
       items = (items || []).filter((it) => it && it.assetId);
-      // Item-morph trigger signature: the same fields that used to drive
-      // the pixel crossfade (mode/behave/palette/asset-set), scoped per
+      // Item-morph trigger signature: the fields that used to drive
+      // the pixel crossfade (mode/behave/asset-set; palette left it, #622), scoped per
       // layer. Deliberately excludes seed — a SHUFFLE re-roll has never
       // dissolved, chip clicks are the only trigger.
       //
@@ -468,10 +468,17 @@ export function createLiveResolver() {
       // every frame: planMorph replanned O(n^2) per frame, and startMs
       // reset each time so raw stayed ~0 and items presented the from-pose
       // for the entire MIX, landing all at once when it finally stopped
-      // changing. paletteId alone still catches a genuine discrete palette
-      // change; the continuously-lerped override values were never meant to
-      // be a transition trigger in their own right — that's what the live
-      // tint shader already animates smoothly, independent of item-morph.
+      // changing. The continuously-lerped override values were never meant
+      // to be a transition trigger in their own right.
+      // #622 — and paletteId is out of the sig too. A palette press alters no
+      // position, scale, asset or count, only colours; since #564 the morph
+      // is a scale swap, so a palette press made every node shrink to zero
+      // and regrow over the MIX. Palette changes must never touch scale.
+      // Known interim: nothing else eases a BARE palette press (the lerp in
+      // resolveLiveRenderState runs only inside a voice MIX, and the pixel
+      // dissolve backs only manual scrub), so the colours now cut in one
+      // frame. The colour transitions are the Sleight v2 modes (#624 WASH,
+      // #625 INJECT); do not paper over the cut by putting paletteId back.
       // #471 — seed rides the sig too, per Matt's mechanism-A pick: EVOLVE's
       // seed target used to write `seed + 1` directly with no morph
       // anywhere (buildPlacements/liveResolve recompute on the spot, every
@@ -496,7 +503,7 @@ export function createLiveResolver() {
       // spend a MIX-long swap wave on top of the load that caused it. !! so an
       // unset mirror and an explicit false hash the same.
       const morphSig = [
-        layoutParams.mode, layoutParams.behave, src.paletteId, seed, assetSig,
+        layoutParams.mode, layoutParams.behave, seed, assetSig,
         !!(src.layoutParams?.mirror), src.layoutParams?.symmetry ?? 'none',
       ].join('|');
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
