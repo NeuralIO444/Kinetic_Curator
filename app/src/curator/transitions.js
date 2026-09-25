@@ -36,6 +36,7 @@ const FAMILIES = {
     tight: ['flock', 'mold'],
     loose: ['scatter'],
     chaotic: ['levy', 'lorenz'],
+    hand: ['seek', 'flee'],
   },
   paletteShift: {
     whole: ['auto', 'split'],
