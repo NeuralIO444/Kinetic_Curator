@@ -59,3 +59,33 @@ Instead, the 4 tracks should function as a curated hierarchy of distinct visual 
 - [ ] Multi-track scenes maintain visual clarity without muddy overlapping.
 - [ ] PATCH matrix routings (`FIELD`, `FEED`, `MOD`) across KC-1 – KC-4 provide tactile physical interaction between layers.
 - [ ] Presets showcase pre-configured 4-track symphonies.
+
+---
+
+## Issue 3: [Sprint] Focused Morph Transition & Fluid State Interpolation Engine
+
+**Labels:** `transitions`, `morph`, `physics`, `feel`, `always-alive`
+
+### Context & Motivation
+PR #540 eliminated the optical cross-fade dissolve by introducing cross-asset spatial pairing, allowing nodes to fly directly to their target slots. However, the travel path is currently a linear coordinate interpolation ($f.x \to to.x$, $f.y \to to.y$), and the asset costume cut occurs at the target state. 
+
+This sprint focuses on advancing the state-morph system into a truly liquid, choreographed physical transition that feels alive at every millisecond.
+
+### Key Focus Areas & Exploration Tracks
+1. **Curved Flight Paths & Vector-Field Advection:**
+   - Instead of straight Euclidean lines between source and destination, nodes should follow curl-noise arcs or bezier deflection influenced by the active flow field during transit.
+   - Elements arc gracefully across the screen rather than cutting straight through other nodes.
+2. **Costume Transition Choreography:**
+   - When a node pairs across different assets (e.g., square $\to$ tendril):
+     - *Option A (Elastic scale pulse):* Node slightly compresses into an energy bead mid-flight and blooms into its new asset form upon arrival.
+     - *Option B (Atlas pixel dissolve during flight):* Fast per-quad shader dissolve between source and destination textures during transit.
+3. **Momentum & Velocity Preservation:**
+   - When transitioning out of high-speed fluid modes (`swarm`, `flow`, `noise`), carry residual particle velocity into the morph rather than zeroing it, letting nodes slingshot into their destination slots with critical damping.
+4. **Adaptive Stagger & Radial Propagation:**
+   - Nodes closer to the attractor or center initiate transit slightly earlier than outer nodes ($10-30\text{ms}$ wave propagation), creating a ripple/domino effect across the canvas rather than an all-at-once departure.
+
+### Acceptance Criteria
+- [ ] Mode changes exhibit organic, arced flight paths with zero linear robotic stiffness.
+- [ ] Asset costume changes feel tactile and physically justified (pulse, bloom, or liquid morph).
+- [ ] In-flight transitions feel buttery smooth on 60fps WebGL canvas with zero performance drops.
+- [ ] Full coverage in `itemMorph.selfcheck.mjs`.
