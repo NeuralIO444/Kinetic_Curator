@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { parseProject, downloadProject } from '../../state/projectDocument.js';
+import { sanitizePalette } from '../../state/slices/paletteLibrarySlice.js';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
 
 function downloadJsonBlob(obj, filename) {
@@ -80,8 +81,14 @@ export function DataExportRow({
       try {
         const parsed = JSON.parse(ev.target.result);
         const list = Array.isArray(parsed) ? parsed : [parsed];
+        // #571-adjacent honesty: count what survives sanitize (same
+        // function the store applies), not what was in the file — an
+        // all-junk file must warn, never toast success.
+        const valid = list.map(sanitizePalette).filter(Boolean);
         emit(Events.PALETTE_IMPORT, list);
-        onMessage(`Imported ${list.length} palette${list.length === 1 ? '' : 's'}`);
+        onMessage(valid.length === 0
+          ? 'No valid palettes in file'
+          : `Imported ${valid.length} palette${valid.length === 1 ? '' : 's'}`);
       } catch {
         onMessage('Invalid palette JSON');
       }

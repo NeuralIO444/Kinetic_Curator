@@ -22,7 +22,7 @@ export function SnapshotGallery({ snapshots }) {
   return (
     <>
       <div className="pipeline-row">
-        <button className="big-btn dl" onClick={() => emit(Events.EXPORT_CLEAR_SNAPSHOTS)} style={{ width: '100%' }}>✕ CLEAR</button>
+        <button className="big-btn dl" onClick={() => { if (window.confirm(`Clear all ${snapshots.length} kept snapshots? This cannot be undone.`)) emit(Events.EXPORT_CLEAR_SNAPSHOTS); }} style={{ width: '100%' }}>✕ CLEAR</button>
       </div>
 
       {snapshots.length > 0 && (
