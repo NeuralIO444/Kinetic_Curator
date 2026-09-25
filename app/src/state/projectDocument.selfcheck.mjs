@@ -157,17 +157,18 @@ hostileAssets[ASSETS[0].id] = false;
 const hostile = parseProject({
   version: 1, seed: 1,
   enabledAssets: hostileAssets,
-  assetWeightOverrides: { ...hostileAssets, [ASSETS[1].id]: 3 },
+  assetWeightOverrides: { ...hostileAssets, [ASSETS[1].id]: 'heavy', [ASSETS[2].id]: 3 },
 });
 assert.ok(hostile.ok, 'hostile asset-map doc must still parse');
 assert.ok(Object.keys(hostile.doc.enabledAssets).length < 500, 'enabledAssets collapsed to known ids');
 assert.strictEqual(hostile.doc.enabledAssets[ASSETS[0].id], false, 'known ids keep their values');
 assert.ok(!('evil-99999' in hostile.doc.enabledAssets), 'hostile keys dropped');
 assert.deepStrictEqual(
-  Object.keys(hostile.doc.assetWeightOverrides).sort(), [ASSETS[0].id, ASSETS[1].id].sort(),
+  Object.keys(hostile.doc.assetWeightOverrides).sort(), [ASSETS[0].id, ASSETS[1].id, ASSETS[2].id].sort(),
   'weight overrides filtered to known ids',
 );
-assert.strictEqual(hostile.doc.assetWeightOverrides[ASSETS[1].id], 3);
+assert.strictEqual(hostile.doc.assetWeightOverrides[ASSETS[1].id], 'heavy', 'weight strings survive the round trip');
+assert.strictEqual(hostile.doc.assetWeightOverrides[ASSETS[2].id], 'light', 'non-string weights fall back to neutral');
 
 // Unknown quality → fallback; a dangling key must never reach the caps lookup.
 const badQ = parseProject({ version: 1, seed: 1, quality: 'ultra-mega' });

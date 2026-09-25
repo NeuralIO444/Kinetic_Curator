@@ -67,16 +67,18 @@ export function sanitizeEnabledAssets(raw, customAssets = []) {
 }
 
 /**
- * Weight overrides apply to catalog assets only; unknown keys are dropped
- * and non-numeric values fall back to the neutral weight.
+ * Weight overrides apply to catalog assets only; unknown keys are dropped.
+ * The store's weight cycle is the strings 'light'/'medium'/'heavy'
+ * (globalSlice WEIGHT_CYCLE) — accept those verbatim; anything else falls
+ * back to the neutral weight ('light' === SELECTION_WEIGHT 1).
  */
+const WEIGHT_STRINGS = new Set(['light', 'medium', 'heavy']);
 export function sanitizeAssetWeightOverrides(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const out = {};
   for (const key of Object.keys(raw)) {
     if (!KNOWN_ASSET_IDS.has(key)) continue;
-    const w = Number(raw[key]);
-    out[key] = Number.isFinite(w) ? w : 1;
+    out[key] = WEIGHT_STRINGS.has(raw[key]) ? raw[key] : 'light';
   }
   return out;
 }
