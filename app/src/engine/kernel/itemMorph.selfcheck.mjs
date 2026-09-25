@@ -20,13 +20,15 @@ ok('matchItems pairs same-asset items nearest-first', () => {
   assert.equal(p0[1].x, 5);
 });
 
-ok('matchItems never pairs across different assets', () => {
+ok('matchItems pairs across different assets spatially (no optical cross-fade dissolve)', () => {
   const from = [{ assetId: 'a', x: 0, y: 0 }];
-  const to = [{ assetId: 'b', x: 0, y: 0 }];
+  const to = [{ assetId: 'b', x: 10, y: 0 }];
   const { pairs, onlyFrom, onlyTo } = matchItems(from, to);
-  assert.equal(pairs.length, 0);
-  assert.equal(onlyFrom.length, 1);
-  assert.equal(onlyTo.length, 1);
+  assert.equal(pairs.length, 1);
+  assert.equal(onlyFrom.length, 0);
+  assert.equal(onlyTo.length, 0);
+  assert.equal(pairs[0][0].assetId, 'a');
+  assert.equal(pairs[0][1].assetId, 'b');
 });
 
 ok('matchItems handles count mismatch within one asset group', () => {

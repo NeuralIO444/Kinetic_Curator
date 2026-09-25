@@ -56,9 +56,14 @@ export function planMorph(fromItems, toItems) {
   const onlyFrom = [];
   const onlyTo = [];
   const allKeys = new Set([...fromGroups.keys(), ...toGroups.keys()]);
+
+  const leftoverFrom = [];
+  const leftoverTo = [];
+
+  // Pass 1: exact same-asset nearest matching
   for (const k of allKeys) {
     const fs = (fromGroups.get(k) || []).slice();
-    const ts = (toGroups.get(k) || []).map((item, origIdx) => ({ item, origIdx }));
+    const ts = (toGroups.get(k) || []).map((item, origIdx) => ({ item, origIdx, g: k }));
     while (fs.length && ts.length) {
       let bi = 0, bj = 0, bd = Infinity;
       for (let i = 0; i < fs.length; i++) {
@@ -71,9 +76,29 @@ export function planMorph(fromItems, toItems) {
       fs.splice(bi, 1);
       ts.splice(bj, 1);
     }
-    onlyFrom.push(...fs);
-    onlyTo.push(...ts.map((t) => ({ g: k, j: t.origIdx })));
+    leftoverFrom.push(...fs);
+    leftoverTo.push(...ts);
   }
+
+  // Pass 2: cross-asset nearest spatial matching (Always Alive: no optical cross-fade dissolve)
+  // When modes or stub chips use different asset sets, nodes physically travel across the
+  // canvas to their nearest destination slot rather than dissolving in place.
+  while (leftoverFrom.length && leftoverTo.length) {
+    let bi = 0, bj = 0, bd = Infinity;
+    for (let i = 0; i < leftoverFrom.length; i++) {
+      for (let j = 0; j < leftoverTo.length; j++) {
+        const d = dist2(leftoverFrom[i], leftoverTo[j].item);
+        if (d < bd) { bd = d; bi = i; bj = j; }
+      }
+    }
+    pairs.push({ f: leftoverFrom[bi], g: leftoverTo[bj].g, j: leftoverTo[bj].origIdx });
+    leftoverFrom.splice(bi, 1);
+    leftoverTo.splice(bj, 1);
+  }
+
+  onlyFrom.push(...leftoverFrom);
+  onlyTo.push(...leftoverTo.map((t) => ({ g: t.g, j: t.origIdx })));
+
   return { pairs, onlyFrom, onlyTo };
 }
 
