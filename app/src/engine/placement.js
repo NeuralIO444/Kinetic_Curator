@@ -91,6 +91,7 @@ export function computeGeometrySoA({
   canvasW, canvasH, caGrid,
   displacement = 0, noiseFreq = 0.005, noiseSpeed = 0.5,
   seedOffsets = null,
+  phylloDivergence = 0,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -116,6 +117,9 @@ export function computeGeometrySoA({
     rng: null, jitter: jitter || 0, seed,
     caGrid: mode === 'ca' ? caGrid : null,
     seedOffsets,
+    // #585 — sampler scalar; undefined for every other mode, and the sampler
+    // treats a non-finite value as the golden angle.
+    phylloDivergence,
   };
 
   const tDenom = count > 1 ? count - 1 : 0;
@@ -216,7 +220,7 @@ export function geometrySignature(p) {
   return [
     p.mode, p.count, p.seed, p.jitter, p.density, p.zTiers, p.bleed,
     p.canvasW, p.canvasH, p.caGrid,
-    p.displacement, p.noiseFreq, p.noiseSpeed,
+    p.displacement, p.noiseFreq, p.noiseSpeed, p.phylloDivergence,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }
