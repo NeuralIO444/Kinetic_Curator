@@ -19,7 +19,8 @@ export function AssetPoolPanel() {
   const swapId = useRef(null);
   const [Studio, setStudio] = useState(null);
   const [studioSeed, setStudioSeed] = useState(null);
-  // #572-adjacent honesty: a failed chunk load must say so (was silent).
+  // #601: a failed chunk load must say so (was silent). Cleared at the start of
+  // each open, so a retry that succeeds doesn't leave a stale banner up.
   const [studioError, setStudioError] = useState(null);
   const { assets } = useApp();
   const { state } = useApp(s => ({
@@ -33,6 +34,7 @@ export function AssetPoolPanel() {
   const { enabled, search, catFilter, poolView, weightOverrides, ingestError } = state;
 
   const openStudio = async (seed) => {
+    setStudioError(null);
     try {
       const mod = await import('./AssetStudioModal.jsx');
       setStudio(() => mod.AssetStudioModal);
