@@ -161,7 +161,7 @@ ok('#419: onlyTo fade-in resolves through a stored slot against live targets', (
 // blends keep target identity, unmatched fade in), fade-outs trailing (they
 // are ~0 alpha at completion and vanish with the transition).
 
-ok('#444: blend emits to-items in raw order, fade-outs trailing (every t)', () => {
+ok('#444: once settled (t>=0.9) the blend emits raw to-order, fade-outs trailing', () => {
   const from = [
     { assetId: 'a', key: 'fromA', x: 0, y: 0, alpha: 100 },
     { assetId: 'a', key: 'fromA2', x: 40, y: 0, alpha: 100 },
@@ -174,7 +174,7 @@ ok('#444: blend emits to-items in raw order, fade-outs trailing (every t)', () =
   ];
   const plan = planMorph(from, to); // group order [a, c, b] ≠ raw to order [b, a, b]
   const toKeys = to.map((i) => i.key);
-  for (const t of [0.25, 0.5, 0.999]) {
+  for (const t of [0.9, 0.95, 0.999]) { // settled: draw order == raw to-order
     const out = blendItems(from, to, t, plan);
     assert.deepEqual(out.slice(0, to.length).map((i) => i.key), toKeys,
       `first ${to.length} entries at t=${t} must be raw to-order`);
@@ -182,6 +182,49 @@ ok('#444: blend emits to-items in raw order, fade-outs trailing (every t)', () =
       assert.ok(!toKeys.includes(o.key),
         `trailing entry ${o.key} at t=${t} must be a fade-out, not a to-item`);
     }
+  }
+});
+
+// ── draw order is continuous at the START too (chip-click z-fight) ──────────
+// Old behavior: t<=0 = from order, t>0 = raw to order -> overlapping items flip
+// stacking on the first blend frame. The depth key slides from-rank -> to-rank.
+ok('z-fight: matched items keep from draw-order at t->0+ and reach to-order by t=0.9', () => {
+  // same asset, from stacks P<Q<R (R on top); to lists them reversed, R<Q<P.
+  const from = [
+    { assetId: 'a', key: 'P', x: 0, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'Q', x: 50, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'R', x: 100, y: 0, alpha: 100 },
+  ];
+  const to = [
+    { assetId: 'a', key: 'R2', x: 100, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'Q2', x: 50, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'P2', x: 0, y: 0, alpha: 100 },
+  ];
+  const plan = planMorph(from, to); // P->P2, Q->Q2, R->R2 (nearest)
+  const order = (t) => blendItems(from, to, t, plan).map((i) => i.key);
+  assert.deepEqual(order(0.001), ['P2', 'Q2', 'R2'], 't->0+: same stacking as from (P,Q,R)');
+  assert.deepEqual(order(0.9), ['R2', 'Q2', 'P2'], 'settled: raw to-order');
+  assert.deepEqual(order(0.999), ['R2', 'Q2', 'P2']);
+  // and it never jumps more than the ordering weight allows between adjacent frames
+  let prev = order(0.001).join();
+  const seen = new Set([prev]);
+  for (let t = 0.01; t < 0.9; t += 0.01) seen.add(order(t).join());
+  assert.ok(seen.size <= 4, 'order transitions are gradual (a few swaps over the blend), not one flip');
+});
+
+ok('z-fight: fade-outs trail once settled (t>=0.9), never among the settled to-items', () => {
+  const from = [
+    { assetId: 'a', key: 'gone', x: 0, y: 0, alpha: 100 },
+    { assetId: 'b', key: 'kept', x: 90, y: 0, alpha: 100 },
+    { assetId: 'a', key: 'gone2', x: 5, y: 0, alpha: 100 },
+  ];
+  const to = [{ assetId: 'b', key: 'kept2', x: 92, y: 0, alpha: 100 }];
+  const plan = planMorph(from, to);
+  assert.equal(plan.onlyFrom.length, 2, 'two source items have no partner');
+  for (const t of [0.9, 0.95, 0.999]) {
+    const keys = blendItems(from, to, t, plan).map((i) => i.key);
+    assert.equal(keys[0], 'kept2', `to-item first at t=${t}`);
+    assert.equal(keys.length, 3);
   }
 });
 
