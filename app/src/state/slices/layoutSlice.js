@@ -7,7 +7,8 @@ import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/pale
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
-import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES } from '../../data/voices.js';
+import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS } from '../../data/voices.js';
+import { ASSETS } from '../../data/assets/index.js';
 
 /**
  * Open a MIX toward `merged` layout params (#284 morph-don't-cut). Live state
@@ -349,6 +350,25 @@ export const createLayoutSlice = (set) => ({
     }
     if (!changed) return {};
     return openParamsMix(state, merged, { name: motion.name });
+  }),
+
+  /**
+   * Shapes axis (#555): swap the asset pool to a curated set, once, at the press.
+   * The live loop's item-morph pairs nodes across the two pools, so there is no
+   * MIX and no end-of-blend pop. Never touches layout, motion or color.
+   */
+  loadShapeSet: (id) => set((state) => {
+    const def = SHAPE_SETS.find((x) => x.id === id);
+    if (!def) return {};
+    const known = new Set(ASSETS.map((a) => a.id));
+    for (const c of state.customAssets || []) known.add(c.id);
+    const map = {};
+    for (const assetId of def.ids) if (known.has(assetId)) map[assetId] = true;
+    if (!Object.keys(map).length) return {};
+    const cur = state.enabledAssets || {};
+    const curOn = Object.keys(cur).filter((k) => cur[k]);
+    if (curOn.length === Object.keys(map).length && curOn.every((k) => map[k])) return {};
+    return { ...pushToUndo(state, true), enabledAssets: map };
   }),
 
   toggleParamLock: (key) => set((state) => ({

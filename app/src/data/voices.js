@@ -332,6 +332,23 @@ export const MOTION_MODES = [
     params: { behave: 'mold', lifeDrift: 0.15, noiseSpeed: 0.2, wind: 0.5, flap: 0.2, breath: 0.5 } },
 ];
 
+/**
+ * Shape chips (#555) — the assets axis: curated 4-shape pools, one per flagship
+ * voice and per layout tile (the stub `assets` data). A chip swaps the asset pool
+ * only, at the press (the live loop's item-morph flies nodes into their new
+ * costumes) — never at the end of a MIX.
+ */
+export const SHAPE_SETS = [
+  ...FLAGSHIP_VOICES.map((v) => ({ id: v.id, name: v.name.toLowerCase(), ids: Object.keys(v.assets) })),
+  ...STUB_VOICES.map((v) => ({ id: v.id, name: v.name, ids: v.assets.slice(0, 4) })),
+];
+
+/** A shape chip reads as active while the enabled pool is exactly its set. */
+export const isShapeSetActive = (enabledAssets, set) => {
+  const on = Object.keys(enabledAssets || {}).filter((k) => enabledAssets[k]);
+  return on.length === set.ids.length && set.ids.every((id) => enabledAssets[id]);
+};
+
 /** A motion chip reads as active while every param it sets is at its value. */
 export const isMotionActive = (layoutParams, motion) => Object.entries(motion.params).every(([k, v]) => layoutParams?.[k] === v);
 

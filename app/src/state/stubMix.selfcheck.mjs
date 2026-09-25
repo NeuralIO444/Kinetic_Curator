@@ -8,7 +8,8 @@
 // asset pool or palette (color and shape chips are their own axes).
 import assert from 'node:assert';
 import { useStore } from './store.js';
-import { STUB_VOICES, MOTION_MODES, isMotionActive } from '../data/voices.js';
+import { STUB_VOICES, MOTION_MODES, SHAPE_SETS, isMotionActive, isShapeSetActive } from '../data/voices.js';
+import { ASSETS } from '../data/assets/index.js';
 import { COMPOSITION_PRESETS as PRESETS } from '../data/presets.js';
 import { validateLayoutParams, BEHAVE_MODES } from '../data/layout-modes.js';
 
@@ -94,6 +95,32 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
   S().commitVoiceMix();
   assert.strictEqual(S().paletteId, b.paletteId, 'preset leaves the palette alone');
   assert.deepStrictEqual(S().enabledAssets, b.assets, 'preset leaves the asset pool alone');
+}
+
+// ── loadShapeSet: the assets axis — swaps the pool at the press, nothing else ──
+{
+  const known = new Set(ASSETS.map((a) => a.id));
+  assert.strictEqual(SHAPE_SETS.length, 15, '3 flagship + 12 layout-tile shape sets');
+  for (const x of SHAPE_SETS) {
+    assert.strictEqual(x.ids.length, 4, `${x.id}: exactly 4 shapes`);
+    assert.ok(x.ids.every((i) => known.has(i)), `${x.id}: all ids are real assets`);
+  }
+  const pick = SHAPE_SETS.find((x) => !isShapeSetActive(S().enabledAssets, x));
+  const b = { params: { ...S().layoutParams }, paletteId: S().paletteId, assets: { ...S().enabledAssets } };
+  S().loadShapeSet(pick.id);
+  assert.strictEqual(S().voiceMix, null, 'a shape chip opens no MIX (no end-of-blend swap)');
+  assert.ok(isShapeSetActive(S().enabledAssets, pick), 'the pool is exactly the set');
+  assert.deepStrictEqual(S().layoutParams, b.params, 'shape chip leaves layout + motion alone');
+  assert.strictEqual(S().paletteId, b.paletteId, 'shape chip leaves color alone');
+  S().loadShapeSet(pick.id);
+  assert.strictEqual(S().historyUndoStack.length > 0, true);
+  const depth = S().historyUndoStack.length;
+  S().loadShapeSet(pick.id);
+  assert.strictEqual(S().historyUndoStack.length, depth, 're-tapping the current set is a no-op (no undo entry)');
+  S().undo();
+  assert.deepStrictEqual(S().enabledAssets, b.assets, 'one undo restores the previous pool');
+  S().loadShapeSet('nope');
+  assert.deepStrictEqual(S().enabledAssets, b.assets, 'unknown shape set is a no-op');
 }
 
 // Unknown id is a no-op.
