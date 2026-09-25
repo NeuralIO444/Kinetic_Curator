@@ -6,23 +6,27 @@
 
 ---
 
-## Stage 0 — v0.9.x · DONE *(location as of 2026-09-24 morning)*
+## Stage 0 — v0.9.x · DONE *(location as of 2026-09-25 evening)*
 
 - Engine spines A–G shipped; KINETICS queue cleared; #422 → #480 (closed); #478 margined.
 - Governor R1–R4 landed; #482–#485 closed.
 - Tracks + matrix landed: PATCH sliders/diagnostic (#506/#507 closed), MOD steering + shared scent + matrix UI (#509 closed), gate cuts, cohesion dim reason.
 - #471-A (seed in `morphSig`) + #479-B (per-layer behave overrides) landed and verified on main.
 - #248 consolidation CLOSED; Matt-only feel/hardware closed (#346, #298, #270); MIDI/OSC proposal #228 closed.
-- In flight (other lane): PRs #523/#525/#527 (layers/patch hygiene).
+- Landed since (2026-09-24/25): **chips split into four axes** — layout / motion / shapes (#555 1–3/3); **persona motion biases on seeded RNG** (#518 closed); **SLEIGHT-OF-HAND director core** (#564 — per-node seeded scale swap replaces the blend; Assets-tab edits and mirror/symmetry now ride it; the ticket stays open on two verifications that need Matt's word); z-fight fix on the first frame of a chip click (#565); sharp edges #568 (favorites persist), #572 (pairing O(n³) → grid + heap, ~219ms → ~2ms at 800 nodes); review items #551 (idempotent cost-tier registry), #552 (already wired), #554 (builtin FX packers clamp before upload).
+- **CI honesty (2026-09-25):** e2e was red on every run, `main` included — the two WebM-recording specs were CPU-starved by parallel SwiftShader workers (pass alone on the same runner); they now run serially after the rest and e2e is green (23/23, ~6 min). The lint job has no browser, so GL parity / ACCUM / composite / uniform-sweep selfchecks silently skipped there; a `selfcheck-browser` job now runs the whole chain with Chromium (~4 min, parallel with e2e). `mothBodies.selfcheck` (the one suite outside the chain, and broken by the SoA rewrite) repaired and wired. Suggested, not done: mark `selfcheck-browser` a required check in branch protection.
+- In flight (other lane): PR #573 (sharp edges #569–#571).
 - **Render/biology audit (2026-09-23, wired-vs-dead bar):** all six bio-drives mechanisms LIVE (call chains traced); render inventoried. WebGL2 capability research feeds Stages 1–4 + Beyond.
 
 ## Stage 1 — v0.10 · PLAY *(feel — the remaining work)*
 
-- **Motion factors #515–#519** (retune → flagship values → stub MIX road → persona biases → curated assets).
+- **Motion factors #515–#519** (retune → flagship values → stub MIX road → persona biases → curated assets) — #515–#518 landed; **#519 (curated asset sets) and #558 (per-node uniqueness) remain.**
 - **EF rack #520** (EF-4 exclusivity → post-accum seam → families → rack UI).
 - #503 ballistics shaping decision (single-vs-double; lookup already cleaned).
 - **Render fidelity (zero sim risk):** half-float accum path audit → ACES-approx + dither final pass (`RESOLVE_FS` bare clamp today); instanced sub-range uploads (remainder after spine G).
 - *Exit:* you play it and nothing feels wrong.
+
+> **Unordered intake (filed 2026-09-25, not in any stage until Matt places them):** the Tropism engine set (#582–#592: Lévy/Lorenz/seek-flee behave rows, phyllotaxis/Truchet/Voronoi/L-system samplers, Euclidean clock, displace domain-warp, OKLCH grade, Markov weights — report: PR #593) and the CHIAROSCURO shading/material/lighting engine (#594 — brief: PR #596). Feature scope; behind the same order-by-Matt rule as everything here.
 
 ## Stage 2 — v0.11 · SHARE *(the benchmark's #1 + #2 — the highest-leverage stage)*
 
