@@ -1,5 +1,6 @@
 # Agent contract — Kinetic Curator
 
+> **SOP:** all agents follow [`docs/AGENT_SOP.md`](docs/AGENT_SOP.md) — roles, lanes, reporting, localhost review, merging. It wins if a chat prompt disagrees.
 Read this before writing code. The product spec for the current engine push is [`docs/ENGINE_PLAN.md`](docs/ENGINE_PLAN.md). That file wins if this one and a chat prompt disagree.
 
 **Embargo:** [`docs/EMBARGO.md`](docs/EMBARGO.md) — no new features until spine C is merged and Matt has played the body. Deferred labs are not tickets.
