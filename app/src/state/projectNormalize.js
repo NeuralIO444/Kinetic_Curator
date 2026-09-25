@@ -118,8 +118,15 @@ export function sanitizePaletteLocks(raw) {
   return out;
 }
 
-export function normalizeSnapshots(raw, customAssets = [], root = {}) {
+export function normalizeSnapshots(raw, customAssets = [], root = {}, layerIds = null) {
   if (!raw || typeof raw !== 'object') return {};
+  // #643 — snapshots are per-layer save states; drop ones whose layer id
+  // matches no layer in the document instead of persisting dead weight that
+  // re-serializes into every future export. layerIds null (e.g. serialize
+  // path, where snapshots are built from live layers) means no filtering.
+  const validIds = Array.isArray(layerIds)
+    ? new Set(layerIds.filter((id) => typeof id === 'string'))
+    : null;
   // #637 — a partial snapshot must not wipe good root values with defaults:
   // fields the snapshot omits fall back to the root document's values, so
   // importing a doc with root seed 9999 and an empty active snapshot keeps
@@ -130,6 +137,7 @@ export function normalizeSnapshots(raw, customAssets = [], root = {}) {
   const out = {};
   for (const [id, snap] of Object.entries(raw)) {
     if (!snap || typeof snap !== 'object') continue;
+    if (validIds && !validIds.has(id)) continue;
     // Fill every field the render path reads. A hand-edited snapshot missing
     // enabledAssets threw inside the Canvas panel's memo (src.enabledAssets
     // undefined); lockedParams/caGrid missing meant a load silently dropped
