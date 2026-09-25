@@ -1,0 +1,3 @@
+# #620 — two PRs that each append a suite to the manifest merge cleanly (both lines kept).
+# Applies to local git rebase/merge; the runner still fails on a duplicate or an unlisted suite.
+app/selfcheck.manifest merge=union
