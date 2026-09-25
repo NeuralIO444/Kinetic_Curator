@@ -96,8 +96,15 @@ export function sanitizeQuality(raw, fallback = 'balanced') {
   return typeof raw === 'string' && QUALITY_PRESETS[raw] ? raw : fallback;
 }
 
-export function normalizeSnapshots(raw, customAssets = []) {
+export function normalizeSnapshots(raw, customAssets = [], root = {}) {
   if (!raw || typeof raw !== 'object') return {};
+  // #637 — a partial snapshot must not wipe good root values with defaults:
+  // fields the snapshot omits fall back to the root document's values, so
+  // importing a doc with root seed 9999 and an empty active snapshot keeps
+  // 9999 instead of resetting to seed 0. Explicit snapshot values keep
+  // precedence; hard defaults apply only when the root lacks the field too.
+  const rootSeed = Number.isFinite(root.seed) ? root.seed >>> 0 : 0;
+  const rootPaletteId = typeof root.paletteId === 'string' ? root.paletteId : 'praystation';
   const out = {};
   for (const [id, snap] of Object.entries(raw)) {
     if (!snap || typeof snap !== 'object') continue;
@@ -109,11 +116,11 @@ export function normalizeSnapshots(raw, customAssets = []) {
     // the root map: the active snapshot wins on import, so an unsanitized map
     // here defeated the allowlist and re-serialized into future exports.
     out[id] = {
-      seed: Number.isFinite(snap.seed) ? snap.seed >>> 0 : 0,
+      seed: Number.isFinite(snap.seed) ? snap.seed >>> 0 : rootSeed,
       seedOffsets: normalizeSeedOffsets(snap.seedOffsets),
-      paletteId: typeof snap.paletteId === 'string' ? snap.paletteId : 'praystation',
+      paletteId: typeof snap.paletteId === 'string' ? snap.paletteId : rootPaletteId,
       paletteOverrides: snap.paletteOverrides ?? null,
-      layoutParams: normalizeLayoutParams(snap.layoutParams),
+      layoutParams: normalizeLayoutParams(snap.layoutParams ?? root.layoutParams),
       lockedParams: snap.lockedParams && typeof snap.lockedParams === 'object' ? snap.lockedParams : {},
       caGrid: sanitizeCaGrid(snap.caGrid),
       enabledAssets: sanitizeEnabledAssets(snap.enabledAssets, customAssets) || {},

@@ -477,7 +477,7 @@ export const createGlobalSlice = (set) => ({
       // every layer per frame.
       next.layers = doc.layers.slice(0, MAX_LAYERS);
       next.activeLayerId = doc.activeLayerId;
-      next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots);
+      next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots, doc.customAssets, doc);
       // Install the active layer's snapshot onto live state. The serializer
       // writes lockedParams/caGrid only into snapshots (never root fields),
       // so without this a load silently dropped parameter locks and the CA

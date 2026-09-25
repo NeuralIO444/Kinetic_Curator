@@ -96,7 +96,12 @@ export function parseProject(raw) {
         paletteOverrides: raw.paletteOverrides || null,
         customAssets,
         ...normalizeLayers(raw.layers, raw.activeLayerId),
-        layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets),
+        // #637 — partial snapshots inherit the root doc's seed/palette/layout.
+        layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets, {
+          seed: seed >>> 0,
+          paletteId: raw.paletteId || raw.palette || 'praystation',
+          layoutParams: raw.layoutParams || raw.layout,
+        }),
       },
     };
   }
@@ -133,7 +138,12 @@ export function parseProject(raw) {
           : null,
       customAssets,
       ...normalizeLayers(raw.layers, raw.activeLayerId),
-      layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets),
+      // #637 — partial snapshots inherit the root doc's seed/palette/layout.
+      layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets, {
+        seed: raw.seed,
+        paletteId: raw.paletteId,
+        layoutParams: raw.layoutParams,
+      }),
     },
   };
 }
