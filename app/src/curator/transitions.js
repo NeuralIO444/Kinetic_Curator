@@ -29,7 +29,7 @@ const FAMILIES = {
     ordered: ['grid', 'rails', 'abacus', 'stratified', 'truchet'],
     radial: ['fibonacci', 'phyllotaxis', 'radial', 'orbit'],
     live: ['swarm', 'hype', 'murmuration'],
-    loose: ['random', 'noise', 'layers', 'flow', 'ca'],
+    loose: ['random', 'noise', 'layers', 'flow', 'ca', 'voronoi'],
   },
   behave: {
     calm: ['cruise', 'orbit'],
