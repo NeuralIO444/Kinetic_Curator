@@ -4,7 +4,6 @@ import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRe
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
 import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/palettes.js';
-import { ASSETS } from '../../data/assets/index.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
@@ -15,17 +14,12 @@ import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES } from '../../dat
  * stays untouched until commitVoiceMix lands it in one undo step. Shared by
  * applyPreset and loadStubMode (#517).
  */
-function openParamsMix(state, merged, { palettePatch = null, assetsPatch = null, name }) {
-  // A preset chip morphs like a voice chip (#284): open a MIX toward the
-  // preset instead of hard-cutting. `state.layoutParams`/paletteOverrides/
-  // enabledAssets stay untouched until commit — commitVoiceMix lands them
-  // in one undo step, same as loadVoice. `to.paletteId`: a real catalog id
-  // when pairing, else null so commit leaves color state alone (see
-  // commitVoiceMix) instead of freezing the current colors into a stray
-  // override.
-  const paletteSrc = palettePatch
-    ? getCatalogPalette(palettePatch.paletteId, state.userPalettes)
-    : resolvePalette(state.paletteId, state.paletteOverrides, state.userPalettes);
+function openParamsMix(state, merged, { name }) {
+  // Layout chips are single-axis: they morph layout params only. The current
+  // palette and asset pool ride along untouched (`to.paletteId === null` makes
+  // commitVoiceMix leave color state alone), so a layout chip can never swap
+  // shapes or colors mid-blend. Color and shape chips are their own axes.
+  const paletteSrc = resolvePalette(state.paletteId, state.paletteOverrides, state.userPalettes);
   const enabled = state.enabledAssets || {};
   const ids = Object.keys(enabled);
   const allOn = ids.length > 0 && ids.every((id) => !!enabled[id]);
@@ -33,10 +27,10 @@ function openParamsMix(state, merged, { palettePatch = null, assetsPatch = null,
     ...resolveVoiceState({
       params: merged,
       palette: paletteSrc,
-      assets: assetsPatch ? assetsPatch.enabledAssets : (allOn ? 'all' : { ...enabled }),
+      assets: allOn ? 'all' : { ...enabled },
       blendSeconds: 2,
     }),
-    paletteId: palettePatch ? palettePatch.paletteId : null,
+    paletteId: null,
   };
   return {
     voiceMix: {
@@ -319,44 +313,13 @@ export const createLayoutSlice = (set) => ({
         changed = true;
       }
     }
-    // #284: a preset may pair with a catalog palette (one-click voice — the
-    // preset chip also switches the palette, like the #220 palette pairing
-    // convention, instead of leaving the old colors on the new composition).
-    // The id must resolve to a real catalog/user entry, never the fallback.
-    let palettePatch = null;
-    if (preset.paletteId && preset.paletteId !== state.paletteId
-        && getCatalogPalette(preset.paletteId, state.userPalettes)?.id === preset.paletteId) {
-      palettePatch = { paletteId: preset.paletteId, paletteOverrides: null, paletteLocks: {} };
-      changed = true;
-    }
-    // #284: a preset may also carry its asset pool (a voice is the full
-    // look — composition + palette + assets). Constrain to 4 assets (HYPE Processing aesthetic).
-    let assetsPatch = null;
-    let targetAssetIds = Array.isArray(preset.assetIds) && preset.assetIds.length
-      ? preset.assetIds.slice(0, 4)
-      : null;
-    if (!targetAssetIds && Array.isArray(preset.categories) && preset.categories.length) {
-      const matching = ASSETS.filter((a) => preset.categories.includes(a.category));
-      const pool = matching.length >= 4 ? matching : ASSETS;
-      targetAssetIds = pool.slice(0, 4).map((a) => a.id);
-    }
-    if (targetAssetIds && targetAssetIds.length) {
-      const known = new Set(ASSETS.map((a) => a.id));
-      for (const c of state.customAssets || []) known.add(c.id);
-      const map = {};
-      for (const id of targetAssetIds) {
-        if (typeof id === 'string' && known.has(id)) map[id] = true;
-      }
-      if (Object.keys(map).length) {
-        assetsPatch = { enabledAssets: map };
-        changed = true;
-      }
-    }
+    // Presets are layout-only: their palette / asset pairings (#284) are ignored
+    // so color and shapes stay on their own chip axes.
     if (!changed && state.layoutParams.composition === preset.id) return {};
-    return openParamsMix(state, merged, { palettePatch, assetsPatch, name: preset.name || preset.id });
+    return openParamsMix(state, merged, { name: preset.name || preset.id });
   }),
 
-  /** #517 — a stub chip (bare mode + a small motion block) rides the same MIX road as a preset. */
+  /** #517 — a stub chip (bare mode + a small motion block) rides the same MIX road as a preset. Layout only: never touches assets or palette. */
   loadStubMode: (id) => set((state) => {
     const stub = STUB_VOICES.find((v) => v.id === id);
     if (!stub) return {};
@@ -368,28 +331,8 @@ export const createLayoutSlice = (set) => ({
         changed = true;
       }
     }
-    // HypeFramework: stub chips activate their curated 4-asset pool
-    let assetsPatch = null;
-    if (Array.isArray(stub.assets) && stub.assets.length) {
-      const known = new Set(ASSETS.map((a) => a.id));
-      for (const c of state.customAssets || []) known.add(c.id);
-      const map = {};
-      for (const assetId of stub.assets.slice(0, 4)) {
-        if (typeof assetId === 'string' && known.has(assetId)) map[assetId] = true;
-      }
-      if (Object.keys(map).length) {
-        const cur = state.enabledAssets || {};
-        const curKeys = Object.keys(cur).filter((k) => !!cur[k]);
-        const mapKeys = Object.keys(map);
-        const assetsDiff = curKeys.length !== mapKeys.length || !mapKeys.every((k) => !!cur[k]);
-        if (assetsDiff) {
-          assetsPatch = { enabledAssets: map };
-          changed = true;
-        }
-      }
-    }
     if (!changed) return {};
-    return openParamsMix(state, merged, { assetsPatch, name: stub.name });
+    return openParamsMix(state, merged, { name: stub.name });
   }),
 
   toggleParamLock: (key) => set((state) => ({
