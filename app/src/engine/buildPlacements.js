@@ -119,6 +119,8 @@ export function buildPlacements({
     canvasH,
     caGrid: layoutParams.mode === 'ca' ? caGrid : null,
     phylloDivergence: layoutParams.phylloDivergence,
+    lsysDepth: layoutParams.lsysDepth,
+    lsysAngle: layoutParams.lsysAngle,
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
