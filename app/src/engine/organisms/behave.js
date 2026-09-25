@@ -3,7 +3,7 @@
  * Adding a profile is a row in BEHAVE, not a new force type.
  */
 
-export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter', 'mold'];
+export const BEHAVE_IDS = ['cruise', 'flock', 'orbit', 'scatter', 'mold', 'levy'];
 
 export const BEHAVE = {
   cruise: {
@@ -68,7 +68,77 @@ export const BEHAVE = {
     chemotaxis: 0.15,
     deposit: 0.06,
   },
+  // #582 — levy: foraging, not wandering. Long holds broken by one long
+  // stride. The steering is deliberately the quietest row in the table (almost
+  // no separation, almost no wind) because the hold has to actually be still —
+  // measured, the baseline drift is the noise floor a stride must beat, and at
+  // scatter/cruise levels it buries the branch entirely. The stride itself
+  // comes from the gated Levy branch in particles.js, which this row opts into
+  // with levyGain. Table-only, like chemotaxis/deposit: a per-layer behave*
+  // override cannot switch the branch on for another verb.
+  levy: {
+    sep: 0.6,
+    ali: 0.02,
+    coh: 0.05,
+    sepR: 32,
+    aliR: 24,
+    cohR: 28,
+    wind: 0.01,
+    orbit: 0,
+    attract: 0.05,
+    levyGain: 0.004,
+    levyAlpha: 1.35,
+  },
 };
+
+/**
+ * #582 — Levy step length, as a pure function of one uniform draw.
+ *
+ * Inverse-transform Pareto: with u uniform on [0,1), (1-u)^(-1/alpha) has tail
+ * P(L > l) = l^-alpha. That is the whole point — the tail index alpha is the
+ * distribution FAMILY, not a scale knob:
+ *   alpha -> 2  : light tail, steps cluster, reads as Brownian wander
+ *   alpha ~ 1.3 : the foraging band (most flights a hold, rare strides)
+ *   alpha -> 0  : almost every draw saturates the cap
+ * Authored range is (0, 2]: at alpha <= 0 the exponent flips sign and long
+ * steps become IMPOSSIBLE instead of rare, and above 2 the character stops
+ * being Levy at all. Both silently change the family rather than failing, so
+ * the value is clamped here rather than trusted.
+ *
+ * Returned SHIFTED by the Pareto floor (L-1), so the result is "how far past a
+ * hold this flight goes" and the common draw is ~0. Unshifted, the smallest
+ * possible draw is still 1, so every "hold" would creep — and the hold has to
+ * be still or the stride has nothing to contrast against. The shift keeps the
+ * tail: P(L-1 > l) = (1+l)^-alpha.
+ *
+ * The cap is what makes it safe to integrate: u -> 1 sends the raw draw to
+ * infinity, and one Infinity in the force pass poisons a particle's position
+ * permanently (the speed clamp cannot bound a non-finite). LEVY_MAX_STEP is
+ * therefore a hard ceiling, not a tuning value.
+ */
+export const LEVY_ALPHA_MIN = 0.05;
+export const LEVY_ALPHA_MAX = 2;
+export const LEVY_MAX_STEP = 64;
+
+/**
+ * #582 — how long an agent commits to one flight, in frames. This is what
+ * makes the walk Levy rather than Brownian: a heavy-tailed magnitude re-drawn
+ * every frame averages out over any visible window (measured: displacement
+ * spread 4.3 with the branch on vs 4.2 off — indistinguishable). Held for a
+ * stretch, a rare large draw becomes a sustained stride instead of one clipped
+ * frame — the speed clamp bounds per-frame velocity, so magnitude alone cannot
+ * produce distance. Duration does.
+ */
+export const LEVY_FLIGHT_FRAMES = 45;
+
+export function levyStep(u, alpha) {
+  const a = Math.min(LEVY_ALPHA_MAX, Math.max(LEVY_ALPHA_MIN, Number(alpha) || LEVY_ALPHA_MIN));
+  const uu = Number.isFinite(u) ? Math.min(1, Math.max(0, u)) : 0;
+  // 1-u keeps the draw in (0,1]; the floor bounds the raw value before the cap
+  // so no intermediate is ever Infinity.
+  const L = Math.pow(Math.max(1 - uu, 1e-9), -1 / a) - 1;
+  return L > LEVY_MAX_STEP ? LEVY_MAX_STEP : L;
+}
 
 export function resolveBehave(id) {
   return BEHAVE[id] || BEHAVE.cruise;

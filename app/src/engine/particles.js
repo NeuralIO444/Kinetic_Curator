@@ -30,7 +30,7 @@ import { createNoise } from './noise.js';
 import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
-import { resolveEffectiveBehave, resolveWindMode, orbitForce } from './organisms/behave.js';
+import { resolveEffectiveBehave, resolveWindMode, orbitForce, levyStep, LEVY_FLIGHT_FRAMES } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
 
@@ -710,6 +710,14 @@ export class ParticleSystem {
     // Chemotaxis is a mold-only sense: the profile opts in with a
     // chemotaxis gain, and pays a deposit so the colony sustains itself.
     const chemOn = organism && (profile.chemotaxis || 0) > 0;
+    // #582 — Levy is a levy-only sense, gated exactly like chemotaxis: the
+    // profile opts in with a gain, so no other verb can reach the branch and
+    // every existing row integrates the identical force sum it did before.
+    // (profile is null outside organism mode, so every read stays behind the
+    // organism gate — a cloud cast must not touch the row at all.)
+    const levyOn = organism && (profile.levyGain || 0) > 0;
+    const levyGain = levyOn ? profile.levyGain : 0;
+    const levyAlpha = levyOn ? profile.levyAlpha : 0;
     const leak = Math.min(1, Math.max(0, Number(palette?.leak) || 0));
     const leakOn = organism && leak > 0;
     const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
@@ -943,6 +951,30 @@ export class ParticleSystem {
           fax += (Math.cos(wa) * wmag) / m;
           fay += (Math.sin(wa) * wmag) / m;
         }
+      }
+      // #582 LEVY — forage: hold, then stride. The magnitude is heavy-tailed,
+      // but a heavy tail drawn fresh EVERY frame is not a Levy walk: over any
+      // window you can actually see, ~F independent draws average out and the
+      // motion reads Brownian (measured: max/median displacement 6.3 at gain 0
+      // vs 6.7 with the branch on — indistinguishable). A flight has to be
+      // COMMITTED to. So the draw is keyed by a flight epoch, not the step:
+      // each agent holds one heading and one magnitude for LEVY_FLIGHT_FRAMES,
+      // then re-draws. Most flights are a hold, a rare one saturates the speed
+      // clamp for its whole duration — which is the stride you see.
+      //
+      // The per-agent phase offset staggers the epoch boundaries; without it
+      // every agent would re-draw on the same frame and the field would
+      // twitch in unison. Keys are offset (+224717/+224737/+224753) to stay
+      // clear of the init, breed and curiosity draws on this channel.
+      if (levyOn) {
+        const phase = hashU01(seedU, CH.dyn, 224717 + i) * LEVY_FLIGHT_FRAMES;
+        const epoch = Math.floor((this._step + phase) / LEVY_FLIGHT_FRAMES);
+        const ul = hashU01(seedU, CH.dyn, epoch * 7919 + 224737 + i);
+        const ua = hashU01(seedU, CH.dyn, epoch * 7919 + 224753 + i);
+        const stride = levyStep(ul, levyAlpha) * levyGain;
+        const ang = ua * TAU;
+        fax += (Math.cos(ang) * stride) / m;
+        fay += (Math.sin(ang) * stride) / m;
       }
       // #287 MOLD — chemotaxis: climb the scent gradient. Gated to
       // profiles that declare a chemotaxis gain (mold only).
