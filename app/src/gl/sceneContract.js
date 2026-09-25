@@ -80,6 +80,11 @@ function toInstance(item, layerId, itemBlend) {
     tint: hexColor(item.color),
     accent: hexColor(item.accent),
     opacity: clamp01((Number(item.alpha) || 0) / 100),
+    // #623: the smear move drives synthetic per-frame velocity from
+    // blendItems; QUAD_VS (velocitySmear) stretches the quad along it.
+    // Absent (the common case) reads as zero — exactly the old path.
+    vx: Number(item.vx) || 0,
+    vy: Number(item.vy) || 0,
     blend: KNOWN_BLENDS.has(itemBlend) ? itemBlend : 'normal',
     zTier: Number(item.zTier) || 0,
     key: String(item.key ?? ''),

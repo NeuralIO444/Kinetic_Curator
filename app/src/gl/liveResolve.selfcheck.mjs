@@ -476,6 +476,24 @@ function dipped(mid, raw) {
   return mid.some((it, i) => raw[i] && (Number(it.scale) || 0) < (Number(raw[i].scale) || 0) * 0.9);
 }
 
+/**
+ * #623: mid-transition, is any node visibly mid-move? The vocabulary's
+ * detector — breath dips scale, smear/fade dip alpha, smear also carries
+ * synthetic velocity. A transition that "fires the director" shows moves,
+ * not raw rest poses.
+ */
+function midMove(mid, raw) {
+  return mid.some((it, i) => {
+    const r = raw[i];
+    if (!r) return false;
+    const rs = Number(r.scale) || 0;
+    if (Math.abs((Number(it.scale) || 0) - rs) > rs * 0.01 + 1e-9) return true;
+    if ((Number(it.alpha) ?? 100) < 99.5) return true;
+    if (Math.hypot(Number(it.vx) || 0, Number(it.vy) || 0) > 1e-9) return true;
+    return false;
+  });
+}
+
 test('#564: swapping an overlay asset SVG under the same id fires the director', () => {
   const r = createLiveResolver();
   // Same array identity per call for a given svg, as the store hands it over.
@@ -634,7 +652,7 @@ test('#622: mode still fires the director while palette does not', () => {
   lyr(r.resolveLayers(mk('grid', 'hydra', 1000)));
   const mid = lyr(r.resolveLayers(mk('grid', 'hydra', 1250)));
   const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 'hydra', 1250)));
-  assert.ok(dipped(mid, raw), 'a mode change (with a palette change) still shrinks nodes through the swap');
+  assert.ok(midMove(mid, raw), 'a mode change (with a palette change) still fires the director — nodes play their moves through the swap');
   r.dispose();
 });
 

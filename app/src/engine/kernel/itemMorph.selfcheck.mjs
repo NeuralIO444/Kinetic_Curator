@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { matchItems, blendItems, planMorph, nodeWindow } from './itemMorph.mjs';
+import { matchItems, blendItems, planMorph, nodeWindow, moveFor,
+  MOVE_SMEAR, MOVE_BREATH, MOVE_FADE, SMEAR_VEL, SMEAR_TRAVEL, DENSE_COUNT } from './itemMorph.mjs';
 // The live loop's own easing — liveResolve feeds blendItems morphEase(raw),
 // so the #564 contract sweeps below must drive it the same way.
 import { morphEase } from '../../gl/paletteMix.mjs';
@@ -271,52 +272,138 @@ const gridTo = Array.from({ length: 24 }, (_, i) => ({
 
 /** One 60fps MIX of `mixSeconds`, exactly as liveResolve drives it. */
 function sweep(from, to, mixSeconds, seed = 0) {
+  return sweepT(from, to, mixSeconds, seed).frames.map((f) => f.items);
+}
+
+/** Same sweep, but each frame carries its eased t (for per-node window math). */
+function sweepT(from, to, mixSeconds, seed = 0) {
   const plan = planMorph(from, to, seed);
   const step = 1 / (60 * mixSeconds);
   const frames = [];
   for (let raw = 0; raw <= 1 + 1e-9; raw += step) {
     const t = morphEase(Math.min(1, raw));
-    frames.push(t >= 1 ? to : blendItems(from, to, t, plan));
+    frames.push({ t, items: t >= 1 ? to : blendItems(from, to, t, plan) });
   }
-  return frames;
+  return { plan, frames };
 }
 
 const costume = (it) => `${it.assetId}|${it.color}|${it.accent}`;
 
-/** Largest residual size (as a fraction of full size) on any costume-swap frame. */
-function worstSwapScale(mixSeconds, seed = 0) {
-  const frames = sweep(gridFrom, gridTo, mixSeconds, seed);
-  let worst = 0;
-  for (let f = 1; f < frames.length; f++) {
-    for (let i = 0; i < frames[f].length; i++) {
-      const now = frames[f][i], was = frames[f - 1][i];
-      if (costume(now) === costume(was)) continue;
-      worst = Math.max(worst, Math.abs(now.scale) / 1.5, Math.abs(was.scale) / 1);
+// ── #623: the move vocabulary's transition contract ─────────────────────────
+// #564's "swap at zero scale" is gone. The contract is now: every node swaps
+// its costume exactly once, at its own move's lowest-visibility moment
+// (u=0.5 — peak stretch, bottom of the breath, bottom of the fade), and no
+// move ever takes a node to zero. Same seed replays the same choreography.
+
+const travelerFrom = [{ assetId: 'a', key: 'f0', x: 0, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#111111', accent: '#222222' }];
+const travelerTo = [{ assetId: 'b', key: 't0', x: 1000, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#eeeeee', accent: '#dddddd' }];
+
+/** Per-node swap frame + its window progress then. Grid fixtures pair 1:1, so out[i] is node i. */
+function swapUs(from, to, mixSeconds, seed) {
+  const { frames } = sweepT(from, to, mixSeconds, seed);
+  const out = [];
+  for (let i = 0; i < to.length; i++) {
+    const was = costume(frames[0].items[i]);
+    const { delay, dur } = nodeWindow(i, seed);
+    let found = -1;
+    for (let f = 1; f < frames.length; f++) {
+      if (costume(frames[f].items[i]) !== was) { found = f; break; }
     }
+    assert.ok(found > 0, `node ${i} swaps exactly once`);
+    for (let f = found + 1; f < frames.length; f++) {
+      assert.equal(costume(frames[f].items[i]), costume(frames[found].items[i]), `node ${i}: one swap only`);
+    }
+    out.push({ f: found, u: (frames[found].t - delay) / dur, items: frames[found].items });
   }
-  return worst;
+  return out;
 }
 
-ok('#564 contract: no costume change while the node is visible', () => {
-  // The envelope is exactly 0 at the swap; a frame only lands NEAR it, so the
-  // residual is a sampling artefact bounded by how many frames the node's
-  // half-window gets. At every MIX the instrument actually plays it is deep
-  // sub-pixel. See the module header for the short-MIX ceiling.
-  for (const [mix, seed] of [[4, 0], [2, 0], [2, 99], [1, 7]]) {
-    const worst = worstSwapScale(mix, seed);
-    assert.ok(worst < 0.02,
-      `MIX ${mix}s seed ${seed}: costume flipped at ${(worst * 100).toFixed(2)}% of full size`);
+ok('#623: move picks are seeded, index-stable, and role-driven', () => {
+  const a = [0, 1, 2, 3, 4, 5].map((i) => moveFor(i, 7, 0, false));
+  const b = [0, 1, 2, 3, 4, 5].map((i) => moveFor(i, 7, 0, false));
+  assert.deepEqual(a, b, 'same seed replays the same choreography');
+  const c = [0, 1, 2, 3, 4, 5].map((i) => moveFor(i, 8, 0, false));
+  assert.notDeepEqual(a, c, 'a different seed is a different choreography');
+  assert.ok(a.includes(MOVE_BREATH) && a.includes(MOVE_FADE), 'sitters split breath/fade, not one move');
+  for (let i = 0; i < 8; i++) {
+    assert.equal(moveFor(i, 7, SMEAR_TRAVEL + 1, false), MOVE_SMEAR, `traveler ${i} smears`);
+    assert.equal(moveFor(i, 7, 0, true), MOVE_FADE, `dense sitter ${i} fades`);
   }
 });
 
-ok('#564 known ceiling: a sub-second MIX has too few frames to hide a swap', () => {
-  // Documented, not fixed (module header): the residual must degrade with the
-  // frame budget and nothing more — if a LONGER mix ever got worse, the
-  // sampling story is wrong and the envelope is the real culprit.
-  const short = worstSwapScale(0.25);
-  const long = worstSwapScale(4);
-  assert.ok(short > long, 'fewer frames means a larger residual, not a smaller one');
-  assert.ok(long < 0.001, `a 4s MIX hides the swap completely (${long})`);
+ok('#623: every swap lands on its move\'s lowest-visibility moment (u=0.5)', () => {
+  for (const [label, from, to] of [['sitters', gridFrom, gridTo], ['travelers', travelerFrom, travelerTo]]) {
+    const seed = 7;
+    const swaps = swapUs(from, to, 2, seed);
+    const dense = to.length >= DENSE_COUNT;
+    // widest single-frame window-progress step, for the "first frame at/after
+    // the minimum" slop
+    const { frames } = sweepT(from, to, 2, seed);
+    let maxDu = 0;
+    for (let f = 1; f < frames.length; f++) {
+      const { dur } = nodeWindow(0, seed);
+      maxDu = Math.max(maxDu, (frames[f].t - frames[f - 1].t) / dur);
+    }
+    for (let i = 0; i < to.length; i++) {
+      const { u, items } = swaps[i];
+      assert.ok(u >= 0.5 - 1e-9, `${label} node ${i}: never swaps before the minimum (u=${u})`);
+      assert.ok(u <= 0.5 + maxDu + 0.02, `${label} node ${i}: swaps promptly at the minimum (u=${u})`);
+      // the envelope is AT its minimum on the nearest frame to u=0.5
+      const travel = Math.hypot(to[i].x - from[i].x, to[i].y - from[i].y);
+      const move = moveFor(i, seed, travel, dense);
+      const it = items[i];
+      if (move === MOVE_BREATH) {
+        assert.ok(it.scale > 0.3 && it.scale < 0.7, `${label} node ${i}: breath bottom ~0.4 (got ${it.scale})`);
+        assert.ok(it.alpha > 90, `${label} node ${i}: breath never dims (got ${it.alpha})`);
+      } else if (move === MOVE_FADE) {
+        assert.ok(it.alpha > 5 && it.alpha < 30, `${label} node ${i}: fade bottom ~15 (got ${it.alpha})`);
+        assert.ok(Math.abs(it.scale - 1.25) < 0.2, `${label} node ${i}: fade never scales (got ${it.scale})`);
+      } else {
+        assert.ok(it.alpha > 55 && it.alpha < 85, `${label} node ${i}: smear dips ~30% (got ${it.alpha})`);
+        assert.ok(Math.hypot(it.vx || 0, it.vy || 0) > SMEAR_VEL * 0.5,
+          `${label} node ${i}: stretched along travel at the swap`);
+      }
+    }
+  }
+});
+
+ok('#623: no move ever hits zero — the uniform shrink wave is gone', () => {
+  for (const seed of [7, 99]) {
+    for (const items of sweep(gridFrom, gridTo, 2, seed)) {
+      for (const it of items) {
+        assert.ok(it.scale > 0.2, `scale never near zero (got ${it.scale})`);
+        assert.ok(it.alpha > 5, `alpha never near zero (got ${it.alpha})`);
+      }
+    }
+  }
+  // smear never touches scale at all; breath never dims
+  for (const { items } of sweepT(travelerFrom, travelerTo, 2, 7).frames) {
+    assert.ok(Math.abs(items[0].scale - 1) < 0.02, `smear keeps full scale (got ${items[0].scale})`);
+  }
+});
+
+ok('#623 known ceiling: fewer frames land the swap farther from the minimum', () => {
+  // The swap hides by SAMPLING the minimum: a sub-second MIX has too few
+  // frames per window to land near u=0.5 — the same ceiling #564 had, now
+  // measured per move instead of in residual scale.
+  const worst = (mix) => Math.max(...swapUs(gridFrom, gridTo, mix, 7).map((s) => Math.abs(s.u - 0.5)));
+  const short = worst(0.25), long = worst(4);
+  assert.ok(short > long, `fewer frames = farther from the minimum (${short.toFixed(3)} vs ${long.toFixed(3)})`);
+  assert.ok(long < 0.03, `a 4s MIX lands the swap on the minimum (${long.toFixed(4)})`);
+});
+
+ok('#623: fast travel happens mid-move, never at rest visibility', () => {
+  // A 1000px traveler smears: its fastest hop must land while dimmed and
+  // stretched — the eye follows the smear, it never sees a full-size jump.
+  const { frames } = sweepT(travelerFrom, travelerTo, 2, 7);
+  let maxHop = 0, at = null;
+  for (let f = 1; f < frames.length; f++) {
+    const hop = Math.abs(frames[f].items[0].x - frames[f - 1].items[0].x);
+    if (hop > maxHop) { maxHop = hop; at = frames[f].items[0]; }
+  }
+  assert.ok(maxHop > 5, `the node actually travels (peak hop ${maxHop.toFixed(1)}px)`);
+  assert.ok(at.alpha <= 80, `fastest hop happens while dimmed (alpha ${at.alpha.toFixed(1)})`);
+  assert.ok(Math.hypot(at.vx || 0, at.vy || 0) > 1, '...and stretched along its travel');
 });
 
 ok('#564 contract: never two costumes in one node — identity comes from one side', () => {
@@ -359,23 +446,6 @@ ok('#564 contract: the stagger is a seeded, index-stable wave', () => {
   const mids = wave(7).map(({ delay, dur }) => delay + dur / 2).sort((a, b) => a - b);
   assert.ok(mids[mids.length - 1] - mids[0] > 0.2,
     `swaps spread across the transition (span ${mids[mids.length - 1] - mids[0]})`);
-});
-
-ok('#564 contract: per-frame motion cap — travel happens while the node is small', () => {
-  const far = [{ assetId: 'a', x: 0, y: 0, scale: 1, alpha: 100, color: '#000000' }];
-  const farTo = [{ assetId: 'b', x: 1000, y: 0, scale: 1, alpha: 100, color: '#ffffff' }];
-  const frames = sweep(far, farTo, 2);
-  let maxRaw = 0, maxVisible = 0;
-  for (let f = 1; f < frames.length; f++) {
-    const now = frames[f][0], was = frames[f - 1][0];
-    const hop = Math.abs(now.x - was.x);
-    maxRaw = Math.max(maxRaw, hop);
-    maxVisible = Math.max(maxVisible, hop * Math.max(now.scale, was.scale));
-  }
-  // The sleight of hand: the node crosses 1000px fastest at zero scale, so
-  // the hop you can actually SEE is a fraction of the hop it makes.
-  assert.ok(maxVisible < maxRaw * 0.5, `visible hop ${maxVisible} is well under the raw hop ${maxRaw}`);
-  assert.ok(maxVisible < 25, `visible per-frame hop stays capped (${maxVisible}px of a 1000px move)`);
 });
 
 // ── #572: the pairing must stay the SAME pairing, just not O(n^3) ──────────

@@ -22,31 +22,36 @@
  * breathing layout (life drift, displacement warp) shifted a target —
  * items darted across their group instead of gliding one straight line.
  *
- * #564 SLEIGHT-OF-HAND — one director, not per-chip blends. A node never
- * changes costume while you can see it: it scales to exactly zero at its own
- * centre, swaps identity (asset, colour, accent, role) at the minimum, and
- * grows back as the new thing. Each node gets its own seeded window inside
- * the transition (nodeWindow), so the swap sweeps across the canvas as a
- * wave instead of every node flipping on one frame. Consequences:
+ * #623 SLEIGHT-OF-HAND v2 — a vocabulary, not one move. #564's single
+ * scale-to-zero wave read as a glitch: the eye saw the mechanism, not the
+ * magic. Each matched node now draws a seeded pick from a small move set in
+ * its own seeded window (moveFor): travelers SMEAR (stretch along the
+ * velocity vector, opacity dips ~30%, costume swaps at peak stretch —
+ * carried by the velocitySmear shader via synthetic vx/vy), sitters BREATHE
+ * (dip to 40%, never zero, regrow with overshoot), and in dense clusters
+ * (or by seeded pick) they FADE (scale untouched, alpha dips to ~15%, swap
+ * at the bottom). The swap-at-minimum contract survives — the minimum is
+ * just each move's lowest-visibility moment now. No node ever sits still,
+ * fully visible, mid-change; no two adjacent nodes telegraph the same
+ * mechanism.
+ * Consequences kept from #564:
  *  - colour/accent no longer interpolate. A tint lerp is a NEW ATLAS CELL
  *    every frame (the tint is baked — see liveAtlas.mjs), which is the
- *    rebake churn of #561. Swapping at zero scale costs one cell, not sixty.
+ *    rebake churn of #561. Swapping at the minimum costs one cell, not sixty.
  *  - unmatched items no longer alpha-fade (that fade was the optical
  *    cross-dissolve the Always Alive protocol bans): a leaver shrinks out by
- *    its window's midpoint, a joiner grows in from it.
+ *    its window's midpoint, a joiner grows in from it. (#626 redoes both.)
  *  - every window closes at or before t=1 (delay ≤ STAGGER, dur ≥ DUR_MIN,
  *    STAGGER + DUR_MIN + DUR_JIT === 1), so the completion frame's handoff
  *    to raw toItems holds no frame and pops nothing.
  *
  * KNOWN CEILING — the swap is hidden by SAMPLING, not by a dead band: the
- * envelope is exactly 0 at u=0.5, but a frame only lands NEAR that instant.
- * How near is a function of how many frames the node's half-window gets, so
- * the residual size on the swap frame scales with MIX: ~0.2% of full size at
- * MIX 2s (the default), ~1% at 1s, ~37% at 0.25s — i.e. below roughly 0.75s
- * a MIX no longer has the frames to hide anything and degrades toward the
- * cut it is already asking for. Upgrade path if a sub-second MIX ever needs
- * to be clean: hold the envelope at zero across a band around u=0.5 whose
- * width comes from the caller's real dt, not a constant.
+ * envelope minimum is at u=0.5, but a frame only lands NEAR that instant.
+ * How near is a function of how many frames the node's window gets, so the
+ * distance from the minimum on the swap frame scales with MIX: negligible
+ * at the MIXes the instrument actually plays, degrading toward a cut below
+ * roughly 0.75s — i.e. a sub-second MIX no longer has the frames to hide
+ * anything and degrades toward the cut it is already asking for.
  */
 
 function dist2(a, b) {
@@ -286,8 +291,69 @@ function ease(x) {
 
 const shrinkEnv = (u) => 1 - ease(u * 2);      // 1 -> 0 across the window's first half
 const growEnv = (u) => ease(u * 2 - 1);        // 0 -> 1 across its second half
-/** Strict scale-to-zero at the midpoint: no bead, nothing left to see mid-swap. */
-const swapEnv = (u) => (u < 0.5 ? shrinkEnv(u) : growEnv(u));
+// (swapEnv died in #623: one scale-to-zero wave for every state change read
+// as a glitch, not a trick. Matched nodes now draw from the move vocabulary
+// below; growEnv/shrinkEnv survive only for the unmatched joiner/leaver
+// paths until #626 redoes them.)
+
+// ── #623: the move vocabulary ───────────────────────────────────────────────
+// The stagger (nodeWindow) still picks WHEN a node plays; a second seeded
+// hash picks WHICH move. Same (index, seed) replays the same choreography —
+// deterministic, rehearsable. The swap-at-minimum contract survives: the
+// costume still comes from exactly one side, chosen at u=0.5 — but the
+// minimum is now each move's lowest-visibility moment (peak stretch, the
+// bottom of the breath, the bottom of the fade), never scale zero.
+export const MOVE_SMEAR = 0;   // the traveler: stretches along its motion, swaps at peak stretch
+export const MOVE_BREATH = 1;  // the sitter: dips to 40% (never zero), regrows with overshoot
+export const MOVE_FADE = 2;    // the quiet one: scale untouched, alpha dips, swaps at the bottom
+
+/** Scene units a node must travel to count as a traveler (smears). */
+export const SMEAR_TRAVEL = 48;
+/** At/above this node count, sitters fade instead of breathe — less churn. */
+export const DENSE_COUNT = 256;
+/**
+ * Peak smear drive in scene-units/frame of synthetic velocity. 12 × the
+ * shader's SMEAR_K (0.06) ≈ 0.72 stretch — the quad grows ~1.7x along its
+ * travel direction at the window's midpoint, then relaxes.
+ */
+export const SMEAR_VEL = 12;
+
+const MOVE_SALT = 0x51ed27;
+
+/**
+ * Which move the node at output index `i` plays. Travelers smear; in dense
+ * clusters sitters fade; otherwise a second seeded hash splits sitters
+ * between breath and fade. Index-stable per seed, like nodeWindow.
+ */
+export function moveFor(i, seed, travel, dense) {
+  if (travel >= SMEAR_TRAVEL) return MOVE_SMEAR;
+  if (dense) return MOVE_FADE;
+  return hash01(i, (seed ^ MOVE_SALT) | 0) < 0.5 ? MOVE_BREATH : MOVE_FADE;
+}
+
+/**
+ * Breath: anticipation dip to 40% (never zero), then a spring regrow with a
+ * slight overshoot — game-feel follow-through. The kink at u=0.5 is the snap
+ * the eye follows; the costume changes underneath it.
+ */
+function breathEnv(u) {
+  if (u <= 0.5) return 1 - 0.6 * ease(u * 2);
+  const v = (u - 0.5) * 2; // 0..1
+  return 0.4 + 0.6 * (1 - Math.cos(v * Math.PI * 1.5) * Math.exp(-3 * v));
+}
+
+/** Alpha multiplier per move over the node's window u in [0,1]. */
+function moveAlpha(move, u) {
+  const dip = Math.sin(Math.PI * u); // 0 → 1 → 0, peak mid-window
+  if (move === MOVE_SMEAR) return 1 - 0.3 * dip;  // opacity dips ~30% at peak stretch
+  if (move === MOVE_FADE) return 1 - 0.85 * dip;   // dips to ~15%; the swap hides at the bottom
+  return 1;                                        // breath: scale does the talking
+}
+
+/** Scale multiplier per move. Smear and fade never touch scale. */
+function moveScale(move, u) {
+  return move === MOVE_BREATH ? breathEnv(u) : 1;
+}
 
 const numOr = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
@@ -296,14 +362,15 @@ const numOr = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
  * verbatim, t>=1 returns toItems verbatim (reference equality, so callers
  * can drop the transition once the blended list === toItems).
  *
- * #564: every node runs the director's scale swap inside its own seeded
+ * #623: every matched node plays its seeded move (moveFor) inside its own
  * window. A matched pair travels (x/y/rotation/alpha/base scale) on its own
- * progress u while its drawn scale rides swapEnv(u) — full size, down to
- * exactly zero at u=0.5, back to full. Its COSTUME (asset, colour, accent,
- * role, key) is the source item's below the minimum and the target item's
- * above it, so the swap only ever happens at zero scale. An unmatched target
- * grows in from the midpoint; an unmatched source shrinks out by it. Nothing
- * alpha-fades and nothing lerps a tint.
+ * eased progress u while its drawn scale/alpha ride the move's envelope —
+ * smear stretches along travel with a ~30% opacity dip, breath dips to 40%
+ * scale with overshoot regrow, fade dips alpha to ~15% with scale untouched.
+ * Its COSTUME (asset, colour, accent, role, key) is the source item's below
+ * u=0.5 and the target item's above it, so the swap only ever happens at
+ * the move's lowest-visibility moment. An unmatched target grows in from
+ * the midpoint; an unmatched source shrinks out by it. Nothing lerps a tint.
  *
  * `plan` is the planMorph() result captured at transition start (#419):
  * the pairing stays fixed for the whole transition while every slot
@@ -355,19 +422,35 @@ export function blendItems(fromItems, toItems, t, plan = null) {
     if (f) {
       const fromRank = (idxFrom.get(f) ?? i) / fromLen;
       const g = ease(u); // travel progress — eased so the node's own move has no jerk
+      // #623: the node's move, picked seeded per index. The costume still
+      // swaps at u=0.5 — each move's lowest-visibility moment — never a
+      // blend of the two sides, so a node is never a third thing that
+      // exists in neither pose (and never needs an atlas cell for one).
+      const ffx = Number.isFinite(f.x) ? f.x : 0, ffy = Number.isFinite(f.y) ? f.y : 0;
+      const ttx = Number.isFinite(to.x) ? to.x : 0, tty = Number.isFinite(to.y) ? to.y : 0;
+      const dx = ttx - ffx, dy = tty - ffy;
+      const travel = Math.hypot(dx, dy);
+      const move = moveFor(i, seed, travel, toList.length >= DENSE_COUNT);
+      const o = {
+        ...(u < 0.5 ? f : to),
+        x: lerp(f.x, to.x, g),
+        y: lerp(f.y, to.y, g),
+        scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, g) * moveScale(move, u),
+        rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, g),
+        alpha: lerp(numOr(f.alpha, 100), numOr(to.alpha, 100), g) * moveAlpha(move, u),
+      };
+      if (move === MOVE_SMEAR) {
+        // Stretch along the travel direction, peaking mid-window — the
+        // velocitySmear carrier (QUAD_VS stretches a_inst2.zw; toInstance
+        // passes vx/vy through). Synthetic and seeded: the same seed
+        // replays the same stretch, independent of frame rate.
+        const vAmt = (SMEAR_VEL * Math.sin(Math.PI * u)) / (travel || 1);
+        o.vx = dx * vAmt;
+        o.vy = dy * vAmt;
+      }
       out.push({
         k: (1 - w) * fromRank + w * toRank,
-        o: {
-          // #564: costume comes from ONE side, chosen at the minimum. Never a
-          // blend of the two, so a node is never a third thing that exists in
-          // neither pose (and never needs an atlas cell for one).
-          ...(u < 0.5 ? f : to),
-          x: lerp(f.x, to.x, g),
-          y: lerp(f.y, to.y, g),
-          scale: lerp(Number(f.scale) || 1, Number(to.scale) || 1, g) * swapEnv(u),
-          rotation: lerpAngle(Number(f.rotation) || 0, Number(to.rotation) || 0, g),
-          alpha: lerp(numOr(f.alpha, 100), numOr(to.alpha, 100), g),
-        },
+        o,
       });
     } else {
       // unmatched target grows in from its window's midpoint (#444: raw position)
