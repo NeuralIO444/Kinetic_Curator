@@ -9,8 +9,8 @@ const CASES = [
   ['all junk', [null, 3, 'x', { swatches: [] }, { swatches: ['nope'] }], 'No valid palettes in file'],
   ['two valid, with ids', [pal('qa-a', 'A', ['#ff0000', '#00ff00']), pal('qa-b', 'B', ['#ffaa00', '#00aaff'])], 'Imported 2 palettes'],
   ['one valid + junk', [pal('qa-c', 'C', ['#123456', '#654321']), null, { swatches: [] }], 'Imported 1 palette'],
-  // Known #628: id-less palettes collide on user-<Date.now()>, the store keeps one — the toast says so.
-  ['three valid, no ids (#628)', [pal(null, '1', ['#ff0000']), pal(null, '2', ['#00ff00']), pal(null, '3', ['#0000ff'])], 'Imported 1 palette'],
+  // #683 fixed #628: id-less palettes get unique ids, all three import.
+  ['three valid, no ids (#628)', [pal(null, '1', ['#ff0000']), pal(null, '2', ['#00ff00']), pal(null, '3', ['#0000ff'])], 'Imported 3 palettes'],
 ];
 
 export default {
