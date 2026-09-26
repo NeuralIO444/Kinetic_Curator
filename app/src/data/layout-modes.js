@@ -17,6 +17,8 @@ export const LAYOUT_MODES = [
   { id: 'layers',    name: 'layers',     glyph: 'z'      },
   { id: 'rails',     name: 'rails',      glyph: 'rail'   },
   { id: 'ca',        name: 'cellular',   glyph: 'ca'     },
+  // #588 — the only sampler that grows a structure: points know their branch.
+  { id: 'lsystem',   name: 'l-system',   glyph: 'frond'  },
   { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
@@ -72,6 +74,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
   accumulationFlow: 0, // #284 Phase B2: curl advection of the trail buffer (FLOW slider)
 
+  // #588 — L-system generation depth and branch angle (degrees).
+  lsysDepth: 4,
+  lsysAngle: 25,
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
   displacement: 0,
@@ -157,6 +162,10 @@ export const PARAM_SPEC = {
   density: { min: 10, max: 100 }, // #272: capped at 100
   zTiers: { min: 1, max: 12, int: true },
   hueRotate: { min: 0, max: 360 },
+  // Depth is capped hard: the worst-case rule is 5^depth segments, and the
+  // walk must never outgrow the placement budget (see the sampler).
+  lsysDepth: { min: 1, max: 5, int: true },
+  lsysAngle: { min: 5, max: 90 },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   displacement: { min: 0, max: 250 },

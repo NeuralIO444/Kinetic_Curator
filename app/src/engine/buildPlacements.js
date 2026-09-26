@@ -118,6 +118,8 @@ export function buildPlacements({
     canvasW,
     canvasH,
     caGrid: layoutParams.mode === 'ca' ? caGrid : null,
+    lsysDepth: layoutParams.lsysDepth,
+    lsysAngle: layoutParams.lsysAngle,
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
