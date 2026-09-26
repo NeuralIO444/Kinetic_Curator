@@ -30,6 +30,7 @@ import { attachVelocities } from './velocitySmear.mjs';
 import { halfLifeToKeep } from '../components/taper.js';
 import { createBallisticsState, processBallistics } from './audioBallistics.mjs';
 import { comboKey } from './liveAtlas.mjs';
+import { createTintInject, applyInject, paletteIdentity } from './tintInject.mjs'; // #625: INJECT field-first propagation
 
 const CX = CANVAS_W / 2;
 const CY = CANVAS_H / 2;
@@ -62,6 +63,12 @@ let building = false;
 
 const velPrev = new Map();
 const smoothedLayoutParams = {};
+
+// #625 (INJECT): the worker is the primary render path (OffscreenCanvas); the
+// in-thread liveLoop.mjs is only the fallback. The same inject machine runs
+// here so palette taps propagate field-first even when the worker owns the loop.
+const injectMachine = createTintInject();
+let lastInjectResolved = null;
 
 function swellEnvelope() {
   if (!swellStart) return 0;
@@ -143,6 +150,24 @@ function buildFrame() {
   const totalInstances = resolved.reduce((acc, l) => acc + (l.items ? l.items.length : 0), 0);
   self.postMessage({ type: 'NODE_COUNT', nodeCount: totalInstances });
 
+  // #625 (INJECT): on palette identity changes, dye the field first on the
+  // fast envelope, then propagate the new tint per agent on seeded delays —
+  // never everywhere at once. Mutates the resolved per-instance tint carrier
+  // in place (no atlas rebake — the atlas key below is asset-only — and no
+  // scale change), then hands the frame to the scene contract.
+  const injectTargetPalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
+  const injectEv = injectMachine.update({
+    identity: paletteIdentity(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes),
+    mode: s.colorMode || 'FADE',
+    mixSeconds: s.paletteMixSeconds,
+    now: loopTimeMs,
+    seed: s.seed || 1,
+    bg: injectTargetPalette.bg,
+    lastResolved: lastInjectResolved,
+  });
+  if (injectEv.injecting) applyInject(resolved, injectEv);
+  lastInjectResolved = resolved;
+
   // Scene contract
   const contract = buildSceneContract({
     doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers },
@@ -186,7 +211,9 @@ function buildFrame() {
   if (!cells) return null;
 
   const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-  const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : activePalette.bg;
+  // #625: during an inject the field dyes first on the fast envelope
+  // (injectEv.bg interpolates); otherwise it is the palette's bg.
+  const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : injectEv.bg;
 
   const renderScale = Math.min(1, Math.max(0.1, (s.renderScale || 1.0) * previewScale));
   const rw = Math.max(2, Math.round(CANVAS_W * renderScale));

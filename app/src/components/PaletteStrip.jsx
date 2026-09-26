@@ -11,7 +11,7 @@ const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
 const COLOR_MODE_HINT = {
   FADE: 'Whole picture melts. Slider is seconds.',
   WASH: 'Color soaks from the front marks back through the trail. Same slider. Feel lands next.',
-  INJECT: 'New swatch dyes the field; agents pick it up as they pass. Same slider. Feel lands next.',
+  INJECT: 'The field dyes first, then the swarm catches up — the new color spreads through the moving marks. Same slider.',
 };
 const CHIP_CAP = 4;
 
@@ -74,7 +74,9 @@ export function PaletteStrip() {
   const { dispatch, palette, palettes, paletteLocks } = useApp();
   const paletteMixSeconds = useStore((s) => s.paletteMixSeconds) ?? MIX_DEFAULT;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
-  const [colorMode, setColorMode] = useState('FADE');
+  // #625 — the color mode lives in the store now: the GL loop reads it to
+  // drive the INJECT propagation. (It used to be component-local and never left.)
+  const colorMode = useStore((s) => s.colorMode) || 'FADE';
   const visible = (palettes || []).slice(0, CHIP_CAP);
   const activeChipRef = useRef(null);
 
@@ -86,7 +88,7 @@ export function PaletteStrip() {
     e.preventDefault();
     e.stopPropagation();
     const i = COLOR_MODES.indexOf(colorMode);
-    setColorMode(COLOR_MODES[(i + 1) % COLOR_MODES.length]);
+    dispatch({ type: A.SET_COLOR_MODE, payload: COLOR_MODES[(i + 1) % COLOR_MODES.length] });
   };
 
   const chips = visible.map((p, i) => {
