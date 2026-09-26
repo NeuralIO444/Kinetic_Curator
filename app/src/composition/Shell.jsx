@@ -56,17 +56,21 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
 
   const activePanel = secondary.find((p) => p.id === activeTab) ?? secondary[0];
 
-  // Dev-only (#193): backtick jumps to the Shader Lab tab.
+  // Dev-only (#193 → #691): backtick opens the merged DEV panel on the Shader Lab tab.
   useEffect(() => {
     if (!import.meta.env.DEV) return undefined;
-    const onKey = (e) => {
+    const onKey = async (e) => {
       if (e.key !== '`' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target;
       const tag = t?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
-      if (!secondary.some((p) => p.id === 'shaderlab')) return;
+      if (!secondary.some((p) => p.id === 'dev')) return;
       e.preventDefault();
-      setActiveTab('shaderlab');
+      // DEV-gated dynamic import, same dead-code-elimination pattern as the
+      // registry's lazy chunks — no dev chunk leaks into the prod bundle.
+      const { requestDevTab } = await import('../panels/devTabs.mjs');
+      requestDevTab('shaderlab');
+      setActiveTab('dev');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

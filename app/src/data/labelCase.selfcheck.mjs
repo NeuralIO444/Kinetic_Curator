@@ -52,7 +52,7 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
   // ── 3. Uppercase Allowlist Invariant: Panels stay uppercase ──
   const ALLOWED_UPPERCASE_PANELS = new Set([
     'CANVAS', 'BUILD', 'ASSETS', 'STIMULI', 'DAVIS', 'PLAY', 'PIPELINE',
-    'SHADER LAB', 'X-RAY', 'GOV TUNE',
+    'DEV', // #691: merged dev panel (was 'SHADER LAB', 'X-RAY', 'GOV TUNE')
   ]);
   for (const p of panelEntries) {
     assert.ok(

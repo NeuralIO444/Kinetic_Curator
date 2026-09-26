@@ -106,3 +106,4 @@ node scripts/runSelfcheck.selfcheck.mjs
 node qa/report.selfcheck.mjs
 node qa/review.selfcheck.mjs
 node qa/board.selfcheck.mjs
+node src/composition/devPanel.selfcheck.mjs
