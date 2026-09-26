@@ -5,13 +5,22 @@ import { sanitizeMixSeconds, MIX_DEFAULT } from '../../gl/paletteMix.mjs';
 
 export const USER_PALETTES_KEY = 'kc:user-palettes:v1';
 
+// Fallback ids must be unique per call (#628): a synchronous import map would
+// otherwise give every id-less entry the same Date.now() millisecond and the
+// store would dedupe them to one. Ids are identity, not sim — a module-level
+// counter suffix is fine, no determinism concern.
+let fallbackIdSeq = 0;
+export function nextFallbackPaletteId() {
+  return `user-${Date.now().toString(36)}-${(fallbackIdSeq++).toString(36)}`;
+}
+
 export function sanitizePalette(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const swatches = Array.isArray(raw.swatches)
     ? raw.swatches.map(normalizeHex).filter(Boolean)
     : [];
   if (swatches.length === 0) return null;
-  const id = typeof raw.id === 'string' && raw.id ? raw.id : `user-${Date.now().toString(36)}`;
+  const id = typeof raw.id === 'string' && raw.id ? raw.id : nextFallbackPaletteId();
   return {
     id,
     name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 40) : 'UNTITLED',
@@ -52,7 +61,7 @@ export const createPaletteLibrarySlice = (set, get) => ({
     const base = getCatalogPalette(state.paletteId, state.userPalettes);
     const o = state.paletteOverrides;
     const entry = sanitizePalette({
-      id: `user-${Date.now().toString(36)}`,
+      id: nextFallbackPaletteId(),
       name: name || `${base.name} ✎`,
       bg: o?.bg || base.bg,
       ink: o?.ink || base.ink,
