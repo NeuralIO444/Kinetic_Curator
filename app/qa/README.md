@@ -57,3 +57,20 @@ behaviour, and say so in a comment when it is a known interim (see `palette-impo
 line has to change when the bug is fixed.
 
 Pure report rendering is unit-tested in `report.selfcheck.mjs` (in the selfcheck manifest).
+
+## Before/after diff
+
+Captures the scenarios on the PR's base branch and on the PR branch, then
+writes one page with each screenshot side by side, a before/after slider,
+and a pixel-diff heatmap (computed in the page itself, no new deps):
+
+```sh
+npm run diff -- 682                              # all scenarios
+npm run diff -- 682 --scenarios palette-import   # only these
+npm run diff -- 682 --open                       # open the page when done
+npm run diff -- 682 --no-install                  # skip npm install in the scratch worktrees
+```
+
+Scratch worktrees live next to yours (`../wt-diff-<n>-base`,
+`../wt-diff-<n>-pr`) and are reused on the next run. The page lands in
+`app/qa-report/diff-<n>.html` (gitignored).
