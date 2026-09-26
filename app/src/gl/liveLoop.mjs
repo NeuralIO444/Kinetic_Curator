@@ -397,10 +397,15 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       treble: audioOn ? (s.audioBands?.treble || 0) : 0,
       beatPulse: audioOn ? (s.beatPulse || 0) : 0,
     };
-    // #503 — voice/state ballistics removed: neither field ever existed, so
-    // this always ran on processBallistics' internal defaults. Honest `{}`.
-    // (Whether the hook-path shaping in useAudioInput makes this second
-    // shaping redundant is still open on #503 — untouched here.)
+    // #503 — two-stage envelope, DELIBERATE (documented, pinned by
+    // audioPipeline.selfcheck.mjs). Stage 1 (useAudioInput) shapes the mic
+    // bands with the user's attack/decay/response knobs on the rAF clock;
+    // this stage re-shapes those store bands with processBallistics'
+    // defaults on the GL clock for dt-correct scale/alpha/glow smoothing.
+    // Neither stage is redundant: removing one changes the response
+    // character (feel) — that call is Matt's, not a cleanup. The old
+    // voice/state ballistics lookup is gone (neither field ever existed);
+    // this always ran on internal defaults, and now says so honestly.
     const ballisticsParams = {};
     const shapedAudio = processBallistics(ballisticsState, rawAudio, dtSec * 1000, ballisticsParams);
 

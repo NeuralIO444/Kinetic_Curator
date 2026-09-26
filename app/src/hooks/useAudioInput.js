@@ -89,6 +89,9 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
       const cb = cbRef.current;
       // #306: shape the envelope before anything downstream sees it. The
       // follower state lives across rAF ticks; dt comes from wall clock.
+      // #503: this is stage 1 of a deliberate two-stage pipeline — the GL
+      // loop (liveLoop.mjs) re-shapes these store bands with defaults for
+      // dt-correct smoothing. Pinned by audioPipeline.selfcheck.mjs.
       const now = performance.now();
       const dtMs = lastTsRef.current > 0 ? now - lastTsRef.current : 16.7;
       lastTsRef.current = now;
