@@ -42,6 +42,8 @@ export const FX_EFFECT_DEFS = {
     params: {
       scale: { label: 'Scale', min: 0, max: 120, step: 1, def: 24, hint: 'Maximum warp displacement in pixels' },
       seed: { label: 'Seed', min: 0, max: 99, step: 1, def: 7, hint: 'Noise seed — same seed, same warp' },
+      // #590 — additive: 0 is the legacy displace, primitive-for-primitive.
+      warp: { label: 'Warp', min: 0, max: 60, step: 1, def: 0, hint: 'Domain warp — bends the noise field itself, so edges boil instead of wobble. 0 is the legacy displace.' },
     },
   },
   tear: {
@@ -178,6 +180,24 @@ function buildDisplace(params, ctx, rid, src) {
   // The turbulenceOctaves tier budget clamps noise detail (#192: no FX cuts).
   const octaves = Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
   const noise = rid();
+  const warp = Math.max(0, Number(params.warp) || 0);
+  // #590 — domain warp, the SVG half: displace the NOISE by a second, slower
+  // turbulence before using it as the displacement map. Same idea as the GL
+  // shader's fbm-of-fbm, expressed in primitives.
+  //
+  // Gated on warp > 0 so the default emits the identical two-primitive list it
+  // always has — a warp-0 filter is byte-for-byte the legacy one, not a
+  // re-derivation that happens to look the same.
+  if (warp > 0) {
+    const warpNoise = rid();
+    const warped = rid();
+    return [
+      { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.0054, numOctaves: Math.min(2, octaves), seed: Math.round(params.seed) + 41, result: warpNoise } },
+      { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.012, numOctaves: octaves, seed: Math.round(params.seed), result: noise } },
+      { prim: 'feDisplacementMap', attrs: { in: noise, in2: warpNoise, scale: r3(warp), xChannelSelector: 'R', yChannelSelector: 'G', result: warped } },
+      { prim: 'feDisplacementMap', attrs: { in: src, in2: warped, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' } },
+    ];
+  }
   return [
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.012, numOctaves: octaves, seed: Math.round(params.seed), result: noise } },
     { prim: 'feDisplacementMap', attrs: { in: src, in2: noise, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' } },

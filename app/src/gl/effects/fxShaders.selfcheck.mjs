@@ -24,6 +24,7 @@ import { FX_EFFECT_DEFS } from '../../fx/fxFilters.js';
 import {
   FX_SHADER_EFFECTS,
   FX_SHADER_KINDS,
+  FX_DISPLACE_FS,
   registerFxShaders,
   compileFxShaders,
   fxChunksUsed,
@@ -215,6 +216,24 @@ ok('compileFxShaders fails closed on unknown kinds and bad params', () => {
   assert.equal(steps[0].aux, null, 'no aux by default');
   assert.equal(steps[1].kind, 'edge');
   assert.deepEqual(steps[1].params, {});
+});
+
+ok('#590: displace warp is additive — 0 is the legacy effect, and the block is guarded', () => {
+  const d = getTemplateEffect('displace').descriptor;
+  assert.ok(d.params.warp, 'displace must expose a warp param');
+  assert.strictEqual(d.params.warp.def, 0, 'the default must be the legacy effect');
+  assert.strictEqual(d.params.warp.min, 0);
+  // Guarded, not multiplied: at warp 0 the branch is skipped and np is the
+  // identical expression, which is why warp-0 output is bit-identical rather
+  // than merely within a tolerance. A "* u_warp" form would still pay for the
+  // lookup and could carry a 0*NaN through.
+  assert.ok(/if \(u_warp > 0\.0\)/.test(FX_DISPLACE_FS), 'the warp lookup must be branch-guarded');
+  assert.ok(FX_DISPLACE_FS.includes('uniform float u_warp;'), 'u_warp must be declared');
+  // Sanitization still clamps it like every other param.
+  const steps = compileFxShaders([{ kind: 'displace', params: { scale: 24, seed: 7, warp: 999 } }]);
+  assert.ok(steps[0].params.warp <= 60, 'warp clamps to its descriptor max');
+  assert.strictEqual(compileFxShaders([{ kind: 'displace', params: { scale: 24, seed: 7, warp: NaN } }])[0].params.warp, 0,
+    'a non-finite warp falls back to the legacy default');
 });
 
 ok('compileFxShaders wires aux textures per kind', () => {
