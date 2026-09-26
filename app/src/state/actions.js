@@ -44,6 +44,7 @@ export const SET_PHRASE_LENGTH  = 'SET_PHRASE_LENGTH';
 export const SET_PHRASE_MODE    = 'SET_PHRASE_MODE';
 export const SET_PHRASE_CLOCK   = 'SET_PHRASE_CLOCK';
 export const SET_PHRASE_BPM     = 'SET_PHRASE_BPM';
+export const SET_EUCLID         = 'SET_EUCLID';
 export const RESET_PHRASE       = 'RESET_PHRASE';
 export const SET_SLOW_RENDER     = 'SET_SLOW_RENDER';
 export const SET_BATCH_PAUSED    = 'SET_BATCH_PAUSED';

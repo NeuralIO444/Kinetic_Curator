@@ -24,6 +24,9 @@ export function PlayPanel() {
     phraseMode: s.phraseMode,
     phraseBeat: s.phraseBeat,
     phraseClock: s.phraseClock,
+    euclidBeats: s.euclidBeats,
+    euclidSteps: s.euclidSteps,
+    euclidRotate: s.euclidRotate,
     phraseBpm: s.phraseBpm,
     morphEvolve: s.morphEvolve,
     morphDurationMs: s.morphDurationMs,
@@ -36,6 +39,7 @@ export function PlayPanel() {
   const {
     evolveMode, evolveSource, evolveTarget, evolveInterval, beatRoute,
     phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseClock, phraseBpm,
+    euclidBeats, euclidSteps, euclidRotate,
     morphEvolve, morphDurationMs, morphing, audioEnabled, beatPulse, audioBands,
     layoutParams,
   } = state;
@@ -74,6 +78,9 @@ export function PlayPanel() {
           audioEnabled={audioEnabled}
           phraseClock={phraseClock || 'audio'}
           phraseBpm={phraseBpm || 120}
+          euclidBeats={euclidBeats}
+          euclidSteps={euclidSteps}
+          euclidRotate={euclidRotate}
           beatPulse={beatPulse || 0}
           rms={rms}
         />

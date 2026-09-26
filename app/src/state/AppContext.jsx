@@ -139,6 +139,7 @@ export function useApp(selector) {
       case A.SET_PHRASE_MODE: return store.setPhraseMode(payload);
       case A.SET_PHRASE_CLOCK: return store.setPhraseClock(payload);
       case A.SET_PHRASE_BPM: return store.setPhraseBpm(payload);
+      case A.SET_EUCLID: return store.setEuclid(payload);
       case A.RESET_PHRASE: return store.resetPhrase();
       case A.SET_SLOW_RENDER: return store.setSlowRender(payload);
       case A.SET_BATCH_PAUSED: return store.setBatchPaused(payload);
