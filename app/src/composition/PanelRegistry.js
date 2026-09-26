@@ -9,19 +9,12 @@ import { DavisPanel } from '../panels/DavisPanel.jsx';
 import { PlayPanel } from '../panels/PlayPanel.jsx';
 import { PipelinePanel } from '../panels/PipelinePanel.jsx';
 
-// Shader Lab (#193) is dev-only: lazy chunk, never registered in prod builds.
-const ShaderLabPanel = import.meta.env.DEV
-  ? lazy(() => import('../panels/ShaderLabPanel.jsx').then((m) => ({ default: m.ShaderLabPanel })))
-  : null;
-
-// Governor X-ray (hardening 5/6) is dev-only: same lazy-chunk pattern.
-const GovernorXrayPanel = import.meta.env.DEV
-  ? lazy(() => import('../panels/GovernorXrayPanel.jsx').then((m) => ({ default: m.GovernorXrayPanel })))
-  : null;
-
-// Governor tuning surface (#259) is dev-only: same lazy-chunk pattern.
-const GovernorTunePanel = import.meta.env.DEV
-  ? lazy(() => import('../panels/GovernorTunePanel.jsx').then((m) => ({ default: m.GovernorTunePanel })))
+// The merged DEV panel (#691) is dev-only: lazy chunk, never registered in
+// prod builds. It re-hosts the three former dev panels — Shader Lab (#193),
+// Governor X-ray (hardening 5/6), Governor tuning (#259) — as tabs; each tab
+// stays its own lazy chunk, loaded only when the tab opens.
+const DevPanel = import.meta.env.DEV
+  ? lazy(() => import('../panels/DevPanel.jsx').then((m) => ({ default: m.DevPanel })))
   : null;
 
 export const PANEL_REGISTRY = [
@@ -40,21 +33,9 @@ export const PANEL_REGISTRY = [
   { id: 'pipeline', title: 'PIPELINE', icon: '⇌', component: PipelinePanel,  zone: 'secondary' },
 ];
 
-if (import.meta.env.DEV && ShaderLabPanel) {
+if (import.meta.env.DEV && DevPanel) {
   PANEL_REGISTRY.push(
-    { id: 'shaderlab', title: 'SHADER LAB', icon: '◈', component: ShaderLabPanel, zone: 'secondary' },
-  );
-}
-
-if (import.meta.env.DEV && GovernorXrayPanel) {
-  PANEL_REGISTRY.push(
-    { id: 'xray', title: 'X-RAY', icon: '◉', component: GovernorXrayPanel, zone: 'secondary' },
-  );
-}
-
-if (import.meta.env.DEV && GovernorTunePanel) {
-  PANEL_REGISTRY.push(
-    { id: 'govtune', title: 'GOV TUNE', icon: '◐', component: GovernorTunePanel, zone: 'secondary' },
+    { id: 'dev', title: 'DEV', icon: '⬢', component: DevPanel, zone: 'secondary' },
   );
 }
 
