@@ -51,7 +51,7 @@ const near = (a, b, tol, msg) => {
 ok('library version header matches COMMON_VERSION', () => {
   const header = COMMON_GLSL.split('\n')[0];
   assert.ok(header.includes(`v${COMMON_VERSION}`), `header: ${header}`);
-  assert.equal(COMMON_VERSION, 1);
+  assert.equal(COMMON_VERSION, 2);
 });
 
 ok('auditChunks is clean (pure, prefixed, documented, resolvable)', () => {

@@ -35,6 +35,7 @@ export const FX_KIND_TO_COST_ID = {
   tear: 'fx/tear',
   solarize: 'fx/solarize',
   edge: 'fx/edge',
+  grade: 'fx/grade',
 };
 
 /** Registry id for one layer effect kind, or null when unmapped. */

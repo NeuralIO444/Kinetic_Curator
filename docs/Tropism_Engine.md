@@ -30,6 +30,20 @@ Every item in this collection is one answer to one force — wind, hand, beat, s
 
 **Second press** — lock palette, CURATE three times. The first press surprises, the second develops, the third returns — that arc is the Markov talking.
 
+## OKLCH — the one caveat worth writing down
+
+The grade pass (#591) works in OKLCH because a hue rotation there keeps
+perceptual lightness: measured over a full 360-degree walk, in-gamut colours
+move by **0.000** in L, while the same walk in HSL drops up to **0.095** (about
+24 eight-bit steps). That is the whole reason mids survive a cross-palette MIX.
+
+**OKLCH hue is not perfectly uniform at high chroma.** Saturated blues and
+purples shift a little as they rotate, and a saturated walk leaves the sRGB
+gamut — the clamp then costs some lightness (measured worst case **0.065**, still
+~6x better than HSL). This is the space behaving as designed, not a bug: do not
+"fix" it by clamping chroma harder or by reaching for a different colour space.
+If a specific hue matters more than the walk, grade it with chroma pulled back.
+
 ## Build record
 
 Tracked per-PR-group in open issues (plan order). Rules that hold across all of it: one fix per PR; numbers glide, enums cut at t>0; seeded channels only, never wall-clock RNG on canvas state; new GPU load declares cost tiers; `Closes #N` lines; Matt merges.

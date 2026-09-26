@@ -127,7 +127,7 @@ function makeFxBridge(gl) {
 }
 
 ok('all five Phase-2 kinds are declared', () => {
-  assert.deepEqual([...FX_SHADER_KINDS].sort(), ['displace', 'edge', 'scanlines', 'solarize', 'tear']);
+  assert.deepEqual([...FX_SHADER_KINDS].sort(), ['displace', 'edge', 'grade', 'scanlines', 'solarize', 'tear']);
 });
 
 ok('descriptors validate and mirror the SVG-side FX catalog', () => {

@@ -26,9 +26,9 @@
  * in the posterize effect) and anything needing uniforms or textures.
  */
 
-export const COMMON_VERSION = 1;
+export const COMMON_VERSION = 2;
 
-export const COMMON_GLSL = `// common.glsl — v1 — Kinetic Curator shared GLSL chunks (order:07, #196).
+export const COMMON_GLSL = `// common.glsl — v2 — Kinetic Curator shared GLSL chunks (order:07, #196).
 // Pure functions only: no uniforms, no textures, no globals. kc_ prefix on everything.
 // Fragment-shader precision is declared here so the block is self-contained
 // wherever it is injected (it always lands before the effect's own precision
@@ -136,6 +136,45 @@ float kc_dither(vec2 fragCoord) {
   return kc_ign(fragCoord) - 0.5;
 }
 
+vec3 kc_lin2oklab(vec3 c) {
+  // Ottosson's Oklab. Linear-light sRGB in, Oklab out (L in [0,1], a/b ~ +-0.4).
+  // Perceptual: equal steps in L look like equal steps in lightness, which is
+  // the whole reason a hue walk here does not sink through gray.
+  float l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
+  float m = 0.2119034982 * c.r + 0.6806995451 * c.g + 0.1073969566 * c.b;
+  float s = 0.0883024619 * c.r + 0.2817188376 * c.g + 0.6299787005 * c.b;
+  // sign-safe cube root: a negative channel (out-of-gamut, or a 16F round
+  // trip) must not become NaN and poison the frame.
+  vec3 lms = vec3(l, m, s);
+  vec3 r = sign(lms) * pow(abs(lms), vec3(0.3333333333));
+  return vec3(
+    0.2104542553 * r.x + 0.7936177850 * r.y - 0.0040720468 * r.z,
+    1.9779984951 * r.x - 2.4285922050 * r.y + 0.4505937099 * r.z,
+    0.0259040371 * r.x + 0.7827717662 * r.y - 0.8086757660 * r.z);
+}
+
+vec3 kc_oklab2lin(vec3 lab) {
+  // Exact inverse of kc_lin2oklab.
+  float l_ = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
+  float m_ = lab.x - 0.1055613458 * lab.y - 0.0638541728 * lab.z;
+  float s_ = lab.x - 0.0894841775 * lab.y - 1.2914855480 * lab.z;
+  vec3 lms = vec3(l_, m_, s_);
+  lms = lms * lms * lms;
+  return vec3(
+    +4.0767416621 * lms.x - 3.3077115913 * lms.y + 0.2309699292 * lms.z,
+    -1.2684380046 * lms.x + 2.6097574011 * lms.y - 0.3413193965 * lms.z,
+    -0.0041960863 * lms.x - 0.7034186147 * lms.y + 1.7076147010 * lms.z);
+}
+
+vec3 kc_oklab2oklch(vec3 lab) {
+  // Polar form: L unchanged, C = chroma, H = hue in RADIANS.
+  return vec3(lab.x, length(lab.yz), atan(lab.z, lab.y));
+}
+
+vec3 kc_oklch2oklab(vec3 lch) {
+  return vec3(lch.x, lch.y * cos(lch.z), lch.y * sin(lch.z));
+}
+
 vec2 kc_uv_centered(vec2 uv) {
   return uv * 2.0 - 1.0;
 }
@@ -166,6 +205,10 @@ export const CHUNK_INDEX = [
   { name: 'kc_lin2srgb', sig: 'float|vec3 kc_lin2srgb(float|vec3 c)', calls: [], doc: 'Linear -> sRGB (overloaded).' },
   { name: 'kc_ign', sig: 'float kc_ign(vec2 fragCoord)', calls: [], doc: 'Interleaved gradient noise in [0,1).' },
   { name: 'kc_dither', sig: 'float kc_dither(vec2 fragCoord)', calls: ['kc_ign'], doc: 'Ordered dither offset in [-0.5, 0.5).' },
+  { name: 'kc_lin2oklab', sig: 'vec3 kc_lin2oklab(vec3 c)', calls: [], doc: 'Linear sRGB -> Oklab (perceptual L, a, b).' },
+  { name: 'kc_oklab2lin', sig: 'vec3 kc_oklab2lin(vec3 lab)', calls: [], doc: 'Oklab -> linear sRGB, exact inverse of kc_lin2oklab.' },
+  { name: 'kc_oklab2oklch', sig: 'vec3 kc_oklab2oklch(vec3 lab)', calls: [], doc: 'Oklab -> OKLCH polar (L, C, H in radians).' },
+  { name: 'kc_oklch2oklab', sig: 'vec3 kc_oklch2oklab(vec3 lch)', calls: [], doc: 'OKLCH -> Oklab, exact inverse of kc_oklab2oklch.' },
   { name: 'kc_uv_centered', sig: 'vec2 kc_uv_centered(vec2 uv)', calls: [], doc: 'UV remapped to [-1,1].' },
   { name: 'kc_uv_aspect', sig: 'vec2 kc_uv_aspect(vec2 uv, vec2 res)', calls: [], doc: 'Centered UV with aspect-corrected x.' },
 ];
