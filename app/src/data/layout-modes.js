@@ -17,6 +17,8 @@ export const LAYOUT_MODES = [
   { id: 'layers',    name: 'layers',     glyph: 'z'      },
   { id: 'rails',     name: 'rails',      glyph: 'rail'   },
   { id: 'ca',        name: 'cellular',   glyph: 'ca'     },
+  // #587 — clusters divided by empty Voronoi seams; no live grid needed.
+  { id: 'voronoi',   name: 'voronoi',    glyph: 'vein'   },
   { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
