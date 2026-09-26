@@ -1,5 +1,22 @@
 # QA harness
 
+## Review cockpit
+
+One command builds a self-contained review page for a PR — CI status, selfcheck,
+the PR's "Review this" checklist (ticks save in your browser), QA screenshots,
+and a localhost link, all on one page:
+
+```sh
+npm run review -- 682            # full cockpit for PR #682
+npm run review -- 682 --no-qa    # skip the browser scenarios (faster)
+npm run review -- 682 --headed   # watch the QA browser while it runs
+```
+
+It puts the PR's branch in a sibling worktree (`../kc-682-review`, reused if it
+exists), runs `npm install` only when needed, and writes
+`qa-report/review-682.html` (gitignored) — then opens it. Checklist ticks persist
+per-PR in the browser's localStorage.
+
 Checks a change's *behaviour* in a real browser and hands you a page with a pass/fail per step
 and screenshots of the exact spot. It exists because "click X, then look near the bottom of
 panel Y" is slow and easy to get lost in. It is **not** the e2e gate (`npm run test:e2e`) — it
