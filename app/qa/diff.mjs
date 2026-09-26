@@ -13,7 +13,7 @@
 // Scratch worktrees live next to this one: ../wt-diff-<n>-base and
 // ../wt-diff-<n>-pr. The page lands in app/qa-report/diff-<n>.html
 // (gitignored, like the rest of qa-report).
-import { spawnSync, execFile } from 'node:child_process';
+import { spawnSync, execFile, spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,8 @@ const QA = dirname(fileURLToPath(import.meta.url));
 const APP = join(QA, '..');
 const ROOT = join(APP, '..');
 const REPORT_DIR = join(APP, 'qa-report');
+
+const up = async (url) => { try { return (await fetch(url)).ok; } catch { return false; } };
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -65,21 +67,48 @@ function ensureInstalled(wtApp, skip) {
   if (!r.ok) fail(`npm install failed in ${wtApp}:\n${r.stderr.slice(-2000)}`);
 }
 
-/** Run the QA harness in a worktree; returns { statuses: Map(scenario -> PASS|FAIL) }. */
-function runQA(wtApp, scenarios, label) {
+/**
+ * Start a private Vite dev server for a worktree on a free port.
+ * Never reuses an existing server: a foreign checkout's dev server on the
+ * same port would silently test the wrong branch. Returns { url, stop }.
+ */
+async function startServer(wtApp) {
+  let port = 5199;
+  let url = '';
+  for (; port < 5250; port++) {
+    url = `http://127.0.0.1:${port}/Kinetic_Curator/`;
+    if (!(await up(url))) break;
+  }
+  if (port >= 5250) fail('no free port in 5199-5249');
+  const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
+    { cwd: wtApp, stdio: 'ignore' });
+  for (let i = 0; i < 60 && !(await up(url)); i++) await new Promise((r) => setTimeout(r, 500));
+  if (!(await up(url))) { child.kill(); fail(`dev server did not come up for ${wtApp} on ${url}`); }
+  return { url, stop: () => child.kill() };
+}
+
+/** Run the QA harness in a worktree against its own private server.
+ *  Returns { statuses: Map(scenario -> PASS|FAIL) }. */
+async function runQA(wtApp, scenarios, label) {
   console.log(`diff: running QA scenarios on ${label}…`);
-  const args = ['qa/run.mjs', ...scenarios];
-  const r = spawnSync('node', args, { cwd: wtApp, encoding: 'utf8' });
-  const statuses = new Map();
-  for (const line of (r.stdout || '').split('\n')) {
-    const m = line.match(/^▶\s+(\S+)\s+…\s+(PASS|FAIL)/);
-    if (m) statuses.set(m[1], m[2]);
+  const server = await startServer(wtApp);
+  try {
+    const args = ['qa/run.mjs', ...scenarios];
+    const r = spawnSync('node', args,
+      { cwd: wtApp, encoding: 'utf8', env: { ...process.env, QA_URL: server.url } });
+    const statuses = new Map();
+    for (const line of (r.stdout || '').split('\n')) {
+      const m = line.match(/^▶\s+(\S+)\s+…\s+(PASS|FAIL)/);
+      if (m) statuses.set(m[1], m[2]);
+    }
+    if (r.status !== 0 && statuses.size === 0) {
+      console.error(r.stdout.slice(-3000));
+      fail(`QA run failed on ${label} (exit ${r.status})`);
+    }
+    return { statuses };
+  } finally {
+    server.stop();
   }
-  if (r.status !== 0 && statuses.size === 0) {
-    console.error(r.stdout.slice(-3000));
-    fail(`QA run failed on ${label} (exit ${r.status})`);
-  }
-  return { statuses };
 }
 
 /** { scenario -> [{ file, label }] } from a worktree's qa-report dir. */
@@ -99,7 +128,7 @@ function collectShots(wtApp) {
   return out;
 }
 
-function main() {
+async function main() {
   const raw = process.argv.slice(2);
   const flags = new Set(raw.filter((a) => a.startsWith('--')));
   const positional = raw.filter((a) => !a.startsWith('--'));
@@ -126,8 +155,8 @@ function main() {
   ensureInstalled(join(baseWt, 'app'), noInstall);
   ensureInstalled(join(prWt, 'app'), noInstall);
 
-  const baseRes = runQA(join(baseWt, 'app'), scenarios, 'base');
-  const prRes = runQA(join(prWt, 'app'), scenarios, 'PR branch');
+  const baseRes = await runQA(join(baseWt, 'app'), scenarios, 'base');
+  const prRes = await runQA(join(prWt, 'app'), scenarios, 'PR branch');
   const baseShots = collectShots(join(baseWt, 'app'));
   const prShots = collectShots(join(prWt, 'app'));
 
