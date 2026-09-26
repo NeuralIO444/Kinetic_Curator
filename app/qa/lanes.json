@@ -1,0 +1,1 @@
+{"_help":"PR number -> lane name override for the build board (qa/board.mjs). Wins over the built-in issue-number rules. Known lane names: sleight-of-hand, backend, tropism, tooling, pipeline, davis-stimuli, import-export, motion, fx, shell, fidelity, other."}
