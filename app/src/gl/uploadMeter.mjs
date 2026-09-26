@@ -5,6 +5,12 @@
 // shadow copy of the same call-index-in-frame from the previous frame,
 // how many of those bytes actually changed (changedBytes).
 //
+// #533 PR2 adds pushedBytes/pushedCalls: the physical bytes actually handed
+// to bufferSubData. With dirty sub-range uploads a drawInstances call may
+// issue several sub-range calls (or none for a static frame); uploadedBytes
+// keeps the logical full-buffer accounting so the PR1 changed/uploaded gate
+// stays comparable, while pushedBytes measures the real win.
+//
 // Wiring (all inside renderer.mjs, #533 is not allowed to touch liveLoop.mjs):
 //   - renderFrameInto() calls beginFrame() once per frame
 //   - drawInstances() calls noteUpload(u8 view of the uploaded data) per
@@ -16,9 +22,11 @@
 // these numbers at the decision gate: changed/uploaded > 0.7 → not worth it.
 
 let frames = 0;          // beginFrame() calls since reset
-let uploadedBytes = 0;   // cumulative bytes handed to bufferSubData
+let uploadedBytes = 0;   // cumulative bytes the frame logically uploaded (full-buffer accounting)
 let changedBytes = 0;    // cumulative bytes differing from last frame's shadow
 let uploadCalls = 0;     // cumulative drawInstances uploads
+let pushedBytes = 0;     // #533 PR2: actual bytes handed to bufferSubData (sub-ranges included)
+let pushedCalls = 0;     // #533 PR2: actual bufferSubData calls issued
 let callIndex = 0;       // call slot within the current frame
 let shadows = [];        // per-call-slot Uint8Array shadow of the last frame
 
@@ -57,6 +65,18 @@ export function noteUpload(bytes) {
   callIndex++;
 }
 
+/**
+ * Record one real bufferSubData call of n bytes. #533 PR2: with dirty
+ * sub-range uploads, one drawInstances call may issue several of these (or
+ * none, for a static frame) — pushedBytes is the physical bytes the GPU
+ * actually received, uploadedBytes stays the logical full-buffer accounting
+ * so the PR1 changed/uploaded gate numbers remain comparable.
+ */
+export function notePushedBytes(n) {
+  pushedBytes += n >>> 0;
+  pushedCalls++;
+}
+
 /** Point-in-time read of the cumulative counters. */
 export function snapshot() {
   return {
@@ -65,6 +85,8 @@ export function snapshot() {
     uploadedBytes,
     changedBytes,
     changedPerUploaded: uploadedBytes > 0 ? changedBytes / uploadedBytes : Number.NaN,
+    pushedBytes,
+    pushedCalls,
   };
 }
 
@@ -74,6 +96,8 @@ export function reset() {
   uploadedBytes = 0;
   changedBytes = 0;
   uploadCalls = 0;
+  pushedBytes = 0;
+  pushedCalls = 0;
   callIndex = 0;
   shadows = [];
 }
