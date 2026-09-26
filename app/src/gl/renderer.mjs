@@ -43,13 +43,17 @@ import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { registerCostTier } from './costTiers.mjs';
-import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
+import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, notePushedBytes as uploadMeterNotePushed, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
+import { computeDirtySpans } from './dirtyRanges.mjs';
 
 // #533 PR1 — upload-byte meter (measure-only). renderer.mjs is the only file
 // allowed to change, so the debug handle attaches here rather than in
 // liveLoop.mjs. QA reads it via page.evaluate(() => window.__uploadMeter.snapshot()).
+// #533 PR2 — createRendererBase extends the handle with reset/setDirtyUploads
+// (they reach the closure-local upload shadow, so they are wired there).
+const uploadDebugHandle = { snapshot: uploadMeterSnapshot, reset: uploadMeterReset };
 if (typeof window !== 'undefined') {
-  window.__uploadMeter = { snapshot: uploadMeterSnapshot, reset: uploadMeterReset };
+  window.__uploadMeter = uploadDebugHandle;
 }
 
 /**
@@ -342,6 +346,19 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   // every call; bufferSubData() into a buffer sized once (grown on demand)
   // does not.
   let instCapacityBytes = 0;
+  // #533 PR2 — dirty sub-range uploads. instShadow mirrors exactly what was
+  // last written into instVbo (bytes [0, instShadow.byteLength)); the diff
+  // against it is the diff against the GL buffer, so uploading only the
+  // changed spans leaves the buffer holding precisely `data` — pixel-
+  // identical to the old full re-upload. Nulled on buffer growth, on meter
+  // reset, and when dirty uploads are toggled (next upload is full).
+  let instShadow = null;
+  let dirtyUploadsEnabled = true;
+  // #533 PR2 — expose the dirty-upload controls on the debug handle (QA uses
+  // setDirtyUploads(false) to measure the pre-optimization baseline; reset
+  // also drops the shadow so the next upload is a full one).
+  uploadDebugHandle.reset = () => { uploadMeterReset(); instShadow = null; };
+  uploadDebugHandle.setDirtyUploads = (on) => { dirtyUploadsEnabled = !!on; instShadow = null; };
 
   function drawFullscreen(prog) {
     gl.bindBuffer(gl.ARRAY_BUFFER, fullVbo);
@@ -413,9 +430,36 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       // tail bytes are never read.
       instCapacityBytes = data.byteLength * 2;
       gl.bufferData(gl.ARRAY_BUFFER, instCapacityBytes, gl.DYNAMIC_DRAW);
+      // Reallocated storage has undefined contents: full upload, fresh shadow.
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+      uploadMeterNotePushed(data.byteLength);
+      instShadow = Float32Array.from(data);
+    } else if (!dirtyUploadsEnabled || instShadow === null) {
+      // Dirty uploads disabled (baseline measurement) or first sighting:
+      // today's full upload.
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+      uploadMeterNotePushed(data.byteLength);
+      instShadow = Float32Array.from(data);
+    } else {
+      // #533 PR2: push only the changed sub-ranges. Adjacent/nearby spans
+      // are coalesced inside computeDirtySpans; a big or scattered change
+      // falls back to one full upload (cheaper than many GL calls).
+      const { spans, full } = computeDirtySpans(instShadow, data);
+      if (spans.length === 0) {
+        // Static frame: the buffer already holds exactly `data`, skip the
+        // upload entirely.
+      } else if (full) {
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+        uploadMeterNotePushed(data.byteLength);
+      } else {
+        for (const [f0, f1] of spans) {
+          gl.bufferSubData(gl.ARRAY_BUFFER, f0 * 4, data.subarray(f0, f1));
+          uploadMeterNotePushed((f1 - f0) * 4);
+        }
+      }
+      instShadow = Float32Array.from(data);
     }
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
-    uploadMeterNoteUpload(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)); // #533 PR1: measure-only
+    uploadMeterNoteUpload(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)); // #533 PR1: logical-upload accounting, unchanged
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
     gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);

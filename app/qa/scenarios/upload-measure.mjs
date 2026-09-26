@@ -5,6 +5,11 @@
 // previous frame). The scenario passes when the meter reports sane values
 // (uploaded > 0); the numbers go into the PR body, where the issue's
 // decision gate lives: changed/uploaded > 0.7 → close as measured-not-worth-it.
+//
+// #533 PR2 — also reports pushedBytes (physical bytes handed to
+// bufferSubData, sub-ranges included). Set KC_DIRTY=0 to disable the dirty
+// sub-range optimization via the debug handle and measure the
+// pre-optimization baseline on the same build.
 
 const MEASURE_MS = 60_000;
 
@@ -48,6 +53,12 @@ export default {
       null, { timeout: 30_000 },
     );
     await page.waitForFunction(() => window.__uploadMeter.snapshot().frames > 10, null, { timeout: 30_000 });
+    // #533 PR2: KC_DIRTY=0 measures the pre-optimization baseline (full
+    // uploads) on the same build. Reset also drops the renderer's upload
+    // shadow, so the first post-reset upload is always full.
+    if (process.env.KC_DIRTY === '0') {
+      await page.evaluate(() => window.__uploadMeter.setDirtyUploads(false));
+    }
     await page.evaluate(() => window.__uploadMeter.reset());
 
     const t0 = Date.now();
@@ -56,6 +67,7 @@ export default {
     const secs = (Date.now() - t0) / 1000;
 
     const ratio = snap.uploadedBytes > 0 ? snap.changedBytes / snap.uploadedBytes : NaN;
+    const pushedPerFrame = snap.frames > 0 ? snap.pushedBytes / snap.frames : NaN;
     const fps = snap.frames / secs;
     const detail =
       `frames=${snap.frames} (${fps.toFixed(1)} fps over ${secs.toFixed(0)}s) · ` +
@@ -63,6 +75,9 @@ export default {
       `uploaded=${fmtBytes(snap.uploadedBytes)} (${snap.uploadedBytes} B) · ` +
       `changed=${fmtBytes(snap.changedBytes)} (${snap.changedBytes} B) · ` +
       `changed/uploaded=${Number.isFinite(ratio) ? ratio.toFixed(3) : 'n/a'} · ` +
+      `pushed=${fmtBytes(snap.pushedBytes)} (${snap.pushedBytes} B over ${snap.pushedCalls} GL calls, ` +
+      `${Number.isFinite(pushedPerFrame) ? Math.round(pushedPerFrame) : 'n/a'} B/frame) · ` +
+      `dirty=${process.env.KC_DIRTY === '0' ? 'OFF (baseline)' : 'ON'} · ` +
       `gate: changed/uploaded > 0.7 → ${Number.isFinite(ratio) && ratio > 0.7 ? 'FIRES (recommend measured-not-worth-it)' : 'does not fire'}`;
 
     ctx.check('meter reports uploads during animation', snap.uploadedBytes > 0, detail);
@@ -70,6 +85,7 @@ export default {
     // kept ticking past the initial mount renders, not a wall-clock fps.
     ctx.check('frames kept ticking', snap.frames > 10, `frames=${snap.frames} in ${secs.toFixed(0)}s`);
     ctx.check('changed bytes ≤ uploaded bytes', snap.changedBytes <= snap.uploadedBytes, detail);
+    ctx.check('pushed bytes ≤ uploaded bytes (sub-ranges only)', snap.pushedBytes <= snap.uploadedBytes, detail);
     ctx.check('upload calls tracked', snap.uploadCalls > 0, `uploads=${snap.uploadCalls}`);
   },
 };
