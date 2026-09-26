@@ -30,6 +30,7 @@ import { attachVelocities } from './velocitySmear.mjs';
 import { halfLifeToKeep } from '../components/taper.js';
 import { createBallisticsState, processBallistics } from './audioBallistics.mjs';
 import { comboKey } from './liveAtlas.mjs';
+import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs';
 
 const CX = CANVAS_W / 2;
 const CY = CANVAS_H / 2;
@@ -62,6 +63,12 @@ let building = false;
 
 const velPrev = new Map();
 const smoothedLayoutParams = {};
+
+// #624 (WASH): the worker is the primary render path (OffscreenCanvas); the
+// in-thread liveLoop.mjs is only the fallback. The same wash machine runs here
+// so palette taps dye across even when the worker owns the loop.
+const washMachine = createTintWash();
+let lastWashResolved = null;
 
 function swellEnvelope() {
   if (!swellStart) return 0;
@@ -143,6 +150,24 @@ function buildFrame() {
   const totalInstances = resolved.reduce((acc, l) => acc + (l.items ? l.items.length : 0), 0);
   self.postMessage({ type: 'NODE_COUNT', nodeCount: totalInstances });
 
+  // #624 (WASH): on palette identity changes, dye the new tint across as a
+  // deterministic per-item wave instead of an instant cut. The wash mutates
+  // the resolved per-instance tint carrier in place (no atlas rebake — the
+  // atlas key below is asset-only — and no scale change), then hands the
+  // frame to the scene contract.
+  const washTargetPalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
+  const washEv = washMachine.update({
+    identity: paletteIdentity(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes),
+    mode: s.colorMode || 'FADE',
+    mixSeconds: s.paletteMixSeconds,
+    now: loopTimeMs,
+    seed: s.seed || 1,
+    bg: washTargetPalette.bg,
+    lastResolved: lastWashResolved,
+  });
+  if (washEv.washing) applyWash(resolved, washEv);
+  lastWashResolved = resolved;
+
   // Scene contract
   const contract = buildSceneContract({
     doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers },
@@ -185,8 +210,9 @@ function buildFrame() {
 
   if (!cells) return null;
 
-  const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-  const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : activePalette.bg;
+  // #624: during a wash the background dyes across the same wave as the
+  // items (washEv.bg interpolates); otherwise it is the palette's bg.
+  const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : washEv.bg;
 
   const renderScale = Math.min(1, Math.max(0.1, (s.renderScale || 1.0) * previewScale));
   const rw = Math.max(2, Math.round(CANVAS_W * renderScale));
@@ -201,7 +227,7 @@ function buildFrame() {
       cells,
     },
     transparent: !bgCss,
-    bgCss: bgCss || activePalette.bg,
+    bgCss: bgCss || washTargetPalette.bg,
     rw, rh,
     accumOn: !!layoutParams.accumulation && !s.perfTier1,
     accumFrozen,
