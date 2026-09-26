@@ -28,7 +28,8 @@
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
-import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
+import { createPaletteMix } from './paletteMix.mjs';
+import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #278: VJ MIX crossfade state machine
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -82,6 +83,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
   let lastFrameTarget = null;
+  // #624 — WASH: per-instance tint adoption state machine (pure). lastResolved
+  // is the previous frame's resolved layers — the re-base source when palette
+  // taps come faster than one soak.
+  const tintWash = createTintWash();
+  let lastResolved = null;
 
   // Spine C (#389): GL-loop owned life clock, audio ballistics follower, and layered breath springs
   const ballisticsState = createBallisticsState();
@@ -541,6 +547,24 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       try { s.setNodeCount(nodes); } catch { /* store gone */ }
     }
 
+    // #624 — WASH color mode: on a palette change each item adopts the new
+    // ink/accent on its own center-out wavefront schedule (seeded jitter per
+    // node). No dissolve, no scale — color never touches the item morph.
+    // Mutates the frame-temporary items in place, so the contract below
+    // carries the washed tints to the live GPU tint shader (u_liveTint).
+    const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
+    const washEv = tintWash.update({
+      identity: paletteIdentity(s.paletteId, s.paletteOverrides, s.userPalettes),
+      mode: s.colorMode,
+      mixSeconds,
+      now: loopTimeMs,
+      seed: s.seed,
+      bg: activePalette.bg,
+      lastResolved,
+    });
+    if (washEv.washing) applyWash(resolved, washEv);
+    lastResolved = resolved;
+
     const contract = buildSceneContract({
       doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers },
       resolvedLayers: resolved,
@@ -621,8 +645,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // Only return null on initial boot before ANY atlas has finished baking.
     if (!cells) return null;
 
-    const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-    const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : activePalette.bg;
+    // #624 — in WASH the field soaks with the wave: washEv.bg is the lerped
+    // field color while a soak runs, the plain palette bg otherwise.
+    const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : washEv.bg;
 
     return {
       payload: {
