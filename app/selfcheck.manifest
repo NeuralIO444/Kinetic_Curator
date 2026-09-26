@@ -93,6 +93,7 @@ node src/state/overlayRoundtrip.selfcheck.mjs
 node src/assets/primitives.selfcheck.mjs
 node src/shimmer/shimmer.selfcheck.mjs
 node src/curator/curate.selfcheck.mjs
+node src/curator/transitions.selfcheck.mjs
 node src/curator/taste.selfcheck.mjs
 node src/curator/renderProfiles.selfcheck.mjs
 node src/gl/mlx/mlxExport.selfcheck.mjs

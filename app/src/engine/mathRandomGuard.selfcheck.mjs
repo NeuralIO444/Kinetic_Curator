@@ -22,6 +22,7 @@ const ALLOWED = {
   'curator/curate.js': { count: 1, why: 'pickCurated default rng param; CURATE passes the seeded CH.curate stream (#518)' },
   'curator/renderProfiles.js': { count: 1, why: 'applyRenderProfile default rng param; seeded by CURATE' },
   'curator/taste.js': { count: 1, why: 'pickPersona default rng param; seeded by CURATE' },
+  'curator/transitions.js': { count: 1, why: 'markovPick default rng param; CURATE always injects the seeded (seed, press #) stream, and the drawn value lands in layoutParams' },
   'engine/harmony.js': { count: 1, why: 'buildHarmony default rng param' },
   'state/paramUtils.js': { count: 4, why: 'randomizeKey default rng param + morph dice (3); result lands in layoutParams' },
   'state/slices/davisSlice.js': { count: 1, why: 'EVOLVE palette dice; result lands in paletteId' },

@@ -23,7 +23,8 @@ export function CuratorBar({ lockCount, composition }) {
   const wrapRef = useRef(null);
   const presetWrapRef = useRef(null);
   const curator = getActiveCurator();
-  const hint = curatorHint(curator);
+  const chainFallback = useStore((s) => s.curateChainFallback);
+  const hint = curatorHint(curator, { chainFallback });
   const presetGroups = useMemo(() => getPresetsByGroup(), []);
 
   // Close either popup on outside click or Escape.
