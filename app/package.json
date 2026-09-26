@@ -14,6 +14,7 @@
     "measure-costs": "node src/gl/debug/costTiers.measure.mjs",
     "test:e2e": "playwright test",
     "qa": "node qa/run.mjs",
+    "review": "node qa/review.mjs",
     "test:e2e:install": "playwright install chromium",
     "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e",
     "parity": "node src/gl/parity/run.mjs"
