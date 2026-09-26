@@ -79,6 +79,7 @@ node src/gl/composite.selfcheck.mjs
 node src/gl/accum.selfcheck.mjs
 node src/gl/velocitySmear.selfcheck.mjs
 node src/gl/audioBallistics.selfcheck.mjs
+node src/gl/audioPipeline.selfcheck.mjs
 node src/gl/spineC.selfcheck.mjs
 node src/gl/spineE.selfcheck.mjs
 node src/gl/spineF.selfcheck.mjs
