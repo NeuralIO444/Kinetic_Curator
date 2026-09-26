@@ -78,6 +78,14 @@ export function usePerformanceGovernor() {
   const slowRender = useStore(s => s.slowRender);
   const slowRenderSource = useStore(s => s.slowRenderSource);
   const perfTier1 = useStore(s => s.perfTier1);
+  // #655 — e2e test hook: a page can force the governor off before the app
+  // boots (page.addInitScript sets window.__KC_GOVERNOR_OFF = true). Shed
+  // cuts are render-only overlays driven by wall-clock FPS, so under CI load
+  // they contaminate node-count assertions with nondeterminism. This flag is
+  // only ever set by tests; it never appears in the product surface.
+  const governorTestOff =
+    typeof window !== 'undefined' && window.__KC_GOVERNOR_OFF === true;
+  const governorArmed = autoQuality && !governorTestOff;
   const perfClampOverride = useStore(s => s.perfClampOverride);
   const assetThin = useStore(s => s.assetThin);
   const renderScale = useStore(s => s.renderScale);
@@ -115,10 +123,10 @@ export function usePerformanceGovernor() {
         fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
       });
     };
-    if (!autoQuality) {
+    if (!governorArmed) {
       criticalSinceRef.current = null;
       // Governor disabled: overlays clear. The cut-6 soft freeze clears via
-      // the declarative restore table (healthy covers !autoQuality); this
+      // the declarative restore table (healthy covers !governorArmed); this
       // path covers the watchdog hard stop, which the table deliberately
       // never auto-clears.
       if (slowRender && slowRenderSource === 'watchdog') clearFreeze('autoQuality off');
@@ -157,7 +165,7 @@ export function usePerformanceGovernor() {
       });
       console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS + ')' + gpuNote);
     }
-  }, [effFps, gpuNote, autoQuality, slowRender, slowRenderSource, tripWatchdog, setSlowRender, clearWatchdogReason, recoverFps, glContext]);
+  }, [effFps, gpuNote, governorArmed, slowRender, slowRenderSource, tripWatchdog, setSlowRender, clearWatchdogReason, recoverFps, glContext]);
 
   // Tier 1 (#107 §4): a milder, self-clearing shed. Independent sustain
   // window from the critical tier above — this one fires first, at a higher
@@ -167,7 +175,7 @@ export function usePerformanceGovernor() {
   // the floor no longer destroys and rebuilds the ACCUM feedback buffer
   // every couple of seconds.
   useEffect(() => {
-    if (!autoQuality) {
+    if (!governorArmed) {
       tier1SinceRef.current = null;
       if (perfTier1) {
         setPerfTier1(false);
@@ -209,7 +217,7 @@ export function usePerformanceGovernor() {
       });
       console.info('[Kinetic] Perf tier1: ACCUM/gloss/mirror off (FPS below', TIER1_FPS + ')' + gpuNote);
     }
-  }, [effFps, gpuNote, autoQuality, perfTier1, setPerfTier1]);
+  }, [effFps, gpuNote, governorArmed, perfTier1, setPerfTier1]);
 
   // The cut list: ordered, one step per sustain+cooldown cycle.
   // Hysteresis (#259): shed below shedFps, recover at/above recoverFps.
@@ -218,7 +226,7 @@ export function usePerformanceGovernor() {
   // quality was. (Cut 3/perfTier1 keeps its own effect — independent
   // mechanism, own hysteresis; cut 7/watchdog needs manual resume.)
   useEffect(() => {
-    const healthy = !autoQuality || effFps >= recoverFps;
+    const healthy = !governorArmed || effFps >= recoverFps;
 
     const snap = {
       renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
@@ -250,7 +258,7 @@ export function usePerformanceGovernor() {
       });
     }
 
-    if (!autoQuality) {
+    if (!governorArmed) {
       lowSinceRef.current = null;
       return;
     }
@@ -307,7 +315,7 @@ export function usePerformanceGovernor() {
     lastActionRef.current = now;
     lowSinceRef.current = null;
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', shedFps + ')' + gpuNote);
-  }, [effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, autoQuality, setQuality, layoutParams.count, perfClampOverride,
+  }, [effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
     slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }

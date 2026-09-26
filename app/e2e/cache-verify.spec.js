@@ -44,6 +44,15 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
 
   await page.addInitScript(() => {
     try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
+    // #655 — disarm the performance governor for this spec. The node count
+    // it asserts on used to be the LIVE post-shed count: under CI load the
+    // governor shed COUNT=700 harder than COUNT=60 (wall-clock FPS driven),
+    // narrowing the 700/60 ratio toward the 1.5x bar and flaking the run.
+    // With the governor off, the pill reports the deterministic resolved
+    // placement count — a pure function of COUNT through the staged-eval
+    // cache — so the ratio is load-independent. The property under test is
+    // unchanged: a swallowed COUNT edit still reads ~1x and fails the bar.
+    window.__KC_GOVERNOR_OFF = true;
   });
   await page.goto('/');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
@@ -71,8 +80,15 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   const restored = await nodeCount(page);
   console.log(`[cache] COUNT 700 -> ${high} nodes, 60 -> ${low}, back to 700 -> ${restored}`);
 
-  // #478: this measures live governor-shed node count, which responds to
-  // real wall-clock frame rate. Under concurrent CI load the governor sheds
+  // #655 (supersedes the #478 note below): the governor is disarmed via
+  // window.__KC_GOVERNOR_OFF, so the node count below is the deterministic
+  // resolved placement count, not the live post-shed count. The margin stays
+  // at 1.5x — deliberately not loosened again — and a real stale-cache bug
+  // still fails decisively: a swallowed edit leaves high/low/restored all at
+  // the last-cached count, a ratio of ~1x, nowhere near the bar.
+  //
+  // #478 (historical): this used to measure the live governor-shed node
+  // count, which responds to real wall-clock frame rate. Under concurrent CI load the governor sheds
   // COUNT=700 harder than COUNT=60, narrowing the ratio toward ~1.8x on a
   // loaded runner (observed 3-11% short of a 2x bar across 4 failures) even
   // though a fresh local build clears it by 6.6x. A real stale-cache bug —
