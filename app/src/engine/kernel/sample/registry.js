@@ -57,6 +57,37 @@ function fibonacci(ctx) {
   return { x: cx + (rng() - 0.5) * jitter, y: cy + (rng() - 0.5) * jitter };
 }
 
+/**
+ * #585 — phyllotaxis: the golden-angle family, with the divergence exposed.
+ *
+ * `fibonacci` above is one fixed point of this family (Vogel's disc at exactly
+ * 2*pi/phi^2). Phyllotaxis is its sibling, not a duplicate: it places on the
+ * same rule and lets the divergence angle move, which is the only knob that
+ * changes the PARASTICHY — the count of visible spiral arms. At the golden
+ * angle the arms land on consecutive Fibonacci numbers (measured: 34, then 21
+ * and 55); a fraction of a degree off and the eye counts a different family.
+ *
+ * `phylloDivergence` is therefore an OFFSET in degrees from the golden angle,
+ * default 0 — so at defaults this sampler is bit-identical to `fibonacci`
+ * (same expression, plus i*0), and the two really are siblings rather than two
+ * near-miss discs. The radius law is Vogel's sqrt(i/count), shared for the
+ * same reason.
+ */
+const PHYLLO_PHI = (1 + Math.sqrt(5)) / 2;
+const DEG = Math.PI / 180;
+
+function phyllotaxis(ctx) {
+  const { i, count, w, h, rng, jitter, phylloDivergence } = ctx;
+  const off = Number.isFinite(phylloDivergence) ? phylloDivergence : 0;
+  // Written as fibonacci's own expression plus the offset term so that at
+  // off = 0 the addition is exactly + 0 and the result is bit-identical.
+  const angle = 2 * Math.PI * i / (PHYLLO_PHI * PHYLLO_PHI) + i * off * DEG;
+  const radius = Math.sqrt(i / count) * Math.min(w, h) * 0.48;
+  const cx = w / 2 + Math.cos(angle) * radius;
+  const cy = h / 2 + Math.sin(angle) * radius;
+  return { x: cx + (rng() - 0.5) * jitter, y: cy + (rng() - 0.5) * jitter };
+}
+
 function radial(ctx) {
   const { i, count, w, h, rng, jitter } = ctx;
   const rings = Math.ceil(Math.sqrt(count));
@@ -198,6 +229,7 @@ function stratified(ctx) {
 registerSampler('random', random);
 registerSampler('grid', grid);
 registerSampler('fibonacci', fibonacci);
+registerSampler('phyllotaxis', phyllotaxis);
 registerSampler('radial', radial);
 registerSampler('swarm', swarm);
 registerSampler('flow', flow);
@@ -215,6 +247,7 @@ export {
   random,
   grid,
   fibonacci,
+  phyllotaxis,
   radial,
   swarm,
   flow,

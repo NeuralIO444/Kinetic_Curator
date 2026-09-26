@@ -118,6 +118,7 @@ export function buildPlacements({
     canvasW,
     canvasH,
     caGrid: layoutParams.mode === 'ca' ? caGrid : null,
+    phylloDivergence: layoutParams.phylloDivergence,
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
