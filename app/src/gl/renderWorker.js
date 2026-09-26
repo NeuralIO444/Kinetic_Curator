@@ -30,7 +30,8 @@ import { attachVelocities } from './velocitySmear.mjs';
 import { halfLifeToKeep } from '../components/taper.js';
 import { createBallisticsState, processBallistics } from './audioBallistics.mjs';
 import { comboKey } from './liveAtlas.mjs';
-import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs';
+import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
+import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
 
 const CX = CANVAS_W / 2;
 const CY = CANVAS_H / 2;
@@ -64,11 +65,13 @@ let building = false;
 const velPrev = new Map();
 const smoothedLayoutParams = {};
 
-// #624 (WASH): the worker is the primary render path (OffscreenCanvas); the
-// in-thread liveLoop.mjs is only the fallback. The same wash machine runs here
-// so palette taps dye across even when the worker owns the loop.
+// #624 (WASH) + #625 (INJECT): the worker is the primary render path
+// (OffscreenCanvas); the in-thread liveLoop.mjs is only the fallback. Both
+// tint machines run here so palette taps soak/propagate even when the worker
+// owns the loop — each activates only in its own color mode.
 const washMachine = createTintWash();
-let lastWashResolved = null;
+const injectMachine = createTintInject();
+let lastResolved = null;
 
 function swellEnvelope() {
   if (!swellStart) return 0;
@@ -150,23 +153,27 @@ function buildFrame() {
   const totalInstances = resolved.reduce((acc, l) => acc + (l.items ? l.items.length : 0), 0);
   self.postMessage({ type: 'NODE_COUNT', nodeCount: totalInstances });
 
-  // #624 (WASH): on palette identity changes, dye the new tint across as a
-  // deterministic per-item wave instead of an instant cut. The wash mutates
-  // the resolved per-instance tint carrier in place (no atlas rebake — the
-  // atlas key below is asset-only — and no scale change), then hands the
-  // frame to the scene contract.
-  const washTargetPalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-  const washEv = washMachine.update({
+  // #624 (WASH) / #625 (INJECT): on palette identity changes, dye the new
+  // tint across as a deterministic per-item wave (WASH) or field-first
+  // propagation (INJECT) instead of an instant cut. The machines mutate the
+  // resolved per-instance tint carrier in place (no atlas rebake — the atlas
+  // key below is asset-only — and no scale change), then hand the frame to
+  // the scene contract.
+  const tintTargetPalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
+  const tintArgs = {
     identity: paletteIdentity(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes),
     mode: s.colorMode || 'FADE',
     mixSeconds: s.paletteMixSeconds,
     now: loopTimeMs,
     seed: s.seed || 1,
-    bg: washTargetPalette.bg,
-    lastResolved: lastWashResolved,
-  });
+    bg: tintTargetPalette.bg,
+    lastResolved,
+  };
+  const washEv = washMachine.update(tintArgs);
+  const injectEv = injectMachine.update(tintArgs);
   if (washEv.washing) applyWash(resolved, washEv);
-  lastWashResolved = resolved;
+  if (injectEv.injecting) applyInject(resolved, injectEv);
+  lastResolved = resolved;
 
   // Scene contract
   const contract = buildSceneContract({
@@ -210,9 +217,11 @@ function buildFrame() {
 
   if (!cells) return null;
 
-  // #624: during a wash the background dyes across the same wave as the
-  // items (washEv.bg interpolates); otherwise it is the palette's bg.
-  const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : washEv.bg;
+  // #624/#625: during a wash the background dyes across the same wave as
+  // the items, during an inject the field dyes first on the fast envelope
+  // (the event's bg interpolates); otherwise it is the palette's bg.
+  const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null
+    : (s.colorMode || 'FADE') === 'INJECT' ? injectEv.bg : washEv.bg;
 
   const renderScale = Math.min(1, Math.max(0.1, (s.renderScale || 1.0) * previewScale));
   const rw = Math.max(2, Math.round(CANVAS_W * renderScale));
@@ -227,7 +236,7 @@ function buildFrame() {
       cells,
     },
     transparent: !bgCss,
-    bgCss: bgCss || washTargetPalette.bg,
+    bgCss: bgCss || tintTargetPalette.bg,
     rw, rh,
     accumOn: !!layoutParams.accumulation && !s.perfTier1,
     accumFrozen,

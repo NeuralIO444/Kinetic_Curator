@@ -11,7 +11,7 @@ const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
 const COLOR_MODE_HINT = {
   FADE: 'Whole picture melts. Slider is seconds.',
   WASH: 'Color soaks from the middle outward — the dye front chases through the marks. Same slider.',
-  INJECT: 'New swatch dyes the field; agents pick it up as they pass. Same slider. Feel lands next.',
+  INJECT: 'The field dyes first, then the swarm catches up — the new color spreads through the moving marks. Same slider.',
 };
 const CHIP_CAP = 4;
 
@@ -74,8 +74,8 @@ export function PaletteStrip() {
   const { dispatch, palette, palettes, paletteLocks } = useApp();
   const paletteMixSeconds = useStore((s) => s.paletteMixSeconds) ?? MIX_DEFAULT;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
-  // #624 — the color mode lives in the store now: the GL loop reads it to
-  // drive WASH/INJECT soaks. (It used to be component-local and never left.)
+  // #624 + #625 — the color mode lives in the store now: the GL loop reads it to
+  // drive the WASH/INJECT soaks. (It used to be component-local and never left.)
   const colorMode = useStore((s) => s.colorMode) || 'FADE';
   const visible = (palettes || []).slice(0, CHIP_CAP);
   const activeChipRef = useRef(null);

@@ -28,8 +28,9 @@
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
-import { createPaletteMix } from './paletteMix.mjs';
-import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #278: VJ MIX crossfade state machine
+import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
+import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
+import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -83,10 +84,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
   let lastFrameTarget = null;
-  // #624 — WASH: per-instance tint adoption state machine (pure). lastResolved
-  // is the previous frame's resolved layers — the re-base source when palette
-  // taps come faster than one soak.
+  // #624 WASH + #625 INJECT: per-instance tint adoption state machines
+  // (pure). Both run every frame and each activates only in its own color
+  // mode — the machines are independent, so keeping them side by side
+  // preserves both feels. lastResolved is the previous frame's resolved
+  // layers — the re-base source when palette taps come faster than one
+  // soak/propagation.
   const tintWash = createTintWash();
+  const tintInject = createTintInject();
   let lastResolved = null;
 
   // Spine C (#389): GL-loop owned life clock, audio ballistics follower, and layered breath springs
@@ -557,13 +562,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       try { s.setNodeCount(nodes); } catch { /* store gone */ }
     }
 
-    // #624 — WASH color mode: on a palette change each item adopts the new
-    // ink/accent on its own center-out wavefront schedule (seeded jitter per
-    // node). No dissolve, no scale — color never touches the item morph.
+    // #624 WASH / #625 INJECT color modes: on a palette change each item
+    // adopts the new ink/accent on its own seeded schedule — WASH soaks on a
+    // center-out wavefront, INJECT dyes the field first and the agents catch
+    // up. No dissolve, no scale — color never touches the item morph.
     // Mutates the frame-temporary items in place, so the contract below
-    // carries the washed tints to the live GPU tint shader (u_liveTint).
+    // carries the tints to the live GPU tint shader (u_liveTint).
     const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-    const washEv = tintWash.update({
+    const tintArgs = {
       identity: paletteIdentity(s.paletteId, s.paletteOverrides, s.userPalettes),
       mode: s.colorMode,
       mixSeconds,
@@ -571,8 +577,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       seed: s.seed,
       bg: activePalette.bg,
       lastResolved,
-    });
+    };
+    const washEv = tintWash.update(tintArgs);
+    const injectEv = tintInject.update(tintArgs);
     if (washEv.washing) applyWash(resolved, washEv);
+    if (injectEv.injecting) applyInject(resolved, injectEv);
     lastResolved = resolved;
 
     const contract = buildSceneContract({
@@ -655,9 +664,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // Only return null on initial boot before ANY atlas has finished baking.
     if (!cells) return null;
 
-    // #624 — in WASH the field soaks with the wave: washEv.bg is the lerped
-    // field color while a soak runs, the plain palette bg otherwise.
-    const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : washEv.bg;
+    // #624/#625 — in WASH the field soaks with the wave, in INJECT the
+    // field dyes first on the fast envelope. The event's bg is the lerped
+    // field color while a soak/propagation runs, the plain palette bg
+    // otherwise.
+    const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null
+      : s.colorMode === 'INJECT' ? injectEv.bg : washEv.bg;
 
     return {
       payload: {
