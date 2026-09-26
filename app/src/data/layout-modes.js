@@ -8,6 +8,8 @@ export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
   { id: 'grid',      name: 'grid',       glyph: 'grid'   },
   { id: 'fibonacci', name: 'fibonacci',  glyph: 'phi'    },
+  // #586 — two-arc Smith tiles; the maze is emergent, not authored.
+  { id: 'truchet',   name: 'truchet',    glyph: 'tile'   },
   { id: 'radial',    name: 'radial',     glyph: 'rad'    },
   { id: 'swarm',     name: 'swarm boids', glyph: 'swarm'  },
   { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
