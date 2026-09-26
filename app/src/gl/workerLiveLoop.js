@@ -29,6 +29,8 @@ export function serializeStoreState(s) {
     paletteId: s.paletteId,
     paletteOverrides: s.paletteOverrides,
     userPalettes: s.userPalettes,
+    colorMode: s.colorMode,
+    paletteMixSeconds: s.paletteMixSeconds,
     voice: s.voice,
     voiceState: s.voiceState,
     evolveMode: s.evolveMode,

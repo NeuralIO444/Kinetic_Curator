@@ -29,6 +29,7 @@ import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
+import { createTintInject, applyInject, paletteIdentity } from './tintInject.mjs'; // #625: INJECT field-first propagation
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -82,6 +83,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
   let lastFrameTarget = null;
+  // #625 — INJECT: field-dyes-first propagation state machine (pure).
+  // lastResolved is the previous frame's resolved layers — the re-base source
+  // when palette taps come faster than one propagation.
+  const tintInject = createTintInject();
+  let lastInjectResolved = null;
 
   // Spine C (#389): GL-loop owned life clock, audio ballistics follower, and layered breath springs
   const ballisticsState = createBallisticsState();
@@ -546,6 +552,26 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       try { s.setNodeCount(nodes); } catch { /* store gone */ }
     }
 
+    // #625 — INJECT color mode: on a palette change the field dyes first on
+    // a fast envelope, then each organism agent adopts the new ink/accent on
+    // its own seeded delay — the new color visibly propagates through the
+    // moving swarm instead of arriving everywhere at once. No dissolve, no
+    // scale — color never touches the item morph. Mutates the
+    // frame-temporary items in place, so the contract below carries the
+    // injected tints to the live GPU tint shader (u_liveTint).
+    const injectTargetPalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
+    const injectEv = tintInject.update({
+      identity: paletteIdentity(s.paletteId, s.paletteOverrides, s.userPalettes),
+      mode: s.colorMode,
+      mixSeconds,
+      now: loopTimeMs,
+      seed: s.seed,
+      bg: injectTargetPalette.bg,
+      lastResolved: lastInjectResolved,
+    });
+    if (injectEv.injecting) applyInject(resolved, injectEv);
+    lastInjectResolved = resolved;
+
     const contract = buildSceneContract({
       doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers },
       resolvedLayers: resolved,
@@ -627,7 +653,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     if (!cells) return null;
 
     const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-    const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : activePalette.bg;
+    // #625 — in INJECT the field dyes first: injectEv.bg is the fast-envelope
+    // field color while a propagation runs, the plain palette bg otherwise.
+    const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null : injectEv.bg;
 
     return {
       payload: {

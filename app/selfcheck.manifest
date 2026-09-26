@@ -84,6 +84,7 @@ node src/gl/spineC.selfcheck.mjs
 node src/gl/spineE.selfcheck.mjs
 node src/gl/spineF.selfcheck.mjs
 node src/gl/paletteMix.selfcheck.mjs
+node src/gl/tintInject.selfcheck.mjs
 node src/gl/exportStill.selfcheck.mjs
 node src/gl/phase6.selfcheck.mjs
 node src/gl/costTiers.selfcheck.mjs
