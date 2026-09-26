@@ -43,6 +43,14 @@ import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { registerCostTier } from './costTiers.mjs';
+import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
+
+// #533 PR1 — upload-byte meter (measure-only). renderer.mjs is the only file
+// allowed to change, so the debug handle attaches here rather than in
+// liveLoop.mjs. QA reads it via page.evaluate(() => window.__uploadMeter.snapshot()).
+if (typeof window !== 'undefined') {
+  window.__uploadMeter = { snapshot: uploadMeterSnapshot, reset: uploadMeterReset };
+}
 
 /**
  * Resolve per-layer mattes (#189, #154 re-plan) to renderable mask specs.
@@ -407,6 +415,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       gl.bufferData(gl.ARRAY_BUFFER, instCapacityBytes, gl.DYNAMIC_DRAW);
     }
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+    uploadMeterNoteUpload(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)); // #533 PR1: measure-only
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
     gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);
@@ -535,6 +544,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * @returns the 16F target holding the frame (one of T.mainA/mainB)
    */
   function renderFrameInto(payload, T, uploaded, { transparent = false } = {}) {
+    uploadMeterBeginFrame(); // #533 PR1: measure-only — resets call-slot indexing for this frame
     const { width: w, height: h, contract, cells, bg } = payload;
     const { atlasTex, grainLuts } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
