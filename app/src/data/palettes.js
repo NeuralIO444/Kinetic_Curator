@@ -268,6 +268,52 @@ export const PALETTES = [
     ink: '#e8e8e8',
     swatches: ['#f2f2f2', '#d9d9d9', '#b3b3b3', '#8c8c8c', '#666666', '#404040'],
   },
+  // --- Rendah style pack: five palettes translating the magazine's world
+  // (dark neutrals + rendah-red identity, D&B glitch heritage, and the
+  // signature looks of its featured artists) into the catalog.
+  // Data-only addition — no system change. Each pairs with a same-id
+  // preset in the 'rendah' preset group.
+  {
+    id: 'rendah',
+    name: 'RENDAH',
+    era: 'Rendah Mag identity · 2026',
+    bg: '#0c0c0d',
+    ink: '#e8e6e3',
+    swatches: ['#ff2a1f', '#e8e6e3', '#8a8a8e', '#55555a', '#2a2a2e', '#0c0c0d'],
+  },
+  {
+    id: 'glitch',
+    name: 'GLITCH',
+    era: 'Kurokawa scan · 2026',
+    bg: '#050505',
+    ink: '#f0f0f0',
+    swatches: ['#00e5ff', '#f0f0f0', '#a0a0a0', '#565656', '#1c1c1c', '#050505'],
+  },
+  {
+    id: 'ink-nebula',
+    name: 'INK NEBULA',
+    era: 'Vanz fluid cosmos · 2026',
+    bg: '#04060f',
+    ink: '#dfe8ff',
+    swatches: ['#7b2ff7', '#00c2ff', '#ff4fd8', '#ff7a1a', '#1a2f6e', '#dfe8ff'],
+    leak: 0.3, // liquid-ink collisions bleed into each other
+  },
+  {
+    id: 'megacity',
+    name: 'MEGACITY',
+    era: 'Siconolfi stacked dusk · 2026',
+    bg: '#101014',
+    ink: '#e8ddc8',
+    swatches: ['#ffb347', '#8a8f98', '#4a4e57', '#2e6f5e', '#3b5a8a', '#e8ddc8'],
+  },
+  {
+    id: 'dirty',
+    name: 'DIRTY',
+    era: 'Strangeloop vibey · 2026',
+    bg: '#0d0a08',
+    ink: '#f5e6d0',
+    swatches: ['#ff5a1f', '#ff2d78', '#ffd400', '#7a3cff', '#3d2b1f', '#f5e6d0'],
+  },
 ];
 
 /**
