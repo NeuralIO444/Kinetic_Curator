@@ -43,7 +43,7 @@ test('poisoned project loads without killing the canvas', async ({ page }) => {
     } catch { /* ignore */ }
   }, POISONED);
 
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1500);
 
@@ -86,7 +86,7 @@ test('hostile 200-layer project boots capped and keeps rendering', async ({ page
     } catch { /* ignore */ }
   }, HOSTILE);
 
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1500);
 

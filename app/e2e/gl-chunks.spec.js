@@ -144,7 +144,7 @@ test.describe('GLSL chunk library', () => {
   });
 
   test('every chunk renders like the CPU reference', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/?boot=factory');
     for (const c of CASES) {
       const px = await renderInPage(page, fsSrcFor(c.body));
       if (px === null) test.skip(true, 'WebGL2 unavailable in this browser');

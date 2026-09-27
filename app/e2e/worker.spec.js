@@ -9,7 +9,7 @@ test.describe('Kinetic Curator decoupled offscreen worker', () => {
       } catch { /* ignore */ }
     });
 
-    await page.goto('/?worker=1&downscale=1');
+    await page.goto('/?worker=1&downscale=1&boot=factory');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
     const gl = page.locator('.canvas-gl').first();

@@ -16,7 +16,7 @@ test.describe('readable recipes (#307)', () => {
       } catch { /* ignore */ }
     });
 
-    await page.goto('/');
+    await page.goto('/?boot=factory');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
     const outputTab = page.getByRole('tab', { name: /pipeline|output/i });
@@ -68,7 +68,7 @@ test.describe('readable recipes (#307)', () => {
       } catch { /* ignore */ }
     });
 
-    await page.goto('/');
+    await page.goto('/?boot=factory');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
     const outputTab = page.getByRole('tab', { name: /pipeline|output/i });

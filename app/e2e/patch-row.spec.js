@@ -7,7 +7,7 @@ test('PATCH target is pickable while OFF and survives a mode change', async ({ p
   await page.addInitScript(() => {
     try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
   });
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   // Header ADD buttons are retired; tap the dimmed ghost slots to arm KC-2, KC-3.

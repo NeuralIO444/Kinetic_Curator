@@ -9,7 +9,7 @@ test.describe('Kinetic Curator smoke', () => {
       } catch { /* ignore */ }
     });
 
-    await page.goto('/');
+    await page.goto('/?boot=factory');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
     // Live WebGL canvas present (PERFORM leg, #224)

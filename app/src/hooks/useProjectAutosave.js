@@ -18,6 +18,19 @@ const MAX_WAIT_MS = 4000;
 const RESTORED_FLAG = 'kc:project:restored-session';
 
 /**
+ * #707 — `?boot=factory` skips the living boot and starts from the
+ * pre-#707 factory defaults. Deterministic entry for e2e (and anyone who
+ * wants the old blank-ish start); the query string survives reloads.
+ */
+function bootFactoryRequested() {
+  try {
+    return new URLSearchParams(window.location.search).get('boot') === 'factory';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * #707 — apply a rolled First Light starter directly (no MIX morph: this is
  * the first frame, not a transition). Seed is re-rolled so every fresh boot
  * is a different piece; running is forced on so the canvas is alive on load.
@@ -59,8 +72,11 @@ export function useProjectAutosave() {
         // up playing. A random First Light starter (curated preset +
         // palette + 2–3 assets), a fresh seed, motion running. This is the
         // only path that changes the empty state — restores are untouched.
-        applyLivingBoot();
-        sessionStorage.setItem(RESTORED_FLAG, '1');
+        // `?boot=factory` opts out (deterministic e2e entry).
+        // NOTE: the restored-session flag is deliberately NOT set here, so
+        // a document written between load and reload (the e2e seedDoc
+        // pattern) is still picked up on the next boot, exactly as before.
+        if (!bootFactoryRequested()) applyLivingBoot();
         return;
       }
       useStore.getState().applyProject(doc);

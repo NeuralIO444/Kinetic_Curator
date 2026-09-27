@@ -10,7 +10,7 @@ test.describe('Mode personas', () => {
     await page.addInitScript(() => {
       try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
     });
-    await page.goto('/');
+    await page.goto('/?boot=factory');
     await page.evaluate(() => {
       try { localStorage.removeItem('kc:user-voices:v1'); } catch { /* ignore */ }
     });
