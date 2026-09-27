@@ -5,5 +5,6 @@ import { ASSETS_PART3 } from './assets-stamp-radial.js';
 import { ASSETS_PART4 } from './assets-experimental.js';
 import { ASSETS_PART5 } from './assets-haeckel.js';
 import { ASSETS_MICRO } from './assets-micro-hud.js';
+import { ASSETS_LETTERS } from './assets-letterforms.js';
 
-export const ASSETS = [...ASSETS_PART1, ...ASSETS_PART2, ...ASSETS_PART3, ...ASSETS_PART4, ...ASSETS_PART5, ...ASSETS_MICRO];
+export const ASSETS = [...ASSETS_PART1, ...ASSETS_PART2, ...ASSETS_PART3, ...ASSETS_PART4, ...ASSETS_PART5, ...ASSETS_MICRO, ...ASSETS_LETTERS];
