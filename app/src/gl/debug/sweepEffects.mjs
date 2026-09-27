@@ -319,6 +319,22 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
+    ...templateEffectDef('halo'),
+    cases: [
+      // #704 — identity at defaults: amount 0 AND vignette 0 must return the
+      // source byte-for-byte, so adding a halo layer costs nothing until used.
+      C('identity → no-op', { amount: 0, radius: 18, threshold: 0.45, vignette: 0 }, { noop: true }),
+      C('soft wide bloom', { amount: 0.6, radius: 24, threshold: 0.45, vignette: 0 }),
+      C('vignette only', { amount: 0, radius: 18, threshold: 0.45, vignette: 0.6 }),
+      C('both', { amount: 0.8, radius: 40, threshold: 0.35, vignette: 0.5 }),
+      C('max', { amount: 1.5, radius: 64, threshold: 0, vignette: 1 }, { costly: true }),
+      C('tight radius', { amount: 0.5, radius: 1, threshold: 0.9, vignette: 0 }),
+      H('hostile negative amount', { amount: -2, radius: 18, threshold: 0.45, vignette: 0 }),
+      H('hostile huge radius', { amount: 0.5, radius: 1e6, threshold: 0.45, vignette: 0 }),
+      H('hostile negative threshold', { amount: 0.5, radius: 18, threshold: -5, vignette: 2 }),
+    ],
+  },
+  {
     ...templateEffectDef('edge'),
     cases: [
       // No params: always-on transform (see solarize note).

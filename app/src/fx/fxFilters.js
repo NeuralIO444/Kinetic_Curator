@@ -44,6 +44,18 @@ export const FX_EFFECT_DEFS = {
       seed: { label: 'Seed', min: 0, max: 99, step: 1, def: 7, hint: 'Noise seed — same seed, same warp' },
     },
   },
+  // #704 — GL renders the halo with ring taps; this SVG builder is an
+  // APPROXIMATION (see buildHalo). Intent matches, pixels do not.
+  halo: {
+    label: 'Halo',
+    hint: 'Soft, wide bloom on the bright parts plus an edge vignette — tuned for dark grounds. Defaults are identity.',
+    params: {
+      amount: { label: 'Amount', min: 0, max: 1.5, step: 0.05, def: 0, hint: 'Bloom strength. 0 is the layer untouched.' },
+      radius: { label: 'Radius', min: 1, max: 64, step: 1, def: 18, hint: 'How far the light spreads, in pixels. The outer ring reaches twice this.' },
+      threshold: { label: 'Threshold', min: 0, max: 1, step: 0.05, def: 0.45, hint: 'Only light above this blooms. Low values fog a dark ground.' },
+      vignette: { label: 'Vignette', min: 0, max: 1, step: 0.05, def: 0, hint: 'Edge falloff. 0 is off.' },
+    },
+  },
   tear: {
     label: 'Tear',
     hint: 'Horizontal scanline slice-tears: banded rows shear left/right. X-only displacement (Y is flattened).',
@@ -101,7 +113,9 @@ export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
  * Nothing cut or demoted returns unless a performer reaches for it mid-set
  * and it is not there, or Matt's eyes miss it on the demo.
  */
-export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert'];
+// #704 — halo joins the add-menu: the chiaroscuro mode needs it reachable,
+// and it is the only effect in the set tuned for a dark ground.
+export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert', 'halo'];
 
 export function isFxLayer(layer) {
   return !!layer && layer.type === 'fx';
@@ -182,6 +196,61 @@ function buildDisplace(params, ctx, rid, src) {
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.012, numOctaves: octaves, seed: Math.round(params.seed), result: noise } },
     { prim: 'feDisplacementMap', attrs: { in: src, in2: noise, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' } },
   ];
+}
+
+/**
+ * #704 — the SVG half of the halo. An honest approximation, like the OKLCH
+ * grade: SVG has no ring-tap primitive, so the bloom is a bright-pass
+ * (feComponentTransfer) into a feGaussianBlur composited back over the source.
+ * Same intent, different pixels — and notably the GL side deliberately avoids
+ * a gaussian (see the shader), so these two cannot match by construction.
+ *
+ * Kept in sync anyway because an unknown kind is DROPPED by
+ * sanitizeFxEffects: a GL-only halo would silently vanish from the print path
+ * and a bloomed canvas would print flat, with no warning.
+ *
+ * Identity at amount 0 AND vignette 0: emits the same pass-through the other
+ * builders use, so a halo layer at defaults costs a filter that changes nothing.
+ */
+function buildHalo(params, ctx, rid, src) {
+  const amount = Math.max(0, Number(params.amount) || 0);
+  const radius = Math.max(1, Number(params.radius) || 18);
+  const rawT = Number(params.threshold);
+  const threshold = Math.min(1, Math.max(0, Number.isFinite(rawT) ? rawT : 0.45));
+  const vignette = Math.min(1, Math.max(0, Number(params.vignette) || 0));
+  if (amount <= 0 && vignette <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  const out = [];
+  let cur = src;
+  if (amount > 0) {
+    const bright = rid();
+    const blur = rid();
+    const lit = rid();
+    // Bright-pass: a linear ramp with a negative intercept keeps only values
+    // above the threshold, matching the shader's smoothstep gate closely
+    // enough for print.
+    out.push({
+      prim: 'feComponentTransfer',
+      attrs: { in: cur, result: bright },
+      children: ['R', 'G', 'B'].map((chan) => ({
+        prim: `feFunc${chan}`,
+        attrs: { type: 'linear', slope: r3(1 / Math.max(0.05, 1 - threshold)), intercept: r3(-threshold / Math.max(0.05, 1 - threshold)) },
+      })),
+    });
+    out.push({ prim: 'feGaussianBlur', attrs: { in: bright, stdDeviation: r3(radius * 0.6), result: blur } });
+    out.push({ prim: 'feComposite', attrs: { in: blur, in2: cur, operator: 'arithmetic', k1: 0, k2: r3(amount), k3: 1, k4: 0, result: lit } });
+    cur = lit;
+  }
+  if (vignette > 0) {
+    const mask = rid();
+    const vig = rid();
+    out.push({
+      prim: 'feFlood',
+      attrs: { 'flood-color': '#000000', 'flood-opacity': r3(vignette), result: mask },
+    });
+    out.push({ prim: 'feComposite', attrs: { in: mask, in2: cur, operator: 'in', result: vig } });
+    out.push({ prim: 'feBlend', attrs: { in: cur, in2: vig, mode: 'multiply' } });
+  }
+  return out;
 }
 
 function buildTear(params, ctx, rid, src) {
@@ -274,7 +343,7 @@ function buildEdge(params, ctx, rid, src) {
   ];
 }
 
-const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
+const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
 
 /**
  * Compile an effects array into filter primitives.
