@@ -268,6 +268,31 @@ export const PALETTES = [
     ink: '#e8e8e8',
     swatches: ['#f2f2f2', '#d9d9d9', '#b3b3b3', '#8c8c8c', '#666666', '#404040'],
   },
+  // #704 — CHIAROSCURO: the dark-glass ground the chiaroscuro render mode
+  // steps into. Near-black WARM (not neutral black — a cool ground kills the
+  // amber), amber ink, blue-violet accent. Every swatch is chosen to sit on
+  // #0d0a08 without the mids going muddy: the ramp climbs amber through to a
+  // pale ember, and the two cool slots are the only ones that read as light
+  // rather than heat.
+  //
+  // Deliberately NOT a high-contrast palette. Chiaroscuro is mostly dark with
+  // a few things catching the light; a bright ink on this ground would read
+  // as a flat poster, which is the look this mode exists to leave behind.
+  {
+    id: 'chiaroscuro',
+    name: 'CHIAROSCURO',
+    era: 'Dark glass · 2026',
+    bg: '#0d0a08',
+    ink: '#e89b3c',
+    swatches: [
+      '#e89b3c', // amber — the ink itself, so a lit facet and its fill agree
+      '#f5c26b', // pale ember, the highlight end of the ramp
+      '#c2691f', // deep amber, the shadow end
+      '#7c5cff', // blue-violet — the accent, and the only cool light here
+      '#5a44c8', // deeper violet, for accents that recede
+      '#8a6a3a', // dim bronze, the bridge between the ramp and the ground
+    ],
+  },
   // --- Rendah style pack: five palettes translating the magazine's world
   // (dark neutrals + rendah-red identity, D&B glitch heritage, and the
   // signature looks of its featured artists) into the catalog.
