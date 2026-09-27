@@ -1,5 +1,6 @@
 // Each chip is a designer brief. params must make that brief visible on click.
 export const PRESET_GROUPS = [
+  { id: 'firstlight', label: 'First Light' },
   { id: 'showcase', label: 'Showcase' },
   { id: 'classic', label: 'Classic' },
   { id: 'rendah',  label: 'Rendah Mag' },
@@ -345,6 +346,58 @@ export const COMPOSITION_PRESETS = [
       lifeDrift: 0.1, displacement: 0, behave: 'cruise',
       accumulation: true, accumulationFade: 17, accumulationOptics: 0.15,
       accumulationTunnel: 0, accumulationPrism: 0, accumulationFlow: 0.3,
+    },
+  },
+  // --- First Light (#707): starter presets for the living boot. Bounded,
+  // tasteful, calm — the instrument wakes up playing, never screaming.
+  // Each carries its palette + a small asset pool; the boot composer picks
+  // 2–3 of the pool at random. Layout-only in the popup per #555.
+  {
+    id: 'first-light', name: 'FIRST LIGHT', group: 'firstlight',
+    desc: 'Gentle wake-up — warm fibonacci bloom, slow breath, soft shapes.',
+    categories: ['organic', 'radial'], paletteShift: 'band',
+    paletteId: 'praystation',
+    assetIds: ['org_blob_01', 'rad_rings_01', 'org_petal_02'],
+    params: {
+      mode: 'fibonacci', count: 200, scale: [0.4, 1.4], rotate: [-60, 60], alpha: [40, 90],
+      zTiers: 4, jitter: 12, density: 80, bleed: false, mirror: false, overlap: true,
+      lifeDrift: 0.15, noiseSpeed: 0.2, displacement: 8, wind: 0.2, behave: 'cruise',
+    },
+  },
+  {
+    id: 'grid-talk', name: 'GRID TALK', group: 'firstlight',
+    desc: 'Quiet machine — sparse dark grid, small signals blinking through.',
+    categories: ['geometric', 'dots'], paletteShift: 'zone',
+    paletteId: 'v01d',
+    assetIds: ['geo_hex_01', 'mic_dotgrid_5', 'line_dash_01'],
+    params: {
+      mode: 'grid', count: 160, scale: [0.3, 1.0], rotate: [-90, 90], alpha: [30, 80],
+      zTiers: 3, jitter: 6, density: 85, bleed: false, mirror: true, overlap: true,
+      lifeDrift: 0.06, noiseSpeed: 0.1, displacement: 0, wind: 0.1, behave: 'cruise',
+    },
+  },
+  {
+    id: 'pond', name: 'POND', group: 'firstlight',
+    desc: 'Still water — slow flow field, organic shapes drifting like leaves.',
+    categories: ['organic', 'linework'], paletteShift: 'band',
+    paletteId: 'tidepool',
+    assetIds: ['org_blob_02', 'line_squiggle_01', 'org_drop_01'],
+    params: {
+      mode: 'flow', count: 220, scale: [0.3, 1.2], rotate: [-45, 45], alpha: [30, 85],
+      zTiers: 4, jitter: 14, density: 85, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.18, noiseSpeed: 0.25, displacement: 16, wind: 0.3, behave: 'cruise',
+    },
+  },
+  {
+    id: 'paper-storm', name: 'PAPER STORM', group: 'firstlight',
+    desc: 'Playful scatter — bright confetti shapes tumbling on paper.',
+    categories: ['geometric', 'stamps'], paletteShift: 'band',
+    paletteId: 'solar-max',
+    assetIds: ['geo_star5_01', 'geo_tri_01', 'stamp_glyph_01'],
+    params: {
+      mode: 'grid', count: 180, scale: [0.35, 1.1], rotate: [-90, 90], alpha: [35, 85],
+      zTiers: 3, jitter: 18, density: 78, bleed: false, mirror: false, overlap: true,
+      lifeDrift: 0.12, noiseSpeed: 0.15, displacement: 6, wind: 0.25, behave: 'cruise',
     },
   },
 ];
