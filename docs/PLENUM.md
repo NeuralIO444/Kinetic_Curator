@@ -46,6 +46,18 @@ blend stays smooth, the nothing never shows.
 **Grain over everything** — any voice + EF-4 grain + long LEAVE fade. Trails
 decay into grain; grain sits over the finished frame; dither last.
 
+**Glitch minimalism** — KUROKAWA SCAN + EF rack: tear (light), scanlines,
+rgbSplit (subtle, live-shimmered), grain. Ordered chaos: sparse field, hard
+scan rows, one signal color. Dither last.
+
+**Ink nebula** — INK NEBULA + long LEAVE fade + grain over everything. Flow
+plumes collide, leak pigment across the cast, trails decay into the dark.
+Dither last.
+
+**Dirty and vibey** — DIRTY SIGNAL + EF rack: displace (low), rgbSplit,
+heavy grain. Scorched highlights, halation on the mids, everything a little
+melted. Dither last.
+
 ## Build record
 
 Tracked per-phase in open issues (plan order). Rules that hold across all of

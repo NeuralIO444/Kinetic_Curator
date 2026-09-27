@@ -29,6 +29,80 @@ export const COMPOSITION_PRESETS = [
       lifeDrift: 0.06, displacement: 6, behave: 'cruise',
     },
   },
+  // --- Rendah style pack: six one-click voices translating the magazine's
+  // world and its featured artists. Data-only — every mode, param, and FX
+  // referenced already exists; each carries its palette via paletteId
+  // (applied on click, smoke-study pattern).
+  {
+    id: 'kurokawa-scan', name: 'KUROKAWA SCAN', group: 'rendah',
+    desc: 'Glitch minimalism — sparse particle field, hard grid scanlines, one signal color on black',
+    categories: ['geometric', 'linework', 'dots'], paletteShift: 'zone',
+    paletteId: 'glitch',
+    assetIds: ['dot_single_01', 'dot_speckle_01'],
+    params: {
+      mode: 'grid', count: 200, scale: [0.2, 0.9], rotate: [-90, 90], alpha: [30, 85],
+      zTiers: 3, jitter: 4, density: 85, bleed: false, mirror: false, overlap: true,
+      lifeDrift: 0.05, displacement: 0, behave: 'cruise',
+    },
+  },
+  {
+    id: 'ink-nebula', name: 'INK NEBULA', group: 'rendah',
+    desc: 'Cosmic liquid ink — flow-field plumes colliding, pigment bleeding across the cast',
+    categories: ['organic', 'dots'], paletteShift: 'band',
+    paletteId: 'ink-nebula',
+    assetIds: ['dot_single_01', 'dot_speckle_01'],
+    params: {
+      mode: 'flow', count: 320, scale: [0.3, 1.2], rotate: [-45, 45], alpha: [30, 90],
+      zTiers: 4, jitter: 14, density: 88, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.2, noiseSpeed: 0.3, displacement: 24, wind: 0.4, behave: 'cruise',
+    },
+  },
+  {
+    id: 'megacity', name: 'MEGACITY', group: 'rendah',
+    desc: 'Stacked dusk — six mirrored depth tiers, amber windows in concrete haze, dramatic light',
+    categories: ['geometric', 'linework'], paletteShift: 'zone',
+    paletteId: 'megacity',
+    params: {
+      mode: 'layers', count: 340, scale: [0.5, 1.6], rotate: [-8, 8], alpha: [45, 95],
+      zTiers: 6, jitter: 6, density: 94, bleed: false, mirror: true, overlap: true,
+      lifeDrift: 0.04, displacement: 0, behave: 'cruise',
+    },
+  },
+  {
+    id: 'dirty-signal', name: 'DIRTY SIGNAL', group: 'rendah',
+    desc: 'Dirty and vibey — scattered hype organisms, scorched highlights, built for heavy grain',
+    categories: ['organic', 'dots'], paletteShift: 'zone',
+    paletteId: 'dirty',
+    params: {
+      mode: 'hype', count: 260, scale: [0.4, 1.4], rotate: [-70, 70], alpha: [40, 100],
+      zTiers: 4, jitter: 16, density: 88, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.18, noiseSpeed: 0.3, displacement: 22, behave: 'scatter',
+      particleCount: 240,
+    },
+  },
+  {
+    id: 'rendah-cover', name: 'RENDAH COVER', group: 'rendah',
+    desc: 'Cover star — bold graphic forms on dark neutrals, one red hit. The magazine identity as a voice.',
+    categories: ['geometric', 'linework'], paletteShift: 'split',
+    paletteId: 'rendah',
+    params: {
+      mode: 'grid', count: 240, scale: [0.4, 1.2], rotate: [-90, 90], alpha: [40, 95],
+      zTiers: 4, jitter: 10, density: 90, bleed: false, mirror: false, overlap: true,
+      lifeDrift: 0.08, displacement: 4, behave: 'cruise',
+    },
+  },
+  {
+    id: 'nastplas-bloom', name: 'NASTPLAS BLOOM', group: 'rendah',
+    desc: 'Layered CGI bloom — mirrored hype scatter, zone-colored UV saturation, reality vs abstraction',
+    categories: ['organic', 'dots'], paletteShift: 'zone',
+    paletteId: 'dystopia',
+    params: {
+      mode: 'hype', count: 300, scale: [0.35, 1.3], rotate: [-60, 60], alpha: [45, 100],
+      zTiers: 5, jitter: 12, density: 90, bleed: true, mirror: true, overlap: true,
+      lifeDrift: 0.15, noiseSpeed: 0.25, displacement: 16, behave: 'scatter',
+      particleCount: 260,
+    },
+  },
   {
     id: 'ghost-recoil', name: 'GHOST RECOIL ABACUS TOTEM', group: 'davis',
     desc: 'Abacus rows — near-zero rotate',
