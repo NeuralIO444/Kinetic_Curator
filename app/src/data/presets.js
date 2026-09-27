@@ -120,6 +120,38 @@ export const COMPOSITION_PRESETS = [
       lifeDrift: 0.12, displacement: 10, behave: 'flock',
     },
   },
+  // #704 — CHIAROSCURO, the layout axis of the dark-glass mode. Pairs with the
+  // same-id palette (data/palettes.js) the way the Rendah pack does: this chip
+  // sets the layout, the palette chip sets the colour. Axes stay separate
+  // (#555), so stepping into the mode is two deliberate presses, not one chip
+  // that quietly swaps everything.
+  {
+    id: 'chiaroscuro', name: 'CHIAROSCURO', group: 'showcase',
+    desc: 'Dark glass — a few large facets turning slowly, most of the plate left dark',
+    categories: ['crystalline', 'geometric'], paletteShift: 'zone',
+    params: {
+      // SPARSE and LARGE are the whole brief: chiaroscuro is mostly dark, and
+      // a high count tiles the plate until there is no dark left for the light
+      // to be carved out of. The sparsest, largest, slowest preset in the set.
+      // count 24, not 64: measured on the real canvas, 64 large facets TILE the
+      // disc and only 22% of the plate is left dark — sparse on paper, dense in
+      // the picture. At 24 the plate is 69% dark and the facets read as objects
+      // in a room rather than a pattern.
+      mode: 'fibonacci', count: 24, scale: [1.6, 3.0], rotate: [-180, 180], alpha: [70, 100],
+      zTiers: 5, jitter: 42, density: 50, bleed: false, mirror: false, overlap: true,
+      // 'normal', not 'screen': screen lifts every overlap toward white and the
+      // dark ground is the point. Facets must occlude, not glow through.
+      blendMode: 'normal',
+      // Measured, not guessed: at the glow maximum this plate blows out to a
+      // near-white bloom (mean luminance 0.24, 15%% of the frame above 0.75) and
+      // the dark ground the mode is built on is gone. These values keep the
+      // wake and the glow while the plate stays dark (mean 0.126, 1.4%% bright),
+      // and they are stable over a long set rather than creeping brighter.
+      accumulation: true, accumulationFade: 14, accumulationOptics: 0.08,
+      lifeDrift: 0.10, noiseSpeed: 0.10, displacement: 8,
+      flap: 0.1, wind: 0.35, behave: 'cruise',
+    },
+  },
   {
     id: 'neon-brood', name: 'NEON BROOD', group: 'showcase',
     desc: 'Blacklight organism — moth·hype at full scatter, zone-colored neon on black',

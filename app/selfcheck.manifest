@@ -41,6 +41,7 @@ node src/components/taper.selfcheck.mjs
 node src/data/helpCopy.selfcheck.mjs
 node src/data/labelCase.selfcheck.mjs
 node src/data/palettes.selfcheck.mjs
+node src/data/chiaroscuro.selfcheck.mjs
 node src/state/paletteLibrary.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
 node src/state/hitsExport.selfcheck.mjs
