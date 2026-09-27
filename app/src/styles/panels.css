@@ -169,6 +169,10 @@
 .tg.tg-on { color: var(--accent3); border-color: var(--accent3); }
 .blend-mode-select { grid-column: 1 / -1; cursor: pointer; }
 
+/* ─── DEV (merged dev tools, #691) ─── */
+.panel-dev { padding: 0; }
+.panel-dev > .panel-tab-content { overflow-y: auto; }
+
 /* ─── Stimulus ─── */
 .panel-stimulus { padding: 0; }
 .panel-stimulus .stim-body { padding: 8px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
