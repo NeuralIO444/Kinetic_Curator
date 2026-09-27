@@ -113,10 +113,10 @@ export function useApp(selector) {
       case A.CLEAR_WEIGHT_OVERRIDES: return store.clearWeightOverrides();
       case 'CYCLE_ASSET_WEIGHT': return store.cycleAssetWeight(action.id);
       case 'DUPLICATE_ASSET': return store.duplicateAsset(action.id);
-      case 'INGEST_ASSET': return store.ingestAsset(action.svg, action.hint, { category: action.category, source: action.source });
+      case 'INGEST_ASSET': return store.ingestAsset(action.svg, action.hint, { category: action.category, source: action.source, sub: action.sub });
       case 'REMOVE_CUSTOM_ASSET': return store.removeCustomAsset(action.id);
       case 'RENAME_CUSTOM_ASSET': return store.renameCustomAsset(action.id, action.name);
-      case 'REPLACE_CUSTOM_ASSET': return store.replaceCustomAsset(action.id, action.svg);
+      case 'REPLACE_CUSTOM_ASSET': return store.replaceCustomAsset(action.id, action.svg, action.sub);
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
       case A.SET_AUDIO_DENIED: return store.setAudioDenied(payload);

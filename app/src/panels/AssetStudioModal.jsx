@@ -1,11 +1,14 @@
 // AssetStudioModal — motif kit over P02. Not Illustrator.
 // Lazy-loaded: the live bundle never imports this until the modal opens.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PRIMITIVES, polyInner } from '../assets/primitives.js';
+import { PRIMITIVES } from '../assets/primitives.js';
 import { traceSilhouette, blendContours, outerLoop, loopsToD, loopsToPath } from '../assets/silhouette.js';
 import { ingestSvg } from '../assets/ingest.js';
+import { sampleRig, rigFromStudioParts, hasRig, studioPartSvg, partAxes } from '../assets/subAnim.mjs';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
+
+const ANIM_KINDS = ['none', 'spin', 'osc', 'pulse', 'blink', 'march'];
 
 let seq = 1;
 const SNAP = 10;
@@ -13,29 +16,12 @@ const UNDO_CAP = 20;
 const snap = (n) => Math.round(n / SNAP) * SNAP;
 const clampS = (n) => Math.max(0.3, Math.min(2.5, +Number(n).toFixed(2)));
 
-function axes(p) {
-  return { sx: p.sx ?? p.scale ?? 1, sy: p.sy ?? p.scale ?? 1 };
-}
-
-function innerFor(p) {
-  if (p.kind === 'poly') return polyInner(p.n);
-  if (p.kind === 'merged') return p.svg || '';
-  return PRIMITIVES[p.kind] || p.svg || '';
-}
-
 function toSvg(parts) {
-  return parts.map((p) => {
-    const token = p.token === 'accent' ? 'var(--accent)' : 'var(--ink)';
-    const paint = p.stroke
-      ? `color: ${token}; fill: none; stroke: currentColor; stroke-width: 3`
-      : `color: ${token}`;
-    const { sx, sy } = axes(p);
-    return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${sx} ${sy}) translate(-50 -50)">${innerFor(p)}</g>`;
-  }).join('');
+  return parts.map((p) => studioPartSvg(p)).join('');
 }
 
 function fresh(kind, extra = {}) {
-  return { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1, sx: 1, sy: 1, token: 'ink', stroke: false, ...extra };
+  return { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1, sx: 1, sy: 1, token: 'ink', stroke: false, anim: { kind: 'none', amp: 20, phase: 0 }, ...extra };
 }
 
 /** Fingerprint of everything the merge trace depends on (module-level: no hook deps). */
@@ -216,6 +202,43 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     setPicked(partsRef.current.length - 1);
   };
 
+  // ---- ANIM: sub-animation rig (sprite-editor edition) ----
+  const [animPeriod, setAnimPeriod] = useState(1.6);
+  const [animFrames, setAnimFrames] = useState(8);
+  const [previewFrame, setPreviewFrame] = useState(0);
+  const [playing, setPlaying] = useState(false);
+
+  const rig = useMemo(() => rigFromStudioParts(parts), [parts]);
+  const rigActive = useMemo(() => hasRig(parts), [parts]);
+  // Filmstrip: the baked frame strip, re-rendered live whenever the rig changes.
+  const stripFrames = useMemo(() => {
+    if (!rigActive) return [];
+    const out = [];
+    for (let i = 0; i < animFrames; i++) out.push(sampleRig(rig, (i / animFrames) * animPeriod, animPeriod));
+    return out;
+  }, [rig, rigActive, animFrames, animPeriod]);
+
+  useEffect(() => {
+    if (!playing || !rigActive) return undefined;
+    const ms = Math.max(60, (animPeriod / animFrames) * 1000);
+    const id = setInterval(() => setPreviewFrame((f) => (f + 1) % animFrames), ms);
+    return () => clearInterval(id);
+  }, [playing, rigActive, animPeriod, animFrames]);
+
+  const pickedAnim = (picked >= 0 && parts[picked]?.anim) || { kind: 'none', amp: 20, phase: 0 };
+  const setAnimKind = (kind) => {
+    if (picked < 0) return;
+    commit((p) => p.map((row, i) => (i === picked
+      ? { ...row, anim: { kind, amp: row.anim?.amp ?? 20, phase: row.anim?.phase ?? 0 } }
+      : row)));
+  };
+  // Sliders scrub live (one undo step per drag: snapshot on grab).
+  const beginScrub = () => { if (picked >= 0) snapshot(); };
+  const scrubAnim = (patch) => {
+    if (picked < 0) return;
+    live((p) => p.map((row, i) => (i === picked ? { ...row, anim: { ...row.anim, ...patch } } : row)));
+  };
+
   // Esc closes the modal; the live canvas keeps running underneath.
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(false); };
@@ -236,7 +259,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     commit((p) => p.map((row, i) => (i === picked ? fn(row) : row)));
   };
   const bump = (key, d) => patchSel((r) => {
-    const { sx, sy } = axes(r);
+    const { sx, sy } = partAxes(r);
     if (key === 'both') {
       const n = clampS((sx + sy) / 2 + d);
       return { ...r, scale: n, sx: n, sy: n };
@@ -329,8 +352,11 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     if (!parts.length && !seedSvg) return;
     const body = svg || seedSvg;
     const out = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${body}</svg>`;
-    if (seedId && String(seedId).startsWith('user:')) emit(Events.ASSETS_REPLACE, { id: seedId, svg: out });
-    else emit(Events.ASSETS_INGEST, { svg: out, hint, category, weight: 'medium', source: 'hand' });
+    // Persist the sub-animation rig when any part carries motion; the atlas
+    // expansion + per-tick frame picking consume it on the canvas.
+    const sub = rigActive ? { frames: animFrames, period: animPeriod, rig } : null;
+    if (seedId && String(seedId).startsWith('user:')) emit(Events.ASSETS_REPLACE, { id: seedId, svg: out, sub });
+    else emit(Events.ASSETS_INGEST, { svg: out, hint, category, weight: 'medium', source: 'hand', sub });
     onClose(true);
   };
 
@@ -466,6 +492,72 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
               Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, melt rounds the joins; flip a ticked shape to − and it punches a hole instead; blend is preview-only.
             </p>
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                ANIM
+                <span style={{ color: rigActive ? 'var(--accent)' : 'var(--dim)', fontSize: 9, letterSpacing: '0.04em' }}>
+                  {rigActive ? '● live' : '○ off'}
+                </span>
+              </div>
+              <label style={lbl} title="Seconds per full animation loop.">
+                period
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="range" min={0.4} max={4} step={0.1} value={animPeriod} onChange={(e) => setAnimPeriod(+e.target.value)} style={{ flex: 1 }} />
+                  <span style={{ color: 'var(--ink)', fontSize: 10, minWidth: 34 }}>{animPeriod.toFixed(1)}s</span>
+                </span>
+              </label>
+              <label style={lbl} title="Baked frames per loop — more frames, smoother motion, more atlas cells.">
+                frames
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="range" min={2} max={16} step={1} value={animFrames} onChange={(e) => { setAnimFrames(+e.target.value); setPreviewFrame(0); }} style={{ flex: 1 }} />
+                  <span style={{ color: 'var(--ink)', fontSize: 10, minWidth: 34 }}>{animFrames}</span>
+                </span>
+              </label>
+              <label style={lbl} title="Motion for the picked part. 'none' = static layer.">
+                picked part motion
+                <select value={pickedAnim.kind} disabled={picked < 0} onChange={(e) => setAnimKind(e.target.value)} style={field}>
+                  {ANIM_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </label>
+              <label style={lbl} title="osc: ±degrees · pulse: ±fraction (0.3 = ±30%) · march: units per loop · spin/blink: unused">
+                amount
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="range" min={0} max={50} step={1} value={pickedAnim.amp} disabled={picked < 0}
+                    onPointerDown={beginScrub} onChange={(e) => scrubAnim({ amp: +e.target.value })} style={{ flex: 1 }} />
+                  <span style={{ color: 'var(--ink)', fontSize: 10, minWidth: 34 }}>{pickedAnim.amp}</span>
+                </span>
+              </label>
+              <label style={lbl} title="Offsets this layer's cycle in periods — chevron chase: 0, 0.33, 0.66.">
+                phase
+                <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <input type="range" min={0} max={1} step={0.05} value={pickedAnim.phase} disabled={picked < 0}
+                    onPointerDown={beginScrub} onChange={(e) => scrubAnim({ phase: +e.target.value })} style={{ flex: 1 }} />
+                  <span style={{ color: 'var(--ink)', fontSize: 10, minWidth: 34 }}>{Number(pickedAnim.phase).toFixed(2)}</span>
+                </span>
+              </label>
+              {rigActive ? (
+                <>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button type="button" className="chip-btn" onClick={() => setPlaying((v) => !v)}>{playing ? 'STOP' : 'PLAY'}</button>
+                    <span style={{ fontSize: 9, color: 'var(--dim)' }}>frame {Math.min(previewFrame, stripFrames.length - 1) + 1}/{animFrames}</span>
+                  </div>
+                  <svg viewBox="0 0 100 100" style={{ width: 120, height: 120, background: '#0a0a0a', border: '1px solid var(--line)', alignSelf: 'center' }}
+                    dangerouslySetInnerHTML={{ __html: stripFrames[Math.min(previewFrame, stripFrames.length - 1)] || '' }} />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {stripFrames.map((f, i) => (
+                      <button key={i} type="button" title={`preview frame ${i + 1}`} onClick={() => { setPlaying(false); setPreviewFrame(i); }}
+                        style={{ padding: 0, border: i === previewFrame ? '1px solid var(--accent)' : '1px solid var(--line)', background: '#0a0a0a', cursor: 'pointer', lineHeight: 0 }}>
+                        <svg viewBox="0 0 100 100" width={34} height={34} dangerouslySetInnerHTML={{ __html: f }} />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)' }}>
+                  Pick a part, give it a motion — the frame strip appears here. SAVE TO POOL keeps the rig.
+                </p>
+              )}
+            </div>
           </div>
         </div>
         <footer style={foot}>

@@ -1,5 +1,6 @@
 import { ingestSvg, duplicateAsset, isHostile, overlayId } from './ingest.js';
 import { sanitizeGradient } from './gradient.js';
+import { validSubRig } from './subAnim.mjs';
 
 export const OVERLAY_CAP = 32;
 
@@ -36,6 +37,9 @@ export function sanitizeOverlay(list) {
       source: raw.source || 'overlay',
       svg: String(raw.svg),
       ...(gradient ? { gradient } : {}),
+      // Sub-animation rigs survive the round trip (project save/load);
+      // malformed rigs fail closed to null -> the asset renders statically.
+      sub: validSubRig(raw.sub) || undefined,
     });
   }
   return out;
@@ -76,6 +80,10 @@ export function ingestIntoOverlay(rawSvg, overlay, hint = 'ingest', opts = {}) {
     if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
   }
   const asset = { ...parsed.asset, source, tags: [...new Set([...(parsed.asset.tags || []), 'overlay', source])] };
+  // Optional sub-animation rig (Asset Studio ANIM section). Validated on the
+  // sanitize pass; stored here so the in-memory asset animates immediately.
+  const sub = validSubRig(opts.sub);
+  if (sub) asset.sub = sub;
   return { ok: true, asset, overlay: [...clean, asset] };
 }
 
@@ -97,12 +105,14 @@ export function renameOverlayAsset(id, nextName, overlay) {
   };
 }
 
-export function replaceOverlayAsset(id, rawSvg, overlay) {
+export function replaceOverlayAsset(id, rawSvg, overlay, opts = {}) {
   if (!String(id).startsWith('user:')) return { ok: false, error: 'canon is read-only', overlay: sanitizeOverlay(overlay) };
   const clean = sanitizeOverlay(overlay);
   const parsed = ingestSvg(rawSvg, { id: String(id).replace(/^user:/, '') });
   if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
   const asset = { ...parsed.asset, id, source: 'replace' };
+  const sub = validSubRig(opts.sub);
+  if (sub) asset.sub = sub;
   return {
     ok: true,
     overlay: clean.map((a) => (a.id === id ? asset : a)),
