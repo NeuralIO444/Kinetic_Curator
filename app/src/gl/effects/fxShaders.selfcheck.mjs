@@ -24,6 +24,7 @@ import { FX_EFFECT_DEFS } from '../../fx/fxFilters.js';
 import {
   FX_SHADER_EFFECTS,
   FX_SHADER_KINDS,
+  FX_HALO_FS,
   registerFxShaders,
   compileFxShaders,
   fxChunksUsed,
@@ -127,7 +128,7 @@ function makeFxBridge(gl) {
 }
 
 ok('all five Phase-2 kinds are declared', () => {
-  assert.deepEqual([...FX_SHADER_KINDS].sort(), ['displace', 'edge', 'scanlines', 'solarize', 'tear']);
+  assert.deepEqual([...FX_SHADER_KINDS].sort(), ['displace', 'edge', 'halo', 'scanlines', 'solarize', 'tear']);
 });
 
 ok('descriptors validate and mirror the SVG-side FX catalog', () => {
@@ -215,6 +216,36 @@ ok('compileFxShaders fails closed on unknown kinds and bad params', () => {
   assert.equal(steps[0].aux, null, 'no aux by default');
   assert.equal(steps[1].kind, 'edge');
   assert.deepEqual(steps[1].params, {});
+});
+
+ok('#704: halo is identity at defaults and never blurs with a gaussian', () => {
+  const d = getTemplateEffect('halo').descriptor;
+  // Identity at defaults: a halo layer costs nothing until it is used.
+  assert.strictEqual(d.params.amount.def, 0, 'bloom must default to off');
+  assert.strictEqual(d.params.vignette.def, 0, 'vignette must default to off');
+  // Both halves are branch-guarded, which is why identity is bit-identical
+  // (measured through a real GL run: max pixel diff 0) rather than "close".
+  assert.ok(/if \(u_amount > 0\.0\)/.test(FX_HALO_FS), 'the bloom must be branch-guarded');
+  assert.ok(/if \(u_vignette > 0\.0\)/.test(FX_HALO_FS), 'the vignette must be branch-guarded');
+  // #308 removed blur from the instrument. The halo gets its spread from ring
+  // taps, and must not re-introduce a gaussian by the back door. Checked
+  // against the CODE, not the comments — which explain the very thing.
+  const code = FX_HALO_FS.replace(/\/\/[^\n]*/g, '');
+  assert.ok(!/blur/i.test(code), 'the GL halo must not reach for a blur');
+  assert.ok(/for \(int ring = 0; ring < 2/.test(code), 'the spread comes from two rings of taps');
+  assert.ok(/for \(int i = 0; i < 6/.test(code), 'six taps per ring — a bounded, countable cost');
+  // The bright-pass is what keeps a dark ground dark — without it the bloom
+  // lifts the whole plate into fog.
+  assert.ok(FX_HALO_FS.includes('smoothstep(u_threshold'), 'the bloom must be threshold-gated');
+  // Aspect-corrected vignette: a circle on any canvas, not an ellipse.
+  assert.ok(FX_HALO_FS.includes('u_res.x / max(u_res.y'), 'the vignette must be aspect corrected');
+  // Sanitisation still clamps every knob.
+  const steps = compileFxShaders([{ kind: 'halo', params: { amount: 99, radius: 1e6, threshold: -5, vignette: 9 } }]);
+  const p = steps[0].params;
+  assert.ok(p.amount <= 1.5 && p.radius <= 64 && p.threshold >= 0 && p.vignette <= 1,
+    `halo params must clamp (${JSON.stringify(p)})`);
+  assert.strictEqual(compileFxShaders([{ kind: 'halo', params: { amount: NaN } }])[0].params.amount, 0,
+    'a non-finite amount falls back to off');
 });
 
 ok('compileFxShaders wires aux textures per kind', () => {

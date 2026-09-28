@@ -41,8 +41,12 @@ ok('sanitize on non-array returns []', () => {
   assert.deepEqual(sanitizeFxEffects('nope'), []);
 });
 
-ok('#310: add-menu is curated to 4, roster stays renderable', () => {
-  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert']);
+ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
+  // #704 — halo joins the menu: the chiaroscuro mode needs it reachable, and
+  // it is the only effect in the set tuned for a dark ground. The list is an
+  // explicit gate (a curated subset of the roster), so additions are a
+  // deliberate edit here rather than something a data change does quietly.
+  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo']);
   assert.ok(!FX_EFFECT_KINDS.includes('blur'), 'blur is cut from the roster');
   for (const k of FX_MENU_KINDS) assert.ok(FX_EFFECT_KINDS.includes(k), `${k} stays in the roster`);
   // The five demoted effects stay renderable: they compile, they just leave the menu.
@@ -266,6 +270,24 @@ ok('#554: builtin u_p packers agree with the catalog sanitize — hostile values
   }
   assert.deepEqual(packFor('invert', {}), [0, 0, 0, 0]);
 });
+ok('#704: the SVG halo is identity at defaults and approximates the bloom otherwise', () => {
+  const idle = compileFxPrimitives([{ kind: 'halo', params: { amount: 0, radius: 18, threshold: 0.45, vignette: 0 } }], {});
+  assert.deepStrictEqual(idle.map((p) => p.prim), ['feOffset'], 'defaults must pass the layer through');
+  const bloom = compileFxPrimitives([{ kind: 'halo', params: { amount: 0.8, radius: 24, threshold: 0.4, vignette: 0 } }], {});
+  const prims = bloom.map((p) => p.prim);
+  assert.ok(prims.includes('feComponentTransfer'), 'the bright-pass keeps a dark ground dark');
+  assert.ok(prims.includes('feGaussianBlur'), 'the SVG half spreads with a gaussian — the GL half deliberately does not');
+  assert.ok(prims.includes('feComposite'), 'the bloom is composited back over the source');
+  const vig = compileFxPrimitives([{ kind: 'halo', params: { amount: 0, radius: 18, threshold: 0.45, vignette: 0.7 } }], {});
+  assert.ok(vig.some((p) => p.prim === 'feFlood'), 'the vignette darkens with a flood');
+  assert.ok(vig.some((p) => p.prim === 'feBlend' && p.attrs.mode === 'multiply'), 'and multiplies it in');
+  // Hostile values must not emit junk primitives.
+  for (const bad of [NaN, -5, null, 'x']) {
+    const out = compileFxPrimitives([{ kind: 'halo', params: { amount: bad, radius: bad, threshold: bad, vignette: bad } }], {});
+    assert.ok(out.length >= 1 && out.every((p) => typeof p.prim === 'string'), `halo ${bad} must still compile`);
+  }
+});
+
 ok('setSelectedFxLayer only accepts fx ids', () => {
   const { api, get } = driveSlice();
   api.addFxLayer();

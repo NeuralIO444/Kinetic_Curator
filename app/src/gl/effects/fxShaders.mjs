@@ -225,6 +225,93 @@ export const FX_EDGE_DESCRIPTOR = {
  * estimate at 1080p (the harness measures the truth; the build gate
  * cross-checks).
  */
+export const FX_HALO_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform float u_amount;
+uniform float u_radius;
+uniform float u_threshold;
+uniform float u_vignette;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec4 src = texture(u_tex, v_cuv);
+  vec3 lit = src.rgb;
+  // #704 — a SOFT, WIDE bloom falloff for dark grounds.
+  //
+  // Ring taps, not a gaussian blur pass: #308 removed blur from the
+  // instrument, and re-introducing one to get a halo would undo that decision
+  // by the back door. Two rings of six, the outer at twice the radius and at
+  // half the weight, give a falloff that is wider and softer than a same-cost
+  // box blur — the outer ring is what makes it read as light in a room rather
+  // than a bright edge.
+  //
+  // Only the BRIGHT parts bloom. On a dark ground an unthresholded bloom
+  // lifts the whole plate into fog; the threshold is what keeps the dark dark.
+  if (u_amount > 0.0) {
+    vec2 px = u_radius / u_res;
+    vec3 sum = vec3(0.0);
+    float wsum = 0.0;
+    for (int ring = 0; ring < 2; ring++) {
+      float scale = ring == 0 ? 1.0 : 2.0;
+      float w = ring == 0 ? 1.0 : 0.5;
+      for (int i = 0; i < 6; i++) {
+        float a = (float(i) + (ring == 0 ? 0.0 : 0.5)) * 1.0471975512; // 60 deg
+        vec2 off = vec2(cos(a), sin(a)) * px * scale;
+        vec3 t = texture(u_tex, v_cuv + off).rgb;
+        // Bright-pass, smooth so the bloom has no visible onset edge.
+        float l = dot(t, vec3(0.2126, 0.7152, 0.0722));
+        sum += t * smoothstep(u_threshold, u_threshold + 0.25, l) * w;
+        wsum += w;
+      }
+    }
+    lit += (sum / max(wsum, 1e-5)) * u_amount;
+  }
+  // Vignette: a soft radial falloff that pulls the FRAME edge down. Aspect
+  // corrected, so it is a circle on any canvas rather than an ellipse, and
+  // applied after the bloom so a halo near the edge falls off with everything
+  // else instead of floating on top of a darkened corner.
+  if (u_vignette > 0.0) {
+    vec2 c = (v_cuv - 0.5) * vec2(max(u_res.x / max(u_res.y, 1.0), 1.0), 1.0);
+    float d = length(c) * 1.41421356;
+    lit *= mix(1.0, smoothstep(1.0, 0.25, d), u_vignette);
+  }
+  // The chain carries PREMULTIPLIED alpha: the taps, the base and the vignette
+  // are all already scaled by their own alpha, so additive light composites
+  // correctly without un-premultiplying. Do NOT multiply by src.a again here —
+  // that darkens every partial-alpha pixel (the sweep's byte-exact no-op case
+  // caught exactly that, max byte diff 64). Clamp to alpha, not to 1.0, or the
+  // premultiplied invariant (rgb <= a) breaks and mipmaps bloom.
+  o = vec4(min(lit, vec3(src.a)), src.a);
+}
+`;
+
+export const FX_HALO_DESCRIPTOR = {
+  label: 'Halo',
+  hint: 'Soft, wide bloom on the bright parts plus an edge vignette — tuned for dark grounds. Defaults are identity.',
+  pad: 0,
+  animated: false,
+  params: {
+    amount: {
+      type: 'float', label: 'Amount', min: 0, max: 1.5, step: 0.05, def: 0,
+      ui: 'slider', hint: 'Bloom strength. 0 is the layer untouched.',
+    },
+    radius: {
+      type: 'float', label: 'Radius', min: 1, max: 64, step: 1, def: 18,
+      ui: 'slider', hint: 'How far the light spreads, in pixels. The outer ring reaches twice this.',
+    },
+    threshold: {
+      type: 'float', label: 'Threshold', min: 0, max: 1, step: 0.05, def: 0.45,
+      ui: 'slider', hint: 'Only light above this blooms. Low values fog a dark ground.',
+    },
+    vignette: {
+      type: 'float', label: 'Vignette', min: 0, max: 1, step: 0.05, def: 0,
+      ui: 'slider', hint: 'Edge falloff. 0 is off.',
+    },
+  },
+};
+
 export const FX_SHADER_EFFECTS = [
   // 2x fbm-3 noise lookups: the costliest template FX — a quality scaler.
   ['displace', { fs: FX_DISPLACE_FS, descriptor: FX_DISPLACE_DESCRIPTOR, file: 'fxShaders.mjs:displace',
@@ -237,6 +324,8 @@ export const FX_SHADER_EFFECTS = [
     cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'pure ALU color op' } }],
   ['edge', { fs: FX_EDGE_FS, descriptor: FX_EDGE_DESCRIPTOR, file: 'fxShaders.mjs:edge',
     cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.4, notes: '3x3 kernel, 9 taps' } }],
+  ['halo', { fs: FX_HALO_FS, descriptor: FX_HALO_DESCRIPTOR, file: 'fxShaders.mjs:halo',
+    cost: { tier: 2, memoryBytes: 1920 * 1080 * 8, timeMs: 1.1, notes: '12 ring taps (two rings of six) + vignette; a quality scaler, not cosmetic — cost is the tap count' } }],
 ];
 
 // The registry reads the cost declarations straight out of the definitions
