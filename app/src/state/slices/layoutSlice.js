@@ -85,10 +85,10 @@ export const createLayoutSlice = (set) => ({
    */
   paletteMixSeconds: 2,
   /**
-   * Sleight-of-hand v2 (#624): how a palette change travels. FADE melts the
-   * whole picture (two-deck dissolve); WASH soaks the new tints through the
-   * marks on a center-out wavefront; INJECT dyes the field first and the
-   * agents catch up (#625). A feel preference like paletteMixSeconds —
+   * Sleight-of-hand v2 (#624, #625): how a palette change travels. FADE melts
+   * the whole picture (two-deck dissolve); WASH soaks the new tints through
+   * the marks on a center-out wavefront; INJECT dyes the field first and the
+   * agents catch up. A feel preference like paletteMixSeconds —
    * deliberately outside the project document.
    */
   colorMode: 'FADE',
@@ -307,7 +307,7 @@ export const createLayoutSlice = (set) => ({
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
   /** VJ MIX (#278): palette-switch crossfade seconds, clamped 0–8. */
   setPaletteMixSeconds: (seconds) => set({ paletteMixSeconds: sanitizeMixSeconds(seconds) }),
-  /** Sleight-of-hand v2 (#624): FADE | WASH | INJECT. Unknown values fall back to FADE. */
+  /** Sleight-of-hand v2 (#624, #625): FADE | WASH | INJECT. Unknown values fall back to FADE. */
   setColorMode: (mode) => set({
     colorMode: mode === 'WASH' || mode === 'INJECT' ? mode : 'FADE',
   }),
