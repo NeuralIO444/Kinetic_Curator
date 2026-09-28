@@ -26,7 +26,6 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **First-run overlay** | Smoke tests set `kc:first-run-seen`; real users see Play Me once. |
 | **WEBM + ACCUM** | In-app REC/CAPTURE records the **live GL canvas** via `captureStream` — ACCUM trails included, what plays is what exports (e2e `accum-recording.spec` asserts the trail differential). The old SVG-sampling caveat is retired; `--accum` stills stay the trail-honest stills (#90). |
 | **Machine-scoped selfcheck failures (#422)** | On at least one machine `gl/accum` (stipple gate Δ0.012) and `gl/debug` (gpuTimer/tapPoints `INVALID_ENUM`) fail and halt the `&&` chain in `npm run selfcheck`. All 77 other suites pass (full-disk sweep 2026-09-22). Open. |
-| **Unwired selfcheck suites (#438)** | `evalContext`, `itemMorph`, `feedLive` sit on disk outside the `selfcheck` chain, so CI never runs them; all three pass when run directly. Open. |
 | **Legacy folder stubs** | Empty or residual paths may remain on disk history; active app is **`app/`** only. |
 | **Offline swarm needs a bake** | `studio/` replays swarm deterministically (#63). The live canvas keeps its RAF loop for pointer response, so the two agree only for the same seed and step count. |
 | **`plus-lighter` in finals** | The GL backend maps `plus-lighter` → `screen` and records the substitution in the sidecar (#96). The old resvg path (which couldn't do it at all) is retired. |
@@ -55,5 +54,6 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 - Spine A–G landed and reviewed (#387–#392); FX layer 4-cap (#341 / PR #412); tape lane (#342 / PR #383)
 - Review sweep: dead `useCanvasLife` path (#418 / PR #429), plan-once itemMorph (#419 / PR #430), `hexToRgb` memo (#420 / PR #433), life-clock rollback on rejected frames (#421 / PR #434)
 - Chip-stutter pair: continuous life-drift phase (#431 / PR #435), integrated warp phase (#432 / PR #436)
+- Unwired selfcheck suites now in manifest: `evalContext`, `itemMorph`, `feedLive` (#438)
 
-*Last updated: 2026-09-22 — bug sweep on `7d60c4b`: lint green, 77/79 selfchecks (the two failures are #422), 19/19 Playwright.*
+*Last updated: 2026-09-28 — #438 (unwired selfcheck suites) verified fixed and moved to reference; #422 remains open. Bug sweep on `7d60c4b`: lint green, 77/79 selfchecks (the two failures are #422), 19/19 Playwright.*
