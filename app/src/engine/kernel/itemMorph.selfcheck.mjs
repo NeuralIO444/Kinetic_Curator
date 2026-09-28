@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { matchItems, blendItems, planMorph, nodeWindow, moveFor,
-  MOVE_SMEAR, MOVE_BREATH, MOVE_FADE, SMEAR_VEL, SMEAR_TRAVEL, DENSE_COUNT } from './itemMorph.mjs';
+  MOVE_SMEAR, MOVE_BREATH, MOVE_FADE, SMEAR_VEL, SMEAR_TRAVEL, DENSE_COUNT,
+  joinMoveFor, leaveMoveFor, JOIN_POP, JOIN_WAVE, LEAVE_FADE, LEAVE_SHRINK } from './itemMorph.mjs';
 // The live loop's own easing — liveResolve feeds blendItems morphEase(raw),
 // so the #564 contract sweeps below must drive it the same way.
 import { morphEase } from '../../gl/paletteMix.mjs';
@@ -73,28 +74,146 @@ ok('blendItems lands position/scale/rotation/costume on the target by t->1', () 
   assert.equal(out.color, '#ffffff', 'colour is the target colour, never a blend of the two');
 });
 
-ok('#564: an unmatched target grows in from zero — no alpha fade', () => {
-  const from = [];
-  const to = [{ assetId: 'a', x: 10, y: 0, scale: 2, alpha: 100, key: 'new-1' }];
-  const { delay, dur } = nodeWindow(0, 0);
-  const [early] = blendItems(from, to, delay + dur * 0.4); // before its midpoint
-  assert.equal(early.key, 'new-1');
-  assert.equal(early.scale, 0, 'nothing on screen until its window turns over');
-  assert.equal(early.alpha, 100, 'alpha untouched — the swap is scale, not opacity');
-  const [late] = blendItems(from, to, 0.99);
-  assert.ok(Math.abs(late.scale - 2) < 0.01, `grown to full (got ${late.scale})`);
+// ── #626: joiner/leaver pairing (obvious face / invisible face) ─────────────
+// The #564 grow-from-midpoint / shrink-by-midpoint placeholders are gone:
+// joiners draw a seeded entrance (pop with overshoot, or fade-up along a
+// center-out wavefront); leavers exit quiet (alpha fade or shrink-out) inside
+// a borrowed joiner window.
+
+ok('#626: joiner and leaver moves are seeded, index-stable, and split', () => {
+  const jm = (s) => Array.from({ length: 64 }, (_, i) => joinMoveFor(i, s));
+  const lm = (s) => Array.from({ length: 64 }, (_, i) => leaveMoveFor(i, s));
+  assert.deepEqual(jm(7), jm(7), 'same seed replays the same entrances');
+  assert.deepEqual(lm(7), lm(7), 'same seed replays the same exits');
+  assert.ok(jm(7).includes(JOIN_POP) && jm(7).includes(JOIN_WAVE), 'both entrances appear in the mix');
+  assert.ok(lm(7).includes(LEAVE_FADE) && lm(7).includes(LEAVE_SHRINK), 'both quiet exits appear in the mix');
+  assert.notDeepEqual(jm(7), jm(8), 'a different seed is a different show');
 });
 
-ok('#564: an unmatched source shrinks out to zero — no alpha fade', () => {
-  const from = [{ assetId: 'a', x: 10, y: 0, scale: 2, alpha: 100, key: 'old-1' }];
-  const to = [];
-  const { delay, dur } = nodeWindow(0, 0); // onlyFrom windows start at index |to| = 0 here
-  const [early] = blendItems(from, to, delay + dur * 0.1);
-  assert.equal(early.key, 'old-1');
-  assert.ok(early.scale > 0 && early.scale <= 2, `still on screen early (got ${early.scale})`);
-  assert.equal(early.alpha, 100, 'alpha untouched');
-  const [late] = blendItems(from, to, delay + dur * 0.6); // past its midpoint
-  assert.equal(late.scale, 0, 'gone by the midpoint, at zero scale not zero alpha');
+ok('#626: pop joiner punches with overshoot, then settles — alpha full throughout', () => {
+  let pi = -1;
+  for (let i = 0; i < 64 && pi < 0; i++) if (joinMoveFor(i, 11) === JOIN_POP) pi = i;
+  assert.ok(pi >= 0, 'a pop joiner exists at seed 11');
+  const to = Array.from({ length: pi + 1 }, (_, k) => ({ assetId: 'a', x: k * 10, y: 0, scale: 2, alpha: 100, key: 'k' + k }));
+  const plan = planMorph([], to, 11);
+  const at = (t) => blendItems([], to, t, plan).find((o) => o.key === 'k' + pi);
+  const { delay, dur } = nodeWindow(pi, 11);
+  // just inside its window the punch has barely started (t<=0 returns fromItems by reference, so stay > 0)
+  const pre = at(delay > 0.02 ? delay - 0.01 : 0.01);
+  assert.ok(pre.scale < 0.5, `starts near zero (got ${pre.scale})`);
+  let peak = 0;
+  for (let t = 0.01; t <= 1; t += 0.02) peak = Math.max(peak, at(t).scale);
+  assert.ok(peak > 2, `punches PAST full size — the overshoot is the arrival (peak ${peak.toFixed(2)})`);
+  const late = at(0.999);
+  assert.ok(Math.abs(late.scale - 2) < 0.02, `settles exactly at full size (got ${late.scale})`);
+  for (let t = 0.01; t <= 1; t += 0.05) assert.equal(at(t).alpha, 100, `pop never touches alpha (t=${t})`);
+});
+
+ok('#626: wave joiner fades up center-out — the middle arrives before the edge', () => {
+  const to = [-200, -100, 0, 100, 200].map((x, k) => ({ assetId: 'a', x, y: 0, scale: 1, alpha: 100, key: 'w' + k }));
+  let seed = -1;
+  for (let s = 0; s < 500 && seed < 0; s++) {
+    if (joinMoveFor(2, s) === JOIN_WAVE && joinMoveFor(0, s) === JOIN_WAVE) seed = s;
+  }
+  assert.ok(seed >= 0, 'found a seed with center+edge wave joiners');
+  const plan = planMorph([], to, seed);
+  const out = (t) => blendItems([], to, t, plan);
+  const alpha = (t, k) => out(t).find((o) => o.key === 'w' + k).alpha;
+  assert.ok(alpha(0.25, 2) > alpha(0.25, 0),
+    `center leads the wavefront (${alpha(0.25, 2).toFixed(1)} vs edge ${alpha(0.25, 0).toFixed(1)})`);
+  assert.ok(Math.abs(alpha(0.999, 2) - 100) < 0.5, 'center lands at full alpha');
+  assert.ok(Math.abs(alpha(0.999, 0) - 100) < 0.5, 'edge lands at full alpha');
+  for (let t = 0.01; t <= 1; t += 0.1) {
+    assert.equal(out(t).find((o) => o.key === 'w2').scale, 1, `wave never touches scale (t=${t})`);
+  }
+});
+
+ok('#626: leaver exits are quiet — fade touches only alpha, shrink only scale', () => {
+  const from = [
+    { assetId: 'a', x: 0, y: 0, scale: 3, alpha: 100, key: 'L0' },
+    { assetId: 'a', x: 50, y: 0, scale: 3, alpha: 100, key: 'L1' },
+  ];
+  let seed = -1;
+  for (let s = 0; s < 500 && seed < 0; s++) {
+    if (leaveMoveFor(0, s) === LEAVE_FADE && leaveMoveFor(1, s) === LEAVE_SHRINK) seed = s;
+  }
+  assert.ok(seed >= 0, 'found a seed with one fade and one shrink leaver');
+  const plan = planMorph(from, [], seed);
+  const at = (t, k) => blendItems(from, [], t, plan).find((o) => o.key === k);
+  for (let t = 0; t < 1; t += 0.05) {
+    const f = at(t, 'L0');
+    assert.equal(f.scale, 3, `fade never touches scale (t=${t.toFixed(2)})`);
+    assert.ok(f.alpha <= 100 && f.alpha >= 0, `fade alpha stays in range (t=${t.toFixed(2)})`);
+    const s = at(t, 'L1');
+    assert.equal(s.alpha, 100, `shrink never touches alpha (t=${t.toFixed(2)})`);
+    assert.ok(s.scale <= 3 && s.scale >= 0, `shrink scale stays in range (t=${t.toFixed(2)})`);
+  }
+  const w0 = nodeWindow(0, seed), w1 = nodeWindow(1, seed);
+  assert.equal(at(w0.delay + w0.dur * 0.6, 'L0').alpha, 0, 'fade completes past its midpoint');
+  assert.equal(at(w1.delay + w1.dur * 0.6, 'L1').scale, 0, 'shrink completes past its midpoint');
+});
+
+ok('#626: a leaver borrows a live joiner\'s window — gone while the joiner peaks', () => {
+  const from = [
+    { assetId: 'a', x: 0, y: 0, scale: 2, alpha: 100, key: 'F0' },
+    { assetId: 'a', x: 100, y: 0, scale: 2, alpha: 100, key: 'F1' },
+    { assetId: 'a', x: 200, y: 0, scale: 2, alpha: 100, key: 'F2' },
+  ];
+  const toPlan = [
+    { assetId: 'b', x: 0, y: 0, scale: 2, alpha: 100, key: 'T0' },
+    { assetId: 'b', x: 10, y: 0, scale: 2, alpha: 100, key: 'T1' },
+  ];
+  let seed = -1;
+  for (let s = 0; s < 500 && seed < 0; s++) if (joinMoveFor(2, s) === JOIN_POP) seed = s;
+  assert.ok(seed >= 0, 'found a seed with a pop joiner at index 2');
+  const plan = planMorph(from, toPlan, seed);
+  assert.equal(plan.onlyFrom.length, 1, 'one plan-time leaver');
+  const leaverKey = plan.onlyFrom[0].key;
+  // the live list grows mid-transition (a MIX count step): a new unmatched
+  // target appears alongside the plan-time leaver
+  const toLive = [...toPlan, { assetId: 'b', x: 20, y: 0, scale: 2, alpha: 100, key: 'T2' }];
+  const out = (t) => blendItems(from, toLive, t, plan);
+  const w = nodeWindow(2, seed); // the borrowed window (pop joiner at index 2)
+  const tMid = w.delay + w.dur * 0.6;
+  const gone = out(tMid).find((o) => o.key === leaverKey);
+  const goneVal = leaveMoveFor(3, seed) === LEAVE_FADE ? gone.alpha : gone.scale;
+  assert.equal(goneVal, 0, 'leaver fully exited inside the borrowed window');
+  const joiner = out(tMid).find((o) => o.key === 'T2');
+  assert.ok(joiner.scale > 2, `joiner at peak punch while the leaver vanishes (scale ${joiner.scale.toFixed(2)})`);
+  const early = out(w.delay + w.dur * 0.1).find((o) => o.key === leaverKey);
+  const earlyVal = leaveMoveFor(3, seed) === LEAVE_FADE ? early.alpha : early.scale;
+  assert.ok(earlyVal > 0, 'leaver still visible early in the window');
+});
+
+ok('#626: mirror doubling rides the joiner path — the doubled half grows in staggered', () => {
+  const from = [{ assetId: 'a', x: 100, y: 0, scale: 2, alpha: 100, key: 'orig' }];
+  const to = [
+    { assetId: 'a', x: 100, y: 0, scale: 2, alpha: 100, key: 'orig' },
+    { assetId: 'a', x: 900, y: 0, scale: 2, alpha: 100, key: 'orig-m', _mirrored: true },
+  ];
+  const plan = planMorph(from, to, 9);
+  assert.equal(plan.pairs.length, 1, 'the original matches its slot');
+  assert.equal(plan.onlyTo.length, 1, 'the mirrored copy is an unmatched joiner');
+  const jm = joinMoveFor(1, 9);
+  const early = blendItems(from, to, 0.05, plan).find((o) => o.key === 'orig-m');
+  if (jm === JOIN_POP) assert.ok(early.scale < 2, `pop starts small, not full-size (got ${early.scale})`);
+  else assert.ok(early.alpha < 100, `wave starts transparent, not full-size (got ${early.alpha})`);
+  const late = blendItems(from, to, 0.999, plan).find((o) => o.key === 'orig-m');
+  assert.ok(Math.abs(late.scale - 2) < 0.02 && Math.abs(late.alpha - 100) < 0.5, 'doubled node lands full');
+});
+
+ok('#626 contract: every joiner has landed by t->1 — no held frames', () => {
+  for (const seed of [0, 1, 7, 4096]) {
+    const to = Array.from({ length: 48 }, (_, k) => ({
+      assetId: 'a', x: (k % 8) * 100, y: Math.floor(k / 8) * 100, scale: 2, alpha: 100, key: 'j' + k,
+    }));
+    const plan = planMorph([], to, seed);
+    const out = blendItems([], to, 0.999, plan);
+    for (const o of out) {
+      assert.ok(Math.abs(o.scale - 2) < 0.02, `joiner ${o.key}@${seed} at full scale (got ${o.scale})`);
+      assert.ok(Math.abs(o.alpha - 100) < 0.5, `joiner ${o.key}@${seed} at full alpha (got ${o.alpha})`);
+    }
+  }
 });
 
 ok('blendItems shortest-path angle interpolation wraps correctly', () => {

@@ -38,9 +38,14 @@
  *  - colour/accent no longer interpolate. A tint lerp is a NEW ATLAS CELL
  *    every frame (the tint is baked — see liveAtlas.mjs), which is the
  *    rebake churn of #561. Swapping at the minimum costs one cell, not sixty.
- *  - unmatched items no longer alpha-fade (that fade was the optical
- *    cross-dissolve the Always Alive protocol bans): a leaver shrinks out by
- *    its window's midpoint, a joiner grows in from it. (#626 redoes both.)
+ *  - #626 JOINER/LEAVER PAIRING (obvious face / invisible face): unmatched
+ *    targets are joiners and draw a seeded entrance — pop (scale punch with
+ *    overshoot) or fade-up along a center-out spatial wavefront. Unmatched
+ *    sources are leavers and exit in the blind spot: each borrows a joiner's
+ *    window so its quiet exit (seeded pick of alpha fade or shrink-out,
+ *    never a big move) completes while the joiner's peak motion holds the
+ *    eye. Mirror/symmetry doubling rides the joiner path — the doubled half
+ *    grows in staggered instead of appearing.
  *  - every window closes at or before t=1 (delay ≤ STAGGER, dur ≥ DUR_MIN,
  *    STAGGER + DUR_MIN + DUR_JIT === 1), so the completion frame's handoff
  *    to raw toItems holds no frame and pops nothing.
@@ -279,8 +284,7 @@ export function nodeWindow(i, seed = 0) {
 /** Transition progress -> this node's own progress, clamped to its window. */
 function nodeT(t, i, seed) {
   const { delay, dur } = nodeWindow(i, seed);
-  const u = (t - delay) / dur;
-  return u <= 0 ? 0 : (u >= 1 ? 1 : u);
+  return windowU(t, delay, dur);
 }
 
 /** Smootherstep — zero slope at both ends, so no node starts or stops with a jerk. */
@@ -290,11 +294,24 @@ function ease(x) {
 }
 
 const shrinkEnv = (u) => 1 - ease(u * 2);      // 1 -> 0 across the window's first half
-const growEnv = (u) => ease(u * 2 - 1);        // 0 -> 1 across its second half
 // (swapEnv died in #623: one scale-to-zero wave for every state change read
 // as a glitch, not a trick. Matched nodes now draw from the move vocabulary
-// below; growEnv/shrinkEnv survive only for the unmatched joiner/leaver
-// paths until #626 redoes them.)
+// below; growEnv died in #626 — joiners play pop or the wavefront now, and
+// shrinkEnv survives as the leaver's quiet exit envelope: the same first-half
+// 1 -> 0 shape carries alpha for LEAVE_FADE and scale for LEAVE_SHRINK.)
+
+/** #626 pop: the legible arrival — 0 at u=0, punches ~16% past full size, settles at 1. */
+function popEnv(u) {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  return 1 - Math.cos(u * Math.PI * 1.5) * Math.exp(-3 * u);
+}
+
+/** Any window's local progress: nodeT is this with the seeded stagger window. */
+function windowU(t, delay, dur) {
+  const u = (t - delay) / dur;
+  return u <= 0 ? 0 : (u >= 1 ? 1 : u);
+}
 
 // ── #623: the move vocabulary ───────────────────────────────────────────────
 // The stagger (nodeWindow) still picks WHEN a node plays; a second seeded
@@ -357,6 +374,55 @@ function moveScale(move, u) {
 
 const numOr = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
+// ── #626: the joiner/leaver pairing ─────────────────────────────────────────
+// Attention is a single spotlight: spend it on arrivals, departures happen in
+// the dark. Joiners draw a seeded entrance (pop or wavefront); leavers stay
+// quiet (fade or shrink) and borrow a joiner's window so the exit lands
+// while the joiner's peak motion holds the eye. The invisible face doesn't
+// improvise — a leaver never plays a big move.
+export const JOIN_POP = 0;    // scale punch with overshoot — the legible arrival
+export const JOIN_WAVE = 1;   // fade-up along a center-out spatial wavefront
+export const LEAVE_FADE = 0;  // alpha fade, scale untouched — quiet
+export const LEAVE_SHRINK = 1;// shrink-out, alpha untouched — quiet
+
+const JOIN_SALT = 0x6a6f696e;
+const LEAVE_SALT = 0x6c656176;
+
+/** Which entrance the joiner at to-index `i` plays. Index-stable per seed. */
+export function joinMoveFor(i, seed) {
+  return hash01(i, (seed ^ JOIN_SALT) | 0) < 0.5 ? JOIN_POP : JOIN_WAVE;
+}
+
+/** Which quiet exit the leaver at window index `i` plays. Index-stable per seed. */
+export function leaveMoveFor(i, seed) {
+  return hash01(i, (seed ^ LEAVE_SALT) | 0) < 0.5 ? LEAVE_FADE : LEAVE_SHRINK;
+}
+
+/**
+ * Center-out wavefront over the to-list: each item's distance from the
+ * centroid, normalized by the max. Wave joiners stagger by this instead of
+ * the hash stagger, so the fade-up visibly sweeps outward from the middle.
+ */
+function wavefront(toList) {
+  const n = toList.length;
+  let cx = 0, cy = 0;
+  for (const it of toList) {
+    const x = Number(it.x), y = Number(it.y);
+    cx += Number.isFinite(x) ? x : 0;
+    cy += Number.isFinite(y) ? y : 0;
+  }
+  cx /= n || 1; cy /= n || 1;
+  const ds = new Array(n);
+  let maxD = 0;
+  for (let k = 0; k < n; k++) {
+    const x = Number(toList[k].x), y = Number(toList[k].y);
+    const d = Math.hypot(Number.isFinite(x) ? x - cx : 0, Number.isFinite(y) ? y - cy : 0);
+    ds[k] = d;
+    if (d > maxD) maxD = d;
+  }
+  return { ds, maxD: maxD || 1 };
+}
+
 /**
  * Blend fromItems -> toItems at eased t in [0,1]. t<=0 returns fromItems
  * verbatim, t>=1 returns toItems verbatim (reference equality, so callers
@@ -369,8 +435,10 @@ const numOr = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
  * scale with overshoot regrow, fade dips alpha to ~15% with scale untouched.
  * Its COSTUME (asset, colour, accent, role, key) is the source item's below
  * u=0.5 and the target item's above it, so the swap only ever happens at
- * the move's lowest-visibility moment. An unmatched target grows in from
- * the midpoint; an unmatched source shrinks out by it. Nothing lerps a tint.
+ * the move's lowest-visibility moment. #626: unmatched targets are joiners
+ * (seeded pop or center-out wavefront fade-up); unmatched sources are
+ * leavers (seeded alpha-fade or shrink-out inside a borrowed joiner window).
+ * Nothing lerps a tint.
  *
  * `plan` is the planMorph() result captured at transition start (#419):
  * the pairing stays fixed for the whole transition while every slot
@@ -413,6 +481,20 @@ export function blendItems(fromItems, toItems, t, plan = null) {
   const fromLen = fromList.length || 1;
   const toLen = toList.length || 1;
   const w = Math.min(1, t / ORDER_SETTLE); // depth-key weight: 0 = from order, 1 = to order
+  // #626: the joiner's window — pop rides the seeded stagger, wave rides the
+  // center-out spatial wavefront. The wavefront is computed lazily, once per
+  // blend, and only if a wave joiner actually needs it.
+  let wf = null;
+  const joinWindow = (i) => {
+    if (joinMoveFor(i, seed) === JOIN_WAVE) {
+      if (!wf) wf = wavefront(toList);
+      return { delay: STAGGER * (wf.ds[i] / wf.maxD), dur: DUR_MIN + DUR_JIT * hash01(i * 2 + 1, seed) };
+    }
+    return nodeWindow(i, seed);
+  };
+  // to-indices with no partner: the joiners. Leavers borrow these windows.
+  const joinerIdx = [];
+  for (let i = 0; i < toList.length; i++) if (!partner[i]) joinerIdx.push(i);
   const out = []; // { o: item, k: depth key }
   for (let i = 0; i < toList.length; i++) {
     const to = toList[i];
@@ -453,18 +535,48 @@ export function blendItems(fromItems, toItems, t, plan = null) {
         o,
       });
     } else {
-      // unmatched target grows in from its window's midpoint (#444: raw position)
-      out.push({ k: toRank, o: { ...to, scale: (Number(to.scale) || 1) * growEnv(u) } });
+      // #626 joiner — the obvious face. Seeded pick: pop (scale punch with
+      // overshoot across the full window) or fade-up along the center-out
+      // wavefront (scale at target, alpha ramps). Arrivals are supposed to
+      // be seen. (#444: raw position.)
+      const jm = joinMoveFor(i, seed);
+      const { delay: jd, dur: jdur } = joinWindow(i);
+      const ju = windowU(t, jd, jdur);
+      const baseScale = Number(to.scale) || 1;
+      const baseAlpha = numOr(to.alpha, 100);
+      out.push({
+        k: toRank,
+        o: jm === JOIN_POP
+          ? { ...to, scale: baseScale * popEnv(ju), alpha: baseAlpha }
+          : { ...to, scale: baseScale, alpha: baseAlpha * ease(ju) },
+      });
     }
   }
-  // unmatched source shrinks out by its window's midpoint; its key drifts past
-  // every to-rank so it trails at settle. Window indices continue past the
-  // to-list so a leaver and a joiner never share one node's slot in the wave.
+  // #626 leaver — the invisible face. Each leaver borrows a joiner's window,
+  // so its quiet exit completes while the paired joiner's peak motion holds
+  // the eye: the eye is busy, and the leaver is gone when attention returns.
+  // The exit is a seeded pick of alpha fade or shrink-out — never a big
+  // move (the invisible face doesn't improvise). With no joiners to hide
+  // behind, it falls back to its own staggered window. Its key still drifts
+  // past every to-rank so it trails at settle.
   let wi = toList.length;
+  let li = 0;
   for (const f of onlyFrom) {
     const fromRank = (idxFrom.get(f) ?? 0) / fromLen;
-    const u = nodeT(t, wi++, seed);
-    out.push({ k: (1 - w) * fromRank + w * 2, o: { ...f, scale: (Number(f.scale) || 1) * shrinkEnv(u) } });
+    const lm = leaveMoveFor(wi, seed);
+    const { delay: ld, dur: ldur } = joinerIdx.length
+      ? joinWindow(joinerIdx[li++ % joinerIdx.length])
+      : nodeWindow(wi, seed);
+    const lu = windowU(t, ld, ldur);
+    const baseScale = Number(f.scale) || 1;
+    const baseAlpha = numOr(f.alpha, 100);
+    out.push({
+      k: (1 - w) * fromRank + w * 2,
+      o: lm === LEAVE_FADE
+        ? { ...f, alpha: baseAlpha * shrinkEnv(lu) }
+        : { ...f, scale: baseScale * shrinkEnv(lu) },
+    });
+    wi++;
   }
   // Array.prototype.sort is stable: ties keep emission order.
   out.sort((x, y) => x.k - y.k);
