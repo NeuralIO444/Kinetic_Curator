@@ -2,6 +2,7 @@
 // Lazy-loaded: the live bundle never imports this until the modal opens.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PRIMITIVES, polyInner } from '../assets/primitives.js';
+import { traceSilhouette, blendContours, outerLoop, loopsToD, loopsToPath } from '../assets/silhouette.js';
 import { ingestSvg } from '../assets/ingest.js';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
@@ -18,6 +19,7 @@ function axes(p) {
 
 function innerFor(p) {
   if (p.kind === 'poly') return polyInner(p.n);
+  if (p.kind === 'merged') return p.svg || '';
   return PRIMITIVES[p.kind] || p.svg || '';
 }
 
@@ -36,6 +38,16 @@ function fresh(kind, extra = {}) {
   return { key: seq++, kind, x: 50, y: 50, rot: 0, scale: 1, sx: 1, sy: 1, token: 'ink', stroke: false, ...extra };
 }
 
+/** Fingerprint of everything the merge trace depends on (module-level: no hook deps). */
+function mergeKeyFor(allParts, keys, meltAmt, blend, subKeys = []) {
+  const set = allParts.filter((p) => keys.includes(p.key));
+  const fp = set
+    .map((p) => [p.key, p.kind, p.x, p.y, p.rot, p.sx, p.sy, p.token, p.stroke, p.n, p.svg,
+      subKeys.includes(p.key) ? 'sub' : 'add'].join('|'))
+    .join(';');
+  return `${blend ? 'B' : 'M'}|${meltAmt}|${fp}`;
+}
+
 export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const [parts, setParts] = useState(() => (
     seedSvg ? [fresh('seed', { svg: seedSvg })] : []
@@ -46,6 +58,21 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const [sides, setSides] = useState(6);
   const [error, setError] = useState('');
   const [undoDepth, setUndoDepth] = useState(0);
+  // Merge kit: tick 2+ parts to fuse. The preview traces the fused silhouette
+  // live (accent); bake replaces the set with one 'merged' part via commit().
+  // Trace results live in state, written only from async continuations —
+  // the effect body itself never calls setState (lint rule).
+  const [mergeKeys, setMergeKeys] = useState([]);
+  // Subtract kit: ticked shapes flipped to "minus" punch holes out of the
+  // merge instead of fusing in. Always a subset of mergeKeys.
+  const [subtractKeys, setSubtractKeys] = useState([]);
+  const [melt, setMelt] = useState(0);
+  const [blendOn, setBlendOn] = useState(false);
+  const [blendT, setBlendT] = useState(0.5);
+  const [blendHold, setBlendHold] = useState(false);
+  const [mergeOut, setMergeOut] = useState({ key: '', svg: '', d: '' });
+  const [blendPair, setBlendPair] = useState(null);
+  const traceToken = useRef(0);
   const drag = useRef(null);
   const svgRef = useRef(null);
   const sheetRef = useRef(null);
@@ -77,6 +104,117 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
 
   const svg = useMemo(() => toSvg(parts), [parts]);
   const compound = parts.length > 1;
+  // Merge keys always name live parts (deleted keys are filtered, never stored back).
+  const validMergeKeys = useMemo(
+    () => mergeKeys.filter((k) => parts.some((p) => p.key === k)),
+    [mergeKeys, parts],
+  );
+  const validSubtractKeys = useMemo(
+    () => subtractKeys.filter((k) => validMergeKeys.includes(k)),
+    [subtractKeys, validMergeKeys],
+  );
+  // 2+ ticked with at least one positive: 1 add + 1 subtract punches a hole.
+  const merging = validMergeKeys.length >= 2
+    && validMergeKeys.some((k) => !validSubtractKeys.includes(k));
+  const toggleSubtract = (key) => {
+    setSubtractKeys((ks) => (ks.includes(key) ? ks.filter((k) => k !== key) : [...ks, key]));
+    setBlendOn(false);
+  };
+
+  // Live merge preview: rasterize the merge set, trace the fused silhouette
+  // (the canvas boolean-unions overlaps for free), melt the joins
+  // metaball-style, draw in accent. Dragging a part or moving the slider
+  // re-traces; stale async runs are dropped by the token. While
+  // re-tracing, the previous preview stays up (no flicker).
+  useEffect(() => {
+    const set = parts.filter((p) => validMergeKeys.includes(p.key));
+    const positives = set.filter((p) => !validSubtractKeys.includes(p.key));
+    const negatives = set.filter((p) => validSubtractKeys.includes(p.key));
+    const key = mergeKeyFor(parts, validMergeKeys, melt, blendOn, validSubtractKeys);
+    if (mergeOut.key === key) return undefined;
+    const token = ++traceToken.current;
+    let cancelled = false;
+    (async () => {
+      try {
+        let svgOut = '';
+        let dOut = '';
+        let pair = null;
+        if (set.length >= 2 && positives.length >= 1) {
+          const loops = await traceSilhouette(toSvg(positives), 320, melt, toSvg(negatives));
+          if (cancelled || token !== traceToken.current) return;
+          dOut = loopsToD(loops);
+          if (dOut) {
+            svgOut = loopsToPath(loops).replace('currentColor', 'var(--accent)');
+            // Blend morphs the outer silhouettes of the first two merge
+            // shapes. Traced lazily: only while the blend preview is on.
+            if (blendOn) {
+              const la = outerLoop(await traceSilhouette(toSvg([positives[0]]), 200));
+              const lb = outerLoop(await traceSilhouette(toSvg([positives[1]]), 200));
+              if (cancelled || token !== traceToken.current) return;
+              pair = la && lb ? { a: la, b: lb } : null;
+            }
+          }
+        }
+        if (cancelled || token !== traceToken.current) return;
+        setMergeOut({ key, svg: svgOut, d: dOut });
+        setBlendPair(pair);
+      } catch {
+        if (cancelled || token !== traceToken.current) return;
+        setMergeOut({ key, svg: '', d: '' });
+        setBlendPair(null);
+        setError('merge preview failed — shapes stay separate');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [parts, validMergeKeys, validSubtractKeys, melt, blendOn, mergeOut.key]);
+
+  // Blend scrub: ping-pong t 0→1→0 while the toggle is on, unless the user
+  // is holding the manual slider.
+  useEffect(() => {
+    if (!blendOn || blendHold) return undefined;
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (now) => {
+      setBlendT(0.5 - 0.5 * Math.cos(((now - t0) / 2600) * Math.PI * 2));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [blendOn, blendHold]);
+
+  const blendSvg = useMemo(() => {
+    if (!blendOn || !blendPair) return '';
+    return loopsToPath([blendContours(blendPair.a, blendPair.b, blendT)])
+      .replace('currentColor', 'var(--accent)');
+  }, [blendOn, blendPair, blendT]);
+
+  // The merge preview replaces the ticked parts on stage; the rest draw normally.
+  // A shrunken merge set hides the preview via `merging` (no stale flash).
+  const stageBase = useMemo(
+    () => toSvg(merging ? parts.filter((p) => !validMergeKeys.includes(p.key)) : parts),
+    [parts, validMergeKeys, merging],
+  );
+  // Blend falls back to the merged preview until its own trace lands.
+  const previewSvg = merging ? (blendOn ? (blendSvg || mergeOut.svg) : mergeOut.svg) : '';
+  // Bake is only offered when the trace matches the current inputs.
+  const bakeReady = mergeOut.key === mergeKeyFor(parts, validMergeKeys, melt, blendOn, validSubtractKeys) && !!mergeOut.d;
+
+  /** Fuse the merge set into one part; undo restores the originals. */
+  const bakeMerge = () => {
+    const key = mergeKeyFor(partsRef.current, validMergeKeys, melt, blendOn, validSubtractKeys);
+    if (mergeOut.key !== key || !mergeOut.d) return;
+    const set = partsRef.current.filter((p) => validMergeKeys.includes(p.key));
+    if (set.length < 2) return;
+    const mergedPart = fresh('merged', {
+      svg: `<path d="${mergeOut.d}" fill-rule="evenodd" fill="currentColor"/>`,
+    });
+    commit((p) => [...p.filter((row) => !validMergeKeys.includes(row.key)), mergedPart]);
+    setMergeKeys([]);
+    setSubtractKeys([]);
+    setBlendOn(false);
+    setBlendHold(false);
+    setPicked(partsRef.current.length - 1);
+  };
 
   // Esc closes the modal; the live canvas keeps running underneath.
   useEffect(() => {
@@ -109,7 +247,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const delSel = () => {
     if (picked < 0) return;
     const i = picked;
+    const deadKey = partsRef.current[i]?.key;
     commit((p) => p.filter((_, n) => n !== i));
+    if (deadKey !== undefined) setMergeKeys((ks) => ks.filter((k) => k !== deadKey));
     setPicked(-1);
   };
   const dup = () => {
@@ -219,7 +359,8 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
           <svg ref={svgRef} viewBox="0 0 100 100" style={stage}
             onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
             <g dangerouslySetInnerHTML={{ __html: grid }} />
-            <g dangerouslySetInnerHTML={{ __html: svg }} />
+            <g dangerouslySetInnerHTML={{ __html: stageBase }} />
+            {previewSvg ? <g dangerouslySetInnerHTML={{ __html: previewSvg }} /> : null}
             {picked >= 0 && parts[picked] && (
               <circle cx={parts[picked].x} cy={parts[picked].y} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
             )}
@@ -257,6 +398,60 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <button type="button" className="chip-btn" disabled={picked < 0} title="Send the picked shape one step back" onClick={() => zShift(-1)}>Z-</button>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Bring the picked shape one step forward" onClick={() => zShift(1)}>Z+</button>
             </div>
+            <div style={mergeBox}>
+              <div style={mergeTitle}>MERGE</div>
+              {parts.length === 0 && <span style={dimNote}>add 2+ shapes, then tick them to fuse</span>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 96, overflowY: 'auto' }}>
+                {parts.map((p, i) => {
+                  const ticked = validMergeKeys.includes(p.key);
+                  const isSub = validSubtractKeys.includes(p.key);
+                  return (
+                    <div key={p.key} style={mergeRow}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title={`Fuse shape ${i + 1} (${p.kind}) into the merge`}>
+                        <input type="checkbox" checked={ticked}
+                          onChange={(e) => {
+                            setMergeKeys((ks) => (e.target.checked ? [...ks, p.key] : ks.filter((k) => k !== p.key)));
+                            if (!e.target.checked) setSubtractKeys((ks) => ks.filter((k) => k !== p.key));
+                          }} />
+                        <span>{i + 1} · {p.kind}</span>
+                      </label>
+                      {ticked && (
+                        <button type="button" className="chip-btn"
+                          title={isSub ? `Shape ${i + 1} subtracts: it punches a hole out of the merge` : `Shape ${i + 1} adds: flip to subtract and it cuts a hole instead`}
+                          onClick={() => toggleSubtract(p.key)}
+                          style={isSub ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}>
+                          {isSub ? '−' : '+'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <label style={lbl} title="Melt the fused joins, metaball-style. 0 is a tight union.">
+                melt {melt}
+                <input type="range" min="0" max="12" step="0.5" value={melt} disabled={!merging}
+                  onChange={(e) => setMelt(+e.target.value)} style={{ width: '100%' }} />
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                <button type="button" className="chip-btn" disabled={!merging || validSubtractKeys.length > 0}
+                  title={validSubtractKeys.length > 0 ? 'Blend is add-shapes only — untick the subtract shapes to morph' : 'Preview a morph between the first two merge shapes (preview only, never baked)'}
+                  onClick={() => { setBlendOn((b) => !b); setBlendHold(false); }}>
+                  {blendOn ? 'BLEND ■' : 'BLEND ▶'}
+                </button>
+                <button type="button" className="chip-btn" disabled={!bakeReady}
+                  title="Fuse the ticked shapes into one shape (undo restores the originals)"
+                  onClick={bakeMerge} style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                  BAKE MERGE
+                </button>
+              </div>
+              {blendOn && (
+                <label style={lbl} title="Scrub the morph by hand (pauses the animation)">
+                  blend {Math.round(blendT * 100)}%
+                  <input type="range" min="0" max="1" step="0.01" value={blendT}
+                    onChange={(e) => { setBlendT(+e.target.value); setBlendHold(true); }} style={{ width: '100%' }} />
+                </label>
+              )}
+            </div>
             <label style={lbl} title="Which family the saved asset lands in.">
               family
               <select value={category} title="Which family the saved asset lands in." onChange={(e) => setCategory(e.target.value)} style={field}>
@@ -269,13 +464,13 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
             </label>
             {error && <p style={{ margin: 0, fontSize: 10, color: 'var(--accent)' }}>{error}</p>}
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
-              Sx/Sy stretch on one axis. S± stays uniform. No boolean. Pen stays in Illustrator.
+              Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, melt rounds the joins; flip a ticked shape to − and it punches a hole instead; blend is preview-only.
             </p>
           </div>
         </div>
         <footer style={foot}>
           <button type="button" className="chip-btn" title="Remove the last added shape" onClick={undo} disabled={!undoDepth}>UNDO</button>
-          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); }}>CLEAR</button>
+          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); setMergeKeys([]); setSubtractKeys([]); setBlendOn(false); setBlendHold(false); }}>CLEAR</button>
           <button type="button" className="chip-btn" title="Download the motif as an SVG file" onClick={exportSvg} disabled={!parts.length && !seedSvg}>EXPORT SVG</button>
           <button type="button" className="chip-btn" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length && !seedSvg} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
         </footer>
@@ -299,5 +494,9 @@ const head = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px
 const body = { display: 'flex', gap: 12, padding: 12, flex: '1 1 auto', minHeight: 0 };
 const stage = { background: '#0a0a0a', border: '1px solid var(--line)', flex: '1 1 auto', minWidth: 280, height: '100%', touchAction: 'none' };
 const foot = { display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line)', flex: '0 0 auto' };
+const mergeBox = { border: '1px solid var(--line)', padding: 6, display: 'flex', flexDirection: 'column', gap: 5 };
+const mergeTitle = { fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: 'var(--dim)' };
+const mergeRow = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--ink)', cursor: 'pointer' };
+const dimNote = { fontSize: 9, color: 'var(--dim)' };
 const lbl = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 9, letterSpacing: '0.08em', color: 'var(--dim)', textTransform: 'uppercase' };
 const field = { background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', fontSize: 11, padding: '4px 6px' };
