@@ -60,20 +60,45 @@ function clampHop(it, q) {
  * a main-thread rebuild spike once per tick instead of spread out). Same
  * rate, continuous instead of stepped: smooth per-frame motion, and
  * rounding thresholds are no longer crossed in lockstep across layers.
+ *
+ * Hitch fix — the value quantizers (Math.round / toFixed) remained, so
+ * each layer's geoSig still invalidated whenever a rounded value stepped
+ * (irregular ~0.8–2s spacing): a full geometry rebuild and a single-frame
+ * canvas blink. The drift is now a smooth post-geometry offset applied
+ * after buildPlacements (see the warp pass below), not a mutation of the
+ * layout params that participate in geometrySignature. Base jitter /
+ * displacement / noiseSpeed stay stable, the cache holds, and the motion
+ * is continuous.
  */
+
+// Deterministic pseudo-random in [0, 1) for stable per-point drift offsets.
+// Integer arithmetic only (no float magic constants).
+function hash01(n) {
+  let h = Math.imul((n | 0) + 0x9e3779b9, 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2545f491) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return h / 4294967296;
+}
+
 function applyLifeDrift(lp, locked, loopTimeMs) {
   const depth = lp.lifeDrift ?? 0.35;
   if (depth <= 0.01) return;
   const t = loopTimeMs * 0.0005;
+  // Continuous drift offsets, applied post-geometry. NOT written into
+  // lp.jitter / lp.displacement / lp.noiseSpeed — those feed
+  // geometrySignature and must stay stable or the placement cache
+  // invalidates every time a rounded value steps (the hitch).
+  const drift = {};
   if (!locked.jitter) {
-    lp.jitter = Math.max(0, Math.min(200, Math.round(lp.jitter + Math.sin(t * 0.7) * 12 * depth)));
+    drift.j = Math.sin(t * 0.7) * 12 * depth;
   }
   if (!locked.displacement) {
-    lp.displacement = Math.max(0, Math.min(250, Math.round(lp.displacement + Math.sin(t * 0.45 + 1.2) * 18 * depth)));
+    drift.d = Math.sin(t * 0.45 + 1.2) * 18 * depth;
   }
   if (!locked.noiseSpeed) {
-    lp.noiseSpeed = Math.max(0.1, Math.min(3, +(lp.noiseSpeed + Math.sin(t * 0.3 + 0.5) * 0.25 * depth).toFixed(2)));
+    drift.ns = Math.sin(t * 0.3 + 0.5) * 0.25 * depth;
   }
+  lp.lifeDriftOffset = drift;
 }
 
 export function createLiveResolver() {
@@ -414,7 +439,11 @@ export function createLiveResolver() {
             // change only affects the phase's rate from that point on.
             const nt0 = (seed & 0xffff) * 0.02;
             const dSec = Math.max(0, nowMs - wp.lastMs) * 0.001;
-            wp.base += dSec * (layoutParams.noiseSpeed ?? 0.5);
+            // Hitch fix — noiseSpeed drift is a smooth rate modulation,
+            // not a quantized geometry param. Base noiseSpeed stays stable
+            // for the cache; the drift adds to the warp phase rate.
+            const driftNs = layoutParams.lifeDriftOffset?.ns ?? 0;
+            wp.base += dSec * ((layoutParams.noiseSpeed ?? 0.5) + driftNs);
             // #460 — high-water mark, not a raw assignment: a backward jump
             // (a rejected/rolled-back frame, #421-style) must not walk
             // lastMs down to match. Without this, the clamp above correctly
@@ -450,6 +479,26 @@ export function createLiveResolver() {
                 x: it.x + (curDx - baseDx),
                 y: it.y + (curDy - baseDy),
               };
+            });
+          }
+
+          // Hitch fix — apply life-drift as smooth post-geometry offsets.
+          // The base jitter/displacement/noiseSpeed in layoutParams stay
+          // stable (geometry cache holds); the drift wobble is continuous.
+          const drift = layoutParams.lifeDriftOffset;
+          if (drift && (drift.j || drift.d)) {
+            items = items.map((it, k) => {
+              let dx = 0, dy = 0;
+              if (drift.j) {
+                dx += (hash01(k) - 0.5) * drift.j;
+                dy += (hash01(k + 7919) - 0.5) * drift.j;
+              }
+              if (drift.d) {
+                // Subtle additional wobble; base displacement is in geometry.
+                dx += (hash01(k + 104729) - 0.5) * drift.d * 0.3;
+                dy += (hash01(k + 104729 + 7919) - 0.5) * drift.d * 0.3;
+              }
+              return dx || dy ? { ...it, x: it.x + dx, y: it.y + dy } : it;
             });
           }
         }

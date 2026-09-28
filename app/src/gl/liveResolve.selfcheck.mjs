@@ -364,10 +364,14 @@ test('#425: per-layer life drift is byte-identical across a focus swap', () => {
   }
   // Per-layer correctness, not just continuity: B's locked jitter is raw in
   // BOTH frames; A's unlocked jitter drifts from its own 40/0.4 base in both.
+  // Hitch fix: drift no longer mutates the base params (stable for the
+  // geometry cache); it rides as lifeDriftOffset applied post-geometry.
   assert.equal(b1.layoutParams.jitter, B425.jitter, 'locked jitter never drifts (pre-swap)');
   assert.equal(b2.layoutParams.jitter, B425.jitter, 'locked jitter never drifts (post-swap)');
-  assert.notEqual(a1.layoutParams.jitter, A425.jitter, "A's unlocked jitter drifts");
-  assert.notEqual(a1.layoutParams.displacement, A425.displacement, "A's unlocked displacement drifts");
+  assert.equal(a1.layoutParams.jitter, A425.jitter, "A's base jitter stays stable (no hitch)");
+  assert.ok(a1.layoutParams.lifeDriftOffset?.j, "A's unlocked jitter drifts via offset");
+  assert.equal(a1.layoutParams.displacement, A425.displacement, "A's base displacement stays stable");
+  assert.ok(a1.layoutParams.lifeDriftOffset?.d, "A's unlocked displacement drifts via offset");
   // And with it, A's world-warped item coords: same weather + same drift →
   // the warp must be identical across the swap (continuity of the render).
   assert.deepEqual(
@@ -383,21 +387,29 @@ test('#425: life drift pauses with batch exports / slowRender / low lifeDrift', 
     activeLayerId: 'lyr-a', layoutParams: A425, seed: 111, lockedParams: {},
     layerSnapshots: {},
   };
-  const jit = (over) => {
+  const driftOf = (over) => {
     const r = createLiveResolver();
     const out = r.resolveLayers(input425({ ...base, ...over }));
-    const v = out.find((l) => l.id === 'lyr-a').layoutParams.jitter;
+    const lp = out.find((l) => l.id === 'lyr-a').layoutParams;
     r.dispose();
-    return v;
+    return lp;
   };
-  assert.notEqual(jit({}), A425.jitter, 'control: drift is on by default');
-  assert.equal(jit({ batchPaused: true }), A425.jitter, 'batch export pauses drift');
-  assert.equal(jit({ slowRender: true }), A425.jitter, 'slowRender pauses drift');
-  assert.equal(
-    jit({ layoutParams: { ...A425, lifeDrift: 0.01 } }),
-    A425.jitter,
-    'lifeDrift <= 0.01 turns drift off for that layer',
-  );
+  // Hitch fix: drift no longer mutates jitter/displacement/noiseSpeed
+  // (those feed geometrySignature — mutating them invalidated the
+  // placement cache and caused single-frame blinks). Base params stay
+  // stable; the drift rides as a smooth post-geometry offset.
+  const control = driftOf({});
+  assert.equal(control.jitter, A425.jitter, 'control: base jitter stays stable (no hitch)');
+  assert.ok(control.lifeDriftOffset?.j, 'control: drift is on by default (offset present)');
+  const paused = driftOf({ batchPaused: true });
+  assert.equal(paused.jitter, A425.jitter, 'batch export pauses drift');
+  assert.equal(paused.lifeDriftOffset, undefined, 'batch export: no drift offset');
+  const slow = driftOf({ slowRender: true });
+  assert.equal(slow.jitter, A425.jitter, 'slowRender pauses drift');
+  assert.equal(slow.lifeDriftOffset, undefined, 'slowRender: no drift offset');
+  const off = driftOf({ layoutParams: { ...A425, lifeDrift: 0.01 } });
+  assert.equal(off.jitter, A425.jitter, 'lifeDrift <= 0.01 turns drift off for that layer');
+  assert.equal(off.lifeDriftOffset, undefined, 'lifeDrift <= 0.01: no drift offset');
 });
 
 test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', () => {
