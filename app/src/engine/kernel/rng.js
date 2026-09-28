@@ -108,6 +108,9 @@ function hashChannel(s) {
 export const STRING_CHANNEL_GROUPS = Object.freeze({
   field: 'spatial',
   ca: 'spatial',
+  // #587 — the Voronoi mask places points, so it rides the spatial stream:
+  // re-rolling SPATIAL must move the veins, and re-rolling colour must not.
+  voronoi: 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([
