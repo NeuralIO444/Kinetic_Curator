@@ -123,4 +123,38 @@ assert.ok(pooled.ok);
 assert.strictEqual(pooled.asset.source, 'ingest');
 assert.strictEqual(pooled.asset.category, 'fragments');
 
+// ── #708 gap: gradient must survive the ONE path that carries untrusted
+// custom assets in — a loaded project file — and only through re-validation.
+{
+  const legal = { type: 'linear', dir: 'down', from: 'ink', to: 'accent' };
+  const withGrad = sanitizeOverlay([{ id: 'user:lit', svg: '<path d="M0 0"/>', gradient: legal }]);
+  assert.strictEqual(withGrad.length, 1);
+  assert.deepStrictEqual(withGrad[0].gradient, legal, 'a legal gradient must round-trip through project load');
+
+  // Untrusted input is re-validated, not trusted verbatim: an arbitrary
+  // colour (not a palette slot) must not survive, same as sanitizeGradient
+  // enforces everywhere else.
+  const withBadGrad = sanitizeOverlay([{ id: 'user:lit', svg: '<path d="M0 0"/>', gradient: { type: 'linear', from: '#ff0000', to: 'accent' } }]);
+  assert.ok(!('gradient' in withBadGrad[0]), 'an illegal gradient must not survive load');
+
+  // Absent stays absent — the field key itself must not appear, so a flat
+  // asset that never had a gradient is indistinguishable from one that did
+  // and lost it (hasGradient() and every `.gradient` truthiness check in
+  // liveAtlas.mjs / atlas.mjs depend on this).
+  const flat = sanitizeOverlay([{ id: 'user:flat', svg: '<path d="M0 0"/>' }]);
+  assert.ok(!('gradient' in flat[0]), 'an asset with no gradient must not gain the key');
+
+  // A duplicate keeps the source asset's gradient (duplicateAsset spreads
+  // `...asset`) — the boundary above is the only place it can be lost.
+  const dup = duplicateIntoOverlay(withGrad[0], withGrad);
+  assert.ok(dup.ok);
+  assert.deepStrictEqual(dup.asset.gradient, legal, 'duplicating a gradient asset must keep the gradient');
+
+  // Replacing an asset's SVG is a deliberate exception: a genuinely new
+  // shape does not inherit a gradient authored for the old one.
+  const replaced = replaceOverlayAsset('user:lit', '<svg viewBox="0 0 100 100"><circle r="10"/></svg>', withGrad);
+  assert.ok(replaced.ok);
+  assert.ok(!('gradient' in replaced.asset), 'replacing the shape must drop the old gradient, not carry it silently');
+}
+
 console.log('overlay.selfcheck: OK');

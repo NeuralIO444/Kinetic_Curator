@@ -1,7 +1,19 @@
 import { ingestSvg, duplicateAsset, isHostile, overlayId } from './ingest.js';
+import { sanitizeGradient } from './gradient.js';
 
 export const OVERLAY_CAP = 32;
 
+/**
+ * #701/#708 — this is the ONE trust boundary a custom asset's `gradient`
+ * field crosses: everything else (duplicateAsset spreading `...asset`,
+ * mergePool reading `asset.gradient` off canon or overlay alike) already
+ * carries an object-shaped field through untouched. A project file is
+ * untrusted input, so the field is re-validated here with the same
+ * sanitizeGradient the bakers trust — never passed through raw. Omitted
+ * (not `null`) when absent or invalid, so an asset with no gradient is
+ * indistinguishable from one that never had the field, and `hasGradient()`
+ * / the `raw.gradient` checks in liveLoop.mjs stay false as intended.
+ */
 export function sanitizeOverlay(list) {
   if (!Array.isArray(list)) return [];
   const out = [];
@@ -14,6 +26,7 @@ export function sanitizeOverlay(list) {
     if (!id.startsWith('user:')) continue;
     if (seen.has(id)) continue;
     seen.add(id);
+    const gradient = sanitizeGradient(raw.gradient);
     out.push({
       id,
       category: raw.category || 'fragments',
@@ -22,6 +35,7 @@ export function sanitizeOverlay(list) {
       compound: !!raw.compound,
       source: raw.source || 'overlay',
       svg: String(raw.svg),
+      ...(gradient ? { gradient } : {}),
     });
   }
   return out;

@@ -90,6 +90,7 @@ node src/gl/phase6.selfcheck.mjs
 node src/gl/costTiers.selfcheck.mjs
 node src/gl/governorEventLog.selfcheck.mjs
 node src/assets/ingest.selfcheck.mjs
+node src/assets/gradient.selfcheck.mjs
 node src/assets/overlay.selfcheck.mjs
 node src/state/overlayRoundtrip.selfcheck.mjs
 node src/assets/primitives.selfcheck.mjs

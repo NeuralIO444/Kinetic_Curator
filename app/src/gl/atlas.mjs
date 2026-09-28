@@ -18,6 +18,7 @@
 
 import { Resvg } from '@resvg/resvg-js';
 import { ASSETS } from '../data/assets/index.js';
+import { applyGradient } from '../assets/gradient.js';
 
 const ASSET_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 
@@ -39,10 +40,14 @@ function bakeCombo(assetId, ink, accent) {
   const asset = ASSET_BY_ID.get(assetId);
   if (!asset) throw new Error(`[atlas] unknown asset "${assetId}"`);
   const { x0, y0, x1, y1 } = CELL_UNITS;
+  // #701 — the stills path bakes the gradient with the REAL palette colours;
+  // the live path bakes the same ramp into its R/G mask. Same module, same
+  // stops, so a gradient asset prints what the canvas showed.
+  const body = applyGradient(asset.svg, asset.gradient, { ink, accent });
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CELL_PX}" height="${CELL_PX}" ` +
     `viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}">` +
-    subColors(asset.svg, ink, accent) +
+    subColors(body, ink, accent) +
     `</svg>`;
   const img = new Resvg(svg).render();
   const pixels = Buffer.from(img.pixels);

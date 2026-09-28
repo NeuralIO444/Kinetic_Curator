@@ -248,6 +248,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   let building = false;
   let buildToken = 0;
   let svgPool = null; // Map asset id -> svg fragment, rebuilt on customAssets change
+  let gradientPool = null; // #701 — Map asset id -> TE gradient, same lifetime
   let svgPoolRef = null;
 
   // ACCUM session state.
@@ -320,6 +321,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // Canon + custom (overlay) assets both carry `.svg` fragments — the
       // same field the offline baker rasterizes (gl/atlas.mjs bakeCombo).
       svgPool = new Map(pool.map((a) => [a.id, a.svg]));
+      // #701 — per-asset TE gradient declarations, keyed the same way. Built
+      // here so the baker never has to reach back into the asset catalogue
+      // (overlay assets come from the store, not from ASSETS).
+      gradientPool = new Map(pool.filter((a) => a.gradient).map((a) => [a.id, a.gradient]));
       svgPoolRef = customAssets;
     }
     return svgPool;
@@ -711,7 +716,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // independent, so a renderScale step skips the heavy sequential-SVG
       // bake and only the (cheap) grain LUTs rebuild.
       if (aKey !== atlasKey) {
-        const atlas = await bakeLiveAtlas(combos, svgById);
+        const atlas = await bakeLiveAtlas(combos, svgById, gradientPool);
         if (token !== buildToken) return; // superseded
         live.setAtlas(atlas.pixels, atlas.width, atlas.height, atlas.mipmaps);
         cells = Object.fromEntries(atlas.cells);

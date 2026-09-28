@@ -27,7 +27,18 @@ export const LIVE_CELL_UNITS = Object.freeze({ x0: -50, y0: -50, x1: 150, y1: 15
 const LIVE_GUTTER = 32;
 const ALPHA_CUTOFF = 4;
 
+import { applyGradient } from '../assets/gradient.js';
+
 export const comboKey = (asset) => asset;
+
+/**
+ * #701 — an asset that opts into a TE-limited gradient paints its ink with a
+ * ramp between palette SLOTS, which is exactly what this mask can carry: the
+ * stops bake as the mask primaries and the shader resolves them to the live
+ * palette per frame. Assets without the field are untouched.
+ */
+const withGradient = (svg, gradient) =>
+  applyGradient(svg, gradient, { ink: '#ff0000', accent: '#00ff00' });
 
 const subColors = (svg, ink, accent) =>
   svg
@@ -59,14 +70,15 @@ function rasterizeSvg(svgString, w, h) {
  * Bake one asset as an R/G mask. Ink = red (#ff0000), Accent = green (#00ff00).
  * Returns { data: Uint8Array (premultiplied RGBA), ink: [x0,y0,x1,y1]|null }
  */
-async function bakeCombo(assetId, svgById) {
+async function bakeCombo(assetId, svgById, gradientById) {
   const src = svgById.get(assetId);
   if (src == null) throw new Error(`[liveAtlas] unknown asset "${assetId}"`);
+  const body = withGradient(src, gradientById && gradientById.get(assetId));
   const { x0, y0, x1, y1 } = LIVE_CELL_UNITS;
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${LIVE_CELL_PX}" height="${LIVE_CELL_PX}" ` +
     `viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}">` +
-    subColors(src, '#ff0000', '#00ff00') +
+    subColors(body, '#ff0000', '#00ff00') +
     `</svg>`;
   const img = await rasterizeSvg(svg, LIVE_CELL_PX, LIVE_CELL_PX);
   const d = img.data;
@@ -132,7 +144,7 @@ function buildMipmaps(pixels, width, height) {
  * @param {Map<string,string>} svgById asset id -> SVG fragment
  * @returns {Promise<{pixels:Uint8Array,width:number,height:number,cells:Map,mipmaps:Array}>}
  */
-export async function bakeLiveAtlas(combos, svgById) {
+export async function bakeLiveAtlas(combos, svgById, gradientById = null) {
   const uniq = [];
   const seen = new Set();
   for (const c of combos) {
@@ -149,7 +161,7 @@ export async function bakeLiveAtlas(combos, svgById) {
   // Rasterize sequentially: parallel Image decodes thrash the raster pool
   for (let i = 0; i < uniq.length; i++) {
     const c = uniq[i];
-    const { data, ink } = await bakeCombo(c.asset, svgById);
+    const { data, ink } = await bakeCombo(c.asset, svgById, gradientById);
     const cx = (i % cols) * stride;
     const cy = Math.floor(i / cols) * stride;
     for (let y = 0; y < LIVE_CELL_PX; y++) {
