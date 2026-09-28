@@ -26,7 +26,7 @@ const AFFINITY = { self: 0.06, kin: 0.64, far: 0.30 };
 
 const FAMILIES = {
   mode: {
-    ordered: ['grid', 'rails', 'abacus', 'stratified', 'truchet'],
+    ordered: ['grid', 'rails', 'abacus', 'stratified', 'truchet', 'lsystem'],
     radial: ['fibonacci', 'phyllotaxis', 'radial', 'orbit'],
     live: ['swarm', 'hype', 'murmuration'],
     loose: ['random', 'noise', 'layers', 'flow', 'ca', 'voronoi'],

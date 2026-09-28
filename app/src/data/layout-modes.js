@@ -22,6 +22,7 @@ export const LAYOUT_MODES = [
   { id: 'rails',     name: 'rails',      glyph: 'rail'   },
   { id: 'ca',        name: 'cellular',   glyph: 'ca'     },
   { id: 'voronoi',   name: 'voronoi',    glyph: 'vein'   },
+  { id: 'lsystem',   name: 'l-system',   glyph: 'frond'  },
   { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
@@ -80,6 +81,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // #585 — degrees of divergence away from the golden angle. 0 is the golden
   // angle itself, where phyllotaxis and the fibonacci tile agree exactly.
   phylloDivergence: 0,
+  // #588 — L-system generation depth and branch angle (degrees).
+  lsysDepth: 4,
+  lsysAngle: 25,
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
   displacement: 0,
@@ -168,6 +172,10 @@ export const PARAM_SPEC = {
   // A fraction of a degree already re-counts the spiral arms, so the range is
   // small on purpose: past a few degrees the disc stops reading as growth.
   phylloDivergence: { min: -20, max: 20 },
+  // Depth is capped hard: the worst-case rule is 5^depth segments, and the
+  // walk must never outgrow the placement budget (see the sampler).
+  lsysDepth: { min: 1, max: 5, int: true },
+  lsysAngle: { min: 5, max: 90 },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   displacement: { min: 0, max: 250 },
