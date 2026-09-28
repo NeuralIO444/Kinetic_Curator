@@ -107,4 +107,80 @@ assert.ok(listed.includes('stratified'));
   );
 }
 
+// ── #585 phyllotaxis ────────────────────────────────────────────────────────
+{
+  const phyllo = getSampler('phyllotaxis');
+  const fib = getSampler('fibonacci');
+  assert.ok(listSamplers().includes('phyllotaxis'), 'phyllotaxis must be registered');
+
+  const W = 1000; const H = 700; const COUNT = 400;
+  /** Lay out the whole disc; jitter off so the geometry is the only thing measured. */
+  const disc = (sampler, phylloDivergence) => {
+    const out = [];
+    for (let i = 0; i < COUNT; i++) {
+      out.push(sampler({ i, count: COUNT, w: W, h: H, rng: () => 0.5, jitter: 0, seed: 7, phylloDivergence }));
+    }
+    return out;
+  };
+
+  // SIBLING, NOT STRANGER — at the default divergence (0 = the golden angle)
+  // phyllotaxis and the fibonacci tile must agree EXACTLY, not merely closely.
+  {
+    const p = disc(phyllo, 0);
+    const f = disc(fib, undefined);
+    for (let i = 0; i < COUNT; i++) {
+      assert.strictEqual(p[i].x, f[i].x, `divergence 0 must equal fibonacci exactly at i=${i}`);
+      assert.strictEqual(p[i].y, f[i].y, `divergence 0 must equal fibonacci exactly at i=${i}`);
+    }
+    // …and an absent/garbage divergence falls back to that same golden angle.
+    for (const bad of [undefined, null, NaN, 'x']) {
+      assert.strictEqual(disc(phyllo, bad)[137].x, f[137].x, `divergence ${bad} must fall back to golden`);
+    }
+  }
+
+  /**
+   * The dominant parastichy: the modal index gap between nearest neighbours.
+   * This is what the eye counts as spiral arms — at the golden angle the gaps
+   * land on consecutive Fibonacci numbers.
+   */
+  const parastichy = (pts) => {
+    const gaps = new Map();
+    for (let i = 0; i < pts.length; i++) {
+      let best = -1; let bd = Infinity;
+      for (let j = 0; j < pts.length; j++) {
+        if (i === j) continue;
+        const d = (pts[i].x - pts[j].x) ** 2 + (pts[i].y - pts[j].y) ** 2;
+        if (d < bd) { bd = d; best = j; }
+      }
+      const g = Math.abs(i - best);
+      gaps.set(g, (gaps.get(g) || 0) + 1);
+    }
+    return [...gaps.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  };
+
+  // THE ACCEPTANCE TEST — the parastichy shift is a count, not a vibe.
+  {
+    const FIBS = new Set([1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]);
+    const atGolden = parastichy(disc(phyllo, 0));
+    assert.ok(FIBS.has(atGolden), `the golden angle must produce a Fibonacci parastichy (got ${atGolden})`);
+    // A fraction of a degree re-counts the arms — that is the whole knob.
+    for (const off of [0.5, 1, 2, -1.5]) {
+      assert.notStrictEqual(parastichy(disc(phyllo, off)),
+        atGolden, `divergence ${off} must shift the parastichy away from ${atGolden}`);
+    }
+  }
+
+  // Bounds, count and determinism.
+  {
+    const p = disc(phyllo, 3);
+    assert.strictEqual(p.length, COUNT);
+    for (const q of p) {
+      assert.ok(Number.isFinite(q.x) && Number.isFinite(q.y), 'finite');
+      assert.ok(q.x >= 0 && q.x <= W && q.y >= 0 && q.y <= H, `point ${q.x},${q.y} left the plate`);
+    }
+    assert.deepStrictEqual(disc(phyllo, 3), p, 'same divergence, same disc');
+    assert.notDeepStrictEqual(disc(phyllo, 4), p, 'a different divergence is a different disc');
+  }
+}
+
 console.log('kernel/sample.selfcheck: OK (K2)', { modes: listSamplers().length });

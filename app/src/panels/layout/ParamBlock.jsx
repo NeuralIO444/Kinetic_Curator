@@ -61,6 +61,17 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         hint="How tightly placements pack; higher = denser"
         onChange={v => set('density', v)} defaultValue={d('density', DEFAULT_LAYOUT_PARAMS.density)}
         locked={lockedParams.density} onToggleLock={() => lock('density')} />
+      {/* #585: phyllotaxis divergence — offset in degrees from the golden
+          angle. The only knob that changes the parastichy (visible spiral-arm
+          count). At 0 the sampler is bit-identical to fibonacci; a fraction
+          of a degree off and the eye counts a different family. Mode-gated
+          per #272: visible but inert outside phyllotaxis, with the reason. */}
+      <RangeRow label="DIVERGENCE" value={layoutParams.phylloDivergence ?? 0} min={-20} max={20} step={0.1}
+        hint="Offset in degrees from the golden angle — changes the count of visible spiral arms (0 = same as the fibonacci tile)"
+        readout={`${(layoutParams.phylloDivergence ?? 0).toFixed(1)}°`}
+        disabled={mode !== 'phyllotaxis'} disabledReason="Phyllotaxis mode only"
+        onChange={v => set('phylloDivergence', v)} defaultValue={d('phylloDivergence', DEFAULT_LAYOUT_PARAMS.phylloDivergence)}
+        locked={lockedParams.phylloDivergence} onToggleLock={() => lock('phylloDivergence')} />
       {/* #310: Z-TIERS / NOISE FREQ / DISPLACE leave performer sight — they
           stay in state and presets/voices still set them, but the live knobs
           are gone. (MATERIAL and SHADING were already voice-only via #268.) */}

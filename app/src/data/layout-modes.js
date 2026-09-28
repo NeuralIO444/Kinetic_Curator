@@ -8,6 +8,9 @@ export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
   { id: 'grid',      name: 'grid',       glyph: 'grid'   },
   { id: 'fibonacci', name: 'fibonacci',  glyph: 'phi'    },
+  // #585 — the golden-angle family with the divergence exposed; `fibonacci`
+  // is its fixed point (see the sampler). Sibling, not duplicate.
+  { id: 'phyllotaxis', name: 'phyllotaxis', glyph: 'phyllo' },
   { id: 'radial',    name: 'radial',     glyph: 'rad'    },
   { id: 'swarm',     name: 'swarm boids', glyph: 'swarm'  },
   { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
@@ -72,6 +75,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
   accumulationFlow: 0, // #284 Phase B2: curl advection of the trail buffer (FLOW slider)
 
+  // #585 — degrees of divergence away from the golden angle. 0 is the golden
+  // angle itself, where phyllotaxis and the fibonacci tile agree exactly.
+  phylloDivergence: 0,
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
   displacement: 0,
@@ -157,6 +163,9 @@ export const PARAM_SPEC = {
   density: { min: 10, max: 100 }, // #272: capped at 100
   zTiers: { min: 1, max: 12, int: true },
   hueRotate: { min: 0, max: 360 },
+  // A fraction of a degree already re-counts the spiral arms, so the range is
+  // small on purpose: past a few degrees the disc stops reading as growth.
+  phylloDivergence: { min: -20, max: 20 },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   displacement: { min: 0, max: 250 },
