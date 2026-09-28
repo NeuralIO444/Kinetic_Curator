@@ -169,4 +169,40 @@ assert.strictEqual(typeof traceSilhouette, 'function');
   assert.deepStrictEqual(areas.map(Math.round), [36, 400, 10000]);
 }
 
+// --- edge padding (the edge-tear fix): a goo-expanded shape clipped at the
+// viewBox edge must trace to one clean loop. Without padding, the contour
+// touches the canvas bounds, marching squares clips it open, and the loop
+// fragments — the "tearing" at the stage edge. Mirrors traceSilhouette's
+// raster tail on hand-built grids (the DOM rasterizer isn't available here).
+{
+  const s = 320, goo = 8, radius = goo * s / 100;
+  const pad = Math.ceil(radius) + 2, S = s + pad * 2;
+  // Disc spilling past the right viewBox edge, clipped like the SVG rasterizer clips it.
+  const disc = (W, ox, oy, cx, cy, r) => {
+    const a = new Uint8Array(W * W);
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+      const vx = x - ox, vy = y - oy;
+      if (vx >= 0 && vy >= 0 && vx < s && vy < s && (vx - cx) ** 2 + (vy - cy) ** 2 <= r * r) a[y * W + x] = 1;
+    }
+    return a;
+  };
+  const run = (alpha, W) => {
+    const field = blurAlpha(alpha, W, W, radius);
+    const bin = new Uint8Array(W * W);
+    for (let i = 0; i < W * W; i++) bin[i] = field[i] > 0.5 ? 1 : 0;
+    return cleanMergeLoops(traceAlpha(bin, W, W));
+  };
+  const torn = run(disc(s, 0, 0, 300, 160, 34), s);
+  const tornMaxX = Math.max(...torn.flat().map(([x]) => x));
+  assert.ok(torn.length > 1 || tornMaxX >= s - 0.6,
+    `unpadded edge clip tears (loops=${torn.length}, maxX=${tornMaxX.toFixed(1)})`);
+  const fixed = run(disc(S, pad, pad, 300, 160, 34), S)
+    .map((loop) => loop.map(([x, y]) => [x - pad, y - pad]));
+  assert.strictEqual(fixed.length, 1, `padded edge clip is one loop, got ${fixed.length}`);
+  const fxs = fixed[0].map(([x]) => x);
+  assert.ok(Math.max(...fxs) < s, 'loop closes inside the viewBox');
+  assert.ok(fixed[0].length > 50, 'loop keeps its vertices');
+  assert.ok(Math.abs(loopArea(fixed[0])) > 1000, 'loop encloses real area');
+}
+
 console.log('silhouette.selfcheck: OK');

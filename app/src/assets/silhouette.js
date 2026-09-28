@@ -115,9 +115,18 @@ function joinSegments(segs) {
  * blurred by goo*size/100 px and re-thresholded at 0.5 before tracing,
  * so joins come out smooth and gooey instead of sharp-cornered.
  * goo=0 skips the blur and traces the tight sharp union.
+ *
+ * The raster is padded by the blur radius (plus a fringe margin): a
+ * goo-expanded shape near the viewBox edge would otherwise touch the canvas
+ * bounds, where marching squares clips the contour open into torn fragments.
+ * Loops are remapped back to 100x100 viewBox coordinates, so callers see no
+ * difference.
  */
 export async function traceSilhouette(svgInner, size = 400, goo = 0) {
   const s = Math.max(64, Math.min(1024, Math.round(size) || 400));
+  const radius = Math.max(0, +goo || 0) * s / 100;
+  const pad = Math.ceil(radius) + 2;
+  const S = s + pad * 2;
   // currentColor has no meaning inside an <img>; pin it to opaque white.
   // Only the alpha channel matters downstream.
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${s}" height="${s}">`
@@ -127,18 +136,17 @@ export async function traceSilhouette(svgInner, size = 400, goo = 0) {
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   await img.decode();
   const c = document.createElement('canvas');
-  c.width = c.height = s;
+  c.width = c.height = S;
   const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, s, s);
-  const px = ctx.getImageData(0, 0, s, s).data;
-  const alpha = new Uint8Array(s * s);
-  for (let i = 0; i < s * s; i++) alpha[i] = px[i * 4 + 3] > 127 ? 1 : 0;
-  const radius = Math.max(0, +goo || 0) * s / 100;
-  const field = radius > 0.5 ? blurAlpha(alpha, s, s, radius) : Float32Array.from(alpha);
-  const bin = new Uint8Array(s * s);
-  for (let i = 0; i < s * s; i++) bin[i] = field[i] > 0.5 ? 1 : 0;
+  ctx.drawImage(img, pad, pad, s, s);
+  const px = ctx.getImageData(0, 0, S, S).data;
+  const alpha = new Uint8Array(S * S);
+  for (let i = 0; i < S * S; i++) alpha[i] = px[i * 4 + 3] > 127 ? 1 : 0;
+  const field = radius > 0.5 ? blurAlpha(alpha, S, S, radius) : Float32Array.from(alpha);
+  const bin = new Uint8Array(S * S);
+  for (let i = 0; i < S * S; i++) bin[i] = field[i] > 0.5 ? 1 : 0;
   const k = 100 / s;
-  const raw = traceAlpha(bin, s, s).map((loop) => loop.map(([x, y]) => [x * k, y * k]));
+  const raw = traceAlpha(bin, S, S).map((loop) => loop.map(([x, y]) => [(x - pad) * k, (y - pad) * k]));
   // The antialiased fringe leaves speck fragments at shape junctions and
   // pinhole gaps where shapes nearly meet — both read as "tearing" on the
   // fused preview, so filter them here for preview and bake alike.
