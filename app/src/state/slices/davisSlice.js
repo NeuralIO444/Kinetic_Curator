@@ -5,6 +5,10 @@ import { tickPhraseBeat } from '../phraseTick.js';
 import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { EUCLID_MAX_STEPS } from '../euclid.js';
+
+/** #589 — the three phrase clock sources. */
+export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
@@ -89,6 +93,11 @@ export const createDavisSlice = (set) => ({
   phraseWrapGen: 0,
   phraseClock: 'audio',
   phraseBpm: 120,
+  // #589 — Euclidean clock: k hits spread as evenly as possible over n steps.
+  // The phrase advances on hit steps only, so the misses are part of the bar.
+  euclidBeats: 5,
+  euclidSteps: 8,
+  euclidRotate: 0,
 
   setEvolveMode: (valOrFn) => set((state) => ({
     evolveMode: typeof valOrFn === 'function' ? valOrFn(state.evolveMode) : valOrFn,
@@ -121,7 +130,24 @@ export const createDavisSlice = (set) => ({
     phraseBeat: 0,
   }),
   setPhraseMode: (mode) => set({ phraseMode: mode }),
-  setPhraseClock: (clock) => set({ phraseClock: clock === 'metro' ? 'metro' : 'audio' }),
+  setPhraseClock: (clock) => set({
+    phraseClock: PHRASE_CLOCKS.includes(clock) ? clock : 'audio',
+  }),
+  // Clamped against each other as well as to their ranges: beats > steps has
+  // no Euclidean meaning (euclid.js degrades it to a plain metro).
+  setEuclid: ({ beats, steps, rotate }) => set((state) => {
+    const next = {};
+    if (steps !== undefined) next.euclidSteps = Math.max(2, Math.min(EUCLID_MAX_STEPS, Math.round(Number(steps) || 8)));
+    const n = next.euclidSteps ?? state.euclidSteps;
+    if (beats !== undefined) next.euclidBeats = Math.max(0, Math.min(n, Math.round(Number(beats) || 0)));
+    if (rotate !== undefined) next.euclidRotate = Math.max(0, Math.min(n - 1, Math.round(Number(rotate) || 0)));
+    // A steps change can strand beats/rotate above the new ceiling.
+    if (next.euclidSteps !== undefined) {
+      next.euclidBeats = Math.min(next.euclidBeats ?? state.euclidBeats, n);
+      next.euclidRotate = Math.min(next.euclidRotate ?? state.euclidRotate, n - 1);
+    }
+    return next;
+  }),
   setPhraseBpm: (bpm) => set({ phraseBpm: Math.max(40, Math.min(240, Number(bpm) || 120)) }),
   armPhrase: (seed) => set({ phraseOriginSeed: seed, phraseBeat: 0 }),
   resetPhrase: () => set((state) => ({

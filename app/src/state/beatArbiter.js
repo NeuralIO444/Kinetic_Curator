@@ -36,6 +36,9 @@ export function routeBeat(state) {
   const route = sanitizeBeatRoute(state.beatRoute);
   const phraseArmed =
     !!state.phraseEnabled &&
+    // #589 — AUDIO only. METRO and EUCLID run their own interval in
+    // usePhraseLoop, so answering mic attacks as well would double-fire the
+    // bar from two sources at once.
     (state.phraseClock || 'audio') === 'audio' &&
     !!state.audioEnabled;
   const evolveArmed = !!state.evolveMode && state.evolveSource === 'beat';

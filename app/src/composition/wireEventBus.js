@@ -38,6 +38,7 @@ export function wireEventBus(rawDispatch) {
     if (p.mode !== undefined) dispatch({ type: A.SET_PHRASE_MODE, payload: p.mode });
     if (p.clock !== undefined) dispatch({ type: A.SET_PHRASE_CLOCK, payload: p.clock });
     if (p.bpm !== undefined) dispatch({ type: A.SET_PHRASE_BPM, payload: p.bpm });
+    if (p.euclid !== undefined) dispatch({ type: A.SET_EUCLID, payload: p.euclid });
   });
   on(Events.DAVIS_RESET_PHRASE, () => dispatch({ type: A.RESET_PHRASE }));
   on(Events.DAVIS_MUTATE_STREAM, (p) => dispatch(p && p.reset

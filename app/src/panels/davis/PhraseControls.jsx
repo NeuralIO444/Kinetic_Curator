@@ -1,4 +1,5 @@
 import { emit, Events } from '../../composition/eventBus.js';
+import { euclidString } from '../../state/euclid.js';
 
 const PHRASE_MODES = [
   { id: 'reset-seed', label: 'RESET', title: 'On wrap, seed returns to the armed origin.' },
@@ -10,11 +11,15 @@ export function PhraseControls({
   phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseProgress,
   layoutMode, audioEnabled, phraseClock = 'audio', phraseBpm = 120,
   beatPulse = 0, rms = 0,
+  euclidBeats = 5, euclidSteps = 8, euclidRotate = 0,
 }) {
   const caLive = layoutMode === 'ca';
+  const euclid = phraseClock === 'euclid';
   const metro = phraseClock === 'metro';
-  const waiting = phraseEnabled && !metro && !audioEnabled;
-  const noAttack = phraseEnabled && !metro && audioEnabled && phraseBeat === 0 && rms > 0.2;
+  // #589 — EUCLID keeps its own interval like METRO, so neither waits on a mic.
+  const internal = metro || euclid;
+  const waiting = phraseEnabled && !internal && !audioEnabled;
+  const noAttack = phraseEnabled && !internal && audioEnabled && phraseBeat === 0 && rms > 0.2;
   return (
     <div style={{ marginTop: 10, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -36,8 +41,35 @@ export function PhraseControls({
         <button className={`chip-btn ${phraseClock === 'metro' ? 'active' : ''}`}
           title="Internal BPM. No mic."
           onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'metro' })}>METRO</button>
+        <button className={`chip-btn ${euclid ? 'active' : ''}`}
+          title="Internal BPM, but the bar only advances on the hit steps of a Euclidean figure. The misses are the piece."
+          onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'euclid' })}>EUCLID</button>
       </div>
-      {metro && (
+      {euclid && (
+        <>
+          <div className="davis-interval-row" title="Hits spread as evenly as possible across the steps.">
+            <span className="davis-label">HITS</span>
+            <input type="range" min={0} max={euclidSteps} step={1} value={euclidBeats}
+              onChange={(e) => emit(Events.DAVIS_PHRASE, { euclid: { beats: Number(e.target.value) } })} />
+            <span className="davis-readout">{euclidBeats}/{euclidSteps}</span>
+          </div>
+          <div className="davis-interval-row" title="Steps in the figure. Hits redistribute.">
+            <span className="davis-label">STEPS</span>
+            <input type="range" min={2} max={32} step={1} value={euclidSteps}
+              onChange={(e) => emit(Events.DAVIS_PHRASE, { euclid: { steps: Number(e.target.value) } })} />
+            <span className="davis-readout">{euclidSteps}</span>
+          </div>
+          <div className="davis-interval-row" title="Turn the figure so a different step lands on the downbeat.">
+            <span className="davis-label">ROTATE</span>
+            <input type="range" min={0} max={Math.max(0, euclidSteps - 1)} step={1} value={euclidRotate}
+              onChange={(e) => emit(Events.DAVIS_PHRASE, { euclid: { rotate: Number(e.target.value) } })} />
+            <span className="davis-readout" style={{ fontFamily: 'var(--font-mono, monospace)', letterSpacing: '0.12em' }}>
+              {euclidString(euclidBeats, euclidSteps, euclidRotate)}
+            </span>
+          </div>
+        </>
+      )}
+      {(metro || euclid) && (
         <div className="davis-interval-row" title="Metronome speed.">
           <span className="davis-label">BPM</span>
           <input type="range" min={40} max={240} step={1} value={phraseBpm}
