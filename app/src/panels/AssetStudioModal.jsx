@@ -2,7 +2,7 @@
 // Lazy-loaded: the live bundle never imports this until the modal opens.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PRIMITIVES, polyInner } from '../assets/primitives.js';
-import { traceSilhouette, chamferContour, blendContours, outerLoop, loopsToD, loopsToPath } from '../assets/silhouette.js';
+import { traceSilhouette, blendContours, outerLoop, loopsToD, loopsToPath } from '../assets/silhouette.js';
 import { ingestSvg } from '../assets/ingest.js';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
@@ -39,12 +39,12 @@ function fresh(kind, extra = {}) {
 }
 
 /** Fingerprint of everything the merge trace depends on (module-level: no hook deps). */
-function mergeKeyFor(allParts, keys, chamferAmt, blend) {
+function mergeKeyFor(allParts, keys, meltAmt, blend) {
   const set = allParts.filter((p) => keys.includes(p.key));
   const fp = set
     .map((p) => [p.key, p.kind, p.x, p.y, p.rot, p.sx, p.sy, p.token, p.stroke, p.n, p.svg].join('|'))
     .join(';');
-  return `${blend ? 'B' : 'M'}|${chamferAmt}|${fp}`;
+  return `${blend ? 'B' : 'M'}|${meltAmt}|${fp}`;
 }
 
 export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
@@ -62,7 +62,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   // Trace results live in state, written only from async continuations —
   // the effect body itself never calls setState (lint rule).
   const [mergeKeys, setMergeKeys] = useState([]);
-  const [chamfer, setChamfer] = useState(0);
+  const [melt, setMelt] = useState(0);
   const [blendOn, setBlendOn] = useState(false);
   const [blendT, setBlendT] = useState(0.5);
   const [blendHold, setBlendHold] = useState(false);
@@ -108,13 +108,13 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const merging = validMergeKeys.length >= 2;
 
   // Live merge preview: rasterize the merge set, trace the fused silhouette
-  // (the canvas boolean-unions overlaps for free), chamfer it, draw in
-  // accent. Dragging a part or moving the slider re-traces; stale async
-  // runs are dropped by the token. While re-tracing, the previous preview
-  // stays up (no flicker).
+  // (the canvas boolean-unions overlaps for free), melt the joins
+  // metaball-style, draw in accent. Dragging a part or moving the slider
+  // re-traces; stale async runs are dropped by the token. While
+  // re-tracing, the previous preview stays up (no flicker).
   useEffect(() => {
     const set = parts.filter((p) => validMergeKeys.includes(p.key));
-    const key = mergeKeyFor(parts, validMergeKeys, chamfer, blendOn);
+    const key = mergeKeyFor(parts, validMergeKeys, melt, blendOn);
     if (mergeOut.key === key) return undefined;
     const token = ++traceToken.current;
     let cancelled = false;
@@ -124,12 +124,11 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
         let dOut = '';
         let pair = null;
         if (set.length >= 2) {
-          const loops = await traceSilhouette(toSvg(set), 320);
+          const loops = await traceSilhouette(toSvg(set), 320, melt);
           if (cancelled || token !== traceToken.current) return;
-          const chamfered = loops.map((l) => chamferContour(l, chamfer));
-          dOut = loopsToD(chamfered);
+          dOut = loopsToD(loops);
           if (dOut) {
-            svgOut = loopsToPath(chamfered).replace('currentColor', 'var(--accent)');
+            svgOut = loopsToPath(loops).replace('currentColor', 'var(--accent)');
             // Blend morphs the outer silhouettes of the first two merge
             // shapes. Traced lazily: only while the blend preview is on.
             if (blendOn) {
@@ -151,7 +150,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [parts, validMergeKeys, chamfer, blendOn, mergeOut.key]);
+  }, [parts, validMergeKeys, melt, blendOn, mergeOut.key]);
 
   // Blend scrub: ping-pong t 0→1→0 while the toggle is on, unless the user
   // is holding the manual slider.
@@ -182,11 +181,11 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   // Blend falls back to the merged preview until its own trace lands.
   const previewSvg = merging ? (blendOn ? (blendSvg || mergeOut.svg) : mergeOut.svg) : '';
   // Bake is only offered when the trace matches the current inputs.
-  const bakeReady = mergeOut.key === mergeKeyFor(parts, validMergeKeys, chamfer, blendOn) && !!mergeOut.d;
+  const bakeReady = mergeOut.key === mergeKeyFor(parts, validMergeKeys, melt, blendOn) && !!mergeOut.d;
 
   /** Fuse the merge set into one part; undo restores the originals. */
   const bakeMerge = () => {
-    const key = mergeKeyFor(partsRef.current, validMergeKeys, chamfer, blendOn);
+    const key = mergeKeyFor(partsRef.current, validMergeKeys, melt, blendOn);
     if (mergeOut.key !== key || !mergeOut.d) return;
     const set = partsRef.current.filter((p) => validMergeKeys.includes(p.key));
     if (set.length < 2) return;
@@ -394,10 +393,10 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
                   </label>
                 ))}
               </div>
-              <label style={lbl} title="Bevel every fused corner by this much. 0 is a pure union.">
-                chamfer {chamfer}
-                <input type="range" min="0" max="12" step="0.5" value={chamfer} disabled={!merging}
-                  onChange={(e) => setChamfer(+e.target.value)} style={{ width: '100%' }} />
+              <label style={lbl} title="Melt the fused joins, metaball-style. 0 is a tight union.">
+                melt {melt}
+                <input type="range" min="0" max="12" step="0.5" value={melt} disabled={!merging}
+                  onChange={(e) => setMelt(+e.target.value)} style={{ width: '100%' }} />
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 <button type="button" className="chip-btn" disabled={!merging}
@@ -431,7 +430,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
             </label>
             {error && <p style={{ margin: 0, fontSize: 10, color: 'var(--accent)' }}>{error}</p>}
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
-              Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, chamfer bevels the joins; blend is preview-only.
+              Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, melt rounds the joins; blend is preview-only.
             </p>
           </div>
         </div>

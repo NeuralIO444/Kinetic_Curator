@@ -8,6 +8,40 @@ const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const lerpPt = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
 /**
+ * Separable box blur over a binary alpha grid — the metaball "goo".
+ * alpha: Uint8Array of w*h (1 = inside). radius: blur radius in pixels.
+ * Returns a Float32Array of w*h in [0,1]. radius 0 returns the input
+ * as floats (no-op, so goo=0 traces exactly the sharp union).
+ */
+export function blurAlpha(alpha, w, h, radius) {
+  const r = Math.max(0, Math.round(radius));
+  const src = Float32Array.from(alpha, (v) => (v ? 1 : 0));
+  if (r === 0) return src;
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  const n = 2 * r + 1;
+  // Horizontal pass.
+  for (let y = 0; y < h; y++) {
+    let acc = 0;
+    for (let x = -r; x <= r; x++) acc += src[y * w + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[y * w + x] = acc / n;
+      acc += src[y * w + Math.min(w - 1, x + r + 1)] - src[y * w + Math.max(0, x - r)];
+    }
+  }
+  // Vertical pass.
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = acc / n;
+      acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+  return out;
+}
+
+/**
  * Marching squares over a binary alpha grid.
  * alpha: Uint8Array of w*h, 1 = inside, 0 = outside.
  * Returns contour loops as arrays of [x, y] in pixel coordinates.
@@ -76,8 +110,13 @@ function joinSegments(segs) {
  * Render an SVG fragment to an offscreen canvas and trace the fused
  * silhouette. Returns loops in 100x100 viewBox coordinates.
  * Async: the SVG raster has to decode before we can read its pixels.
+ *
+ * goo (viewBox units, 0..12): metaball melt. The rasterized alpha is
+ * blurred by goo*size/100 px and re-thresholded at 0.5 before tracing,
+ * so joins come out smooth and gooey instead of sharp-cornered.
+ * goo=0 skips the blur and traces the tight sharp union.
  */
-export async function traceSilhouette(svgInner, size = 400) {
+export async function traceSilhouette(svgInner, size = 400, goo = 0) {
   const s = Math.max(64, Math.min(1024, Math.round(size) || 400));
   // currentColor has no meaning inside an <img>; pin it to opaque white.
   // Only the alpha channel matters downstream.
@@ -94,8 +133,12 @@ export async function traceSilhouette(svgInner, size = 400) {
   const px = ctx.getImageData(0, 0, s, s).data;
   const alpha = new Uint8Array(s * s);
   for (let i = 0; i < s * s; i++) alpha[i] = px[i * 4 + 3] > 127 ? 1 : 0;
+  const radius = Math.max(0, +goo || 0) * s / 100;
+  const field = radius > 0.5 ? blurAlpha(alpha, s, s, radius) : Float32Array.from(alpha);
+  const bin = new Uint8Array(s * s);
+  for (let i = 0; i < s * s; i++) bin[i] = field[i] > 0.5 ? 1 : 0;
   const k = 100 / s;
-  return traceAlpha(alpha, s, s).map((loop) => loop.map(([x, y]) => [x * k, y * k]));
+  return traceAlpha(bin, s, s).map((loop) => loop.map(([x, y]) => [x * k, y * k]));
 }
 
 /**

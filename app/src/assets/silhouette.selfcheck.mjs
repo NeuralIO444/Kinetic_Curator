@@ -4,7 +4,7 @@
 // on hand-built grids.
 import assert from 'node:assert';
 import {
-  traceAlpha, chamferContour, resampleContour, blendContours,
+  traceAlpha, blurAlpha, chamferContour, resampleContour, blendContours,
   loopArea, outerLoop, loopsToD, loopsToPath, traceSilhouette,
 } from './silhouette.js';
 
@@ -119,5 +119,35 @@ assert.deepStrictEqual(traceAlpha(new Uint8Array(16), 4, 4), []);
 
 // --- traceSilhouette exists for the browser (canvas rasterizer, not run here).
 assert.strictEqual(typeof traceSilhouette, 'function');
+
+// --- blurAlpha (metaball goo): radius 0 is the identity; a real radius
+// visibly moves a DENSE traced contour (the regression the old vertex
+// chamfer missed — it only bent coarse polygons).
+{
+  // Two overlapping discs on a 100x100 grid, traced like the modal does.
+  const w = 100, h = 100;
+  const alpha = new Uint8Array(w * h);
+  const disc = (cx, cy, r) => {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) alpha[y * w + x] = 1;
+    }
+  };
+  disc(38, 50, 22); disc(62, 50, 22);
+  const sharp = outerLoop(traceAlpha(alpha, w, h));
+  assert.ok(sharp.length > 100, `dense trace, got ${sharp.length} vertices`);
+  const id = blurAlpha(alpha, w, h, 0);
+  assert.deepStrictEqual(Array.from(id), Array.from(alpha, (v) => (v ? 1 : 0)), 'radius 0 is the identity');
+  const gooey = blurAlpha(alpha, w, h, 10);
+  const bin = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) bin[i] = gooey[i] > 0.5 ? 1 : 0;
+  const melted = outerLoop(traceAlpha(bin, w, h));
+  assert.ok(melted.length > 50, 'gooey trace still yields a real loop');
+  // Resample both to the same count and measure the max pointwise shift.
+  const rs = resampleContour(sharp, 128);
+  const rm = resampleContour(melted, 128);
+  let max = 0;
+  for (let i = 0; i < 128; i++) max = Math.max(max, Math.hypot(rs[i][0] - rm[i][0], rs[i][1] - rm[i][1]));
+  assert.ok(max > 2, `goo visibly moves the outline, max shift ${max.toFixed(2)}px`);
+}
 
 console.log('silhouette.selfcheck: OK');
