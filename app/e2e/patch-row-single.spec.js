@@ -6,7 +6,7 @@ test('PATCH row is disabled until there are two KC tracks', async ({ page }) => 
   await page.addInitScript(() => {
     try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
   });
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
 

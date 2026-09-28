@@ -13,7 +13,7 @@ test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
       return orig.call(this, fn, ms, ...rest);
     };
   });
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   await page.locator('.layer-row[style*="0.35"]').filter({ hasText: 'KC-2' }).click();

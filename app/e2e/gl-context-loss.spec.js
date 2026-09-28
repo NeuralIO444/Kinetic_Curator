@@ -34,7 +34,7 @@ test.describe('WebGL context loss (#263)', () => {
       if (faultWindow) glErrors.push(`pageerror: ${e.message}`);
     });
 
-    await page.goto('/');
+    await page.goto('/?boot=factory');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
     const gl = page.locator('.canvas-gl').first();
     await expect(gl).toBeVisible();

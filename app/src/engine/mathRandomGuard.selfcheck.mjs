@@ -20,6 +20,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** file (relative to src/) -> { count, why } */
 const ALLOWED = {
   'curator/curate.js': { count: 1, why: 'pickCurated default rng param; CURATE passes the seeded CH.curate stream (#518)' },
+  'data/firstLight.js': { count: 1, why: 'rollLivingBoot default rng param; the roll lands in layoutParams/paletteId/enabledAssets (#707)' },
   'curator/renderProfiles.js': { count: 1, why: 'applyRenderProfile default rng param; seeded by CURATE' },
   'curator/taste.js': { count: 1, why: 'pickPersona default rng param; seeded by CURATE' },
   'engine/harmony.js': { count: 1, why: 'buildHarmony default rng param' },

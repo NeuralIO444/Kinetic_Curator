@@ -11,7 +11,7 @@ async function boot(page) {
       localStorage.setItem('kc:first-run-seen', '1');
     } catch { /* ignore */ }
   });
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   return errors;
 }

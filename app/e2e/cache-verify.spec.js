@@ -54,7 +54,7 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
     // unchanged: a swallowed COUNT edit still reads ~1x and fails the bar.
     window.__KC_GOVERNOR_OFF = true;
   });
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1000);
 

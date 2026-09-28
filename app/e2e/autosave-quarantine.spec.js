@@ -15,7 +15,7 @@ async function boot(page, autosaveRaw) {
       else localStorage.setItem('kc:project:v1', raw);
     } catch { /* ignore */ }
   }, autosaveRaw);
-  await page.goto('/');
+  await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1200);
   return errors;

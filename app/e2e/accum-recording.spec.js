@@ -41,7 +41,7 @@ async function installBlobTap(page) {
 }
 
 async function seedDoc(page, fade) {
-  await page.goto('/Kinetic_Curator/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/Kinetic_Curator/?boot=factory', { waitUntil: 'domcontentloaded' });
   await page.evaluate((doc) => {
     localStorage.setItem('kc:first-run-seen', '1');
     localStorage.setItem(

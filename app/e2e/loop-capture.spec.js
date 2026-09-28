@@ -55,7 +55,7 @@ test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, 
   test.setTimeout(360_000);
   await installBlobTap(page);
 
-  await page.goto('/Kinetic_Curator/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/Kinetic_Curator/?boot=factory', { waitUntil: 'domcontentloaded' });
   await page.evaluate((doc) => {
     localStorage.setItem('kc:first-run-seen', '1');
     localStorage.setItem(
