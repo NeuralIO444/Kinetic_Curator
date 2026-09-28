@@ -1,6 +1,22 @@
 # Changelog
 
-## Current — Stage 0/1 (2026-09-23)
+## Current — KC-1 review queue (2026-09-28)
+
+One-PR-at-a-time review lane. Builders build, Matt looks and merges.
+
+- **Phyllotaxis sampler + DIVERGENCE slider (#673)** — fibonacci's sibling: the golden-angle family with the divergence exposed. At 0° it's bit-identical to the phi tile; the DIVERGENCE slider (−20°…+20°, BUILD panel, mode-gated) re-counts the visible spiral arms live.
+- **Lorenz-ride behave row (#671)** — seventh BEHAVE mode: each agent rides an independent Lorenz trajectory (`lorenzRho` 28, `lorenzGain` 0.05). Below rho ~25 it settles; ~40 goes wild.
+- **Asset Studio merge (#698)** — merge with chamfer + live blend preview.
+- **INJECT color mode (#689)** — the field dyes first, agents catch up. Joins FADE and WASH (#682, soak from the middle outward) on the palette bar.
+- **Halo / chiaroscuro (#715)** — soft wide bloom + vignette tuned for dark grounds; CHIAROSCURO palette (#709) and sparse-facet preset (#714).
+- **Living boot (#713)** — First Light starters: the instrument wakes up playing.
+- **Joiner/leaver (#694)** — obvious face / invisible face pairing.
+- **TE-limited gradients, per-asset opt-in (#708)**; Rendah style pack: 5 palettes + 6 presets + 3 Plenum recipes (#696); Micro-HUD ornament pack (#697); Letterform asset pack A–Z 0–9 (#700).
+- **Tooling** — DEV panel merges Shader Lab + X-Ray + Gov Tune (#692); before/after visual diff for PR review (#693); build board (#684); PR review cockpit (#686).
+- **Closed unmerged: #690** — dirty-range uploads measured ~0.3% savings; not worth the 311-line complexity. The #685 byte meter stays.
+- Fixes: shape transitions play a per-node move vocabulary (#679), palette-import fallback ids (#683), upload-byte meter (#685), e2e cache-verify independent of wall clock (#687), audio envelope contract docs (#688), teamLab people-detective research report (#718).
+
+## Stage 0/1 (2026-09-23)
 
 Night Migration 30/60 sign-off recorded — embargo lifted for Stage 1 (`docs/EMBARGO.md`).
 

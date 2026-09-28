@@ -8,7 +8,7 @@ Live: [neuralio444.github.io/Kinetic_Curator](https://neuralio444.github.io/Kine
 
 *A terrarium, not a DAW.* You curate plates, palettes, and voices. The seed and the wind do the rest.
 
-**Release on `main` (2026-09-23):** **[0.9.0](CHANGELOG.md)** kernel + the live GPU instrument. Engine spines A–G merged, governor R1–R4 landed, Night Migration 30/60 sign-off recorded ([docs/EMBARGO.md](docs/EMBARGO.md) — Stage 1 unfrozen). Roadmap: [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md). See [Now](#now-on-main).
+**Release on `main` (2026-09-28):** **[0.9.0](CHANGELOG.md)** + the KC-1 review queue: color modes (FADE/WASH/INJECT), Asset Studio, living boot, halo, lorenz behave, phyllotaxis sampler. Engine spines A–G merged, governor R1–R4 landed, Night Migration 30/60 sign-off recorded ([docs/EMBARGO.md](docs/EMBARGO.md) — Stage 1 unfrozen). Roadmap: [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md). See [Now](#now-on-main).
 
 ## Now on main
 
@@ -24,8 +24,15 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - Voice + preset MIX (stepped color, smooth palette, no rebake) with morph-ease arrival; flagship voices + curated road (motion factors #515–#519 filed).
 - Flagship voices, 4 content-track cap, track patch round-trip + cap on load, H/M/L asset locker, FADE on the palette bar.
 - ACCUM trails, GPU FX (chain compiler + template effects + cost tiers + measured costs), showrunner shed ladder behind one tape readout (budget knob, named stages, FX-stack weight).
-- Behave profiles + bio-drives (drives, scent, mold, graze, leak, swell) on one integrator. Audio ballistics shape mic input and the GL loop.
+- Behave profiles + bio-drives (drives, scent, mold, graze, leak, swell) on one integrator. Seven verbs: cruise, flock, orbit, scatter, mold, levy, lorenz. Audio ballistics shape mic input and the GL loop.
 - DAVIS panel (GHOST STATION): Evolve, morph, phrase clock, LFO life, sub-seed streams, BEHAVE readout.
+- **Color modes** — FADE (the default melt), WASH (soak from the middle outward), INJECT (field dyes first, agents catch up). One slider, seconds.
+- **Asset Studio** — merge assets with chamfer + live blend preview.
+- **Living boot** — First Light starters: the instrument wakes up playing.
+- **Halo** — soft wide bloom + vignette tuned for dark grounds.
+- **Phyllotaxis sampler** — fibonacci's sibling; the DIVERGENCE slider re-counts the spiral arms.
+- **Joiner/leaver** — obvious face / invisible face pairing.
+- **DEV panel** — Shader Lab + X-Ray + Gov Tune in one place.
 
 **Not done (do not advertise as shipped)**
 
@@ -53,7 +60,7 @@ Not a blank canvas. You assign palettes and instruct placement DNA. *We are not 
 
 ## Features
 
-- **Live instrument** — Fibonacci, Grid, CA, Orbit, Flow, Swarm, Stratified, … same GPU as exports.
+- **Live instrument** — Fibonacci, Phyllotaxis, Grid, CA, Orbit, Flow, Swarm, Stratified, … same GPU as exports.
 - **Stills** — GPU readback 1×–8K PNG + JSON sidecar.
 - **Parity** — `npm run selfcheck`; under 10% pixel vs the SVG reference is a pass.
 - **FX** — rgbSplit, displace, tear, grain, scanlines, posterize, invert, solarize, edge (+ template effects, no runner change per effect). Chain compiler + cost tiers + measured costs.
@@ -63,9 +70,9 @@ Not a blank canvas. You assign palettes and instruct placement DNA. *We are not 
 - **Audio** — mic or file → scale, opacity, evolve-on-beat, ballistics-shaped envelopes.
 - **Davis** — Evolve, morph, phrase clock, LFO life, BEHAVE readout.
 - **Hits** — 1–9 recall, Enter advances.
-- **Colour** — slot edit / locks, library, harmony + shuffle, FADE.
+- **Colour** — slot edit / locks, library, harmony + shuffle, FADE / WASH / INJECT.
 - **Organisms** — moth / petal bodies, flap, breath, named behave profiles, bio-drives (hunger, scent, mold, graze, leak).
-- **Assets** — drop SVG, tags, H/M/L, DUP. Lab / species editor is deferred.
+- **Assets** — drop SVG, tags, H/M/L, DUP. Asset Studio: merge with chamfer + live blend preview. Lab / species editor is deferred.
 - **Studio farm** — `studio/studio.py` stills, ACCUM, batch, ffmpeg video, gated Curator CLIP.
 
 ## Stack
@@ -81,7 +88,7 @@ npm install
 npm run dev
 ```
 
-http://localhost:5173
+http://localhost:5173/Kinetic_Curator/
 
 | Command | Purpose |
 |---------|---------|
