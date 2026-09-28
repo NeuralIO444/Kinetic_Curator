@@ -44,7 +44,7 @@ npm run dev
 # Or directly in the app directory:
 npm run dev --prefix app
 ```
-Opens instantly at `http://localhost:5173/`. Changes in React, shaders, or store slices hot-reload in real-time.
+Opens instantly at `http://localhost:5173/Kinetic_Curator/`. Changes in React, shaders, or store slices hot-reload in real-time.
 
 ### Building for Production
 ```bash

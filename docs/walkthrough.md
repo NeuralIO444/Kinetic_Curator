@@ -81,7 +81,7 @@ app/src/
 ## Verification
 
 - ✅ `npm run build` — 362ms, 0 errors, 47 modules, ~270KB JS (gzip: 78KB)
-- ✅ `npm run dev` — Vite serves at localhost:5173
+- ✅ `npm run dev` — Vite serves at localhost:5173/Kinetic_Curator/
 - ✅ All 13 presets render grouped by category
 - ✅ All 137 assets load, all 11 category filter chips visible
 - ✅ Canvas renders fibonacci layout with palette colors
