@@ -205,4 +205,26 @@ assert.strictEqual(typeof traceSilhouette, 'function');
   assert.ok(Math.abs(loopArea(fixed[0])) > 1000, 'loop encloses real area');
 }
 
+// --- subtract (negative shapes): the canvas erases the subtract shapes with
+// destination-out, then the goo blur runs over the erased field. A disc
+// punched out of a slab must survive the whole tail as a hole loop.
+{
+  const s = 320, goo = 6, radius = goo; // grid is the 100x100 viewBox: radius in grid px
+  const W = 100, cx = 50, cy = 50;
+  const alpha = new Uint8Array(W * W);
+  for (let y = 15; y < 85; y++) for (let x = 15; x < 85; x++) alpha[y * W + x] = 1;
+  // destination-out erase of a disc, as the rasterizer does for subtract shapes.
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+    if ((x - cx) ** 2 + (y - cy) ** 2 <= 14 * 14) alpha[y * W + x] = 0;
+  }
+  const field = blurAlpha(alpha, W, W, radius);
+  const bin = new Uint8Array(W * W);
+  for (let i = 0; i < W * W; i++) bin[i] = field[i] > 0.5 ? 1 : 0;
+  const loops = cleanMergeLoops(traceAlpha(bin, W, W));
+  assert.strictEqual(loops.length, 2, `subtract leaves outer + hole, got ${loops.length}`);
+  const areas = loops.map((l) => Math.abs(loopArea(l))).sort((a, b) => a - b);
+  assert.ok(areas[1] > 4000, `outer slab intact, got ${areas[1].toFixed(0)}`);
+  assert.ok(areas[0] > 150 && areas[0] < 620, `hole survives the goo, got ${areas[0].toFixed(0)}`);
+}
+
 console.log('silhouette.selfcheck: OK');

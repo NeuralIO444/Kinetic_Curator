@@ -121,8 +121,12 @@ function joinSegments(segs) {
  * bounds, where marching squares clips the contour open into torn fragments.
  * Loops are remapped back to 100x100 viewBox coordinates, so callers see no
  * difference.
+ *
+ * svgSubtract (optional): SVG fragment of "negative" shapes, drawn with
+ * destination-out after the positives — the merge punches them out as holes.
+ * The melt blur runs after the erase, so hole edges melt just like joins.
  */
-export async function traceSilhouette(svgInner, size = 400, goo = 0) {
+export async function traceSilhouette(svgInner, size = 400, goo = 0, svgSubtract = '') {
   const s = Math.max(64, Math.min(1024, Math.round(size) || 400));
   const radius = Math.max(0, +goo || 0) * s / 100;
   const pad = Math.ceil(radius) + 2;
@@ -139,6 +143,17 @@ export async function traceSilhouette(svgInner, size = 400, goo = 0) {
   c.width = c.height = S;
   const ctx = c.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(img, pad, pad, s, s);
+  if (svgSubtract) {
+    const simg = new Image();
+    simg.decoding = 'sync';
+    simg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${s}" height="${s}">`
+      + String(svgSubtract).replace(/currentColor/g, '#fff') + '</svg>');
+    await simg.decode();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.drawImage(simg, pad, pad, s, s);
+    ctx.globalCompositeOperation = 'source-over';
+  }
   const px = ctx.getImageData(0, 0, S, S).data;
   const alpha = new Uint8Array(S * S);
   for (let i = 0; i < S * S; i++) alpha[i] = px[i * 4 + 3] > 127 ? 1 : 0;

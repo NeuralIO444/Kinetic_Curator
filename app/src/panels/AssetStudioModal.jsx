@@ -39,10 +39,11 @@ function fresh(kind, extra = {}) {
 }
 
 /** Fingerprint of everything the merge trace depends on (module-level: no hook deps). */
-function mergeKeyFor(allParts, keys, meltAmt, blend) {
+function mergeKeyFor(allParts, keys, meltAmt, blend, subKeys = []) {
   const set = allParts.filter((p) => keys.includes(p.key));
   const fp = set
-    .map((p) => [p.key, p.kind, p.x, p.y, p.rot, p.sx, p.sy, p.token, p.stroke, p.n, p.svg].join('|'))
+    .map((p) => [p.key, p.kind, p.x, p.y, p.rot, p.sx, p.sy, p.token, p.stroke, p.n, p.svg,
+      subKeys.includes(p.key) ? 'sub' : 'add'].join('|'))
     .join(';');
   return `${blend ? 'B' : 'M'}|${meltAmt}|${fp}`;
 }
@@ -62,6 +63,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   // Trace results live in state, written only from async continuations —
   // the effect body itself never calls setState (lint rule).
   const [mergeKeys, setMergeKeys] = useState([]);
+  // Subtract kit: ticked shapes flipped to "minus" punch holes out of the
+  // merge instead of fusing in. Always a subset of mergeKeys.
+  const [subtractKeys, setSubtractKeys] = useState([]);
   const [melt, setMelt] = useState(0);
   const [blendOn, setBlendOn] = useState(false);
   const [blendT, setBlendT] = useState(0.5);
@@ -105,7 +109,17 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     () => mergeKeys.filter((k) => parts.some((p) => p.key === k)),
     [mergeKeys, parts],
   );
-  const merging = validMergeKeys.length >= 2;
+  const validSubtractKeys = useMemo(
+    () => subtractKeys.filter((k) => validMergeKeys.includes(k)),
+    [subtractKeys, validMergeKeys],
+  );
+  // 2+ ticked with at least one positive: 1 add + 1 subtract punches a hole.
+  const merging = validMergeKeys.length >= 2
+    && validMergeKeys.some((k) => !validSubtractKeys.includes(k));
+  const toggleSubtract = (key) => {
+    setSubtractKeys((ks) => (ks.includes(key) ? ks.filter((k) => k !== key) : [...ks, key]));
+    setBlendOn(false);
+  };
 
   // Live merge preview: rasterize the merge set, trace the fused silhouette
   // (the canvas boolean-unions overlaps for free), melt the joins
@@ -114,7 +128,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   // re-tracing, the previous preview stays up (no flicker).
   useEffect(() => {
     const set = parts.filter((p) => validMergeKeys.includes(p.key));
-    const key = mergeKeyFor(parts, validMergeKeys, melt, blendOn);
+    const positives = set.filter((p) => !validSubtractKeys.includes(p.key));
+    const negatives = set.filter((p) => validSubtractKeys.includes(p.key));
+    const key = mergeKeyFor(parts, validMergeKeys, melt, blendOn, validSubtractKeys);
     if (mergeOut.key === key) return undefined;
     const token = ++traceToken.current;
     let cancelled = false;
@@ -123,8 +139,8 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
         let svgOut = '';
         let dOut = '';
         let pair = null;
-        if (set.length >= 2) {
-          const loops = await traceSilhouette(toSvg(set), 320, melt);
+        if (set.length >= 2 && positives.length >= 1) {
+          const loops = await traceSilhouette(toSvg(positives), 320, melt, toSvg(negatives));
           if (cancelled || token !== traceToken.current) return;
           dOut = loopsToD(loops);
           if (dOut) {
@@ -132,8 +148,8 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
             // Blend morphs the outer silhouettes of the first two merge
             // shapes. Traced lazily: only while the blend preview is on.
             if (blendOn) {
-              const la = outerLoop(await traceSilhouette(toSvg([set[0]]), 200));
-              const lb = outerLoop(await traceSilhouette(toSvg([set[1]]), 200));
+              const la = outerLoop(await traceSilhouette(toSvg([positives[0]]), 200));
+              const lb = outerLoop(await traceSilhouette(toSvg([positives[1]]), 200));
               if (cancelled || token !== traceToken.current) return;
               pair = la && lb ? { a: la, b: lb } : null;
             }
@@ -150,7 +166,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [parts, validMergeKeys, melt, blendOn, mergeOut.key]);
+  }, [parts, validMergeKeys, validSubtractKeys, melt, blendOn, mergeOut.key]);
 
   // Blend scrub: ping-pong t 0→1→0 while the toggle is on, unless the user
   // is holding the manual slider.
@@ -181,11 +197,11 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   // Blend falls back to the merged preview until its own trace lands.
   const previewSvg = merging ? (blendOn ? (blendSvg || mergeOut.svg) : mergeOut.svg) : '';
   // Bake is only offered when the trace matches the current inputs.
-  const bakeReady = mergeOut.key === mergeKeyFor(parts, validMergeKeys, melt, blendOn) && !!mergeOut.d;
+  const bakeReady = mergeOut.key === mergeKeyFor(parts, validMergeKeys, melt, blendOn, validSubtractKeys) && !!mergeOut.d;
 
   /** Fuse the merge set into one part; undo restores the originals. */
   const bakeMerge = () => {
-    const key = mergeKeyFor(partsRef.current, validMergeKeys, melt, blendOn);
+    const key = mergeKeyFor(partsRef.current, validMergeKeys, melt, blendOn, validSubtractKeys);
     if (mergeOut.key !== key || !mergeOut.d) return;
     const set = partsRef.current.filter((p) => validMergeKeys.includes(p.key));
     if (set.length < 2) return;
@@ -194,6 +210,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     });
     commit((p) => [...p.filter((row) => !validMergeKeys.includes(row.key)), mergedPart]);
     setMergeKeys([]);
+    setSubtractKeys([]);
     setBlendOn(false);
     setBlendHold(false);
     setPicked(partsRef.current.length - 1);
@@ -385,13 +402,30 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <div style={mergeTitle}>MERGE</div>
               {parts.length === 0 && <span style={dimNote}>add 2+ shapes, then tick them to fuse</span>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 96, overflowY: 'auto' }}>
-                {parts.map((p, i) => (
-                  <label key={p.key} style={mergeRow} title={`Fuse shape ${i + 1} (${p.kind}) into the merge`}>
-                    <input type="checkbox" checked={validMergeKeys.includes(p.key)}
-                      onChange={(e) => setMergeKeys((ks) => (e.target.checked ? [...ks, p.key] : ks.filter((k) => k !== p.key)))} />
-                    <span>{i + 1} · {p.kind}</span>
-                  </label>
-                ))}
+                {parts.map((p, i) => {
+                  const ticked = validMergeKeys.includes(p.key);
+                  const isSub = validSubtractKeys.includes(p.key);
+                  return (
+                    <div key={p.key} style={mergeRow}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title={`Fuse shape ${i + 1} (${p.kind}) into the merge`}>
+                        <input type="checkbox" checked={ticked}
+                          onChange={(e) => {
+                            setMergeKeys((ks) => (e.target.checked ? [...ks, p.key] : ks.filter((k) => k !== p.key)));
+                            if (!e.target.checked) setSubtractKeys((ks) => ks.filter((k) => k !== p.key));
+                          }} />
+                        <span>{i + 1} · {p.kind}</span>
+                      </label>
+                      {ticked && (
+                        <button type="button" className="chip-btn"
+                          title={isSub ? `Shape ${i + 1} subtracts: it punches a hole out of the merge` : `Shape ${i + 1} adds: flip to subtract and it cuts a hole instead`}
+                          onClick={() => toggleSubtract(p.key)}
+                          style={isSub ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}>
+                          {isSub ? '−' : '+'}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <label style={lbl} title="Melt the fused joins, metaball-style. 0 is a tight union.">
                 melt {melt}
@@ -399,8 +433,8 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
                   onChange={(e) => setMelt(+e.target.value)} style={{ width: '100%' }} />
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                <button type="button" className="chip-btn" disabled={!merging}
-                  title="Preview a morph between the first two merge shapes (preview only, never baked)"
+                <button type="button" className="chip-btn" disabled={!merging || validSubtractKeys.length > 0}
+                  title={validSubtractKeys.length > 0 ? 'Blend is add-shapes only — untick the subtract shapes to morph' : 'Preview a morph between the first two merge shapes (preview only, never baked)'}
                   onClick={() => { setBlendOn((b) => !b); setBlendHold(false); }}>
                   {blendOn ? 'BLEND ■' : 'BLEND ▶'}
                 </button>
@@ -430,13 +464,13 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
             </label>
             {error && <p style={{ margin: 0, fontSize: 10, color: 'var(--accent)' }}>{error}</p>}
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
-              Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, melt rounds the joins; blend is preview-only.
+              Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, melt rounds the joins; flip a ticked shape to − and it punches a hole instead; blend is preview-only.
             </p>
           </div>
         </div>
         <footer style={foot}>
           <button type="button" className="chip-btn" title="Remove the last added shape" onClick={undo} disabled={!undoDepth}>UNDO</button>
-          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); setMergeKeys([]); setBlendOn(false); setBlendHold(false); }}>CLEAR</button>
+          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); setMergeKeys([]); setSubtractKeys([]); setBlendOn(false); setBlendHold(false); }}>CLEAR</button>
           <button type="button" className="chip-btn" title="Download the motif as an SVG file" onClick={exportSvg} disabled={!parts.length && !seedSvg}>EXPORT SVG</button>
           <button type="button" className="chip-btn" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length && !seedSvg} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
         </footer>
