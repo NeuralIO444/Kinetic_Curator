@@ -26,8 +26,8 @@ const AFFINITY = { self: 0.06, kin: 0.64, far: 0.30 };
 
 const FAMILIES = {
   mode: {
-    ordered: ['grid', 'rails', 'abacus', 'stratified'],
-    radial: ['fibonacci', 'radial', 'orbit'],
+    ordered: ['grid', 'rails', 'abacus', 'stratified', 'truchet'],
+    radial: ['fibonacci', 'phyllotaxis', 'radial', 'orbit'],
     live: ['swarm', 'hype', 'murmuration'],
     loose: ['random', 'noise', 'layers', 'flow', 'ca'],
   },
@@ -35,6 +35,7 @@ const FAMILIES = {
     calm: ['cruise', 'orbit'],
     tight: ['flock', 'mold'],
     loose: ['scatter'],
+    chaotic: ['levy', 'lorenz'],
   },
   paletteShift: {
     whole: ['auto', 'split'],

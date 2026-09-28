@@ -12,6 +12,7 @@ export const LAYOUT_MODES = [
   // is its fixed point (see the sampler). Sibling, not duplicate.
   { id: 'phyllotaxis', name: 'phyllotaxis', glyph: 'phyllo' },
   { id: 'radial',    name: 'radial',     glyph: 'rad'    },
+  { id: 'truchet',   name: 'truchet',    glyph: 'tile'   },
   { id: 'swarm',     name: 'swarm boids', glyph: 'swarm'  },
   { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
   { id: 'hype',      name: 'moth·hype', glyph: 'hype'   },
