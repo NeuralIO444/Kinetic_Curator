@@ -72,9 +72,12 @@ function clampHop(it, q) {
  */
 
 // Deterministic pseudo-random in [0, 1) for stable per-point drift offsets.
+// Integer arithmetic only (no float magic constants).
 function hash01(n) {
-  const s = Math.sin(n * 12.9898) * 43758.5453;
-  return s - Math.floor(s);
+  let h = Math.imul((n | 0) + 0x9e3779b9, 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2545f491) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return h / 4294967296;
 }
 
 function applyLifeDrift(lp, locked, loopTimeMs) {
