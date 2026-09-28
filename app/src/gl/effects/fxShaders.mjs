@@ -331,6 +331,59 @@ export const FX_HALO_DESCRIPTOR = {
   },
 };
 
+export const FX_GRADE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform float u_hue;
+uniform float u_chroma;
+uniform float u_lift;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec4 src = texture(u_tex, v_cuv);
+  // #591 — grade in OKLCH, not RGB/HSL. A hue rotation here keeps L and C
+  // exactly, so mids travel between palettes without sinking through gray;
+  // the same walk in HSL drags lightness with it.
+  //
+  // Premultiplied in, premultiplied out: the chain carries premultiplied
+  // alpha, so un-premultiply before the colour math and restore after, or a
+  // graded edge pixel darkens against its own alpha.
+  float a = max(src.a, 1e-5);
+  vec3 lin = kc_srgb2lin(src.rgb / a);
+  vec3 lch = kc_oklab2oklch(kc_lin2oklab(lin));
+  lch.x = clamp(lch.x * u_lift, 0.0, 1.0);
+  lch.y = max(lch.y * u_chroma, 0.0);
+  lch.z += radians(u_hue);
+  vec3 outLin = kc_oklab2lin(kc_oklch2oklab(lch));
+  // Out-of-gamut hues land outside [0,1]; clamp in LINEAR light so the
+  // channel that clipped does not drag the others through the sRGB curve.
+  vec3 rgb = kc_lin2srgb(clamp(outLin, 0.0, 1.0));
+  o = vec4(rgb * src.a, src.a);
+}
+`;
+
+export const FX_GRADE_DESCRIPTOR = {
+  label: 'Grade',
+  hint: 'Colour grade in OKLCH: hue travels without losing brightness. Defaults are identity.',
+  pad: 0,
+  animated: false,
+  params: {
+    hue: {
+      type: 'float', label: 'Hue', min: -180, max: 180, step: 1, def: 0,
+      ui: 'slider', hint: 'Rotate hue in degrees. L and C are untouched, so nothing dims.',
+    },
+    chroma: {
+      type: 'float', label: 'Chroma', min: 0, max: 2, step: 0.05, def: 1,
+      ui: 'slider', hint: 'Scale colourfulness. 0 is neutral gray, 1 is unchanged.',
+    },
+    lift: {
+      type: 'float', label: 'Lift', min: 0.5, max: 1.5, step: 0.01, def: 1,
+      ui: 'slider', hint: 'Scale perceptual lightness. 1 is unchanged.',
+    },
+  },
+};
+
 export const FX_SHADER_EFFECTS = [
   // 2x fbm-3 noise lookups: the costliest template FX — a quality scaler.
   ['displace', { fs: FX_DISPLACE_FS, descriptor: FX_DISPLACE_DESCRIPTOR, file: 'fxShaders.mjs:displace',
@@ -345,6 +398,8 @@ export const FX_SHADER_EFFECTS = [
     cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.4, notes: '3x3 kernel, 9 taps' } }],
   ['halo', { fs: FX_HALO_FS, descriptor: FX_HALO_DESCRIPTOR, file: 'fxShaders.mjs:halo',
     cost: { tier: 2, memoryBytes: 1920 * 1080 * 8, timeMs: 1.1, notes: '12 ring taps (two rings of six) + vignette; a quality scaler, not cosmetic — cost is the tap count' } }],
+  ['grade', { fs: FX_GRADE_FS, descriptor: FX_GRADE_DESCRIPTOR, file: 'fxShaders.mjs:grade',
+    cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.45, notes: 'OKLCH round trip: 2 matrices + cbrt/cube, pure ALU, no taps' } }],
 ];
 
 // The registry reads the cost declarations straight out of the definitions

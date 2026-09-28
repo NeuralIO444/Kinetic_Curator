@@ -28,6 +28,7 @@ export const MEASURED_COSTS = {
   'builtin/rgbSplit': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/displace': { ms: 0.4, method: 'wall', draws: 90 },
   'fx/edge': { ms: 0.3, method: 'wall', draws: 90 },
+  'fx/grade': { ms: 0.3333, method: 'wall', draws: 90 },
   'fx/halo': { ms: 0.3333, method: 'wall', draws: 90 },
   'fx/scanlines': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/solarize': { ms: 0.3, method: 'wall', draws: 90 },
