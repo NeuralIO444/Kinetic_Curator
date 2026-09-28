@@ -4,7 +4,7 @@
 // on hand-built grids.
 import assert from 'node:assert';
 import {
-  traceAlpha, blurAlpha, chamferContour, resampleContour, blendContours,
+  traceAlpha, blurAlpha, cleanMergeLoops, chamferContour, resampleContour, blendContours,
   loopArea, outerLoop, loopsToD, loopsToPath, traceSilhouette,
 } from './silhouette.js';
 
@@ -148,6 +148,25 @@ assert.strictEqual(typeof traceSilhouette, 'function');
   let max = 0;
   for (let i = 0; i < 128; i++) max = Math.max(max, Math.hypot(rs[i][0] - rm[i][0], rs[i][1] - rm[i][1]));
   assert.ok(max > 2, `goo visibly moves the outline, max shift ${max.toFixed(2)}px`);
+}
+
+// --- cleanMergeLoops: the tear fix. Speck fragments at junctions are
+// dropped, pinhole gaps between fused shapes are filled, real holes and
+// small separate shapes survive.
+{
+  const big = [[0, 0], [100, 0], [100, 100], [0, 100]]; // area 10000
+  const speck = [[38, 45], [38.5, 45.5], [38, 46], [37.5, 45.5]]; // area 0.5
+  const pinhole = [[44, 41], [55, 41], [50, 44]]; // area ~16, inside big
+  const donut = [[40, 40], [60, 40], [60, 60], [40, 60]]; // area 400, inside big
+  const farDot = [[200, 200], [206, 200], [206, 206], [200, 206]]; // area 36, outside
+  const out = cleanMergeLoops([big, speck, pinhole, donut, farDot]);
+  const areas = out.map((l) => Math.abs(loopArea(l))).sort((a, b) => a - b);
+  assert.ok(!out.includes(speck), 'junction speck dropped');
+  assert.ok(!out.includes(pinhole), 'pinhole gap filled');
+  assert.ok(out.includes(donut), 'real hole survives');
+  assert.ok(out.includes(farDot), 'small separate shape survives');
+  assert.ok(out.includes(big), 'main silhouette survives');
+  assert.deepStrictEqual(areas.map(Math.round), [36, 400, 10000]);
 }
 
 console.log('silhouette.selfcheck: OK');

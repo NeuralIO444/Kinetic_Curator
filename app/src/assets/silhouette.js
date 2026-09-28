@@ -138,7 +138,11 @@ export async function traceSilhouette(svgInner, size = 400, goo = 0) {
   const bin = new Uint8Array(s * s);
   for (let i = 0; i < s * s; i++) bin[i] = field[i] > 0.5 ? 1 : 0;
   const k = 100 / s;
-  return traceAlpha(bin, s, s).map((loop) => loop.map(([x, y]) => [x * k, y * k]));
+  const raw = traceAlpha(bin, s, s).map((loop) => loop.map(([x, y]) => [x * k, y * k]));
+  // The antialiased fringe leaves speck fragments at shape junctions and
+  // pinhole gaps where shapes nearly meet — both read as "tearing" on the
+  // fused preview, so filter them here for preview and bake alike.
+  return cleanMergeLoops(raw);
 }
 
 /**
@@ -204,6 +208,41 @@ export function outerLoop(loops) {
     if (a > bestA) { bestA = a; best = l; }
   }
   return best;
+}
+
+/** Ray-casting point-in-polygon: is pt inside loop? */
+function pointInLoop(pt, loop) {
+  const [x, y] = pt;
+  let inside = false;
+  for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
+    const [xi, yi] = loop[i];
+    const [xj, yj] = loop[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Drop the junk loops a raster trace leaves behind so the fused preview
+ * and baked shapes don't "tear" at the joins. Loops are in 100x100
+ * viewBox units.
+ * - Specks: sub-pixel diamond fragments the antialiased fringe leaves at
+ *   shape junctions (area < 2). Always dropped.
+ * - Pinholes: tiny gaps where nearly-meeting shapes don't quite cover the
+ *   raster (holes with area < 60). Filled — a fused shape shouldn't have
+ *   pinholes. Real holes (donuts) and small separate shapes survive.
+ */
+export function cleanMergeLoops(loops, speck = 2, pinhole = 60) {
+  const solid = (loops || []).filter((l) => l.length >= 3 && Math.abs(loopArea(l)) >= speck);
+  if (solid.length <= 1) return solid;
+  const byArea = [...solid].sort((a, b) => Math.abs(loopArea(b)) - Math.abs(loopArea(a)));
+  const keep = [];
+  for (const l of byArea) {
+    const holeOf = keep.find((k) => Math.abs(loopArea(k)) > Math.abs(loopArea(l)) && pointInLoop(l[0], k));
+    if (holeOf && Math.abs(loopArea(l)) < pinhole) continue; // pinhole gap: fill it
+    keep.push(l);
+  }
+  return keep;
 }
 
 /**
