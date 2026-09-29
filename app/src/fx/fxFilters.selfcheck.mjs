@@ -2,6 +2,7 @@
 // fail-closed behavior, Showrunner shed wiring, layer model, and
 // project round-trip.
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import {
   FX_EFFECT_DEFS,
   FX_EFFECT_KINDS,
@@ -105,6 +106,34 @@ ok('#520: onMove absent — mid-chain grain still moves silently on non-load pat
     { kind: 'posterize', params: { levels: 4 } },
   ]);
   assert.deepEqual(out.map((e) => e.kind), ['posterize', 'grain']);
+});
+
+// #520 Phase 1b — availableFxKinds offer-list
+// #520 Phase 2 — post-accum grain split
+ok('#520 Phase 2: grain-family split partitions effects correctly', () => {
+  const effects = [
+    { kind: 'rgbSplit', params: {} },
+    { kind: 'posterize', params: {} },
+    { kind: 'grain', params: {} },
+  ];
+  const pre = effects.filter((f) => !GRAIN_FAMILY_KINDS.includes(f.kind));
+  const fin = effects.filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
+  assert.deepEqual(pre.map((f) => f.kind), ['rgbSplit', 'posterize']);
+  assert.deepEqual(fin.map((f) => f.kind), ['grain']);
+});
+ok('#520 Phase 2: grain-free stack has empty finEffects', () => {
+  const effects = [{ kind: 'rgbSplit', params: {} }, { kind: 'invert', params: {} }];
+  const fin = effects.filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
+  assert.deepEqual(fin, []);
+});
+ok('#520 Phase 2: renderer.mjs local GRAIN_FAMILY_KINDS matches fxFilters.js', () => {
+  // renderer.mjs must stay in sync with GRAIN_FAMILY_KINDS — it can't import
+  // from src/fx/ because the parity harness only serves src/gl/.
+  const src = readFileSync(new URL('../gl/renderer.mjs', import.meta.url).pathname, 'utf8');
+  const m = src.match(/const GRAIN_FAMILY_KINDS\s*=\s*(\[[^\]]*\])/);
+  assert.ok(m, 'renderer.mjs must define local GRAIN_FAMILY_KINDS');
+  const local = JSON.parse(m[1].replace(/'/g, '"'));
+  assert.deepEqual(local, GRAIN_FAMILY_KINDS, 'renderer.mjs local constant must match fxFilters.js');
 });
 
 // #520 Phase 1b — availableFxKinds offer-list

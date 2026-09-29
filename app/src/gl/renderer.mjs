@@ -43,6 +43,10 @@ import { createBridge } from './bridge/bridge.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
+
+// #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
+// harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
+const GRAIN_FAMILY_KINDS = ['grain'];
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { registerCostTier } from './costTiers.mjs';
 import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
@@ -550,6 +554,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const { width: w, height: h, contract, cells, bg } = payload;
     const { atlasTex, grainLuts } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
+    const fxFinishChains = [];
 
     const byLayer = new Map();
     for (const it of contract.instances) {
@@ -646,19 +651,22 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
           [wRead, wWrite] = [wWrite, wRead];
         }
         pending = [];
-        // The chain runs through the JS↔GL bridge (#194) via the #188 GL
-        // compiler: sanitized (unknown kinds dropped, params clamped),
-        // grain LUT wired as aux. Template effects (#195) need zero
-        // runner changes per effect.
-        const steps = compileFxShaders(layer.fx || [], {
-          auxFor: (kind) => {
-            if (kind !== 'grain') return null;
-            // #749 / #748: procedural grain does not need a LUT. Missing bake
-            // used to throw and abort the whole FX chain (RGB disappeared).
-            return grainLuts[wrap.fxLayerId] || null;
-          },
-        });
-        const afterFx = bridge.runChain(layerId, wRead, steps);
+        // #520 Phase 2: split FX chain at GRAIN_FAMILY_KINDS — grain-family
+        // effects belong in EF-4 FINISH and must run post-accum so they don't
+        // compound in the feedback loop. Non-grain steps still run pre-accum.
+        const auxForGrain = (kind) => {
+          if (kind !== 'grain') return null;
+          // #749 / #748: procedural grain does not need a LUT; a missing bake
+          // must not abort the FX chain.
+          return grainLuts[wrap.fxLayerId] || null;
+        };
+        const preEffects = (layer.fx || []).filter((f) => !GRAIN_FAMILY_KINDS.includes(f.kind));
+        const finEffects = (layer.fx || []).filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
+        const preSteps = compileFxShaders(preEffects, { auxFor: () => null });
+        const afterFx = preSteps.length ? bridge.runChain(layerId, wRead, preSteps) : wRead;
+        if (finEffects.length) {
+          fxFinishChains.push({ layerId, steps: compileFxShaders(finEffects, { auxFor: auxForGrain }) });
+        }
         // An FX layer's own matte masks the wrap result at composite time.
         // #227: no region clip — the FX output is defined over the whole
         // composite below, so clipping to the pending layers' bbox would cut
@@ -680,7 +688,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // arrived — a mid-frame crash for a field with no producer. The renderer now
     // never reads it; wiring live text later is a deliberate change here AND in
     // sceneContract.js (whose selfcheck pins the field to [] so it can't drift in).
-    return mRead;
+    return { ...mRead, fxFinishChains };
   }
 
   /** Resolve a 16F premultiplied target to RGBA8 bytes (top-first rows). */
@@ -774,6 +782,7 @@ export function createRenderer(canvas) {
       // #309 velocity smear: per-frame displacement per instance, attached
       // as vx/vy — the stills/export path smears exactly like the live loop.
       const velPrev = new Map();
+      let lastFxFinishChains = [];
       let i = 0;
       for (const payload of frames) {
         if (payload.contract.version !== 1) {
@@ -786,9 +795,15 @@ export function createRenderer(canvas) {
         // #306: swell scales the glow gesture only (the washout control).
         const params = audio ? applyAudioEnvelope(base, audio[i] || {}, { swell }) : base;
         accum.step(frameT.tex, params);
+        lastFxFinishChains = frameT.fxFinishChains || [];
         i++;
       }
-      const pixels = resolveTargetToBytes(accum.texture(), T, w, h);
+      // #520 Phase 2: apply grain-family finish chain once against the final accum.
+      let finalTex = accum.texture();
+      for (const { layerId, steps } of lastFxFinishChains) {
+        finalTex = bridge.runChain(layerId, finalTex, steps);
+      }
+      const pixels = resolveTargetToBytes(finalTex, T, w, h);
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after accum render: 0x${err.toString(16)}`);
       return { pixels, width: w, height: h };

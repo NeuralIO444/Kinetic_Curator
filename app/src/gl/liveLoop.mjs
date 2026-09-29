@@ -786,7 +786,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       }
     }
     lastFrameTarget = outTarget;
-    return outTarget;
+    // #520 Phase 2: propagate grain-family finish chains (from renderFrameInto)
+    // so the accum path can apply them post-step.
+    return { target: outTarget, fxFinishChains: toTarget.fxFinishChains || [] };
   }
 
   function tick() {
@@ -911,7 +913,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
                 accumObj = fresh;
                 accumObj.begin(bgCss);
               }
-              const target = renderMixedFrame(payload, true, mix);
+              const { target, fxFinishChains } = renderMixedFrame(payload, true, mix);
               const bands = audioBands || { rms: 0, beatPulse: 0 };
               // Silence is a true no-op: the envelope passes params through at 0.
               // #306: the bands are already shaped by the ballistics follower
@@ -924,16 +926,21 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
               }, { swell: audioSwell ?? 1 });
               // #309: the frame is backing-store sized; the pair is logical.
               accumObj.step(target.tex, rp, { width: target.w, height: target.h });
-              live.presentUpscaled(accumObj.texture());
+              // #520 Phase 2: apply grain-family finish chain post-accum.
+              let accumTex = accumObj.texture();
+              for (const { layerId, steps } of fxFinishChains) {
+                accumTex = live.getBridge().runChain(layerId, accumTex, steps);
+              }
+              live.presentUpscaled(accumTex);
             } catch (e) {
               noteAccumFault(e);
               // Fall back to plain rendering so the canvas keeps moving.
-              const target = renderMixedFrame(payload, transparent, mix);
+              const { target } = renderMixedFrame(payload, transparent, mix);
               live.present(target);
             }
           } else {
             // ACCUM unavailable this frame (enable failed or cooling down).
-            const target = renderMixedFrame(payload, transparent, mix);
+            const { target } = renderMixedFrame(payload, transparent, mix);
             live.present(target);
           }
         } else {
@@ -948,7 +955,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
             accumFrozen = false;
           }
           lastAccumOn = false;
-          const target = renderMixedFrame(payload, transparent, mix);
+          const { target } = renderMixedFrame(payload, transparent, mix);
           live.present(target);
         }
       } finally {
