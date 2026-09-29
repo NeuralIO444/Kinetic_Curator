@@ -42,6 +42,7 @@ node src/data/helpCopy.selfcheck.mjs
 node src/data/labelCase.selfcheck.mjs
 node src/data/palettes.selfcheck.mjs
 node src/data/chiaroscuro.selfcheck.mjs
+node src/data/taxonomy.selfcheck.mjs
 node src/data/firstLight.selfcheck.mjs
 node src/state/paletteLibrary.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
@@ -69,6 +70,7 @@ node src/fx/fxFilters.selfcheck.mjs
 node src/fx/printPost.selfcheck.mjs
 node src/gl/renderFault.selfcheck.mjs
 node src/gl/sceneContract.selfcheck.mjs
+node src/gl/resolve.selfcheck.mjs
 node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs
 node src/gl/parity/diff.selfcheck.mjs

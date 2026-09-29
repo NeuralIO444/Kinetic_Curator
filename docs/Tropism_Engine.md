@@ -24,11 +24,40 @@ Every item in this collection is one answer to one force — wind, hand, beat, s
 
 **Five in eight** — mold + Euclidean 5/8 + CYCLE + long LEAVE fade. The colony breathes through the misses and re-seeds on the fifth hit; the misses are the piece.
 
-**Storm flag** — HYPE + displace warp 45 + Euclidean 3/4. The shapes hold on misses and tear on hits.
+**Storm flag** — HYPE + FX displace *warp* 45 + Euclidean 3/4. The shapes hold on misses and tear on hits. Play-only. Do not write warp 45 into factory HYPE. See below.
 
 **Clean crossing** — MURM → SWARM, MIX 10s, grade on. Watch the mids: yesterday they went muddy at t=0.5; now they stay lit.
 
 **Second press** — lock palette, CURATE three times. The first press surprises, the second develops, the third returns — that arc is the Markov talking.
+
+## Storm flag — impact (2026-09-28)
+
+A performance on top of sealed Chrome Parade. Not a fourth Voice. Not a Look.
+
+```
+load HYPE factory
+arm FX displace.warp = 45     // #590 domain warp, range 0–60. Not layoutParams.displacement.
+arm Euclidean phrase 3/4      // #589  E(3,4) → x.xx  (three hits, one hole)
+```
+
+Factory HYPE stays: `behave: scatter`, `layoutParams.displacement: 0`, `accumulationFade: 3`, `blendSeconds: 0.8`, Tropism four (`flora_flower_01`, `flora_vine_01`, `line_spiral_01`, `flora_sprig_01`).
+
+| Clock | Phrase | Warp | Plate |
+|-------|--------|------|-------|
+| Hit (`x`) | `tickPhraseBeat` fires | still boiling | wrap + short fade 3 + edge reads as a tear |
+| Miss (`.`) | no tick | still boiling | hold relative to the last hit |
+
+The hold is the hole in the clock. Warp does not mute on misses. Evolve-on-BEAT makes hits also re-roll seed; that is the storm. Evolve off is just 3-of-4 wraps.
+
+Do not:
+
+- set `layoutParams.displacement` to 45 (that is placement fBm, Kernel K1)
+- pack warp 45 into `FLAGSHIP_VOICES.hype` or the #717 DAVIS tap
+- treat Storm flag as a #519 Cast change
+
+Keep as a fork via #734 if the plate should be recallable. Factory map stays byte-stable.
+
+Taste check on the four: under warp 45 the spiral reads mechanical; the sprig can look like torn stem. Swap only the fourth seat on #519 if Hand test / Storm flag looks sparse. Do not steal SWARM's `org_petal_01` by default.
 
 ## OKLCH — the one caveat worth writing down
 

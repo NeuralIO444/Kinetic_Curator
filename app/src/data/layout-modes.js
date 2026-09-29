@@ -2,6 +2,7 @@
 
 import { BEHAVE_IDS } from '../engine/organisms/behave.js';
 import { COMPOSITION_PRESETS } from './presets.js';
+import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 
 export const LAYOUT_MODES = [
@@ -327,7 +328,11 @@ export function validateLayoutParams(partial) {
 }
 
 function pickEnumOk(value, allowed) {
-  return typeof value === 'string' && allowed.includes(value);
+  if (typeof value !== 'string') return false;
+  if (allowed.includes(value)) return true;
+  // Look aliases: composition:'murmuration' is a valid Look address, not a new enum.
+  if (allowed === COMPOSITION_IDS && allowed.includes(resolveLookId(value))) return true;
+  return false;
 }
 
 export function normalizeLayoutParams(partial) {
@@ -386,7 +391,7 @@ export function normalizeLayoutParams(partial) {
   // not callable — and threw "sample is not a function" mid-render, taking
   // down a studio batch or the live canvas.
   next.mode = pickEnum(next.mode, MODE_IDS, DEFAULT_LAYOUT_PARAMS.mode);
-  next.composition = pickEnum(next.composition, COMPOSITION_IDS, DEFAULT_LAYOUT_PARAMS.composition);
+  next.composition = pickEnum(resolveLookId(next.composition), COMPOSITION_IDS, DEFAULT_LAYOUT_PARAMS.composition);
   next.blendMode = pickEnum(next.blendMode, BLEND_MODES, 'normal');
   next.paletteShift = pickEnum(next.paletteShift, PALETTE_SHIFTS, 'auto');
   next.symmetry = pickEnum(next.symmetry, SYMMETRY_MODES, 'none');
