@@ -69,6 +69,7 @@ node src/fx/fxFilters.selfcheck.mjs
 node src/fx/printPost.selfcheck.mjs
 node src/gl/renderFault.selfcheck.mjs
 node src/gl/sceneContract.selfcheck.mjs
+node src/gl/resolve.selfcheck.mjs
 node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs
 node src/gl/parity/diff.selfcheck.mjs
