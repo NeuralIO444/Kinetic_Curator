@@ -653,9 +653,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         const steps = compileFxShaders(layer.fx || [], {
           auxFor: (kind) => {
             if (kind !== 'grain') return null;
-            const aux = grainLuts[wrap.fxLayerId];
-            if (!aux) throw new Error(`[gl] missing grain LUT for wrap ${wrap.fxLayerId}`);
-            return aux;
+            // #749 / #748: procedural grain does not need a LUT. Missing bake
+            // used to throw and abort the whole FX chain (RGB disappeared).
+            return grainLuts[wrap.fxLayerId] || null;
           },
         });
         const afterFx = bridge.runChain(layerId, wRead, steps);

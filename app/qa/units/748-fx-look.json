@@ -1,0 +1,37 @@
+{
+  "id": "748",
+  "issues": [744, 745],
+  "branch": "feat/744-signed-grain",
+  "localhost": "http://localhost:5177/Kinetic_Curator/",
+  "not": ["CI", "factory", "rack", "ACES"],
+  "cases": [
+    {
+      "id": "grain-03",
+      "issue": 744,
+      "setup": "FX-4 Grain only. Amount 0.3. RGB off. ACCUM off.",
+      "pass": "Toggle grain off/on: plate lift stays. Fine sparkle only.",
+      "fail": "Whole frame sinks when grain comes on."
+    },
+    {
+      "id": "grain-08",
+      "issue": 744,
+      "setup": "Same, amount 0.8.",
+      "pass": "Texture heavier. Shadows crunch a little. Not a dimmer to black.",
+      "fail": "Frame goes to mud / empty."
+    },
+    {
+      "id": "rgb-paper",
+      "issue": 745,
+      "setup": "Grain off. ORIGIN paper. BLEED on. FX-1 RGB Split 8 then 13.",
+      "pass": "Marks still there. Fringe only.",
+      "fail": "Canvas fills with paper / white."
+    },
+    {
+      "id": "rgb-void-hot",
+      "issue": 745,
+      "setup": "VOID. BLEED off. Split 19.",
+      "pass": "Mostly green cores — expected. Not the paper wipe.",
+      "fail": "Use this shot to judge #745."
+    }
+  ]
+}
