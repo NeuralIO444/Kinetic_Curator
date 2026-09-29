@@ -1,6 +1,6 @@
 // #532 PR1 — resolve probe is compiled in and bypassed.
 import assert from 'node:assert/strict';
-import { RESOLVE_FS } from './shaders.mjs';
+import { RESOLVE_FS } from './resolveFs.mjs';
 
 assert.match(RESOLVE_FS, /uniform float u_aces/);
 assert.match(RESOLVE_FS, /uniform float u_exposure/);
