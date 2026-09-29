@@ -226,7 +226,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'resolve', name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS,
     vsFile: 'shaders.mjs:FULL_VS', fsFile: 'resolveFs.mjs:RESOLVE_FS',
-    uniforms: ['u_src', 'u_aces', 'u_exposure', 'u_dither'],
+    uniforms: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
