@@ -11,6 +11,10 @@ import { assetCostScore } from './ingest.js';
 
 export function getAssetCost(asset) {
   if (!asset) return 0;
-  if (Number.isFinite(asset.costScore)) return asset.costScore;
-  return assetCostScore(asset.svg || '');
+  const base = Number.isFinite(asset.costScore) ? asset.costScore : assetCostScore(asset.svg || '');
+  // Sub-animated assets bake one atlas cell per frame (see subAnim.mjs),
+  // so their rasterization cost scales with the frame count.
+  const frames = asset?.sub?.frames;
+  if (Number.isFinite(frames) && frames > 1) return base * Math.round(frames);
+  return base;
 }

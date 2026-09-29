@@ -388,8 +388,8 @@ export const createGlobalSlice = (set) => ({
     return { customAssets: result.overlay, enabledAssets: enabled, assetWeightOverrides: overrides, ingestError: null };
   }),
 
-  replaceCustomAsset: (id, svg) => set((state) => {
-    const result = replaceOverlayAsset(id, svg, state.customAssets);
+  replaceCustomAsset: (id, svg, sub) => set((state) => {
+    const result = replaceOverlayAsset(id, svg, state.customAssets, { sub });
     if (!result.ok) return { ingestError: result.error };
     return { customAssets: result.overlay, ingestError: null };
   }),

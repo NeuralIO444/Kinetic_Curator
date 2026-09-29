@@ -9,6 +9,7 @@
 import { bakeLiveAtlas } from './liveAtlas.mjs';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
+import { expandSubFrames } from '../assets/subAnim.mjs';
 
 export function serializeStoreState(s) {
   if (!s) return {};
@@ -68,13 +69,15 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
   let reqCounter = 0;
   const pendingRequests = new Map();
 
-  // Helper to load SVGs for atlas bake
+  // Helper to load SVGs for atlas bake. Sub-animated assets expand into
+  // their baked frame strips here (once per set, never per frame).
   function getSvgMap() {
     const s = getState();
     const svgMap = new Map();
     const pool = mergePool(ASSETS, s?.customAssets || []);
     for (const a of pool) {
       if (a && a.id && a.svg) svgMap.set(a.id, a.svg);
+      for (const f of expandSubFrames(a)) svgMap.set(f.id, f.svg);
     }
     return svgMap;
   }
