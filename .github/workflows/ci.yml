@@ -1,10 +1,16 @@
 name: CI
 
 on:
+  # Main only on push. PRs only on pull_request.
+  # Do not add push: ** — that doubles every PR update.
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 # Same three job names as before — branch protection still matches.
 # No `needs` between them: lint no longer blocks browser install.
@@ -49,8 +55,6 @@ jobs:
         env:
           CI: true
 
-  # Lint has no browser, so GL suites skip there. This job installs
-  # Chromium and runs the whole chain. Starts with lint (no needs).
   selfcheck-browser:
     runs-on: ubuntu-latest
     defaults:
