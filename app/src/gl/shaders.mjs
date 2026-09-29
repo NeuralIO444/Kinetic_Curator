@@ -280,23 +280,21 @@ void main() {
 
   if (u_effect == 0) {                        // invert: out = a - rgb (premultiplied)
     o = vec4(vec3(s.a) - s.rgb, s.a);
-  } else if (u_effect == 1) {                 // rgbSplit: R +dx, B -dx, screen alpha
+  } else if (u_effect == 1) {                 // rgbSplit: original screen-OR alpha
     float dx = u_p.x;                         // canvas-uv units
     vec4 r = texture(u_src, tuv - vec2(dx, 0.0));
     vec4 b = texture(u_src, tuv + vec2(dx, 0.0));
-    // #745: source alpha only — fringe stays inside the mark, BLEED paper cannot fill.
-    o = vec4(r.r, s.g, b.b, s.a);
-      } else if (u_effect == 2) {                 // grain: #744 film speckle (pixel hash)
-    vec3 cs = unpre(s.rgb, s.a);
+    float ao = 1.0 - (1.0 - r.a) * (1.0 - s.a) * (1.0 - b.a);
+    o = vec4(r.r, s.g, b.b, ao);
+  } else if (u_effect == 2) {                 // grain: #744 speckle, premul-safe so it survives RGB
     vec2 p = gl_FragCoord.xy;
     vec3 h = fract(vec3(p.xyx) * 0.1031);
     h += dot(h, h.yzx + 33.33);
     float n = fract((h.x + h.y) * h.z);
     float amt = clamp(u_p.x, 0.0, 1.0);
-    // low amt = fine grit; high amt = visible halide speckle. mono, no wash.
-    vec3 outc = clamp(cs + (n - 0.5) * amt * 0.55, 0.0, 1.0);
-    o = vec4(outc * s.a, s.a);
-} else if (u_effect == 5) {                 // posterize: discrete table in straight space
+    float k = (n - 0.5) * amt * 0.55;
+    o = vec4(clamp(s.rgb + vec3(k), 0.0, 1.0), s.a);
+  } else if (u_effect == 5) {                 // posterize: discrete table in straight space
     float levels = u_p.x;
     vec3 cs = unpre(s.rgb, s.a);
     vec3 q;
