@@ -8,7 +8,7 @@ const base = {
   phraseOriginSeed: 10,
   seed: 10,
   phraseWrapGen: 0,
-  phraseMode: 'reset-seed',
+  phraseMode: 'cycle-seed',
 };
 
 let s = { ...base };
@@ -16,9 +16,11 @@ s = { ...s, ...tickPhraseBeat(s) };
 assert.strictEqual(s.phraseBeat, 1);
 assert.ok(!s.phraseDidWrap);
 
+// cycle-seed wrap: seed advances, origin follows
 s = { ...s, ...tickPhraseBeat({ ...s, phraseBeat: 3 }) };
 assert.strictEqual(s.phraseBeat, 0);
-assert.strictEqual(s.seed, 10);
+assert.strictEqual(s.seed, 11);
+assert.strictEqual(s.phraseOriginSeed, 11);
 assert.strictEqual(s.phraseDidWrap, true);
 
 s = tickPhraseBeat({ ...base, phraseBeat: 3, phraseMode: 'cycle-seed' });

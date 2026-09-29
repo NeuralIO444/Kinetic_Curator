@@ -87,7 +87,7 @@ export const createDavisSlice = (set) => ({
 
   phraseEnabled: false,
   phraseLength: 8,
-  phraseMode: 'reset-seed',
+  phraseMode: 'cycle-seed',
   phraseBeat: 0,
   phraseOriginSeed: null,
   phraseWrapGen: 0,
