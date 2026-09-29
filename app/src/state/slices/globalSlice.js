@@ -41,6 +41,25 @@ function persistPoolView(view) {
   }
 }
 
+// #740: FXAA in the resolve pass is a per-machine display preference (like the
+// pool view), not project content — it lives in its own localStorage key and
+// never enters the project document. Default ON.
+const FXAA_KEY = 'kc:fxaa:v1';
+export function readFxaa() {
+  try {
+    return localStorage.getItem(FXAA_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+function persistFxaa(on) {
+  try {
+    localStorage.setItem(FXAA_KEY, on ? '1' : '0');
+  } catch {
+    // private window / quota — the session value still works. Deliberately silent.
+  }
+}
+
 function findAsset(id, overlay) {
   return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
 }
@@ -200,6 +219,11 @@ export const createGlobalSlice = (set) => ({
   search: '',
   catFilter: 'all',
   poolView: readPoolView(),
+  fxaa: readFxaa(),
+  setFxaa: (on) => {
+    persistFxaa(!!on);
+    set({ fxaa: !!on });
+  },
   /**
    * #310: the canvas background cycle moved from the CanvasPanel header to
    * OUTPUT. The state lives here (not panel-local) so both panels share it;

@@ -18,6 +18,7 @@ import { emit, Events } from '../composition/eventBus.js';
 import { invoke } from '@tauri-apps/api/tauri';
 import { RenderFinalBlock } from './pipeline/RenderFinalBlock.jsx';
 import { PrintDeskBlock } from './pipeline/PrintDeskBlock.jsx';
+import { DisplayBlock } from './pipeline/DisplayBlock.jsx';
 import { BatchEditionBlock } from './pipeline/BatchEditionBlock.jsx';
 import { SnapRecordRow } from './pipeline/SnapRecordRow.jsx';
 import { LoopCaptureBlock } from './pipeline/LoopCaptureBlock.jsx';
@@ -271,6 +272,8 @@ export function PipelinePanel() {
 
         {/* ── PROCESS: render, post ── */}
         <div className="pipeline-section-label">PROCESS</div>
+
+        <DisplayBlock />
 
         <RenderFinalBlock
           glLoopRef={glLoopRef} palette={palette} seed={seed} layoutParams={layoutParams}
