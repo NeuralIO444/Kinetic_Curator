@@ -1,3 +1,4 @@
+import { resolveLookId } from './taxonomy.js';
 // Each chip is a designer brief. params must make that brief visible on click.
 export const PRESET_GROUPS = [
   { id: 'firstlight', label: 'First Light' },
@@ -111,7 +112,8 @@ export const COMPOSITION_PRESETS = [
   // render-proof project JSON under docs/presets/. One preset per engine
   // mode, pulled from existing systems — no invented modes.
   {
-    id: 'murmuration', name: 'MURMURATION', group: 'showcase',
+    // was: murmuration — Look id moved so it no longer collides with voice id murmuration (Deep Water). Alias in taxonomy.js.
+    id: 'dusk-flock', name: 'DUSK FLOCK', group: 'showcase',
     desc: 'Dusk flock — cohesive swarm boids, tight damping, split ink on deep indigo',
     categories: ['organic', 'dots'], paletteShift: 'split',
     params: {
@@ -283,7 +285,7 @@ export const COMPOSITION_PRESETS = [
   },
   {
     id: 'bio-breath', name: 'BREATHING', group: 'bio',
-    desc: 'The cast breathes — scale swells with each agent\u2019s energy. Tired creatures breathe shallow.',
+    desc: 'The cast breathes — scale swells with each agent’s energy. Tired creatures breathe shallow.',
     categories: ['radial', 'organic'], paletteShift: 'zone',
     params: {
       mode: 'hype', count: 180, scale: [0.4, 1.2], rotate: [-30, 30], alpha: [50, 100],
@@ -304,7 +306,7 @@ export const COMPOSITION_PRESETS = [
     },
   },
   {
-    id: 'bio-plate-litho', name: 'PLATE \u00B7 LITHO', group: 'bio',
+    id: 'bio-plate-litho', name: 'PLATE · LITHO', group: 'bio',
     desc: 'Specimen plate — Haeckel bodies pinned on a grid. Pair with LITHOGRAPH and watch the trails fall to the paper.',
     categories: ['radial'], paletteShift: 'band',
     params: {
@@ -316,7 +318,7 @@ export const COMPOSITION_PRESETS = [
     },
   },
   {
-    id: 'bio-plate-sepia', name: 'PLATE \u00B7 SEPIA', group: 'bio',
+    id: 'bio-plate-sepia', name: 'PLATE · SEPIA', group: 'bio',
     desc: 'Radial organisms as plate specimens — six-fold mirrored fans. Pair with SEPIA PLATE.',
     categories: ['radial', 'linework'], paletteShift: 'band',
     params: {
@@ -403,7 +405,8 @@ export const COMPOSITION_PRESETS = [
 ];
 
 export function getPreset(id) {
-  return COMPOSITION_PRESETS.find(p => p.id === id) || COMPOSITION_PRESETS[0];
+  const canon = resolveLookId(id);
+  return COMPOSITION_PRESETS.find(p => p.id === canon) || COMPOSITION_PRESETS[0];
 }
 
 export function getPresetsByGroup() {
