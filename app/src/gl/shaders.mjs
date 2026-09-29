@@ -284,12 +284,14 @@ void main() {
     float dx = u_p.x;                         // canvas-uv units
     vec4 r = texture(u_src, tuv - vec2(dx, 0.0));
     vec4 b = texture(u_src, tuv + vec2(dx, 0.0));
-    float a = 1.0 - (1.0 - r.a) * (1.0 - s.a) * (1.0 - b.a);
-    o = vec4(r.r, s.g, b.b, a);
-  } else if (u_effect == 2) {                 // grain: LUT noise, masked by src alpha
+    // #745: keep source alpha so BLEED paper samples cannot fill the frame.
+    o = vec4(r.r * s.a, s.g, b.b * s.a, s.a);
+  } else if (u_effect == 2) {                 // grain: #744 signed LUT around 0.5
     vec4 nz = texture(u_aux, vec2(v_cuv.x, 1.0 - v_cuv.y));  // LUT bake is top-first, NEAREST
-    float gA = u_p.x * nz.a * s.a;
-    o = vec4(s.rgb * (1.0 - gA), gA + s.a * (1.0 - gA));
+    vec3 cs = unpre(s.rgb, s.a);
+    float amt = u_p.x * s.a;
+    vec3 outc = clamp(cs + (nz.rgb - 0.5) * amt, 0.0, 1.0);
+    o = vec4(outc * s.a, s.a);
   } else if (u_effect == 5) {                 // posterize: discrete table in straight space
     float levels = u_p.x;
     vec3 cs = unpre(s.rgb, s.a);
