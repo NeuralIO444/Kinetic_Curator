@@ -284,8 +284,8 @@ void main() {
     float dx = u_p.x;                         // canvas-uv units
     vec4 r = texture(u_src, tuv - vec2(dx, 0.0));
     vec4 b = texture(u_src, tuv + vec2(dx, 0.0));
-    // #745: keep source alpha so BLEED paper samples cannot fill the frame.
-    o = vec4(r.r * s.a, s.g, b.b * s.a, s.a);
+    // #745: source alpha only — fringe stays inside the mark, BLEED paper cannot fill.
+    o = vec4(r.r, s.g, b.b, s.a);
   } else if (u_effect == 2) {                 // grain: #744 signed LUT around 0.5
     vec4 nz = texture(u_aux, vec2(v_cuv.x, 1.0 - v_cuv.y));  // LUT bake is top-first, NEAREST
     vec3 cs = unpre(s.rgb, s.a);
