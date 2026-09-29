@@ -8,7 +8,8 @@ import { useStore } from '../../state/store.js';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES } from '../../data/layout-modes.js';
-import { FX_EFFECT_DEFS, FX_RACK, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
+import { FX_EFFECT_DEFS, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
+import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
 import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
@@ -64,57 +65,64 @@ function PatchDiagLine({ layerId, patch, srcN, dstN }) {
   return <div className="patch-diag" title={line.title}>{line.text}</div>;
 }
 
-function FxEffectEditor({ layer }) {
-  const [addKind, setAddKind] = useState(null);
+// #520 Phase 4 — rack UI: slot-driven display, one row per EF slot.
+// Slot order is fixed (EF-1 first, EF-4 last); reorder buttons are gone.
+function FxEffectEditor({ layer, fxOrdinal }) {
+  const [pick, setPick] = useState(null);
+  const slot = rackSlotForFxOrdinal(fxOrdinal);
   const effects = layer.effects || [];
-  // #520 Phase 1b — offer-list: only kinds whose rack slot isn't filled yet,
-  // grouped by slot so the picker shows EF-2 / EF-3 / EF-4 sections.
-  const availableKinds = availableFxKinds(effects);
-  const effectiveKind = availableKinds.includes(addKind) ? addKind : (availableKinds[0] ?? null);
-  return (
-    <div className="fx-editor" title="Effect stack">
-      {effects.map((fx, i) => {
-        const def = FX_EFFECT_DEFS[fx.kind];
-        if (!def) return null;
-        // Find which slot this effect belongs to for the label
-        const slot = FX_RACK.find((s) => s.kinds.includes(fx.kind));
-        return (
-          <div className="fx-effect" key={`${fx.kind}-${i}`}>
-            <div className="fx-effect-head">
-              <span className="fx-effect-name" title={def.hint}>{def.label}</span>
-              {slot && <span className="fx-slot-label">{slot.slot}</span>}
-              <button className="micro-btn" disabled={i === 0} onClick={() => emit(Events.FX_EFFECT_REORDER, { layerId: layer.id, index: i, delta: -1 })}>▲</button>
-              <button className="micro-btn" disabled={i === effects.length - 1} onClick={() => emit(Events.FX_EFFECT_REORDER, { layerId: layer.id, index: i, delta: 1 })}>▼</button>
-              <button className="micro-btn" onClick={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: i })}>×</button>
-            </div>
-            {Object.entries(def.params).map(([key, p]) => (
-              <div className="fx-param" key={key}>
-                <label title={p.hint}>{p.label}</label>
-                <input type="range" min={p.min} max={p.max} step={p.step} value={fx.params?.[key] ?? p.def}
-                  onDoubleClick={() => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: i, key, value: p.def })}
-                  onChange={(e) => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: i, key, value: Number(e.target.value) })} />
-                <span className="fx-param-readout">{fx.params?.[key] ?? p.def}</span>
-              </div>
-            ))}
+  if (!slot) return null;
+  const filledIdx = effects.findIndex((fx) => slot.kinds.includes(fx.kind));
+  const filled = filledIdx >= 0 ? effects[filledIdx] : null;
+  const slotKinds = slot.kinds.filter((k) => availableFxKinds(effects).includes(k) || (filled && filled.kind === k));
+
+  if (filled) {
+    const def = FX_EFFECT_DEFS[filled.kind];
+    if (!def) return null;
+    return (
+      <div className="fx-editor" title={`${slot.label} · one family`}>
+        <div className="fx-slot">
+          <div className="fx-effect-head">
+            <span className="fx-slot-label">FX {fxOrdinal}</span>
+            <span className="fx-effect-name" title={def.hint}>{def.label}</span>
+            <button className="micro-btn" onClick={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}>×</button>
           </div>
-        );
-      })}
-      {effectiveKind && (
-        <div className="fx-add-row">
-          <select className="tg" value={effectiveKind} onChange={(e) => setAddKind(e.target.value)}>
-            {FX_RACK.map((slot) => {
-              const slotKinds = slot.kinds.filter((k) => availableKinds.includes(k));
-              if (!slotKinds.length) return null;
-              return (
-                <optgroup key={slot.slot} label={`${slot.slot} · ${slot.label}`}>
-                  {slotKinds.map((k) => <option key={k} value={k}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>)}
-                </optgroup>
-              );
-            })}
-          </select>
-          <button className="chip-btn" onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}>+ EFFECT</button>
+          {Object.entries(def.params).map(([key, p]) => (
+            <div className="fx-param" key={key}>
+              <label title={p.hint}>{p.label}</label>
+              <input type="range" min={p.min} max={p.max} step={p.step} value={filled.params?.[key] ?? p.def}
+                onDoubleClick={() => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: p.def })}
+                onChange={(e) => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: Number(e.target.value) })} />
+              <span className="fx-param-readout">{filled.params?.[key] ?? p.def}</span>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  const effectiveKind = slotKinds.includes(pick) ? pick : (slotKinds[0] ?? null);
+  return (
+    <div className="fx-editor" title={`${slot.label} · one family`}>
+      <div className="fx-slot fx-slot-empty">
+        <span className="fx-slot-label">FX {fxOrdinal}</span>
+        <span className="fx-slot-family">{slot.label}</span>
+        {slot.stubs.map((s) => (
+          <span key={s} className="fx-stub" title="Planned — not yet available">{s.toUpperCase()}</span>
+        ))}
+        {effectiveKind && (
+          <>
+            {slotKinds.length > 1 && (
+              <select className="tg" value={effectiveKind} onChange={(e) => setPick(e.target.value)}>
+                {slotKinds.map((k) => <option key={k} value={k}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>)}
+              </select>
+            )}
+            <button className="chip-btn" onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}>
+              + {slotKinds.length === 1 ? FX_EFFECT_DEFS[effectiveKind].label.toUpperCase() : 'ADD'}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -253,7 +261,7 @@ export function LayerStack() {
                 <PatchDiagLine layerId={layer.id} patch={patch} srcN={ordinals.get(patch.to) ?? '?'} dstN={ordinals.get(layer.id) ?? '?'} />
                 </>
               )}
-              {fx && isFxSelected && <FxEffectEditor layer={layer} />}
+              {fx && isFxSelected && <FxEffectEditor layer={layer} fxOrdinal={ordinals.get(layer.id) || 1} />}
             </div>
           );
         })}
