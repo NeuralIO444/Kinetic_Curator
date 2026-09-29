@@ -57,3 +57,20 @@ A declaration is `{ tier, memoryBytes, timeMs, notes }`, optionally `memoryGate:
 **Not built here:** none of the above is implemented by this entry. This is Phase 0 of `docs/PANEL_CONSOLIDATION_PLAN.md` writing the spec down per issue #248's instructions — implementation is `docs/ARCHITECTURE_PLAN.md` Phase 4, tracked separately, needs the Mac Studio MLX runbook to have actually run first.
 
 **Loop leg:** learn (this is the format the curator's learning-from-kept-renders pipeline will persist to disk).
+
+---
+
+## Chip taxonomy: LOOK / VOICE / SYSTEM / CAST
+
+**What:** Four nouns on the face of KC-1. Spec: [`docs/TAXONOMY.md`](TAXONOMY.md). Ticket #735.
+
+- **System** — engine mode (`layoutParams.mode`). Incomplete look. No downbeat wait.
+- **Voice** — finished genome (flagships + MY VOICES). MIX including `blendSeconds`.
+- **Look** — layout costume (`COMPOSITION_PRESETS`). MIX params only. Replaces **Preset** on the face.
+- **Cast** — enabled asset ids. Not `categories[]`.
+
+Palette remains paint. Curator remains a verb. Boot (`rollLivingBoot`) is a factory roll, not a fifth noun. Look click stays layout-only (#555). Promote Look → Voice only by fork (CHIP_LAB / #734).
+
+**Why:** The board was three types in one skin (TEMPO_AND_CHIPS). Face copy still said PRESET / VIBE / HYPE for all of them. Cleaning names is the system; a new apply path would be a bandage.
+
+**Loop leg:** guide.
