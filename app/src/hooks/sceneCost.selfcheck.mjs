@@ -8,7 +8,7 @@ import '../gl/bridge/builtinEffects.mjs';
 import '../gl/accum.mjs';
 import '../gl/renderer.mjs';
 import { MEASURED_COSTS } from '../gl/effects/measuredCosts.mjs';
-import { FX_EFFECT_DEFS, defaultFxEffects } from '../fx/fxFilters.js';
+import { FX_EFFECT_DEFS } from '../fx/fxFilters.js';
 import {
   FX_KIND_TO_COST_ID,
   costIdForFxKind,
@@ -31,16 +31,16 @@ import {
   console.log('[selfcheck] sceneCost map covers all FX kinds, all registered');
 }
 
-// The default stack sums bench-measured ms only (all nine kinds measured).
+// A reference stack (rgbSplit + grain) sums bench-measured ms only.
 {
-  const kinds = defaultFxEffects().map((f) => f.kind);
+  const kinds = ['rgbSplit', 'grain'];
   const c = sceneFxCost(kinds);
   const expect = kinds.reduce((s, k) => s + MEASURED_COSTS[costIdForFxKind(k)].ms, 0);
-  assert.strictEqual(c.totalMs, expect, 'default stack sums measured ms');
-  assert.strictEqual(c.measured, kinds.length, 'default stack fully measured');
-  assert.strictEqual(c.declared, 0, 'no declared fallback on the default stack');
-  assert.deepStrictEqual(c.unknown, [], 'no unknowns on the default stack');
-  console.log(`[selfcheck] sceneCost default stack ≈ ${c.totalMs.toFixed(1)}ms bench`);
+  assert.strictEqual(c.totalMs, expect, 'reference stack sums measured ms');
+  assert.strictEqual(c.measured, kinds.length, 'reference stack fully measured');
+  assert.strictEqual(c.declared, 0, 'no declared fallback on the reference stack');
+  assert.deepStrictEqual(c.unknown, [], 'no unknowns on the reference stack');
+  console.log(`[selfcheck] sceneCost reference stack ≈ ${c.totalMs.toFixed(1)}ms bench`);
 }
 
 // Unknown kinds add 0 and are listed — cost is never invented.

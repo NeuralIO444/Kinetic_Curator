@@ -1,6 +1,6 @@
 import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { initialEnabledAssets } from './globalSlice.js';
-import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS } from '../../fx/fxFilters.js';
+import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS, availableFxKinds, fxEffectInsertIndex } from '../../fx/fxFilters.js';
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { isTapeFull } from '../tapeBudget.js';
@@ -201,7 +201,18 @@ export const createLayersSlice = (set) => ({
   fxEffectAdd: (layerId, kind) => set((state) => {
     const params = defaultFxParams(kind);
     if (!params) return {};
-    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: state.layers.map((l) => (l.id === layerId && isFxLayer(l) ? { ...l, effects: [...(l.effects || []), { kind, params }] } : l)) };
+    return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+      layers: state.layers.map((l) => {
+        if (l.id !== layerId || !isFxLayer(l)) return l;
+        // #520 Phase 1b: one effect per rack slot — reject if this slot is filled.
+        if (!availableFxKinds(l.effects).includes(kind)) return l;
+        // Insert at the correct rack position so EF-1..EF-4 order is maintained.
+        const effects = [...(l.effects || [])];
+        effects.splice(fxEffectInsertIndex(kind, l.effects), 0, { kind, params });
+        return { ...l, effects };
+      }),
+    };
   }),
 
   fxEffectRemove: (layerId, index) => set((state) => {

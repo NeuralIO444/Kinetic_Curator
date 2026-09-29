@@ -103,7 +103,8 @@ assert.ok(fxId, 'addFxLayer selects the new FX layer');
 assert.strictEqual(topKind(), UNDO_KIND_LAYERS);
 const fxEffects0 = S().layers.find((l) => l.id === fxId).effects.length;
 
-S().fxEffectAdd(fxId, 'grain');
+// #520 Phase 1b: default stack is empty — use posterize (EF-3) to test add/undo.
+S().fxEffectAdd(fxId, 'posterize');
 assert.strictEqual(S().layers.find((l) => l.id === fxId).effects.length, fxEffects0 + 1);
 S().undo();
 assert.strictEqual(S().layers.find((l) => l.id === fxId).effects.length, fxEffects0, 'undo removes the added effect');
@@ -112,6 +113,9 @@ S().fxEffectRemove(fxId, 99);
 assert.strictEqual(undoDepth(), fxDepthBefore + 1, 'no-op FX remove must not push');
 S().fxEffectReorder(fxId, 0, -5);
 assert.strictEqual(undoDepth(), fxDepthBefore + 1, 'no-op FX reorder must not push');
+
+// Add rgbSplit (has 'dx' param) so fxEffectSetParam has a target to test debounce timing.
+S().fxEffectAdd(fxId, 'rgbSplit');
 
 await sleep(900);
 const d0 = undoDepth();
@@ -124,7 +128,8 @@ assert.strictEqual(
   S().layers.find((l) => l.id === fxId).effects[0].params.dx, 3,
   'undo restores the pre-drag FX param',
 );
-S().undo();
+S().undo(); // undo fxEffectAdd(rgbSplit)
+S().undo(); // undo addFxLayer
 assert.ok(!S().layers.some((l) => l.id === fxId), 'undo removes the FX layer');
 
 S().setActiveLayer(layerA);

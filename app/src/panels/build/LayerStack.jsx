@@ -8,7 +8,7 @@ import { useStore } from '../../state/store.js';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES } from '../../data/layout-modes.js';
-import { FX_EFFECT_DEFS, FX_MENU_KINDS, isFxLayer } from '../../fx/fxFilters.js';
+import { FX_EFFECT_DEFS, FX_RACK, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
 import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
@@ -65,17 +65,24 @@ function PatchDiagLine({ layerId, patch, srcN, dstN }) {
 }
 
 function FxEffectEditor({ layer }) {
-  const [addKind, setAddKind] = useState(FX_MENU_KINDS[0]);
+  const [addKind, setAddKind] = useState(null);
   const effects = layer.effects || [];
+  // #520 Phase 1b — offer-list: only kinds whose rack slot isn't filled yet,
+  // grouped by slot so the picker shows EF-2 / EF-3 / EF-4 sections.
+  const availableKinds = availableFxKinds(effects);
+  const effectiveKind = availableKinds.includes(addKind) ? addKind : (availableKinds[0] ?? null);
   return (
     <div className="fx-editor" title="Effect stack">
       {effects.map((fx, i) => {
         const def = FX_EFFECT_DEFS[fx.kind];
         if (!def) return null;
+        // Find which slot this effect belongs to for the label
+        const slot = FX_RACK.find((s) => s.kinds.includes(fx.kind));
         return (
           <div className="fx-effect" key={`${fx.kind}-${i}`}>
             <div className="fx-effect-head">
               <span className="fx-effect-name" title={def.hint}>{def.label}</span>
+              {slot && <span className="fx-slot-label">{slot.slot}</span>}
               <button className="micro-btn" disabled={i === 0} onClick={() => emit(Events.FX_EFFECT_REORDER, { layerId: layer.id, index: i, delta: -1 })}>▲</button>
               <button className="micro-btn" disabled={i === effects.length - 1} onClick={() => emit(Events.FX_EFFECT_REORDER, { layerId: layer.id, index: i, delta: 1 })}>▼</button>
               <button className="micro-btn" onClick={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: i })}>×</button>
@@ -92,12 +99,22 @@ function FxEffectEditor({ layer }) {
           </div>
         );
       })}
-      <div className="fx-add-row">
-        <select className="tg" value={addKind} onChange={(e) => setAddKind(e.target.value)}>
-          {FX_MENU_KINDS.map((k) => <option key={k} value={k}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>)}
-        </select>
-        <button className="chip-btn" onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: addKind })}>+ EFFECT</button>
-      </div>
+      {effectiveKind && (
+        <div className="fx-add-row">
+          <select className="tg" value={effectiveKind} onChange={(e) => setAddKind(e.target.value)}>
+            {FX_RACK.map((slot) => {
+              const slotKinds = slot.kinds.filter((k) => availableKinds.includes(k));
+              if (!slotKinds.length) return null;
+              return (
+                <optgroup key={slot.slot} label={`${slot.slot} · ${slot.label}`}>
+                  {slotKinds.map((k) => <option key={k} value={k}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>)}
+                </optgroup>
+              );
+            })}
+          </select>
+          <button className="chip-btn" onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}>+ EFFECT</button>
+        </div>
+      )}
     </div>
   );
 }

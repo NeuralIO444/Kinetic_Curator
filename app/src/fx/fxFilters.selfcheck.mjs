@@ -6,8 +6,11 @@ import {
   FX_EFFECT_DEFS,
   FX_EFFECT_KINDS,
   FX_MENU_KINDS,
+  FX_RACK,
   GRAIN_FAMILY_KINDS,
   sanitizeFxEffects,
+  availableFxKinds,
+  fxEffectInsertIndex,
   defaultFxEffects,
   defaultFxParams,
   compileFxPrimitives,
@@ -47,12 +50,12 @@ ok('#520: GRAIN_FAMILY_KINDS is exported and includes grain', () => {
   assert.ok(Array.isArray(GRAIN_FAMILY_KINDS));
   assert.ok(GRAIN_FAMILY_KINDS.includes('grain'));
 });
-ok('#520: defaultFxEffects is already valid — grain is already last', () => {
+ok('#520: defaultFxEffects is empty — empty rack is trivially valid', () => {
   const defs = defaultFxEffects();
+  assert.deepEqual(defs, [], 'default rack starts empty');
   let moved = false;
   sanitizeFxEffects(defs, { onMove: () => { moved = true; } });
-  assert.ok(!moved, 'default stack must not trigger onMove');
-  assert.equal(defs[defs.length - 1].kind, 'grain');
+  assert.ok(!moved, 'empty stack must not trigger onMove');
 });
 ok('#520: grain mid-chain is moved to last, onMove fires with kind', () => {
   const moved = [];
@@ -102,6 +105,46 @@ ok('#520: onMove absent — mid-chain grain still moves silently on non-load pat
     { kind: 'posterize', params: { levels: 4 } },
   ]);
   assert.deepEqual(out.map((e) => e.kind), ['posterize', 'grain']);
+});
+
+// #520 Phase 1b — availableFxKinds offer-list
+ok('#520 Phase 1b: availableFxKinds — empty stack offers all live kinds in slot order', () => {
+  const kinds = availableFxKinds([]);
+  // EF-1 has no live kinds; EF-2, EF-3, EF-4 each have some
+  const ef2 = FX_RACK.find(s => s.slot === 'EF-2').kinds;
+  const ef3 = FX_RACK.find(s => s.slot === 'EF-3').kinds;
+  const ef4 = FX_RACK.find(s => s.slot === 'EF-4').kinds;
+  assert.deepEqual(kinds, [...ef2, ...ef3, ...ef4]);
+  assert.ok(!kinds.some(k => FX_RACK.find(s => s.slot === 'EF-1').stubs.includes(k)), 'no stubs in offer-list');
+});
+ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-list', () => {
+  const kinds = availableFxKinds([{ kind: 'rgbSplit', params: {} }]);
+  assert.ok(!kinds.includes('rgbSplit'), 'rgbSplit slot filled');
+  assert.ok(!kinds.includes('displace'), 'same EF-2 slot: displace gone too');
+  assert.ok(!kinds.includes('tear'), 'same EF-2 slot: tear gone too');
+  assert.ok(kinds.includes('posterize'), 'EF-3 still available');
+  assert.ok(kinds.includes('grain'), 'EF-4 still available');
+});
+ok('#520 Phase 1b: availableFxKinds — all slots filled returns empty', () => {
+  const effects = [
+    { kind: 'rgbSplit', params: {} },   // EF-2
+    { kind: 'posterize', params: {} },  // EF-3
+    { kind: 'grain', params: {} },      // EF-4
+  ];
+  assert.deepEqual(availableFxKinds(effects), []);
+});
+
+// #520 Phase 1b — fxEffectInsertIndex ordered insertion
+ok('#520 Phase 1b: fxEffectInsertIndex — EF-3 inserts before EF-4', () => {
+  const effects = [{ kind: 'rgbSplit', params: {} }, { kind: 'grain', params: {} }];
+  assert.equal(fxEffectInsertIndex('posterize', effects), 1); // before grain (EF-4)
+});
+ok('#520 Phase 1b: fxEffectInsertIndex — EF-2 appends before any higher slot', () => {
+  assert.equal(fxEffectInsertIndex('rgbSplit', []), 0);
+  assert.equal(fxEffectInsertIndex('grain', [{ kind: 'rgbSplit', params: {} }]), 1);
+});
+ok('#520 Phase 1b: fxEffectInsertIndex — unknown kind appends', () => {
+  assert.equal(fxEffectInsertIndex('vaporwave', [{ kind: 'grain', params: {} }]), 1);
 });
 
 ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
@@ -271,6 +314,7 @@ ok('duplicateLayer deep-clones the effect stack', () => {
   const { api, get } = driveSlice();
   api.addFxLayer();
   const fxId = get().layers[1].id;
+  api.fxEffectAdd(fxId, 'rgbSplit');
   api.fxEffectSetParam(fxId, 0, 'dx', 10);
   api.duplicateLayer(fxId);
   const s = get();
@@ -284,17 +328,26 @@ ok('effect CRUD is fail-closed', () => {
   const { api, get } = driveSlice();
   api.addFxLayer();
   const fxId = get().layers[1].id;
-  api.fxEffectAdd('nope', 'tear');
-  api.fxEffectAdd(fxId, 'vaporwave');
-  assert.equal(get().layers[1].effects.length, 2); // unchanged
+  // default stack: empty
+  api.fxEffectAdd('nope', 'tear');          // bad layerId — rejected
+  api.fxEffectAdd(fxId, 'vaporwave');       // unknown kind — rejected
+  assert.equal(get().layers[1].effects.length, 0); // unchanged
+  // add rgbSplit (EF-2)
+  api.fxEffectAdd(fxId, 'rgbSplit');
+  assert.equal(get().layers[1].effects.length, 1);
+  // #520 Phase 1b: tear is EF-2, same slot as rgbSplit — rejected
   api.fxEffectAdd(fxId, 'tear');
-  assert.equal(get().layers[1].effects.length, 3);
-  assert.deepEqual(get().layers[1].effects[2].params, defaultFxParams('tear'));
+  assert.equal(get().layers[1].effects.length, 1); // still 1
+  // posterize is EF-3 (empty slot) — accepted, inserted after rgbSplit
+  api.fxEffectAdd(fxId, 'posterize');
+  assert.equal(get().layers[1].effects.length, 2);
+  assert.deepEqual(get().layers[1].effects.map(e => e.kind), ['rgbSplit', 'posterize']);
+  assert.deepEqual(get().layers[1].effects[1].params, defaultFxParams('posterize'));
   api.fxEffectRemove(fxId, 99);
   api.fxEffectReorder(fxId, 0, 99);
   api.fxEffectSetParam(fxId, 0, 'dx', 'not-a-number');
   api.fxEffectSetParam(fxId, 0, 'bogus', 5);
-  assert.equal(get().layers[1].effects.length, 3);
+  assert.equal(get().layers[1].effects.length, 2);
   assert.equal(get().layers[1].effects[0].params.dx, 3); // NaN -> default
   api.fxEffectSetParam(fxId, 0, 'dx', 1000);
   assert.equal(get().layers[1].effects[0].params.dx, 24); // clamped
@@ -305,10 +358,10 @@ ok('effect CRUD is fail-closed', () => {
   api.fxEffectSetParam(fxId, 0, 'dx', Infinity);
   assert.equal(get().layers[1].effects[0].params.dx, 3); // non-finite -> default
   api.fxEffectSetParam(fxId, 0, 'dx', 24);
-  api.fxEffectReorder(fxId, 0, 1);
-  assert.equal(get().layers[1].effects[0].kind, 'grain');
+  api.fxEffectReorder(fxId, 0, 1); // swap rgbSplit ↔ posterize
+  assert.equal(get().layers[1].effects[0].kind, 'posterize');
   api.fxEffectRemove(fxId, 0);
-  assert.equal(get().layers[1].effects.length, 2);
+  assert.equal(get().layers[1].effects.length, 1);
 });
 // #554 — the builtin u_p packers clamp for themselves (the GL harness serves
 // only src/gl, so they cannot import the catalog). This is the drift gate:
@@ -399,12 +452,10 @@ ok('project JSON round-trips fx layers exactly', () => {
   const { api, get } = driveSlice();
   api.addFxLayer();
   const fxId = get().layers[1].id;
+  // Build a non-trivial stack explicitly: rgbSplit (EF-2) + grain (EF-4).
+  api.fxEffectAdd(fxId, 'rgbSplit');
   api.fxEffectSetParam(fxId, 0, 'dx', 7);
-  api.fxEffectAdd(fxId, 'tear');
-  // defaultFxEffects is [rgbSplit, grain]; after adding tear: [rgbSplit, grain, tear].
-  // #520 Phase 1: grain must be last. Swap grain (index 1) with tear (index 2)
-  // so live state is already normalized before serializing.
-  api.fxEffectReorder(fxId, 1, 1); // [rgbSplit, tear, grain]
+  api.fxEffectAdd(fxId, 'grain'); // inserted after rgbSplit (EF-4 > EF-2)
   const doc = serializeProject({ ...get(), quality: 'high', assetWeightOverrides: null, paletteOverrides: null, customAssets: [] });
   const json = JSON.parse(JSON.stringify(doc)); // through the wire
   const parsed = parseProject(json);
