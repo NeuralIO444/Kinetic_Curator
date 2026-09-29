@@ -154,6 +154,37 @@ export function isFxLayer(layer) {
   return !!layer && layer.type === 'fx';
 }
 
+/**
+ * #520 Phase 1b — offer-list: which kinds can still be added to this stack?
+ * A slot is filled once any of its kinds appears in effects. Returns live kinds
+ * only (no stubs), ordered by slot (EF-1..EF-4). Used by FxEffectEditor for
+ * the add picker and by fxEffectAdd to reject already-filled slots.
+ */
+export function availableFxKinds(effects) {
+  const filledSlots = new Set();
+  for (const e of (effects || [])) {
+    for (const slot of FX_RACK) {
+      if (slot.kinds.includes(e.kind)) { filledSlots.add(slot.slot); break; }
+    }
+  }
+  return FX_RACK.flatMap((slot) => (filledSlots.has(slot.slot) ? [] : slot.kinds));
+}
+
+/**
+ * #520 Phase 1b — where should a new effect of this kind be inserted to keep
+ * the stack in slot order (EF-1 first, EF-4 last)? Returns the splice index.
+ * Unknown kinds (not in any FX_RACK slot) append to the end.
+ */
+export function fxEffectInsertIndex(kind, effects) {
+  const slotIdx = FX_RACK.findIndex((s) => s.kinds.includes(kind));
+  if (slotIdx < 0) return (effects || []).length;
+  const i = (effects || []).findIndex((e) => {
+    const eSlot = FX_RACK.findIndex((s) => s.kinds.includes(e.kind));
+    return eSlot > slotIdx;
+  });
+  return i < 0 ? (effects || []).length : i;
+}
+
 /** Default stack for a newly added FX layer: the reference feel. */
 export function defaultFxEffects() {
   return [

@@ -103,7 +103,9 @@ assert.ok(fxId, 'addFxLayer selects the new FX layer');
 assert.strictEqual(topKind(), UNDO_KIND_LAYERS);
 const fxEffects0 = S().layers.find((l) => l.id === fxId).effects.length;
 
-S().fxEffectAdd(fxId, 'grain');
+// #520 Phase 1b: default stack has grain (EF-4) + rgbSplit (EF-2); use
+// posterize (EF-3, unfilled) — grain would be rejected (slot already filled).
+S().fxEffectAdd(fxId, 'posterize');
 assert.strictEqual(S().layers.find((l) => l.id === fxId).effects.length, fxEffects0 + 1);
 S().undo();
 assert.strictEqual(S().layers.find((l) => l.id === fxId).effects.length, fxEffects0, 'undo removes the added effect');
