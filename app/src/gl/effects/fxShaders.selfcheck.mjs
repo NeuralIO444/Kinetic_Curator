@@ -30,6 +30,7 @@ import {
   compileFxShaders,
   fxChunksUsed,
 } from './fxShaders.mjs';
+import { EFFECT_FS } from '../shaders.mjs';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -287,6 +288,12 @@ ok('noise comes from the shared chunk library — never reimplemented', () => {
     const local = /float\s+kc_\w+\s*\(|vec2\s+kc_\w+\s*\(/.test(def.fs);
     assert.equal(local, false, `${kind}: defines no kc_ functions of its own`);
   }
+});
+
+ok('grain stays premultiplied — no speckle on transparent pixels (#748)', () => {
+  const g = EFFECT_FS.split('u_effect == 2')[1].split('u_effect ==')[0];
+  assert.match(g, /float k = [^;]*\* s\.a;/, 'grain offset scales by source alpha');
+  assert.match(g, /clamp\(s\.rgb \+ vec3\(k\), 0\.0, s\.a\)/, 'grain rgb clamps to alpha');
 });
 
 console.log(`fxShaders.selfcheck: OK (${n} cases)`);
