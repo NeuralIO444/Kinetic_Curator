@@ -197,7 +197,12 @@ export function normalizeLayers(rawLayers, rawActiveId) {
       layerOpacity: Number.isFinite(l.layerOpacity) ? Math.min(1, Math.max(0, l.layerOpacity)) : 1,
     };
     if (type === 'fx') {
-      layer.effects = sanitizeFxEffects(l.effects);
+      // #520 Phase 1 — shed-report any grain-family moved to last position (#192: never silent).
+      layer.effects = sanitizeFxEffects(l.effects, {
+        onMove: ({ kinds }) => {
+          console.warn(`[normalize] fx layer ${l.id}: grain-family (${kinds.join(', ')}) moved to finish position — save the project to persist the fix`);
+        },
+      });
     } else {
       // #456 — patches were dropped entirely on load (never copied from the
       // raw doc into the normalized layer). `to` is a stable layer id
