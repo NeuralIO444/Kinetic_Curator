@@ -80,13 +80,13 @@ export const FLAGSHIP_VOICES = [
     },
     params: {
       mode: 'swarm',
-      count: 260,
+      count: 160,
       scale: [0.3, 1.1],
       rotate: [-180, 180],
       alpha: [60, 100],
       zTiers: 4,
       jitter: 24,
-      density: 78,
+      density: 55,
       bleed: false,
       mirror: false,
       overlap: true,
@@ -94,14 +94,14 @@ export const FLAGSHIP_VOICES = [
       hueRotate: 0,
       paletteShift: 'auto',
       accumulation: true,
-      accumulationFade: 8, // #743 shorter trail — readable flock
-      accumulationOptics: 0.35,
+      accumulationFade: 4, // #743 second cut
+      accumulationOptics: 0.18,
       accumulationTunnel: 0,
       accumulationPrism: 0,
       noiseFreq: 0.005,
       noiseSpeed: 0.5,
       displacement: 0,
-      particleCount: 200,
+      particleCount: 120,
       swarmCohesion: 0.6, // slider max — past this the flock is one blob (#272)
       gravityWells: 2.5,
       damping: 0.95,
@@ -123,7 +123,7 @@ export const FLAGSHIP_VOICES = [
       audioAlphaMod: 0.25,
       lifeDrift: 0.35,
     },
-    fx: { grain: 0.6, vignette: true, posterize: false, edge: false, glow: 0.35, contrast: 1.0 },
+    fx: { grain: 0.35, vignette: true, posterize: false, edge: false, glow: 0.2, contrast: 1.0 },
     assets: {
       dot_single_01: true,
       org_petal_01: true,
