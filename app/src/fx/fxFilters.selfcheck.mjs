@@ -6,6 +6,7 @@ import {
   FX_EFFECT_DEFS,
   FX_EFFECT_KINDS,
   FX_MENU_KINDS,
+  GRAIN_FAMILY_KINDS,
   sanitizeFxEffects,
   defaultFxEffects,
   defaultFxParams,
@@ -39,6 +40,68 @@ ok('sanitize drops unknown kinds, clamps params, fills defaults', () => {
 ok('sanitize on non-array returns []', () => {
   assert.deepEqual(sanitizeFxEffects(null), []);
   assert.deepEqual(sanitizeFxEffects('nope'), []);
+});
+
+// #520 Phase 1 — grain-family-last enforcement
+ok('#520: GRAIN_FAMILY_KINDS is exported and includes grain', () => {
+  assert.ok(Array.isArray(GRAIN_FAMILY_KINDS));
+  assert.ok(GRAIN_FAMILY_KINDS.includes('grain'));
+});
+ok('#520: defaultFxEffects is already valid — grain is already last', () => {
+  const defs = defaultFxEffects();
+  let moved = false;
+  sanitizeFxEffects(defs, { onMove: () => { moved = true; } });
+  assert.ok(!moved, 'default stack must not trigger onMove');
+  assert.equal(defs[defs.length - 1].kind, 'grain');
+});
+ok('#520: grain mid-chain is moved to last, onMove fires with kind', () => {
+  const moved = [];
+  const out = sanitizeFxEffects(
+    [{ kind: 'grain', params: { amount: 0.4 } }, { kind: 'rgbSplit', params: { dx: 3 } }],
+    { onMove: ({ kinds }) => moved.push(...kinds) }
+  );
+  assert.deepEqual(out.map((e) => e.kind), ['rgbSplit', 'grain']);
+  assert.deepEqual(moved, ['grain']);
+});
+ok('#520: grain at last position with non-grain before it — no move, onMove silent', () => {
+  let moved = false;
+  const out = sanitizeFxEffects(
+    [{ kind: 'rgbSplit', params: { dx: 3 } }, { kind: 'grain', params: { amount: 0.4 } }],
+    { onMove: () => { moved = true; } }
+  );
+  assert.deepEqual(out.map((e) => e.kind), ['rgbSplit', 'grain']);
+  assert.ok(!moved);
+});
+ok('#520: multiple grain-family mid-chain all move to end, order preserved within group', () => {
+  const moved = [];
+  const out = sanitizeFxEffects(
+    [
+      { kind: 'grain', params: { amount: 0.2 } },
+      { kind: 'grain', params: { amount: 0.6 } },
+      { kind: 'displace', params: { scale: 24, seed: 7 } },
+    ],
+    { onMove: ({ kinds }) => moved.push(...kinds) }
+  );
+  assert.deepEqual(out.map((e) => e.kind), ['displace', 'grain', 'grain']);
+  assert.equal(out[1].params.amount, 0.2); // relative order within group preserved
+  assert.equal(out[2].params.amount, 0.6);
+  assert.deepEqual(moved, ['grain', 'grain']);
+});
+ok('#520: all-grain-family stack is valid (nothing non-grain follows any grain)', () => {
+  let moved = false;
+  const out = sanitizeFxEffects(
+    [{ kind: 'grain', params: { amount: 0.3 } }, { kind: 'grain', params: { amount: 0.7 } }],
+    { onMove: () => { moved = true; } }
+  );
+  assert.equal(out.length, 2);
+  assert.ok(!moved);
+});
+ok('#520: onMove absent — mid-chain grain still moves silently on non-load paths', () => {
+  const out = sanitizeFxEffects([
+    { kind: 'grain', params: { amount: 0.4 } },
+    { kind: 'posterize', params: { levels: 4 } },
+  ]);
+  assert.deepEqual(out.map((e) => e.kind), ['posterize', 'grain']);
 });
 
 ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
@@ -338,6 +401,10 @@ ok('project JSON round-trips fx layers exactly', () => {
   const fxId = get().layers[1].id;
   api.fxEffectSetParam(fxId, 0, 'dx', 7);
   api.fxEffectAdd(fxId, 'tear');
+  // defaultFxEffects is [rgbSplit, grain]; after adding tear: [rgbSplit, grain, tear].
+  // #520 Phase 1: grain must be last. Swap grain (index 1) with tear (index 2)
+  // so live state is already normalized before serializing.
+  api.fxEffectReorder(fxId, 1, 1); // [rgbSplit, tear, grain]
   const doc = serializeProject({ ...get(), quality: 'high', assetWeightOverrides: null, paletteOverrides: null, customAssets: [] });
   const json = JSON.parse(JSON.stringify(doc)); // through the wire
   const parsed = parseProject(json);

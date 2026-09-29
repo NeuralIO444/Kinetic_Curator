@@ -118,6 +118,26 @@ export const FX_EFFECT_DEFS = {
 
 export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
 
+// #520 Phase 1 — grain-family kinds that may only occupy the last (EF-4 FINISH)
+// position. Phase 3 adds Dither and Stipple here.
+export const GRAIN_FAMILY_KINDS = ['grain'];
+
+/**
+ * #520 — EF rack: 4 fixed slots per FX layer, applied bottom-up (EF-1 first,
+ * EF-4 last). Each slot has a curated family; EF-4 is hard-exclusive to its
+ * family. Phase 4 wires the rack UI; this is the data contract for offer-lists
+ * and the slot enforcement added in phases 1-3.
+ *
+ * `stubs` are planned kinds not yet in FX_EFFECT_DEFS — they appear in the
+ * rack UI as disabled placeholders so the slot is never visually empty.
+ */
+export const FX_RACK = [
+  { slot: 'EF-1', label: 'Blur / Focus', kinds: [],              stubs: ['sharpen', 'haze'] },
+  { slot: 'EF-2', label: 'Distort',      kinds: ['displace', 'tear', 'rgbSplit', 'edge'], stubs: [] },
+  { slot: 'EF-3', label: 'Tonal',        kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
+  { slot: 'EF-4', label: 'Finish',       kinds: ['grain', 'scanlines', 'halo'],          stubs: ['dither', 'stipple'] },
+];
+
 /**
  * #310 — the FX add-menu is curated to four visible effects: RGB Split,
  * Displace, Tear, Invert. The other five roster effects (grain, scanlines,
@@ -154,8 +174,15 @@ export function defaultFxParams(kind) {
 /**
  * Sanitize a raw effects array: drop unknown kinds and non-objects, clamp
  * params to their defined ranges, fill defaults. Fail closed, never throw.
+ *
+ * #520 Phase 1 — grain-family kinds (GRAIN_FAMILY_KINDS) must only appear as
+ * the final effects in the stack (EF-4 FINISH slot). Any grain-family entry
+ * with a non-grain-family effect after it is moved to the end. The optional
+ * onMove callback receives { kinds } (array of kind strings) so callers on
+ * load paths can shed-report the migration (#192: never silent).
+ * Render-path callers (sceneContract) pass no callback and stay silent.
  */
-export function sanitizeFxEffects(raw) {
+export function sanitizeFxEffects(raw, { onMove } = {}) {
   if (!Array.isArray(raw)) return [];
   const out = [];
   for (const fx of raw) {
@@ -169,6 +196,19 @@ export function sanitizeFxEffects(raw) {
       params[key] = Number.isFinite(v) ? Math.min(p.max, Math.max(p.min, v)) : p.def;
     }
     out.push({ kind: fx.kind, params });
+  }
+  // Enforce grain-family-last: any grain-family effect that has a non-grain-family
+  // effect after it is out of position. Stable-sort: non-grain-family first,
+  // grain-family last, preserving relative order within each group.
+  const violated = out.some(
+    (e, i) => GRAIN_FAMILY_KINDS.includes(e.kind) && out.slice(i + 1).some((e2) => !GRAIN_FAMILY_KINDS.includes(e2.kind))
+  );
+  if (violated) {
+    const nonFinish = out.filter((e) => !GRAIN_FAMILY_KINDS.includes(e.kind));
+    const finish = out.filter((e) => GRAIN_FAMILY_KINDS.includes(e.kind));
+    out.length = 0;
+    out.push(...nonFinish, ...finish);
+    if (typeof onMove === 'function') onMove({ kinds: finish.map((e) => e.kind) });
   }
   return out;
 }
