@@ -33,9 +33,11 @@
  */
 
 import {
-  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, RESOLVE_FS, COPY_FS, UPSCALE_FS,
+  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS,
   blendIdFor,
 } from './shaders.mjs';
+import { RESOLVE_FS } from './resolveFs.mjs';
+import { bindResolveProbe } from './resolveBind.mjs';
 import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
@@ -219,8 +221,8 @@ export const RENDERER_PROGRAMS = [
   },
   {
     key: 'resolve', name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS,
-    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:RESOLVE_FS',
-    uniforms: ['u_src'],
+    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'resolveFs.mjs:RESOLVE_FS',
+    uniforms: ['u_src', 'u_aces', 'u_exposure', 'u_dither'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -688,6 +690,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.disable(gl.BLEND);
     gl.useProgram(resProg);
     gl.uniform1i(U(resProg, 'u_src'), bindTex(0, mRead.tex));
+    bindResolveProbe(gl, (n) => U(resProg, n));
     drawFullscreen(resProg);
     const pixels = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
@@ -914,6 +917,7 @@ export function createLiveRenderer(canvas) {
     gl.disable(gl.BLEND);
     gl.useProgram(b.progs.resolve);
     gl.uniform1i(b.U(b.progs.resolve, 'u_src'), b.bindTex(0, target.tex));
+    bindResolveProbe(gl, (n) => b.U(b.progs.resolve, n));
     b.drawFullscreen(b.progs.resolve);
   }
 

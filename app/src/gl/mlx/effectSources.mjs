@@ -11,7 +11,8 @@
  * (ACCUM_PASS_SOURCES) to make this possible; no harness behavior changed.
  */
 
-import { FULL_VS, COMPOSITE_FS, RESOLVE_FS, COPY_FS, QUAD_VS, QUAD_FS, EFFECT_FS } from '../shaders.mjs';
+import { FULL_VS, COMPOSITE_FS, COPY_FS, QUAD_VS, QUAD_FS, EFFECT_FS } from '../shaders.mjs';
+import { RESOLVE_FS } from '../resolveFs.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
 import { ACCUM_PASS_SOURCES } from '../accum.mjs';
 import { declaredKinds } from './declaredCostTiers.mjs';
@@ -32,7 +33,7 @@ const BUILTIN = {
 const PROGRAMS = {
   quad:        { fs: QUAD_FS,  vs: QUAD_VS, paramCount: 0, passCount: 1 },
   composite:   { fs: COMPOSITE_FS, vs: FULL_VS, paramCount: 3, passCount: 1 },
-  resolve:     { fs: RESOLVE_FS,   vs: FULL_VS, paramCount: 0, passCount: 1 },
+  resolve:     { fs: RESOLVE_FS,   vs: FULL_VS, paramCount: 3, passCount: 1 },
   copy:        { fs: COPY_FS,  vs: FULL_VS, paramCount: 0, passCount: 1 },
 };
 
@@ -44,7 +45,7 @@ export function effectSources() {
   const out = new Map();
 
   for (const [kind, spec] of Object.entries(PROGRAMS)) {
-    out.set(kind, { sources: [spec.vs, spec.fs], passCount: spec.passCount, paramCount: spec.paramCount, file: 'shaders.mjs' });
+    out.set(kind, { sources: [spec.vs, spec.fs], passCount: spec.passCount, paramCount: spec.paramCount, file: kind === 'resolve' ? 'resolveFs.mjs' : 'shaders.mjs' });
   }
   for (const [kind, spec] of Object.entries(BUILTIN)) {
     out.set(kind, { sources: [EFFECT_FS], passCount: spec.passCount, paramCount: spec.paramCount, file: 'shaders.mjs:EFFECT_FS' });

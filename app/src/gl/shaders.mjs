@@ -304,16 +304,8 @@ void main() {
   }
 }`;
 
-/** Final resolve: 16F premultiplied -> RGBA8 premultiplied bytes.
- *  Flips v so readPixels returns top-first rows (resvg's convention). */
-export const RESOLVE_FS = `#version 300 es
-precision highp float;
-uniform sampler2D u_src;
-in vec2 v_cuv;
-out vec4 o;
-void main() {
-  o = clamp(texture(u_src, vec2(v_cuv.x, 1.0 - v_cuv.y)), 0.0, 1.0);
-}`;
+/** Final resolve lives in resolveFs.mjs (#532). Re-export so existing imports keep working. */
+export { RESOLVE_FS } from './resolveFs.mjs';
 
 /** Plain texture copy, no flip (FBO-to-FBO). */
 export const COPY_FS = `#version 300 es

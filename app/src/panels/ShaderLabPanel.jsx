@@ -23,15 +23,16 @@ import {
 } from '../gl/debug/debugStrip.mjs';
 import { tapToDataURL } from '../gl/debug/tapPoints.mjs';
 import {
-  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, EFFECT_FS, RESOLVE_FS, COPY_FS,
+  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, EFFECT_FS, COPY_FS,
 } from '../gl/shaders.mjs';
+import { RESOLVE_FS } from '../gl/resolveFs.mjs';
 
 // Programs the Phase 1 renderer builds (mirrors renderer.mjs).
 const PROGRAMS = [
   { name: 'quad', vs: QUAD_VS, fs: QUAD_FS, set: ['u_canvas', 'u_atlas'] },
   { name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS, set: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn'] },
   { name: 'effect', vs: FULL_VS, fs: EFFECT_FS, set: ['u_src', 'u_aux', 'u_effect', 'u_p', 'u_texel', 'u_clip', 'u_clipOn'] },
-  { name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS, set: ['u_src'] },
+  { name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS, set: ['u_src', 'u_aces', 'u_exposure', 'u_dither'] },
   { name: 'copy', vs: FULL_VS, fs: COPY_FS, set: ['u_src'] },
 ];
 // NOTE: the `set` lists mirror the uniforms renderer.mjs uploads. If the
@@ -97,14 +98,13 @@ export function ShaderLabPanel() {
     if (!gl) { setNoGL(true); return; }
     glRef.current = gl;
 
-    // 1 — compile check + uniform audit for every Phase 1 program.
     const cRows = [];
     const aRows = [];
     for (const p of PROGRAMS) {
       try {
         const prog = buildProgramChecked(gl, p.vs, p.fs, {
           name: p.name,
-          vsFile: 'shaders.mjs', fsFile: 'shaders.mjs',
+          vsFile: 'shaders.mjs', fsFile: p.name === 'resolve' ? 'resolveFs.mjs' : 'shaders.mjs',
         });
         cRows.push({ name: p.name, ok: true });
         const a = auditUniforms(gl, prog, p.set);
@@ -117,7 +117,6 @@ export function ShaderLabPanel() {
     setCompileRows(cRows);
     setAuditRows(aRows);
 
-    // 2 — flag views over the synthetic texture.
     const fp = createFlagPass(gl);
     const demo = makeDemoTexture(gl);
     const target = makeTarget(gl, demo.size);
@@ -134,7 +133,6 @@ export function ShaderLabPanel() {
     gl.deleteTexture(demo.tex); gl.deleteTexture(target.tex); gl.deleteFramebuffer(target.fb);
     setThumbs(urls);
 
-    // 3 — GPU timer capability + one measured clear.
     const t = createGpuTimer(gl);
     t.begin('clear');
     gl.clearColor(0, 0, 0, 1);
@@ -153,7 +151,6 @@ export function ShaderLabPanel() {
       }
     }, 16);
 
-    // 4 — debug strip round-trip as a printed table.
     const labels = ['u_amount', 'u_texel.x', 'iterations', 'seed'];
     const values = [0.75, 0.0025, 16, 0xC0FFEE];
     const back = unpackStripPixels(packStripValues(values));
