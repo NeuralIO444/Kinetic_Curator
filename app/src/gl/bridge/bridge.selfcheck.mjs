@@ -423,4 +423,18 @@ ok('uniform dirty-cache is per-program: a second program re-uploads u_res (QA sw
   assert.deepEqual([resUploads[0].args[1], resUploads[0].args[2]], [400, 280]);
 });
 
+ok('two FX layers on one program never inherit each other\'s uniforms (#748)', () => {
+  // GL uniform state lives on the program, not the layer: FX-1 rgbSplit and
+  // FX-4 grain share 'effect', so each frame must re-upload its own u_effect.
+  const gl = makeMockGl({ nullUniforms: ['u_res'] });
+  const bridge = makeBridge(gl);
+  const a = bridge.layer('fx1'), b = bridge.layer('fx4');
+  for (let i = 0; i < 2; i++) {
+    bridge.runChain('fx1', a.t0, chainOf('rgbSplit'));
+    bridge.runChain('fx4', b.t0, chainOf('grain'));
+  }
+  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
+  assert.deepEqual(modes, [1, 2, 1, 2], 'frame 2 re-uploads each layer\'s effect id');
+});
+
 console.log(`bridge.selfcheck: OK (${n} cases)`);

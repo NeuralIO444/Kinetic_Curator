@@ -80,7 +80,10 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
   const programs = new Map();    // name -> { program, locations: Map }
   const effects = new Map();     // kind -> { program, pad, passes }
   const layers = new Map();      // id -> { t0, t1, padT0, padT1|null, pad }
-  const uniformCache = new Map();// `${layerId}` -> Map(uname -> value)
+  // #748: one cache for the bridge, keyed `${program}\0${uname}`. Uniform
+  // values live on the GL program, which every layer shares — a per-layer
+  // cache let FX-1 skip uploads FX-4 had overwritten (grain drove RGB dx).
+  const uniformCache = new Map();
   let vbo = null;
 
   const stats = {
@@ -250,9 +253,8 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
   }
 
   function uploadUniforms(rec, def, values, cache) {
-    // The cache is shared per layer but uniform LOCATIONS are per program:
-    // a later program in the same chain must not inherit an earlier
-    // program's "already uploaded" marks. (Concretely: u_res uploaded for
+    // Uniform values and LOCATIONS are per program: a program must not
+    // inherit another program's "already uploaded" marks. (Concretely: u_res uploaded for
     // displace was then skipped for edge, leaving it at (0,0) so
     // 1.0/u_res produced Inf offsets and garbage output.) Key by program.
     const ns = rec.name + '\0';
@@ -286,8 +288,7 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     if (!steps.length) return readTarget;
     let read = readTarget;
     let write = read === L.t0 ? L.t1 : L.t0;
-    let cache = uniformCache.get(layerId);
-    if (!cache) { cache = new Map(); uniformCache.set(layerId, cache); }
+    const cache = uniformCache;
     for (const step of steps) {
       const def = effects.get(step.kind);
       if (!def) throw new Error(`[bridge] unknown effect kind "${step.kind}" — register it with defineEffect first`);
