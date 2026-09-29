@@ -185,12 +185,9 @@ export function fxEffectInsertIndex(kind, effects) {
   return i < 0 ? (effects || []).length : i;
 }
 
-/** Default stack for a newly added FX layer: the reference feel. */
+/** Default stack for a newly added FX layer: empty rack, designer builds from scratch. */
 export function defaultFxEffects() {
-  return [
-    { kind: 'rgbSplit', params: { dx: 3 } },
-    { kind: 'grain', params: { amount: 0.4 } },
-  ];
+  return [];
 }
 
 /** Default params for one effect kind (used by "add effect"). */
