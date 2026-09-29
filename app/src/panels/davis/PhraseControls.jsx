@@ -2,7 +2,6 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { euclidString } from '../../state/euclid.js';
 
 const PHRASE_MODES = [
-  { id: 'reset-seed', label: 'RESET', title: 'On wrap, seed returns to the armed origin.' },
   { id: 'cycle-seed', label: 'CYCLE', title: 'On wrap, seed becomes origin+1 and origin follows.' },
   { id: 'step-ca', label: 'CA', title: 'On wrap, step the CA grid. Only paints when layout is Cellular.' },
 ];
@@ -112,7 +111,7 @@ export function PhraseControls({
                     ? `METRO ${phraseBeat}/${phraseLength}`
                     : `BEAT ${phraseBeat}/${phraseLength}`}
             </span>
-            <button className="micro-btn" title="Beat 0. RESET mode also homes the seed." onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>RESET NOW</button>
+            <button className="micro-btn" title="Jump to beat 0." onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>RESET NOW</button>
           </div>
           <div style={{ position: 'relative', height: 4, background: 'var(--line-2)', borderRadius: 2, overflow: 'hidden' }}
             title="Bar fill = count. White pip = last audio attack.">
