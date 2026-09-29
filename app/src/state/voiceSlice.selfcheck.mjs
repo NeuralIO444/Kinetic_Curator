@@ -119,7 +119,7 @@ assert.strictEqual(state.voiceMix.auto, true, 'driver tick preserves auto');
 api.commitVoiceMix();
 assert.strictEqual(state.voiceMix, null);
 assert.strictEqual(state.layoutParams.mode, 'swarm');
-assert.strictEqual(state.layoutParams.particleCount, 280);
+assert.strictEqual(state.layoutParams.particleCount, 120);
 assert.strictEqual(state.paletteOverrides.swatches.length, 8);
 assert.deepStrictEqual(state.enabledAssets, {
   dot_single_01: true,
