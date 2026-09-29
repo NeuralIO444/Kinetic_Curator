@@ -1,10 +1,14 @@
-/** #532 PR1 — upload resolve uniforms in the bypassed state.
- *  Live renderer calls this after binding u_src. PR2 will pass real values.
+/** #532 PR2 — live resolve defaults.
+ *  ACES on, Bayer on, exposure 1.0. No panel this PR.
  */
 export const RESOLVE_UNIFORMS = ['u_src', 'u_aces', 'u_exposure', 'u_dither'];
 
-export function bindResolveProbe(gl, getLoc) {
-  gl.uniform1f(getLoc('u_aces'), 0.0);
-  gl.uniform1f(getLoc('u_exposure'), 1.0);
-  gl.uniform1f(getLoc('u_dither'), 0.0);
+export function bindResolveProbe(gl, getLoc, {
+  aces = 1,
+  exposure = 1,
+  dither = 1,
+} = {}) {
+  gl.uniform1f(getLoc('u_aces'), aces ? 1 : 0);
+  gl.uniform1f(getLoc('u_exposure'), Number.isFinite(exposure) ? exposure : 1);
+  gl.uniform1f(getLoc('u_dither'), dither ? 1 : 0);
 }
