@@ -286,15 +286,19 @@ void main() {
     vec4 b = texture(u_src, tuv + vec2(dx, 0.0));
     // #745: source alpha only — fringe stays inside the mark, BLEED paper cannot fill.
     o = vec4(r.r, s.g, b.b, s.a);
-  } else if (u_effect == 2) {                 // grain: #744 signed LUT around 0.5
-    vec4 nz = texture(u_aux, vec2(v_cuv.x, 1.0 - v_cuv.y));  // LUT bake is top-first, NEAREST
+    } else if (u_effect == 2) {                 // grain: #744 overlay on LUT alpha
+    vec4 nz = texture(u_aux, vec2(v_cuv.x, 1.0 - v_cuv.y));
     vec3 cs = unpre(s.rgb, s.a);
-    float amt = u_p.x * s.a;
-    // LUT stores grain in alpha (Phase-1 bake). RGB is unused / often dark.
     float n = nz.a;
-    vec3 outc = clamp(cs + (n - 0.5) * amt, 0.0, 1.0);
+    vec3 g = vec3(n);
+    vec3 ov;
+    ov.r = cs.r <= 0.5 ? 2.0 * cs.r * g.r : 1.0 - 2.0 * (1.0 - cs.r) * (1.0 - g.r);
+    ov.g = cs.g <= 0.5 ? 2.0 * cs.g * g.g : 1.0 - 2.0 * (1.0 - cs.g) * (1.0 - g.g);
+    ov.b = cs.b <= 0.5 ? 2.0 * cs.b * g.b : 1.0 - 2.0 * (1.0 - cs.b) * (1.0 - g.b);
+    float amt = clamp(u_p.x, 0.0, 1.0);
+    vec3 outc = mix(cs, ov, amt);
     o = vec4(outc * s.a, s.a);
-  } else if (u_effect == 5) {                 // posterize: discrete table in straight space
+} else if (u_effect == 5) {                 // posterize: discrete table in straight space
     float levels = u_p.x;
     vec3 cs = unpre(s.rgb, s.a);
     vec3 q;
