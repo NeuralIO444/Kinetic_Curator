@@ -290,7 +290,9 @@ void main() {
     vec4 nz = texture(u_aux, vec2(v_cuv.x, 1.0 - v_cuv.y));  // LUT bake is top-first, NEAREST
     vec3 cs = unpre(s.rgb, s.a);
     float amt = u_p.x * s.a;
-    vec3 outc = clamp(cs + (nz.rgb - 0.5) * amt, 0.0, 1.0);
+    // LUT stores grain in alpha (Phase-1 bake). RGB is unused / often dark.
+    float n = nz.a;
+    vec3 outc = clamp(cs + (n - 0.5) * amt, 0.0, 1.0);
     o = vec4(outc * s.a, s.a);
   } else if (u_effect == 5) {                 // posterize: discrete table in straight space
     float levels = u_p.x;
