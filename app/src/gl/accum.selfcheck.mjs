@@ -1128,7 +1128,9 @@ async function runBrowserTests() {
       const iSmeared = inked(seq.pixels);
       const iPlain = inked(single.pixels);
       assert.ok(iPlain > 0, 'control render has ink');
-      assert.ok(iSmeared > iPlain * 1.4,
+      // #532 PR2: ACES changes the 8-bit inked count. Smear must still
+      // add ink; the 1.4x margin was clamp-resolve specific.
+      assert.ok(iSmeared > iPlain,
         `smeared inked pixels ${iSmeared} vs plain ${iPlain}`);
     });
 
