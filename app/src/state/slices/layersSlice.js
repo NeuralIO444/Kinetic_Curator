@@ -175,6 +175,10 @@ export const createLayersSlice = (set) => ({
     const i = state.layers.findIndex((l) => l.id === id);
     const j = i + delta;
     if (i < 0 || j < 0 || j >= state.layers.length) return {};
+    // #732 — FX tracks stay above KC tracks. Array is bottom→top.
+    const a = state.layers[i];
+    const b = state.layers[j];
+    if (isFxLayer(a) !== isFxLayer(b)) return {};
     const layers = [...state.layers];
     [layers[i], layers[j]] = [layers[j], layers[i]];
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
