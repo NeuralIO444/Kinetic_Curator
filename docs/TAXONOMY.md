@@ -2,7 +2,19 @@
 
 Standing vocabulary for KC-1. Amends the face language in [TEMPO_AND_CHIPS.md](TEMPO_AND_CHIPS.md) (`PRESET` on the deck → **LOOK**). Apply logic does not change here; names and homes do.
 
-Iterate by appending the Changelog. Do not silently reuse a banned word on a new chip.
+```
+Version: 1.1.0
+Compat: look-apply = layout-only (#555)
+Frozen voice ids: swarm, hype, murmuration
+```
+
+Runtime: `app/src/data/taxonomy.js` (`resolveLookId`, semver helpers). Iterate by appending the Changelog **and** bumping `TAXONOMY_VERSION` in the same PR.
+
+- PATCH — face string
+- MINOR — new noun, home, or alias
+- MAJOR — Look/Voice click semantics
+
+Do not silently reuse a banned word on a new chip.
 
 Decided 2026-09-28. Ticket: #735.
 
@@ -57,7 +69,7 @@ One home per Voice. After #717 the three titles leave PLAY.
 
 1. Look click is layout-only. `layoutSlice` ignores `paletteId` / `assetIds` / `categories`. Selfcheck stays.
 2. `paletteId` / `assetIds` on a Look are legal only on `group: 'firstlight'` and only consumed by boot.
-3. No Look `id` may equal a voice id (`swarm`, `hype`, `murm`) or the showcase collision `murmuration` (rename that Look).
+3. No Look `id` may equal a frozen voice id (`swarm`, `hype`, `murmuration`). Enforced by `taxonomy.selfcheck.mjs`.
 4. `categories[]` is not a Cast. Tags or delete. Do not enable shelves from it.
 5. Stubs do not gain `blendSeconds`.
 6. Promotion path: fork Look → Voice (CHIP_LAB C1 / #734). No silent promotion on click.
@@ -81,4 +93,5 @@ One home per Voice. After #717 the three titles leave PLAY.
 
 ## Changelog
 
-- 2026-09-28 — initial. LOOK replaces PRESET on the face. Four nouns. Boot is not a noun. #735.
+- 2026-09-28 — initial. LOOK replaces PRESET on the face. Four nouns. Boot is not a noun. #735. (1.0.0)
+- 2026-09-28 — 1.1.0 runtime: `taxonomy.js` semver + `LOOK_ALIASES`. Showcase Look `murmuration` → `dusk-flock`. Old composition id still loads. Voice id `murmuration` frozen.
