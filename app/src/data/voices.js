@@ -80,7 +80,7 @@ export const FLAGSHIP_VOICES = [
     },
     params: {
       mode: 'swarm',
-      count: 420,
+      count: 260,
       scale: [0.3, 1.1],
       rotate: [-180, 180],
       alpha: [60, 100],
@@ -94,14 +94,14 @@ export const FLAGSHIP_VOICES = [
       hueRotate: 0,
       paletteShift: 'auto',
       accumulation: true,
-      accumulationFade: 16, // ~0.94 keep → half-life frames
+      accumulationFade: 8, // #743 shorter trail — readable flock
       accumulationOptics: 0.35,
-      accumulationTunnel: 0.15,
+      accumulationTunnel: 0,
       accumulationPrism: 0,
       noiseFreq: 0.005,
       noiseSpeed: 0.5,
       displacement: 0,
-      particleCount: 280,
+      particleCount: 200,
       swarmCohesion: 0.6, // slider max — past this the flock is one blob (#272)
       gravityWells: 2.5,
       damping: 0.95,
