@@ -30,6 +30,7 @@ export const HELP_TOPICS = [
   { id: 'output-recipe', group: 'Output', title: 'recipe', text: 'Each snapshot has a copy button for its recipe as plain text (seed, params, sub-seed offsets). Paste it back with PASTE RECIPE to restore the exact scene.' },
   { id: 'davis-clear', group: 'Ghost Station', title: 'clear', text: 'Wipe the trail buffer to the background.' },
   { id: 'layers-blend', group: 'Build', title: 'blend', text: 'How this layer composites onto the stack below.' },
+  { id: 'output-fxaa', group: 'Output', title: 'edge aa', text: 'FXAA smooths hard stair-stepped edges on the final frame — grid, letterforms, paused shots. Applies to the live canvas and to exports. Costs a little GPU.' },
   { id: 'output-loop', group: 'Output', title: 'capture loop', text: 'Records a fixed-length take and exports it as a seamless looping WebM — the tail dissolves into the head so there is no visible cut.' },
   { id: 'layout-flow', group: 'Build', title: 'flow', text: 'Curl-advects the ACCUM trail buffer as it decays — trails curl like smoke instead of just fading. 0 is off.' },
   { id: 'layers-patch-mod', group: 'Build', title: 'mod', text: 'Source motion shoves this track — glow, fade, nudge. A still source drives nothing; strength sets how hard it pushes when things move.' },

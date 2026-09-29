@@ -691,6 +691,12 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     return { ...mRead, fxFinishChains };
   }
 
+  // #740: resolve-pass options (FXAA) — one bag shared by the live present and the
+  // readback/export path so what you see is what you export. Empty = the probe
+  // defaults (fxaa off), which is what the golden/parity harness renderers use.
+  let resolveOpts = {};
+  function setResolveOptions(o) { resolveOpts = { ...o }; }
+
   /** Resolve a 16F premultiplied target to RGBA8 bytes (top-first rows). */
   function resolveTargetToBytes(mRead, T, w, h) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, T.outT.fb);
@@ -698,7 +704,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.disable(gl.BLEND);
     gl.useProgram(resProg);
     gl.uniform1i(U(resProg, 'u_src'), bindTex(0, mRead.tex));
-    bindResolveProbe(gl, (n) => U(resProg, n));
+    bindResolveProbe(gl, (n) => U(resProg, n), resolveOpts);
     drawFullscreen(resProg);
     const pixels = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
@@ -717,6 +723,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     composite, drawInstances, instanceData, renderLayerInstances,
     uploadStatic, freeStatic, makeTarget, allocFrameTargets, freeFrameTargets,
     renderFrameInto, resolveTargetToBytes, disposeBase,
+    setResolveOptions, getResolveOptions: () => resolveOpts,
   };
 }
 
@@ -932,7 +939,7 @@ export function createLiveRenderer(canvas) {
     gl.disable(gl.BLEND);
     gl.useProgram(b.progs.resolve);
     gl.uniform1i(b.U(b.progs.resolve, 'u_src'), b.bindTex(0, target.tex));
-    bindResolveProbe(gl, (n) => b.U(b.progs.resolve, n));
+    bindResolveProbe(gl, (n) => b.U(b.progs.resolve, n), b.getResolveOptions());
     b.drawFullscreen(b.progs.resolve);
   }
 
@@ -1112,6 +1119,7 @@ export function createLiveRenderer(canvas) {
 
   return {
     setAtlas, setGrainLuts,
+    setResolveOptions: (o) => b.setResolveOptions(o),
     hasAtlas: () => !!atlasTex,
     renderFrame, renderFrameOffscreen, present, presentUpscaled, readback,
     ensureAccum, dropAccum,

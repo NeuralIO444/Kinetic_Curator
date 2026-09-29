@@ -878,6 +878,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // and present. Timer query when the extension exists; CPU-wall
       // fallback (submission time) otherwise. Reported through the patrol
       // channel; disjoint or still-pending queries skip this round.
+      // #740: global FXAA (Pipeline panel). Re-pushed every frame so a recreated
+      // live renderer (context loss) never loses it.
+      live.setResolveOptions({ fxaa: getState().fxaa !== false });
       const timer = ensureGpuTimer();
       const cpuFallback = !timer.isHardware;
       const cpuT0 = cpuFallback ? performance.now() : 0;
