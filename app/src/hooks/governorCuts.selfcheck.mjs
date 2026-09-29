@@ -72,7 +72,7 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   }
   // The table is in shed order (recovery iterates it reversed).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  assert.deepStrictEqual(order, ['renderScale', 'quality', 'assetThin', 'countClamp', 'slowRender']);
+  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'quality', 'assetThin', 'countClamp', 'slowRender']);
   console.log('[selfcheck] governorCuts (#264 restore coverage):',
     `shed kinds [${[...shedKinds].join(', ')}] all restorable`);
 }
@@ -122,4 +122,33 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
     false, 'watchdog stop never auto-clears',
   );
   console.log('[selfcheck] governorCuts (#264 watchdog/manual-resume contract): 4 cases passed');
+}
+
+// #740 — cut 0: edge AA (FXAA) sheds before pixel trim, only when the GPU is the
+// bottleneck, only when the caller says it is on-and-unshed, and restores last.
+{
+  const base = {
+    renderScale: 1, quality: 'high', assetThin: false,
+    perfClampOverride: null, effectiveCount: 400, slowRender: false,
+    gpuSaturated: true,
+  };
+  // Older callers (no fxaa key) keep the pre-#740 ladder: renderScale first.
+  assert.strictEqual(nextGovernorCut(base).kind, 'renderScale', 'no fxaa key → ladder unchanged');
+  assert.strictEqual(nextGovernorCut({ ...base, fxaa: false }).kind, 'renderScale', 'fxaa off/shed → skip cut 0');
+  // fxaa on + GPU-bound: cut 0 comes first, then the ladder proceeds as before.
+  const c0 = nextGovernorCut({ ...base, fxaa: true });
+  assert.deepStrictEqual([c0.kind, c0.label], ['fxaa', 'EDGE AA OFF']);
+  assert.strictEqual(nextGovernorCut({ ...base, fxaa: false }).scale, 0.75, 'then pixel trim');
+  // Main-thread bound: dropping AA cannot buy frames back → not shed (same gate as cut 1).
+  assert.strictEqual(nextGovernorCut({ ...base, fxaa: true, gpuSaturated: false }).kind, 'quality');
+  // Restore: only when the governor shed it, only when healthy; walked in reverse → last back.
+  const r = GOVERNOR_RESTORE_CUTS.find((c) => c.kind === 'fxaa');
+  assert.strictEqual(r.needsRestore({ fxaaShed: true }, { healthy: true }), true);
+  assert.strictEqual(r.needsRestore({ fxaaShed: true }, { healthy: false }), false, 'not while still struggling');
+  assert.strictEqual(r.needsRestore({ fxaaShed: false }, { healthy: true }), false, 'never restores a user-off FXAA');
+  assert.strictEqual(GOVERNOR_RESTORE_CUTS[0].kind, 'fxaa', 'first shed = last restored');
+  // Badge is honest about it.
+  assert.deepStrictEqual(shedSummary({ renderScale: 1, fxaaShed: true }), ['edge AA off']);
+  assert.strictEqual(shedSummary({ renderScale: 1, fxaaShed: false }), null);
+  console.log('[selfcheck] governorCuts (#740 cut 0 edge AA): 10 cases passed');
 }

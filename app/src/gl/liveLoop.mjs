@@ -880,7 +880,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // channel; disjoint or still-pending queries skip this round.
       // #740: global FXAA (Pipeline panel). Re-pushed every frame so a recreated
       // live renderer (context loss) never loses it.
-      live.setResolveOptions({ fxaa: getState().fxaa !== false });
+      { const st = getState(); live.setResolveOptions({ fxaa: st.fxaa !== false && !st.fxaaShed }); }
       const timer = ensureGpuTimer();
       const cpuFallback = !timer.isHardware;
       const cpuT0 = cpuFallback ? performance.now() : 0;

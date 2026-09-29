@@ -8,9 +8,13 @@ import { helpText } from '../../data/helpCopy.js';
 export function DisplayBlock() {
   const fxaa = useStore((s) => s.fxaa);
   const setFxaa = useStore((s) => s.setFxaa);
+  const shed = useStore((s) => s.fxaaShed);
   return (
     <div className="pipeline-row" title={helpText('output-fxaa')}>
-      <span style={{ flex: 1, fontSize: 11 }}>EDGE AA · FXAA</span>
+      <span style={{ flex: 1, fontSize: 11 }}>
+        EDGE AA · FXAA
+        {fxaa && shed && <em style={{ marginLeft: 6, color: '#ffb000' }}>shed by governor</em>}
+      </span>
       <button
         type="button"
         className={`chip-btn${fxaa ? ' active' : ''}`}

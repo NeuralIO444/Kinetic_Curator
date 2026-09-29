@@ -141,8 +141,10 @@ for (const row of shedding.passes) {
     assert.equal(row.shed, false, `${row.id}: non-tier-1 pass never shed by perfTier1`);
   }
 }
-assert.equal(shedding.cuts.length, 7, 'one row per shed-ladder step');
+assert.equal(shedding.cuts.length, 8, 'one row per shed-ladder step (cut 0 fxaa + 1–7)');
 const stepMap = new Map(shedding.cuts.map((c) => [c.cutKind, c]));
+assert.equal(stepMap.get('fxaa').active, false, 'fxaa on → not shed');
+assert.equal(buildXray({ tiers, measuredMs: MEASURED_COSTS, shed: { fxaaShed: true } }).cuts.find((c) => c.cutKind === 'fxaa').state, 'off');
 assert.equal(stepMap.get('renderScale').active, false);
 assert.equal(stepMap.get('perfTier1').active, true);
 const scaled = buildXray({ tiers, measuredMs: MEASURED_COSTS, shed: { renderScale: 0.5 } });
@@ -150,6 +152,7 @@ assert.equal(new Map(scaled.cuts.map((c) => [c.cutKind, c])).get('renderScale').
 
 // --- F. step mapping follows the ladder contract -----------------------------
 assert.deepEqual(SHED_STEPS, {
+  fxaa: 0,
   renderScale: 1,
   quality: 2,
   perfTier1: 3,

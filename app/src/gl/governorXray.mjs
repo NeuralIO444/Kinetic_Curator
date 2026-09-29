@@ -26,7 +26,7 @@ export function formatMemoryMB(bytes) {
  * @param {object} args
  *   { tiers: [{id, tier, timeMs, memoryBytes, notes}],        // allCostTiers()
  *     measuredMs: (id) => number|undefined | Record<string, number>,
- *     shed: { perfTier1, renderScale, assetThin, perfClampOverride,
+ *     shed: { fxaaShed, perfTier1, renderScale, assetThin, perfClampOverride,
  *             slowRender, watchdogTripped } }                  // store state
  * @returns { cuts: [...], passes: [...] }
  *   cuts: one row per shed-ladder step with its live state:
@@ -47,6 +47,7 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
     ? (id) => asMs(measuredMs(id))
     : (id) => asMs(measuredMs?.[id]);
   const s = {
+    fxaaShed: !!shed.fxaaShed,
     perfTier1: !!shed.perfTier1,
     renderScale: Number.isFinite(Number(shed.renderScale)) ? Number(shed.renderScale) : 1,
     assetThin: !!shed.assetThin,
@@ -58,6 +59,12 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
   };
 
   const cuts = [
+    {
+      step: SHED_STEPS.fxaa, cutKind: 'fxaa',
+      label: 'edge AA (FXAA)',
+      active: s.fxaaShed,
+      state: s.fxaaShed ? 'off' : 'on',
+    },
     {
       step: SHED_STEPS.renderScale, cutKind: 'renderScale',
       label: 'resolution scale (dynamic)',
