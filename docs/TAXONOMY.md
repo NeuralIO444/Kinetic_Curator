@@ -91,7 +91,24 @@ One home per Voice. After #717 the three titles leave PLAY.
 - #734 Voice dish, fork only
 - #615 Feels (audio), not Voices
 
+## Soon — finish 1.1.0 then audit the other overloaded nouns
+
+Do not start a new vocabulary. These are the same class of bug as PRESET.
+
+1. **Wire the alias** — Look id `murmuration` → `dusk-flock` in `presets.js`; `getPreset` + `normalizeLayoutParams` call `resolveLookId`. Until that lands, `taxonomy.selfcheck` is red. Not on `main`.
+2. **Face copy PATCH** — PRESETS ▾ → LOOKS ▾ (tour, CuratorBar, helpCopy). Same mapper. #716.
+3. **Voice titles** — SWARM/HYPE/MURM chips print Night Migration / Chrome Parade / Deep Water. Ids stay frozen. #717.
+4. **`vibe` field** — `FLAGSHIP_VOICES[].vibe` is liner notes. Face must not say Vibe. #615 feels stay audio-only.
+5. **`mode: 'hype'` vs voice `hype`** — system chip lowercase; voice title Chrome Parade. Dirty Signal / Neon Brood Looks that set `mode: 'hype'` stay Looks.
+6. **Palette ids that twin Looks** — `murmuration`, `chiaroscuro`, Rendah same-id pairs. Paint ids may match a *name*; they must not be treated as Look apply.
+7. **SHAPE_SETS vs Cast** — four-id maps are Cast, not shelves. #519 / keep-4.
+8. **categories[]** — dead or tags. Do not enable assets from it.
+9. **project.format vs TAXONOMY_VERSION** — keep two clocks. Bump project format only when a new persisted key appears (#733 levels).
+
+Do not edit PERF/POLISH/session roadmaps for this. Those docs are frozen or historical. This section is the board.
+
 ## Changelog
 
 - 2026-09-28 — initial. LOOK replaces PRESET on the face. Four nouns. Boot is not a noun. #735. (1.0.0)
 - 2026-09-28 — 1.1.0 runtime: `taxonomy.js` semver + `LOOK_ALIASES`. Showcase Look `murmuration` → `dusk-flock`. Old composition id still loads. Voice id `murmuration` frozen.
+- 2026-09-28 — Soon queue: finish alias wiring, then audit vibe/mode/palette-twin/SHAPE_SETS/categories/project.format.
