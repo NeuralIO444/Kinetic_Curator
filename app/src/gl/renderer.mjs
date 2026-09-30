@@ -210,7 +210,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -257,6 +257,15 @@ for (const def of RENDERER_PROGRAMS) {
 registerCostTier('gl/sun', {
   tier: 0, memoryBytes: 0, timeMs: 0.02,
   notes: '#594 PR1 sun: per-instance diffuse in QUAD_VS/FS; zero passes; live + GL stills',
+});
+// #594 PR2 bevel: 4 extra atlas taps per LIT fragment (only when the sun is on
+// and bevel > 0), inside the same quad pass. Declared tier 0 like the rest of the
+// quad program because the cost gate needs a harness measurement for tiers 1–3
+// and the sweep harness cannot drive the instanced quad program yet — this is an
+// UNMEASURED estimate. Re-tier to 2 (quality scaler) once a quad sweep exists.
+registerCostTier('gl/sun-bevel', {
+  tier: 0, memoryBytes: 0, timeMs: 0.15,
+  notes: '#594 PR2 bevel-from-alpha normals + spec: +4 atlas taps per lit fragment; unmeasured estimate (no quad sweep yet) — re-tier to 2 when measurable',
 });
 // #740: FXAA runs inside the resolve pass behind u_fxaa (same pass, no new texture) —
 // declared separately so the harness can measure resolve with it on. Tier 0 stays: the
@@ -448,6 +457,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform4f(U(quadProg, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
     gl.uniform4f(U(quadProg, 'u_sunLight'), sun ? sun.color[0] : 1, sun ? sun.color[1] : 1, sun ? sun.color[2] : 1, sun ? sun.intensity : 0);
     gl.uniform1f(U(quadProg, 'u_ambient'), sun ? sun.ambient : 1);
+    gl.uniform2f(U(quadProg, 'u_sunMat'), sun ? sun.bevel : 0, sun ? sun.spec : 0); // #594 PR2
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);

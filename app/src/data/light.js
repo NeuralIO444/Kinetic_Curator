@@ -15,6 +15,7 @@ export const LIGHT_SLOTS = Object.freeze(['white', 'ink',
 /** A fresh sun: upper-left, low enough to rake, warm white. */
 export const LIGHT_DEFAULT = Object.freeze({
   x: 220, y: 140, height: 260, intensity: 0.8, ambient: 0.35, slot: 'white',
+  bevel: 0.6, spec: 0.3, // #594 PR2: bevel 0 = the flat per-instance light of PR1
 });
 
 const RANGES = {
@@ -23,6 +24,8 @@ const RANGES = {
   height: [20, 1000],
   intensity: [0, 1],
   ambient: [0, 1],
+  bevel: [0, 1],
+  spec: [0, 1],
 };
 
 const clamp = (v, [lo, hi], def) => {
@@ -71,6 +74,7 @@ export function contractLight(raw, palette) {
   return {
     x: l.x, y: l.y, height: l.height,
     intensity: l.intensity, ambient: l.ambient,
+    bevel: l.bevel, spec: l.spec,
     color: lightColor(l.slot, palette),
   };
 }

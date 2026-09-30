@@ -41,7 +41,7 @@ assert.strictEqual(parseProject(JSON.parse(JSON.stringify(offDoc))).doc.light, n
 const onDoc = serializeProject({ ...base, light: { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink' } });
 const back = parseProject(JSON.parse(JSON.stringify(onDoc)));
 assert.ok(back.ok);
-assert.deepStrictEqual(back.doc.light, { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink' });
+assert.deepStrictEqual(back.doc.light, { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink', bevel: LIGHT_DEFAULT.bevel, spec: LIGHT_DEFAULT.spec });
 
 // ── scene contract: key omitted when off; colour resolved when on ─────────
 const c0 = buildSceneContract({ doc: { seed: 1 }, resolvedLayers: [] });
@@ -56,8 +56,15 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(c1.light)), c1.light, 'JSON-saf
 // ── shader: off path is exactly 1.0 and the FS never touches unlit pixels ──
 assert.match(QUAD_VS, /ONE sun, never three-point/, 'the rule is written where the next person looks');
 assert.match(QUAD_VS, /v_light = vec3\(1\.0\);/, 'sun off → exactly 1.0');
-assert.match(QUAD_FS, /if \(u_sun\.w > 0\.5\) o\.rgb = min\(o\.rgb \* v_light, vec3\(o\.a\)\);/,
-  'lighting gated on the uniform (unlit pixels are not even clamped)');
+{
+  // Every lighting write to o.rgb sits inside the sun-on gate: unlit pixels are
+  // not even clamped (live-tint rgb can sit a hair above alpha).
+  const body = QUAD_FS.slice(QUAD_FS.indexOf('void main'));
+  const gate = body.indexOf('if (u_sun.w > 0.5) {');
+  assert.ok(gate > 0, 'lighting gated on the u_sun uniform');
+  let i = -1;
+  while ((i = body.indexOf('o.rgb =', i + 1)) >= 0) assert.ok(i > gate, 'no o.rgb write outside the sun gate');
+}
 const here = dirname(fileURLToPath(import.meta.url));
 assert.match(readFileSync(join(here, 'light.js'), 'utf8'), /ONE sun, never three-point/);
 
@@ -75,6 +82,20 @@ assert.match(readFileSync(join(here, 'light.js'), 'utf8'), /ONE sun, never three
   assert.strictEqual(state.light.slot, 'swatch2');
   state.setLight(false);
   assert.strictEqual(state.light, null, 'off');
+}
+
+// ── #594 PR2 bevel: bounded material, gated shader, taps stay in the cell ──
+{
+  const m = sanitizeLight({ bevel: 9, spec: -1 });
+  assert.deepStrictEqual([m.bevel, m.spec], [1, 0], 'bevel/spec clamp to 0–1');
+  const c = contractLight({ bevel: 0.4, spec: 0.2 }, pal);
+  assert.deepStrictEqual([c.bevel, c.spec], [0.4, 0.2], 'contract carries the material');
+  assert.match(QUAD_FS, /if \(u_sunMat\.x > 0\.0\)/, 'bevel only when strength > 0');
+  assert.match(QUAD_FS, /\} else \{\s*o\.rgb = min\(o\.rgb \* v_light, vec3\(o\.a\)\);/, 'bevel 0 = exactly the PR1 path');
+  const taps = QUAD_FS.match(/texture\(u_atlas, clamp\(/g) || [];
+  assert.strictEqual(taps.length, 4, 'four bevel taps, every one clamped to the cell');
+  const fsBody = QUAD_FS.slice(QUAD_FS.indexOf('void main'));
+  assert.ok(fsBody.indexOf('u_sunMat.x > 0.0') > fsBody.indexOf('u_sun.w > 0.5'), 'bevel sits inside the sun-on gate');
 }
 
 console.log('light.selfcheck: OK');
