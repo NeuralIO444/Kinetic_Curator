@@ -193,7 +193,7 @@ export const FLAGSHIP_VOICES = [
       flora_flower_01: true,
       flora_vine_01: true,
       line_spiral_01: true,
-      flora_sprig_01: true,
+      org_petal_01: true,
     },
   },
   {

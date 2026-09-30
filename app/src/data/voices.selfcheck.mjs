@@ -57,6 +57,14 @@ assert.strictEqual(hype.params.behave, 'scatter');
 assert.strictEqual(hype.fx.posterize, true);
 assert.strictEqual(hype.fx.edge, true);
 
+// #519 — HYPE four locked to the Tropism taste (Matt's call 2026-09-30):
+// bloom, stem, coil, petal. The fourth seat is org_petal_01, not the sprig.
+assert.deepStrictEqual(
+  Object.keys(hype.assets).sort(),
+  ['flora_flower_01', 'flora_vine_01', 'line_spiral_01', 'org_petal_01'].sort(),
+  'HYPE four is the Tropism taste lock',
+);
+
 const murm = resolveVoiceState(FLAGSHIP_VOICES[2]);
 assert.strictEqual(murm.params.mode, 'murmuration');
 assert.ok(MODE_IDS.includes('murmuration'), 'murmuration is a real mode id');
