@@ -116,6 +116,9 @@ export class ParticleSystem {
     // #278 — signature of the palette swatch set colors were last resolved
     // from. init() sets it; update() re-resolves on change (see below).
     this._colorSig = null;
+    // #710 — behave id seen by the last update(). update() re-seeds the
+    // Lorenz phase state on entry into the lorenz behave (see below).
+    this._lastBehave = null;
     // Authored population from the last init — tracked separately from the
     // runtime population (this.n), which `breed` grows past the authored
     // count. update() re-inits only when the authored count changes, so
@@ -277,6 +280,28 @@ export class ParticleSystem {
     this._breedSeq = 0;
     // #278 — colors were just (re)assigned from this swatch set.
     this._colorSig = (palette?.swatches || ['#ffffff']).join('|');
+    // #710 — a (re)init is a fresh cast: the next update re-evaluates the
+    // behave-entry transition from scratch.
+    this._lastBehave = null;
+  }
+
+  /**
+   * #710 — seed one agent's Lorenz phase state from the seeded hashes,
+   * clear of the origin fixed point. Shared by _spawnRange and the
+   * restart-from-seed on lorenz-behave entry, so the two can never drift:
+   * entry state is always exactly the seeded state. Same drive-init
+   * precedent as the grazer trait: separate hashes (not the sequential
+   * r() stream), so the six load-bearing placement draws in _spawnRange
+   * keep their exact sequence and legacy seeds still reproduce
+   * bit-identical positions.
+   */
+  _seedLorenzState(i, seed) {
+    const l = lorenzSeed(
+      hashU01(seed >>> 0, CH.dyn, 12288 + i),
+      hashU01(seed >>> 0, CH.dyn, 16384 + i),
+      hashU01(seed >>> 0, CH.dyn, 20480 + i),
+    );
+    this.lorenzX[i] = l.x; this.lorenzY[i] = l.y; this.lorenzZ[i] = l.z;
   }
 
   _spawnRange(start, end, activeAssets, palette, seed, seedOffsets, opts = {}) {
@@ -320,18 +345,9 @@ export class ParticleSystem {
       this.energy[i] = 1;
       this.drive[i] = hashU01(seed >>> 0, CH.dyn, 4096 + i);
       this.grazer[i] = hashU01(seed >>> 0, CH.dyn, 8192 + i) < grazeFrac ? 1 : 0;
-      // #583 — seed this agent's Lorenz ride, clear of the origin fixed point.
-      // Same drive-init precedent: separate hashes, so the six load-bearing
-      // placement draws above keep their exact sequence and legacy seeds
-      // still reproduce bit-identical positions.
-      {
-        const l = lorenzSeed(
-          hashU01(seed >>> 0, CH.dyn, 12288 + i),
-          hashU01(seed >>> 0, CH.dyn, 16384 + i),
-          hashU01(seed >>> 0, CH.dyn, 20480 + i),
-        );
-        this.lorenzX[i] = l.x; this.lorenzY[i] = l.y; this.lorenzZ[i] = l.z;
-      }
+      // #583 — seed this agent's Lorenz ride via the shared helper (#710),
+      // so spawn and behave-entry can never drift apart.
+      this._seedLorenzState(i, seed);
       const [lr, lg, lb] = hexToRgb3(this.color[i]);
       this.leakRgb[i * 3] = lr;
       this.leakRgb[i * 3 + 1] = lg;
@@ -660,6 +676,17 @@ export class ParticleSystem {
     if (this.n === 0) return;
     this._step += 1;
     this._layout = layoutParams;
+    // #710 — restart-from-seed: entering the lorenz behave re-seeds every
+    // agent's Lorenz phase state from the seeded hashes, so re-tapping the
+    // pill restarts the identical dance (rehearsable) — never a random one,
+    // never a resume of the frozen poles. Persist-across-exits was rejected
+    // as unrehearsable by feel. Phase state only: positions keep gliding
+    // through the behave-switch blend, untouched here.
+    const behaveId = layoutParams.behave;
+    if (behaveId === 'lorenz' && this._lastBehave !== 'lorenz') {
+      for (let i = 0; i < this.n; i++) this._seedLorenzState(i, seed);
+    }
+    this._lastBehave = behaveId;
     // dtFrames: 1.0 at 60 fps, 2.0 at 30 fps, 0.5 at 120 fps.
     // Multiplied into every per-frame quantity so the physics integrates
     // in real time regardless of frame rate.
