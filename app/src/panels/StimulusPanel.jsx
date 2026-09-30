@@ -4,6 +4,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { SourceControls } from './stimulus/SourceControls.jsx';
 import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
+import { FeelPicker } from './stimulus/FeelPicker.jsx';
 import { MeterHero } from './stimulus/MeterHero.jsx';
 import { ModMatrix } from './stimulus/ModMatrix.jsx';
 
@@ -43,6 +44,7 @@ export function StimulusPanel() {
   // #310: the audio source row is collapsed setup — the AUDIO toggle stays
   // in performer sight, mic/file/monitor/gain live behind SETUP.
   const [setupOpen, setSetupOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false); // #615: raw sliders collapsed by default
 
   return (
     <div className="panel panel-stimulus">
@@ -81,7 +83,12 @@ export function StimulusPanel() {
             />
           )}
 
-          <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} attackMs={attackMs} decayMs={decayMs} response={response} swell={swell} audioEnabled={audioEnabled} />
+          {/* #615 — the face is three feels; the eight raw sliders survive behind ADVANCED, unchanged. */}
+          <FeelPicker layoutParams={layoutParams} />
+          <details className="stim-advanced" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
+            <summary>ADVANCED</summary>
+            <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} attackMs={attackMs} decayMs={decayMs} response={response} swell={swell} audioEnabled={audioEnabled} />
+          </details>
 
       </div>
     </div>
