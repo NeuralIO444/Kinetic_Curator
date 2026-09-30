@@ -25,6 +25,7 @@ import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
+import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme } from '../data/kinemes.js';
 import { resolvePalette } from '../data/palettes.js';
 
 export const GL_CONTRACT_VERSION = 1;
@@ -252,6 +253,31 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     }
   }
 
+  // #781 KINEME (Build A): instances whose asset has a kineme carry its table
+  // index (1-based; 0/absent = still) and a per-instance phase. The table and
+  // the motion time ride on the contract ONLY when something moves, so every
+  // motionless contract (and its hash) is exactly what it was before.
+  const kinemeFields = (() => {
+    const map = sanitizeAssetKineme(doc.assetKineme);
+    if (!map) return {};
+    const table = [];
+    const slot = new Map();
+    for (const inst of instances) {
+      const k = getKineme(map[inst.asset]);
+      if (!k) continue;
+      if (!slot.has(k.id)) {
+        if (table.length >= KINEME_TABLE_MAX) continue; // ponytail: 16-slot cap; a bigger library needs a texture table
+        slot.set(k.id, table.length + 1);
+        table.push({ kind: KINEME_KINDS[k.kind], period: k.period, amp: k.amp });
+      }
+      inst.kineme = slot.get(k.id);
+      inst.kinemePhase = kinemePhase(inst.seedOffset, inst.key);
+    }
+    if (!table.length) return {};
+    const t = Number(doc.kinemeTime);
+    return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0 };
+  })();
+
   const scene = {
     version: GL_CONTRACT_VERSION,
     canvas: { w: CONTRACT_CANVAS.w, h: CONTRACT_CANVAS.h },
@@ -292,6 +318,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       const q = Number(doc.squash ?? doc.layoutParams?.squash);
       return Number.isFinite(q) && q > 0 ? { squash: Math.min(1, q) } : {};
     })(),
+    ...kinemeFields,
     textRuns: [], // #550: CUT — no producer (glyph-atlas baker removed; text is baked into stamp assets). Kept as [] for shape/hash stability; the renderer never reads it.
     accum: accum && accum.enabled
       ? {

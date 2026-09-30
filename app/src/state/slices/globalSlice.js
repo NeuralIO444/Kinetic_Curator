@@ -17,6 +17,7 @@ import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
+import { sanitizeAssetKineme, getKineme } from '../../data/kinemes.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -225,6 +226,8 @@ export const createGlobalSlice = (set) => ({
 
   enabledAssets: initialEnabledAssets,
   assetWeightOverrides: {},
+  /** #781 KINEME — { assetId: kinemeId }: which assets move, and how. Assets stay static sources. */
+  assetKineme: {},
   customAssets: [],
   ingestError: null,
   /**
@@ -459,6 +462,23 @@ export const createGlobalSlice = (set) => ({
     return { customAssets: result.overlay, ingestError: null };
   }),
 
+  /**
+   * #781 KINEME — give an asset a motion (kinemeId) or make it still (null).
+   * Unknown kineme ids are ignored. The UI arrives with the DAVIS perform
+   * surface; until then this is the store/test entry point.
+   */
+  setAssetKineme: (assetId, kinemeId) => set((state) => {
+    const cur = state.assetKineme || {};
+    if (!assetId) return {};
+    if (kinemeId == null) {
+      if (!(assetId in cur)) return {};
+      const next = { ...cur };
+      delete next[assetId];
+      return { assetKineme: next };
+    }
+    if (!getKineme(kinemeId) || cur[assetId] === kinemeId) return {};
+    return { assetKineme: { ...cur, [assetId]: kinemeId } };
+  }),
   setAssetWeight: (id, weight) => set((state) => {
     if (!WEIGHT_CYCLE.includes(weight)) return {};
     const asset = findAsset(id, sanitizeOverlay(state.customAssets));
@@ -542,6 +562,7 @@ export const createGlobalSlice = (set) => ({
     // around the swatches the designer pinned.
     next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
+    next.assetKineme = sanitizeAssetKineme(doc.assetKineme) || {}; // #781 — a doc without kinemes is still
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       // #103 Track B — bound on the apply path too; the live loop resolves
       // every layer per frame.

@@ -210,7 +210,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_kineme', 'u_kinemeTime'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -258,6 +258,13 @@ registerCostTier('gl/sun', {
   tier: 0, memoryBytes: 0, timeMs: 0.02,
   notes: '#594 PR1 sun: per-instance diffuse in QUAD_VS/FS; zero passes; live + GL stills',
 });
+// #781 KINEME Build A: whole-mark motion (spin/rock/pulse/blink/bob) evaluated
+// per vertex in the existing quad shader, only for instances with a kineme;
+// no pass, no texture, no atlas cells. Stills pause with loop time. Tier 0.
+registerCostTier('gl/kineme', {
+  tier: 0, memoryBytes: 0, timeMs: 0.01,
+  notes: '#781 KINEME A: per-instance motion in QUAD_VS from a 16-slot uniform table; moving instances only; zero passes/cells; live + GL stills',
+});
 // #594 PR2 bevel: 4 extra atlas taps per LIT fragment (only when the sun is on
 // and bevel > 0), inside the same quad pass. Declared tier 0 like the rest of the
 // quad program because the cost gate needs a harness measurement for tiers 1–3
@@ -295,7 +302,8 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
 
   // 20 floats/instance (80-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
-  // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,0,0).
+  // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase).
+  // #781: kineme 0 = still (exactly the old zeros).
   const maxLen = instances.length;
   const buf = new Float32Array(maxLen * 20);
   let o = 0;
@@ -313,7 +321,7 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     const ink = hexToRgb(it.tint);
     const acc = hexToRgb(it.accent);
     buf[o + 12] = ink[0]; buf[o + 13] = ink[1]; buf[o + 14] = ink[2]; buf[o + 15] = acc[0];
-    buf[o + 16] = acc[1]; buf[o + 17] = acc[2]; buf[o + 18] = 0; buf[o + 19] = 0;
+    buf[o + 16] = acc[1]; buf[o + 17] = acc[2]; buf[o + 18] = it.kineme || 0; buf[o + 19] = it.kinemePhase || 0;
     o += 20;
   }
   if (o === 0) return new Float32Array(0);
@@ -435,6 +443,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
   // #594: the frame's sun, set by renderFrameInto from the contract (null = off).
   let sun = null;
+  let kinemeTable = null; // #781: the frame's kineme table (null = nothing moves)
+  let kinemeTime = 0;
+  const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
 
   function drawInstances(data, atlasTex, w, h) {
@@ -459,6 +470,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform4f(U(quadProg, 'u_sunLight'), sun ? sun.color[0] : 1, sun ? sun.color[1] : 1, sun ? sun.color[2] : 1, sun ? sun.intensity : 0);
     gl.uniform1f(U(quadProg, 'u_ambient'), sun ? sun.ambient : 1);
     gl.uniform2f(U(quadProg, 'u_sunMat'), sun ? sun.bevel : 0, sun ? sun.spec : 0); // #594 PR2
+    // #781 KINEME: (kind, period, amp) per slot; untouched slots stay 0 (unused).
+    kinemeBuf.fill(0);
+    if (kinemeTable) kinemeTable.slice(0, 16).forEach((k, i) => { kinemeBuf[i * 3] = k.kind; kinemeBuf[i * 3 + 1] = k.period; kinemeBuf[i * 3 + 2] = k.amp; });
+    gl.uniform3fv(U(quadProg, 'u_kineme'), kinemeBuf);
+    gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);
@@ -587,6 +603,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const { width: w, height: h, contract, cells, bg } = payload;
     sun = contract.light || null;
     squash = contract.squash || 0; // #594 PR3
+    kinemeTable = contract.kinemes || null; // #781
+    kinemeTime = contract.kinemeTime || 0;
     const { atlasTex, grainLuts } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];

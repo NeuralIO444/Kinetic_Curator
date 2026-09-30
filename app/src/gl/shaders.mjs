@@ -51,6 +51,11 @@ uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
 uniform vec4 u_sun;       // x, y (scene units), height above the plane, w = on (0/1)
 uniform vec4 u_sunLight;  // rgb = palette-slot colour, a = intensity
 uniform float u_ambient;  // light that reaches a mark facing away from the sun
+// #781 KINEME: whole-mark motion. Slot i = (kind, period s, amp); kinds
+// 1 spin, 2 osc (± deg), 3 pulse (± scale), 4 blink (duty), 5 bob (± units).
+// Per instance a_inst4.z = slot + 1 (0 = still), a_inst4.w = phase [0,1).
+uniform vec3 u_kineme[16];
+uniform float u_kinemeTime;
 out vec2 v_uv;
 out float v_opacity;
 out vec3 v_ink;
@@ -66,7 +71,24 @@ void main() {
   // the CLAMP_TO_EDGE-clamped UVs. (Half-texel offset.)
   vec2 au = a_corner * 199.5 - 49.75;
   vec2 c = (au - 50.0) * a_inst0.zw;      // center on the 100x100 box, scale
-  float th = radians(a_inst1.x);
+  float kDeg = 0.0;   // #781 KINEME extra rotation (degrees)
+  float kVis = 1.0;   // blink visibility
+  vec2 kOff = vec2(0.0); // bob offset (scene units)
+  // Gated on the slot: a still instance (0) never enters, so it is bit-for-bit
+  // the pre-KINEME path.
+  if (a_inst4.z > 0.5) {
+    vec3 km = u_kineme[int(a_inst4.z + 0.5) - 1];
+    float per = max(km.y, 1e-3);
+    float ph = fract(u_kinemeTime / per + a_inst4.w);
+    float wav = sin(ph * 6.28318530718);
+    int kind = int(km.x + 0.5);
+    if (kind == 1) kDeg = ph * 360.0;
+    else if (kind == 2) kDeg = km.z * wav;
+    else if (kind == 3) c *= 1.0 + km.z * wav;
+    else if (kind == 4) kVis = ph < km.z ? 1.0 : 0.0;
+    else if (kind == 5) kOff = vec2(0.0, km.z * wav);
+  }
+  float th = radians(a_inst1.x + kDeg);
   float co = cos(th), si = sin(th);
   vec2 rr = vec2(c.x * co - c.y * si, c.x * si + c.y * co);  // SVG rotate(), y-down
   // #309 velocity smear: per-frame displacement (scene units) rides in
@@ -87,10 +109,10 @@ void main() {
       rr = along + (rr - along) * mix(1.0, 1.0 / (1.0 + smk), u_smear.z);
     }
   }
-  vec2 world = a_inst0.xy + rr;
+  vec2 world = a_inst0.xy + rr + kOff;
   gl_Position = vec4(world.x / u_canvas.x * 2.0 - 1.0, 1.0 - world.y / u_canvas.y * 2.0, 0.0, 1.0);
   v_uv = vec2(mix(a_inst1.z, a_inst2.x, a_corner.x), mix(a_inst1.w, a_inst2.y, a_corner.y));
-  v_opacity = a_inst1.y;
+  v_opacity = a_inst1.y * kVis;
   v_ink = a_inst3.xyz;
   v_accent = vec3(a_inst3.w, a_inst4.xy);
   v_world = world;

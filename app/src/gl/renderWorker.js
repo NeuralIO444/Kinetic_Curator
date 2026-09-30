@@ -21,6 +21,7 @@
 
 import { createLiveRenderer } from './renderer.mjs';
 import { createLiveResolver } from './liveResolve.mjs';
+import { createKinemeClock } from '../data/kinemes.js';
 import { buildSceneContract } from './sceneContract.js';
 import { resolvePalette } from '../data/palettes.js';
 import { resolveLiveRenderState } from '../data/voices.js';
@@ -47,6 +48,7 @@ let running = false;
 let rafId = 0;
 let lastTickMs = 0;
 let loopTimeMs = 0;
+const kinemeClock = createKinemeClock(); // #781 KINEME RATE (anchored)
 
 let storeState = {};
 let view = { zoom: 1, pan: { x: 0, y: 0 }, attractor: null };
@@ -198,7 +200,7 @@ function buildFrame() {
 
   // Scene contract
   const contract = buildSceneContract({
-    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, palette: tintTargetPalette },
+    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: tintTargetPalette },
     resolvedLayers: resolved,
     caps: null,
     accum: null,

@@ -28,6 +28,7 @@
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
+import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
 import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
@@ -81,6 +82,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
 
   let live = createLiveRenderer(canvas);
   const resolver = createLiveResolver();
+  const kinemeClock = createKinemeClock(); // #781 KINEME RATE (anchored)
   // #278 — VJ MIX: palette crossfade state machine (pure) + the last
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
@@ -594,7 +596,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     lastResolved = resolved;
 
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, palette: activePalette },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: activePalette },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
