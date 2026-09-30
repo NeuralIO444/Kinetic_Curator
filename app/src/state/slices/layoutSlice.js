@@ -8,6 +8,7 @@ import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/pale
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
+import { FEEL_PRESETS } from '../../data/feels.js';
 import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS, SHAPE_MIX_MAX, MIXABLE_SHAPE_IDS, liveShapeLevels, shapeMixIds } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
@@ -308,6 +309,25 @@ export const createLayoutSlice = (set) => ({
       next.caGrid = createGrid(40, 28);
     }
     return next;
+  }),
+
+  /**
+   * STIMULI FEEL (#615): set the 8 reactivity params to a Gentle / Punchy /
+   * Violent macro in ONE undo step. Locked params are left alone (a lock is
+   * the performer's taste), same as applyPreset. Unknown id is a no-op.
+   */
+  applyFeel: (id) => set((state) => {
+    const feel = FEEL_PRESETS.find((f) => f.id === id);
+    if (!feel) return {};
+    const merged = { ...state.layoutParams };
+    let changed = false;
+    for (const [k, v] of Object.entries(feel.params)) {
+      if (!state.lockedParams[k] && !Object.is(merged[k], v)) { merged[k] = v; changed = true; }
+    }
+    if (!changed) return {};
+    const { params, rejected } = validateLayoutParams(merged);
+    if (rejected.length) return {};
+    return { ...pushToUndo(state, true), layoutParams: params, voiceMix: null, activeVoiceId: null };
   }),
 
   setLayoutParams: (params) => set((state) => {
