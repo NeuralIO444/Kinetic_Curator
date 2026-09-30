@@ -10,6 +10,7 @@ import { sanitizeLight } from '../data/light.js';
 import { sanitizeAssetKineme } from '../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
+import { sanitizeMidiMap } from '../midi/map.mjs';
 import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
@@ -87,6 +88,10 @@ export function serializeProject(state) {
     doc.canvasPresetId = canvas.canvasPresetId;
     doc.stageMode = canvas.stageMode;
   }
+  // #617 — MIDI mappings. Written only when something is mapped: an unmapped
+  // project exports exactly as before.
+  const midiMap = sanitizeMidiMap(state.midiMap);
+  if (Object.keys(midiMap).length) doc.midiMap = midiMap;
   if (Array.isArray(state.layers) && state.activeLayerId) {
     doc.layers = state.layers;
     doc.activeLayerId = state.activeLayerId;
@@ -139,6 +144,7 @@ export function parseProject(raw) {
         light: sanitizeLight(raw.light), // #594 — absent → null (off)
         assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
         audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
+        midiMap: sanitizeMidiMap(raw.midiMap), // #617
         customAssets,
         layers,
         activeLayerId,
@@ -185,6 +191,7 @@ export function parseProject(raw) {
       light: sanitizeLight(raw.light), // #594 — absent → null (off)
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
+      midiMap: sanitizeMidiMap(raw.midiMap), // #617
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
           ? raw.paletteOverrides

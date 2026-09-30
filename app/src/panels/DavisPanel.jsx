@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { emit, Events } from '../composition/eventBus.js';
+import { emit, on, Events } from '../composition/eventBus.js';
 import { BehaveReadout } from './davis/BehaveReadout.jsx';
 import { VoiceTiles } from './davis/VoiceTiles.jsx';
 import { EvolveProgress } from './davis/EvolveProgress.jsx';
+import { MidiSection } from './davis/MidiSection.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { captureFavorite } from '../state/slices/davisSlice.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
@@ -55,6 +56,8 @@ export function DavisPanel() {
   // Phase A gesture: local FREEZE toggle state (the hook resets on ACCUM
   // toggle, and this row unmounts with it, so the two stay in sync).
   const [accumFrozen, setAccumFrozen] = useState(false);
+  // #617: a MIDI pad can hold FREEZE; keep the button honest about it
+  useEffect(() => on(Events.ACCUM_GESTURE, (p) => { if (p && p.action === 'freeze') setAccumFrozen(!!p.value); }), []);
   const toggleFreeze = () => {
     const next = !accumFrozen;
     setAccumFrozen(next);
@@ -133,6 +136,7 @@ export function DavisPanel() {
           <div className="davis-phrase-status" title="Phrase clock status. The controls live in PLAY; this panel only reports.">
             <i>PHRASE</i><b>{phraseStatus}</b>
           </div>
+          <MidiSection />
           {accumOn && (
             <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
               <button className={`big-btn ${accumFrozen ? 'active' : ''}`}

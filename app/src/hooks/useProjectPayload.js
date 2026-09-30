@@ -6,12 +6,12 @@ import { serializeProject } from '../state/projectDocument.js';
  */
 export function buildProjectPayload({
   seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
-  enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, customAssets, layers,
+  enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, midiMap, customAssets, layers,
   activeLayerId, layerSnapshots,
 }) {
   return serializeProject({
     seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
-    enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, customAssets, layers,
+    enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, midiMap, customAssets, layers,
     activeLayerId, layerSnapshots,
   });
 }

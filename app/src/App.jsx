@@ -3,6 +3,7 @@ import { KERNEL_VERSION } from './engine/kernel/version.js';
 import { AppProvider } from './state/AppContext.jsx';
 import { MasterBar } from './components/MasterBar.jsx';
 import { PaletteStrip } from './components/PaletteStrip.jsx';
+import { useMidi } from './hooks/useMidi.js';
 import { ModeStrip } from './components/ModeStrip.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
@@ -204,6 +205,7 @@ function AppInner() {
     if (tickPhrase) s.tickPhraseBeat();
     if (fireEvolve) s.triggerEvolve({ loopTimeMs: glLoopRef?.current?.getLoopTimeMs?.() });
   }, [piped]);
+  useMidi(); // #617: Web MIDI engine, while MIDI is enabled in DAVIS
   useAudioInput({
     enabled: state.audioEnabled,
     source: state.audioSource,
