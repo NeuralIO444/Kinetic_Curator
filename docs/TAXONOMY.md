@@ -5,7 +5,7 @@ Standing vocabulary for KC-1. Amends the face language in [TEMPO_AND_CHIPS.md](T
 Research trail (why, collisions, rejected alternatives): [`TAXONOMY_RESEARCH.md`](TAXONOMY_RESEARCH.md).
 
 ```
-Version: 1.2.1
+Version: 1.3.0
 Compat: look-apply = layout-only (#555)
 Frozen voice ids: swarm, hype, murmuration, dark-glass
 ```
@@ -98,7 +98,7 @@ One home per Voice. After #717 the three titles leave PLAY.
 Do not start a new vocabulary. These are the same class of bug as PRESET.
 
 1. **Wire the alias** — landed on `docs/taxonomy`. Look id `dusk-flock`; `getPreset` + `normalizeLayoutParams` call `resolveLookId`. Old `composition: 'murmuration'` rewrites to `dusk-flock`. Voice id `murmuration` untouched.
-2. **Face copy PATCH** — ~~PRESETS ▾ → LOOKS ▾ (tour, CuratorBar, helpCopy).~~ Done 1.2.1. Top-bar home still #716.
+2. **Face copy PATCH** — ~~PRESETS ▾ → LOOKS ▾ (tour, CuratorBar, helpCopy).~~ Done 1.2.1. Top-bar home done 1.3.0 (#716).
 3. **Voice titles** — ~~SWARM/HYPE/MURM chips print Night Migration / Chrome Parade / Deep Water.~~ Done 1.2.1 (chips + MIX bar). Ids stay frozen. The move to DAVIS is still #717.
 4. **`vibe` field** — `FLAGSHIP_VOICES[].vibe` is liner notes. Face must not say Vibe. #615 feels stay audio-only.
 5. **`mode: 'hype'` vs voice `hype`** — system chip lowercase; voice title Chrome Parade. Dirty Signal / Neon Brood Looks that set `mode: 'hype'` stay Looks.
@@ -118,3 +118,4 @@ Do not edit PERF/POLISH/session roadmaps for this. Those docs are frozen or hist
 - 2026-09-29 — 1.2.0: fourth Voice `dark-glass` (face: DARK GLASS / Chiaroscuro), id frozen. Look `chiaroscuro` and palette `chiaroscuro` unchanged. #704.
 - 2026-09-28 — research report: [`TAXONOMY_RESEARCH.md`](TAXONOMY_RESEARCH.md). No version bump (companion doc).
 - 2026-09-29 — 1.2.1 PATCH (face copy): CuratorBar `presets ▾` → `looks ▾`; tour step 1 "Pick a Look" (was "recipe", which named palettes); help copy. Flagship chips and the MIX bar print the Voice title only (no SWARM/HYPE/MURM). Voice `dark-glass` title is **Dark Glass**, not Chiaroscuro (that name is the Look + palette). Header now tracks 1.2.x and the `dark-glass` freeze. `taxonomy.selfcheck` guards these faces. #735.
+- 2026-09-30 — 1.3.0 MINOR (new home): the Curator cluster `[LOOKS ▾] [VOICE ▾] [Curator]` leaves BUILD for the top bar, next to KC-1 — a global verb, not a panel control. Same popups, same layout-only Look apply; menus open downward; the persona hint is the Curator button's tooltip. #716 Part 1, #735 step 3.

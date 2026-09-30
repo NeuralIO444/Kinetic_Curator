@@ -6,6 +6,7 @@ import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
 import { MIX_DEFAULT } from '../gl/paletteMix.mjs';
+import { CuratorBar } from '../panels/layout/CuratorBar.jsx';
 
 const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
 const COLOR_MODE_HINT = {
@@ -109,7 +110,7 @@ export function PaletteStrip() {
             onInk={(hex) => dispatch({ type: A.SET_PALETTE_INK, payload: hex })}
             onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
           />
-          {p.name}
+          <span className="palette-chip-name">{p.name}</span>
         </div>
       );
     }
@@ -118,7 +119,7 @@ export function PaletteStrip() {
         <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={`${p.name} — key ${i + 1}`}>
           {num}
           <CompactSwatches swatches={p.swatches || []} />
-          {p.name}
+          <span className="palette-chip-name">{p.name}</span>
         </button>
       </span>
     );
@@ -151,19 +152,12 @@ export function PaletteStrip() {
           <span className="logo-version">v0.9.0</span>
         </span>
       </div>
+      {/* #716 — the Curator is the instrument's main verb: a global control,
+          not a BUILD-panel one. Same popups, new address. */}
+      <CuratorBar />
       <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
-            {chips}
-          </div>
-          <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
-            <span className="palette-switch-label">PALETTE</span>
-            <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
-              {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
-            </select>
-            <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳ SHUFFLE</button>
-          </span>
-          <label className="palette-mix" style={{ flexShrink: 0 }} title={COLOR_MODE_HINT[colorMode]}>
+          <label className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }} title={COLOR_MODE_HINT[colorMode]}>
             <button
               type="button"
               className="palette-mix-label"
@@ -188,6 +182,16 @@ export function PaletteStrip() {
               {Number(paletteMixSeconds).toFixed(1)}s
             </span>
           </label>
+          <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+            {chips}
+          </div>
+          <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <span className="palette-switch-label">PALETTE</span>
+            <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
+              {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
+            </select>
+            <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳<span className="palette-shuffle-word"> SHUFFLE</span></button>
+          </span>
         </div>
       </div>
     </div>
