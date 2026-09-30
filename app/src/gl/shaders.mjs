@@ -389,7 +389,7 @@ void main() {
     vec3 h = fract(vec3(p.xyx) * 0.1031);
     h += dot(h, h.yzx + 33.33);
     float n = fract((h.x + h.y) * h.z);
-    float amt = clamp(u_p.x, 0.0, 1.0);
+    float amt = clamp(u_p.y, 0.0, 1.0);
     float k = (n - 0.5) * amt * 0.55 * s.a;  // premul: no speckle where s.a == 0
     o = vec4(clamp(s.rgb + vec3(k), 0.0, s.a), s.a);
   } else if (u_effect == 5) {                 // posterize: discrete table in straight space
