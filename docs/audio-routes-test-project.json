@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "seed": 20260930,
+  "seedOffsets": {
+    "spatial": 0,
+    "color": 0,
+    "asset": 0,
+    "noise": 0
+  },
+  "paletteId": "praystation",
+  "layoutParams": {
+    "composition": "praystation",
+    "mode": "swarm",
+    "count": 140,
+    "scale": [
+      0.4,
+      1.6
+    ],
+    "rotate": [
+      -180,
+      180
+    ],
+    "alpha": [
+      40,
+      100
+    ],
+    "zTiers": 4,
+    "jitter": 24,
+    "density": 78,
+    "bleed": false,
+    "mirror": false,
+    "previewDownscale": false,
+    "renderWorker": false,
+    "overlap": true,
+    "blendMode": "normal",
+    "hueRotate": 0,
+    "paletteShift": "auto",
+    "accumulation": false,
+    "accumulationFade": 5.4,
+    "accumulationOptics": 0,
+    "accumulationTunnel": 0,
+    "accumulationPrism": 0,
+    "accumulationFlow": 0,
+    "phylloDivergence": 0,
+    "lsysDepth": 4,
+    "lsysAngle": 25,
+    "noiseFreq": 0.005,
+    "noiseSpeed": 0.5,
+    "displacement": 0,
+    "particleCount": 150,
+    "swarmCohesion": 0.6,
+    "gravityWells": 1,
+    "damping": 0.95,
+    "body": 3,
+    "flap": 0.35,
+    "kinemeRate": 1,
+    "squash": 0,
+    "tight": 0.55,
+    "wind": 1,
+    "symmetry": "none",
+    "behave": "cruise",
+    "behaveSep": null,
+    "behaveAli": null,
+    "behaveCoh": null,
+    "behaveSepR": null,
+    "behaveAliR": null,
+    "behaveCohR": null,
+    "behaveWind": null,
+    "behaveOrbit": null,
+    "behaveAttract": null,
+    "material": "plate",
+    "metabolism": 0,
+    "breath": 0,
+    "graze": 0,
+    "contactRadius": 0,
+    "contactRestitution": 0.5,
+    "contactRepel": 0,
+    "contactMode": "none",
+    "collideMask": 4294967295,
+    "audioModDepth": 1,
+    "audioScaleMod": 1,
+    "audioAlphaMod": 1,
+    "audioAttackMs": 25,
+    "audioDecayMs": 320,
+    "audioResponse": "exponential",
+    "audioSwell": 1,
+    "lifeDrift": 0.2
+  },
+  "enabledAssets": {},
+  "quality": "balanced",
+  "autoQuality": true,
+  "audioRoutes": [
+    {
+      "input": "band.sub",
+      "target": "render.breath",
+      "depth": 0.12
+    },
+    {
+      "input": "band.mud",
+      "target": "render.scale",
+      "depth": 0.6
+    },
+    {
+      "input": "band.pres",
+      "target": "render.alpha",
+      "depth": 14
+    },
+    {
+      "input": "band.air",
+      "target": "render.glow",
+      "depth": 0.9
+    },
+    {
+      "input": "beat",
+      "target": "render.scale",
+      "depth": 0.3
+    }
+  ],
+  "description": "Audio-routes test scene (#790): five band routes. Import via PIPELINE → IMPORT, open STIMULI, turn AUDIO ON and play music. SUB→breath, MUD→scale, PRES→alpha, AIR→frame glow, BEAT→scale. RESET in the matrix returns the default routes."
+}
