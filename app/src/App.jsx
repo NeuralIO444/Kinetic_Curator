@@ -50,6 +50,7 @@ function AppInner() {
     evolveTarget: s.evolveTarget,
     autoSnapshot: s.autoSnapshot,
     lastEvolveTs: s.lastEvolveTs,
+    audioSidecar: s.audioSidecar, // #618
     exportResolution: s.exportResolution,
     audioEnabled: s.audioEnabled,
     audioSource: s.audioSource,
@@ -179,6 +180,7 @@ function AppInner() {
     source: state.audioSource,
     gain: state.audioGain,
     monitor: state.audioMonitor,
+    sidecar: state.audioSidecar?.env ?? null, // #618: FILE source envelope sidecar
     // #306: envelope ballistics — attack/decay + response curve shape the
     // mic envelope before any reactivity consumer sees it.
     ballistics: {

@@ -9,6 +9,7 @@
 import { useRef, useEffect } from 'react';
 import { setAudioMeterTap } from './audioMeterTap.js';
 import { METER_FFT_SIZE } from '../gl/meterBands.mjs';
+import { envelopeTick } from '../gl/audioEnvelopeCore.mjs';
 import {
   createBallisticsState,
   resetBallistics,
@@ -23,7 +24,7 @@ import {
 // goes through the shaped envelope. Silence decays to exact zeros, so the
 // no-op contracts downstream are preserved.
 
-export function useAudioInput({ enabled, source, gain, monitor, ballistics, onStimulus, onBands, onBeat, onDenied }) {
+export function useAudioInput({ enabled, source, gain, monitor, ballistics, sidecar = null, onStimulus, onBands, onBeat, onDenied }) {
   const ctxRef = useRef(null);
   const analyserRef = useRef(null);
   const sourceRef = useRef(null);
@@ -36,6 +37,12 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
   // graph start so the envelope never resumes from a stale session.
   const followerRef = useRef(createBallisticsState());
   const lastTsRef = useRef(0);
+  // #618: a kc-audio-envelope/1 sidecar for the FILE source. When present (and
+  // the source is a file) it is the truth: rms and beats come from the sidecar
+  // at the playback position — deterministic, not re-derived from the FFT.
+  const sidecarRef = useRef(sidecar);
+  useEffect(() => { sidecarRef.current = sidecar; }, [sidecar]);
+  const envPrevTRef = useRef(null);
 
   const cbRef = useRef({ onStimulus, onBands, onBeat, onDenied });
   const gainRef = useRef(gain);
@@ -83,10 +90,25 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
         else trebleSum += v;
       }
 
-      const rms = total / len;
-      const bass = bassEnd > 0 ? bassSum / bassEnd : 0;
-      const mid = (midEnd - bassEnd) > 0 ? midSum / (midEnd - bassEnd) : 0;
-      const treble = (len - midEnd) > 0 ? trebleSum / (len - midEnd) : 0;
+      let rms = total / len;
+      let bass = bassEnd > 0 ? bassSum / bassEnd : 0;
+      let mid = (midEnd - bassEnd) > 0 ? midSum / (midEnd - bassEnd) : 0;
+      let treble = (len - midEnd) > 0 ? trebleSum / (len - midEnd) : 0;
+
+      // #618: sidecar truth. LEVEL and BEAT come from the envelope at the file's
+      // playback position; the sidecar carries no per-band data, so BASS/MID/
+      // TREBLE read 0 rather than a live-FFT guess (the panel says so).
+      const env = sidecarRef.current;
+      const el = audioElRef.current;
+      let envBeat = null;
+      if (env && el && source.type === 'file') {
+        const tick = envelopeTick(env, el.currentTime, envPrevTRef.current);
+        envPrevTRef.current = el.currentTime;
+        rms = tick.rms; bass = 0; mid = 0; treble = 0;
+        envBeat = tick.beats > 0;
+      } else {
+        envPrevTRef.current = null;
+      }
 
       const cb = cbRef.current;
       // #306: shape the envelope before anything downstream sees it. The
@@ -108,7 +130,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
 
       // Beat detection: sharp rms spike — on the RAW rms, so the clock
       // keeps its snap regardless of the follower's attack setting.
-      if (rms - prevRmsRef.current > 0.15) cb.onBeat?.();
+      if (envBeat != null ? envBeat : rms - prevRmsRef.current > 0.15) cb.onBeat?.();
       prevRmsRef.current = rms;
 
       if (runningRef.current) rafRef.current = requestAnimationFrame(analyze);
@@ -183,6 +205,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
     return () => {
       cancelled = true;
       runningRef.current = false;
+      envPrevTRef.current = null;
       setAudioMeterTap(null); // #613: the meter reads idle, never a frozen ghost
       prevRmsRef.current = 0;
       // #306: session over — drop the envelope so a re-enable starts silent.
