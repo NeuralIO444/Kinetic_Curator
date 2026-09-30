@@ -95,6 +95,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
 
   body: 3,
   flap: 0.35,
+  kinemeRate: 1, // #781 KINEME RATE: 1 = each kineme's own tempo, 0 freezes
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   tight: 0.55,
   wind: 1,
@@ -193,6 +194,7 @@ export const PARAM_SPEC = {
   // #594 PR3 squash-and-stretch: how much a moving mark thins across its
   // motion while the #309 smear stretches it along — 1 holds its area.
   squash: { min: 0, max: 1 },
+  kinemeRate: { min: 0, max: 4 }, // #781 KINEME RATE
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the

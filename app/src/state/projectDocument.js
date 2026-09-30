@@ -7,6 +7,7 @@ import { normalizeSnapshots, normalizeLayers } from './projectNormalize.js';
 export { normalizeSnapshots, normalizeLayers };
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
+import { sanitizeAssetKineme } from '../data/kinemes.js';
 import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
@@ -68,6 +69,10 @@ export function serializeProject(state) {
   // exactly as it did before lighting existed.
   const light = sanitizeLight(state.light);
   if (light) doc.light = light;
+  // #781 KINEME — which assets move, and how. Written only when set: a
+  // motionless piece exports exactly as before.
+  const kineme = sanitizeAssetKineme(state.assetKineme);
+  if (kineme) doc.assetKineme = kineme;
   if (Array.isArray(state.layers) && state.activeLayerId) {
     doc.layers = state.layers;
     doc.activeLayerId = state.activeLayerId;
@@ -118,6 +123,7 @@ export function parseProject(raw) {
         paletteOverrides: raw.paletteOverrides || null,
         paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
         light: sanitizeLight(raw.light), // #594 — absent → null (off)
+        assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
         customAssets,
         layers,
         activeLayerId,
@@ -162,6 +168,7 @@ export function parseProject(raw) {
       autoQuality: raw.autoQuality !== false,
       assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
       light: sanitizeLight(raw.light), // #594 — absent → null (off)
+      assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
           ? raw.paletteOverrides
