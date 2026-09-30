@@ -41,6 +41,20 @@ export const WASH_JITTER_SPAN = 0.25;
 /** Fraction of the wash each item's own adoption takes. */
 export const WASH_ADOPT_SPAN = 0.2;
 
+/**
+ * #632 FADE — the default color mode. The same carrier as WASH (per-instance
+ * v_ink/v_accent, no rebake, no size change) on a flatter schedule: no
+ * center-out wavefront, just each node's own seeded moment, and a long
+ * adoption so colors ease across the whole MIX time instead of racing it.
+ * Spans sum to 1 like WASH, so every node is on the new palette at t=1.
+ */
+export const FADE_JITTER_SPAN = 0.3;
+export const FADE_ADOPT_SPAN = 0.7;
+const SCHEDULES = {
+  WASH: { wave: WASH_WAVE_SPAN, jitter: WASH_JITTER_SPAN, adopt: WASH_ADOPT_SPAN },
+  FADE: { wave: 0, jitter: FADE_JITTER_SPAN, adopt: FADE_ADOPT_SPAN },
+};
+
 // Canvas geometry for the center-out wavefront (scene units, 1000x700).
 const CX = 500;
 const CY = 350;
@@ -105,8 +119,9 @@ export function waveRank(x, y) {
  * When (fraction of the wash) item `gi` starts adopting, from its wavefront
  * rank and its seeded jitter. Same (gi, seed) → same delay, every time.
  */
-export function adoptionDelay(gi, seed, rank) {
-  return rank * WASH_WAVE_SPAN + hash01(gi, (seed ^ WASH_SALT) | 0) * WASH_JITTER_SPAN;
+export function adoptionDelay(gi, seed, rank, mode = 'WASH') {
+  const sch = SCHEDULES[mode] || SCHEDULES.WASH;
+  return rank * sch.wave + hash01(gi, (seed ^ WASH_SALT) | 0) * sch.jitter;
 }
 
 /**
@@ -180,8 +195,8 @@ export function createTintWash() {
     }
     const identityChanged = identity !== seen;
 
-    if (mode !== 'WASH') {
-      // Leaving WASH mid-soak: drop it. The resolver already hands the new
+    if (mode !== 'WASH' && mode !== 'FADE') {
+      // Leaving WASH/FADE mid-soak: drop it. The resolver already hands the new
       // palette's colors to every item, so the next frame is the new picture.
       active = null;
       fromColors = null;
@@ -203,7 +218,7 @@ export function createTintWash() {
         lastBg = bgNow;
         return { washing: false, bg: bgNow };
       }
-      active = { startMs: now, durMs, seed: (seed >>> 0) || 0 };
+      active = { startMs: now, durMs, seed: (seed >>> 0) || 0, mode };
     }
 
     if (!active) {
@@ -221,6 +236,7 @@ export function createTintWash() {
       washing: true,
       t: Math.max(0, t),
       seed: active.seed,
+      mode: active.mode,
       fromColors,
       bg: lerpHex(fromBg, bgNow, t),
     };
@@ -239,6 +255,7 @@ export function createTintWash() {
  */
 export function applyWash(resolved, ev) {
   const { t, seed, fromColors } = ev;
+  const sch = SCHEDULES[ev.mode] || SCHEDULES.WASH;
   if (!fromColors || !Array.isArray(resolved)) return;
   let gi = 0;
   for (const layer of resolved) {
@@ -248,8 +265,8 @@ export function applyWash(resolved, ev) {
       const it = items[i];
       const from = fromColors.get(washKey(layer.id, i));
       if (!from) continue;
-      const delay = adoptionDelay(gi, seed, waveRank(it.x, it.y));
-      const p = (t - delay) / WASH_ADOPT_SPAN;
+      const delay = adoptionDelay(gi, seed, waveRank(it.x, it.y), ev.mode);
+      const p = (t - delay) / sch.adopt;
       if (p <= 0) {
         it.color = from.color;
         it.accent = from.accent;

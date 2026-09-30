@@ -178,7 +178,10 @@ function buildFrame() {
   // the scene contract.
   const tintTargetPalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
   const tintArgs = {
-    identity: paletteIdentity(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes),
+    // The store's palette, not voiceState's: a voice MIX blends the overrides
+    // every frame, and a per-frame identity change would restart the fade
+    // forever (FADE is the default mode now, #632). liveLoop does the same.
+    identity: paletteIdentity(s.paletteId, s.paletteOverrides, s.userPalettes),
     mode: s.colorMode || 'FADE',
     mixSeconds: s.paletteMixSeconds,
     now: loopTimeMs,
