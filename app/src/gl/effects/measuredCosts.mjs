@@ -33,4 +33,9 @@ export const MEASURED_COSTS = {
   'fx/scanlines': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/solarize': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/tear': { ms: 0.3, method: 'wall', draws: 90 },
+  // #740 — added by hand from a `measure-costs` run (software GL, wall clock). The pair is
+  // within timer quantization (~0.03 ms), so it shows NO FXAA cost signal; re-run
+  // `npm run measure-costs` on hardware (gpu timer) to bless real numbers.
+  'renderer/resolve': { ms: 0.3, method: 'wall', draws: 90 },
+  'renderer/resolve-fxaa': { ms: 0.3333, method: 'wall', draws: 90 },
 };
