@@ -18,10 +18,26 @@ import { test, expect } from '@playwright/test';
 import { glNodeCount, waitForLiveFrame } from './gl-helpers.js';
 
 // The GL loop reports node count through the CanvasPanel pill. Poll for a
-// nonzero count so we never read a pre-first-frame zero.
+// nonzero count so we never read a pre-first-frame zero — then wait for it to
+// SETTLE. A COUNT edit reaches the pill over several frames; the old single
+// read after a fixed 700 ms caught it mid-way on slower CI runners
+// (COUNT 60 read as 311 on the way down from 343) and failed a correct build.
+// Settled = the same value on SETTLE_READS consecutive polls. A swallowed edit
+// still settles — at the stale count — so the ratio bar below keeps its teeth.
+const SETTLE_READS = 4;
+const SETTLE_POLL_MS = 250;
 const nodeCount = async (page) => {
   await waitForLiveFrame(page);
-  return glNodeCount(page);
+  let last = await glNodeCount(page);
+  let same = 1;
+  const deadline = Date.now() + 20_000;
+  while (same < SETTLE_READS && Date.now() < deadline) {
+    await page.waitForTimeout(SETTLE_POLL_MS);
+    const n = await glNodeCount(page);
+    same = n === last ? same + 1 : 1;
+    last = n;
+  }
+  return last;
 };
 
 /** Set a range input to an exact value and let React commit it. */
