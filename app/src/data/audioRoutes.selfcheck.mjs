@@ -196,12 +196,13 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
   const ui = src('../panels/stimulus/ModMatrix.jsx');
-  for (const s of ['Route ${index + 1} input', 'Route ${index + 1} target', 'Route ${index + 1} depth', 'Remove route ${index + 1}', '+ ROUTE', 'RESET', 'frame glow', 'not routed:']) {
+  for (const s of ['Route ${index + 1} input', 'Route ${index + 1} target', 'Route ${index + 1} depth', 'Remove route ${index + 1}', '+ ROUTE', 'CLEAR', 'RESET', 'frame glow', 'not routed:']) {
     assert.ok(ui.includes(s), `the matrix offers ${s}`);
   }
   assert.ok(/disabled=\{taken\(id, route\.target\)\}/.test(ui) && /disabled=\{taken\(route\.input, id\)\}/.test(ui), 'a duplicate pair cannot be picked');
   assert.ok(/onEdit\(\(t\) => patchRoute\(t, index, \{ depth: Number\(e\.target\.value\) \}\), true\)/.test(ui), 'the depth slider edits continuously (one undo step per drag)');
   assert.ok(/disabled=\{full\}/.test(ui) && /disabled=\{!custom\}/.test(ui), '+ ROUTE stops at the cap; RESET only when customised');
+  assert.ok(/disabled=\{table\.length === 0\} onClick=\{\(\) => setAudioRoutes\(\[\]\)\}/.test(ui), 'CLEAR empties the table (start from scratch), greyed when already empty');
   const meter = src('../panels/stimulus/MeterHero.jsx');
   assert.ok(/editAudioRoutes\(\(t\) => \{ const n = nextRoute\(t, input\)/.test(meter) && /onClick=\{routeBand\}/.test(meter), 'a click on a meter band adds a route for that band');
 }

@@ -49,11 +49,22 @@ test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) 
   await expect(page.getByLabel('Route 1 target')).toHaveValue('render.scale');
   await expect(reset).toBeDisabled();
 
-  // remove every route: audio drives nothing, and it says so
-  for (let i = 7; i >= 1; i--) await page.getByRole('button', { name: `Remove route ${i}` }).click();
+  // CLEAR: start from scratch in one click: audio drives nothing, and it says so
+  const clear = page.getByRole('button', { name: 'CLEAR', exact: true });
+  await expect(clear).toBeEnabled();
+  await clear.click();
   await expect(rows).toHaveCount(0);
   await expect(page.locator('.stim-matrix-empty')).toContainText('sound drives nothing');
+  await expect(clear).toBeDisabled();
   await expect(add).toBeEnabled();
+  // …and build up from nothing with + ROUTE
+  await add.click();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByLabel('Route 1 input')).toHaveValue('band.air');
+  await expect(reset).toBeEnabled();
+  // removing the last route is the same empty state
+  await page.getByRole('button', { name: 'Remove route 1' }).click();
+  await expect(rows).toHaveCount(0);
   await reset.click();
   await expect(rows).toHaveCount(7);
 

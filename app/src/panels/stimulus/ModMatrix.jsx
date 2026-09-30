@@ -71,13 +71,15 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       <div className="stim-matrix-head" role="row">
         <span>ROUTE</span><span>DEPTH</span><span>LIVE</span><span />
       </div>
-      {table.length === 0 && <div className="stim-matrix-empty">No routes: sound drives nothing. Add one below.</div>}
+      {table.length === 0 && <div className="stim-matrix-empty">No routes: sound drives nothing. Add one below, or click a band in the meter.</div>}
       {rows.map((row, i) => (
         <Row key={i} row={row} route={table[i]} index={i} table={table} onEdit={editAudioRoutes} />
       ))}
       <div className="stim-matrix-foot">
         <button type="button" className="chip-btn" disabled={full} onClick={() => editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; }, false)}
           title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}>+ ROUTE</button>
+        <button type="button" className="chip-btn" disabled={table.length === 0} onClick={() => setAudioRoutes([])}
+          title={table.length === 0 ? 'Already empty' : 'Remove every route: start from scratch'}>CLEAR</button>
         <button type="button" className="chip-btn" disabled={!custom} onClick={() => setAudioRoutes(null)}
           title={custom ? 'Back to the default routes' : 'Already the default routes'}>RESET</button>
         <span className="stim-matrix-count">{table.length}/{MAX_ROUTES}</span>
