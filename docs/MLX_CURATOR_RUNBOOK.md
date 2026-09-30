@@ -144,10 +144,53 @@ more labels, or tell me and we dig into why.
   backend, re-run `embed` — the `.npz` format is identical, but the numbers
   inside come from a different model (1152 dims now, was 768). The `train`
   step refuses to mix them, loudly, rather than silently giving wrong answers.
-- **`selfcheck` is still stdlib-only.** All MLX/torch imports live behind the
-  model-loading boundary; `python3 studio/curator.py selfcheck` needs nothing
-  installed.
-- **No web-app changes.** This is all `studio/` Python. The app never sees MLX.
+- **`selfcheck` is still stdlib-only** for the selection logic. All MLX imports live behind the
+  model-loading boundary; the Taste v1 train/head check (#762) runs too when numpy +
+  scikit-learn are installed (they are, via `.[curator]`) and prints a skip line otherwise.
+- **The app never sees MLX.** Phase 2 below hands it a small distilled head in `taste.json`
+  (recipe features, no embeddings) — the browser scores with that, never with images.
 - First `embed` on a fresh machine is slow (weight download); subsequent runs
   are fast. If `embed` fails to load the model, the error message tells you
   exactly what to install.
+
+## 4. Phase 2 — `taste.json` → the app (#762)
+
+**What this adds, in plain language:** Phase 1's probe ranks *images*. The live
+CURATOR button can't use it — it scores 8 freshly rolled recipes per press and
+never renders them. So `train` also **distils** the probe into a small head over
+each render's named recipe features (the ones every sidecar carries since #759).
+That head is what the app runs, and `inspect` reads it back in words.
+
+One copy-paste block, from the repo root on the Mac Studio (`base.project.json`
+= any project you like as a starting point; ↓ PROJECT from the app):
+
+```bash
+# 1. a VARIED pool, rolled with the same dice CURATE uses (~200 is plenty)
+node studio/pool_recipes.mjs base.project.json --count 200 --seed 1 --out pool-recipes/
+python3 studio/hits_bridge.py pool --recipes pool-recipes/ --pool pool/      # resumable
+
+# 2. your keeps: in the app keep with ★ / F, then Pipeline → ↓ HITS  (saves hits.json)
+python3 studio/hits_bridge.py build --hits hits.json --pool pool/ --out labels.json
+#    -> labels.json + features.json (renders any kept seed missing from the pool)
+
+# 3. embed + train (writes taste.json: probe + distilled head + manifest)
+python3 studio/curator.py embed pool/
+python3 studio/curator.py train --index pool/curator-index.npz --labels labels.json \
+    --features features.json --out taste.json
+
+# 4. read it in words — does this sound like you?
+python3 studio/curator.py inspect taste.json
+
+# 5. app: Pipeline → IN → IMPORT TASTE → taste.json
+#    the curator bar then reads "curated pick · mlx"
+```
+
+**What good looks like:** `train` prints ROC-AUC above 0.6 and a head fidelity
+above 0.3; `inspect` reads like you ("leans sparse, large marks, trails on; avoids
+screen blend"). Fidelity under 0.3 means recipe features can't reproduce what the
+probe learned — the app then keeps the persona curator and says so. More keeps,
+and a pool that varies what you actually vary, are the fixes.
+
+**Privacy:** `taste.json` stores content hashes of the training renders, never the
+images. It moves machines with the file; the app keeps it per machine
+(`kc:taste:v1`), never in project files.

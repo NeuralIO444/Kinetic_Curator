@@ -106,6 +106,36 @@ def render_hit(project_path: Path, pool: Path, seed: int, res: str) -> None:
     )
 
 
+def recipe_png(recipe: Path, pool: Path) -> Path:
+    """#762 — pool file for one recipe: recipe-0007.project.json -> pool/recipe-0007.png."""
+    return pool / (recipe.name.split(".")[0] + ".png")
+
+
+def cmd_pool(a) -> None:
+    """#762 — render a varied recipe pool (studio/pool_recipes.mjs) with sidecars.
+
+    Each render goes through `studio.py render --sidecar`, so every sidecar carries
+    the recipe features (#759) the taste head trains on. Already-rendered recipes are
+    skipped, so an interrupted run resumes where it stopped.
+    """
+    recipes = sorted(Path(a.recipes).glob("*.project.json"))
+    if not recipes:
+        sys.exit(f"{a.recipes}: no *.project.json recipes (run studio/pool_recipes.mjs first)")
+    pool = Path(a.pool)
+    pool.mkdir(parents=True, exist_ok=True)
+    todo = [r for r in recipes if not recipe_png(r, pool).exists()]
+    print(f"{len(recipes)} recipes, {len(recipes) - len(todo)} already rendered, rendering {len(todo)}...")
+    for n, r in enumerate(todo, 1):
+        seed = int(json.loads(r.read_text()).get("seed", 0)) & 0xFFFFFFFF
+        subprocess.run(
+            [sys.executable, str(STUDIO_PY), "render", str(r), "-o", str(recipe_png(r, pool)),
+             "--seed", str(seed), "--res", a.res, "--sidecar"],
+            check=True,
+        )
+        if n % 10 == 0 or n == len(todo):
+            print(f"  {n}/{len(todo)}")
+
+
 # ── cli ──────────────────────────────────────────────────────────────────
 
 
@@ -179,6 +209,8 @@ def cmd_selfcheck(_a=None) -> None:
             if side is not None:
                 (pool / name).with_suffix(".json").write_text(json.dumps(side))
         assert scan_features(pool) == {"a.png": {"v": 1, "system": "grid"}}, "features read from sidecars"
+        # #762 — a recipe maps to its own pool png, stable across runs (resume)
+        assert recipe_png(Path("r/recipe-0007.project.json"), Path("pool")) == Path("pool/recipe-0007.png")
     print("hits_bridge selfcheck OK")
 
 
@@ -195,6 +227,12 @@ def main(argv=None) -> None:
                     help="named recipe features per labelled png (default: features.json next to --out)")
     sp.add_argument("--res", default="1", help="resolution for any on-demand hit renders")
     sp.set_defaults(func=cmd_build)
+
+    sp = sub.add_parser("pool", help="#762: render studio/pool_recipes.mjs recipes into a pool (with sidecars)")
+    sp.add_argument("--recipes", required=True, help="dir of *.project.json from pool_recipes.mjs")
+    sp.add_argument("--pool", required=True, help="output dir for PNG + JSON sidecars")
+    sp.add_argument("--res", default="1")
+    sp.set_defaults(func=cmd_pool)
 
     sub.add_parser("selfcheck", help="pure-logic checks, no rendering, no model") \
         .set_defaults(func=cmd_selfcheck)

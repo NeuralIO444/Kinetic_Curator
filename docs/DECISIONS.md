@@ -35,7 +35,9 @@ A declaration is `{ tier, memoryBytes, timeMs, notes }`, optionally `memoryGate:
 
 ---
 
-## Taste v1 file format (spec only — not yet implemented)
+## Taste v1 file format
+
+> **Implemented (#762):** `studio/curator.py train --features` writes `taste.json` per this spec, plus one addition — a **distilled head** (ridge over the #759 recipe features, fitted to the probe's scores, with a Spearman `fidelity`). The browser can't embed, and CURATE scores unrendered candidates, so the head is what the app runs; `inspect` reads it in words. `scores.json` below stays unbuilt: nothing needs precomputed per-candidate scores while the head exists.
 
 **What:** `curator/taste.js` today is an interim heuristic scorer — it measures 15 real visual features from a candidate's params and scores them against a persona's hand-distilled Loves/Avoids (`personaTastes.js`). It is not the MLX embedding-based taste system `docs/ARCHITECTURE_PLAN.md` Phase 4 describes, which hasn't shipped (`docs/MLX_HARNESS_RUNBOOK.md` hasn't been run on the Mac Studio yet). This entry specs the file format that system will use, so the format is settled before the training/inference code is written — the interim scorer keeps running exactly as-is until that lands.
 

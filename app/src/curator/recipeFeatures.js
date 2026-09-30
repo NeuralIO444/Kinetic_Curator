@@ -12,9 +12,38 @@
 // happened to draw. Bump FEATURES_VERSION whenever a key or bucket edge changes
 // — the model must never mix two definitions under one name.
 import { ASSETS } from '../data/assets/index.js';
-import { normalizeLayoutParams } from '../data/layout-modes.js';
+import { normalizeLayoutParams, PARAM_SPEC } from '../data/layout-modes.js';
+import { RANDOMIZABLE_KEYS } from '../state/paramUtils.js';
 
-export const FEATURES_VERSION = 1;
+// v2 (#762): + `num`, the continuous layout keys CURATE actually varies,
+// normalized 0–1 — the buckets alone are too coarse to tell 8 candidates apart.
+export const FEATURES_VERSION = 2;
+
+// The three pair params have no PARAM_SPEC range; these bounds are the dice's
+// own (state/paramUtils.js randomizeKey), so 0–1 spans what CURATE can roll.
+const PAIR_NUMS = {
+  scale: (v) => ['scaleMid', ((v[0] + v[1]) / 2 - 0.1) / (3.0 - 0.1)],
+  rotate: (v) => ['rotateSpread', (v[1] - v[0]) / 360],
+  alpha: (v) => ['alphaMid', ((v[0] + v[1]) / 2) / 100],
+};
+const clamp01 = (x) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
+
+/** The continuous CURATE keys, normalized 0–1 (fixed key order, 4-decimal). */
+export function recipeNumerics(p) {
+  const out = {};
+  for (const k of RANDOMIZABLE_KEYS) {
+    const v = p[k];
+    if (PAIR_NUMS[k]) {
+      const pair = Array.isArray(v) && v.length === 2 ? v.map(Number) : [0, 0];
+      const [name, x] = PAIR_NUMS[k](pair);
+      out[name] = +clamp01(x).toFixed(4);
+      continue;
+    }
+    const s = PARAM_SPEC[k];
+    out[k] = s ? +clamp01((Number(v) - s.min) / (s.max - s.min)).toFixed(4) : 0;
+  }
+  return out;
+}
 
 const CATEGORY_BY_ID = new Map(ASSETS.map((a) => [a.id, a.category]));
 const LIVE_MODES = new Set(['swarm', 'hype', 'murmuration']);
@@ -56,5 +85,6 @@ export function recipeFeatures({ layoutParams, paletteId, assets } = {}) {
     castCategories: cast
       ? [...new Set(cast.map((id) => CATEGORY_BY_ID.get(id) || (id.startsWith('user:') ? 'user' : 'unknown')))].sort()
       : null,
+    num: recipeNumerics(p),
   };
 }

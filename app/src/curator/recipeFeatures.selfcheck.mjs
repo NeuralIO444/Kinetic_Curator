@@ -4,7 +4,7 @@ import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 const KEYS = ['v', 'system', 'symmetry', 'behave', 'blend', 'paletteShift', 'palette', 'accum', 'mirror',
-  'bleed', 'overlap', 'bodies', 'density', 'scale', 'cast', 'castSize', 'castCategories'];
+  'bleed', 'overlap', 'bodies', 'density', 'scale', 'cast', 'castSize', 'castCategories', 'num'];
 
 // shape is fixed: the model must see the same keys on every row
 const d = recipeFeatures();
@@ -45,5 +45,20 @@ assert.deepStrictEqual(Object.keys(h), KEYS);
 assert.strictEqual(h.palette, null);
 assert.deepStrictEqual(h.cast, ['ghost', 'user:mine']);
 assert.deepStrictEqual(h.castCategories, ['unknown', 'user']);
+
+// v2 (#762): `num` — every CURATE-varied key, normalized 0–1, fixed key order
+{
+  const n = recipeFeatures({ layoutParams: { count: 10, density: 100, scale: [0.1, 0.1], rotate: [-180, 180], alpha: [0, 0] } }).num;
+  assert.strictEqual(Object.keys(n).length, 18, 'one number per RANDOMIZABLE_KEY');
+  assert.strictEqual(n.count, 0, 'min → 0');
+  assert.strictEqual(n.density, 1, 'max → 1');
+  assert.strictEqual(n.scaleMid, 0);
+  assert.strictEqual(n.rotateSpread, 1);
+  for (const v of Object.values(recipeFeatures({ layoutParams: { count: 'x', scale: 'big' } }).num)) {
+    assert.ok(Number.isFinite(v) && v >= 0 && v <= 1, 'hostile input stays in 0–1');
+  }
+  assert.deepStrictEqual(Object.keys(n), Object.keys(recipeFeatures().num), 'stable key order');
+  assert.strictEqual(FEATURES_VERSION, 2);
+}
 
 console.log('recipeFeatures.selfcheck: OK');
