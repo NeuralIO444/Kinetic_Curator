@@ -60,6 +60,23 @@ function persistFxaa(on) {
   }
 }
 
+// #741: gate weave — the other per-machine display pref. Default OFF (a finish you opt into).
+const WEAVE_KEY = 'kc:weave:v1';
+export function readWeave() {
+  try {
+    return localStorage.getItem(WEAVE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function persistWeave(on) {
+  try {
+    localStorage.setItem(WEAVE_KEY, on ? '1' : '0');
+  } catch {
+    // private window / quota — the session value still works. Deliberately silent.
+  }
+}
+
 function findAsset(id, overlay) {
   return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
 }
@@ -222,6 +239,11 @@ export const createGlobalSlice = (set) => ({
   catFilter: 'all',
   poolView: readPoolView(),
   fxaa: readFxaa(),
+  weave: readWeave(),
+  setWeave: (on) => {
+    persistWeave(!!on);
+    set({ weave: !!on });
+  },
   setFxaa: (on) => {
     persistFxaa(!!on);
     set({ fxaa: !!on });

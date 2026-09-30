@@ -10,6 +10,7 @@ uniform float u_aces;      // 0 = clamp-only bypass (PR1)
 uniform float u_exposure;  // default 1.0
 uniform float u_dither;    // 0 = off; PR2 ~0.5/255
 uniform float u_fxaa;      // #740 PR1 probe: 0 = bypass (pixel-identical), >=0.5 = FXAA
+uniform vec2 u_weave;      // #741 gate weave: sample-position offset in output px; (0,0) = byte-identical
 in vec2 v_cuv;
 out vec4 o;
 
@@ -74,7 +75,8 @@ vec4 fxaa(vec2 uv, vec2 px) {
 }
 
 void main() {
-  vec2 suv = vec2(v_cuv.x, 1.0 - v_cuv.y);
+  // #741: whole-frame sub-pixel drift. x + 0.0 == x, so (0,0) changes nothing.
+  vec2 suv = vec2(v_cuv.x, 1.0 - v_cuv.y) + u_weave / vec2(textureSize(u_src, 0));
   vec4 s = texture(u_src, suv);
   if (u_aces < 0.5 && u_dither < 1e-8 && u_fxaa < 0.5) {
     o = clamp(s, 0.0, 1.0);

@@ -28,6 +28,7 @@
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
+import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
 import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
 import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
@@ -880,7 +881,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // channel; disjoint or still-pending queries skip this round.
       // #740: global FXAA (Pipeline panel). Re-pushed every frame so a recreated
       // live renderer (context loss) never loses it.
-      { const st = getState(); live.setResolveOptions({ fxaa: st.fxaa !== false && !st.fxaaShed }); }
+      {
+        const st = getState();
+        live.setResolveOptions({
+          fxaa: st.fxaa !== false && !st.fxaaShed,
+          // #741: gate weave — live canvas (and so WebM recording) only; stills stay exact.
+          weave: st.weave ? gateWeaveOffset(performance.now(), frameCount) : null,
+        });
+      }
       const timer = ensureGpuTimer();
       const cpuFallback = !timer.isHardware;
       const cpuT0 = cpuFallback ? performance.now() : 0;

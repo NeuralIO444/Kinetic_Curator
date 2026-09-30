@@ -233,7 +233,7 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
 /* ------------------------------------------------------------------ */
 
 const F = { kind: 'float' };
-const RESOLVE_DECLS = { u_src: S(0), u_aces: F, u_exposure: F, u_dither: F, u_fxaa: F };
+const RESOLVE_DECLS = { u_src: S(0), u_aces: F, u_exposure: F, u_dither: F, u_fxaa: F, u_weave: { kind: 'vec2' } };
 
 /** Uniform values match resolveBind.mjs's production defaults (aces 1, dither 1/255). */
 function resolveDef(id, fxaa) {
@@ -258,6 +258,7 @@ function resolveDef(id, fxaa) {
             u_exposure: c.params.exposure ?? 1,
             u_dither: 1 / 255,
             u_fxaa: fxaa,
+            u_weave: c.params.weave ?? [0, 0],
           });
         },
         dispose: () => gl.deleteProgram(program),
@@ -441,6 +442,7 @@ export const SWEEP_EFFECTS = [
     cases: [
       C('defaults', { exposure: 1 }, { costly: true }),
       C('exposure 4', { exposure: 4 }),
+      C('gate weave max', { exposure: 1, weave: [0.6, -0.6] }),
       H('hostile negative exposure', { exposure: -2 }),
     ],
   },
