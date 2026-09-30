@@ -55,6 +55,9 @@ out float v_opacity;
 out vec3 v_ink;
 out vec3 v_accent;
 out vec3 v_light;
+out vec2 v_world;   // #594 PR2: fragment position (scene units) for per-texel light
+out vec4 v_rot;     // cos, sin of the instance rotation; x/y mirror signs
+out vec4 v_cell;    // the instance's atlas cell (u0, v0, u1, v1): bevel taps never leave it
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -82,6 +85,13 @@ void main() {
   v_opacity = a_inst1.y;
   v_ink = a_inst3.xyz;
   v_accent = vec3(a_inst3.w, a_inst4.xy);
+  v_world = world;
+  // Mirror = scale sign × atlas uv direction, so a sprite-space normal maps to
+  // scene space however the instance was flipped or the cell was stored.
+  float mx = (a_inst0.z < 0.0 ? -1.0 : 1.0) * (a_inst2.x < a_inst1.z ? -1.0 : 1.0);
+  float my = (a_inst0.w < 0.0 ? -1.0 : 1.0) * (a_inst2.y < a_inst1.w ? -1.0 : 1.0);
+  v_rot = vec4(co, si, mx, my);
+  v_cell = vec4(a_inst1.zw, a_inst2.xy);
   // #594 PR1: per-instance diffuse from the one sun, flat normal (0,0,1), at the
   // instance centre. Off → exactly vec3(1.0), so the unlit path is byte-identical.
   if (u_sun.w > 0.5) {
@@ -97,6 +107,12 @@ precision highp float;
 uniform sampler2D u_atlas;
 uniform float u_liveTint;
 uniform vec4 u_sun;        // #594: shared with the vertex stage (w = on)
+uniform vec4 u_sunLight;   // #594: shared, rgb colour + intensity
+uniform float u_ambient;   // #594: shared
+uniform vec2 u_sunMat;     // #594 PR2: x = bevel strength (0 = flat per-instance light), y = specular
+in vec2 v_world;
+in vec4 v_rot;
+in vec4 v_cell;
 in vec2 v_uv;
 in float v_opacity;
 in vec3 v_ink;
@@ -119,7 +135,39 @@ void main() {
   // #594: light the premultiplied colour; alpha untouched, rgb capped at alpha.
   // Gated on the uniform, not on v_light: the unlit path must not even clamp
   // (live-tint rgb can legitimately sit a hair above a), so off stays byte-identical.
-  if (u_sun.w > 0.5) o.rgb = min(o.rgb * v_light, vec3(o.a));
+  if (u_sun.w > 0.5) {
+    if (u_sunMat.x > 0.0) {
+      // #594 PR2 bevel-from-alpha (the Sprite Lamp trick): the mark's own alpha
+      // is its height field, so edges slope and interiors face the camera — no
+      // asset changes. Four taps, clamped inside this instance's atlas cell so a
+      // neighbouring cell can never leak into the slope.
+      vec2 tx = 1.0 / vec2(textureSize(u_atlas, 0));
+      vec2 lo = min(v_cell.xy, v_cell.zw) + 0.5 * tx;
+      vec2 hi = max(v_cell.xy, v_cell.zw) - 0.5 * tx;
+      // Taps 2 texels out: a 1-texel slope turns 8-bit alpha steps into banding.
+      vec2 st = 2.0 * tx;
+      float aL = texture(u_atlas, clamp(v_uv - vec2(st.x, 0.0), lo, hi)).a;
+      float aR = texture(u_atlas, clamp(v_uv + vec2(st.x, 0.0), lo, hi)).a;
+      float aU = texture(u_atlas, clamp(v_uv - vec2(0.0, st.y), lo, hi)).a;
+      float aD = texture(u_atlas, clamp(v_uv + vec2(0.0, st.y), lo, hi)).a;
+      // Dead zone: slopes under ~2 alpha steps are quantization noise on a flat
+      // face, not an edge — they read as flat instead of as fine stripes.
+      vec2 g = vec2(aL - aR, aU - aD);
+      g = sign(g) * max(abs(g) - 2.0 / 255.0, 0.0);
+      float k = u_sunMat.x * 6.0;
+      vec3 n = normalize(vec3(g * k, 1.0));
+      n.xy *= v_rot.zw;                                               // mirror
+      n.xy = vec2(n.x * v_rot.x - n.y * v_rot.y, n.x * v_rot.y + n.y * v_rot.x); // rotate
+      vec3 L = normalize(vec3(u_sun.xy - v_world, u_sun.z));
+      float diff = max(dot(n, L), 0.0);
+      vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));                   // viewer straight on
+      float spec = u_sunMat.y * pow(max(dot(n, H), 0.0), 48.0);      // tight, enamel-like
+      vec3 lit = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * diff);
+      o.rgb = min(o.rgb * lit + u_sunLight.rgb * (spec * u_sunLight.a) * o.a, vec3(o.a));
+    } else {
+      o.rgb = min(o.rgb * v_light, vec3(o.a));
+    }
+  }
 }`;
 
 /** Fullscreen pass: v_cuv is y-down canvas UV. */

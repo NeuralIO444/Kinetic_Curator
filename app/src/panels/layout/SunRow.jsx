@@ -36,6 +36,12 @@ export function SunRow() {
           <RangeRow label="AMBIENT" value={light.ambient} min={0} max={1} step={0.01}
             hint="Light that reaches marks facing away — 0 is black shadow sides"
             onChange={(v) => setLight({ ambient: v })} defaultValue={LIGHT_DEFAULT.ambient} />
+          <RangeRow label="BEVEL" value={light.bevel} min={0} max={1} step={0.01}
+            hint="Edges slope from each mark's own shape and catch the light — 0 is flat"
+            onChange={(v) => setLight({ bevel: v })} defaultValue={LIGHT_DEFAULT.bevel} />
+          <RangeRow label="SPEC" value={light.spec} min={0} max={1} step={0.01}
+            hint="A tight enamel highlight where an edge faces the sun"
+            onChange={(v) => setLight({ spec: v })} defaultValue={LIGHT_DEFAULT.spec} />
           <div className="chip-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
             <span style={{ fontSize: 10, marginRight: 4 }}>sun colour</span>
             {LIGHT_SLOTS.map((s) => (
