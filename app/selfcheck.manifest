@@ -64,6 +64,10 @@ node src/state/tapeBudget.selfcheck.mjs
 node src/engine/particles.selfcheck.mjs
 node src/engine/swarm.inventory.selfcheck.mjs
 node src/gl/clock.inventory.selfcheck.mjs
+node src/gl/clock.evolve.selfcheck.mjs
+node src/gl/clock.workerDt.selfcheck.mjs
+node src/gl/clock.capture.selfcheck.mjs
+node src/gl/accum.inventory.selfcheck.mjs
 node src/gl/fx.upSlots.selfcheck.mjs
 node src/engine/particles.lorenzReseed.selfcheck.mjs
 node src/engine/particles.seekFleeSwarm.selfcheck.mjs
