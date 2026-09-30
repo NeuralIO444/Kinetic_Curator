@@ -37,6 +37,7 @@ export function serializeStoreState(s) {
     evolveMode: s.evolveMode,
     perfTier1: s.perfTier1,
     enabledAssets: s.enabledAssets ? { ...s.enabledAssets } : null,
+    shapeLevels: s.shapeLevels ? { ...s.shapeLevels } : null, // #733
     assetWeightOverrides: s.assetWeightOverrides ? { ...s.assetWeightOverrides } : null,
     quality: s.quality,
     caGrid: s.caGrid,

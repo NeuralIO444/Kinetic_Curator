@@ -152,6 +152,7 @@ function buildFrame() {
     layoutParams: { ...layoutParams, ...smoothedLayoutParams },
     caGrid: s.caGrid,
     enabledAssets: s.enabledAssets,
+    shapeLevels: s.shapeLevels, // #733
     assetWeightOverrides: s.assetWeightOverrides,
     customAssets: s.customAssets,
     quality: s.quality,

@@ -4,6 +4,7 @@ import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { getQualityCaps } from '../data/quality.js';
+import { shapeMixWeights, liveShapeLevels } from '../data/voices.js';
 import { getAssetCost } from '../assets/cost.js';
 import { isFxLayer } from '../fx/fxFilters.js';
 import { mergePool } from '../assets/overlay.js';
@@ -362,15 +363,19 @@ export function createLiveResolver() {
         applyLifeDrift(layoutParams, locks, input.loopTimeMs ?? 0);
       }
       const palette = resolvePalette(src.paletteId, src.paletteOverrides, input.userPalettes);
+      // #733 — shape mixer: normalized per-asset pick weights, live only
+      // while the pool is exactly the on-chips' union (liveShapeLevels).
+      const mixW = shapeMixWeights(liveShapeLevels(input.shapeLevels, src.enabledAssets));
       let activeAssets = pool
         .filter((a) => !src.enabledAssets || src.enabledAssets[a.id])
-        .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
+        .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a))
+        .map((a) => (mixW && mixW[a.id] ? { ...a, mixWeight: mixW[a.id] } : a));
       // #564 — identity of the pool this layer actually draws: which assets,
       // at what weight, with what content. Computed BEFORE assetThin on
       // purpose: a governor shed is a different class of change (#564's
       // out-of-scope list) and must not fire a transition.
       const assetSig = activeAssets
-        .map((a) => `${a.id}:${a.weight || ''}:${overlayRevs.get(a.id) || 0}`)
+        .map((a) => `${a.id}:${a.weight || ''}:${a.mixWeight || ''}:${overlayRevs.get(a.id) || 0}`)
         .join(',');
       if (input.assetThin && activeAssets.length > 1) {
         const ranked = [...activeAssets].sort((a, b) => getAssetCost(b) - getAssetCost(a));

@@ -405,6 +405,54 @@ export const isShapeSetActive = (enabledAssets, set) => {
   return on.length === set.ids.length && set.ids.every((id) => enabledAssets[id]);
 };
 
+// ── #733 shape mixer: off → 1 → 2 → 3 → off, up to four chips on ─────────
+/** Chips that may be on at once. A fifth tap is refused, never evicts. */
+export const SHAPE_MIX_MAX = 4;
+
+/** The chips that get the 4-state mixer: the 12 layout-costume shape sets. */
+export const MIXABLE_SHAPE_IDS = STUB_VOICES.map((v) => v.id);
+
+/**
+ * Union of the asset ids the on-chips contribute. Order: SHAPE_SETS order, so
+ * the result is deterministic for a given levels map.
+ */
+export function shapeMixIds(levels) {
+  const seen = new Set();
+  for (const set of SHAPE_SETS) if (levels?.[set.id] > 0) for (const id of set.ids) seen.add(id);
+  return [...seen];
+}
+
+/**
+ * Normalized pick weights for a levels map { chipId: 1|2|3 }. Each on-chip
+ * gives its ids weight `level`; an id in two sets sums its weights FIRST, then
+ * everything is divided by the same total so the weights add to 1.
+ * Returns null when nothing is on.
+ */
+export function shapeMixWeights(levels) {
+  const w = {};
+  let total = 0;
+  for (const set of SHAPE_SETS) {
+    const lv = levels?.[set.id] || 0;
+    if (!(lv > 0)) continue;
+    for (const id of set.ids) { w[id] = (w[id] || 0) + lv; total += lv; }
+  }
+  if (!total) return null;
+  for (const id of Object.keys(w)) w[id] /= total;
+  return w;
+}
+
+/**
+ * The mixer's levels are only live while the enabled pool is exactly the
+ * union of the on-chips' sets. Any other writer of enabledAssets (asset
+ * panel, a voice, import) silently retires them — no invalidation hooks.
+ */
+export function liveShapeLevels(levels, enabledAssets) {
+  const ids = shapeMixIds(levels);
+  if (!ids.length) return {};
+  const on = Object.keys(enabledAssets || {}).filter((k) => enabledAssets[k]);
+  return on.length === ids.length && ids.every((id) => enabledAssets[id]) ? levels : {};
+}
+
 /** A motion chip reads as active while every param it sets is at its value. */
 export const isMotionActive = (layoutParams, motion) => Object.entries(motion.params).every(([k, v]) => layoutParams?.[k] === v);
 
