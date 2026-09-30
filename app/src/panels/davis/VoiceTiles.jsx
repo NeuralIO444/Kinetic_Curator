@@ -2,10 +2,13 @@
 // machine. Night Migration / Chrome Parade / Deep Water / Dark Glass load
 // their sealed factory state through the existing voice MIX (loadVoice →
 // blendSeconds). Load only: no second mixer, no save-in-place, no edit badge
-// (that is #734). The MIX bar below is the same readout BUILD shows.
+// on the chip itself. #734: the ✎ badge opens a dish that forks a copy. The
+// MIX bar below is the same readout BUILD shows.
+import { useState } from 'react';
 import { useStore } from '../../state/store.js';
 import { FLAGSHIP_VOICES } from '../../data/voices.js';
 import { MixBar } from '../layout/MixBar.jsx';
+import { VoiceDish } from './VoiceDish.jsx';
 
 function FlagshipChip({ voice, active, onTap }) {
   const dots = voice.palette.swatches.slice(0, 4);
@@ -30,13 +33,21 @@ function FlagshipChip({ voice, active, onTap }) {
 export function VoiceTiles() {
   const activeVoiceId = useStore((s) => s.activeVoiceId);
   const loadVoice = useStore((s) => s.loadVoice);
+  const [editing, setEditing] = useState(null);
+  const editVoice = FLAGSHIP_VOICES.find((v) => v.id === editing);
   return (
     <div className="voice-row davis-voices">
       <div className="voice-flagships">
         {FLAGSHIP_VOICES.map((v) => (
-          <FlagshipChip key={v.id} voice={v} active={activeVoiceId === v.id} onTap={() => loadVoice(v.id)} />
+          <div key={v.id} className="voice-tile">
+            <FlagshipChip voice={v} active={activeVoiceId === v.id} onTap={() => loadVoice(v.id)} />
+            <button type="button" className={`voice-edit-badge ${editing === v.id ? 'active' : ''}`}
+              aria-label={`Edit a copy of ${v.title}`} title={`Edit a copy of ${v.title} — saves as a new voice`}
+              onClick={() => setEditing(editing === v.id ? null : v.id)}>✎</button>
+          </div>
         ))}
       </div>
+      {editVoice && <VoiceDish key={editVoice.id} voice={editVoice} onClose={() => setEditing(null)} />}
       <MixBar />
     </div>
   );
