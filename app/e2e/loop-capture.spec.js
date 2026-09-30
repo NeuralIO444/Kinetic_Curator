@@ -100,17 +100,24 @@ test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, 
     video.muted = true;
     video.src = url;
     const duration = await new Promise((res, rej) => {
-      const to = setTimeout(() => res(NaN), 10_000);
+      // CI's software GL starves the page (each captured frame is ~1s of CPU), so
+      // the seek that resolves Chromium's Infinity duration can take well over
+      // the old 10s and the old code resolved NaN. Poll instead of trusting one
+      // durationchange, give it a real budget, and fall back to where the seek
+      // landed (Chromium clamps currentTime to the true end).
+      let settled = false;
+      const done = (v) => { if (settled) return; settled = true; clearTimeout(to); clearInterval(poll); res(v); };
+      const to = setTimeout(() => done(NaN), 40_000);
+      const poll = setInterval(() => { if (Number.isFinite(video.duration)) done(video.duration); }, 100);
       video.addEventListener('loadedmetadata', () => {
-        if (Number.isFinite(video.duration)) { clearTimeout(to); res(video.duration); }
-        else {
-          // Chromium reports Infinity for MediaRecorder WebM until a seek
-          // forces it to parse the real duration.
-          video.addEventListener('durationchange', () => { clearTimeout(to); res(video.duration); }, { once: true });
-          video.currentTime = 1e7;
-        }
+        if (Number.isFinite(video.duration)) done(video.duration);
+        else video.currentTime = 1e7;
       }, { once: true });
-      video.onerror = () => { clearTimeout(to); rej(new Error('webm decode failed')); };
+      video.addEventListener('seeked', () => {
+        if (Number.isFinite(video.duration)) done(video.duration);
+        else if (Number.isFinite(video.currentTime) && video.currentTime > 0) done(video.currentTime);
+      });
+      video.onerror = () => { done(NaN); rej(new Error('webm decode failed')); };
     });
     // The duration seek above parks the playhead at the end; rewind before
     // counting frames or play() ends immediately with a single callback.
