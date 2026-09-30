@@ -4,6 +4,8 @@ import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
 import { hitsFromFavorites } from '../../state/hitsExport.js';
+import { useStore } from '../../state/store.js';
+import { helpText } from '../../data/helpCopy.js';
 
 function downloadJsonBlob(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
@@ -26,6 +28,10 @@ export function DataExportRow({
 }) {
   const fileInputRef = useRef(null);
   const paletteInputRef = useRef(null);
+  const tasteInputRef = useRef(null);
+  const tasteStatus = useStore((s) => s.tasteStatus);
+  const importTasteToStore = useStore((s) => s.importTaste);
+  const clearTaste = useStore((s) => s.clearTaste);
 
   const projectFields = {
     seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
@@ -74,6 +80,29 @@ export function DataExportRow({
     e.target.value = '';
   };
 
+  // #762 — taste.json from the Mac Studio runbook (§4). Validated before it is
+  // kept; a bad file says why and changes nothing.
+  const importTaste = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      let raw;
+      try {
+        raw = JSON.parse(ev.target.result);
+      } catch {
+        onMessage('Taste: not valid JSON');
+        return;
+      }
+      const r = importTasteToStore(raw);
+      onMessage(r.ok ? 'Taste loaded' : `Taste: ${r.error}`);
+      if (r.ok) setTimeout(() => onMessage(null), 2000);
+    };
+    reader.onerror = () => onMessage('Could not read file');
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const importPalettes = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -114,6 +143,12 @@ export function DataExportRow({
           ↓ HITS ({(favorites || []).length})
         </button>
       </div>
+      <div className="pipeline-row" title={helpText('output-taste')}>
+        <button className="big-btn" onClick={() => tasteInputRef.current?.click()} style={{ flex: 3 }}>↑ IMPORT TASTE</button>
+        <button className="big-btn" onClick={clearTaste} style={{ flex: 1 }} title="Forget the imported taste">CLEAR</button>
+        <input ref={tasteInputRef} type="file" accept=".json,application/json" onChange={importTaste} style={{ display: 'none' }} />
+      </div>
+      <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
     </>
   );
 }

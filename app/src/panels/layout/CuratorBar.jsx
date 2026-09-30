@@ -22,6 +22,7 @@ export function CuratorBar({ lockCount, composition }) {
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const wrapRef = useRef(null);
   const presetWrapRef = useRef(null);
+  useStore((s) => s.tasteRev); // #762: re-resolve the engine when a taste is imported/cleared
   const curator = getActiveCurator();
   const chainFallback = useStore((s) => s.curateChainFallback);
   const hint = curatorHint(curator, { chainFallback });
