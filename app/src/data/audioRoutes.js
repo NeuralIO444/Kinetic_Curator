@@ -53,3 +53,56 @@ export function sanitizeAudioRoutes(raw) {
   if (out.length === 0) return null;
   return isDefaultRoutes(out) ? null : out;
 }
+
+// ── editing helpers (#790 PR4) — pure; the UI and the store compose these ──
+
+/** The table being edited: the scene's table, or a fresh copy of the default. */
+export function editableRoutes(routes) {
+  return Array.isArray(routes) ? routes.map((r) => ({ ...r })) : DEFAULT_ROUTES.map((r) => ({ ...r }));
+}
+
+/** A sensible starting depth per target (natural units, well inside its ceiling). */
+export const NEW_ROUTE_DEPTH = Object.freeze({
+  'render.scale': 0.2, 'render.alpha': 10, 'render.breath': 0.03, 'render.glow': 0.5,
+});
+
+/** Slider bounds and step for a target's route depth. */
+export function routeDepthRange(target) {
+  const max = ROUTE_TARGETS[target].clamp[1];
+  return { min: -max, max, step: max >= 60 ? 0.5 : max >= 1 ? 0.01 : 0.001 };
+}
+
+/** The depth a double-click resets a route to: its default-table value, else the new-route depth. */
+export function defaultDepthFor(input, target) {
+  return DEFAULT_BY_PAIR.get(`${input}>${target}`) ?? NEW_ROUTE_DEPTH[target];
+}
+
+/**
+ * The next route to add: the first (input, target) pair the table doesn't
+ * already hold, preferring `input` when given (clicking a meter band). Null when
+ * the table is full or every pair is taken.
+ */
+export function nextRoute(table, input = null) {
+  if (!Array.isArray(table) || table.length >= MAX_ROUTES) return null;
+  const taken = new Set(table.map(pairKey));
+  const inputs = input ? [input, ...ROUTE_INPUTS.filter((i) => i !== input)] : ['band.air', ...ROUTE_INPUTS.filter((i) => i !== 'band.air')];
+  for (const i of inputs) {
+    for (const t of Object.keys(ROUTE_TARGETS)) {
+      if (!taken.has(`${i}>${t}`)) return { input: i, target: t, depth: NEW_ROUTE_DEPTH[t] };
+    }
+  }
+  return null;
+}
+
+/** Table with route `i` patched. A patch that would duplicate another route's pair is refused (table returned as is). */
+export function patchRoute(table, i, patch) {
+  if (!table[i]) return table;
+  const next = { ...table[i], ...patch };
+  if (table.some((r, j) => j !== i && pairKey(r) === pairKey(next))) return table;
+  return table.map((r, j) => (j === i ? next : r));
+}
+
+/** Table without route `i`. */
+export function removeRoute(table, i) {
+  return table.filter((_, j) => j !== i);
+}

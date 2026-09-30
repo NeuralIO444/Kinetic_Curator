@@ -7,8 +7,11 @@
 // site mentions the field, so the next miss is caught here instead of in a bug.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { sanitizeAudioRoutes, isDefaultRoutes } from './audioRoutes.js';
-import { DEFAULT_ROUTES, MAX_ROUTES } from '../gl/audioRoutes.mjs';
+import {
+  sanitizeAudioRoutes, isDefaultRoutes, editableRoutes, nextRoute, patchRoute, removeRoute,
+  routeDepthRange, defaultDepthFor, NEW_ROUTE_DEPTH,
+} from './audioRoutes.js';
+import { DEFAULT_ROUTES, MAX_ROUTES, ROUTE_INPUTS, ROUTE_TARGETS } from '../gl/audioRoutes.mjs';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { useStore } from '../state/store.js';
 import { DEFAULT_LAYOUT_PARAMS } from './layout-modes.js';
@@ -109,5 +112,97 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
     const n = (src(`../${file}`).match(/audioRoutes|sanitizeAudioRoutes/g) || []).length;
     assert.ok(n >= min, `${file} must wire audioRoutes (found ${n}, expected >= ${min})`);
   }
+}
+// ── editing helpers (#790 PR4) ───────────────────────────────────────────
+{
+  const ed = editableRoutes(null);
+  assert.deepStrictEqual(ed, DEFAULT_ROUTES.map((r) => ({ ...r })), 'editing the default starts from a copy of it');
+  ed[0].depth = 99;
+  assert.notStrictEqual(DEFAULT_ROUTES[0].depth, 99, 'and never aliases the frozen default');
+  const mine = [R('band.air', 'render.glow', 0.5)];
+  const copy = editableRoutes(mine);
+  copy[0].depth = 1;
+  assert.strictEqual(mine[0].depth, 0.5, 'editableRoutes copies a custom table too');
+
+  // nextRoute: first free pair, preferring a clicked band, null when full
+  assert.deepStrictEqual(nextRoute([], 'band.mud'), { input: 'band.mud', target: 'render.scale', depth: NEW_ROUTE_DEPTH['render.scale'] }, 'a clicked band starts on the first target');
+  assert.deepStrictEqual(nextRoute([R('band.mud', 'render.scale', 0.1)], 'band.mud').target, 'render.alpha', '… then the next free one for that band');
+  assert.strictEqual(nextRoute([], null).input, 'band.air', "'+ ROUTE' starts on AIR");
+  const allMud = Object.keys(ROUTE_TARGETS).map((t) => R('band.mud', t, 0.01));
+  assert.notStrictEqual(nextRoute(allMud, 'band.mud').input, 'band.mud', 'a band with every target taken moves on to another input');
+  assert.strictEqual(nextRoute(Array.from({ length: MAX_ROUTES }, (_, i) => R(ROUTE_INPUTS[i % 12], Object.keys(ROUTE_TARGETS)[i % 4], 0.01))), null, 'full table: nothing to add');
+  for (const t of Object.keys(ROUTE_TARGETS)) {
+    const rg = routeDepthRange(t);
+    assert.ok(rg.min === -rg.max && rg.step > 0, `${t} range is symmetric`);
+    assert.ok(Math.abs(NEW_ROUTE_DEPTH[t]) <= rg.max, `${t}: a new route starts inside its range`);
+  }
+  assert.strictEqual(defaultDepthFor('beat', 'render.alpha'), 18, 'double-click resets to the default-table depth');
+  assert.strictEqual(defaultDepthFor('band.air', 'render.scale'), NEW_ROUTE_DEPTH['render.scale'], 'or the new-route depth for a pair the default lacks');
+
+  // patch / remove: immutable, refuse duplicates
+  const t3 = [R('band.air', 'render.glow', 0.5), R('band.sub', 'render.breath', 0.05)];
+  const patched = patchRoute(t3, 0, { depth: 0.9 });
+  assert.strictEqual(patched[0].depth, 0.9);
+  assert.strictEqual(t3[0].depth, 0.5, 'patch never mutates');
+  assert.strictEqual(patchRoute(t3, 1, { input: 'band.air', target: 'render.glow' }), t3, 'a patch that duplicates another pair is refused');
+  assert.strictEqual(patchRoute(t3, 9, { depth: 1 }), t3, 'patching a missing row is a no-op');
+  assert.deepStrictEqual(removeRoute(t3, 0), [t3[1]]);
+  assert.strictEqual(t3.length, 2, 'remove never mutates');
+}
+
+// ── store: the edit action (#790 PR4) ────────────────────────────────────
+{
+  const S = () => useStore.getState();
+  useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
+  // the first edit of the default customises it
+  S().editAudioRoutes((t) => patchRoute(t, 0, { depth: 0.2 }));
+  assert.ok(Array.isArray(S().audioRoutes) && S().audioRoutes.length === 7 && S().audioRoutes[0].depth === 0.2, 'first edit customises a copy of the default');
+  assert.strictEqual(S().historyUndoStack.length, 1);
+  // a no-op edit is not an edit
+  S().editAudioRoutes((t) => t);
+  assert.strictEqual(S().historyUndoStack.length, 1, 'no change → no undo step');
+  // editing back to the default stores null again
+  S().editAudioRoutes((t) => patchRoute(t, 0, { depth: 0.38 }));
+  assert.strictEqual(S().audioRoutes, null, 'edited back to the default → null (RESET-equivalent)');
+  S().undo(); S().undo();
+  assert.strictEqual(S().audioRoutes, null);
+  useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
+  // slider drag: continuous ticks coalesce into ONE undo step; a discrete edit right after is its own step
+  for (const d of [0.1, 0.12, 0.14, 0.16, 0.18]) S().editAudioRoutes((t) => patchRoute(t, 0, { depth: d }), true);
+  assert.strictEqual(S().audioRoutes[0].depth, 0.18, 'the drag lands on its last value');
+  assert.strictEqual(S().historyUndoStack.length, 1, 'a whole drag is one undo step');
+  S().editAudioRoutes((t) => removeRoute(t, 1));
+  assert.strictEqual(S().historyUndoStack.length, 2, 'a discrete edit is its own step');
+  S().undo();
+  assert.strictEqual(S().audioRoutes.length, 7, 'undo restores the removed route');
+  S().undo();
+  assert.strictEqual(S().audioRoutes, null, 'and undo of the drag restores the default');
+  // delete every route: [] is kept (audio drives nothing) and is still undoable
+  useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
+  S().editAudioRoutes((t) => t.filter(() => false));
+  assert.deepStrictEqual(S().audioRoutes, [], 'removing every route keeps [] (not the default)');
+  S().setAudioRoutes(null);
+  assert.strictEqual(S().audioRoutes, null, 'RESET');
+  // add fills, caps, and refuses duplicates
+  useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
+  S().editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; });
+  assert.strictEqual(S().audioRoutes.length, 8);
+  for (let i = 0; i < 20; i++) S().editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; });
+  assert.strictEqual(S().audioRoutes.length, MAX_ROUTES, 'adding stops at the cap');
+  useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
+}
+
+// ── UI wiring (#790 PR4) ─────────────────────────────────────────────────
+{
+  const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const ui = src('../panels/stimulus/ModMatrix.jsx');
+  for (const s of ['Route ${index + 1} input', 'Route ${index + 1} target', 'Route ${index + 1} depth', 'Remove route ${index + 1}', '+ ROUTE', 'RESET', 'frame glow', 'not routed:']) {
+    assert.ok(ui.includes(s), `the matrix offers ${s}`);
+  }
+  assert.ok(/disabled=\{taken\(id, route\.target\)\}/.test(ui) && /disabled=\{taken\(route\.input, id\)\}/.test(ui), 'a duplicate pair cannot be picked');
+  assert.ok(/onEdit\(\(t\) => patchRoute\(t, index, \{ depth: Number\(e\.target\.value\) \}\), true\)/.test(ui), 'the depth slider edits continuously (one undo step per drag)');
+  assert.ok(/disabled=\{full\}/.test(ui) && /disabled=\{!custom\}/.test(ui), '+ ROUTE stops at the cap; RESET only when customised');
+  const meter = src('../panels/stimulus/MeterHero.jsx');
+  assert.ok(/editAudioRoutes\(\(t\) => \{ const n = nextRoute\(t, input\)/.test(meter) && /onClick=\{routeBand\}/.test(meter), 'a click on a meter band adds a route for that band');
 }
 console.log('audioRoutes (state) selfcheck: OK');

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getAudioMeterTap } from '../../hooks/audioMeterTap.js';
 import { METER_BANDS, meterBandLevels, holdPeaks } from '../../gl/meterBands.mjs';
 import { useStore } from '../../state/store.js';
+import { nextRoute } from '../../data/audioRoutes.js';
 
 const H = 132;
 const WAVE_H = 52;
@@ -110,13 +111,24 @@ export function MeterHero() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // #790 PR4 — "tap a band, pick a target": a click on a band's bar adds a route
+  // for that band (first free target); the new row's pickers are right below.
+  const routeBand = (e) => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const r = cv.getBoundingClientRect();
+    if (e.clientY - r.top < WAVE_H + 8) return; // the waveform is not a band
+    const i = Math.min(METER_BANDS.length - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * METER_BANDS.length)));
+    const input = `band.${METER_BANDS[i].label.toLowerCase()}`;
+    useStore.getState().editAudioRoutes((t) => { const n = nextRoute(t, input); return n ? [...t, n] : t; });
+  };
   return (
     <div className="stim-meter-hero">
       <div className="stim-meter-head">
-        <span>METER</span>
+        <span>METER <em className="stim-meter-hint">click a band to route it</em></span>
         <span className={`stim-source ${source === 'IDLE' ? 'idle' : ''}`} title="Where the sound comes from">{source}</span>
       </div>
-      <canvas ref={canvasRef} className="stim-meter-canvas" style={{ height: H }} aria-label="Audio meter: waveform, seven bands, beat" />
+      <canvas ref={canvasRef} className="stim-meter-canvas" style={{ height: H, cursor: 'pointer' }} onClick={routeBand} aria-label="Audio meter: waveform, seven bands, beat. Click a band to add a route for it." />
     </div>
   );
 }
