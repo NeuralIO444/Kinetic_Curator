@@ -5,9 +5,11 @@
  * Every shader effect routed through the checked builders gets a sweep:
  * the 5 template FX shaders (fxShaders.mjs), the 5 builtin FX modes
  * (EFFECT_FS via builtinEffects.mjs), and the 8 ACCUM passes (accum.mjs).
- * The renderer programs (quad/composite/resolve/copy) are not effects —
- * they have no sweepable parameters — so they are covered by the
- * compile+audit gate only.
+ * The renderer programs (quad/composite/copy) are not effects — they have
+ * no sweepable parameters — so they are covered by the compile+audit gate
+ * only. The exception is the final resolve pass (#740): it carries FXAA
+ * behind u_fxaa, so it is swept twice — off (`renderer/resolve`) and on
+ * (`renderer/resolve-fxaa`) — and the harness measures the difference.
  *
  * Case kinds:
  * - 'contract': values the effect's knobs can actually take (descriptor /
@@ -50,6 +52,7 @@
  */
 
 import { FULL_VS, EFFECT_FS } from '../shaders.mjs';
+import { RESOLVE_FS } from '../resolveFs.mjs';
 import { TEMPLATE_VS, uniformDecls, uploadUniformsFor } from '../effects/template.mjs';
 import { injectCommon } from '../effects/chunks.mjs';
 import { buildProgramChecked, auditProgramChecked } from './diagnostics.mjs';
@@ -226,6 +229,44 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
 }
 
 /* ------------------------------------------------------------------ */
+/* final resolve pass (#740: exposure -> ACES -> [FXAA] -> dither)      */
+/* ------------------------------------------------------------------ */
+
+const F = { kind: 'float' };
+const RESOLVE_DECLS = { u_src: S(0), u_aces: F, u_exposure: F, u_dither: F, u_fxaa: F };
+
+/** Uniform values match resolveBind.mjs's production defaults (aces 1, dither 1/255). */
+function resolveDef(id, fxaa) {
+  return {
+    id,
+    build(gl) {
+      const { program, locs } = buildChecked(gl, {
+        vs: FULL_VS,
+        fs: RESOLVE_FS,
+        name: `sweep-${id}`,
+        vsFile: 'shaders.mjs:FULL_VS',
+        fsFile: 'resolveFs.mjs:RESOLVE_FS',
+        decls: RESOLVE_DECLS,
+      });
+      return {
+        program,
+        locs,
+        apply: (glA, locsA, c, lab, targets) => {
+          lab.render(program, targets.out, locsA, RESOLVE_DECLS, {
+            u_src: lab.input.tex,
+            u_aces: 1,
+            u_exposure: c.params.exposure ?? 1,
+            u_dither: 1 / 255,
+            u_fxaa: fxaa,
+          });
+        },
+        dispose: () => gl.deleteProgram(program),
+      };
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* ACCUM passes                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -391,6 +432,24 @@ export const SWEEP_EFFECTS = [
       C('max', { amount: 1 }, { costly: true }),
       C('high', { amount: 0.7 }),
       H('hostile negative amount', { amount: -0.5 }),
+    ],
+  },
+  // ---- final resolve pass, FXAA off / on (#740) ----
+  // Not noop: ACES + dither always run, so there is no identity case to prove.
+  {
+    ...resolveDef('renderer/resolve', 0),
+    cases: [
+      C('defaults', { exposure: 1 }, { costly: true }),
+      C('exposure 4', { exposure: 4 }),
+      H('hostile negative exposure', { exposure: -2 }),
+    ],
+  },
+  {
+    ...resolveDef('renderer/resolve-fxaa', 1),
+    cases: [
+      C('defaults', { exposure: 1 }, { costly: true }),
+      C('exposure 4', { exposure: 4 }),
+      H('hostile negative exposure', { exposure: -2 }),
     ],
   },
   {

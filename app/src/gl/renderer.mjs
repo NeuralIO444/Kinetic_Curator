@@ -228,7 +228,7 @@ export const RENDERER_PROGRAMS = [
     vsFile: 'shaders.mjs:FULL_VS', fsFile: 'resolveFs.mjs:RESOLVE_FS',
     uniforms: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
-      notes: 'structural renderer program (composite/present plumbing); never shed' },
+      notes: 'final resolve: exposure + ACES + dither, one tap; structural, never shed (FXAA is its own governor cut, see renderer/resolve-fxaa)' },
   },
   {
     key: 'copy', name: 'copy', vs: FULL_VS, fs: COPY_FS,
@@ -251,6 +251,14 @@ export const RENDERER_PROGRAMS = [
 for (const def of RENDERER_PROGRAMS) {
   registerCostTier(`renderer/${def.key}`, def.cost);
 }
+// #740: FXAA runs inside the resolve pass behind u_fxaa (same pass, no new texture) —
+// declared separately so the harness can measure resolve with it on. Tier 0 stays: the
+// pass is structural; the governor sheds FXAA as its own cut 0 (governorCuts.js), not
+// via this tier. timeMs is the author's estimate (9 display-referred taps at 1080p).
+registerCostTier('renderer/resolve-fxaa', {
+  tier: 0, memoryBytes: 0, timeMs: 0.4,
+  notes: 'resolve pass with FXAA 3.11 console (9 taps, ~+30 ALU); shed by governor cut 0, not by tier',
+});
 
 /**
  * #309 velocity smear amount (QUAD_VS u_smear = (k, max)): each scene-unit
