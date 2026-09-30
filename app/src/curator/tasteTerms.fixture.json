@@ -1,0 +1,17 @@
+{
+  "_comment": "#762 — the ONE term rule shared by curator/tasteHead.js (browser) and studio/curator.py (training). Scalars and booleans become key=value (booleans lowercase: true/false); arrays become one term per element; null values and the keys v, cast, castSize, num are skipped (num is scored as numbers, not terms). Both selfchecks assert these exact outputs.",
+  "cases": [
+    {
+      "features": { "v": 2, "system": "fibonacci", "symmetry": "none", "behave": "cruise", "blend": "normal", "paletteShift": "zone", "palette": "chiaroscuro", "accum": true, "mirror": false, "bleed": false, "overlap": true, "bodies": "sparse", "density": "mid", "scale": "large", "cast": ["xsh01", "xsh03"], "castSize": 2, "castCategories": ["crystalline"], "num": { "count": 0.0177 } },
+      "terms": ["system=fibonacci", "symmetry=none", "behave=cruise", "blend=normal", "paletteShift=zone", "palette=chiaroscuro", "accum=true", "mirror=false", "bleed=false", "overlap=true", "bodies=sparse", "density=mid", "scale=large", "castCategories=crystalline"]
+    },
+    {
+      "features": { "v": 2, "system": "swarm", "palette": null, "accum": false, "cast": null, "castSize": null, "castCategories": null, "num": {} },
+      "terms": ["system=swarm", "accum=false"]
+    },
+    {
+      "features": { "castCategories": ["geometric", "crystalline"], "density": "high" },
+      "terms": ["castCategories=geometric", "castCategories=crystalline", "density=high"]
+    }
+  ]
+}

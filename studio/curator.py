@@ -17,9 +17,11 @@ The selection logic (`rank_indices`, `diversify`) is stdlib-only and covered by
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -68,6 +70,119 @@ def diversify(order: list[int], clusters, k: int) -> list[int]:
 def label_path(root: Path, p: Path) -> str:
     """Index/label key: path relative to the index root, POSIX-style."""
     return Path(p).resolve().relative_to(Path(root).resolve()).as_posix()
+
+
+
+# ── taste v1 (#762): the shared term rule, words, compatibility — stdlib only ──
+
+TASTE_KIND = "kc-taste"
+TASTE_VERSION = 1
+# Fidelity (Spearman of the distilled head vs the probe on the pool) below this
+# means the head can't reproduce the taste from recipe features; the app then
+# keeps curating with the persona scorer rather than act on a bad copy.
+HEAD_MIN_FIDELITY = 0.3
+TERM_SKIP = {"v", "cast", "castSize", "num"}
+TERM_FIXTURE = HERE.parent / "app" / "src" / "curator" / "tasteTerms.fixture.json"
+
+
+def feature_terms(features: dict) -> list[str]:
+    """#762 — the ONE term rule (mirrored by app/src/curator/tasteHead.js).
+
+    Scalars/booleans -> key=value (booleans lowercase), arrays -> one term per
+    element, None and the keys v/cast/castSize/num skipped. Pinned by
+    app/src/curator/tasteTerms.fixture.json, asserted by both selfchecks.
+    """
+    out = []
+    for k, v in features.items():
+        if k in TERM_SKIP or v is None:
+            continue
+        vals = v if isinstance(v, list) else [v]
+        for x in vals:
+            if x is None:
+                continue
+            out.append(f"{k}={'true' if x is True else 'false' if x is False else x}")
+    return out
+
+
+def spearman(a, b) -> float:
+    """Rank correlation (average ranks for ties). 0.0 when undefined."""
+    def ranks(xs):
+        order = sorted(range(len(xs)), key=lambda i: xs[i])
+        r = [0.0] * len(xs)
+        i = 0
+        while i < len(order):
+            j = i
+            while j + 1 < len(order) and xs[order[j + 1]] == xs[order[i]]:
+                j += 1
+            for k in range(i, j + 1):
+                r[order[k]] = (i + j) / 2
+            i = j + 1
+        return r
+    if len(a) != len(b) or len(a) < 2:
+        return 0.0
+    ra, rb = ranks(list(a)), ranks(list(b))
+    ma, mb = sum(ra) / len(ra), sum(rb) / len(rb)
+    cov = sum((x - ma) * (y - mb) for x, y in zip(ra, rb))
+    va = sum((x - ma) ** 2 for x in ra) ** 0.5
+    vb = sum((y - mb) ** 2 for y in rb) ** 0.5
+    return cov / (va * vb) if va and vb else 0.0
+
+
+_WORDS = {
+    "bodies": "{v} crowds", "density": "{v} density", "scale": "{v} marks",
+    "system": "{v} layouts", "symmetry": "{v} symmetry", "behave": "{v} motion",
+    "blend": "{v} blend", "palette": "the {v} palette", "castCategories": "{v} marks",
+    "paletteShift": "{v} colour shift",
+}
+_BOOL_WORDS = {"accum": ("trails on", "trails off"), "mirror": ("mirrored", "unmirrored"),
+               "bleed": ("bleed on", "bleed off"), "overlap": ("overlap", "no overlap")}
+_NUM_WORDS = {"count": "more marks", "particleCount": "more particles", "scaleMid": "bigger marks",
+              "rotateSpread": "wilder rotation", "alphaMid": "more opaque marks", "jitter": "looser placement",
+              "density": "denser fields", "zTiers": "more depth tiers", "noiseFreq": "finer noise",
+              "noiseSpeed": "faster noise", "displacement": "more displacement", "swarmCohesion": "tighter swarms",
+              "gravityWells": "stronger gravity", "damping": "more damping", "wind": "more wind",
+              "flap": "more flap", "breath": "more breath", "lifeDrift": "more drift"}
+
+
+def describe_term(term: str) -> str:
+    """'bodies=sparse' -> 'sparse crowds'; 'accum=true' -> 'trails on'."""
+    k, _, v = term.partition("=")
+    if k in _BOOL_WORDS and v in ("true", "false"):
+        return _BOOL_WORDS[k][0 if v == "true" else 1]
+    return _WORDS.get(k, "{k} {v}").format(k=k, v=v)
+
+
+def describe_head(head: dict, n: int = 5) -> str:
+    """Human summary of a distilled head: what it leans toward and away from."""
+    items = [(w, describe_term(t)) for t, w in (head.get("terms") or {}).items()]
+    items += [(w, _NUM_WORDS.get(k, f"more {k}")) for k, w in (head.get("num") or {}).items()]
+    items = [x for x in items if abs(x[0]) > 1e-9]
+    if not items:
+        return "no clear lean (the head learned nothing distinguishable)"
+    pos = [d for w, d in sorted(items, key=lambda x: -x[0]) if w > 0][:n]
+    neg = [d for w, d in sorted(items, key=lambda x: x[0]) if w < 0][:n]
+    parts = []
+    if pos:
+        parts.append("leans " + ", ".join(pos))
+    if neg:
+        parts.append("avoids " + ", ".join(neg))
+    return "; ".join(parts)
+
+
+def check_compatible(model_meta: dict, index_model: str, index_dims: int) -> None:
+    """DECISIONS Taste v1 migration rule: refuse, never silently mix dimensions."""
+    m, d = model_meta.get("model"), model_meta.get("dims")
+    if m != index_model or (d is not None and int(d) != int(index_dims)):
+        sys.exit(f"taste was trained on {m}/{d}-dim, index is {index_model}/{index_dims}-dim"
+                 " — re-embed required (curator.py embed), then retrain")
+
+
+def file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 # ── index ────────────────────────────────────────────────────────────────
@@ -258,9 +373,20 @@ def cmd_train(a) -> None:
                            scoring="accuracy")
 
     clf.fit(X, y)
-    np.savez(Path(a.out), w=clf.coef_[0].astype("float32"),
-             b=np.float32(clf.intercept_[0]), model=idx["model"], n=len(y),
-             cv_acc=acc.mean(), cv_auc=auc.mean(), baseline=base.mean())
+    out = Path(a.out)
+    if out.suffix == ".npz":  # legacy format, still readable by rank/similar
+        np.savez(out, w=clf.coef_[0].astype("float32"),
+                 b=np.float32(clf.intercept_[0]), model=idx["model"], n=len(y),
+                 cv_acc=acc.mean(), cv_auc=auc.mean(), baseline=base.mean())
+    else:
+        taste = build_taste(idx, keys, y, clf, cv={"acc": float(acc.mean()), "auc": float(auc.mean()),
+                            "baseline": float(base.mean()), "folds": folds}, C=a.C,
+                            features_path=Path(a.features) if a.features else None, alpha=a.head_alpha)
+        out.write_text(json.dumps(taste, indent=1, sort_keys=True))
+        h = taste.get("head")
+        if h:
+            print(f"  head fidelity {h['fidelity']:.3f} (Spearman vs probe on {h['fitOn']} pool renders)")
+            print(f"  {describe_head(h)}")
     print(f"{len(y)} labels ({int(y.sum())} likes / {int((1 - y).sum())} passes), "
           f"{folds}-fold CV")
     print(f"  held-out accuracy {acc.mean():.3f} +/- {acc.std():.3f}")
@@ -271,13 +397,116 @@ def cmd_train(a) -> None:
     print(Path(a.out))
 
 
+def fit_head(feature_rows: list[dict], target, alpha: float = 1.0) -> dict:
+    """#762 — distil the probe into a linear head over recipe features.
+
+    Ridge on one-hot feature_terms + the normalized `num` block, target = the
+    probe's decision score per render. This is what the browser runs (it can't
+    embed) and what `inspect` reads. fidelity = Spearman(head, probe).
+    """
+    import numpy as np
+
+    vocab = sorted({t for f in feature_rows for t in feature_terms(f)})
+    nums = sorted({k for f in feature_rows for k in (f.get("num") or {})})
+    col = {t: i for i, t in enumerate(vocab)}
+    X = np.zeros((len(feature_rows), len(vocab) + len(nums)))
+    for r, f in enumerate(feature_rows):
+        for t in feature_terms(f):
+            X[r, col[t]] = 1.0
+        for j, k in enumerate(nums):
+            X[r, len(vocab) + j] = float((f.get("num") or {}).get(k, 0.0))
+    y = np.asarray(target, dtype=float)
+    xm, ym = X.mean(axis=0), y.mean()
+    Xc = X - xm
+    w = np.linalg.solve(Xc.T @ Xc + alpha * np.eye(X.shape[1]), Xc.T @ (y - ym))
+    bias = float(ym - xm @ w)
+    pred = X @ w + bias
+    rnd = lambda v: round(float(v), 6)  # noqa: E731
+    return {
+        "terms": {t: rnd(w[i]) for i, t in enumerate(vocab)},
+        "num": {k: rnd(w[len(vocab) + j]) for j, k in enumerate(nums)},
+        "bias": rnd(bias),
+        "alpha": alpha,
+        "fidelity": round(spearman(pred.tolist(), y.tolist()), 4),
+        "fitOn": len(feature_rows),
+    }
+
+
+def build_taste(idx, keys, y, clf, *, cv, C, features_path, alpha) -> dict:
+    """Taste v1 (docs/DECISIONS.md): model + dims, probe, head, manifest, labels."""
+    import numpy as np
+
+    w = clf.coef_[0]
+    taste = {
+        "kind": TASTE_KIND, "version": TASTE_VERSION,
+        "model": idx["model"], "dims": int(idx["emb"].shape[1]),
+        "probe": {"weights": [round(float(x), 6) for x in w], "bias": round(float(clf.intercept_[0]), 6), "C": C},
+        # Content hashes, never images: privacy, and it keeps the file small.
+        "manifest": [{"png": k, "sha256": file_sha256(idx["root"] / k)} for k in keys
+                     if (idx["root"] / k).exists()],
+        "labels": {"likes": int(y.sum()), "passes": int(len(y) - y.sum())},
+        "cv": cv,
+        "trainedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    if features_path:
+        feats = json.loads(features_path.read_text())
+        pos = {p: i for i, p in enumerate(idx["paths"])}
+        names = [n for n in sorted(feats) if n in pos]
+        if len(names) < 10:
+            sys.exit(f"{features_path}: only {len(names)} pool renders have features — need 10+ "
+                     "(render the pool with sidecars: hits_bridge.py pool / studio.py --sidecar)")
+        versions = {feats[n].get("v") for n in names}
+        if len(versions) != 1:
+            sys.exit(f"{features_path}: mixed feature versions {sorted(versions, key=str)} — re-render the pool")
+        scores = idx["emb"][[pos[n] for n in names]] @ w + clf.intercept_[0]
+        taste["featuresVersion"] = versions.pop()
+        taste["head"] = fit_head([feats[n] for n in names], np.asarray(scores).tolist(), alpha=alpha)
+    return taste
+
+
+def load_model(path: Path) -> dict:
+    """Probe from taste.json (v1) or the legacy taste.npz."""
+    import numpy as np
+
+    if path.suffix == ".json":
+        t = json.loads(path.read_text())
+        if t.get("kind") != TASTE_KIND or t.get("version") != TASTE_VERSION:
+            sys.exit(f"{path}: not a Taste v{TASTE_VERSION} file")
+        return {"w": np.asarray(t["probe"]["weights"], dtype="float32"), "b": float(t["probe"]["bias"]),
+                "model": t["model"], "dims": t["dims"]}
+    m = np.load(path, allow_pickle=False)
+    return {"w": m["w"], "b": float(m["b"]), "model": str(m["model"]), "dims": int(m["w"].shape[0])}
+
+
 def score_all(idx, model_path: Path):
     import numpy as np
 
-    m = np.load(model_path, allow_pickle=False)
-    if str(m["model"]) != idx["model"]:
-        sys.exit(f"model trained on {m['model']}, index is {idx['model']}")
+    m = load_model(model_path)
+    check_compatible(m, idx["model"], idx["emb"].shape[1])
     return 1 / (1 + np.exp(-(idx["emb"] @ m["w"] + m["b"])))
+
+
+def cmd_inspect(a) -> None:
+    """#762 — a taste in human terms, not a weight dump."""
+    t = json.loads(Path(a.taste).read_text())
+    if t.get("kind") != TASTE_KIND:
+        sys.exit(f"{a.taste}: not a taste file")
+    lab = t.get("labels", {})
+    print(f"taste v{t.get('version')} · {t.get('model')} ({t.get('dims')}-dim) · trained {t.get('trainedAt', '?')}")
+    print(f"  learned from {lab.get('likes', 0)} keeps / {lab.get('passes', 0)} passes"
+          f" · {len(t.get('manifest', []))} renders in the manifest")
+    cv = t.get("cv") or {}
+    if cv:
+        print(f"  held-out ROC-AUC {cv.get('auc', 0):.3f} (0.5 = chance)")
+    h = t.get("head")
+    if not h:
+        print("  no head — train with --features to give the app a live curator")
+        return
+    print(f"  {describe_head(h)}")
+    print(f"  head fidelity {h.get('fidelity', 0):.3f} vs the probe on {h.get('fitOn', 0)} renders")
+    if h.get("fidelity", 0) < HEAD_MIN_FIDELITY:
+        print("  WARNING: the head can't reproduce this taste from recipe features —"
+              " live curation will stay on the persona scorer")
 
 
 def cmd_rank(a) -> None:
@@ -354,7 +583,80 @@ def cmd_selfcheck(_a=None) -> None:
     # label keys are index-root-relative and stable
     assert label_path(Path("/a/b"), Path("/a/b/c/d.png")) == "c/d.png"
 
+    # #762 — the term rule matches the fixture the browser also asserts
+    for case in json.loads(TERM_FIXTURE.read_text())["cases"]:
+        assert feature_terms(case["features"]) == case["terms"], (feature_terms(case["features"]), case["terms"])
+    assert abs(spearman([1, 2, 3, 4], [10, 20, 30, 40]) - 1) < 1e-12
+    assert abs(spearman([1, 2, 3, 4], [4, 3, 2, 1]) + 1) < 1e-12
+    assert spearman([1, 1], [1, 1]) == 0.0
+    assert describe_term("bodies=sparse") == "sparse crowds"
+    assert describe_term("accum=false") == "trails off"
+    words = describe_head({"terms": {"scale=large": 1.2, "blend=screen": -0.8}, "num": {"count": -0.3}})
+    assert words == "leans large marks; avoids screen blend, more marks", words
+    try:
+        check_compatible({"model": "a", "dims": 768}, "a", 1152)
+        raise AssertionError("dims mismatch must refuse")
+    except SystemExit as e:
+        assert "re-embed required" in str(e)
+
+    # #762 — the numeric path end to end (needs numpy + scikit-learn, as train does)
+    try:
+        import numpy  # noqa: F401
+        import sklearn  # noqa: F401
+    except ImportError:
+        print("  (skipped taste train/head check: numpy/scikit-learn not installed)")
+    else:
+        _selfcheck_taste_train()
+
     print("curator selfcheck OK")
+
+
+def _selfcheck_taste_train() -> None:
+    """Synthetic pool: large-scale renders are the keeps. No MLX, no images needed."""
+    import tempfile
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        n, dims = 80, 16
+        paths, feats, labels = [], {}, {}
+        emb = rng.normal(size=(n, dims)).astype("float32")
+        for i in range(n):
+            name = f"recipe-{i:04d}.png"
+            (root / name).write_bytes(bytes([i]))
+            large = i % 2 == 0
+            emb[i, 0] += 3.0 if large else -3.0  # the embedding "sees" size
+            feats[name] = {"v": 2, "system": "grid", "scale": "large" if large else "small",
+                           "accum": bool(i % 3), "num": {"count": round(float(rng.random()), 4)}}
+            labels[name] = 1 if large else 0
+            paths.append(name)
+        np.savez(root / "idx.npz", root=str(root), paths=np.array(paths), emb=emb, model="m/test")
+        (root / "labels.json").write_text(json.dumps(labels))
+        (root / "features.json").write_text(json.dumps(feats))
+        out = root / "taste.json"
+        main(["train", "--index", str(root / "idx.npz"), "--labels", str(root / "labels.json"),
+              "--features", str(root / "features.json"), "--out", str(out)])
+        t = json.loads(out.read_text())
+        assert t["kind"] == TASTE_KIND and t["version"] == TASTE_VERSION
+        assert t["model"] == "m/test" and t["dims"] == dims and len(t["probe"]["weights"]) == dims
+        assert t["labels"] == {"likes": 40, "passes": 40}
+        assert len(t["manifest"]) == n and all(len(m["sha256"]) == 64 for m in t["manifest"])
+        assert "png" in t["manifest"][0] and "image" not in json.dumps(t["manifest"][0]), "hashes, never images"
+        assert t["featuresVersion"] == 2
+        h = t["head"]
+        assert h["terms"]["scale=large"] > 0 > h["terms"]["scale=small"], h["terms"]
+        assert h["fidelity"] > 0.5, h["fidelity"]
+        assert "large marks" in describe_head(h)
+        # rank reads taste.json and refuses a mismatched index
+        m = load_model(out)
+        assert m["dims"] == dims
+        try:
+            check_compatible(m, "m/other", dims)
+            raise AssertionError("model mismatch must refuse")
+        except SystemExit:
+            pass
+    print("  taste train/head check OK")
 
 
 # ── cli ──────────────────────────────────────────────────────────────────
@@ -400,14 +702,21 @@ def main(argv=None) -> None:
     sp = sub.add_parser("train", help="linear probe on likes vs passes + held-out accuracy")
     sp.add_argument("--index", required=True)
     sp.add_argument("--labels", required=True)
-    sp.add_argument("--out", default="taste.npz")
+    sp.add_argument("--out", default="taste.json", help="taste.json (Taste v1) — or *.npz for the legacy file")
+    sp.add_argument("--features", default=None,
+                    help="#762 features.json from hits_bridge build — distils the head the app runs")
+    sp.add_argument("--head-alpha", type=float, default=1.0, help="ridge strength for the distilled head")
     sp.add_argument("--folds", type=int, default=5)
     sp.add_argument("-C", type=float, default=0.05, help="inverse L2 strength")
     sp.set_defaults(func=cmd_train)
 
+    sp = sub.add_parser("inspect", help="#762: describe a taste.json in human terms")
+    sp.add_argument("taste")
+    sp.set_defaults(func=cmd_inspect)
+
     sp = sub.add_parser("rank", help="score the index, print a diversified top-K")
     sp.add_argument("--index", required=True)
-    sp.add_argument("--model", default="taste.npz")
+    sp.add_argument("--model", default="taste.json", help="taste.json or legacy taste.npz")
     sp.add_argument("-k", type=int, default=20)
     sp.add_argument("--pool", type=int, default=200, help="candidates clustered for diversity")
     sp.add_argument("--clusters", type=int, default=20)
