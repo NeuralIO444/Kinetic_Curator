@@ -43,6 +43,7 @@ export function PipelinePanel() {
     enabledAssets: s.enabledAssets,
     assetWeightOverrides: s.assetWeightOverrides,
     assetKineme: s.assetKineme, // #781
+    audioRoutes: s.audioRoutes, // #790
     paletteOverrides: s.paletteOverrides,
     lockedParams: s.lockedParams,
     caGrid: s.caGrid,
@@ -59,7 +60,7 @@ export function PipelinePanel() {
   }));
   const {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
-    quality, autoQuality, paletteId, paletteLocks, enabledAssets, assetWeightOverrides, assetKineme,
+    quality, autoQuality, paletteId, paletteLocks, enabledAssets, assetWeightOverrides, assetKineme, audioRoutes,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
     userPalettes, favorites, rendering, watchdogTripGen,
   } = state;
@@ -265,7 +266,7 @@ export function PipelinePanel() {
         <DataExportRow
           seed={seed} seedOffsets={seedOffsets} paletteId={paletteId} paletteOverrides={paletteOverrides} paletteLocks={paletteLocks}
           layoutParams={layoutParams} lockedParams={lockedParams} caGrid={caGrid}
-          enabledAssets={enabledAssets} quality={quality} autoQuality={autoQuality} assetWeightOverrides={assetWeightOverrides} assetKineme={assetKineme}
+          enabledAssets={enabledAssets} quality={quality} autoQuality={autoQuality} assetWeightOverrides={assetWeightOverrides} assetKineme={assetKineme} audioRoutes={audioRoutes}
           customAssets={customAssets} layers={layers} activeLayerId={activeLayerId}
           layerSnapshots={layerSnapshots} userPalettes={userPalettes} favorites={favorites}
           onMessage={setMessage}

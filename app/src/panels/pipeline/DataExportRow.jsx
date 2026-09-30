@@ -23,7 +23,7 @@ function downloadJsonBlob(obj, filename) {
 // matches the original single status line under this section.
 export function DataExportRow({
   seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
-  enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, customAssets, layers,
+  enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, customAssets, layers,
   activeLayerId, layerSnapshots, userPalettes, favorites, onMessage,
 }) {
   const fileInputRef = useRef(null);
@@ -35,7 +35,7 @@ export function DataExportRow({
 
   const projectFields = {
     seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
-    enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, customAssets, layers,
+    enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, customAssets, layers,
     activeLayerId, layerSnapshots,
   };
 

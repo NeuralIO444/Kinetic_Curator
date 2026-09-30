@@ -443,7 +443,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
 
     // Ballistics on scaleMul / alphaBoost / glow (keep silence-is-zero contract).
     // #613: the routes live in audioRoutes.mjs, shared with the STIMULI matrix.
-    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt });
+    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt }, s.audioRoutes); // #790: the scene's route table (null = default)
     const { scaleMul, alphaBoost } = routes;
 
     // Layered life LFO (incommensurate sines) from the GL loop

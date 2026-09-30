@@ -7,8 +7,9 @@ import { audioMatrixRows } from '../../gl/audioRoutes.mjs';
 
 const fmt = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(3));
 
-export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod, alphaMod }) {
-  const rows = audioMatrixRows({ ...audioBands, beatPulse }, { depth, scaleMod, alphaMod }, audioEnabled);
+export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod, alphaMod, routes = null }) {
+  // #790: the rows follow the scene's route table (null = today's default routes)
+  const rows = audioMatrixRows({ ...audioBands, beatPulse }, { depth, scaleMod, alphaMod }, audioEnabled, routes);
   return (
     <div className="stim-matrix" role="table" aria-label="Modulation matrix">
       <div className="stim-matrix-head" role="row">
