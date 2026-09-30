@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { BehaveReadout } from './davis/BehaveReadout.jsx';
+import { VoiceTiles } from './davis/VoiceTiles.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { captureFavorite } from '../state/slices/davisSlice.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
@@ -82,6 +83,8 @@ export function DavisPanel() {
               morph status even though the controls that drive them now
               live in PLAY — cross-panel status at a glance, same as Phase 4
               left beatCollision's inputs selected here for PLAY to read. */}
+          {/* #717 — the flagship Voices' one home: load through the voice MIX. */}
+          <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
 
           <div className="davis-actions">

@@ -20,18 +20,30 @@ test.describe('Mode personas', () => {
     await expect(page.locator('.voice-row')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('flagship chips, stub tiles and + chip render', async ({ page }) => {
+  // #717 — the flagship Voices' one home is DAVIS.
+  const openDavis = async (page) => {
+    await page.getByRole('tab', { name: /davis/i }).click();
+    await expect(page.locator('.davis-voices')).toBeVisible({ timeout: 10_000 });
+  };
+
+  test('flagship chips live on DAVIS, not BUILD', async ({ page }) => {
+    await expect(page.locator('.panel-layout .voice-chip.flagship')).toHaveCount(0);
+    await openDavis(page);
     await expect(page.locator('.voice-chip.flagship')).toHaveCount(4);
     await expect(page.locator('.voice-flagships')).toContainText(/Night Migration/);
     await expect(page.locator('.voice-flagships')).toContainText(/Chrome Parade/);
     await expect(page.locator('.voice-flagships')).toContainText(/Deep Water/);
     await expect(page.locator('.voice-flagships')).toContainText(/Dark Glass/);
+  });
+
+  test('BUILD keeps the stub tiles and the + chip', async ({ page }) => {
     // 12 stub tiles keep the mode grid
     await expect(page.locator('.mode-grid .mode-tile')).toHaveCount(12);
     await expect(page.locator('.plus-chip')).toBeVisible();
   });
 
   test('tapping Night Migration crossfades through MIX and lands the voice', async ({ page }) => {
+    await openDavis(page);
     await page.locator('.voice-chip.flagship', { hasText: 'Night Migration' }).click();
     // MIX bar appears while the crossfade runs
     const mixBar = page.locator('.mix-bar');

@@ -12,9 +12,11 @@ test('fresh boot rolls a First Light starter and is alive', async ({ page }) => 
   const skip = page.locator('button', { hasText: 'Skip' });
   if (await skip.count()) await skip.first().click();
 
-  // A starter composition is named on the P03 BUILD chip shortly after load.
+  // A starter composition is named on the P03 BUILD header shortly after load.
+  // Read the subtitle element itself: a page-text regex ran on into whatever
+  // lowercase chip text follows the header (#717 moved the Voice chips away).
   await expect
-    .poll(async () => page.locator('body').textContent().then((t) => t.match(/P03BUILD([a-z-]+)/)?.[1] || ''),
+    .poll(async () => ((await page.locator('.panel-layout .panel-subtitle').first().textContent().catch(() => '')) || '').trim(),
       { timeout: 15_000 })
     .toMatch(new RegExp(`^(${STARTERS.join('|')})$`));
 

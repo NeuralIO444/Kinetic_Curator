@@ -1,38 +1,18 @@
 // Voice row (#280) — curated mode personas + the performer's own shelf.
 //
 // Layout tiles change the arrangement only; MOTION chips change the animation only; SHAPES chips swap the asset pool only (#555).
-// Flagship voices (Night Migration / Chrome Parade / Deep Water / Dark Glass) load complete curated states
-// through a MIX crossfade. The twelve stub modes (#517) ride the same MIX road
+// Flagship voices (Night Migration / Chrome Parade / Deep Water / Dark Glass) live on
+// DAVIS now (#717, one home per Voice — panels/davis/VoiceTiles.jsx). The twelve stub modes (#517) ride the same MIX road
 // with a small motion block (loadStubMode). The row ends with the + chip:
 // tap to capture the live state as a user voice (VOICE 01, …), long-press a
 // user chip to overwrite it, double-click to rename, × to delete (confirm).
 import { useRef, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isMotionActive, isShapeSetActive, liveShapeLevels } from '../../data/voices.js';
+import { STUB_VOICES, MOTION_MODES, SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isMotionActive, isShapeSetActive, liveShapeLevels } from '../../data/voices.js';
 import { MAX_USER_VOICES } from '../../state/slices/voiceSlice.js';
 import { MixBar } from './MixBar.jsx';
 
 const LONG_PRESS_MS = 650;
-
-function FlagshipChip({ voice, active, onTap }) {
-  const dots = voice.palette.swatches.slice(0, 4);
-  return (
-    <button
-      className={`voice-chip flagship${active ? ' active' : ''}`}
-      onClick={onTap}
-      title={`${voice.title} — ${voice.vibe}`}
-    >
-      <span className="voice-dots" aria-hidden="true">
-        {dots.map((c, i) => (
-          <i key={i} style={{ background: c }} />
-        ))}
-      </span>
-      {/* #735: the face prints the Voice title. SWARM/HYPE/MURM are ids and
-          chassis names, banned as face labels (docs/TAXONOMY.md). */}
-      <span className="voice-name">{voice.title}</span>
-    </button>
-  );
-}
 
 function UserChip({ voice, active, onTap, onOverwrite, onRename, onDelete }) {
   const [renaming, setRenaming] = useState(false);
@@ -130,17 +110,6 @@ export function ModeGrid({ mode }) {
 
   return (
     <div className="voice-row">
-      <div className="voice-flagships">
-        {FLAGSHIP_VOICES.map((v) => (
-          <FlagshipChip
-            key={v.id}
-            voice={v}
-            active={activeVoiceId === v.id}
-            onTap={() => loadVoice(v.id)}
-          />
-        ))}
-      </div>
-
       <div className="mode-grid">
         {STUB_VOICES.map((m) => (
           <button
