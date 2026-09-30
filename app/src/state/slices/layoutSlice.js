@@ -10,6 +10,7 @@ import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngFo
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
+import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 
 /**
  * Open a MIX toward `merged` layout params (#284 morph-don't-cut). Live state
@@ -80,6 +81,8 @@ export const createLayoutSlice = (set) => ({
    * authored count regardless of what the live canvas is drawing.
    */
   perfClampOverride: null,
+  /** #594 — the ONE scene sun (never per layer, never a list). null = off. */
+  light: null,
   motionSmoothing: true,
   /**
    * VJ MIX (#278): palette-switch crossfade duration in seconds, 0–8.
@@ -262,6 +265,19 @@ export const createLayoutSlice = (set) => ({
   // #280 — a manual edit during a voice MIX ends the mix and the voice chip
   // lets go: the performer's hands have it now. (commitVoiceMix writes the
   // keys directly, so landing a voice never trips this.)
+  /**
+   * #594 — turn the sun on/off or move it. `true` = on at the defaults (or where
+   * it was), `false`/`null` = off, an object = patch. Undoable; a slider drag
+   * coalesces through pushToUndo's debounce like any other param.
+   */
+  setLight: (patch) => set((state) => {
+    let next;
+    if (patch === false || patch === null) next = null;
+    else if (patch === true) next = sanitizeLight(state.light || LIGHT_DEFAULT);
+    else next = sanitizeLight({ ...(state.light || LIGHT_DEFAULT), ...(patch || {}) });
+    if (JSON.stringify(next) === JSON.stringify(state.light ?? null)) return {};
+    return { ...pushToUndo(state), light: next };
+  }),
   setLayoutParam: (key, value) => set((state) => {
     if (state.layoutParams[key] === value) return {};
     const { params, rejected } = validateLayoutParams({ ...state.layoutParams, [key]: value });

@@ -210,7 +210,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -251,6 +251,13 @@ export const RENDERER_PROGRAMS = [
 for (const def of RENDERER_PROGRAMS) {
   registerCostTier(`renderer/${def.key}`, def.cost);
 }
+// #594 — the one CHIAROSCURO sun: a per-instance diffuse term in the existing
+// quad shader (a few ALU ops at the instance centre, one multiply per fragment),
+// no pass, no texture; off is byte-identical. Tier 0, like the #309 smear.
+registerCostTier('gl/sun', {
+  tier: 0, memoryBytes: 0, timeMs: 0.02,
+  notes: '#594 PR1 sun: per-instance diffuse in QUAD_VS/FS; zero passes; live + GL stills',
+});
 // #740: FXAA runs inside the resolve pass behind u_fxaa (same pass, no new texture) —
 // declared separately so the harness can measure resolve with it on. Tier 0 stays: the
 // pass is structural; the governor sheds FXAA as its own cut 0 (governorCuts.js), not
@@ -417,6 +424,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
   /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
+  // #594: the frame's sun, set by renderFrameInto from the contract (null = off).
+  let sun = null;
+
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
@@ -434,6 +444,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
     gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);
     gl.uniform1f(U(quadProg, 'u_liveTint'), isLive ? 1.0 : 0.0);
+    // #594 the one sun (off → w = 0 and the shader's light term is exactly 1.0).
+    gl.uniform4f(U(quadProg, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
+    gl.uniform4f(U(quadProg, 'u_sunLight'), sun ? sun.color[0] : 1, sun ? sun.color[1] : 1, sun ? sun.color[2] : 1, sun ? sun.intensity : 0);
+    gl.uniform1f(U(quadProg, 'u_ambient'), sun ? sun.ambient : 1);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);
@@ -560,6 +574,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   function renderFrameInto(payload, T, uploaded, { transparent = false } = {}) {
     uploadMeterBeginFrame(); // #533 PR1: measure-only — resets call-slot indexing for this frame
     const { width: w, height: h, contract, cells, bg } = payload;
+    sun = contract.light || null;
     const { atlasTex, grainLuts } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];

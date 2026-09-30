@@ -11,6 +11,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { ModeGrid } from './layout/ModeGrid.jsx';
 import { ParamBlock } from './layout/ParamBlock.jsx';
 import { ToggleRow } from './layout/ToggleRow.jsx';
+import { SunRow } from './layout/SunRow.jsx';
 import { CuratorBar } from './layout/CuratorBar.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
 
@@ -33,6 +34,7 @@ export function BuildPanel() {
         <CuratorBar lockCount={lockCount} composition={layoutParams.composition} />
         <ParamBlock layoutParams={layoutParams} lockedParams={lockedParams} />
         <ToggleRow layoutParams={layoutParams} />
+        <SunRow />
         <LayerStack />
       </div>
     </div>

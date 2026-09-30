@@ -6,6 +6,7 @@ import { sanitizeOverlay } from '../assets/overlay.js';
 import { normalizeSnapshots, normalizeLayers } from './projectNormalize.js';
 export { normalizeSnapshots, normalizeLayers };
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
+import { sanitizeLight } from '../data/light.js';
 import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
@@ -63,6 +64,10 @@ export function serializeProject(state) {
   }
   const overlay = sanitizeOverlay(state.customAssets);
   if (overlay.length) doc.customAssets = overlay;
+  // #594 — the one scene sun. Written only when on: an unlit piece exports
+  // exactly as it did before lighting existed.
+  const light = sanitizeLight(state.light);
+  if (light) doc.light = light;
   if (Array.isArray(state.layers) && state.activeLayerId) {
     doc.layers = state.layers;
     doc.activeLayerId = state.activeLayerId;
@@ -112,6 +117,7 @@ export function parseProject(raw) {
         assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
         paletteOverrides: raw.paletteOverrides || null,
         paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
+        light: sanitizeLight(raw.light), // #594 — absent → null (off)
         customAssets,
         layers,
         activeLayerId,
@@ -155,6 +161,7 @@ export function parseProject(raw) {
       quality: sanitizeQuality(raw.quality),
       autoQuality: raw.autoQuality !== false,
       assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
+      light: sanitizeLight(raw.light), // #594 — absent → null (off)
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
           ? raw.paletteOverrides

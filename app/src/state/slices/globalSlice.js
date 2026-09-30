@@ -14,6 +14,7 @@ import {
   MAX_LAYERS,
 } from '../projectNormalize.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { sanitizeLight } from '../../data/light.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -525,6 +526,7 @@ export const createGlobalSlice = (set) => ({
     // #638 — restore palette locks so harmony regeneration keeps building
     // around the swatches the designer pinned.
     next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
+    next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       // #103 Track B — bound on the apply path too; the live loop resolves
       // every layer per frame.

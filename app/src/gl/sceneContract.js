@@ -24,6 +24,8 @@
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
+import { contractLight } from '../data/light.js';
+import { resolvePalette } from '../data/palettes.js';
 
 export const GL_CONTRACT_VERSION = 1;
 
@@ -274,6 +276,16 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       };
     })(),
     instances, // draw order = array order within each layer's slice
+    // #594 — the ONE scene sun. Key omitted when off, so an unlit contract (and
+    // its hash) is exactly what it was before lighting existed. Colour comes
+    // from a palette slot: callers that already resolved the palette (live,
+    // incl. user palettes) pass doc.palette; export paths resolve from the id.
+    ...(() => {
+      if (!doc.light) return {};
+      const pal = doc.palette || resolvePalette(doc.paletteId || 'praystation', doc.paletteOverrides || null);
+      const light = contractLight(doc.light, pal);
+      return light ? { light } : {};
+    })(),
     textRuns: [], // #550: CUT — no producer (glyph-atlas baker removed; text is baked into stamp assets). Kept as [] for shape/hash stability; the renderer never reads it.
     accum: accum && accum.enabled
       ? {

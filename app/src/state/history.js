@@ -52,6 +52,7 @@ export function captureUndoEntry(state, kind = UNDO_KIND_EDIT) {
     lockedParams: deep(state.lockedParams),
     caGrid: deep(state.caGrid),
     enabledAssets: deep(state.enabledAssets),
+    light: deep(state.light ?? null), // #594 scene sun
   };
   if (kind === UNDO_KIND_LAYERS) {
     entry.layers = deep(state.layers);
@@ -150,6 +151,7 @@ export function editRestoreFields(entry) {
     lockedParams: entry.lockedParams,
     caGrid: entry.caGrid,
     enabledAssets: entry.enabledAssets,
+    light: entry.light ?? null, // #594 — older entries predate the sun: off
   };
 }
 
