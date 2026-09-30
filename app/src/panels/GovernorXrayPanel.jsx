@@ -68,6 +68,7 @@ export function GovernorXrayPanel() {
   // zustand's snapshot change every render → infinite loop (React #185).
   const renderScale = useStore((s) => s.renderScale);
   const perfTier1 = useStore((s) => s.perfTier1);
+  const fxaaShed = useStore((s) => s.fxaaShed);
   const assetThin = useStore((s) => s.assetThin);
   const perfClampOverride = useStore((s) => s.perfClampOverride);
   const slowRender = useStore((s) => s.slowRender);
@@ -85,6 +86,7 @@ export function GovernorXrayPanel() {
   }, []);
 
   const shed = useMemo(() => ({
+    fxaaShed,
     perfTier1,
     renderScale,
     assetThin,
@@ -93,7 +95,7 @@ export function GovernorXrayPanel() {
     watchdogTripped: !!lastWatchdogReason,
     quality,
     qualityShedFrom,
-  }), [perfTier1, renderScale, assetThin, perfClampOverride, slowRender, lastWatchdogReason, quality, qualityShedFrom]);
+  }), [fxaaShed, perfTier1, renderScale, assetThin, perfClampOverride, slowRender, lastWatchdogReason, quality, qualityShedFrom]);
 
   const { cuts, passes } = useMemo(
     () => buildXray({ tiers: allCostTiers(), measuredMs: MEASURED_COSTS, shed }),

@@ -120,6 +120,8 @@ export const createGlobalSlice = (set) => ({
    * shed everything tier 1 sheds too.
    */
   perfTier1: false,
+  /** #740 — governor cut 0: FXAA shed. Render-only overlay: never serialized, auto-clears on recovery. The user's own `fxaa` choice is never overwritten. */
+  fxaaShed: false,
   /**
    * Showrunner patrol snapshot (§4): per-stage rolling-average timings in
    * ms, synced ~4Hz by useFpsMeter. Keys are stage names ('kernel', …);
@@ -271,6 +273,7 @@ export const createGlobalSlice = (set) => ({
   clearWatchdogReason: () => set({ lastWatchdogReason: null }),
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
   setPerfTier1: (on) => set({ perfTier1: !!on }),
+  setFxaaShed: (on) => set({ fxaaShed: !!on }),
   setStageTimings: (stages) => set({ stageTimings: { ...stages } }),
   setRenderScale: (scale) => {
     const s = Number(scale);

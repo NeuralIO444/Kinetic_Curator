@@ -28,6 +28,7 @@ export const MAX_EVENTS = 128;
  * cutKind → step. Watchdog (step 7) is the hard stop.
  */
 export const SHED_STEPS = {
+  fxaa: 0, // #740 — cut 0, ahead of pixel trim
   renderScale: 1,
   quality: 2,
   perfTier1: 3,

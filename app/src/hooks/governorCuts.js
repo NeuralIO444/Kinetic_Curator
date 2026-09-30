@@ -3,6 +3,9 @@
 // usePerformanceGovernor owns timing (sustain windows, cooldown); this
 // module owns the ORDER of cuts. The order is the contract:
 //
+//   cut 0: edge AA off (FXAA, #740) — cosmetic and the cheapest thing to lose;
+//          gated on gpuSaturated like cut 1, fires only when the caller says
+//          fxaa === true (armed and not already shed)
 //   cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
 //          gated on the gpuSaturated signal (#259): fires only when the GPU
 //          is the bottleneck — otherwise it only pixelates.
@@ -64,6 +67,13 @@ export function isGpuBinding(fps, gpuFps, shedFps) {
  * manual resume and never auto-restores.
  */
 export const GOVERNOR_RESTORE_CUTS = [
+  {
+    kind: 'fxaa',
+    // #740 — cut 0. Restores LAST (the table is walked in reverse): the
+    // cheapest cut to lose is the last thing to come back.
+    needsRestore: (s, ctx) => ctx.healthy && !!s.fxaaShed,
+    restoredLabel: 'EDGE AA back on',
+  },
   {
     kind: 'renderScale',
     needsRestore: (s, ctx) => ctx.healthy && Number(s.renderScale) < 1 - 1e-9,
@@ -136,6 +146,13 @@ export function perfTier1Passes() {
  */
 export function nextGovernorCut(s) {
   const gpuSaturated = s.gpuSaturated !== false; // unknown signal: shed as before
+  // Cut 0 (#740): edge AA. Opt-in per caller (`fxaa === true` = the user has it
+  // on and the governor has not already shed it) so older callers and their
+  // selfchecks keep the pre-#740 ladder. Same GPU-bound gate as cut 1: if the
+  // GPU is not the bottleneck, dropping AA cannot buy frames back.
+  if (s.fxaa === true && gpuSaturated) {
+    return { kind: 'fxaa', label: 'EDGE AA OFF' };
+  }
   const scale = Number(s.renderScale);
   // Cut 1: dynamic resolution scaling. Unknown/NaN scale snaps to full.
   // Skipped outright when the GPU is not the bottleneck (#259): pixels
@@ -199,6 +216,7 @@ export function shedSummary(s) {
   if (s.qualityShedFrom != null && s.quality !== s.qualityShedFrom) {
     out.push(`tier → ${String(s.quality).toUpperCase()}`);
   }
+  if (s.fxaaShed) out.push('edge AA off');
   if (s.perfTier1) out.push('shine off');
   if (s.assetThin) out.push('dead weight cut');
   if (s.perfClampOverride) out.push(`crowd control → ${s.perfClampOverride.count}`);

@@ -96,6 +96,9 @@ export function usePerformanceGovernor() {
   const setPerfClampOverride = useStore(s => s.setPerfClampOverride);
   const setAssetThin = useStore(s => s.setAssetThin);
   const setRenderScale = useStore(s => s.setRenderScale);
+  const fxaa = useStore(s => s.fxaa);
+  const fxaaShed = useStore(s => s.fxaaShed);
+  const setFxaaShed = useStore(s => s.setFxaaShed);
   const layoutParams = useStore(s => s.layoutParams);
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
@@ -229,12 +232,13 @@ export function usePerformanceGovernor() {
     const healthy = !governorArmed || effFps >= recoverFps;
 
     const snap = {
-      renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
+      fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
       slowRender, slowRenderSource,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
       switch (cut.kind) {
+        case 'fxaa': setFxaaShed(false); break;
         case 'renderScale': setRenderScale(1); break;
         case 'quality':
           // #264 M1 — restore the tier the governor stepped down from,
@@ -282,6 +286,7 @@ export function usePerformanceGovernor() {
     if (!sustained || !cooled) return;
 
     const cut = nextGovernorCut({
+      fxaa: fxaa !== false && !fxaaShed,
       renderScale,
       quality,
       assetThin,
@@ -293,6 +298,7 @@ export function usePerformanceGovernor() {
     if (!cut) return; // ladder exhausted — hold; the watchdog is separate
 
     switch (cut.kind) {
+      case 'fxaa': setFxaaShed(true); break;
       case 'renderScale': setRenderScale(cut.scale); break;
       case 'quality':
         // #264 — record the tier being stepped down from, once per shed
@@ -315,7 +321,7 @@ export function usePerformanceGovernor() {
     lastActionRef.current = now;
     lowSinceRef.current = null;
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', shedFps + ')' + gpuNote);
-  }, [effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
+  }, [fxaa, fxaaShed, setFxaaShed, effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
     slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }

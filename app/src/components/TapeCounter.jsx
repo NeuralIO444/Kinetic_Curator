@@ -44,6 +44,7 @@ export function TapeCounter() {
     quality: s.quality,
     qualityShedFrom: s.qualityShedFrom,
     perfTier1: s.perfTier1,
+    fxaaShed: s.fxaaShed,
     assetThin: s.assetThin,
     perfClampOverride: s.perfClampOverride,
     slowRender: s.slowRender,
@@ -56,7 +57,7 @@ export function TapeCounter() {
   }));
   const {
     fps = 0, stageTimings, renderScale = 1, quality = 'balanced',
-    qualityShedFrom = null, perfTier1 = false, assetThin = false,
+    qualityShedFrom = null, perfTier1 = false, fxaaShed = false, assetThin = false,
     perfClampOverride = null, slowRender = false, slowRenderSource = null,
     lastWatchdogReason = null, renderFault = false, renderFaultReason = null,
     autoQuality = true,
@@ -69,7 +70,7 @@ export function TapeCounter() {
   }, []);
 
   const summary = shedSummary({
-    renderScale, perfTier1, assetThin, perfClampOverride, slowRender,
+    renderScale, perfTier1, fxaaShed, assetThin, perfClampOverride, slowRender,
     watchdogTripped: !!lastWatchdogReason, quality, qualityShedFrom,
   });
   const watchdog = slowRender && slowRenderSource === 'watchdog';
