@@ -70,6 +70,10 @@ def write_hit_project(hits_export: dict, hit: dict, out_path: Path) -> None:
     # #537 — the recipe is only reproducible with its stream offsets (#305).
     if isinstance(hit.get("seedOffsets"), dict):
         base["seedOffsets"] = hit["seedOffsets"]
+    # #719 — a keep's cast (enabled asset ids). Legacy hits have none: keep the
+    # project's own pool rather than invent one.
+    if isinstance(hit.get("assets"), list) and hit["assets"]:
+        base["enabledAssets"] = {str(a): True for a in hit["assets"]}
     base.setdefault("version", 1)
     out_path.write_text(json.dumps(base, indent=2))
 
@@ -133,6 +137,11 @@ def cmd_selfcheck(_a=None) -> None:
         assert json.loads(out.read_text())["seedOffsets"] == offs, "hit offsets ride into the render project"
         write_hit_project({"project": {"seedOffsets": {"spatial": 9}}}, {"seed": 5}, out)
         assert json.loads(out.read_text())["seedOffsets"] == {"spatial": 9}, "legacy hit keeps the project's own"
+        write_hit_project({"project": {"enabledAssets": {"a": True, "b": True}}},
+                          {"seed": 5, "assets": ["xsh01", "xsh07"]}, out)
+        assert json.loads(out.read_text())["enabledAssets"] == {"xsh01": True, "xsh07": True}, "hit cast rides into the render project"
+        write_hit_project({"project": {"enabledAssets": {"a": True}}}, {"seed": 5}, out)
+        assert json.loads(out.read_text())["enabledAssets"] == {"a": True}, "legacy hit keeps the project's cast"
     print("hits_bridge selfcheck OK")
 
 

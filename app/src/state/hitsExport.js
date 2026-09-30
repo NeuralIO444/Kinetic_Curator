@@ -15,5 +15,7 @@ export function hitsFromFavorites(favorites) {
     timestamp: f.timestamp,
     layoutParams: f.config?.layout || null,
     paletteId: f.config?.palette?.id || null,
+    // #719 — the kept cast; legacy keeps omit it (hits_bridge then keeps the project's own).
+    ...(Array.isArray(f.config?.assets) && f.config.assets.length ? { assets: [...f.config.assets] } : {}),
   }));
 }

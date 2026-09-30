@@ -19,4 +19,13 @@ assert.deepStrictEqual(rows[0].layoutParams, { mode: 'grid' });
 assert.strictEqual(rows[0].paletteId, 'bone');
 assert.strictEqual(rows[2].layoutParams, null);
 assert.deepStrictEqual(hitsFromFavorites(undefined), []);
+// #719 — the kept cast rides along; legacy rows omit it (hits_bridge keeps the project's own)
+{
+  const [withCast, legacy] = hitsFromFavorites([
+    { seed: 1, config: { layout: {}, palette: { id: 'x' }, assets: ['xsh01', 'xsh07'] } },
+    { seed: 2, config: { layout: {}, palette: { id: 'x' } } },
+  ]);
+  assert.deepStrictEqual(withCast.assets, ['xsh01', 'xsh07']);
+  assert.ok(!('assets' in legacy), 'legacy row: no cast key');
+}
 console.log('hitsExport.selfcheck: OK');

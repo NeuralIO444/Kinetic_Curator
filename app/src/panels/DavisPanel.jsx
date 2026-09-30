@@ -4,6 +4,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { BehaveReadout } from './davis/BehaveReadout.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
+import { captureFavorite } from '../state/slices/davisSlice.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -21,6 +22,7 @@ export function DavisPanel() {
     seed: s.seed,
     seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
+    enabledAssets: s.enabledAssets,
     phraseEnabled: s.phraseEnabled,
     phraseLength: s.phraseLength,
     phraseBeat: s.phraseBeat,
@@ -32,22 +34,17 @@ export function DavisPanel() {
   }));
   const {
     evolveMode,
-    seed, seedOffsets, layoutParams,
+    seed, seedOffsets, layoutParams, enabledAssets,
     phraseEnabled, phraseLength, phraseBeat,
     phraseClock, phraseBpm, morphing, audioEnabled,
     audioBands,
   } = state;
   const { palette } = useApp();
 
+  // #719: the one keep capture — seed, offsets (#305), layout, palette, cast.
   const saveFavorite = () => emit(Events.DAVIS_FAVORITE, {
     action: 'add',
-    favorite: {
-      seed,
-      // #305 — the recipe is only deterministic with the stream offsets.
-      seedOffsets: { ...(seedOffsets || {}) },
-      timestamp: new Date().toISOString().slice(11, 19),
-      config: { layout: { ...layoutParams }, palette: { id: palette.id } },
-    },
+    favorite: captureFavorite({ seed, seedOffsets, layoutParams, enabledAssets }, palette.id),
   });
 
   const metro = phraseClock === 'metro';

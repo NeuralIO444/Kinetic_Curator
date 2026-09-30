@@ -24,6 +24,7 @@ import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import { routeBeat } from './state/beatArbiter.js';
 import { useStore } from './state/store.js';
+import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
 
@@ -131,13 +132,10 @@ function AppInner() {
         },
       }).catch((e) => console.error('[snap] hotkey capture failed:', e));
     },
+    // #719: same capture as the DAVIS ★ — this used to drop seedOffsets.
     'f': () => piped({
       type: A.ADD_FAVORITE,
-      favorite: {
-        seed: state.seed,
-        timestamp: new Date().toISOString().slice(11, 19),
-        config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
-      },
+      favorite: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
     }),
     'g': () => piped({ type: A.TOGGLE_FULLSCREEN }),
     // #107 §7: while recording or batch/final-rendering, N/E are debounced —
