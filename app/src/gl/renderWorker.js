@@ -24,8 +24,6 @@ import { createLiveResolver } from './liveResolve.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolvePalette } from '../data/palettes.js';
 import { resolveLiveRenderState } from '../data/voices.js';
-import { ASSETS } from '../data/assets/index.js';
-import { frameId, baseAssetId, frameIndexFor, phaseFor } from '../assets/subAnim.mjs';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
@@ -74,21 +72,6 @@ const smoothedLayoutParams = {};
 const washMachine = createTintWash();
 const injectMachine = createTintInject();
 let lastResolved = null;
-
-// Asset sub-animation rig registry: base asset id -> sub rig. Rebuilt when
-// the custom-asset list changes identity; the catalog half is static.
-let subRigCache = null;
-let subRigCustomRef = null;
-function subRigById(customAssets) {
-  if (!subRigCache || subRigCustomRef !== customAssets) {
-    const m = new Map();
-    for (const a of ASSETS) if (a && a.sub && a.id) m.set(a.id, a.sub);
-    for (const a of customAssets || []) if (a && a.sub && a.id) m.set(a.id, a.sub);
-    subRigCache = m;
-    subRigCustomRef = customAssets;
-  }
-  return subRigCache;
-}
 
 function swellEnvelope() {
   if (!swellStart) return 0;
@@ -221,54 +204,16 @@ function buildFrame() {
     attachVelocities(contract.instances, velPrev);
   }
 
-  // Asset sub-animation: rewrite animated instances to their current frame
-  // id (string swap only — the frames were baked as atlas cells up front).
-  // Static assets skip this entirely: exactly the old path.
-  const rigs = subRigById(s.customAssets);
-  if (rigs.size > 0) {
-    const tSec = loopTimeMs / 1000;
-    for (const it of contract.instances) {
-      // Look up by BASE id: it.asset may already carry a __fN suffix from the
-      // previous tick (instance objects persist), so strip before matching.
-      const base = baseAssetId(it.asset);
-      const sub = rigs.get(base);
-      if (!sub) continue;
-      it.asset = frameId(base, frameIndexFor(sub, tSec, phaseFor(sub, it.seedOffset, it.key)));
-    }
-  }
-
   // Combos check for atlas
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
   const fxLayerIds = Array.from(new Set((contract.fxWraps || []).map((w) => w.fxLayerId)));
-  // Bake-storm guard: the key is computed from BASE asset ids, so the
-  // animation clock advancing frames never churns it. The bake request below
-  // expands animated assets to ALL their frames, so one bake covers the strip.
-  const nextAtlasKey = combos.map((c) => comboKey(baseAssetId(c.asset))).sort().join('|');
+  const nextAtlasKey = combos.map((c) => comboKey(c.asset)).sort().join('|');
 
   if (nextAtlasKey !== atlasKey && !building) {
     building = true;
-    const bakeCombos = [];
-    const seenBake = new Set();
-    for (const c of combos) {
-      const base = baseAssetId(c.asset);
-      const sub = rigs.get(base);
-      const frames = sub ? Math.max(2, Math.floor(Number(sub.frames) || 8)) : 0;
-      if (frames > 1) {
-        for (let i = 0; i < frames; i++) {
-          const fid = frameId(base, i);
-          if (!seenBake.has(fid)) {
-            seenBake.add(fid);
-            bakeCombos.push({ asset: fid, ink: c.ink, accent: c.accent });
-          }
-        }
-      } else if (!seenBake.has(c.asset)) {
-        seenBake.add(c.asset);
-        bakeCombos.push(c);
-      }
-    }
     self.postMessage({
       type: 'REQUEST_ATLAS_BAKE',
-      combos: bakeCombos,
+      combos,
       fxLayerIds,
       key: nextAtlasKey,
     });

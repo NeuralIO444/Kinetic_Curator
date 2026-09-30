@@ -111,7 +111,6 @@ node src/assets/overlay.selfcheck.mjs
 node src/state/overlayRoundtrip.selfcheck.mjs
 node src/assets/primitives.selfcheck.mjs
 node src/assets/silhouette.selfcheck.mjs
-node src/assets/subAnim.selfcheck.mjs
 node src/shimmer/shimmer.selfcheck.mjs
 node src/curator/curate.selfcheck.mjs
 node src/curator/transitions.selfcheck.mjs
