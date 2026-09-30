@@ -18,27 +18,20 @@ import { test, expect } from '@playwright/test';
 import { glNodeCount, waitForLiveFrame } from './gl-helpers.js';
 
 // The GL loop reports node count through the CanvasPanel pill. Poll for a
-// nonzero count so we never read a pre-first-frame zero — then wait for it to
-// SETTLE. A COUNT edit reaches the pill over several frames; the old single
-// read after a fixed 700 ms caught it mid-way on slower CI runners
-// (COUNT 60 read as 311 on the way down from 343) and failed a correct build.
-// Settled = the same value on SETTLE_READS consecutive polls. A swallowed edit
-// still settles — at the stale count — so the ratio bar below keeps its teeth.
-const SETTLE_READS = 4;
-const SETTLE_POLL_MS = 250;
+// nonzero count so we never read a pre-first-frame zero.
 const nodeCount = async (page) => {
   await waitForLiveFrame(page);
-  let last = await glNodeCount(page);
-  let same = 1;
-  const deadline = Date.now() + 20_000;
-  while (same < SETTLE_READS && Date.now() < deadline) {
-    await page.waitForTimeout(SETTLE_POLL_MS);
-    const n = await glNodeCount(page);
-    same = n === last ? same + 1 : 1;
-    last = n;
-  }
-  return last;
+  return glNodeCount(page);
 };
+
+// A COUNT edit reaches the pill over several frames. A single read after a
+// fixed sleep caught it mid-way on slow CI runners (COUNT 60 read as 311 on the
+// way down from 343), and waiting for N identical reads never finished there
+// either (the pill kept moving), timing the test out. So poll the PROPERTY:
+// wait up to CONVERGE_MS for the count to cross the ratio bar. A slow runner
+// gets time; a swallowed edit never crosses it and still fails.
+const CONVERGE_MS = 20_000;
+const MARGIN = 1.5;
 
 /** Set a range input to an exact value and let React commit it. */
 async function setRange(page, slider, value) {
@@ -91,29 +84,30 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   await setRange(page, count, 700);
   const high = await nodeCount(page);
   await setRange(page, count, 60);
+  await expect.poll(() => glNodeCount(page), {
+    message: 'COUNT=60 should place many fewer shapes than COUNT=700 (a stale cache stays high)',
+    timeout: CONVERGE_MS,
+  }).toBeLessThan(high / MARGIN);
   const low = await nodeCount(page);
   await setRange(page, count, 700);
+  await expect.poll(() => glNodeCount(page), {
+    message: 'returning COUNT to 700 should restore the high node count',
+    timeout: CONVERGE_MS,
+  }).toBeGreaterThan(low * MARGIN);
   const restored = await nodeCount(page);
   console.log(`[cache] COUNT 700 -> ${high} nodes, 60 -> ${low}, back to 700 -> ${restored}`);
 
-  // #655 (supersedes the #478 note below): the governor is disarmed via
-  // window.__KC_GOVERNOR_OFF, so the node count below is the deterministic
-  // resolved placement count, not the live post-shed count. The margin stays
-  // at 1.5x — deliberately not loosened again — and a real stale-cache bug
-  // still fails decisively: a swallowed edit leaves high/low/restored all at
-  // the last-cached count, a ratio of ~1x, nowhere near the bar.
+  // #655: the governor is disarmed via window.__KC_GOVERNOR_OFF, so the node
+  // count is the deterministic resolved placement count, not the live post-shed
+  // count. The margin stays at 1.5x — deliberately not loosened again — and a
+  // real stale-cache bug still fails decisively: a swallowed edit leaves the
+  // count at the last-cached value, a ratio of ~1x, and the polls above time
+  // out instead of crossing the bar.
   //
-  // #478 (historical): this used to measure the live governor-shed node
-  // count, which responds to real wall-clock frame rate. Under concurrent CI load the governor sheds
-  // COUNT=700 harder than COUNT=60, narrowing the ratio toward ~1.8x on a
-  // loaded runner (observed 3-11% short of a 2x bar across 4 failures) even
-  // though a fresh local build clears it by 6.6x. A real stale-cache bug —
-  // the thing this test exists to catch — doesn't produce a narrowed ratio;
-  // a swallowed edit means `high` never moves off whatever was last cached,
-  // so the ratio reads close to 1x, nowhere near either bar. 1.5x keeps a
-  // wide margin below every CI-load ratio seen so far while staying just as
-  // decisive against the real failure mode.
-  const MARGIN = 1.5;
+  // #478 (historical): this used to measure the live governor-shed node count,
+  // which under CI load narrowed the ratio toward ~1.8x; 1.5x keeps a wide
+  // margin below every CI-load ratio seen while staying decisive against the
+  // real failure mode.
   expect(high, 'COUNT=700 should place many more shapes than COUNT=60')
     .toBeGreaterThan(low * MARGIN);
   expect(restored, 'returning COUNT to 700 should restore the high node count')
