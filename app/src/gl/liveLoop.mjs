@@ -29,6 +29,8 @@ import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
 import { audioRoutes } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
+import { createBandFeed } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
+import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
@@ -100,6 +102,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
 
   // Spine C (#389): GL-loop owned life clock, audio ballistics follower, and layered breath springs
   const ballisticsState = createBallisticsState();
+  const bandFeed = createBandFeed(); // #790 PR3
   let loopLifeT = 0;
   let breathScaleSmoothed = 1;
   let breathRotSmoothed = 0;
@@ -443,7 +446,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
 
     // Ballistics on scaleMul / alphaBoost / glow (keep silence-is-zero contract).
     // #613: the routes live in audioRoutes.mjs, shared with the STIMULI matrix.
-    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt }, s.audioRoutes); // #790: the scene's route table (null = default)
+    // #790: the scene's route table (null = default) and, only if a route reads one, the 7 meter bands.
+    const shapedBands = bandFeed.read({
+      routes: s.audioRoutes, enabled: audioOn, sidecar: !!(s.audioSidecar && s.audioSource?.type === 'file'),
+      readBands: readMeterBandLevels, dtMs: dtSec * 1000,
+    });
+    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt }, s.audioRoutes, shapedBands);
     const { scaleMul, alphaBoost } = routes;
 
     // Layered life LFO (incommensurate sines) from the GL loop
