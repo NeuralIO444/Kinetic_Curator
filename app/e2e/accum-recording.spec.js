@@ -64,15 +64,20 @@ async function recordWebM(page, fade, secs) {
   await page.waitForTimeout(secs * 1000);
   await page.getByRole('button', { name: /STOP REC/ }).click();
   await page.waitForFunction(() => window.__webmBlobs.length > 0, null, { timeout: 15_000 });
+  // Ferry the blob as base64, not as a JSON array of numbers: a multi-MB
+  // WebM serialized number-by-number was most of this test's 180s budget on
+  // CPU-starved CI runners ("page.evaluate: Test ended" flake).
   const bytes = await page.evaluate(async () => {
     const blob = window.__webmBlobs[window.__webmBlobs.length - 1];
-    return {
-      size: blob.size,
-      type: blob.type,
-      data: Array.from(new Uint8Array(await blob.arrayBuffer())),
-    };
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(',')[1] || '');
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(blob);
+    });
+    return { size: blob.size, type: blob.type, b64 };
   });
-  return { size: bytes.size, type: bytes.type, buffer: Buffer.from(bytes.data) };
+  return { size: bytes.size, type: bytes.type, buffer: Buffer.from(bytes.b64, 'base64') };
 }
 
 // Decodes the captured WebM in-page (video + requestVideoFrameCallback) and
@@ -99,12 +104,14 @@ async function analyzeWebM(page) {
       const onFrame = () => {
         ctx.drawImage(video, 0, 0, W, H);
         frames.push(ctx.getImageData(0, 0, W, H).data.slice());
-        if (frames.length >= 30) res();
+        // 12 frames = 11 diffs, double the >= 6 the assertions need. Decoding
+        // 30 on software GL was the other half of the timeout budget.
+        if (frames.length >= 12) res();
         else video.requestVideoFrameCallback(onFrame);
       };
       video.requestVideoFrameCallback(onFrame);
       video.play().catch(() => res());
-      setTimeout(res, 25_000);
+      setTimeout(res, 12_000);
     });
     URL.revokeObjectURL(url);
     const diffs = [];
