@@ -43,8 +43,9 @@ layout(location=3) in vec4 a_inst2;
 layout(location=4) in vec4 a_inst3;
 layout(location=5) in vec4 a_inst4;
 uniform vec2 u_canvas;
-uniform vec2 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
-                        // per-frame velocity, y = max stretch factor
+uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
+                        // per-frame velocity, y = max stretch factor,
+                        // z = #594 PR3 squash (0 = stretch only, 1 = area held)
 // #594 the CHIAROSCURO sun. ONE sun, never three-point: a rim or fill light
 // breaks the rule — propose it on #594 before adding a second uniform set.
 uniform vec4 u_sun;       // x, y (scene units), height above the plane, w = on (0/1)
@@ -78,6 +79,13 @@ void main() {
     vec2 smd = smv / sms;
     float smk = min(sms * u_smear.x, u_smear.y);
     rr += smd * (dot(rr, smd) * smk);
+    // #594 PR3 squash-and-stretch: thin the mark across its motion so it
+    // keeps its mass instead of growing. Gated so squash 0 is bit-for-bit
+    // the plain smear (the recombine below is not exact in float).
+    if (u_smear.z > 0.0) {
+      vec2 along = smd * dot(rr, smd);
+      rr = along + (rr - along) * mix(1.0, 1.0 / (1.0 + smk), u_smear.z);
+    }
   }
   vec2 world = a_inst0.xy + rr;
   gl_Position = vec4(world.x / u_canvas.x * 2.0 - 1.0, 1.0 - world.y / u_canvas.y * 2.0, 0.0, 1.0);

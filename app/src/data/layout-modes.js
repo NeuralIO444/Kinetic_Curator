@@ -95,6 +95,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
 
   body: 3,
   flap: 0.35,
+  squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   tight: 0.55,
   wind: 1,
   symmetry: 'none',
@@ -189,6 +190,9 @@ export const PARAM_SPEC = {
   damping: { min: 0.80, max: 0.99 },
   body: { min: 1, max: 7, int: true },
   flap: { min: 0, max: 1 },
+  // #594 PR3 squash-and-stretch: how much a moving mark thins across its
+  // motion while the #309 smear stretches it along — 1 holds its area.
+  squash: { min: 0, max: 1 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the

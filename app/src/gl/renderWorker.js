@@ -198,7 +198,7 @@ function buildFrame() {
 
   // Scene contract
   const contract = buildSceneContract({
-    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, palette: tintTargetPalette },
+    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, palette: tintTargetPalette },
     resolvedLayers: resolved,
     caps: null,
     accum: null,
