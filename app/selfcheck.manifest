@@ -94,6 +94,7 @@ node src/gl/atlasKeyGuard.selfcheck.mjs
 node src/gl/velocitySmear.selfcheck.mjs
 node src/gl/squash.selfcheck.mjs
 node src/gl/audioRoutes.selfcheck.mjs
+node src/gl/bandFeed.selfcheck.mjs
 node src/gl/audioSidecar.selfcheck.mjs
 node src/gl/kineme.selfcheck.mjs
 node src/gl/audioBallistics.selfcheck.mjs

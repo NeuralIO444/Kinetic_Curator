@@ -4,12 +4,13 @@
 // Inputs with no route today (MID, TREBLE) are listed honestly as unrouted.
 // Audio off → every live value reads 0.
 import { audioMatrixRows } from '../../gl/audioRoutes.mjs';
+import { getShapedBands } from '../../gl/bandFeed.mjs';
 
 const fmt = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(3));
 
 export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod, alphaMod, routes = null }) {
   // #790: the rows follow the scene's route table (null = today's default routes)
-  const rows = audioMatrixRows({ ...audioBands, beatPulse }, { depth, scaleMod, alphaMod }, audioEnabled, routes);
+  const rows = audioMatrixRows({ ...audioBands, beatPulse }, { depth, scaleMod, alphaMod }, audioEnabled, routes, getShapedBands()); // bands: exactly what the loop fed
   return (
     <div className="stim-matrix" role="table" aria-label="Modulation matrix">
       <div className="stim-matrix-head" role="row">
