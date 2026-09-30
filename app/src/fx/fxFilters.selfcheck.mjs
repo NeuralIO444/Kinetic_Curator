@@ -401,17 +401,18 @@ ok('#554: builtin u_p packers agree with the catalog sanitize — hostile values
     const def = BUILTIN_EFFECT_DEFS.find((d) => d.kind === kind);
     return def.make(EFFECT_IDS).passes[0].params(params);
   };
-  // packed slot per knob (invert has none)
-  const KNOBS = { rgbSplit: ['dx', 1000], grain: ['amount', 1], posterize: ['levels', 1] };
-  for (const [kind, [key, scale]] of Object.entries(KNOBS)) {
+  // packed slot per knob (invert has none). grain amount lives on u_p.y (#821).
+  const KNOBS = { rgbSplit: ['dx', 1000, 0], grain: ['amount', 1, 1], posterize: ['levels', 1, 0] };
+  for (const [kind, [key, scale, slot]] of Object.entries(KNOBS)) {
     for (const v of HOSTILE) {
       const want = sanitizeFxEffects([{ kind, params: { [key]: v } }])[0].params[key];
-      const got = packFor(kind, { [key]: v })[0] * scale;
+      const packed = packFor(kind, { [key]: v });
+      const got = packed[slot] * scale;
       assert.ok(Number.isFinite(got), `${kind}.${key}=${String(v)} packs finite`);
       assert.ok(Math.abs(got - want) < 1e-9, `${kind}.${key}=${String(v)}: packer ${got} !== catalog ${want}`);
+      if (kind === 'grain') assert.equal(packed[0], 0, 'grain must not write u_p.x');
     }
-    // missing params land on the catalog default
-    assert.ok(Math.abs(packFor(kind, {})[0] * scale - FX_EFFECT_DEFS[kind].params[key].def) < 1e-9, `${kind} default`);
+    assert.ok(Math.abs(packFor(kind, {})[slot] * scale - FX_EFFECT_DEFS[kind].params[key].def) < 1e-9, `${kind} default`);
   }
   assert.deepEqual(packFor('invert', {}), [0, 0, 0, 0]);
 });
