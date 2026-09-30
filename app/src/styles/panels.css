@@ -212,7 +212,20 @@
 }
 .stim-toggle:hover { color: var(--ink); border-color: var(--ink); }
 .stim-toggle.on { color: #000; font-weight: 700; }
-.stim-meters { display: grid; grid-template-columns: 1fr; gap: 3px; margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.25); border: 1px solid var(--line); }
+.stim-meter-hero { margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.25); border: 1px solid var(--line); }
+.stim-meter-head { display: flex; justify-content: space-between; font-size: 9px; letter-spacing: 0.1em; color: var(--dim); margin-bottom: 4px; }
+.stim-source { color: var(--ink); border: 1px solid var(--line-2); padding: 0 5px; }
+.stim-source.idle { color: var(--dim); }
+.stim-meter-canvas { display: block; width: 100%; }
+/* #613 MATRIX */
+.stim-matrix { margin-bottom: 8px; font-size: 9px; letter-spacing: 0.04em; border: 1px solid var(--line); }
+.stim-matrix-head, .stim-matrix-row { display: grid; grid-template-columns: 1.4fr 1fr 1.6fr; gap: 6px; padding: 2px 6px; align-items: center; }
+.stim-matrix-head { color: var(--dim); border-bottom: 1px solid var(--line); letter-spacing: 0.1em; }
+.stim-matrix-row.unrouted { color: var(--dim); }
+.stim-matrix-depth { color: var(--dim); font-variant-numeric: tabular-nums; }
+.stim-matrix-live { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.stim-matrix-bar { flex: 1; height: 4px; background: var(--line-2); position: relative; }
+.stim-matrix-bar b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
 .stim-meter-row { display: grid; grid-template-columns: 52px 1fr 32px; align-items: center; gap: 6px; font-size: 9px; }
 .stim-meter-label { color: var(--dim); letter-spacing: 0.08em; text-transform: lowercase; }
 .stim-meter-track { position: relative; height: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--line); }

@@ -4,7 +4,8 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { SourceControls } from './stimulus/SourceControls.jsx';
 import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
-import { MeterBlock } from './stimulus/MeterBlock.jsx';
+import { MeterHero } from './stimulus/MeterHero.jsx';
+import { ModMatrix } from './stimulus/ModMatrix.jsx';
 
 export function StimulusPanel() {
   const { state } = useApp(s => ({
@@ -47,6 +48,11 @@ export function StimulusPanel() {
     <div className="panel panel-stimulus">
       <PanelHeader tag="P06" title="STIMULI" subtitle={audioEnabled ? 'active' : 'idle'} />
       <div className="stim-body">
+          {/* #613 — hierarchy inverted: the METER is the hero, the MATRIX shows
+              which sound drives what, live; setup and raw knobs follow. */}
+          <MeterHero />
+          <ModMatrix audioBands={audioBands} beatPulse={beatPulse} audioEnabled={audioEnabled}
+            depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} />
           <div className="stim-toggle-row">
             {/* #310: VIDEO (soon) removed — dead control, nothing reads motionEnergy. */}
             <button
@@ -77,7 +83,6 @@ export function StimulusPanel() {
 
           <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} attackMs={attackMs} decayMs={decayMs} response={response} swell={swell} audioEnabled={audioEnabled} />
 
-          <MeterBlock audioBands={audioBands} beatPulse={beatPulse} />
       </div>
     </div>
   );

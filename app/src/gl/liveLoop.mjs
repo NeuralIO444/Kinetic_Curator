@@ -28,6 +28,7 @@
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
+import { audioRoutes } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
@@ -440,13 +441,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const alphaModAmt = layoutParams.audioAlphaMod ?? 0.25;
     const lifeDrift = layoutParams.lifeDrift ?? 0.35;
 
-    // Ballistics on scaleMul / alphaBoost / glow (keep silence-is-zero contract)
-    const scaleMul = 1 + (
-      shapedAudio.beatPulse * 0.38 * scaleModAmt +
-      (shapedAudio.bass * 0.55 + shapedAudio.rms * 0.35) * 0.28
-    ) * depth;
-
-    const alphaBoost = shapedAudio.beatPulse * 18 * alphaModAmt * depth;
+    // Ballistics on scaleMul / alphaBoost / glow (keep silence-is-zero contract).
+    // #613: the routes live in audioRoutes.mjs, shared with the STIMULI matrix.
+    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt });
+    const { scaleMul, alphaBoost } = routes;
 
     // Layered life LFO (incommensurate sines) from the GL loop
     const t = loopLifeT;
@@ -455,7 +453,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       0.30 * Math.sin(t * 1.19 + 1.7) +
       0.15 * Math.sin(t * 0.29 + 4.1);
 
-    const targetBreathScale = 1 + rawBreath * 0.012 * lifeDrift + shapedAudio.beatPulse * 0.035 * depth;
+    const targetBreathScale = 1 + rawBreath * 0.012 * lifeDrift + routes.breathAudio;
     const targetBreathRot = rawBreath * 0.6 * lifeDrift;
 
     // Critically damp breathScale / breathRot (omega ≈ 8)
@@ -463,7 +461,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     breathScaleSmoothed += (targetBreathScale - breathScaleSmoothed) * dampFactor;
     breathRotSmoothed += (targetBreathRot - breathRotSmoothed) * dampFactor;
 
-    const glow = Math.min(1, shapedAudio.beatPulse * 0.8 + shapedAudio.rms * 0.4) * depth;
+    const glow = routes.glow;
 
     const effectiveScale = [
       (layoutParams.scale?.[0] ?? 0.4) * scaleMul,

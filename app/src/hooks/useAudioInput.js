@@ -7,6 +7,8 @@
 // mic connection mid-performance.
 
 import { useRef, useEffect } from 'react';
+import { setAudioMeterTap } from './audioMeterTap.js';
+import { METER_FFT_SIZE } from '../gl/meterBands.mjs';
 import {
   createBallisticsState,
   resetBallistics,
@@ -144,8 +146,16 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.8;
 
+        // #613 — a second, finer analyser for the STIMULI meter only (7 named
+        // bands + waveform). Modulation keeps reading `analyser` above, so the
+        // instrument's feel is untouched by the meter.
+        const meterAnalyser = ctx.createAnalyser();
+        meterAnalyser.fftSize = METER_FFT_SIZE;
+        meterAnalyser.smoothingTimeConstant = 0.6;
+
         srcNode.connect(gainNode);
         gainNode.connect(analyser);
+        gainNode.connect(meterAnalyser);
         // A file source routed only into the analyser is silent. Always monitor
         // file playback; a live mic is monitored on request (feedback risk).
         if (monitor || source.type === 'file') gainNode.connect(ctx.destination);
@@ -154,6 +164,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
         sourceRef.current = { node: srcNode, stream };
         gainNodeRef.current = gainNode;
         analyserRef.current = analyser;
+        setAudioMeterTap({ analyser: meterAnalyser, sampleRate: ctx.sampleRate, kind: source.type === 'file' ? 'FILE' : 'MIC' });
         runningRef.current = true;
         // #306: fresh session, fresh envelope — never resume from stale values.
         resetBallistics(follower);
@@ -172,6 +183,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, onSt
     return () => {
       cancelled = true;
       runningRef.current = false;
+      setAudioMeterTap(null); // #613: the meter reads idle, never a frozen ghost
       prevRmsRef.current = 0;
       // #306: session over — drop the envelope so a re-enable starts silent.
       resetBallistics(follower);
