@@ -17,3 +17,11 @@ app/public/particles.wat
 # MLX harness working data (measurements, PNGs, failure logs) — local only.
 # The committed products live in mlx_artifacts/ (see its README).
 mlx_data/
+
+# Local-only working files at the repo root (not part of the project)
+/Kinetic_Curator/
+/kc-track-graph/
+/tmp-review/
+/scripts/pr-launcher.mjs
+/trails.png
+/trails-swarm.png
