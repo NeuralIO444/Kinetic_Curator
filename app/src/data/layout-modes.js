@@ -231,6 +231,16 @@ export const PARAM_SPEC = {
   collideMask: { min: 0, max: 0xffffffff, int: true },
 };
 
+/**
+ * #764 — params that can change WHICH assets get placed, and so the live
+ * atlas key (liveLoop atlasKeyFor: asset ids + FX layers). The Hold rule
+ * (docs/PLENUM.md): a MIX may lerp these per frame only while the placed
+ * asset set stays constant across the blend, because a new asset id mid-
+ * blend is a rebake. gl/atlasKeyGuard.selfcheck.mjs sweeps real MIXes and
+ * fails when that breaks. A new param that affects placement joins this list.
+ */
+export const ATLAS_AFFECTING_PARAMS = ['count', 'particleCount', 'lsysDepth', 'body'];
+
 /** Bounds for each end of the dual-slider ranges. */
 export const RANGE_SPEC = {
   scale: { min: 0.1, max: 3.0 },
