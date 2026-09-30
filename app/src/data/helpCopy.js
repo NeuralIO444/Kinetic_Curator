@@ -33,6 +33,7 @@ export const HELP_TOPICS = [
   { id: 'layers-blend', group: 'Build', title: 'blend', text: 'How this layer composites onto the stack below.' },
   { id: 'output-fxaa', group: 'Output', title: 'edge aa', text: 'FXAA smooths hard stair-stepped edges on the final frame — grid, letterforms, paused shots. Applies to the live canvas and to exports. Costs a little GPU — the governor drops it first if the frame rate sags, and brings it back when it recovers.' },
   { id: 'output-weave', group: 'Output', title: 'gate weave', text: 'A whisper of projector wobble: the whole frame drifts under one pixel. Live canvas and recordings only — still snaps stay exact. Off by default.' },
+  { id: 'output-taste', group: 'Output', title: 'taste', text: 'Load a taste.json trained on the Mac Studio (MLX runbook §4). The curator then picks with your taste — the bar reads "curated pick · mlx". Kept on this machine only; CLEAR forgets it.' },
   { id: 'output-loop', group: 'Output', title: 'capture loop', text: 'Records a fixed-length take and exports it as a seamless looping WebM — the tail dissolves into the head so there is no visible cut.' },
   { id: 'layout-flow', group: 'Build', title: 'flow', text: 'Curl-advects the ACCUM trail buffer as it decays — trails curl like smoke instead of just fading. 0 is off.' },
   { id: 'layers-patch-mod', group: 'Build', title: 'mod', text: 'Source motion shoves this track — glow, fade, nudge. A still source drives nothing; strength sets how hard it pushes when things move.' },

@@ -6,10 +6,10 @@
 // status() -> 'active' | 'untrained'. Scorers plug in at getActiveCurator()
 // below, highest priority first:
 //
-//   1. MLX curator (studio/curator.py + docs/MLX_CURATOR_RUNBOOK.md) — ranks
-//      by embedding similarity to kept renders once the Mac Studio runbook
-//      has produced a taste artifact. NOT TRAINED YET: mlxCurator() returns
-//      null until that run happens, and nothing here pretends otherwise.
+//   1. MLX curator (studio/curator.py + docs/MLX_CURATOR_RUNBOOK.md §4) — a
+//      linear head distilled from the embedding probe trained on kept renders,
+//      scoring recipe features (curator/tasteHead.js). Null until a taste.json
+//      is imported and its head is faithful (fidelity ≥ 0.3).
 //   2. Persona curator (taste.js) — interim taste: measures 15 real visual
 //      features per candidate and scores them against the active persona's
 //      distilled Loves/Avoids. Honest about being a stand-in, not a model.
@@ -18,6 +18,8 @@
 //      was tasted. Never fake curation.
 
 import { personaCurator } from './taste.js';
+import { makeMlxCurator } from './tasteHead.js';
+import { getTaste } from './tasteStore.js';
 
 export const CURATE_CANDIDATES = 8;
 
@@ -31,13 +33,12 @@ export function nullCurator() {
 }
 
 /**
- * MLX-backed curator. Returns null until the Mac Studio runbook produces a
- * taste artifact — when it does, return an engine here implementing the
- * same { name, status(), pick() } contract and it takes priority over the
- * persona scorer automatically.
+ * MLX-backed curator (#762). Active once a taste.json from the Mac Studio
+ * runbook is imported (Pipeline → IMPORT TASTE) and its distilled head is
+ * faithful enough; otherwise null, and the persona scorer takes over.
  */
 function mlxCurator() {
-  return null;
+  return makeMlxCurator(getTaste());
 }
 
 /**

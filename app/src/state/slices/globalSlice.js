@@ -14,6 +14,8 @@ import {
   MAX_LAYERS,
 } from '../projectNormalize.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
+import { tasteSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
@@ -239,6 +241,19 @@ export const createGlobalSlice = (set) => ({
   search: '',
   catFilter: 'all',
   poolView: readPoolView(),
+  // #762 — the imported taste (kept per machine in curator/tasteStore.js). The
+  // store mirrors a status line + a revision so the curator bar re-renders.
+  tasteStatus: tasteSummary(getTaste()),
+  tasteRev: 0,
+  importTaste: (raw) => {
+    const r = keepTaste(raw);
+    if (r.ok) set((s) => ({ tasteStatus: tasteSummary(r.taste), tasteRev: (s.tasteRev || 0) + 1 }));
+    return r;
+  },
+  clearTaste: () => {
+    dropTaste();
+    set((s) => ({ tasteStatus: tasteSummary(null), tasteRev: (s.tasteRev || 0) + 1 }));
+  },
   fxaa: readFxaa(),
   weave: readWeave(),
   setWeave: (on) => {
