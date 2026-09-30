@@ -69,6 +69,9 @@ assert.equal(params.composition, 'dusk-flock', 'load rewrites alias to canonical
   const curatorBar = read('../panels/layout/CuratorBar.jsx');
   assert.ok(/>\s*looks ▾\s*</.test(curatorBar), 'CuratorBar button says looks ▾');
   assert.ok(!/>\s*presets\s*▾/i.test(curatorBar), 'no "presets ▾" on the face');
+  // 1.3.0 (#716): the Curator cluster's one home is the top bar, next to KC-1.
+  assert.ok(/<CuratorBar \/>/.test(read('../components/PaletteStrip.jsx')), 'top bar renders the Curator cluster');
+  assert.ok(!/CuratorBar/.test(read('../panels/BuildPanel.jsx')), 'BUILD no longer carries the Curator cluster (one home)');
   const tour = read('tour.js');
   assert.ok(!/title:\s*'[^']*\b(preset|recipe)\b/i.test(tour), 'tour titles say Look, not preset/recipe');
   const modeGrid = read('../panels/layout/ModeGrid.jsx');

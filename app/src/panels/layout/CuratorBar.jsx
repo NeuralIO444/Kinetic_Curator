@@ -2,7 +2,8 @@
 // Rolls CURATE_CANDIDATES scenes, keeps the curator engine's pick.
 // The voice popup (left of the Curator button) chooses which persona
 // tastes the candidates ("off" = honest dice roll). The hint always says
-// who picked. The looks popup (#735: Looks, never "presets", on the face) (also left of Curator) applies a named,
+// who picked. #716: lives in the top bar (global verb), so it reads its own
+// state and the hint rides the Curator button's tooltip. The looks popup (#735: Looks, never "presets", on the face) (also left of Curator) applies a named,
 // complete scene directly — a different action from taste-biased random.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
@@ -16,7 +17,9 @@ import {
   setActivePersona,
 } from '../../curator/taste.js';
 
-export function CuratorBar({ lockCount, composition }) {
+export function CuratorBar() {
+  const composition = useStore((s) => s.layoutParams.composition);
+  const lockCount = useStore((s) => Object.values(s.lockedParams || {}).filter(Boolean).length);
   const [voice, setVoice] = useState(getActivePersonaId() ?? 'off');
   const [menuOpen, setMenuOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
@@ -73,8 +76,7 @@ export function CuratorBar({ lockCount, composition }) {
     }
   };
   return (
-    <div className="randomize-bar">
-      <div className="curator-left-group">
+    <div className="curator-left-group kc-topbar-curator">
         <div className="curator-voice-wrap" ref={presetWrapRef}>
           <button
             className="curator-voice-btn"
@@ -139,11 +141,9 @@ export function CuratorBar({ lockCount, composition }) {
             </div>
           )}
         </div>
-        <button className="randomize-btn" onClick={onCurate}>
+        <button className="randomize-btn" onClick={onCurate} title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
           Curator
         </button>
-      </div>
-      <span className="randomize-hint">{lockCount > 0 ? `${lockCount} locked · ` : ''}{hint}</span>
     </div>
   );
 }

@@ -100,7 +100,33 @@
   border-bottom: 1px solid var(--line-2);
   height: 38px;
   min-height: 0;
-  overflow: hidden;
+  /* #716 — visible so the top-bar LOOKS/VOICE menus can drop below the bar;
+     the palette switch clips its own overflow instead. */
+  overflow: visible;
+  position: relative;
+  z-index: 20;
+  gap: 12px;
+}
+.palette-strip > .palette-switch { overflow: hidden; }
+/* #716 — Curator cluster in the top bar: menus open downward. */
+.kc-topbar-curator { flex-shrink: 0; }
+.kc-topbar-curator .curator-voice-menu { top: calc(100% + 4px); bottom: auto; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+/* #716 — narrow-width rule: palette chips shrink to swatches before anything
+   wraps (names cost ~170px, so they go first, below 1440), then the time
+   slider shortens, the redundant PALETTE label drops and gaps tighten (<1280). Below
+   1024 the phone layout already wraps the bar. */
+@media (max-width: 1439px) {
+  .palette-chip .palette-chip-name { display: none; }
+}
+@media (max-width: 1279px) {
+  .palette-strip { gap: 6px; }
+  .palette-strip .palette-switch > div { gap: 6px !important; }
+  .palette-strip .palette-mix-slider { width: 64px; }
+  .palette-strip .palette-switch-label { display: none; }
+}
+@media (max-width: 1099px) {
+  .palette-strip .palette-mix-slider { width: 40px; }
+  .palette-strip .palette-shuffle-word { display: none; } /* ⟳ alone; the tooltip names it */
 }
 
 /* Mode strip — mode/behave quick-access, same role as palette-strip but
