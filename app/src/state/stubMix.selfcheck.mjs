@@ -100,7 +100,7 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
 // ── loadShapeSet: the assets axis — swaps the pool at the press, nothing else ──
 {
   const known = new Set(ASSETS.map((a) => a.id));
-  assert.strictEqual(SHAPE_SETS.length, 15, '3 flagship + 12 layout-tile shape sets');
+  assert.strictEqual(SHAPE_SETS.length, 16, '4 flagship (#704 dark glass) + 12 layout-tile shape sets');
   for (const x of SHAPE_SETS) {
     assert.strictEqual(x.ids.length, 4, `${x.id}: exactly 4 shapes`);
     assert.ok(x.ids.every((i) => known.has(i)), `${x.id}: all ids are real assets`);

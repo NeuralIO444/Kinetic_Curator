@@ -21,10 +21,11 @@ test.describe('Mode personas', () => {
   });
 
   test('flagship chips, stub tiles and + chip render', async ({ page }) => {
-    await expect(page.locator('.voice-chip.flagship')).toHaveCount(3);
+    await expect(page.locator('.voice-chip.flagship')).toHaveCount(4);
     await expect(page.locator('.voice-flagships')).toContainText(/SWARM/);
     await expect(page.locator('.voice-flagships')).toContainText(/HYPE/);
     await expect(page.locator('.voice-flagships')).toContainText(/MURM/);
+    await expect(page.locator('.voice-flagships')).toContainText(/DARK GLASS/);
     // 12 stub tiles keep the mode grid
     await expect(page.locator('.mode-grid .mode-tile')).toHaveCount(12);
     await expect(page.locator('.plus-chip')).toBeVisible();

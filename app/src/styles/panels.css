@@ -83,7 +83,7 @@
 
 /* ─── Voice row (#280) ─── */
 .voice-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.voice-flagships { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.voice-flagships { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
 .voice-chip {
   background: transparent;
   border: 1px solid var(--line);

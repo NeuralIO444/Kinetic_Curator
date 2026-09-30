@@ -9,11 +9,11 @@
 // resolveLookId is ONLY for layoutParams.composition / getPreset.
 // Never run it on a voice id. Frozen voice ids do not rename.
 
-export const TAXONOMY_VERSION = '1.1.0';
+export const TAXONOMY_VERSION = '1.2.0';
 export const TAXONOMY_COMPAT = 'look-apply=layout-only';
 
 /** Voice ids. Face titles may change; these strings do not. */
-export const FROZEN_VOICE_IDS = Object.freeze(['swarm', 'hype', 'murmuration']);
+export const FROZEN_VOICE_IDS = Object.freeze(['swarm', 'hype', 'murmuration', 'dark-glass']);
 
 /**
  * Old Look id → canonical COMPOSITION_PRESETS id.

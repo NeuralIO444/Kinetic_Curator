@@ -11,6 +11,9 @@ import {
   VOICE_SWATCH_COUNT,
 } from './voices.js';
 import { DEFAULT_LAYOUT_PARAMS, MODE_IDS, validateLayoutParams } from './layout-modes.js';
+import { ASSETS } from './assets/index.js';
+import { getCatalogPalette } from './palettes.js';
+import { COMPOSITION_PRESETS } from './presets.js';
 
 // #515: HYPE read as rattle, not pulse — its life LFO was the hottest of the three
 // flagships (0.5). Retuned to 0.3; raise it deliberately, with a play-test.
@@ -19,9 +22,9 @@ import { DEFAULT_LAYOUT_PARAMS, MODE_IDS, validateLayoutParams } from './layout-
   assert.ok(life('hype') <= 0.3, `HYPE lifeDrift ${life('hype')} must not exceed 0.3`);
 }
 
-// Three flagships, each a COMPLETE state.
-assert.strictEqual(FLAGSHIP_VOICES.length, 3);
-assert.deepStrictEqual(FLAGSHIP_VOICE_IDS, ['swarm', 'hype', 'murmuration']);
+// Four flagships, each a COMPLETE state.
+assert.strictEqual(FLAGSHIP_VOICES.length, 4);
+assert.deepStrictEqual(FLAGSHIP_VOICE_IDS, ['swarm', 'hype', 'murmuration', 'dark-glass']);
 
 for (const v of FLAGSHIP_VOICES) {
   const st = resolveVoiceState(v);
@@ -65,7 +68,14 @@ for (const stub of STUB_VOICES) {
   assert.ok(MODE_IDS.includes(stub.id), `stub ${stub.id} is a real mode`);
   assert.ok(!isFlagshipVoiceId(stub.id), `stub ${stub.id} is not a flagship`);
 }
-for (const id of FLAGSHIP_VOICE_IDS) assert.ok(MODE_IDS.includes(id), `flagship ${id} is a real mode`);
+// A flagship is a Voice over a mode (#735), not necessarily a mode itself:
+// SWARM/HYPE/MURM happen to share their mode's id; DARK GLASS (#704) rides
+// fibonacci. What must hold: every flagship lands on a real mode, and no
+// flagship id shadows a stub chip.
+for (const v of FLAGSHIP_VOICES) {
+  assert.ok(MODE_IDS.includes(resolveVoiceState(v).params.mode), `flagship ${v.id} lands on a real mode`);
+  assert.ok(!STUB_VOICES.some((s) => s.id === v.id), `flagship ${v.id} does not shadow a stub chip`);
+}
 
 const a = resolveVoiceState(FLAGSHIP_VOICES[0]);
 const b = resolveVoiceState(FLAGSHIP_VOICES[1]);
@@ -105,6 +115,39 @@ assert.deepStrictEqual(sanitizeFx(null), sanitizeFx({}));
   }
   assert.ok(p('hype').metabolism > p('swarm').metabolism && p('swarm').metabolism > p('murmuration').metabolism, 'metabolism: HYPE > SWARM > MURM');
   assert.ok(p('murmuration').breath > p('hype').breath && p('hype').breath > p('swarm').breath, 'breath: MURM > HYPE > SWARM');
+}
+
+// #704 — DARK GLASS: the chiaroscuro mode in one press. Its cast is four
+// crystalline facets, each painting a TE-limited gradient (≤2 stops, palette
+// slots only — var(--ink)/var(--accent), no literal colours) so it resolves
+// through the live palette. Palette = the CHIAROSCURO catalog entry; layout =
+// the CHIAROSCURO Look. If either twin is retuned, this fails until they agree.
+{
+  const def = FLAGSHIP_VOICES.find((v) => v.id === 'dark-glass');
+  assert.ok(def, 'dark-glass voice exists');
+  const st = resolveVoiceState(def);
+  for (const id of Object.keys(st.assets)) {
+    const a = ASSETS.find((x) => x.id === id);
+    assert.ok(a, `${id} is a real asset`);
+    assert.strictEqual(a.category, 'crystalline', `${id} must be a crystalline facet`);
+    const grads = a.svg.match(/<(linear|radial)Gradient[\s\S]*?<\/(linear|radial)Gradient>/g) || [];
+    assert.ok(grads.length >= 1, `${id} paints a gradient`);
+    for (const g of grads) {
+      const stops = g.match(/<stop\b[^>]*>/g) || [];
+      assert.ok(stops.length >= 2 && stops.length <= 2, `${id}: two stops max (got ${stops.length})`);
+      for (const s of stops) {
+        assert.match(s, /stop-color="var\(--(ink|accent)\)"/, `${id}: stops are palette slots only — ${s}`);
+      }
+    }
+  }
+  const cat = getCatalogPalette('chiaroscuro');
+  assert.strictEqual(st.palette.bg, cat.bg.toLowerCase(), 'bg = CHIAROSCURO palette');
+  assert.strictEqual(st.palette.ink, cat.ink.toLowerCase(), 'ink = CHIAROSCURO palette');
+  const look = COMPOSITION_PRESETS.find((p) => p.id === 'chiaroscuro');
+  for (const [k, v] of Object.entries(look.params)) {
+    assert.deepStrictEqual(st.params[k], v, `params.${k} = CHIAROSCURO Look`);
+  }
+  console.log('voices.selfcheck: dark-glass — 4 crystalline gradient facets, CHIAROSCURO palette + Look');
 }
 
 console.log('voices.selfcheck: OK');

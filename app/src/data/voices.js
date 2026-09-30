@@ -4,7 +4,7 @@
 // description, and asset selection. Loading a chip always lands somewhere
 // beautiful; the performer's hands take it from there.
 //
-// Three flagships are fully voiced. The remaining modes are stubs — their
+// Four flagships are fully voiced. The remaining modes are stubs — their
 // chips keep the current mode-switch behavior until they are voiced later.
 //
 // Voice state shape:
@@ -259,6 +259,62 @@ export const FLAGSHIP_VOICES = [
       rad_rings_01: true,
       hae_tendril_01: true,
       dot_field_01: true,
+    },
+  },
+  // #704 — DARK GLASS: chiaroscuro as a mode you step into with ONE press. The
+  // CHIAROSCURO Look (presets.js) and palette (palettes.js) stay separate chips
+  // (#555 axes); this voice is the all-axes object (#735) that also brings the
+  // cast — four crystalline facets whose inline two-stop ink/accent gradients
+  // are the TE-limited gradients of #704 part 2 (palette slots only, so they
+  // resolve through the live palette like every flat asset). Params mirror the
+  // CHIAROSCURO Look; palette mirrors the CHIAROSCURO catalog entry. The halo
+  // FX (#715) is an FX layer, which a voice cannot carry — one extra press.
+  {
+    id: 'dark-glass',
+    name: 'DARK GLASS',
+    title: 'Chiaroscuro',
+    vibe: 'A few lit facets turning in a dark room — amber glass, one violet light.',
+    glyph: 'glass',
+    blendSeconds: 3,
+    palette: {
+      bg: '#0d0a08',
+      ink: '#e89b3c',
+      swatches: swatches8(['#e89b3c', '#f5c26b', '#c2691f', '#7c5cff', '#5a44c8', '#8a6a3a']),
+    },
+    params: {
+      mode: 'fibonacci',
+      count: 24,
+      scale: [1.6, 3.0],
+      rotate: [-180, 180],
+      alpha: [70, 100],
+      zTiers: 5,
+      jitter: 42,
+      density: 50,
+      bleed: false,
+      mirror: false,
+      overlap: true,
+      blendMode: 'normal', // facets occlude; screen would lift the dark ground
+      paletteShift: 'zone',
+      accumulation: true,
+      accumulationFade: 14,
+      accumulationOptics: 0.08,
+      lifeDrift: 0.10,
+      noiseSpeed: 0.10,
+      displacement: 8,
+      flap: 0.1,
+      wind: 0.35,
+      behave: 'cruise',
+      // #287 bio-drives (every flagship carries both): a slow room-sized breath,
+      // the calmest metabolism of the four — glass turns, it does not graze.
+      breath: 0.25,
+      metabolism: 0.15,
+    },
+    fx: { grain: 0.15, vignette: true, posterize: false, edge: false, glow: 0.08, contrast: 1.0 },
+    assets: {
+      xsh07: true, // hex gem — the faceted solid
+      xsh01: true, // shard — crisp crystal with a violet edge
+      xsh05: true, // twin prism — overlapping planes, depth
+      xsh03: true, // radial burst — the soft light source in the room
     },
   },
 ];
@@ -559,7 +615,7 @@ export function captureLiveVoiceState(s) {
   };
 }
 
-/** True when a mode id has a curated flagship voice. */
+/** True when an id is a flagship voice (#704: not every flagship id is a mode id). */
 export function isFlagshipVoiceId(id) {
   return FLAGSHIP_VOICE_IDS.includes(id);
 }

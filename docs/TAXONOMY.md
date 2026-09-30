@@ -115,4 +115,5 @@ Do not edit PERF/POLISH/session roadmaps for this. Those docs are frozen or hist
 - 2026-09-28 — 1.1.0 runtime: `taxonomy.js` semver + `LOOK_ALIASES`. Showcase Look `murmuration` → `dusk-flock`. Old composition id still loads. Voice id `murmuration` frozen.
 - 2026-09-28 — Soon queue: finish alias wiring, then audit vibe/mode/palette-twin/SHAPE_SETS/categories/project.format.
 - 2026-09-28 — alias wired in `presets.js` + `layout-modes.js`. `taxonomy.selfcheck` can go green. Face copy still PATCH (#716).
+- 2026-09-29 — 1.2.0: fourth Voice `dark-glass` (face: DARK GLASS / Chiaroscuro), id frozen. Look `chiaroscuro` and palette `chiaroscuro` unchanged. #704.
 - 2026-09-28 — research report: [`TAXONOMY_RESEARCH.md`](TAXONOMY_RESEARCH.md). No version bump (companion doc).
