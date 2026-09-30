@@ -96,6 +96,7 @@ export function useProjectAutosave() {
         state.enabledAssets === prev.enabledAssets &&
         state.assetWeightOverrides === prev.assetWeightOverrides &&
         state.assetKineme === prev.assetKineme && // #781
+        state.audioRoutes === prev.audioRoutes && // #790
         state.customAssets === prev.customAssets &&
         state.layers === prev.layers &&
         state.paletteOverrides === prev.paletteOverrides

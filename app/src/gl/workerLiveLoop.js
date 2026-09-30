@@ -39,6 +39,7 @@ export function serializeStoreState(s) {
     shapeLevels: s.shapeLevels ? { ...s.shapeLevels } : null, // #733
     assetWeightOverrides: s.assetWeightOverrides ? { ...s.assetWeightOverrides } : null,
     assetKineme: s.assetKineme ? { ...s.assetKineme } : null, // #781
+    audioRoutes: Array.isArray(s.audioRoutes) ? s.audioRoutes.map((r) => ({ ...r })) : null, // #790
     quality: s.quality,
     caGrid: s.caGrid,
     lockedParams: s.lockedParams ? { ...s.lockedParams } : null,

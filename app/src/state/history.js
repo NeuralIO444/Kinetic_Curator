@@ -53,6 +53,7 @@ export function captureUndoEntry(state, kind = UNDO_KIND_EDIT) {
     caGrid: deep(state.caGrid),
     enabledAssets: deep(state.enabledAssets),
     light: deep(state.light ?? null), // #594 scene sun
+    audioRoutes: deep(state.audioRoutes ?? null), // #790 scene audio routes
   };
   if (kind === UNDO_KIND_LAYERS) {
     entry.layers = deep(state.layers);
@@ -77,6 +78,7 @@ function entrySignature(entry) {
     entry.lockedParams,
     entry.caGrid,
     entry.enabledAssets,
+    entry.audioRoutes, // #790: a routes-only edit must not be deduped out of undo
     entry.seedOffsets,
     entry.layers,
     entry.activeLayerId,
@@ -152,6 +154,7 @@ export function editRestoreFields(entry) {
     caGrid: entry.caGrid,
     enabledAssets: entry.enabledAssets,
     light: entry.light ?? null, // #594 — older entries predate the sun: off
+    audioRoutes: entry.audioRoutes ?? null, // #790 — older entries: the default routes
   };
 }
 

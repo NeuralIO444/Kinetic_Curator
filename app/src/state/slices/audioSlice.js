@@ -1,3 +1,6 @@
+import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
+import { pushToUndo } from '../history.js';
+
 export const createAudioSlice = (set) => ({
   audioEnabled: false,
   // #107 §5: set true when the browser denies mic access, so the UI can say
@@ -13,6 +16,9 @@ export const createAudioSlice = (set) => ({
   // one is loaded and valid, else null. `audioSidecarNote` says why a pick was
   // refused (shown honestly in SOURCE). Session state, like the file URL itself:
   // not part of the project document.
+  // #790 — the scene's audio route table: null = today's default routes.
+  // Scene-level (saved in the project, undoable), never carried by voices.
+  audioRoutes: null,
   audioSidecar: null,
   audioSidecarNote: '',
 
@@ -28,6 +34,12 @@ export const createAudioSlice = (set) => ({
     }
     // A sidecar describes ONE file: a different source invalidates it.
     return { audioSource: source, audioSidecar: null, audioSidecarNote: '' };
+  }),
+  /** Replace the route table (sanitized; null = the default table). One undo step per edit. */
+  setAudioRoutes: (routes) => set((state) => {
+    const next = sanitizeAudioRoutes(routes);
+    if (JSON.stringify(next) === JSON.stringify(state.audioRoutes ?? null)) return {};
+    return { ...pushToUndo(state, true), audioRoutes: next };
   }),
   setAudioSidecar: (sidecar, note = '') => set({ audioSidecar: sidecar || null, audioSidecarNote: sidecar ? '' : String(note || '') }),
   setAudioGain: (gain) => set({ audioGain: gain }),

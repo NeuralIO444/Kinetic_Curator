@@ -126,6 +126,7 @@ node src/data/voices.selfcheck.mjs
 node src/state/voiceSlice.selfcheck.mjs
 node src/state/fxaa.selfcheck.mjs
 node src/data/light.selfcheck.mjs
+node src/data/audioRoutes.selfcheck.mjs
 node src/data/feels.selfcheck.mjs
 node src/data/evolveProgress.selfcheck.mjs
 node src/gl/gateWeave.selfcheck.mjs

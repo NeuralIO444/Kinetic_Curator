@@ -16,6 +16,7 @@ export function StimulusPanel() {
     audioMonitor: s.audioMonitor,
     audioSidecar: s.audioSidecar, // #618
     audioSidecarNote: s.audioSidecarNote,
+    audioRoutes: s.audioRoutes, // #790
     beatPulse: s.beatPulse,
     audioBands: s.audioBands,
     layoutParams: s.layoutParams,
@@ -23,7 +24,7 @@ export function StimulusPanel() {
   const {
     audioEnabled, audioGain, audioSource,
     audioMonitor, beatPulse, audioBands, layoutParams,
-    audioSidecar, audioSidecarNote,
+    audioSidecar, audioSidecarNote, audioRoutes,
   } = state;
 
   const [devices, setDevices] = useState([]);
@@ -57,7 +58,7 @@ export function StimulusPanel() {
               which sound drives what, live; setup and raw knobs follow. */}
           <MeterHero />
           <ModMatrix audioBands={audioBands} beatPulse={beatPulse} audioEnabled={audioEnabled}
-            depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} />
+            depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} routes={audioRoutes} />
           <div className="stim-toggle-row">
             {/* #310: VIDEO (soon) removed — dead control, nothing reads motionEnergy. */}
             <button
