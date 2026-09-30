@@ -15,7 +15,8 @@ export function MeterHero() {
   const canvasRef = useRef(null);
   const [source, setSource] = useState('IDLE');
   const beatRef = useRef(0);
-  useEffect(() => useStore.subscribe((s) => { beatRef.current = s.beatPulse || 0; }), []);
+  const sidecarRef = useRef(false); // #618: a loaded sidecar is what's driving a FILE source
+  useEffect(() => useStore.subscribe((s) => { beatRef.current = s.beatPulse || 0; sidecarRef.current = !!s.audioSidecar; }), []);
 
   useEffect(() => {
     let raf = 0;
@@ -43,7 +44,7 @@ export function MeterHero() {
       const dt = (now - last) / 1000;
       last = now;
       const tap = getAudioMeterTap();
-      const kind = tap ? tap.kind : 'IDLE';
+      const kind = tap ? (tap.kind === 'FILE' && sidecarRef.current ? 'FILE+ENV' : tap.kind) : 'IDLE';
       if (kind !== shownSource) { shownSource = kind; setSource(kind); }
 
       // waveform

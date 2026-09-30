@@ -9,6 +9,12 @@ export const createAudioSlice = (set) => ({
   audioBands: { bass: 0, mid: 0, treble: 0, rms: 0 },
   beatPulse: 0,
   audioStimulus: 0,
+  // #618 — a kc-audio-envelope/1 sidecar for the FILE source: { name, env } when
+  // one is loaded and valid, else null. `audioSidecarNote` says why a pick was
+  // refused (shown honestly in SOURCE). Session state, like the file URL itself:
+  // not part of the project document.
+  audioSidecar: null,
+  audioSidecarNote: '',
 
   setAudioEnabled: (enabled) => set({ audioEnabled: enabled }),
   setAudioDenied: (denied) => set({ audioDenied: !!denied }),
@@ -20,8 +26,10 @@ export const createAudioSlice = (set) => ({
     if (prev && prev.type === 'file' && typeof prev.url === 'string' && prev.url !== source?.url) {
       try { URL.revokeObjectURL(prev.url); } catch { /* already revoked */ }
     }
-    return { audioSource: source };
+    // A sidecar describes ONE file: a different source invalidates it.
+    return { audioSource: source, audioSidecar: null, audioSidecarNote: '' };
   }),
+  setAudioSidecar: (sidecar, note = '') => set({ audioSidecar: sidecar || null, audioSidecarNote: sidecar ? '' : String(note || '') }),
   setAudioGain: (gain) => set({ audioGain: gain }),
   setAudioMonitor: (monitor) => set({ audioMonitor: monitor }),
   setAudioBands: (bands) => set({ audioBands: bands }),

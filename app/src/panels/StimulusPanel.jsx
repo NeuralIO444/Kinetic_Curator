@@ -14,6 +14,8 @@ export function StimulusPanel() {
     audioGain: s.audioGain,
     audioSource: s.audioSource,
     audioMonitor: s.audioMonitor,
+    audioSidecar: s.audioSidecar, // #618
+    audioSidecarNote: s.audioSidecarNote,
     beatPulse: s.beatPulse,
     audioBands: s.audioBands,
     layoutParams: s.layoutParams,
@@ -21,6 +23,7 @@ export function StimulusPanel() {
   const {
     audioEnabled, audioGain, audioSource,
     audioMonitor, beatPulse, audioBands, layoutParams,
+    audioSidecar, audioSidecarNote,
   } = state;
 
   const [devices, setDevices] = useState([]);
@@ -79,6 +82,8 @@ export function StimulusPanel() {
               audioSource={audioSource}
               audioGain={audioGain}
               audioMonitor={audioMonitor}
+              audioSidecar={audioSidecar}
+              audioSidecarNote={audioSidecarNote}
               devices={devices}
             />
           )}
