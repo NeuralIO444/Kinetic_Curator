@@ -6,7 +6,7 @@ import {
   createTintWash, applyWash, colorMap, washKey, paletteIdentity,
   hash01, hexToRgb, rgbToHex, lerpHex, smootherstep,
   waveRank, adoptionDelay,
-  WASH_SALT, WASH_WAVE_SPAN, WASH_JITTER_SPAN, WASH_ADOPT_SPAN,
+  WASH_SALT, WASH_WAVE_SPAN, WASH_JITTER_SPAN, WASH_ADOPT_SPAN, FADE_JITTER_SPAN, FADE_ADOPT_SPAN,
 } from './tintWash.mjs';
 
 let n = 0;
@@ -91,8 +91,8 @@ ok('idle when nothing changed; starts on palette identity change', () => {
   assert.equal(r3.t, 0, 'clock starts at t=0');
 });
 
-ok('non-WASH modes never soak', () => {
-  for (const mode of ['FADE', 'INJECT', undefined]) {
+ok('non-WASH/FADE modes never soak', () => {
+  for (const mode of ['INJECT', undefined]) {
     const w = createTintWash();
     w.update(baseInput({ mode, lastResolved: fakeResolved([mkItem(0, 0)]) }));
     const r = w.update(baseInput({ mode, identity: id2(), now: 100, lastResolved: fakeResolved([mkItem(0, 0)]) }));
@@ -212,6 +212,54 @@ ok('paletteIdentity is content-stable across structured clones', () => {
   w.update(baseInput({ identity: paletteIdentity('p1', null, []), lastResolved: fakeResolved([mkItem(0, 0)]) }));
   const r = w.update(baseInput({ identity: paletteIdentity('p1', null, []), now: 100, lastResolved: fakeResolved([mkItem(0, 0)]) }));
   assert.equal(r.washing, false, 'fresh-but-equal arrays do not restart the wash');
+});
+
+// ── #632 FADE — the default mode: colour-only, per-node, seeded ───────────
+const fadeItems = () => Array.from({ length: 24 }, (_, i) => mkItem((i * 41) % 1000, (i * 67) % 700, '#111111', '#222222'));
+/** Drive a FADE from p1→p2 and apply it at fraction t; returns the displayed items. */
+function fadeAt(t, seed = 7, mix = 2) {
+  const w = createTintWash();
+  const old = fakeResolved(fadeItems());
+  w.update(baseInput({ mode: 'FADE', seed, lastResolved: old }));
+  // the change frame starts the clock at now=0; the frame under test lands at t
+  w.update(baseInput({ mode: 'FADE', seed, identity: id2(), now: 0, mixSeconds: mix, bg: '#000000', lastResolved: old }));
+  const ev = w.update(baseInput({ mode: 'FADE', seed, identity: id2(), now: t * mix * 1000, mixSeconds: mix, bg: '#000000', lastResolved: old }));
+  const next = fakeResolved(fadeItems().map((it) => ({ ...it, color: '#ffffff', accent: '#ffffff' })));
+  if (ev.washing) applyWash(next, ev);
+  return { ev, items: next[0].items };
+}
+
+ok('FADE: a palette press starts a soak, sized to the MIX time', () => {
+  const { ev } = fadeAt(0.25);
+  assert.equal(ev.washing, true);
+  assert.equal(ev.mode, 'FADE');
+  assert.ok(Math.abs(ev.t - 0.25) < 1e-9, 't follows paletteMixSeconds');
+  assert.equal(fadeAt(2 / 4, 7, 4).ev.t, 0.5, 'a longer slider stretches the same fade');
+});
+
+ok('FADE: no wavefront — delay ignores position; spans sum to 1', () => {
+  assert.equal(adoptionDelay(5, 7, 0, 'FADE'), adoptionDelay(5, 7, 1, 'FADE'), 'rank does not move a FADE delay');
+  assert.ok(Math.abs(FADE_JITTER_SPAN + FADE_ADOPT_SPAN - 1) < 1e-9);
+  for (let i = 0; i < 200; i++) {
+    assert.ok(adoptionDelay(i, 9, 0.5, 'FADE') + FADE_ADOPT_SPAN <= 1 + 1e-9, 'every node finishes by t=1');
+  }
+});
+
+ok('FADE: same seed → same adoption order; different seed differs', () => {
+  const a = fadeAt(0.5, 7).items.map((it) => it.color);
+  assert.deepEqual(a, fadeAt(0.5, 7).items.map((it) => it.color), 'same seed replays the same fade');
+  assert.notDeepEqual(a, fadeAt(0.5, 99).items.map((it) => it.color), 'another seed fades in another order');
+  assert.ok(new Set(a).size > 1, 'nodes are at different stages mid-fade');
+});
+
+ok('FADE: colours only — never touches size/position; ends exactly on the new palette', () => {
+  const mid = fadeAt(0.5).items;
+  fadeItems().forEach((it, i) => { assert.equal(mid[i].x, it.x); assert.equal(mid[i].y, it.y); assert.equal('scale' in mid[i], false, 'no size field written'); });
+  const start = fadeAt(0).items;
+  assert.ok(start.every((it) => it.color === '#111111'), 't=0 shows the old colours');
+  const end = fadeAt(0.999).items;
+  assert.ok(end.every((it) => it.color !== '#111111'), 'almost done: every node has started');
+  assert.equal(fadeAt(1).ev.washing, false, 'at t=1 the fade hands off to the plain new palette');
 });
 
 console.log(`\n${n} tests done`);
