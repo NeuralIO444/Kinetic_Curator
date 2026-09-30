@@ -21,6 +21,7 @@ the plenum is where it arrives, 60 times a second, and the nothing never shows.
 3. **Hold** — atlas stability, resolved per #561's decision (stepping restored
    for atlas-affecting keys, or keep drawing on existing combos while new ones
    bake). No jitter, no held frames — the MIX never rebakes visibly mid-blend.
+   **The rule:** a param that can change which assets get placed (`ATLAS_AFFECTING_PARAMS`, `data/layout-modes.js`) may lerp per frame only while the placed-asset set stays constant across the blend — new atlas-affecting params must step or hold-then-bake; `gl/atlasKeyGuard.selfcheck.mjs` enforces it.
 4. **Finish** — EF rack + post-accum grain seam (#520). Fixed finishing chain
    per FX layer, grain-family locked to the final step, grain over the
    finished frame.
