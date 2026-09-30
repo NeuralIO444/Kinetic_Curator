@@ -282,7 +282,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // per-frame shader-recompile storm when enable itself is what throws).
   let accumRetryAt = 0;
   let lastAccumErrTs = 0;
+  // #763 — a non-finite recipe means poisoned params, not a transient GL
+  // hiccup: three in a row trip the watchdog rather than retrying forever.
+  let accumPoisonRun = 0;
   const noteAccumFault = (e) => {
+    if (e?.name === 'AccumRecipeError' && ++accumPoisonRun >= 3) {
+      try { getState().tripWatchdog('accum-nan'); } catch { /* store gone */ }
+      accumPoisonRun = 0;
+    }
     try { live.dropAccum(); } catch { /* already torn down */ }
     accumObj = null;
     accumActive = false;
@@ -937,6 +944,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
               }, { swell: audioSwell ?? 1 });
               // #309: the frame is backing-store sized; the pair is logical.
               accumObj.step(target.tex, rp, { width: target.w, height: target.h });
+              accumPoisonRun = 0;
               // #520 Phase 2: apply grain-family finish chain post-accum.
               let accumTex = accumObj.texture();
               for (const { layerId, steps } of fxFinishChains) {

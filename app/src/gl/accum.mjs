@@ -119,11 +119,21 @@ function opticsDerived(o) {
 
 /**
  * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
+ *
+ * Safe ranges (#763) — the bounds live here, next to the params, and every
+ * out-of-range or non-numeric input is clamped (never passed through):
+ *   fade    0..0.99  feedback keep; 1.0 would recirculate forever. NaN → 0
+ *                    (no feedback — the safe direction, not the loud one)
+ *   optics, tunnel, prism, flow  0..1 (garbage → 0)
+ *   echoes  0..4 taps (0..3 at >= 2048px wide, the memory gate)
+ * The per-frame result is re-checked by assertRecipeFinite() at step().
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
  */
 export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000' } = {}) {
-  const keep = Math.min(0.99, Math.max(0, Number(fade)));
+  // NaN slips through Math.max/min (they return NaN), which would poison the
+  // feedback buffer — non-finite fade collapses to 0 (#763).
+  const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
   const o = clamp01(optics);
   const t = clamp01(tunnel);
   const pr = clamp01(prism);
@@ -156,6 +166,24 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
     echoTaps: gated,
     echoWeights: [0.5, 0.35, 0.25, 0.18].slice(0, gated),
   };
+}
+
+/**
+ * #763 — the per-frame poison guard. A NaN/Infinity anywhere in the recipe
+ * would be multiplied into the feedback buffer and recirculate forever, a
+ * failure that shows only as a smear found by eye. Fail closed: throw before
+ * any pass runs, so the live loop's ACCUM fault path (teardown → fresh
+ * buffer → cooldown) clears it and repeated faults trip the watchdog.
+ */
+export class AccumRecipeError extends Error {
+  constructor(field) {
+    super(`[accum] recipe field "${field}" is not finite — refusing to feed the buffer`);
+    this.name = 'AccumRecipeError';
+  }
+}
+export function assertRecipeFinite(p) {
+  const bad = (v) => (Array.isArray(v) ? v.some(bad) : typeof v === 'number' && !Number.isFinite(v));
+  for (const [k, v] of Object.entries(p)) if (bad(v)) throw new AccumRecipeError(k);
 }
 
 /**
@@ -1070,6 +1098,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
      */
     step(frameTex, params, frameSize) {
       const p = params;
+      assertRecipeFinite(p);
       // Drain stale errors first so the post-step check below only reflects
       // this step's own passes (see drainGlErrors).
       drainGlErrors(gl);
