@@ -21,7 +21,9 @@ test('fresh boot rolls a First Light starter and is alive', async ({ page }) => 
     .toMatch(new RegExp(`^(${STARTERS.join('|')})$`));
 
   // The seed was re-rolled (not the factory default) — every boot differs.
-  const seed = await page.locator('body').textContent().then((t) => t.match(/seed:([0-9a-f]{8})/)?.[1]);
+  // The footer prints the seed as unpadded hex (seed:5654c is a real seed), so
+  // match 1-8 digits: the old {8} failed on ~1 boot in 16 (any seed < 0x10000000).
+  const seed = await page.locator('body').textContent().then((t) => t.match(/seed:([0-9a-f]{1,8})/)?.[1]);
   expect(seed).toBeTruthy();
   expect(seed).not.toBe(FACTORY_SEED);
 
@@ -33,6 +35,6 @@ test('fresh boot rolls a First Light starter and is alive', async ({ page }) => 
 test('?boot=factory keeps the deterministic factory start', async ({ page }) => {
   await page.goto('/?boot=factory');
   await page.locator('.app').waitFor({ timeout: 30_000 });
-  const seed = await page.locator('body').textContent().then((t) => t.match(/seed:([0-9a-f]{8})/)?.[1]);
+  const seed = await page.locator('body').textContent().then((t) => t.match(/seed:([0-9a-f]{1,8})/)?.[1]);
   expect(seed).toBe(FACTORY_SEED);
 });
