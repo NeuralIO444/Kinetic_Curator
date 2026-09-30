@@ -286,6 +286,12 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       const light = contractLight(doc.light, pal);
       return light ? { light } : {};
     })(),
+    // #594 PR3 — squash-and-stretch amount (scene-level, like the sun). Key
+    // omitted at 0 so every existing contract and its hash are unchanged.
+    ...(() => {
+      const q = Number(doc.squash ?? doc.layoutParams?.squash);
+      return Number.isFinite(q) && q > 0 ? { squash: Math.min(1, q) } : {};
+    })(),
     textRuns: [], // #550: CUT — no producer (glyph-atlas baker removed; text is baked into stamp assets). Kept as [] for shape/hash stability; the renderer never reads it.
     accum: accum && accum.enabled
       ? {

@@ -92,6 +92,7 @@ node src/gl/accum.selfcheck.mjs
 node src/gl/accumGuard.selfcheck.mjs
 node src/gl/atlasKeyGuard.selfcheck.mjs
 node src/gl/velocitySmear.selfcheck.mjs
+node src/gl/squash.selfcheck.mjs
 node src/gl/audioBallistics.selfcheck.mjs
 node src/gl/audioPipeline.selfcheck.mjs
 node src/gl/spineC.selfcheck.mjs

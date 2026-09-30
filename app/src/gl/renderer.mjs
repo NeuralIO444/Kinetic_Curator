@@ -435,6 +435,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
   // #594: the frame's sun, set by renderFrameInto from the contract (null = off).
   let sun = null;
+  let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
 
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
@@ -451,7 +452,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     uploadMeterNoteUpload(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)); // #533 PR1: measure-only
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
-    gl.uniform2f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX);
+    gl.uniform3f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX, squash); // #594 PR3: z = squash
     gl.uniform1f(U(quadProg, 'u_liveTint'), isLive ? 1.0 : 0.0);
     // #594 the one sun (off → w = 0 and the shader's light term is exactly 1.0).
     gl.uniform4f(U(quadProg, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
@@ -585,6 +586,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     uploadMeterBeginFrame(); // #533 PR1: measure-only — resets call-slot indexing for this frame
     const { width: w, height: h, contract, cells, bg } = payload;
     sun = contract.light || null;
+    squash = contract.squash || 0; // #594 PR3
     const { atlasTex, grainLuts } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];

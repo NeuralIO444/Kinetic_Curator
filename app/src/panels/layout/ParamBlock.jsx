@@ -132,6 +132,13 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"
         onChange={v => set('breath', v)} defaultValue={d('breath', DEFAULT_LAYOUT_PARAMS.breath)}
         locked={lockedParams.breath} onToggleLock={() => lock('breath')} />
+      {/* #594 PR3 — squash-and-stretch: moving marks already stretch along
+          their motion (#309); this thins them across it so they keep their
+          mass. Works on anything that moves. */}
+      <RangeRow label="SQUASH" value={layoutParams.squash ?? 0} min={0} max={1} step={0.05}
+        hint="Moving marks thin across their motion as they stretch — 1 keeps their mass, 0 is stretch only"
+        onChange={v => set('squash', v)} defaultValue={d('squash', DEFAULT_LAYOUT_PARAMS.squash)}
+        locked={lockedParams.squash} onToggleLock={() => lock('squash')} />
       <RangeRow label="WIND" value={layoutParams.wind ?? 1} min={0} max={3} step={0.1}
         hint="Hype-only multiplier on the noise wind"
         disabled={!isHype} disabledReason="Hype mode only"

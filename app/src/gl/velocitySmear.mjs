@@ -28,7 +28,7 @@ registerCostTier('gl/velocity-smear', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.02,
-  notes: '#309 velocity smear: per-instance vx/vy attached on the CPU, stretched in the existing QUAD_VS — zero fullscreen passes; live + stills',
+  notes: '#309 velocity smear: per-instance vx/vy attached on the CPU, stretched in the existing QUAD_VS — zero fullscreen passes; live + stills. #594 PR3 squash rides the same branch: a few ALU per moving vertex, gated off at 0',
 });
 
 /** Scene units per frame past which a delta is a teleport, not motion. */
