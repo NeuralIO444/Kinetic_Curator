@@ -111,6 +111,15 @@ export function nextVoiceName(list) {
   return `VOICE ${String(max + 1).padStart(2, '0')}`;
 }
 
+/** #734 — a fork's shelf name: "<base> fork", then "<base> fork 2", … (24-char cap). */
+export function forkName(base, list) {
+  const stem = `${String(base || 'VOICE').trim()} fork`.slice(0, 21);
+  const taken = new Set((list || []).map((v) => v.name));
+  if (!taken.has(stem)) return stem;
+  for (let n = 2; n < 100; n++) if (!taken.has(`${stem} ${n}`)) return `${stem} ${n}`;
+  return stem;
+}
+
 /** Find a voice definition by id across flagships and the user shelf. */
 export function findVoiceDef(id, userVoices) {
   const f = FLAGSHIP_VOICES.find((v) => v.id === id);
@@ -265,6 +274,22 @@ export const createVoiceSlice = (set) => ({
     const userVoices = [...state.userVoices, entry];
     persist(userVoices);
     // Capturing doesn't switch voices — it shelves what you're hearing.
+    return { userVoices };
+  }),
+
+  /**
+   * #734 — fork: save an edited copy of a voice as a NEW user voice. The only
+   * write path from the DAVIS dish. Factory voices are sealed: this never
+   * touches FLAGSHIP_VOICES, and never overwrites an existing entry (a repeated
+   * id is refused). Refused when the shelf is full, like the + chip.
+   */
+  forkVoice: ({ id, name, state: draft }) => set((state) => {
+    if (state.userVoices.length >= MAX_USER_VOICES) return {};
+    if (!id || state.userVoices.some((v) => v.id === id)) return {};
+    const entry = sanitizeUserVoice({ id, name: forkName(name, state.userVoices), state: draft, createdAt: Date.now() });
+    if (!entry) return {};
+    const userVoices = [...state.userVoices, entry];
+    persist(userVoices);
     return { userVoices };
   }),
 
