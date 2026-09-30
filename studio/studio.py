@@ -321,6 +321,9 @@ def sidecar(project: Path, seed, size, uncapped, extra=None, normalized=None) ->
         # sanitized form the kernel ran on. Keep both - the difference is the
         # audit trail.
         doc["_render"]["normalized"] = normalized.get("layoutParams")
+        # #719 — named recipe features (app/src/curator/recipeFeatures.js).
+        if normalized.get("features") is not None:
+            doc["_render"]["features"] = normalized["features"]
     if extra:
         doc["_render"].update(extra)
     return doc
@@ -450,14 +453,16 @@ def cmd_render(a) -> None:
         output = ({"file": out.name, "sha256": content_hash(out)}
                   if out.is_file() else None)
         sidecar_path = None
+        # #719: once, for both the sidecar (normalized params + features) and the hash.
+        normalized = normalized_project(project)
         if a.sidecar and error is None:
             out.with_suffix(".json").write_text(
-                json.dumps(sidecar(project, a.seed, size, a.uncapped), indent=2))
+                json.dumps(sidecar(project, a.seed, size, a.uncapped, normalized=normalized), indent=2))
             sidecar_path = out.with_suffix(".json").name
         manifest["editions"].append(edition_record(
             path=out.stem, seed=a.seed or 0,
             input_hash=edition_hash(project, a.seed or 0, size, a.uncapped,
-                                    normalized_project(project)),
+                                    normalized),
             status="ok" if error is None else "failed",
             duration_s=duration_s, device=device, git_sha=git["sha"],
             output=output, sidecar=sidecar_path, error=error))
@@ -591,17 +596,19 @@ def cmd_accum(a, size, out: Path, *, log: RunLog | None = None,
         output = ({"file": out.name, "sha256": content_hash(out)}
                   if out.is_file() else None)
         sidecar_path = None
+        normalized = normalized_project(project)  # #719: sidecar features + hash
         if a.sidecar and error is None:
             out.with_suffix(".json").write_text(json.dumps(sidecar(
                 project, a.seed, size, a.uncapped,
                 extra={"accum": True, **accum_params,
                        "renderer": "app/src/gl (WebGL2) shared ACCUM recipe"},
+                normalized=normalized,
             ), indent=2))
             sidecar_path = out.with_suffix(".json").name
         manifest["editions"].append(edition_record(
             path=out.stem, seed=a.seed or 0,
             input_hash=edition_hash(project, a.seed or 0, size, a.uncapped,
-                                    normalized_project(project)),
+                                    normalized),
             status="ok" if error is None else "failed",
             duration_s=duration_s, device=device, git_sha=git["sha"],
             output=output, sidecar=sidecar_path, error=error))

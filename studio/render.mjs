@@ -22,6 +22,7 @@ import { parseProject } from '../app/src/state/projectDocument.js';
 import { blend, BLEND_FALLBACK } from './blendFallback.mjs';
 import { KERNEL_VERSION } from '../app/src/engine/kernel/version.js';
 import { fxFilterStringForLayer, fxFilterId, isFxLayer } from '../app/src/fx/fxFilters.js';
+import { recipeFeatures } from '../app/src/curator/recipeFeatures.js';
 
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
@@ -447,6 +448,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       layoutParams: doc.layoutParams,
       layerSnapshots: doc.layerSnapshots || null,
       activeLayerId: doc.activeLayerId || null,
+      // #719 — named features of what the active layer rendered (topLevelSource):
+      // the same function the app's ↓ HITS rows use, so keeps and passes agree.
+      features: recipeFeatures({
+        layoutParams: doc.layoutParams,
+        paletteId: doc.paletteId,
+        assets: doc.enabledAssets ? Object.keys(doc.enabledAssets).filter((k) => doc.enabledAssets[k]) : null,
+      }),
       layers: layers.map((L) => ({
         id: L.id,
         mode: L.layoutParams?.mode,

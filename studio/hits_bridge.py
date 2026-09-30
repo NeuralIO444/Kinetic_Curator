@@ -59,6 +59,25 @@ def scan_pool(pool: Path) -> dict[str, int]:
     return out
 
 
+def scan_features(pool: Path) -> dict[str, dict]:
+    """#719 — png -> named recipe features, from each render's sidecar.
+
+    studio.py writes them (`_render.features`) from app/src/curator/recipeFeatures.js
+    via render.mjs, for pool and hit renders alike, so keeps and passes carry the
+    same definition. Sidecars from before #719 have none: they are skipped (and
+    counted by the caller) rather than given invented features.
+    """
+    out = {}
+    for png in sorted(pool.glob("*.png")):
+        sidecar = png.with_suffix(".json")
+        if not sidecar.exists():
+            continue
+        feats = (json.loads(sidecar.read_text()).get("_render") or {}).get("features")
+        if isinstance(feats, dict):
+            out[png.name] = feats
+    return out
+
+
 def write_hit_project(hits_export: dict, hit: dict, out_path: Path) -> None:
     """One favourite -> a standalone project JSON studio.py can render."""
     base = dict(hits_export.get("project") or {})
@@ -114,6 +133,14 @@ def cmd_build(a) -> None:
 
     labels = build_labels(hit_seeds, sidecars)
     Path(a.out).write_text(json.dumps(labels, indent=1, sort_keys=True))
+    # #719 — the features ledger, keyed exactly like labels.json.
+    feats = scan_features(pool)
+    features = {name: feats[name] for name in labels if name in feats}
+    features_out = Path(a.features_out) if a.features_out else Path(a.out).with_name("features.json")
+    features_out.write_text(json.dumps(features, indent=1, sort_keys=True))
+    missing = len(labels) - len(features)
+    print(f"{features_out}: {len(features)} feature rows"
+          + (f" ({missing} renders predate #719 — re-render them to get features)" if missing else ""))
     pos = sum(labels.values())
     print(f"{a.out}: {len(labels)} labels ({pos} likes / {len(labels) - pos} passes) from pool {pool}")
     if pos < len(hit_seeds):
@@ -142,6 +169,16 @@ def cmd_selfcheck(_a=None) -> None:
         assert json.loads(out.read_text())["enabledAssets"] == {"xsh01": True, "xsh07": True}, "hit cast rides into the render project"
         write_hit_project({"project": {"enabledAssets": {"a": True}}}, {"seed": 5}, out)
         assert json.loads(out.read_text())["enabledAssets"] == {"a": True}, "legacy hit keeps the project's cast"
+        # #719 — features come from sidecars; pre-#719 sidecars are skipped, not invented
+        pool = Path(d) / "pool"
+        pool.mkdir()
+        for name, side in (("a.png", {"seed": 1, "_render": {"features": {"v": 1, "system": "grid"}}}),
+                           ("b.png", {"seed": 2, "_render": {}}),
+                           ("c.png", None)):
+            (pool / name).write_bytes(b"")
+            if side is not None:
+                (pool / name).with_suffix(".json").write_text(json.dumps(side))
+        assert scan_features(pool) == {"a.png": {"v": 1, "system": "grid"}}, "features read from sidecars"
     print("hits_bridge selfcheck OK")
 
 
@@ -154,6 +191,8 @@ def main(argv=None) -> None:
     sp.add_argument("--hits", required=True, help="JSON from the app's ↓ HITS export")
     sp.add_argument("--pool", required=True, help="studio.py batch output dir (PNG + JSON sidecars)")
     sp.add_argument("--out", default="labels.json")
+    sp.add_argument("--features-out", default=None,
+                    help="named recipe features per labelled png (default: features.json next to --out)")
     sp.add_argument("--res", default="1", help="resolution for any on-demand hit renders")
     sp.set_defaults(func=cmd_build)
 
