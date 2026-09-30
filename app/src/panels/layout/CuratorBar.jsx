@@ -2,7 +2,7 @@
 // Rolls CURATE_CANDIDATES scenes, keeps the curator engine's pick.
 // The voice popup (left of the Curator button) chooses which persona
 // tastes the candidates ("off" = honest dice roll). The hint always says
-// who picked. The presets popup (also left of Curator) applies a named,
+// who picked. The looks popup (#735: Looks, never "presets", on the face) (also left of Curator) applies a named,
 // complete scene directly — a different action from taste-biased random.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
@@ -78,9 +78,9 @@ export function CuratorBar({ lockCount, composition }) {
           <button
             className="curator-voice-btn"
             onClick={() => setPresetMenuOpen((o) => !o)}
-            title="Apply a named preset scene directly"
+            title="Apply a Look — layout only; your palette and marks stay put"
           >
-            presets ▾
+            looks ▾
           </button>
           {presetMenuOpen && (
             <div className="curator-voice-menu preset-menu" role="menu">
