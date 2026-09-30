@@ -1,5 +1,6 @@
 // e2e/davis-regroup.spec.js — #616: DAVIS reads in labelled sections, every
-// existing control is still there, and EVOLVE shows live progress.
+// existing control is still there, and EVOLVE shows its progress box (the
+// generation counting itself is selfchecked: it depends on real time + the governor).
 import { test, expect } from '@playwright/test';
 
 test('DAVIS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE progress', async ({ page }) => {
@@ -29,10 +30,12 @@ test('DAVIS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE progr
   await expect(progress).toContainText('SEED');
   await expect(progress).toContainText('S/GEN');
   await expect(progress).toContainText('SEEN');
-  // generations actually advance (evolve interval default 2 s)
-  await expect.poll(async () => Number((await progress.locator('.davis-progress-cell b').first().textContent()) || 0), { timeout: 15_000 }).toBeGreaterThanOrEqual(1);
+  // Whether generations ADVANCE is proven deterministically in
+  // data/evolveProgress.selfcheck.mjs: automatic evolve pauses under the
+  // governor's slowRender, which CI's software GL hits, so a wall-clock wait
+  // here would test the runner, not the feature.
 
-  // stopped again: last-run summary
+  // stopped again: last-run summary (0 generations is a valid run)
   await panel.getByRole('button', { name: 'STOP', exact: true }).click();
   await expect(panel.locator('.davis-progress')).toContainText(/last run: \d+ gen/);
 });
