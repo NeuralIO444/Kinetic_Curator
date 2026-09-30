@@ -29,6 +29,7 @@ export const HELP_TOPICS = [
   { id: 'output-webm', group: 'Output', title: 'rec webm', text: 'Records the live WebGL canvas to WebM — ACCUM trails included. What plays is what exports.' },
   { id: 'output-recipe', group: 'Output', title: 'recipe', text: 'Each snapshot has a copy button for its recipe as plain text (seed, params, sub-seed offsets). Paste it back with PASTE RECIPE to restore the exact scene.' },
   { id: 'davis-clear', group: 'Ghost Station', title: 'clear', text: 'Wipe the trail buffer to the background.' },
+  { id: 'layout-sun', group: 'Build', title: 'sun', text: 'One sun lights the whole scene (every layer). Marks facing it brighten, marks facing away fall to AMBIENT. Colour is a palette slot. Lights the live canvas and GL exports; SVG studio stills stay flat.' },
   { id: 'layers-blend', group: 'Build', title: 'blend', text: 'How this layer composites onto the stack below.' },
   { id: 'output-fxaa', group: 'Output', title: 'edge aa', text: 'FXAA smooths hard stair-stepped edges on the final frame — grid, letterforms, paused shots. Applies to the live canvas and to exports. Costs a little GPU — the governor drops it first if the frame rate sags, and brings it back when it recovers.' },
   { id: 'output-weave', group: 'Output', title: 'gate weave', text: 'A whisper of projector wobble: the whole frame drifts under one pixel. Live canvas and recordings only — still snaps stay exact. Off by default.' },

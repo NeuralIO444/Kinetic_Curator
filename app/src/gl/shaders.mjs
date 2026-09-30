@@ -45,10 +45,16 @@ layout(location=5) in vec4 a_inst4;
 uniform vec2 u_canvas;
 uniform vec2 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor
+// #594 the CHIAROSCURO sun. ONE sun, never three-point: a rim or fill light
+// breaks the rule — propose it on #594 before adding a second uniform set.
+uniform vec4 u_sun;       // x, y (scene units), height above the plane, w = on (0/1)
+uniform vec4 u_sunLight;  // rgb = palette-slot colour, a = intensity
+uniform float u_ambient;  // light that reaches a mark facing away from the sun
 out vec2 v_uv;
 out float v_opacity;
 out vec3 v_ink;
 out vec3 v_accent;
+out vec3 v_light;
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -76,16 +82,26 @@ void main() {
   v_opacity = a_inst1.y;
   v_ink = a_inst3.xyz;
   v_accent = vec3(a_inst3.w, a_inst4.xy);
+  // #594 PR1: per-instance diffuse from the one sun, flat normal (0,0,1), at the
+  // instance centre. Off → exactly vec3(1.0), so the unlit path is byte-identical.
+  if (u_sun.w > 0.5) {
+    vec3 L = normalize(vec3(u_sun.xy - a_inst0.xy, u_sun.z));
+    v_light = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * L.z);
+  } else {
+    v_light = vec3(1.0);
+  }
 }`;
 
 export const QUAD_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_atlas;
 uniform float u_liveTint;
+uniform vec4 u_sun;        // #594: shared with the vertex stage (w = on)
 in vec2 v_uv;
 in float v_opacity;
 in vec3 v_ink;
 in vec3 v_accent;
+in vec3 v_light;
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
@@ -100,6 +116,10 @@ void main() {
   } else {
     o = vec4(t.rgb * v_opacity, t.a * v_opacity);
   }
+  // #594: light the premultiplied colour; alpha untouched, rgb capped at alpha.
+  // Gated on the uniform, not on v_light: the unlit path must not even clamp
+  // (live-tint rgb can legitimately sit a hair above a), so off stays byte-identical.
+  if (u_sun.w > 0.5) o.rgb = min(o.rgb * v_light, vec3(o.a));
 }`;
 
 /** Fullscreen pass: v_cuv is y-down canvas UV. */
