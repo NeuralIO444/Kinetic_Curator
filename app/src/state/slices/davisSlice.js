@@ -19,6 +19,43 @@ import { normalizeLayoutParams } from '../../data/layout-modes.js';
 // the composition, and the hits export format is out of scope.
 export const FAVORITES_KEY = 'kc:favorites:v1';
 const FAVORITES_MAX = 200;
+/** #719 — cap on a kept cast (ids, not the full enabled map). */
+export const FAVORITE_CAST_MAX = 256;
+
+/**
+ * #719 — a keep's cast: the ENABLED asset ids, sorted and de-duplicated.
+ * Absent (legacy keeps) stays absent — never invent a cast. Ids are opaque
+ * strings here (catalog or `user:`); the project load path re-validates them.
+ */
+export function sanitizeCast(raw) {
+  if (!Array.isArray(raw)) return undefined;
+  const ids = [...new Set(raw.filter((x) => typeof x === 'string' && x && x.length <= 80))].sort();
+  return ids.slice(0, FAVORITE_CAST_MAX);
+}
+
+/**
+ * #719 — the ONE place a keep is captured, so every keep path (DAVIS ★, the
+ * `f` hotkey) records the full recipe: seed, stream offsets (#305), layout,
+ * palette and the cast. The hotkey used to drop the offsets.
+ */
+export function captureFavorite(state, paletteId) {
+  const enabled = state.enabledAssets || {};
+  return {
+    seed: state.seed,
+    seedOffsets: { ...(state.seedOffsets || {}) },
+    timestamp: new Date().toISOString().slice(11, 19),
+    config: {
+      layout: { ...state.layoutParams },
+      palette: { id: paletteId },
+      assets: sanitizeCast(Object.keys(enabled).filter((k) => enabled[k])),
+    },
+  };
+}
+
+/** #719 — a kept cast back to the store's enabledAssets map (ids on, nothing else). */
+function castToEnabled(ids) {
+  return Object.fromEntries(ids.map((id) => [id, true]));
+}
 
 export function sanitizeFavorite(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -26,6 +63,7 @@ export function sanitizeFavorite(raw) {
   if (!Number.isFinite(seed)) return null;
   const layout = raw.config?.layout;
   const paletteId = raw.config?.palette?.id;
+  const cast = sanitizeCast(raw.config?.assets);
   return {
     id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
     seed,
@@ -36,6 +74,7 @@ export function sanitizeFavorite(raw) {
       ...(layout && typeof layout === 'object' && !Array.isArray(layout)
         ? { layout: normalizeLayoutParams(layout) } : {}),
       palette: { id: typeof paletteId === 'string' ? paletteId.slice(0, 80) : '' },
+      ...(cast && cast.length ? { assets: cast } : {}),
     },
   };
 }
@@ -259,13 +298,19 @@ export const createDavisSlice = (set) => ({
     seedOffsets: normalizeSeedOffsets(fav.seedOffsets),
     ...(fav.config?.layout ? { layoutParams: { ...fav.config.layout } } : {}),
     ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
+    // #719 — the kept cast comes back too; legacy keeps (no cast) leave the pool alone.
+    ...(fav.config?.assets?.length ? { enabledAssets: castToEnabled(fav.config.assets) } : {}),
   }),
   morphToFavorite: (fav) => set((state) => {
     const target = fav.config?.layout;
     // #305 — old favorites carry no offsets → zeros, like a fresh project.
     const favOffsets = normalizeSeedOffsets(fav.seedOffsets);
+    // #719 — the cast swaps at the press, like a shape chip (item-morph flies
+    // the nodes into their new costumes); layout keeps its own morph below.
+    const cast = fav.config?.assets?.length ? { enabledAssets: castToEnabled(fav.config.assets) } : {};
     if (!target || typeof target !== 'object') {
       return {
+        ...cast,
         seed: fav.seed,
         seedOffsets: favOffsets,
         ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
@@ -285,6 +330,7 @@ export const createDavisSlice = (set) => ({
     }
     if (Object.keys(to).length === 0) {
       return {
+        ...cast,
         seed: fav.seed,
         seedOffsets: favOffsets,
         layoutParams: { ...state.layoutParams, ...target },
@@ -294,6 +340,7 @@ export const createDavisSlice = (set) => ({
     return {
       // #107 §7: same one-entry-per-morph undo as triggerEvolve above.
       ...pushToUndo(state, true),
+      ...cast,
       layoutParams: { ...state.layoutParams, ...discrete },
       morphing: true,
       morphFrom: from,
