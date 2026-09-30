@@ -34,7 +34,7 @@ import {
   resolveEffectiveBehave, resolveWindMode, orbitForce,
   levyStep, LEVY_FLIGHT_FRAMES,
   lorenzAdvance, lorenzSeed, LORENZ_DT,
-  resolveSeekGain,
+  resolveSeekGain, resolveBehave,
 } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
@@ -821,7 +821,13 @@ export class ParticleSystem {
     // #584 — seek/flee retune the force below rather than adding a second
     // attractor. Rows without a seekGain resolve to 1, so nothing changes for
     // them; flee is a negative gain, which flips the same vector.
-    const seekMul = organism ? resolveSeekGain(profile) : 1;
+    // #711 — the row's seekGain now reaches the swarm attractor path too, so
+    // the chips act in every mode, not just hype. resolveBehave (raw table)
+    // suffices here: seekGain is table-only, never a per-layer override (see
+    // BEHAVE_OVERRIDE_FIELDS), so it matches the effective row exactly.
+    const seekMul = organism
+      ? resolveSeekGain(profile)
+      : resolveSeekGain(resolveBehave(layoutParams.behave));
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
     const sepRadius2 = sepRadius * sepRadius;
