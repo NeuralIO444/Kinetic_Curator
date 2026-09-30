@@ -13,7 +13,7 @@ import { ASSETS } from '../data/assets/index.js';
 
 /** First-render SVG SHA-256 of the all-era fixture — bump only on intentional render changes. */
 export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH =
-  '90ae4f2ee5473d9cd8a2b07f4cc948e512d6941363377e9883e99946a72ed666';
+  '793a2bb9e3874938cd7954a8f5c39c61112e207bce1553ca5d95a646b57276bc' // re-pinned: #699 revert removed 3 demo assets from the catalog;
 
 const raw = JSON.parse(readFileSync(new URL('./fixtures/all-era-project.json', import.meta.url), 'utf8'));
 

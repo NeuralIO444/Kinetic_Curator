@@ -145,9 +145,6 @@ export function AssetPoolPanel() {
                   style={{ position: 'absolute', top: 2, left: 2, fontSize: 9, fontWeight: 700, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.5)', color: 'var(--dim)', zIndex: 2 }}>
                   {WEIGHT_LABEL[w]}
                 </button>
-                {a.sub && (
-                  <span title="Animated asset — sub-animation plays on the canvas" style={{ position: 'absolute', top: 2, right: 2, fontSize: 8, fontWeight: 700, padding: '2px 4px', border: '1px solid var(--accent)', background: 'rgba(0,0,0,0.55)', color: 'var(--accent)', zIndex: 2 }}>ANIM</span>
-                )}
                 <button className="tile-solo" title="Solo" onClick={() => emit(Events.ASSETS_SOLO, { id: a.id })}>◉</button>
                 <button type="button" title="Duplicate overlay copy" onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}
                   style={{ position: 'absolute', bottom: 22, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>DUP</button>
