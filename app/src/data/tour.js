@@ -7,10 +7,10 @@ export const TOUR_STORAGE_KEY = 'kc:tour-seen';
 
 export const TOUR_STEPS = [
   {
-    id: 'preset',
+    id: 'look',
     tab: 'build',
-    title: '1 · Pick a recipe',
-    body: 'Open BUILD and tap a recipe — V01D, HYDRA, KILN COLUMNS. Each one rebuilds the picture from a seed.',
+    title: '1 · Pick a Look',
+    body: 'Open BUILD and pick from looks ▾. A Look re-costumes the layout; your palette and marks stay put.',
   },
   {
     id: 'slider',

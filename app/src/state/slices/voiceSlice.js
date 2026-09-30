@@ -114,7 +114,7 @@ export function nextVoiceName(list) {
 /** Find a voice definition by id across flagships and the user shelf. */
 export function findVoiceDef(id, userVoices) {
   const f = FLAGSHIP_VOICES.find((v) => v.id === id);
-  if (f) return { ...f, kind: 'flagship', displayName: `${f.name} — ${f.title}` };
+  if (f) return { ...f, kind: 'flagship', displayName: f.title }; // #735: title on the face, never the id
   const u = (userVoices || []).find((v) => v.id === id);
   if (u) {
     return {

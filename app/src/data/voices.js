@@ -272,7 +272,7 @@ export const FLAGSHIP_VOICES = [
   {
     id: 'dark-glass',
     name: 'DARK GLASS',
-    title: 'Chiaroscuro',
+    title: 'Dark Glass', // not 'Chiaroscuro': that name is the Look + palette (TAXONOMY twin rule)
     vibe: 'A few lit facets turning in a dark room — amber glass, one violet light.',
     glyph: 'glass',
     blendSeconds: 3,

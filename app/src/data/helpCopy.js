@@ -20,7 +20,7 @@ export const HELP_TOPICS = [
   { id: 'output-batch', group: 'Output', title: 'batch', text: 'Render N sequential seeds as PNG + JSON sidecars.' },
   { id: 'assets-import', group: 'Assets', title: 'import', text: 'Drop an SVG into the project overlay. The canon is untouched.' },
   { id: 'master-run', group: 'Master', title: 'run', text: 'Play / pause the live loop (Space).' },
-  { id: 'help-tour', group: 'Help', title: 'tour', text: 'Replay the 4-step first-run tour (preset, slider, PLAY, still) from the HELP tab.' },
+  { id: 'help-tour', group: 'Help', title: 'tour', text: 'Replay the 4-step first-run tour (look, slider, PLAY, still) from the HELP tab.' },
   { id: 'davis-audio', group: 'Ghost Station', title: 'clock audio', text: 'Tick on a mic attack. Held noise is not a beat — armed · no attack.' },
   { id: 'davis-metro', group: 'Ghost Station', title: 'clock metro', text: 'Internal BPM. No mic.' },
   { id: 'davis-interval', group: 'Ghost Station', title: 'interval', text: 'Seconds between Evolve fires. Dead while SOURCE is BEAT.' },

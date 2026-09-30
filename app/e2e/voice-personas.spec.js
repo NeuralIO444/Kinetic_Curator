@@ -22,25 +22,25 @@ test.describe('Mode personas', () => {
 
   test('flagship chips, stub tiles and + chip render', async ({ page }) => {
     await expect(page.locator('.voice-chip.flagship')).toHaveCount(4);
-    await expect(page.locator('.voice-flagships')).toContainText(/SWARM/);
-    await expect(page.locator('.voice-flagships')).toContainText(/HYPE/);
-    await expect(page.locator('.voice-flagships')).toContainText(/MURM/);
-    await expect(page.locator('.voice-flagships')).toContainText(/DARK GLASS/);
+    await expect(page.locator('.voice-flagships')).toContainText(/Night Migration/);
+    await expect(page.locator('.voice-flagships')).toContainText(/Chrome Parade/);
+    await expect(page.locator('.voice-flagships')).toContainText(/Deep Water/);
+    await expect(page.locator('.voice-flagships')).toContainText(/Dark Glass/);
     // 12 stub tiles keep the mode grid
     await expect(page.locator('.mode-grid .mode-tile')).toHaveCount(12);
     await expect(page.locator('.plus-chip')).toBeVisible();
   });
 
-  test('tapping SWARM crossfades through MIX and lands the voice', async ({ page }) => {
-    await page.locator('.voice-chip.flagship', { hasText: 'SWARM' }).click();
+  test('tapping Night Migration crossfades through MIX and lands the voice', async ({ page }) => {
+    await page.locator('.voice-chip.flagship', { hasText: 'Night Migration' }).click();
     // MIX bar appears while the crossfade runs
     const mixBar = page.locator('.mix-bar');
     await expect(mixBar).toBeVisible({ timeout: 5_000 });
-    await expect(mixBar).toContainText(/SWARM/);
+    await expect(mixBar).toContainText(/Night Migration/);
     // 4s signature blend — wait for the commit to land
     await expect(mixBar).toBeHidden({ timeout: 15_000 });
     // Chip stays lit and the canvas reports the voice's mode
-    await expect(page.locator('.voice-chip.flagship.active', { hasText: 'SWARM' })).toBeVisible();
+    await expect(page.locator('.voice-chip.flagship.active', { hasText: 'Night Migration' })).toBeVisible();
     await expect(page.locator('.canvas-corner.tr').first()).toContainText(/swarm/i, { timeout: 10_000 });
   });
 
