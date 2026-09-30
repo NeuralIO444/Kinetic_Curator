@@ -33,7 +33,7 @@ const BUILTIN = {
 const PROGRAMS = {
   quad:        { fs: QUAD_FS,  vs: QUAD_VS, paramCount: 0, passCount: 1 },
   composite:   { fs: COMPOSITE_FS, vs: FULL_VS, paramCount: 3, passCount: 1 },
-  resolve:     { fs: RESOLVE_FS,   vs: FULL_VS, paramCount: 4, passCount: 1 },
+  resolve:     { fs: RESOLVE_FS,   vs: FULL_VS, paramCount: 5, passCount: 1 },
   copy:        { fs: COPY_FS,  vs: FULL_VS, paramCount: 0, passCount: 1 },
 };
 
