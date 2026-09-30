@@ -8,7 +8,7 @@ import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/pale
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
-import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS } from '../../data/voices.js';
+import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS, SHAPE_MIX_MAX, MIXABLE_SHAPE_IDS, liveShapeLevels, shapeMixIds } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 
@@ -98,6 +98,7 @@ export const createLayoutSlice = (set) => ({
    * deliberately outside the project document.
    */
   colorMode: 'FADE',
+  shapeLevels: {}, // #733 shape mixer intensities { chipId: 1|2|3 } — live only while the pool matches (liveShapeLevels)
   caGrid: null,
   historyUndoStack: [],
   historyRedoStack: [],
@@ -400,6 +401,32 @@ export const createLayoutSlice = (set) => ({
     const curOn = Object.keys(cur).filter((k) => cur[k]);
     if (curOn.length === Object.keys(map).length && curOn.every((k) => map[k])) return {};
     return { ...pushToUndo(state, true), enabledAssets: map };
+  }),
+
+  /**
+   * Shape mixer (#733): tap a shape chip → off → 1 → 2 → 3 → off. Up to
+   * SHAPE_MIX_MAX chips on; a fifth is refused (no-op, never evicts). The pool
+   * becomes the union of the on-chips' sets and `shapeLevels` carries the
+   * intensities the placer weights by. The last chip cannot go off — an empty
+   * pool renders nothing — so at 3 it stays 3. Same single-axis contract as
+   * loadShapeSet: shapes only, no MIX, never touches layout/motion/colour.
+   */
+  cycleShapeLevel: (id) => set((state) => {
+    if (!MIXABLE_SHAPE_IDS.includes(id)) return {};
+    const cur = liveShapeLevels(state.shapeLevels, state.enabledAssets);
+    const at = cur[id] || 0;
+    const on = Object.keys(cur).filter((k) => cur[k] > 0).length;
+    if (at === 0 && on >= SHAPE_MIX_MAX) return {}; // the refusal is the visible constraint
+    const next = { ...cur };
+    const level = (at + 1) % 4;
+    if (level === 0) delete next[id]; else next[id] = level;
+    if (!Object.keys(next).length) return {}; // never empty the pool
+    const known = new Set(ASSETS.map((a) => a.id));
+    for (const c of state.customAssets || []) known.add(c.id);
+    const map = {};
+    for (const assetId of shapeMixIds(next)) if (known.has(assetId)) map[assetId] = true;
+    if (!Object.keys(map).length) return {};
+    return { ...pushToUndo(state, true), enabledAssets: map, shapeLevels: next };
   }),
 
   toggleParamLock: (key) => set((state) => ({

@@ -123,6 +123,7 @@ node src/state/fxaa.selfcheck.mjs
 node src/data/light.selfcheck.mjs
 node src/gl/gateWeave.selfcheck.mjs
 node src/state/stubMix.selfcheck.mjs
+node src/state/shapeMix.selfcheck.mjs
 node scripts/runSelfcheck.selfcheck.mjs
 node qa/report.selfcheck.mjs
 node qa/review.selfcheck.mjs

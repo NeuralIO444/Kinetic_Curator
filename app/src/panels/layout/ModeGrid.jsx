@@ -8,7 +8,7 @@
 // user chip to overwrite it, double-click to rename, × to delete (confirm).
 import { useRef, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, SHAPE_SETS, isMotionActive, isShapeSetActive } from '../../data/voices.js';
+import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isMotionActive, isShapeSetActive, liveShapeLevels } from '../../data/voices.js';
 import { MAX_USER_VOICES } from '../../state/slices/voiceSlice.js';
 import { MixBar } from './MixBar.jsx';
 
@@ -113,6 +113,8 @@ export function ModeGrid({ mode }) {
   const loadStubMode = useStore((s) => s.loadStubMode);
   const loadMotion = useStore((s) => s.loadMotion);
   const loadShapeSet = useStore((s) => s.loadShapeSet);
+  const cycleShapeLevel = useStore((s) => s.cycleShapeLevel);
+  const shapeLevels = liveShapeLevels(useStore((s) => s.shapeLevels), useStore((s) => s.enabledAssets));
   const enabledAssets = useStore((s) => s.enabledAssets);
   const layoutParams = useStore((s) => s.layoutParams);
   const captureUserVoice = useStore((s) => s.captureUserVoice);
@@ -173,17 +175,38 @@ export function ModeGrid({ mode }) {
       <div className="voice-shelf">
         <span className="shelf-label">SHAPES</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
-          {SHAPE_SETS.map((x) => (
-            <button
-              key={x.id}
-              type="button"
-              className={`chip-btn ${isShapeSetActive(enabledAssets, x) ? 'active' : ''}`}
-              onClick={() => loadShapeSet(x.id)}
-              title={`${x.name} — ${x.ids.length} shapes`}
-            >
-              {x.name}
-            </button>
-          ))}
+          {SHAPE_SETS.map((x) => {
+            if (!MIXABLE_SHAPE_IDS.includes(x.id)) {
+              return (
+                <button
+                  key={x.id}
+                  type="button"
+                  className={`chip-btn ${isShapeSetActive(enabledAssets, x) ? 'active' : ''}`}
+                  onClick={() => loadShapeSet(x.id)}
+                  title={`${x.name} — ${x.ids.length} shapes`}
+                >
+                  {x.name}
+                </button>
+              );
+            }
+            // #733 — 4-state LED chip: three stepped pips under the label.
+            const lv = shapeLevels[x.id] || 0;
+            return (
+              <button
+                key={x.id}
+                type="button"
+                className={`chip-btn shape-mix ${lv ? 'active' : ''}`}
+                onClick={() => cycleShapeLevel(x.id)}
+                aria-label={`${x.name}, level ${lv} of 3`}
+                title={`${x.name} — level ${lv}/3. Tap: off → 1 → 2 → 3 → off. Up to ${SHAPE_MIX_MAX} on.`}
+              >
+                {x.name}
+                <span className="shape-pips" aria-hidden="true">
+                  {[1, 2, 3].map((n) => <i key={n} className={lv >= n ? 'lit' : ''} />)}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

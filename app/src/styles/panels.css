@@ -34,6 +34,14 @@
 .chip-btn:hover { color: var(--ink); border-color: var(--ink); }
 .chip-btn.active { color: var(--bg); background: var(--ink); border-color: var(--ink); }
 
+/* #733 shape mixer: three stepped LED pips under the label. Segmented, no
+   gradient, no glow, no animation; lit = filled, unlit = outline (state is
+   never opacity alone). currentColor tracks the chip's own on/off inversion. */
+.chip-btn.shape-mix { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.shape-pips { display: flex; gap: 2px; }
+.shape-pips i { width: 6px; height: 3px; box-sizing: border-box; border: 1px solid currentColor; background: transparent; }
+.shape-pips i.lit { background: currentColor; }
+
 /* #536: chip-identity fixed shapes */
 .chip-btn.chip-behave {
   border-radius: 9999px;

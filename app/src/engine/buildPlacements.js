@@ -161,7 +161,9 @@ export function buildPlacements({
   if (bindHit) {
     ({ assetIds, colors, accents, keys } = cache);
   } else {
-    const weights = activeAssets.map((a) => SELECTION_WEIGHT[a.weight] || 1);
+    // #733 — a shape-mixer weight (already normalized) replaces the asset's
+    // own heavy/medium/light when the resolver set one.
+    const weights = activeAssets.map((a) => (a.mixWeight > 0 ? a.mixWeight : SELECTION_WEIGHT[a.weight] || 1));
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
     assetIds = new Array(soa.n);
     colors = new Array(soa.n);
