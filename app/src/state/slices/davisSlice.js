@@ -1,3 +1,4 @@
+import { startRun, tickRun, finishRun } from '../../data/evolveProgress.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { generateLayoutTargets, MORPHABLE_KEYS, PALETTE_IDS } from '../paramUtils.js';
 import { genId } from '../id.js';
@@ -100,8 +101,25 @@ function persistFavorites(list) {
   }
 }
 
+/**
+ * #616 — stamp EVOLVE progress onto an evolve step's update: the generation
+ * (only while EVOLVE runs) and the candidate seen (every tick, run or manual).
+ */
+function withEvolveStats(state, update) {
+  if (!update || !Object.keys(update).length) return update;
+  return {
+    ...update,
+    evolveRun: state.evolveMode ? tickRun(state.evolveRun, update.lastEvolveTs || Date.now()) : state.evolveRun,
+    evolveSeen: (state.evolveSeen || 0) + 1,
+  };
+}
+
 export const createDavisSlice = (set) => ({
   evolveMode: false,
+  // #616 EVOLVE progress: live run, last finished run, candidates seen this session.
+  evolveRun: null,
+  evolveLast: null,
+  evolveSeen: 0,
   evolveSource: 'time',
   evolveTarget: 'seed',
   evolveInterval: 2000,
@@ -138,9 +156,15 @@ export const createDavisSlice = (set) => ({
   euclidSteps: 8,
   euclidRotate: 0,
 
-  setEvolveMode: (valOrFn) => set((state) => ({
-    evolveMode: typeof valOrFn === 'function' ? valOrFn(state.evolveMode) : valOrFn,
-  })),
+  setEvolveMode: (valOrFn) => set((state) => {
+    const next = !!(typeof valOrFn === 'function' ? valOrFn(state.evolveMode) : valOrFn);
+    if (next === !!state.evolveMode) return { evolveMode: next };
+    const now = Date.now();
+    // #616: start a fresh run on EVOLVE, keep a summary when it stops.
+    return next
+      ? { evolveMode: true, evolveRun: startRun(now) }
+      : { evolveMode: false, evolveRun: null, evolveLast: finishRun(state.evolveRun, now) };
+  }),
   setEvolveSource: (source) => set({ evolveSource: source }),
   setEvolveTarget: (target) => set({ evolveTarget: target }),
   setEvolveInterval: (interval) => set({ evolveInterval: interval }),
@@ -205,7 +229,7 @@ export const createDavisSlice = (set) => ({
     return next;
   }),
 
-  triggerEvolve: () => set((state) => {
+  triggerEvolve: () => set((state) => withEvolveStats(state, (() => {
     const ts = Date.now();
     const caUpdate = state.layoutParams.mode === 'ca'
       ? { caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28) }
@@ -267,7 +291,7 @@ export const createDavisSlice = (set) => ({
       };
     }
     return {};
-  }),
+  })())),
 
   addFavorite: (fav) => set((state) => {
     const entry = sanitizeFavorite({ ...fav, id: genId() });

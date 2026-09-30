@@ -4,6 +4,7 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { BehaveReadout } from './davis/BehaveReadout.jsx';
 import { VoiceTiles } from './davis/VoiceTiles.jsx';
+import { EvolveProgress } from './davis/EvolveProgress.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { captureFavorite } from '../state/slices/davisSlice.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
@@ -61,21 +62,25 @@ export function DavisPanel() {
   };
   const accumOn = !!layoutParams.accumulation;
 
+  // The header subtitle is unchanged (#616 only moved it out of the JSX). The
+  // PERFORM readout is the phrase half of it, stated on its own.
+  const phraseStatus = morphing ? 'morphing…'
+    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`
+    : phraseEnabled && !audioEnabled ? 'armed · waiting for beat'
+    : noAttack ? 'armed · no attack'
+    : phraseEnabled ? `${phraseBeat}/${phraseLength}`
+    : 'off';
+  const subtitle = morphing ? 'morphing…'
+    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`
+    : phraseEnabled && !audioEnabled ? 'phrase armed · waiting for beat'
+    : noAttack ? 'armed · no attack'
+    : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}`
+    : evolveMode ? 'evolving'
+    : 'paused';
+
   return (
     <div className="panel panel-davis">
-      <PanelHeader
-        tag="P07"
-        title="GHOST STATION"
-        subtitle={
-          morphing ? 'morphing…'
-            : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`
-            : phraseEnabled && !audioEnabled ? 'phrase armed · waiting for beat'
-            : noAttack ? 'armed · no attack'
-            : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}`
-            : evolveMode ? 'evolving'
-            : 'paused'
-        }
-      />
+      <PanelHeader tag="P07" title="GHOST STATION" subtitle={subtitle} />
       <div className="davis-body">
           {/* #248 Phase 5 — MORPH EVOLVE and PHRASE LOOP moved to PLAY.
               The phrase- and morph-related state above stays selected here:
@@ -83,10 +88,14 @@ export function DavisPanel() {
               morph status even though the controls that drive them now
               live in PLAY — cross-panel status at a glance, same as Phase 4
               left beatCollision's inputs selected here for PLAY to read. */}
+          {/* #616 — the panel reads in three labelled sections. Nothing was
+              removed or re-wired: same controls, same events, new headings. */}
+          <div className="davis-section-label">VOICES</div>
           {/* #717 — the flagship Voices' one home: load through the voice MIX. */}
           <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
 
+          <div className="davis-section-label">GENERATE</div>
           <div className="davis-actions">
             <button className={`big-btn ${evolveMode ? 'active' : ''}`}
               onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>
@@ -118,6 +127,12 @@ export function DavisPanel() {
             </button>
           </div>
 
+          <EvolveProgress />
+
+          <div className="davis-section-label">PERFORM</div>
+          <div className="davis-phrase-status" title="Phrase clock status. The controls live in PLAY; this panel only reports.">
+            <i>PHRASE</i><b>{phraseStatus}</b>
+          </div>
           {accumOn && (
             <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
               <button className={`big-btn ${accumFrozen ? 'active' : ''}`}
