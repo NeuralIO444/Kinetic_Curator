@@ -1170,6 +1170,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
 
   return {
     start, stop, dispose,
+    getLoopTimeMs: () => loopTimeMs,
     setBgMode,
     setAccumFrozen: (f) => { accumFrozen = !!f; },
     swellAccum: () => { swellStart = performance.now(); },

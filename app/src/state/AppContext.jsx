@@ -132,7 +132,7 @@ export function useApp(selector) {
       case A.SET_EVOLVE_INTERVAL: return store.setEvolveInterval(payload);
       case A.SET_AUTO_SNAPSHOT: return store.setAutoSnapshot(payload);
       case A.SET_BEAT_ROUTE: return store.setBeatRoute(payload);
-      case A.TRIGGER_EVOLVE: return store.triggerEvolve();
+      case A.TRIGGER_EVOLVE: return store.triggerEvolve(payload || {});
       case A.SET_MORPH_EVOLVE: return store.setMorphEvolve(payload);
       case A.SET_MORPH_DURATION: return store.setMorphDurationMs(payload);
       case A.SET_PHRASE_ENABLED: return store.setPhraseEnabled(payload);

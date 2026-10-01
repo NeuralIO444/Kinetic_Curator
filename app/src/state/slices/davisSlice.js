@@ -229,8 +229,8 @@ export const createDavisSlice = (set) => ({
     return next;
   }),
 
-  triggerEvolve: () => set((state) => withEvolveStats(state, (() => {
-    const ts = Date.now();
+  triggerEvolve: (opts = {}) => set((state) => withEvolveStats(state, (() => {
+    const ts = Number.isFinite(opts.loopTimeMs) ? opts.loopTimeMs : Date.now();
     const caUpdate = state.layoutParams.mode === 'ca'
       ? { caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28) }
       : {};

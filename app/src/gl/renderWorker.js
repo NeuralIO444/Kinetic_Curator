@@ -122,7 +122,7 @@ function buildFrame() {
 
   // Audio ballistics
   const audioBands = s.audioInput || null;
-  const ballistics = processBallistics(ballisticsState, audioBands, dtSec);
+  const ballistics = processBallistics(ballisticsState, audioBands, dtMs);
 
   // Resolver step
   const resolved = resolver.resolveLayers({

@@ -66,7 +66,7 @@ export const BUILTIN_EFFECT_DEFS = [
     make: (id) => one(id.rgbSplit, (p) => [knob(p.dx, 0, 24, 3) / 1000, 0, 0, 0]) },
   { kind: 'grain',
     cost: { tier: 3, memoryBytes: FRAME_16F, timeMs: 0.4, notes: 'LUT fetch + mix; grain LUT is baked, not per-frame' },
-    make: (id) => one(id.grain, (p) => [knob(p.amount, 0, 1, 0.4), 0, 0, 0]) },
+    make: (id) => one(id.grain, (p) => [0, knob(p.amount, 0, 1, 0.4), 0, 0]) },
   { kind: 'posterize',
     cost: { tier: 3, memoryBytes: FRAME_16F, timeMs: 0.2, notes: 'pure ALU color op' },
     make: (id) => one(id.posterize, (p) => [knob(p.levels, 2, 8, 4), 0, 0, 0]) },
