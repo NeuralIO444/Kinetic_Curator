@@ -149,6 +149,17 @@ export class ParticleSystem {
     this.phase = new Float64Array(cap);
     this.u = new Float64Array(cap);
     this.seedOffset = new Float64Array(cap);
+    // #558 — per-node uniqueness (Always-Alive Protocol rule 4: no two
+    // nodes in lockstep unison). Assigned at instantiation from seeded
+    // hash channels only (never the load-bearing r() stream, never
+    // wall-clock); evaluated per-agent by #806 (phase vs loopTimeMs).
+    // phaseOffset: static phase offset in [0,1) — siblings start out of phase.
+    // driftMul / speedMul: fractional multipliers on lifeDrift / noiseSpeed.
+    // noiseSeed: per-agent noise-domain seed for wobble/sway decorrelation.
+    this.phaseOffset = new Float64Array(cap);
+    this.driftMul = new Float64Array(cap);
+    this.speedMul = new Float64Array(cap);
+    this.noiseSeed = new Float64Array(cap);
     this.assetIndex = new Int32Array(cap);
     // #167 — contact columns. alive is the live/dead gate (die/breed);
     // cgroup is the particle's collide layer, stable for its lifetime
@@ -206,6 +217,10 @@ export class ParticleSystem {
     this.phase = grow(this.phase);
     this.u = grow(this.u);
     this.seedOffset = grow(this.seedOffset);
+    this.phaseOffset = grow(this.phaseOffset);
+    this.driftMul = grow(this.driftMul);
+    this.speedMul = grow(this.speedMul);
+    this.noiseSeed = grow(this.noiseSeed);
     this.assetIndex = grow(this.assetIndex);
     this.alive = grow(this.alive);
     this.cgroup = grow(this.cgroup);
@@ -304,6 +319,20 @@ export class ParticleSystem {
     this.lorenzX[i] = l.x; this.lorenzY[i] = l.y; this.lorenzZ[i] = l.z;
   }
 
+  /**
+   * #558 — per-node uniqueness channels for the instanced array. Spread
+   * onto items wherever seedOffset rides, so the render path carries the
+   * full per-agent identity #806 will evaluate (phase vs loopTimeMs).
+   */
+  _uniqueness(i) {
+    return {
+      phaseOffset: this.phaseOffset[i],
+      driftMul: this.driftMul[i],
+      speedMul: this.speedMul[i],
+      noiseSeed: this.noiseSeed[i],
+    };
+  }
+
   _spawnRange(start, end, activeAssets, palette, seed, seedOffsets, opts = {}) {
     const swatches = palette?.swatches || ['#ffffff'];
     const grazeFrac = Math.min(1, Math.max(0, Number(opts.graze) || 0));
@@ -333,6 +362,14 @@ export class ParticleSystem {
       this.phase[i] = 0;
       this.u[i] = 0;
       this.seedOffset[i] = seedOffset;
+      // #558 — per-node uniqueness: separate hashes (not the sequential
+      // r() stream), so the six load-bearing placement draws above keep
+      // their exact sequence and legacy seeds still reproduce bit-identical
+      // positions. Same precedent as the grazer trait and #710/#583.
+      this.phaseOffset[i] = hashU01(seed >>> 0, CH.dyn, 24576 + i);
+      this.driftMul[i] = 0.8 + 0.4 * hashU01(seed >>> 0, CH.dyn, 28672 + i);
+      this.speedMul[i] = 0.8 + 0.4 * hashU01(seed >>> 0, CH.dyn, 32768 + i);
+      this.noiseSeed[i] = hashU01(seed >>> 0, CH.dyn, 36864 + i) * 10;
       this.assetIndex[i] = i % activeAssets.length;
       this.alive[i] = 1;
       this.cgroup[i] = (i % activeAssets.length) % 32;
@@ -1288,6 +1325,7 @@ export class ParticleSystem {
           vx: this.vx[i], vy: this.vy[i],
           // Spine C (#389): per-agent phase for layered life
           seedOffset: this.seedOffset[i],
+          ...this._uniqueness(i),
         });
       }
       return items;
@@ -1329,6 +1367,7 @@ export class ParticleSystem {
           key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
           vx, vy,
           seedOffset: this.seedOffset[i],
+          ...this._uniqueness(i),
         });
       }
       if (symmetry === 'bilateral') {
@@ -1343,13 +1382,13 @@ export class ParticleSystem {
           x: px - pyh * reach, y: py + pxh * reach,
           scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
-          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
+          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i], ...this._uniqueness(i),
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
           scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
-          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i],
+          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i], ...this._uniqueness(i),
         });
       } else {
         // #287 — radial fans. The bilateral pair above generalizes to an
@@ -1375,6 +1414,7 @@ export class ParticleSystem {
               key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
               vx, vy,
               seedOffset: this.seedOffset[i],
+              ...this._uniqueness(i),
               ...(mirrored ? { _mirrored: true } : null),
             });
           }
