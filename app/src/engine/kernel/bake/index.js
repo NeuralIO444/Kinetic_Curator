@@ -118,7 +118,7 @@ export function bakeParticles({
   if (!ranWasm) {
     for (let s = 0; s < steps; s++) {
       // Fixed timestep from a fixed origin — the one thing that makes this
-      // reproducible. The live loop passes Date.now() here.
+      // reproducible. The live loop passes loopTimeMs here.
       sys.update(params, activeAssets, palette, seed, BAKE_TIME_ORIGIN + s * dt, attractor, seedOffsets);
     }
   }

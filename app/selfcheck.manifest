@@ -28,6 +28,7 @@ node src/engine/kernel/tracks/trackGraph.mod.selfcheck.mjs
 node src/engine/kernel/tracks/feedLive.selfcheck.mjs
 node src/engine/kernel/color/color.selfcheck.mjs
 node src/engine/kernel/bake/bake.selfcheck.mjs
+node src/engine/kernel/bake/bake.parity.selfcheck.mjs
 node src/engine/kernel/bake/swarmWasm.selfcheck.mjs
 node src/engine/kernel/evalContext.selfcheck.mjs
 node src/engine/kernel/itemMorph.selfcheck.mjs
@@ -68,6 +69,7 @@ node src/gl/clock.evolve.selfcheck.mjs
 node src/gl/clock.workerDt.selfcheck.mjs
 node src/gl/clock.capture.selfcheck.mjs
 node src/gl/accum.inventory.selfcheck.mjs
+node src/gl/accum.seam.selfcheck.mjs
 node src/gl/fx.upSlots.selfcheck.mjs
 node src/engine/particles.lorenzReseed.selfcheck.mjs
 node src/engine/particles.seekFleeSwarm.selfcheck.mjs
