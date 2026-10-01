@@ -80,7 +80,7 @@ export function DavisPanel() {
 
   return (
     <div className="panel panel-davis">
-      <PanelHeader tag="P07" title="GHOST STATION" subtitle={subtitle} />
+      <PanelHeader tag="P07" title="DIRECTOR" subtitle={subtitle} />
       <div className="davis-body">
           {/* #248 Phase 5 — MORPH EVOLVE and PHRASE LOOP moved to PLAY.
               The phrase- and morph-related state above stays selected here:
