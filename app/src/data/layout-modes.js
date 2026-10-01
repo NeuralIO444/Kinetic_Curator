@@ -142,6 +142,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   audioResponse: 'exponential',
   audioSwell: 1,
   lifeDrift: 0.35,
+  parallax: 0, // #796 diorama drift; 0 = placements bit-identical
 };
 
 /** #306 — audio envelope response-curve shapes. */
@@ -227,6 +228,7 @@ export const PARAM_SPEC = {
   audioDecayMs: { min: 0, max: 5000 },
   audioSwell: { min: 0, max: 1 },
   lifeDrift: { min: 0, max: 1 },
+  parallax: { min: 0, max: 1 },
   // #167 — contact disc radius in px (0 = contacts off), bounce 0–1,
   // personal-space force gain, and the 32-bit layer-interaction mask.
   // No sliders expose these yet — the spec is the trust boundary (#107),
