@@ -92,7 +92,10 @@ function AppInner() {
     // independent of slowRender, since a batch must hold regardless of the
     // momentary FPS reading.
     if (!state.evolveMode || state.evolveSource !== 'time' || state.slowRender || state.batchPaused) return;
-    const interval = setInterval(() => piped({ type: A.TRIGGER_EVOLVE }), state.evolveInterval);
+    const interval = setInterval(() => {
+      const loopTimeMs = glLoopRef?.current?.getLoopTimeMs?.();
+      piped({ type: A.TRIGGER_EVOLVE, payload: { loopTimeMs } });
+    }, state.evolveInterval);
     return () => clearInterval(interval);
   }, [state.evolveMode, state.evolveSource, state.evolveInterval, state.slowRender, state.batchPaused, piped]);
 
@@ -173,7 +176,7 @@ function AppInner() {
     const s = useStore.getState();
     const { tickPhrase, fireEvolve } = routeBeat(s);
     if (tickPhrase) s.tickPhraseBeat();
-    if (fireEvolve) s.triggerEvolve();
+    if (fireEvolve) s.triggerEvolve({ loopTimeMs: glLoopRef?.current?.getLoopTimeMs?.() });
   }, [piped]);
   useAudioInput({
     enabled: state.audioEnabled,

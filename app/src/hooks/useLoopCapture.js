@@ -24,16 +24,11 @@
  * cleared buffer. captureFrame() resolves the persistent ACCUM/offscreen
  * targets and readPixels — always real pixels, rAF-independent.
  *
- * Honest limits: the take is fixed-length and fixed-fps, but the underlying
- * sim runs on the live clock (Date.now drives the noise field), so two
- * captures of the same seed are not bit-identical — the LENGTH and the
- * SEAM are deterministic, the pixels are a performance. Audio-reactive
- * voices capture "what plays", same as REC. The recorder runs in real
- * time: on hardware that renders below the capture fps (e.g. software GL,
- * where a frame can take ~1s) the take stretches with the wall clock — the
- * video is never truncated, but it is only exactly N seconds when the
- * machine keeps up. The e2e asserts the strict length on capable hardware
- * and recorder honesty (never longer than the take) everywhere else.
+ * Honest limits: the take is fixed-length and fixed-fps. Sim time is
+ * loopTimeMs from the live loop (#387 / #810), not Date.now. Two captures
+ * of the same seed at the same loopTimeMs are the same weather; two live
+ * performances are not bit-identical. Audio-reactive voices capture "what
+ * plays", same as REC.
  */
 
 export const LOOP_CAPTURE_FPS = 30;
