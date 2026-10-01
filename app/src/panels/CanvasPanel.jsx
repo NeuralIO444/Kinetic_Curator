@@ -22,7 +22,9 @@ export function CanvasPanel() {
   const evolveMode = useStore(s => s.evolveMode);
   const nodeCount = useStore(s => s.nodeCount);
   const canvasBg = useStore(s => s.canvasBg);
-  const accumOn = !!layoutParams.accumulation;
+  const canvasW = useStore(s => s.canvasW) || CANVAS_W;
+  const canvasH = useStore(s => s.canvasH) || CANVAS_H;
+  const stageBlackout = useStore(s => s.stageBlackout);
   // #268: the pill must read the EFFECTIVE state — the loop computes
   // accumulation as setting AND not-shed (liveLoop buildFrame). Under LOAD
   // SHED the setting stays on while the buffer is actually off.
@@ -171,7 +173,7 @@ export function CanvasPanel() {
           {/* BG cycle lives beside RESET VIEW (canvas belongs with canvas). */}
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
           <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
-          <span className="meter-pill">{CANVAS_W}×{CANVAS_H}</span>
+          <span className="meter-pill">{canvasW}×{canvasH}{canvasW !== CANVAS_W || canvasH !== CANVAS_H ? ` · live ${CANVAS_W}×${CANVAS_H}` : ''}</span>
           {accumEffective && <span className="meter-pill" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>ACCUM</span>}
           {accumOn && !accumEffective && <span className="meter-pill" title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery." style={{ color: '#ffb454' }}>ACCUM HELD</span>}
           <span className="meter-pill" title="Instances drawn this frame">{nodeCount} NODES</span>
@@ -192,6 +194,9 @@ export function CanvasPanel() {
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 1 }}
             onWheel={viewport.onWheel} onPointerDown={viewport.onPointerDown} onPointerMove={viewport.onPointerMoveCombined}
             onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />
+        )}
+        {stageBlackout && (
+          <div style={{ position: 'absolute', inset: 0, background: '#000', zIndex: 4 }} aria-label="Stage blackout" />
         )}
         <span className="canvas-corner tl">0,0</span>
         <span className="canvas-corner tr">{layoutParams.mode}{accumEffective ? ' · ACCUM' : accumOn ? ' · ACCUM HELD' : ''}</span>

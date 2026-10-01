@@ -19,6 +19,8 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { RenderFinalBlock } from './pipeline/RenderFinalBlock.jsx';
 import { PrintDeskBlock } from './pipeline/PrintDeskBlock.jsx';
 import { DisplayBlock } from './pipeline/DisplayBlock.jsx';
+import { SetupBlock } from './pipeline/SetupBlock.jsx';
+import { StageBlock } from './pipeline/StageBlock.jsx';
 import { BatchEditionBlock } from './pipeline/BatchEditionBlock.jsx';
 import { SnapRecordRow } from './pipeline/SnapRecordRow.jsx';
 import { LoopCaptureBlock } from './pipeline/LoopCaptureBlock.jsx';
@@ -260,6 +262,9 @@ export function PipelinePanel() {
     <div className="panel panel-pipeline panel-output">
       <PanelHeader tag="P05" title="PIPELINE" subtitle={`${snapshots.length} snaps`} />
       <div className="panel-body pipeline-body output-body">
+        <div className="pipeline-section-label">SETUP</div>
+        <SetupBlock />
+
         {/* ── IN: import, load, paste ── */}
         <div className="pipeline-section-label">IN</div>
         <RecipeRow onMessage={setMessage} />
@@ -441,6 +446,9 @@ export function PipelinePanel() {
         </div>
 
         {/* ── OUT: batch, capture, gallery ── */}
+        <div className="pipeline-section-label">STAGE</div>
+        <StageBlock />
+
         <div className="pipeline-section-label">OUT</div>
 
         <div
