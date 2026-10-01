@@ -312,11 +312,19 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     // Spine D: fallback supports both live (R/G mask per asset) and offline (baked combos)
     const cell = cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
     if (!cell) continue; // Spine B: skip missing instance, never throw
+    let u0 = cell.u0, v0 = cell.v0, u1 = cell.u1, v1 = cell.v1;
+    if (it.cellIndex != null && it.cellCount > 1) {
+      const n = it.cellCount;
+      const i = Math.max(0, Math.min(n - 1, it.cellIndex | 0));
+      const w = (u1 - u0) / n;
+      u0 = u0 + w * i;
+      u1 = u0 + w;
+    }
     buf[o] = it.x; buf[o + 1] = it.y;
     buf[o + 2] = it.scaleX; buf[o + 3] = it.scaleY;
     buf[o + 4] = it.rotation; buf[o + 5] = it.opacity * alphaScale;
-    buf[o + 6] = cell.u0; buf[o + 7] = cell.v0;
-    buf[o + 8] = cell.u1; buf[o + 9] = cell.v1;
+    buf[o + 6] = u0; buf[o + 7] = v0;
+    buf[o + 8] = u1; buf[o + 9] = v1;
     buf[o + 10] = it.vx || 0; buf[o + 11] = it.vy || 0;
     const ink = hexToRgb(it.tint);
     const acc = hexToRgb(it.accent);

@@ -25,7 +25,7 @@ export const PANEL_REGISTRY = [
   // The drawer mechanism in Shell.jsx stays, idle until a panel claims it.
   { id: 'assets',   title: 'ASSETS',   icon: '◇', component: AssetPoolPanel, zone: 'secondary' },
   { id: 'stimulus', title: 'STIMULI',  icon: '▸', component: StimulusPanel,  zone: 'secondary' },
-  { id: 'davis',    title: 'DAVIS',    icon: '◎', component: DavisPanel,     zone: 'secondary' },
+  { id: 'davis',    title: 'DIRECTOR', icon: '◎', component: DavisPanel,     zone: 'secondary' },
   // #248 Phase 4: PLAY is new, registered alongside davis/stimulus while
   // they still hold content — expected mid-migration tab-count bulge
   // (PANEL_CONSOLIDATION_PLAN.md §2.8), not a violation of the 4-tab cap.

@@ -38,6 +38,7 @@ import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // 
 import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
+import { applyParallax } from './parallax.mjs';
 import { resolvePalette } from '../data/palettes.js';
 import { resolveLiveRenderState } from '../data/voices.js';
 import { authoredCanvas } from '../data/canvasPresets.js';
@@ -606,6 +607,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
+    });
+
+    applyParallax(contract.instances, {
+      zTiers: layoutParams.zTiers,
+      parallax: layoutParams.parallax,
+      seed: s.seed,
+      loopTimeMs,
     });
 
     // Apply viewport (zoom/pan) + breath transforms to instance coordinates
