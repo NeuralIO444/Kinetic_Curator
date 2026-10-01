@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS,
+  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas,
 } from './canvasPresets.js';
 import { serializeProject } from '../state/projectDocument.js';
 
@@ -40,6 +40,13 @@ test('#606 instrument canvas omitted from serialize', () => {
   assert.equal(doc.canvasW, undefined);
   assert.ok(isInstrumentCanvas({ canvasW: 1000, canvasH: 700 }));
   assert.equal(INSTRUMENT_CANVAS.w, 1000);
+});
+
+test('#606 authoredCanvas reads store-shaped state', () => {
+  const a = authoredCanvas({ canvasW: 1080, canvasH: 1920, canvasFps: 30 });
+  assert.equal(a.w, 1080);
+  assert.equal(a.h, 1920);
+  assert.equal(a.fps, 30);
 });
 
 test('#606 custom size is written', () => {

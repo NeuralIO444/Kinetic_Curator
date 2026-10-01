@@ -5,7 +5,7 @@ import { useState, useRef, useCallback } from 'react';
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
 
-export function useCanvasViewport() {
+export function useCanvasViewport(canvasW = CANVAS_W, canvasH = CANVAS_H) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragRef = useRef({ active: false, pointerId: null, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
@@ -61,10 +61,10 @@ export function useCanvasViewport() {
     // degenerate rect as "no attractor this frame" instead of feeding the
     // physics a poisoned value.
     if (!(rect.width > 0) || !(rect.height > 0)) { attractorRef.current = null; return; }
-    const x = (e.clientX - rect.left) * (CANVAS_W / rect.width);
-    const y = (e.clientY - rect.top) * (CANVAS_H / rect.height);
+    const x = (e.clientX - rect.left) * (canvasW / rect.width);
+    const y = (e.clientY - rect.top) * (canvasH / rect.height);
     attractorRef.current = { x: (x - pan.x) / zoom, y: (y - pan.y) / zoom };
-  }, [pan.x, pan.y, zoom]);
+  }, [pan.x, pan.y, zoom, canvasW, canvasH]);
 
   const clearAttractor = useCallback(() => { attractorRef.current = null; }, []);
 

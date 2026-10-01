@@ -25,13 +25,14 @@ export function CanvasPanel() {
   const canvasW = useStore(s => s.canvasW) || CANVAS_W;
   const canvasH = useStore(s => s.canvasH) || CANVAS_H;
   const stageBlackout = useStore(s => s.stageBlackout);
+  const accumOn = !!layoutParams.accumulation;
   // #268: the pill must read the EFFECTIVE state — the loop computes
   // accumulation as setting AND not-shed (liveLoop buildFrame). Under LOAD
   // SHED the setting stays on while the buffer is actually off.
   const perfTier1 = useStore(s => s.perfTier1);
   const accumEffective = accumOn && !perfTier1;
 
-  const viewport = useCanvasViewport();
+  const viewport = useCanvasViewport(canvasW, canvasH);
   // Fresh-per-frame view of the viewport for the loop (the loop reads these
   // per render tick, so they live in a ref rather than a re-subscription).
   const viewRef = useRef({ zoom: 1, pan: { x: 0, y: 0 }, attractor: null });
@@ -190,7 +191,7 @@ export function CanvasPanel() {
             </div>
           </div>
         ) : (
-          <canvas ref={glCanvasRef} className="canvas-gl" width={CANVAS_W} height={CANVAS_H}
+          <canvas ref={glCanvasRef} className="canvas-gl" width={canvasW} height={canvasH}
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 1 }}
             onWheel={viewport.onWheel} onPointerDown={viewport.onPointerDown} onPointerMove={viewport.onPointerMoveCombined}
             onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />

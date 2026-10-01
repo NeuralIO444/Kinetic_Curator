@@ -51,8 +51,8 @@ export function SetupBlock() {
         </select>
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
-        Authored {authored}
-        {differ ? ` · live raster still ${actual} until the resize engine lands` : ' · live raster matches'}
+        Authored {authored} · live raster follows SETUP
+        {differ ? '' : ''}
         . Color space waits on #532 ACES.
       </div>
     </div>

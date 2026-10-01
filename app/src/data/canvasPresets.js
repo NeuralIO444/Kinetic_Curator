@@ -31,6 +31,11 @@ export function sanitizeCanvasSpec(raw = {}) {
   return { canvasW: w, canvasH: h, canvasFps: fps, canvasPresetId: presetId, stageMode };
 }
 
+export function authoredCanvas(state = {}) {
+  const spec = sanitizeCanvasSpec(state);
+  return { w: spec.canvasW, h: spec.canvasH, fps: spec.canvasFps };
+}
+
 export function isInstrumentCanvas(spec) {
   return spec.canvasW === 1000 && spec.canvasH === 700;
 }

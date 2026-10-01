@@ -1,4 +1,5 @@
 import { useStore } from '../../state/store.js';
+import { closeStageWindow, isTauriRuntime, openStageWindow } from './stageWindow.js';
 
 export function StageBlock() {
   const mode = useStore((s) => s.stageMode);
@@ -22,8 +23,14 @@ export function StageBlock() {
           <button key={m} type="button" className={`chip-btn${mode === m ? ' active' : ''}`}
             onClick={() => {
               setMode(m);
-              if (m === 'fullscreen' && !isFs) toggleFs?.();
-              if (m === 'preview' && isFs) toggleFs?.();
+              if (m === 'fullscreen') {
+                if (isTauriRuntime()) openStageWindow();
+                else if (!isFs) toggleFs?.();
+              }
+              if (m === 'preview') {
+                if (isTauriRuntime()) closeStageWindow();
+                else if (isFs) toggleFs?.();
+              }
             }}>
             {m === 'preview' ? 'PREVIEW' : m === 'fullscreen' ? 'FULLSCREEN' : 'SYPHON'}
           </button>
