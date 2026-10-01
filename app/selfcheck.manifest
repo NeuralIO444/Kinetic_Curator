@@ -44,6 +44,8 @@ node src/data/helpCopy.selfcheck.mjs
 node src/data/labelCase.selfcheck.mjs
 node src/data/palettes.selfcheck.mjs
 node src/data/chiaroscuro.selfcheck.mjs
+node src/data/cellKinemes.selfcheck.mjs
+node src/data/biology.selfcheck.mjs
 node src/gl/parallax.selfcheck.mjs
 node src/data/taxonomy.selfcheck.mjs
 node src/data/firstLight.selfcheck.mjs
