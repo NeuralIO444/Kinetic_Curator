@@ -32,6 +32,13 @@ import { noiseSeedFor } from '../rng.js';
 // without importing the loader module directly.
 export { ensureSwarmWasm };
 
+/** #814 — contacts bake on the JS integrator. WASM must refuse. */
+export function contactsBakePolicy(layoutParams = {}) {
+  const radius = layoutParams.contactRadius ?? 0;
+  if (!(radius > 0)) return { contacts: false, engine: 'auto' };
+  return { contacts: true, engine: 'js', reason: 'contacts' };
+}
+
 /** Fixed origin for baked time — any constant works; this one is arbitrary
  *  and deliberately not Date.now(). */
 export const BAKE_TIME_ORIGIN = 1_000_000;
@@ -95,7 +102,12 @@ export function bakeParticles({
   // #175 — Rust/wasm fast path. Opt-in at the call site via ensureSwarmWasm()
   // preload; scope-gated to the cloud path the wasm module implements.
   let ranWasm = false;
-  if (!wasmForcedOff() && engine !== 'js' && wasmBakeEligible({ layoutParams: params, attractor, count: sys.n }).ok) {
+  if (!wasmForcedOff() && engine !== 'js') {
+    const gate = wasmBakeEligible({ layoutParams: params, attractor, count: sys.n });
+    if (engine === 'wasm' && !gate.ok) {
+      throw new Error(`bakeParticles: engine "wasm" cannot bake this config (${gate.reason})`);
+    }
+    if (gate.ok) {
     const wasm = getSwarmWasm();
     if (wasm) {
       runSwarmWasm(wasm, sys, {
@@ -113,6 +125,7 @@ export function bakeParticles({
       throw new Error(
         'bakeParticles: engine "wasm" requested but the swarm wasm module is not loaded — call ensureSwarmWasm() first.',
       );
+    }
     }
   }
   if (!ranWasm) {
