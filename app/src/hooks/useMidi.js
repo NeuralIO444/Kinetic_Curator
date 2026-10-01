@@ -14,7 +14,12 @@ export function useMidi() {
   useEffect(() => {
     if (!enabled) return undefined;
     const engine = createMidiEngine({
-      requestAccess: typeof navigator !== 'undefined' && navigator.requestMIDIAccess ? navigator.requestMIDIAccess.bind(navigator) : null,
+      // Tests inject window.__kcMidiAccess so CI never waits on the native permission prompt.
+      requestAccess: (typeof window !== 'undefined' && typeof window.__kcMidiAccess === 'function')
+        ? window.__kcMidiAccess
+        : (typeof navigator !== 'undefined' && navigator.requestMIDIAccess
+          ? navigator.requestMIDIAccess.bind(navigator)
+          : null),
       getMap: () => useStore.getState().midiMap,
       ctx: { emit, Events, getState: useStore.getState },
       onStatus: (status) => useStore.getState().setMidiStatus(status),
