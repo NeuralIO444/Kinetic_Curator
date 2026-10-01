@@ -30,7 +30,7 @@ export const createExportSlice = (set) => ({
   setIsRendering: (rendering) => set({ isRendering: !!rendering }),
   setCanvasSize: (w, h, presetId = 'custom') => set(() => {
     const next = sanitizeCanvasSpec({ canvasW: w, canvasH: h, canvasPresetId: presetId });
-    return { canvasW: next.canvasW, canvasH: next.canvasH, canvasPresetId };
+    return { canvasW: next.canvasW, canvasH: next.canvasH, canvasPresetId: presetId };
   }),
   applyCanvasPreset: (id) => set(() => {
     const p = CANVAS_PRESETS.find((x) => x.id === id);
