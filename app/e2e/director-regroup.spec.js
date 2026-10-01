@@ -1,13 +1,13 @@
-// e2e/davis-regroup.spec.js — #616: DAVIS reads in labelled sections, every
+// e2e/director-regroup.spec.js — #616: DIRECTOR reads in labelled sections, every
 // existing control is still there, and EVOLVE shows its progress box (the
 // generation counting itself is selfchecked: it depends on real time + the governor).
 import { test, expect } from '@playwright/test';
 
-test('DAVIS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE progress', async ({ page }) => {
+test('DIRECTOR: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE progress', async ({ page }) => {
   await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('tab', { name: /davis/i }).click();
+  await page.getByRole('tab', { name: /director/i }).click();
   const panel = page.locator('.panel-davis');
 
   // three labelled sections, in order
