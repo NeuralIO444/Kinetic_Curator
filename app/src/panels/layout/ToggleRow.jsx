@@ -34,6 +34,7 @@ export function ToggleRow({ layoutParams }) {
       ))}
 
       {layoutParams.accumulation && (
+        <>
         <button type="button" className={`chip-btn${layoutParams.trail === 'leave' ? ' active' : ''}`}
           title="LEAVE holds the stamps. Fade is optional. Tunnel, prism, and flow can fade too."
           onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === 'leave' ? 'accum' : 'leave' })}>
@@ -52,6 +53,7 @@ export function ToggleRow({ layoutParams }) {
             onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'echoes', value: parseFloat(e.target.value) })}
             style={{ width: 64 }} />
         </label>
+        </>
       )}
       {layoutParams.trail === 'leave' && (
         <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}

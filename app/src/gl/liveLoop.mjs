@@ -44,6 +44,7 @@ import { resolveLiveRenderState } from '../data/voices.js';
 import { authoredCanvas } from '../data/canvasPresets.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
+import { isLeave, isRibbon, isComet } from './trailMode.mjs';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
@@ -722,7 +723,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         tunnel: layoutParams.accumulationTunnel,
         prism: layoutParams.accumulationPrism,
         flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider
-        trail: layoutParams.trail, // #560 Leave holds the stamps
+        leave: isLeave(layoutParams.trail),
+        ribbon: isRibbon(layoutParams.trail),
+        comet: isComet(layoutParams.trail),
         leaveFade: layoutParams.leaveFade, // 0 holds, higher fades
         echoes: layoutParams.echoes,
         tunnelFade: layoutParams.tunnelFade,

@@ -130,14 +130,12 @@ function opticsDerived(o) {
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
  */
-import { isLeave, isRibbon, isComet } from './trailMode.mjs';
-
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', trail = 'accum', leaveFade = 0, tunnelFade = 0, prismFade = 0, flowFade = 0 } = {}) {
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', leave = false, ribbon = false, comet = false, leaveFade = 0, tunnelFade = 0, prismFade = 0, flowFade = 0 } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
   const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
   const o = clamp01(optics);
-  const leaveEarly = isLeave(trail);
+  const leaveEarly = !!leave;
   const fadeOf = (v) => leaveEarly ? 1 - Math.min(1, Math.max(0, Number(v) || 0)) : 1;
   const t = clamp01(tunnel) * fadeOf(tunnelFade);
   const pr = clamp01(prism) * fadeOf(prismFade);
@@ -149,15 +147,15 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
   // #287 fade-to-paper: the fade target, parsed from the background CSS
   // color. Black keeps the legacy `rgb *= keep` exactly (0 * (1 - keep) = 0).
   const bg = hexToRgb01(background);
-  const leave = isLeave(trail);
+  const held = !!leave;
   return {
     leave,
-    ribbon: isRibbon(trail),
-    comet: isComet(trail),
-    keep: leave
+    ribbon: !!ribbon,
+    comet: !!comet,
+    keep: held
       ? Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0)))
-      : isRibbon(trail) ? Math.max(keep, 0.96)
-      : isComet(trail) ? Math.min(keep, 0.72)
+      : ribbon ? Math.max(keep, 0.96)
+      : comet ? Math.min(keep, 0.72)
       : keep,
     bg,
     ...opticsDerived(o),
@@ -171,7 +169,7 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
     prismUv: 0.001 * pr, // radial UV offset per channel at prism = 1 (constant across canvas)
     // Phase B2 — flow-advected feedback. Max UV displacement per frame at
     // flow = 1 (30px on a 1000px canvas); 0 skips the FEED pass entirely.
-    flowUv: isRibbon(trail) ? Math.max(0.03 * fl, 0.012) : 0.03 * fl,
+    flowUv: ribbon ? Math.max(0.03 * fl, 0.012) : 0.03 * fl,
     // Phase B3 — echoes. echoTaps K: tap i mixes the frame from i+1 steps
     // ago (delays 1..K), additive ghosts; weights decay with age. 0 = no
     // ring, no mix pass — exactly the old composite.
