@@ -6,6 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import { euclidHit } from '../state/euclid.js';
+import { loopClock, loopIntervalTick } from '../gl/loopClock.js';
 
 /**
  * #458 — METRO must respect the same freeze gates the other two auto-
@@ -47,11 +48,21 @@ export function usePhraseLoop() {
 
   useEffect(() => {
     if (!phraseEnabled || phraseClock !== 'metro' || !metroTickGated({ slowRender, batchPaused })) return undefined;
-    const bpm = Math.max(40, Math.min(240, Number(phraseBpm) || 120));
-    const id = setInterval(() => {
-      useStore.getState().tickPhraseBeat();
-    }, 60000 / bpm);
-    return () => clearInterval(id);
+    // #808: the metro is loop time — a wall-clock setInterval keeps ticking
+    // through a freeze and re-rolls the phrase mid-stall. Same accumulator
+    // shape as the EVOLVE interval (App.jsx): holds on a held clock, fires
+    // at most once per threshold crossing on thaw.
+    const stepMs = 60000 / Math.max(40, Math.min(240, Number(phraseBpm) || 120));
+    let raf = 0;
+    let lastTick = -1;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const step = loopIntervalTick(lastTick, loopClock.ms, stepMs);
+      lastTick = step.lastFire;
+      if (step.fire) useStore.getState().tickPhraseBeat();
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [phraseEnabled, phraseClock, phraseBpm, phraseLength, phraseMode, slowRender, batchPaused]);
 
   // #589 — EUCLID rides the same interval and the same freeze gates as METRO,
@@ -63,14 +74,23 @@ export function usePhraseLoop() {
   // mid-pattern — a switch is immediate and lands on the downbeat.
   useEffect(() => {
     if (!phraseEnabled || phraseClock !== 'euclid' || !metroTickGated({ slowRender, batchPaused })) return undefined;
-    const bpm = Math.max(40, Math.min(240, Number(phraseBpm) || 120));
+    // #808: same loop-time accumulator as METRO above — the euclid figure
+    // holds through a freeze instead of stepping on wall time.
+    const stepMs = 60000 / Math.max(40, Math.min(240, Number(phraseBpm) || 120));
+    let raf = 0;
+    let lastTick = -1;
     let step = 0;
-    const id = setInterval(() => {
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const acc = loopIntervalTick(lastTick, loopClock.ms, stepMs);
+      lastTick = acc.lastFire;
+      if (!acc.fire) return;
       const hit = euclidHit(step, euclidBeats, euclidSteps, euclidRotate);
       step += 1;
       if (hit) useStore.getState().tickPhraseBeat();
-    }, 60000 / bpm);
-    return () => clearInterval(id);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [phraseEnabled, phraseClock, phraseBpm, phraseLength, phraseMode,
     euclidBeats, euclidSteps, euclidRotate, slowRender, batchPaused]);
 }
