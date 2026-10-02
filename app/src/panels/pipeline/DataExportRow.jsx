@@ -37,6 +37,7 @@ export function DataExportRow({
   const [recent, setRecent] = useState(() => readRecent());
   const [loadedName, setLoadedName] = useState(null);
   const exportedPayload = useRef(null);
+  const [behind, setBehind] = useState(false);
   const tasteStatus = useStore((s) => s.tasteStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const clearTaste = useStore((s) => s.clearTaste);
@@ -47,16 +48,6 @@ export function DataExportRow({
     activeLayerId, layerSnapshots,
   };
 
-
-  useEffect(() => {
-    const onKey = (ev) => {
-      if (!shouldExportOnKey(ev)) return;
-      ev.preventDefault();
-      exportProject();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
 
   const exportProject = () => {
     let payload = buildProjectPayload(projectFields);
@@ -69,7 +60,22 @@ export function DataExportRow({
     exportedPayload.current = JSON.stringify(payload);
     onMessage(exportSavedMessage(filename));
     setRecent(rememberRecent(filename));
+    setBehind(false);
   };
+
+  useEffect(() => {
+    const onKey = (ev) => {
+      if (!shouldExportOnKey(ev)) return;
+      ev.preventDefault();
+      exportProject();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  useEffect(() => {
+    setBehind(Boolean(dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields)))));
+  }, [projectFields]);
 
 
   const exportPalettes = () => downloadJsonBlob(userPalettes || [], 'kinetic-curator-palettes.json');
@@ -189,7 +195,7 @@ export function DataExportRow({
       </div>
       <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
       {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}{readThumbnail(projectFields) ? '' : ''}</div>}
-      {dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields))) && (
+      {behind && (
         <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>
       )}
       {recent.length > 0 && (
