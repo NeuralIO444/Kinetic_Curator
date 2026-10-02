@@ -13,6 +13,7 @@ export function SetupBlock() {
   const apply = useStore((s) => s.applyCanvasPreset);
   const save = useStore((s) => s.saveCanvasPreset);
   const remove = useStore((s) => s.deleteCanvasPreset);
+  const rename = useStore((s) => s.renameCanvasPreset);
   const load = useStore((s) => s.loadUserCanvasPresets);
   const setSize = useStore((s) => s.setCanvasSize);
   const setFps = useStore((s) => s.setCanvasFps);
@@ -77,7 +78,10 @@ export function SetupBlock() {
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, fontSize: 11 }} />
         <button type="button" className="chip-btn" onClick={() => save(name || 'My wall')}>SAVE</button>
         {String(presetId).startsWith('mine-') && (
-          <button type="button" className="chip-btn" onClick={() => remove(presetId)}>DELETE</button>
+          <>
+            <button type="button" className="chip-btn" onClick={() => rename(presetId, name || 'My wall')}>RENAME</button>
+            <button type="button" className="chip-btn" onClick={() => remove(presetId)}>DELETE</button>
+          </>
         )}
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>

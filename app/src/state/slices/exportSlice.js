@@ -47,6 +47,9 @@ export const createExportSlice = (set) => ({
   deleteCanvasPreset: (id) => set((s) => ({
     userCanvasPresets: writeUserPresets(s.userCanvasPresets.filter((p) => p.id !== id)),
   })),
+  renameCanvasPreset: (id, label) => set((s) => ({
+    userCanvasPresets: writeUserPresets(s.userCanvasPresets.map((p) => p.id === id ? { ...p, label } : p)),
+  })),
   setCanvasFps: (fps) => set({ canvasFps: sanitizeCanvasSpec({ canvasFps: fps }).canvasFps }),
   setCanvasAspectLock: (on) => set({ canvasAspectLock: !!on }),
   swapCanvasOrientation: () => set((s) => ({
