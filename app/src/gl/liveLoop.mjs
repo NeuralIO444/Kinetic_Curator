@@ -530,6 +530,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     }
 
     const resolved = resolver.resolveLayers({
+      canvasW, canvasH,
       layers: s.layers,
       activeLayerId: s.activeLayerId,
       layerSnapshots: s.layerSnapshots,
@@ -700,6 +701,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       payload: {
         width: rw,
         height: rh,
+        sceneW: canvasW,
+        sceneH: canvasH,
         bg: bgCss || '#000000',
         contract,
         cells,

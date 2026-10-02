@@ -456,6 +456,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
 
+  let sceneW = 1000, sceneH = 700;
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
@@ -470,7 +471,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
     uploadMeterNoteUpload(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)); // #533 PR1: measure-only
     gl.useProgram(quadProg);
-    gl.uniform2f(U(quadProg, 'u_canvas'), 1000, 700);
+    gl.uniform2f(U(quadProg, 'u_canvas'), sceneW, sceneH);
     gl.uniform3f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX, squash); // #594 PR3: z = squash
     gl.uniform1f(U(quadProg, 'u_liveTint'), isLive ? 1.0 : 0.0);
     // #594 the one sun (off → w = 0 and the shader's light term is exactly 1.0).
@@ -609,6 +610,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   function renderFrameInto(payload, T, uploaded, { transparent = false } = {}) {
     uploadMeterBeginFrame(); // #533 PR1: measure-only — resets call-slot indexing for this frame
     const { width: w, height: h, contract, cells, bg } = payload;
+    sceneW = payload.sceneW || 1000; // #606: scene units follow the authored canvas
+    sceneH = payload.sceneH || 700;
     sun = contract.light || null;
     squash = contract.squash || 0; // #594 PR3
     kinemeTable = contract.kinemes || null; // #781

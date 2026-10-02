@@ -192,7 +192,7 @@ export function CanvasPanel() {
           </div>
         ) : (
           <canvas ref={glCanvasRef} className="canvas-gl" width={canvasW} height={canvasH}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 1 }}
+            style={{ zIndex: 1 }}
             onWheel={viewport.onWheel} onPointerDown={viewport.onPointerDown} onPointerMove={viewport.onPointerMoveCombined}
             onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />
         )}
