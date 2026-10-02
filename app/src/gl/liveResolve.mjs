@@ -106,6 +106,13 @@ function applyLifeDrift(lp, locked, loopTimeMs) {
   lp.lifeDriftOffset = drift;
 }
 
+export function nodePhase(base, it) {
+  // #558 — phase is a seed offset, speedMul scales the loop clock. Neither reads wall time.
+  const speed = Number(it?.speedMul);
+  const phase = Number(it?.phaseOffset);
+  return base * (Number.isFinite(speed) && speed > 0 ? speed : 1) + (Number.isFinite(phase) ? phase : 0);
+}
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -550,7 +557,7 @@ export function createLiveResolver() {
               // bandMult is time-invariant, so scaling the already-accumulated
               // phase by it is exactly the integral of (speed * bandMult) dt.
               const bandMult = isLayersMode ? (0.4 + band * 0.25) : 1;
-              const ntLive = nt0 + wp.base * bandMult;
+              const ntLive = nt0 + nodePhase(wp.base * bandMult, it);
               const curDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, ntLive, 3) * displacement;
               const curDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, ntLive + 100, 3) * displacement;
               const baseDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, nt0, 3) * displacement;
