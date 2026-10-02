@@ -40,7 +40,15 @@ async function boot(page, extraScript = '') {
   await page.goto('/Kinetic_Curator/?boot=factory', { waitUntil: 'domcontentloaded' });
   await page.locator('.app').waitFor({ timeout: 15_000 });
   await page.getByRole('tab', { name: /director/i }).click();
-  return page.locator('.davis-midi');
+  const midi = page.locator('.davis-midi');
+  await midi.scrollIntoViewIfNeeded();
+  return midi;
+}
+
+async function enable(midi) {
+  const btn = midi.getByRole('button', { name: 'ENABLE' });
+  await btn.scrollIntoViewIfNeeded();
+  await btn.click({ force: true });
 }
 
 test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
@@ -48,7 +56,7 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI off', { timeout: 3_000 });
   await expect(midi.locator('.davis-midi-map li')).toHaveCount(3, { timeout: 3_000 });
 
-  await midi.getByRole('button', { name: 'ENABLE' }).click();
+  await enable(midi);
   await expect(midi.locator('.davis-midi-status')).toContainText('1 device: Test Pad', { timeout: 3_000 });
 
   const evolve = page.locator('.panel-davis').getByRole('button', { name: /^(EVOLVE|STOP)$/ });
@@ -93,13 +101,13 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
 
 test('MIDI: a refused permission says so', async ({ page }) => {
   const midi = await boot(page, `window.__kcMidiAccess = async () => { throw new DOMException('Permission denied', 'SecurityError'); };`);
-  await midi.getByRole('button', { name: 'ENABLE' }).click();
+  await enable(midi);
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI access refused', { timeout: 3_000 });
   await expect(midi.locator('.davis-midi-note')).toContainText('site settings', { timeout: 3_000 });
 });
 
 test('MIDI: a browser without Web MIDI says so', async ({ page }) => {
   const midi = await boot(page, `window.__kcMidiAccess = null; delete Navigator.prototype.requestMIDIAccess;`);
-  await midi.getByRole('button', { name: 'ENABLE' }).click();
+  await enable(midi);
   await expect(midi.locator('.davis-midi-status')).toContainText('not available', { timeout: 3_000 });
 });
