@@ -80,7 +80,7 @@ export function createPaletteMix() {
   let dissolve = null; // null | { start: -1 (arming) | ms timestamp, dur }
 
   function update({
-    id, overrides, userPalettes, mode, behave, assetsKey,
+    id, overrides, userPalettes, mode, assetsKey,
     mixSeconds, now, canDissolve, bakeReady, scrubT,
   }) {
     const changed = !seen
@@ -88,11 +88,10 @@ export function createPaletteMix() {
       || overrides !== seen.overrides
       || userPalettes !== seen.user
       || mode !== seen.mode
-      || behave !== seen.behave
       || assetsKey !== seen.assetsKey;
     if (changed) {
       const retarget = dissolve !== null;
-      seen = { id, overrides, user: userPalettes, mode, behave, assetsKey };
+      seen = { id, overrides, user: userPalettes, mode, assetsKey };
       const dur = sanitizeMixSeconds(mixSeconds);
       if (!canDissolve || (dur <= 0 && scrubT == null)) {
         dissolve = null;
@@ -151,8 +150,8 @@ export function createPaletteMix() {
    * next update() sees id/mode/behave change and fires a cut or dissolve
    * for a frame that never visually changed.
    */
-  function resync({ id, overrides, userPalettes, mode, behave, assetsKey }) {
-    seen = { id, overrides, user: userPalettes, mode, behave, assetsKey };
+  function resync({ id, overrides, userPalettes, mode, assetsKey }) {
+    seen = { id, overrides, user: userPalettes, mode, assetsKey };
     dissolve = null;
   }
 

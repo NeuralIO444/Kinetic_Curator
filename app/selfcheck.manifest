@@ -165,3 +165,5 @@ node qa/report.selfcheck.mjs
 node qa/review.selfcheck.mjs
 node qa/board.selfcheck.mjs
 node src/composition/devPanel.selfcheck.mjs
+node src/engine/organisms/behaveEase.selfcheck.mjs
+node src/panels/pipeline/thumbnail.selfcheck.mjs

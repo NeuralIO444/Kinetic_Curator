@@ -6,6 +6,7 @@ import {
   confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
   missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
 } from './pipelineNotices.mjs';
+import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
 import { hitsFromFavorites } from '../../state/hitsExport.js';
 import { useStore } from '../../state/store.js';
@@ -60,7 +61,11 @@ export function DataExportRow({
   });
 
   const exportProject = () => {
-    const payload = buildProjectPayload(projectFields);
+    let payload = buildProjectPayload(projectFields);
+    const canvas = document.querySelector('canvas');
+    if (canvas?.toDataURL) {
+      try { payload = attachThumbnail(payload, canvas.toDataURL('image/jpeg', 0.4)); } catch { /* hold last frame */ }
+    }
     const filename = exportFilename(payload);
     downloadProject(payload, filename);
     exportedPayload.current = JSON.stringify(payload);
@@ -185,7 +190,7 @@ export function DataExportRow({
         <input ref={tasteInputRef} type="file" accept=".json,application/json" onChange={importTaste} style={{ display: 'none' }} />
       </div>
       <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
-      {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}</div>}
+      {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}{readThumbnail(projectFields) ? '' : ''}</div>}
       {dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields))) && (
         <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>
       )}

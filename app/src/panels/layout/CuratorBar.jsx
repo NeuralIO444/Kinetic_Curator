@@ -135,7 +135,7 @@ export function CuratorBar() {
                   className={voice === p.id ? 'active' : ''}
                   onClick={() => pickVoice(p.id)}
                 >
-                  voice: {p.alias}
+                  voice: {p.title || p.alias}
                 </button>
               ))}
             </div>
