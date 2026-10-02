@@ -174,7 +174,7 @@ export function CanvasPanel() {
           {/* BG cycle lives beside RESET VIEW (canvas belongs with canvas). */}
           <button className="chip-btn" onClick={viewport.resetView} title="Reset View">RESET VIEW</button>
           <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
-          <span className="meter-pill">{canvasW}×{canvasH}{canvasW !== CANVAS_W || canvasH !== CANVAS_H ? ` · live ${CANVAS_W}×${CANVAS_H}` : ''}</span>
+          <span className="meter-pill" title="Authored canvas. The element is this size.">{canvasW}×{canvasH}</span>
           {accumEffective && <span className="meter-pill" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>ACCUM</span>}
           {accumOn && !accumEffective && <span className="meter-pill" title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery." style={{ color: '#ffb454' }}>ACCUM HELD</span>}
           <span className="meter-pill" title="Instances drawn this frame">{nodeCount} NODES</span>
