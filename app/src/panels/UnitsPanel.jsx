@@ -1,45 +1,59 @@
-// DEV → UNITS. Make a selfcheck stub and watch window.__kcUnits while the app runs.
+// DEV → UNITS. One section per open PR. RUN tests the files that PR changed.
 import { useEffect, useState } from 'react';
-import { UNIT_TRIO, makeUnit, pushUnitCheck, readUnitLog, clearUnitLog } from '../dev/unitMaker.mjs';
+import { makeUnit, pushUnitCheck } from '../dev/unitMaker.mjs';
 
 export function UnitsPanel() {
+  const [prs, setPrs] = useState([]);
+  const [error, setError] = useState('');
+  const [runs, setRuns] = useState({});
   const [issue, setIssue] = useState('722');
   const [name, setName] = useState('behave ease');
   const [made, setMade] = useState(() => makeUnit({ issue: '722', name: 'behave ease' }));
-  const [log, setLog] = useState([]);
 
   useEffect(() => {
-    const id = setInterval(() => setLog(readUnitLog().slice(-8).reverse()), 400);
-    return () => clearInterval(id);
+    if (!import.meta.env.DEV) return;
+    fetch('/__kc/units').then((r) => r.json()).then((d) => {
+      setPrs(d.prs || []);
+      setError(d.error || '');
+    }).catch((e) => setError(String(e)));
   }, []);
 
-  const make = () => {
-    const next = makeUnit({ issue, name });
-    setMade(next);
-    pushUnitCheck(`made #${issue}`, true, next.file);
-  };
-  const probe = () => {
-    const ok = made.src.includes(`#${issue.replace(/\D/g, '') || '000'}`);
-    pushUnitCheck('probe stub', ok, ok ? made.file : 'stub missing the issue');
+  const run = async (n) => {
+    setRuns((s) => ({ ...s, [n]: { running: true, results: [] } }));
+    const data = await fetch(`/__kc/units?pr=${n}`).then((r) => r.json());
+    const ok = (data.results || []).every((r) => r.ok);
+    pushUnitCheck(`PR ${n}`, ok && (data.results || []).length > 0, `${(data.results || []).length} suites`);
+    setRuns((s) => ({ ...s, [n]: { running: false, ...data, ok } }));
   };
 
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
-      <p style={{ opacity: 0.75 }}>Press U to open this tab. Debug log is window.__kcUnits. Review page: http://127.0.0.1:5170/Kinetic_Curator/</p>
-      {Object.entries(UNIT_TRIO).map(([lane, items]) => (
-        <div key={lane} style={{ marginBottom: 6 }}><b>{lane}</b> · {items.join(' · ')}</div>
-      ))}
-      <div style={{ display: 'flex', gap: 6, margin: '8px 0' }}>
+      <p style={{ opacity: 0.75 }}>Press U. Each open PR runs the tests next to its files. This is the dev server only.</p>
+      {error && <p>{error}</p>}
+      {prs.map((pr) => {
+        const runState = runs[pr.number];
+        return (
+          <section key={pr.number} style={{ borderTop: '1px solid #333', padding: '8px 0' }}>
+            <div>#{pr.number} {pr.title}</div>
+            <button type="button" className="chip-btn" onClick={() => run(pr.number)} disabled={runState?.running}>
+              {runState?.running ? 'RUNNING' : 'RUN'}
+            </button>
+            {runState && !runState.running && (
+              <div>
+                {(runState.results || []).length === 0 ? 'no unit next to this PR' : runState.results.map((r) => (
+                  <div key={r.suite}>{r.ok ? 'ok' : 'fail'} {r.suite}</div>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+      <div style={{ marginTop: 12 }}>
         <input value={issue} onChange={(e) => setIssue(e.target.value)} style={{ width: 64 }} aria-label="Issue" />
-        <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1 }} aria-label="Unit name" />
-        <button type="button" className="chip-btn" onClick={make}>MAKE</button>
-        <button type="button" className="chip-btn" onClick={probe}>PROBE</button>
-        <button type="button" className="chip-btn" onClick={() => navigator.clipboard?.writeText(made.src)}>COPY</button>
-        <button type="button" className="chip-btn" onClick={() => { clearUnitLog(); setLog([]); }}>CLEAR</button>
+        <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: 140 }} aria-label="Unit name" />
+        <button type="button" className="chip-btn" onClick={() => setMade(makeUnit({ issue, name }))}>MAKE</button>
+        <pre style={{ whiteSpace: 'pre-wrap' }}>{made.src}</pre>
       </div>
-      <div style={{ opacity: 0.7, marginBottom: 4 }}>{made.file}</div>
-      <pre style={{ whiteSpace: 'pre-wrap', background: '#111', padding: 8 }}>{made.src}</pre>
-      <div>{log.length ? log.map((r) => `${r.ok ? 'ok' : 'fail'} ${r.name}${r.detail ? ` — ${r.detail}` : ''}`).join(' · ') : 'no checks yet'}</div>
     </div>
   );
 }
