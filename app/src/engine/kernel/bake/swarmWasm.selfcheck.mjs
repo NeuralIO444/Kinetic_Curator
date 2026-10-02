@@ -133,20 +133,20 @@ console.log('[ok] scope gate routes hype/contacts/attractor/empty/breath to JS')
 
 {
   const small = { ...base, count: 40, steps: 30 };
-  const hypeJs = bakeParticles({ ...small, layoutParams: { ...small.layoutParams, mode: 'hype' }, engine: 'js' });
-  const hypeWasm = bakeParticles({ ...small, layoutParams: { ...small.layoutParams, mode: 'hype' }, engine: 'wasm' });
-  assert.deepStrictEqual(
-    hypeWasm.map((p) => [p.x, p.y]),
-    hypeJs.map((p) => [p.x, p.y]),
-    'hype + engine:"wasm" must fall back to the JS engine exactly',
+  // #814 — engine:"wasm" on a config the gate refuses throws (no silent JS fallback).
+  assert.throws(
+    () => bakeParticles({ ...small, layoutParams: { ...small.layoutParams, mode: 'hype' }, engine: 'wasm' }),
+    /cannot bake this config \(organism-mode\)/,
+    'hype + engine:"wasm" must throw',
   );
-  const contactJs = bakeParticles({ ...small, layoutParams: { ...small.layoutParams, contactRadius: 8 }, engine: 'js' });
-  const contactWasm = bakeParticles({ ...small, layoutParams: { ...small.layoutParams, contactRadius: 8 }, engine: 'wasm' });
-  assert.deepStrictEqual(
-    contactWasm.map((p) => [p.x, p.y]),
-    contactJs.map((p) => [p.x, p.y]),
-    'contacts + engine:"wasm" must fall back to the JS engine exactly',
+  assert.throws(
+    () => bakeParticles({ ...small, layoutParams: { ...small.layoutParams, contactRadius: 8 }, engine: 'wasm' }),
+    /cannot bake this config \(contacts\)/,
+    'contacts + engine:"wasm" must throw',
   );
+  // engine:'auto' still routes both to the JS engine.
+  assert.ok(Array.isArray(bakeParticles({ ...small, layoutParams: { ...small.layoutParams, mode: 'hype' }, engine: 'auto' })));
+  assert.ok(Array.isArray(bakeParticles({ ...small, layoutParams: { ...small.layoutParams, contactRadius: 8 }, engine: 'auto' })));
   globalThis.process.env.KC_SWARM_WASM = '0';
   try {
     const forced = bakeParticles({ ...small, engine: 'auto' });
