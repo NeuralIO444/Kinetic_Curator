@@ -98,6 +98,7 @@ node src/gl/sceneContract.selfcheck.mjs
 node src/gl/resolve.selfcheck.mjs
 node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs
+node src/gl/tracks.causal.selfcheck.mjs
 node src/gl/parity/diff.selfcheck.mjs
 node src/gl/parity/parity.selfcheck.mjs
 node src/gl/debug/debug.selfcheck.mjs

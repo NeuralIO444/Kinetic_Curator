@@ -189,8 +189,12 @@ export function createLiveResolver() {
     // should free this entry.
     for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
     for (const k of [...growthTickByLayer.keys()]) if (!documentIds.has(k)) growthTickByLayer.delete(k); // #720
+    // #822 — FEED slots follow the document, not visibility. Freeing a slot
+    // on hide let the next layer reuse it and read the hidden track's
+    // delay-1 buffer (a snap, and a partner the picture did not have).
+    // Only a removed layer returns its slot.
     for (const k of [...feedSlots.keys()]) {
-      if (!aliveIds.has(k)) { feedSlotFree.push(feedSlots.get(k)); feedSlots.delete(k); }
+      if (!documentIds.has(k)) { feedSlotFree.push(feedSlots.get(k)); feedSlots.delete(k); }
     }
   }
 
@@ -660,6 +664,12 @@ export function createLiveResolver() {
       // it); resolve the source by id against THIS frame's content list,
       // not by ordinal. Hide/solo/reorder/remove of some OTHER layer
       // never changes which layer this patch targets.
+      if (patch.mode === 'field' || patch.mode === 'feed') {
+        // #822 — a missing or hidden partner is not a partner. Do not
+        // slotFor() a ghost id (that invents a delay slot) and do not hop.
+        const src = content.find((c) => c.id === patch.to && c.id !== e.id);
+        if (!src) return;
+      }
       if (patch.mode === 'field') {
         const src = content.find((c) => c.id === patch.to);
         const srcPts = (src?.items || []).map(toNorm);
@@ -675,9 +685,10 @@ export function createLiveResolver() {
         });
         recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx: pullSumPx / Math.max(1, fieldN) });
       } else if (patch.mode === 'feed') {
+        const src = content.find((c) => c.id === patch.to);
         const pts = (e.items || []).map(toNorm);
         const amt = patchStrength(patch) * 0.05;
-        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: slotFor(patch.to), to: slotFor(e.id), strength: amt });
+        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: slotFor(src.id), to: slotFor(e.id), strength: amt });
         // #507 — same accumulation shape as FIELD (mean post-clamp hop px).
         let feedSumPx = 0;
         const feedN = (e.items || []).length;
