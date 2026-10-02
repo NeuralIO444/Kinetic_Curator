@@ -9,3 +9,11 @@ export function resolveTrail(value) {
 export function isLeave(value) {
   return resolveTrail(value) === 'leave';
 }
+
+export function isRibbon(value) {
+  return resolveTrail(value) === 'ribbon';
+}
+
+export function isComet(value) {
+  return resolveTrail(value) === 'comet';
+}

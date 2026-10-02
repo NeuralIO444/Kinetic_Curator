@@ -32,3 +32,13 @@ test('#560 tunnel prism and flow can fade in Leave', () => {
   assert.equal(faded.flowUv, 0);
   assert.ok(accumRecipeParams({ trail: 'accum', tunnel: 1, tunnelFade: 1 }).tunnelZoom > 1);
 });
+
+test('#560 ribbon smears and comet fades the tail', () => {
+  const ribbon = accumRecipeParams({ fade: 0.5, trail: 'ribbon' });
+  const comet = accumRecipeParams({ fade: 0.9, trail: 'comet' });
+  assert.equal(ribbon.ribbon, true);
+  assert.ok(ribbon.keep >= 0.96);
+  assert.ok(ribbon.flowUv > 0);
+  assert.equal(comet.comet, true);
+  assert.ok(comet.keep <= 0.72);
+});

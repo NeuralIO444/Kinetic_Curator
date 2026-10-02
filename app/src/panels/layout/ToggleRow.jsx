@@ -39,6 +39,19 @@ export function ToggleRow({ layoutParams }) {
           onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === 'leave' ? 'accum' : 'leave' })}>
           LEAVE
         </button>
+        {['ribbon', 'comet'].map((name) => (
+          <button key={name} type="button" className={`chip-btn${layoutParams.trail === name ? ' active' : ''}`}
+            title={name === 'ribbon' ? 'RIBBON smears the path into a line.' : 'COMET keeps a bright head and a short tail.'}
+            onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === name ? 'accum' : name })}>
+            {name.toUpperCase()}
+          </button>
+        ))}
+        <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }} title="Live echoes. Zero is off.">
+          ECHOES
+          <input type="range" min={0} max={4} step={1} value={layoutParams.echoes ?? 0}
+            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'echoes', value: parseFloat(e.target.value) })}
+            style={{ width: 64 }} />
+        </label>
       )}
       {layoutParams.trail === 'leave' && (
         <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}

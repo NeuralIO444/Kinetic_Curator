@@ -77,6 +77,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulation: false,
   accumulationFade: 5.4, // #274: trail half-life in frames (was keep 0.88)
   trail: 'accum', // #560 Leave holds the stamps
+  echoes: 0, // live echo taps, 0..4
   leaveFade: 0, // 0 holds the stamps, higher fades them
   tunnelFade: 0,
   prismFade: 0,
@@ -237,6 +238,7 @@ export const PARAM_SPEC = {
   tunnelFade: { min: 0, max: 1 },
   prismFade: { min: 0, max: 1 },
   flowFade: { min: 0, max: 1 },
+  echoes: { min: 0, max: 4 },
   accumulationOptics: { min: 0, max: 0.25 }, // #308 review: remapped — full slider travel is the usable range
   accumulationTunnel: { min: 0, max: 1 },
   accumulationPrism: { min: 0, max: 1 },
