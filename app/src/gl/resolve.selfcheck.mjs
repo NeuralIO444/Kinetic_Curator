@@ -9,7 +9,7 @@ import { bindResolveProbe, DITHER_AMPLITUDE } from './resolveBind.mjs';
 assert.match(RESOLVE_FS, /uniform float u_aces/);
 assert.match(RESOLVE_FS, /acesNarkowicz/);
 assert.match(RESOLVE_FS, /bayer4/);
-assert.match(RESOLVE_FS, /u_aces < 0\.5 && u_dither < 1e-8 && u_fxaa < 0\.5/);
+assert.match(RESOLVE_FS, /u_aces < 0\.5 && u_dither < 1e-8 && u_fxaa < 0\.5 && u_shape < 0\.5/);
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'resolveBind.mjs'), 'utf8');
 assert.match(src, /aces = 1/);

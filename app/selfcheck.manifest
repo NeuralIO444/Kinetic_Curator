@@ -170,3 +170,4 @@ node qa/trio.selfcheck.mjs
 node src/dev/unitMaker.selfcheck.mjs
 node src/gl/nodePhase.selfcheck.mjs
 node src/data/light.pool.selfcheck.mjs
+node src/gl/shapeDither.selfcheck.mjs

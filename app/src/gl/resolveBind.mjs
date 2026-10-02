@@ -2,7 +2,7 @@
  *  ACES on, Bayer on, exposure 1.0. No panel this PR.
  */
 export const DITHER_AMPLITUDE = 1 / 255;
-export const RESOLVE_UNIFORMS = ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave', 'u_fake', 'u_light'];
+export const RESOLVE_UNIFORMS = ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave', 'u_fake', 'u_light', 'u_shape'];
 
 export function bindResolveProbe(gl, getLoc, {
   aces = 1,
@@ -27,4 +27,5 @@ export function bindResolveProbe(gl, getLoc, {
   const lx = light && Number.isFinite(light[0]) ? light[0] : 0.4;
   const ly = light && Number.isFinite(light[1]) ? light[1] : 0.7;
   gl.uniform2f(getLoc('u_light'), lx, ly);
+  gl.uniform1f(getLoc('u_shape'), 0);
 }
