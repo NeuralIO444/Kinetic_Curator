@@ -1,5 +1,16 @@
 # QA harness
 
+## Units (the fast loop)
+
+Full selfcheck is the PR gate (160+ suites). While iterating, run only the suites next to the diff:
+
+```sh
+npm run units -- 850
+npm run units -- src/panels/pipeline/pipelineNotices.mjs
+```
+
+It prints a hardness line: unit, face, or feel. Feel still needs eyes. Face still needs e2e if the click path changed.
+
 ## Review cockpit
 
 One command builds a self-contained review page for a PR — CI status, selfcheck,
