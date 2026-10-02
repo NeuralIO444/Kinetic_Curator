@@ -32,6 +32,14 @@ export function ToggleRow({ layoutParams }) {
           {key === 'accumulation' ? 'ACCUM' : key.toUpperCase()}
         </button>
       ))}
+
+      {layoutParams.accumulation && (
+        <button type="button" className={`chip-btn${layoutParams.trail === 'leave' ? ' active' : ''}`}
+          title="LEAVE holds the stamps. Clear is the only erase. Flow, tunnel, and prism do nothing here."
+          onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === 'leave' ? 'accum' : 'leave' })}>
+          LEAVE
+        </button>
+      )}
       {layoutParams.accumulation && (
         <label
           className="tg"

@@ -130,14 +130,17 @@ function opticsDerived(o) {
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
  */
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000' } = {}) {
+import { isLeave } from './trailMode.mjs';
+
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', trail = 'accum' } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
   const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
   const o = clamp01(optics);
-  const t = clamp01(tunnel);
-  const pr = clamp01(prism);
-  const fl = clamp01(flow);
+  const leaveEarly = isLeave(trail);
+  const t = leaveEarly ? 0 : clamp01(tunnel);
+  const pr = leaveEarly ? 0 : clamp01(prism);
+  const fl = leaveEarly ? 0 : clamp01(flow);
   const e = Math.min(4, Math.max(0, Math.round(Number(echoes) || 0)));
   // B3 resolution gate: a full-res 16F ring target is ~8 bytes/px, so at
   // >=2K widths the tap count is capped (see "Echoes" in docs/ACCUM.md).
@@ -145,8 +148,10 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
   // #287 fade-to-paper: the fade target, parsed from the background CSS
   // color. Black keeps the legacy `rgb *= keep` exactly (0 * (1 - keep) = 0).
   const bg = hexToRgb01(background);
+  const leave = isLeave(trail);
   return {
-    keep,
+    leave,
+    keep: leave ? 1 : keep,
     bg,
     ...opticsDerived(o),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
@@ -1161,16 +1166,21 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         cur = write;
         write = other();
       }
-      // 2. fade (+ Phase A feedback: tunnel zoom/spin, prism drift)
-      pass('fade', write, (u, bind) => {
-        gl.uniform1i(u.u_src, bind(0, cur.tex));
-        gl.uniform1f(u.u_keep, p.keep);
-        // #287 fade-to-paper: the fade target follows the palette bg.
-        gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
-        gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
-        gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
-        gl.uniform1f(u.u_prism, p.prismUv);
-      });
+      // 2. fade, or Leave: copy the held stamps. Clear is the only erase.
+      if (p.leave) {
+        pass('copy', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, cur.tex));
+        });
+      } else {
+        pass('fade', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, cur.tex));
+          gl.uniform1f(u.u_keep, p.keep);
+          gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
+          gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
+          gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
+          gl.uniform1f(u.u_prism, p.prismUv);
+        });
+      }
       cur = write;
       // 3. (#308: removed) — no blur-over-time; the frame lands sharp.
       // 4. over
