@@ -72,8 +72,22 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       requestDevTab('shaderlab');
       setActiveTab('dev');
     };
+    const onUnits = async (e) => {
+      if (e.key !== 'u' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+      if (!secondary.some((p) => p.id === 'dev')) return;
+      e.preventDefault();
+      const { requestDevTab } = await import('../panels/devTabs.mjs');
+      requestDevTab('units');
+      setActiveTab('dev');
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onUnits);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onUnits);
+    };
   }, [secondary]);
 
   return (

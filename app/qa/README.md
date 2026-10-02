@@ -1,4 +1,29 @@
+## Trio
+
+The iteration gate is three of each: selfcheck, Playwright, QA. Not the 161-suite chain.
+
+```sh
+npm run trio
+npm run trio -- --playwright
+npm run trio -- --qa
+```
+
+Selfchecks: palette import copy, clock worker dt, units mapper.
+Playwright: smoke, living boot, director regroup.
+QA: palette-import, wash-mode, fx-finish-grain-rgb.
+
 # QA harness
+
+## Units (the fast loop)
+
+Full selfcheck is the PR gate (160+ suites). While iterating, run only the suites next to the diff:
+
+```sh
+npm run units -- 850
+npm run units -- src/panels/pipeline/pipelineNotices.mjs
+```
+
+It prints a hardness line: unit, face, or feel. Feel still needs eyes. Face still needs e2e if the click path changed.
 
 ## Review cockpit
 

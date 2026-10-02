@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { unitsDevPlugin } from './vite.units.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkg = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8'))
@@ -23,7 +24,7 @@ function gitShortSha() {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), unitsDevPlugin(here)],
   base,
   clearScreen: false,
   server: {
