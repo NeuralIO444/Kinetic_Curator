@@ -91,6 +91,13 @@ export function buildPlacements({
   scale: scaleOverride,
   alpha: alphaOverride,
   cache,
+  // #720 — DLA / Eden growth. growthTick advances the aggregate one step
+  // per presented frame (the live resolver owns the counter, per layer);
+  // audioEnergy (0..1, null when the Stimuli bus is silent) is the default
+  // audio driver for the cells-per-tick rate. Both ride into geoParams like
+  // caGrid — geometry inputs, not layout params.
+  growthTick = 0,
+  audioEnergy = null,
 }) {
   const caps = capsIn || getQualityCaps('balanced');
   const preset = getPreset(layoutParams.composition);
@@ -121,6 +128,13 @@ export function buildPlacements({
     phylloDivergence: layoutParams.phylloDivergence,
     lsysDepth: layoutParams.lsysDepth,
     lsysAngle: layoutParams.lsysAngle,
+    // #720 — DLA / Eden growth. Rate/branch knobs come from layoutParams
+    // (curator-driven); the tick and audio drive are per-frame resolver
+    // inputs, like caGrid.
+    growthRate: layoutParams.growthRate,
+    growthBranch: layoutParams.growthBranch,
+    growthTick,
+    audioEnergy,
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,

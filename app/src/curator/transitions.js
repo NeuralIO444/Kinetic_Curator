@@ -30,6 +30,10 @@ const FAMILIES = {
     radial: ['fibonacci', 'phyllotaxis', 'radial', 'orbit'],
     live: ['swarm', 'hype', 'murmuration'],
     loose: ['random', 'noise', 'layers', 'flow', 'ca', 'voronoi'],
+    // #720 — growth organisms. Without a family, a new mode's row can never
+    // reach another un-familied mode (far excludes null-family values), so
+    // every mode must belong to one — the "every value reachable" invariant.
+    growth: ['dla', 'eden'],
   },
   behave: {
     calm: ['cruise', 'orbit'],

@@ -111,6 +111,9 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #587 — the Voronoi mask places points, so it rides the spatial stream:
   // re-rolling SPATIAL must move the veins, and re-rolling colour must not.
   voronoi: 'spatial',
+  // #720 — the DLA/Eden aggregate places points, so it rides the spatial
+  // stream too: re-rolling SPATIAL regrows the organism, colour must not.
+  growth: 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

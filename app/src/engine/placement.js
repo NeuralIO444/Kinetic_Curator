@@ -93,6 +93,11 @@ export function computeGeometrySoA({
   seedOffsets = null,
   phylloDivergence = 0,
   lsysDepth = 4, lsysAngle = 25,
+  // #720 — DLA / Eden growth. growthRate/growthBranch are curator-driven
+  // knobs (exposed, not mapped); growthTick advances the aggregate one step
+  // per presented frame; audioEnergy (0..1, null when silent) is the default
+  // audio driver for the cells-per-tick rate.
+  growthRate = 3, growthBranch = 0.8, growthTick = 0, audioEnergy = null,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -123,6 +128,8 @@ export function computeGeometrySoA({
     phylloDivergence,
     // sampler scalars; ignored by every other mode.
     lsysDepth, lsysAngle,
+    // #720 — DLA / Eden growth scalars; ignored by every other mode.
+    growthRate, growthBranch, growthTick, audioEnergy,
   };
 
   const tDenom = count > 1 ? count - 1 : 0;
@@ -224,6 +231,11 @@ export function geometrySignature(p) {
     p.mode, p.count, p.seed, p.jitter, p.density, p.zTiers, p.bleed,
     p.canvasW, p.canvasH, p.caGrid,
     p.displacement, p.noiseFreq, p.noiseSpeed, p.phylloDivergence, p.lsysDepth, p.lsysAngle,
+    // #720 — growthTick advances every presented frame for dla/eden layers,
+    // busting the cache honestly (the CA grid's identity-change deal).
+    // audioEnergy stays out: an ephemeral drive consumed at tick-advance
+    // time, not geometry identity.
+    p.growthRate, p.growthBranch, p.growthTick,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }

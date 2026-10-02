@@ -24,6 +24,8 @@ export const LAYOUT_MODES = [
   { id: 'ca',        name: 'cellular',   glyph: 'ca'     },
   { id: 'voronoi',   name: 'voronoi',    glyph: 'vein'   },
   { id: 'lsystem',   name: 'l-system',   glyph: 'frond'  },
+  { id: 'dla',       name: 'DLA growth', glyph: 'coral'  }, // #720
+  { id: 'eden',      name: 'Eden growth', glyph: 'bloom'  }, // #720
   { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
@@ -85,6 +87,12 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // #588 — L-system generation depth and branch angle (degrees).
   lsysDepth: 4,
   lsysAngle: 25,
+  // #720 — DLA / Eden growth. growthRate is cells per tick at full drive
+  // (floors at 1 — the piece never freezes); growthBranch is DLA stick
+  // probability (Eden ignores it). Both are exposed for the curator
+  // engine (#762), which owns the audio→growth mapping.
+  growthRate: 3,
+  growthBranch: 0.8,
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
   displacement: 0,
@@ -180,6 +188,10 @@ export const PARAM_SPEC = {
   // walk must never outgrow the placement budget (see the sampler).
   lsysDepth: { min: 1, max: 5, int: true },
   lsysAngle: { min: 5, max: 90 },
+  // #720 — growthRate 0 still creeps (1 cell/tick floor in the engine);
+  // growthBranch maps to DLA stick probability 0.25..1.0.
+  growthRate: { min: 0, max: 12 },
+  growthBranch: { min: 0, max: 1 },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   displacement: { min: 0, max: 250 },
