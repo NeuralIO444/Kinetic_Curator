@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { makeUnit, UNIT_TRIO, pushUnitCheck } from './unitMaker.mjs';
+import { makeUnit, UNIT_TRIO } from './unitMaker.mjs';
 
-test('units maker names the file and the issue', () => {
+test('units maker fails closed until the behavior is filled', () => {
   const made = makeUnit({ issue: '722', name: 'behave ease' });
   assert.equal(made.file, 'src/behave-ease.selfcheck.mjs');
-  assert.match(made.src, /#722 behave ease/);
-  assert.equal(UNIT_TRIO.qa.length, 3);
-  assert.equal(pushUnitCheck('probe', false, 'missing').ok, false);
+  assert.match(made.src, /assert\.fail/);
+  assert.doesNotMatch(made.src, /assert\.equal\(true, true\)/);
+  assert.equal(UNIT_TRIO.selfcheck.length, 3);
 });

@@ -1,6 +1,6 @@
 // DEV → UNITS. Make a selfcheck stub and watch window.__kcUnits while the app runs.
 import { useEffect, useState } from 'react';
-import { UNIT_TRIO, makeUnit, pushUnitCheck, readUnitLog } from '../dev/unitMaker.mjs';
+import { UNIT_TRIO, makeUnit, pushUnitCheck, readUnitLog, clearUnitLog } from '../dev/unitMaker.mjs';
 
 export function UnitsPanel() {
   const [issue, setIssue] = useState('722');
@@ -35,6 +35,7 @@ export function UnitsPanel() {
         <button type="button" className="chip-btn" onClick={make}>MAKE</button>
         <button type="button" className="chip-btn" onClick={probe}>PROBE</button>
         <button type="button" className="chip-btn" onClick={() => navigator.clipboard?.writeText(made.src)}>COPY</button>
+        <button type="button" className="chip-btn" onClick={() => { clearUnitLog(); setLog([]); }}>CLEAR</button>
       </div>
       <div style={{ opacity: 0.7, marginBottom: 4 }}>{made.file}</div>
       <pre style={{ whiteSpace: 'pre-wrap', background: '#111', padding: 8 }}>{made.src}</pre>

@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 test('#${n} ${title}', () => {
-  assert.equal(true, true);
+  assert.fail('fill this: one behavior, then delete this line');
 });
 `,
   };
@@ -36,4 +36,9 @@ export function pushUnitCheck(name, ok, detail = '') {
 export function readUnitLog() {
   if (typeof globalThis.window === 'undefined') return [];
   return [...(globalThis.window.__kcUnits || [])];
+}
+
+export function clearUnitLog() {
+  if (typeof globalThis.window !== 'undefined') globalThis.window.__kcUnits = [];
+  return [];
 }
