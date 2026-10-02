@@ -233,6 +233,10 @@ export const PARAM_SPEC = {
   breath: { min: 0, max: 1 },
   graze: { min: 0, max: 1 },
   accumulationFade: { min: 1, max: 40 }, // #274: half-life frames
+  leaveFade: { min: 0, max: 1 },
+  tunnelFade: { min: 0, max: 1 },
+  prismFade: { min: 0, max: 1 },
+  flowFade: { min: 0, max: 1 },
   accumulationOptics: { min: 0, max: 0.25 }, // #308 review: remapped — full slider travel is the usable range
   accumulationTunnel: { min: 0, max: 1 },
   accumulationPrism: { min: 0, max: 1 },
