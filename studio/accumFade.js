@@ -1,6 +1,8 @@
 /**
- * Fade law shared by live useAccumulationBuffer and studio.py --accum.
- * destination-in with rgba(0,0,0,keep), then source-over the new frame.
+ * #819 leftover. Clamp only — not the trail recipe.
+ * The 2D destination-in fade (rgba keep, then source-over) is gone.
+ * Live and studio stills both run accum.mjs (light *= keep). Nothing
+ * imports this module except its selfcheck.
  */
 export const DEFAULT_ACCUM_FADE = 0.88;
 
