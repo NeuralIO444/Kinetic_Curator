@@ -78,6 +78,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulationFade: 5.4, // #274: trail half-life in frames (was keep 0.88)
   trail: 'accum', // #560 Leave holds the stamps
   leaveFade: 0, // 0 holds the stamps, higher fades them
+  tunnelFade: 0,
+  prismFade: 0,
+  flowFade: 0,
   accumulationOptics: 0, // #190: bloom + halation + stipple-diffusion amount (GLOW slider) (#308: no gaussian blur)
   accumulationTunnel: 0, // Phase A: feedback zoom/spin amount (TUNNEL slider)
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)

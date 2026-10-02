@@ -132,15 +132,16 @@ function opticsDerived(o) {
  */
 import { isLeave } from './trailMode.mjs';
 
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', trail = 'accum', leaveFade = 0 } = {}) {
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', trail = 'accum', leaveFade = 0, tunnelFade = 0, prismFade = 0, flowFade = 0 } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
   const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
   const o = clamp01(optics);
   const leaveEarly = isLeave(trail);
-  const t = leaveEarly ? 0 : clamp01(tunnel);
-  const pr = leaveEarly ? 0 : clamp01(prism);
-  const fl = leaveEarly ? 0 : clamp01(flow);
+  const fadeOf = (v) => leaveEarly ? 1 - Math.min(1, Math.max(0, Number(v) || 0)) : 1;
+  const t = clamp01(tunnel) * fadeOf(tunnelFade);
+  const pr = clamp01(prism) * fadeOf(prismFade);
+  const fl = clamp01(flow) * fadeOf(flowFade);
   const e = Math.min(4, Math.max(0, Math.round(Number(echoes) || 0)));
   // B3 resolution gate: a full-res 16F ring target is ~8 bytes/px, so at
   // >=2K widths the tap count is capped (see "Echoes" in docs/ACCUM.md).

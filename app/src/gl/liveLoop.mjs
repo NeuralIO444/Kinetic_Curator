@@ -724,6 +724,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider
         trail: layoutParams.trail, // #560 Leave holds the stamps
         leaveFade: layoutParams.leaveFade, // 0 holds, higher fades
+        tunnelFade: layoutParams.tunnelFade,
+        prismFade: layoutParams.prismFade,
+        flowFade: layoutParams.flowFade,
       },
       audioBands: shapedAudio,
       audioOn,
