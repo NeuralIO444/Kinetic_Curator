@@ -130,14 +130,16 @@ function opticsDerived(o) {
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
  */
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000' } = {}) {
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', leave = false, ribbon = false, comet = false, leaveFade = 0, tunnelFade = 0, prismFade = 0, flowFade = 0 } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
   const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
   const o = clamp01(optics);
-  const t = clamp01(tunnel);
-  const pr = clamp01(prism);
-  const fl = clamp01(flow);
+  const leaveEarly = !!leave;
+  const fadeOf = (v) => leaveEarly ? 1 - Math.min(1, Math.max(0, Number(v) || 0)) : 1;
+  const t = clamp01(tunnel) * fadeOf(tunnelFade);
+  const pr = clamp01(prism) * fadeOf(prismFade);
+  const fl = clamp01(flow) * fadeOf(flowFade);
   const e = Math.min(4, Math.max(0, Math.round(Number(echoes) || 0)));
   // B3 resolution gate: a full-res 16F ring target is ~8 bytes/px, so at
   // >=2K widths the tap count is capped (see "Echoes" in docs/ACCUM.md).
@@ -145,8 +147,16 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
   // #287 fade-to-paper: the fade target, parsed from the background CSS
   // color. Black keeps the legacy `rgb *= keep` exactly (0 * (1 - keep) = 0).
   const bg = hexToRgb01(background);
+  const held = !!leave;
   return {
-    keep,
+    leave,
+    ribbon: !!ribbon,
+    comet: !!comet,
+    keep: held
+      ? Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0)))
+      : ribbon ? Math.max(keep, 0.96)
+      : comet ? Math.min(keep, 0.72)
+      : keep,
     bg,
     ...opticsDerived(o),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
@@ -159,7 +169,7 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
     prismUv: 0.001 * pr, // radial UV offset per channel at prism = 1 (constant across canvas)
     // Phase B2 — flow-advected feedback. Max UV displacement per frame at
     // flow = 1 (30px on a 1000px canvas); 0 skips the FEED pass entirely.
-    flowUv: 0.03 * fl,
+    flowUv: ribbon ? Math.max(0.03 * fl, 0.012) : 0.03 * fl,
     // Phase B3 — echoes. echoTaps K: tap i mixes the frame from i+1 steps
     // ago (delays 1..K), additive ghosts; weights decay with age. 0 = no
     // ring, no mix pass — exactly the old composite.
@@ -1161,16 +1171,21 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         cur = write;
         write = other();
       }
-      // 2. fade (+ Phase A feedback: tunnel zoom/spin, prism drift)
-      pass('fade', write, (u, bind) => {
-        gl.uniform1i(u.u_src, bind(0, cur.tex));
-        gl.uniform1f(u.u_keep, p.keep);
-        // #287 fade-to-paper: the fade target follows the palette bg.
-        gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
-        gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
-        gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
-        gl.uniform1f(u.u_prism, p.prismUv);
-      });
+      // 2. fade, or Leave: copy the held stamps. Clear is the only erase.
+      if (p.leave && p.keep >= 1) {
+        pass('copy', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, cur.tex));
+        });
+      } else {
+        pass('fade', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, cur.tex));
+          gl.uniform1f(u.u_keep, p.keep);
+          gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
+          gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
+          gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
+          gl.uniform1f(u.u_prism, p.prismUv);
+        });
+      }
       cur = write;
       // 3. (#308: removed) — no blur-over-time; the frame lands sharp.
       // 4. over

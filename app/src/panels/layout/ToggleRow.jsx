@@ -32,6 +32,51 @@ export function ToggleRow({ layoutParams }) {
           {key === 'accumulation' ? 'ACCUM' : key.toUpperCase()}
         </button>
       ))}
+
+      {layoutParams.accumulation && (
+        <>
+        <button type="button" className={`chip-btn${layoutParams.trail === 'leave' ? ' active' : ''}`}
+          title="LEAVE holds the stamps. Fade is optional. Tunnel, prism, and flow can fade too."
+          onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === 'leave' ? 'accum' : 'leave' })}>
+          LEAVE
+        </button>
+        {['ribbon', 'comet'].map((name) => (
+          <button key={name} type="button" className={`chip-btn${layoutParams.trail === name ? ' active' : ''}`}
+            title={name === 'ribbon' ? 'RIBBON smears the path into a line.' : 'COMET keeps a bright head and a short tail.'}
+            onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === name ? 'accum' : name })}>
+            {name.toUpperCase()}
+          </button>
+        ))}
+        <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }} title="Live echoes. Zero is off.">
+          ECHOES
+          <input type="range" min={0} max={4} step={1} value={layoutParams.echoes ?? 0}
+            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'echoes', value: parseFloat(e.target.value) })}
+            style={{ width: 64 }} />
+        </label>
+        </>
+      )}
+      {layoutParams.trail === 'leave' && (
+        <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
+          title="LEAVE fade. Zero holds the stamps. Higher lets them decay. Clear still wipes.">
+          FADE
+          <input type="range" min={0} max={0.2} step={0.01}
+            value={layoutParams.leaveFade ?? 0}
+            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'leaveFade', value: parseFloat(e.target.value) })}
+            style={{ width: 64 }} />
+        </label>
+      )}
+      {layoutParams.trail === 'leave' && ['tunnel', 'prism', 'flow'].map((name) => (
+        <label key={name} className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
+          title={`${name} fade. Zero keeps the effect. Higher lets it die. Accum is unchanged.`}>
+          {name.toUpperCase()} FADE
+          <input type="range" min={0} max={1} step={0.01}
+            value={layoutParams[`${name}Fade`] ?? 0}
+            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: `${name}Fade`, value: parseFloat(e.target.value) })}
+            style={{ width: 64 }} />
+        </label>
+      ))}
+
+
       {layoutParams.accumulation && (
         <label
           className="tg"
