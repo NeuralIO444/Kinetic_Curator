@@ -1,3 +1,17 @@
+## Trio
+
+The iteration gate is three of each: selfcheck, Playwright, QA. Not the 161-suite chain.
+
+```sh
+npm run trio
+npm run trio -- --playwright
+npm run trio -- --qa
+```
+
+Selfchecks: palette import copy, clock worker dt, units mapper.
+Playwright: smoke, living boot, director regroup.
+QA: palette-import, wash-mode, fx-finish-grain-rgb.
+
 # QA harness
 
 ## Units (the fast loop)

@@ -16,6 +16,7 @@
     "qa": "node qa/run.mjs",
     "review": "node qa/review.mjs",
     "units": "node qa/units.mjs",
+    "trio": "node qa/trio.mjs",
     "board": "node qa/board.mjs",
     "diff": "node qa/diff.mjs",
     "test:e2e:install": "playwright install chromium",
