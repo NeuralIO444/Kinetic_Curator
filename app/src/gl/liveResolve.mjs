@@ -20,6 +20,9 @@ import { createScentField } from '../engine/kernel/field/scent.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
+import { ensureAggregate, GrowthHooks } from '../engine/kernel/sample/growth.js'; // #793 — biology regrow
+import { assessAggregate, decideLifecycle, recordLifecycleState } from '../biology/lifecycle.js';
+import { getBiologyPolicy } from '../biology/policy.js';
 
 const HOP_MAX_PX = 4;
 
@@ -443,8 +446,34 @@ export function createLiveResolver() {
         if (layoutParams.mode === 'dla' || layoutParams.mode === 'eden') {
           const gKey = [layoutParams.mode, seed, seedOffsets?.spatial || 0].join('|');
           let gt = growthTickByLayer.get(layer.id);
-          if (!gt || gt.key !== gKey) { gt = { tick: 0, key: gKey }; growthTickByLayer.set(layer.id, gt); }
-          if (!input.slowRender) gt.tick++;
+          if (!gt || gt.key !== gKey) { gt = { tick: 0, key: gKey, gen: 0 }; growthTickByLayer.set(layer.id, gt); }
+          if (!input.slowRender) {
+            gt.tick++;
+            // #793 — biology: the policy may end this generation. The decision
+            // is pure over the aggregate's vital signs; the regrow goes
+            // through GrowthHooks (clear + tick reset → the zygote blooms
+            // again on the next sample, same seed, same organism reborn).
+            const policy = getBiologyPolicy();
+            const agg = ensureAggregate(seed, layoutParams.mode, gt.tick, {
+              growthRate: layoutParams.growthRate,
+              growthBranch: layoutParams.growthBranch,
+              audioEnergy,
+              seedOffsets,
+            });
+            const stats = assessAggregate(agg);
+            const decision = decideLifecycle(stats, policy.growth, gt.tick);
+            if (decision.action === 'regrow') {
+              GrowthHooks.clearGrowth(seed, layoutParams.mode, seedOffsets);
+              gt.tick = 0;
+              gt.gen++;
+            }
+            recordLifecycleState(layer.id, {
+              mode: layoutParams.mode, gen: gt.gen, tick: gt.tick,
+              cellCount: stats.cellCount, oldestAge: stats.oldestAge,
+              meanAge01: stats.meanAge01, decision: decision.action,
+              reason: decision.reason,
+            });
+          }
           growthTick = gt.tick;
         }
         items = buildPlacements({

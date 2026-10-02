@@ -32,12 +32,16 @@ const GovernorTunePanel = lazy(() =>
 const ShaderLabPanel = lazy(() =>
   import('./ShaderLabPanel.jsx').then((m) => ({ default: m.ShaderLabPanel })),
 );
+const BiologyPanel = lazy(() =>
+  import('./BiologyPanel.jsx').then((m) => ({ default: m.BiologyPanel })),
+);
 
-/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab. */
+/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793). */
 export const DEV_TABS = [
   { id: 'xray',      title: 'X-RAY',      icon: '◉', component: GovernorXrayPanel },
   { id: 'govtune',   title: 'GOV TUNE',   icon: '◐', component: GovernorTunePanel },
   { id: 'shaderlab', title: 'SHADER LAB', icon: '◈', component: ShaderLabPanel },
+  { id: 'biology',   title: 'BIOLOGY',    icon: '❋', component: BiologyPanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];
