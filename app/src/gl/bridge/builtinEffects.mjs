@@ -57,6 +57,22 @@ const knob = (v, lo, hi, def) => {
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def;
 };
 
+/** #816 — EFFECT_FS slot map. One program. u_effect selects the kind.
+ *  u_p components are per-kind and must not be shared:
+ *    invert    u_effect 0   u_p unused
+ *    rgbSplit  u_effect 1   u_p.x = dx/1000 (canvas uv), yzw 0
+ *    grain     u_effect 2   u_p.x = 0, u_p.y = amount (not dx)
+ *    posterize u_effect 5   u_p.x = levels
+ *  Missing grain aux is not a throw: the chain step still runs, u_aux
+ *  falls back to the source texture (bridge.runChain).
+ */
+export const EFFECT_SLOT_MAP = Object.freeze({
+  invert: { u_effect: 0, u_p: ['unused', 'unused', 'unused', 'unused'] },
+  rgbSplit: { u_effect: 1, u_p: ['dx/1000', '0', '0', '0'] },
+  grain: { u_effect: 2, u_p: ['0', 'amount', '0', '0'] },
+  posterize: { u_effect: 5, u_p: ['levels', '0', '0', '0'] },
+});
+
 export const BUILTIN_EFFECT_DEFS = [
   { kind: 'invert',
     cost: { tier: 3, memoryBytes: FRAME_16F, timeMs: 0.15, notes: 'pure ALU color op' },
