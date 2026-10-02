@@ -22,7 +22,7 @@ export const TOUR_STEPS = [
     id: 'play',
     tab: null,
     title: '3 · Hit PLAY',
-    body: 'Space (or the MasterBar RUN pill) starts the live loop. Evolve and the phrase bar perform from the DAVIS tab.',
+    body: 'Space (or the MasterBar RUN pill) starts the live loop. Evolve and the phrase bar perform from the DIRECTOR tab.',
   },
   {
     id: 'still',

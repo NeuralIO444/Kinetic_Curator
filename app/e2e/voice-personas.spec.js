@@ -20,13 +20,13 @@ test.describe('Mode personas', () => {
     await expect(page.locator('.voice-row')).toBeVisible({ timeout: 10_000 });
   });
 
-  // #717 — the flagship Voices' one home is DAVIS.
+  // #717 — the flagship Voices' one home is the DIRECTOR panel.
   const openDavis = async (page) => {
-    await page.getByRole('tab', { name: /davis/i }).click();
+    await page.getByRole('tab', { name: /director/i }).click();
     await expect(page.locator('.davis-voices')).toBeVisible({ timeout: 10_000 });
   };
 
-  test('flagship chips live on DAVIS, not BUILD', async ({ page }) => {
+  test('flagship chips live on DIRECTOR, not BUILD', async ({ page }) => {
     await expect(page.locator('.panel-layout .voice-chip.flagship')).toHaveCount(0);
     await openDavis(page);
     await expect(page.locator('.voice-chip.flagship')).toHaveCount(4);

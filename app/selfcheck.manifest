@@ -46,6 +46,10 @@ node src/data/helpCopy.selfcheck.mjs
 node src/data/labelCase.selfcheck.mjs
 node src/data/palettes.selfcheck.mjs
 node src/data/chiaroscuro.selfcheck.mjs
+node src/data/canvasPresets.selfcheck.mjs
+node src/data/cellKinemes.selfcheck.mjs
+node src/data/biology.selfcheck.mjs
+node src/gl/parallax.selfcheck.mjs
 node src/data/taxonomy.selfcheck.mjs
 node src/data/firstLight.selfcheck.mjs
 node src/state/paletteLibrary.selfcheck.mjs
@@ -64,6 +68,7 @@ node src/state/layersPatch.selfcheck.mjs
 node src/state/layerNames.selfcheck.mjs
 node src/state/tapeBudget.selfcheck.mjs
 node src/engine/particles.selfcheck.mjs
+node src/engine/particles.uniqueness.selfcheck.mjs
 node src/engine/swarm.inventory.selfcheck.mjs
 node src/gl/clock.inventory.selfcheck.mjs
 node src/gl/clock.evolve.selfcheck.mjs
