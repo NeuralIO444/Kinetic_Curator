@@ -39,7 +39,7 @@ async function boot(page, extraScript = '') {
   }, { doc: DOC, extra: extraScript || fakeAccessScript() });
   await page.goto('/Kinetic_Curator/?boot=factory', { waitUntil: 'domcontentloaded' });
   await page.locator('.app').waitFor({ timeout: 15_000 });
-  await page.getByRole('tab', { name: /davis/i }).click();
+  await page.getByRole('tab', { name: /director/i }).click();
   return page.locator('.davis-midi');
 }
 
@@ -76,7 +76,7 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   await page.evaluate(() => window.__midi.send([0xb0, 7, 0]));
   await expect(depth).toHaveValue('0', { timeout: 3_000 });
 
-  await page.getByRole('tab', { name: /davis/i }).click();
+  await page.getByRole('tab', { name: /director/i }).click();
   await page.evaluate(() => window.__midi.send([0x90, 38, 100]));
   await expect(freeze).toHaveText('THAW', { timeout: 3_000 });
   await page.evaluate(() => window.__midi.unplug());
