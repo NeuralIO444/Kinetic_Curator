@@ -25,7 +25,7 @@ export function UnitsPanel() {
 
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
-      <p style={{ opacity: 0.75 }}>Review: http://127.0.0.1:5170/Kinetic_Curator/ · debug log is window.__kcUnits</p>
+      <p style={{ opacity: 0.75 }}>Press U to open this tab. Debug log is window.__kcUnits. Review page: http://127.0.0.1:5170/Kinetic_Curator/</p>
       {Object.entries(UNIT_TRIO).map(([lane, items]) => (
         <div key={lane} style={{ marginBottom: 6 }}><b>{lane}</b> · {items.join(' · ')}</div>
       ))}
