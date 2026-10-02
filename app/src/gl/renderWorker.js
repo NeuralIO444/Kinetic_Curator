@@ -97,7 +97,16 @@ function handleInit(data) {
   startLoop();
 }
 
-function buildFrame() {
+/**
+ * Build one frame. With no arguments this is the live tick: dt comes from the
+ * wall clock and loopTimeMs advances. With (dtSecOverride, loopTimeMsOverride)
+ * it is a non-advancing peek — the frame resolves at the given clock without
+ * consuming wall time or moving loopTimeMs. Capture uses buildFrame(0,
+ * loopTimeMs), mirroring the in-thread capture peek (#810): zero dt makes
+ * springs/ballistics/physics exact no-ops while warp/morph sample the
+ * current loop time.
+ */
+function buildFrame(dtSecOverride, loopTimeMsOverride) {
   const s = storeState;
   const layoutParams = s.layoutParams || {};
   const layers = s.layers || [];
@@ -106,11 +115,19 @@ function buildFrame() {
 
   // Time step
   const now = performance.now();
-  const dtMs = lastTickMs ? Math.min(now - lastTickMs, 100) : 16.667;
-  lastTickMs = now;
-  const dtSec = dtMs / 1000;
-
-  loopTimeMs += dtMs;
+  let dtMs, dtSec, frameTimeMs;
+  if (dtSecOverride === undefined) {
+    dtMs = lastTickMs ? Math.min(now - lastTickMs, 100) : 16.667;
+    lastTickMs = now;
+    dtSec = dtMs / 1000;
+    loopTimeMs += dtMs;
+    frameTimeMs = loopTimeMs;
+  } else {
+    // Peek: resolve at the override clock, advance nothing.
+    dtSec = dtSecOverride;
+    dtMs = dtSec * 1000;
+    frameTimeMs = loopTimeMsOverride === undefined ? loopTimeMs : loopTimeMsOverride;
+  }
 
   // Spring smoothing for layoutParams
   for (const [k, v] of Object.entries(layoutParams)) {
@@ -150,7 +167,7 @@ function buildFrame() {
     attractor: view.attractor,
     audioBands: ballistics,
     dtSec,
-    loopTimeMs,
+    loopTimeMs: frameTimeMs,
   });
 
   const totalInstances = resolved.reduce((acc, l) => acc + (l.items ? l.items.length : 0), 0);
@@ -170,7 +187,7 @@ function buildFrame() {
     identity: paletteIdentity(s.paletteId, s.paletteOverrides, s.userPalettes),
     mode: s.colorMode || 'FADE',
     mixSeconds: s.paletteMixSeconds,
-    now: loopTimeMs,
+    now: frameTimeMs,
     seed: s.seed || 1,
     bg: tintTargetPalette.bg,
     lastResolved,
@@ -183,7 +200,7 @@ function buildFrame() {
 
   // Scene contract
   const contract = buildSceneContract({
-    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: tintTargetPalette },
+    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(frameTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: tintTargetPalette },
     resolvedLayers: resolved,
     caps: null,
     accum: null,
@@ -394,7 +411,10 @@ self.onmessage = (e) => {
       const { reqId, width, height } = msg;
       try {
         if (!live) throw new Error('Live renderer not initialized');
-        const frame = buildFrame();
+        // #809 drive-by: a peek, not a tick — resolve at the current clock
+        // without advancing loopTimeMs (a background-tab capture used to eat
+        // up to a 100ms wall-derived dt per still).
+        const frame = buildFrame(0, loopTimeMs);
         if (!frame) throw new Error('Frame not ready for capture');
         const pixels = live.renderFrameOffscreen(
           { ...frame.payload, width: width || CANVAS_W, height: height || CANVAS_H },
