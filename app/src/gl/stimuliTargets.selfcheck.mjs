@@ -15,5 +15,5 @@ test('#803 silence is zero and a loud hit stays clamped', () => {
   ]);
   assert.equal(loud.hue, 180);
   assert.equal(loud.accum, 40);
-  assert.ok(ROUTE_TARGETS['render.kinemeRate']);
+  assert.ok(ROUTE_TARGETS['render.kineme']);
 });
