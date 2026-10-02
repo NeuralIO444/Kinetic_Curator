@@ -226,7 +226,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'resolve', name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS,
     vsFile: 'shaders.mjs:FULL_VS', fsFile: 'resolveFs.mjs:RESOLVE_FS',
-    uniforms: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave'],
+    uniforms: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave', 'u_fake', 'u_light'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'final resolve: exposure + ACES + dither, one tap; structural, never shed (FXAA is its own governor cut, see renderer/resolve-fxaa)' },
   },
