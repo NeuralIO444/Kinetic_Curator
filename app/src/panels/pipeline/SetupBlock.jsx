@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
 import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS } from '../../data/canvasPresets.js';
 
