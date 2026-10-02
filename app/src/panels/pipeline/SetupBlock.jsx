@@ -62,7 +62,7 @@ export function SetupBlock() {
         <button type="button" className="chip-btn" onClick={() => {
           const r = ledRaster(cab.w, cab.h, cab.px);
           setSize(r.w, r.h);
-        }}>APPLY</button>
+        }}>SET SIZE</button>
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
         Authored {authored} · live raster follows SETUP
