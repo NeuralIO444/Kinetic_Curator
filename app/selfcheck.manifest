@@ -175,3 +175,4 @@ node src/gl/shapeDither.selfcheck.mjs
 node src/gl/trailMode.selfcheck.mjs
 node src/engine/organisms/behaveEase.selfcheck.mjs
 node src/panels/pipeline/thumbnail.selfcheck.mjs
+node src/data/canvasPresets.mine.selfcheck.mjs

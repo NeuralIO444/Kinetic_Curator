@@ -39,3 +39,26 @@ export function authoredCanvas(state = {}) {
 export function isInstrumentCanvas(spec) {
   return spec.canvasW === 1000 && spec.canvasH === 700;
 }
+
+const PRESET_KEY = 'kc:canvas-presets';
+
+export function sanitizeUserPresets(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((p) => p && typeof p === 'object').slice(0, 24).map((p) => {
+    const spec = sanitizeCanvasSpec(p);
+    const label = String(p?.label || `${spec.canvasW}×${spec.canvasH}`).slice(0, 40);
+    const id = String(p?.id || `mine-${spec.canvasW}x${spec.canvasH}`).slice(0, 40);
+    return { id, group: 'Mine', label, w: spec.canvasW, h: spec.canvasH, fps: spec.canvasFps };
+  });
+}
+
+export function readUserPresets() {
+  try { return sanitizeUserPresets(JSON.parse(localStorage.getItem(PRESET_KEY) || '[]')); }
+  catch { return []; }
+}
+
+export function writeUserPresets(list) {
+  const next = sanitizeUserPresets(list);
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+  return next;
+}

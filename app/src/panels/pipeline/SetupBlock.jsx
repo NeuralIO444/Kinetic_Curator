@@ -7,7 +7,11 @@ export function SetupBlock() {
   const fps = useStore((s) => s.canvasFps);
   const presetId = useStore((s) => s.canvasPresetId);
   const lock = useStore((s) => s.canvasAspectLock);
+  const mine = useStore((s) => s.userCanvasPresets);
   const apply = useStore((s) => s.applyCanvasPreset);
+  const save = useStore((s) => s.saveCanvasPreset);
+  const remove = useStore((s) => s.deleteCanvasPreset);
+  const load = useStore((s) => s.loadUserCanvasPresets);
   const setSize = useStore((s) => s.setCanvasSize);
   const setFps = useStore((s) => s.setCanvasFps);
   const setLock = useStore((s) => s.setCanvasAspectLock);
@@ -15,6 +19,8 @@ export function SetupBlock() {
   const actual = `${INSTRUMENT_CANVAS.w}×${INSTRUMENT_CANVAS.h}`;
   const authored = `${w}×${h}`;
   const differ = authored !== actual;
+  const [name, setName] = useState('My wall');
+  useEffect(() => { load?.(); }, [load]);
 
   return (
     <div className="pipeline-setup">
@@ -23,6 +29,9 @@ export function SetupBlock() {
         <select value={presetId} onChange={(e) => apply(e.target.value)} style={{ fontSize: 11, maxWidth: 180 }}>
           {CANVAS_PRESETS.map((p) => (
             <option key={p.id} value={p.id}>{p.group} · {p.label}</option>
+          ))}
+          {(mine || []).map((p) => (
+            <option key={p.id} value={p.id}>Mine · {p.label}</option>
           ))}
         </select>
       </div>
@@ -49,6 +58,13 @@ export function SetupBlock() {
         <select value={fps} onChange={(e) => setFps(Number(e.target.value))} style={{ fontSize: 11 }}>
           {CANVAS_FPS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
+      </div>
+      <div className="pipeline-row">
+        <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, fontSize: 11 }} />
+        <button type="button" className="chip-btn" onClick={() => save(name || 'My wall')}>SAVE</button>
+        {String(presetId).startsWith('mine-') && (
+          <button type="button" className="chip-btn" onClick={() => remove(presetId)}>DELETE</button>
+        )}
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
         Authored {authored} · live raster follows SETUP
