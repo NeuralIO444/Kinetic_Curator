@@ -41,7 +41,7 @@ assert.strictEqual(parseProject(JSON.parse(JSON.stringify(offDoc))).doc.light, n
 const onDoc = serializeProject({ ...base, light: { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink' } });
 const back = parseProject(JSON.parse(JSON.stringify(onDoc)));
 assert.ok(back.ok);
-assert.deepStrictEqual(back.doc.light, { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink', bevel: LIGHT_DEFAULT.bevel, spec: LIGHT_DEFAULT.spec });
+assert.deepStrictEqual(back.doc.light, { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink', bevel: LIGHT_DEFAULT.bevel, spec: LIGHT_DEFAULT.spec, pool: 0 });
 
 // ── scene contract: key omitted when off; colour resolved when on ─────────
 const c0 = buildSceneContract({ doc: { seed: 1 }, resolvedLayers: [] });

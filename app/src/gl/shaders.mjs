@@ -140,6 +140,7 @@ uniform vec4 u_sun;        // #594: shared with the vertex stage (w = on)
 uniform vec4 u_sunLight;   // #594: shared, rgb colour + intensity
 uniform float u_ambient;   // #594: shared
 uniform vec2 u_sunMat;     // #594 PR2: x = bevel strength (0 = flat per-instance light), y = specular
+uniform float u_pool;      // #594: 0 = today's sun. Ink in the shadow, paper on the highlight.
 in vec2 v_world;
 in vec4 v_rot;
 in vec4 v_cell;
@@ -192,8 +193,16 @@ void main() {
       float diff = max(dot(n, L), 0.0);
       vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));                   // viewer straight on
       float spec = u_sunMat.y * pow(max(dot(n, H), 0.0), 48.0);      // tight, enamel-like
-      vec3 lit = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * diff);
+      float wrap = max(diff * 0.65 + 0.35, 0.0);
+      vec3 lit = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * wrap);
       o.rgb = min(o.rgb * lit + u_sunLight.rgb * (spec * u_sunLight.a) * o.a, vec3(o.a));
+      if (u_pool > 0.0) {
+        vec3 ink = vec3(0.07, 0.04, 0.03);
+        vec3 paper = vec3(0.94, 0.86, 0.72);
+        float night = 1.0 - wrap;
+        o.rgb = mix(o.rgb, ink * o.a, u_pool * night * 0.7);
+        o.rgb = min(mix(o.rgb, paper * o.a, u_pool * wrap * spec), vec3(o.a));
+      }
     } else {
       o.rgb = min(o.rgb * v_light, vec3(o.a));
     }

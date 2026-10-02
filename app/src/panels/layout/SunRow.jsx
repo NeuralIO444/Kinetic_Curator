@@ -42,6 +42,9 @@ export function SunRow() {
           <RangeRow label="SPEC" value={light.spec} min={0} max={1} step={0.01}
             hint="A tight enamel highlight where an edge faces the sun"
             onChange={(v) => setLight({ spec: v })} defaultValue={LIGHT_DEFAULT.spec} />
+          <RangeRow label="POOL" value={light.pool ?? 0} min={0} max={1} step={0.01}
+            hint="Zero is today's sun. Higher pools ink in the shadow and paper on the highlight."
+            onChange={(v) => setLight({ pool: v })} defaultValue={0} />
           <div className="chip-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
             <span style={{ fontSize: 10, marginRight: 4 }}>sun colour</span>
             {LIGHT_SLOTS.map((s) => (
