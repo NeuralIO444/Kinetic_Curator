@@ -3,7 +3,11 @@
 // cannot hang the suite (that was the 60s timeout).
 import { test, expect } from '@playwright/test';
 
-test.describe.configure({ timeout: 20_000 });
+// No describe timeout: the default 60s applies, like every other spec. The
+// 20s cap this used to carry guarded against Chromium's native MIDI prompt
+// hanging the suite — that prompt is gone now (window.__kcMidiAccess below),
+// and on CI's software GL this boot alone measures ~16s of that budget, so
+// the cap was timing out a healthy boot, not catching a hang.
 
 const DOC = {
   version: 1, seed: 4242, autoQuality: false,
@@ -38,9 +42,13 @@ async function boot(page, extraScript = '') {
     if (extra) eval(extra);
   }, { doc: DOC, extra: extraScript || fakeAccessScript() });
   await page.goto('/Kinetic_Curator/?boot=factory', { waitUntil: 'domcontentloaded' });
-  await page.locator('.app').waitFor({ timeout: 15_000 });
+  // 30s for the shell, same as director-regroup: software GL paints the
+  // seeded project slowly, and a slow boot must fail as itself — not as a
+  // stability hang further down.
+  await page.locator('.app').waitFor({ timeout: 30_000 });
   await page.getByRole('tab', { name: /director/i }).click();
   const midi = page.locator('.davis-midi');
+  await expect(midi).toBeVisible({ timeout: 15_000 });
   await midi.scrollIntoViewIfNeeded();
   return midi;
 }
