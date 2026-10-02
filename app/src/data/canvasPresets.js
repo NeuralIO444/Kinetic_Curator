@@ -39,3 +39,11 @@ export function authoredCanvas(state = {}) {
 export function isInstrumentCanvas(spec) {
   return spec.canvasW === 1000 && spec.canvasH === 700;
 }
+
+/** Cabinets across × cabinets down × pixels per cabinet. Writes the native raster. */
+export function ledRaster(cabinetsW, cabinetsH, cabinetPx) {
+  const cw = Math.max(1, Math.round(Number(cabinetsW) || 1));
+  const ch = Math.max(1, Math.round(Number(cabinetsH) || 1));
+  const px = Math.max(1, Math.round(Number(cabinetPx) || 1));
+  return { w: cw * px, h: ch * px };
+}
