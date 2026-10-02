@@ -82,11 +82,25 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       requestDevTab('units');
       setActiveTab('dev');
     };
+    const onExport = (ev) => {
+      if (!shouldExportOnKey(ev)) return;
+      ev.preventDefault();
+      const s = useStore.getState();
+      let payload = buildProjectPayload(s);
+      const canvas = document.querySelector('canvas');
+      if (canvas?.toDataURL) {
+        try { payload = attachThumbnail(payload, canvas.toDataURL('image/jpeg', 0.4)); } catch { /* hold last frame */ }
+      }
+      downloadProject(payload, exportFilename(payload));
+      s.setStatus?.(exportSavedMessage(exportFilename(payload)));
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keydown', onUnits);
+    window.addEventListener('keydown', onExport);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keydown', onUnits);
+      window.removeEventListener('keydown', onExport);
     };
   }, [secondary]);
 

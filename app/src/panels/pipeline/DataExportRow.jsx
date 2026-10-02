@@ -64,16 +64,6 @@ export function DataExportRow({
   };
 
   useEffect(() => {
-    const onKey = (ev) => {
-      if (!shouldExportOnKey(ev)) return;
-      ev.preventDefault();
-      exportProject();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-
-  useEffect(() => {
     setBehind(Boolean(dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields)))));
   }, [projectFields]);
 

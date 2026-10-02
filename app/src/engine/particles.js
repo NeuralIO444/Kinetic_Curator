@@ -270,6 +270,7 @@ export class ParticleSystem {
   }
 
   init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null, opts = {}) {
+    this._behaveEase = null;
     this.canvasW = canvasW;
     this.canvasH = canvasH;
     // #818 — one climate. seedOffsets.noise is a domain offset applied at
@@ -800,7 +801,7 @@ export class ParticleSystem {
         this._behaveEase = { id, from, to: rawProfile, start: time };
       }
       const t = (time - this._behaveEase.start) / BEHAVE_EASE_MS;
-      profile = t >= 1 ? rawProfile : blendBehave(this._behaveEase.from, this._behaveEase.to, t);
+      profile = t >= 1 || id === 'lorenz' ? rawProfile : blendBehave(this._behaveEase.from, this._behaveEase.to, t);
     }
     // #287 — the scent field exists only for organism casts (drives,
     // chemotaxis, and feeding all read it). Created lazily so cloud-mode
