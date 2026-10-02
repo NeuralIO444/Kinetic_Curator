@@ -132,7 +132,7 @@ function opticsDerived(o) {
  */
 import { isLeave } from './trailMode.mjs';
 
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', trail = 'accum' } = {}) {
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', trail = 'accum', leaveFade = 0 } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
   const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
@@ -151,7 +151,7 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
   const leave = isLeave(trail);
   return {
     leave,
-    keep: leave ? 1 : keep,
+    keep: leave ? Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0))) : keep,
     bg,
     ...opticsDerived(o),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
@@ -1167,7 +1167,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         write = other();
       }
       // 2. fade, or Leave: copy the held stamps. Clear is the only erase.
-      if (p.leave) {
+      if (p.leave && p.keep >= 1) {
         pass('copy', write, (u, bind) => {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
         });

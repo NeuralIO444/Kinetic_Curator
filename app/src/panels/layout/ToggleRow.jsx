@@ -40,6 +40,17 @@ export function ToggleRow({ layoutParams }) {
           LEAVE
         </button>
       )}
+      {layoutParams.trail === 'leave' && (
+        <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
+          title="LEAVE fade. Zero holds the stamps. Higher lets them decay. Clear still wipes.">
+          FADE
+          <input type="range" min={0} max={0.2} step={0.01}
+            value={layoutParams.leaveFade ?? 0}
+            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'leaveFade', value: parseFloat(e.target.value) })}
+            style={{ width: 64 }} />
+        </label>
+      )}
+
       {layoutParams.accumulation && (
         <label
           className="tg"

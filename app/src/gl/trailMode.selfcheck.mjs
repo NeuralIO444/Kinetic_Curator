@@ -18,3 +18,9 @@ test('#560 accum still fades', () => {
   assert.equal(today.leave, false);
   assert.equal(today.keep, 0.5);
 });
+
+test('#560 Leave fade is optional', () => {
+  assert.equal(accumRecipeParams({ trail: 'leave', leaveFade: 0 }).keep, 1);
+  assert.equal(accumRecipeParams({ trail: 'leave', leaveFade: 0.2 }).keep, 0.8);
+  assert.equal(accumRecipeParams({ trail: 'accum', leaveFade: 0.2 }).keep, 0.88);
+});
