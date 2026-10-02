@@ -1,7 +1,11 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
+import {
+  confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
+  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
+} from './pipelineNotices.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
 import { hitsFromFavorites } from '../../state/hitsExport.js';
 import { useStore } from '../../state/store.js';
@@ -29,6 +33,9 @@ export function DataExportRow({
   const fileInputRef = useRef(null);
   const paletteInputRef = useRef(null);
   const tasteInputRef = useRef(null);
+  const [recent, setRecent] = useState(() => readRecent());
+  const [loadedName, setLoadedName] = useState(null);
+  const exportedPayload = useRef(null);
   const tasteStatus = useStore((s) => s.tasteStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const clearTaste = useStore((s) => s.clearTaste);
@@ -39,7 +46,28 @@ export function DataExportRow({
     activeLayerId, layerSnapshots,
   };
 
-  const exportProject = () => downloadProject(buildProjectPayload(projectFields));
+
+  useEffect(() => {
+    const onKey = (ev) => {
+      if (ev.key !== 'e' || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      const tag = ev.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || ev.target?.isContentEditable) return;
+      ev.preventDefault();
+      exportProject();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const exportProject = () => {
+    const payload = buildProjectPayload(projectFields);
+    const filename = exportFilename(payload);
+    downloadProject(payload, filename);
+    exportedPayload.current = JSON.stringify(payload);
+    onMessage(exportSavedMessage(filename));
+    setRecent(rememberRecent(filename));
+  };
+
 
   const exportPalettes = () => downloadJsonBlob(userPalettes || [], 'kinetic-curator-palettes.json');
 
@@ -54,6 +82,10 @@ export function DataExportRow({
   const importProject = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (layers?.length && !window.confirm(confirmReplaceMessage())) {
+      e.target.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
@@ -64,8 +96,12 @@ export function DataExportRow({
           return;
         }
         emit(Events.EXPORT_LOAD_PROJECT, result.doc);
-        onMessage('Project loaded');
-        setTimeout(() => onMessage(null), 2000);
+        const miss = missingPaletteMessage(result.doc, userPalettes);
+        const loaded = loadedMessage(file.name, result.doc);
+        onMessage(miss ? `${loaded}. ${miss}` : loaded);
+        setLoadedName(file.name);
+        setRecent(rememberRecent(file.name));
+        exportedPayload.current = JSON.stringify(buildProjectPayload(projectFields));
       } catch (err) {
         console.warn('Failed to import project:', err);
         onMessage('Invalid JSON');
@@ -149,6 +185,15 @@ export function DataExportRow({
         <input ref={tasteInputRef} type="file" accept=".json,application/json" onChange={importTaste} style={{ display: 'none' }} />
       </div>
       <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
+      {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}</div>}
+      {dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields))) && (
+        <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>
+      )}
+      {recent.length > 0 && (
+        <div className="pipeline-hint" style={{ fontSize: 10 }}>
+          Recent: {recent.join(' · ')}
+        </div>
+      )}
     </>
   );
 }
