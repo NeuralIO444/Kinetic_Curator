@@ -77,6 +77,7 @@ node src/gl/clock.evolve.selfcheck.mjs
 node src/gl/clock.evolve-accum.selfcheck.mjs
 node src/gl/clock.workerDt.selfcheck.mjs
 node src/gl/clock.capture.selfcheck.mjs
+node src/gl/clock.freeze.selfcheck.mjs
 node src/gl/accum.inventory.selfcheck.mjs
 node src/gl/accum.seam.selfcheck.mjs
 node src/gl/fx.upSlots.selfcheck.mjs

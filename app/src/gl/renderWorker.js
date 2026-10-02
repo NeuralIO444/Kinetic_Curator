@@ -121,6 +121,11 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
     lastTickMs = now;
     dtSec = dtMs / 1000;
     loopTimeMs += dtMs;
+    // #823 — a governor cut6/watchdog freeze (and a true pause) holds the
+    // loop clock, mirroring liveLoop.mjs: roll the tick's advance back so
+    // every loopTimeMs reader sees a held clock and nothing lump-sums on
+    // thaw. frameTimeMs below is read after the rollback.
+    if (s.running === false || s.slowRender) loopTimeMs -= dtMs;
     frameTimeMs = loopTimeMs;
   } else {
     // Peek: resolve at the override clock, advance nothing.
