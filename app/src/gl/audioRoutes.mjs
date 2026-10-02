@@ -36,6 +36,11 @@ export const ROUTE_TARGETS = Object.freeze({
   'render.alpha': Object.freeze({ clamp: [0, 60] }),
   'render.breath': Object.freeze({ clamp: [0, 0.2] }),
   'render.glow': Object.freeze({ clamp: [0, 1] }),
+  'render.hue': Object.freeze({ clamp: [-180, 180] }),
+  'render.squash': Object.freeze({ clamp: [0, 1] }),
+  'render.kineme': Object.freeze({ clamp: [0, 4] }),
+  'render.accum': Object.freeze({ clamp: [0, 40] }),
+  'render.sun': Object.freeze({ clamp: [0, 1] }),
 });
 
 /** Most routes a table may hold. */
@@ -96,7 +101,7 @@ export function routesUseBands(routes) {
 /** Evaluate a route table. Same four outputs as the legacy path. */
 export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands = null) {
   const c = compile(routes);
-  let scale = 0, alpha = 0, breath = 0, glow = 0;
+  let scale = 0, alpha = 0, breath = 0, glow = 0, hue = 0, squash = 0, kinemeRate = 0, accum = 0, sun = 0;
   for (let i = 0; i < c.n; i++) {
     const v = c.read[i](a, bands) * c.depth[i];
     switch (c.target[i]) {
@@ -104,15 +109,27 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
       case 'render.alpha': alpha += v; break;
       case 'render.breath': breath += v; break;
       case 'render.glow': glow += v; break;
+      case 'render.hue': hue += v; break;
+      case 'render.squash': squash += v; break;
+      case 'render.kineme': kinemeRate += v; break;
+      case 'render.accum': accum += v; break;
+      case 'render.sun': sun += v; break;
       default: break;
     }
   }
-  return {
+  const out = {
     scaleMul: clampTo(1 + scale * depth, ROUTE_TARGETS['render.scale'].clamp),
     alphaBoost: clampTo(alpha * alphaMod * depth, ROUTE_TARGETS['render.alpha'].clamp),
     breathAudio: clampTo(breath * depth, ROUTE_TARGETS['render.breath'].clamp),
     glow: clampTo(Math.min(1, glow) * depth, ROUTE_TARGETS['render.glow'].clamp),
   };
+  const used = new Set(c.target);
+  if (used.has('render.hue')) out.hue = clampTo(hue * depth, ROUTE_TARGETS['render.hue'].clamp);
+  if (used.has('render.squash')) out.squash = clampTo(squash * depth, ROUTE_TARGETS['render.squash'].clamp);
+  if (used.has('render.kineme')) out.kineme = clampTo(kinemeRate * depth, ROUTE_TARGETS['render.kineme'].clamp);
+  if (used.has('render.accum')) out.accum = clampTo(accum * depth, ROUTE_TARGETS['render.accum'].clamp);
+  if (used.has('render.sun')) out.sun = clampTo(sun * depth, ROUTE_TARGETS['render.sun'].clamp);
+  return out;
 }
 
 /**
