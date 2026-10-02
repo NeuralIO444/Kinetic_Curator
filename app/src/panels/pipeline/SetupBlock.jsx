@@ -65,9 +65,9 @@ export function SetupBlock() {
         }}>SET SIZE</button>
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
-        Authored {authored} · live raster follows SETUP
-        {differ ? '' : ''}
-        . Color space waits on #532 ACES.
+        {authored} at {fps}fps · {Math.round((w * h * fps) / 1e6)} Mpx/s
+        {differ ? ` · not the ${actual} instrument` : ''}
+        . Syphon still does not send a frame from the browser.
       </div>
     </div>
   );
