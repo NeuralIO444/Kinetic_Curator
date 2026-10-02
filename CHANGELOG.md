@@ -1,5 +1,21 @@
 # Changelog
 
+## Current — Pipeline, audio routes, light (2026-10-01)
+
+Everything merged to `main` since the 2026-09-28 sync.
+
+- **Pipeline SETUP + STAGE (#606 #607 #608, #827)** — canvas presets, W×H lock/swap, capture fps; the live raster and scene units follow the authored size (a new aspect reveals canvas, never scales content; the 1000×700 instrument default is unchanged). Stage preview / fullscreen (Tauri stage window native) / Syphon status (honest not-linked).
+- **Audio as data (#790 PR1–4, #613, #615, #618)** — route table engine with default parity; `audioRoutes` is saved, undoable project state; METER hero with seven named bands; editable MATRIX (band, target, depth; ≤16 routes); FEEL presets; FILE source + `kc-audio-envelope/1` sidecar.
+- **Director (#830, #616, #717, #734)** — DAVIS renamed Director; regrouped VOICES / GENERATE / PERFORM with live EVOLVE progress; flagship voices moved here, load-only, with ✎ fork dish into MY VOICES.
+- **Light and mass (#594 1–3/5, #704, #741, #740, #532)** — the one CHIAROSCURO sun, bevel normals + tight spec, squash-and-stretch, DARK GLASS voice, gate weave, FXAA as governor cut 0, ACES + Bayer resolve.
+- **Motion (#781, #558, #796, #807–#821, #763, #711, #710)** — kinemes (Build A, Build C UV window), per-node uniqueness at instantiation, diorama parallax, remainder clocks, ACCUM feedback guard, seek/flee in swarm mode, lorenz re-entry.
+- **Colour + shapes (#632, #733, #735, #716)** — FADE per-node transition, 4-state shape mixer, taxonomy LOOK/VOICE/SYSTEM/CAST, Curator cluster in the top bar.
+- **Curator (#762, #719, #793)** — Taste v1 + `taste.json` import, named recipe features on keeps, biology lifecycle policy, taste validator.
+- **FX (#732, #744, #745, #520)** — one family per FX stack slot, signed grain, RGB split keeps source alpha, FX rack UI.
+- **Samplers (#586–#592)** — truchet, voronoi scatter, l-system, OKLCH grade, displace domain-warp, Markov weights, euclidean phrase clock.
+- **Reverted:** asset sub-animation frame strips (#699, #782).
+- **Tooling** — CI parallel jobs + Playwright cache (#747); e2e de-flakes (#769, #788, #798, #805); hardware research (#785), KINEME handoff (#783).
+
 ## Current — KC-1 review queue (2026-09-28)
 
 One-PR-at-a-time review lane. Builders build, Matt looks and merges.

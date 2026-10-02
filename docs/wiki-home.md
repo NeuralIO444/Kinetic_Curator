@@ -28,10 +28,14 @@ cd app && npm install && npm run dev
 - Render quality pillars: one kernel, one seed; finals off-store; sidecar honesty
 - Organism contacts (bounce / swap / breed), moth-body ladders, overlay QA
 
+## Since 0.9.0 (2026-10-01)
+
+Pipeline SETUP/STAGE with an authored canvas, assignable audio routes, the Director panel, the CHIAROSCURO sun, kinemes, per-node uniqueness. See [CHANGELOG](../CHANGELOG.md).
+
 ## Earlier (0.8.0)
 
 - Project JSON + RENDER FINAL / BATCH / ACCUM
 - Setlist morph, weight mix, gloss LOD
 - CI: `npm run selfcheck` + Playwright smoke
 
-*Version: 0.8.0 · 2026-09-15*
+*Version: 0.9.0 · 2026-10-01*
