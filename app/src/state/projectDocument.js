@@ -9,6 +9,7 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
 import { sanitizeAssetKineme } from '../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
+import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
 import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
@@ -78,6 +79,14 @@ export function serializeProject(state) {
   // default table), so an untouched piece exports exactly as before. [] is saved.
   const audioRoutes = sanitizeAudioRoutes(state.audioRoutes);
   if (audioRoutes) doc.audioRoutes = audioRoutes;
+  const canvas = sanitizeCanvasSpec(state);
+  if (!isInstrumentCanvas(canvas) || canvas.canvasFps !== 60 || canvas.stageMode !== 'preview') {
+    doc.canvasW = canvas.canvasW;
+    doc.canvasH = canvas.canvasH;
+    doc.canvasFps = canvas.canvasFps;
+    doc.canvasPresetId = canvas.canvasPresetId;
+    doc.stageMode = canvas.stageMode;
+  }
   if (Array.isArray(state.layers) && state.activeLayerId) {
     doc.layers = state.layers;
     doc.activeLayerId = state.activeLayerId;

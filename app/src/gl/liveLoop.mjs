@@ -41,7 +41,7 @@ import { buildSceneContract } from './sceneContract.js';
 import { applyParallax } from './parallax.mjs';
 import { resolvePalette } from '../data/palettes.js';
 import { resolveLiveRenderState } from '../data/voices.js';
-import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
+import { authoredCanvas } from '../data/canvasPresets.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
@@ -55,9 +55,6 @@ import {
   frameFaultReason,
   bakeFaultReason,
 } from './renderFault.mjs';
-
-const CX = CANVAS_W / 2;
-const CY = CANVAS_H / 2;
 
 /**
  * #265 — the atlas is resolution-independent (asset/color combos only), so
@@ -359,6 +356,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
    */
   function buildFrame(dtSec = 1 / 60, loopTimeMs = 0) {
     const s = getState();
+    const { w: canvasW, h: canvasH } = authoredCanvas(s);
+    const CX = canvasW / 2;
+    const CY = canvasH / 2;
     // #280: during a voice MIX the loop renders the interpolated blend,
     // not the raw committed state — no hard jumps on voice switches.
     const voiceState = resolveLiveRenderState(s);
@@ -530,6 +530,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     }
 
     const resolved = resolver.resolveLayers({
+      canvasW, canvasH,
       layers: s.layers,
       activeLayerId: s.activeLayerId,
       layerSnapshots: s.layerSnapshots,
@@ -675,8 +676,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const fxLayerIds = new Set((contract.fxWraps || []).map((w) => w.fxLayerId));
 
     const renderScale = Math.min(1, Math.max(0.1, s.renderScale || 1));
-    const rw = Math.max(2, Math.round(CANVAS_W * renderScale));
-    const rh = Math.max(2, Math.round(CANVAS_H * renderScale));
+    const rw = Math.max(2, Math.round(canvasW * renderScale));
+    const rh = Math.max(2, Math.round(canvasH * renderScale));
 
     const aKey = atlasKeyFor(combos, fxLayerIds);
     const gKey = grainKeyFor(fxLayerIds, rw, rh);
@@ -700,6 +701,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       payload: {
         width: rw,
         height: rh,
+        sceneW: canvasW,
+        sceneH: canvasH,
         bg: bgCss || '#000000',
         contract,
         cells,
@@ -1038,7 +1041,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
    * Used by PNG stills, batch export, and the print desk. The render size is
    * independent of the live renderScale (1x/2x/4x stills).
    */
-  function captureFrame({ width = CANVAS_W, height = CANVAS_H } = {}) {
+  function captureFrame(opts = {}) {
+    const spec = authoredCanvas(getState());
+    const width = opts.width ?? spec.w;
+    const height = opts.height ?? spec.h;
     // #263: never hand back black pixels from a dead GPU session — the
     // caller surfaces this instead of a silently blank export.
     // isContextLost() covers the gap before webglcontextlost dispatches.

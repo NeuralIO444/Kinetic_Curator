@@ -33,10 +33,10 @@ function hashStr(str) {
   return h;
 }
 
-function clampHop(it, q) {
+function clampHop(it, q, W = CANVAS_W, H = CANVAS_H) {
   if (!q) return it;
-  let dx = q.x * CANVAS_W - it.x;
-  let dy = q.y * CANVAS_H - it.y;
+  let dx = q.x * W - it.x;
+  let dy = q.y * H - it.y;
   const m = Math.hypot(dx, dy);
   if (m > HOP_MAX_PX) { dx *= HOP_MAX_PX / m; dy *= HOP_MAX_PX / m; }
   return { ...it, x: it.x + dx, y: it.y + dy };
@@ -106,6 +106,9 @@ export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
   const feedLive = createFeedLive(CANVAS_W, CANVAS_H);
+  // #606: scene units follow the authored canvas (set per resolveLayers).
+  let W = CANVAS_W;
+  let H = CANVAS_H;
   let worldNoise = null;
   let worldNoiseSeed = null;
 
@@ -191,7 +194,7 @@ export function createLiveResolver() {
       st = { system: new ParticleSystem(), initKey: null, phraseGen: -1 };
       swarmState.set(layerId, st);
     }
-    const initKey = [ctx.mode, ctx.seed, CANVAS_W, CANVAS_H,
+    const initKey = [ctx.mode, ctx.seed, W, H,
       ctx.seedOffsets?.spatial || 0, ctx.seedOffsets?.color || 0,
       ctx.seedOffsets?.asset || 0, ctx.seedOffsets?.noise || 0,
       ctx.layoutParams.graze || 0].join('|');
@@ -206,7 +209,7 @@ export function createLiveResolver() {
       // the new scatter -- but the targets are arbitrary relative to a
       // frame ago, so every organism used to fly canvas-wide on entry.
       const wasShown = ctx.slowRender ? [] : (lastShown.get(layerId)?.items || []);
-      st.system.init(Math.ceil(ctx.safeParticles), CANVAS_W, CANVAS_H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, { graze: ctx.layoutParams.graze || 0 });
+      st.system.init(Math.ceil(ctx.safeParticles), W, H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, { graze: ctx.layoutParams.graze || 0 });
       st.initKey = initKey;
       if (wasShown.length) {
         // Right after init every particle is alive and (for organisms)
@@ -288,12 +291,14 @@ export function createLiveResolver() {
     if (!ctx.layoutParams.overlap) items = [...items].sort((a, b) => a.baseScale - b.baseScale);
     const stamp = ctx.layoutParams.mirror || ctx.layoutParams.symmetry === 'stamp';
     if (stamp && ctx.caps.allowMirror) {
-      items = [...items, ...items.map((item) => ({ ...item, x: CANVAS_W - item.x, rotation: -item.rotation, _mirrored: true, key: item.key ? `${item.key}-stamp` : undefined, seedOffset: item.seedOffset }))];
+      items = [...items, ...items.map((item) => ({ ...item, x: W - item.x, rotation: -item.rotation, _mirrored: true, key: item.key ? `${item.key}-stamp` : undefined, seedOffset: item.seedOffset }))];
     }
     return items;
   }
 
   function resolveLayers(input) {
+    W = input.canvasW || CANVAS_W;
+    H = input.canvasH || CANVAS_H;
     const caps = getQualityCaps(input.quality || 'balanced');
     const pool = mergePool(ASSETS, input.customAssets || []);
     if (overlayRevSrc !== input.customAssets) {
@@ -407,7 +412,7 @@ export function createLiveResolver() {
       } else {
         items = buildPlacements({
           layoutParams, seed, seedOffsets, activeAssets, palette,
-          caGrid: src.caGrid ?? null, caps, canvasW: CANVAS_W, canvasH: CANVAS_H,
+          caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
         }).items;
 
@@ -563,7 +568,7 @@ export function createLiveResolver() {
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }
     const content = out.filter((e) => !e.isFx);
-    const toNorm = (it) => ({ x: (Number(it.x) || 0) / CANVAS_W, y: (Number(it.y) || 0) / CANVAS_H });
+    const toNorm = (it) => ({ x: (Number(it.x) || 0) / W, y: (Number(it.y) || 0) / H });
     // #343 / Spine F: MOD reads the source's motion (position + velocity).
     // Both cloud and organism tracks provide real vx/vy for motionMetrics.
     const toNormVel = (it) => ({ ...toNorm(it), vx: Number(it.vx) || 0, vy: Number(it.vy) || 0 });
@@ -597,7 +602,7 @@ export function createLiveResolver() {
         let pullSumPx = 0;
         const fieldN = (e.items || []).length;
         e.items = (e.items || []).map((it, k) => {
-          const next = clampHop(it, pulled[k]);
+          const next = clampHop(it, pulled[k], W, H);
           pullSumPx += Math.hypot(next.x - it.x, next.y - it.y);
           return next;
         });
@@ -610,7 +615,7 @@ export function createLiveResolver() {
         let feedSumPx = 0;
         const feedN = (e.items || []).length;
         e.items = (e.items || []).map((it, k) => {
-          const next = clampHop(it, pulled[k]);
+          const next = clampHop(it, pulled[k], W, H);
           feedSumPx += Math.hypot(next.x - it.x, next.y - it.y);
           return next;
         });

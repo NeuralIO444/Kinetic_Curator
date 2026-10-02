@@ -10,7 +10,12 @@ use std::path::Path;
 use std::sync::Mutex;
 
 #[tauri::command]
-fn write_batch_frame(data: Vec<u8>, path: String) -> Result<usize, String> {
+fn syphon_status() -> serde_json::Value {
+    serde_json::json!({
+        "available": false,
+        "reason": "Syphon server not linked in this build — STAGE toggle stays off"
+    })
+}
     let target_path = Path::new(&path);
     if let Some(parent) = target_path.parent() {
         if !parent.as_os_str().is_empty() {
@@ -28,6 +33,7 @@ fn main() {
         .manage(media::MediaAppState::new())
         .invoke_handler(tauri::generate_handler![
             write_batch_frame,
+            syphon_status,
             metal::metal_init,
             metal::metal_step_boids,
             metal::metal_step_accum,

@@ -19,6 +19,7 @@ import { tasteSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, getKineme } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
+import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -564,7 +565,15 @@ export const createGlobalSlice = (set) => ({
     next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
     next.assetKineme = sanitizeAssetKineme(doc.assetKineme) || {}; // #781 — a doc without kinemes is still
-    next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790 — a doc without routes uses the default table
+    next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
+    {
+      const canvas = sanitizeCanvasSpec(doc);
+      next.canvasW = canvas.canvasW;
+      next.canvasH = canvas.canvasH;
+      next.canvasFps = canvas.canvasFps;
+      next.canvasPresetId = canvas.canvasPresetId;
+      next.stageMode = canvas.stageMode;
+    }
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       // #103 Track B — bound on the apply path too; the live loop resolves
       // every layer per frame.
