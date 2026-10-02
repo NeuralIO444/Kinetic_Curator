@@ -305,6 +305,19 @@ export const COMPOSITION_PRESETS = [
       particleCount: 200, metabolism: 0.8, breath: 0.3, graze: 0,
     },
   },
+  { // #834 — LIVING REEF showcases the DLA growth organism (#720): the aggregate
+    // crystallizes Haeckel corals from a seed while the trail becomes the artwork.
+    // Growth knobs ride along so the mode-gated sliders wake up with the look.
+    id: 'bio-reef', name: 'LIVING REEF', group: 'bio',
+    desc: 'Living reef — DLA growth crystallizes coral arms from a seed; the trail is the artwork. Pair with TIDEPOOL.',
+    categories: ['organic', 'radial'], paletteShift: 'band',
+    params: {
+      mode: 'dla', count: 200, scale: [0.35, 1.1], rotate: [-45, 45], alpha: [45, 95],
+      zTiers: 4, jitter: 10, density: 88, bleed: true, mirror: false, overlap: true,
+      lifeDrift: 0.12, noiseSpeed: 0.2, displacement: 10, behave: 'cruise',
+      growthRate: 4, growthBranch: 0.85,
+    },
+  },
   {
     id: 'bio-plate-litho', name: 'PLATE · LITHO', group: 'bio',
     desc: 'Specimen plate — Haeckel bodies pinned on a grid. Pair with LITHOGRAPH and watch the trails fall to the paper.',

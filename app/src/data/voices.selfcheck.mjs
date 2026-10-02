@@ -71,7 +71,7 @@ assert.ok(MODE_IDS.includes('murmuration'), 'murmuration is a real mode id');
 assert.strictEqual(murm.params.paletteShift, 'split');
 assert.ok(murm.blendSeconds >= 10, 'ten-second dissolves');
 
-assert.strictEqual(STUB_VOICES.length, 12);
+assert.strictEqual(STUB_VOICES.length, 14); // #834: +dla, +eden growth tiles
 for (const stub of STUB_VOICES) {
   assert.ok(MODE_IDS.includes(stub.id), `stub ${stub.id} is a real mode`);
   assert.ok(!isFlagshipVoiceId(stub.id), `stub ${stub.id} is not a flagship`);
