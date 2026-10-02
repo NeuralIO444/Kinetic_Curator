@@ -169,13 +169,13 @@ for (let i = 0; i <= 20; i++) {
   assert.strictEqual(mix.kind, 'mix');
 }
 
-// Spine E: Behave / assets change triggers dissolve wipe.
+// #722: a behave change eases the verb. It does not dissolve the canvas.
 {
   const m = createPaletteMix();
   m.update(base({ canDissolve: false, now: 0, mode: 'swarm', behave: 'cruise' }));
   const ev = m.update(base({ now: 1000, mode: 'swarm', behave: 'wander' }));
-  assert.strictEqual(ev.kind, 'start');
-  assert.strictEqual(m.isDissolving(), true);
+  assert.notStrictEqual(ev.kind, 'start');
+  assert.strictEqual(m.isDissolving(), false);
 }
 
 // Spine E: Manual scrubT drives dissolve directly.

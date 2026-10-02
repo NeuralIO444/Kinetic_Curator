@@ -27,6 +27,7 @@
  */
 
 import { createNoise } from './noise.js';
+import { blendBehave, BEHAVE_EASE_MS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
@@ -269,6 +270,7 @@ export class ParticleSystem {
   }
 
   init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null, opts = {}) {
+    this._behaveEase = null;
     this.canvasW = canvasW;
     this.canvasH = canvasH;
     // #818 — one climate. seedOffsets.noise is a domain offset applied at
@@ -789,7 +791,18 @@ export class ParticleSystem {
     // #479 Option B — table row + any per-layer overrides, shared with the
     // DAVIS readout/editor via resolveEffectiveBehave() so the two can
     // never disagree on what "effective" means.
-    const profile = organism ? resolveEffectiveBehave(layoutParams) : null;
+    const rawProfile = organism ? resolveEffectiveBehave(layoutParams) : null;
+    // #722 — ease the verb row over ~1s. Retarget from the current blend.
+    let profile = rawProfile;
+    if (organism && rawProfile) {
+      const id = layoutParams.behave || 'cruise';
+      if (!this._behaveEase || this._behaveEase.id !== id) {
+        const from = this._behaveEase ? blendBehave(this._behaveEase.from, this._behaveEase.to, Math.min(1, (time - this._behaveEase.start) / BEHAVE_EASE_MS)) : rawProfile;
+        this._behaveEase = { id, from, to: rawProfile, start: time };
+      }
+      const t = (time - this._behaveEase.start) / BEHAVE_EASE_MS;
+      profile = t >= 1 || id === 'lorenz' ? rawProfile : blendBehave(this._behaveEase.from, this._behaveEase.to, t);
+    }
     // #287 — the scent field exists only for organism casts (drives,
     // chemotaxis, and feeding all read it). Created lazily so cloud-mode
     // sessions never pay for it; persists across init() calls.

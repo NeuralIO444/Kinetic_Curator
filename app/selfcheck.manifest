@@ -10,6 +10,7 @@ node src/hooks/useLoopCapture.selfcheck.mjs
 node src/hooks/batchGate.selfcheck.mjs
 node src/panels/pipeline/SnapshotGallery.selfcheck.mjs
 node src/panels/pipeline/paletteImportCopy.selfcheck.mjs
+node src/panels/pipeline/pipelineNotices.selfcheck.mjs
 node src/hooks/useMediaExport.selfcheck.mjs
 node src/hooks/governorCuts.selfcheck.mjs
 node src/hooks/governorHostileScene.selfcheck.mjs
@@ -172,3 +173,5 @@ node src/gl/nodePhase.selfcheck.mjs
 node src/data/light.pool.selfcheck.mjs
 node src/gl/shapeDither.selfcheck.mjs
 node src/gl/trailMode.selfcheck.mjs
+node src/engine/organisms/behaveEase.selfcheck.mjs
+node src/panels/pipeline/thumbnail.selfcheck.mjs
