@@ -896,6 +896,20 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         return;
       }
 
+      // #823 — a governor cut6/watchdog freeze holds the loop clock: roll
+      // the tick's advance back exactly like the paused path, so every
+      // loopTimeMs reader (kineme, palette mix, wash/inject, parallax,
+      // noise, the App.jsx mirror) sees a held clock and nothing lump-sums
+      // on thaw. The per-consumer pins (#474 warp, #808 accumulator re-arm)
+      // stay as defense in depth; the clock simply never walks under them
+      // now. Life clocks (loopLifeT, ballistics, breath) keep integrating —
+      // they step continuously in small dtSec increments, so there is no
+      // thaw jump to defend against there, and audio keeps flowing through
+      // a GPU freeze.
+      if (getState().slowRender) {
+        loopTimeMs -= clampedDtMs;
+      }
+
       if (wrapEl) {
         wrapEl.style.boxShadow = glow > 0.02
           ? `0 0 ${Math.round(90 * glow)}px ${Math.round(18 * glow)}px rgba(255,255,255,${(0.10 * glow).toFixed(3)})`
