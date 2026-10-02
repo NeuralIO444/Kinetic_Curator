@@ -115,13 +115,26 @@ export function wasmForcedOff() {
 }
 
 /**
+ * #814 — the one detector for "contacts ≠ default". The contact pass in
+ * ParticleSystem.update() is gated solely on contactRadius > 0: a
+ * non-default mode / repel / restitution with radius 0 is inert (the pass
+ * is skipped and the swarm is bit-identical to the pre-contact engine),
+ * so radius is the honest activation signal. The wasm fast path has no
+ * contact solver, so an active contact config refuses the fast path
+ * rather than rendering a contact-less flock.
+ */
+export function contactsActive(layoutParams = {}) {
+  return (layoutParams.contactRadius ?? 0) > 0;
+}
+
+/**
  * Scope gate: can this bake config run on the wasm fast path?
  * Returns { ok:true } or { ok:false, reason }.
  */
 export function wasmBakeEligible({ layoutParams = {}, attractor = null, count = 0 } = {}) {
   if (!Number.isFinite(count) || count <= 0) return { ok: false, reason: 'empty' };
   if (isOrganismMode(layoutParams.mode)) return { ok: false, reason: 'organism-mode' };
-  if ((layoutParams.contactRadius ?? 0) > 0) return { ok: false, reason: 'contacts' };
+  if (contactsActive(layoutParams)) return { ok: false, reason: 'contacts' };
   // #287 — the wasm cloud path doesn't implement the breathing scale
   // modulation; fall back to the JS engine when breath is on.
   if ((layoutParams.breath ?? 0) > 0) return { ok: false, reason: 'breath' };
