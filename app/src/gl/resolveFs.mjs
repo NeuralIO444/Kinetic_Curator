@@ -9,6 +9,7 @@ uniform sampler2D u_src;
 uniform float u_aces;      // 0 = clamp-only bypass (PR1)
 uniform float u_exposure;  // default 1.0
 uniform float u_dither;    // 0 = off; PR2 ~0.5/255
+uniform float u_shape;     // #706 cell size in px. 0 = off
 uniform float u_fxaa;      // #740 PR1 probe: 0 = bypass (pixel-identical), >=0.5 = FXAA
 uniform vec2 u_weave;      // #741 gate weave: sample-position offset in output px; (0,0) = byte-identical
 uniform vec4 u_fake;       // x contact, y wrap, z shoulder. 0 = off
@@ -80,7 +81,7 @@ void main() {
   // #741: whole-frame sub-pixel drift. x + 0.0 == x, so (0,0) changes nothing.
   vec2 suv = vec2(v_cuv.x, 1.0 - v_cuv.y) + u_weave / vec2(textureSize(u_src, 0));
   vec4 s = texture(u_src, suv);
-  if (u_aces < 0.5 && u_dither < 1e-8 && u_fxaa < 0.5) {
+  if (u_aces < 0.5 && u_dither < 1e-8 && u_fxaa < 0.5 && u_shape < 0.5) {
     o = clamp(s, 0.0, 1.0);
     return;
   }
@@ -108,6 +109,17 @@ void main() {
     vec4 f = fxaa(suv, 1.0 / vec2(textureSize(u_src, 0)));
     c = unpre(f.rgb, f.a);
     a = f.a;
+  }
+  if (u_shape >= 0.5) {
+    vec2 px = vec2(textureSize(u_src, 0));
+    vec2 cell = floor(gl_FragCoord.xy / u_shape);
+    vec2 center = (cell + 0.5) * u_shape;
+    vec2 sampleUv = vec2(center.x / px.x, 1.0 - center.y / px.y);
+    vec4 tap = texture(u_src, sampleUv);
+    float luma = dot(tap.rgb, vec3(0.299, 0.587, 0.114));
+    float radius = (1.0 - clamp(luma, 0.0, 1.0)) * u_shape * 0.5;
+    float d = length(gl_FragCoord.xy - center);
+    if (d < radius) c = mix(c, vec3(0.08, 0.05, 0.03), 0.85);
   }
   if (u_dither > 1e-8) {
     float b = bayer4(gl_FragCoord.xy) - 0.5;
