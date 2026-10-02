@@ -23,6 +23,7 @@ import {
   VOICE_SWATCH_COUNT,
 } from '../../data/voices.js';
 import { pushToUndo } from '../history.js';
+import { loopClock } from '../../gl/loopClock.js';
 
 export const USER_VOICES_KEY = 'kc:user-voices:v1';
 export const MAX_USER_VOICES = 12;
@@ -169,7 +170,9 @@ export const createVoiceSlice = (set) => ({
         t: 0,
         durationMs,
         auto: true,
-        startedAt: performance.now(),
+        // #806: MIX dissolve is a must-loop performer — stamp in loop ms
+        // (useVoiceMixDriver reads loopClock.ms), never wall clock.
+        startedAt: loopClock.ms,
         targetVoiceId: voiceId,
         targetName: def.displayName || def.name || voiceId,
       },
@@ -204,7 +207,9 @@ export const createVoiceSlice = (set) => ({
     const mix = state.voiceMix;
     if (!mix || mix.auto) return {};
     return {
-      voiceMix: { ...mix, auto: true, startedAt: performance.now() - mix.t * mix.durationMs },
+      // #806: MIX dissolve is a must-loop performer — re-anchor in loop ms,
+      // preserving the scrubbed position, never wall clock.
+      voiceMix: { ...mix, auto: true, startedAt: loopClock.ms - mix.t * mix.durationMs },
     };
   }),
 
