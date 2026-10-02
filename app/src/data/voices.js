@@ -362,6 +362,12 @@ export const STUB_VOICES = [
   { id: 'abacus',     name: 'abacus',    glyph: 'abacus', vibe: 'Counting House: beads on wires. Arithmetic made visible.',
     assets: ['geo_hex_02', 'stamp_glyph_01', 'stamp_num_01', 'geo_circle_01'],
   },
+  { id: 'dla',        name: 'DLA growth', glyph: 'coral',  vibe: 'Coral Reef: wandering particles stick and crystallize — dendritic arms bloom from a seed. Living geology.', // #834
+    assets: ['hae_coral_01', 'hae_mycelium_01', 'hae_tendril_01', 'hae_fern_01'],
+  },
+  { id: 'eden',       name: 'Eden growth', glyph: 'bloom', vibe: 'Eden Garden: cells divide outward from a seed — a compact blob breathes into being. Soft biology.', // #834
+    assets: ['org_blob_01', 'org_blob_02', 'hae_sponge_01', 'dot_field_01'],
+  },
 ];
 
 /**

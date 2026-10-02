@@ -140,6 +140,7 @@ node src/gl/mlx/mlxExport.selfcheck.mjs
 node scripts/checkSemanticGoldens.mjs
 node scripts/predictCostTier.mjs
 node src/data/voices.selfcheck.mjs
+node src/data/growthTiles.selfcheck.mjs
 node src/state/voiceSlice.selfcheck.mjs
 node src/state/fxaa.selfcheck.mjs
 node src/data/light.selfcheck.mjs

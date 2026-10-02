@@ -14,7 +14,7 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 const S = () => useStore.getState();
 const set = (id) => SHAPE_SETS.find((x) => x.id === id);
 const [A, B, C, D, E] = MIXABLE_SHAPE_IDS;
-assert.strictEqual(MIXABLE_SHAPE_IDS.length, 12, 'the twelve layout-costume chips');
+assert.strictEqual(MIXABLE_SHAPE_IDS.length, 14, 'the fourteen layout-costume chips'); // #834: +dla, +eden
 assert.strictEqual(SHAPE_MIX_MAX, 4);
 
 // ── weights: normalize to 1; set-level lean is level : level ─────────────
