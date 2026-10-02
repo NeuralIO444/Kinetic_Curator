@@ -20,6 +20,7 @@ import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, getKineme } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
+import { sanitizeMidiMap } from '../../midi/map.mjs';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -574,6 +575,7 @@ export const createGlobalSlice = (set) => ({
       next.canvasPresetId = canvas.canvasPresetId;
       next.stageMode = canvas.stageMode;
     }
+    next.midiMap = sanitizeMidiMap(doc.midiMap); // #617 — a doc without mappings maps nothing
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       // #103 Track B — bound on the apply path too; the live loop resolves
       // every layer per frame.

@@ -19,8 +19,13 @@ export default defineConfig({
   // project chain, each depending on the one before it, after everything else.
   // Everything else keeps its parallelism.
   projects: [
-    { name: 'app', testIgnore: /(accum-recording|loop-capture)\.spec\.js/ },
-    { name: 'rec-accum', testMatch: /accum-recording\.spec\.js/, dependencies: ['app'] },
+    { name: 'app', testIgnore: /(accum-recording|loop-capture|midi)\.spec\.js/ },
+    // The MIDI boot seeds a whole project (autoQuality off, accumulation on,
+    // 40 nodes): software GL renders it at full cost, so beside the other
+    // workers it starves and its boot eats a whole test timeout. It takes the
+    // chain after app, one group at a time, like the recording specs.
+    { name: 'midi', testMatch: /midi\.spec\.js/, dependencies: ['app'] },
+    { name: 'rec-accum', testMatch: /accum-recording\.spec\.js/, dependencies: ['midi'] },
     { name: 'rec-loop', testMatch: /loop-capture\.spec\.js/, dependencies: ['rec-accum'] },
   ],
   webServer: {

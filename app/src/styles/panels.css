@@ -270,6 +270,19 @@
 .davis-progress-cell i, .davis-phrase-status i { font-style: normal; font-size: 8px; letter-spacing: 0.1em; color: var(--dim); }
 .davis-progress-cell b, .davis-phrase-status b { font-weight: 400; color: var(--ink); }
 .davis-progress.running { border-color: var(--ink); }
+/* #617 MIDI */
+.davis-midi { display: flex; flex-direction: column; gap: 3px; padding: 4px 6px; border: 1px solid var(--line); font-size: 9px; }
+.davis-midi-head { display: flex; justify-content: space-between; align-items: center; }
+.davis-midi-head i { font-style: normal; font-size: 8px; letter-spacing: 0.1em; color: var(--dim); }
+.davis-midi-status.ok { color: var(--ink); }
+.davis-midi-status.idle { color: var(--dim); }
+.davis-midi-status.warn, .davis-midi-note.warn { color: var(--ink); border-left: 2px solid var(--accent); padding-left: 4px; }
+.davis-midi-status.bad, .davis-midi-note.bad { color: var(--ink); border-left: 2px solid var(--accent); padding-left: 4px; }
+.davis-midi-note { color: var(--dim); }
+.davis-midi-last { color: var(--dim); font-variant-numeric: tabular-nums; }
+.davis-midi-map { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.davis-midi-map li { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+.davis-midi-map code { color: var(--dim); font-size: 8px; }
 .davis-phrase-status { display: flex; justify-content: space-between; padding: 3px 6px; border: 1px solid var(--line); font-size: 9px; }
 
 /* #479 — BEHAVE steering-weight editor: resolved values, editable per
