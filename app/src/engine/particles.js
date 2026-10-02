@@ -27,7 +27,7 @@
  */
 
 import { createNoise } from './noise.js';
-import { CH, hashU01, rngForIndex, noiseSeedFor } from './kernel/rng.js';
+import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
 import {
@@ -271,9 +271,9 @@ export class ParticleSystem {
   init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null, opts = {}) {
     this.canvasW = canvasW;
     this.canvasH = canvasH;
-    // #305 — zero offsets → exactly the old `seed || 444`; a noise offset
-    // re-rolls the flow field while the other streams stay locked.
-    this._noiseSeed = noiseSeedFor(seed, seedOffsets);
+    // #818 — one climate. seedOffsets.noise is a domain offset applied at
+    // sample time, not a second createNoise. Zero offset stays seed || 444.
+    this._noiseSeed = seed || 444;
     this._noise = createNoise(this._noiseSeed);
     if (!activeAssets || activeAssets.length === 0) {
       this.n = 0;
@@ -739,14 +739,13 @@ export class ParticleSystem {
       this.n = targetCap;
       this._authoredCount = targetCap;
     }
-    // #305 — a mutated noise offset re-rolls the flow field live; otherwise
-    // the field is created once (same identity as the old `seed || 444`).
-    // Spine F (#392): injected shared world noise from resolver.
+    // #818 — injected world noise is the owner. The fallback is the same
+    // climate (seed || 444). A noise offset shifts the sample, below.
     if (layoutParams.noise) {
       this._noise = layoutParams.noise;
       this._noiseSeed = null;
     } else {
-      const ns = noiseSeedFor(seed, seedOffsets);
+      const ns = seed || 444;
       if (!this._noise || this._noiseSeed !== ns) {
         this._noise = createNoise(ns);
         this._noiseSeed = ns;
