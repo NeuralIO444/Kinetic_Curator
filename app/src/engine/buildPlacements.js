@@ -21,6 +21,8 @@ import { assignColor, resolveStrategy } from './kernel/color/index.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
+import { getBiologyPolicy } from '../biology/policy.js';
+import { fadeForAge } from '../biology/lifecycle.js';
 import {
   pickWeightedIndexStable,
 } from './kernel/rng.js';
@@ -154,6 +156,18 @@ export function buildPlacements({
   // Spine E: float count fades the spawning/dying point's alpha
   if (countFrac > 0.001 && soa.n > 0) {
     soa.alpha[soa.n - 1] *= countFrac;
+  }
+  // #793 — biology: old growth fades. The sampler's `t` is the cell's age01;
+  // the policy maps it through GrowthHooks.fadeWeight into the per-item alpha
+  // channel stage C already owns. Growth modes bust the geometry cache every
+  // frame (growthTick is in the signature), so this recomputes honestly and
+  // the render path is untouched. Young cells are always being born
+  // (cellsPerTick floors at 1), so the form never goes fully dark.
+  if ((layoutParams.mode === 'dla' || layoutParams.mode === 'eden') && soa.t) {
+    const fade = getBiologyPolicy().growth;
+    for (let k = 0; k < soa.n; k++) {
+      soa.alpha[k] *= fadeForAge(soa.t[k], fade);
+    }
   }
 
   // ── Stage D+E: asset bind + colour. Both are functions of (seed, index)
