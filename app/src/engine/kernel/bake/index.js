@@ -25,17 +25,24 @@
 // live loop would show after N steps from the same seed.
 
 import { ParticleSystem } from '../../particles.js';
-import { ensureSwarmWasm, getSwarmWasm, runSwarmWasm, resolveWasmParams, wasmBakeEligible, wasmForcedOff } from './swarmWasm.mjs';
+import { ensureSwarmWasm, getSwarmWasm, runSwarmWasm, resolveWasmParams, wasmBakeEligible, wasmForcedOff, contactsActive } from './swarmWasm.mjs';
 import { noiseSeedFor } from '../rng.js';
 
 // Re-exported so the studio render path can preload the wasm fast path
 // without importing the loader module directly.
 export { ensureSwarmWasm };
 
-/** #814 — contacts bake on the JS integrator. WASM must refuse. */
+/**
+ * #814 — contacts bake policy: the live gate for "bake the state or refuse
+ * the still". Contacts are live-only (JS `_contactPass` in particles.js;
+ * the wasm module has no contact solver), so a contact-active config bakes
+ * on the JS integrator — bit-for-bit with the live ticks — and the wasm
+ * fast path refuses it (reason 'contacts') rather than rendering a
+ * contact-less flock. `bakeParticles` consults this before attempting the
+ * wasm path, so the policy is the decision, not a comment.
+ */
 export function contactsBakePolicy(layoutParams = {}) {
-  const radius = layoutParams.contactRadius ?? 0;
-  if (!(radius > 0)) return { contacts: false, engine: 'auto' };
+  if (!contactsActive(layoutParams)) return { contacts: false, engine: 'auto' };
   return { contacts: true, engine: 'js', reason: 'contacts' };
 }
 
@@ -101,8 +108,16 @@ export function bakeParticles({
 
   // #175 — Rust/wasm fast path. Opt-in at the call site via ensureSwarmWasm()
   // preload; scope-gated to the cloud path the wasm module implements.
+  // #814 — the contacts policy gates first: a contact-active config bakes
+  // on the JS integrator below (bit-for-bit with the live ticks); the wasm
+  // path refuses it rather than rendering a contact-less flock. Forcing
+  // engine:'wasm' on such a config throws honestly — no silent fallback.
+  const policy = contactsBakePolicy(params);
+  if (engine === 'wasm' && policy.engine === 'js') {
+    throw new Error(`bakeParticles: engine "wasm" cannot bake this config (${policy.reason})`);
+  }
   let ranWasm = false;
-  if (!wasmForcedOff() && engine !== 'js') {
+  if (!wasmForcedOff() && engine !== 'js' && policy.engine !== 'js') {
     const gate = wasmBakeEligible({ layoutParams: params, attractor, count: sys.n });
     if (engine === 'wasm' && !gate.ok) {
       throw new Error(`bakeParticles: engine "wasm" cannot bake this config (${gate.reason})`);
