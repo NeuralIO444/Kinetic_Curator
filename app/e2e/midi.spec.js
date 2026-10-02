@@ -60,6 +60,11 @@ async function enable(midi) {
 }
 
 test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
+  // This runner paints on software GL at ~5-7.5x the cost of a GPU machine
+  // (cache-verify: 7.5s under local emulation, 56.1s on CI). The body below
+  // measures 11.5s emulated — 60-86s on the runner, over the default 60.
+  // The other two tests are a third of its steps and stay on the default.
+  test.setTimeout(180_000);
   const midi = await boot(page);
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI off', { timeout: 3_000 });
   await expect(midi.locator('.davis-midi-map li')).toHaveCount(3, { timeout: 3_000 });
