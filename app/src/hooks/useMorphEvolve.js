@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
+import { loopClock } from '../gl/loopClock.js';
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
@@ -38,8 +39,13 @@ export function useMorphEvolve() {
   useEffect(() => {
     if (!morphing || !morphFrom || !morphTo) return;
 
-    const tick = (now) => {
-      const elapsed = now - morphStart;
+    // #806: morph is a must-loop performer — ease off the loop clock, not
+    // the rAF wall timestamp, so a freeze/pause holds the morph instead of
+    // completing it invisibly. loopClock.ms <= 0 means "not observed yet":
+    // treat as t=0 rather than a stamp.
+    const tick = () => {
+      const nowMs = loopClock.ms > 0 ? loopClock.ms : morphStart;
+      const elapsed = Math.max(0, nowMs - morphStart);
       const t = Math.min(1, elapsed / Math.max(1, morphDurationMs));
       // ease-in-out cubic
       const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;

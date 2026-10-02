@@ -12,6 +12,7 @@ import { FEEL_PRESETS } from '../../data/feels.js';
 import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS, SHAPE_MIX_MAX, MIXABLE_SHAPE_IDS, liveShapeLevels, shapeMixIds } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
+import { loopClock } from '../../gl/loopClock.js';
 
 /**
  * Open a MIX toward `merged` layout params (#284 morph-don't-cut). Live state
@@ -43,7 +44,9 @@ function openParamsMix(state, merged, { name }) {
       t: 0,
       durationMs: Math.max(200, (to.blendSeconds || 2) * 1000),
       auto: true,
-      startedAt: performance.now(),
+      // #806: MIX dissolve is a must-loop performer — stamp in loop ms
+      // (useVoiceMixDriver reads loopClock.ms), never wall clock.
+      startedAt: loopClock.ms,
       targetVoiceId: null,
       targetName: name,
     },

@@ -6,6 +6,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state/store.js';
+import { loopClock } from '../gl/loopClock.js';
 
 export function useVoiceMixDriver() {
   useEffect(() => {
@@ -15,7 +16,11 @@ export function useVoiceMixDriver() {
       const s = useStore.getState();
       const mix = s.voiceMix;
       if (!mix || !mix.auto) return;
-      const t = Math.min(1, (performance.now() - mix.startedAt) / mix.durationMs);
+      // #806: MIX dissolve is a must-loop performer — advance off the loop
+      // clock, not wall clock, so a freeze/pause holds the dissolve instead
+      // of completing it invisibly. Unobserved clock (<= 0) holds at t=0.
+      const nowMs = loopClock.ms > 0 ? loopClock.ms : mix.startedAt;
+      const t = Math.min(1, Math.max(0, nowMs - mix.startedAt) / mix.durationMs);
       if (t >= 1) {
         // commitVoiceMix is a plain store action — no setState-in-effect.
         s.commitVoiceMix();

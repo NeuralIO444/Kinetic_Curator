@@ -281,7 +281,9 @@ export const createDavisSlice = (set) => ({
           morphing: true,
           morphFrom: from,
           morphTo: to,
-          morphStart: performance.now(),
+          // #806: morph easing is a must-loop performer — stamp in loop ms
+          // (useMorphEvolve reads loopClock.ms), never wall clock.
+          morphStart: loopClock.ms,
           morphPendingSeed: null,
           morphPendingSeedOffsets: null,
           morphPendingPalette: null,
@@ -376,7 +378,9 @@ export const createDavisSlice = (set) => ({
       morphing: true,
       morphFrom: from,
       morphTo: to,
-      morphStart: performance.now(),
+      // #806: morph easing is a must-loop performer — stamp in loop ms
+      // (useMorphEvolve reads loopClock.ms), never wall clock.
+      morphStart: loopClock.ms,
       morphPendingSeed: fav.seed,
       morphPendingSeedOffsets: favOffsets,
       morphPendingPalette: fav.config?.palette.id || null,
