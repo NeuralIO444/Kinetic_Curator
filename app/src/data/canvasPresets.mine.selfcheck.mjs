@@ -8,4 +8,7 @@ test('#606 a saved preset keeps a label and a size', () => {
   assert.equal(list[0].label, 'Booth');
   assert.equal(list[0].w, 512);
   assert.equal(list[0].group, 'Mine');
+  const renamed = sanitizeUserPresets([{ ...list[0], label: 'Lobby' }]);
+  assert.equal(renamed[0].label, 'Lobby');
+  assert.equal(renamed[0].w, 512);
 });
