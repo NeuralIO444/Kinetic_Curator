@@ -233,7 +233,7 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
 /* ------------------------------------------------------------------ */
 
 const F = { kind: 'float' };
-const RESOLVE_DECLS = { u_src: S(0), u_aces: F, u_exposure: F, u_dither: F, u_fxaa: F, u_weave: { kind: 'vec2' }, u_fake: { kind: 'vec4' }, u_light: { kind: 'vec2' } };
+const RESOLVE_DECLS = { u_src: S(0), u_aces: F, u_exposure: F, u_dither: F, u_fxaa: F, u_weave: { kind: 'vec2' }, u_fake: { kind: 'vec4' }, u_light: { kind: 'vec2' }, u_shape: F };
 
 /** Uniform values match resolveBind.mjs's production defaults (aces 1, dither 1/255). */
 function resolveDef(id, fxaa) {
@@ -261,6 +261,7 @@ function resolveDef(id, fxaa) {
             u_weave: c.params.weave ?? [0, 0],
             u_fake: [0, 0, 0, 0],
             u_light: [0.4, 0.7],
+            u_shape: 0,
           });
         },
         dispose: () => gl.deleteProgram(program),
