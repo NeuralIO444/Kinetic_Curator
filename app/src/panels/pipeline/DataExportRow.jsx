@@ -4,7 +4,7 @@ import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
 import {
   confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
-  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
+  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, shouldExportOnKey,
 } from './pipelineNotices.mjs';
 import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
@@ -50,9 +50,7 @@ export function DataExportRow({
 
   useEffect(() => {
     const onKey = (ev) => {
-      if (ev.key !== 'e' || ev.metaKey || ev.ctrlKey || ev.altKey) return;
-      const tag = ev.target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || ev.target?.isContentEditable) return;
+      if (!shouldExportOnKey(ev)) return;
       ev.preventDefault();
       exportProject();
     };

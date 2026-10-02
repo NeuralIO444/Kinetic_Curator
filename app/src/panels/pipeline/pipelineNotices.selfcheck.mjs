@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
-  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
+  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, shouldExportOnKey,
 } from './pipelineNotices.mjs';
 
 test('#647 import confirms before replace', () => {
@@ -41,4 +41,11 @@ test('#648 dirty when live payload differs', () => {
   assert.equal(dirtyMessage(null, 'live'), null);
   assert.equal(dirtyMessage('same', 'same'), null);
   assert.match(dirtyMessage('old', 'live'), /behind/);
+});
+
+test('#652 X exports, E stays Evolve', () => {
+  assert.equal(shouldExportOnKey({ key: 'x' }), true);
+  assert.equal(shouldExportOnKey({ key: 'e' }), false);
+  assert.equal(shouldExportOnKey({ key: 'x', target: { tagName: 'INPUT' } }), false);
+  assert.equal(shouldExportOnKey({ key: 'x', metaKey: true }), false);
 });

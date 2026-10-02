@@ -60,3 +60,11 @@ export function dirtyMessage(exported, live) {
   if (!exported) return null;
   return exported === live ? null : 'Export is behind the live piece';
 }
+
+export function shouldExportOnKey(ev) {
+  // E is Evolve. Export is X, and only when you are not typing.
+  if (!ev || ev.key !== 'x' || ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey || ev.repeat) return false;
+  const tag = ev.target?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || ev.target?.isContentEditable) return false;
+  return true;
+}
