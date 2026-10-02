@@ -168,3 +168,4 @@ node qa/units.selfcheck.mjs
 node qa/trio.selfcheck.mjs
 node src/dev/unitMaker.selfcheck.mjs
 node src/gl/nodePhase.selfcheck.mjs
+node src/gl/trailMode.selfcheck.mjs
