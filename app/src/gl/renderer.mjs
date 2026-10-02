@@ -210,7 +210,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_kineme', 'u_kinemeTime'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -479,6 +479,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform4f(U(quadProg, 'u_sunLight'), sun ? sun.color[0] : 1, sun ? sun.color[1] : 1, sun ? sun.color[2] : 1, sun ? sun.intensity : 0);
     gl.uniform1f(U(quadProg, 'u_ambient'), sun ? sun.ambient : 1);
     gl.uniform2f(U(quadProg, 'u_sunMat'), sun ? sun.bevel : 0, sun ? sun.spec : 0); // #594 PR2
+    gl.uniform1f(U(quadProg, 'u_pool'), sun ? sun.pool || 0 : 0);
     // #781 KINEME: (kind, period, amp) per slot; untouched slots stay 0 (unused).
     kinemeBuf.fill(0);
     if (kinemeTable) kinemeTable.slice(0, 16).forEach((k, i) => { kinemeBuf[i * 3] = k.kind; kinemeBuf[i * 3 + 1] = k.period; kinemeBuf[i * 3 + 2] = k.amp; });
