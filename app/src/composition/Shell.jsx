@@ -2,6 +2,11 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { panelsByZone } from './PanelRegistry.js';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { DrawerOverlay } from '../components/DrawerOverlay.jsx';
+import { useStore } from '../state/store.js';
+import { downloadProject } from '../state/projectDocument.js';
+import { buildProjectPayload } from '../hooks/useProjectPayload.js';
+import { shouldExportOnKey, exportFilename, exportSavedMessage } from '../panels/pipeline/pipelineNotices.mjs';
+import { attachThumbnail } from '../panels/pipeline/thumbnail.mjs';
 
 const TAB_STORAGE_KEY = 'kc:active-panel-tab';
 
@@ -82,6 +87,15 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       requestDevTab('units');
       setActiveTab('dev');
     };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onUnits);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onUnits);
+    };
+  }, [secondary]);
+
+  useEffect(() => {
     const onExport = (ev) => {
       if (!shouldExportOnKey(ev)) return;
       ev.preventDefault();
@@ -94,15 +108,9 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       downloadProject(payload, exportFilename(payload));
       s.setStatus?.(exportSavedMessage(exportFilename(payload)));
     };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('keydown', onUnits);
     window.addEventListener('keydown', onExport);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('keydown', onUnits);
-      window.removeEventListener('keydown', onExport);
-    };
-  }, [secondary]);
+    return () => window.removeEventListener('keydown', onExport);
+  }, []);
 
   return (
     <div className="grid" ref={containerRef} style={{ gridTemplateColumns: gridTemplate }}>
