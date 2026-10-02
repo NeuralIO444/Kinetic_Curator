@@ -11,6 +11,8 @@ uniform float u_exposure;  // default 1.0
 uniform float u_dither;    // 0 = off; PR2 ~0.5/255
 uniform float u_fxaa;      // #740 PR1 probe: 0 = bypass (pixel-identical), >=0.5 = FXAA
 uniform vec2 u_weave;      // #741 gate weave: sample-position offset in output px; (0,0) = byte-identical
+uniform vec4 u_fake;       // x contact, y wrap, z shoulder. 0 = off
+uniform vec2 u_light;      // sun direction in UV
 in vec2 v_cuv;
 out vec4 o;
 
@@ -83,6 +85,22 @@ void main() {
     return;
   }
   vec3 c = unpre(s.rgb, s.a) * max(u_exposure, 0.0);
+  if (u_fake.x > 0.0 || u_fake.y > 0.0 || u_fake.z > 0.0) {
+    vec2 px = 1.0 / vec2(textureSize(u_src, 0));
+    vec2 dir = length(u_light) > 1e-4 ? normalize(u_light) : vec2(0.4, 0.7);
+    if (u_fake.x > 0.0) {
+      float occ = texture(u_src, suv - dir * 6.0 * px).a;
+      c *= 1.0 - u_fake.x * occ * 0.45;
+    }
+    if (u_fake.y > 0.0) {
+      float luma = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(c, mix(vec3(0.16, 0.08, 0.05), c, clamp(luma, 0.0, 1.0)), u_fake.y);
+    }
+    if (u_fake.z > 0.0) {
+      float luma = dot(c, vec3(0.299, 0.587, 0.114));
+      c += u_fake.z * pow(clamp(luma, 0.0, 1.0), 8.0) * vec3(1.0, 0.92, 0.8);
+    }
+  }
   if (u_aces >= 0.5) c = acesNarkowicz(c);
   float a = s.a;
   // #740: between tonemap and dither — dither stays the last thing to touch pixels.
