@@ -9,6 +9,7 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { startRun, tickRun, finishRun, secPerGen } from './evolveProgress.js';
+import { loopClock } from '../gl/loopClock.js';
 import { useStore } from '../state/store.js';
 
 // ── A ────────────────────────────────────────────────────────────────────
@@ -28,11 +29,14 @@ import { useStore } from '../state/store.js';
 // ── B ────────────────────────────────────────────────────────────────────
 {
   const S = () => useStore.getState();
+  // #808: the evolve stamp is loop time, not wall time — simulate an
+  // observed loop clock so the stamps land on it.
+  loopClock.ms = 42000;
   useStore.setState({ evolveMode: false, evolveRun: null, evolveLast: null, evolveSeen: 0, evolveTarget: 'seed', lastEvolveTs: 0 });
   const seed0 = S().seed;
   S().triggerEvolve(); // manual tick while stopped
   assert.strictEqual(S().seed, (seed0 + 1) % 1000000, 'the evolve step is unchanged: the seed steps');
-  assert.ok(S().lastEvolveTs > 0, 'and stamps lastEvolveTs');
+  assert.strictEqual(S().lastEvolveTs, 42000, 'and stamps lastEvolveTs with the loop clock');
   assert.strictEqual(S().evolveSeen, 1, 'a manual tick is a candidate seen');
   assert.strictEqual(S().evolveRun, null, 'but not a generation: there is no run');
 

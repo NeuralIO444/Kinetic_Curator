@@ -73,6 +73,7 @@ node src/engine/particles.uniqueness.selfcheck.mjs
 node src/engine/swarm.inventory.selfcheck.mjs
 node src/gl/clock.inventory.selfcheck.mjs
 node src/gl/clock.evolve.selfcheck.mjs
+node src/gl/clock.evolve-accum.selfcheck.mjs
 node src/gl/clock.workerDt.selfcheck.mjs
 node src/gl/clock.capture.selfcheck.mjs
 node src/gl/accum.inventory.selfcheck.mjs

@@ -1,4 +1,5 @@
 import { startRun, tickRun, finishRun } from '../../data/evolveProgress.js';
+import { loopClock } from '../../gl/loopClock.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { generateLayoutTargets, MORPHABLE_KEYS, PALETTE_IDS } from '../paramUtils.js';
 import { genId } from '../id.js';
@@ -109,7 +110,9 @@ function withEvolveStats(state, update) {
   if (!update || !Object.keys(update).length) return update;
   return {
     ...update,
-    evolveRun: state.evolveMode ? tickRun(state.evolveRun, update.lastEvolveTs || Date.now()) : state.evolveRun,
+    // #808: the run stamp rides the same loop clock as lastEvolveTs — a
+    // Date.now() fallback here would mix clocks and break secPerGen.
+    evolveRun: state.evolveMode ? tickRun(state.evolveRun, update.lastEvolveTs ?? loopClock.ms) : state.evolveRun,
     evolveSeen: (state.evolveSeen || 0) + 1,
   };
 }
@@ -159,7 +162,9 @@ export const createDavisSlice = (set) => ({
   setEvolveMode: (valOrFn) => set((state) => {
     const next = !!(typeof valOrFn === 'function' ? valOrFn(state.evolveMode) : valOrFn);
     if (next === !!state.evolveMode) return { evolveMode: next };
-    const now = Date.now();
+    // #808: run timing is loop time, not wall — the HUD cadence (secPerGen)
+    // reads the real cadence, and the ticks land on the same clock.
+    const now = loopClock.ms;
     // #616: start a fresh run on EVOLVE, keep a summary when it stops.
     return next
       ? { evolveMode: true, evolveRun: startRun(now) }
@@ -230,7 +235,9 @@ export const createDavisSlice = (set) => ({
   }),
 
   triggerEvolve: (opts = {}) => set((state) => withEvolveStats(state, (() => {
-    const ts = Number.isFinite(opts.loopTimeMs) ? opts.loopTimeMs : Date.now();
+    // #808: the stamp is loop time. Callers thread it through (App.jsx);
+    // the event-bus path has no loop handle, so it reads the mirrored stamp.
+    const ts = Number.isFinite(opts.loopTimeMs) ? opts.loopTimeMs : loopClock.ms;
     const caUpdate = state.layoutParams.mode === 'ca'
       ? { caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28) }
       : {};

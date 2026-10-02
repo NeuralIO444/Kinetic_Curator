@@ -20,6 +20,7 @@ import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
 import { useCuratorIPC } from './hooks/useCuratorIPC.js';
+import { loopClock, loopIntervalTick } from './gl/loopClock.js';
 import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import { routeBeat } from './state/beatArbiter.js';
@@ -85,31 +86,56 @@ function AppInner() {
   }, [state.evolveMode, state.evolveSource]);
 
   useEffect(() => {
+    // #808 — the loop's presented-frame stamp, mirrored for slices/hooks.
+    // liveLoop owns the counter; this effect just publishes it once per
+    // frame so interval math never touches Date.now().
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const ms = glLoopRef?.current?.getLoopTimeMs?.();
+      if (Number.isFinite(ms)) loopClock.ms = ms;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
     // #107 §4: an automatic trigger, not a manual one — pauses under
     // slowRender so evolve stops adding param churn on top of a near-zero
     // frame rate. An explicit "evolve now" action is unaffected.
     // #107 §5: also pauses for the duration of a batch export (batchPaused) —
     // independent of slowRender, since a batch must hold regardless of the
     // momentary FPS reading.
+    // #808: the interval is LOOP time, not wall time. The accumulator only
+    // advances on presented frames, so a freeze (slowRender, pause, rejected
+    // frame) holds the cadence; on thaw at most one evolve fires — the
+    // accumulator never credits a catch-up burst.
     if (!state.evolveMode || state.evolveSource !== 'time' || state.slowRender || state.batchPaused) return;
-    const interval = setInterval(() => {
+    let raf = 0;
+    let lastFire = -1;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
       const loopTimeMs = glLoopRef?.current?.getLoopTimeMs?.();
-      piped({ type: A.TRIGGER_EVOLVE, payload: { loopTimeMs } });
-    }, state.evolveInterval);
-    return () => clearInterval(interval);
+      const step = loopIntervalTick(lastFire, loopTimeMs, state.evolveInterval);
+      lastFire = step.lastFire;
+      if (step.fire) piped({ type: A.TRIGGER_EVOLVE, payload: { loopTimeMs } });
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [state.evolveMode, state.evolveSource, state.evolveInterval, state.slowRender, state.batchPaused, piped]);
 
   const lastSnapRef = useRef(0);
   useEffect(() => {
-    const now = Date.now();
+    // #808: throttle on loop time — lastEvolveTs is a loop-time stamp now,
+    // so a wall-clock throttle would stack snapshots across a freeze/thaw.
     if (state.lastEvolveTs && state.autoSnapshot && glLoopRef?.current) {
-      if (now - lastSnapRef.current > 2000) {
+      if (state.lastEvolveTs - lastSnapRef.current > 2000) {
         captureStill({
           loopRef: glLoopRef,
           resolution: state.exportResolution,
           seedStr: state.seed.toString(16),
         }).catch((e) => console.warn('[auto-snapshot] capture failed:', e));
-        lastSnapRef.current = now;
+        lastSnapRef.current = state.lastEvolveTs;
       }
     }
   }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, glLoopRef]);
