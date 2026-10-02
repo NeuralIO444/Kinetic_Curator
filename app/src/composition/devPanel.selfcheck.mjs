@@ -36,11 +36,11 @@ for (const dead of ['shaderlab', 'xray', 'govtune']) {
 }
 
 // C. four tabs in order — #691's three plus Biology (#793) — each a React.lazy component.
-assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology'],
-  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology, got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
+assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units'],
+  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units, got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
 for (const t of DEV_TABS) {
   assert.ok(t.component?.$$typeof === Symbol.for('react.lazy'),
     `tab '${t.id}' must be a React.lazy component (one chunk per tab)`);
 }
 
-console.log('[selfcheck] dev panel OK — one DEV registry entry (DEV-gated); four lazy tabs; no stale dev ids');
+console.log('[selfcheck] dev panel OK — one DEV registry entry (DEV-gated); five lazy tabs; no stale dev ids');

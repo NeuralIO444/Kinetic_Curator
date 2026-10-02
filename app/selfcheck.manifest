@@ -166,3 +166,4 @@ node qa/board.selfcheck.mjs
 node src/composition/devPanel.selfcheck.mjs
 node qa/units.selfcheck.mjs
 node qa/trio.selfcheck.mjs
+node src/dev/unitMaker.selfcheck.mjs

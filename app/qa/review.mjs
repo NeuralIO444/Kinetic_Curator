@@ -140,13 +140,13 @@ const up = async (url) => { try { return (await fetch(url)).ok; } catch { return
 
 /** Same shape as the QA harness's ensureServer, but serves the given app dir on a free port. */
 async function startServer(appDir) {
-  let port = 5199;
+  let port = 5170;
   let url = '';
-  for (; port < 5250; port++) {
+  for (; port < 5190; port++) {
     url = `http://127.0.0.1:${port}/Kinetic_Curator/`;
     if (!(await up(url))) break;
   }
-  if (port >= 5250) throw new Error('no free port in 5199-5249');
+  if (port >= 5190) throw new Error('no free port in 5170-5189');
   const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
     { cwd: appDir, stdio: 'ignore', shell: process.platform === 'win32' });
   for (let i = 0; i < 60 && !(await up(url)); i++) await new Promise((r) => setTimeout(r, 500));
