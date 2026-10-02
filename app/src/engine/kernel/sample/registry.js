@@ -6,6 +6,7 @@
 
 import { makeCaField, sampleFieldPoint } from '../field/index.js';
 import { CH, hashU01, rngForIndex } from '../rng.js';
+import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
 
@@ -430,6 +431,19 @@ function lsystem(ctx) {
   };
 }
 
+// #720 — DLA / Eden growth. Two organisms, one engine (growth.js): the
+// sampler reads instance marks off a living aggregate that advances one
+// tick per presented frame. Per-sampler params ride ctx like lsysDepth —
+// growthRate and growthBranch are exposed for the curator engine (#762),
+// which owns the audio→growth mapping; this module never hardcodes it.
+function dla(ctx) {
+  return sampleGrowthPoint(ctx, 'dla');
+}
+
+function eden(ctx) {
+  return sampleGrowthPoint(ctx, 'eden');
+}
+
 function orbit(ctx) {
   const { i, count, w, h, rng, seed } = ctx;
   const planets = [
@@ -495,6 +509,8 @@ registerSampler('rails', rails);
 registerSampler('ca', ca);
 registerSampler('voronoi', voronoi);
 registerSampler('lsystem', lsystem);
+registerSampler('dla', dla); // #720
+registerSampler('eden', eden); // #720
 registerSampler('orbit', orbit);
 registerSampler('abacus', abacus);
 registerSampler('noise', grid); // grid base; displacement warps in orchestrator
@@ -516,6 +532,8 @@ export {
   ca,
   voronoi,
   lsystem,
+  dla, // #720
+  eden, // #720
   orbit,
   abacus,
   stratified,

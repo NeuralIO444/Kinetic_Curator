@@ -19,6 +19,7 @@ import { createNoise } from '../engine/noise.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
+import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
 
 const HOP_MAX_PX = 4;
 
@@ -132,6 +133,13 @@ export function createLiveResolver() {
   // (integral of noiseSpeed over each frame's dt) rather than derived as
   // speed × absolute session time. See the warp block below for why.
   const warpPhase = new Map(); // layerId -> { base, lastMs }
+  // #720 — DLA / Eden growth tick, per layer. The aggregate advances one
+  // tick per presented frame (never in slowRender); growthTick rides the
+  // geometry signature, so the placement cache busts honestly — the same
+  // deal as the CA grid's identity change. Pruned against documentIds like
+  // warpPhase: a hidden-then-reshown layer resumes its grown form instead
+  // of regrowing from the seed.
+  const growthTickByLayer = new Map(); // layerId -> { tick, key }
   // #564 — Assets-tab edits that change what a layer DRAWS without changing
   // which ids are enabled: SWAP replaces an overlay asset's SVG under the
   // same id, a weight edit re-rolls which asset each slot gets. Neither
@@ -177,6 +185,7 @@ export function createLiveResolver() {
     // (gone from the document entirely, so absent from documentIds too)
     // should free this entry.
     for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
+    for (const k of [...growthTickByLayer.keys()]) if (!documentIds.has(k)) growthTickByLayer.delete(k); // #720
     for (const k of [...feedSlots.keys()]) {
       if (!aliveIds.has(k)) { feedSlotFree.push(feedSlots.get(k)); feedSlots.delete(k); }
     }
@@ -332,6 +341,23 @@ export function createLiveResolver() {
       }
     }
 
+    // #720 — default audio drive for DLA/Eden growth: the mean of the
+    // Stimuli meter bands, read once per resolve. null when the bus is
+    // silent — the engine's seeded baseline keeps the piece alive. This is
+    // a default driver, not the mapping: the curator engine (#762) owns
+    // which bands drive rate/branching and will drive growthRate/growthBranch
+    // directly.
+    let audioEnergy = null;
+    const meterBands = readMeterBandLevels();
+    if (meterBands) {
+      let sum = 0;
+      let n = 0;
+      for (const v of Object.values(meterBands)) {
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      if (n > 0) audioEnergy = Math.min(1, Math.max(0, sum / n));
+    }
+
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
       if (isFxLayer(layer)) {
@@ -410,10 +436,22 @@ export function createLiveResolver() {
           noiseDomainOffset: (seedOffsets?.noise || 0) * 100,
         });
       } else {
+        // #720 — advance the growth tick for dla/eden layers. A mode, seed,
+        // or spatial-offset change restarts the organism from its zygote.
+        // Frozen in slowRender: stills stay deterministic, like the warp pin.
+        let growthTick = 0;
+        if (layoutParams.mode === 'dla' || layoutParams.mode === 'eden') {
+          const gKey = [layoutParams.mode, seed, seedOffsets?.spatial || 0].join('|');
+          let gt = growthTickByLayer.get(layer.id);
+          if (!gt || gt.key !== gKey) { gt = { tick: 0, key: gKey }; growthTickByLayer.set(layer.id, gt); }
+          if (!input.slowRender) gt.tick++;
+          growthTick = gt.tick;
+        }
         items = buildPlacements({
           layoutParams, seed, seedOffsets, activeAssets, palette,
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
+          growthTick, audioEnergy,
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).

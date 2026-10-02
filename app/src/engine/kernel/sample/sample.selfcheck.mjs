@@ -10,6 +10,7 @@ import { hashU01 } from '../rng.js';
 const required = [
   'grid', 'fibonacci', 'radial', 'swarm', 'flow', 'layers', 'rails',
   'ca', 'orbit', 'abacus', 'noise', 'hype', 'stratified', 'random',
+  'dla', 'eden', // #720
 ];
 
 for (const id of required) {

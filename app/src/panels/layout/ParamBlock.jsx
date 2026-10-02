@@ -72,6 +72,22 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         disabled={mode !== 'phyllotaxis'} disabledReason="Phyllotaxis mode only"
         onChange={v => set('phylloDivergence', v)} defaultValue={d('phylloDivergence', DEFAULT_LAYOUT_PARAMS.phylloDivergence)}
         locked={lockedParams.phylloDivergence} onToggleLock={() => lock('phylloDivergence')} />
+      {/* #720: GROWTH RATE / BRANCHING drive the DLA / Eden organisms —
+          mode-gated per #272 like DIVERGENCE: visible but inert outside
+          dla/eden, with the reason. The audio→growth mapping itself is the
+          curator engine's (#762); these are the exposed knobs it will drive. */}
+      <RangeRow label="GROWTH RATE" value={layoutParams.growthRate ?? 3} min={0} max={12} step={0.5}
+        hint="Cells grown per tick at full drive — never 0, the piece never freezes"
+        readout={`${(layoutParams.growthRate ?? 3).toFixed(1)}/tick`}
+        disabled={mode !== 'dla' && mode !== 'eden'} disabledReason="DLA / Eden growth modes only"
+        onChange={v => set('growthRate', v)} defaultValue={d('growthRate', DEFAULT_LAYOUT_PARAMS.growthRate)}
+        locked={lockedParams.growthRate} onToggleLock={() => lock('growthRate')} />
+      <RangeRow label="BRANCHING" value={layoutParams.growthBranch ?? 0.8} min={0} max={1} step={0.01}
+        hint="DLA stick probability — high grows coral, low grows dense (Eden ignores it)"
+        readout={`${Math.round((layoutParams.growthBranch ?? 0.8) * 100)}%`}
+        disabled={mode !== 'dla' && mode !== 'eden'} disabledReason="DLA / Eden growth modes only"
+        onChange={v => set('growthBranch', v)} defaultValue={d('growthBranch', DEFAULT_LAYOUT_PARAMS.growthBranch)}
+        locked={lockedParams.growthBranch} onToggleLock={() => lock('growthBranch')} />
       {/* #310: Z-TIERS / NOISE FREQ / DISPLACE leave performer sight — they
           stay in state and presets/voices still set them, but the live knobs
           are gone. (MATERIAL and SHADING were already voice-only via #268.) */}
