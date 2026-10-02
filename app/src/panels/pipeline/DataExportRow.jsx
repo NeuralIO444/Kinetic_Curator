@@ -4,7 +4,7 @@ import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
 import {
   confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
-  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, shouldExportOnKey,
+  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
 } from './pipelineNotices.mjs';
 import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
