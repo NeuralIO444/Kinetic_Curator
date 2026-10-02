@@ -37,8 +37,8 @@ test.describe('Mode personas', () => {
   });
 
   test('BUILD keeps the stub tiles and the + chip', async ({ page }) => {
-    // 12 stub tiles keep the mode grid
-    await expect(page.locator('.mode-grid .mode-tile')).toHaveCount(12);
+    // 14 stub tiles keep the mode grid (12 + DLA growth + Eden growth)
+    await expect(page.locator('.mode-grid .mode-tile')).toHaveCount(14);
     await expect(page.locator('.plus-chip')).toBeVisible();
   });
 
