@@ -14,6 +14,22 @@ import { efTileFace } from '../../fx/efRackTile.mjs';
 import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
+import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
+
+// #716 Part 2 — black block + white numeral heads every row. The edited
+// track inverts (white block, black numeral). Ghosts keep the tile so the
+// empty slot still has an address.
+function TrackNumeral({ n, kind, edited = false, ghost = false }) {
+  const glyph = trackNumeral(n, kind);
+  if (!glyph) return null;
+  return (
+    <span
+      className={`track-numeral${edited ? ' track-numeral-edited' : ''}`}
+      title={trackNumeralTitle(n, kind, { edited, ghost })}
+      aria-hidden="true"
+    >{glyph}</span>
+  );
+}
 
 // #509 phase 3 — matrix overview: every live cross-layer link in one
 // glance. Config render of store state (re-renders with layers naturally);
@@ -193,13 +209,19 @@ export function LayerStack() {
       <PatchMatrix layers={layers} ordinals={ordinals} />
       <div className="layer-list">
         {fxGhosts.slice().reverse().map((n) => (
-          <div key={`ghost-fx-${n}`} className="layer-row" style={{ opacity: 0.35 }} onClick={() => emit(Events.LAYER_ADD_FX)}>
-            <div className="layer-row-main"><button className="layer-name" type="button">FX {n}</button></div>
+          <div key={`ghost-fx-${n}`} className="layer-row layer-row-ghost" onClick={() => emit(Events.LAYER_ADD_FX)}>
+            <div className="layer-row-main">
+              <TrackNumeral n={n} kind="fx" ghost />
+              <button className="layer-name" type="button">FX {n}</button>
+            </div>
           </div>
         ))}
         {ghosts.slice().reverse().map((n) => (
-          <div key={`ghost-kc-${n}`} className="layer-row" style={{ opacity: 0.35 }} onClick={() => emit(Events.LAYER_ADD)}>
-            <div className="layer-row-main"><button className="layer-name" type="button">KC-{n}</button></div>
+          <div key={`ghost-kc-${n}`} className="layer-row layer-row-ghost" onClick={() => emit(Events.LAYER_ADD)}>
+            <div className="layer-row-main">
+              <TrackNumeral n={n} kind="kc" ghost />
+              <button className="layer-name" type="button">KC-{n}</button>
+            </div>
           </div>
         ))}
         {[...layers].reverse().map((layer, ri) => {
@@ -214,6 +236,7 @@ export function LayerStack() {
           return (
             <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''}`}>
               <div className="layer-row-main">
+                <TrackNumeral n={ordinals.get(layer.id) || 1} kind={fx ? 'fx' : 'kc'} edited={fx ? isFxSelected : isActive} />
                 <div className="layer-reorder">
                   <button className="micro-btn" disabled={i === layers.length - 1} onClick={() => emit(Events.LAYER_REORDER, { id: layer.id, delta: 1 })}>▲</button>
                   <button className="micro-btn" disabled={i === 0} onClick={() => emit(Events.LAYER_REORDER, { id: layer.id, delta: -1 })}>▼</button>
@@ -221,8 +244,12 @@ export function LayerStack() {
                 <button className="micro-btn" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
                 <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks' : undefined} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{soloed ? 'S·' : 'S'}</button>
                 {fx && <span className="fx-badge">FX</span>}
-                <button className="layer-name" onClick={() => emit(fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id })}>
-                  {label}{isActive && !fx ? ' · editing' : ''}{isFxSelected && fx ? ' · editing fx' : ''}
+                <button
+                  className="layer-name"
+                  title={(isActive && !fx) || (isFxSelected && fx) ? `${label} — editing` : label}
+                  onClick={() => emit(fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id })}
+                >
+                  {label}
                 </button>
                 <button className="micro-btn" onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
                 <button className="micro-btn" disabled={!isFxLayer(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>

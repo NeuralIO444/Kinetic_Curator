@@ -183,4 +183,5 @@ node src/gl/stimuliTargets.selfcheck.mjs
 node src/gl/hands.selfcheck.mjs
 node src/fx/efRackTile.selfcheck.mjs
 node src/components/motionGlyph.selfcheck.mjs
+node src/panels/build/trackNumeral.selfcheck.mjs
 node src/deferredStubs.selfcheck.mjs
