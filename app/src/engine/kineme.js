@@ -272,6 +272,15 @@ export function kinemeStillSec(seed, fps = BOIL_FPS_DEFAULT) {
 }
 
 /**
+ * Seed-derived still boil frame (slice 5): the boiled drivers' drawing at
+ * print time. Same seed → same drawing; reseed → a new one. Any
+ * non-negative int is a valid frame — the wobble hash is keyed on it.
+ */
+export function kinemeStillStep(seed) {
+  return Math.floor(hashPhase(seed | 0, 'still-boil') * 4096);
+}
+
+/**
  * Assemble the per-frame kineme ctx for buildPlacements (slice 3).
  *
  * driverSec is the ANCHORED driver time (the same kinemeTime the GPU
