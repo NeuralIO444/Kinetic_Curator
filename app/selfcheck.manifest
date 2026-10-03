@@ -176,5 +176,6 @@ node src/gl/trailMode.selfcheck.mjs
 node src/engine/organisms/behaveEase.selfcheck.mjs
 node src/panels/pipeline/thumbnail.selfcheck.mjs
 node src/data/canvasPresets.led.selfcheck.mjs
+node src/data/canvasPresets.mine.selfcheck.mjs
 node src/gl/stimuliTargets.selfcheck.mjs
 node src/gl/hands.selfcheck.mjs

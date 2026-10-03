@@ -1,5 +1,5 @@
 import { genId } from '../id.js';
-import { INSTRUMENT_CANVAS, sanitizeCanvasSpec, CANVAS_PRESETS } from '../../data/canvasPresets.js';
+import { INSTRUMENT_CANVAS, sanitizeCanvasSpec, CANVAS_PRESETS, readUserPresets, writeUserPresets } from '../../data/canvasPresets.js';
 
 const MAX_SNAPSHOTS = 24;
 
@@ -17,6 +17,7 @@ export const createExportSlice = (set) => ({
   stageBlackout: false,
   syphonOn: false,
   syphonName: 'Kinetic Curator',
+  userCanvasPresets: [],
 
   addSnapshot: (snap) => set((state) => ({
     snapshots: [...state.snapshots, { id: genId(), ...snap }].slice(-MAX_SNAPSHOTS),
@@ -32,11 +33,23 @@ export const createExportSlice = (set) => ({
     const next = sanitizeCanvasSpec({ canvasW: w, canvasH: h, canvasPresetId: presetId });
     return { canvasW: next.canvasW, canvasH: next.canvasH, canvasPresetId: presetId };
   }),
-  applyCanvasPreset: (id) => set(() => {
-    const p = CANVAS_PRESETS.find((x) => x.id === id);
+  applyCanvasPreset: (id) => set((s) => {
+    const p = CANVAS_PRESETS.find((x) => x.id === id) || s.userCanvasPresets.find((x) => x.id === id);
     if (!p) return {};
     return { canvasW: p.w, canvasH: p.h, canvasFps: p.fps, canvasPresetId: p.id };
   }),
+  loadUserCanvasPresets: () => set({ userCanvasPresets: readUserPresets() }),
+  saveCanvasPreset: (label) => set((s) => {
+    const id = `mine-${Date.now()}`;
+    const next = writeUserPresets([...s.userCanvasPresets, { id, label, w: s.canvasW, h: s.canvasH, fps: s.canvasFps }]);
+    return { userCanvasPresets: next, canvasPresetId: id };
+  }),
+  deleteCanvasPreset: (id) => set((s) => ({
+    userCanvasPresets: writeUserPresets(s.userCanvasPresets.filter((p) => p.id !== id)),
+  })),
+  renameCanvasPreset: (id, label) => set((s) => ({
+    userCanvasPresets: writeUserPresets(s.userCanvasPresets.map((p) => p.id === id ? { ...p, label } : p)),
+  })),
   setCanvasFps: (fps) => set({ canvasFps: sanitizeCanvasSpec({ canvasFps: fps }).canvasFps }),
   setCanvasAspectLock: (on) => set({ canvasAspectLock: !!on }),
   swapCanvasOrientation: () => set((s) => ({

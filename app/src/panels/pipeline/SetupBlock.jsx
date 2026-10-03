@@ -1,5 +1,5 @@
+import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { useState } from 'react';
 import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster } from '../../data/canvasPresets.js';
 
 export function SetupBlock() {
@@ -8,7 +8,12 @@ export function SetupBlock() {
   const fps = useStore((s) => s.canvasFps);
   const presetId = useStore((s) => s.canvasPresetId);
   const lock = useStore((s) => s.canvasAspectLock);
+  const mine = useStore((s) => s.userCanvasPresets);
   const apply = useStore((s) => s.applyCanvasPreset);
+  const save = useStore((s) => s.saveCanvasPreset);
+  const remove = useStore((s) => s.deleteCanvasPreset);
+  const rename = useStore((s) => s.renameCanvasPreset);
+  const load = useStore((s) => s.loadUserCanvasPresets);
   const setSize = useStore((s) => s.setCanvasSize);
   const setFps = useStore((s) => s.setCanvasFps);
   const setLock = useStore((s) => s.setCanvasAspectLock);
@@ -17,6 +22,8 @@ export function SetupBlock() {
   const authored = `${w}×${h}`;
   const differ = authored !== actual;
   const [cab, setCab] = useState({ w: 4, h: 3, px: 128 });
+  const [name, setName] = useState('My wall');
+  useEffect(() => { load?.(); }, [load]);
 
   return (
     <div className="pipeline-setup">
@@ -25,6 +32,9 @@ export function SetupBlock() {
         <select value={presetId} onChange={(e) => apply(e.target.value)} style={{ fontSize: 11, maxWidth: 180 }}>
           {CANVAS_PRESETS.map((p) => (
             <option key={p.id} value={p.id}>{p.group} · {p.label}</option>
+          ))}
+          {(mine || []).map((p) => (
+            <option key={p.id} value={p.id}>Mine · {p.label}</option>
           ))}
         </select>
       </div>
@@ -63,6 +73,16 @@ export function SetupBlock() {
           const r = ledRaster(cab.w, cab.h, cab.px);
           setSize(r.w, r.h);
         }}>SET SIZE</button>
+      </div>
+      <div className="pipeline-row">
+        <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, fontSize: 11 }} />
+        <button type="button" className="chip-btn" onClick={() => save(name || 'My wall')}>SAVE</button>
+        {String(presetId).startsWith('mine-') && (
+          <>
+            <button type="button" className="chip-btn" onClick={() => rename(presetId, name || 'My wall')}>RENAME</button>
+            <button type="button" className="chip-btn" onClick={() => remove(presetId)}>DELETE</button>
+          </>
+        )}
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
         {authored} at {fps}fps · {Math.round((w * h * fps) / 1e6)} Mpx/s
