@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import {
   importConfirmMessage, loadedMessage, exportSavedMessage, exportFilename,
   nextExportFilename, nextTitleVersion, titleSlug,
-  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, exportPillState, payloadFingerprint, shouldExportOnKey,
+  missingPaletteMessage, missingPaletteId, rememberRecent, readRecent, dirtyMessage, exportPillState, payloadFingerprint, shouldExportOnKey,
 } from './pipelineNotices.mjs';
 
 test('#647 import confirm dialog copy names the file and seed', () => {
@@ -59,6 +59,14 @@ test('#650 missing user palette warns', () => {
   assert.equal(missingPaletteMessage({ paletteId: 'bone' }, []), null);
   assert.match(missingPaletteMessage({ paletteId: 'user:mine' }, []), /Missing palette/);
   assert.equal(missingPaletteMessage({ paletteId: 'user:mine' }, [{ id: 'mine' }]), null);
+});
+
+test('#650 missingPaletteId returns the id for the banner', () => {
+  assert.equal(missingPaletteId({ paletteId: 'bone' }, []), null);
+  assert.equal(missingPaletteId({ paletteId: 'user:mine' }, []), 'user:mine');
+  assert.equal(missingPaletteId({ paletteId: 'user:mine' }, [{ id: 'mine' }]), null);
+  assert.equal(missingPaletteId({ paletteId: 'user:mine' }, [{ id: 'user:mine' }]), null);
+  assert.equal(missingPaletteId({}, []), null);
 });
 
 test('#653 recent files cap at 5, newest first', () => {

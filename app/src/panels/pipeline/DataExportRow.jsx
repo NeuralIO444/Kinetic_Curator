@@ -4,7 +4,7 @@ import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
 import {
   importConfirmMessage, loadedMessage, exportSavedMessage, nextExportFilename,
-  missingPaletteMessage, rememberRecent, readRecent, exportPillState, payloadFingerprint,
+  missingPaletteId, rememberRecent, readRecent, exportPillState, payloadFingerprint,
 } from './pipelineNotices.mjs';
 import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
@@ -37,6 +37,7 @@ export function DataExportRow({
   const [recent, setRecent] = useState(() => readRecent());
   const [loadedName, setLoadedName] = useState(null);
   const [pendingImport, setPendingImport] = useState(null); // #647 — { fileName, doc, sanitized }
+  const [missingPalette, setMissingPalette] = useState(null); // #650 — palette id for the banner
   const exportedPayload = useRef(null);
   const [exportPill, setExportPill] = useState('none'); // #648 — none | exported | stale
   const tasteStatus = useStore((s) => s.tasteStatus);
@@ -108,9 +109,10 @@ export function DataExportRow({
 
   const applyImport = (fileName, doc, sanitized) => {
     emit(Events.EXPORT_LOAD_PROJECT, doc);
-    const miss = missingPaletteMessage(doc, userPalettes);
+    const missId = missingPaletteId(doc, userPalettes);
     const loaded = loadedMessage(fileName, doc, sanitized);
-    onMessage(miss ? `${loaded}. ${miss}` : loaded);
+    onMessage(loaded);
+    setMissingPalette(missId); // #650 — banner names it; null clears a stale banner
     setLoadedName(fileName);
     setRecent(rememberRecent(fileName));
     exportedPayload.current = payloadFingerprint(buildProjectPayload(projectFields));
@@ -182,6 +184,7 @@ export function DataExportRow({
         const list = Array.isArray(parsed) ? parsed : [parsed];
         emit(Events.PALETTE_IMPORT, list);
         onMessage(paletteImportMessage(list)); // #601: what the store keeps, not what the file held
+        setMissingPalette(null);
       } catch {
         onMessage('Invalid palette JSON');
       }
@@ -219,6 +222,17 @@ export function DataExportRow({
         <button className="big-btn" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Import palette library JSON">↑ PALETTES</button>
         <input ref={paletteInputRef} type="file" accept=".json,application/json" onChange={importPalettes} style={{ display: 'none' }} />
       </div>
+      {missingPalette && (
+        <div style={{ border: '1px solid #8a6d2f', borderRadius: 4, padding: 8, margin: '2px 0 6px', background: '#16130c' }}>
+          <div style={{ fontSize: 11, marginBottom: 6 }}>
+            This project needs palette &ldquo;{missingPalette}&rdquo; — using the fallback palette until you import it.
+          </div>
+          <div className="pipeline-row" style={{ gap: 6 }}>
+            <button className="big-btn dl" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Open the palettes file picker">Import palettes file</button>
+            <button className="big-btn" onClick={() => setMissingPalette(null)} style={{ flex: 1 }} title="Keep the fallback palette">Dismiss</button>
+          </div>
+        </div>
+      )}
       <div className="pipeline-row">
         <button
           className="big-btn dl"
