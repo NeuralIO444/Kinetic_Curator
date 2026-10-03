@@ -370,7 +370,8 @@ vec2 flowVec(vec2 uv) {
   return vec2(n1 - 0.5 + 0.5 * (n3 - 0.5), n2 - 0.5 - 0.5 * (n3 - 0.5));
 }
 void main() {
-  vec2 advect = u_flowShared > 0.5 ? texture(u_flowField, v_cuv).xy : flowVec(v_cuv);
+  // RGBA8 table: xy packed from [-1,1] into [0,1]. CI's GL probe rejects RGBA16F uploads.
+  vec2 advect = u_flowShared > 0.5 ? texture(u_flowField, v_cuv).xy * 2.0 - 1.0 : flowVec(v_cuv);
   vec2 tuv = v_cuv + advect * u_flow;
   o = texture(u_src, tuv);
 }`;
@@ -1067,20 +1068,21 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array([0, 0, 0, 1]));
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 255]));
   gl.bindTexture(gl.TEXTURE_2D, null);
   let flowKey = null;
   const ensureFlow = (field) => {
     if (!field || flowKey === field.seed) return;
     const n = field.n;
-    const rgba = new Float32Array(n * n * 4);
+    const rgba = new Uint8Array(n * n * 4);
+    const pack = (v) => Math.max(0, Math.min(255, Math.round((v * 0.5 + 0.5) * 255)));
     for (let i = 0; i < n * n; i++) {
-      rgba[i * 4] = field.data[i * 2];
-      rgba[i * 4 + 1] = field.data[i * 2 + 1];
-      rgba[i * 4 + 3] = 1;
+      rgba[i * 4] = pack(field.data[i * 2]);
+      rgba[i * 4 + 1] = pack(field.data[i * 2 + 1]);
+      rgba[i * 4 + 3] = 255;
     }
     gl.bindTexture(gl.TEXTURE_2D, flowTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, n, n, 0, gl.RGBA, gl.FLOAT, rgba);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, n, n, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
     gl.bindTexture(gl.TEXTURE_2D, null);
     flowKey = field.seed;
   };
