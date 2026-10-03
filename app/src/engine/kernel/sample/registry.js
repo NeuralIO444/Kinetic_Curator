@@ -543,6 +543,10 @@ function traceBrushTrails(ctx, trailCount, per) {
   const stepLen = Math.max(0.5, brushSpacing * brushSize);
   const noise = createNoise(hashU32(seed, CH.noise, 1, seedOffsets));
   const seedZ = hashU01(seed, CH.noise, 2, seedOffsets) * 100;
+  // Slice 2 — the crooked: perpendicular trail wobble. Amp 0 skips the
+  // noise eval entirely, so amp 0 is bit-identical to no wobble knob.
+  const wobbleAmp = ctx.wobbleAmp ?? 0;
+  const wobbleFreq = ctx.wobbleFreq ?? 0.5;
   const trails = [];
   for (let k = 0; k < trailCount; k++) {
     let x = hashU01(seed, CH.noise, 10 + k * 2, seedOffsets) * w;
@@ -559,10 +563,18 @@ function traceBrushTrails(ctx, trailCount, per) {
       if (ny < 0 || ny > h) { a = -a; ny = y + Math.sin(a) * stepLen; }
       nx = Math.min(w, Math.max(0, nx));
       ny = Math.min(h, Math.max(0, ny));
+      // Wobble pushes the stamp off the trail, perpendicular to the step,
+      // by fBm noise — the hand-drawn quiver. Bounded by wobbleAmp.
+      let ox = 0, oy = 0;
+      if (wobbleAmp > 0) {
+        const off = noise.fBm3D(s * wobbleFreq, k * 13.7 + 5, seedZ * 2 + 3, 2) * wobbleAmp;
+        ox = -Math.sin(a) * off;
+        oy = Math.cos(a) * off;
+      }
       // rot01 maps the full circle onto the stage-C unit draw so that the
       // default rotate range [-180, 180] reproduces the tangent in degrees.
       const deg = a * 180 / Math.PI;
-      pts.push({ x: nx, y: ny, rot01: (((deg % 360) + 540) % 360) / 360 });
+      pts.push({ x: nx + ox, y: ny + oy, rot01: (((deg % 360) + 540) % 360) / 360 });
       x = nx;
       y = ny;
     }

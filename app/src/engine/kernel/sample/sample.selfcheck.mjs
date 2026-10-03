@@ -495,11 +495,15 @@ assert.ok(listed.includes('stratified'));
     assert.ok(d <= maxStep, `spacing invariant step ${k}: ${d} ≤ ${maxStep}`);
   }
 
-  // rotation = trail tangent (degrees) at the default rotate range
+  // rotation aims along the trail tangent (slice 2 adds ±10° stamp jitter)
+  const tangDiff = (k, arr) => {
+    const tang = Math.atan2(arr[k].y - arr[k - 1].y, arr[k].x - arr[k - 1].x) * 180 / Math.PI;
+    let diff = Math.abs(arr[k].rotation - tang) % 360;
+    return diff > 180 ? 360 - diff : diff;
+  };
   for (let k = 1; k < a.length; k++) {
     if (!sameTrail(k)) continue;
-    const tang = Math.atan2(a[k].y - a[k - 1].y, a[k].x - a[k - 1].x) * 180 / Math.PI;
-    assert.ok(Math.abs(a[k].rotation - tang) < 1e-9, `tangent rotation ${k}: ${a[k].rotation} vs ${tang}`);
+    assert.ok(tangDiff(k, a) <= 10 + 1e-9, `rotation near tangent ${k}: ${tangDiff(k, a)}`);
   }
 
   // a different seed draws a different line
@@ -511,6 +515,68 @@ assert.ok(listed.includes('stratified'));
   for (const [key, val] of [['brushSize', 25], ['brushSpacing', 0.6], ['fieldScale', 0.005], ['trailCount', 7]]) {
     assert.notDeepStrictEqual(geometrySignature({ ...P, [key]: val }), s1, `${key} must bust the cache`);
   }
+}
+
+// ── brush slice 2: the crooked — trail wobble + stamp jitter ────────────────
+{
+  const W = 1000, H = 700, COUNT = 60, TRAILS = 6;
+  const PER = Math.ceil(COUNT / TRAILS);
+  const P = {
+    mode: 'brush', count: COUNT, seed: 0xbeef,
+    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
+    jitter: 0, density: 100, zTiers: 1, bleed: false,
+    canvasW: W, canvasH: H,
+    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: TRAILS,
+    wobbleFreq: 0.5,
+  };
+  const lay = (extra) => computePlacements({ ...P, ...extra });
+  const straight = lay({});
+
+  // amount-0 identity: explicit wobbleAmp 0 is bit-identical to no wobble knob
+  const zero = lay({ wobbleAmp: 0 });
+  assert.strictEqual(straight.length, zero.length);
+  for (let k = 0; k < straight.length; k++) {
+    assert.strictEqual(straight[k].x, zero[k].x, `wobble-0 x identity ${k}`);
+    assert.strictEqual(straight[k].y, zero[k].y, `wobble-0 y identity ${k}`);
+  }
+
+  // wobble moves stamps, perpendicular to the trail, bounded by the amp
+  const AMP = 8;
+  const wobbled = lay({ wobbleAmp: AMP });
+  let moved = 0, maxD = 0;
+  for (let k = 0; k < straight.length; k++) {
+    const d = Math.hypot(wobbled[k].x - straight[k].x, wobbled[k].y - straight[k].y);
+    maxD = Math.max(maxD, d);
+    if (d > AMP * 0.1) moved++;
+  }
+  assert.ok(moved > straight.length * 0.3, `wobble must move stamps (${moved})`);
+  assert.ok(maxD <= AMP * 1.5, `wobble bounded by amp (${maxD} ≤ ${AMP * 1.5})`);
+
+  // reseed repeats the wobble bit-identically
+  const wobbled2 = lay({ wobbleAmp: AMP });
+  for (let k = 0; k < straight.length; k++) {
+    assert.strictEqual(wobbled[k].x, wobbled2[k].x, `wobble reseed x ${k}`);
+    assert.strictEqual(wobbled[k].y, wobbled2[k].y, `wobble reseed y ${k}`);
+  }
+
+  // stamp jitter: rotation stays within ±10° of the trail tangent …
+  const sameTrail = (k) => Math.floor(k / PER) === Math.floor((k - 1) / PER);
+  for (let k = 1; k < straight.length; k++) {
+    if (!sameTrail(k)) continue;
+    const tang = Math.atan2(straight[k].y - straight[k - 1].y, straight[k].x - straight[k - 1].x) * 180 / Math.PI;
+    let diff = Math.abs(straight[k].rotation - tang) % 360;
+    if (diff > 180) diff = 360 - diff;
+    assert.ok(diff <= 10 + 1e-9, `rotation jitter ≤ 10° at ${k}: ${diff}`);
+  }
+  // … and scale stays within ±15% of the range around its midpoint
+  for (let k = 0; k < straight.length; k++) {
+    assert.ok(straight[k].scale >= 0.54 && straight[k].scale <= 0.66, `scale jitter ${k}: ${straight[k].scale}`);
+  }
+
+  // cache honesty for the new knobs
+  const s2 = geometrySignature(P);
+  assert.notDeepStrictEqual(geometrySignature({ ...P, wobbleAmp: 4 }), s2, 'wobbleAmp must bust the cache');
+  assert.notDeepStrictEqual(geometrySignature({ ...P, wobbleFreq: 0.9 }), s2, 'wobbleFreq must bust the cache');
 }
 
 console.log('kernel/sample.selfcheck: OK (K2)', { modes: listSamplers().length });

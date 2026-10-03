@@ -108,6 +108,10 @@ export const DEFAULT_LAYOUT_PARAMS = {
   brushSpacing: 0.5,
   fieldScale: 0.004,
   trailCount: 6,
+  // Slice 2 — the crooked: perpendicular wobble amplitude in px (0 = the
+  // trail exactly) and its frequency per stamp.
+  wobbleAmp: 0,
+  wobbleFreq: 0.5,
   particleCount: 150,
   swarmCohesion: 0.6, // #272: retuned to the honest slider max (was 1.5, past the 'one blob' threshold)
   gravityWells: 1.0,
@@ -214,6 +218,8 @@ export const PARAM_SPEC = {
   brushSpacing: { min: 0.1, max: 2 },
   fieldScale: { min: 0.001, max: 0.02 },
   trailCount: { min: 1, max: 24, int: true },
+  wobbleAmp: { min: 0, max: 40 },
+  wobbleFreq: { min: 0.05, max: 2 },
   displacement: { min: 0, max: 250 },
   // int: true — a fractional value mid-MIX reaches ParticleSystem.init as a
   // non-integer array length (RangeError, surfaces as a RENDER FAULT). Every
