@@ -239,16 +239,29 @@ export function parseProject(raw) {
     return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
 }
 
+/**
+ * #649 — the anchor-click download API cannot report a blocked download:
+ * popup/permission/save-dialog-cancel all fail silently. The honest
+ * contract is to report what the dispatch itself can know — { ok:true }
+ * when the click went out, { ok:false, error } when building or
+ * dispatching threw. Callers surface the error instead of claiming
+ * "Saved" when nothing was proven to save.
+ */
 export function downloadProject(doc, filename) {
-  const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename || `kinetic-curator-${(doc.seed >>> 0).toString(16)}.project.json`;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  try {
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || `kinetic-curator-${(doc.seed >>> 0).toString(16)}.project.json`;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err?.message || String(err) };
+  }
 }
 
 /**

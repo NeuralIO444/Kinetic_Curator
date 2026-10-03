@@ -1,6 +1,6 @@
 // node src/state/projectDocument.selfcheck.mjs
 import assert from 'node:assert';
-import { serializeProject, parseProject, PROJECT_VERSION, countRepairedFields } from './projectDocument.js';
+import { serializeProject, parseProject, PROJECT_VERSION, countRepairedFields, downloadProject } from './projectDocument.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeQuality, MAX_LAYERS, MAX_CONTENT_TRACKS } from './projectNormalize.js';
 import { ASSETS } from '../data/assets/index.js';
@@ -307,6 +307,35 @@ assert.strictEqual(
   assert.ok(parsed.ok);
   assert.ok(parsed.sanitized >= 3, `hostile doc must count repairs, got ${parsed.sanitized}`);
   assert.strictEqual(countRepairedFields(hostile, parsed.doc), parsed.sanitized);
+}
+
+// #649 — downloadProject reports the dispatch honestly. The anchor-click
+// API cannot see a browser-level block, so the contract is: { ok:true }
+// when the click went out, { ok:false, error } when building/dispatching
+// threw. No theater about blocks the API cannot detect.
+{
+  const noDom = downloadProject({ seed: 1 }, 'x.json');
+  assert.equal(noDom.ok, false);
+  assert.ok(typeof noDom.error === 'string' && noDom.error.length > 0);
+
+  const calls = [];
+  const origSetTimeout = globalThis.setTimeout;
+  const origCreateObjectURL = URL.createObjectURL;
+  globalThis.setTimeout = () => 0;
+  globalThis.document = {
+    createElement: () => ({ click: () => calls.push('click'), remove: () => {} }),
+    body: { appendChild: () => {} },
+  };
+  URL.createObjectURL = () => 'blob:fake';
+  try {
+    const withDom = downloadProject({ seed: 1 }, 'x.json');
+    assert.equal(withDom.ok, true);
+    assert.deepEqual(calls, ['click']);
+  } finally {
+    URL.createObjectURL = origCreateObjectURL;
+    delete globalThis.document;
+    globalThis.setTimeout = origSetTimeout;
+  }
 }
 
 console.log('projectDocument.selfcheck: OK');
