@@ -78,11 +78,17 @@ export function nextExportFilename(doc, store = globalThis.localStorage) {
   return exportFilename(doc, nextTitleVersion(slug, store));
 }
 
-export function missingPaletteMessage(doc, userPalettes) {
+/** #650 — the missing user-palette id, or null. The banner names it. */
+export function missingPaletteId(doc, userPalettes) {
   const id = doc?.paletteId;
   if (typeof id !== 'string' || !id.startsWith('user:')) return null;
   const have = (userPalettes || []).some((p) => p && (`user:${p.id}` === id || p.id === id));
-  return have ? null : `Missing palette ${id}`;
+  return have ? null : id;
+}
+
+export function missingPaletteMessage(doc, userPalettes) {
+  const id = missingPaletteId(doc, userPalettes);
+  return id ? `Missing palette ${id}` : null;
 }
 
 export function rememberRecent(name, store = globalThis.localStorage) {
