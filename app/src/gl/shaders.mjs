@@ -90,6 +90,12 @@ void main() {
     float sm = fract(sstr * 2.0) * 2.0 - 1.0;
     c.x *= 1.0 + u_hands.x * 0.30 * (sstr < 0.5 ? sm : sm * 0.25);
     c.y *= 1.0 + u_hands.x * 0.30 * (sstr < 0.5 ? sm * 0.25 : sm);
+    float nstr = fract(seed * 9.31);
+    float npick = floor(nstr * 4.0);
+    vec2 ncorner = vec2(mod(npick, 2.0), floor(npick / 2.0));
+    if (distance(a_corner, ncorner) < 0.5) {
+      c *= 1.0 - u_hands.x * 0.35;
+    }
   }
   float kDeg = 0.0;   // #781 KINEME extra rotation (degrees)
   float kVis = 1.0;   // blink visibility

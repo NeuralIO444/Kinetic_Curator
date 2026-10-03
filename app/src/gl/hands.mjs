@@ -19,6 +19,15 @@ export function stretchCorner(c, amount, seed) {
   return { x: c.x * (1 + amount * 0.30 * ax), y: c.y * (1 + amount * 0.30 * ay) };
 }
 
+export function nickCorner(c, amount, seed, cornerIndex) {
+  if (!(amount > 0)) return { x: c.x, y: c.y };
+  const s = seed * 9.31 - Math.floor(seed * 9.31); // fract, seed in [0,1)
+  const pick = Math.min(3, Math.floor(s * 4)); // one of the four corners
+  if (pick !== cornerIndex) return { x: c.x, y: c.y };
+  const k = 1 - amount * 0.35; // pull the picked corner toward center
+  return { x: c.x * k, y: c.y * k };
+}
+
 export function openAlpha(alpha, local, amount, seed) {
   if (!(amount > 0)) return alpha;
   const d = Math.hypot(local.x - 0.5, local.y - 0.5);

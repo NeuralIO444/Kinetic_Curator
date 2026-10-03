@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { crookedCorner, openAlpha, stretchCorner } from './hands.mjs';
+import { crookedCorner, openAlpha, stretchCorner, nickCorner } from './hands.mjs';
 
 test('#866 amount 0 is the current quad and the current sample', () => {
   const c = { x: 12, y: -8 };
@@ -42,4 +42,19 @@ test('#865 stretch: amount 0 is identity, repeats per seed, clamps at 30% per ax
   // the GLSL implements the stretch strand
   const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
   assert.match(src, /fract\(seed \* 3\.7\)/);
+});
+
+test('#865 nick: amount 0 is identity, one corner nicked per seed, pull is amount*0.35', () => {
+  const c = { x: 12, y: -8 };
+  for (let k = 0; k < 4; k++) assert.deepEqual(nickCorner(c, 0, 0.3, k), c);
+  const seed = 0.42;
+  const outs = [0, 1, 2, 3].map((k) => nickCorner(c, 0.7, seed, k));
+  assert.deepEqual(outs[0], nickCorner(c, 0.7, seed, 0), 'same seed repeats');
+  const nicked = outs.filter((o) => o.x !== c.x || o.y !== c.y);
+  assert.equal(nicked.length, 1, 'exactly one corner is nicked per seed');
+  const k = 1 - 0.7 * 0.35;
+  assert.ok(Math.abs(nicked[0].x - c.x * k) < 1e-9 && Math.abs(nicked[0].y - c.y * k) < 1e-9);
+  // the GLSL implements the nick strand
+  const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
+  assert.match(src, /fract\(seed \* 9\.31\)/);
 });
