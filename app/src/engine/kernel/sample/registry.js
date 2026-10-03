@@ -5,8 +5,9 @@
 // legacy modes still apply their own jitter for visual parity.
 
 import { makeCaField, sampleFieldPoint } from '../field/index.js';
-import { CH, hashU01, rngForIndex } from '../rng.js';
+import { CH, hashU01, hashU32, rngForIndex } from '../rng.js';
 import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
+import { createNoise } from '../../noise.js';
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
 
@@ -516,6 +517,85 @@ registerSampler('abacus', abacus);
 registerSampler('noise', grid); // grid base; displacement warps in orchestrator
 registerSampler('hype', swarm);
 registerSampler('murmuration', swarm); // #280 — voice over the swarm engine
+/**
+ * brush — flow-field trail stamping for the Crooked Hand brush line.
+ *
+ * K seeded trails are traced through a simplex vector field
+ * (angle = noise3D(x·fieldScale, y·fieldScale, seedZ) · TAU); the count is
+ * dealt round-robin as stamps along the trails. Each stamp returns its
+ * trail-tangent as rot01 so the orchestrator can aim the stamp: stage C
+ * maps the unit draw through the rotate range, which at the default
+ * [-180, 180] IS the tangent angle in degrees.
+ *
+ * Pure and memoized per ctx: the ctx object is fresh per
+ * computeGeometrySoA call, so ctx._brush cannot leak across calls (same
+ * pattern as the CA field WeakMap, but call-scoped). Deliberately does NOT
+ * apply ctx.jitter — jitter would scatter stamps off the trail and break
+ * the line; wobbleAmp (slice 2) is the crooked knob.
+ */
+const BRUSH_TAU = Math.PI * 2;
+
+function traceBrushTrails(ctx, trailCount, per) {
+  const { w, h, seed, seedOffsets } = ctx;
+  const fieldScale = ctx.fieldScale ?? 0.004;
+  const brushSize = ctx.brushSize ?? 24;
+  const brushSpacing = ctx.brushSpacing ?? 0.5;
+  const stepLen = Math.max(0.5, brushSpacing * brushSize);
+  const noise = createNoise(hashU32(seed, CH.noise, 1, seedOffsets));
+  const seedZ = hashU01(seed, CH.noise, 2, seedOffsets) * 100;
+  // Slice 2 — the crooked: perpendicular trail wobble. Amp 0 skips the
+  // noise eval entirely, so amp 0 is bit-identical to no wobble knob.
+  const wobbleAmp = ctx.wobbleAmp ?? 0;
+  const wobbleFreq = ctx.wobbleFreq ?? 0.5;
+  const trails = [];
+  for (let k = 0; k < trailCount; k++) {
+    let x = hashU01(seed, CH.noise, 10 + k * 2, seedOffsets) * w;
+    let y = hashU01(seed, CH.noise, 11 + k * 2, seedOffsets) * h;
+    const pts = [];
+    for (let s = 0; s < per; s++) {
+      const ang = noise.noise3D(x * fieldScale, y * fieldScale, seedZ) * BRUSH_TAU;
+      // Step, reflecting off the canvas edges so trails stay on the page.
+      // Reflection preserves the step length, which the spacing invariant needs.
+      let a = ang;
+      let nx = x + Math.cos(a) * stepLen;
+      let ny = y + Math.sin(a) * stepLen;
+      if (nx < 0 || nx > w) { a = Math.PI - a; nx = x + Math.cos(a) * stepLen; }
+      if (ny < 0 || ny > h) { a = -a; ny = y + Math.sin(a) * stepLen; }
+      nx = Math.min(w, Math.max(0, nx));
+      ny = Math.min(h, Math.max(0, ny));
+      // Wobble pushes the stamp off the trail, perpendicular to the step,
+      // by fBm noise — the hand-drawn quiver. Bounded by wobbleAmp.
+      let ox = 0, oy = 0;
+      if (wobbleAmp > 0) {
+        const off = noise.fBm3D(s * wobbleFreq, k * 13.7 + 5, seedZ * 2 + 3, 2) * wobbleAmp;
+        ox = -Math.sin(a) * off;
+        oy = Math.cos(a) * off;
+      }
+      // rot01 maps the full circle onto the stage-C unit draw so that the
+      // default rotate range [-180, 180] reproduces the tangent in degrees.
+      const deg = a * 180 / Math.PI;
+      pts.push({ x: nx + ox, y: ny + oy, rot01: (((deg % 360) + 540) % 360) / 360 });
+      x = nx;
+      y = ny;
+    }
+    trails.push(pts);
+  }
+  return trails;
+}
+
+function brush(ctx) {
+  const { i, count } = ctx;
+  const trailCount = Math.max(1, Math.round(ctx.trailCount ?? 6));
+  const per = Math.max(1, Math.ceil(count / trailCount));
+  const cache = ctx._brush || (ctx._brush = traceBrushTrails(ctx, trailCount, per));
+  const trail = Math.floor(i / per) % trailCount;
+  const step = i % per;
+  const pts = cache[trail];
+  const p = pts[Math.min(step, pts.length - 1)];
+  return { x: p.x, y: p.y, t: per > 1 ? step / (per - 1) : 0.5, rot01: p.rot01 };
+}
+
+registerSampler('brush', brush);
 registerSampler('stratified', stratified);
 
 export {
@@ -537,4 +617,5 @@ export {
   orbit,
   abacus,
   stratified,
+  brush,
 };

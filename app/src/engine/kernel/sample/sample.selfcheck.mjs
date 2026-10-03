@@ -3,7 +3,7 @@
 
 import assert from 'node:assert';
 import { getSampler, listSamplers, stratified } from './registry.js';
-import { computePlacements } from '../../placement.js';
+import { computePlacements, geometrySignature } from '../../placement.js';
 import { mkRng } from '../../prng.js';
 import { hashU01 } from '../rng.js';
 
@@ -11,11 +11,15 @@ const required = [
   'grid', 'fibonacci', 'radial', 'swarm', 'flow', 'layers', 'rails',
   'ca', 'orbit', 'abacus', 'noise', 'hype', 'stratified', 'random',
   'dla', 'eden', // #720
+  'brush', // flow-field trail stamping
 ];
 
 for (const id of required) {
   assert.ok(getSampler(id), `missing sampler ${id}`);
 }
+// getSampler falls back to `random` for unknown modes, so the required loop
+// above cannot prove registration — the list check can.
+assert.ok(listSamplers().includes('brush'), 'brush must be registered');
 
 const listed = listSamplers();
 assert.ok(listed.includes('stratified'));
@@ -456,6 +460,123 @@ assert.ok(listed.includes('stratified'));
     assert.notDeepStrictEqual(lay(400, { lsysAngle: 40 }), p, 'the branch angle must change the plant');
     assert.notDeepStrictEqual(lay(400, { seed: 43 }), p, 'a different seed grows a different plant');
   }
+}
+
+// ── brush mode: flow-field trail stamping ──────────────────────────────────
+{
+  const W = 1000, H = 700, COUNT = 60, TRAILS = 6;
+  const PER = Math.ceil(COUNT / TRAILS);
+  const P = {
+    mode: 'brush', count: COUNT, seed: 0xbeef,
+    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
+    jitter: 0, density: 100, zTiers: 1, bleed: false,
+    canvasW: W, canvasH: H,
+    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: TRAILS,
+  };
+  const lay = (seed) => computePlacements({ ...P, seed });
+
+  // seed determinism: same seed → bit-identical placements, inside the canvas
+  const a = lay(0xbeef), b = lay(0xbeef);
+  assert.strictEqual(a.length, COUNT);
+  for (let k = 0; k < a.length; k++) {
+    assert.strictEqual(a[k].x, b[k].x, `x determinism ${k}`);
+    assert.strictEqual(a[k].y, b[k].y, `y determinism ${k}`);
+    assert.strictEqual(a[k].rotation, b[k].rotation, `rotation determinism ${k}`);
+    assert.ok(a[k].x >= 0 && a[k].x <= W, `x in bounds ${k}`);
+    assert.ok(a[k].y >= 0 && a[k].y <= H, `y in bounds ${k}`);
+  }
+
+  // spacing invariant: consecutive stamps on one trail step ≤ brushSpacing × brushSize
+  const sameTrail = (k) => Math.floor(k / PER) === Math.floor((k - 1) / PER);
+  const maxStep = P.brushSpacing * P.brushSize * 1.001;
+  for (let k = 1; k < a.length; k++) {
+    if (!sameTrail(k)) continue;
+    const d = Math.hypot(a[k].x - a[k - 1].x, a[k].y - a[k - 1].y);
+    assert.ok(d <= maxStep, `spacing invariant step ${k}: ${d} ≤ ${maxStep}`);
+  }
+
+  // rotation aims along the trail tangent (slice 2 adds ±10° stamp jitter)
+  const tangDiff = (k, arr) => {
+    const tang = Math.atan2(arr[k].y - arr[k - 1].y, arr[k].x - arr[k - 1].x) * 180 / Math.PI;
+    let diff = Math.abs(arr[k].rotation - tang) % 360;
+    return diff > 180 ? 360 - diff : diff;
+  };
+  for (let k = 1; k < a.length; k++) {
+    if (!sameTrail(k)) continue;
+    assert.ok(tangDiff(k, a) <= 10 + 1e-9, `rotation near tangent ${k}: ${tangDiff(k, a)}`);
+  }
+
+  // a different seed draws a different line
+  const c = lay(0x1234);
+  assert.ok(c.some((p, k) => p.x !== a[k].x), 'a new seed must move the line');
+
+  // cache honesty: every brush param busts the geometry signature
+  const s1 = geometrySignature(P);
+  for (const [key, val] of [['brushSize', 25], ['brushSpacing', 0.6], ['fieldScale', 0.005], ['trailCount', 7]]) {
+    assert.notDeepStrictEqual(geometrySignature({ ...P, [key]: val }), s1, `${key} must bust the cache`);
+  }
+}
+
+// ── brush slice 2: the crooked — trail wobble + stamp jitter ────────────────
+{
+  const W = 1000, H = 700, COUNT = 60, TRAILS = 6;
+  const PER = Math.ceil(COUNT / TRAILS);
+  const P = {
+    mode: 'brush', count: COUNT, seed: 0xbeef,
+    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
+    jitter: 0, density: 100, zTiers: 1, bleed: false,
+    canvasW: W, canvasH: H,
+    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: TRAILS,
+    wobbleFreq: 0.5,
+  };
+  const lay = (extra) => computePlacements({ ...P, ...extra });
+  const straight = lay({});
+
+  // amount-0 identity: explicit wobbleAmp 0 is bit-identical to no wobble knob
+  const zero = lay({ wobbleAmp: 0 });
+  assert.strictEqual(straight.length, zero.length);
+  for (let k = 0; k < straight.length; k++) {
+    assert.strictEqual(straight[k].x, zero[k].x, `wobble-0 x identity ${k}`);
+    assert.strictEqual(straight[k].y, zero[k].y, `wobble-0 y identity ${k}`);
+  }
+
+  // wobble moves stamps, perpendicular to the trail, bounded by the amp
+  const AMP = 8;
+  const wobbled = lay({ wobbleAmp: AMP });
+  let moved = 0, maxD = 0;
+  for (let k = 0; k < straight.length; k++) {
+    const d = Math.hypot(wobbled[k].x - straight[k].x, wobbled[k].y - straight[k].y);
+    maxD = Math.max(maxD, d);
+    if (d > AMP * 0.1) moved++;
+  }
+  assert.ok(moved > straight.length * 0.3, `wobble must move stamps (${moved})`);
+  assert.ok(maxD <= AMP * 1.5, `wobble bounded by amp (${maxD} ≤ ${AMP * 1.5})`);
+
+  // reseed repeats the wobble bit-identically
+  const wobbled2 = lay({ wobbleAmp: AMP });
+  for (let k = 0; k < straight.length; k++) {
+    assert.strictEqual(wobbled[k].x, wobbled2[k].x, `wobble reseed x ${k}`);
+    assert.strictEqual(wobbled[k].y, wobbled2[k].y, `wobble reseed y ${k}`);
+  }
+
+  // stamp jitter: rotation stays within ±10° of the trail tangent …
+  const sameTrail = (k) => Math.floor(k / PER) === Math.floor((k - 1) / PER);
+  for (let k = 1; k < straight.length; k++) {
+    if (!sameTrail(k)) continue;
+    const tang = Math.atan2(straight[k].y - straight[k - 1].y, straight[k].x - straight[k - 1].x) * 180 / Math.PI;
+    let diff = Math.abs(straight[k].rotation - tang) % 360;
+    if (diff > 180) diff = 360 - diff;
+    assert.ok(diff <= 10 + 1e-9, `rotation jitter ≤ 10° at ${k}: ${diff}`);
+  }
+  // … and scale stays within ±15% of the range around its midpoint
+  for (let k = 0; k < straight.length; k++) {
+    assert.ok(straight[k].scale >= 0.54 && straight[k].scale <= 0.66, `scale jitter ${k}: ${straight[k].scale}`);
+  }
+
+  // cache honesty for the new knobs
+  const s2 = geometrySignature(P);
+  assert.notDeepStrictEqual(geometrySignature({ ...P, wobbleAmp: 4 }), s2, 'wobbleAmp must bust the cache');
+  assert.notDeepStrictEqual(geometrySignature({ ...P, wobbleFreq: 0.9 }), s2, 'wobbleFreq must bust the cache');
 }
 
 console.log('kernel/sample.selfcheck: OK (K2)', { modes: listSamplers().length });
