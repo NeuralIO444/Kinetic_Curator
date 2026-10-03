@@ -1,5 +1,6 @@
 // Parameter block — RangeRows with tooltips (#14)
 import { RangeRow, DualRangeRow } from '../../components/RangeRow.jsx';
+import { MotionTile } from '../../components/MotionTile.jsx';
 import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES, isOrganismMode } from '../../data/layout-modes.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
@@ -129,7 +130,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         disabled={!isHype} disabledReason="Moth bodies only (hype mode)"
         onChange={v => set('body', v)} defaultValue={d('body', DEFAULT_LAYOUT_PARAMS.body)}
         locked={lockedParams.body} onToggleLock={() => lock('body')} />
-      <RangeRow label="FLAP" value={layoutParams.flap ?? 0.35} min={0} max={1} step={0.05}
+      <MotionTile kind="flap" label="flap" value={layoutParams.flap ?? 0.35} min={0} max={1} step={0.05}
         hint="Wing beat amplitude on bilateral wings and radial fans"
         disabled={!(isHype && (bilateral || radial))} disabledReason="Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)"
         onChange={v => set('flap', v)} defaultValue={d('flap', DEFAULT_LAYOUT_PARAMS.flap)}
@@ -143,7 +144,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
           on body scale; amplitude follows each creature's energy, so tired
           creatures breathe shallow. Scale is universal — it works on swarm
           dots, moths and stamps alike. */}
-      <RangeRow label="BREATH" value={layoutParams.breath ?? 0} min={0} max={1} step={0.05}
+      <MotionTile kind="breath" label="breath" value={layoutParams.breath ?? 0} min={0} max={1} step={0.05}
         hint="Breathing swell on body scale — amplitude follows each creature's energy, so tired creatures breathe shallow"
         disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"
         onChange={v => set('breath', v)} defaultValue={d('breath', DEFAULT_LAYOUT_PARAMS.breath)}
@@ -161,7 +162,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         hint="Moving marks thin across their motion as they stretch — 1 keeps their mass, 0 is stretch only"
         onChange={v => set('squash', v)} defaultValue={d('squash', DEFAULT_LAYOUT_PARAMS.squash)}
         locked={lockedParams.squash} onToggleLock={() => lock('squash')} />
-      <RangeRow label="WIND" value={layoutParams.wind ?? 1} min={0} max={3} step={0.1}
+      <MotionTile kind="wind" label="wind" value={layoutParams.wind ?? 1} min={0} max={3} step={0.1}
         hint="Hype-only multiplier on the noise wind"
         disabled={!isHype} disabledReason="Hype mode only"
         onChange={v => set('wind', v)} defaultValue={d('wind', DEFAULT_LAYOUT_PARAMS.wind)}
