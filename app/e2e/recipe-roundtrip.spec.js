@@ -53,8 +53,8 @@ test.describe('readable recipes (#307)', () => {
 
     // Paste the recipe back and apply: the exact scene returns.
     await page.getByRole('button', { name: /paste recipe/i }).click();
-    await page.getByLabel(/recipe text to apply/i).fill(recipeText);
-    await page.getByRole('button', { name: /^apply recipe$/i }).click();
+    await page.getByLabel(/recipe text or link to apply/i).fill(recipeText);
+    await page.getByRole('button', { name: /^apply$/i }).click();
 
     await expect(page.locator('.panel-output')).toContainText(/recipe applied/i);
     await expect(footer).toContainText(new RegExp(`seed:${seedHex}`, 'i'));
@@ -79,8 +79,8 @@ test.describe('readable recipes (#307)', () => {
     const before = await footer.textContent();
 
     await page.getByRole('button', { name: /paste recipe/i }).click();
-    await page.getByLabel(/recipe text to apply/i).fill('not a recipe at all');
-    await page.getByRole('button', { name: /^apply recipe$/i }).click();
+    await page.getByLabel(/recipe text or link to apply/i).fill('not a recipe at all');
+    await page.getByRole('button', { name: /^apply$/i }).click();
 
     await expect(page.locator('.panel-output')).toContainText(/recipe:/i);
     expect(await footer.textContent()).toBe(before);
