@@ -76,3 +76,5 @@ Palette remains paint. Curator remains a verb. Boot (`rollLivingBoot`) is a fact
 **Why:** The board was three types in one skin (TEMPO_AND_CHIPS). Face copy still said PRESET / VIBE / HYPE for all of them. Cleaning names is the system; a new apply path would be a bandage.
 
 **Loop leg:** guide.
+
+**2026-10-03 addendum:** Two deliberate exceptions to the Preset ban, recorded so a future audit doesn't "fix" them: CANVAS PRESET (SetupBlock — canvas dimensions, #606) and QUALITY_PRESETS (governor budgets, BudgetKnob) name different objects than the composition preset → Look rename; the ban covers the composition noun only. Kineme (#781) is not a fifth noun — its drivers are modulation, RATE/amounts/BOIL are controls. The four-noun set is closed.
