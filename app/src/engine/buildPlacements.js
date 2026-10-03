@@ -17,6 +17,7 @@
 // exactly as before. Selfchecks and studio/render.mjs take that path.
 
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
+import { applyKinemeDrivers } from './kineme.js';
 import { assignColor, resolveStrategy } from './kernel/color/index.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
@@ -100,6 +101,13 @@ export function buildPlacements({
   // caGrid — geometry inputs, not layout params.
   growthTick = 0,
   audioEnergy = null,
+  kineme = null,
+  // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
+  // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
+  // must not bust the geometry cache. kineme = {
+  //   driverSec, boilStep, seed,
+  //   amounts: { breath, drift, pulse, brushWobble },
+  //   canvasW, canvasH, shedTier }
 }) {
   const caps = capsIn || getQualityCaps('balanced');
   const preset = getPreset(layoutParams.composition);
@@ -169,6 +177,11 @@ export function buildPlacements({
       soa.alpha[k] *= fadeForAge(soa.t[k], fade);
     }
   }
+
+  // Kineme living-motion drivers (slice 2): per-instance scale/position
+  // deltas folded into the stage-C channels. Ephemeral — the geometry and
+  // bind caches above are untouched, and amount 0 is bit-identical.
+  if (kineme) applyKinemeDrivers(soa, kineme);
 
   // ── Stage D+E: asset bind + colour. Both are functions of (seed, index)
   // plus the asset pool / palette / strategy — never of the ranges — so they
