@@ -76,6 +76,7 @@
 import { FULL_VS, COPY_FS } from './shaders.mjs';
 import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
 import { registerCostTier } from './costTiers.mjs';
+import { sampleFlowField } from './flowField.mjs';
 
 export const ACCUM_VERSION = 2;
 
@@ -328,14 +329,17 @@ void main() {
 }`;
 
 // Phase B2 — flow-advected feedback. Samples the buffer at
-// uv + flow(uv) * u_flow, where flow() is a small in-shader value-noise
-// field (no textures). The hash is integer-based so the JS mirror can
-// reproduce it exactly (float sin-hashes diverge between GPU float32 and
-// JS float64). Skipped on the CPU side at flow = 0 — exact old behavior.
+// uv + flow(uv) * u_flow. Default flow() is the integer hash (legacy,
+// seedless). When u_flowShared is set, the displacement is the project-seed
+// curl table uploaded by the loop — the same createNoise the swarm uses.
+// The hash stays so a step with no field is byte-identical to before.
+// Skipped on the CPU side at flow = 0 — exact old behavior.
 export const FEED_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
+uniform sampler2D u_flowField;
 uniform float u_flow;   // max UV displacement; 0 = off (pass skipped)
+uniform float u_flowShared; // 1 = sample the project-seed curl table
 in vec2 v_cuv;
 out vec4 o;
 uint ihash(uvec2 p) {
@@ -366,7 +370,8 @@ vec2 flowVec(vec2 uv) {
   return vec2(n1 - 0.5 + 0.5 * (n3 - 0.5), n2 - 0.5 - 0.5 * (n3 - 0.5));
 }
 void main() {
-  vec2 tuv = v_cuv + flowVec(v_cuv) * u_flow;
+  vec2 advect = u_flowShared > 0.5 ? texture(u_flowField, v_cuv).xy : flowVec(v_cuv);
+  vec2 tuv = v_cuv + advect * u_flow;
   o = texture(u_src, tuv);
 }`;
 
@@ -523,7 +528,7 @@ export const ACCUM_PROGRAMS = {
   fade: { fs: FADE_FS, file: 'accum.mjs:FADE_FS', uniforms: ['u_src', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.8, notes: 'fade + tunnel/prism feedback; shed with ACCUM' } },
   // Flow feedback: advects the buffer through the flow field.
-  feed: { fs: FEED_FS, file: 'accum.mjs:FEED_FS', uniforms: ['u_src', 'u_flow'],
+  feed: { fs: FEED_FS, file: 'accum.mjs:FEED_FS', uniforms: ['u_src', 'u_flowField', 'u_flow', 'u_flowShared'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 1.0, notes: 'flow feedback advection' } },
   // Echoes: mixes up to 4 past frames; the ring is the memory-heavy one.
   echo: { fs: ECHO_FS, file: 'accum.mjs:ECHO_FS', uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps'],
@@ -785,8 +790,14 @@ function vnoise2(px, py) {
   return (a + (b - a) * ux) * (1 - uy) + (c + (d - c) * ux) * uy;
 }
 
-/** Flow displacement vector for UV (u, v), matching FEED_FS flowVec. */
-export function mirrorFlowVec(u, v) {
+/** Flow displacement vector for UV (u, v).
+ *  No field: legacy hash, matching FEED_FS flowVec.
+ *  Field: project-seed curl table, matching the shared sampler. */
+export function mirrorFlowVec(u, v, field = null) {
+  if (field) {
+    // Late import keeps accum.mjs free of a cycle through the field builder.
+    return sampleFlowField(field, u, v);
+  }
   const px = u * 6, py = v * 6;
   const n1 = vnoise2(px, py);
   const n2 = vnoise2(px + 7.3, py + 2.9);
@@ -843,7 +854,7 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const u = (x + 0.5) / w, v = (y + 0.5) / h;
-        const [fx, fy] = mirrorFlowVec(u, v);
+        const [fx, fy] = mirrorFlowVec(u, v, p.flowField);
         const tu = u + fx * p.flowUv, tv = v + fy * p.flowUv;
         const o = (y * w + x) * 4;
         fed[o] = nearest(tu, tv, 0);
@@ -981,7 +992,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       const L = {};
       const U = (n) => gl.getUniformLocation(progs[name], n);
       for (const u of ['u_src', 'u_dst', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
-        'u_flow',
+        'u_flow', 'u_flowField', 'u_flowShared',
         'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps',
         'u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint',
         'u_srcSize']) {
@@ -1046,6 +1057,32 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     return unit;
+  };
+
+  // Project-seed curl table. Static. Rebuilt only when the seed changes.
+  // 1x1 zero keeps the sampler valid when the legacy hash path is on.
+  const flowTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, flowTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, 1, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array([0, 0, 0, 1]));
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  let flowKey = null;
+  const ensureFlow = (field) => {
+    if (!field || flowKey === field.seed) return;
+    const n = field.n;
+    const rgba = new Float32Array(n * n * 4);
+    for (let i = 0; i < n * n; i++) {
+      rgba[i * 4] = field.data[i * 2];
+      rgba[i * 4 + 1] = field.data[i * 2 + 1];
+      rgba[i * 4 + 3] = 1;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, flowTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, n, n, 0, gl.RGBA, gl.FLOAT, rgba);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    flowKey = field.seed;
   };
 
   function pass(name, writeT, setup) {
@@ -1164,9 +1201,12 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       // buffer is exactly the old one (the optics no-op precedent).
       let write = other();
       if (p.flowUv > 0) {
+        ensureFlow(p.flowField);
         pass('feed', write, (u, bind) => {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
+          gl.uniform1i(u.u_flowField, bind(1, flowTex));
           gl.uniform1f(u.u_flow, p.flowUv);
+          gl.uniform1f(u.u_flowShared, p.flowField ? 1 : 0);
         });
         cur = write;
         write = other();
