@@ -9,7 +9,7 @@ Everything merged to `main` since the 2026-09-28 sync.
 - **Director (#830, #616, #717, #734)** — DAVIS renamed Director; regrouped VOICES / GENERATE / PERFORM with live EVOLVE progress; flagship voices moved here, load-only, with ✎ fork dish into MY VOICES.
 - **Light and mass (#594 1–3/5, #704, #741, #740, #532)** — the one CHIAROSCURO sun, bevel normals + tight spec, squash-and-stretch, DARK GLASS voice, gate weave, FXAA as governor cut 0, ACES + Bayer resolve.
 - **Motion (#781, #558, #796, #807–#821, #763, #711, #710)** — kinemes (Build A, Build C UV window), per-node uniqueness at instantiation, diorama parallax, remainder clocks, ACCUM feedback guard, seek/flee in swarm mode, lorenz re-entry.
-- **Colour + shapes (#632, #733, #735, #716)** — FADE per-node transition, 4-state shape mixer, taxonomy LOOK/VOICE/SYSTEM/CAST, Curator cluster in the top bar. An FX slot reads as a TX-6 tile: abbreviation, ✕, glyph, one mode word.
+- **Colour + shapes (#632, #733, #735, #716)** — FADE per-node transition, 4-state shape mixer, taxonomy LOOK/VOICE/SYSTEM/CAST, Curator cluster in the top bar. An FX slot reads as a TX-6 tile: abbreviation, ✕, glyph, one mode word. Wind, breath, flap and life wear a live-glyph tile: the pictogram tracks the slider, with a big number and a lowercase label.
 - **Curator (#762, #719, #793)** — Taste v1 + `taste.json` import, named recipe features on keeps, biology lifecycle policy, taste validator.
 - **FX (#732, #744, #745, #520)** — one family per FX stack slot, signed grain, RGB split keeps source alpha, FX rack UI.
 - **Samplers (#586–#592)** — truchet, voronoi scatter, l-system, OKLCH grade, displace domain-warp, Markov weights, euclidean phrase clock.

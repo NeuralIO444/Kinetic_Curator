@@ -1,5 +1,6 @@
 import { emit, Events } from '../../composition/eventBus.js';
 import { ModSlider } from './ModSlider.jsx';
+import { MotionTile } from '../../components/MotionTile.jsx';
 import { BALLISTICS_CURVES } from '../../gl/audioBallistics.mjs';
 
 // #306: envelope ballistics deepen the existing REACTIVITY controls —
@@ -86,8 +87,9 @@ export function ReactivityControls({ depth, scaleMod, alphaMod, life, attackMs, 
       <ModSlider label="ALPHA" value={alphaMod} min={0} max={1} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: v })} hint="Bands → opacity pulse."
         disabled={!audioEnabled} disabledReason={disabledReason} />
-      <ModSlider label="LIFE" value={life} min={0} max={1} step={0.05}
-        onChange={v => emit(Events.LAYOUT_PARAM, { key: 'lifeDrift', value: v })} hint="Slow LFO while RUN is on. Independent of phrase and evolve." />
+      <MotionTile kind="life" label="life" value={life} min={0} max={1} step={0.05}
+        onChange={v => emit(Events.LAYOUT_PARAM, { key: 'lifeDrift', value: v })}
+        hint="Slow LFO while RUN is on. Independent of phrase and evolve." />
 
       <div style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', margin: '8px 0 6px' }} title="Attack/decay ballistics shape the mic envelope before it drives anything — smoothing jittery transient-snapping into a heavy, fluid weight.">ENVELOPE</div>
 
