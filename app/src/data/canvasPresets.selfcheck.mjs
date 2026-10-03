@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas, renderDims, canvasCostTier,
+  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas, renderDims, canvasCostTier, resolveCanvasFps,
 } from './canvasPresets.js';
 import { serializeProject } from '../state/projectDocument.js';
 
@@ -49,7 +49,22 @@ test('#606 canvasCostTier maps Mpx/s onto governor tiers', () => {
   assert.equal(canvasCostTier(1427), 3); // Times Square-class @ 60
 });
 
-test('#606 instrument canvas omitted from serialize', () => {
+test('#606 sync fps resolves against the display, capped at 60', () => {
+  assert.equal(resolveCanvasFps('sync', 120), 60); // 120Hz display -> cap
+  assert.equal(resolveCanvasFps('sync', 60), 60);
+  assert.equal(resolveCanvasFps('sync', 50), 50); // slower display -> follow it
+  assert.equal(resolveCanvasFps('sync', null), 60); // unknown display -> cap
+  assert.equal(resolveCanvasFps(30, 120), 30); // fixed fps ignores the display
+  assert.equal(resolveCanvasFps(60, 120), 60);
+});
+
+test('#606 sanitize keeps the sync fps option', () => {
+  assert.equal(sanitizeCanvasSpec({ canvasFps: 'sync' }).canvasFps, 'sync');
+  assert.equal(sanitizeCanvasSpec({ canvasFps: 30 }).canvasFps, 30);
+  assert.equal(sanitizeCanvasSpec({ canvasFps: 12 }).canvasFps, 60); // invalid -> default
+});
+
+test('#606 HD boot default: instrument canvas is 1920x1080 and omitted from serialize', () => {
   const doc = serializeProject({
     seed: 1,
     seedOffsets: null,
@@ -58,8 +73,8 @@ test('#606 instrument canvas omitted from serialize', () => {
     enabledAssets: {},
     quality: 'balanced',
     autoQuality: true,
-    canvasW: 1000,
-    canvasH: 700,
+    canvasW: 1920,
+    canvasH: 1080,
     canvasFps: 60,
     canvasPresetId: 'instrument',
     stageMode: 'preview',
@@ -67,8 +82,10 @@ test('#606 instrument canvas omitted from serialize', () => {
     activeLayerId: null,
   });
   assert.equal(doc.canvasW, undefined);
-  assert.ok(isInstrumentCanvas({ canvasW: 1000, canvasH: 700 }));
-  assert.equal(INSTRUMENT_CANVAS.w, 1000);
+  assert.ok(isInstrumentCanvas({ canvasW: 1920, canvasH: 1080 }));
+  assert.ok(!isInstrumentCanvas({ canvasW: 1000, canvasH: 700 }));
+  assert.equal(INSTRUMENT_CANVAS.w, 1920);
+  assert.equal(INSTRUMENT_CANVAS.h, 1080);
 });
 
 test('#606 authoredCanvas reads store-shaped state', () => {
