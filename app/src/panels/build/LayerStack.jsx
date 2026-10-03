@@ -10,6 +10,7 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES } from '../../data/layout-modes.js';
 import { FX_EFFECT_DEFS, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
 import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
+import { efTileFace } from '../../fx/efRackTile.mjs';
 import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
@@ -65,8 +66,33 @@ function PatchDiagLine({ layerId, patch, srcN, dstN }) {
   return <div className="patch-diag" title={line.title}>{line.text}</div>;
 }
 
+function EfGlyph({ kind }) {
+  if (kind === 'displace') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 16c4-6 6 6 10 0s6-6 10 0" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
+  if (kind === 'tear') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 8h10M14 16h10M8 24h10" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
+  if (kind === 'rgbSplit') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 10h8M14 16h8M10 22h8" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
+  if (kind === 'halo') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="4" fill="currentColor" /><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>;
+  if (kind === 'grain') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="12" r="1" fill="currentColor" /><circle cx="18" cy="10" r="1" fill="currentColor" /><circle cx="22" cy="18" r="1" fill="currentColor" /><circle cx="12" cy="20" r="1" fill="currentColor" /></svg>;
+  if (!kind || kind === 'empty') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="8" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2" /></svg>;
+  return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
+}
+
+function EfTile({ slot, kind, onBypass, children }) {
+  const face = efTileFace(slot, kind);
+  return (
+    <div className="ef-tile" title={`${slot.label} · ${face.word}`}>
+      <span className="ef-abbr">{face.abbr}</span>
+      {onBypass ? (
+        <button type="button" className="ef-bypass" onClick={onBypass} title="Remove this effect">✕</button>
+      ) : <span className="ef-bypass ef-bypass-off" aria-hidden="true" />}
+      <EfGlyph kind={face.glyph} />
+      <span className="ef-word">{face.word}</span>
+      {children}
+    </div>
+  );
+}
+
 // #520 Phase 4 — rack UI: slot-driven display, one row per EF slot.
-// Slot order is fixed (EF-1 first, EF-4 last); reorder buttons are gone.
+// #716 — TX-6 tile: abbreviation, ✕, glyph, one mode word.
 function FxEffectEditor({ layer, fxOrdinal }) {
   const [pick, setPick] = useState(null);
   const slot = rackSlotForFxOrdinal(fxOrdinal);
@@ -80,13 +106,8 @@ function FxEffectEditor({ layer, fxOrdinal }) {
     const def = FX_EFFECT_DEFS[filled.kind];
     if (!def) return null;
     return (
-      <div className="fx-editor" title={`${slot.label} · one family`}>
-        <div className="fx-slot">
-          <div className="fx-effect-head">
-            <span className="fx-slot-label">FX {fxOrdinal}</span>
-            <span className="fx-effect-name" title={def.hint}>{def.label}</span>
-            <button className="micro-btn" onClick={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}>×</button>
-          </div>
+      <div className="fx-editor" title={`FX ${fxOrdinal} · ${slot.label}`}>
+        <EfTile slot={slot} kind={filled.kind} onBypass={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}>
           {Object.entries(def.params).map(([key, p]) => (
             <div className="fx-param" key={key}>
               <label title={p.hint}>{p.label}</label>
@@ -96,7 +117,7 @@ function FxEffectEditor({ layer, fxOrdinal }) {
               <span className="fx-param-readout">{filled.params?.[key] ?? p.def}</span>
             </div>
           ))}
-        </div>
+        </EfTile>
       </div>
     );
   }
@@ -104,8 +125,7 @@ function FxEffectEditor({ layer, fxOrdinal }) {
   const effectiveKind = slotKinds.includes(pick) ? pick : (slotKinds[0] ?? null);
   return (
     <div className="fx-editor" title={`${slot.label} · one family`}>
-      <div className="fx-slot fx-slot-empty">
-        <span className="fx-slot-label">FX {fxOrdinal}</span>
+      <EfTile slot={slot} kind={null}>
         <span className="fx-slot-family">{slot.label}</span>
         {slot.stubs.map((s) => (
           <span key={s} className="fx-stub" title="Planned — not yet available">{s.toUpperCase()}</span>
@@ -122,7 +142,7 @@ function FxEffectEditor({ layer, fxOrdinal }) {
             </button>
           </>
         )}
-      </div>
+      </EfTile>
     </div>
   );
 }
