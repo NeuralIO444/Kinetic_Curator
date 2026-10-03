@@ -13,8 +13,14 @@
 export const QUAD_LEAF_BUDGET = 1024;
 /** Absolute max subdivision depth (spec: builder's call, 6 is the box). */
 export const QUAD_MAX_DEPTH = 6;
-/** Starting split threshold (spec §Subdivision). */
-export const QUAD_THRESHOLD = 0.35;
+/**
+ * Split threshold (spec §Subdivision suggested ~0.35 as a starting point;
+ * calibrated to 0.22 against the actual term scales: the field term's
+ * scale-aware stencil reads ~0.25 at the root of a typical seed, and the
+ * audio term spans 0..1 — 0.22 splits real ridges and hot bands without
+ * turning a busy field uniform).
+ */
+export const QUAD_THRESHOLD = 0.22;
 /** Cache size: the family's small-evicting-Map discipline (cf. lsystem). */
 const QUAD_CACHE_SIZE = 8;
 
@@ -29,7 +35,8 @@ const _quadCache = new Map();
  * all-interesting signal degrades to a uniform grid at maxDepth, not a hang.
  *
  * @param {object} opts
- * @param {(x:number,y:number,depth:number)=>number} opts.interestingness
+ * @param {(x:number,y:number,w:number,h:number,depth:number)=>number} opts.interestingness
+ *   cell center (x,y), cell size (w,h), depth → 0..1
  * @param {number} [opts.maxDepth=5]
  * @param {number} [opts.leafBudget=1024]
  * @param {number} [opts.threshold=0.35]
@@ -73,8 +80,11 @@ export function clearQuadtreeCache() {
 
 function subdivide(interestingness, maxDepth, leafBudget, threshold) {
   // Non-finite scores fail safe to 0 (never interesting, never a split).
+  // The callback gets the cell center AND bounds: point signals (field
+  // ridges) sample the center; smooth signals (audio geography) can take
+  // the max over the cell so a hot band inside a cool cell still splits it.
   const scoreOf = (x, y, w, h, d) => {
-    const s = interestingness(x + w / 2, y + h / 2, d);
+    const s = interestingness(x + w / 2, y + h / 2, w, h, d);
     return Number.isFinite(s) ? Math.min(1, Math.max(0, s)) : 0;
   };
   const leaves = [{ x: 0, y: 0, w: 1, h: 1, depth: 0, score: scoreOf(0, 0, 1, 1, 0) }];
