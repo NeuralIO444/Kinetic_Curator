@@ -46,6 +46,7 @@ import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
 import { isLeave, isRibbon, isComet } from './trailMode.mjs';
 import { buildFlowField } from './flowField.mjs';
+import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
@@ -278,7 +279,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   const flowFor = (seed) => {
     const key = (seed >>> 0) || 444;
     if (!flowField || flowFieldSeed !== key) {
-      flowField = buildFlowField(key);
+      flowField = buildFlowField(createNoise(key));
       flowFieldSeed = key;
     }
     return flowField;

@@ -1,14 +1,12 @@
 // FLOW wire — the trail advects through the project-seed curl, not a private hash.
 // Static lookup. Not the Stage 3 ping-pong scent field.
-
-import { createNoise } from '../engine/noise.js';
+// No engine import: the GL probe server only serves src/gl.
 
 export const FLOW_FIELD_N = 32;
 
-/** One curl2 sample per cell. Same createNoise the swarm uses. */
-export function buildFlowField(seed) {
-  const key = (seed >>> 0) || 444;
-  const noise = createNoise(key);
+/** One curl2 sample per cell. Caller passes createNoise(seed). */
+export function buildFlowField(noise) {
+  if (!noise || typeof noise.curl2 !== 'function') throw new Error('buildFlowField: noise.curl2 required');
   const n = FLOW_FIELD_N;
   const data = new Float32Array(n * n * 2);
   const out = { x: 0, y: 0 };
@@ -22,7 +20,7 @@ export function buildFlowField(seed) {
       data[o + 1] = out.y;
     }
   }
-  return { n, seed: key, data };
+  return { n, seed: noise.seed, data };
 }
 
 /** Bilinear sample. Matches a linear texture of the same table. */
