@@ -1,3 +1,5 @@
+> **2026-10-03:** stale below the review. #782 (frame-strip revert) and #784 (Build A: spin, rock, pulse, blink, bob) are merged. Instance floats 18 and 19 are spent. Do not rebuild Build A. §6 stepped-cell question is still open.
+
 # Handoff: KINEME — the decoupled animation system
 
 **Status:** DRAFT for Matt's review. No build authorized yet — decisions pending (see Review §6).

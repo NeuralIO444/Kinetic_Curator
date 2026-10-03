@@ -1,3 +1,5 @@
+> **2026-10-03:** this note is the closed gen-1 contract. Do not start at spine A. Successor: [ENGINE_PLAN_GEN2.md](ENGINE_PLAN_GEN2.md). LEAVE is already on main (`trailMode.mjs`). KINEME Build A is #784. The open wire is FLOW sharing `worldNoise`.
+
 # KC-1 engine plan — connect what exists
 
 *Reviewed against `main` at `f2e0fa3` (2026-09-19). Plan, not a patch.*
