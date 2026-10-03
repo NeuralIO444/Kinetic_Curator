@@ -59,7 +59,11 @@ export function DataExportRow({
       try { payload = attachThumbnail(payload, canvas.toDataURL('image/jpeg', 0.4)); } catch { /* hold last frame */ }
     }
     const filename = nextExportFilename(payload);
-    downloadProject(payload, filename);
+    const dl = downloadProject(payload, filename);
+    if (!dl.ok) {
+      onMessage(`Export failed: ${dl.error}`);
+      return;
+    }
     exportedPayload.current = payloadFingerprint(payload);
     onMessage(exportSavedMessage(filename));
     setRecent(rememberRecent(filename));

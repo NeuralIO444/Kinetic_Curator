@@ -106,8 +106,8 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
         try { payload = attachThumbnail(payload, canvas.toDataURL('image/jpeg', 0.4)); } catch { /* hold last frame */ }
       }
       const filename = nextExportFilename(payload);
-      downloadProject(payload, filename);
-      s.setStatus?.(exportSavedMessage(filename));
+      const dl = downloadProject(payload, filename);
+      s.setStatus?.(dl.ok ? exportSavedMessage(filename) : `Export failed: ${dl.error}`);
     };
     window.addEventListener('keydown', onExport);
     return () => window.removeEventListener('keydown', onExport);
