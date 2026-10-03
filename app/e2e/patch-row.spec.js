@@ -11,7 +11,7 @@ test('PATCH target is pickable while OFF and survives a mode change', async ({ p
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   // Header ADD buttons are retired; tap the dimmed ghost slots to arm KC-2, KC-3.
-  for (const n of [2, 3]) await page.locator('.layer-row[style*="0.35"]').filter({ hasText: `KC-${n}` }).click();
+  for (const n of [2, 3]) await page.locator('.layer-row-ghost').filter({ hasText: `KC-${n}` }).click();
 
   // DOM order is top-of-stack first, so KC-1 is the last content row.
   const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).last();

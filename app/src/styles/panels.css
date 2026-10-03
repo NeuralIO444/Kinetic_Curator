@@ -329,10 +329,21 @@
 /* ─── Layers ─── */
 .layer-list { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
 .layer-row { border: 1px solid var(--line); padding: 4px; background: rgba(0,0,0,0.15); }
+.layer-row-ghost { opacity: 0.35; }
 .layer-row-active { border-color: var(--accent3); }
 .layer-row-fx { border-color: #8a6cff; background: rgba(138, 108, 255, 0.07); }
 .layer-row-fx-selected { border-color: #b49aff; box-shadow: 0 0 0 1px #b49aff inset; }
 .layer-row-main { display: flex; align-items: center; gap: 4px; }
+/* #716 — TX-6 numeral tile. Black block + white numeral on every row;
+   the edited track inverts. Literals, not theme tokens: the tile is hardware. */
+.track-numeral {
+  flex: 0 0 auto; min-width: 22px; height: 22px; padding: 0 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #0a0a0a; color: #f4f4f4; border: 1px solid #0a0a0a;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.02em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.track-numeral-edited { background: #f4f4f4; color: #0a0a0a; border-color: #f4f4f4; }
 .layer-reorder { display: flex; flex-direction: column; }
 .layer-reorder .micro-btn { padding: 0 4px; line-height: 1.1; font-size: 8px; }
 .layer-name {
