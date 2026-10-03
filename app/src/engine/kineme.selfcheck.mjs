@@ -287,3 +287,57 @@ console.log('kineme.selfcheck: OK (live ctx + freeze)');
 }
 
 console.log('kineme.selfcheck: OK (shed hold)');
+
+// ── slice 5: still/print path ────────────────────────────────────────────
+import { kinemeStillStep } from './kineme.js';
+
+{
+  const st = kinemeStillStep(1234);
+  assert.strictEqual(st, kinemeStillStep(1234), 'same seed → same boil frame');
+  assert.ok(Number.isInteger(st) && st >= 0, 'a valid frame');
+  assert.notStrictEqual(st, kinemeStillStep(1235), 'reseed → new drawing');
+}
+
+// The baker's contract: same seed + same amounts → same items, through the
+// SAME evaluator the live canvas uses. Different seed → different pose.
+{
+  const assets = [
+    { id: 'a', weight: 'heavy' },
+    { id: 'b', weight: 'medium' },
+  ];
+  const palette = { swatches: ['#111', '#222', '#333'] };
+  const layoutParams = {
+    mode: 'grid', composition: 'default', count: 40,
+    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
+    jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false,
+    displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+    kinemeBreath: 0.6, kinemeDrift: 0.4, kinemePulse: 0.5, kinemeBoilFps: 8,
+  };
+  const base = {
+    layoutParams, activeAssets: assets, palette,
+    caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
+    canvasW: 1000, canvasH: 700,
+  };
+  const stillKineme = (seed) => buildKinemeCtx({
+    layoutParams,
+    driverSec: kinemeStillSec(seed, clampBoilFps(layoutParams.kinemeBoilFps)),
+    boilStep: kinemeStillStep(seed),
+    seed, canvasW: 1000, canvasH: 700, shedTier: 0,
+  });
+  const itemsFor = (seed) => buildPlacements({ ...base, seed, kineme: stillKineme(seed) }).items;
+  const a = itemsFor(777);
+  const b = itemsFor(777);
+  assert.strictEqual(a.length, b.length);
+  for (let i = 0; i < a.length; i++) {
+    assert.strictEqual(a[i].x, b[i].x, 'reprint same seed → identical still');
+    assert.strictEqual(a[i].scale, b[i].scale, 'reprint same seed → identical still');
+  }
+  const c = itemsFor(778);
+  let moved = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (c[i].x !== a[i].x || c[i].scale !== a[i].scale) moved++;
+  }
+  assert.ok(moved > 0, 'reseed → a new moment, not the same frame');
+}
+
+console.log('kineme.selfcheck: OK (still path)');
