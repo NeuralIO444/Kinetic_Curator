@@ -140,6 +140,17 @@ export function buildPlacements({
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
+    // Brush line: the stamped tip asset id, plus the six placement scalars.
+    // brushTip rides stage D (asset bind); the scalars ride stage A/B
+    // geometry — without them the live path silently ran PR1/PR2 defaults
+    // no matter what the layout params said.
+    brushTip: layoutParams.brushTip,
+    brushSize: layoutParams.brushSize,
+    brushSpacing: layoutParams.brushSpacing,
+    fieldScale: layoutParams.fieldScale,
+    trailCount: layoutParams.trailCount,
+    wobbleAmp: layoutParams.wobbleAmp,
+    wobbleFreq: layoutParams.wobbleFreq,
   };
 
   const strategy = resolveStrategy(layoutParams, preset);
@@ -193,13 +204,19 @@ export function buildPlacements({
     // own heavy/medium/light when the resolver set one.
     const weights = activeAssets.map((a) => (a.mixWeight > 0 ? a.mixWeight : SELECTION_WEIGHT[a.weight] || 1));
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    // Brush line: every stamp carries the picked tip, not a weighted cast
+    // draw. A missing/blank tip falls back to the dot primitive; an unknown
+    // id is left alone and the renderer skips it (Spine B), never throws.
+    const tip = layoutParams.mode === 'brush'
+      ? (typeof layoutParams.brushTip === 'string' && layoutParams.brushTip ? layoutParams.brushTip : 'geo_circle_01')
+      : null;
     assetIds = new Array(soa.n);
     colors = new Array(soa.n);
     accents = new Array(soa.n);
     keys = new Array(soa.n);
     for (let k = 0; k < soa.n; k++) {
       const index = soa.index[k];
-      const asset = pickWeightedIndexStable(
+      const asset = tip ? { id: tip } : pickWeightedIndexStable(
         activeAssets, weights, totalWeight, seed, index, seedOffsets,
       );
       // K5 (#64): colour comes from the kernel's colour channel only.

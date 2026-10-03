@@ -1,6 +1,6 @@
 // Parameter block — RangeRows with tooltips (#14)
 import { RangeRow, DualRangeRow } from '../../components/RangeRow.jsx';
-import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES, isOrganismMode } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES, BRUSH_TIPS, isOrganismMode } from '../../data/layout-modes.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
@@ -18,6 +18,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
   // physics sliders, not the moth ones.
   const isSwarm = mode === 'swarm' || mode === 'murmuration';
   const isHype = mode === 'hype';
+  const isBrush = mode === 'brush';
   // #479 micro-fix: COHESION is already dimmed off-swarm (#272), but on hype
   // the reason named the mode gate, not the authority — the BEHAVE table's
   // coh wins there (particles.js: cohW = organism ? profile.coh : ...).
@@ -166,6 +167,21 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         disabled={!isHype} disabledReason="Hype mode only"
         onChange={v => set('wind', v)} defaultValue={d('wind', DEFAULT_LAYOUT_PARAMS.wind)}
         locked={lockedParams.wind} onToggleLock={() => lock('wind')} />
+
+      <div className="param-subheader">🖌 BRUSH LINE</div>
+      {/* Brush-tip picker: which asset is stamped along the path. #272 — the
+          row stays visible off brush mode but inert, with the reason on the
+          buttons, like every other mode-gated control in this block. */}
+      <div className="davis-source-row" style={{ marginTop: 6 }} data-testid="brush-tip-row">
+        <span className="davis-label">TIP</span>
+        {BRUSH_TIPS.map((t) => (
+          <button key={t.id} type="button"
+            className={`chip-btn ${(layoutParams.brushTip || 'geo_circle_01') === t.id ? 'active' : ''}`}
+            disabled={!isBrush}
+            title={isBrush ? `Stamp every mark with ${t.name}` : 'Brush mode only'}
+            onClick={() => set('brushTip', t.id)}>{t.name}</button>
+        ))}
+      </div>
 
       <div className="davis-source-row" style={{ marginTop: 6 }}>
         <span className="davis-label">SYMMETRY</span>

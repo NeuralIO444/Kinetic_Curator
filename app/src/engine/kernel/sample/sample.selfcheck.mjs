@@ -512,7 +512,7 @@ assert.ok(listed.includes('stratified'));
 
   // cache honesty: every brush param busts the geometry signature
   const s1 = geometrySignature(P);
-  for (const [key, val] of [['brushSize', 25], ['brushSpacing', 0.6], ['fieldScale', 0.005], ['trailCount', 7]]) {
+  for (const [key, val] of [['brushSize', 25], ['brushSpacing', 0.6], ['fieldScale', 0.005], ['trailCount', 7], ['brushTip', 'geo_circle_02']]) {
     assert.notDeepStrictEqual(geometrySignature({ ...P, [key]: val }), s1, `${key} must bust the cache`);
   }
 }
