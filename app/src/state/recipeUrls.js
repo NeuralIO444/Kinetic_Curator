@@ -87,6 +87,27 @@ function fail(error) {
 }
 
 /**
+ * Build the full shareable href for an encoded payload: the current page
+ * minus any existing fragment, plus `#r=<payload>`. Pure — the fragment
+ * never leaves the machine except by user copy.
+ */
+export function buildShareHref(payload, baseUrl) {
+  const base = typeof baseUrl === 'string' ? baseUrl.split('#')[0] : '';
+  return `${base}#${RECIPE_URL_HASH_KEY}=${payload}`;
+}
+
+/**
+ * Find a kc-r/1 payload inside pasted text: a full share URL
+ * (`…/#r=kc-r/1.…`), a bare `kc-r/1.…` payload, or either wrapped in
+ * whitespace. Returns the payload string or null.
+ */
+export function extractRecipePayload(text) {
+  if (typeof text !== 'string') return null;
+  const m = /(kc-r\/1\.[A-Za-z0-9-_]+)/.exec(text);
+  return m ? m[1] : null;
+}
+
+/**
  * Encode recipe fields to a kc-r/1 URL string (the part after `#r=`).
  * Fields: { seed, seedOffsets, paletteId, paletteOverrides?, layoutParams }.
  * Accepts the same carrier shape as recipes.recipeFieldsFromKept — favorites
