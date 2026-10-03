@@ -1,11 +1,14 @@
 /**
- * Shared GLSL sources — Phase 1 (#187). Browser-safe (pure strings, no imports).
+ * Shared GLSL sources — Phase 1 (#187). Browser-safe (pure strings; the one
+ * import is chunks.mjs, itself browser-safe with no Node imports).
  *
  * Conventions (match the SVG reference path):
  * - All color is premultiplied-alpha sRGB bytes, exactly like resvg output.
  * - Canvas UV is y-down: (0,0) = top-left of the 1000x700 canvas.
  * - Texture sampling of FBOs flips v (GL textures are y-up).
  */
+
+import { injectCommon } from './effects/chunks.mjs';
 
 export const BLEND_IDS = Object.freeze({
   normal: 0, multiply: 1, screen: 2, overlay: 3, darken: 4, lighten: 5,
@@ -34,8 +37,10 @@ export const EFFECT_IDS = Object.freeze({
 // are gone, not reserved. posterize keeps id 5 (ids are explicit, nothing
 // renumbers).
 
-/** Instanced textured quads. Per-instance: (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0). */
-export const QUAD_VS = `#version 300 es
+/** Instanced textured quads. Per-instance: (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0).
+ *  Wrapped with the shared chunk library (#196) so hands can use kc_hash12
+ *  instead of an inline sin-hash (the chunk selfcheck bans duplicates). */
+const QUAD_VS_SRC = `#version 300 es
 layout(location=0) in vec2 a_corner;
 layout(location=1) in vec4 a_inst0;
 layout(location=2) in vec4 a_inst1;
@@ -73,7 +78,7 @@ void main() {
   // the CLAMP_TO_EDGE-clamped UVs. (Half-texel offset.)
   vec2 au = a_corner * 199.5 - 49.75;
   vec2 c = (au - 50.0) * a_inst0.zw;      // center on the 100x100 box, scale
-  float seed = fract(sin(dot(a_inst0.xy, vec2(12.9898, 78.233))) * 43758.5453);
+  float seed = kc_hash12(a_inst0.xy);
   v_seed = seed;
   // Crooked Hand. Amount 0 never enters, so the quad stays the pre-hand path.
   if (u_hands.x > 0.0) {
@@ -142,6 +147,8 @@ void main() {
     v_light = vec3(1.0);
   }
 }`;
+
+export const QUAD_VS = injectCommon(QUAD_VS_SRC);
 
 export const QUAD_FS = `#version 300 es
 precision highp float;
