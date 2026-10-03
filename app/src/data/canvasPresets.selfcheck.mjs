@@ -20,6 +20,16 @@ test('#606 sanitize clamps and defaults stage to preview', () => {
   assert.equal(s.stageMode, 'preview');
 });
 
+test('#606 wide VJ + IG social presets present', () => {
+  const dims = new Set(CANVAS_PRESETS.map((p) => `${p.group}:${p.w}x${p.h}`));
+  for (const d of ['VJ:2560x1080', 'VJ:3440x1440', 'VJ:5760x1080']) {
+    assert.ok(dims.has(d), `missing VJ preset ${d}`);
+  }
+  for (const d of ['Social:1080x1440', 'Social:1080x1080', 'Social:1080x566']) {
+    assert.ok(dims.has(d), `missing Social preset ${d}`);
+  }
+});
+
 test('#606 instrument canvas omitted from serialize', () => {
   const doc = serializeProject({
     seed: 1,
