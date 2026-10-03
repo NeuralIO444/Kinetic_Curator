@@ -248,9 +248,10 @@ export function evaluateKineme(soa, ctx) {
  *
  * Brush-line boil: the boiled wobble (dWobble, ±amount edge-band fraction)
  * rides the trail perpendicular stored in geometry (soa.wobNX/wobNY), scaled
- * by ctx.wobbleAmp (px). The normals are (0,0) off brush mode, so this is a
- * natural no-op everywhere else; wobbleAmp 0 means no wobble character to
- * boil. Freeze holds boilStep upstream, so the pose holds here for free.
+ * by ctx.wobbleAmp (px) — the brush's wobbleAmp, or the 0.25 × brushSize
+ * fallback on a straight trail. The normals are (0,0) off brush mode, so
+ * this is a natural no-op everywhere else. Freeze holds boilStep upstream,
+ * so the pose holds here for free.
  */
 export function applyKinemeDrivers(soa, ctx) {
   if (!soa || !ctx) return;
@@ -335,9 +336,11 @@ export function buildKinemeCtx({ layoutParams, driverSec, boilStep, seed, canvas
     canvasW,
     canvasH,
     shedTier: shedTier | 0,
-    // Brush-line boil reach (px): the brush's own wobbleAmp. The boil is a
-    // fraction of the edge band (spec) — no wobble character, nothing to boil.
-    wobbleAmp: Math.max(0, Number(lp.wobbleAmp) || 0),
+    // Brush-line boil reach (px): the brush's own wobbleAmp when it has one.
+    // On a perfectly straight trail (wobbleAmp 0) fall back to a subtle
+    // fraction of the brush size — the spec's edge band is the trail's own
+    // band (≈ brushSize/2), so 0.25 × brushSize reads as half that band.
+    wobbleAmp: Math.max(0, Number(lp.wobbleAmp) || 0) || 0.25 * Math.max(0, Number(lp.brushSize) || 0),
   };
 }
 

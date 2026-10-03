@@ -415,3 +415,65 @@ import { kinemeStillStep } from './kineme.js';
 }
 
 console.log('kineme.selfcheck: OK (still path)');
+
+// ── brush-kineme wiring: straight trail (wobbleAmp 0) falls back to a ──
+// brush-size fraction as the boil reach, so the WOBBLE knob still boils a
+// straight line. wobbleAmp 0 + amount 0 stays bit-identical (hard gate).
+{
+  const assets = [{ id: 'a', weight: 'heavy' }];
+  const palette = { swatches: ['#111'] };
+  const BRUSH = 24;
+  const FALLBACK = 0.25 * BRUSH; // the fallback reach the ctx must thread
+  const lp = {
+    mode: 'brush', composition: 'default', count: 60,
+    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
+    jitter: 0, density: 100, zTiers: 1, bleed: false, mirror: false,
+    displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+    brushSize: BRUSH, brushSpacing: 0.5, fieldScale: 0.004, trailCount: 6,
+    wobbleAmp: 0, wobbleFreq: 0.5,
+  };
+  const base = {
+    seed: 0xbeef, activeAssets: assets, palette,
+    caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
+    canvasW: 1000, canvasH: 700,
+  };
+  const frame = (seed, boilStep, wobble) => {
+    const layoutParams = { ...lp, kinemeBrushWobble: wobble };
+    return buildPlacements({
+      ...base, seed, layoutParams,
+      kineme: buildKinemeCtx({
+        layoutParams, driverSec: 3.25, boilStep, seed,
+        canvasW: 1000, canvasH: 700,
+      }),
+    }).items;
+  };
+
+  // amount 0 → bit-identical to no kineme at all
+  const plain = buildPlacements({ ...base, layoutParams: lp }).items;
+  const s0 = frame(0xbeef, 5, 0);
+  assert.strictEqual(s0.length, plain.length);
+  for (let i = 0; i < plain.length; i++) {
+    assert.strictEqual(s0[i].x, plain[i].x, 'straight trail, amount 0: x bit-identical');
+    assert.strictEqual(s0[i].y, plain[i].y, 'straight trail, amount 0: y bit-identical');
+  }
+
+  // amount > 0 → the straight trail boils, bounded by the brush-size fallback
+  const f5 = frame(0xbeef, 5, 1);
+  const f6 = frame(0xbeef, 6, 1);
+  let jumped = 0;
+  for (let i = 0; i < f5.length; i++) {
+    if (f5[i].x !== f6[i].x || f5[i].y !== f6[i].y) jumped++;
+    assert.ok(Math.abs(f5[i].x - s0[i].x) <= FALLBACK + 1e-9, `straight boil x bounded by fallback (${i})`);
+    assert.ok(Math.abs(f5[i].y - s0[i].y) <= FALLBACK + 1e-9, `straight boil y bounded by fallback (${i})`);
+  }
+  assert.ok(jumped > f5.length / 2, `straight trail boils between frames (${jumped}/${f5.length})`);
+
+  // freeze: same boilStep → the held pose, no pop
+  const f5b = frame(0xbeef, 5, 1);
+  for (let i = 0; i < f5.length; i++) {
+    assert.strictEqual(f5b[i].x, f5[i].x, 'straight freeze holds x');
+    assert.strictEqual(f5b[i].y, f5[i].y, 'straight freeze holds y');
+  }
+}
+
+console.log('kineme.selfcheck: OK (brush boil straight-trail fallback)');
