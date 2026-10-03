@@ -171,8 +171,8 @@ function num01(v) {
  * SoA entirely, so amount 0 is bit-identical to no kineme (hard gate — the
  * noise math is skipped, not multiplied by zero).
  *
- * dWobble is computed but has no stage-C consumer until brush mode lands
- * (#894/#897): on main it is evaluated, tested, and left unapplied.
+ * dWobble is consumed by applyKinemeDrivers below: the boiled offset rides
+ * the trail perpendicular (soa.wobNX/wobNY) written by the brush sampler.
  */
 export function evaluateKineme(soa, ctx) {
   const n = soa?.n | 0;
@@ -245,6 +245,12 @@ export function evaluateKineme(soa, ctx) {
  *
  * ctx.shedTier >= 3 (pin-to-rest / zero-amounts) → identity, channels
  * untouched. !active → identity, channels untouched (the hard gate).
+ *
+ * Brush-line boil: the boiled wobble (dWobble, ±amount edge-band fraction)
+ * rides the trail perpendicular stored in geometry (soa.wobNX/wobNY), scaled
+ * by ctx.wobbleAmp (px). The normals are (0,0) off brush mode, so this is a
+ * natural no-op everywhere else; wobbleAmp 0 means no wobble character to
+ * boil. Freeze holds boilStep upstream, so the pose holds here for free.
  */
 export function applyKinemeDrivers(soa, ctx) {
   if (!soa || !ctx) return;
@@ -252,13 +258,21 @@ export function applyKinemeDrivers(soa, ctx) {
   const d = evaluateKineme(soa, ctx);
   if (!d.active) return;
   const n = soa.n | 0;
+  // Brush-line boil (wired): the boiled offset rides the geometry normals.
+  // Guarded for hand-rolled SoAs (selfchecks) that lack the channels.
+  const reach = Number(ctx.wobbleAmp) || 0;
+  const wnx = soa.wobNX, wny = soa.wobNY;
+  const boil = reach > 0 && wnx && wny;
   for (let k = 0; k < n; k++) {
     soa.scale[k] *= 1 + d.dScale[k];
     soa.x[k] += d.dx[k];
     soa.y[k] += d.dy[k];
+    if (boil) {
+      const w = d.dWobble[k] * reach;
+      soa.x[k] += w * wnx[k];
+      soa.y[k] += w * wny[k];
+    }
   }
-  // dWobble: no consumer on main — brush mode (#894/#897) applies it when
-  // it lands. Evaluated and tested here, wired defensively (no-op absent).
 }
 
 /**
@@ -292,6 +306,9 @@ export function kinemeStillStep(seed) {
  * frames on governor shed tier 1+, so the boil freezes pose instead of
  * stepping. Stills compute it once from the seed-derived instant.
  *
+ * wobbleAmp rides the ctx so the stage-C applier can scale the boiled brush
+ * offset in px (fraction of the edge band, per the spec).
+ *
  * Returns null when every amount is 0: the pipeline then skips kineme
  * entirely (zero cost when the artist hasn't turned it on). Garbage time
  * → null, never NaN into the pipeline.
@@ -318,6 +335,9 @@ export function buildKinemeCtx({ layoutParams, driverSec, boilStep, seed, canvas
     canvasW,
     canvasH,
     shedTier: shedTier | 0,
+    // Brush-line boil reach (px): the brush's own wobbleAmp. The boil is a
+    // fraction of the edge band (spec) — no wobble character, nothing to boil.
+    wobbleAmp: Math.max(0, Number(lp.wobbleAmp) || 0),
   };
 }
 

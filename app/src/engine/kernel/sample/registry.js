@@ -573,8 +573,13 @@ function traceBrushTrails(ctx, trailCount, per) {
       }
       // rot01 maps the full circle onto the stage-C unit draw so that the
       // default rotate range [-180, 180] reproduces the tangent in degrees.
+      // wobNX/wobNY is the trail-perpendicular unit vector at this stamp —
+      // geometry the kineme boil rides at stage C (zero cost when off).
       const deg = a * 180 / Math.PI;
-      pts.push({ x: nx + ox, y: ny + oy, rot01: (((deg % 360) + 540) % 360) / 360 });
+      pts.push({
+        x: nx + ox, y: ny + oy, rot01: (((deg % 360) + 540) % 360) / 360,
+        wobNX: -Math.sin(a), wobNY: Math.cos(a),
+      });
       x = nx;
       y = ny;
     }
@@ -592,7 +597,7 @@ function brush(ctx) {
   const step = i % per;
   const pts = cache[trail];
   const p = pts[Math.min(step, pts.length - 1)];
-  return { x: p.x, y: p.y, t: per > 1 ? step / (per - 1) : 0.5, rot01: p.rot01 };
+  return { x: p.x, y: p.y, t: per > 1 ? step / (per - 1) : 0.5, rot01: p.rot01, wobNX: p.wobNX, wobNY: p.wobNY };
 }
 
 registerSampler('brush', brush);

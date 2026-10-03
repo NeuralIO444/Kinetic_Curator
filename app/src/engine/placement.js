@@ -63,6 +63,11 @@ function allocSoA(capacity) {
     uScale: new Float64Array(capacity),
     uRot: new Float64Array(capacity),
     uAlpha: new Float64Array(capacity),
+    // Brush-line trail perpendicular (unit vector), written by the brush
+    // sampler; (0,0) for every other mode. Geometry the kineme boil rides
+    // at stage C — derived from (seed, brush params), so no signature change.
+    wobNX: new Float64Array(capacity),
+    wobNY: new Float64Array(capacity),
   };
 }
 
@@ -183,6 +188,11 @@ export function computeGeometrySoA({
     // is a no-op for them.
     soa.uRot[n] = pos.rot01 !== undefined ? pos.rot01 : hashU01(seed, CH.attr, i * 3 + 1, seedOffsets);
     soa.uAlpha[n] = hashU01(seed, CH.attr, i * 3 + 2, seedOffsets);
+    // Trail perpendicular for the kineme boil (stage C). The brush sampler
+    // is the only one that returns it; everything else rides (0,0), which
+    // makes the boil a natural no-op off brush mode.
+    soa.wobNX[n] = pos.wobNX ?? 0;
+    soa.wobNY[n] = pos.wobNY ?? 0;
     // Slice 2 — stamp jitter, the hand on top of the trail: ±10° rotation
     // and ±15% of the scale range around its midpoint, both from the
     // per-instance seed hash, so a reseed repeats the same crookedness.

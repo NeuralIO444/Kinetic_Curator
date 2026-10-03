@@ -3,7 +3,7 @@
 
 import assert from 'node:assert';
 import { getSampler, listSamplers, stratified } from './registry.js';
-import { computePlacements, geometrySignature } from '../../placement.js';
+import { computePlacements, computeGeometrySoA, geometrySignature } from '../../placement.js';
 import { mkRng } from '../../prng.js';
 import { hashU01 } from '../rng.js';
 
@@ -577,6 +577,23 @@ assert.ok(listed.includes('stratified'));
   const s2 = geometrySignature(P);
   assert.notDeepStrictEqual(geometrySignature({ ...P, wobbleAmp: 4 }), s2, 'wobbleAmp must bust the cache');
   assert.notDeepStrictEqual(geometrySignature({ ...P, wobbleFreq: 0.9 }), s2, 'wobbleFreq must bust the cache');
+
+  // kineme wiring: the sampler returns the trail perpendicular per stamp and
+  // placement carries it on the SoA (unit normals); every other mode rides
+  // (0,0) so the stage-C boil is a natural no-op off brush mode.
+  {
+    const soa = computeGeometrySoA({ ...P, wobbleAmp: AMP });
+    assert.strictEqual(soa.n, COUNT);
+    for (let k = 0; k < soa.n; k++) {
+      const nx = soa.wobNX[k], ny = soa.wobNY[k];
+      assert.ok(Math.abs(nx * nx + ny * ny - 1) < 1e-12, `unit normal ${k}`);
+    }
+    const other = computeGeometrySoA({ ...P, mode: 'grid' });
+    for (let k = 0; k < other.n; k++) {
+      assert.strictEqual(other.wobNX[k], 0, `non-brush wobNX ${k}`);
+      assert.strictEqual(other.wobNY[k], 0, `non-brush wobNY ${k}`);
+    }
+  }
 }
 
 console.log('kernel/sample.selfcheck: OK (K2)', { modes: listSamplers().length });

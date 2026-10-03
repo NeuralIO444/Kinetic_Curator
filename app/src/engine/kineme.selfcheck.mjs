@@ -224,6 +224,80 @@ import { buildPlacements } from './buildPlacements.js';
 
 console.log('kineme.selfcheck: OK (placements integration)');
 
+// ── brush-kineme wiring: the boiled wobble drives the trail perpendicular ──
+// End to end through the real ctx factory: buildKinemeCtx threads the
+// brush's wobbleAmp, the stage-C applier folds dWobble along the geometry
+// normals. Amount 0 is bit-identical; the boil jumps per frame, holds on a
+// repeated frame (freeze), and reseeds deterministically.
+{
+  const assets = [{ id: 'a', weight: 'heavy' }];
+  const palette = { swatches: ['#111'] };
+  const AMP = 8;
+  const lp = {
+    mode: 'brush', composition: 'default', count: 60,
+    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
+    jitter: 0, density: 100, zTiers: 1, bleed: false, mirror: false,
+    displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: 6,
+    wobbleAmp: AMP, wobbleFreq: 0.5,
+  };
+  const base = {
+    seed: 0xbeef, activeAssets: assets, palette,
+    caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
+    canvasW: 1000, canvasH: 700,
+  };
+  const frame = (seed, boilStep, wobble) => {
+    const layoutParams = { ...lp, kinemeBrushWobble: wobble };
+    return buildPlacements({
+      ...base, seed, layoutParams,
+      kineme: buildKinemeCtx({
+        layoutParams, driverSec: 3.25, boilStep, seed,
+        canvasW: 1000, canvasH: 700,
+      }),
+    }).items;
+  };
+
+  // amount 0 → bit-identical to no kineme at all
+  const plain = buildPlacements({ ...base, layoutParams: lp }).items;
+  const s0 = frame(0xbeef, 5, 0);
+  assert.strictEqual(s0.length, plain.length);
+  for (let i = 0; i < plain.length; i++) {
+    assert.strictEqual(s0[i].x, plain[i].x, 'wobble amount 0: x bit-identical');
+    assert.strictEqual(s0[i].y, plain[i].y, 'wobble amount 0: y bit-identical');
+  }
+
+  // amount > 0 → the trail boils between boil frames, bounded by wobbleAmp
+  const f5 = frame(0xbeef, 5, 1);
+  const f6 = frame(0xbeef, 6, 1);
+  let jumped = 0;
+  for (let i = 0; i < f5.length; i++) {
+    if (f5[i].x !== f6[i].x || f5[i].y !== f6[i].y) jumped++;
+    assert.ok(Math.abs(f5[i].x - s0[i].x) <= AMP + 1e-9, `boil x bounded by wobbleAmp (${i})`);
+    assert.ok(Math.abs(f5[i].y - s0[i].y) <= AMP + 1e-9, `boil y bounded by wobbleAmp (${i})`);
+  }
+  assert.ok(jumped > f5.length / 2, `boil jumps between frames (${jumped}/${f5.length})`);
+
+  // freeze: same boilStep → the held pose, no pop
+  const f5b = frame(0xbeef, 5, 1);
+  for (let i = 0; i < f5.length; i++) {
+    assert.strictEqual(f5b[i].x, f5[i].x, 'freeze holds x');
+    assert.strictEqual(f5b[i].y, f5[i].y, 'freeze holds y');
+  }
+
+  // reseed → a different but equally deterministic boiling line
+  const g5 = frame(0xbeef + 1, 5, 1);
+  const g5b = frame(0xbeef + 1, 5, 1);
+  let moved = 0;
+  for (let i = 0; i < f5.length; i++) {
+    if (g5[i].x !== f5[i].x || g5[i].y !== f5[i].y) moved++;
+    assert.strictEqual(g5b[i].x, g5[i].x, 'reseed deterministic x');
+    assert.strictEqual(g5b[i].y, g5[i].y, 'reseed deterministic y');
+  }
+  assert.ok(moved > 0, 'reseed → a new boiling line');
+}
+
+console.log('kineme.selfcheck: OK (brush boil wiring)');
+
 // ── slice 3: live ctx assembly + freeze contract ─────────────────────────
 import { buildKinemeCtx, holdKinemeTimes, KINEME_SHED_LABELS } from './kineme.js';
 
