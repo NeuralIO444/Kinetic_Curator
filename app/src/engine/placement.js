@@ -98,6 +98,11 @@ export function computeGeometrySoA({
   // per presented frame; audioEnergy (0..1, null when silent) is the default
   // audio driver for the cells-per-tick rate.
   growthRate = 3, growthBranch = 0.8, growthTick = 0, audioEnergy = null,
+  // Brush line: flow-field trail stamping. brushSize is the nominal stamp
+  // diameter in px (drives step length, not the stage-C scale range);
+  // brushSpacing is step length as a fraction of brushSize (≤ 0.7 reads as
+  // a continuous line); fieldScale is the simplex sampling scale per px.
+  brushSize = 24, brushSpacing = 0.5, fieldScale = 0.004, trailCount = 6,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -130,6 +135,8 @@ export function computeGeometrySoA({
     lsysDepth, lsysAngle,
     // #720 — DLA / Eden growth scalars; ignored by every other mode.
     growthRate, growthBranch, growthTick, audioEnergy,
+    // Brush line scalars; ignored by every other mode.
+    brushSize, brushSpacing, fieldScale, trailCount,
   };
 
   const tDenom = count > 1 ? count - 1 : 0;
@@ -166,7 +173,10 @@ export function computeGeometrySoA({
     soa.zTier[n] = zTier;
     soa.depth[n] = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
     soa.uScale[n] = hashU01(seed, CH.attr, i * 3, seedOffsets);
-    soa.uRot[n] = hashU01(seed, CH.attr, i * 3 + 1, seedOffsets);
+    // Brush stamps aim along their trail tangent: the sampler returns the
+    // tangent as a unit draw; every other mode keeps the hash draw, so this
+    // is a no-op for them.
+    soa.uRot[n] = pos.rot01 !== undefined ? pos.rot01 : hashU01(seed, CH.attr, i * 3 + 1, seedOffsets);
     soa.uAlpha[n] = hashU01(seed, CH.attr, i * 3 + 2, seedOffsets);
     n++;
   }
@@ -236,6 +246,10 @@ export function geometrySignature(p) {
     // audioEnergy stays out: an ephemeral drive consumed at tick-advance
     // time, not geometry identity.
     p.growthRate, p.growthBranch, p.growthTick,
+    // Brush line: every param the brush sampler reads. The staged-eval
+    // cache compares element-wise, so a missing entry here would silently
+    // serve stale trails after a param edit.
+    p.brushSize, p.brushSpacing, p.fieldScale, p.trailCount,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }

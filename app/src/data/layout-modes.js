@@ -19,6 +19,7 @@ export const LAYOUT_MODES = [
   { id: 'hype',      name: 'moth·hype', glyph: 'hype'   },
   { id: 'stratified', name: 'stratified', glyph: 'strat' },
   { id: 'flow',      name: 'flow',       glyph: 'flow'   },
+  { id: 'brush',     name: 'brush line', glyph: 'brush'  },
   { id: 'layers',    name: 'layers',     glyph: 'z'      },
   { id: 'rails',     name: 'rails',      glyph: 'rail'   },
   { id: 'ca',        name: 'cellular',   glyph: 'ca'     },
@@ -99,9 +100,14 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // engine (#762), which owns the audio→growth mapping.
   growthRate: 3,
   growthBranch: 0.8,
-  noiseFreq: 0.005,
-  noiseSpeed: 0.5,
+  noiseFreq: 0.005,  noiseSpeed: 0.5,
   displacement: 0,
+  // Brush line: nominal stamp diameter px, step as fraction of it,
+  // simplex field scale per px, trail count.
+  brushSize: 24,
+  brushSpacing: 0.5,
+  fieldScale: 0.004,
+  trailCount: 6,
   particleCount: 150,
   swarmCohesion: 0.6, // #272: retuned to the honest slider max (was 1.5, past the 'one blob' threshold)
   gravityWells: 1.0,
@@ -202,6 +208,12 @@ export const PARAM_SPEC = {
   growthBranch: { min: 0, max: 1 },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
+  // Brush line: spacing ≤ 0.7 reads as a continuous line; wider is a
+  // dotted texture (a feature). trailCount is an int.
+  brushSize: { min: 4, max: 96 },
+  brushSpacing: { min: 0.1, max: 2 },
+  fieldScale: { min: 0.001, max: 0.02 },
+  trailCount: { min: 1, max: 24, int: true },
   displacement: { min: 0, max: 250 },
   // int: true — a fractional value mid-MIX reaches ParticleSystem.init as a
   // non-integer array length (RangeError, surfaces as a RENDER FAULT). Every

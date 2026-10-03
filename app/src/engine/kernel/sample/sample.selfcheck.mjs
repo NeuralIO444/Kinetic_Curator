@@ -3,7 +3,7 @@
 
 import assert from 'node:assert';
 import { getSampler, listSamplers, stratified } from './registry.js';
-import { computePlacements } from '../../placement.js';
+import { computePlacements, geometrySignature } from '../../placement.js';
 import { mkRng } from '../../prng.js';
 import { hashU01 } from '../rng.js';
 
@@ -11,11 +11,15 @@ const required = [
   'grid', 'fibonacci', 'radial', 'swarm', 'flow', 'layers', 'rails',
   'ca', 'orbit', 'abacus', 'noise', 'hype', 'stratified', 'random',
   'dla', 'eden', // #720
+  'brush', // flow-field trail stamping
 ];
 
 for (const id of required) {
   assert.ok(getSampler(id), `missing sampler ${id}`);
 }
+// getSampler falls back to `random` for unknown modes, so the required loop
+// above cannot prove registration — the list check can.
+assert.ok(listSamplers().includes('brush'), 'brush must be registered');
 
 const listed = listSamplers();
 assert.ok(listed.includes('stratified'));
@@ -455,6 +459,57 @@ assert.ok(listed.includes('stratified'));
     assert.deepStrictEqual(lay(400), p, 'same seed, same plant');
     assert.notDeepStrictEqual(lay(400, { lsysAngle: 40 }), p, 'the branch angle must change the plant');
     assert.notDeepStrictEqual(lay(400, { seed: 43 }), p, 'a different seed grows a different plant');
+  }
+}
+
+// ── brush mode: flow-field trail stamping ──────────────────────────────────
+{
+  const W = 1000, H = 700, COUNT = 60, TRAILS = 6;
+  const PER = Math.ceil(COUNT / TRAILS);
+  const P = {
+    mode: 'brush', count: COUNT, seed: 0xbeef,
+    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
+    jitter: 0, density: 100, zTiers: 1, bleed: false,
+    canvasW: W, canvasH: H,
+    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: TRAILS,
+  };
+  const lay = (seed) => computePlacements({ ...P, seed });
+
+  // seed determinism: same seed → bit-identical placements, inside the canvas
+  const a = lay(0xbeef), b = lay(0xbeef);
+  assert.strictEqual(a.length, COUNT);
+  for (let k = 0; k < a.length; k++) {
+    assert.strictEqual(a[k].x, b[k].x, `x determinism ${k}`);
+    assert.strictEqual(a[k].y, b[k].y, `y determinism ${k}`);
+    assert.strictEqual(a[k].rotation, b[k].rotation, `rotation determinism ${k}`);
+    assert.ok(a[k].x >= 0 && a[k].x <= W, `x in bounds ${k}`);
+    assert.ok(a[k].y >= 0 && a[k].y <= H, `y in bounds ${k}`);
+  }
+
+  // spacing invariant: consecutive stamps on one trail step ≤ brushSpacing × brushSize
+  const sameTrail = (k) => Math.floor(k / PER) === Math.floor((k - 1) / PER);
+  const maxStep = P.brushSpacing * P.brushSize * 1.001;
+  for (let k = 1; k < a.length; k++) {
+    if (!sameTrail(k)) continue;
+    const d = Math.hypot(a[k].x - a[k - 1].x, a[k].y - a[k - 1].y);
+    assert.ok(d <= maxStep, `spacing invariant step ${k}: ${d} ≤ ${maxStep}`);
+  }
+
+  // rotation = trail tangent (degrees) at the default rotate range
+  for (let k = 1; k < a.length; k++) {
+    if (!sameTrail(k)) continue;
+    const tang = Math.atan2(a[k].y - a[k - 1].y, a[k].x - a[k - 1].x) * 180 / Math.PI;
+    assert.ok(Math.abs(a[k].rotation - tang) < 1e-9, `tangent rotation ${k}: ${a[k].rotation} vs ${tang}`);
+  }
+
+  // a different seed draws a different line
+  const c = lay(0x1234);
+  assert.ok(c.some((p, k) => p.x !== a[k].x), 'a new seed must move the line');
+
+  // cache honesty: every brush param busts the geometry signature
+  const s1 = geometrySignature(P);
+  for (const [key, val] of [['brushSize', 25], ['brushSpacing', 0.6], ['fieldScale', 0.005], ['trailCount', 7]]) {
+    assert.notDeepStrictEqual(geometrySignature({ ...P, [key]: val }), s1, `${key} must bust the cache`);
   }
 }
 
