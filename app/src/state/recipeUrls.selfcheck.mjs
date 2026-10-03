@@ -9,8 +9,11 @@ import assert from 'node:assert';
 import {
   RECIPE_URL_VERSION,
   RECIPE_URL_PREFIX,
+  RECIPE_URL_HASH_KEY,
   encodeRecipeUrl,
   decodeRecipeUrl,
+  buildShareHref,
+  extractRecipePayload,
 } from './recipeUrls.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { recipeFieldsFromKept } from './recipes.js';
@@ -140,6 +143,34 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   // Unknown version with otherwise-valid payload refuses distinctly.
   const r = decodeRecipeUrl(corrupt('{"v":99,"s":1}'));
   assert.ok(!r.ok && /version/i.test(r.error), 'unknown version refused');
+}
+
+// --- share href + paste extraction (slice 2 pure helpers) -------------------
+{
+  const payload = encodeRecipeUrl(FIELDS);
+  const href = buildShareHref(payload, 'https://example.com/Kinetic_Curator/#r=old');
+  assert.ok(href.startsWith('https://example.com/Kinetic_Curator/'), 'base kept');
+  assert.ok(href.includes(`#${RECIPE_URL_HASH_KEY}=${payload}`), 'fragment carries the payload');
+  assert.ok(!href.includes('#r=old'), 'stale fragment stripped');
+
+  // extractRecipePayload finds the payload in every paste shape.
+  assert.strictEqual(extractRecipePayload(payload), payload, 'bare payload');
+  assert.strictEqual(extractRecipePayload(`  ${payload}\n`), payload, 'padded payload');
+  assert.strictEqual(extractRecipePayload(href), payload, 'full share URL');
+  assert.strictEqual(extractRecipePayload('have a look:\n' + href + '\n!'), payload, 'URL in prose');
+  assert.strictEqual(extractRecipePayload('kc-recipe/1\nseed: 0x1'), null, 'text recipe is not a link');
+  assert.strictEqual(extractRecipePayload(''), null, 'empty');
+  assert.strictEqual(extractRecipePayload(null), null, 'non-string');
+
+  // Paste routing: payload present -> URL path, else text path.
+  const classify = (t) => (extractRecipePayload(t) ? 'url' : 'text');
+  assert.strictEqual(classify(href), 'url');
+  assert.strictEqual(classify('kc-recipe/1\nseed: 0x1a2b3c4d'), 'text');
+
+  // End-to-end paste: the extracted payload decodes to the same recipe.
+  const back = decodeRecipeUrl(extractRecipePayload(href));
+  assert.ok(back.ok);
+  assert.deepStrictEqual(back.recipe.layoutParams, FIELDS.layoutParams);
 }
 
 console.log('recipeUrls.selfcheck: OK');
