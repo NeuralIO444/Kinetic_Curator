@@ -44,12 +44,11 @@ export function useMorphEvolve() {
     // completing it invisibly. loopClock.ms <= 0 means "not observed yet":
     // treat as t=0 rather than a stamp.
     //
-    // seq-morph-semantics: stuck-morphing guard. If the loop clock never
-    // advances (engine paused, headless), the morph would hold at t=0
-    // forever and the UI would show MORPH… indefinitely. After the duration
-    // plus a generous grace, force-finish on wall time.
-    const wallStart = performance.now();
-    const wallCapMs = Math.max(1, morphDurationMs) + 15000;
+    // seq-morph-semantics: deliberately NO wall-clock backstop here.
+    // A stalled loop clock with a live rAF means freeze/pause — and the
+    // contract is hold-and-resume, so the morph must hold, not force-finish.
+    // Rapid steps can't strand morphing=true: latest-wins restarts this
+    // effect (cleanup cancels the old rAF) on every new morph.
     const tick = () => {
       const nowMs = loopClock.ms > 0 ? loopClock.ms : morphStart;
       const elapsed = Math.max(0, nowMs - morphStart);
@@ -72,7 +71,7 @@ export function useMorphEvolve() {
       }
       setLayoutParams(next);
 
-      if (t >= 1 || performance.now() - wallStart > wallCapMs) {
+      if (t >= 1) {
         finishMorph();
         return;
       }
