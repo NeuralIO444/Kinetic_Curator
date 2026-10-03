@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { emit, Events } from '../composition/eventBus.js';
+import { recipeFieldsFromKept, copyTextToClipboard } from '../state/recipes.js';
+import { encodeRecipeUrl, buildShareHref } from '../state/recipeUrls.js';
 
 const MAX_VISIBLE = 12;
 
@@ -17,6 +19,21 @@ export function FavoritesTray() {
   const favorites = state.favorites || [];
   const trayRef = useRef(null);
   const [cursor, setCursor] = useState(0);
+  // #534 — per-hit link feedback: the chip key whose link just copied.
+  const [copiedKey, setCopiedKey] = useState(null);
+
+  // #534 — favorite-as-link: favorites carry the identical field set as
+  // live state, so one shared function encodes them.
+  const copyLink = useCallback(async (fav) => {
+    const payload = encodeRecipeUrl(recipeFieldsFromKept(fav));
+    const href = buildShareHref(payload, typeof window !== 'undefined' ? window.location.href : '');
+    const ok = await copyTextToClipboard(href);
+    if (ok) {
+      const key = fav.id ?? `${fav.seed}-${fav.timestamp || ''}`;
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey((cur) => (cur === key ? null : cur)), 1500);
+    }
+  }, []);
 
   // Performance order = favorites array order (oldest → newest); show last N
   const start = Math.max(0, favorites.length - MAX_VISIBLE);
@@ -125,6 +142,14 @@ export function FavoritesTray() {
               >
                 <span className="fav-chip-num">{i + 1}</span>
                 <span className="fav-chip-seed">{seedHex}</span>
+              </button>
+              <button
+                type="button"
+                className="fav-chip-evolve"
+                title="Copy a share link for this hit"
+                onClick={() => copyLink(f)}
+              >
+                {copiedKey === (f.id ?? `${f.seed}-${f.timestamp || ''}`) ? '✓' : '⧉'}
               </button>
               <button
                 type="button"
