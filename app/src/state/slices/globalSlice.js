@@ -281,6 +281,13 @@ export const createGlobalSlice = (set) => ({
   })),
 
   setPersistStatus: (persistStatus) => set({ persistStatus }),
+  /**
+   * #534 — transient boot note (share-link applied, bad link, palette
+   * fallback). Set once at boot; MasterBar shows it as a pill and clears
+   * it after a few seconds. Never persisted, never blocks boot.
+   */
+  bootNotice: null,
+  setBootNotice: (msg) => set({ bootNotice: typeof msg === 'string' && msg ? msg : null }),
   setRunning: (running) => set((state) => {
     // #264 — manual resume contract: anything that sets running=true
     // (Space, the RUN button) after a watchdog hard stop clears the stop
