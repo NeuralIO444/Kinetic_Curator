@@ -16,7 +16,7 @@ test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
-  await page.locator('.layer-row[style*="0.35"]').filter({ hasText: 'KC-2' }).click();
+  await page.locator('.layer-row-ghost').filter({ hasText: 'KC-2' }).click();
 
   // Patch KC-1 (last content row) so its diag line is live.
   const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).last();
