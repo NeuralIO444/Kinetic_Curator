@@ -103,6 +103,34 @@ function persistFavorites(list) {
   }
 }
 
+// seq-gap-toggles: per-gap cut/morph transitions, keyed by the destination
+// favorite's id. Same trust boundary as favorites — sanitized on the way in.
+export const SEQ_GAPS_KEY = 'kc:seq-gaps:v1';
+
+function readSeqGaps() {
+  try {
+    const raw = localStorage.getItem(SEQ_GAPS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof k === 'string' && k.length <= 80 && (v === 'cut' || v === 'morph')) out[k] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function persistSeqGaps(gaps) {
+  try {
+    localStorage.setItem(SEQ_GAPS_KEY, JSON.stringify(gaps));
+  } catch (e) {
+    console.warn('[seq-gaps] save failed', e);
+  }
+}
+
 /**
  * #616 — stamp EVOLVE progress onto an evolve step's update: the generation
  * (only while EVOLVE runs) and the candidate seen (every tick, run or manual).
@@ -138,7 +166,7 @@ export const createDavisSlice = (set, get) => ({
   seqIndex: 0,
   seqLoop: true,
   seqClock: 'metro', // metro | phrase | audio | euclid (picker in seq-clock-sources)
-  seqGaps: {}, // { [favoriteId]: 'cut' | 'morph' } — persisted in seq-gap-toggles
+  seqGaps: readSeqGaps(), // { [favoriteId]: 'cut' | 'morph' } — transition INTO that favorite
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
@@ -361,6 +389,18 @@ export const createDavisSlice = (set, get) => ({
   seqSetLoop: (loop) => set({ seqLoop: !!loop }),
   seqSetClock: (clock) => set({ seqClock: clock }),
   seqSetIndex: (i) => set({ seqIndex: Math.max(0, Math.trunc(Number(i)) || 0) }),
+  /**
+   * Set the transition INTO a favorite ('cut' | 'morph'). Keyed by favorite
+   * id so it survives reorders; unknown ids and bogus modes are ignored.
+   */
+  seqSetGap: (favId, mode) => set((state) => {
+    if (typeof favId !== 'string' || !favId) return {};
+    if (mode !== 'cut' && mode !== 'morph') return {};
+    if (!state.favorites.some((f) => f.id === favId)) return {};
+    const seqGaps = { ...state.seqGaps, [favId]: mode };
+    persistSeqGaps(seqGaps);
+    return { seqGaps };
+  }),
   /**
    * Advance the playhead one step. Returns { favorite, mode, index, wrapped }
    * for the caller to fire through the event bus (recall vs morph per the

@@ -222,6 +222,27 @@
   background: var(--accent2);
   margin: 2px 0;
 }
+/* seq-gap-toggles: the transition INTO the next cell. Tiny TE toggle. */
+.seq-gap-toggle {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 1px 4px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+.seq-gap-toggle:hover {
+  color: var(--ink);
+  border-color: var(--dim);
+}
+.seq-gap-toggle.cut {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 .seq-cell-main {
   display: inline-flex;
   align-items: center;

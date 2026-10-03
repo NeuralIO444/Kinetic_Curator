@@ -55,7 +55,9 @@ export function SeqStrip() {
     seqPlaying: s.seqPlaying,
     seqIndex: s.seqIndex,
     seqLoop: s.seqLoop,
+    seqGaps: s.seqGaps,
   }));
+  const seqSetGap = useStore((s) => s.seqSetGap);
   const seqStep = useStore((s) => s.seqStep);
   const seqPlay = useStore((s) => s.seqPlay);
   const seqStop = useStore((s) => s.seqStop);
@@ -156,13 +158,16 @@ export function SeqStrip() {
     emit(Events.DAVIS_FAVORITE, { action: 'reorder', id: fav.id, delta });
   }, []);
 
-  // Manual step: advance the playhead and fire. Slice 3 fires recall (the
-  // tray's advance behavior); the gap-toggle slice will consult the mode.
+  // Manual step: advance the playhead and fire the transition the gap toggle
+  // chose for the destination cell (seq-gap-toggles).
   const stepFire = useCallback(() => {
     const res = seqStep();
     if (!res || res.stopped || !res.favorite) return;
-    recall(res.favorite);
-  }, [seqStep, recall]);
+    emit(Events.DAVIS_FAVORITE, {
+      action: res.mode === 'cut' ? 'recall' : 'morph',
+      favorite: res.favorite,
+    });
+  }, [seqStep]);
 
   const advance = useCallback(() => {
     stepFire();
@@ -242,6 +247,19 @@ export function SeqStrip() {
           return (
             <Fragment key={f.id ?? `${f.seed}-${f.timestamp || i}`}>
               {dropGap === i && <div className="seq-drop-indicator" aria-hidden="true" />}
+              {/* Gap toggle: the transition INTO this cell. Default morph. */}
+              <button
+                type="button"
+                className={`seq-gap-toggle ${((state.seqGaps || {})[f.id] || 'morph') === 'cut' ? 'cut' : ''}`}
+                title={`Transition into hit ${i + 1}: ${(state.seqGaps || {})[f.id] || 'morph'} — click to flip`}
+                onClick={() => {
+                  if (!f.id) return;
+                  const curMode = (state.seqGaps || {})[f.id] || 'morph';
+                  seqSetGap(f.id, curMode === 'cut' ? 'morph' : 'cut');
+                }}
+              >
+                {((state.seqGaps || {})[f.id] || 'morph') === 'cut' ? 'C' : 'M'}
+              </button>
               <div
                 ref={(el) => { if (f.id) { if (el) cellEls.current.set(f.id, el); else cellEls.current.delete(f.id); } }}
                 className={`seq-cell ${isCurrent ? 'active' : ''} ${isCursor ? (state.seqPlaying ? 'seq-playhead' : 'seq-cursor') : ''} ${isDragging ? 'seq-dragging' : ''}`}

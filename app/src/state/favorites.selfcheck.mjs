@@ -133,6 +133,34 @@ mem.delete(FAVORITES_KEY);
   assert.deepStrictEqual(d.get().favorites.map((f) => f.seed), [20, 10, 30, 40], 'move persists across reload');
 }
 
+// seq-gap-toggles: per-gap cut/morph, persisted, sanitized on load
+mem.delete(FAVORITES_KEY);
+mem.delete('kc:seq-gaps:v1');
+{
+  const c = boot();
+  [10, 20].forEach((seed) => c.call('addFavorite', fav(seed)));
+  const ids = c.get().favorites.map((f) => f.id);
+  assert.deepStrictEqual(c.get().seqGaps, {}, 'gaps start empty (default morph)');
+  c.call('seqSetGap', ids[0], 'cut');
+  assert.strictEqual(c.get().seqGaps[ids[0]], 'cut', 'gap set to cut');
+  c.call('seqSetGap', ids[0], 'morph');
+  assert.strictEqual(c.get().seqGaps[ids[0]], 'morph', 'gap flips back');
+  c.call('seqSetGap', ids[1], 'bogus');
+  assert.strictEqual(c.get().seqGaps[ids[1]], undefined, 'bogus mode ignored');
+  c.call('seqSetGap', 'nope', 'cut');
+  assert.strictEqual(c.get().seqGaps['nope'], undefined, 'unknown id ignored');
+  c.call('seqSetGap', ids[0], 'cut');
+  const d = boot(); // reload
+  assert.strictEqual(d.get().seqGaps[ids[0]], 'cut', 'gaps persist across reload');
+}
+// hostile gap storage sanitizes
+mem.set('kc:seq-gaps:v1', JSON.stringify({ a: 'cut', b: 'explode', c: 42, d: null }));
+{
+  const e = boot();
+  assert.deepStrictEqual(e.get().seqGaps, { a: 'cut' }, 'only cut|morph survive');
+}
+mem.delete('kc:seq-gaps:v1');
+
 // no localStorage at all (private mode / node) still works in memory
 delete globalThis.localStorage;
 {
