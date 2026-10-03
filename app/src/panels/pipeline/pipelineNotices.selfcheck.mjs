@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
+  importConfirmMessage, loadedMessage, exportSavedMessage, exportFilename,
   nextExportFilename, nextTitleVersion, titleSlug,
   missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, shouldExportOnKey,
 } from './pipelineNotices.mjs';
 
-test('#647 import confirms before replace', () => {
-  assert.match(confirmReplaceMessage(), /replaces the current piece/);
+test('#647 import confirm dialog copy names the file and seed', () => {
+  const msg = importConfirmMessage('dusk.json', 12345);
+  assert.match(msg, /dusk\.json/);
+  assert.match(msg, /seed 12345/);
+  assert.match(msg, /replace/i);
 });
 
 test('#630 #646 loaded message names the file, seed, tracks, palette', () => {

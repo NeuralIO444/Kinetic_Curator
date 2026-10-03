@@ -3,7 +3,7 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
 import {
-  confirmReplaceMessage, loadedMessage, exportSavedMessage, nextExportFilename,
+  importConfirmMessage, loadedMessage, exportSavedMessage, nextExportFilename,
   missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
 } from './pipelineNotices.mjs';
 import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
@@ -36,6 +36,7 @@ export function DataExportRow({
   const tasteInputRef = useRef(null);
   const [recent, setRecent] = useState(() => readRecent());
   const [loadedName, setLoadedName] = useState(null);
+  const [pendingImport, setPendingImport] = useState(null); // #647 — { fileName, doc, sanitized }
   const exportedPayload = useRef(null);
   const [behind, setBehind] = useState(false);
   const tasteStatus = useStore((s) => s.tasteStatus);
@@ -80,41 +81,68 @@ export function DataExportRow({
     }, 'kinetic-curator-hits.json');
   };
 
-  const importProject = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (layers?.length && !window.confirm(confirmReplaceMessage())) {
-      e.target.value = '';
-      return;
-    }
+  // #647 — read + parse shared by direct import and the confirm dialog.
+  const readImportFile = (file) => new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
         const raw = JSON.parse(ev.target.result);
         const result = parseProject(raw);
-        if (!result.ok) {
-          onMessage(result.error);
-          return;
-        }
-        emit(Events.EXPORT_LOAD_PROJECT, result.doc);
-        const miss = missingPaletteMessage(result.doc, userPalettes);
-        const loaded = loadedMessage(file.name, result.doc, result.sanitized);
-        onMessage(miss ? `${loaded}. ${miss}` : loaded);
-        setLoadedName(file.name);
-        setRecent(rememberRecent(file.name));
-        exportedPayload.current = JSON.stringify(buildProjectPayload(projectFields));
+        resolve(result.ok
+          ? { ok: true, doc: result.doc, sanitized: result.sanitized }
+          : { ok: false, error: result.error });
       } catch (err) {
         console.warn('Failed to import project:', err);
-        onMessage('Invalid JSON');
+        resolve({ ok: false, error: 'Invalid JSON' });
       }
     };
     // #640 — a failed file read (disk error, permissions) must say so
     // instead of failing silently.
-    reader.onerror = () => {
-      onMessage('Could not read file');
-    };
+    reader.onerror = () => resolve({ ok: false, error: 'Could not read file' });
     reader.readAsText(file);
+  });
+
+  const applyImport = (fileName, doc, sanitized) => {
+    emit(Events.EXPORT_LOAD_PROJECT, doc);
+    const miss = missingPaletteMessage(doc, userPalettes);
+    const loaded = loadedMessage(fileName, doc, sanitized);
+    onMessage(miss ? `${loaded}. ${miss}` : loaded);
+    setLoadedName(fileName);
+    setRecent(rememberRecent(fileName));
+    exportedPayload.current = JSON.stringify(buildProjectPayload(projectFields));
+  };
+
+  const importProject = async (e) => {
+    const file = e.target.files[0];
     e.target.value = '';
+    if (!file) return;
+    const result = await readImportFile(file);
+    if (!result.ok) {
+      onMessage(result.error);
+      return;
+    }
+    if (layers?.length) {
+      // #647 — confirm before the import replaces the live piece. The
+      // dialog shows the incoming seed and offers export-first.
+      setPendingImport({ fileName: file.name, doc: result.doc, sanitized: result.sanitized });
+      return;
+    }
+    applyImport(file.name, result.doc, result.sanitized);
+  };
+
+  const cancelImport = () => setPendingImport(null);
+
+  const proceedImport = () => {
+    if (!pendingImport) return;
+    applyImport(pendingImport.fileName, pendingImport.doc, pendingImport.sanitized);
+    setPendingImport(null);
+  };
+
+  const exportFirstImport = () => {
+    if (!pendingImport) return;
+    exportProject();
+    applyImport(pendingImport.fileName, pendingImport.doc, pendingImport.sanitized);
+    setPendingImport(null);
   };
 
   // #762 — taste.json from the Mac Studio runbook (§4). Validated before it is
@@ -172,6 +200,16 @@ export function DataExportRow({
         <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
         <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
       </div>
+      {pendingImport && (
+        <div style={{ border: '1px solid #8a6d2f', borderRadius: 4, padding: 8, margin: '2px 0 6px', background: '#16130c' }}>
+          <div style={{ fontSize: 11, marginBottom: 6 }}>{importConfirmMessage(pendingImport.fileName, pendingImport.doc.seed)}</div>
+          <div className="pipeline-row" style={{ gap: 6 }}>
+            <button className="big-btn dl" onClick={exportFirstImport} style={{ flex: 1 }} title="Save the current piece to a file first, then import">Export current first</button>
+            <button className="big-btn" onClick={cancelImport} style={{ flex: 1 }}>Cancel</button>
+            <button className="big-btn" onClick={proceedImport} style={{ flex: 1 }} title="Replace the current piece with the imported file">Proceed</button>
+          </div>
+        </div>
+      )}
       <div className="pipeline-row">
         <button className="big-btn dl" onClick={exportPalettes} style={{ flex: 1 }} title={`Export your ${(userPalettes || []).length} saved palettes`}>↓ PALETTES</button>
         <button className="big-btn" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Import palette library JSON">↑ PALETTES</button>
