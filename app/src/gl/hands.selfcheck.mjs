@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { crookedCorner, openAlpha, stretchCorner, nickCorner } from './hands.mjs';
+import { crookedCorner, openAlpha, stretchCorner, nickCorner, flipCorner } from './hands.mjs';
 
 test('#866 amount 0 is the current quad and the current sample', () => {
   const c = { x: 12, y: -8 };
@@ -57,4 +57,22 @@ test('#865 nick: amount 0 is identity, one corner nicked per seed, pull is amoun
   // the GLSL implements the nick strand
   const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
   assert.match(src, /fract\(seed \* 9\.31\)/);
+});
+
+test('#865 flip: amount 0 is identity, binary per seed, mirror is exact', () => {
+  const c = { x: 12, y: -8 };
+  assert.deepEqual(flipCorner(c, 0, 0.3), c);
+  assert.deepEqual(flipCorner(c, 0.6, 0.3), flipCorner(c, 0.6, 0.3), 'same seed repeats');
+  // find one seed that flips and one that does not
+  let flipped = null, kept = null;
+  for (let i = 0; i < 100 && (!flipped || !kept); i++) {
+    const r = flipCorner(c, 0.6, i / 100);
+    if (r.x === -c.x && r.y === c.y) flipped = r;
+    if (r.x === c.x && r.y === c.y) kept = r;
+  }
+  assert.ok(flipped, 'some seeds flip');
+  assert.ok(kept, 'some seeds keep');
+  // the GLSL implements the flip strand
+  const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
+  assert.match(src, /fract\(seed \* 5\.77\)/);
 });
