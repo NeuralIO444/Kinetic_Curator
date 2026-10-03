@@ -61,7 +61,7 @@ Out of scope, written in the PR body: RIBBON, COMET, live ECHOES, hierarchical e
 | #722 behave ease | Spine E erratum: steering eases over ~1 s, no second dissolve. Not a generation. |
 | Favorites sequencer (#895) | Product surface. Docs may scope it. Not an engine PR. |
 | Fixed-timestep accumulator | Deferred in spine A. Still shared with studio video. |
-| GPU scent field, shared curl texture, transform feedback, WebGPU | Roadmap Stage 3 / Beyond. After the FLOW wire, not instead of it. |
+| GPU scent field, shared curl texture, transform feedback, WebGPU | Roadmap Stage 3 / Beyond. Field spec: [STAGE_3.md](STAGE_3.md). Agent move: [STAGE_4.md](STAGE_4.md). After the FLOW wire, not instead of it. |
 
 ## 3. First PR
 
