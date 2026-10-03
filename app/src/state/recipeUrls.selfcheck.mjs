@@ -14,6 +14,8 @@ import {
   decodeRecipeUrl,
   buildShareHref,
   extractRecipePayload,
+  parseBootHash,
+  describePaletteFallback,
 } from './recipeUrls.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { recipeFieldsFromKept } from './recipes.js';
@@ -171,6 +173,40 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   const back = decodeRecipeUrl(extractRecipePayload(href));
   assert.ok(back.ok);
   assert.deepStrictEqual(back.recipe.layoutParams, FIELDS.layoutParams);
+}
+
+// --- boot-from-hash decisions (slice 3 pure helpers) ------------------------
+{
+  const payload = encodeRecipeUrl(FIELDS);
+  const href = buildShareHref(payload, 'https://example.com/app/');
+
+  // A share-URL fragment parses to the recipe.
+  const ok = parseBootHash(new URL(href).hash);
+  assert.strictEqual(ok.status, 'ok');
+  assert.strictEqual(ok.recipe.seed, FIELDS.seed >>> 0);
+  assert.deepStrictEqual(ok.recipe.layoutParams, FIELDS.layoutParams);
+
+  // No hash / wrong key -> none (normal boot proceeds).
+  assert.deepStrictEqual(parseBootHash('').status, 'none');
+  assert.deepStrictEqual(parseBootHash('#foo=bar').status, 'none');
+  assert.deepStrictEqual(parseBootHash(null).status, 'none');
+
+  // Present but unreadable -> bad (clean boot + note).
+  for (const h of ['#r=', '#r=!!!', '#r=kc-r/2.e30', '#r=kc-r/1.']) {
+    const r = parseBootHash(h);
+    assert.strictEqual(r.status, 'bad', h);
+    assert.ok(typeof r.error === 'string' && r.error.length > 0, 'plain-language error');
+  }
+
+  // Palette fallback detection: known -> null, unknown -> badge info, null -> null.
+  assert.strictEqual(describePaletteFallback('praystation', []), null);
+  assert.strictEqual(describePaletteFallback(null, []), null);
+  const fb = describePaletteFallback('no-such-palette', []);
+  assert.ok(fb && typeof fb.requested === 'string' && typeof fb.used === 'string');
+  assert.strictEqual(fb.requested, 'no-such-palette');
+  // A user palette on this machine satisfies the link without fallback.
+  const userPalettes = [{ id: 'mine', name: 'Mine', swatches: ['#111111'] }];
+  assert.strictEqual(describePaletteFallback('mine', userPalettes), null);
 }
 
 console.log('recipeUrls.selfcheck: OK');

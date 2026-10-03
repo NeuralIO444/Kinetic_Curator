@@ -7,6 +7,8 @@ import {
   readPipelineAutosave,
 } from '../state/projectDocument.js';
 import { rollLivingBoot } from '../data/firstLight.js';
+import { recipeToProjectDoc } from '../state/recipes.js';
+import { parseBootHash, describePaletteFallback } from '../state/recipeUrls.js';
 
 const DEBOUNCE_MS = 500;
 // General safety net: any sustained stream of edits (a held slider, a fast
@@ -48,6 +50,53 @@ function applyLivingBoot() {
 }
 
 /**
+ * #534 — share-link boot. A `#r=kc-r/1.…` fragment is an explicit paste: it
+ * wins over the autosave restore (and over `?boot=factory`, which only opts
+ * out of the *random* living boot). The fragment is consumed (stripped) once
+ * applied, so a reload falls back to the autosave instead of re-applying the
+ * link over the operator's tweaks. Fail-closed: an unreadable link boots the
+ * normal path with a note; an unknown palette falls back via the catalog
+ * with a badge.
+ *
+ * Returns 'applied' (skip the rest of boot), 'bad' (consumed but broken —
+ * continue with the normal boot), or 'none' (no fragment).
+ */
+function bootFromHash() {
+  let hash = '';
+  try {
+    hash = window.location.hash || '';
+  } catch {
+    // no window (SSR/tests) — normal boot
+  }
+  const parsed = parseBootHash(hash);
+  if (parsed.status === 'none') return 'none';
+  try {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch {
+    // non-fatal: the link just stays in the bar
+  }
+  const st = useStore.getState();
+  if (parsed.status === 'bad') {
+    st.setBootNotice('Share link unreadable — started clean');
+    return 'bad';
+  }
+  const recipe = parsed.recipe;
+  st.applyProject({ ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides });
+  const fb = describePaletteFallback(recipe.paletteId, st.userPalettes);
+  st.setBootNotice(
+    fb
+      ? `Opened from link · palette "${fb.requested}" not here — using "${fb.used}"`
+      : 'Opened shared scene from link',
+  );
+  try {
+    sessionStorage.setItem(RESTORED_FLAG, '1');
+  } catch {
+    // ignore
+  }
+  return 'applied';
+}
+
+/**
  * Subscribe to meaningful project fields, debounce write to localStorage.
  * On first mount, restore last project once per browser session.
  */
@@ -61,6 +110,11 @@ export function useProjectAutosave() {
     restored.current = true;
     try {
       if (sessionStorage.getItem(RESTORED_FLAG)) return;
+      // #534 — a share-link fragment boots the linked scene instead of the
+      // autosave. 'bad' was consumed but broken: fall through to the normal
+      // boot with the note already set.
+      const hashBoot = bootFromHash();
+      if (hashBoot === 'applied') return;
       const { doc, quarantined } = readPipelineAutosave();
       if (quarantined) {
         // Boot factory defaults and say so. Never silently apply a document
