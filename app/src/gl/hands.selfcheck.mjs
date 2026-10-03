@@ -80,12 +80,12 @@ test('#865 flip: amount 0 is identity, binary per seed, mirror is exact', () => 
 test('#868 double: amount 0 is identity, repeats per seed, faint mix bounded by amount*0.35', () => {
   const local = { x: 0.5, y: 0.5 };
   assert.equal(openAlpha(0.8, local, 0, 0.2), 0.8);
-  // find a seed whose strand picks the double ink (3-way pick this slice)
+  // find a seed whose strand picks the double ink (4-way pick)
   let dseed = null;
   for (let i = 0; i < 200; i++) {
     const s = i / 200;
     const istr = s * 3.3 - Math.floor(s * 3.3);
-    if (Math.min(2, Math.floor(istr * 3)) === 2) { dseed = s; break; }
+    if (Math.min(3, Math.floor(istr * 4)) === 2) { dseed = s; break; }
   }
   assert.ok(dseed !== null, 'some seed picks double');
   const a = openAlpha(0.8, local, 0.7, dseed);
@@ -94,4 +94,32 @@ test('#868 double: amount 0 is identity, repeats per seed, faint mix bounded by 
   assert.ok(a >= 0.8 * (1 - 0.7 * 0.35) - 1e-9, 'mix bounded by amount*0.35');
   const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
   assert.match(src, /fract\(v_seed \* 3\.3\)/);
+});
+
+test('#868 crop: amount 0 is identity, repeats per seed, window never keeps less than 40%', () => {
+  const center = { x: 0.5, y: 0.5 };
+  assert.equal(openAlpha(0.8, center, 0, 0.9), 0.8);
+  // find seeds whose strand picks the crop ink (4-way pick)
+  const cropSeeds = [];
+  for (let i = 0; i < 400 && cropSeeds.length < 20; i++) {
+    const s = i / 400;
+    const istr = s * 3.3 - Math.floor(s * 3.3);
+    if (Math.min(3, Math.floor(istr * 4)) === 3) cropSeeds.push(s);
+  }
+  assert.ok(cropSeeds.length > 0, 'some seeds pick crop');
+  for (const s of cropSeeds) {
+    assert.equal(openAlpha(0.8, center, 0.7, s), openAlpha(0.8, center, 0.7, s), 'same seed repeats');
+    // fraction of the cell kept nearly-opaque must stay >= 35% (design: >= 40%)
+    let kept = 0;
+    const N = 10;
+    for (let ix = 0; ix < N; ix++) {
+      for (let iy = 0; iy < N; iy++) {
+        const r = openAlpha(1, { x: (ix + 0.5) / N, y: (iy + 0.5) / N }, 1, s);
+        if (r > 0.9) kept++;
+      }
+    }
+    assert.ok(kept / (N * N) >= 0.35, `seed=${s} keeps ${kept}% of the cell`);
+  }
+  const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
+  assert.match(src, /fract\(v_seed \* 6\.1\)/);
 });

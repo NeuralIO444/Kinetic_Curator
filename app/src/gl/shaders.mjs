@@ -186,13 +186,13 @@ in vec3 v_light;
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
-  // Open Hand. Amount 0 never enters. The seed picks the ink: stroke, hollow, double.
+  // Open Hand. Amount 0 never enters. The seed picks the ink: stroke, hollow, double, crop.
   if (u_hands.y > 0.0) {
     vec2 span = max(v_cell.zw - v_cell.xy, vec2(1e-4));
     vec2 local = (v_uv - v_cell.xy) / span;
     float d = length(local - 0.5);
     float istr = fract(v_seed * 3.3);
-    float ipick = floor(istr * 3.0);
+    float ipick = floor(istr * 4.0);
     if (ipick < 0.5) {
       float edge = smoothstep(0.05, 0.22, d) * (1.0 - smoothstep(0.34, 0.48, d));
       t.a *= mix(1.0, edge, u_hands.y);
@@ -202,7 +202,7 @@ void main() {
       float keep = 1.0 - u_hands.y * hole * (0.45 + 0.4 * v_seed);
       t.a *= keep;
       t.rgb *= keep;
-    } else {
+    } else if (ipick < 2.5) {
       // double: second strike of the same cell, offset a few texels along a
       // seeded direction, mixed in faint. Clamped to the cell.
       float dstr = fract(v_seed * 4.9);
@@ -211,6 +211,17 @@ void main() {
       vec2 uv2 = clamp(v_cell.xy + (local + ddir * u_hands.y * 0.015) * span, v_cell.xy, v_cell.zw);
       vec4 t2 = texture(u_atlas, uv2);
       t = mix(t, t2, u_hands.y * 0.35);
+    } else {
+      // crop: seeded window holds part of the mark back. Edge sits at
+      // 0.4..0.6 so the window never keeps less than 40% of the cell.
+      float cstr = fract(v_seed * 6.1);
+      float cfg = floor(cstr * 4.0);
+      float cedge = 0.4 + fract(cstr * 7.0) * 0.2;
+      float coord = cfg < 0.5 ? local.x : cfg < 1.5 ? 1.0 - local.x : cfg < 2.5 ? local.y : 1.0 - local.y;
+      float keep = 1.0 - smoothstep(cedge, cedge + 0.08, coord);
+      float cmix = mix(1.0, keep, u_hands.y);
+      t.a *= cmix;
+      t.rgb *= cmix;
     }
   }
   if (u_liveTint > 0.5) {
