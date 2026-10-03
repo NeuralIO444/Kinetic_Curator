@@ -178,6 +178,7 @@ export const createDavisSlice = (set, get) => ({
   morphFrom: null,
   morphTo: null,
   morphStart: 0,
+  morphTweakedKeys: {}, // seq-morph-semantics: params touched mid-morph ride on top
   morphPendingSeed: null,
   morphPendingPalette: null,
   // #305 — a morph-to-favorite lands the favorite's stream offsets with its seed.
@@ -222,6 +223,7 @@ export const createDavisSlice = (set, get) => ({
     morphing: false,
     morphFrom: null,
     morphTo: null,
+    morphTweakedKeys: {},
     ...(state.morphPendingSeed != null ? { seed: state.morphPendingSeed } : {}),
     ...(state.morphPendingSeedOffsets ? { seedOffsets: state.morphPendingSeedOffsets } : {}),
     ...(state.morphPendingPalette ? { paletteId: state.morphPendingPalette } : {}),
@@ -478,6 +480,9 @@ export const createDavisSlice = (set, get) => ({
       morphing: true,
       morphFrom: from,
       morphTo: to,
+      // seq-morph-semantics: a new morph restarts from the live layout
+      // (overlapping morphs: latest wins) with a clean tweak slate.
+      morphTweakedKeys: {},
       // #806: morph easing is a must-loop performer — stamp in loop ms
       // (useMorphEvolve reads loopClock.ms), never wall clock.
       morphStart: loopClock.ms,

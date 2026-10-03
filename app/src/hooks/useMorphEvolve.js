@@ -43,6 +43,13 @@ export function useMorphEvolve() {
     // the rAF wall timestamp, so a freeze/pause holds the morph instead of
     // completing it invisibly. loopClock.ms <= 0 means "not observed yet":
     // treat as t=0 rather than a stamp.
+    //
+    // seq-morph-semantics: stuck-morphing guard. If the loop clock never
+    // advances (engine paused, headless), the morph would hold at t=0
+    // forever and the UI would show MORPH… indefinitely. After the duration
+    // plus a generous grace, force-finish on wall time.
+    const wallStart = performance.now();
+    const wallCapMs = Math.max(1, morphDurationMs) + 15000;
     const tick = () => {
       const nowMs = loopClock.ms > 0 ? loopClock.ms : morphStart;
       const elapsed = Math.max(0, nowMs - morphStart);
@@ -51,8 +58,11 @@ export function useMorphEvolve() {
       const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
       const next = { ...useStore.getState().layoutParams };
+      const tweaked = useStore.getState().morphTweakedKeys || {};
       for (const key of Object.keys(morphTo)) {
-        if (key in morphFrom) {
+        // Live tweaks ride on top: a param the operator touched mid-morph
+        // is left alone — the morph continues around it.
+        if (key in morphFrom && !tweaked[key]) {
           next[key] = lerpValue(morphFrom[key], morphTo[key], e);
           // Integer-ish keys: round at the end
           if (['count', 'jitter', 'density', 'zTiers', 'displacement', 'particleCount'].includes(key)) {
@@ -62,7 +72,7 @@ export function useMorphEvolve() {
       }
       setLayoutParams(next);
 
-      if (t >= 1) {
+      if (t >= 1 || performance.now() - wallStart > wallCapMs) {
         finishMorph();
         return;
       }

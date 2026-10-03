@@ -12,12 +12,14 @@ globalThis.localStorage = {
 const { SEED_OFFSET_GROUPS } = await import('../engine/kernel/rng.js');
 const G = SEED_OFFSET_GROUPS[0];
 const { createDavisSlice, sanitizeFavorite, FAVORITES_KEY, captureFavorite, sanitizeCast, FAVORITE_CAST_MAX } = await import('./slices/davisSlice.js');
+const { createLayoutSlice } = await import('./slices/layoutSlice.js');
 
-/** A tiny zustand stand-in: one slice, real set semantics. */
+/** A tiny zustand stand-in: davis + layout slices, real set semantics. */
 function boot() {
   let state;
   const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
-  state = createDavisSlice(set, () => state);
+  const get = () => state;
+  state = { ...createLayoutSlice(set, get), ...createDavisSlice(set, get) };
   return { api: state, get: () => state, call: (name, ...a) => state[name](...a) };
 }
 
@@ -175,6 +177,45 @@ mem.delete('kc:seq-gaps:v1');
   assert.strictEqual(c.get().seqClock, 'audio', 'bogus clock ignored');
   c.call('seqSetClock', null);
   assert.strictEqual(c.get().seqClock, 'audio', 'null clock ignored');
+}
+
+// seq-morph-semantics: overlapping morphs, tweak ride-on-top, stuck guard state
+{
+  const c = boot();
+  const favA = fav(100);
+  favA.config.layout = { count: 100, scale: 1.0 };
+  const favB = fav(200);
+  favB.config.layout = { count: 200, scale: 2.0 };
+  c.call('addFavorite', favA);
+  c.call('addFavorite', favB);
+
+  // start a morph to A
+  c.call('morphToFavorite', favA);
+  let st = c.get();
+  assert.strictEqual(st.morphing, true, 'morphing after morphToFavorite');
+  assert.deepStrictEqual(st.morphTweakedKeys, {}, 'tweak slate clean on new morph');
+  const firstFrom = { ...st.morphFrom };
+
+  // simulate mid-morph live position (useMorphEvolve writes each frame)
+  c.call('setLayoutParams', { ...st.layoutParams, count: 150 });
+  // overlapping morph to B: latest wins, from = live position
+  c.call('morphToFavorite', favB);
+  st = c.get();
+  assert.strictEqual(st.morphing, true, 'still morphing after overlap');
+  assert.strictEqual(st.morphFrom.count, 150, 'overlapping morph starts from live position');
+  assert.notDeepStrictEqual(st.morphFrom, firstFrom, 'from updated to live');
+
+  // live tweak during morph rides on top
+  c.call('setLayoutParam', 'count', 42);
+  st = c.get();
+  assert.strictEqual(st.morphTweakedKeys.count, true, 'tweaked key marked');
+  assert.strictEqual(st.morphTweakedKeys.scale, undefined, 'untweaked key not marked');
+
+  // finish clears the slate
+  c.call('finishMorph');
+  st = c.get();
+  assert.strictEqual(st.morphing, false, 'morph finished');
+  assert.deepStrictEqual(st.morphTweakedKeys, {}, 'tweak slate cleared on finish');
 }
 
 // no localStorage at all (private mode / node) still works in memory

@@ -308,6 +308,11 @@ export const createLayoutSlice = (set) => ({
 
     const undoUpdate = pushToUndo(state, false);
     const next = { ...undoUpdate, layoutParams: params, voiceMix: null, activeVoiceId: null };
+    // seq-morph-semantics: a live tweak during a morph rides on top — mark
+    // the key so useMorphEvolve leaves it alone instead of overwriting it.
+    if (state.morphing) {
+      next.morphTweakedKeys = { ...(state.morphTweakedKeys || {}), [key]: true };
+    }
     if (key === 'mode' && value === 'ca' && !state.caGrid) {
       next.caGrid = createGrid(40, 28);
     }
