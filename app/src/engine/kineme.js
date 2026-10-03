@@ -270,3 +270,86 @@ export function kinemeStillSec(seed, fps = BOIL_FPS_DEFAULT) {
   const u = hashPhase(seed | 0, 'still');
   return u / clampBoilFps(fps);
 }
+
+/**
+ * Assemble the per-frame kineme ctx for buildPlacements (slice 3).
+ *
+ * driverSec is the ANCHORED driver time (the same kinemeTime the GPU
+ * contract carries for Build A): freeze holds it, resume continues it, and
+ * a RATE change re-anchors instead of jumping — the whole pose contract
+ * rides one value.
+ *
+ * boilStep is caller-computed (slice 4): the live resolver holds it across
+ * frames on governor shed tier 1+, so the boil freezes pose instead of
+ * stepping. Stills compute it once from the seed-derived instant.
+ *
+ * Returns null when every amount is 0: the pipeline then skips kineme
+ * entirely (zero cost when the artist hasn't turned it on). Garbage time
+ * → null, never NaN into the pipeline.
+ */
+export function buildKinemeCtx({ layoutParams, driverSec, boilStep, seed, canvasW, canvasH, shedTier = 0 }) {
+  const lp = layoutParams || {};
+  const amounts = {
+    breath: num01(lp.kinemeBreath),
+    drift: num01(lp.kinemeDrift),
+    pulse: num01(lp.kinemePulse),
+    brushWobble: num01(lp.kinemeBrushWobble),
+  };
+  if (!(amounts.breath > 0 || amounts.drift > 0 || amounts.pulse > 0 || amounts.brushWobble > 0)) {
+    return null;
+  }
+  const t = Number(driverSec);
+  if (!Number.isFinite(t)) return null;
+  const step = boilStep | 0;
+  return {
+    driverSec: t,
+    boilStep: step,
+    seed: seed | 0,
+    amounts,
+    canvasW,
+    canvasH,
+    shedTier: shedTier | 0,
+  };
+}
+
+/** Governor shed-tier labels (slice 4) — TE-terse, for the badge/event log. */
+export const KINEME_SHED_LABELS = Object.freeze({
+  1: 'BOIL HELD',
+  2: 'LIVING MOTION HELD',
+  3: 'MOTION PINNED TO REST',
+  4: 'LIVING MOTION OFF',
+});
+
+/**
+ * Governor shed hold logic (slice 4). Pure.
+ *
+ * tier 1: hold the boil — boil drivers freeze pose, smooth drivers live on.
+ * tier 2: hold all kineme — driver time and boil both freeze.
+ * tier 3/4: identity — pin to rest / zero amounts (the hard gate in
+ *   applyKinemeDrivers leaves the channels untouched).
+ *
+ * held is the caller's stored frame ({ driverSec, boilStep } | null).
+ * Recovery resumes from the held pose: held values persist until the tier
+ * clears, and seed/phase are never touched, so nothing re-anchors.
+ */
+export function holdKinemeTimes(held, tier, driverSec, boilStep) {
+  const next = {
+    driverSec: held?.driverSec ?? null,
+    boilStep: held?.boilStep ?? null,
+  };
+  let t = driverSec;
+  let b = boilStep;
+  if (tier >= 2) {
+    if (next.driverSec == null) next.driverSec = driverSec;
+    t = next.driverSec;
+  } else {
+    next.driverSec = null;
+  }
+  if (tier >= 1) {
+    if (next.boilStep == null) next.boilStep = boilStep;
+    b = next.boilStep;
+  } else {
+    next.boilStep = null;
+  }
+  return { held: next, driverSec: t, boilStep: b };
+}

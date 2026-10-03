@@ -223,3 +223,67 @@ import { buildPlacements } from './buildPlacements.js';
 }
 
 console.log('kineme.selfcheck: OK (placements integration)');
+
+// ── slice 3: live ctx assembly + freeze contract ─────────────────────────
+import { buildKinemeCtx, holdKinemeTimes, KINEME_SHED_LABELS } from './kineme.js';
+
+{
+  const lp = (o) => ({ kinemeBreath: 0, kinemeDrift: 0, kinemePulse: 0, kinemeBrushWobble: 0, kinemeBoilFps: 8, ...o });
+  const base = { layoutParams: lp(), driverSec: 3.25, boilStep: 26, seed: 42, canvasW: 1000, canvasH: 700 };
+
+  assert.strictEqual(buildKinemeCtx(base), null, 'all-zero amounts → null (zero cost when off)');
+
+  const on = buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 0.5 }) });
+  assert.ok(on, 'amount up → ctx');
+  assert.strictEqual(on.driverSec, 3.25);
+  assert.strictEqual(on.boilStep, 26, 'boil step rides the caller (shed holds it)');
+  assert.strictEqual(on.seed, 42);
+  assert.strictEqual(on.amounts.breath, 0.5);
+  assert.strictEqual(on.shedTier, 0);
+
+  // garbage time → null, never NaN into the pipeline
+  assert.strictEqual(buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 1 }), driverSec: NaN }), null);
+
+  // freeze: the same driver second assembles the identical ctx → same pose
+  const held1 = buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 1, kinemeDrift: 0.3 }) });
+  const held2 = buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 1, kinemeDrift: 0.3 }) });
+  assert.deepStrictEqual(held1, held2, 'held clock → identical ctx → held pose');
+}
+
+console.log('kineme.selfcheck: OK (live ctx + freeze)');
+
+// ── slice 4: governor shed hold logic ────────────────────────────────────
+{
+  assert.deepStrictEqual(
+    Object.keys(KINEME_SHED_LABELS).map(Number), [1, 2, 3, 4], 'four tiers, one entry',
+  );
+
+  // tier 0: passthrough, held cleared
+  let r = holdKinemeTimes({ driverSec: 9, boilStep: 70 }, 0, 3.25, 26);
+  assert.deepStrictEqual([r.driverSec, r.boilStep], [3.25, 26]);
+  assert.deepStrictEqual(r.held, { driverSec: null, boilStep: null }, 'tier 0 clears the hold');
+
+  // tier 1: boil held, smooth drivers live
+  r = holdKinemeTimes(null, 1, 3.25, 26);
+  assert.deepStrictEqual([r.driverSec, r.boilStep], [3.25, 26], 'first held frame arms');
+  r = holdKinemeTimes(r.held, 1, 5.5, 44);
+  assert.strictEqual(r.driverSec, 5.5, 'smooth drivers keep living');
+  assert.strictEqual(r.boilStep, 26, 'boil frozen at the held step');
+
+  // tier 2: everything held
+  r = holdKinemeTimes(null, 2, 3.25, 26);
+  r = holdKinemeTimes(r.held, 2, 9.75, 78);
+  assert.deepStrictEqual([r.driverSec, r.boilStep], [3.25, 26], 'all motion holds pose');
+
+  // tier 2 → 1: smooth resumes, boil stays held
+  r = holdKinemeTimes(r.held, 1, 12.0, 96);
+  assert.strictEqual(r.driverSec, 12.0, 'smooth resumes live');
+  assert.strictEqual(r.boilStep, 26, 'boil still held');
+
+  // tier → 0: live again, holds released
+  r = holdKinemeTimes(r.held, 0, 12.5, 100);
+  assert.deepStrictEqual([r.driverSec, r.boilStep], [12.5, 100]);
+  assert.deepStrictEqual(r.held, { driverSec: null, boilStep: null });
+}
+
+console.log('kineme.selfcheck: OK (shed hold)');

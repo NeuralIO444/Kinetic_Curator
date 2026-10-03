@@ -13,6 +13,8 @@
 //   cut 3: mirror/gloss/ACCUM shed (perfTier1 — independent, lower FPS floor)
 //   cut 4: cost-aware asset thinning
 //   cut 5: render-only count clamp below the PERF floor
+//   kineme shed: hold the boil → hold all living motion → pin to rest →
+//          zero amounts (one ladder entry; skipped when kineme is off)
 //   cut 6: freeze motion via slowRender
 //   cut 7: watchdog hard stop
 //
@@ -40,6 +42,7 @@
 // and that no FX-culling cut exists.
 
 import { tier1ShedIds } from '../gl/costTiers.mjs';
+import { KINEME_SHED_LABELS } from '../engine/kineme.js';
 
 /**
  * #265 — when is the GPU the binding constraint? Cut 1 (resolution) may
@@ -98,6 +101,15 @@ export const GOVERNOR_RESTORE_CUTS = [
     // so it also clears on tier change — the nuance the old block carried.
     needsRestore: (s, ctx) => !!s.perfClampOverride && (ctx.healthy || s.quality !== 'performance'),
     restoredLabel: 'crowd control lifted',
+  },
+  {
+    kind: 'kinemeShed',
+    // Kineme living-motion shed (slice 4): one registry entry for the whole
+    // driver system (tiers walk 1→4 inside the kind, not as separate cuts).
+    // Restores BEFORE slowRender in reverse walk order — motion comes back
+    // before the full freeze lifts, matching the shed order below.
+    needsRestore: (s, ctx) => ctx.healthy && (s.kinemeShed | 0) > 0,
+    restoredLabel: 'living motion back',
   },
   {
     kind: 'slowRender',
@@ -191,6 +203,16 @@ export function nextGovernorCut(s) {
     return { kind: 'countClamp', count, label: `CROWD CONTROL → ${count} (live only)` };
   }
 
+  // Kineme shed (slice 4): four tiers, gentler than cut 6's full freeze —
+  // hold the boil → hold all motion → pin to rest → zero amounts.
+  // Skipped when kineme is off (every amount 0 → nothing to shed) or the
+  // tiers are exhausted. One ladder entry for the whole driver system.
+  const kinemeTier = s.kinemeShed | 0;
+  if (s.kinemeActive && kinemeTier < 4) {
+    const tier = kinemeTier + 1;
+    return { kind: 'kinemeShed', tier, label: KINEME_SHED_LABELS[tier] };
+  }
+
   // Cut 6: freeze motion. Reuses the tested slowRender path (pauses
   // evolve/ambient-drift/ACCUM/swarm). A still instrument beats a dead one.
   if (!s.slowRender) {
@@ -222,6 +244,7 @@ export function shedSummary(s) {
   if (s.perfClampOverride) out.push(`crowd control → ${s.perfClampOverride.count}`);
   if (s.slowRender) out.push('freeze frame');
   if (s.watchdogTripped) out.push('watchdog — hard stop');
+  if ((s.kinemeShed | 0) > 0) out.push('living motion held');
   return out.length ? out : null;
 }
 
