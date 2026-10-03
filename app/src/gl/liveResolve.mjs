@@ -16,6 +16,7 @@ import { applyField, applyMod, motionMetrics, MAX_TRACKS } from '../engine/kerne
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
+import { buildKinemeCtx } from '../engine/kineme.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
@@ -492,6 +493,14 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
+          // Kineme living-motion drivers (slice 3): the anchored driver
+          // time rides input.kinemeTime (liveLoop/renderWorker). Null when
+          // every amount is 0 — zero cost when off. shedTier arrives in
+          // slice 4 (governor).
+          kineme: buildKinemeCtx({
+            layoutParams, driverSec: input.kinemeTime, seed,
+            canvasW: W, canvasH: H, shedTier: 0,
+          }),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).

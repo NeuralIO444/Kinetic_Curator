@@ -223,3 +223,31 @@ import { buildPlacements } from './buildPlacements.js';
 }
 
 console.log('kineme.selfcheck: OK (placements integration)');
+
+// ── slice 3: live ctx assembly + freeze contract ─────────────────────────
+import { buildKinemeCtx } from './kineme.js';
+
+{
+  const lp = (o) => ({ kinemeBreath: 0, kinemeDrift: 0, kinemePulse: 0, kinemeBrushWobble: 0, kinemeBoilFps: 8, ...o });
+  const base = { layoutParams: lp(), driverSec: 3.25, seed: 42, canvasW: 1000, canvasH: 700 };
+
+  assert.strictEqual(buildKinemeCtx(base), null, 'all-zero amounts → null (zero cost when off)');
+
+  const on = buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 0.5 }) });
+  assert.ok(on, 'amount up → ctx');
+  assert.strictEqual(on.driverSec, 3.25);
+  assert.strictEqual(on.boilStep, boilStep(3.25, 8), 'boil step quantized from driver time');
+  assert.strictEqual(on.seed, 42);
+  assert.strictEqual(on.amounts.breath, 0.5);
+  assert.strictEqual(on.shedTier, 0);
+
+  // garbage time → null, never NaN into the pipeline
+  assert.strictEqual(buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 1 }), driverSec: NaN }), null);
+
+  // freeze: the same driver second assembles the identical ctx → same pose
+  const held1 = buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 1, drift: 0, kinemeDrift: 0.3 }) });
+  const held2 = buildKinemeCtx({ ...base, layoutParams: lp({ kinemeBreath: 1, kinemeDrift: 0.3 }) });
+  assert.deepStrictEqual(held1, held2, 'held clock → identical ctx → held pose');
+}
+
+console.log('kineme.selfcheck: OK (live ctx + freeze)');
