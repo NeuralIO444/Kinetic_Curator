@@ -10,6 +10,12 @@ export const CANVAS_PRESETS = Object.freeze([
   { id: 'reel', group: 'Social', label: 'Reel / Story 1080×1920', w: 1080, h: 1920, fps: 30 },
   { id: 'ig-portrait', group: 'Social', label: 'IG Portrait 1080×1350', w: 1080, h: 1350, fps: 30 },
   { id: 'yt-hd', group: 'Social', label: 'YouTube HD 1920×1080', w: 1920, h: 1080, fps: 30 },
+  { id: 'ig-tall', group: 'Social', label: 'IG Tall 1080×1440', w: 1080, h: 1440, fps: 30 },
+  { id: 'ig-square', group: 'Social', label: 'IG Square 1080×1080', w: 1080, h: 1080, fps: 30 },
+  { id: 'ig-landscape', group: 'Social', label: 'IG Landscape 1080×566', w: 1080, h: 566, fps: 30 },
+  { id: 'vj-ultrawide', group: 'VJ', label: 'VJ Ultrawide 2560×1080', w: 2560, h: 1080, fps: 60 },
+  { id: 'vj-ultrawide-qhd', group: 'VJ', label: 'VJ Ultrawide QHD 3440×1440', w: 3440, h: 1440, fps: 60 },
+  { id: 'vj-triple-hd', group: 'VJ', label: 'VJ Triple-HD 5760×1080', w: 5760, h: 1080, fps: 60 },
   // OOH — vendor rasters are examples, not universal specs. Each carries its
   // source; the Times Square entry is one spectacular's raster.
   { id: 'ooh-lamar-bulletin', group: 'OOH', label: 'Lamar Digital Bulletin 1400×400', w: 1400, h: 400, fps: 60, source: 'Lamar Advertising autoscale template (example only — bulletins vary by market)' },
