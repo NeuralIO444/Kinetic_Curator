@@ -47,6 +47,19 @@ export function isOrganismMode(mode) {
 export const SYMMETRY_MODES = ['none', 'bilateral', 'radial-4', 'radial-6', 'radial-8', 'stamp'];
 export const BEHAVE_MODES = BEHAVE_IDS;
 
+/**
+ * Brush-tip picker options. Curated from the existing catalog — simple marks
+ * only: a detailed asset stamped 200× reads as caterpillar, not line. The
+ * default DOT is the primitive fallback.
+ */
+export const BRUSH_TIPS = [
+  { id: 'geo_circle_01', name: 'DOT' },
+  { id: 'geo_circle_02', name: 'RING' },
+  { id: 'org_blob_01', name: 'BLOB' },
+  { id: 'line_dash_01', name: 'DASH' },
+];
+export const BRUSH_TIP_IDS = BRUSH_TIPS.map((t) => t.id);
+
 /** #167 — onContact response per overlapping pair. */
 export const CONTACT_MODES = ['none', 'bounce', 'swap', 'stick', 'die', 'breed'];
 
@@ -103,11 +116,13 @@ export const DEFAULT_LAYOUT_PARAMS = {
   noiseFreq: 0.005,  noiseSpeed: 0.5,
   displacement: 0,
   // Brush line: nominal stamp diameter px, step as fraction of it,
-  // simplex field scale per px, trail count.
+  // simplex field scale per px, trail count, and the stamped tip asset id
+  // (joins geometrySignature — switching tips busts the staged-eval cache).
   brushSize: 24,
   brushSpacing: 0.5,
   fieldScale: 0.004,
   trailCount: 6,
+  brushTip: 'geo_circle_01',
   // Slice 2 — the crooked: perpendicular wobble amplitude in px (0 = the
   // trail exactly) and its frequency per stamp.
   wobbleAmp: 0,
@@ -334,6 +349,7 @@ const ENUM_SPEC = {
   behave: BEHAVE_MODES,
   contactMode: CONTACT_MODES,
   audioResponse: AUDIO_RESPONSE_IDS, // #306
+  brushTip: BRUSH_TIP_IDS, // corrupt/hand-edited tip ids reject, keeping the previous tip
 };
 
 /** True when `value` is a number we can meaningfully clamp. */

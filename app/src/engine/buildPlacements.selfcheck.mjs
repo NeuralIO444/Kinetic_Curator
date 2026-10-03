@@ -115,6 +115,42 @@ const noMirrorCap = buildPlacements({
 assert.strictEqual(noMirrorCap.items.length, noMirrorCap.safeCount);
 assert.ok(!noMirrorCap.items.some((it) => it._mirrored));
 
+// --- brush tip picker: stage D binds every stamp to the picked tip ---
+{
+  const brushLP = {
+    ...layoutParams, mode: 'brush', count: 40, brushTip: 'b',
+    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: 6,
+    wobbleAmp: 0, wobbleFreq: 0.5,
+  };
+  const t1 = buildPlacements({ ...opts, layoutParams: brushLP });
+  assert.ok(t1.items.length > 0, 'brush mode produces items');
+  assert.ok(t1.items.every((it) => it.assetId === 'b'),
+    'every stamp binds the picked tip');
+  // switching tips rebinds but must not move the stamps
+  const t2 = buildPlacements({
+    ...opts, layoutParams: { ...brushLP, brushTip: 'c' },
+  });
+  assert.ok(t2.items.every((it) => it.assetId === 'c'), 'tip switch rebinds');
+  assert.strictEqual(t2.items.length, t1.items.length);
+  for (let k = 0; k < t1.items.length; k++) {
+    assert.strictEqual(t2.items[k].x, t1.items[k].x, `tip switch must not move stamp x ${k}`);
+    assert.strictEqual(t2.items[k].y, t1.items[k].y, `tip switch must not move stamp y ${k}`);
+  }
+  // non-brush modes ignore brushTip entirely
+  const g1 = buildPlacements({
+    ...opts, layoutParams: { ...layoutParams, brushTip: 'b' },
+  });
+  assert.ok(g1.items.some((it) => it.assetId !== 'b'),
+    'grid mode must not force the brush tip');
+  // reseed repeats the same tipped line
+  const t3 = buildPlacements({ ...opts, layoutParams: brushLP, seed: 0x1a4f });
+  assert.strictEqual(t3.items.length, t1.items.length);
+  for (let k = 0; k < t1.items.length; k++) {
+    assert.strictEqual(t3.items[k].x, t1.items[k].x, `reseed x ${k}`);
+    assert.strictEqual(t3.items[k].assetId, 'b', `reseed keeps tip ${k}`);
+  }
+}
+
 // --- empty assets ---
 const empty = buildPlacements({ ...opts, activeAssets: [] });
 assert.deepStrictEqual(empty.items, []);

@@ -263,6 +263,10 @@ export function geometrySignature(p) {
     // cache compares element-wise, so a missing entry here would silently
     // serve stale trails after a param edit.
     p.brushSize, p.brushSpacing, p.fieldScale, p.trailCount,
+    // The stamped tip asset id (brush mode). An asset-bind input, but it
+    // rides the geometry signature too: bindHit requires geoHit, so a tip
+    // switch busts both caches and the staged eval never serves a stale tip.
+    p.brushTip,
     // Slice 2 — the crooked knobs.
     p.wobbleAmp, p.wobbleFreq,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
