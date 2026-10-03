@@ -39,7 +39,7 @@ export function openAlpha(alpha, local, amount, seed) {
   if (!(amount > 0)) return alpha;
   const d = Math.hypot(local.x - 0.5, local.y - 0.5);
   const istr = seed * 3.3 - Math.floor(seed * 3.3); // ink pick strand
-  const ipick = Math.min(2, Math.floor(istr * 3)); // 0 stroke, 1 hollow, 2 double
+  const ipick = Math.min(3, Math.floor(istr * 4)); // 0 stroke, 1 hollow, 2 double, 3 crop
   if (ipick === 0) {
     const edge = (d < 0.05 ? 0 : d < 0.22 ? (d - 0.05) / 0.17 : d < 0.34 ? 1 : d < 0.48 ? 1 - (d - 0.34) / 0.14 : 0);
     return alpha * (1 - amount + amount * edge);
@@ -48,8 +48,18 @@ export function openAlpha(alpha, local, amount, seed) {
     const hole = d < 0.12 ? 1 : d < 0.22 ? 1 - (d - 0.12) / 0.1 : 0;
     return alpha * (1 - amount * hole * (0.45 + 0.4 * seed));
   }
-  // double: faint second strike; mirror models the mix bound (the GLSL samples the cell)
-  const dstr = seed * 4.9 - Math.floor(seed * 4.9); // strike direction strand
-  const faint = 0.5 + 0.5 * dstr;
-  return alpha * (1 - amount * 0.35) + alpha * amount * 0.35 * faint;
+  if (ipick === 2) {
+    // double: faint second strike; mirror models the mix bound (the GLSL samples the cell)
+    const dstr = seed * 4.9 - Math.floor(seed * 4.9); // strike direction strand
+    const faint = 0.5 + 0.5 * dstr;
+    return alpha * (1 - amount * 0.35) + alpha * amount * 0.35 * faint;
+  }
+  // crop: seeded window holds part of the mark back; never keeps less than 40%
+  const cstr = seed * 6.1 - Math.floor(seed * 6.1);
+  const cfg = Math.min(3, Math.floor(cstr * 4)); // 0:+x 1:-x 2:+y 3:-y held back
+  const cedge = 0.4 + (cstr * 7 - Math.floor(cstr * 7)) * 0.2; // 0.4..0.6
+  const coord = cfg === 0 ? local.x : cfg === 1 ? 1 - local.x : cfg === 2 ? local.y : 1 - local.y;
+  const ct = Math.max(0, Math.min(1, (coord - cedge) / 0.08));
+  const keep = 1 - (ct * ct * (3 - 2 * ct)); // smoothstep falloff
+  return alpha * (1 - amount + amount * keep);
 }
