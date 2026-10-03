@@ -27,7 +27,7 @@
  */
 
 import { createNoise } from './noise.js';
-import { blendBehave, BEHAVE_EASE_MS } from './organisms/behaveEase.mjs';
+import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
@@ -792,16 +792,17 @@ export class ParticleSystem {
     // DAVIS readout/editor via resolveEffectiveBehave() so the two can
     // never disagree on what "effective" means.
     const rawProfile = organism ? resolveEffectiveBehave(layoutParams) : null;
-    // #722 — ease the verb row over ~1s. Retarget from the current blend.
+    // #722 — ease the verb row over ~1s of sim time (dtSec, not wall).
+    // Retarget from the current blend. Wind kernel held until the ease lands.
+    // Lorenz is not a hard cut: its gain eases, and the ODE step warms with it.
     let profile = rawProfile;
+    let windHold = null;
     if (organism && rawProfile) {
       const id = layoutParams.behave || 'cruise';
-      if (!this._behaveEase || this._behaveEase.id !== id) {
-        const from = this._behaveEase ? blendBehave(this._behaveEase.from, this._behaveEase.to, Math.min(1, (time - this._behaveEase.start) / BEHAVE_EASE_MS)) : rawProfile;
-        this._behaveEase = { id, from, to: rawProfile, start: time };
-      }
-      const t = (time - this._behaveEase.start) / BEHAVE_EASE_MS;
-      profile = t >= 1 || id === 'lorenz' ? rawProfile : blendBehave(this._behaveEase.from, this._behaveEase.to, t);
+      const stepped = stepBehaveEase(this._behaveEase, id, rawProfile, dtSec, layoutParams.mode);
+      this._behaveEase = stepped.state;
+      profile = stepped.profile;
+      windHold = stepped.windHold;
     }
     // #287 — the scent field exists only for organism casts (drives,
     // chemotaxis, and feeding all read it). Created lazily so cloud-mode
@@ -818,21 +819,25 @@ export class ParticleSystem {
     const drivesOn = organism && meta > 0;
     // Chemotaxis is a mold-only sense: the profile opts in with a
     // chemotaxis gain, and pays a deposit so the colony sustains itself.
-    const chemOn = organism && (profile.chemotaxis || 0) > 0;
+    const chemOn = organism && (profile.chemotaxis || 0) > BEHAVE_GAIN_EPS;
     // #582 — Levy is a levy-only sense, gated exactly like chemotaxis: the
     // profile opts in with a gain, so no other verb can reach the branch and
     // every existing row integrates the identical force sum it did before.
     // (profile is null outside organism mode, so every read stays behind the
     // organism gate — a cloud cast must not touch the row at all.)
-    const levyOn = organism && (profile.levyGain || 0) > 0;
+    const levyOn = organism && (profile.levyGain || 0) > BEHAVE_GAIN_EPS;
     const levyGain = levyOn ? profile.levyGain : 0;
     const levyAlpha = levyOn ? profile.levyAlpha : 0;
     // #583 — lorenz is a lorenz-only sense, gated exactly like chemotaxis, so
     // no other verb can reach the branch and every existing row integrates the
     // identical force sum. (profile is null outside organism mode.)
-    const lorenzOn = organism && (profile.lorenzGain || 0) > 0;
+    const lorenzOn = organism && (profile.lorenzGain || 0) > BEHAVE_GAIN_EPS;
+    // #710 — phase advances on the selected verb, even while gain is still
+    // easing up from epsilon. Otherwise re-entry's first frame skips the
+    // step the original entry took and the seeded dance drifts.
+    const lorenzPhase = organism && behaveId === 'lorenz';
     const lorenzGain = lorenzOn ? profile.lorenzGain : 0;
-    const lorenzRho = lorenzOn ? profile.lorenzRho : 0;
+    const lorenzRho = lorenzPhase ? (rawProfile.lorenzRho || profile.lorenzRho || 28) : 0;
     const leak = Math.min(1, Math.max(0, Number(palette?.leak) || 0));
     const leakOn = organism && leak > 0;
     const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
@@ -849,7 +854,11 @@ export class ParticleSystem {
     // Scatter, cloud swarm, and cruise HYPE keep point wind (noise3D -> angle).
     // #479 — factored into resolveWindMode() (organisms/behave.js) so the
     // DAVIS readout can show it without duplicating this derivation.
-    const useCurl = resolveWindMode(layoutParams) === 'curl';
+    // #722 — explicit windMode/windType still wins. Otherwise hold the
+    // kernel we were on until the behave ease completes (no mid-blend flip).
+    const useCurl = (layoutParams.windMode || layoutParams.windType)
+      ? resolveWindMode(layoutParams) === 'curl'
+      : (windHold ? windHold === 'curl' : resolveWindMode(layoutParams) === 'curl');
 
     const sepRadius = organism ? profile.sepR : 35;
     const aliRadius = organism ? profile.aliR : 60;
@@ -1110,13 +1119,17 @@ export class ParticleSystem {
       // is the authority. State is per agent, so a flock does not ride in
       // lockstep; it is advanced here (not in the integrator) because it is a
       // steering input, not a position.
-      if (lorenzOn) {
+      if (lorenzPhase) {
+        // #722 — phase is the #710 reseed (full step). The ride warms
+        // through eased lorenzGain, applied only once the blend clears epsilon.
         const adv = lorenzAdvance(LZX[i], LZY[i], LZZ[i], lorenzRho, LORENZ_DT * dtFrames);
         LZX[i] = adv.x; LZY[i] = adv.y; LZZ[i] = adv.z;
-        const mag = Math.sqrt(adv.dx * adv.dx + adv.dy * adv.dy);
-        if (mag > 1e-9) {
-          fax += ((adv.dx / mag) * lorenzGain) / m;
-          fay += ((adv.dy / mag) * lorenzGain) / m;
+        if (lorenzOn) {
+          const mag = Math.sqrt(adv.dx * adv.dx + adv.dy * adv.dy);
+          if (mag > 1e-9) {
+            fax += ((adv.dx / mag) * lorenzGain) / m;
+            fay += ((adv.dy / mag) * lorenzGain) / m;
+          }
         }
       }
       // #287 MOLD — chemotaxis: climb the scent gradient. Gated to
