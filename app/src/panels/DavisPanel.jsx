@@ -6,6 +6,7 @@ import { BehaveReadout } from './davis/BehaveReadout.jsx';
 import { VoiceTiles } from './davis/VoiceTiles.jsx';
 import { EvolveProgress } from './davis/EvolveProgress.jsx';
 import { MidiSection } from './davis/MidiSection.jsx';
+import { KinemeSection } from './davis/KinemeSection.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { captureFavorite } from '../state/slices/davisSlice.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
@@ -137,6 +138,9 @@ export function DavisPanel() {
             <i>PHRASE</i><b>{phraseStatus}</b>
           </div>
           <MidiSection />
+          {/* Kineme living-motion (slice 6): its own taxonomy row — global
+              RATE plus the four curated driver amounts (Matt decision 7). */}
+          <KinemeSection layoutParams={layoutParams} />
           {accumOn && (
             <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
               <button className={`big-btn ${accumFrozen ? 'active' : ''}`}
