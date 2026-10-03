@@ -9,7 +9,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
 import { TourOverlay } from './components/TourOverlay.jsx';
-import { FavoritesTray } from './components/FavoritesTray.jsx';
+import { SeqStrip } from './components/SeqStrip.jsx';
 import { useHotkeys } from './hooks/useHotkeys.js';
 import { useAudioInput } from './hooks/useAudioInput.js';
 import { useColumnResize } from './hooks/useColumnResize.js';
@@ -249,7 +249,7 @@ function AppInner() {
         />
       </ErrorBoundary>
       <MasterBar />
-      <FavoritesTray />
+      <SeqStrip />
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>

@@ -128,35 +128,40 @@
 }
 .first-run-skip:hover { color: var(--dim); }
 
-/* ─── Floating Favorites tray (#8) ─── */
-.favorites-tray {
+/* ─── Hits sequencer strip (was the floating Favorites tray, #8) ─── */
+.seq-strip {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 10px;
   background: var(--panel-2);
   border-top: 1px solid var(--line);
-  min-height: 32px;
+  min-height: 36px;
   outline: none;
 }
-.favorites-tray:focus {
+.seq-strip:focus {
   box-shadow: inset 0 0 0 1px var(--accent2);
 }
-.favorites-tray-empty {
+.seq-strip-empty {
   opacity: 0.55;
 }
-.favorites-tray-label {
+.seq-transport-slot {
+  flex-shrink: 0;
+  min-width: 0;
+  /* Filled by the seq-transport slice: ▶/■, step, loop, tempo. */
+}
+.seq-label {
   flex-shrink: 0;
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.1em;
   color: var(--dim);
 }
-.favorites-tray-hint {
+.seq-hint {
   font-size: 9px;
   color: var(--dimmer);
 }
-.favorites-tray-chips {
+.seq-cells {
   display: flex;
   gap: 4px;
   overflow-x: auto;
@@ -164,18 +169,24 @@
   min-width: 0;
   padding: 2px 0;
 }
-.fav-chip {
+.seq-cell {
   display: inline-flex;
   align-items: stretch;
   border: 1px solid var(--line);
   background: var(--panel);
   flex-shrink: 0;
 }
-.fav-chip.active {
+.seq-cell.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px rgba(255, 45, 111, 0.25);
 }
-.fav-chip-main {
+/* The playhead: driven by the sequencer clock from the seq-transport slice on.
+   TE rules — hard cuts, no easing. */
+.seq-cell.seq-playhead {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 1px rgba(0, 217, 255, 0.35);
+}
+.seq-cell-main {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -185,17 +196,17 @@
   color: var(--ink);
   font-size: 10px;
 }
-.fav-chip-main:hover { background: rgba(255,255,255,0.04); }
-.fav-chip-num {
+.seq-cell-main:hover { background: rgba(255,255,255,0.04); }
+.seq-cell-num {
   color: var(--dim);
   font-size: 9px;
   font-weight: 700;
 }
-.fav-chip-seed {
+.seq-cell-seed {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
 }
-.fav-chip-evolve {
+.seq-cell-btn {
   padding: 0 5px;
   background: transparent;
   border: none;
@@ -203,12 +214,12 @@
   color: var(--dim);
   font-size: 11px;
 }
-.fav-chip-evolve:hover {
+.seq-cell-btn:hover {
   color: var(--accent2);
   background: rgba(0, 217, 255, 0.08);
 }
 
-.app-fullscreen .favorites-tray { display: none; }
+.app-fullscreen .seq-strip { display: none; }
 
 /* ─── First-run tour (#222) ─── */
 .tour-overlay {

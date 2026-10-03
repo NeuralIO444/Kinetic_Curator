@@ -5,17 +5,22 @@ import { emit, Events } from '../composition/eventBus.js';
 const MAX_VISIBLE = 12;
 
 /**
- * Floating Favorites / Hits setlist (#8 / #35).
- * Ordered tray: 1–9 recall, Enter/Space = next, morph-to, reorder.
+ * Hits sequencer strip (was the floating Favorites tray, #8 / #35).
+ * The tray becomes the sequencer — one surface, not two.
+ *
+ * Slice 1 (seq-cells): restyle as a bottom cell strip. No behavior change —
+ * click = recall, shift-click = evolve-from, alt-click = morph-to,
+ * 1–9 recall, Enter/Space/arrows step, ‹ › reorder by delta.
+ * The transport slot at the left is reserved for the seq-transport slice.
  */
-export function FavoritesTray() {
+export function SeqStrip() {
   const { state } = useApp((s) => ({
     favorites: s.favorites,
     seed: s.seed,
     morphing: s.morphing,
   }));
   const favorites = state.favorites || [];
-  const trayRef = useRef(null);
+  const stripRef = useRef(null);
   const [cursor, setCursor] = useState(0);
 
   // Performance order = favorites array order (oldest → newest); show last N
@@ -81,9 +86,10 @@ export function FavoritesTray() {
 
   if (visible.length === 0) {
     return (
-      <div className="favorites-tray favorites-tray-empty" title="Press F to favorite a hit">
-        <span className="favorites-tray-label">HITS</span>
-        <span className="favorites-tray-hint">
+      <div className="seq-strip seq-strip-empty" title="Press F to favorite a hit">
+        <div className="seq-transport-slot" aria-hidden="true" />
+        <span className="seq-label">HITS</span>
+        <span className="seq-hint">
           F to save · Enter advances setlist
         </span>
       </div>
@@ -92,16 +98,18 @@ export function FavoritesTray() {
 
   return (
     <div
-      className="favorites-tray"
-      ref={trayRef}
+      className="seq-strip"
+      ref={stripRef}
       tabIndex={0}
       onKeyDown={onKeyDown}
       role="toolbar"
-      aria-label="Favorite hits setlist"
+      aria-label="Hits sequencer"
     >
-      <span className="favorites-tray-label">HITS</span>
-      {state.morphing && <span className="favorites-tray-hint" style={{ color: 'var(--accent)' }}>MORPH…</span>}
-      <div className="favorites-tray-chips">
+      {/* Transport lives here from the seq-transport slice on. */}
+      <div className="seq-transport-slot" aria-hidden="true" />
+      <span className="seq-label">HITS</span>
+      {state.morphing && <span className="seq-hint" style={{ color: 'var(--accent)' }}>MORPH…</span>}
+      <div className="seq-cells">
         {visible.map((f, i) => {
           const isCurrent = f.seed === state.seed;
           const isCursor = i === cur;
@@ -109,13 +117,13 @@ export function FavoritesTray() {
           return (
             <div
               key={f.id ?? `${f.seed}-${f.timestamp || i}`}
-              className={`fav-chip ${isCurrent ? 'active' : ''} ${isCursor ? 'setlist-cursor' : ''}`}
+              className={`seq-cell ${isCurrent ? 'active' : ''} ${isCursor ? 'seq-cursor' : ''}`}
               title={`Seed ${f.seed.toString(16)} · click recall · shift=evolve · alt=morph`}
               style={isCursor ? { outline: '1px solid var(--accent)' } : undefined}
             >
               <button
                 type="button"
-                className="fav-chip-main"
+                className="seq-cell-main"
                 onClick={(e) => {
                   setCursor(i);
                   if (e.altKey) morphTo(f);
@@ -123,12 +131,12 @@ export function FavoritesTray() {
                   else recall(f);
                 }}
               >
-                <span className="fav-chip-num">{i + 1}</span>
-                <span className="fav-chip-seed">{seedHex}</span>
+                <span className="seq-cell-num">{i + 1}</span>
+                <span className="seq-cell-seed">{seedHex}</span>
               </button>
               <button
                 type="button"
-                className="fav-chip-evolve"
+                className="seq-cell-btn"
                 title="Morph layout to this hit"
                 onClick={() => { setCursor(i); morphTo(f); }}
               >
@@ -136,7 +144,7 @@ export function FavoritesTray() {
               </button>
               <button
                 type="button"
-                className="fav-chip-evolve"
+                className="seq-cell-btn"
                 title="Evolve from this"
                 onClick={() => evolveFrom(f)}
               >
@@ -144,7 +152,7 @@ export function FavoritesTray() {
               </button>
               <button
                 type="button"
-                className="fav-chip-evolve"
+                className="seq-cell-btn"
                 title="Move earlier in setlist"
                 onClick={() => move(f, -1)}
                 disabled={!f.id}
@@ -153,7 +161,7 @@ export function FavoritesTray() {
               </button>
               <button
                 type="button"
-                className="fav-chip-evolve"
+                className="seq-cell-btn"
                 title="Move later in setlist"
                 onClick={() => move(f, 1)}
                 disabled={!f.id}

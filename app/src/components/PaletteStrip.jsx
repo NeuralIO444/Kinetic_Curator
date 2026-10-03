@@ -130,7 +130,7 @@ export function PaletteStrip() {
   // and setPaletteId clears overrides — must not fire on the active palette).
   // The favorites tray owns 1–9 while it has focus; let it keep them.
   const selectChipByIndex = (e, i) => {
-    if (e.target?.closest?.('.favorites-tray')) return;
+    if (e.target?.closest?.('.seq-strip')) return;
     const p = visible[i];
     if (!p || p.id === palette.id) return;
     dispatch({ type: A.SET_PALETTE_ID, payload: p.id });
