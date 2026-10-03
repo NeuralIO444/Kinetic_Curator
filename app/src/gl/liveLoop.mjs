@@ -45,6 +45,8 @@ import { authoredCanvas } from '../data/canvasPresets.js';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
 import { isLeave, isRibbon, isComet } from './trailMode.mjs';
+import { buildFlowField } from './flowField.mjs';
+import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
@@ -271,6 +273,18 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // frame-to-frame displacement attached as vx/vy. Cleared whenever the
   // ACCUM session ends so re-enabling starts at zero velocity.
   let velPrev = new Map();
+  // FLOW wire: one curl table per project seed, shared with the swarm.
+  let flowField = null;
+  let flowFieldSeed = null;
+  const flowFor = (seed) => {
+    const key = (seed >>> 0) || 444;
+    if (!flowField || flowFieldSeed !== key) {
+      flowField = buildFlowField(createNoise(key));
+      flowFieldSeed = key;
+    }
+    return flowField;
+  };
+
   // #268 SWELL: breathe the trail length out and back over ~2s. A timestamp,
   // not a flag — the envelope derives from wall-clock in buildFrame, so the
   // gesture can't stick if a frame is dropped mid-swell.
@@ -724,6 +738,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         tunnel: layoutParams.accumulationTunnel,
         prism: layoutParams.accumulationPrism,
         flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider
+        flowField: (layoutParams.accumulationFlow > 0) ? flowFor(s.seed) : null,
         leave: isLeave(layoutParams.trail),
         ribbon: isRibbon(layoutParams.trail),
         comet: isComet(layoutParams.trail),
@@ -986,6 +1001,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
                 flux: 0,
                 beatPulse: audioOn ? bands.beatPulse || 0 : 0,
               }, { swell: audioSwell ?? 1 });
+              if (accumParams.flowField) rp.flowField = accumParams.flowField;
               // #309: the frame is backing-store sized; the pair is logical.
               accumObj.step(target.tex, rp, { width: target.w, height: target.h });
               accumPoisonRun = 0;

@@ -497,8 +497,8 @@ export const SWEEP_EFFECTS = [
   },
   {
     ...accumDef('feed',
-      { u_src: S(0), u_flow: { kind: 'float' } },
-      (c, lab) => ({ u_src: lab.input.tex, u_flow: c.params.flow })),
+      { u_src: S(0), u_flowField: S(1), u_flow: { kind: 'float' }, u_flowShared: { kind: 'float' } },
+      (c, lab) => ({ u_src: lab.input.tex, u_flowField: lab.input.tex, u_flow: c.params.flow, u_flowShared: 0 })),
     cases: [
       // The house pattern: flow=0 skips exactly (createAccum.step); the
       // shader at flow=0 is independently the identity.
