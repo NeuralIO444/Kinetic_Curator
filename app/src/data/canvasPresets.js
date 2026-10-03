@@ -1,8 +1,10 @@
-// #606 canvas presets — SETUP. Instrument default stays 1000×700 until a preset applies.
-export const INSTRUMENT_CANVAS = Object.freeze({ w: 1000, h: 700, fps: 60, id: 'instrument' });
+// #606 canvas presets — SETUP. Boot default is HD 1920×1080 (Matt's call);
+// a saved session or loaded project overrides it at boot.
+export const INSTRUMENT_CANVAS = Object.freeze({ w: 1920, h: 1080, fps: 60, id: 'instrument' });
 
 export const CANVAS_PRESETS = Object.freeze([
-  { id: 'instrument', group: 'VJ', label: 'Instrument 1000×700', w: 1000, h: 700, fps: 60 },
+  { id: 'instrument', group: 'VJ', label: 'Instrument 1920×1080', w: 1920, h: 1080, fps: 60 },
+  { id: 'legacy-1000', group: 'VJ', label: '1000×700 legacy', w: 1000, h: 700, fps: 60 },
   { id: 'hd', group: 'VJ', label: 'HD 1920×1080', w: 1920, h: 1080, fps: 60 },
   { id: '720', group: 'VJ', label: '1280×720', w: 1280, h: 720, fps: 60 },
   { id: 'uhd', group: 'VJ', label: 'UHD 3840×2160', w: 3840, h: 2160, fps: 60 },
@@ -37,7 +39,8 @@ export function clampCanvasDim(n, fallback) {
 export function sanitizeCanvasSpec(raw = {}) {
   const w = clampCanvasDim(raw.canvasW ?? raw.w, INSTRUMENT_CANVAS.w);
   const h = clampCanvasDim(raw.canvasH ?? raw.h, INSTRUMENT_CANVAS.h);
-  const fps = CANVAS_FPS.includes(raw.canvasFps ?? raw.fps) ? (raw.canvasFps ?? raw.fps) : 60;
+  const rawFps = raw.canvasFps ?? raw.fps;
+  const fps = rawFps === 'sync' || CANVAS_FPS.includes(rawFps) ? rawFps : 60;
   const presetId = typeof raw.canvasPresetId === 'string' ? raw.canvasPresetId : 'custom';
   const stageMode = STAGE_MODES.includes(raw.stageMode) ? raw.stageMode : 'preview';
   return { canvasW: w, canvasH: h, canvasFps: fps, canvasPresetId: presetId, stageMode };
@@ -48,8 +51,71 @@ export function authoredCanvas(state = {}) {
   return { w: spec.canvasW, h: spec.canvasH, fps: spec.canvasFps };
 }
 
+/**
+ * Actual rendered pixel dims after the governor's renderScale trim.
+ * Mirrors liveLoop: scale clamps to [0.1, 1], dims round to at least 2px.
+ */
+export function renderDims(w, h, scale) {
+  const s = Math.min(1, Math.max(0.1, Number(scale) || 1));
+  return { w: Math.max(2, Math.round(w * s)), h: Math.max(2, Math.round(h * s)), scale: s };
+}
+
+// #606 — canvas fill-rate mapped onto the governor's cost tiers, visible
+// before the performer commits. Bands are multiples of the 1080p60 reference
+// budget (124.416 Mpx/s) the cost system measures against (costTiers.mjs:
+// "per full-frame pass at 1080p"). This is a static budget zone — the
+// governor itself sheds on measured fps, not on this label.
+const MPX_1080P60 = (1920 * 1080 * 60) / 1e6;
+export function canvasCostTier(mpxPerSec) {
+  const m = Number(mpxPerSec) || 0;
+  if (m <= MPX_1080P60) return 0;
+  if (m <= MPX_1080P60 * 2) return 1;
+  if (m <= MPX_1080P60 * 4) return 2;
+  return 3;
+}
+
+export const SYNC_FPS = 'sync';
+export const SYNC_FPS_CAP = 60;
+
+/**
+ * Resolve the capture-timestep fps. 'sync' follows the display refresh rate,
+ * hard-capped at 60 (Matt's call); a fixed fps ignores the display.
+ * Unknown display (null) resolves to the cap.
+ */
+export function resolveCanvasFps(fps, displayHz) {
+  if (fps !== SYNC_FPS) return fps;
+  const hz = Number(displayHz);
+  if (!Number.isFinite(hz) || hz <= 0) return SYNC_FPS_CAP;
+  return Math.min(Math.round(hz), SYNC_FPS_CAP);
+}
+
+let displayHzPromise = null;
+/**
+ * Measure the display refresh rate via rAF deltas (median of ~24 frames),
+ * cached. Falls back to the 60 cap outside a browser.
+ */
+export function measureDisplayHz() {
+  if (displayHzPromise) return displayHzPromise;
+  displayHzPromise = new Promise((resolve) => {
+    if (typeof requestAnimationFrame !== 'function') { resolve(SYNC_FPS_CAP); return; }
+    const deltas = [];
+    let last = 0;
+    const tick = (t) => {
+      if (last) deltas.push(t - last);
+      last = t;
+      if (deltas.length < 24) { requestAnimationFrame(tick); return; }
+      deltas.sort((a, b) => a - b);
+      const median = deltas[Math.floor(deltas.length / 2)];
+      const hz = median > 0 ? Math.round(1000 / median) : SYNC_FPS_CAP;
+      resolve(Math.min(240, Math.max(24, hz)));
+    };
+    requestAnimationFrame(tick);
+  });
+  return displayHzPromise;
+}
+
 export function isInstrumentCanvas(spec) {
-  return spec.canvasW === 1000 && spec.canvasH === 700;
+  return spec.canvasW === 1920 && spec.canvasH === 1080;
 }
 
 /** Cabinets across × cabinets down × pixels per cabinet. Writes the native raster. */
@@ -81,4 +147,25 @@ export function writeUserPresets(list) {
   const next = sanitizeUserPresets(list);
   try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { /* private mode */ }
   return next;
+}
+
+const SESSION_KEY = 'kc:canvas-session';
+
+/** Last-used canvas (W/H/fps/preset) — the boot fallback when no project is loaded. */
+export function readCanvasSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = sanitizeCanvasSpec(JSON.parse(raw));
+    return { canvasW: s.canvasW, canvasH: s.canvasH, canvasFps: s.canvasFps, canvasPresetId: s.canvasPresetId };
+  } catch { return null; }
+}
+
+export function writeCanvasSession(spec) {
+  try {
+    const s = sanitizeCanvasSpec(spec || {});
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      canvasW: s.canvasW, canvasH: s.canvasH, canvasFps: s.canvasFps, canvasPresetId: s.canvasPresetId,
+    }));
+  } catch { /* private mode */ }
 }
