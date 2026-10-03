@@ -164,10 +164,10 @@ export async function runMockChecks() {
     // Every allocated texture must be canvas-sized, glow-chain at W/8,
     // or the bridge pair at W/div (div=1 here → canvas-sized).
     const gw = Math.floor(w / GLOW_DIV), gh = Math.floor(h / GLOW_DIV);
-    const allowed = new Set([`${w}x${h}`, `${gw}x${gh}`]);
+    const allowed = new Set([`${w}x${h}`, `${gw}x${gh}`, '1x1']);
     for (const [tw, th] of texSizes(gl)) {
       assert.ok(allowed.has(`${tw}x${th}`),
-        `${name}: texture ${tw}x${th} not canvas ${w}x${h} or glow ${gw}x${gh}`);
+        `${name}: texture ${tw}x${th} not canvas ${w}x${h}, glow ${gw}x${gh}, or the 1x1 curl table`);
       n++;
     }
     // Every viewport must be canvas-sized (begin clears the pair at pair
@@ -187,10 +187,10 @@ export async function runMockChecks() {
     const postCalls = gl.calls.slice(before);
     const postTex = postCalls.filter((c) => c[0] === 'texImage2D').map((c) => [c[1], c[2]]);
     assert.ok(postTex.length > 0, `${name}: resize produced no reallocations`);
-    const allowed2 = new Set([`${other.w}x${other.h}`, `${ogw}x${ogh}`]);
+    const allowed2 = new Set([`${other.w}x${other.h}`, `${ogw}x${ogh}`, '1x1']);
     for (const [tw, th] of postTex) {
       assert.ok(allowed2.has(`${tw}x${th}`),
-        `resize: texture ${tw}x${th} not ${other.w}x${other.h} or glow ${ogw}x${ogh}`);
+        `resize: texture ${tw}x${th} not ${other.w}x${other.h}, glow ${ogw}x${ogh}, or the 1x1 curl table`);
       n++;
     }
     acc.dispose();
