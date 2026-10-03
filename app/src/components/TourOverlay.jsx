@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { TOUR_STEPS, TOUR_STORAGE_KEY, activateTourTab } from '../data/tour.js';
 
 /**
- * First-run guided tour (#222). Four steps across the panels — pick a
- * preset, move a slider, hit PLAY, render a still. A card, not coach marks
+ * First-run guided tour (#222, re-aimed #535). Four steps across the panels —
+ * pick a look, push it around, hit PLAY, keep the moment. A card, not coach
  * (#158: no coach marks); each step flips the panel tab so the operator
  * sees the real control, not a screenshot.
  *

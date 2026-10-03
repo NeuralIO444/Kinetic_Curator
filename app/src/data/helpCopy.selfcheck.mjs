@@ -125,4 +125,59 @@ import { HELP_TOPICS, HELP_SHORTCUTS, helpText } from './helpCopy.js';
   console.log('single-source hover titles: 5 components wired');
 }
 
+// ── 6. #535: group names match panel titles; tour-derived copy can't drift ──
+{
+  // Every help group must be a real panel title (case-insensitive) or one of
+  // the two sanctioned chrome groups (Master = top bar, Help = ? overlay) —
+  // so a panel rename/move fails loudly instead of orphaning copy.
+  const registrySrc = read('composition/PanelRegistry.js');
+  const panelTitles = new Set(
+    [...registrySrc.matchAll(/title:\s*'([^']+)'/g)].map((m) => m[1].toUpperCase())
+  );
+  const chrome = new Set(['MASTER', 'HELP']);
+  for (const t of HELP_TOPICS) {
+    const g = t.group.toUpperCase();
+    assert.ok(panelTitles.has(g) || chrome.has(g),
+      `help group '${t.group}' (${t.id}) matches no panel title — rename the group or the panel`);
+  }
+  console.log(`help groups: ${new Set(HELP_TOPICS.map((t) => t.group)).size} all placed`);
+
+  // The help-tour text is generated from TOUR_STEPS, never hardcoded.
+  const helpSrc = read('data/helpCopy.js');
+  assert.ok(/from '\.\/tour\.js'/.test(helpSrc),
+    'helpCopy.js must import the tour data module for derived copy');
+  const { TOUR_STEPS } = await import('./tour.js');
+  const helpTour = HELP_TOPICS.find((t) => t.id === 'help-tour');
+  assert.ok(helpTour, 'help-tour topic must exist');
+  for (const s of TOUR_STEPS) {
+    assert.ok(helpTour.text.includes(s.id),
+      `help-tour text must name tour step '${s.id}' — it is generated from TOUR_STEPS`);
+  }
+  assert.ok(helpTour.text.includes(String(TOUR_STEPS.length)),
+    'help-tour text must carry the live step count');
+
+  // The first-run tooltip is generated from TOUR_STEPS, never hardcoded.
+  const firstRunSrc = read('components/FirstRunOverlay.jsx');
+  assert.ok(/from '\.\.\/data\/tour\.js'/.test(firstRunSrc),
+    'FirstRunOverlay must import the tour data module for its tooltip');
+
+  // Tour bodies + help texts must not name retired tabs: these are the names
+  // that actually went stale before (#535) — OUTPUT→PIPELINE (#542),
+  // DAVIS→DIRECTOR (#830), LAYOUT/LAYERS→BUILD (#443/#445), GHOST retired.
+  // A denylist (not an ALLCAPS scan) so file formats like PNG don't trip it.
+  const staleNames = ['OUTPUT', 'DAVIS', 'LAYOUT', 'LAYERS', 'GHOST'];
+  const tourBodies = [...read('data/tour.js').matchAll(/body:\s*'([^']+)'/g)].map((m) => m[1]);
+  const copyBlobs = [
+    ...tourBodies,
+    ...HELP_TOPICS.map((t) => `${t.group} ${t.title} ${t.text}`),
+  ];
+  for (const blob of copyBlobs) {
+    for (const stale of staleNames) {
+      assert.ok(!new RegExp(`\\b${stale}\\b`).test(blob),
+        `copy names retired tab '${stale}' — re-aim it: ${blob.slice(0, 60)}…`);
+    }
+  }
+  console.log('tour-derived copy: help-tour + first-run tooltip generated, bodies name real tabs');
+}
+
 console.log('helpCopy.selfcheck OK');

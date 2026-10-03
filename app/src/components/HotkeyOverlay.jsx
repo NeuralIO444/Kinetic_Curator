@@ -70,7 +70,7 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
         )}
         {tab === 'settings' && (
           <div className="hotkey-desc" style={{ lineHeight: 1.45, padding: '6px 0' }}>
-            Quality, gloss, and audio live on the MasterBar and Stimuli.
+            Quality lives on the MasterBar; audio lives on STIMULI.
             There is no second prefs store — that would fight the project document and #107.
           </div>
         )}
