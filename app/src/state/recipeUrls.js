@@ -13,6 +13,7 @@
 // refusal into a clean boot + note.
 
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { getCatalogPalette } from '../data/palettes.js';
 import { RECIPE_OFFSET_CHANNELS, readSeedOffsets } from './recipes.js';
 
 /** Version tag — cleartext prefix of every recipe URL. Bump on format change. */
@@ -105,6 +106,40 @@ export function extractRecipePayload(text) {
   if (typeof text !== 'string') return null;
   const m = /(kc-r\/1\.[A-Za-z0-9-_]+)/.exec(text);
   return m ? m[1] : null;
+}
+
+/**
+ * Decide what a location hash means for boot. Returns:
+ *   { status: 'none' }                          — no share fragment; boot normally.
+ *   { status: 'bad', error }                     — fragment present but unreadable; clean boot + note.
+ *   { status: 'ok', recipe }                     — fragment decodes; apply the recipe.
+ * Pure — the hook applies the decision.
+ */
+export function parseBootHash(hash) {
+  if (typeof hash !== 'string' || !hash) return { status: 'none' };
+  const payload = extractRecipePayload(hash);
+  if (!payload) {
+    // A #r= key with nothing parseable in it is a bad link, not "no link".
+    const m = /(?:^|&|#)r=/.exec(hash);
+    if (m) return { status: 'bad', error: 'Share link is empty or unreadable — starting clean.' };
+    return { status: 'none' };
+  }
+  const result = decodeRecipeUrl(payload);
+  if (!result.ok) return { status: 'bad', error: result.error };
+  return { status: 'ok', recipe: result.recipe };
+}
+
+/**
+ * Check whether a recipe's palette id resolves on this machine. Returns null
+ * when it does (catalog or a local user palette), else { requested, used } —
+ * the apply path falls back via getCatalogPalette, and the boot note badges it.
+ */
+export function describePaletteFallback(paletteId, userPalettes) {
+  if (typeof paletteId !== 'string' || !paletteId) return null;
+  const extra = Array.isArray(userPalettes) ? userPalettes : [];
+  const resolved = getCatalogPalette(paletteId, extra);
+  if (resolved && resolved.id === paletteId) return null;
+  return { requested: paletteId, used: resolved ? resolved.id : null };
 }
 
 /**

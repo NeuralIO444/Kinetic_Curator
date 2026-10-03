@@ -15,6 +15,7 @@ export function MasterBar() {
     running: s.running, fps: s.fps, stageTimings: s.stageTimings, governorShedFps: s.governorShedFps,
     seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
     isRecording: s.isRecording, persistStatus: s.persistStatus, frameLock: s.frameLock,
+    bootNotice: s.bootNotice, setBootNotice: s.setBootNotice,
     setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, glContext: s.glContext,
     curatorConfidence: s.curatorConfidence, curatorActive: s.curatorActive,
     layers: s.layers,
@@ -64,6 +65,16 @@ export function MasterBar() {
     prevPersist.current = persistStatus;
   }, [persistStatus]);
 
+  // #534: boot notice pill (share-link applied, bad link, palette fallback).
+  // Shows for a few seconds, then clears itself from the store.
+  const bootNotice = state.bootNotice;
+  const setBootNotice = state.setBootNotice;
+  useEffect(() => {
+    if (!bootNotice) return;
+    const t = setTimeout(() => setBootNotice(null), 8000);
+    return () => clearTimeout(t);
+  }, [bootNotice, setBootNotice]);
+
   return (
     <div className="master-bar">
       <div className="master-left">
@@ -93,6 +104,14 @@ export function MasterBar() {
             title="Project autosaved to pipeline backup.">
             <span className="status-dot" style={{ background: '#00ff88' }} />
             SAVED
+          </div>
+        )}
+
+        {bootNotice && (
+          <div className="status-pill" style={{ background: 'rgba(0, 217, 255, 0.12)', color: '#00d9ff', borderColor: '#00d9ff' }}
+            title={bootNotice}>
+            <span className="status-dot" style={{ background: '#00d9ff' }} />
+            {bootNotice.length > 48 ? `${bootNotice.slice(0, 47)}…` : bootNotice}
           </div>
         )}
 
