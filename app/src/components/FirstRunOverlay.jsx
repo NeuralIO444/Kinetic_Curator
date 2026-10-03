@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { TOUR_STEPS, tourStepNames } from '../data/tour.js';
 
 const STORAGE_KEY = 'kc:first-run-seen';
 
@@ -60,7 +61,7 @@ export function FirstRunOverlay({ onPlay, onTour }) {
           type="button"
           className="first-run-play"
           onClick={startTour}
-          title="A 4-step guided tour: pick a recipe, move a slider, hit PLAY, render a still"
+          title={`A ${TOUR_STEPS.length}-step guided tour: ${tourStepNames().join(', ')}`}
           style={{ background: 'transparent', border: '1px solid var(--line-2)', color: 'var(--ink)' }}
         >
           TAKE THE TOUR
