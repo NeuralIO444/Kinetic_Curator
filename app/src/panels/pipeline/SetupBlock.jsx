@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster, renderDims, canvasCostTier } from '../../data/canvasPresets.js';
+import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster, renderDims, canvasCostTier, SYNC_FPS, SYNC_FPS_CAP, resolveCanvasFps, measureDisplayHz } from '../../data/canvasPresets.js';
 
 export function SetupBlock() {
   const w = useStore((s) => s.canvasW);
@@ -26,8 +26,16 @@ export function SetupBlock() {
   // rendered pixels after the governor's renderScale trim.
   const rendered = renderDims(w, h, renderScale);
   const trimmed = rendered.scale < 1 - 1e-9;
-  const mpx = Math.round((w * h * fps) / 1e6);
-  const tier = canvasCostTier((w * h * fps) / 1e6);
+  // #606 — sync resolves against the measured display Hz (cap 60); the
+  // Mpx/s + tier planning numbers use the resolved fps.
+  const [displayHz, setDisplayHz] = useState(null);
+  useEffect(() => {
+    if (fps === SYNC_FPS) { measureDisplayHz().then(setDisplayHz); }
+  }, [fps]);
+  const effFps = fps === SYNC_FPS ? resolveCanvasFps(fps, displayHz) : fps;
+  const mpx = Math.round((w * h * effFps) / 1e6);
+  const tier = canvasCostTier((w * h * effFps) / 1e6);
+  const fpsLabel = fps === SYNC_FPS ? `sync→${effFps}` : `${fps}`;
   const [cab, setCab] = useState({ w: 4, h: 3, px: 128 });
   const [name, setName] = useState('My wall');
   useEffect(() => { load?.(); }, [load]);
@@ -63,9 +71,10 @@ export function SetupBlock() {
         <button type="button" className={`chip-btn${lock ? ' active' : ''}`} onClick={() => setLock(!lock)}>LOCK</button>
         <button type="button" className="chip-btn" onClick={swap}>SWAP</button>
       </div>
-      <div className="pipeline-row" title="Capture timestep. Live raf still follows the display.">
+      <div className="pipeline-row" title="Capture timestep: the frame cadence captures and exports assume. Sync follows the display's refresh rate, capped at 60fps. The live canvas already follows the display via rAF — this setting does not change live playback.">
         <span style={{ flex: 1, fontSize: 11 }}>CAPTURE FPS</span>
-        <select value={fps} onChange={(e) => setFps(Number(e.target.value))} style={{ fontSize: 11 }}>
+        <select value={fps} onChange={(e) => setFps(e.target.value === SYNC_FPS ? SYNC_FPS : Number(e.target.value))} style={{ fontSize: 11 }}>
+          <option value={SYNC_FPS}>Sync to display (≤{SYNC_FPS_CAP})</option>
           {CANVAS_FPS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </div>
@@ -93,7 +102,7 @@ export function SetupBlock() {
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}
         title="Canvas × fps mapped to the governor's cost tiers (budget zones from the 1080p60 reference). Static estimate — the governor sheds on measured fps, not this label.">
-        {authored} at {fps}fps · {mpx} Mpx/s · tier {tier}
+        {authored} at {fpsLabel}fps · {mpx} Mpx/s · tier {tier}
         {differ ? ` · not the ${actual} instrument` : ''}
         {trimmed ? ` · rendering ${rendered.w}×${rendered.h} (${Math.round(rendered.scale * 100)}% governor)` : ''}
         . Syphon still does not send a frame from the browser.

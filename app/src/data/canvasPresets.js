@@ -37,7 +37,8 @@ export function clampCanvasDim(n, fallback) {
 export function sanitizeCanvasSpec(raw = {}) {
   const w = clampCanvasDim(raw.canvasW ?? raw.w, INSTRUMENT_CANVAS.w);
   const h = clampCanvasDim(raw.canvasH ?? raw.h, INSTRUMENT_CANVAS.h);
-  const fps = CANVAS_FPS.includes(raw.canvasFps ?? raw.fps) ? (raw.canvasFps ?? raw.fps) : 60;
+  const rawFps = raw.canvasFps ?? raw.fps;
+  const fps = rawFps === 'sync' || CANVAS_FPS.includes(rawFps) ? rawFps : 60;
   const presetId = typeof raw.canvasPresetId === 'string' ? raw.canvasPresetId : 'custom';
   const stageMode = STAGE_MODES.includes(raw.stageMode) ? raw.stageMode : 'preview';
   return { canvasW: w, canvasH: h, canvasFps: fps, canvasPresetId: presetId, stageMode };
@@ -69,6 +70,46 @@ export function canvasCostTier(mpxPerSec) {
   if (m <= MPX_1080P60 * 2) return 1;
   if (m <= MPX_1080P60 * 4) return 2;
   return 3;
+}
+
+export const SYNC_FPS = 'sync';
+export const SYNC_FPS_CAP = 60;
+
+/**
+ * Resolve the capture-timestep fps. 'sync' follows the display refresh rate,
+ * hard-capped at 60 (Matt's call); a fixed fps ignores the display.
+ * Unknown display (null) resolves to the cap.
+ */
+export function resolveCanvasFps(fps, displayHz) {
+  if (fps !== SYNC_FPS) return fps;
+  const hz = Number(displayHz);
+  if (!Number.isFinite(hz) || hz <= 0) return SYNC_FPS_CAP;
+  return Math.min(Math.round(hz), SYNC_FPS_CAP);
+}
+
+let displayHzPromise = null;
+/**
+ * Measure the display refresh rate via rAF deltas (median of ~24 frames),
+ * cached. Falls back to the 60 cap outside a browser.
+ */
+export function measureDisplayHz() {
+  if (displayHzPromise) return displayHzPromise;
+  displayHzPromise = new Promise((resolve) => {
+    if (typeof requestAnimationFrame !== 'function') { resolve(SYNC_FPS_CAP); return; }
+    const deltas = [];
+    let last = 0;
+    const tick = (t) => {
+      if (last) deltas.push(t - last);
+      last = t;
+      if (deltas.length < 24) { requestAnimationFrame(tick); return; }
+      deltas.sort((a, b) => a - b);
+      const median = deltas[Math.floor(deltas.length / 2)];
+      const hz = median > 0 ? Math.round(1000 / median) : SYNC_FPS_CAP;
+      resolve(Math.min(240, Math.max(24, hz)));
+    };
+    requestAnimationFrame(tick);
+  });
+  return displayHzPromise;
 }
 
 export function isInstrumentCanvas(spec) {

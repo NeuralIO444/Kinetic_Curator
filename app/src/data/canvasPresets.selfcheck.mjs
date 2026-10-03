@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas, renderDims, canvasCostTier,
+  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas, renderDims, canvasCostTier, resolveCanvasFps,
 } from './canvasPresets.js';
 import { serializeProject } from '../state/projectDocument.js';
 
@@ -47,6 +47,21 @@ test('#606 canvasCostTier maps Mpx/s onto governor tiers', () => {
   assert.equal(canvasCostTier(497.664), 2); // 4K60 — top of tier 2
   assert.equal(canvasCostTier(498), 3); // just over 4x the budget
   assert.equal(canvasCostTier(1427), 3); // Times Square-class @ 60
+});
+
+test('#606 sync fps resolves against the display, capped at 60', () => {
+  assert.equal(resolveCanvasFps('sync', 120), 60); // 120Hz display -> cap
+  assert.equal(resolveCanvasFps('sync', 60), 60);
+  assert.equal(resolveCanvasFps('sync', 50), 50); // slower display -> follow it
+  assert.equal(resolveCanvasFps('sync', null), 60); // unknown display -> cap
+  assert.equal(resolveCanvasFps(30, 120), 30); // fixed fps ignores the display
+  assert.equal(resolveCanvasFps(60, 120), 60);
+});
+
+test('#606 sanitize keeps the sync fps option', () => {
+  assert.equal(sanitizeCanvasSpec({ canvasFps: 'sync' }).canvasFps, 'sync');
+  assert.equal(sanitizeCanvasSpec({ canvasFps: 30 }).canvasFps, 30);
+  assert.equal(sanitizeCanvasSpec({ canvasFps: 12 }).canvasFps, 60); // invalid -> default
 });
 
 test('#606 instrument canvas omitted from serialize', () => {
