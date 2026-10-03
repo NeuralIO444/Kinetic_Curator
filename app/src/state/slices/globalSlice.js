@@ -129,6 +129,15 @@ export const createGlobalSlice = (set) => ({
    */
   qualityShedFrom: null,
   /**
+   * Kineme living-motion shed tier (slice 4): 0 = full motion, 1 = boil
+   * held, 2 = all motion held, 3 = pinned to rest, 4 = amounts zeroed.
+   * Session-only governor overlay — never serialized, auto-clears on
+   * recovery via the restore table (governorCuts.js), like slowRender.
+   * Shedding never touches seed or phase: recovery resumes from the held
+   * pose.
+   */
+  kinemeShed: 0,
+  /**
    * Set for the duration of a batch export (#107 §5). Deliberately separate
    * from slowRender/perfTier1 above — those are owned by usePerformanceGovernor
    * and auto-clear on live FPS, which would fight a pause that must hold for
@@ -313,6 +322,8 @@ export const createGlobalSlice = (set) => ({
   }),
   /** #264 — the governor records the tier its quality shed stepped from. */
   setQualityShedFrom: (tier) => set({ qualityShedFrom: tier }),
+  /** Kineme shed: clamp to the four tiers; 0 restores full motion. */
+  setKinemeShed: (tier) => set({ kinemeShed: Math.min(4, Math.max(0, tier | 0)) }),
   /** #264 — lets the badge return to clean once a watchdog stop is gone. */
   clearWatchdogReason: () => set({ lastWatchdogReason: null }),
   setBatchPaused: (paused) => set({ batchPaused: !!paused }),
@@ -535,6 +546,9 @@ export const createGlobalSlice = (set) => ({
       autoQuality: doc.autoQuality !== false,
       // #264 — a fresh document owns its quality; any governor shed claim ends here.
       qualityShedFrom: null,
+      // Kineme shed (slice 4): overlay state, never serialized — a fresh
+      // project starts at full motion.
+      kinemeShed: 0,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
       ingestError: null,

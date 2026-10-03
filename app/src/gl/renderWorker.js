@@ -160,6 +160,7 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
     seed: s.seed || 1,
     seedOffsets: s.seedOffsets || {},
     kinemeTime,
+    kinemeShed: s.kinemeShed | 0,
     paletteId: voiceState.paletteId,
     paletteOverrides: voiceState.paletteOverrides,
     userPalettes: s.userPalettes,
