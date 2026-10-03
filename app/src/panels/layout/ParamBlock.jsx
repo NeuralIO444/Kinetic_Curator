@@ -151,6 +151,12 @@ export function ParamBlock({ layoutParams, lockedParams }) {
       {/* #594 PR3 — squash-and-stretch: moving marks already stretch along
           their motion (#309); this thins them across it so they keep their
           mass. Works on anything that moves. */}
+      <RangeRow label="CROOKED" value={layoutParams.crooked ?? 0} min={0} max={1} step={0.01}
+        hint="Zero is today's quad. Higher shears and pinches each mark from its own seed."
+        onChange={v => set('crooked', v)} defaultValue={0} />
+      <RangeRow label="OPEN" value={layoutParams.open ?? 0} min={0} max={1} step={0.01}
+        hint="Zero is today's ink. Higher strokes or hollows the same cell. Not the resolve plate."
+        onChange={v => set('open', v)} defaultValue={0} />
       <RangeRow label="SQUASH" value={layoutParams.squash ?? 0} min={0} max={1} step={0.05}
         hint="Moving marks thin across their motion as they stretch — 1 keeps their mass, 0 is stretch only"
         onChange={v => set('squash', v)} defaultValue={d('squash', DEFAULT_LAYOUT_PARAMS.squash)}

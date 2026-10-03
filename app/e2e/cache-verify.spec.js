@@ -81,21 +81,26 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   }).locator('input[type="range"]');
   await expect(count).toBeVisible();
 
-  await setRange(page, count, 700);
+  // CI load: COUNT=700 under SwiftShader saturates the runner's main thread —
+  // Playwright protocol calls (evaluate, textContent) then time out even though
+  // the app is healthy. 300 still clears the 1.5x bar by a wide margin (5x)
+  // while cutting the software-GL load by more than half. The property under
+  // test is unchanged: a swallowed COUNT edit reads ~1x and fails the bar.
+  await setRange(page, count, 300);
   const high = await nodeCount(page);
   await setRange(page, count, 60);
   await expect.poll(() => glNodeCount(page), {
-    message: 'COUNT=60 should place many fewer shapes than COUNT=700 (a stale cache stays high)',
+    message: 'COUNT=60 should place many fewer shapes than COUNT=300 (a stale cache stays high)',
     timeout: CONVERGE_MS,
   }).toBeLessThan(high / MARGIN);
   const low = await nodeCount(page);
-  await setRange(page, count, 700);
+  await setRange(page, count, 300);
   await expect.poll(() => glNodeCount(page), {
-    message: 'returning COUNT to 700 should restore the high node count',
+    message: 'returning COUNT to 300 should restore the high node count',
     timeout: CONVERGE_MS,
   }).toBeGreaterThan(low * MARGIN);
   const restored = await nodeCount(page);
-  console.log(`[cache] COUNT 700 -> ${high} nodes, 60 -> ${low}, back to 700 -> ${restored}`);
+  console.log(`[cache] COUNT 300 -> ${high} nodes, 60 -> ${low}, back to 300 -> ${restored}`);
 
   // #655: the governor is disarmed via window.__KC_GOVERNOR_OFF, so the node
   // count is the deterministic resolved placement count, not the live post-shed
@@ -108,9 +113,9 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   // which under CI load narrowed the ratio toward ~1.8x; 1.5x keeps a wide
   // margin below every CI-load ratio seen while staying decisive against the
   // real failure mode.
-  expect(high, 'COUNT=700 should place many more shapes than COUNT=60')
+  expect(high, 'COUNT=300 should place many more shapes than COUNT=60')
     .toBeGreaterThan(low * MARGIN);
-  expect(restored, 'returning COUNT to 700 should restore the high node count')
+  expect(restored, 'returning COUNT to 300 should restore the high node count')
     .toBeGreaterThan(low * MARGIN);
 
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);

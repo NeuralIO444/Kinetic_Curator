@@ -1,11 +1,14 @@
 /**
- * Shared GLSL sources — Phase 1 (#187). Browser-safe (pure strings, no imports).
+ * Shared GLSL sources — Phase 1 (#187). Browser-safe (pure strings; the one
+ * import is chunks.mjs, itself browser-safe with no Node imports).
  *
  * Conventions (match the SVG reference path):
  * - All color is premultiplied-alpha sRGB bytes, exactly like resvg output.
  * - Canvas UV is y-down: (0,0) = top-left of the 1000x700 canvas.
  * - Texture sampling of FBOs flips v (GL textures are y-up).
  */
+
+import { injectCommon } from './effects/chunks.mjs';
 
 export const BLEND_IDS = Object.freeze({
   normal: 0, multiply: 1, screen: 2, overlay: 3, darken: 4, lighten: 5,
@@ -34,8 +37,10 @@ export const EFFECT_IDS = Object.freeze({
 // are gone, not reserved. posterize keeps id 5 (ids are explicit, nothing
 // renumbers).
 
-/** Instanced textured quads. Per-instance: (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0). */
-export const QUAD_VS = `#version 300 es
+/** Instanced textured quads. Per-instance: (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0).
+ *  Wrapped with the shared chunk library (#196) so hands can use kc_hash12
+ *  instead of an inline sin-hash (the chunk selfcheck bans duplicates). */
+const QUAD_VS_SRC = `#version 300 es
 layout(location=0) in vec2 a_corner;
 layout(location=1) in vec4 a_inst0;
 layout(location=2) in vec4 a_inst1;
@@ -56,6 +61,8 @@ uniform float u_ambient;  // light that reaches a mark facing away from the sun
 // Per instance a_inst4.z = slot + 1 (0 = still), a_inst4.w = phase [0,1).
 uniform vec3 u_kineme[16];
 uniform float u_kinemeTime;
+uniform vec2 u_hands;     // x crooked, y open. 0 is today's quad and today's ink.
+out float v_seed;
 out vec2 v_uv;
 out float v_opacity;
 out vec3 v_ink;
@@ -71,6 +78,15 @@ void main() {
   // the CLAMP_TO_EDGE-clamped UVs. (Half-texel offset.)
   vec2 au = a_corner * 199.5 - 49.75;
   vec2 c = (au - 50.0) * a_inst0.zw;      // center on the 100x100 box, scale
+  float seed = kc_hash12(a_inst0.xy);
+  v_seed = seed;
+  // Crooked Hand. Amount 0 never enters, so the quad stays the pre-hand path.
+  if (u_hands.x > 0.0) {
+    float shear = (seed * 2.0 - 1.0) * u_hands.x * 0.45;
+    float pinch = (fract(seed * 7.13) * 2.0 - 1.0) * u_hands.x * 0.35;
+    c.x += c.y * shear;
+    c.x *= 1.0 - pinch * clamp(c.y / 50.0, -1.0, 1.0);
+  }
   float kDeg = 0.0;   // #781 KINEME extra rotation (degrees)
   float kVis = 1.0;   // blink visibility
   vec2 kOff = vec2(0.0); // bob offset (scene units)
@@ -132,6 +148,8 @@ void main() {
   }
 }`;
 
+export const QUAD_VS = injectCommon(QUAD_VS_SRC);
+
 export const QUAD_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_atlas;
@@ -141,6 +159,8 @@ uniform vec4 u_sunLight;   // #594: shared, rgb colour + intensity
 uniform float u_ambient;   // #594: shared
 uniform vec2 u_sunMat;     // #594 PR2: x = bevel strength (0 = flat per-instance light), y = specular
 uniform float u_pool;      // #594: 0 = today's sun. Ink in the shadow, paper on the highlight.
+uniform vec2 u_hands;      // y = Open Hand. 0 returns the current sample.
+in float v_seed;
 in vec2 v_world;
 in vec4 v_rot;
 in vec4 v_cell;
@@ -152,6 +172,22 @@ in vec3 v_light;
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
+  // Open Hand. Amount 0 never enters. Stroke or hollow, picked by the instance seed.
+  if (u_hands.y > 0.0) {
+    vec2 span = max(v_cell.zw - v_cell.xy, vec2(1e-4));
+    vec2 local = (v_uv - v_cell.xy) / span;
+    float d = length(local - 0.5);
+    if (v_seed > 0.5) {
+      float edge = smoothstep(0.05, 0.22, d) * (1.0 - smoothstep(0.34, 0.48, d));
+      t.a *= mix(1.0, edge, u_hands.y);
+      t.rgb *= mix(1.0, edge, u_hands.y);
+    } else {
+      float hole = 1.0 - smoothstep(0.12, 0.22, d);
+      float keep = 1.0 - u_hands.y * hole * (0.45 + 0.4 * v_seed);
+      t.a *= keep;
+      t.rgb *= keep;
+    }
+  }
   if (u_liveTint > 0.5) {
     // Spine D: t.r is premultiplied ink mask, t.g is premultiplied accent mask,
     // t.b is the base grayscale mask (for hardcoded whites/blacks).
