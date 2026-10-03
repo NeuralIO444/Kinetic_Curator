@@ -251,7 +251,18 @@ export async function runBrowserChecks() {
 async function main() {
   const skipBrowser = process.argv.includes('--skip-browser');
   let n = await runMockChecks();
-  if (!skipBrowser) n += await runBrowserChecks();
+  if (!skipBrowser) {
+    try {
+      n += await runBrowserChecks();
+    } catch (e) {
+      // The lint job does not install the Playwright browser. The e2e job does.
+      if (/Executable doesn't exist/.test(e.message || '') && /playwright/i.test(e.message || '')) {
+        console.log('  [skip] browser canvas-size checks: Playwright browser not installed in this environment');
+      } else {
+        throw e;
+      }
+    }
+  }
   console.log(`canvasSizes.selfcheck: OK (${n} cases)`);
 }
 
