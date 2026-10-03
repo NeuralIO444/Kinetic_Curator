@@ -18,5 +18,8 @@ test('#716 rack editor uses the tile grammar', () => {
   assert.match(jsx, /className="ef-abbr"/);
   assert.match(jsx, /className="ef-bypass"/);
   assert.match(jsx, /className="ef-word"/);
-  assert.match(css, /\.ef-tile \{[^}]*display:\s*grid/);
+  assert.match(css, /\.ef-abbr \{[^}]*grid-row:\s*1/);
+  assert.match(css, /\.ef-bypass \{[^}]*grid-row:\s*1/);
+  assert.match(css, /\.ef-glyph \{[^}]*grid-row:\s*2/);
+  assert.match(css, /\.ef-word \{[^}]*grid-row:\s*3/);
 });

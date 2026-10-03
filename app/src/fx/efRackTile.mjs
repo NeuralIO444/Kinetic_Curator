@@ -1,5 +1,5 @@
-// #716 Part 2 — EF rack tile face. Abbreviation, one mode word, glyph id.
-// The ✕ stays the existing remove; there is no bypass flag in the store.
+// #716 — EF rack tile face. Grammar is the TX-6 line `DLY ✕ WARP`:
+// abbreviation top-left, bypass top-right, glyph centre, one mode word.
 
 export const SLOT_ABBR = {
   'EF-1': 'BLR',
