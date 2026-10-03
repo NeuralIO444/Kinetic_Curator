@@ -186,20 +186,31 @@ in vec3 v_light;
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
-  // Open Hand. Amount 0 never enters. Stroke or hollow, picked by the instance seed.
+  // Open Hand. Amount 0 never enters. The seed picks the ink: stroke, hollow, double.
   if (u_hands.y > 0.0) {
     vec2 span = max(v_cell.zw - v_cell.xy, vec2(1e-4));
     vec2 local = (v_uv - v_cell.xy) / span;
     float d = length(local - 0.5);
-    if (v_seed > 0.5) {
+    float istr = fract(v_seed * 3.3);
+    float ipick = floor(istr * 3.0);
+    if (ipick < 0.5) {
       float edge = smoothstep(0.05, 0.22, d) * (1.0 - smoothstep(0.34, 0.48, d));
       t.a *= mix(1.0, edge, u_hands.y);
       t.rgb *= mix(1.0, edge, u_hands.y);
-    } else {
+    } else if (ipick < 1.5) {
       float hole = 1.0 - smoothstep(0.12, 0.22, d);
       float keep = 1.0 - u_hands.y * hole * (0.45 + 0.4 * v_seed);
       t.a *= keep;
       t.rgb *= keep;
+    } else {
+      // double: second strike of the same cell, offset a few texels along a
+      // seeded direction, mixed in faint. Clamped to the cell.
+      float dstr = fract(v_seed * 4.9);
+      float dang = dstr * 6.28318530718;
+      vec2 ddir = vec2(cos(dang), sin(dang));
+      vec2 uv2 = clamp(v_cell.xy + (local + ddir * u_hands.y * 0.015) * span, v_cell.xy, v_cell.zw);
+      vec4 t2 = texture(u_atlas, uv2);
+      t = mix(t, t2, u_hands.y * 0.35);
     }
   }
   if (u_liveTint > 0.5) {
