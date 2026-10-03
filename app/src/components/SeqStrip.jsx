@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 
@@ -22,6 +22,71 @@ export function SeqStrip() {
   const favorites = state.favorites || [];
   const stripRef = useRef(null);
   const [cursor, setCursor] = useState(0);
+
+  // --- seq-dnd: pointer-based drag reorder ---------------------------------
+  // Drag starts on a cell's main button; a >6px move becomes a drag (the
+  // click is then suppressed). The insertion gap is computed from the
+  // pointer's x against cell midpoints; the drop indicator renders at it.
+  const dragRef = useRef(null); // { id, fromIndex, startX, startY } | null
+  const suppressClickRef = useRef(false);
+  const cellEls = useRef(new Map()); // fav.id -> element
+  const [dragId, setDragId] = useState(null);
+  const [dropGap, setDropGap] = useState(null); // insertion gap 0..n
+
+  const gapFromPoint = useCallback((clientX) => {
+    const els = [];
+    cellEls.current.forEach((el) => { if (el) els.push(el); });
+    for (let k = 0; k < els.length; k++) {
+      const r = els[k].getBoundingClientRect();
+      if (clientX < r.left + r.width / 2) return k;
+    }
+    return els.length;
+  }, []);
+
+  const onCellPointerDown = useCallback((e, fav, i) => {
+    if (e.button !== 0 || !fav.id) return;
+    dragRef.current = { id: fav.id, fromIndex: i, startX: e.clientX, startY: e.clientY };
+  }, []);
+
+  // Window-level move/up: the pointer leaves the button mid-drag, so the
+  // button's own handlers would go deaf. These read dragRef and no-op
+  // unless a drag is in flight.
+  useEffect(() => {
+    const onMove = (e) => {
+      const d = dragRef.current;
+      if (!d) return;
+      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) <= 6) return;
+      setDragId((prev) => (prev === d.id ? prev : d.id));
+      setDropGap(gapFromPoint(e.clientX));
+    };
+    const onUp = (e) => {
+      const d = dragRef.current;
+      dragRef.current = null;
+      setDragId(null);
+      setDropGap(null);
+      if (!d) return;
+      if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) <= 6) return; // a click
+      const gap = gapFromPoint(e.clientX);
+      const toIndex = gap > d.fromIndex ? gap - 1 : gap;
+      suppressClickRef.current = true;
+      setTimeout(() => { suppressClickRef.current = false; }, 100);
+      emit(Events.DAVIS_FAVORITE, { action: 'move', id: d.id, toIndex });
+    };
+    const onCancel = () => {
+      dragRef.current = null;
+      setDragId(null);
+      setDropGap(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+    };
+  }, [gapFromPoint]);
+  // --- /seq-dnd -------------------------------------------------------------
 
   // Performance order = favorites array order (oldest → newest); show last N
   const start = Math.max(0, favorites.length - MAX_VISIBLE);
@@ -113,18 +178,23 @@ export function SeqStrip() {
         {visible.map((f, i) => {
           const isCurrent = f.seed === state.seed;
           const isCursor = i === cur;
+          const isDragging = dragId === f.id;
           const seedHex = (f.seed >>> 0).toString(16).padStart(4, '0').slice(-4);
           return (
-            <div
-              key={f.id ?? `${f.seed}-${f.timestamp || i}`}
-              className={`seq-cell ${isCurrent ? 'active' : ''} ${isCursor ? 'seq-cursor' : ''}`}
-              title={`Seed ${f.seed.toString(16)} · click recall · shift=evolve · alt=morph`}
-              style={isCursor ? { outline: '1px solid var(--accent)' } : undefined}
-            >
+            <Fragment key={f.id ?? `${f.seed}-${f.timestamp || i}`}>
+              {dropGap === i && <div className="seq-drop-indicator" aria-hidden="true" />}
+              <div
+                ref={(el) => { if (f.id) { if (el) cellEls.current.set(f.id, el); else cellEls.current.delete(f.id); } }}
+                className={`seq-cell ${isCurrent ? 'active' : ''} ${isCursor ? 'seq-cursor' : ''} ${isDragging ? 'seq-dragging' : ''}`}
+                title={`Seed ${f.seed.toString(16)} · click recall · shift=evolve · alt=morph · drag to reorder`}
+                style={isCursor ? { outline: '1px solid var(--accent)' } : undefined}
+              >
               <button
                 type="button"
                 className="seq-cell-main"
+                onPointerDown={(e) => onCellPointerDown(e, f, i)}
                 onClick={(e) => {
+                  if (suppressClickRef.current) { suppressClickRef.current = false; return; }
                   setCursor(i);
                   if (e.altKey) morphTo(f);
                   else if (e.shiftKey) evolveFrom(f);
@@ -169,8 +239,10 @@ export function SeqStrip() {
                 ›
               </button>
             </div>
+            </Fragment>
           );
         })}
+        {dropGap === visible.length && <div className="seq-drop-indicator" aria-hidden="true" />}
       </div>
     </div>
   );

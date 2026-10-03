@@ -112,6 +112,27 @@ mem.delete(FAVORITES_KEY);
   assert.deepStrictEqual(m.get().enabledAssets, { xsh01: true, xsh07: true }, 'morph swaps the cast at the press');
 }
 
+// moveFavorite(id, toIndex): direct index move for drag-and-drop (seq-dnd)
+mem.delete(FAVORITES_KEY);
+{
+  const c = boot();
+  [10, 20, 30, 40].forEach((seed) => c.call('addFavorite', fav(seed)));
+  const ids = c.get().favorites.map((f) => f.id);
+  c.call('moveFavorite', ids[0], 3);
+  assert.deepStrictEqual(c.get().favorites.map((f) => f.seed), [20, 30, 40, 10], 'move 0 -> 3');
+  c.call('moveFavorite', ids[0], 0);
+  assert.deepStrictEqual(c.get().favorites.map((f) => f.seed), [10, 20, 30, 40], 'move 3 -> 0');
+  c.call('moveFavorite', ids[1], 99);
+  assert.deepStrictEqual(c.get().favorites.map((f) => f.seed), [10, 30, 40, 20], 'out-of-range high clamps');
+  c.call('moveFavorite', ids[1], -5);
+  assert.deepStrictEqual(c.get().favorites.map((f) => f.seed), [20, 10, 30, 40], 'out-of-range low clamps');
+  const beforeIds = c.get().favorites.map((f) => f.id);
+  c.call('moveFavorite', 'nope', 0);
+  assert.deepStrictEqual(c.get().favorites.map((f) => f.id), beforeIds, 'unknown id is a no-op');
+  const d = boot(); // reload: the move persisted
+  assert.deepStrictEqual(d.get().favorites.map((f) => f.seed), [20, 10, 30, 40], 'move persists across reload');
+}
+
 // no localStorage at all (private mode / node) still works in memory
 delete globalThis.localStorage;
 {

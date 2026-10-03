@@ -186,6 +186,17 @@
   border-color: var(--accent2);
   box-shadow: 0 0 0 1px rgba(0, 217, 255, 0.35);
 }
+/* seq-dnd: the cell being dragged, and the insertion-gap indicator. */
+.seq-cell.seq-dragging {
+  opacity: 0.4;
+}
+.seq-drop-indicator {
+  flex-shrink: 0;
+  width: 2px;
+  align-self: stretch;
+  background: var(--accent2);
+  margin: 2px 0;
+}
 .seq-cell-main {
   display: inline-flex;
   align-items: center;
@@ -195,6 +206,7 @@
   border: none;
   color: var(--ink);
   font-size: 10px;
+  touch-action: pan-y; /* seq-dnd: horizontal pointer moves are ours (drag reorder) */
 }
 .seq-cell-main:hover { background: rgba(255,255,255,0.04); }
 .seq-cell-num {

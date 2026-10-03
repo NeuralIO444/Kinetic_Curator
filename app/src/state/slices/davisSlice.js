@@ -325,6 +325,18 @@ export const createDavisSlice = (set) => ({
     persistFavorites(next);
     return { favorites: next };
   }),
+  // seq-dnd: direct index move for drag-and-drop (cleaner than delta-chains).
+  moveFavorite: (id, toIndex) => set((state) => {
+    const idx = state.favorites.findIndex((f) => f.id === id);
+    if (idx < 0) return {};
+    const j = Math.max(0, Math.min(state.favorites.length - 1, Math.trunc(Number(toIndex)) || 0));
+    if (j === idx) return {};
+    const next = [...state.favorites];
+    const [item] = next.splice(idx, 1);
+    next.splice(j, 0, item);
+    persistFavorites(next);
+    return { favorites: next };
+  }),
   recallFavorite: (fav) => set({
     seed: fav.seed,
     // #305 — a kept recipe replays its stream offsets too.
