@@ -10,6 +10,15 @@ export function crookedCorner(c, amount, seed) {
   return { x, y };
 }
 
+export function stretchCorner(c, amount, seed) {
+  if (!(amount > 0)) return { x: c.x, y: c.y };
+  const s = seed * 3.7 - Math.floor(seed * 3.7); // fract, seed in [0,1)
+  const m = (s * 2 - Math.floor(s * 2)) * 2 - 1; // -1..1 magnitude+sign
+  const ax = s < 0.5 ? m : m * 0.25; // one axis dominates: wider or taller, never both equally
+  const ay = s < 0.5 ? m * 0.25 : m;
+  return { x: c.x * (1 + amount * 0.30 * ax), y: c.y * (1 + amount * 0.30 * ay) };
+}
+
 export function openAlpha(alpha, local, amount, seed) {
   if (!(amount > 0)) return alpha;
   const d = Math.hypot(local.x - 0.5, local.y - 0.5);
