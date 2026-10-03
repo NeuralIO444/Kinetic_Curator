@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { accumRecipeParams } from './accum.mjs';
+import { getCostTier } from './costTiers.mjs';
 import { isLeave } from './trailMode.mjs';
 
 test('#560 Leave holds the stamps until its fade is raised', () => {
@@ -41,4 +42,11 @@ test('#560 ribbon smears and comet fades the tail', () => {
   assert.ok(ribbon.flowUv > 0);
   assert.equal(comet.comet, true);
   assert.ok(comet.keep <= 0.72);
+});
+
+test('#560 LEAVE shed is named', () => {
+  const shed = getCostTier('accum/leave');
+  assert.equal(shed.tier, 1);
+  assert.match(shed.notes, /CLEAR/);
+  assert.ok(shed.memoryBytes > 0);
 });

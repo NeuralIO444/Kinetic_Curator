@@ -572,6 +572,14 @@ registerCostTier('audio/modulation', {
   notes: 'scalar per-frame recipe math (CPU); the cheapest thing in the chain, never shed',
 });
 
+// #560 LEAVE. Hold is the copy pass, not a new shader. Tier 1 with the chain:
+// a shed loses the stamps and they recover when the chain comes back.
+// Disclosed, not engineered around. CLEAR still wipes both pair buffers.
+registerCostTier('accum/leave', {
+  tier: 1, memoryBytes: FRAME_16F, timeMs: 0.2,
+  notes: 'LEAVE hold: copy instead of fade. Shed loses the stamps; CLEAR wipes both buffers',
+});
+
 // --- targets ---------------------------------------------------------------
 
 function makeTarget(gl, w, h) {
