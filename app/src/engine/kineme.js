@@ -270,3 +270,40 @@ export function kinemeStillSec(seed, fps = BOIL_FPS_DEFAULT) {
   const u = hashPhase(seed | 0, 'still');
   return u / clampBoilFps(fps);
 }
+
+/**
+ * Assemble the per-frame kineme ctx for buildPlacements (slice 3).
+ *
+ * driverSec is the ANCHORED driver time (the same kinemeTime the GPU
+ * contract carries for Build A): freeze holds it, resume continues it, and
+ * a RATE change re-anchors instead of jumping — the whole pose contract
+ * rides one value.
+ *
+ * Returns null when every amount is 0: the pipeline then skips kineme
+ * entirely (zero cost when the artist hasn't turned it on). Garbage time
+ * → null, never NaN into the pipeline.
+ */
+export function buildKinemeCtx({ layoutParams, driverSec, seed, canvasW, canvasH, shedTier = 0 }) {
+  const lp = layoutParams || {};
+  const amounts = {
+    breath: num01(lp.kinemeBreath),
+    drift: num01(lp.kinemeDrift),
+    pulse: num01(lp.kinemePulse),
+    brushWobble: num01(lp.kinemeBrushWobble),
+  };
+  if (!(amounts.breath > 0 || amounts.drift > 0 || amounts.pulse > 0 || amounts.brushWobble > 0)) {
+    return null;
+  }
+  const t = Number(driverSec);
+  if (!Number.isFinite(t)) return null;
+  const boilFps = clampBoilFps(lp.kinemeBoilFps);
+  return {
+    driverSec: t,
+    boilStep: boilStep(t, boilFps),
+    seed: seed | 0,
+    amounts,
+    canvasW,
+    canvasH,
+    shedTier: shedTier | 0,
+  };
+}

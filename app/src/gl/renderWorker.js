@@ -147,12 +147,19 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
   const ballistics = processBallistics(ballisticsState, audioBands, dtMs);
 
   // Resolver step
+  // Kineme living-motion (slice 3): ONE anchored time per frame for the GPU
+  // contract (Build A) and the CPU stage-C drivers — both resolve the
+  // identical instant. Freeze holds the pose: frameTimeMs stops advancing
+  // when the loop holds (!running/slowRender roll it back above).
+  const kinemeTime = kinemeClock.at(frameTimeMs / 1000, layoutParams.kinemeRate ?? 1);
+
   const resolved = resolver.resolveLayers({
     layers,
     activeLayerId,
     layerSnapshots: s.layerSnapshots,
     seed: s.seed || 1,
     seedOffsets: s.seedOffsets || {},
+    kinemeTime,
     paletteId: voiceState.paletteId,
     paletteOverrides: voiceState.paletteOverrides,
     userPalettes: s.userPalettes,
@@ -203,9 +210,10 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
   if (injectEv.injecting) applyInject(resolved, injectEv);
   lastResolved = resolved;
 
-  // Scene contract
+  // Scene contract — reuses the anchored kineme time computed above so the
+  // GPU path and the CPU drivers resolve the identical instant.
   const contract = buildSceneContract({
-    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(frameTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: tintTargetPalette },
+    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime, palette: tintTargetPalette },
     resolvedLayers: resolved,
     caps: null,
     accum: null,
