@@ -1,8 +1,10 @@
-// #606 canvas presets — SETUP. Instrument default stays 1000×700 until a preset applies.
-export const INSTRUMENT_CANVAS = Object.freeze({ w: 1000, h: 700, fps: 60, id: 'instrument' });
+// #606 canvas presets — SETUP. Boot default is HD 1920×1080 (Matt's call);
+// a saved session or loaded project overrides it at boot.
+export const INSTRUMENT_CANVAS = Object.freeze({ w: 1920, h: 1080, fps: 60, id: 'instrument' });
 
 export const CANVAS_PRESETS = Object.freeze([
-  { id: 'instrument', group: 'VJ', label: 'Instrument 1000×700', w: 1000, h: 700, fps: 60 },
+  { id: 'instrument', group: 'VJ', label: 'Instrument 1920×1080', w: 1920, h: 1080, fps: 60 },
+  { id: 'legacy-1000', group: 'VJ', label: '1000×700 legacy', w: 1000, h: 700, fps: 60 },
   { id: 'hd', group: 'VJ', label: 'HD 1920×1080', w: 1920, h: 1080, fps: 60 },
   { id: '720', group: 'VJ', label: '1280×720', w: 1280, h: 720, fps: 60 },
   { id: 'uhd', group: 'VJ', label: 'UHD 3840×2160', w: 3840, h: 2160, fps: 60 },
@@ -113,7 +115,7 @@ export function measureDisplayHz() {
 }
 
 export function isInstrumentCanvas(spec) {
-  return spec.canvasW === 1000 && spec.canvasH === 700;
+  return spec.canvasW === 1920 && spec.canvasH === 1080;
 }
 
 /** Cabinets across × cabinets down × pixels per cabinet. Writes the native raster. */

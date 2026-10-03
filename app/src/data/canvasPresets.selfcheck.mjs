@@ -64,7 +64,7 @@ test('#606 sanitize keeps the sync fps option', () => {
   assert.equal(sanitizeCanvasSpec({ canvasFps: 12 }).canvasFps, 60); // invalid -> default
 });
 
-test('#606 instrument canvas omitted from serialize', () => {
+test('#606 HD boot default: instrument canvas is 1920x1080 and omitted from serialize', () => {
   const doc = serializeProject({
     seed: 1,
     seedOffsets: null,
@@ -73,8 +73,8 @@ test('#606 instrument canvas omitted from serialize', () => {
     enabledAssets: {},
     quality: 'balanced',
     autoQuality: true,
-    canvasW: 1000,
-    canvasH: 700,
+    canvasW: 1920,
+    canvasH: 1080,
     canvasFps: 60,
     canvasPresetId: 'instrument',
     stageMode: 'preview',
@@ -82,8 +82,10 @@ test('#606 instrument canvas omitted from serialize', () => {
     activeLayerId: null,
   });
   assert.equal(doc.canvasW, undefined);
-  assert.ok(isInstrumentCanvas({ canvasW: 1000, canvasH: 700 }));
-  assert.equal(INSTRUMENT_CANVAS.w, 1000);
+  assert.ok(isInstrumentCanvas({ canvasW: 1920, canvasH: 1080 }));
+  assert.ok(!isInstrumentCanvas({ canvasW: 1000, canvasH: 700 }));
+  assert.equal(INSTRUMENT_CANVAS.w, 1920);
+  assert.equal(INSTRUMENT_CANVAS.h, 1080);
 });
 
 test('#606 authoredCanvas reads store-shaped state', () => {
