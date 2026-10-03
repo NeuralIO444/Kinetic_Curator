@@ -96,6 +96,10 @@ void main() {
     if (distance(a_corner, ncorner) < 0.5) {
       c *= 1.0 - u_hands.x * 0.35;
     }
+    float fstr = fract(seed * 5.77);
+    if (fstr > 0.5) {
+      c.x = -c.x;
+    }
   }
   float kDeg = 0.0;   // #781 KINEME extra rotation (degrees)
   float kVis = 1.0;   // blink visibility

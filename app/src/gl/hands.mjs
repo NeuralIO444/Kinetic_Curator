@@ -28,6 +28,13 @@ export function nickCorner(c, amount, seed, cornerIndex) {
   return { x: c.x * k, y: c.y * k };
 }
 
+export function flipCorner(c, amount, seed) {
+  if (!(amount > 0)) return { x: c.x, y: c.y };
+  const s = seed * 5.77 - Math.floor(seed * 5.77); // fract, seed in [0,1)
+  if (!(s > 0.5)) return { x: c.x, y: c.y };
+  return { x: -c.x, y: c.y }; // seeded horizontal turn, still the same cell
+}
+
 export function openAlpha(alpha, local, amount, seed) {
   if (!(amount > 0)) return alpha;
   const d = Math.hypot(local.x - 0.5, local.y - 0.5);
