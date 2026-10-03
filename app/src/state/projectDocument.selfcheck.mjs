@@ -1,6 +1,6 @@
 // node src/state/projectDocument.selfcheck.mjs
 import assert from 'node:assert';
-import { serializeProject, parseProject, PROJECT_VERSION } from './projectDocument.js';
+import { serializeProject, parseProject, PROJECT_VERSION, countRepairedFields } from './projectDocument.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeQuality, MAX_LAYERS, MAX_CONTENT_TRACKS } from './projectNormalize.js';
 import { ASSETS } from '../data/assets/index.js';
@@ -286,5 +286,27 @@ assert.strictEqual(
   MAX_CONTENT_TRACKS,
   'applied doc must respect the content-track cap',
 );
+
+// #646 — sanitized-field counting: a clean round-trip repairs nothing,
+// hostile fields count honestly.
+{
+  const cleanState = { ...state, enabledAssets: { org_blob_01: true, org_blob_02: false } };
+  const clean = parseProject(serializeProject(cleanState));
+  assert.ok(clean.ok);
+  assert.strictEqual(clean.sanitized, 0, 'clean doc repairs nothing');
+  assert.strictEqual(countRepairedFields(serializeProject(cleanState), clean.doc), 0);
+
+  const hostile = {
+    ...serializeProject(cleanState),
+    quality: 'turbo-ultra',          // unknown preset → fallback
+    paletteId: 42,                   // non-string → fallback
+    autoQuality: 'yes',              // non-boolean → coerced
+    layers: [...Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, name: `C${i}`, type: 'content' })), { id: 'fx1', name: 'FX', type: 'fx' }],
+  };
+  const parsed = parseProject(hostile);
+  assert.ok(parsed.ok);
+  assert.ok(parsed.sanitized >= 3, `hostile doc must count repairs, got ${parsed.sanitized}`);
+  assert.strictEqual(countRepairedFields(hostile, parsed.doc), parsed.sanitized);
+}
 
 console.log('projectDocument.selfcheck: OK');

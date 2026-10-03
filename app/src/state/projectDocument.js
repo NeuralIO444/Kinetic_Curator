@@ -24,6 +24,34 @@ export const AUTOSAVE_KEY = 'kc:project:v1';
 export const QUARANTINE_KEY = 'kc:project:quarantine';
 
 const MAX_UINT32 = 0xffffffff;
+
+/**
+ * #646 — count top-level fields the sanitizers repaired: the raw file had a
+ * value and the doc has something else. Missing fields filled with defaults
+ * don't count (normalization, not repair). Pure and exported for tests.
+ */
+export function countRepairedFields(raw, doc) {
+  if (raw == null || typeof raw !== 'object' || doc == null || typeof doc !== 'object') return 0;
+  const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  let n = 0;
+  // quality: unknown preset falls back
+  if (raw.quality !== undefined && doc.quality !== raw.quality) n++;
+  // paletteId: non-string falls back to 'praystation'
+  if (raw.paletteId !== undefined && doc.paletteId !== raw.paletteId) n++;
+  // autoQuality: coerced via !== false
+  if (raw.autoQuality !== undefined && typeof raw.autoQuality !== 'boolean') n++;
+  // enabledAssets: hostile map collapsed to the known set
+  if (raw.enabledAssets != null && typeof raw.enabledAssets === 'object'
+    && !sameJson(raw.enabledAssets, doc.enabledAssets)) n++;
+  // assetWeightOverrides / paletteLocks: dropped keys
+  if (raw.assetWeightOverrides != null && typeof raw.assetWeightOverrides === 'object'
+    && !sameJson(raw.assetWeightOverrides, doc.assetWeightOverrides)) n++;
+  if (raw.paletteLocks != null && typeof raw.paletteLocks === 'object'
+    && !sameJson(raw.paletteLocks, doc.paletteLocks || {})) n++;
+  // layers: dropped or capped
+  if (Array.isArray(raw.layers) && raw.layers.length !== (doc.layers || []).length) n++;
+  return n;
+}
 /**
  * #642 — seeds are uint32. Oversized, negative, fractional, or non-numeric
  * seeds reject with a clear message instead of silently truncating to 0
@@ -122,9 +150,7 @@ export function parseProject(raw) {
     const { layers, activeLayerId } = normalizeLayers(raw.layers, raw.activeLayerId);
     // #643 — drop snapshots for layers that don't exist in the doc.
     const layerIds = (layers || []).map((l) => l && l.id);
-    return {
-      ok: true,
-      doc: {
+    const doc = {
         version: PROJECT_VERSION,
         seed: seed >>> 0,
         seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
@@ -159,8 +185,8 @@ export function parseProject(raw) {
           paletteId: raw.paletteId || raw.palette || 'praystation',
           layoutParams: raw.layoutParams || raw.layout,
         }, layerIds),
-      },
     };
+    return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
   }
 
   // #641 — accept the version written as a numeric string ("1" means 1);
@@ -178,9 +204,7 @@ export function parseProject(raw) {
   const { layers, activeLayerId } = normalizeLayers(raw.layers, raw.activeLayerId);
   // #643 — drop snapshots for layers that don't exist in the doc.
   const layerIds = (layers || []).map((l) => l && l.id);
-  return {
-    ok: true,
-    doc: {
+  const doc = {
       version: PROJECT_VERSION,
       seed: seed >>> 0,
       seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
@@ -211,8 +235,8 @@ export function parseProject(raw) {
         paletteId: raw.paletteId,
         layoutParams: raw.layoutParams,
       }, layerIds),
-    },
-  };
+    };
+    return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
 }
 
 export function downloadProject(doc, filename) {

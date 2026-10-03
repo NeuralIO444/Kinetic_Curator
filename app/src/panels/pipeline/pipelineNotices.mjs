@@ -3,17 +3,25 @@
 const RECENT_KEY = 'kc-recent-projects';
 const RECENT_CAP = 5;
 
-export function confirmReplaceMessage() {
-  return 'Import replaces the current piece. Continue?';
+export function importConfirmMessage(fileName, seed) {
+  const name = fileName || 'project';
+  const seedPart = Number.isFinite(seed) ? ` (seed ${seed >>> 0})` : '';
+  return `Import "${name}"${seedPart} and replace the current piece?`;
 }
 
-export function loadedMessage(fileName, doc) {
+export function loadedMessage(fileName, doc, sanitized = 0) {
   const name = fileName || 'project';
   const layers = Array.isArray(doc?.layers) ? doc.layers.length : 0;
+  const seed = Number.isFinite(doc?.seed) ? doc.seed >>> 0 : null;
+  const palette = typeof doc?.paletteId === 'string' && doc.paletteId ? doc.paletteId : null;
   const title = typeof doc?.title === 'string' && doc.title.trim() ? doc.title.trim() : null;
-  return title
-    ? `Loaded ${title} (${name}) · ${layers} track${layers === 1 ? '' : 's'}`
-    : `Loaded ${name} · ${layers} track${layers === 1 ? '' : 's'}`;
+  let msg = title ? `Loaded ${title} (${name})` : `Loaded ${name}`;
+  if (seed !== null) msg += ` · seed ${seed}`;
+  msg += ` · ${layers} track${layers === 1 ? '' : 's'}`;
+  if (palette) msg += ` · ${palette}`;
+  const n = Math.max(0, Math.floor(Number(sanitized) || 0));
+  if (n > 0) msg += ` · ${n} field${n === 1 ? '' : 's'} sanitized`;
+  return msg;
 }
 
 export function exportSavedMessage(filename) {
