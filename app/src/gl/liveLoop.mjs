@@ -611,6 +611,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
     });
 
+    contract.hands = { crooked: Number(layoutParams.crooked) || 0, open: Number(layoutParams.open) || 0 };
     applyParallax(contract.instances, {
       zTiers: layoutParams.zTiers,
       parallax: layoutParams.parallax,

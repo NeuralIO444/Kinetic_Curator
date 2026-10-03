@@ -210,7 +210,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -451,6 +451,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
   // #594: the frame's sun, set by renderFrameInto from the contract (null = off).
   let sun = null;
+  let hands = { crooked: 0, open: 0 };
   let kinemeTable = null; // #781: the frame's kineme table (null = nothing moves)
   let kinemeTime = 0;
   const kinemeBuf = new Float32Array(16 * 3);
@@ -485,6 +486,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (kinemeTable) kinemeTable.slice(0, 16).forEach((k, i) => { kinemeBuf[i * 3] = k.kind; kinemeBuf[i * 3 + 1] = k.period; kinemeBuf[i * 3 + 2] = k.amp; });
     gl.uniform3fv(U(quadProg, 'u_kineme'), kinemeBuf);
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
+    gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);
@@ -614,6 +616,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     sceneW = payload.sceneW || 1000; // #606: scene units follow the authored canvas
     sceneH = payload.sceneH || 700;
     sun = contract.light || null;
+    hands = contract.hands || { crooked: 0, open: 0 };
     squash = contract.squash || 0; // #594 PR3
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;

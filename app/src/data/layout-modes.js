@@ -111,6 +111,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   flap: 0.35,
   kinemeRate: 1, // #781 KINEME RATE: 1 = each kineme's own tempo, 0 freezes
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
+  crooked: 0, // Crooked Hand. 0 is today's quad.
+  open: 0, // Open Hand. 0 is today's ink.
   tight: 0.55,
   wind: 1,
   symmetry: 'none',
@@ -213,6 +215,8 @@ export const PARAM_SPEC = {
   // #594 PR3 squash-and-stretch: how much a moving mark thins across its
   // motion while the #309 smear stretches it along — 1 holds its area.
   squash: { min: 0, max: 1 },
+  crooked: { min: 0, max: 1 },
+  open: { min: 0, max: 1 },
   kinemeRate: { min: 0, max: 4 }, // #781 KINEME RATE
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
