@@ -61,3 +61,4 @@ Design only. Nothing is built, no issues filed, no PRs.
 4. Cell content: **number + seed hex** for v1 — thumbnails parked as follow-on.
 5. Tempo clock **un-parked** — Matt deliberately lifts the spine-E park; the transport is KC-1's first visible clock.
 6. Freeze: **hold and resume** — the playhead holds on loop-clock freeze like morphs and evolves.
+7. Duration rule: **double up** — one cell is one step, always. To hold a favorite for N steps, repeat it N times in the strip. No per-cell durations, no drag-to-resize (follow-on slice if ever wanted).
