@@ -48,6 +48,15 @@ export function authoredCanvas(state = {}) {
   return { w: spec.canvasW, h: spec.canvasH, fps: spec.canvasFps };
 }
 
+/**
+ * Actual rendered pixel dims after the governor's renderScale trim.
+ * Mirrors liveLoop: scale clamps to [0.1, 1], dims round to at least 2px.
+ */
+export function renderDims(w, h, scale) {
+  const s = Math.min(1, Math.max(0.1, Number(scale) || 1));
+  return { w: Math.max(2, Math.round(w * s)), h: Math.max(2, Math.round(h * s)), scale: s };
+}
+
 export function isInstrumentCanvas(spec) {
   return spec.canvasW === 1000 && spec.canvasH === 700;
 }

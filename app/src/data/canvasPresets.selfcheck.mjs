@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas,
+  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas, renderDims,
 } from './canvasPresets.js';
 import { serializeProject } from '../state/projectDocument.js';
 
@@ -28,6 +28,15 @@ test('#606 wide VJ + IG social presets present', () => {
   for (const d of ['Social:1080x1440', 'Social:1080x1080', 'Social:1080x566']) {
     assert.ok(dims.has(d), `missing Social preset ${d}`);
   }
+});
+
+test('#606 renderDims mirrors the live loop governor trim', () => {
+  assert.deepEqual(renderDims(1920, 1080, 1), { w: 1920, h: 1080, scale: 1 });
+  assert.deepEqual(renderDims(1920, 1080, 0.75), { w: 1440, h: 810, scale: 0.75 });
+  // clamps like liveLoop: scale in [0.1, 1], dims at least 2px
+  assert.deepEqual(renderDims(1000, 700, 0.05), { w: 100, h: 70, scale: 0.1 });
+  assert.deepEqual(renderDims(10, 10, 0.1).w, 2);
+  assert.deepEqual(renderDims(1920, 1080, 2).scale, 1);
 });
 
 test('#606 instrument canvas omitted from serialize', () => {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster } from '../../data/canvasPresets.js';
+import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster, renderDims } from '../../data/canvasPresets.js';
 
 export function SetupBlock() {
   const w = useStore((s) => s.canvasW);
   const h = useStore((s) => s.canvasH);
   const fps = useStore((s) => s.canvasFps);
+  const renderScale = useStore((s) => s.renderScale);
   const presetId = useStore((s) => s.canvasPresetId);
   const lock = useStore((s) => s.canvasAspectLock);
   const mine = useStore((s) => s.userCanvasPresets);
@@ -21,6 +22,10 @@ export function SetupBlock() {
   const actual = `${INSTRUMENT_CANVAS.w}×${INSTRUMENT_CANVAS.h}`;
   const authored = `${w}×${h}`;
   const differ = authored !== actual;
+  // #606 — the performer sees both numbers: authored size and the actual
+  // rendered pixels after the governor's renderScale trim.
+  const rendered = renderDims(w, h, renderScale);
+  const trimmed = rendered.scale < 1 - 1e-9;
   const [cab, setCab] = useState({ w: 4, h: 3, px: 128 });
   const [name, setName] = useState('My wall');
   useEffect(() => { load?.(); }, [load]);
@@ -87,6 +92,7 @@ export function SetupBlock() {
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
         {authored} at {fps}fps · {Math.round((w * h * fps) / 1e6)} Mpx/s
         {differ ? ` · not the ${actual} instrument` : ''}
+        {trimmed ? ` · rendering ${rendered.w}×${rendered.h} (${Math.round(rendered.scale * 100)}% governor)` : ''}
         . Syphon still does not send a frame from the browser.
       </div>
     </div>
