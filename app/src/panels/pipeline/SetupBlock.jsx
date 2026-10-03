@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { useEffect, useState } from 'react';
 import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster } from '../../data/canvasPresets.js';
 
 export function SetupBlock() {
@@ -74,6 +73,7 @@ export function SetupBlock() {
           const r = ledRaster(cab.w, cab.h, cab.px);
           setSize(r.w, r.h);
         }}>SET SIZE</button>
+      </div>
       <div className="pipeline-row">
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, fontSize: 11 }} />
         <button type="button" className="chip-btn" onClick={() => save(name || 'My wall')}>SAVE</button>
