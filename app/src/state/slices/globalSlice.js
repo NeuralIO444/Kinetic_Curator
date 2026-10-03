@@ -19,7 +19,7 @@ import { tasteSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, getKineme } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
-import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
+import { sanitizeCanvasSpec, writeCanvasSession } from '../../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../../midi/map.mjs';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
@@ -574,6 +574,8 @@ export const createGlobalSlice = (set) => ({
       next.canvasFps = canvas.canvasFps;
       next.canvasPresetId = canvas.canvasPresetId;
       next.stageMode = canvas.stageMode;
+      // #606 — a loaded project's canvas becomes the session default.
+      writeCanvasSession(canvas);
     }
     next.midiMap = sanitizeMidiMap(doc.midiMap); // #617 — a doc without mappings maps nothing
     // #651 — reimported titles persist; a doc without a title clears it.

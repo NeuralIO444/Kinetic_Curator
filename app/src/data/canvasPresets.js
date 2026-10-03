@@ -82,3 +82,24 @@ export function writeUserPresets(list) {
   try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { /* private mode */ }
   return next;
 }
+
+const SESSION_KEY = 'kc:canvas-session';
+
+/** Last-used canvas (W/H/fps/preset) — the boot fallback when no project is loaded. */
+export function readCanvasSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = sanitizeCanvasSpec(JSON.parse(raw));
+    return { canvasW: s.canvasW, canvasH: s.canvasH, canvasFps: s.canvasFps, canvasPresetId: s.canvasPresetId };
+  } catch { return null; }
+}
+
+export function writeCanvasSession(spec) {
+  try {
+    const s = sanitizeCanvasSpec(spec || {});
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      canvasW: s.canvasW, canvasH: s.canvasH, canvasFps: s.canvasFps, canvasPresetId: s.canvasPresetId,
+    }));
+  } catch { /* private mode */ }
+}
