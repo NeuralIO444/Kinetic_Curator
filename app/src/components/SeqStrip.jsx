@@ -6,7 +6,7 @@ import { emit, Events } from '../composition/eventBus.js';
 const MAX_VISIBLE = 12;
 
 /** Manual transport: ▶/■, step-forward, loop. The clock slices reuse it. */
-function Transport({ playing, loop, onPlayStop, onStep, onLoop }) {
+function Transport({ playing, loop, phraseBpm, onPlayStop, onStep, onLoop, onBpm }) {
   return (
     <div className="seq-transport" role="toolbar" aria-label="Sequencer transport">
       <button
@@ -34,6 +34,19 @@ function Transport({ playing, loop, onPlayStop, onStep, onLoop }) {
       >
         ∞
       </button>
+      {/* The visible clock (seq-clocked): the SHARED phrase BPM, displayed
+          and set right here. One tempo for everything. */}
+      <input
+        type="number"
+        className="seq-tempo"
+        min={40}
+        max={240}
+        step={1}
+        value={phraseBpm}
+        title="Tempo — shared with the phrase clock"
+        aria-label="Sequencer tempo (shared phrase BPM)"
+        onChange={(e) => onBpm(Number(e.target.value))}
+      />
     </div>
   );
 }
@@ -56,6 +69,7 @@ export function SeqStrip() {
     seqIndex: s.seqIndex,
     seqLoop: s.seqLoop,
     seqGaps: s.seqGaps,
+    phraseBpm: s.phraseBpm,
   }));
   const seqSetGap = useStore((s) => s.seqSetGap);
   const seqStep = useStore((s) => s.seqStep);
@@ -232,9 +246,11 @@ export function SeqStrip() {
       <Transport
         playing={state.seqPlaying}
         loop={state.seqLoop}
+        phraseBpm={state.phraseBpm}
         onPlayStop={() => (state.seqPlaying ? seqStop() : seqPlay())}
         onStep={stepFire}
         onLoop={() => seqSetLoop(!state.seqLoop)}
+        onBpm={(bpm) => emit(Events.DAVIS_PHRASE, { bpm })}
       />
       <span className="seq-label">HITS</span>
       {state.morphing && <span className="seq-hint" style={{ color: 'var(--accent)' }}>MORPH…</span>}

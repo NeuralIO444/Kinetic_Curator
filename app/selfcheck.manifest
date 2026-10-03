@@ -58,6 +58,7 @@ node src/data/taxonomy.selfcheck.mjs
 node src/data/firstLight.selfcheck.mjs
 node src/state/paletteLibrary.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
+node src/state/seqEngine.selfcheck.mjs
 node src/state/hitsExport.selfcheck.mjs
 node src/curator/recipeFeatures.selfcheck.mjs
 node src/curator/tasteHead.selfcheck.mjs

@@ -243,6 +243,34 @@
   color: var(--accent);
   border-color: var(--accent);
 }
+/* seq-clocked: the visible tempo — shared phrase BPM, displayed and set here. */
+.seq-tempo {
+  flex-shrink: 0;
+  width: 34px;
+  padding: 2px 1px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom-color: var(--dim);
+  color: var(--ink);
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  text-align: center;
+}
+.seq-tempo:hover,
+.seq-tempo:focus {
+  border-color: var(--accent2);
+  outline: none;
+}
+/* hide the spinner — TE wants a clean readout, not browser chrome */
+.seq-tempo::-webkit-outer-spin-button,
+.seq-tempo::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.seq-tempo[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
 .seq-cell-main {
   display: inline-flex;
   align-items: center;

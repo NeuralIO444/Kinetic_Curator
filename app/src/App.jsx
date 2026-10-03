@@ -17,6 +17,7 @@ import { useFpsMeter } from './hooks/useFpsMeter.js';
 import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
 import { useBeatDecay } from './hooks/useBeatDecay.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
+import { useSeqClock } from './hooks/useSeqClock.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
@@ -74,6 +75,7 @@ function AppInner() {
   usePerformanceGovernor();
   useBeatDecay();
   usePhraseLoop();
+  useSeqClock(); // favorites sequencer transport clock
   useMorphEvolve();
   useVoiceMixDriver();
   useProjectAutosave();

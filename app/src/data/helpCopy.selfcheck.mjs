@@ -90,8 +90,8 @@ import { HELP_TOPICS, HELP_SHORTCUTS, helpText } from './helpCopy.js';
   assert.ok(hotkeySrc.includes("from '../data/helpCopy.js'"),
     '? overlay must read the single helpCopy.js map');
 
-  const traySrc = read('components/FavoritesTray.jsx');
-  assert.ok(!traySrc.includes('? help'), 'tray must not duplicate the footer `?` help entry');
+  const traySrc = read('components/SeqStrip.jsx');
+  assert.ok(!traySrc.includes('? help'), 'strip must not duplicate the footer `?` help entry');
 
   const masterSrc = read('components/MasterBar.jsx');
   assert.ok(masterSrc.includes("title={running ? 'Live loop is running"),

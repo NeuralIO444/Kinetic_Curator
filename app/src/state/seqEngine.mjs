@@ -31,3 +31,12 @@ export function seqFireMode(gaps, favId) {
   if (gaps && favId != null && gaps[favId] === 'cut') return 'cut';
   return 'morph';
 }
+
+/**
+ * Step interval in ms for a BPM. Shared with the phrase clock's clamp
+ * (40–240); the sequencer has no tempo of its own (Matt's decision).
+ */
+export function seqStepMs(bpm) {
+  const b = Math.max(40, Math.min(240, Number(bpm) || 120));
+  return 60000 / b;
+}

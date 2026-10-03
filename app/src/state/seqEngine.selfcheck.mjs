@@ -1,7 +1,7 @@
 // node src/state/seqEngine.selfcheck.mjs
 // The sequencer's step math: window, advance, wrap, stop, fire mode.
 import assert from 'node:assert';
-import { SEQ_WINDOW, seqWindow, seqNextIndex, seqFireMode } from './seqEngine.mjs';
+import { SEQ_WINDOW, seqWindow, seqNextIndex, seqFireMode, seqStepMs } from './seqEngine.mjs';
 
 const favs = (n) => Array.from({ length: n }, (_, i) => ({ id: `f${i}`, seed: i }));
 
@@ -31,5 +31,13 @@ assert.strictEqual(seqFireMode(null, 'f1'), 'morph');
 assert.strictEqual(seqFireMode({ f1: 'cut' }, 'f1'), 'cut');
 assert.strictEqual(seqFireMode({ f1: 'cut' }, 'f2'), 'morph', 'other favorites unaffected');
 assert.strictEqual(seqFireMode({ f1: 'bogus' }, 'f1'), 'morph', 'unknown mode falls back to morph');
+
+// tempo: shared phrase BPM clamp, step interval math
+assert.strictEqual(seqStepMs(120), 500, '120bpm -> 500ms');
+assert.strictEqual(seqStepMs(60), 1000, '60bpm -> 1000ms');
+assert.strictEqual(seqStepMs(240), 250, '240bpm -> 250ms');
+assert.strictEqual(seqStepMs(0), 500, 'garbage -> 120 default');
+assert.strictEqual(seqStepMs(1000), 250, 'clamped to 240');
+assert.strictEqual(seqStepMs(1), 1500, 'clamped to 40');
 
 console.log('seqEngine.selfcheck: OK');
