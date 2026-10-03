@@ -76,3 +76,22 @@ test('#865 flip: amount 0 is identity, binary per seed, mirror is exact', () => 
   const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
   assert.match(src, /fract\(seed \* 5\.77\)/);
 });
+
+test('#868 double: amount 0 is identity, repeats per seed, faint mix bounded by amount*0.35', () => {
+  const local = { x: 0.5, y: 0.5 };
+  assert.equal(openAlpha(0.8, local, 0, 0.2), 0.8);
+  // find a seed whose strand picks the double ink (3-way pick this slice)
+  let dseed = null;
+  for (let i = 0; i < 200; i++) {
+    const s = i / 200;
+    const istr = s * 3.3 - Math.floor(s * 3.3);
+    if (Math.min(2, Math.floor(istr * 3)) === 2) { dseed = s; break; }
+  }
+  assert.ok(dseed !== null, 'some seed picks double');
+  const a = openAlpha(0.8, local, 0.7, dseed);
+  assert.equal(a, openAlpha(0.8, local, 0.7, dseed), 'same seed repeats');
+  assert.ok(a <= 0.8 + 1e-9, 'faint mix never exceeds the original alpha');
+  assert.ok(a >= 0.8 * (1 - 0.7 * 0.35) - 1e-9, 'mix bounded by amount*0.35');
+  const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
+  assert.match(src, /fract\(v_seed \* 3\.3\)/);
+});
