@@ -20,7 +20,14 @@ import { glNodeCount, waitForLiveFrame } from './gl-helpers.js';
 // The GL loop reports node count through the CanvasPanel pill. Poll for a
 // nonzero count so we never read a pre-first-frame zero.
 const nodeCount = async (page) => {
-  await waitForLiveFrame(page);
+  // First frame only. Re-arming the 30s wait on every read blew the 60s
+  // test cap on CI (main and this branch, same line): the polls had already
+  // crossed the bar, then the last read waited for a pill that was slow, not
+  // absent.
+  if (!page.__kcLive) {
+    await waitForLiveFrame(page);
+    page.__kcLive = true;
+  }
   return glNodeCount(page);
 };
 
@@ -47,6 +54,9 @@ async function setRange(page, slider, value) {
 }
 
 test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
+  // 60s cannot hold a 30s first-frame wait plus two 20s converge polls.
+  // That sum is what timed out on main (37134040106) and on #896.
+  test.setTimeout(120_000);
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -79,7 +89,7 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   const count = page.locator('.param-block .range-row', {
     has: page.locator('.range-label', { hasText: /^COUNT$/ }),
   }).locator('input[type="range"]');
-  await expect(count).toBeVisible();
+  await expect(count).toBeVisible({ timeout: 15_000 });
 
   // CI load: COUNT=700 under SwiftShader saturates the runner's main thread —
   // Playwright protocol calls (evaluate, textContent) then time out even though

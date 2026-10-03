@@ -168,7 +168,7 @@ export function ToggleRow({ layoutParams }) {
           </label>
           <label
             style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-            title="FLOW: curl-advects the trail buffer itself as it decays — trails curl like smoke instead of just fading (0 = off)"
+            title="FLOW: advects the trail buffer through the project-seed curl — the same weather as the swarm (0 = off)"
           >
             FLOW
             <input

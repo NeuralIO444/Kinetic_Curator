@@ -10,6 +10,8 @@
 //   driftMul    — fractional multiplier on lifeDrift, [0.8, 1.2)
 //   speedMul    — fractional multiplier on noiseSpeed, [0.8, 1.2)
 //   noiseSeed   — per-agent noise-domain seed, [0, 10)
+//   mass        — slight mass variation, [0.4, 1.2), from the seeded
+//                 placement stream (the third r() draw). Not a new draw.
 //
 // This suite proves two things:
 //   1. SIBLING DIVERGENCE is statistical, not boolean: the mean pairwise
@@ -23,8 +25,8 @@
 //      reproduce bit-identical positions — guarded independently by
 //      particles.selfcheck.mjs's exact agreement with the reference engine.)
 //
-// Evaluation of these channels vs loopTimeMs is #806's scope. This issue
-// is instantiation/init only: no behaviour/force changes.
+// Phase is evaluated against loopTimeMs (#853). This suite is init only:
+// no behaviour/force changes, and the six placement draws stay in order.
 
 import assert from 'node:assert';
 import { ParticleSystem } from './particles.js';
@@ -74,6 +76,7 @@ const phaseOffset = Array.from(sys.phaseOffset.slice(0, N));
 const driftMul = Array.from(sys.driftMul.slice(0, N));
 const speedMul = Array.from(sys.speedMul.slice(0, N));
 const noiseSeed = Array.from(sys.noiseSeed.slice(0, N));
+const mass = Array.from(sys.mass.slice(0, N));
 
 // ── 1. Statistical sibling divergence ──────────────────────────────────
 {
@@ -101,6 +104,13 @@ const noiseSeed = Array.from(sys.noiseSeed.slice(0, N));
   assert.ok(d > 1.5, `#558: noiseSeed mean pairwise distance ${d.toFixed(4)} — noise seeds in lockstep`);
   console.log(`[ok] noise seeds diverge: mean pairwise distance ${d.toFixed(4)} (uniform ≈ 3.33)`);
 }
+{
+  // mass = r() * 0.8 + 0.4, so [0.4, 1.2). Uniform mean pairwise ≈ 0.267.
+  assert.ok(mass.every((v) => v >= 0.4 && v < 1.2), '#558: mass out of [0.4, 1.2)');
+  const d = meanPairwiseAbs(mass);
+  assert.ok(d > 0.12, `#558: mass mean pairwise distance ${d.toFixed(4)} — mass in lockstep`);
+  console.log(`[ok] mass in [0.4, 1.2), mean pairwise distance ${d.toFixed(4)} (uniform ≈ 0.267)`);
+}
 
 // ── 2. Determinism: same seed → identical channels, bit-for-bit ─────────
 {
@@ -110,6 +120,7 @@ const noiseSeed = Array.from(sys.noiseSeed.slice(0, N));
     ['driftMul', sys.driftMul, again.driftMul],
     ['speedMul', sys.speedMul, again.speedMul],
     ['noiseSeed', sys.noiseSeed, again.noiseSeed],
+    ['mass', sys.mass, again.mass],
     ['x', sys.x, again.x],
     ['y', sys.y, again.y],
   ]) {
