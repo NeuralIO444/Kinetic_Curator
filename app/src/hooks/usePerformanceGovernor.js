@@ -96,10 +96,18 @@ export function usePerformanceGovernor() {
   const setPerfClampOverride = useStore(s => s.setPerfClampOverride);
   const setAssetThin = useStore(s => s.setAssetThin);
   const setRenderScale = useStore(s => s.setRenderScale);
+  const kinemeShed = useStore(s => s.kinemeShed);
+  const setKinemeShed = useStore(s => s.setKinemeShed);
   const fxaa = useStore(s => s.fxaa);
   const fxaaShed = useStore(s => s.fxaaShed);
   const setFxaaShed = useStore(s => s.setFxaaShed);
   const layoutParams = useStore(s => s.layoutParams);
+  // Kineme shed (slice 4): only walk the tiers when kineme is actually on —
+  // every amount 0 means nothing to shed, so the ladder skips to cut 6.
+  const kinemeActive = (Number(layoutParams?.kinemeBreath) || 0) > 0
+    || (Number(layoutParams?.kinemeDrift) || 0) > 0
+    || (Number(layoutParams?.kinemePulse) || 0) > 0
+    || (Number(layoutParams?.kinemeBrushWobble) || 0) > 0;
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.
@@ -233,7 +241,7 @@ export function usePerformanceGovernor() {
 
     const snap = {
       fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
-      slowRender, slowRenderSource,
+      slowRender, slowRenderSource, kinemeShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
@@ -250,6 +258,7 @@ export function usePerformanceGovernor() {
           break;
         case 'assetThin': setAssetThin(false); break;
         case 'countClamp': setPerfClampOverride(null); break;
+        case 'kinemeShed': setKinemeShed(0); break;
         case 'slowRender': setSlowRender(false); break;
         default: break;
       }
@@ -294,6 +303,8 @@ export function usePerformanceGovernor() {
       effectiveCount: layoutParams.count,
       slowRender,
       gpuSaturated,
+      kinemeShed,
+      kinemeActive,
     });
     if (!cut) return; // ladder exhausted — hold; the watchdog is separate
 
@@ -309,10 +320,11 @@ export function usePerformanceGovernor() {
         break;
       case 'assetThin': setAssetThin(true); break;
       case 'countClamp': setPerfClampOverride({ count: cut.count, mirror: false }); break;
+      case 'kinemeShed': setKinemeShed(cut.tier); break;
       case 'slowRender': setSlowRender(true, 'cut6'); break;
       default: break;
     }
-    // Event-log only: steps 1–2 / 4–6 of the shed ladder fire here.
+    // Event-log only: steps 1–2 / 4–6 + the kineme shed tiers fire here.
     recordGovernorEvent({
       type: 'shed', cutKind: cut.kind, label: cut.label,
       fps: { at: effFps, threshold: shedFps, sustainedMs: SUSTAIN_MS },
@@ -323,5 +335,6 @@ export function usePerformanceGovernor() {
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', shedFps + ')' + gpuNote);
   }, [fxaa, fxaaShed, setFxaaShed, effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
-    slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
+    slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated,
+    kinemeShed, setKinemeShed, kinemeActive]);
 }

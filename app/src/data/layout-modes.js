@@ -135,6 +135,14 @@ export const DEFAULT_LAYOUT_PARAMS = {
   body: 3,
   flap: 0.35,
   kinemeRate: 1, // #781 KINEME RATE: 1 = each kineme's own tempo, 0 freezes
+  // Kineme living-motion driver amounts (v1: curated four). 0 = today's
+  // render exactly — the drivers hard-gate, so untouched projects behave
+  // byte-identically. Boil fps: 8 default, 6–12 exposed (Matt decision 2).
+  kinemeBreath: 0,
+  kinemeDrift: 0,
+  kinemePulse: 0,
+  kinemeBrushWobble: 0,
+  kinemeBoilFps: 8,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   crooked: 0, // Crooked Hand. 0 is today's quad.
   open: 0, // Open Hand. 0 is today's ink.
@@ -251,6 +259,11 @@ export const PARAM_SPEC = {
   crooked: { min: 0, max: 1 },
   open: { min: 0, max: 1 },
   kinemeRate: { min: 0, max: 4 }, // #781 KINEME RATE
+  kinemeBreath: { min: 0, max: 1 },
+  kinemeDrift: { min: 0, max: 1 },
+  kinemePulse: { min: 0, max: 1 },
+  kinemeBrushWobble: { min: 0, max: 1 },
+  kinemeBoilFps: { min: 6, max: 12 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the

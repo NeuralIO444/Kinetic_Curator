@@ -530,8 +530,19 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       if (!live.snapshotHoldFrame(lastFrameTarget)) paletteMix.cancel();
     }
 
+    // Kineme living-motion (slice 3): ONE anchored time per frame feeds the
+    // GPU contract (doc.kinemeTime, Build A) and the CPU stage-C drivers,
+    // so both agree exactly — across RATE changes and freezes. Freeze holds
+    // the pose for free: loopTimeMs stops advancing when the loop holds
+    // (pause/slowRender roll it back), so the anchored clock — and every
+    // driver reading it — holds with it. Resume continues from the held
+    // instant: no pop, no re-anchor jump.
+    const kinemeTime = kinemeClock.at(loopTimeMs / 1000, layoutParams.kinemeRate ?? 1);
+
     const resolved = resolver.resolveLayers({
       canvasW, canvasH,
+      kinemeTime,
+      kinemeShed: s.kinemeShed | 0,
       layers: s.layers,
       activeLayerId: s.activeLayerId,
       layerSnapshots: s.layerSnapshots,
@@ -605,7 +616,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     lastResolved = resolved;
 
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: activePalette },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime, palette: activePalette },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned

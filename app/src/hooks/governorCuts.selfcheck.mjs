@@ -72,7 +72,7 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   }
   // The table is in shed order (recovery iterates it reversed).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'quality', 'assetThin', 'countClamp', 'slowRender']);
+  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'quality', 'assetThin', 'countClamp', 'kinemeShed', 'slowRender']);
   console.log('[selfcheck] governorCuts (#264 restore coverage):',
     `shed kinds [${[...shedKinds].join(', ')}] all restorable`);
 }
@@ -151,4 +151,49 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   assert.deepStrictEqual(shedSummary({ renderScale: 1, fxaaShed: true }), ['edge AA off']);
   assert.strictEqual(shedSummary({ renderScale: 1, fxaaShed: false }), null);
   console.log('[selfcheck] governorCuts (#740 cut 0 edge AA): 10 cases passed');
+}
+
+// Kineme shed (slice 4): four tiers walk between countClamp and slowRender —
+// gentler than the full freeze — and are skipped entirely when kineme is off.
+{
+  const base = {
+    renderScale: 0.33, quality: 'performance', assetThin: true,
+    perfClampOverride: { count: 80, mirror: false }, slowRender: false,
+    gpuSaturated: true, kinemeShed: 0,
+  };
+  // Kineme off: straight to the full freeze, ladder unchanged.
+  assert.strictEqual(
+    nextGovernorCut({ ...base, kinemeActive: false }).kind, 'slowRender',
+    'kineme off → skip to cut 6',
+  );
+  assert.strictEqual(
+    nextGovernorCut({ ...base }).kind, 'slowRender',
+    'no kinemeActive key → skip to cut 6',
+  );
+  // Kineme on: tiers walk 1 → 4, then the full freeze.
+  let s = { ...base, kinemeActive: true };
+  const tiers = [];
+  for (let i = 0; i < 5; i++) {
+    const c = nextGovernorCut(s);
+    tiers.push([c.kind, c.tier, c.label]);
+    if (c.kind === 'kinemeShed') s = { ...s, kinemeShed: c.tier };
+    else break;
+  }
+  assert.deepStrictEqual(
+    tiers.map(([k, t]) => `${k}:${t}`),
+    ['kinemeShed:1', 'kinemeShed:2', 'kinemeShed:3', 'kinemeShed:4', 'slowRender:undefined'],
+    'tiers walk 1→4, then cut 6',
+  );
+  assert.ok(tiers.slice(0, 4).every(([, , l]) => typeof l === 'string' && l.length > 0), 'labels set');
+  // Tiers exhausted → the ladder holds at slowRender, never a tier 5.
+  assert.strictEqual(nextGovernorCut({ ...base, kinemeActive: true, kinemeShed: 4 }).kind, 'slowRender');
+  // Restore: only when the governor shed it, only when healthy.
+  const k = GOVERNOR_RESTORE_CUTS.find((c) => c.kind === 'kinemeShed');
+  assert.strictEqual(k.needsRestore({ kinemeShed: 2 }, { healthy: true }), true);
+  assert.strictEqual(k.needsRestore({ kinemeShed: 2 }, { healthy: false }), false, 'not while struggling');
+  assert.strictEqual(k.needsRestore({ kinemeShed: 0 }, { healthy: true }), false);
+  assert.strictEqual(k.restoredLabel, 'living motion back');
+  // Badge is honest about it.
+  assert.deepStrictEqual(shedSummary({ renderScale: 1, kinemeShed: 3 }), ['living motion held']);
+  console.log('[selfcheck] governorCuts (kineme shed tiers): 12 cases passed');
 }

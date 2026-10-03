@@ -5,6 +5,7 @@
 # IGNORED in scripts/runSelfcheck.mjs); the runner fails on an unlisted suite or a duplicate.
 node src/data/bodies/demoLadder.selfcheck.mjs
 node src/engine/buildPlacements.selfcheck.mjs
+node src/engine/kineme.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
 node src/hooks/batchGate.selfcheck.mjs
