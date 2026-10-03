@@ -14,6 +14,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ASSETS } from '../app/src/data/assets/index.js';
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
+import {
+  buildKinemeCtx, kinemeStillSec, kinemeStillStep, clampBoilFps,
+} from '../app/src/engine/kineme.js';
 import { bakeSwarmItems, ensureSwarmWasm } from '../app/src/engine/kernel/bake/index.js';
 import { resolvePalette } from '../app/src/data/palettes.js';
 import { getRenderCaps, shouldRenderGloss } from '../app/src/data/quality.js';
@@ -191,6 +194,19 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
           caps,
           canvasW: CANVAS_W,
           canvasH: CANVAS_H,
+          // Kineme still (slice 5): the SAME evaluator the live canvas
+          // uses, at one fixed seed-derived instant — no separate stills
+          // code path. Same seed → same printed frame, always. No governor
+          // shed offline (shedTier 0).
+          kineme: buildKinemeCtx({
+            layoutParams,
+            driverSec: kinemeStillSec(src.seed >>> 0, clampBoilFps(layoutParams.kinemeBoilFps)),
+            boilStep: kinemeStillStep(src.seed >>> 0),
+            seed: src.seed >>> 0,
+            canvasW: CANVAS_W,
+            canvasH: CANVAS_H,
+            shedTier: 0,
+          }),
         }).items;
 
       return {
