@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
-import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster, renderDims } from '../../data/canvasPresets.js';
+import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster, renderDims, canvasCostTier } from '../../data/canvasPresets.js';
 
 export function SetupBlock() {
   const w = useStore((s) => s.canvasW);
@@ -26,6 +26,8 @@ export function SetupBlock() {
   // rendered pixels after the governor's renderScale trim.
   const rendered = renderDims(w, h, renderScale);
   const trimmed = rendered.scale < 1 - 1e-9;
+  const mpx = Math.round((w * h * fps) / 1e6);
+  const tier = canvasCostTier((w * h * fps) / 1e6);
   const [cab, setCab] = useState({ w: 4, h: 3, px: 128 });
   const [name, setName] = useState('My wall');
   useEffect(() => { load?.(); }, [load]);
@@ -89,8 +91,9 @@ export function SetupBlock() {
           </>
         )}
       </div>
-      <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
-        {authored} at {fps}fps · {Math.round((w * h * fps) / 1e6)} Mpx/s
+      <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}
+        title="Canvas × fps mapped to the governor's cost tiers (budget zones from the 1080p60 reference). Static estimate — the governor sheds on measured fps, not this label.">
+        {authored} at {fps}fps · {mpx} Mpx/s · tier {tier}
         {differ ? ` · not the ${actual} instrument` : ''}
         {trimmed ? ` · rendering ${rendered.w}×${rendered.h} (${Math.round(rendered.scale * 100)}% governor)` : ''}
         . Syphon still does not send a frame from the browser.

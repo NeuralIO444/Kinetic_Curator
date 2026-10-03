@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas, renderDims,
+  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas, renderDims, canvasCostTier,
 } from './canvasPresets.js';
 import { serializeProject } from '../state/projectDocument.js';
 
@@ -37,6 +37,16 @@ test('#606 renderDims mirrors the live loop governor trim', () => {
   assert.deepEqual(renderDims(1000, 700, 0.05), { w: 100, h: 70, scale: 0.1 });
   assert.deepEqual(renderDims(10, 10, 0.1).w, 2);
   assert.deepEqual(renderDims(1920, 1080, 2).scale, 1);
+});
+
+test('#606 canvasCostTier maps Mpx/s onto governor tiers', () => {
+  assert.equal(canvasCostTier(42), 0); // 1000x700 @ 60 — inside the budget
+  assert.equal(canvasCostTier(124.416), 0); // 1080p60 — the reference budget
+  assert.equal(canvasCostTier(166), 1); // VJ ultrawide 2560x1080 @ 60
+  assert.equal(canvasCostTier(373), 2); // VJ triple-HD 5760x1080 @ 60
+  assert.equal(canvasCostTier(497.664), 2); // 4K60 — top of tier 2
+  assert.equal(canvasCostTier(498), 3); // just over 4x the budget
+  assert.equal(canvasCostTier(1427), 3); // Times Square-class @ 60
 });
 
 test('#606 instrument canvas omitted from serialize', () => {

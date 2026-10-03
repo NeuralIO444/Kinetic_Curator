@@ -57,6 +57,20 @@ export function renderDims(w, h, scale) {
   return { w: Math.max(2, Math.round(w * s)), h: Math.max(2, Math.round(h * s)), scale: s };
 }
 
+// #606 — canvas fill-rate mapped onto the governor's cost tiers, visible
+// before the performer commits. Bands are multiples of the 1080p60 reference
+// budget (124.416 Mpx/s) the cost system measures against (costTiers.mjs:
+// "per full-frame pass at 1080p"). This is a static budget zone — the
+// governor itself sheds on measured fps, not on this label.
+const MPX_1080P60 = (1920 * 1080 * 60) / 1e6;
+export function canvasCostTier(mpxPerSec) {
+  const m = Number(mpxPerSec) || 0;
+  if (m <= MPX_1080P60) return 0;
+  if (m <= MPX_1080P60 * 2) return 1;
+  if (m <= MPX_1080P60 * 4) return 2;
+  return 3;
+}
+
 export function isInstrumentCanvas(spec) {
   return spec.canvasW === 1000 && spec.canvasH === 700;
 }
