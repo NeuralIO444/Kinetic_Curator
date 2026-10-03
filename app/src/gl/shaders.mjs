@@ -86,6 +86,10 @@ void main() {
     float pinch = (fract(seed * 7.13) * 2.0 - 1.0) * u_hands.x * 0.35;
     c.x += c.y * shear;
     c.x *= 1.0 - pinch * clamp(c.y / 50.0, -1.0, 1.0);
+    float sstr = fract(seed * 3.7);
+    float sm = fract(sstr * 2.0) * 2.0 - 1.0;
+    c.x *= 1.0 + u_hands.x * 0.30 * (sstr < 0.5 ? sm : sm * 0.25);
+    c.y *= 1.0 + u_hands.x * 0.30 * (sstr < 0.5 ? sm * 0.25 : sm);
   }
   float kDeg = 0.0;   // #781 KINEME extra rotation (degrees)
   float kVis = 1.0;   // blink visibility

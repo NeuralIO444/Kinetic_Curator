@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { crookedCorner, openAlpha } from './hands.mjs';
+import { crookedCorner, openAlpha, stretchCorner } from './hands.mjs';
 
 test('#866 amount 0 is the current quad and the current sample', () => {
   const c = { x: 12, y: -8 };
@@ -22,4 +22,24 @@ test('#866 a non-zero hand changes the mark and repeats for the same seed', () =
   const ink = openAlpha(0.8, { x: 0.5, y: 0.5 }, 0.7, 0.2);
   assert.equal(ink, openAlpha(0.8, { x: 0.5, y: 0.5 }, 0.7, 0.2));
   assert.ok(ink < 0.8);
+});
+
+test('#865 stretch: amount 0 is identity, repeats per seed, clamps at 30% per axis', () => {
+  const c = { x: 12, y: -8 };
+  assert.deepEqual(stretchCorner(c, 0, 0.3), c);
+  const a = stretchCorner(c, 0.6, 0.3);
+  assert.deepEqual(a, stretchCorner(c, 0.6, 0.3));
+  assert.ok(a.x !== c.x || a.y !== c.y, 'non-zero stretch changes the corner');
+  // clamp: neither axis moves more than 30% for amount <= 1 (slider max)
+  for (let i = 0; i < 50; i++) {
+    const seed = i / 50;
+    for (const amount of [0.25, 0.6, 1]) {
+      const r = stretchCorner({ x: 40, y: -25 }, amount, seed);
+      assert.ok(Math.abs(r.x - 40) <= 0.30 * 40 + 1e-9, `x clamp seed=${seed} amount=${amount}`);
+      assert.ok(Math.abs(r.y - -25) <= 0.30 * 25 + 1e-9, `y clamp seed=${seed} amount=${amount}`);
+    }
+  }
+  // the GLSL implements the stretch strand
+  const src = readFileSync(new URL('./shaders.mjs', import.meta.url), 'utf8');
+  assert.match(src, /fract\(seed \* 3\.7\)/);
 });
