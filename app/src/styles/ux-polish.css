@@ -271,6 +271,13 @@
   -moz-appearance: textfield;
   appearance: textfield;
 }
+/* seq-clock-sources: the clock-source picker. Tiny TE button. */
+.seq-clock-btn {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  min-width: 26px;
+}
 .seq-cell-main {
   display: inline-flex;
   align-items: center;

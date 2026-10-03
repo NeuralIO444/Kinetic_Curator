@@ -17,7 +17,7 @@ import { useFpsMeter } from './hooks/useFpsMeter.js';
 import { usePerformanceGovernor } from './hooks/usePerformanceGovernor.js';
 import { useBeatDecay } from './hooks/useBeatDecay.js';
 import { usePhraseLoop } from './hooks/usePhraseLoop.js';
-import { useSeqClock } from './hooks/useSeqClock.js';
+import { useSeqClock, fireSeqStep } from './hooks/useSeqClock.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
@@ -206,6 +206,8 @@ function AppInner() {
     const { tickPhrase, fireEvolve } = routeBeat(s);
     if (tickPhrase) s.tickPhraseBeat();
     if (fireEvolve) s.triggerEvolve({ loopTimeMs: glLoopRef?.current?.getLoopTimeMs?.() });
+    // Sequencer audio clock: every detected attack steps the setlist.
+    if (s.seqPlaying && s.seqClock === 'audio') fireSeqStep();
   }, [piped]);
   useMidi(); // #617: Web MIDI engine, while MIDI is enabled in DAVIS
   useAudioInput({

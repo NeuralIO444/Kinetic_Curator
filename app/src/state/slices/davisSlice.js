@@ -387,7 +387,12 @@ export const createDavisSlice = (set, get) => ({
     return { seqPlaying: true };
   }),
   seqSetLoop: (loop) => set({ seqLoop: !!loop }),
-  seqSetClock: (clock) => set({ seqClock: clock }),
+  seqSetClock: (clock) => set((state) => {
+    const valid = ['metro', 'phrase', 'audio', 'euclid'];
+    if (!valid.includes(clock)) return {};
+    if (state.seqClock === clock) return {};
+    return { seqClock: clock };
+  }),
   seqSetIndex: (i) => set({ seqIndex: Math.max(0, Math.trunc(Number(i)) || 0) }),
   /**
    * Set the transition INTO a favorite ('cut' | 'morph'). Keyed by favorite

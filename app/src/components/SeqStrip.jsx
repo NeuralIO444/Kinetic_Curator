@@ -1,12 +1,17 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
+import { SEQ_CLOCKS, SEQ_CLOCK_LABELS } from '../hooks/useSeqClock.js';
 import { emit, Events } from '../composition/eventBus.js';
 
 const MAX_VISIBLE = 12;
 
-/** Manual transport: ▶/■, step-forward, loop. The clock slices reuse it. */
-function Transport({ playing, loop, phraseBpm, onPlayStop, onStep, onLoop, onBpm }) {
+/** Manual transport: ▶/■, step-forward, loop, clock source, tempo. */
+function Transport({ playing, loop, clock, phraseBpm, onPlayStop, onStep, onLoop, onClock, onBpm }) {
+  const cycleClock = () => {
+    const i = SEQ_CLOCKS.indexOf(clock);
+    onClock(SEQ_CLOCKS[(i + 1) % SEQ_CLOCKS.length]);
+  };
   return (
     <div className="seq-transport" role="toolbar" aria-label="Sequencer transport">
       <button
@@ -33,6 +38,15 @@ function Transport({ playing, loop, phraseBpm, onPlayStop, onStep, onLoop, onBpm
         aria-pressed={loop}
       >
         ∞
+      </button>
+      {/* Clock source picker (seq-clock-sources): metro / phrase / audio / euclid. */}
+      <button
+        type="button"
+        className="seq-transport-btn seq-clock-btn"
+        title={`Clock source: ${clock} — click to cycle`}
+        onClick={cycleClock}
+      >
+        {SEQ_CLOCK_LABELS[clock] || 'MTR'}
       </button>
       {/* The visible clock (seq-clocked): the SHARED phrase BPM, displayed
           and set right here. One tempo for everything. */}
@@ -70,7 +84,9 @@ export function SeqStrip() {
     seqLoop: s.seqLoop,
     seqGaps: s.seqGaps,
     phraseBpm: s.phraseBpm,
+    seqClock: s.seqClock,
   }));
+  const seqSetClock = useStore((s) => s.seqSetClock);
   const seqSetGap = useStore((s) => s.seqSetGap);
   const seqStep = useStore((s) => s.seqStep);
   const seqPlay = useStore((s) => s.seqPlay);
@@ -246,10 +262,12 @@ export function SeqStrip() {
       <Transport
         playing={state.seqPlaying}
         loop={state.seqLoop}
+        clock={state.seqClock}
         phraseBpm={state.phraseBpm}
         onPlayStop={() => (state.seqPlaying ? seqStop() : seqPlay())}
         onStep={stepFire}
         onLoop={() => seqSetLoop(!state.seqLoop)}
+        onClock={(c) => seqSetClock(c)}
         onBpm={(bpm) => emit(Events.DAVIS_PHRASE, { bpm })}
       />
       <span className="seq-label">HITS</span>

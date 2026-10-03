@@ -161,6 +161,22 @@ mem.set('kc:seq-gaps:v1', JSON.stringify({ a: 'cut', b: 'explode', c: 42, d: nul
 }
 mem.delete('kc:seq-gaps:v1');
 
+// seq-clock-sources: clock source validation
+{
+  const c = boot();
+  assert.strictEqual(c.get().seqClock, 'metro', 'default clock is metro');
+  c.call('seqSetClock', 'euclid');
+  assert.strictEqual(c.get().seqClock, 'euclid', 'clock switches to euclid');
+  c.call('seqSetClock', 'phrase');
+  assert.strictEqual(c.get().seqClock, 'phrase', 'clock switches to phrase');
+  c.call('seqSetClock', 'audio');
+  assert.strictEqual(c.get().seqClock, 'audio', 'clock switches to audio');
+  c.call('seqSetClock', 'bogus');
+  assert.strictEqual(c.get().seqClock, 'audio', 'bogus clock ignored');
+  c.call('seqSetClock', null);
+  assert.strictEqual(c.get().seqClock, 'audio', 'null clock ignored');
+}
+
 // no localStorage at all (private mode / node) still works in memory
 delete globalThis.localStorage;
 {
