@@ -98,7 +98,7 @@ export function DataExportRow({
         }
         emit(Events.EXPORT_LOAD_PROJECT, result.doc);
         const miss = missingPaletteMessage(result.doc, userPalettes);
-        const loaded = loadedMessage(file.name, result.doc);
+        const loaded = loadedMessage(file.name, result.doc, result.sanitized);
         onMessage(miss ? `${loaded}. ${miss}` : loaded);
         setLoadedName(file.name);
         setRecent(rememberRecent(file.name));

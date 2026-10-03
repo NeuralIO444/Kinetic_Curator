@@ -10,9 +10,22 @@ test('#647 import confirms before replace', () => {
   assert.match(confirmReplaceMessage(), /replaces the current piece/);
 });
 
-test('#630 #646 loaded message names the file and the tracks', () => {
-  assert.equal(loadedMessage('dusk.json', { layers: [{}, {}] }), 'Loaded dusk.json · 2 tracks');
-  assert.match(loadedMessage('a.json', { title: 'Dusk Flock', layers: [{}] }), /Dusk Flock/);
+test('#630 #646 loaded message names the file, seed, tracks, palette', () => {
+  const doc = { seed: 12345, layers: [{}, {}], paletteId: 'praystation' };
+  const msg = loadedMessage('dusk.json', doc);
+  assert.match(msg, /dusk\.json/);
+  assert.match(msg, /seed 12345/);
+  assert.match(msg, /2 tracks/);
+  assert.match(msg, /praystation/);
+  assert.match(loadedMessage('a.json', { title: 'Dusk Flock', seed: 1, layers: [{}], paletteId: 'bone' }), /Dusk Flock/);
+});
+
+test('#646 sanitized count shown only when repairs happened', () => {
+  const doc = { seed: 7, layers: [], paletteId: 'praystation' };
+  assert.doesNotMatch(loadedMessage('c.json', doc, 0), /sanitized/);
+  assert.doesNotMatch(loadedMessage('c.json', doc), /sanitized/);
+  assert.match(loadedMessage('h.json', doc, 1), /1 field sanitized/);
+  assert.match(loadedMessage('h.json', doc, 3), /3 fields sanitized/);
 });
 
 test('#649 #651 export names the title and confirms', () => {

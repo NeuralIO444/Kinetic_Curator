@@ -7,13 +7,19 @@ export function confirmReplaceMessage() {
   return 'Import replaces the current piece. Continue?';
 }
 
-export function loadedMessage(fileName, doc) {
+export function loadedMessage(fileName, doc, sanitized = 0) {
   const name = fileName || 'project';
   const layers = Array.isArray(doc?.layers) ? doc.layers.length : 0;
+  const seed = Number.isFinite(doc?.seed) ? doc.seed >>> 0 : null;
+  const palette = typeof doc?.paletteId === 'string' && doc.paletteId ? doc.paletteId : null;
   const title = typeof doc?.title === 'string' && doc.title.trim() ? doc.title.trim() : null;
-  return title
-    ? `Loaded ${title} (${name}) · ${layers} track${layers === 1 ? '' : 's'}`
-    : `Loaded ${name} · ${layers} track${layers === 1 ? '' : 's'}`;
+  let msg = title ? `Loaded ${title} (${name})` : `Loaded ${name}`;
+  if (seed !== null) msg += ` · seed ${seed}`;
+  msg += ` · ${layers} track${layers === 1 ? '' : 's'}`;
+  if (palette) msg += ` · ${palette}`;
+  const n = Math.max(0, Math.floor(Number(sanitized) || 0));
+  if (n > 0) msg += ` · ${n} field${n === 1 ? '' : 's'} sanitized`;
+  return msg;
 }
 
 export function exportSavedMessage(filename) {
