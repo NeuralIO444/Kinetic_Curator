@@ -151,6 +151,33 @@ assert.ok(!noMirrorCap.items.some((it) => it._mirrored));
   }
 }
 
+// --- fix(brush): the six brush scalars must reach geometry through buildPlacements ---
+{
+  const baseLP = {
+    ...layoutParams, mode: 'brush', count: 40, brushTip: 'b',
+    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: 6,
+    wobbleAmp: 12, wobbleFreq: 0.5,
+  };
+  const base = buildPlacements({ ...opts, layoutParams: baseLP });
+  assert.ok(base.items.length > 0, 'brush mode produces items');
+  const xs = (r) => r.items.map((it) => it.x).join(',');
+  const baseXs = xs(base);
+  // one param changed at a time; wobbleFreq needs a non-zero amp to matter
+  const variants = {
+    brushSize: 96,
+    brushSpacing: 1.5,
+    fieldScale: 0.02,
+    trailCount: 1,
+    wobbleAmp: 30,
+    wobbleFreq: 2,
+  };
+  for (const [key, val] of Object.entries(variants)) {
+    const v = buildPlacements({ ...opts, layoutParams: { ...baseLP, [key]: val } });
+    assert.strictEqual(v.items.length, base.items.length, `${key}: item count must not move`);
+    assert.notStrictEqual(xs(v), baseXs, `${key}=${val} must reach geometry`);
+  }
+}
+
 // --- empty assets ---
 const empty = buildPlacements({ ...opts, activeAssets: [] });
 assert.deepStrictEqual(empty.items, []);

@@ -140,10 +140,17 @@ export function buildPlacements({
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
-    // Brush line: the stamped tip asset id. (The other brush scalars —
-    // brushSize et al — are PR1/PR2 params; only the tip is forwarded here.
-    // See the report for the gap this leaves.)
+    // Brush line: the stamped tip asset id, plus the six placement scalars.
+    // brushTip rides stage D (asset bind); the scalars ride stage A/B
+    // geometry — without them the live path silently ran PR1/PR2 defaults
+    // no matter what the layout params said.
     brushTip: layoutParams.brushTip,
+    brushSize: layoutParams.brushSize,
+    brushSpacing: layoutParams.brushSpacing,
+    fieldScale: layoutParams.fieldScale,
+    trailCount: layoutParams.trailCount,
+    wobbleAmp: layoutParams.wobbleAmp,
+    wobbleFreq: layoutParams.wobbleFreq,
   };
 
   const strategy = resolveStrategy(layoutParams, preset);
