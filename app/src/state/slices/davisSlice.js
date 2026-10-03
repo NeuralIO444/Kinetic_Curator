@@ -8,6 +8,7 @@ import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { EUCLID_MAX_STEPS } from '../euclid.js';
+import { seqWindow, seqNextIndex, seqFireMode } from '../seqEngine.mjs';
 
 /** #589 — the three phrase clock sources. */
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
@@ -117,7 +118,7 @@ function withEvolveStats(state, update) {
   };
 }
 
-export const createDavisSlice = (set) => ({
+export const createDavisSlice = (set, get) => ({
   evolveMode: false,
   // #616 EVOLVE progress: live run, last finished run, candidates seen this session.
   evolveRun: null,
@@ -129,6 +130,15 @@ export const createDavisSlice = (set) => ({
   autoSnapshot: false,
   lastEvolveTs: 0,
   favorites: readFavorites(),
+  // --- favorites sequencer (transport slices) ---
+  // The playhead: index into seqWindow(favorites). Manual transport (this
+  // slice) and the metro/phrase/audio/euclid clocks (later slices) all
+  // advance it; the strip highlights it. Tweaks ride on top — nothing locks.
+  seqPlaying: false,
+  seqIndex: 0,
+  seqLoop: true,
+  seqClock: 'metro', // metro | phrase | audio | euclid (picker in seq-clock-sources)
+  seqGaps: {}, // { [favoriteId]: 'cut' | 'morph' } — persisted in seq-gap-toggles
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
@@ -337,6 +347,39 @@ export const createDavisSlice = (set) => ({
     persistFavorites(next);
     return { favorites: next };
   }),
+  // --- favorites sequencer transport (seq-transport-manual and on) ---
+  seqPlay: () => set((state) => {
+    if (state.seqPlaying || seqWindow(state.favorites).length === 0) return {};
+    return { seqPlaying: true };
+  }),
+  seqStop: () => set({ seqPlaying: false }),
+  seqTogglePlay: () => set((state) => {
+    if (state.seqPlaying) return { seqPlaying: false };
+    if (seqWindow(state.favorites).length === 0) return {};
+    return { seqPlaying: true };
+  }),
+  seqSetLoop: (loop) => set({ seqLoop: !!loop }),
+  seqSetClock: (clock) => set({ seqClock: clock }),
+  seqSetIndex: (i) => set({ seqIndex: Math.max(0, Math.trunc(Number(i)) || 0) }),
+  /**
+   * Advance the playhead one step. Returns { favorite, mode, index, wrapped }
+   * for the caller to fire through the event bus (recall vs morph per the
+   * gap toggle), or { stopped: true } when the end holds without loop.
+   * Pure index math lives in seqEngine; this only commits the new index.
+   */
+  seqStep: () => {
+    const state = get();
+    const list = seqWindow(state.favorites);
+    const res = seqNextIndex(state.seqIndex, list.length, state.seqLoop);
+    if (res.stopped && list.length > 0 && state.seqIndex >= list.length - 1) {
+      set({ seqPlaying: false });
+      return { stopped: true };
+    }
+    if (res.stopped) return { stopped: true };
+    const favorite = list[res.index];
+    set({ seqIndex: res.index });
+    return { favorite, mode: seqFireMode(state.seqGaps, favorite?.id), index: res.index, wrapped: res.wrapped };
+  },
   recallFavorite: (fav) => set({
     seed: fav.seed,
     // #305 — a kept recipe replays its stream offsets too.

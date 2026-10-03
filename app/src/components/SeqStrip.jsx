@@ -1,27 +1,68 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
+import { useStore } from '../state/store.js';
 import { emit, Events } from '../composition/eventBus.js';
 
 const MAX_VISIBLE = 12;
+
+/** Manual transport: ▶/■, step-forward, loop. The clock slices reuse it. */
+function Transport({ playing, loop, onPlayStop, onStep, onLoop }) {
+  return (
+    <div className="seq-transport" role="toolbar" aria-label="Sequencer transport">
+      <button
+        type="button"
+        className={`seq-transport-btn ${playing ? 'on' : ''}`}
+        title={playing ? 'Stop the sequencer (■)' : 'Play the setlist (▶)'}
+        onClick={onPlayStop}
+      >
+        {playing ? '■' : '▶'}
+      </button>
+      <button
+        type="button"
+        className="seq-transport-btn"
+        title="Step forward one hit"
+        onClick={onStep}
+      >
+        ⏭
+      </button>
+      <button
+        type="button"
+        className={`seq-transport-btn ${loop ? 'on' : ''}`}
+        title={loop ? 'Loop on — wraps at the end' : 'Loop off — stops at the end'}
+        onClick={onLoop}
+        aria-pressed={loop}
+      >
+        ∞
+      </button>
+    </div>
+  );
+}
 
 /**
  * Hits sequencer strip (was the floating Favorites tray, #8 / #35).
  * The tray becomes the sequencer — one surface, not two.
  *
- * Slice 1 (seq-cells): restyle as a bottom cell strip. No behavior change —
- * click = recall, shift-click = evolve-from, alt-click = morph-to,
- * 1–9 recall, Enter/Space/arrows step, ‹ › reorder by delta.
- * The transport slot at the left is reserved for the seq-transport slice.
+ * Slice 3 (seq-transport-manual): the transport shell lives in the reserved
+ * slot — ▶/■, step-forward, loop. The local cursor is now the store
+ * playhead (seqIndex); manual steps fire recall, like the tray's advance.
+ * The clock slices drive the same playhead.
  */
 export function SeqStrip() {
   const { state } = useApp((s) => ({
     favorites: s.favorites,
     seed: s.seed,
     morphing: s.morphing,
+    seqPlaying: s.seqPlaying,
+    seqIndex: s.seqIndex,
+    seqLoop: s.seqLoop,
   }));
+  const seqStep = useStore((s) => s.seqStep);
+  const seqPlay = useStore((s) => s.seqPlay);
+  const seqStop = useStore((s) => s.seqStop);
+  const seqSetLoop = useStore((s) => s.seqSetLoop);
+  const seqSetIndex = useStore((s) => s.seqSetIndex);
   const favorites = state.favorites || [];
   const stripRef = useRef(null);
-  const [cursor, setCursor] = useState(0);
 
   // --- seq-dnd: pointer-based drag reorder ---------------------------------
   // Drag starts on a cell's main button; a >6px move becomes a drag (the
@@ -88,12 +129,14 @@ export function SeqStrip() {
   }, [gapFromPoint]);
   // --- /seq-dnd -------------------------------------------------------------
 
-  // Performance order = favorites array order (oldest → newest); show last N
+  // Performance order = favorites array order (oldest → newest); show last N.
+  // The playhead (seqIndex) is the store's — the old local cursor is gone;
+  // manual transport, keyboard, and (later) the clock all drive one playhead.
   const start = Math.max(0, favorites.length - MAX_VISIBLE);
   const visible = favorites.slice(start);
-  // The window slides as favorites are added/removed — clamp the cursor so
-  // it never points past the end or at a shifted item.
-  const cur = Math.min(cursor, Math.max(0, visible.length - 1));
+  // The window slides as favorites are added/removed — clamp the playhead
+  // so it never points past the end or at a shifted item.
+  const cur = Math.min(state.seqIndex, Math.max(0, visible.length - 1));
 
   const recall = useCallback((fav) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
@@ -113,19 +156,24 @@ export function SeqStrip() {
     emit(Events.DAVIS_FAVORITE, { action: 'reorder', id: fav.id, delta });
   }, []);
 
+  // Manual step: advance the playhead and fire. Slice 3 fires recall (the
+  // tray's advance behavior); the gap-toggle slice will consult the mode.
+  const stepFire = useCallback(() => {
+    const res = seqStep();
+    if (!res || res.stopped || !res.favorite) return;
+    recall(res.favorite);
+  }, [seqStep, recall]);
+
   const advance = useCallback(() => {
-    if (visible.length === 0) return;
-    const next = (cur + 1) % visible.length;
-    setCursor(next);
-    recall(visible[next]);
-  }, [visible, cur, recall]);
+    stepFire();
+  }, [stepFire]);
 
   const onKeyDown = useCallback((e) => {
     if (e.key >= '1' && e.key <= '9') {
       const idx = parseInt(e.key, 10) - 1;
       if (visible[idx]) {
         e.preventDefault();
-        setCursor(idx);
+        seqSetIndex(idx);
         recall(visible[idx]);
       }
       return;
@@ -144,18 +192,24 @@ export function SeqStrip() {
       e.preventDefault();
       if (visible.length === 0) return;
       const next = (cur - 1 + visible.length) % visible.length;
-      setCursor(next);
+      seqSetIndex(next);
       recall(visible[next]);
     }
-  }, [visible, recall, advance, cur]);
+  }, [visible, recall, advance, cur, seqSetIndex]);
 
   if (visible.length === 0) {
     return (
       <div className="seq-strip seq-strip-empty" title="Press F to favorite a hit">
-        <div className="seq-transport-slot" aria-hidden="true" />
+        <Transport
+          playing={state.seqPlaying}
+          loop={state.seqLoop}
+          onPlayStop={() => (state.seqPlaying ? seqStop() : seqPlay())}
+          onStep={stepFire}
+          onLoop={() => seqSetLoop(!state.seqLoop)}
+        />
         <span className="seq-label">HITS</span>
         <span className="seq-hint">
-          F to save · Enter advances setlist
+          F to save · ▶ plays the setlist
         </span>
       </div>
     );
@@ -170,8 +224,13 @@ export function SeqStrip() {
       role="toolbar"
       aria-label="Hits sequencer"
     >
-      {/* Transport lives here from the seq-transport slice on. */}
-      <div className="seq-transport-slot" aria-hidden="true" />
+      <Transport
+        playing={state.seqPlaying}
+        loop={state.seqLoop}
+        onPlayStop={() => (state.seqPlaying ? seqStop() : seqPlay())}
+        onStep={stepFire}
+        onLoop={() => seqSetLoop(!state.seqLoop)}
+      />
       <span className="seq-label">HITS</span>
       {state.morphing && <span className="seq-hint" style={{ color: 'var(--accent)' }}>MORPH…</span>}
       <div className="seq-cells">
@@ -185,9 +244,9 @@ export function SeqStrip() {
               {dropGap === i && <div className="seq-drop-indicator" aria-hidden="true" />}
               <div
                 ref={(el) => { if (f.id) { if (el) cellEls.current.set(f.id, el); else cellEls.current.delete(f.id); } }}
-                className={`seq-cell ${isCurrent ? 'active' : ''} ${isCursor ? 'seq-cursor' : ''} ${isDragging ? 'seq-dragging' : ''}`}
+                className={`seq-cell ${isCurrent ? 'active' : ''} ${isCursor ? (state.seqPlaying ? 'seq-playhead' : 'seq-cursor') : ''} ${isDragging ? 'seq-dragging' : ''}`}
                 title={`Seed ${f.seed.toString(16)} · click recall · shift=evolve · alt=morph · drag to reorder`}
-                style={isCursor ? { outline: '1px solid var(--accent)' } : undefined}
+                style={isCursor && !state.seqPlaying ? { outline: '1px solid var(--accent)' } : undefined}
               >
               <button
                 type="button"
@@ -195,7 +254,7 @@ export function SeqStrip() {
                 onPointerDown={(e) => onCellPointerDown(e, f, i)}
                 onClick={(e) => {
                   if (suppressClickRef.current) { suppressClickRef.current = false; return; }
-                  setCursor(i);
+                  seqSetIndex(i);
                   if (e.altKey) morphTo(f);
                   else if (e.shiftKey) evolveFrom(f);
                   else recall(f);
@@ -208,7 +267,7 @@ export function SeqStrip() {
                 type="button"
                 className="seq-cell-btn"
                 title="Morph layout to this hit"
-                onClick={() => { setCursor(i); morphTo(f); }}
+                onClick={() => { seqSetIndex(i); morphTo(f); }}
               >
                 ↔
               </button>

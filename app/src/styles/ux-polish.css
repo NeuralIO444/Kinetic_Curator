@@ -150,6 +150,31 @@
   min-width: 0;
   /* Filled by the seq-transport slice: ▶/■, step, loop, tempo. */
 }
+/* seq-transport-manual: the transport shell. TE language — tiny glyphs. */
+.seq-transport {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 1px 2px;
+}
+.seq-transport-btn {
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.seq-transport-btn:hover {
+  color: var(--ink);
+  background: rgba(255,255,255,0.04);
+}
+.seq-transport-btn.on {
+  color: var(--accent2);
+}
 .seq-label {
   flex-shrink: 0;
   font-size: 9px;
