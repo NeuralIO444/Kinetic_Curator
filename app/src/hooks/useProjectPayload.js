@@ -7,11 +7,11 @@ import { serializeProject } from '../state/projectDocument.js';
 export function buildProjectPayload({
   seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
   enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, midiMap, customAssets, layers,
-  activeLayerId, layerSnapshots,
+  activeLayerId, layerSnapshots, projectTitle,
 }) {
   return serializeProject({
     seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
     enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, midiMap, customAssets, layers,
-    activeLayerId, layerSnapshots,
+    activeLayerId, layerSnapshots, projectTitle,
   });
 }

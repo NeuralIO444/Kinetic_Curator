@@ -18,6 +18,9 @@ export const createExportSlice = (set) => ({
   syphonOn: false,
   syphonName: 'Kinetic Curator',
   userCanvasPresets: [],
+  projectTitle: '', // #651 — optional title, used in export filenames
+
+  setProjectTitle: (t) => set({ projectTitle: String(t ?? '').slice(0, 80) }),
 
   addSnapshot: (snap) => set((state) => ({
     snapshots: [...state.snapshots, { id: genId(), ...snap }].slice(-MAX_SNAPSHOTS),
