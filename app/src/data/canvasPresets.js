@@ -10,6 +10,12 @@ export const CANVAS_PRESETS = Object.freeze([
   { id: 'reel', group: 'Social', label: 'Reel / Story 1080×1920', w: 1080, h: 1920, fps: 30 },
   { id: 'ig-portrait', group: 'Social', label: 'IG Portrait 1080×1350', w: 1080, h: 1350, fps: 30 },
   { id: 'yt-hd', group: 'Social', label: 'YouTube HD 1920×1080', w: 1920, h: 1080, fps: 30 },
+  // OOH — vendor rasters are examples, not universal specs. Each carries its
+  // source; the Times Square entry is one spectacular's raster.
+  { id: 'ooh-lamar-bulletin', group: 'OOH', label: 'Lamar Digital Bulletin 1400×400', w: 1400, h: 400, fps: 60, source: 'Lamar Advertising autoscale template (example only — bulletins vary by market)' },
+  { id: 'ooh-jcdecaux-fhd', group: 'OOH', label: 'JCDecaux DOOH 1920×1080', w: 1920, h: 1080, fps: 60, source: 'JCDecaux digital network Full HD (example only — units vary)' },
+  { id: 'ooh-jcdecaux-billboard', group: 'OOH', label: 'JCDecaux Digital Billboard 1260×720', w: 1260, h: 720, fps: 60, source: 'JCDecaux digital billboard, aspect-locked (example only)' },
+  { id: 'ooh-times-square', group: 'OOH', label: 'Times Square-class 10048×2368', w: 10048, h: 2368, fps: 60, source: 'Example only — 1535 Broadway-class spectacular raster; not a universal spec' },
 ]);
 
 export const CANVAS_FPS = Object.freeze([24, 25, 30, 50, 60]);

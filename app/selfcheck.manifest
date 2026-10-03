@@ -112,6 +112,7 @@ node src/gl/bridge/fxUniforms.selfcheck.mjs
 node src/gl/effects/oklch.selfcheck.mjs
 node src/gl/composite.selfcheck.mjs
 node src/gl/accum.selfcheck.mjs
+node src/gl/canvasSizes.selfcheck.mjs
 node src/gl/accumGuard.selfcheck.mjs
 node src/gl/atlasKeyGuard.selfcheck.mjs
 node src/gl/atlas.skip.selfcheck.mjs

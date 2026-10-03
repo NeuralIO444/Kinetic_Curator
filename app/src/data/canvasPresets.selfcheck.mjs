@@ -49,6 +49,21 @@ test('#606 authoredCanvas reads store-shaped state', () => {
   assert.equal(a.fps, 30);
 });
 
+test('#606 OOH group: four source-labeled presets', () => {
+  const ooh = CANVAS_PRESETS.filter((p) => p.group === 'OOH');
+  assert.equal(ooh.length, 4);
+  const dims = new Set(ooh.map((p) => `${p.w}x${p.h}`));
+  for (const d of ['1400x400', '1920x1080', '1260x720', '10048x2368']) {
+    assert.ok(dims.has(d), `OOH missing ${d}`);
+  }
+  // Every OOH preset carries its source; Times Square is example-only.
+  for (const p of ooh) {
+    assert.ok(typeof p.source === 'string' && p.source.length > 0, `${p.id} missing source`);
+  }
+  const ts = ooh.find((p) => p.w === 10048);
+  assert.ok(/example/i.test(ts.source), 'Times Square preset must be labeled example-only');
+});
+
 test('#606 custom size is written', () => {
   const doc = serializeProject({
     seed: 1,
