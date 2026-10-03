@@ -3,8 +3,10 @@
 const RECENT_KEY = 'kc-recent-projects';
 const RECENT_CAP = 5;
 
-export function confirmReplaceMessage() {
-  return 'Import replaces the current piece. Continue?';
+export function importConfirmMessage(fileName, seed) {
+  const name = fileName || 'project';
+  const seedPart = Number.isFinite(seed) ? ` (seed ${seed >>> 0})` : '';
+  return `Import "${name}"${seedPart} and replace the current piece?`;
 }
 
 export function loadedMessage(fileName, doc, sanitized = 0) {
