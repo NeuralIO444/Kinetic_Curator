@@ -41,6 +41,7 @@ node src/engine/kernel/itemMorph.selfcheck.mjs
 node src/state/projectDocument.selfcheck.mjs
 node src/state/allEraGolden.selfcheck.mjs
 node src/state/recipes.selfcheck.mjs
+node src/state/recipeUrls.selfcheck.mjs
 node src/state/qaRegression.selfcheck.mjs
 node src/state/firewall.selfcheck.mjs
 node src/state/watchdog.selfcheck.mjs
