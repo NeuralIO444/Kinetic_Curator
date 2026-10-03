@@ -16,7 +16,7 @@ import { applyField, applyMod, motionMetrics, MAX_TRACKS } from '../engine/kerne
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
-import { buildKinemeCtx } from '../engine/kineme.js';
+import { buildKinemeCtx, holdKinemeTimes, boilStep, clampBoilFps } from '../engine/kineme.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
@@ -151,6 +151,11 @@ export function createLiveResolver() {
   // warpPhase: a hidden-then-reshown layer resumes its grown form instead
   // of regrowing from the seed.
   const growthTickByLayer = new Map(); // layerId -> { tick, key }
+  // Kineme shed tiers 1–2 (slice 4): the held driver instants. Time is
+  // global (one clock), so one held pair serves every layer. Persists until
+  // the tier clears — recovery resumes from the held pose, and seed/phase
+  // are never touched.
+  let kinemeHeld = null; // { driverSec, boilStep } | null
   // #564 — Assets-tab edits that change what a layer DRAWS without changing
   // which ids are enabled: SWAP replaces an overlay asset's SVG under the
   // same id, a weight edit re-rolls which asset each slot gets. Neither
@@ -493,14 +498,23 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
-          // Kineme living-motion drivers (slice 3): the anchored driver
+          // Kineme living-motion drivers (slices 3–4): the anchored driver
           // time rides input.kinemeTime (liveLoop/renderWorker). Null when
-          // every amount is 0 — zero cost when off. shedTier arrives in
-          // slice 4 (governor).
-          kineme: buildKinemeCtx({
-            layoutParams, driverSec: input.kinemeTime, seed,
-            canvasW: W, canvasH: H, shedTier: 0,
-          }),
+          // every amount is 0 — zero cost when off. Governor shed tiers 1–2
+          // hold the boil / hold all motion via the pure hold helper; the
+          // held instants persist until the tier clears, so recovery resumes
+          // from the held pose with seed/phase untouched.
+          kineme: (() => {
+            const tier = input.kinemeShed | 0;
+            const liveSec = input.kinemeTime ?? 0;
+            const liveStep = boilStep(liveSec, clampBoilFps(layoutParams.kinemeBoilFps));
+            const held = holdKinemeTimes(kinemeHeld, tier, liveSec, liveStep);
+            kinemeHeld = held.held;
+            return buildKinemeCtx({
+              layoutParams, driverSec: held.driverSec, boilStep: held.boilStep,
+              seed, canvasW: W, canvasH: H, shedTier: tier,
+            });
+          })(),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).

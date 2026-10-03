@@ -556,6 +556,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const resolved = resolver.resolveLayers({
       canvasW, canvasH,
       kinemeTime,
+      kinemeShed: s.kinemeShed | 0,
       layers: s.layers,
       activeLayerId: s.activeLayerId,
       layerSnapshots: s.layerSnapshots,
