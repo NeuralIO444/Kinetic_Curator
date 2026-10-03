@@ -8,7 +8,8 @@ import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { EUCLID_MAX_STEPS } from '../euclid.js';
-import { seqWindow, seqNextIndex, seqFireMode } from '../seqEngine.mjs';
+import { seqNextIndex, seqFireMode } from '../seqEngine.mjs';
+import { SEQ_PAGE_SIZE } from '../seqEngine.mjs';
 
 /** #589 — the three phrase clock sources. */
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
@@ -159,14 +160,15 @@ export const createDavisSlice = (set, get) => ({
   lastEvolveTs: 0,
   favorites: readFavorites(),
   // --- favorites sequencer (transport slices) ---
-  // The playhead: index into seqWindow(favorites). Manual transport (this
-  // slice) and the metro/phrase/audio/euclid clocks (later slices) all
+  // The playhead: index into the full arranged favorites array (NOT a
+  // sliding window — seq-strip-cap). Manual transport and the clocks all
   // advance it; the strip highlights it. Tweaks ride on top — nothing locks.
   seqPlaying: false,
   seqIndex: 0,
   seqLoop: true,
   seqClock: 'metro', // metro | phrase | audio | euclid (picker in seq-clock-sources)
   seqGaps: readSeqGaps(), // { [favoriteId]: 'cut' | 'morph' } — transition INTO that favorite
+  seqPage: 0, // seq-strip-cap: 16-cell pages; the playhead auto-follows when playing
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
@@ -379,13 +381,13 @@ export const createDavisSlice = (set, get) => ({
   }),
   // --- favorites sequencer transport (seq-transport-manual and on) ---
   seqPlay: () => set((state) => {
-    if (state.seqPlaying || seqWindow(state.favorites).length === 0) return {};
+    if (state.seqPlaying || state.favorites.length === 0) return {};
     return { seqPlaying: true };
   }),
   seqStop: () => set({ seqPlaying: false }),
   seqTogglePlay: () => set((state) => {
     if (state.seqPlaying) return { seqPlaying: false };
-    if (seqWindow(state.favorites).length === 0) return {};
+    if (state.favorites.length === 0) return {};
     return { seqPlaying: true };
   }),
   seqSetLoop: (loop) => set({ seqLoop: !!loop }),
@@ -395,7 +397,21 @@ export const createDavisSlice = (set, get) => ({
     if (state.seqClock === clock) return {};
     return { seqClock: clock };
   }),
-  seqSetIndex: (i) => set({ seqIndex: Math.max(0, Math.trunc(Number(i)) || 0) }),
+  seqSetIndex: (i) => set((state) => {
+    const idx = Math.max(0, Math.trunc(Number(i)) || 0);
+    const clamped = Math.min(idx, Math.max(0, state.favorites.length - 1));
+    // The page follows the playhead — it stays stable across pages.
+    return { seqIndex: clamped, seqPage: Math.floor(clamped / SEQ_PAGE_SIZE) };
+  }),
+  /**
+   * Set the visible strip page (0-based), clamped to the page count.
+   * Manual paging; while playing, seqStep auto-follows the playhead.
+   */
+  seqSetPage: (p) => set((state) => {
+    const pageCount = Math.max(1, Math.ceil(state.favorites.length / SEQ_PAGE_SIZE));
+    const page = Math.max(0, Math.min(pageCount - 1, Math.trunc(Number(p)) || 0));
+    return { seqPage: page };
+  }),
   /**
    * Set the transition INTO a favorite ('cut' | 'morph'). Keyed by favorite
    * id so it survives reorders; unknown ids and bogus modes are ignored.
@@ -416,7 +432,7 @@ export const createDavisSlice = (set, get) => ({
    */
   seqStep: () => {
     const state = get();
-    const list = seqWindow(state.favorites);
+    const list = state.favorites;
     const res = seqNextIndex(state.seqIndex, list.length, state.seqLoop);
     if (res.stopped && list.length > 0 && state.seqIndex >= list.length - 1) {
       set({ seqPlaying: false });
@@ -424,7 +440,8 @@ export const createDavisSlice = (set, get) => ({
     }
     if (res.stopped) return { stopped: true };
     const favorite = list[res.index];
-    set({ seqIndex: res.index });
+    // The page follows the playhead while stepping — stable across pages.
+    set({ seqIndex: res.index, seqPage: Math.floor(res.index / SEQ_PAGE_SIZE) });
     return { favorite, mode: seqFireMode(state.seqGaps, favorite?.id), index: res.index, wrapped: res.wrapped };
   },
   recallFavorite: (fav) => set({

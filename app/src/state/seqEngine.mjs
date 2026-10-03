@@ -26,6 +26,10 @@ export function seqNextIndex(index, length, loop) {
   return { index: length - 1, wrapped: false, stopped: true };
 }
 
+/** Cells per strip page. The sequencer plays the full arranged array; the
+ * strip pages through it 16 at a time (Matt's decision). */
+export const SEQ_PAGE_SIZE = 16;
+
 /** Transition mode for stepping INTO a favorite. Slice seq-gap-toggles owns the map. */
 export function seqFireMode(gaps, favId) {
   if (gaps && favId != null && gaps[favId] === 'cut') return 'cut';

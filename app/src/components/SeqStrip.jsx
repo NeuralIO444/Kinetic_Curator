@@ -2,9 +2,10 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { SEQ_CLOCKS, SEQ_CLOCK_LABELS } from '../hooks/useSeqClock.js';
+import { SEQ_PAGE_SIZE } from '../state/seqEngine.mjs';
 import { emit, Events } from '../composition/eventBus.js';
 
-const MAX_VISIBLE = 12;
+// (SEQ_PAGE_SIZE lives in seqEngine.mjs)
 
 /** Manual transport: ▶/■, step-forward, loop, clock source, tempo. */
 function Transport({ playing, loop, clock, phraseBpm, onPlayStop, onStep, onLoop, onClock, onBpm }) {
@@ -85,8 +86,10 @@ export function SeqStrip() {
     seqGaps: s.seqGaps,
     phraseBpm: s.phraseBpm,
     seqClock: s.seqClock,
+    seqPage: s.seqPage,
   }));
   const seqSetClock = useStore((s) => s.seqSetClock);
+  const seqSetPage = useStore((s) => s.seqSetPage);
   const seqSetGap = useStore((s) => s.seqSetGap);
   const seqStep = useStore((s) => s.seqStep);
   const seqPlay = useStore((s) => s.seqPlay);
@@ -95,6 +98,15 @@ export function SeqStrip() {
   const seqSetIndex = useStore((s) => s.seqSetIndex);
   const favorites = state.favorites || [];
   const stripRef = useRef(null);
+
+  // seq-strip-cap: page computation lives here so the DnD handlers below
+  // can use the global pageStart.
+  const pageCount = Math.max(1, Math.ceil(favorites.length / SEQ_PAGE_SIZE));
+  const page = Math.max(0, Math.min(state.seqPage, pageCount - 1));
+  const pageStart = page * SEQ_PAGE_SIZE;
+  const visible = favorites.slice(pageStart, pageStart + SEQ_PAGE_SIZE);
+  // Global playhead index; the page-relative position for highlighting.
+  const cur = Math.min(state.seqIndex, Math.max(0, favorites.length - 1));
 
   // --- seq-dnd: pointer-based drag reorder ---------------------------------
   // Drag starts on a cell's main button; a >6px move becomes a drag (the
@@ -118,8 +130,10 @@ export function SeqStrip() {
 
   const onCellPointerDown = useCallback((e, fav, i) => {
     if (e.button !== 0 || !fav.id) return;
-    dragRef.current = { id: fav.id, fromIndex: i, startX: e.clientX, startY: e.clientY };
-  }, []);
+    // Store the global index and page start — DnD is within the page, but
+    // moveFavorite needs the global toIndex.
+    dragRef.current = { id: fav.id, fromIndex: pageStart + i, pageStart, startX: e.clientX, startY: e.clientY };
+  }, [pageStart]);
 
   // Window-level move/up: the pointer leaves the button mid-drag, so the
   // button's own handlers would go deaf. These read dragRef and no-op
@@ -140,7 +154,9 @@ export function SeqStrip() {
       if (!d) return;
       if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) <= 6) return; // a click
       const gap = gapFromPoint(e.clientX);
-      const toIndex = gap > d.fromIndex ? gap - 1 : gap;
+      // gap is page-relative; convert to a global toIndex.
+      const globalGap = d.pageStart + gap;
+      const toIndex = globalGap > d.fromIndex ? globalGap - 1 : globalGap;
       suppressClickRef.current = true;
       setTimeout(() => { suppressClickRef.current = false; }, 100);
       emit(Events.DAVIS_FAVORITE, { action: 'move', id: d.id, toIndex });
@@ -160,15 +176,6 @@ export function SeqStrip() {
     };
   }, [gapFromPoint]);
   // --- /seq-dnd -------------------------------------------------------------
-
-  // Performance order = favorites array order (oldest → newest); show last N.
-  // The playhead (seqIndex) is the store's — the old local cursor is gone;
-  // manual transport, keyboard, and (later) the clock all drive one playhead.
-  const start = Math.max(0, favorites.length - MAX_VISIBLE);
-  const visible = favorites.slice(start);
-  // The window slides as favorites are added/removed — clamp the playhead
-  // so it never points past the end or at a shifted item.
-  const cur = Math.min(state.seqIndex, Math.max(0, visible.length - 1));
 
   const recall = useCallback((fav) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
@@ -208,7 +215,7 @@ export function SeqStrip() {
       const idx = parseInt(e.key, 10) - 1;
       if (visible[idx]) {
         e.preventDefault();
-        seqSetIndex(idx);
+        seqSetIndex(pageStart + idx);
         recall(visible[idx]);
       }
       return;
@@ -225,12 +232,12 @@ export function SeqStrip() {
     }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault();
-      if (visible.length === 0) return;
-      const next = (cur - 1 + visible.length) % visible.length;
+      if (favorites.length === 0) return;
+      const next = (cur - 1 + favorites.length) % favorites.length;
       seqSetIndex(next);
-      recall(visible[next]);
+      recall(favorites[next]);
     }
-  }, [visible, recall, advance, cur, seqSetIndex]);
+  }, [visible, favorites, recall, advance, cur, pageStart, seqSetIndex]);
 
   if (visible.length === 0) {
     return (
@@ -271,21 +278,47 @@ export function SeqStrip() {
         onBpm={(bpm) => emit(Events.DAVIS_PHRASE, { bpm })}
       />
       <span className="seq-label">HITS</span>
+      {pageCount > 1 && (
+        <span className="seq-pager" role="group" aria-label="Strip pages">
+          <button
+            type="button"
+            className="seq-pager-btn"
+            title="Previous page"
+            disabled={page <= 0}
+            onClick={() => seqSetPage(page - 1)}
+          >
+            ‹
+          </button>
+          <span className="seq-pager-num" title={`Page ${page + 1} of ${pageCount}`}>
+            {page + 1}/{pageCount}
+          </span>
+          <button
+            type="button"
+            className="seq-pager-btn"
+            title="Next page"
+            disabled={page >= pageCount - 1}
+            onClick={() => seqSetPage(page + 1)}
+          >
+            ›
+          </button>
+        </span>
+      )}
       {state.morphing && <span className="seq-hint" style={{ color: 'var(--accent)' }}>MORPH…</span>}
       <div className="seq-cells">
         {visible.map((f, i) => {
+          const gi = pageStart + i; // global index in the full array
           const isCurrent = f.seed === state.seed;
-          const isCursor = i === cur;
+          const isCursor = gi === cur;
           const isDragging = dragId === f.id;
           const seedHex = (f.seed >>> 0).toString(16).padStart(4, '0').slice(-4);
           return (
-            <Fragment key={f.id ?? `${f.seed}-${f.timestamp || i}`}>
+            <Fragment key={f.id ?? `${f.seed}-${f.timestamp || gi}`}>
               {dropGap === i && <div className="seq-drop-indicator" aria-hidden="true" />}
               {/* Gap toggle: the transition INTO this cell. Default morph. */}
               <button
                 type="button"
                 className={`seq-gap-toggle ${((state.seqGaps || {})[f.id] || 'morph') === 'cut' ? 'cut' : ''}`}
-                title={`Transition into hit ${i + 1}: ${(state.seqGaps || {})[f.id] || 'morph'} — click to flip`}
+                title={`Transition into hit ${gi + 1}: ${(state.seqGaps || {})[f.id] || 'morph'} — click to flip`}
                 onClick={() => {
                   if (!f.id) return;
                   const curMode = (state.seqGaps || {})[f.id] || 'morph';
@@ -306,20 +339,20 @@ export function SeqStrip() {
                 onPointerDown={(e) => onCellPointerDown(e, f, i)}
                 onClick={(e) => {
                   if (suppressClickRef.current) { suppressClickRef.current = false; return; }
-                  seqSetIndex(i);
+                  seqSetIndex(gi);
                   if (e.altKey) morphTo(f);
                   else if (e.shiftKey) evolveFrom(f);
                   else recall(f);
                 }}
               >
-                <span className="seq-cell-num">{i + 1}</span>
+                <span className="seq-cell-num">{gi + 1}</span>
                 <span className="seq-cell-seed">{seedHex}</span>
               </button>
               <button
                 type="button"
                 className="seq-cell-btn"
                 title="Morph layout to this hit"
-                onClick={() => { seqSetIndex(i); morphTo(f); }}
+                onClick={() => { seqSetIndex(gi); morphTo(f); }}
               >
                 ↔
               </button>

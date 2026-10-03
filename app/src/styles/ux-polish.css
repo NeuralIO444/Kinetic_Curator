@@ -278,6 +278,36 @@
   letter-spacing: 0.04em;
   min-width: 26px;
 }
+/* seq-strip-cap: page navigation. Tiny TE controls. */
+.seq-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.seq-pager-btn {
+  padding: 1px 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.2;
+}
+.seq-pager-btn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--dim);
+}
+.seq-pager-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.seq-pager-num {
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+  min-width: 24px;
+  text-align: center;
+}
 .seq-cell-main {
   display: inline-flex;
   align-items: center;

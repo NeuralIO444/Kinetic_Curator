@@ -218,6 +218,43 @@ mem.delete('kc:seq-gaps:v1');
   assert.deepStrictEqual(st.morphTweakedKeys, {}, 'tweak slate cleared on finish');
 }
 
+// seq-strip-cap: 16-cell paging, playhead stable across pages, full array order
+mem.delete(FAVORITES_KEY);
+{
+  const c = boot();
+  // 20 favorites — more than one page, more than the old 12-window
+  for (let s = 0; s < 20; s++) c.call('addFavorite', fav(1000 + s));
+  const st0 = c.get();
+  assert.strictEqual(st0.favorites.length, 20, '20 favorites');
+  assert.strictEqual(st0.seqPage, 0, 'starts on page 0');
+
+  // seqSetPage clamps
+  c.call('seqSetPage', 5);
+  assert.strictEqual(c.get().seqPage, 1, 'clamps to last page (20/16 = 2 pages)');
+  c.call('seqSetPage', -1);
+  assert.strictEqual(c.get().seqPage, 0, 'clamps to first page');
+
+  // stepping past 16 auto-follows the page
+  c.call('seqSetIndex', 15);
+  assert.strictEqual(c.get().seqPage, 0, 'index 15 on page 0');
+  const r = c.call('seqStep');
+  assert.strictEqual(r.index, 16, 'steps to 16 (past the old 12-window)');
+  assert.strictEqual(c.get().seqPage, 1, 'page follows the playhead');
+  assert.strictEqual(r.favorite.seed, 1016, 'plays the 17th favorite in array order');
+
+  // seqSetIndex moves the page too
+  c.call('seqSetIndex', 3);
+  assert.strictEqual(c.get().seqPage, 0, 'page follows manual index set');
+
+  // wrap from the end goes to 0 and back to page 0
+  c.call('seqSetIndex', 19);
+  assert.strictEqual(c.get().seqPage, 1, 'index 19 on page 1');
+  const w = c.call('seqStep');
+  assert.strictEqual(w.wrapped, true, 'wraps at end');
+  assert.strictEqual(w.index, 0, 'wraps to 0');
+  assert.strictEqual(c.get().seqPage, 0, 'page follows wrap');
+}
+
 // no localStorage at all (private mode / node) still works in memory
 delete globalThis.localStorage;
 {
