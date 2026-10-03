@@ -3,7 +3,7 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
 import {
-  confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
+  confirmReplaceMessage, loadedMessage, exportSavedMessage, nextExportFilename,
   missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
 } from './pipelineNotices.mjs';
 import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
@@ -41,11 +41,13 @@ export function DataExportRow({
   const tasteStatus = useStore((s) => s.tasteStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const clearTaste = useStore((s) => s.clearTaste);
+  const projectTitle = useStore((s) => s.projectTitle);
+  const setProjectTitle = useStore((s) => s.setProjectTitle);
 
   const projectFields = {
     seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
     enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, midiMap, customAssets, layers,
-    activeLayerId, layerSnapshots,
+    activeLayerId, layerSnapshots, projectTitle,
   };
 
 
@@ -55,7 +57,7 @@ export function DataExportRow({
     if (canvas?.toDataURL) {
       try { payload = attachThumbnail(payload, canvas.toDataURL('image/jpeg', 0.4)); } catch { /* hold last frame */ }
     }
-    const filename = exportFilename(payload);
+    const filename = nextExportFilename(payload);
     downloadProject(payload, filename);
     exportedPayload.current = JSON.stringify(payload);
     onMessage(exportSavedMessage(filename));
@@ -159,7 +161,14 @@ export function DataExportRow({
   return (
     <>
       <div className="pipeline-row">
-        <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project">↓ PROJECT</button>
+        <input
+          value={projectTitle}
+          onChange={(e) => setProjectTitle(e.target.value)}
+          placeholder="Project title (optional)"
+          title="Project title — used in export filenames"
+          style={{ flex: 2, fontSize: 11 }}
+        />
+        <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project (X)">↓ PROJECT</button>
         <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
         <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
       </div>

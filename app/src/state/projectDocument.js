@@ -57,6 +57,10 @@ export function serializeProject(state) {
   if (state.assetWeightOverrides && Object.keys(state.assetWeightOverrides).length > 0) {
     doc.assetWeightOverrides = { ...state.assetWeightOverrides };
   }
+  // #651 — optional project title, stored in the doc so reimported titles persist.
+  if (typeof state.projectTitle === 'string' && state.projectTitle.trim()) {
+    doc.title = state.projectTitle.trim().slice(0, 80);
+  }
   if (state.paletteOverrides) {
     doc.paletteOverrides = JSON.parse(JSON.stringify(state.paletteOverrides));
   }

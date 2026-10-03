@@ -5,7 +5,7 @@ import { DrawerOverlay } from '../components/DrawerOverlay.jsx';
 import { useStore } from '../state/store.js';
 import { downloadProject } from '../state/projectDocument.js';
 import { buildProjectPayload } from '../hooks/useProjectPayload.js';
-import { shouldExportOnKey, exportFilename, exportSavedMessage } from '../panels/pipeline/pipelineNotices.mjs';
+import { shouldExportOnKey, nextExportFilename, exportSavedMessage } from '../panels/pipeline/pipelineNotices.mjs';
 import { attachThumbnail } from '../panels/pipeline/thumbnail.mjs';
 
 const TAB_STORAGE_KEY = 'kc:active-panel-tab';
@@ -105,8 +105,9 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       if (canvas?.toDataURL) {
         try { payload = attachThumbnail(payload, canvas.toDataURL('image/jpeg', 0.4)); } catch { /* hold last frame */ }
       }
-      downloadProject(payload, exportFilename(payload));
-      s.setStatus?.(exportSavedMessage(exportFilename(payload)));
+      const filename = nextExportFilename(payload);
+      downloadProject(payload, filename);
+      s.setStatus?.(exportSavedMessage(filename));
     };
     window.addEventListener('keydown', onExport);
     return () => window.removeEventListener('keydown', onExport);

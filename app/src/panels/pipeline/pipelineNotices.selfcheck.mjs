@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   confirmReplaceMessage, loadedMessage, exportSavedMessage, exportFilename,
+  nextExportFilename, nextTitleVersion, titleSlug,
   missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, shouldExportOnKey,
 } from './pipelineNotices.mjs';
 
@@ -15,10 +16,27 @@ test('#630 #646 loaded message names the file and the tracks', () => {
 });
 
 test('#649 #651 export names the title and confirms', () => {
-  const name = exportFilename({ title: 'Night Migration', seed: 16 });
-  assert.equal(name, 'night-migration.project.json');
-  assert.equal(exportSavedMessage(name), 'Saved night-migration.project.json');
-  assert.match(exportFilename({ seed: 255 }), /ff/);
+  const name = exportFilename({ title: 'Night Migration', seed: 16 }, 3);
+  assert.equal(name, 'night-migration-v3-10.project.json');
+  assert.equal(exportSavedMessage(name), 'Saved night-migration-v3-10.project.json');
+  assert.match(exportFilename({ seed: 255 }), /^kinetic-curator-ff\.project\.json$/);
+});
+
+test('#651 title slug + per-title version counter', () => {
+  assert.equal(titleSlug('  Night Migration!! '), 'night-migration');
+  assert.equal(titleSlug(''), '');
+  assert.equal(titleSlug(null), '');
+  const mem = new Map();
+  const store = {
+    getItem: (k) => mem.get(k) ?? null,
+    setItem: (k, v) => mem.set(k, v),
+  };
+  assert.equal(nextTitleVersion('dusk', store), 1);
+  assert.equal(nextTitleVersion('dusk', store), 2);
+  assert.equal(nextTitleVersion('dawn', store), 1);
+  assert.equal(nextExportFilename({ title: 'Dusk', seed: 16 }, store), 'dusk-v3-10.project.json');
+  // untitled keeps the seed naming, no version
+  assert.match(nextExportFilename({ seed: 255 }, store), /^kinetic-curator-ff\.project\.json$/);
 });
 
 test('#650 missing user palette warns', () => {

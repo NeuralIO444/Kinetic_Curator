@@ -20,15 +20,54 @@ export function exportSavedMessage(filename) {
   return `Saved ${filename}`;
 }
 
-export function exportFilename(doc) {
-  const title = typeof doc?.title === 'string' ? doc.title.trim() : '';
-  const slug = title
+const TITLE_VERSIONS_KEY = 'kc-title-versions';
+
+export function titleSlug(title) {
+  const t = typeof title === 'string' ? title.trim() : '';
+  return t
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 40);
-  if (slug) return `${slug}.project.json`;
-  return `kinetic-curator-${(doc?.seed >>> 0).toString(16)}.project.json`;
+}
+
+function readTitleVersions(store = globalThis.localStorage) {
+  if (!store) return {};
+  try {
+    const raw = JSON.parse(store.getItem(TITLE_VERSIONS_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+/** #651 — version counter persisted per title slug, increments on each export. */
+export function nextTitleVersion(slug, store = globalThis.localStorage) {
+  if (!slug || !store) return 1;
+  const versions = readTitleVersions(store);
+  const next = (Number(versions[slug]) || 0) + 1;
+  versions[slug] = next;
+  try {
+    store.setItem(TITLE_VERSIONS_KEY, JSON.stringify(versions));
+  } catch { /* storage full or blocked — version still returned */ }
+  return next;
+}
+
+export function exportFilename(doc, version) {
+  const slug = titleSlug(doc?.title);
+  const seedHex = (doc?.seed >>> 0).toString(16);
+  if (slug) {
+    const v = Number(version) || 1;
+    return `${slug}-v${v}-${seedHex}.project.json`;
+  }
+  return `kinetic-curator-${seedHex}.project.json`;
+}
+
+/** #651 — filename for an export: bumps the per-title version counter. */
+export function nextExportFilename(doc, store = globalThis.localStorage) {
+  const slug = titleSlug(doc?.title);
+  if (!slug) return exportFilename(doc);
+  return exportFilename(doc, nextTitleVersion(slug, store));
 }
 
 export function missingPaletteMessage(doc, userPalettes) {

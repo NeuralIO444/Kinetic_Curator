@@ -576,6 +576,8 @@ export const createGlobalSlice = (set) => ({
       next.stageMode = canvas.stageMode;
     }
     next.midiMap = sanitizeMidiMap(doc.midiMap); // #617 — a doc without mappings maps nothing
+    // #651 — reimported titles persist; a doc without a title clears it.
+    next.projectTitle = typeof doc.title === 'string' ? doc.title.slice(0, 80) : '';
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
       // #103 Track B — bound on the apply path too; the live loop resolves
       // every layer per frame.
