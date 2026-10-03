@@ -31,7 +31,7 @@ export const COMPOSITION_PRESETS = [
       lifeDrift: 0.06, displacement: 6, behave: 'cruise',
     },
   },
-  // --- Rendah style pack: six one-click voices translating the magazine's
+  // --- Rendah style pack: six one-click looks translating the magazine's
   // world and its featured artists. Data-only — every mode and param
   // referenced already exists. Presets are layout-only per #555: palettes
   // are paired by name in each desc (bio-preset convention), never carried.
@@ -78,7 +78,7 @@ export const COMPOSITION_PRESETS = [
   },
   {
     id: 'rendah-cover', name: 'RENDAH COVER', group: 'rendah',
-    desc: 'Cover star — bold graphic forms on dark neutrals, one red hit. The magazine identity as a voice. Pair with RENDAH.',
+    desc: 'Cover star — bold graphic forms on dark neutrals, one red hit. The magazine identity as a look. Pair with RENDAH.',
     categories: ['geometric', 'linework'], paletteShift: 'split',
     params: {
       mode: 'grid', count: 240, scale: [0.4, 1.2], rotate: [-90, 90], alpha: [40, 95],
@@ -236,7 +236,7 @@ export const COMPOSITION_PRESETS = [
     },
   },
   // --- #287 bio-drives: Oxman behavior through the creature systems.
-  // Each preset is a voice for one drive. Palettes are paired by name in the
+  // Each look is a costume for one drive. Palettes are paired by name in the
   // desc — presets don't carry palettes (paletteId is separate state).
   {
     id: 'bio-hunger', name: 'HUNGER', group: 'bio',
@@ -342,14 +342,14 @@ export const COMPOSITION_PRESETS = [
       accumulation: true, accumulationFade: 12,
     },
   },
-  // --- #284 Smoke Study voice: the flow-field voice. A voice, not an engine —
+  // --- #284 Smoke Study look: the flow-field look. A look, not an engine —
   // every knob below already existed; the only new UI is the FLOW slider.
   // Pairs with the SMOKE catalog palette (applied on click via paletteId).
   {
     id: 'smoke-study', name: 'SMOKE STUDY', group: 'showcase',
     desc: 'Flow-field smoke — 400 hairline particles on a slow noise field, curl-advected ACCUM trails, monochrome. Built for Loop Capture.',
     categories: ['dots'], paletteShift: 'band',
-    // Palette + asset pool pair as one voice: monochrome SMOKE palette and
+    // Palette + asset pool pair as one look: monochrome SMOKE palette and
     // tiny dots only, so the preset is one click, not a setup chore.
     paletteId: 'smoke',
     assetIds: ['dot_single_01', 'dot_speckle_01'],
