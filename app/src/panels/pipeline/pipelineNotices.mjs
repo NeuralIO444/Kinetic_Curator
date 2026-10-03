@@ -108,6 +108,36 @@ export function dirtyMessage(exported, live) {
   return exported === live ? null : 'Export is behind the live piece';
 }
 
+/**
+ * #648 — explicit export-state pill: 'none' before the first export,
+ * 'exported' while the file matches the live piece, 'stale' once the live
+ * piece diverges. Same tracking as dirtyMessage, presentation-grade.
+ */
+export function exportPillState(exported, live) {
+  if (!exported) return 'none';
+  return exported === live ? 'exported' : 'stale';
+}
+
+/**
+ * #648 — fingerprint for export-state comparison. The thumbnail is captured
+ * from the live canvas at export time, so it must not dirty the comparison.
+ * Accepts a payload object or its JSON string.
+ */
+export function payloadFingerprint(payload) {
+  if (payload == null) return null;
+  let obj = payload;
+  if (typeof obj === 'string') {
+    try {
+      obj = JSON.parse(obj);
+    } catch {
+      return null;
+    }
+  }
+  if (obj == null || typeof obj !== 'object') return null;
+  const { thumbnail, ...rest } = obj;
+  return JSON.stringify(rest);
+}
+
 export function shouldExportOnKey(ev) {
   // E is Evolve. Export is X, and only when you are not typing.
   if (!ev || ev.key !== 'x' || ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey || ev.repeat) return false;

@@ -4,7 +4,7 @@ import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
 import {
   importConfirmMessage, loadedMessage, exportSavedMessage, nextExportFilename,
-  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
+  missingPaletteMessage, rememberRecent, readRecent, exportPillState, payloadFingerprint,
 } from './pipelineNotices.mjs';
 import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
@@ -38,7 +38,7 @@ export function DataExportRow({
   const [loadedName, setLoadedName] = useState(null);
   const [pendingImport, setPendingImport] = useState(null); // #647 — { fileName, doc, sanitized }
   const exportedPayload = useRef(null);
-  const [behind, setBehind] = useState(false);
+  const [exportPill, setExportPill] = useState('none'); // #648 — none | exported | stale
   const tasteStatus = useStore((s) => s.tasteStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const clearTaste = useStore((s) => s.clearTaste);
@@ -60,14 +60,14 @@ export function DataExportRow({
     }
     const filename = nextExportFilename(payload);
     downloadProject(payload, filename);
-    exportedPayload.current = JSON.stringify(payload);
+    exportedPayload.current = payloadFingerprint(payload);
     onMessage(exportSavedMessage(filename));
     setRecent(rememberRecent(filename));
-    setBehind(false);
+    setExportPill('exported');
   };
 
   useEffect(() => {
-    setBehind(Boolean(dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields)))));
+    setExportPill(exportPillState(exportedPayload.current, payloadFingerprint(buildProjectPayload(projectFields))));
   }, [projectFields]);
 
 
@@ -109,7 +109,7 @@ export function DataExportRow({
     onMessage(miss ? `${loaded}. ${miss}` : loaded);
     setLoadedName(fileName);
     setRecent(rememberRecent(fileName));
-    exportedPayload.current = JSON.stringify(buildProjectPayload(projectFields));
+    exportedPayload.current = payloadFingerprint(buildProjectPayload(projectFields));
   };
 
   const importProject = async (e) => {
@@ -232,8 +232,11 @@ export function DataExportRow({
       </div>
       <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
       {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}{readThumbnail(projectFields) ? '' : ''}</div>}
-      {behind && (
-        <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>
+      {exportPill === 'exported' && (
+        <div className="pipeline-pill" style={{ fontSize: 10, display: 'inline-block', padding: '2px 8px', borderRadius: 10, background: '#12351f', color: '#7ee2a0', border: '1px solid #2c6b3f', margin: '2px 0' }}>EXPORTED ✓</div>
+      )}
+      {exportPill === 'stale' && (
+        <div className="pipeline-pill" style={{ fontSize: 10, display: 'inline-block', padding: '2px 8px', borderRadius: 10, background: '#3a2a10', color: '#f0b429', border: '1px solid #8a6d2f', margin: '2px 0' }}>FILE STALE</div>
       )}
       {recent.length > 0 && (
         <div className="pipeline-hint" style={{ fontSize: 10 }}>

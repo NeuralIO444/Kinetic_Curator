@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import {
   importConfirmMessage, loadedMessage, exportSavedMessage, exportFilename,
   nextExportFilename, nextTitleVersion, titleSlug,
-  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, shouldExportOnKey,
+  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, exportPillState, payloadFingerprint, shouldExportOnKey,
 } from './pipelineNotices.mjs';
 
 test('#647 import confirm dialog copy names the file and seed', () => {
@@ -71,10 +71,12 @@ test('#653 recent files cap at 5, newest first', () => {
   assert.deepEqual(readRecent(store), ['f', 'e', 'd', 'c', 'b']);
 });
 
-test('#648 dirty when live payload differs', () => {
-  assert.equal(dirtyMessage(null, 'live'), null);
-  assert.equal(dirtyMessage('same', 'same'), null);
-  assert.match(dirtyMessage('old', 'live'), /behind/);
+test('#648 export pill ignores the live thumbnail', () => {
+  const withThumb = payloadFingerprint({ seed: 1, thumbnail: 'data:image/jpeg;base64,AAA' });
+  const without = payloadFingerprint({ seed: 1 });
+  assert.equal(withThumb, without);
+  assert.equal(exportPillState(withThumb, without), 'exported');
+  assert.equal(payloadFingerprint(null), null);
 });
 
 test('#652 X exports, E stays Evolve', () => {
