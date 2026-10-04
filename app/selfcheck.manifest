@@ -142,6 +142,7 @@ node src/gl/governorEventLog.selfcheck.mjs
 node src/assets/ingest.selfcheck.mjs
 node src/assets/gradient.selfcheck.mjs
 node src/assets/overlay.selfcheck.mjs
+node src/assets/regionMattes.selfcheck.mjs
 node src/state/overlayRoundtrip.selfcheck.mjs
 node src/assets/primitives.selfcheck.mjs
 node src/assets/silhouette.selfcheck.mjs
