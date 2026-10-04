@@ -123,6 +123,24 @@ function twoSquares() {
   assert.strictEqual(res.regions.length, 0);
 }
 
+// 6b. Isolated sub-minimum specks (AA fringe pixels with no adjacent region)
+// are dropped, not reported — Matt Q1: minimum region size.
+{
+  const S = 64, px = new Uint8ClampedArray(S * S * 4);
+  for (let y = 20; y < 40; y++) for (let x = 20; x < 40; x++) {
+    const o = (y * S + x) * 4;
+    px[o] = 255; px[o + 3] = 255;
+  }
+  const specks = [[5, 5], [50, 10], [10, 55], [58, 58], [30, 2]];
+  for (const [x, y] of specks) {
+    const o = (y * S + x) * 4;
+    px[o] = 200; px[o + 1] = 30; px[o + 2] = 30; px[o + 3] = 40;
+  }
+  const { regions } = detectRegions(px, S, S);
+  assert.strictEqual(regions.length, 1, `specks must not spawn regions, got ${regions.length}`);
+  assert.strictEqual(regions[0].color, 'ff0000');
+}
+
 // 7. Hostile input: bad args → empty result, never throws.
 {
   assert.deepStrictEqual(detectRegions(null, 200, 200).regions, []);

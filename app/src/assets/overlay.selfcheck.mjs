@@ -157,4 +157,47 @@ assert.strictEqual(pooled.asset.category, 'fragments');
   assert.ok(!('gradient' in replaced.asset), 'replacing the shape must drop the old gradient, not carry it silently');
 }
 
+// ── #725: region mattes cross the same trust boundary. Regions and slot
+// assignments round-trip when well-formed; malformed input is dropped.
+{
+  const regions = [
+    { id: 'rm-ff0000-2-2', color: 'ff0000', cx: 0.25, cy: 0.25, x0: 0.1, y0: 0.1, x1: 0.4, y1: 0.4, area: 3600 },
+  ];
+  const clean = sanitizeOverlay([{
+    id: 'user:matte', svg: '<path d="M0 0"/>',
+    regions,
+    regionSlots: { A: 'rm-ff0000-2-2', B: 'bogus', C: null, D: null },
+  }]);
+  assert.deepStrictEqual(clean[0].regions, regions, 'well-formed regions must round-trip');
+  assert.deepStrictEqual(clean[0].regionSlots, { A: 'rm-ff0000-2-2', B: null, C: null, D: null },
+    'well-formed slot assignments must round-trip; bogus IDs dropped');
+
+  const hostile = sanitizeOverlay([{
+    id: 'user:matte', svg: '<path d="M0 0"/>',
+    regions: 'x',
+    regionSlots: { A: 42, __proto__: 'rm-ff0000-2-2' },
+    extra: 'drop me',
+  }]);
+  assert.ok(!('regions' in hostile[0]), 'malformed regions must not survive load');
+  assert.ok(!('regionSlots' in hostile[0]), 'malformed slots must not survive load');
+  assert.ok(!('extra' in hostile[0]), 'unknown fields must not survive load');
+
+  const bare = sanitizeOverlay([{ id: 'user:matte', svg: '<path d="M0 0"/>' }]);
+  assert.ok(!('regions' in bare[0]) && !('regionSlots' in bare[0]),
+    'an asset without mattes must not gain the keys');
+
+  // Replace: geometry is re-detected, but slot assignments carry forward so
+  // a redraw keeping the flat colors keeps its slots (IDs are stable).
+  const withSlots = sanitizeOverlay([{
+    id: 'user:matte', svg: '<path d="M0 0"/>',
+    regions,
+    regionSlots: { A: 'rm-ff0000-2-2', B: null, C: null, D: null },
+  }]);
+  const rep = replaceOverlayAsset('user:matte', '<svg viewBox="0 0 100 100"><circle r="10"/></svg>', withSlots);
+  assert.ok(rep.ok);
+  assert.ok(!('regions' in rep.asset), 'replace must drop stale geometry');
+  assert.strictEqual(rep.asset.regionSlots.A, 'rm-ff0000-2-2',
+    'replace must carry slot assignments (ID stability does the rest)');
+}
+
 console.log('overlay.selfcheck: OK');

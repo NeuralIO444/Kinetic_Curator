@@ -1,5 +1,6 @@
 import { ingestSvg, duplicateAsset, isHostile, overlayId } from './ingest.js';
 import { sanitizeGradient } from './gradient.js';
+import { normalizeRegions, normalizeRegionSlots, REGION_SLOTS } from './regionSlots.js';
 
 export const OVERLAY_CAP = 32;
 
@@ -27,6 +28,12 @@ export function sanitizeOverlay(list) {
     if (seen.has(id)) continue;
     seen.add(id);
     const gradient = sanitizeGradient(raw.gradient);
+    // #725: region mattes — detected regions and their slot assignments.
+    // Trust boundary: both are re-validated here, never passed through raw.
+    // Written only when set, so an asset without mattes is indistinguishable
+    // from one that never had them.
+    const regions = normalizeRegions(raw.regions);
+    const regionSlots = normalizeRegionSlots(raw.regionSlots);
     out.push({
       id,
       category: raw.category || 'fragments',
@@ -36,6 +43,8 @@ export function sanitizeOverlay(list) {
       source: raw.source || 'overlay',
       svg: String(raw.svg),
       ...(gradient ? { gradient } : {}),
+      ...(regions.length ? { regions } : {}),
+      ...(REGION_SLOTS.some((s) => regionSlots[s]) ? { regionSlots } : {}),
     });
   }
   return out;
@@ -102,7 +111,18 @@ export function replaceOverlayAsset(id, rawSvg, overlay) {
   const clean = sanitizeOverlay(overlay);
   const parsed = ingestSvg(rawSvg, { id: String(id).replace(/^user:/, '') });
   if (!parsed.ok) return { ok: false, error: parsed.error, overlay: clean };
-  const asset = { ...parsed.asset, id, source: 'replace' };
+  // #725: the old geometry is gone (regions re-detect from the new SVG),
+  // but slot assignments are keyed by stable region ID — carry them so a
+  // redraw that keeps the flat colors keeps its assignments. IDs that no
+  // longer exist are pruned when the new regions land (see setAssetRegions).
+  const prev = clean.find((a) => a.id === id);
+  const slots = normalizeRegionSlots(prev?.regionSlots);
+  const asset = {
+    ...parsed.asset,
+    id,
+    source: 'replace',
+    ...(REGION_SLOTS.some((s) => slots[s]) ? { regionSlots: slots } : {}),
+  };
   return {
     ok: true,
     overlay: clean.map((a) => (a.id === id ? asset : a)),

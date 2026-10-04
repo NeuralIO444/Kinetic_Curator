@@ -52,6 +52,16 @@ export function AssetPoolPanel() {
     if (saved) emit(Events.ASSETS_CAT_FILTER, 'user');
   };
 
+  // #725 region mattes — dynamic import like the studio (keeps the picker
+  // out of the initial bundle). The picker looks the asset up live by id.
+  const [pickerId, setPickerId] = useState(null);
+  const [Picker, setPicker] = useState(null);
+  const openPicker = async (id) => {
+    const mod = await import('./RegionPicker.jsx');
+    setPicker(() => mod.RegionPicker);
+    setPickerId(id);
+  };
+
   const filtered = useMemo(() => {
     let list = assets;
     if (catFilter === 'user') list = list.filter(a => String(a.id).startsWith('user:'));
@@ -152,6 +162,8 @@ export function AssetPoolPanel() {
                   <>
                     <button type="button" title="Edit in motif kit" onClick={(e) => { e.stopPropagation(); openStudio({ id: a.id, svg: a.svg }); }}
                       style={{ position: 'absolute', bottom: 22, left: 28, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>EDIT</button>
+                    <button type="button" title="Region mattes — pick regions for slots A/B/C/D" onClick={(e) => { e.stopPropagation(); openPicker(a.id); }}
+                      style={{ position: 'absolute', bottom: 22, left: 58, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>REG</button>
                     <button type="button" title="Rename overlay id" onClick={(e) => {
                       e.stopPropagation();
                       const name = window.prompt('Overlay id (no user: prefix)', a.id.replace(/^user:/, ''));
@@ -183,6 +195,9 @@ export function AssetPoolPanel() {
           seedId={studioSeed?.id || ''}
           onClose={closeStudio}
         />
+      )}
+      {Picker && pickerId && (
+        <Picker assetId={pickerId} onClose={() => { setPicker(null); setPickerId(null); }} />
       )}
     </div>
   );

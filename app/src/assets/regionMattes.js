@@ -21,9 +21,11 @@ const QUANTUM = 48;
 const POS_GRID = 8;
 /** area/perimeter below this ⇒ edge sliver, absorbed into its neighbor. */
 const SLIVER_RATIO = 2.5;
+/** Default minimum region area: scales with raster size (≈4×4 px at 200²). */
+const minAreaFor = (w, h) => Math.max(8, Math.round((w * h) / 2500));
 
 const isBadInput = (pixels, w, h) =>
-  !(pixels instanceof Uint8ClampedArray) ||
+  (!(pixels instanceof Uint8ClampedArray) && !(pixels instanceof Uint8Array)) ||
   !Number.isInteger(w) || !Number.isInteger(h) || w <= 0 || h <= 0 ||
   pixels.length < w * h * 4;
 
@@ -156,11 +158,24 @@ export function detectRegions(pixels, w, h, opts = {}) {
     if (!changed) break;
   }
 
-  // 5. Stable IDs: rm-<color>-<gx>-<gy> on an 8x8 nearest grid; deterministic
+  // 5. Drop sub-minimum specks that absorption couldn't merge: isolated AA
+  //    pixels (alpha ≥ cutoff, surrounded by sub-cutoff alpha) have no
+  //    adjacent region, so there is nothing to absorb them into. Matt Q1:
+  //    minimum region size is explicit — these are not artwork.
+  const minArea = opts.minArea ?? minAreaFor(w, h);
+  for (let i = 0; i < regions.length; i++) {
+    const ri = find(i);
+    if (ri !== i || !regions[ri].alive) continue;
+    // Leave the parent chain intact: the idMap pass maps dead roots to -1.
+    if (regions[ri].area < minArea) regions[ri].alive = false;
+  }
+
+  // 6. Stable IDs: rm-<color>-<gx>-<gy> on an 8x8 nearest grid; deterministic
   //    disambiguator when color+cell collide.
   const alive = regions.filter((r) => r.alive);
   alive.sort((a, b) => (a.cy - b.cy) || (a.cx - b.cx));
   const used = new Set();
+  const finalIndex = new Map();
   for (const r of alive) {
     const gx = Math.max(0, Math.min(POS_GRID - 1, Math.round(r.cx * POS_GRID)));
     const gy = Math.max(0, Math.min(POS_GRID - 1, Math.round(r.cy * POS_GRID)));
@@ -169,6 +184,22 @@ export function detectRegions(pixels, w, h, opts = {}) {
     while (used.has(id)) id = `rm-${r.color}-${gx}-${gy}-${k++}`;
     used.add(id);
     r.id = id;
+    finalIndex.set(regions.indexOf(r), alive.indexOf(r));
+  }
+
+  // Optional pixel→region map for hit-testing (picking UI). Values index
+  // into the returned regions array; -1 = no region.
+  let idMap = null;
+  if (opts.wantMap) {
+    idMap = new Int32Array(n).fill(-1);
+    const rootToFinal = new Map();
+    for (let i = 0; i < regions.length; i++) {
+      if (regions[i].alive) rootToFinal.set(find(i), finalIndex.get(i));
+    }
+    for (let i = 0; i < n; i++) {
+      const r = regionOf[i];
+      if (r !== -1) idMap[i] = rootToFinal.get(find(r)) ?? -1;
+    }
   }
 
   return {
@@ -178,5 +209,6 @@ export function detectRegions(pixels, w, h, opts = {}) {
     })),
     width: w,
     height: h,
+    ...(idMap ? { idMap } : {}),
   };
 }
