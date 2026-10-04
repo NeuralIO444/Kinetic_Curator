@@ -13,7 +13,7 @@ import { ASSETS } from '../data/assets/index.js';
 
 /** First-render SVG SHA-256 of the all-era fixture — bump only on intentional render changes. */
 export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH =
-  '793a2bb9e3874938cd7954a8f5c39c61112e207bce1553ca5d95a646b57276bc' // re-pinned: #699 revert removed 3 demo assets from the catalog;
+  'c1c626a19978b7d44d6979ffeabdc0700616300591c099bd6d55f051a624f166' // re-pinned: #705 added mic_needle to the catalog;
 
 const raw = JSON.parse(readFileSync(new URL('./fixtures/all-era-project.json', import.meta.url), 'utf8'));
 
