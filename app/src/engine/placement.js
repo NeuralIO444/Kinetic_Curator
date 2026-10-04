@@ -106,6 +106,8 @@ export function computeGeometrySoA({
   // Slice 2 — the crooked: perpendicular trail wobble in px (0 = the trail
   // exactly) and its frequency per stamp.
   wobbleAmp = 0, wobbleFreq = 0.5,
+  // #721 — quadtree scatter: audio/field blend weights and max depth.
+  quadAudio = 0.5, quadField = 0.5, quadDepth = 5,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -142,6 +144,8 @@ export function computeGeometrySoA({
     brushSize, brushSpacing, fieldScale, trailCount,
     // Slice 2 — the crooked; ignored by every other mode.
     wobbleAmp, wobbleFreq,
+    // #721 — quadtree scatter scalars; ignored by every other mode.
+    quadAudio, quadField, quadDepth,
   };
 
   const tDenom = count > 1 ? count - 1 : 0;
@@ -265,6 +269,9 @@ export function geometrySignature(p) {
     p.brushSize, p.brushSpacing, p.fieldScale, p.trailCount,
     // Slice 2 — the crooked knobs.
     p.wobbleAmp, p.wobbleFreq,
+    // #721 — quadtree knobs; a missing entry would silently serve a stale
+    // tree after a knob drag (same staged-eval deal as the brush).
+    p.quadAudio, p.quadField, p.quadDepth,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }

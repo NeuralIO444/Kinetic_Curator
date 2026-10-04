@@ -1,3 +1,10 @@
+import {
+  makeQuadtreeInterestingness,
+  quantizeBands,
+  readSmoothedBands,
+  QUAD_BAND_ORDER,
+} from './quadtreeSignal.js';
+
 // #721 — quadtree sampler core: adaptive subdivision scatter.
 //
 // Pure; no React, no audio imports. The tree answers "where is point i"
@@ -114,4 +121,123 @@ function subdivide(interestingness, maxDepth, leafBudget, threshold) {
     }
   }
   return leaves;
+}
+
+/**
+ * Slice 3 — the scatter layer.
+ *
+ * quadtreeTree builds (and caches) the leaf array for one signal state.
+ * fieldBucket is the slow-tick bucket; fieldZ = bucket * 0.25 noise units.
+ * The signal key carries the quantized bands, the bucket, and the depth so
+ * any of them changing rebuilds the tree (and nothing else does).
+ */
+export function quadtreeTree({ seed, seedOffsets = null, quadAudio = 0.5, quadField = 0.5, quadDepth = 5, bands = null, fieldBucket = 0 }) {
+  const interestingness = makeQuadtreeInterestingness({
+    seed, seedOffsets, quadAudio, quadField, fieldZ: fieldBucket * 0.25, bands,
+  });
+  return buildQuadtree({
+    interestingness,
+    maxDepth: Math.min(6, Math.max(1, Math.round(quadDepth) || 5)),
+    seed,
+    seedOffsets,
+    signalKey: `${quantizeBands(bands)}:z${fieldBucket | 0}:d${Math.round(quadDepth) || 5}`,
+  });
+}
+
+/**
+ * Density-by-depth dealing: each leaf's share of `count` is proportional to
+ * 2^depth × area(leaf) — deeper leaves are denser per unit area. Largest-
+ * remainder distribution, so the total is EXACTLY `count`: the instance
+ * budget is a distribution, never a multiplier.
+ */
+export function dealLeafCounts(leaves, count) {
+  const n = Math.max(0, count | 0);
+  const weights = new Array(leaves.length);
+  let total = 0;
+  for (let j = 0; j < leaves.length; j++) {
+    const L = leaves[j];
+    const w = Math.pow(2, L.depth) * L.w * L.h;
+    weights[j] = w;
+    total += w;
+  }
+  const dealt = new Array(leaves.length).fill(0);
+  if (total <= 0 || n === 0) return dealt;
+  const frac = new Array(leaves.length);
+  let assigned = 0;
+  for (let j = 0; j < leaves.length; j++) {
+    const q = (n * weights[j]) / total;
+    const b = Math.floor(q);
+    dealt[j] = b;
+    frac[j] = q - b;
+    assigned += b;
+  }
+  // Largest remainder: hand the leftover seats to the biggest fractions.
+  // `assigned` is within leaves.length of n, so the order array covers it.
+  const order = frac.map((f, j) => j).sort((a, b) => frac[b] - frac[a] || a - b);
+  for (let k = 0; k < n - assigned; k++) dealt[order[k]]++;
+  return dealt;
+}
+
+/** Prefix sums of a dealing: prefix[j] = marks in leaves 0..j. */
+export function dealPrefix(dealt) {
+  const prefix = new Array(dealt.length);
+  let acc = 0;
+  for (let j = 0; j < dealt.length; j++) {
+    acc += dealt[j];
+    prefix[j] = acc;
+  }
+  return prefix;
+}
+
+/** Item i (0-based, i < count) → leaf index via binary search on the prefix. */
+export function leafIndexFor(prefix, i) {
+  let lo = 0;
+  let hi = prefix.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (prefix[mid] > i) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
+/**
+ * The sampler body, testable with an explicit clock. Reads the throttled
+ * smoothed bands (the single readMeterBandLevels touch point), picks the
+ * slow-tick bucket (4 Hz while audio is live, 0.25 Hz idle — the field
+ * still drifts, so the tree relaxes rather than snapping), deals item i
+ * to its leaf, and jitters inside the leaf bounds (the JITTER knob contract).
+ */
+export function quadtreePlacement(ctx, nowMs) {
+  const { i, count, w, h, rng, jitter, seed, seedOffsets } = ctx;
+  const quadAudio = Number.isFinite(ctx.quadAudio) ? ctx.quadAudio : 0.5;
+  const quadField = Number.isFinite(ctx.quadField) ? ctx.quadField : 0.5;
+  const quadDepth = Math.min(6, Math.max(1, Math.round(Number.isFinite(ctx.quadDepth) ? ctx.quadDepth : 5)));
+
+  const bands = readSmoothedBands(nowMs);
+  const audioLive = !!bands && QUAD_BAND_ORDER.some((k) => (bands[k] || 0) >= 0.02);
+  const fieldBucket = Math.floor(nowMs / (audioLive ? 250 : 4000));
+
+  const leaves = quadtreeTree({ seed, seedOffsets, quadAudio, quadField, quadDepth, bands, fieldBucket });
+
+  // Dealing is per (tree, count); memoize on the ctx, which is fresh per
+  // computeGeometrySoA call (same discipline as the brush's ctx._brush).
+  // The cached tree array is identical on a cache hit, so reference
+  // equality is a sound key.
+  let deal = ctx._quad;
+  if (!deal || deal.leaves !== leaves || deal.count !== count) {
+    deal = ctx._quad = { leaves, count, prefix: dealPrefix(dealLeafCounts(leaves, count)) };
+  }
+  const L = leaves[leafIndexFor(deal.prefix, Math.min(Math.max(0, i | 0), Math.max(0, (count | 0) - 1)))];
+  return {
+    x: (L.x + rng() * L.w) * w + (rng() - 0.5) * jitter,
+    y: (L.y + rng() * L.h) * h + (rng() - 0.5) * jitter,
+    t: quadDepth > 0 ? L.depth / quadDepth : 0,
+  };
+}
+
+/** The registered sampler: placement-time only, never per-frame. */
+export function quadtree(ctx) {
+  const nowMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  return quadtreePlacement(ctx, nowMs);
 }

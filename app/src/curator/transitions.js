@@ -29,7 +29,9 @@ const FAMILIES = {
     ordered: ['grid', 'rails', 'abacus', 'stratified', 'truchet', 'lsystem'],
     radial: ['fibonacci', 'phyllotaxis', 'radial', 'orbit'],
     live: ['swarm', 'hype', 'murmuration'],
-    loose: ['random', 'noise', 'layers', 'flow', 'ca', 'voronoi'],
+    loose: ['random', 'noise', 'layers', 'flow', 'ca', 'voronoi', 'quadtree'],
+    // #721 — quadtree is organic subdivision (noise ridges, audio peaks);
+    // its kin are the loose organic arrangements, not the geometric grids.
     // #720 — growth organisms. Without a family, a new mode's row can never
     // reach another un-familied mode (far excludes null-family values), so
     // every mode must belong to one — the "every value reachable" invariant.

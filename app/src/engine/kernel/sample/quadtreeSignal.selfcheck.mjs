@@ -14,6 +14,8 @@ import {
   createBandSmoother,
   makeQuadtreeInterestingness,
   quantizeBands,
+  audioNorm,
+  audioTermCell,
 } from './quadtreeSignal.js';
 
 const SEED = 99;
@@ -144,6 +146,20 @@ const BRIGHT = { sub: 0.02, bass: 0.05, mud: 0.1, edge: 0.4, pres: 0.7, air: 0.9
   assert.strictEqual(a, b, 'sub-quantum wobble must not change the key');
   const c = quantizeBands({ ...KICK, sub: 0.1 });
   assert.ok(c !== a, 'real changes must change the key');
+}
+
+// ── audioNorm: contrast normalization, flat → null (field-only) ────────────
+{
+  assert.strictEqual(audioNorm(null), null, 'null bands → null norm');
+  assert.strictEqual(audioNorm(bandsOf(0)), null, 'silence → null norm');
+  assert.strictEqual(audioNorm(bandsOf(0.5)), null, 'flat spectrum → null norm');
+  const norm = audioNorm(KICK);
+  assert.ok(norm && norm.range > 0.05, 'shaped spectrum → norm');
+  // Normalized: cool bands near 0, hot bands near 1.
+  const cool = audioTermCell(KICK, 0.45, 0.55, norm); // mids (cool)
+  const hot = audioTermCell(KICK, 0.9, 1.0, norm);   // sub (hot)
+  assert.ok(hot > cool + 0.3, `contrast-normalized (cool ${cool.toFixed(2)}, hot ${hot.toFixed(2)})`);
+  assert.strictEqual(audioTermCell(KICK, 0, 1, null), 0, 'null norm → 0');
 }
 
 console.log('quadtreeSignal.selfcheck: OK');

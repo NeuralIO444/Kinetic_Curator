@@ -148,6 +148,10 @@ export function buildPlacements({
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
+    // #721 — quadtree scatter scalars; ignored by every other mode.
+    quadAudio: layoutParams.quadAudio,
+    quadField: layoutParams.quadField,
+    quadDepth: layoutParams.quadDepth,
   };
 
   const strategy = resolveStrategy(layoutParams, preset);
