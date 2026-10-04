@@ -126,6 +126,32 @@
 .randomize-btn:hover { background: var(--ink); color: var(--bg); }
 .randomize-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: lowercase; }
 
+/* #942 — KINETIC button: a breathing x-axis pill. Compact at rest (a
+   comfortable touch target that keeps the menu row clean), swelling to the
+   full label on hover/press/focus. Heat-driven swelling lands with #945. */
+.kinetic-btn {
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 6px; min-width: 48px; min-height: 22px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  white-space: nowrap; overflow: hidden; cursor: pointer;
+  transition: max-width 180ms ease, background-color 100ms, color 100ms, border-color 100ms;
+  max-width: 64px;
+}
+.kinetic-btn:hover, .kinetic-btn:active, .kinetic-btn:focus-visible {
+  background: var(--ink); color: var(--bg); border-color: var(--ink);
+  max-width: 150px;
+}
+.kinetic-glyph { font-size: 10px; line-height: 1; flex-shrink: 0; }
+.kinetic-word { display: inline-flex; overflow: hidden; }
+.kinetic-rest {
+  display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap;
+  transition: max-width 180ms ease;
+}
+.kinetic-btn:hover .kinetic-rest,
+.kinetic-btn:active .kinetic-rest,
+.kinetic-btn:focus-visible .kinetic-rest { max-width: 60px; }
+
 .curator-left-group { display: flex; align-items: center; gap: 6px; }
 .curator-voice-wrap { position: relative; }
 .curator-voice-btn {

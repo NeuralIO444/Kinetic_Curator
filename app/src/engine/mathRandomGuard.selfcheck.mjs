@@ -27,7 +27,7 @@ const ALLOWED = {
   'engine/harmony.js': { count: 1, why: 'buildHarmony default rng param' },
   'state/paramUtils.js': { count: 4, why: 'randomizeKey default rng param + morph dice (3); result lands in layoutParams' },
   'state/slices/davisSlice.js': { count: 1, why: 'EVOLVE palette dice; result lands in paletteId' },
-  'state/slices/layoutSlice.js': { count: 2, why: 'bumpSeed / mutateSeedOffset dice; result lands in seed / seedOffsets' },
+  'state/slices/layoutSlice.js': { count: 4, why: 'bumpSeed / mutateSeedOffset dice + #942 kineticRoll die + seed roll; every result lands in seed / paletteId / layoutParams / enabledAssets / layers' },
   'state/slices/layersSlice.js': { count: 2, why: 'layer id suffix (identity, not sim) + new-layer seed dice; seed lands in the snapshot' },
   'engine/ca-engine.js': { count: 1, why: 'createGrid dice; the grid is serialized (caGrid)' },
 };
