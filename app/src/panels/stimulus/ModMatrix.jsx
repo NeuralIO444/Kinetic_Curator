@@ -14,7 +14,10 @@ import { editableRoutes, nextRoute, patchRoute, removeRoute, routeDepthRange, de
 const fmt = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(3));
 const INPUT_LABEL = (id) => (id.startsWith('band.') ? `BAND ${id.slice(5).toUpperCase()}` : id.toUpperCase());
 // glow is the DOM frame glow (box-shadow), not a GL glow: the picker says so.
-const TARGET_LABEL = { 'render.scale': 'scale', 'render.alpha': 'alpha', 'render.breath': 'breath', 'render.glow': 'frame glow' };
+// #790 PR5: only targets the live loop consumes get picker options — the rest
+// (hue, squash, kineme, sun) land one PR each and stay out till then.
+const TARGET_LABEL = { 'render.scale': 'scale', 'render.alpha': 'alpha', 'render.breath': 'breath', 'render.glow': 'frame glow', 'render.accum': 'accum trails' };
+const PICKABLE_TARGETS = Object.keys(ROUTE_TARGETS).filter((id) => TARGET_LABEL[id]);
 
 function Row({ row, route, index, table, onEdit }) {
   const range = routeDepthRange(route.target);
@@ -36,7 +39,7 @@ function Row({ row, route, index, table, onEdit }) {
         <i aria-hidden="true">▸</i>
         <select aria-label={`Route ${index + 1} target`} className="blend-mode-select" value={route.target}
           onChange={(e) => onEdit((t) => patchRoute(t, index, { target: e.target.value, depth: defaultDepthFor(route.input, e.target.value) }), false)}>
-          {Object.keys(ROUTE_TARGETS).map((id) => <option key={id} value={id} disabled={taken(route.input, id)}>{TARGET_LABEL[id]}</option>)}
+          {PICKABLE_TARGETS.map((id) => <option key={id} value={id} disabled={taken(route.input, id)}>{TARGET_LABEL[id]}</option>)}
         </select>
       </span>
       <span className="stim-route-depth" title={`effective gain ×${fmt(row.depth)} after the master DEPTH / SCALE / ALPHA knobs · double-click to reset`}>

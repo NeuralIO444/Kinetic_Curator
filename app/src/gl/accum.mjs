@@ -228,7 +228,11 @@ export function applyAudioEnvelope(p, a = {}, opts = {}) {
   const r = rms;
   const x = flux;
   const b = beatPulse;
-  if (r <= 0 && x <= 0 && b <= 0) return { ...p };
+  // #790 PR5 (render.accum): the assignable route's output, in hundredths of
+  // keep (0..40 → +0..0.40 trail persistence). Clamped finite here too — the
+  // recipe guard trips the watchdog on non-finite, so never trust the caller.
+  const accumAudio = Number.isFinite(opts.accumAudio) ? Math.min(40, Math.max(0, opts.accumAudio)) : 0;
+  if (r <= 0 && x <= 0 && b <= 0 && accumAudio <= 0) return { ...p };
   // #306: swell scales the audio contribution to the glow only. clamp01
   // coerces garbage (NaN, non-numeric) to 0, so a bad caller mutes the glow
   // gesture rather than exploding it.
@@ -236,7 +240,7 @@ export function applyAudioEnvelope(p, a = {}, opts = {}) {
   const stretch = 1 + 2 * r + x + b;
   return {
     ...p,
-    keep: Math.min(0.99, p.keep + 0.08 * r + 0.04 * x),
+    keep: Math.min(0.99, p.keep + 0.08 * r + 0.04 * x + accumAudio / 100),
     // #273: optics modulation is headroom-relative — audio swells the glow
     // toward the slider's ceiling instead of adding past it, so loud audio
     // can never peg GLOW at 1. The gesture keeps its full strength at
