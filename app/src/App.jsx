@@ -48,7 +48,10 @@ function AppInner() {
 
   // LOIS honest feed (#948/#956): records user-behavior signals only —
   // no UI, no store writes, nothing visible. Surfaces come later.
-  useEffect(() => loisActivity.start({ store: useStore }), []);
+  useEffect(() => {
+    loisActivity.start({ store: useStore });
+    return () => loisActivity.stop();
+  }, []);
 
   const { state } = useApp(s => ({
     evolveMode: s.evolveMode,
