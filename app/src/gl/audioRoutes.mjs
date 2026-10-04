@@ -27,9 +27,11 @@ export const ROUTE_INPUTS = Object.freeze([...COARSE_INPUTS, ...BAND_INPUTS]);
 
 /**
  * Targets, dotted so MIDI learn (#617) can address the same ids. Only the four
- * that are safe per-frame today; ACCUM / hue / squash / kinemeRate / sun follow,
- * one PR each. `clamp` bounds the OUTPUT (ACCUM-class targets must stay finite).
- * glow is the DOM frame glow (box-shadow), not a GL glow.
+ * that are safe per-frame today, plus color.hue (#790); squash / kineme /
+ * accum / sun follow, one PR each. `clamp` bounds the OUTPUT (ACCUM-class
+ * targets must stay finite). glow is the DOM frame glow (box-shadow), not a
+ * GL glow. (render.hue is the #803 engine id; color.hue is the shipped #790
+ * target id — both feed the same hue output.)
  */
 export const ROUTE_TARGETS = Object.freeze({
   'render.scale': Object.freeze({ clamp: [0.5, 3] }),
@@ -37,6 +39,7 @@ export const ROUTE_TARGETS = Object.freeze({
   'render.breath': Object.freeze({ clamp: [0, 0.2] }),
   'render.glow': Object.freeze({ clamp: [0, 1] }),
   'render.hue': Object.freeze({ clamp: [-180, 180] }),
+  'color.hue': Object.freeze({ clamp: [-180, 180] }), // #790: shipped hue target id
   'render.squash': Object.freeze({ clamp: [0, 1] }),
   'render.kineme': Object.freeze({ clamp: [0, 4] }),
   'render.accum': Object.freeze({ clamp: [0, 40] }),
@@ -109,7 +112,8 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
       case 'render.alpha': alpha += v; break;
       case 'render.breath': breath += v; break;
       case 'render.glow': glow += v; break;
-      case 'render.hue': hue += v; break;
+      case 'render.hue':
+      case 'color.hue': hue += v; break;
       case 'render.squash': squash += v; break;
       case 'render.kineme': kinemeRate += v; break;
       case 'render.accum': accum += v; break;
@@ -124,7 +128,7 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
     glow: clampTo(Math.min(1, glow) * depth, ROUTE_TARGETS['render.glow'].clamp),
   };
   const used = new Set(c.target);
-  if (used.has('render.hue')) out.hue = clampTo(hue * depth, ROUTE_TARGETS['render.hue'].clamp);
+  if (used.has('render.hue') || used.has('color.hue')) out.hue = clampTo(hue * depth, ROUTE_TARGETS['color.hue'].clamp);
   if (used.has('render.squash')) out.squash = clampTo(squash * depth, ROUTE_TARGETS['render.squash'].clamp);
   if (used.has('render.kineme')) out.kineme = clampTo(kinemeRate * depth, ROUTE_TARGETS['render.kineme'].clamp);
   if (used.has('render.accum')) out.accum = clampTo(accum * depth, ROUTE_TARGETS['render.accum'].clamp);
@@ -171,7 +175,7 @@ export function audioMatrixRows(a, { depth, scaleMod, alphaMod }, enabled = true
       const mod = r.target === 'render.alpha' ? alphaMod : (r.input === 'beat' && r.target === 'render.scale' ? scaleMod : 1);
       const gain = r.depth * mod * depth;
       const label = r.input.startsWith('band.') ? `BAND ${r.input.slice(5).toUpperCase()}` : r.input.toUpperCase();
-      return { input: label, target: r.target.slice('render.'.length), depth: gain, live: READ[r.input](a, bands) * on * gain, inputId: r.input, targetId: r.target };
+      return { input: label, target: r.target.split('.').pop(), depth: gain, live: READ[r.input](a, bands) * on * gain, inputId: r.input, targetId: r.target };
     });
   }
   const beat = (a?.beatPulse || 0) * on;
