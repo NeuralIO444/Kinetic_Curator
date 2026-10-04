@@ -74,3 +74,33 @@ jobs:
       - run: npm ci --no-fund --no-audit
       - run: npx playwright install chromium --with-deps
       - run: npm run selfcheck
+
+  # Added 2026-10-03 (cleanup lane C): the Rust shell had no compile gate at
+  # all — #827 (2026-10-01) deleted write_batch_frame's signature, main.rs
+  # stopped parsing, and every JS check stayed green while the crate rotted.
+  # macOS only: Tauri v1 + metal + libc's mach_* APIs don't build on the
+  # ubuntu runners above. Suggested follow-up (same as selfcheck-browser's):
+  # mark this check required in branch protection.
+  cargo-check:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      # tauri::generate_context! embeds ../app/dist at compile time
+      # (tauri.conf.json distDir), so the crate won't check without this.
+      - run: npm ci --no-fund --no-audit
+        working-directory: app
+      - run: npm run build
+        working-directory: app
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: cargo check --locked --all-targets

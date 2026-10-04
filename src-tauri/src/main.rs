@@ -16,6 +16,12 @@ fn syphon_status() -> serde_json::Value {
         "reason": "Syphon server not linked in this build — STAGE toggle stays off"
     })
 }
+
+// #827 replaced this signature with syphon_status's and left the body orphaned,
+// so the crate has not parsed since 2026-10-01 — restored verbatim from
+// 1a04ab4^ (it matches the invoke in PipelinePanel.jsx and the unit test below).
+#[tauri::command]
+fn write_batch_frame(data: Vec<u8>, path: String) -> Result<usize, String> {
     let target_path = Path::new(&path);
     if let Some(parent) = target_path.parent() {
         if !parent.as_os_str().is_empty() {
