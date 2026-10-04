@@ -38,6 +38,20 @@ export function getKineme(id) {
 }
 
 /**
+ * #705 — micro-HUD ornaments that move out of the box. Per-project; the user
+ * can clear any entry (setAssetKineme(id, null)) to return it to the static
+ * path. Motion through KINEME, never the asset system (#699 stays reverted).
+ */
+export const DEFAULT_ASSET_KINEME = Object.freeze({
+  mic_dotgrid_5: 'pulse',
+  mic_dotgrid_3: 'pulse',
+  mic_plus: 'pulse',
+  mic_crosshair: 'blink',
+  mic_target: 'blink',
+  mic_arrow: 'rock',
+});
+
+/**
  * Sanitize an asset → kineme map (project document / import trust boundary).
  * Unknown kineme ids and non-string keys are dropped. Returns null when
  * nothing valid remains, so callers can omit the field entirely.

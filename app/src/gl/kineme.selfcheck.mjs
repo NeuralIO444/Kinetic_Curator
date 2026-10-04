@@ -10,6 +10,7 @@
 import assert from 'node:assert';
 import {
   KINEMES, KINEME_KINDS, getKineme, sanitizeAssetKineme, kinemePhase, createKinemeClock,
+  DEFAULT_ASSET_KINEME,
 } from '../data/kinemes.js';
 import { PARAM_SPEC, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
@@ -58,19 +59,23 @@ assert.strictEqual(DEFAULT_LAYOUT_PARAMS.kinemeRate, 1);
   assert.deepStrictEqual(parseProject(JSON.parse(JSON.stringify(serializeProject(base)))).doc.assetKineme, {}, 'absent → still');
 }
 
-// ── store: set, clear, refuse unknown; import applies, a doc without clears ─
+// ── store: defaults out of the box; set, clear, refuse unknown; import merges ─
 {
   const S = () => useStore.getState();
+  assert.deepStrictEqual(S().assetKineme, { ...DEFAULT_ASSET_KINEME }, 'micro-HUD defaults out of the box (#705)');
   S().setAssetKineme('geo_tri_01', 'rock');
-  assert.deepStrictEqual(S().assetKineme, { geo_tri_01: 'rock' });
+  assert.deepStrictEqual(S().assetKineme, { ...DEFAULT_ASSET_KINEME, geo_tri_01: 'rock' });
   S().setAssetKineme('geo_tri_01', 'nope');
-  assert.deepStrictEqual(S().assetKineme, { geo_tri_01: 'rock' }, 'unknown kineme refused');
-  S().setAssetKineme('geo_tri_01', null);
-  assert.deepStrictEqual(S().assetKineme, {});
+  assert.deepStrictEqual(S().assetKineme, { ...DEFAULT_ASSET_KINEME, geo_tri_01: 'rock' }, 'unknown kineme refused');
+  S().setAssetKineme('mic_dotgrid_5', null);
+  assert.ok(!('mic_dotgrid_5' in S().assetKineme), 'clearing a default returns the static path');
+  assert.strictEqual(S().assetKineme.mic_plus, 'pulse', 'other defaults untouched');
   S().applyProject({ ...parseProject({ seed: 1, assetKineme: { geo_chev_01: 'blink' } }).doc });
-  assert.deepStrictEqual(S().assetKineme, { geo_chev_01: 'blink' }, 'import applies kinemes');
+  assert.deepStrictEqual(S().assetKineme, { ...DEFAULT_ASSET_KINEME, geo_chev_01: 'blink' }, 'import applies kinemes');
+  S().applyProject({ ...parseProject({ seed: 1, assetKineme: { mic_plus: 'rock' } }).doc });
+  assert.strictEqual(S().assetKineme.mic_plus, 'rock', 'doc value wins over the default');
   S().applyProject({ ...parseProject({ seed: 1 }).doc });
-  assert.deepStrictEqual(S().assetKineme, {}, 'a doc without kinemes is still');
+  assert.deepStrictEqual(S().assetKineme, { ...DEFAULT_ASSET_KINEME }, 'a doc without kinemes → factory defaults');
 }
 
 // ── contract ─────────────────────────────────────────────────────────────
@@ -133,6 +138,20 @@ async function runBrowserTests() {
     // a still mark ignores the motion clock entirely
     const stillT = buildSceneContract({ doc: { seed: 1, assetKineme: { geo_tri_02: 'spin' }, kinemeTime: 3 }, resolvedLayers: layer([item('geo_tri_01', 'solo')]) });
     assert.ok(same(rest, (await renderViaGL(stillT, { width: 400, height: 280, bg: '#000000' })).pixels), 'still mark: byte-identical');
+    // #705: the six mapped micro-HUD ornaments move on the loop; static ones don't.
+    // Phase pinned to 0 so t alone decides the pose; t at 10% vs 60% of each
+    // kineme's period catches pulse, blink, and rock mid-motion.
+    const hudItem = (assetId) => ({ assetId, x: 500, y: 350, scale: 2.5, rotation: 0, color: '#ffffff', accent: '#ff4444', alpha: 100, key: 'solo', seedOffset: 0 });
+    const hudShot = async (asset, t) => {
+      const c = buildSceneContract({ doc: { seed: 1, assetKineme: { ...DEFAULT_ASSET_KINEME }, kinemeTime: t }, resolvedLayers: layer([hudItem(asset)]) });
+      c.instances[0].kinemePhase = 0;
+      return (await renderViaGL(c, { width: 400, height: 280, bg: '#000000' })).pixels;
+    };
+    for (const a of Object.keys(DEFAULT_ASSET_KINEME)) {
+      const period = getKineme(DEFAULT_ASSET_KINEME[a]).period;
+      assert.ok(!same(await hudShot(a, period * 0.1), await hudShot(a, period * 0.6)), `#705 ${a} moves on the loop`);
+    }
+    assert.ok(same(await hudShot('mic_bracket_tl', 0), await hudShot('mic_bracket_tl', 0.8)), '#705 static ornament: bit-identical');
     console.log(`kineme GPU: OK — pulse ${small}→${big}px, blink ${on}/${off}px, bob ${dy.toFixed(2)}px`);
   } finally {
     await closeGlDriver();
