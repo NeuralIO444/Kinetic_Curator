@@ -36,6 +36,32 @@ function pickOtherPreset(presets, currentComposition) {
   return presets.find((p) => p.id === id) || presets[0];
 }
 
+/**
+ * #943 — modes whose layouts converge on a focal region (vs field modes that
+ * cover the plate). A focal-mode brief naturally yields one clear hero with
+ * a supporting cast; a field brief (flow, grid, rails…) breaks the
+ * always-centered habit by construction.
+ */
+const FOCAL_MODES = new Set(['fibonacci', 'phyllotaxis', 'radial', 'orbit']);
+
+/**
+ * #943 — the RULES pass's compositional strategy, as a documented
+ * distribution rather than a dice accident: half the passes land a
+ * focal-mode brief (one clear focal region), half land a field brief
+ * (off-center asymmetry allowed — the centering habit breaks across taps).
+ * The current composition is always excluded: a RULES pass re-works, never
+ * re-deals the same brief.
+ */
+function pickRulesPreset(currentComposition) {
+  const pool = COMPOSITION_PRESETS.filter((p) => p.id !== currentComposition);
+  const src = pool.length ? pool : COMPOSITION_PRESETS;
+  const focal = src.filter((p) => FOCAL_MODES.has(p.params.mode));
+  const field = src.filter((p) => !FOCAL_MODES.has(p.params.mode));
+  const bucket = die(2) === 0 ? focal : field;
+  const list = bucket.length ? bucket : src;
+  return list[die(list.length)];
+}
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -640,6 +666,61 @@ export const createLayoutSlice = (set) => ({
       voiceMix: null,
       activeVoiceId: null,
     };
+  }),
+
+  /**
+   * KINETIC button — RULES layer (#943). A calm tap runs a compositional
+   * RULES pass over the current piece instead of the naive full re-roll:
+   * order is imposed on what's on screen, not randomness dealt fresh.
+   *
+   * The DNA stays put — same seed, same palette, same asset pool, same FX
+   * chain and blend modes — so the result is recognizably related to what
+   * was on screen. What changes is the compositional order, under four
+   * rules (each respecting lockedParams, like applyPreset):
+   *
+   *  1. separation — `overlap: false` (small-first paint order) plus density
+   *     clamped into 35..65 for breathing room between elements;
+   *  2. focal hierarchy — the new brief is drawn from a documented
+   *     focal/field distribution (see pickRulesPreset): focal-mode briefs
+   *     converge on one clear region with a supporting cast;
+   *  3. off-center allowed — field briefs (flow, grid, rails…) are eligible
+   *     picks, so the always-centered habit breaks across taps; nothing
+   *     here re-centers;
+   *  4. edge-bleed allowed — `bleed` is rolled fresh each pass (~half the
+   *     passes run elements off-canvas).
+   *
+   * One atomic store update = one undo entry (edit kind: only layoutParams
+   * move — layers, FX and blends are untouched). The honest die
+   * (Math.random) matches kineticRoll's convention: replayability comes
+   * from the stored state + seed (#710), not from the pass itself.
+   * kineticRoll stays for #945's heat ceiling.
+   */
+  kineticRulesPass: () => set((state) => {
+    const undo = pushToUndo(state, true);
+
+    const preset = pickRulesPreset(state.layoutParams.composition);
+    const merged = { ...state.layoutParams };
+    if (!state.lockedParams.composition) merged.composition = preset.id;
+    for (const [k, v] of Object.entries(preset.params)) {
+      if (!state.lockedParams[k] && merged[k] !== v) merged[k] = v;
+    }
+
+    // Rule 1 — separation.
+    if (!state.lockedParams.overlap) merged.overlap = false;
+    if (!state.lockedParams.density && merged.density > 65) {
+      merged.density = 35 + die(31); // 35..65
+    }
+    // Rule 4 — edge-bleed allowed: rolled fresh, ~half the passes bleed.
+    if (!state.lockedParams.bleed) merged.bleed = die(2) === 0;
+
+    const next = {
+      ...undo,
+      layoutParams: merged,
+      voiceMix: null,
+      activeVoiceId: null,
+    };
+    if (merged.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28);
+    return next;
   }),
 
   // Entries are tagged with the layerId they were captured for (#92) and the
