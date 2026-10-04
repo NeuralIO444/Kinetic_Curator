@@ -400,14 +400,22 @@ void main() {
   o = vec4(acc.rgb, min(acc.a, 1.0));
 }`;
 
+// #560 comet-head: the bright head. COMET promises "a bright head and a short
+// tail" — the tail is the 0.72 keep cap, the head is this boost on the incoming
+// frame in the shared OVER_FS. Same program, parameterized (not a fork), so
+// #815's "no second fade law" holds. Hot-fade is deliberately NOT built.
+const COMET_HEAD_BOOST = 1.15;
+
 export const OVER_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;   // new frame
 uniform sampler2D u_dst;   // faded accum
+uniform float u_headBoost; // 1.0 = off (today's render, bit-identical)
 in vec2 v_cuv;
 out vec4 o;
 void main() {
   vec4 s = texture(u_src, v_cuv);
+  s.rgb *= u_headBoost;      // brighten the incoming head; the tail law is untouched
   vec4 d = texture(u_dst, v_cuv);
   o = s + d * (1.0 - s.a);   // premultiplied source-over
 }`;
@@ -538,7 +546,7 @@ export const ACCUM_PROGRAMS = {
       memoryGate: { minWidth: 2048, maxTaps: 3 } } },
   copy: { fs: COPY_FS, file: 'shaders.mjs:COPY_FS', uniforms: ['u_src'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.2, notes: 'chain plumbing: ping-pong copy, shed with the chain' } },
-  over: { fs: OVER_FS, file: 'accum.mjs:OVER_FS', uniforms: ['u_src', 'u_dst'],
+  over: { fs: OVER_FS, file: 'accum.mjs:OVER_FS', uniforms: ['u_src', 'u_dst', 'u_headBoost'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.25, notes: 'chain plumbing: source-over, shed with the chain' } },
   down: { fs: DOWN_FS, file: 'accum.mjs:DOWN_FS', uniforms: ['u_src'],
     cost: { tier: 1, memoryBytes: FRAME_16F / 64, timeMs: 0.3, notes: 'chain plumbing: 8x8 box downsample into the glow target, shed with the chain' } },
@@ -929,13 +937,15 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   }
   // 3. (#308: removed) — no blur-over-time; the incoming frame lands sharp.
   const fIn = frameIn;
-  // 4. over
+  // 4. over — mirrors OVER_FS exactly, including the #560 comet head-bright
+  // (u_headBoost on the incoming frame's rgb; 1.0 = off, bit-identical).
+  const headBoost = p.comet ? COMET_HEAD_BOOST : 1.0;
   const comp = new Float64Array(n);
   for (let i = 0; i < n; i += 4) {
     const sa = fIn[i + 3];
-    comp[i] = fIn[i] + faded[i] * (1 - sa);
-    comp[i + 1] = fIn[i + 1] + faded[i + 1] * (1 - sa);
-    comp[i + 2] = fIn[i + 2] + faded[i + 2] * (1 - sa);
+    comp[i] = fIn[i] * headBoost + faded[i] * (1 - sa);
+    comp[i + 1] = fIn[i + 1] * headBoost + faded[i + 1] * (1 - sa);
+    comp[i + 2] = fIn[i + 2] * headBoost + faded[i + 2] * (1 - sa);
     comp[i + 3] = sa + faded[i + 3] * (1 - sa);
   }
   if (p.optics <= 0) return comp;
@@ -1000,7 +1010,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       });
       const L = {};
       const U = (n) => gl.getUniformLocation(progs[name], n);
-      for (const u of ['u_src', 'u_dst', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
+      for (const u of ['u_src', 'u_dst', 'u_headBoost', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
         'u_flow', 'u_flowField', 'u_flowShared',
         'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps',
         'u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint',
@@ -1243,6 +1253,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       pass('over', write, (u, bind) => {
         gl.uniform1i(u.u_src, bind(0, frameIn));
         gl.uniform1i(u.u_dst, bind(1, cur.tex));
+        gl.uniform1f(u.u_headBoost, p.comet ? COMET_HEAD_BOOST : 1.0);
       });
       cur = write;
       // 5/6. glow (#308): mip-chain bloom + stipple diffusion + chromatic

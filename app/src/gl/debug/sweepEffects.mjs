@@ -538,8 +538,8 @@ export const SWEEP_EFFECTS = [
   },
   {
     ...accumDef('over',
-      { u_src: S(0), u_dst: S(1) },
-      (c, lab, aux) => ({ u_src: lab.input.tex, u_dst: aux.gray })),
+      { u_src: S(0), u_dst: S(1), u_headBoost: { kind: 'float' } },
+      (c, lab, aux) => ({ u_src: lab.input.tex, u_dst: aux.gray, u_headBoost: 1.0 })),
     cases: [C('source-over', {}, { costly: true })],
   },
   {
