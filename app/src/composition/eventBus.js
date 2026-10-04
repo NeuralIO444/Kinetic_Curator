@@ -71,6 +71,7 @@ export const Events = {
   ASSETS_REPLACE: 'assets:replace',
   ASSETS_REGION_SLOT: 'assets:regionSlot',
   ASSETS_REGION_KINEME: 'assets:regionKineme',
+  ASSETS_REGION_CYCLE: 'assets:regionCycle',
   EXPORT_SNAPSHOT: 'export:snapshot',
   EXPORT_RECORD: 'export:record',
   EXPORT_RENDERING: 'export:rendering',

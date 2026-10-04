@@ -145,6 +145,7 @@ node src/assets/overlay.selfcheck.mjs
 node src/assets/regionMattes.selfcheck.mjs
 node src/assets/regionSlots.selfcheck.mjs
 node src/assets/regionInstances.selfcheck.mjs
+node src/assets/regionCycle.selfcheck.mjs
 node src/state/overlayRoundtrip.selfcheck.mjs
 node src/assets/primitives.selfcheck.mjs
 node src/assets/silhouette.selfcheck.mjs

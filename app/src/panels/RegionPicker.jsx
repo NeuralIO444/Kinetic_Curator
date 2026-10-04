@@ -9,13 +9,14 @@ import { useApp } from '../state/AppContext.jsx';
 import { rasterizeRegions, regionAt, REGION_RASTER_PX } from '../assets/regionRaster.js';
 import { REGION_SLOTS, normalizeRegionSlots, slotOfRegion } from '../assets/regionSlots.js';
 import { KINEMES } from '../data/kinemes.js';
+import { CYCLE_MAX } from '../assets/regionCycle.js';
 
 const SLOT_COLORS = { A: '#ffd166', B: '#06d6a0', C: '#118ab2', D: '#ef476f' };
 const PREVIEW_PX = 240;
 
 export function RegionPicker({ assetId, onClose }) {
   const { assets } = useApp();
-  const { state } = useApp((s) => ({ assetRegionKineme: s.assetRegionKineme }));
+  const { state } = useApp((s) => ({ assetRegionKineme: s.assetRegionKineme, assetRegionCycle: s.assetRegionCycle }));
   const asset = assets.find((a) => a.id === assetId) || null;
   const [cached, setCached] = useState(null);
   const [hoverId, setHoverId] = useState(null);
@@ -25,6 +26,7 @@ export function RegionPicker({ assetId, onClose }) {
 
   const slots = useMemo(() => normalizeRegionSlots(asset?.regionSlots), [asset?.regionSlots]);
   const regionKinemes = (state.assetRegionKineme || {})[assetId] || {};
+  const regionCycles = (state.assetRegionCycle || {})[assetId] || {};
 
   useEffect(() => {
     let live = true;
@@ -155,6 +157,18 @@ export function RegionPicker({ assetId, onClose }) {
                         <option key={k.id} value={k.id}>{k.id}</option>
                       ))}
                     </select>
+                    <label title={`Hue cycle speed for slot ${s} (cycles/sec, 0 = off)`}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--dim)' }}>
+                      ↻
+                      <input
+                        type="range" min="0" max={CYCLE_MAX} step="0.25"
+                        value={regionCycles[s] || 0}
+                        onChange={(e) => emit(Events.ASSETS_REGION_CYCLE, {
+                          id: asset.id, slot: s, speed: Number(e.target.value),
+                        })}
+                        style={{ width: 64 }} />
+                      <span style={{ minWidth: 28 }}>{(regionCycles[s] || 0).toFixed(2)}</span>
+                    </label>
                     <button type="button" className="chip-btn" title={`Unassign slot ${s}`} onClick={() => unassign(s)}>×</button>
                   </>
                 )}

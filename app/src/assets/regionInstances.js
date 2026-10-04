@@ -22,18 +22,28 @@ export const slotIndex = (slot) => REGION_SLOTS.indexOf(slot) + 1;
  * @param {Map} slotsByAsset - assetId -> normalized slot map
  * @param {Object} regionKineme - {assetId: {slot: kinemeId}} (sanitized)
  * @param {Function} getKineme - kinemeId -> def or undefined
+ * @param {Object} regionCycle - {assetId: {slot: speed}} (sanitized, optional)
  * @returns {Array} instances with .region set; region instances also carry
- *   .regionKinemeId and .regionSlot for phase/table building.
+ *   .regionKinemeId, .regionSlot, and .regionCycle (speed, 0 when none).
+ *
+ * A slot is "active" (gets a cutout) when it has a motion kineme OR a cycle
+ * speed. The remainder keeps everything else.
  */
-export function expandRegionInstances(instances, slotsByAsset, regionKineme, getKineme) {
+export function expandRegionInstances(instances, slotsByAsset, regionKineme, getKineme, regionCycle = null) {
   const out = [];
   for (const inst of instances) {
     const slots = slotsByAsset.get(inst.asset);
     const rk = regionKineme?.[inst.asset];
+    const cy = regionCycle?.[inst.asset];
     const animated = [];
-    if (slots && rk && typeof rk === 'object') {
+    if (slots && (rk || cy)) {
       for (const s of REGION_SLOTS) {
-        if (slots[s] && rk[s] && getKineme(rk[s])) animated.push(s);
+        if (!slots[s]) continue;
+        const kid = rk && typeof rk === 'object' ? rk[s] : null;
+        const speed = cy && typeof cy === 'object' ? Number(cy[s]) || 0 : 0;
+        if ((kid && getKineme(kid)) || speed > 0) {
+          animated.push({ slot: s, kinemeId: kid && getKineme(kid) ? kid : null, cycle: speed });
+        }
       }
     }
     if (!animated.length) {
@@ -43,12 +53,13 @@ export function expandRegionInstances(instances, slotsByAsset, regionKineme, get
     // Remainder first (drawn under the region cutouts): keeps every pixel
     // whose mask is 0 — unassigned regions and assigned-but-static slots.
     out.push({ ...inst, region: 0 });
-    for (const s of animated) {
+    for (const a of animated) {
       out.push({
         ...inst,
-        region: slotIndex(s),
-        regionSlot: s,
-        regionKinemeId: rk[s],
+        region: slotIndex(a.slot),
+        regionSlot: a.slot,
+        regionKinemeId: a.kinemeId,
+        regionCycle: a.cycle,
       });
     }
   }

@@ -331,7 +331,9 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     const acc = hexToRgb(it.accent);
     buf[o + 12] = ink[0]; buf[o + 13] = ink[1]; buf[o + 14] = ink[2]; buf[o + 15] = acc[0];
     buf[o + 16] = acc[1]; buf[o + 17] = acc[2]; buf[o + 18] = it.kineme || 0; buf[o + 19] = it.kinemePhase || 0;
-    buf[o + 20] = it.region ?? -1; buf[o + 21] = 0; buf[o + 22] = 0; buf[o + 23] = 0;
+    // #725: a_inst5 = (region filter, cycle speed, 0, 0). Cycle is hue
+    // cycles/sec for this region's slot (0 = off, amount-0 identity).
+    buf[o + 20] = it.region ?? -1; buf[o + 21] = it.regionCycle || 0; buf[o + 22] = 0; buf[o + 23] = 0;
     o += 24;
   }
   if (o === 0) return new Float32Array(0);
