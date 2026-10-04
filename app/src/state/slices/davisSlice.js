@@ -45,7 +45,9 @@ export function captureFavorite(state, paletteId) {
   return {
     seed: state.seed,
     seedOffsets: { ...(state.seedOffsets || {}) },
-    timestamp: new Date().toISOString().slice(11, 19),
+    // #948 — full epoch ISO; legacy HH:MM:SS keeps still parse via
+    // loisActivity.parseFavoriteTimestamp (date unknown -> null, honestly).
+    timestamp: new Date().toISOString(),
     config: {
       layout: { ...state.layoutParams },
       palette: { id: paletteId },

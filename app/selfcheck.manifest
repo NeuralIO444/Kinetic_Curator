@@ -158,6 +158,7 @@ node src/curator/curate.selfcheck.mjs
 node src/curator/transitions.selfcheck.mjs
 node src/curator/taste.selfcheck.mjs
 node src/curator/renderProfiles.selfcheck.mjs
+node src/curator/loisActivity.selfcheck.mjs
 node src/gl/mlx/mlxExport.selfcheck.mjs
 node scripts/checkSemanticGoldens.mjs
 node scripts/predictCostTier.mjs
