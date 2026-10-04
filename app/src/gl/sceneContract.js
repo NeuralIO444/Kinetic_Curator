@@ -26,6 +26,7 @@ import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeA
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
 import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme } from '../data/kinemes.js';
+import { ASSET_CELL_KINEME, cellIndexAt, getCellKineme } from '../data/cellKinemes.js';
 import { resolvePalette } from '../data/palettes.js';
 
 export const GL_CONTRACT_VERSION = 1;
@@ -277,6 +278,24 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     const t = Number(doc.kinemeTime);
     return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0 };
   })();
+
+  // #705 Build C: instances whose asset has a cell kineme carry per-frame
+  // cellIndex/cellCount. The asset id never changes; only the UV window moves
+  // (the renderer subdivides the wide strip cell). Cell 0 is the canonical
+  // frame — shed and freeze pin it. Per-instance phase via kinemePhase so
+  // copies don't step in sync. Director RATE is the master control: RATE 0
+  // freezes kinemeTime, which freezes the cell index.
+  for (const inst of instances) {
+    const kinemeId = ASSET_CELL_KINEME[inst.asset];
+    if (!kinemeId) continue;
+    const k = getCellKineme(kinemeId);
+    if (!k) continue;
+    const t = Number(doc.kinemeTime);
+    const time = Number.isFinite(t) ? t : 0;
+    const phase = kinemePhase(inst.seedOffset, inst.key);
+    inst.cellIndex = cellIndexAt(time + phase * k.period, { period: k.period, cells: k.cells });
+    inst.cellCount = k.cells;
+  }
 
   const scene = {
     version: GL_CONTRACT_VERSION,

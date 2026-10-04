@@ -19,6 +19,8 @@
 import { Resvg } from '@resvg/resvg-js';
 import { ASSETS } from '../data/assets/index.js';
 import { applyGradient } from '../assets/gradient.js';
+import { ASSET_CELL_KINEME } from '../data/cellKinemes.js';
+import { MICRO_HUD_STRIPS } from '../data/assets/assets-micro-hud-strips.js';
 
 const ASSET_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 
@@ -33,21 +35,15 @@ const subColors = (svg, ink, accent) =>
     .replace(/var\(--accent[^)]*\)/g, accent);
 
 /**
- * Bake one asset/color combination into a CELL_PX square.
+ * Bake one SVG string (already color-substituted) into a CELL_PX square.
  * Returns {pixels, ink} where ink is the bbox in asset units.
  */
-function bakeCombo(assetId, ink, accent) {
-  const asset = ASSET_BY_ID.get(assetId);
-  if (!asset) throw new Error(`[atlas] unknown asset "${assetId}"`);
+function bakeSvg(svgBody, ink, accent) {
   const { x0, y0, x1, y1 } = CELL_UNITS;
-  // #701 — the stills path bakes the gradient with the REAL palette colours;
-  // the live path bakes the same ramp into its R/G mask. Same module, same
-  // stops, so a gradient asset prints what the canvas showed.
-  const body = applyGradient(asset.svg, asset.gradient, { ink, accent });
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CELL_PX}" height="${CELL_PX}" ` +
     `viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}">` +
-    subColors(body, ink, accent) +
+    subColors(svgBody, ink, accent) +
     `</svg>`;
   const img = new Resvg(svg).render();
   const pixels = Buffer.from(img.pixels);
@@ -73,6 +69,49 @@ function bakeCombo(assetId, ink, accent) {
   return { pixels, ink: inkBounds };
 }
 
+/**
+ * Bake one asset/color combination into a CELL_PX square.
+ * Returns {pixels, ink} where ink is the bbox in asset units.
+ */
+function bakeCombo(assetId, ink, accent) {
+  const asset = ASSET_BY_ID.get(assetId);
+  if (!asset) throw new Error(`[atlas] unknown asset "${assetId}"`);
+  // #701 — the stills path bakes the gradient with the REAL palette colours;
+  // the live path bakes the same ramp into its R/G mask. Same module, same
+  // stops, so a gradient asset prints what the canvas showed.
+  const body = applyGradient(asset.svg, asset.gradient, { ink, accent });
+  return bakeSvg(body, ink, accent);
+}
+
+/**
+ * #705 — bake a UV strip: all frames side-by-side in a wide cell.
+ * Returns {pixels, width, ink} where width = n*CELL_PX and ink is the union
+ * bbox across frames (in asset units, for filter-region clipping).
+ */
+function bakeStrip(assetId, ink, accent) {
+  const frames = MICRO_HUD_STRIPS[assetId];
+  if (!frames) throw new Error(`[atlas] unknown strip "${assetId}"`);
+  const n = frames.length;
+  const width = n * CELL_PX;
+  const pixels = Buffer.alloc(width * CELL_PX * 4, 0);
+  let ux0 = Infinity, uy0 = Infinity, ux1 = -Infinity, uy1 = -Infinity;
+  frames.forEach((svg, i) => {
+    const { pixels: fp, ink: fink } = bakeSvg(svg, ink, accent);
+    for (let y = 0; y < CELL_PX; y++) {
+      fp.copy(pixels, ((y * width) + i * CELL_PX) * 4, y * CELL_PX * 4, (y + 1) * CELL_PX * 4);
+    }
+    if (fink) {
+      ux0 = Math.min(ux0, fink[0]); uy0 = Math.min(uy0, fink[1]);
+      ux1 = Math.max(ux1, fink[2]); uy1 = Math.max(uy1, fink[3]);
+    }
+  });
+  const inkUnion = ux1 >= 0 ? [ux0, uy0, ux1, uy1] : null;
+  return { pixels, width, ink: inkUnion };
+}
+
+/** True if this combo bakes as a UV strip (wide cell). */
+const isStripCombo = (assetId) => ASSET_CELL_KINEME[assetId] && MICRO_HUD_STRIPS[assetId];
+
 export const comboKey = (assetId, ink, accent) => `${assetId}|${ink}|${accent}`;
 
 /**
@@ -81,6 +120,11 @@ export const comboKey = (assetId, ink, accent) => `${assetId}|${ink}|${accent}`;
  * @returns {{pixels: Buffer, width: number, height: number,
  *   cells: Map<string, {u0,v0,u1,v1, ink: [x0,y0,x1,y1]|null}>}}
  *   cells map key -> atlas UV rect + ink bbox in asset units.
+ *
+ * #705: combos for assets in ASSET_CELL_KINEME bake as UV strips — all
+ * frames side-by-side in a wide cell. The renderer subdivides the wide UV
+ * rect by cellIndex/cellCount. Strips get their own rows below the grid;
+ * geometry is mirrored in liveAtlas.mjs.
  */
 export function bakeAtlas(combos) {
   const uniq = [];
@@ -89,18 +133,22 @@ export function bakeAtlas(combos) {
     const k = comboKey(c.asset, c.ink, c.accent);
     if (!seen.has(k)) { seen.add(k); uniq.push({ ...c, key: k }); }
   }
+  const normal = uniq.filter((c) => !isStripCombo(c.asset));
+  const strips = uniq.filter((c) => isStripCombo(c.asset));
   // Gutter between cells: mipmap footprints at the cell edge must not reach
   // the neighbor cell's ink. The gutter is transparent black; combined with
   // the half-texel UV inset, edge filtering stays correct and invisible.
   const GUTTER = 32;
   const stride = CELL_PX + GUTTER;
-  const cols = Math.max(1, Math.ceil(Math.sqrt(uniq.length)));
-  const rows = Math.max(1, Math.ceil(uniq.length / cols));
-  const width = cols * stride;
-  const height = rows * stride;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(normal.length)));
+  const rows = Math.max(1, Math.ceil(normal.length / cols));
+  const stripWidths = strips.map((c) => MICRO_HUD_STRIPS[c.asset].length * CELL_PX);
+  const maxStripWidth = stripWidths.length ? Math.max(...stripWidths) : 0;
+  const width = Math.max(cols * stride, maxStripWidth + GUTTER);
+  const height = (rows + strips.length) * stride;
   const pixels = Buffer.alloc(width * height * 4, 0);
   const cells = new Map();
-  uniq.forEach((c, i) => {
+  normal.forEach((c, i) => {
     const { pixels: cp, ink } = bakeCombo(c.asset, c.ink, c.accent);
     const cx = (i % cols) * stride;
     const cy = Math.floor(i / cols) * stride;
@@ -112,6 +160,19 @@ export function bakeAtlas(combos) {
       // (asset units [-49.75, 149.75]), so UVs address texel centers.
       u0: (cx + 0.5) / width, v0: (cy + 0.5) / height,
       u1: (cx + CELL_PX - 0.5) / width, v1: (cy + CELL_PX - 0.5) / height,
+      ink,
+    });
+  });
+  strips.forEach((c, j) => {
+    const { pixels: sp, width: sw, ink } = bakeStrip(c.asset, c.ink, c.accent);
+    const cx = 0;
+    const cy = (rows + j) * stride;
+    for (let y = 0; y < CELL_PX; y++) {
+      sp.copy(pixels, ((cy + y) * width + cx) * 4, y * sw * 4, (y + 1) * sw * 4);
+    }
+    cells.set(c.key, {
+      u0: (cx + 0.5) / width, v0: (cy + 0.5) / height,
+      u1: (cx + sw - 0.5) / width, v1: (cy + CELL_PX - 0.5) / height,
       ink,
     });
   });
