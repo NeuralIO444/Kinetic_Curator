@@ -18,6 +18,7 @@ import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../
 import { tasteSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetRegionKineme, getKineme } from '../../data/kinemes.js';
+import { sanitizeAssetRegionCycle, CYCLE_MAX } from '../../assets/regionCycle.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../../midi/map.mjs';
@@ -235,6 +236,8 @@ export const createGlobalSlice = (set) => ({
   assetKineme: {},
   /** #725 — { assetId: { slot: kinemeId } }: region-targeted kinemes. */
   assetRegionKineme: {},
+  /** #725 — { assetId: { slot: cycles/sec } }: per-region hue cycling. */
+  assetRegionCycle: {},
   customAssets: [],
   ingestError: null,
   /**
@@ -574,6 +577,28 @@ export const createGlobalSlice = (set) => ({
     if (!getKineme(kinemeId) || curSlots[slot] === kinemeId) return {};
     return { assetRegionKineme: { ...cur, [assetId]: { ...curSlots, [slot]: kinemeId } } };
   }),
+  /**
+   * #725 — set a region slot's hue-cycle speed (cycles/sec, 0 = off).
+   * Speeds clamp to [0, CYCLE_MAX]; 0 removes the entry.
+   */
+  setAssetRegionCycle: (assetId, slot, speed) => set((state) => {
+    if (!assetId || !REGION_SLOTS.includes(slot)) return {};
+    const v = Number(speed);
+    const cur = state.assetRegionCycle || {};
+    const curSlots = cur[assetId] || {};
+    if (!Number.isFinite(v) || v <= 0) {
+      if (!(slot in curSlots)) return {};
+      const nextSlots = { ...curSlots };
+      delete nextSlots[slot];
+      const next = { ...cur };
+      if (Object.keys(nextSlots).length) next[assetId] = nextSlots;
+      else delete next[assetId];
+      return { assetRegionCycle: next };
+    }
+    const clamped = Math.min(CYCLE_MAX, v);
+    if (curSlots[slot] === clamped) return {};
+    return { assetRegionCycle: { ...cur, [assetId]: { ...curSlots, [slot]: clamped } } };
+  }),
   setAssetWeight: (id, weight) => set((state) => {
     if (!WEIGHT_CYCLE.includes(weight)) return {};
     const asset = findAsset(id, sanitizeOverlay(state.customAssets));
@@ -659,6 +684,7 @@ export const createGlobalSlice = (set) => ({
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
     next.assetKineme = sanitizeAssetKineme(doc.assetKineme) || {}; // #781 — a doc without kinemes is still
     next.assetRegionKineme = sanitizeAssetRegionKineme(doc.assetRegionKineme) || {}; // #725
+    next.assetRegionCycle = sanitizeAssetRegionCycle(doc.assetRegionCycle) || {}; // #725
     next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
     {
       const canvas = sanitizeCanvasSpec(doc);

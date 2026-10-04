@@ -82,6 +82,21 @@ const base = (asset) => ({ asset, x: 10, y: 20, kineme: 0 });
   assert.strictEqual(out[0].region, -1);
 }
 
+// Cycle speed alone (no motion kineme) also expands the slot.
+{
+  const out = expandRegionInstances(
+    [base('user:shapes')],
+    slots,
+    {},
+    getKineme,
+    { 'user:shapes': { B: 1.5 } },
+  );
+  assert.deepStrictEqual(out.map((i) => i.region), [0, 2]);
+  assert.strictEqual(out[1].regionCycle, 1.5);
+  assert.strictEqual(out[1].regionKinemeId, null);
+  assert.strictEqual(out[0].regionCycle, undefined, 'remainder carries no cycle');
+}
+
 // Mask: 200px detection → 400px cell at offset (100,100), 1:1.
 {
   const W = MASK_DETECT_PX;

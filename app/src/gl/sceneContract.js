@@ -28,6 +28,7 @@ import { contractLight } from '../data/light.js';
 import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, sanitizeAssetRegionKineme } from '../data/kinemes.js';
 import { expandRegionInstances } from '../assets/regionInstances.js';
 import { normalizeRegionSlots } from '../assets/regionSlots.js';
+import { sanitizeAssetRegionCycle } from '../assets/regionCycle.js';
 import { resolvePalette } from '../data/palettes.js';
 
 export const GL_CONTRACT_VERSION = 1;
@@ -267,20 +268,21 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
   const kinemeFields = (() => {
     const map = sanitizeAssetKineme(doc.assetKineme);
     const regionMap = sanitizeAssetRegionKineme(doc.assetRegionKineme);
-    // Expand first (no-op unless a slot has both an assignment and a kineme).
-    // Stills opt out (expandRegions: false) — the offline baker has no slot
-    // mask, so region cutouts would sample garbage; a still shows the asset
-    // whole and at rest, which is the honest single frame.
-    if (regionMap && expandRegions) {
+    const cycleMap = sanitizeAssetRegionCycle(doc.assetRegionCycle);
+    // Expand first (no-op unless a slot has an assignment plus a kineme or
+    // a cycle speed). Stills opt out (expandRegions: false) — the offline
+    // baker has no slot mask, so region cutouts would sample garbage; a
+    // still shows the asset whole and at rest, which is the honest frame.
+    if ((regionMap || cycleMap) && expandRegions) {
       const slotsByAsset = new Map();
       for (const a of doc.customAssets || []) {
         if (a && a.id && a.regionSlots) slotsByAsset.set(String(a.id), normalizeRegionSlots(a.regionSlots));
       }
-      const expanded = expandRegionInstances(instances, slotsByAsset, regionMap, getKineme);
+      const expanded = expandRegionInstances(instances, slotsByAsset, regionMap, getKineme, cycleMap);
       instances.length = 0;
       instances.push(...expanded);
     }
-    if (!map && !regionMap) return {};
+    if (!map && !regionMap && !cycleMap) return {};
     const table = [];
     const slot = new Map();
     for (const inst of instances) {

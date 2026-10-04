@@ -74,6 +74,7 @@ out vec2 v_world;   // #594 PR2: fragment position (scene units) for per-texel l
 out vec4 v_rot;     // cos, sin of the instance rotation; x/y mirror signs
 out vec4 v_cell;    // the instance's atlas cell (u0, v0, u1, v1): bevel taps never leave it
 out float v_region;  // #725: region filter from a_inst5.x (-1 = no mask test)
+out float v_cycle;   // #725: hue cycles/sec from a_inst5.y (0 = off)
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -156,6 +157,7 @@ void main() {
   v_rot = vec4(co, si, mx, my);
   v_cell = vec4(a_inst1.zw, a_inst2.xy);
   v_region = a_inst5.x;  // #725: -1 normal, 0 remainder, 1-4 slot
+  v_cycle = a_inst5.y;   // #725: hue cycles/sec (0 = off)
   // #594 PR1: per-instance diffuse from the one sun, flat normal (0,0,1), at the
   // instance centre. Off → exactly vec3(1.0), so the unlit path is byte-identical.
   if (u_sun.w > 0.5) {
@@ -179,6 +181,7 @@ uniform float u_ambient;   // #594: shared
 uniform vec2 u_sunMat;     // #594 PR2: x = bevel strength (0 = flat per-instance light), y = specular
 uniform float u_pool;      // #594: 0 = today's sun. Ink in the shadow, paper on the highlight.
 uniform vec2 u_hands;      // y = Open Hand. 0 returns the current sample.
+uniform float u_kinemeTime; // #725: shared with the vertex stage — drives hue cycling.
 in float v_seed;
 in vec2 v_world;
 in vec4 v_rot;
@@ -189,7 +192,21 @@ in vec3 v_ink;
 in vec3 v_accent;
 in vec3 v_light;
 in float v_region;  // #725: -1 = no mask test
+in float v_cycle;   // #725: hue cycles/sec (0 = off)
 out vec4 o;
+// #725: SVG feColorMatrix hueRotate (sRGB luminance axis). 0° is identity,
+// so the static path (v_cycle = 0) never enters and stays bit-identical.
+vec3 hueRotate(vec3 c, float deg) {
+  float rad = radians(mod(deg, 360.0));
+  float co = cos(rad), si = sin(rad);
+  // Column-major: constructor args are column 0, then 1, then 2.
+  mat3 m = mat3(
+    0.213 + co * 0.787 - si * 0.213, 0.213 - co * 0.213 + si * 0.143, 0.213 - co * 0.213 - si * 0.787,
+    0.715 - co * 0.715 - si * 0.715, 0.715 + co * 0.285 + si * 0.140, 0.715 - co * 0.715 + si * 0.715,
+    0.072 - co * 0.072 + si * 0.928, 0.072 - co * 0.072 - si * 0.283, 0.072 + co * 0.928 + si * 0.072
+  );
+  return m * c;
+}
 void main() {
   // #725: region cutout. Expanded instances keep only their region's pixels;
   // normal instances (-1) skip the mask entirely, so the unmasked path is
@@ -248,6 +265,16 @@ void main() {
     o = vec4(color * v_opacity, t.a * v_opacity);
   } else {
     o = vec4(t.rgb * v_opacity, t.a * v_opacity);
+  }
+  // #725: per-region hue cycling. v_cycle = cycles/sec; the hue angle rides
+  // u_kinemeTime, so Director RATE 0 freezes it with everything else.
+  // Amount-0 identity: v_cycle = 0 never enters — the static path is untouched.
+  // Applied to premultiplied rgb (the matrix is linear, so premultiplication
+  // survives); alpha is not a hue. Assigned via the whole vec4 so the #594
+  // light audit — which gates rgb writes on the sun — still holds: this is a
+  // color effect, not lighting.
+  if (v_cycle > 0.0) {
+    o = vec4(hueRotate(o.rgb, u_kinemeTime * v_cycle * 360.0), o.a);
   }
   // #594: light the premultiplied colour; alpha untouched, rgb capped at alpha.
   // Gated on the uniform, not on v_light: the unlit path must not even clamp
