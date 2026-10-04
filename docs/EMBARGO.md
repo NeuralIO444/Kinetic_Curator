@@ -16,6 +16,7 @@ Matt, 2026-09-19. Coding agents: this file plus [AGENTS.md](../AGENTS.md) plus [
 #391 spine E  mode-chip dissolve + slider springs  — closed (direct push)
 #392 spine F  shared noise + curl wind + organism vx  — closed (direct push)
 ```
+Spine G (bufferSubData) landed #408, 2026-09-22 — the block above predates it.
 
 **2026-09-23 (Matt):** the `shimmer/` prototype readout mounted in `EvolveControls.jsx` is **accepted as-is** — it stays. This line amends the deferred pile below: what stays deferred is the shimmer *sidecar/stage*, not the mounted prototype.
 
@@ -37,7 +38,7 @@ Planning docs in `docs/` marked **deferred** are allowed. They are not tickets.
 
 ## Allowed now
 
-Spine letters are all closed — do not reopen. #341 (FX 4-cap) landed as PR #412 (2026-09-22), issue closed. Matt-only feel (#374, #346, #298). Docs that *narrow* scope.
+Spine letters are all closed — do not reopen. #341 (FX 4-cap) landed as PR #412 (2026-09-22), issue closed. Matt-only feel (#374, #346, #298) — ✅ all three closed as of 2026-09-25, so this line no longer names open work. Docs that *narrow* scope.
 
 **2026-09-22 (Matt-approved):** #411 (item-level morph for chip clicks) and #413 (mode/behave quick strip + presets popup) landed during the embargo and are **covered** — accepted as in-scope engine/UI mechanics, not embargoed features. This coverage is not the Night Migration sign-off: the embargo above otherwise stands until that is recorded here.
 

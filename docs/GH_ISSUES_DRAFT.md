@@ -1,5 +1,7 @@
 # GitHub Issue Drafts
 
+> **Status 2026-10-03 — never filed; stale.** These drafts predate the spine era and the #555 four-axis chip split, and none of them is in the roadmap or the issue queue. They are **not orders** — do not file anything here without re-checking it against current code and `docs/ROADMAP_V1.md` (some assumptions, e.g. asset-kinship/`cgroup` behavior, have moved on). Kept for the ideas only.
+
 These issues are ready to file on GitHub for the next development sprints following the Always Alive Protocol.
 
 ---
