@@ -36,18 +36,18 @@ export function ToggleRow({ layoutParams }) {
       {layoutParams.accumulation && (
         <>
         <button type="button" className={`chip-btn${layoutParams.trail === 'leave' ? ' active' : ''}`}
-          title="LEAVE holds the stamps. Fade is optional. Tunnel, prism, and flow can fade too."
+          title={helpText('layout-trail-leave')}
           onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === 'leave' ? 'accum' : 'leave' })}>
           LEAVE
         </button>
         {['ribbon', 'comet'].map((name) => (
           <button key={name} type="button" className={`chip-btn${layoutParams.trail === name ? ' active' : ''}`}
-            title={name === 'ribbon' ? 'RIBBON smears the path into a line.' : 'COMET keeps a bright head and a short tail.'}
+            title={helpText(name === 'ribbon' ? 'layout-trail-ribbon' : 'layout-trail-comet')}
             onClick={() => emit(Events.LAYOUT_PARAM, { key: 'trail', value: layoutParams.trail === name ? 'accum' : name })}>
             {name.toUpperCase()}
           </button>
         ))}
-        <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }} title="Live echoes. Zero is off.">
+        <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }} title={helpText('layout-echoes')}>
           ECHOES
           <input type="range" min={0} max={4} step={1} value={layoutParams.echoes ?? 0}
             onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'echoes', value: parseFloat(e.target.value) })}
@@ -57,7 +57,7 @@ export function ToggleRow({ layoutParams }) {
       )}
       {layoutParams.trail === 'leave' && (
         <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
-          title="LEAVE fade. Zero holds the stamps. Higher lets them decay. Clear still wipes.">
+          title={helpText('layout-leave-fade')}>
           FADE
           <input type="range" min={0} max={0.2} step={0.01}
             value={layoutParams.leaveFade ?? 0}
