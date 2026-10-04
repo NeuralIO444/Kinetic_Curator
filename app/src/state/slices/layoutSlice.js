@@ -723,6 +723,62 @@ export const createLayoutSlice = (set) => ({
     return next;
   }),
 
+  /**
+   * KINETIC button — WEATHER layer (#944). A second tap while the button is
+   * still warm drifts the atmosphere over the SAME structure instead of
+   * re-working it: palette weather, light mood, atmospheric FX. Skeleton
+   * holds; air changes.
+   *
+   * What moves:
+   *  1. palette weather — paletteId rolls to a different catalog palette
+   *     (overrides + swatch locks clear, exactly like setPaletteId);
+   *  2. mood — the chiaroscuro sun, if it's on, moves to a new position and
+   *     intensity (a storm rolling in, golden hour…); off stays off;
+   *  3. atmospheric FX — accumulationOptics (bloom + halation, the GLOW
+   *     slider) rolls fresh, unless locked.
+   *
+   * What holds: seed (same DNA — the HUD readout keeps showing it),
+   * composition and every structural param, asset pool, layers, FX chain.
+   * One atomic store update = one undo entry (edit kind). The honest die
+   * matches kineticRulesPass/kineticRoll's convention: replayability comes
+   * from the stored state + seed (#710), not from the pass itself.
+   */
+  kineticWeatherPass: () => set((state) => {
+    const undo = pushToUndo(state, true);
+
+    // 1. Palette weather — a different sky, never the one already up.
+    const paletteId = pickOtherId(PALETTES.map((p) => p.id), state.paletteId);
+
+    // 2. Mood — move the sun if it's out.
+    let light = state.light;
+    if (light) {
+      light = sanitizeLight({
+        ...light,
+        x: -500 + die(2001),
+        y: -500 + die(1701),
+        intensity: 0.3 + Math.random() * 0.7,
+        ambient: 0.2 + Math.random() * 0.5,
+      });
+    }
+
+    // 3. Atmospheric FX — bloom + halation amount.
+    const merged = { ...state.layoutParams };
+    if (!state.lockedParams.accumulationOptics) {
+      merged.accumulationOptics = Math.random() * 0.25;
+    }
+
+    return {
+      ...undo,
+      paletteId,
+      paletteOverrides: null,
+      paletteLocks: {},
+      light,
+      layoutParams: merged,
+      voiceMix: null,
+      activeVoiceId: null,
+    };
+  }),
+
   // Entries are tagged with the layerId they were captured for (#92) and the
   // stack is shared across layers (never reset on switch). An 'edit' entry
   // only ever applies when its layer is active — otherwise it would restore

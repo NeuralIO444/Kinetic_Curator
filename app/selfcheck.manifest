@@ -76,6 +76,7 @@ node src/state/undoLayers.selfcheck.mjs
 node src/state/undoSeedOffsets.selfcheck.mjs
 node src/state/kineticRoll.selfcheck.mjs
 node src/state/kineticRulesPass.selfcheck.mjs
+node src/state/kineticWeatherPass.selfcheck.mjs
 node src/state/layersPatch.selfcheck.mjs
 node src/state/layerNames.selfcheck.mjs
 node src/state/tapeBudget.selfcheck.mjs
