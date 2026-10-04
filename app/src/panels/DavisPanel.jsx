@@ -7,6 +7,7 @@ import { VoiceTiles } from './davis/VoiceTiles.jsx';
 import { EvolveProgress } from './davis/EvolveProgress.jsx';
 import { MidiSection } from './davis/MidiSection.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
+import { confirmClearTrailMessage, decideClearTrail } from './davisTrailCopy.mjs'; // #560: CLEAR confirms
 import { captureFavorite } from '../state/slices/davisSlice.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
@@ -145,7 +146,12 @@ export function DavisPanel() {
                 {accumFrozen ? 'THAW' : 'FREEZE'}
               </button>
               <button className="big-btn"
-                onClick={() => emit(Events.ACCUM_GESTURE, { action: 'clear' })}
+                onClick={() => {
+                  // #560: CLEAR is destructive — confirm stating the stakes (#571's pattern).
+                  // FREEZE and SWELL stay one-click (non-destructive).
+                  const action = decideClearTrail(window.confirm(confirmClearTrailMessage()));
+                  if (action) emit(Events.ACCUM_GESTURE, { action });
+                }}
                 title={helpText('davis-clear')}>
                 CLEAR
               </button>
