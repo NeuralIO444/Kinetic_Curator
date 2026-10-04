@@ -117,6 +117,7 @@ export function useApp(selector) {
       case 'REMOVE_CUSTOM_ASSET': return store.removeCustomAsset(action.id);
       case 'RENAME_CUSTOM_ASSET': return store.renameCustomAsset(action.id, action.name);
       case 'REPLACE_CUSTOM_ASSET': return store.replaceCustomAsset(action.id, action.svg);
+      case 'SET_ASSET_REGION_SLOT': return store.setAssetRegionSlot(action.id, action.slot, action.regionId);
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
       case A.SET_AUDIO_DENIED: return store.setAudioDenied(payload);

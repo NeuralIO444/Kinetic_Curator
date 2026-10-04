@@ -69,6 +69,7 @@ export const Events = {
   ASSETS_REMOVE: 'assets:remove',
   ASSETS_RENAME: 'assets:rename',
   ASSETS_REPLACE: 'assets:replace',
+  ASSETS_REGION_SLOT: 'assets:regionSlot',
   EXPORT_SNAPSHOT: 'export:snapshot',
   EXPORT_RECORD: 'export:record',
   EXPORT_RENDERING: 'export:rendering',
