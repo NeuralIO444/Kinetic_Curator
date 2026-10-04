@@ -31,6 +31,11 @@ export function CuratorBar() {
   const chainFallback = useStore((s) => s.curateChainFallback);
   const hint = curatorHint(curator, { chainFallback });
   const presetGroups = useMemo(() => getPresetsByGroup(), []);
+  // #946 — START: CHAOS / FIXED. What a cold launch opens on: one full
+  // wild roll (default), or the deterministic factory opener for
+  // performance situations that need a known first frame.
+  const startupMode = useStore((s) => s.startupMode);
+  const setStartupMode = useStore((s) => s.setStartupMode);
 
   // Close either popup on outside click or Escape.
   useEffect(() => {
@@ -80,6 +85,21 @@ export function CuratorBar() {
     <div className="curator-left-group kc-topbar-curator">
         {/* #942 — KINETIC leads the global-verb row: storm generator first, tasting second. */}
         <KineticButton />
+        {/* #946 — START mode toggle: what a cold launch opens on. */}
+        <button
+          type="button"
+          className="start-mode-btn"
+          data-mode={startupMode}
+          onClick={() => setStartupMode(startupMode === 'chaos' ? 'fixed' : 'chaos')}
+          title={
+            startupMode === 'chaos'
+              ? 'START: CHAOS — every cold launch opens on one full wild roll. Click for a fixed, deterministic opener.'
+              : 'START: FIXED — every cold launch opens on the factory default scene. Click for chaos.'
+          }
+          aria-label={`Start mode ${startupMode}. Activate to switch to ${startupMode === 'chaos' ? 'fixed' : 'chaos'}`}
+        >
+          START: {startupMode === 'chaos' ? 'CHAOS' : 'FIXED'}
+        </button>
         <div className="curator-voice-wrap" ref={presetWrapRef}>
           <button
             className="curator-voice-btn"

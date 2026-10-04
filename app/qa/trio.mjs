@@ -19,7 +19,7 @@ export const TRIO = {
   ],
   playwright: [
     'e2e/smoke.spec.js',
-    'e2e/living-boot.spec.js',
+    'e2e/startup-chaos.spec.js',
     'e2e/director-regroup.spec.js',
   ],
   qa: [
