@@ -21,6 +21,8 @@ import { sanitizeAssetKineme, getKineme } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../../midi/map.mjs';
+import { normalizeRegions, normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
+import { queueRegionDetect } from '../../assets/regionRaster.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -427,6 +429,17 @@ export const createGlobalSlice = (set) => ({
   ingestAsset: (svg, hint, opts = {}) => set((state) => {
     const result = ingestIntoOverlay(svg, state.customAssets, hint, opts);
     if (!result.ok) return { ingestError: result.error || 'ingest failed' };
+    // #725: region detection needs a rasterize (async) — the asset lands
+    // now, its regions follow. Stale-guarded: a replace in between wins.
+    queueRegionDetect(result.asset.id, result.asset.svg, (id, regions) => {
+      set((st) => {
+        const cur = findAsset(id, sanitizeOverlay(st.customAssets));
+        if (!cur || cur.svg !== result.asset.svg) return {};
+        return {
+          customAssets: st.customAssets.map((a) => (a.id === id ? { ...a, regions } : a)),
+        };
+      });
+    });
     return {
       customAssets: result.overlay,
       enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
@@ -469,7 +482,57 @@ export const createGlobalSlice = (set) => ({
   replaceCustomAsset: (id, svg) => set((state) => {
     const result = replaceOverlayAsset(id, svg, state.customAssets);
     if (!result.ok) return { ingestError: result.error };
+    // #725: re-detect regions for the new artwork; stale-guard as above.
+    const nextSvg = result.overlay.find((a) => a.id === id)?.svg;
+    if (nextSvg) {
+      queueRegionDetect(id, nextSvg, (rid, regions) => {
+        set((st) => {
+          const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
+          if (!cur || cur.svg !== nextSvg) return {};
+          return {
+            customAssets: st.customAssets.map((a) => (a.id === rid ? { ...a, regions } : a)),
+          };
+        });
+      });
+    }
     return { customAssets: result.overlay, ingestError: null };
+  }),
+
+  /**
+   * #725 — set an asset's detected regions (from the async rasterize) or
+   * assign a region to a named slot (A/B/C/D). Slot keys are stable region
+   * IDs: redraw-same-color survives, recolor breaks (new ID).
+   */
+  setAssetRegions: (id, regions) => set((state) => {
+    const clean = normalizeRegions(regions);
+    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
+    if (!asset) return {};
+    // #725: prune slot assignments whose IDs died with the recolor — a slot
+    // pointing at a missing region is a broken promise, not a kept one.
+    const alive = new Set(clean.map((r) => r.id));
+    const slots = normalizeRegionSlots(asset.regionSlots);
+    let pruned = false;
+    for (const s of REGION_SLOTS) {
+      if (slots[s] && !alive.has(slots[s])) { slots[s] = null; pruned = true; }
+    }
+    const prevSlots = normalizeRegionSlots(asset.regionSlots);
+    const slotsChanged = pruned || REGION_SLOTS.some((s) => slots[s] !== prevSlots[s]);
+    return {
+      customAssets: state.customAssets.map((a) => (a.id === id
+        ? { ...a, regions: clean, ...(slotsChanged ? { regionSlots: slots } : {}) }
+        : a)),
+    };
+  }),
+  setAssetRegionSlot: (id, slot, regionId) => set((state) => {
+    if (!REGION_SLOTS.includes(slot)) return {};
+    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
+    if (!asset) return {};
+    const next = assignRegionSlot(asset.regionSlots, slot, regionId);
+    const prev = normalizeRegionSlots(asset.regionSlots);
+    if (REGION_SLOTS.every((s) => next[s] === prev[s])) return {};
+    return {
+      customAssets: state.customAssets.map((a) => (a.id === id ? { ...a, regionSlots: next } : a)),
+    };
   }),
 
   /**
