@@ -57,6 +57,7 @@ node src/data/palettes.selfcheck.mjs
 node src/data/chiaroscuro.selfcheck.mjs
 node src/data/canvasPresets.selfcheck.mjs
 node src/data/cellKinemes.selfcheck.mjs
+node src/data/assets/assets-micro-hud-strips.selfcheck.mjs
 node src/data/kinemes.selfcheck.mjs
 node src/gl/parallax.selfcheck.mjs
 node src/data/taxonomy.selfcheck.mjs

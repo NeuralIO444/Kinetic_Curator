@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CELL_KINEMES, cellIndexAt, cellUvWindow, getCellKineme } from './cellKinemes.js';
+import { ASSET_CELL_KINEME, CELL_KINEMES, cellIndexAt, cellUvWindow, getCellKineme } from './cellKinemes.js';
 
 test('#781 C asset id is not in the cell kineme', () => {
   for (const k of CELL_KINEMES) {
@@ -26,4 +26,26 @@ test('#781 C UV window keeps v and splits u', () => {
   assert.ok(Object.is(mid.v0, 0.1) && Object.is(mid.v1, 0.5));
   assert.ok(mid.u0 > base.u0 && mid.u1 < base.u1);
   assert.equal(getCellKineme('dial-sweep').cells, 8);
+});
+
+test('#705 spec-chase: 8 cells, 2.0s period', () => {
+  const k = getCellKineme('spec-chase');
+  assert.ok(k, 'spec-chase is registered');
+  assert.equal(k.cells, 8);
+  assert.equal(k.period, 2);
+  assert.equal(k.costCells, 8);
+});
+
+test('#705 ASSET_CELL_KINEME: values name real cell kinemes, keys name animated assets', () => {
+  const ids = new Set(CELL_KINEMES.map((k) => k.id));
+  const animated = new Set(['mic_dial', 'mic_chevrons', 'mic_specbar_h', 'mic_specbar_v', 'mic_wave']);
+  assert.deepEqual(new Set(Object.keys(ASSET_CELL_KINEME)), animated);
+  for (const [asset, kineme] of Object.entries(ASSET_CELL_KINEME)) {
+    assert.ok(ids.has(kineme), `${asset} -> unknown cell kineme ${kineme}`);
+  }
+  assert.equal(ASSET_CELL_KINEME.mic_dial, 'dial-sweep');
+  assert.equal(ASSET_CELL_KINEME.mic_chevrons, 'chevron-chase');
+  assert.equal(ASSET_CELL_KINEME.mic_specbar_h, 'spec-chase');
+  assert.equal(ASSET_CELL_KINEME.mic_specbar_v, 'spec-chase');
+  assert.equal(ASSET_CELL_KINEME.mic_wave, 'wave-scroll');
 });
