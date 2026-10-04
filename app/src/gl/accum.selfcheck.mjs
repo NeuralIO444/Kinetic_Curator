@@ -157,6 +157,19 @@ ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () =>
   assert.equal(onTheOne.keep, base.keep, 'beatPulse alone leaves keep alone');
   assert.ok(loud.keep > transient.keep, 'full RMS punches harder than flux alone');
   assert.equal(applyAudioEnvelope(base, { rms: 1 }).keep, Math.min(0.99, 0.9 + 0.08 * 1), 'keep math is exact');
+  // #790 PR5 (render.accum): the assignable route's output rides keep in
+  // hundredths, on top of the hardcoded gesture, clamped at the 0.99 ceiling.
+  const dryBase = accumRecipeParams({ fade: 0.5, optics: 0.5, tunnel: 0.5, prism: 0.5 });
+  const routed = applyAudioEnvelope(dryBase, { rms: 0, flux: 0, beatPulse: 0 }, { accumAudio: 20 });
+  assert.equal(routed.keep, 0.5 + 0.20, 'route adds +0.20 keep');
+  const loudRouted = applyAudioEnvelope(dryBase, { rms: 1, flux: 0, beatPulse: 0 }, { accumAudio: 20 });
+  assert.equal(loudRouted.keep, 0.5 + 0.08 + 0.20, 'route stacks with the hardcoded gesture');
+  const ceiling = applyAudioEnvelope(base, { rms: 1 }, { accumAudio: 40 });
+  assert.equal(ceiling.keep, 0.99, 'keep never exceeds the 0.99 ceiling');
+  const silentRouted = applyAudioEnvelope(dryBase, { rms: 0, flux: 0, beatPulse: 0 }, { accumAudio: 0 });
+  assert.deepEqual(silentRouted, dryBase, 'zero route is identity');
+  const garbage = applyAudioEnvelope(dryBase, { rms: 0, flux: 0, beatPulse: 0 }, { accumAudio: NaN });
+  assert.deepEqual(garbage, dryBase, 'non-finite route output is ignored, never explodes keep');
   // Optics is one amount: every derived glow field recomputes from the
   // modulated value, so audio genuinely swells the mip glow/stipple/chroma.
   const glowBase = accumRecipeParams({ fade: 0.9, optics: 0.2 });

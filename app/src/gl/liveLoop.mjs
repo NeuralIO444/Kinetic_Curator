@@ -756,6 +756,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // untouched.
       audioSwell: s.layoutParams.audioSwell ?? 1,
       glow,
+      // #790 PR5: the assignable render.accum route's output (0..40, hundredths
+      // of trail keep). Undefined on the default table → 0 → today's gesture exactly.
+      accumAudio: routes.accum ?? 0,
       paused: !s.running,
       // #278 — the pixel dissolve now backs only manual voice-MIX
       // scrubbing (dragging the MIX control by hand). Auto chip-triggered
@@ -912,7 +915,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         return;
       }
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, glow, paused, mix } = frame;
+      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, accumAudio, glow, paused, mix } = frame;
 
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
@@ -1000,7 +1003,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
                 rms: audioOn ? bands.rms || 0 : 0,
                 flux: 0,
                 beatPulse: audioOn ? bands.beatPulse || 0 : 0,
-              }, { swell: audioSwell ?? 1 });
+              }, { swell: audioSwell ?? 1, accumAudio });
               if (accumParams.flowField) rp.flowField = accumParams.flowField;
               // #309: the frame is backing-store sized; the pair is logical.
               accumObj.step(target.tex, rp, { width: target.w, height: target.h });
