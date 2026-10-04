@@ -86,6 +86,27 @@ function persistWeave(on) {
   }
 }
 
+// #946: START mode — what a cold launch opens on. 'chaos' (default) fires
+// one full wild roll; 'fixed' boots the deterministic factory opener for
+// performance situations that need a known first frame. A per-machine
+// preference like the pool view, not project content — its own
+// localStorage key, never enters the project document.
+const STARTUP_MODE_KEY = 'kc:startup-mode:v1';
+function readStartupMode() {
+  try {
+    return localStorage.getItem(STARTUP_MODE_KEY) === 'fixed' ? 'fixed' : 'chaos';
+  } catch {
+    return 'chaos';
+  }
+}
+function persistStartupMode(mode) {
+  try {
+    localStorage.setItem(STARTUP_MODE_KEY, mode);
+  } catch {
+    // private window / quota — the session value still works. Deliberately silent.
+  }
+}
+
 function findAsset(id, overlay) {
   return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
 }
@@ -271,6 +292,15 @@ export const createGlobalSlice = (set) => ({
   setFxaa: (on) => {
     persistFxaa(!!on);
     set({ fxaa: !!on });
+  },
+  // #946 — START: CHAOS / FIXED. Read by the boot sequence in
+  // useProjectAutosave; the toggle lives next to the KIN button in the
+  // CuratorBar. Anything but 'fixed' sanitizes to 'chaos' (the default).
+  startupMode: readStartupMode(),
+  setStartupMode: (mode) => {
+    const next = mode === 'fixed' ? 'fixed' : 'chaos';
+    persistStartupMode(next);
+    set({ startupMode: next });
   },
   /**
    * #310: the canvas background cycle moved from the CanvasPanel header to
