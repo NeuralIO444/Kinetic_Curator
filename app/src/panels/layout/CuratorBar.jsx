@@ -83,9 +83,7 @@ export function CuratorBar() {
   };
   return (
     <div className="curator-left-group kc-topbar-curator">
-        {/* #942 — KINETIC leads the global-verb row: storm generator first, tasting second. */}
-        <KineticButton />
-        {/* #946 — START mode toggle: what a cold launch opens on. */}
+        {/* #946 — START mode toggle: what a cold launch opens on. Sits left of KIN: [logo] [START] [KIN]. */}
         <button
           type="button"
           className="start-mode-btn"
@@ -100,6 +98,8 @@ export function CuratorBar() {
         >
           START: {startupMode === 'chaos' ? 'CHAOS' : 'FIXED'}
         </button>
+        {/* #942 — KINETIC: storm generator after the START toggle. */}
+        <KineticButton />
         <div className="curator-voice-wrap" ref={presetWrapRef}>
           <button
             className="curator-voice-btn"
