@@ -27,6 +27,7 @@ export const LAYOUT_MODES = [
   { id: 'lsystem',   name: 'l-system',   glyph: 'frond'  },
   { id: 'dla',       name: 'DLA growth', glyph: 'coral'  }, // #720
   { id: 'eden',      name: 'Eden growth', glyph: 'bloom'  }, // #720
+  { id: 'quadtree',  name: 'quadtree', glyph: 'quad'   }, // #721 — adaptive subdivision scatter
   { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
@@ -177,6 +178,10 @@ export const DEFAULT_LAYOUT_PARAMS = {
   audioSwell: 1,
   lifeDrift: 0.35,
   parallax: 0, // #796 diorama drift; 0 = placements bit-identical
+  // #721 — quadtree scatter: audio/field blend weights and max depth.
+  quadAudio: 0.5,
+  quadField: 0.5,
+  quadDepth: 5,
 };
 
 /** #306 — audio envelope response-curve shapes. */
@@ -218,6 +223,11 @@ export const PARAM_SPEC = {
   // growthBranch maps to DLA stick probability 0.25..1.0.
   growthRate: { min: 0, max: 12 },
   growthBranch: { min: 0, max: 1 },
+  // #721 — quadtree: blend weights for the audio/field terms, and the max
+  // subdivision depth (1 = coarse grid, 6 = fine clustering).
+  quadAudio: { min: 0, max: 1 },
+  quadField: { min: 0, max: 1 },
+  quadDepth: { min: 1, max: 6, int: true },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   // Brush line: spacing ≤ 0.7 reads as a continuous line; wider is a

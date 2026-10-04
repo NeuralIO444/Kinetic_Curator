@@ -51,24 +51,36 @@ function bandAtPos(bands, pos) {
 }
 
 /**
- * Audio term over a whole cell: the max band energy anywhere in the cell's
- * vertical span. A cell CONTAINING a hot band splits even if its center is
- * cool — otherwise a smooth signal (hot floor, cool middle) would never
- * subdivide past a lukewarm root.
+ * Contrast normalization for the spectrum snapshot: the tree follows the
+ * SHAPE of the spectrum (peaks subdivide), not its absolute level. Returns
+ * null for a flat spectrum (no spectral information — the audio term then
+ * contributes nothing and the blend relaxes to field-only).
  */
-export function audioTermCell(bands, y0, y1) {
-  if (!bands) return 0;
+export function audioNorm(bands) {
+  if (!bands) return null;
+  let mn = 1, mx = 0;
+  for (const k of QUAD_BAND_ORDER) {
+    const v = bandLevel(bands, k);
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+  }
+  if (mx - mn < 0.05) return null;
+  return { mn, range: mx - mn };
+}
+
+/**
+ * Audio term over a whole cell: the contrast-normalized MEAN band energy
+ * across the cell's vertical span (3 taps). 0 at the coolest band, 1 at the
+ * hottest — so best-first subdivision forms a depth gradient that pools at
+ * the spectral peaks (kick → floor, hats → ceiling).
+ */
+export function audioTermCell(bands, y0, y1, norm) {
+  if (!bands || !norm) return 0;
   const lo = Math.min(1, Math.max(0, y0));
   const hi = Math.min(1, Math.max(0, y1));
-  const p0 = (1 - hi) * (QUAD_BAND_ORDER.length - 1);
-  const p1 = (1 - lo) * (QUAD_BAND_ORDER.length - 1);
-  let best = Math.max(bandAtPos(bands, p0), bandAtPos(bands, p1));
-  // Interior band boundaries: the piecewise-linear peak may sit inside.
-  for (let b = Math.ceil(p0); b <= Math.floor(p1); b++) {
-    const v = bandAtPos(bands, b);
-    if (v > best) best = v;
-  }
-  return best;
+  const p = (y) => (1 - y) * (QUAD_BAND_ORDER.length - 1);
+  const mean = (bandAtPos(bands, p(lo)) + bandAtPos(bands, p((lo + hi) / 2)) + bandAtPos(bands, p(hi))) / 3;
+  return Math.min(1, Math.max(0, (mean - norm.mn) / norm.range));
 }
 
 /**
@@ -145,13 +157,13 @@ export function createBandSmoother({ attackSec = QUAD_ATTACK_SEC, releaseSec = Q
  */
 export function makeQuadtreeInterestingness({ seed, seedOffsets = null, quadAudio = 0.5, quadField = 0.5, fieldZ = 0, bands = null }) {
   const field = makeQuadtreeField(seed, seedOffsets, fieldZ);
-  // Relax contract: when the bus is silent the audio weight eases to zero,
-  // so the tree becomes field-only at FULL strength — not half-diluted by a
-  // dead term. (Spec §Dropout: "at zero audio term, interesting = fieldTerm".)
-  const audioActive = !!bands && QUAD_BAND_ORDER.some((k) => bandLevel(bands, k) >= BAND_FLOOR);
-  const wa = audioActive ? quadAudio : 0;
+  // Relax contract: when the bus is silent OR the spectrum is flat, the
+  // audio weight eases to zero — the tree becomes field-only at FULL
+  // strength, not half-diluted by a dead term. (Spec §Dropout.)
+  const norm = audioNorm(bands);
+  const wa = norm ? quadAudio : 0;
   return (nx, ny, w, h /* , depth */) => blendInteresting(
-    audioTermCell(bands, ny - h / 2, ny + h / 2),
+    audioTermCell(bands, ny - h / 2, ny + h / 2, norm),
     fieldTermAt(field, nx, ny, w),
     wa,
     quadField,
