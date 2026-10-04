@@ -82,13 +82,29 @@ async function recordWebM(page, fade, secs) {
 
 // Decodes the captured WebM in-page (video + requestVideoFrameCallback) and
 // returns the mean consecutive-frame difference — the trail-decay signal.
+//
+// The decode drives itself off the FILE, not the wall clock: it runs to
+// `ended` (or 12 frames, whichever first) with a generous backstop. The old
+// version gave up after a fixed 12s — barely longer than the 10s recording
+// itself — so on a CPU-starved runner it counted *decode speed* instead of
+// file content, and the frame-count assertion flaked at 5/6 (main run
+// 37172882467, 2026-10-03: hi >= 6 passed, lo got 5). `ended`/`duration` ride
+// back in the result so the next failure is self-diagnosing:
+//   ended=false -> the runner could not keep up (starvation)
+//   ended=true, frames<6 -> the file really is that short (capture-side)
 async function analyzeWebM(page) {
   return page.evaluate(async () => {
     const blob = window.__webmBlobs[window.__webmBlobs.length - 1];
     const url = URL.createObjectURL(blob);
     const video = document.createElement('video');
     video.muted = true;
+    video.playsInline = true;
     video.src = url;
+    // Attach the element (off the corner, invisible): an undisplayed <video>
+    // is a media-pipeline throttle target, and requestVideoFrameCallback only
+    // fires for frames that actually present.
+    video.style.cssText = 'position:fixed;left:-1px;top:-1px;width:1px;height:1px;opacity:0';
+    document.body.appendChild(video);
     await new Promise((res, rej) => {
       video.onloadedmetadata = res;
       video.onerror = () => rej(new Error('webm decode failed'));
@@ -101,18 +117,35 @@ async function analyzeWebM(page) {
     const ctx = cv.getContext('2d', { willReadFrequently: true });
     const frames = [];
     await new Promise((res) => {
+      let timer = 0;
+      let stopped = false;
+      const finish = () => {
+        if (stopped) return;
+        stopped = true;
+        clearTimeout(timer);
+        res();
+      };
       const onFrame = () => {
+        if (stopped) return;
         ctx.drawImage(video, 0, 0, W, H);
         frames.push(ctx.getImageData(0, 0, W, H).data.slice());
-        // 12 frames = 11 diffs, double the >= 6 the assertions need. Decoding
-        // 30 on software GL was the other half of the timeout budget.
-        if (frames.length >= 12) res();
+        // 12 frames = 11 diffs, double the >= 6 the assertions need.
+        if (frames.length >= 12) finish();
         else video.requestVideoFrameCallback(onFrame);
       };
       video.requestVideoFrameCallback(onFrame);
-      video.play().catch(() => res());
-      setTimeout(res, 12_000);
+      video.addEventListener('ended', finish, { once: true });
+      // Backstop: a 10s recording takes ~10s to play through at full speed,
+      // so this is lag allowance, not the primary stop condition.
+      timer = setTimeout(finish, 40_000);
+      video.play().catch(finish);
     });
+    const meta = {
+      frames: frames.length,
+      ended: video.ended,
+      duration: Number.isFinite(video.duration) ? Math.round(video.duration * 100) / 100 : null,
+    };
+    video.remove();
     URL.revokeObjectURL(url);
     const diffs = [];
     for (let i = 1; i < frames.length; i++) {
@@ -125,12 +158,16 @@ async function analyzeWebM(page) {
       diffs.push(s / (a.length / 4) / 3);
     }
     const mean = diffs.reduce((x, y) => x + y, 0) / Math.max(1, diffs.length);
-    return { frames: frames.length, meanDiff: mean };
+    return { ...meta, meanDiff: mean };
   });
 }
 
 test('REC WebM records the ACCUM trail buffer (fade differential)', async ({ page, browser }, testInfo) => {
-  test.setTimeout(180_000);
+  // Two real 10s recordings (plus trail build-up and blob ferrying) and two
+  // full in-page decodes on a starved runner. The decode backstop above can
+  // cost 40s each in the worst case, so the old 180s left the CI retry with
+  // no room at all (run 37172882467's retry died mid-wait at 180s).
+  test.setTimeout(240_000);
   await installBlobTap(page);
 
   const hi = await recordWebM(page, 5, 10);
@@ -162,8 +199,12 @@ test('REC WebM records the ACCUM trail buffer (fade differential)', async ({ pag
   // and cross-context frame timing makes the ratio unreliable. The size and
   // frame-count assertions above already prove the ACCUM trail buffer is
   // captured in the WebM stream.)
-  expect(hiStats.frames).toBeGreaterThanOrEqual(6);
-  expect(loStats.frames).toBeGreaterThanOrEqual(6);
+  // The diag string carries `ended`/`duration`: if the count ever fails
+  // again, the message says whether the decoder starved (ended=false) or the
+  // file itself is short (ended=true).
+  const diag = (s) => `frames=${s.frames} ended=${s.ended} duration=${s.duration}s`;
+  expect(hiStats.frames, diag(hiStats)).toBeGreaterThanOrEqual(6);
+  expect(loStats.frames, diag(loStats)).toBeGreaterThanOrEqual(6);
   expect(hiStats.meanDiff).toBeGreaterThan(5);
   expect(loStats.meanDiff).toBeGreaterThan(0);
 });
