@@ -48,6 +48,7 @@ import { isLeave, isRibbon, isComet } from './trailMode.mjs';
 import { buildFlowField } from './flowField.mjs';
 import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
+import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
@@ -626,6 +627,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     });
 
     contract.hands = { crooked: Number(layoutParams.crooked) || 0, open: Number(layoutParams.open) || 0 };
+    // #790 (color.hue): the assignable hue-rotation route's output, in
+    // degrees. Rides on top of each layer's layout hueRotate (the #262
+    // uniform path — never the palette). 0 on the default table (routes.hue
+    // undefined) → the contract is exactly as built, today's render
+    // bit-identical.
+    applyHueAudio(contract.layers, routes.hue ?? 0);
     applyParallax(contract.instances, {
       zTiers: layoutParams.zTiers,
       parallax: layoutParams.parallax,
