@@ -114,4 +114,18 @@ const bandKey = (bands) => bands ? QUAD_BAND_ORDER.map((k) => (bands[k] || 0).to
   assert.ok(meanY(audioLed) > 0.6, `audio-led tree pools low (meanY ${meanY(audioLed).toFixed(2)})`);
 }
 
+// 8. DEPTH extremes: 1 = coarse grid, 5 = fine clustering.
+{
+  const mk = (quadDepth) => quadtreeTree({
+    seed: SEED(555), seedOffsets: null, quadAudio: 0.5, quadField: 0.5, quadDepth, bands: null, fieldBucket: 0,
+  });
+  const coarse = mk(1);
+  const fine = mk(5);
+  const maxDepthOf = (ls) => Math.max(...ls.map((L) => L.depth));
+  assert.ok(maxDepthOf(coarse) <= 1, `DEPTH 1 caps at depth 1 (got ${maxDepthOf(coarse)})`);
+  assert.ok(coarse.length <= 4, `DEPTH 1 is a coarse grid (${coarse.length} leaves)`);
+  assert.ok(fine.length > coarse.length * 4, `DEPTH 5 clusters finer (${fine.length} vs ${coarse.length} leaves)`);
+  assert.ok(maxDepthOf(fine) >= 4, `DEPTH 5 reaches deep (${maxDepthOf(fine)})`);
+}
+
 console.log('quadtreeScatter.selfcheck: OK');

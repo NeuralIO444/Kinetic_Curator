@@ -89,6 +89,28 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         disabled={mode !== 'dla' && mode !== 'eden'} disabledReason="DLA / Eden growth modes only"
         onChange={v => set('growthBranch', v)} defaultValue={d('growthBranch', DEFAULT_LAYOUT_PARAMS.growthBranch)}
         locked={lockedParams.growthBranch} onToggleLock={() => lock('growthBranch')} />
+      {/* #721: AUDIO / FIELD / DEPTH drive the quadtree scatter — mode-gated
+          per #272 like DIVERGENCE: visible but inert outside quadtree, with
+          the reason. AUDIO weights the spectral-geography term, FIELD the
+          noise-ridge term, DEPTH caps the subdivision (1 = coarse grid). */}
+      <RangeRow label="AUDIO" value={layoutParams.quadAudio ?? 0.5} min={0} max={1} step={0.01}
+        hint="How much the live spectrum shapes the subdivision — 0 is field-only"
+        readout={`${Math.round((layoutParams.quadAudio ?? 0.5) * 100)}%`}
+        disabled={mode !== 'quadtree'} disabledReason="Quadtree mode only"
+        onChange={v => set('quadAudio', v)} defaultValue={d('quadAudio', DEFAULT_LAYOUT_PARAMS.quadAudio)}
+        locked={lockedParams.quadAudio} onToggleLock={() => lock('quadAudio')} />
+      <RangeRow label="FIELD" value={layoutParams.quadField ?? 0.5} min={0} max={1} step={0.01}
+        hint="How much the noise ridges shape the subdivision — the relax driver when audio drops"
+        readout={`${Math.round((layoutParams.quadField ?? 0.5) * 100)}%`}
+        disabled={mode !== 'quadtree'} disabledReason="Quadtree mode only"
+        onChange={v => set('quadField', v)} defaultValue={d('quadField', DEFAULT_LAYOUT_PARAMS.quadField)}
+        locked={lockedParams.quadField} onToggleLock={() => lock('quadField')} />
+      <RangeRow label="DEPTH" value={layoutParams.quadDepth ?? 5} min={1} max={6} step={1}
+        hint="Max subdivision depth — 1 is a coarse grid, 6 is fine clustering"
+        readout={`${layoutParams.quadDepth ?? 5}`}
+        disabled={mode !== 'quadtree'} disabledReason="Quadtree mode only"
+        onChange={v => set('quadDepth', v)} defaultValue={d('quadDepth', DEFAULT_LAYOUT_PARAMS.quadDepth)}
+        locked={lockedParams.quadDepth} onToggleLock={() => lock('quadDepth')} />
       {/* #310: Z-TIERS / NOISE FREQ / DISPLACE leave performer sight — they
           stay in state and presets/voices still set them, but the live knobs
           are gone. (MATERIAL and SHADING were already voice-only via #268.) */}
