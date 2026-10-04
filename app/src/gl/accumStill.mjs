@@ -203,7 +203,7 @@ async function main(argv) {
       const t = progress * duration;
       const resolvedLayers = resolveLayers(doc, { caps, ramp, motion, progress });
       frames.push(buildSceneContract({
-        doc, resolvedLayers, caps,
+        doc, resolvedLayers, caps, expandRegions: false,
         accum: { enabled: true, fade: args.fade, optics: args.optics, tunnel: args.tunnel, prism: args.prism, flow: args.flow, echoes: args.echoes, background },
       }));
       if (audioEnv) {

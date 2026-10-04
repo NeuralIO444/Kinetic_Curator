@@ -210,7 +210,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_regionMask', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -301,11 +301,12 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
 
-  // 20 floats/instance (80-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
-  // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase).
-  // #781: kineme 0 = still (exactly the old zeros).
+  // 24 floats/instance (96-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase)
+  // (region,0,0,0). #781: kineme 0 = still (exactly the old zeros).
+  // #725: region -1 = normal (no mask test), 0 = remainder, 1-4 = slot.
   const maxLen = instances.length;
-  const buf = new Float32Array(maxLen * 20);
+  const buf = new Float32Array(maxLen * 24);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = instances[i];
@@ -330,7 +331,8 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     const acc = hexToRgb(it.accent);
     buf[o + 12] = ink[0]; buf[o + 13] = ink[1]; buf[o + 14] = ink[2]; buf[o + 15] = acc[0];
     buf[o + 16] = acc[1]; buf[o + 17] = acc[2]; buf[o + 18] = it.kineme || 0; buf[o + 19] = it.kinemePhase || 0;
-    o += 20;
+    buf[o + 20] = it.region ?? -1; buf[o + 21] = 0; buf[o + 22] = 0; buf[o + 23] = 0;
+    o += 24;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
@@ -404,6 +406,27 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     return unit;
   }
 
+  // #725: 1x1 zero R8 for paths without a slot mask (stills). Lazily created.
+  // Binds on the given unit — never rely on the currently-active unit, since
+  // this is called from inside bindTex() argument evaluation.
+  let _dummyMask = null;
+  function dummyMaskTex(unit) {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    if (_dummyMask) {
+      gl.bindTexture(gl.TEXTURE_2D, _dummyMask);
+      return _dummyMask;
+    }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    _dummyMask = tex;
+    return tex;
+  }
+
   /**
    * Composite srcTex over dstTex (ping-pong): reads dstRead, writes dstWrite.
    * blend: blend id from blendIdFor(); opacity: group opacity; clip: [x0,y0,x1,y1] or null.
@@ -458,7 +481,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
 
   let sceneW = 1000, sceneH = 700;
-  function drawInstances(data, atlasTex, w, h) {
+  function drawInstances(data, atlasTex, regionMaskTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     if (data.byteLength > instCapacityBytes) {
@@ -488,22 +511,29 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
     gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
+    // #725: null (stills path) → 1x1 zero dummy; the mask test then keeps
+    // remainder pixels and drops region cutouts, but stills never expand
+    // (expandRegions: false), so every instance is -1 and skips the test.
+    // #725: slot mask on unit 7 (well clear of the atlas on 0). dummyMaskTex
+    // binds explicitly — it must not touch unit 0's atlas binding.
+    if (regionMaskTex) gl.uniform1i(U(quadProg, 'u_regionMask'), bindTex(7, regionMaskTex));
+    else gl.uniform1i(U(quadProg, 'u_regionMask'), (dummyMaskTex(7), 7));
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(0, 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 6; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 80, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 96, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 20);
-    for (let i = 0; i <= 5; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 24);
+    for (let i = 0; i <= 6; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
 
@@ -524,7 +554,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * groupOpacity folds into instance alpha (mask bakes; normal layers keep
    * group opacity in the composite pass, matching the SVG <g opacity>).
    */
-  function renderLayerInstances(layerTarget, instances, cells, atlasTex, scratch, blendTmp, w, h, groupOpacity = 1) {
+  function renderLayerInstances(layerTarget, instances, cells, atlasTex, regionMaskTex, scratch, blendTmp, w, h, groupOpacity = 1) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 0);
@@ -533,7 +563,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const flushNormal = () => {
       if (batch.length) {
         const data = instanceData(batch, cells, groupOpacity);
-        if (data.length) drawInstances(data, atlasTex, w, h);
+        if (data.length) drawInstances(data, atlasTex, regionMaskTex, w, h);
       }
       batch = [];
     };
@@ -546,7 +576,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      drawInstances(data, atlasTex, w, h);
+      drawInstances(data, atlasTex, regionMaskTex, w, h);
       composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(blendMode), 1, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
       gl.viewport(0, 0, w, h);
@@ -620,7 +650,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     squash = contract.squash || 0; // #594 PR3
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
-    const { atlasTex, grainLuts } = uploaded;
+    const { atlasTex, grainLuts, regionMaskTex } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];
 
@@ -639,7 +669,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // its opacity is baked into the mask alpha.
     const renderMask = (sourceId) => {
       const src = layerById.get(sourceId);
-      renderLayerInstances(maskT, byLayer.get(sourceId) || [], cells, atlasTex, scratchT, blendT, w, h, src.opacity);
+      renderLayerInstances(maskT, byLayer.get(sourceId) || [], cells, atlasTex, regionMaskTex, scratchT, blendT, w, h, src.opacity);
     };
     const maskFor = (layerId) => {
       const m = matteMap.get(layerId);
@@ -667,7 +697,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       // hueRotate (#262): implemented in the composite shader via the
       // SVG feColorMatrix hue-rotation matrix; 0 is pixel-identical to off.
       const hueRotate = (layer.layout && layer.layout.hueRotate) || 0;
-      renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h);
+      renderLayerInstances(layerT, instances, cells, atlasTex, regionMaskTex, scratchT, blendT, w, h);
       composite(
         compProg, compU, layerT.tex, dRead, dWrite,
         blendIdFor(layer.blend), layer.opacity, null, maskFor(layer.id), hueRotate
@@ -817,7 +847,7 @@ export function createRenderer(canvas) {
     canvas.width = w; canvas.height = h;
     bridge.resize(w, h, 1);
 
-    const uploaded = uploadStatic(payload);
+    const uploaded = { ...uploadStatic(payload), regionMaskTex: null };
     const T = allocFrameTargets(w, h);
     try {
       const mRead = renderFrameInto(payload, T, uploaded);
@@ -942,6 +972,34 @@ export function createLiveRenderer(canvas) {
   let atlasTex = null;
   let grainTexs = {};
   let accum = null;
+  // #725: region slot mask (R8, 0 = no slot, 1-4 = slot A-D). NEAREST, no
+  // mips — slot indices must never blend. Starts as a 1x1 zero so the
+  // sampler is always valid, even before any mask bakes.
+  let regionMaskTex = null;
+  function ensureRegionMaskTex() {
+    if (regionMaskTex) return regionMaskTex;
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array([0]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    regionMaskTex = tex;
+    return tex;
+  }
+  function setRegionMask(pixels, w, h) {
+    if (regionMaskTex) gl.deleteTexture(regionMaskTex);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, w, h, 0, gl.RED, gl.UNSIGNED_BYTE, pixels);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    regionMaskTex = tex;
+  }
 
   // #267: last live geometry, so offscreen captures can restore the
   // bridge to exactly the live size after rendering at capture size.
@@ -998,7 +1056,7 @@ export function createLiveRenderer(canvas) {
     ensureTargets(payload.width, payload.height, dprScale);
     // Draw at backing-store size; u_canvas stays 1000×700 so the scene
     // layout is identical — the extra pixels are pure sharpness.
-    return b.renderFrameInto({ ...payload, width: TW, height: TH }, T, { atlasTex, grainLuts: grainTexs }, { transparent });
+    return b.renderFrameInto({ ...payload, width: TW, height: TH }, T, { atlasTex, grainLuts: grainTexs, regionMaskTex: ensureRegionMaskTex() }, { transparent });
   }
 
   /** Present a composited target to the visible canvas (Y-flip resolve). */
@@ -1178,7 +1236,7 @@ export function createLiveRenderer(canvas) {
       // pure sharpness, same trick governor renderScale uses below 1x.
       const mRead = b.renderFrameInto(
         { ...payload, width: w, height: h }, OT,
-        { atlasTex, grainLuts: grainTexs }, { transparent });
+        { atlasTex, grainLuts: grainTexs, regionMaskTex: ensureRegionMaskTex() }, { transparent });
       return b.resolveTargetToBytes(mRead, OT, w, h);
     } finally {
       // A capture can only run after the first live frame (waitForReady), so
@@ -1198,7 +1256,7 @@ export function createLiveRenderer(canvas) {
   }
 
   return {
-    setAtlas, setGrainLuts,
+    setAtlas, setGrainLuts, setRegionMask,
     setResolveOptions: (o) => b.setResolveOptions(o),
     hasAtlas: () => !!atlasTex,
     renderFrame, renderFrameOffscreen, present, presentUpscaled, readback,

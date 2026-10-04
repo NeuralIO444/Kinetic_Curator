@@ -409,6 +409,8 @@ self.onmessage = (e) => {
       building = false;
       if (live) {
         live.setAtlas(msg.pixels, msg.width, msg.height, msg.mipmaps);
+        // #725: slot mask rides with the atlas when the bake produced one.
+        if (msg.mask) live.setRegionMask(msg.mask, msg.width, msg.height);
       }
       break;
 

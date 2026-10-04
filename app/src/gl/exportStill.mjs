@@ -169,7 +169,7 @@ export async function renderExport({
     motion: motion && motion !== 'none' ? motion : null,
     progress,
   });
-  const contract = buildSceneContract({ doc: d, resolvedLayers, caps });
+  const contract = buildSceneContract({ doc: d, resolvedLayers, caps, expandRegions: false });
   warnUnsupportedMaterials(resolvedLayers);
   // Background: explicit flag wins, else the project's palette bg (same rule
   // as the parity candidate and accumStill).

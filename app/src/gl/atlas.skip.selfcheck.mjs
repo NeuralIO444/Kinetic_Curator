@@ -25,9 +25,12 @@ test('#817 missing cell is skipped and the frame continues', () => {
     inst({ asset: 'ghost' }),
     inst(),
   ], cells);
-  assert.equal(packed.length, 20, 'the present combo still packs');
+  assert.equal(packed.length, 24, 'the present combo still packs (24 floats: 6 vec4s)');
   assert.ok(Math.abs(packed[6] - 0.1) < 1e-6, 'uv survived the skip');
   assert.ok(packed[12] > 0, 'ink is an attribute, not a rebaked cell');
+  assert.equal(packed[20], -1, '#725: default region is -1 (normal, no mask test)');
+  const withRegion = packInstanceData([inst({ region: 2 })], cells);
+  assert.equal(withRegion[20], 2, '#725: region filter rides in the 6th vec4');
   assert.equal(packInstanceData([inst({ asset: 'ghost' })], cells).length, 0);
   assert.equal(packInstanceData([inst()], null).length, 0);
 });

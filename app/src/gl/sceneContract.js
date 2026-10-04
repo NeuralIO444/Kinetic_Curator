@@ -25,7 +25,9 @@ import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
-import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme } from '../data/kinemes.js';
+import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, sanitizeAssetRegionKineme } from '../data/kinemes.js';
+import { expandRegionInstances } from '../assets/regionInstances.js';
+import { normalizeRegionSlots } from '../assets/regionSlots.js';
 import { resolvePalette } from '../data/palettes.js';
 
 export const GL_CONTRACT_VERSION = 1;
@@ -205,7 +207,7 @@ export function warnUnsupportedMaterials(resolvedLayers) {
   }
 }
 
-export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = null }) {
+export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = null, expandRegions = true }) {
   if (!doc || typeof doc !== 'object') throw new TypeError('buildSceneContract: doc required');
   if (!Array.isArray(resolvedLayers)) throw new TypeError('buildSceneContract: resolvedLayers required');
 
@@ -257,13 +259,33 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
   // index (1-based; 0/absent = still) and a per-instance phase. The table and
   // the motion time ride on the contract ONLY when something moves, so every
   // motionless contract (and its hash) is exactly what it was before.
+  //
+  // #725: region-targeted kinemes expand an asset's instance into per-region
+  // cutouts (remainder + one per animated slot) BEFORE the table is built,
+  // so region instances join the same flat table. A region's phase folds its
+  // slot into kinemePhase(seedOffset, key) — same function, no lockstep.
   const kinemeFields = (() => {
     const map = sanitizeAssetKineme(doc.assetKineme);
-    if (!map) return {};
+    const regionMap = sanitizeAssetRegionKineme(doc.assetRegionKineme);
+    // Expand first (no-op unless a slot has both an assignment and a kineme).
+    // Stills opt out (expandRegions: false) — the offline baker has no slot
+    // mask, so region cutouts would sample garbage; a still shows the asset
+    // whole and at rest, which is the honest single frame.
+    if (regionMap && expandRegions) {
+      const slotsByAsset = new Map();
+      for (const a of doc.customAssets || []) {
+        if (a && a.id && a.regionSlots) slotsByAsset.set(String(a.id), normalizeRegionSlots(a.regionSlots));
+      }
+      const expanded = expandRegionInstances(instances, slotsByAsset, regionMap, getKineme);
+      instances.length = 0;
+      instances.push(...expanded);
+    }
+    if (!map && !regionMap) return {};
     const table = [];
     const slot = new Map();
     for (const inst of instances) {
-      const k = getKineme(map[inst.asset]);
+      const kid = inst.region > 0 ? inst.regionKinemeId : map?.[inst.asset];
+      const k = getKineme(kid);
       if (!k) continue;
       if (!slot.has(k.id)) {
         if (table.length >= KINEME_TABLE_MAX) continue; // ponytail: 16-slot cap; a bigger library needs a texture table
@@ -271,7 +293,9 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         table.push({ kind: KINEME_KINDS[k.kind], period: k.period, amp: k.amp });
       }
       inst.kineme = slot.get(k.id);
-      inst.kinemePhase = kinemePhase(inst.seedOffset, inst.key);
+      inst.kinemePhase = inst.region > 0
+        ? kinemePhase(inst.seedOffset, `${inst.key}\x00${inst.regionSlot}`)
+        : kinemePhase(inst.seedOffset, inst.key);
     }
     if (!table.length) return {};
     const t = Number(doc.kinemeTime);

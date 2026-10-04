@@ -74,6 +74,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_RENAME, ({ id, name }) => dispatch({ type: 'RENAME_CUSTOM_ASSET', id, name }));
   on(Events.ASSETS_REPLACE, ({ id, svg }) => dispatch({ type: 'REPLACE_CUSTOM_ASSET', id, svg }));
   on(Events.ASSETS_REGION_SLOT, ({ id, slot, regionId }) => dispatch({ type: 'SET_ASSET_REGION_SLOT', id, slot, regionId }));
+  on(Events.ASSETS_REGION_KINEME, ({ id, slot, kinemeId }) => dispatch({ type: 'SET_ASSET_REGION_KINEME', id, slot, kinemeId }));
 
   on(Events.EXPORT_RECORD, (recording) => dispatch({ type: A.SET_IS_RECORDING, payload: recording }));
   on(Events.EXPORT_RENDERING, (rendering) => dispatch({ type: A.SET_IS_RENDERING, payload: rendering }));

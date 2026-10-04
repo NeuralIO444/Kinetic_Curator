@@ -70,6 +70,7 @@ export const Events = {
   ASSETS_RENAME: 'assets:rename',
   ASSETS_REPLACE: 'assets:replace',
   ASSETS_REGION_SLOT: 'assets:regionSlot',
+  ASSETS_REGION_KINEME: 'assets:regionKineme',
   EXPORT_SNAPSHOT: 'export:snapshot',
   EXPORT_RECORD: 'export:record',
   EXPORT_RENDERING: 'export:rendering',

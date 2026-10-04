@@ -9,7 +9,8 @@
 // untouched by the motion clock.
 import assert from 'node:assert';
 import {
-  KINEMES, KINEME_KINDS, getKineme, sanitizeAssetKineme, kinemePhase, createKinemeClock,
+  KINEMES, KINEME_KINDS, getKineme, sanitizeAssetKineme, sanitizeAssetRegionKineme,
+  kinemePhase, createKinemeClock,
 } from '../data/kinemes.js';
 import { PARAM_SPEC, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
@@ -25,6 +26,16 @@ assert.strictEqual(sanitizeAssetKineme(null), null);
 assert.strictEqual(sanitizeAssetKineme([]), null);
 assert.strictEqual(sanitizeAssetKineme({ a: 'nope' }), null, 'unknown kineme ids drop; nothing left → null');
 assert.deepStrictEqual(sanitizeAssetKineme({ a: 'spin', b: 7, c: 'bob' }), { a: 'spin', c: 'bob' });
+
+// ── #725 region kineme map sanitizer ─────────────────────────────────────
+assert.strictEqual(sanitizeAssetRegionKineme(null), null);
+assert.strictEqual(sanitizeAssetRegionKineme([]), null);
+assert.strictEqual(sanitizeAssetRegionKineme({ a: { A: 'nope' } }), null, 'unknown kineme ids drop; nothing left → null');
+assert.deepStrictEqual(
+  sanitizeAssetRegionKineme({ a: { A: 'spin', B: 'nope', Z: 'bob', C: 'pulse' }, b: 'spin' }),
+  { a: { A: 'spin', C: 'pulse' } },
+  'unknown slots and non-object values drop',
+);
 
 // ── phase: deterministic, and copies differ ──────────────────────────────
 assert.strictEqual(kinemePhase(3, 'p1-x'), kinemePhase(3, 'p1-x'));

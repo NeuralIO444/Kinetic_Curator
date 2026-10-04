@@ -17,7 +17,7 @@ import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
-import { sanitizeAssetKineme, getKineme } from '../../data/kinemes.js';
+import { sanitizeAssetKineme, sanitizeAssetRegionKineme, getKineme } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../../midi/map.mjs';
@@ -233,6 +233,8 @@ export const createGlobalSlice = (set) => ({
   assetWeightOverrides: {},
   /** #781 KINEME — { assetId: kinemeId }: which assets move, and how. Assets stay static sources. */
   assetKineme: {},
+  /** #725 — { assetId: { slot: kinemeId } }: region-targeted kinemes. */
+  assetRegionKineme: {},
   customAssets: [],
   ingestError: null,
   /**
@@ -552,6 +554,26 @@ export const createGlobalSlice = (set) => ({
     if (!getKineme(kinemeId) || cur[assetId] === kinemeId) return {};
     return { assetKineme: { ...cur, [assetId]: kinemeId } };
   }),
+  /**
+   * #725 — give an asset's region slot a motion (kinemeId) or make it still
+   * (null). Unknown kineme ids and unknown slots are ignored.
+   */
+  setAssetRegionKineme: (assetId, slot, kinemeId) => set((state) => {
+    if (!assetId || !REGION_SLOTS.includes(slot)) return {};
+    const cur = state.assetRegionKineme || {};
+    const curSlots = cur[assetId] || {};
+    if (kinemeId == null) {
+      if (!(slot in curSlots)) return {};
+      const nextSlots = { ...curSlots };
+      delete nextSlots[slot];
+      const next = { ...cur };
+      if (Object.keys(nextSlots).length) next[assetId] = nextSlots;
+      else delete next[assetId];
+      return { assetRegionKineme: next };
+    }
+    if (!getKineme(kinemeId) || curSlots[slot] === kinemeId) return {};
+    return { assetRegionKineme: { ...cur, [assetId]: { ...curSlots, [slot]: kinemeId } } };
+  }),
   setAssetWeight: (id, weight) => set((state) => {
     if (!WEIGHT_CYCLE.includes(weight)) return {};
     const asset = findAsset(id, sanitizeOverlay(state.customAssets));
@@ -636,6 +658,7 @@ export const createGlobalSlice = (set) => ({
     next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
     next.assetKineme = sanitizeAssetKineme(doc.assetKineme) || {}; // #781 — a doc without kinemes is still
+    next.assetRegionKineme = sanitizeAssetRegionKineme(doc.assetRegionKineme) || {}; // #725
     next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
     {
       const canvas = sanitizeCanvasSpec(doc);

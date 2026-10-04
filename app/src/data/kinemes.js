@@ -52,6 +52,28 @@ export function sanitizeAssetKineme(raw) {
 }
 
 /**
+ * #725 — sanitize an asset → slot → kineme map (region-targeted kinemes).
+ * Shape: { assetId: { A: kinemeId, B: ..., C: ..., D: ... } }. Unknown slots,
+ * unknown kineme ids, and non-string keys are dropped. Returns null when
+ * nothing valid remains, so callers can omit the field entirely.
+ */
+const REGION_SLOT_IDS = ['A', 'B', 'C', 'D'];
+export function sanitizeAssetRegionKineme(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  for (const [assetId, slots] of Object.entries(raw)) {
+    if (typeof assetId !== 'string' || !assetId || !slots || typeof slots !== 'object') continue;
+    const clean = {};
+    for (const s of REGION_SLOT_IDS) {
+      const kid = slots[s];
+      if (typeof kid === 'string' && BY_ID.has(kid)) clean[s] = kid;
+    }
+    if (Object.keys(clean).length) out[assetId] = clean;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
  * Per-instance phase in [0, 1) from instance identity, so copies of one asset
  * never move in lockstep. Deterministic: same (seedOffset, key) → same phase.
  */
