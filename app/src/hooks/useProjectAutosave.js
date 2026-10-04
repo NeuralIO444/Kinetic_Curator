@@ -6,7 +6,7 @@ import {
   writePipelineAutosave,
   readPipelineAutosave,
 } from '../state/projectDocument.js';
-import { rollLivingBoot } from '../data/firstLight.js';
+import { decideBoot } from '../state/startupBoot.mjs';
 import { recipeToProjectDoc } from '../state/recipes.js';
 import { parseBootHash, describePaletteFallback } from '../state/recipeUrls.js';
 
@@ -33,21 +33,24 @@ function bootFactoryRequested() {
 }
 
 /**
- * #707 — apply a rolled First Light starter directly (no MIX morph: this is
- * the first frame, not a transition). Seed is re-rolled so every fresh boot
- * is a different piece; running is forced on so the canvas is alive on load.
+ * #946 — startup chaos: one full wild roll on cold launch. Reuses the #945
+ * kineticRoll path (seed, palette, composition, mode, FX chain, blend
+ * modes, assets, density/count, behave) — one atomic store update, so the
+ * roll is exactly one undo entry. Running is forced on so the canvas is
+ * alive on load (same "wakes up playing" contract the living boot had).
+ * Heat starts cool: the first KIN tap after boot is a RULES pass.
  */
-function applyLivingBoot() {
+function applyStartupChaos() {
   const st = useStore.getState();
-  const { preset, paletteId, assetIds } = rollLivingBoot();
-  st.bumpSeed(); // fresh random seed so every boot is a different piece
-  st.setPaletteId(paletteId);
-  st.setEnabledAssets(Object.fromEntries(assetIds.map((id) => [id, true])));
-  st.setLayoutParams({ ...preset.params, composition: preset.id });
-  // The instrument wakes up playing: running is forced on (also clears a
-  // watchdog hard stop per the #264 resume contract).
+  st.kineticRoll();
   st.setRunning(true);
 }
+
+// Module-scope once-guard: the `restored` ref below already makes the boot
+// effect exactly-once per mount (StrictMode-safe), but a hot reload can
+// remount the tree without re-executing this module — this flag is the
+// cheap distinguisher so HMR doesn't fire a second chaos roll.
+let bootFired = false;
 
 /**
  * #534 — share-link boot. A `#r=kc-r/1.…` fragment is an explicit paste: it
@@ -106,35 +109,59 @@ export function useProjectAutosave() {
   const restored = useRef(false);
 
   useEffect(() => {
-    if (restored.current) return;
+    if (restored.current || bootFired) return;
     restored.current = true;
+    bootFired = true;
     try {
-      if (sessionStorage.getItem(RESTORED_FLAG)) return;
+      // #946 — in START: CHAOS mode (the default) every cold page load
+      // gets its opening roll, even on a same-session reload or second tab
+      // (the #33 once-per-session gate below only governs the restore).
+      // ?boot=factory and START: FIXED never roll.
+      if (sessionStorage.getItem(RESTORED_FLAG)) {
+        const st = useStore.getState();
+        if (st.startupMode !== 'fixed' && !bootFactoryRequested()) applyStartupChaos();
+        return;
+      }
       // #534 — a share-link fragment boots the linked scene instead of the
       // autosave. 'bad' was consumed but broken: fall through to the normal
-      // boot with the note already set.
+      // boot with the note already set. 'applied' wins over everything —
+      // an explicit paste is never rolled over.
       const hashBoot = bootFromHash();
       if (hashBoot === 'applied') return;
+      const st = useStore.getState();
       const { doc, quarantined } = readPipelineAutosave();
+      const decision = decideBoot({
+        shareApplied: false,
+        factoryRequested: bootFactoryRequested(),
+        startupMode: st.startupMode,
+        hasDoc: !!doc,
+      });
       if (quarantined) {
         // Boot factory defaults and say so. Never silently apply a document
         // we could not parse (#107 §6).
-        useStore.getState().setPersistStatus('quarantined');
+        st.setPersistStatus('quarantined');
       }
-      if (!doc) {
-        // #707 — living boot: no saved project means the instrument wakes
-        // up playing. A random First Light starter (curated preset +
-        // palette + 2–3 assets), a fresh seed, motion running. This is the
-        // only path that changes the empty state — restores are untouched.
-        // `?boot=factory` opts out (deterministic e2e entry).
-        // NOTE: the restored-session flag is deliberately NOT set here, so
-        // a document written between load and reload (the e2e seedDoc
-        // pattern) is still picked up on the next boot, exactly as before.
-        if (!bootFactoryRequested()) applyLivingBoot();
-        return;
+      if (decision.action === 'restore' || decision.action === 'restore-roll') {
+        // #33 — the saved project is the undo base the startup roll lands
+        // on, so yesterday is one Ctrl+Z away. (START: FIXED skips the
+        // restore — the known opener is the factory defaults, not
+        // yesterday. ?boot=factory keeps its historical meaning: restore,
+        // no roll.)
+        st.applyProject(doc);
+        sessionStorage.setItem(RESTORED_FLAG, '1');
       }
-      useStore.getState().applyProject(doc);
-      sessionStorage.setItem(RESTORED_FLAG, '1');
+      if (decision.action === 'roll' || decision.action === 'restore-roll') {
+        // #946 — replaces the #707 living boot: one full wild roll, then
+        // the instrument settles into normal tap behavior (heat starts
+        // cool, so the first KIN tap is a RULES pass).
+        // NOTE: the restored-session flag is deliberately NOT set on the
+        // fresh-boot roll, so a document written between load and reload
+        // (the e2e seedDoc pattern) is still picked up on the next boot,
+        // exactly as before.
+        applyStartupChaos();
+      }
+      // 'factory' — do nothing: the initial store state is the known,
+      // deterministic opener.
     } catch {
       // ignore
     }

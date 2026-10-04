@@ -177,6 +177,23 @@
 }
 
 .curator-left-group { display: flex; align-items: center; gap: 6px; }
+
+/* #946 — START: CHAOS / FIXED toggle. Sits next to the KIN button in the
+   top bar: plainly named, one click, remembered across sessions. CHAOS is
+   the default (accent dot lit); FIXED reads quiet. */
+.start-mode-btn {
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 6px; min-height: 22px; white-space: nowrap; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: background-color 100ms, color 100ms, border-color 100ms;
+}
+.start-mode-btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.start-mode-btn::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  border: 1px solid var(--dim); flex-shrink: 0;
+}
+.start-mode-btn[data-mode="chaos"]::before { background: var(--accent); border-color: var(--accent); }
 .curator-voice-wrap { position: relative; }
 .curator-voice-btn {
   background: transparent; border: 1px solid var(--line-2); color: var(--ink);
