@@ -47,6 +47,8 @@ layout(location=2) in vec4 a_inst1;
 layout(location=3) in vec4 a_inst2;
 layout(location=4) in vec4 a_inst3;
 layout(location=5) in vec4 a_inst4;
+layout(location=6) in vec4 a_inst5;   // #725: x = region filter (-1 normal,
+// 0 remainder keeps mask 0, 1-4 slot A-D keeps that slot's pixels)
 uniform vec2 u_canvas;
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
@@ -71,6 +73,7 @@ out vec3 v_light;
 out vec2 v_world;   // #594 PR2: fragment position (scene units) for per-texel light
 out vec4 v_rot;     // cos, sin of the instance rotation; x/y mirror signs
 out vec4 v_cell;    // the instance's atlas cell (u0, v0, u1, v1): bevel taps never leave it
+out float v_region;  // #725: region filter from a_inst5.x (-1 = no mask test)
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -152,6 +155,7 @@ void main() {
   float my = (a_inst0.w < 0.0 ? -1.0 : 1.0) * (a_inst2.y < a_inst1.w ? -1.0 : 1.0);
   v_rot = vec4(co, si, mx, my);
   v_cell = vec4(a_inst1.zw, a_inst2.xy);
+  v_region = a_inst5.x;  // #725: -1 normal, 0 remainder, 1-4 slot
   // #594 PR1: per-instance diffuse from the one sun, flat normal (0,0,1), at the
   // instance centre. Off → exactly vec3(1.0), so the unlit path is byte-identical.
   if (u_sun.w > 0.5) {
@@ -167,6 +171,7 @@ export const QUAD_VS = injectCommon(QUAD_VS_SRC);
 export const QUAD_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_atlas;
+uniform sampler2D u_regionMask;  // #725: R8, 0 = no slot, 1-4 = slot A-D. NEAREST, no mips.
 uniform float u_liveTint;
 uniform vec4 u_sun;        // #594: shared with the vertex stage (w = on)
 uniform vec4 u_sunLight;   // #594: shared, rgb colour + intensity
@@ -183,8 +188,17 @@ in float v_opacity;
 in vec3 v_ink;
 in vec3 v_accent;
 in vec3 v_light;
+in float v_region;  // #725: -1 = no mask test
 out vec4 o;
 void main() {
+  // #725: region cutout. Expanded instances keep only their region's pixels;
+  // normal instances (-1) skip the mask entirely, so the unmasked path is
+  // bit-for-bit what it was. The mask is R8 slot indices sampled NEAREST.
+  if (v_region > -0.5) {
+    float m = texture(u_regionMask, v_uv).r * 255.0;
+    float want = v_region < 0.5 ? 0.0 : v_region;
+    if (abs(m - want) > 0.5) discard;
+  }
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
   // Open Hand. Amount 0 never enters. The seed picks the ink: stroke, hollow, double, crop.
   if (u_hands.y > 0.0) {

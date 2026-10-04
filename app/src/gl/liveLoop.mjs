@@ -37,6 +37,7 @@ import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade s
 import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
 import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
 import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
+import { normalizeRegionSlots, REGION_SLOTS } from '../assets/regionSlots.js';
 import { buildSceneContract } from './sceneContract.js';
 import { applyParallax } from './parallax.mjs';
 import { resolvePalette } from '../data/palettes.js';
@@ -262,6 +263,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   let buildToken = 0;
   let svgPool = null; // Map asset id -> svg fragment, rebuilt on customAssets change
   let gradientPool = null; // #701 — Map asset id -> TE gradient, same lifetime
+  let regionSlotsPool = null; // #725 — Map asset id -> normalized region slots, same lifetime
   let svgPoolRef = null;
 
   // ACCUM session state.
@@ -357,6 +359,15 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // here so the baker never has to reach back into the asset catalogue
       // (overlay assets come from the store, not from ASSETS).
       gradientPool = new Map(pool.filter((a) => a.gradient).map((a) => [a.id, a.gradient]));
+      // #725 — per-asset region slot assignments for the slot-mask bake.
+      // Normalized here so the baker gets clean slot maps or nothing.
+      regionSlotsPool = new Map();
+      for (const a of pool) {
+        if (a && a.id && a.regionSlots) {
+          const norm = normalizeRegionSlots(a.regionSlots);
+          if (REGION_SLOTS.some((s) => norm[s])) regionSlotsPool.set(a.id, norm);
+        }
+      }
       svgPoolRef = customAssets;
     }
     return svgPool;
@@ -781,9 +792,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // independent, so a renderScale step skips the heavy sequential-SVG
       // bake and only the (cheap) grain LUTs rebuild.
       if (aKey !== atlasKey) {
-        const atlas = await bakeLiveAtlas(combos, svgById, gradientPool);
+        const atlas = await bakeLiveAtlas(combos, svgById, gradientPool, regionSlotsPool);
         if (token !== buildToken) return; // superseded
         live.setAtlas(atlas.pixels, atlas.width, atlas.height, atlas.mipmaps);
+        // #725: slot mask rides alongside the atlas (same cell layout). Null
+        // when nothing has slots — the shader's 1x1 zero dummy keeps those
+        // contracts on the unmasked path.
+        if (atlas.mask) live.setRegionMask(atlas.mask, atlas.width, atlas.height);
         cells = Object.fromEntries(atlas.cells);
         atlasKey = aKey;
       }

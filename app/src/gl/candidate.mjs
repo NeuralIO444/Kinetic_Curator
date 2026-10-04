@@ -25,7 +25,7 @@ export async function renderCandidate(scene, { width = 400 } = {}) {
   const caps = getRenderCaps(doc.quality || 'balanced', false);
   await whenSwarmWasmReady(); // #175 — wasm fast path warmed up when available
   const resolvedLayers = resolveLayers(doc, { caps });
-  const contract = buildSceneContract({ doc, resolvedLayers, caps });
+  const contract = buildSceneContract({ doc, resolvedLayers, caps, expandRegions: false });
   const height = Math.round((width * 700) / 1000);
   const bg = resolvedLayers[0]?.palette?.bg || '#000000';
   const { pixels } = await renderViaGL(contract, { width, height, bg });

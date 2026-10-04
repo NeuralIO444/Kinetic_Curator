@@ -28,6 +28,8 @@ const LIVE_GUTTER = 32;
 const ALPHA_CUTOFF = 4;
 
 import { applyGradient } from '../assets/gradient.js';
+import { rasterizeRegions } from '../assets/regionRaster.js';
+import { buildRegionMask, MASK_CELL_PX } from '../assets/regionInstances.js';
 
 export const comboKey = (asset) => asset;
 
@@ -142,9 +144,13 @@ function buildMipmaps(pixels, width, height) {
  * Bake an atlas for the given assets as masks.
  * @param {Array<{asset:string}>} combos
  * @param {Map<string,string>} svgById asset id -> SVG fragment
- * @returns {Promise<{pixels:Uint8Array,width:number,height:number,cells:Map,mipmaps:Array}>}
+ * @param {Map<string,string>|null} gradientById
+ * @param {Map<string,object>|null} slotsById #725: asset id -> normalized region slot map
+ * @returns {Promise<{pixels:Uint8Array,width:number,height:number,cells:Map,mipmaps:Array,mask:Uint8Array|null}>}
+ *   mask is an R8 cell-parallel slot map (0 = no slot, 1-4 = slot A-D), or
+ *   null when no combo has slots. Same width/height/cell layout as pixels.
  */
-export async function bakeLiveAtlas(combos, svgById, gradientById = null) {
+export async function bakeLiveAtlas(combos, svgById, gradientById = null, slotsById = null) {
   const uniq = [];
   const seen = new Set();
   for (const c of combos) {
@@ -157,6 +163,9 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null) {
   const width = cols * stride;
   const height = rows * stride;
   const pixels = new Uint8Array(width * height * 4); // transparent black gutters
+  // #725: parallel R8 slot mask, same cell layout. Built lazily — stays null
+  // unless at least one combo's asset has region slots.
+  let mask = null;
   const cells = new Map();
   // Rasterize sequentially: parallel Image decodes thrash the raster pool
   for (let i = 0; i < uniq.length; i++) {
@@ -170,6 +179,26 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null) {
         ((cy + y) * width + cx) * 4,
       );
     }
+    // #725: region slot mask for this combo's asset. Detection runs at
+    // 200px over the 0..100 box; buildRegionMask places it 1:1 into the
+    // 400px cell (see regionInstances.js for the geometry contract).
+    const slots = slotsById?.get(c.asset);
+    if (slots) {
+      const src = svgById.get(c.asset);
+      if (src != null) {
+        const cached = await rasterizeRegions(src).catch(() => null);
+        if (cached) {
+          if (!mask) mask = new Uint8Array(width * height);
+          const cell = buildRegionMask(cached, slots);
+          for (let y = 0; y < MASK_CELL_PX; y++) {
+            mask.set(
+              cell.subarray(y * MASK_CELL_PX, (y + 1) * MASK_CELL_PX),
+              (cy + y) * width + cx,
+            );
+          }
+        }
+      }
+    }
     cells.set(c.key, {
       // Half-texel inset: the shader quad spans texel centers.
       u0: (cx + 0.5) / width, v0: (cy + 0.5) / height,
@@ -178,7 +207,7 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null) {
     });
   }
   const mipmaps = buildMipmaps(pixels, width, height);
-  return { pixels, width, height, cells, mipmaps };
+  return { pixels, width, height, cells, mipmaps, mask };
 }
 
 /**

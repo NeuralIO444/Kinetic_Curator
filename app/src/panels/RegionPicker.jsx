@@ -8,12 +8,14 @@ import { emit, Events } from '../composition/eventBus.js';
 import { useApp } from '../state/AppContext.jsx';
 import { rasterizeRegions, regionAt, REGION_RASTER_PX } from '../assets/regionRaster.js';
 import { REGION_SLOTS, normalizeRegionSlots, slotOfRegion } from '../assets/regionSlots.js';
+import { KINEMES } from '../data/kinemes.js';
 
 const SLOT_COLORS = { A: '#ffd166', B: '#06d6a0', C: '#118ab2', D: '#ef476f' };
 const PREVIEW_PX = 240;
 
 export function RegionPicker({ assetId, onClose }) {
   const { assets } = useApp();
+  const { state } = useApp((s) => ({ assetRegionKineme: s.assetRegionKineme }));
   const asset = assets.find((a) => a.id === assetId) || null;
   const [cached, setCached] = useState(null);
   const [hoverId, setHoverId] = useState(null);
@@ -22,6 +24,7 @@ export function RegionPicker({ assetId, onClose }) {
   const wrapRef = useRef(null);
 
   const slots = useMemo(() => normalizeRegionSlots(asset?.regionSlots), [asset?.regionSlots]);
+  const regionKinemes = (state.assetRegionKineme || {})[assetId] || {};
 
   useEffect(() => {
     let live = true;
@@ -139,7 +142,21 @@ export function RegionPicker({ assetId, onClose }) {
                   {slots[s] || '—'}
                 </span>
                 {slots[s] && (
-                  <button type="button" className="chip-btn" title={`Unassign slot ${s}`} onClick={() => unassign(s)}>×</button>
+                  <>
+                    <select
+                      value={regionKinemes[s] || ''}
+                      title={`Kineme for slot ${s} — animates only this region`}
+                      onChange={(e) => emit(Events.ASSETS_REGION_KINEME, {
+                        id: asset.id, slot: s, kinemeId: e.target.value || null,
+                      })}
+                      style={{ fontSize: 10, background: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--line)' }}>
+                      <option value="">still</option>
+                      {KINEMES.map((k) => (
+                        <option key={k.id} value={k.id}>{k.id}</option>
+                      ))}
+                    </select>
+                    <button type="button" className="chip-btn" title={`Unassign slot ${s}`} onClick={() => unassign(s)}>×</button>
+                  </>
                 )}
               </div>
             ))}

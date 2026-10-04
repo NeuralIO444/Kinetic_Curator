@@ -9,6 +9,7 @@
 import { bakeLiveAtlas } from './liveAtlas.mjs';
 import { ASSETS } from '../data/assets/index.js';
 import { mergePool } from '../assets/overlay.js';
+import { normalizeRegionSlots, REGION_SLOTS } from '../assets/regionSlots.js';
 
 export function serializeStoreState(s) {
   if (!s) return {};
@@ -105,7 +106,15 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
         isBuilding = true;
         try {
           const svgById = getSvgMap();
-          const atlas = await bakeLiveAtlas(msg.combos, svgById);
+          // #725: region slots for the mask bake (same pool the SVG map uses).
+          const slotsById = new Map();
+          for (const a of mergePool(ASSETS, getState()?.customAssets || [])) {
+            if (a?.id && a.regionSlots) {
+              const norm = normalizeRegionSlots(a.regionSlots);
+              if (REGION_SLOTS.some((s) => norm[s])) slotsById.set(a.id, norm);
+            }
+          }
+          const atlas = await bakeLiveAtlas(msg.combos, svgById, null, slotsById);
           if (disposed) return;
 
           const transferList = [];
@@ -122,6 +131,10 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
               }
             }
           }
+          if (atlas.mask?.buffer && !seen.has(atlas.mask.buffer)) {
+            transferList.push(atlas.mask.buffer);
+            seen.add(atlas.mask.buffer);
+          }
 
           const cellsObj = atlas.cells instanceof Map ? Object.fromEntries(atlas.cells) : (atlas.cells || {});
           worker.postMessage(
@@ -133,6 +146,7 @@ export function createWorkerLiveLoop(canvas, { getState, viewRef, previewScale =
               height: atlas.height,
               cells: cellsObj,
               mipmaps: atlas.mipmaps,
+              mask: atlas.mask || null,
             },
             transferList
           );
