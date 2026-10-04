@@ -1,9 +1,9 @@
 # Agent contract — Kinetic Curator
 
 > **SOP:** all agents follow [`docs/AGENT_SOP.md`](docs/AGENT_SOP.md) — roles, lanes, reporting, localhost review, merging. It wins if a chat prompt disagrees.
-Read this before writing code. The product spec for the current engine push is [`docs/ENGINE_PLAN.md`](docs/ENGINE_PLAN.md). That file wins if this one and a chat prompt disagree.
+Read this before writing code. [`docs/ENGINE_PLAN.md`](docs/ENGINE_PLAN.md) is **closed** (spines A–G shipped — do not reopen or re-derive). The ordering surface is [`docs/ROADMAP_V1.md`](docs/ROADMAP_V1.md); the ledger is GitHub's open issues. Where this file and a chat prompt disagree, AGENT_SOP wins; where a plan doc and this file disagree, the still-open plan doc wins.
 
-**Embargo:** [`docs/EMBARGO.md`](docs/EMBARGO.md) — no new features until spine C is merged and Matt has played the body. Deferred labs are not tickets.
+**Embargo:** [`docs/EMBARGO.md`](docs/EMBARGO.md) — **lifted 2026-09-23** (Night Migration 30/60 sign-off recorded there; Stage 1 unfrozen). The deferred labs pile is **still deferred** — deferred labs are not tickets.
 
 **Physics & Animation Mandate:** [`docs/ALWAYS_ALIVE.md`](docs/ALWAYS_ALIVE.md) — The "Always Alive" Protocol.
 
@@ -14,16 +14,16 @@ Long-range layers (do not implement out of order): [`docs/path/README.md`](docs/
 | Who | Does | Does not |
 |-----|------|----------|
 | **Coding agent** | One spine letter per PR. CI green. Selfcheck honest. | Merge. Invent the next letter. Re-derive shipped work. |
-| **Review agent (Grok)** | Read the PR against ENGINE_PLAN + this file. Flag collisions, stamps, missing tests. | Rewrite the patch in-chat as a second implementation. |
+| **Review agent (Grok)** | Read the PR against this file + `AGENT_SOP` + the assigned issue or still-open plan doc. Flag collisions, stamps, missing tests. | Rewrite the patch in-chat as a second implementation. |
 | **Matt** | Play it. Eyes on feel, FEED (#374), icons (#346), M3 costs (#298). Merge word. | |
 
-Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveResolve.mjs` / `particles.js` stay one-writer files for any concurrent work, spine or not — the "through B" clause is moot now (spine is through F).
+Do not run two coding agents on the live loop at once. `liveLoop.mjs` / `liveResolve.mjs` / `particles.js` stay one-writer files for any concurrent work, spine or not — the old "through B" clause is moot (spine ran A through G, all merged).
 
 ## Before you open a branch
 
 1. `git pull origin main`.
 2. Read ENGINE_PLAN §0 (**already shipped — do not redo**).
-3. **Spines A–F (#387–#392) are closed, and #341 (FX 4-cap) landed as PR #412 — there is no open spine letter and no lowest-open coding item waiting.** What's open: Matt-only feel (#374, #346, #298), parked (#221, #228), and product lanes (#248 panel consolidation, #270 mobile, #344/#345 leftovers). The #248 coding plan is [`docs/PANEL_CONSOLIDATION_PLAN.md`](docs/PANEL_CONSOLIDATION_PLAN.md) — read its open-questions section first; those need Matt's nod, not a guess. If what you're about to touch isn't assigned to you, stop.
+3. **Spines A–G (#387–#392, #408) are closed, and #341 (FX 4-cap) landed as PR #412 — there is no open spine letter and no lowest-open coding item waiting.** *(Ledger refresh 2026-10-03: every item this paragraph used to list as open — #374, #346, #298, #270, #344, #345, #228, and #248's issue — is now closed.)* Open work lives in exactly two places: the **GitHub open-issue queue** (12 open, `order:` labels — trail #560, mod matrix #790, kinemes #705, live output #607/#608, MIDI learn #617, taste #762/#925/#926, region mattes #725, macro knobs #724, glyph pack #702) and the **stage lists in ROADMAP_V1** (refreshed 2026-10-03). One caution: #248's *status* is disputed — Phases 0–5 shipped, Phases 6–12 unmarked in [`docs/PANEL_CONSOLIDATION_PLAN.md`](docs/PANEL_CONSOLIDATION_PLAN.md), 6 tabs running vs a 4-tab end state. Neither resuming Phases 6+ nor declaring the plan done is yours to decide; read its open-questions section and stop. If what you're about to touch isn't assigned to you, stop.
 4. One letter per PR. Do not bundle A with D. (Note: C–F did not go through this — see below.)
 5. Read the issue body AND every comment on the issue before writing code. Comments carry acceptance criteria, edge cases, and recorded decisions — build them in, don't rediscover them.
 
@@ -61,7 +61,7 @@ Tape lane (#342 PR #383) merged 2026-09-21. **#341** (FX 4-cap) landed as PR #41
 
 **Authoring freeze:** no new showcase / persona / bio-drive chips on the performance deck. Extra costumes are DLC/drawer. Bio-drive *engine* stays in core. See [`docs/path/06-library.md`](docs/path/06-library.md).
 
-**No labs until C is felt:** chip editor, species dish, UV scroll, HarfBuzz, synbio chrome — [`docs/CHIP_LAB.md`](docs/CHIP_LAB.md), [`docs/ASSET_LAB.md`](docs/ASSET_LAB.md), [`docs/SYNTHETIC_BIOLOGY.md`](docs/SYNTHETIC_BIOLOGY.md).
+**No labs (still deferred):** the C-feel gate is met and the embargo was lifted 2026-09-23, but these wait on Matt re-ordering the deferred pile — chip editor, species dish, UV scroll, HarfBuzz, synbio chrome — [`docs/CHIP_LAB.md`](docs/CHIP_LAB.md), [`docs/ASSET_LAB.md`](docs/ASSET_LAB.md), [`docs/SYNTHETIC_BIOLOGY.md`](docs/SYNTHETIC_BIOLOGY.md).
 
 ## PR rules
 

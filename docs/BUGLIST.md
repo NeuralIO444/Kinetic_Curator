@@ -25,7 +25,7 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **package-lock + Playwright** | CI uses `npm install` so `@playwright/test` can resolve without a fully regenerated lock after 0.8. Prefer regenerating lock when convenient. |
 | **First-run overlay** | Smoke tests set `kc:first-run-seen`; real users see Play Me once. |
 | **WEBM + ACCUM** | In-app REC/CAPTURE records the **live GL canvas** via `captureStream` — ACCUM trails included, what plays is what exports (e2e `accum-recording.spec` asserts the trail differential). The old SVG-sampling caveat is retired; `--accum` stills stay the trail-honest stills (#90). |
-| **Machine-scoped selfcheck failures (#422)** | On at least one machine `gl/accum` (stipple gate Δ0.012) and `gl/debug` (gpuTimer/tapPoints `INVALID_ENUM`) fail and halt the `&&` chain in `npm run selfcheck`. All 77 other suites pass (full-disk sweep 2026-09-22). Open. |
+| **Machine-scoped selfcheck failures (#422)** | On at least one machine `gl/accum` (stipple gate Δ0.012) and `gl/debug` (gpuTimer/tapPoints `INVALID_ENUM`) fail and halt the `&&` chain in `npm run selfcheck`. All 77 other suites pass (full-disk sweep 2026-09-22). ~~Open.~~ **Closed — issue #422 closed; verified 2026-10-03.** |
 | **Legacy folder stubs** | Empty or residual paths may remain on disk history; active app is **`app/`** only. |
 | **Offline swarm needs a bake** | `studio/` replays swarm deterministically (#63). The live canvas keeps its RAF loop for pointer response, so the two agree only for the same seed and step count. |
 | **`plus-lighter` in finals** | The GL backend maps `plus-lighter` → `screen` and records the substitution in the sidecar (#96). The old resvg path (which couldn't do it at all) is retired. |
@@ -56,4 +56,4 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 - Chip-stutter pair: continuous life-drift phase (#431 / PR #435), integrated warp phase (#432 / PR #436)
 - Unwired selfcheck suites now in manifest: `evalContext`, `itemMorph`, `feedLive` (#438)
 
-*Last updated: 2026-09-28 — #438 (unwired selfcheck suites) verified fixed and moved to reference; #422 remains open. Bug sweep on `7d60c4b`: lint green, 77/79 selfchecks (the two failures are #422), 19/19 Playwright.*
+*Last updated: 2026-09-28 — #438 (unwired selfcheck suites) verified fixed and moved to reference; #422 remains open. Bug sweep on `7d60c4b`: lint green, 77/79 selfchecks (the two failures are #422), 19/19 Playwright. (**Ledger note 2026-10-03:** #422 has since been closed; the sweep figures above are a dated snapshot, not current state.)*

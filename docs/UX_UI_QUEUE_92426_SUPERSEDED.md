@@ -1,5 +1,7 @@
 # 🛠️ UX/UI & Architecture Refactor Queue
 
+> **Status 2026-10-03 — superseded; not orders.** Renamed from `docs/UX / UI 92426` (trailing/leading-space path) so tooling stops choking on it. Every item here has been overtaken: the **Pipeline rename shipped** (PIPELINE tab, P05), the **four architecture phases went to `KC1_ARCHITECTURE_ROADMAP.md`** (recorded implemented and validated), the **tally light** folds into the taste work (#762/#793), and the **offscreen/worker preview** shipped in the render-worker era. Kept as a dated snapshot — do not file from it.
+
 ## Issue: Refactor Output Panel to "Pipeline" (I/O)
 **Labels:** `UX/UI`, `Enhancement`
 
