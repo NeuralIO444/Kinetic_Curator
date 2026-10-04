@@ -34,6 +34,7 @@ const COLUMN_FRACTIONS = [0.62, 0.38];
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
 import { wireEventBus } from './composition/wireEventBus.js';
 import { subscribeDispatch } from './composition/dispatchPipe.js';
+import { loisActivity } from './curator/loisActivity.js';
 
 function AppInner() {
   const { dispatch: rawDispatch, history, palette, glLoopRef } = useApp();
@@ -44,6 +45,10 @@ function AppInner() {
   useEffect(() => subscribeDispatch((a) => {
     if (import.meta.env.DEV) console.debug('[pipe]', a.type);
   }), []);
+
+  // LOIS honest feed (#948/#956): records user-behavior signals only —
+  // no UI, no store writes, nothing visible. Surfaces come later.
+  useEffect(() => loisActivity.start({ store: useStore }), []);
 
   const { state } = useApp(s => ({
     evolveMode: s.evolveMode,

@@ -102,4 +102,5 @@ export const Events = {
   PALETTE_IMPORT: 'palette:import',
   PALETTE_LOCK: 'palette:lock',
   PALETTE_HARMONY: 'palette:harmony',
+  KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
 };

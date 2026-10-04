@@ -28,6 +28,7 @@ import {
   decayHeat,
   heatLevel,
 } from './kineticHeat.mjs';
+import { Events, emit } from '../../composition/eventBus.js';
 
 export function KineticButton() {
   const kineticRulesPass = useStore((s) => s.kineticRulesPass);
@@ -68,6 +69,8 @@ export function KineticButton() {
     const r = routeKineticTapHeat(runRef.current, now);
     runRef.current = { heat: r.heat, taps: r.taps, lastTapAt: r.lastTapAt };
     setHeat(r.heat);
+    // LOIS honest feed: the single observable for a KINETIC tap (button + K).
+    emit(Events.KINETIC_TAP, { kind: r.layer });
     if (r.layer === 'chaos') kineticRoll();
     else if (r.layer === 'weather') kineticWeatherPass();
     else kineticRulesPass();
