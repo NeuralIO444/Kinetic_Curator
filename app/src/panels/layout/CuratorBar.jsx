@@ -16,6 +16,7 @@ import {
   getActivePersonaId,
   setActivePersona,
 } from '../../curator/taste.js';
+import { KineticButton } from './KineticButton.jsx';
 
 export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
@@ -77,6 +78,8 @@ export function CuratorBar() {
   };
   return (
     <div className="curator-left-group kc-topbar-curator">
+        {/* #942 — KINETIC leads the global-verb row: storm generator first, tasting second. */}
+        <KineticButton />
         <div className="curator-voice-wrap" ref={presetWrapRef}>
           <button
             className="curator-voice-btn"

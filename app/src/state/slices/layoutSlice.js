@@ -1,10 +1,12 @@
-import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, trimUndoStack, UNDO_KIND_LAYERS } from '../history.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
 import { hasChain, markovPick } from '../../curator/transitions.js';
-import { getCatalogPalette, normalizeHex, resolvePalette } from '../../data/palettes.js';
+import { getCatalogPalette, normalizeHex, resolvePalette, PALETTES } from '../../data/palettes.js';
+import { COMPOSITION_PRESETS } from '../../data/presets.js';
+import { defaultFxParams, isFxLayer, FX_MENU_KINDS } from '../../fx/fxFilters.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
@@ -13,6 +15,39 @@ import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SH
 import { ASSETS } from '../../data/assets/index.js';
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
+import { isTapeFull } from '../tapeBudget.js';
+
+/** One honest die for #942's naive roll — every result lands in serialized state. */
+const die = (n) => (Math.random() * n) | 0;
+
+/** Pick a random id from `ids`, preferring one that differs from `current`. */
+function pickOtherId(ids, current) {
+  if (!ids.length) return current;
+  if (ids.length === 1) return ids[0];
+  let next = current;
+  for (let i = 0; i < 8 && next === current; i++) next = ids[die(ids.length)];
+  return next;
+}
+
+/** Pick a random composition preset, preferring a different composition id. */
+function pickOtherPreset(presets, currentComposition) {
+  const ids = presets.map((p) => p.id);
+  const id = pickOtherId(ids, currentComposition);
+  return presets.find((p) => p.id === id) || presets[0];
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = die(i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pick(arr) {
+  return arr[die(arr.length)];
+}
 
 /**
  * Open a MIX toward `merged` layout params (#284 morph-don't-cut). Live state
@@ -519,6 +554,91 @@ export const createLayoutSlice = (set) => ({
       // Honest flag: if any chain had no row for the current value this press
       // had no memory behind it, and the bar says so.
       curateChainFallback: chainFellBack,
+    };
+  }),
+
+  /**
+   * KINETIC button (#942) — naive full re-roll of the recipe. Placeholder
+   * until the RULES/WEATHER/HEAT layers land (#943–#945): every tap rolls a
+   * fresh seed, palette, composition preset (composition + mode + behave +
+   * density/count + the designer's brief), asset pool, FX chain and blend
+   * modes, in one atomic store update = one undo entry.
+   *
+   * Reuses the existing axes rather than inventing new ones: the preset
+   * merge respects lockedParams exactly like applyPreset, the pool swap maps
+   * through known ids like loadShapeSet, palette overrides clear like
+   * setPaletteId (the palette crossfade rides paletteMixSeconds). Behave
+   * easing (#722) and the seed phase restart (#710) live in the engine and
+   * apply automatically — no special-casing here.
+   *
+   * UNDO_KIND_LAYERS because the roll touches layer structure (FX effects,
+   * blend modes) as well as edit fields; 'layers' entries hold the whole
+   * document and always apply on undo (#223).
+   */
+  kineticRoll: () => set((state) => {
+    const undo = pushToUndo(state, true, UNDO_KIND_LAYERS);
+
+    // 1. seed — nonzero uint32. The worker rebuilds placements from it (#710:
+    // same seed in → same picture out; the footer shows seed:{hex}).
+    let seed = (Math.random() * 0xffffffff) >>> 0;
+    if (seed === 0) seed = 1;
+
+    // 2. palette — random catalog id, preferably not the current one.
+    const paletteId = pickOtherId(PALETTES.map((p) => p.id), state.paletteId);
+
+    // 3. composition — random preset (carries composition + mode + behave +
+    // density/count), preferably a different composition; locked params hold.
+    const preset = pickOtherPreset(COMPOSITION_PRESETS, state.layoutParams.composition);
+    const merged = { ...state.layoutParams, composition: preset.id };
+    for (const [k, v] of Object.entries(preset.params)) {
+      if (!state.lockedParams[k] && merged[k] !== v) merged[k] = v;
+    }
+
+    // 4. assets — random shape set, mapped through known ids like loadShapeSet.
+    const shapeSet = SHAPE_SETS[die(SHAPE_SETS.length)];
+    const known = new Set(ASSETS.map((a) => a.id));
+    for (const c of state.customAssets || []) known.add(c.id);
+    const enabledAssets = {};
+    for (const assetId of shapeSet.ids) if (known.has(assetId)) enabledAssets[assetId] = true;
+
+    // 5. FX + blend — one FX layer, 0–3 random menu effects with default
+    // params; content layers get a random blend mode. Never strands the
+    // project: an empty shape-set mapping keeps the current pool.
+    let layers = state.layers;
+    let fxLayer = layers.find(isFxLayer);
+    let selectedFxLayerId = state.selectedFxLayerId;
+    if (!fxLayer && !isTapeFull(state)) {
+      // Layer id derives from the roll's own seed — unique per roll, no wall
+      // clock (layoutSlice is a must-loop performer per #806).
+      fxLayer = {
+        id: `fx-${seed.toString(36)}`,
+        name: `FX ${layers.filter(isFxLayer).length + 1}`,
+        type: 'fx', visible: true, effects: [],
+        layerBlendMode: 'normal', layerOpacity: 1,
+      };
+      layers = [...layers, fxLayer];
+      selectedFxLayerId = fxLayer.id;
+    }
+    const fxKinds = shuffle(FX_MENU_KINDS).slice(0, die(4));
+    const effects = fxKinds.map((kind) => ({ kind, params: defaultFxParams(kind) }));
+    layers = layers.map((l) => {
+      if (fxLayer && l.id === fxLayer.id) return { ...l, effects };
+      if (!isFxLayer(l)) return { ...l, layerBlendMode: pick(BLEND_MODES) };
+      return l;
+    });
+
+    return {
+      ...undo,
+      seed,
+      paletteId,
+      paletteOverrides: null,
+      paletteLocks: {},
+      layoutParams: merged,
+      enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
+      layers,
+      selectedFxLayerId,
+      voiceMix: null,
+      activeVoiceId: null,
     };
   }),
 
