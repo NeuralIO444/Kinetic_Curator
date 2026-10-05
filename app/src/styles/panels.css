@@ -432,7 +432,14 @@
   overflow: hidden;
 }
 .snap-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.snap-fmt { font-size: 8px; letter-spacing: 0.1em; padding: 1px 3px; background: var(--ink); color: var(--bg); font-weight: 800; }
+.snap-fmt { font-size: 8px; letter-spacing: 0.1em; color: var(--dim); opacity: 0.6; }
+/* #962 (UX-2): read-only status must never look tappable — dim plain text,
+   no pill/button styling, default cursor. */
+.pipeline-status {
+  font-size: 10px; letter-spacing: 0.08em; color: var(--dim); opacity: 0.6;
+  cursor: default; user-select: none; white-space: nowrap;
+}
+.pipeline-hex { color: var(--dim); opacity: 0.55; cursor: default; user-select: none; }
 .snap-meta { display: flex; flex-direction: column; padding: 2px 4px; font-size: 8px; color: var(--dim); gap: 1px; }
 .snap-meta span:first-child { color: var(--ink); }
 .pipeline-hint {
@@ -440,6 +447,12 @@
   background: rgba(255,255,255,0.02);
   border: 1px dashed var(--line-2);
   color: var(--dim); font-size: 9px; letter-spacing: 0.04em;
+}
+/* #962 (UX-2): the export hint lines sit in their own zone below a divider,
+   so the read-only status never interleaves visually with the buttons. */
+.pipeline-export-hints {
+  margin-top: 6px; padding-top: 6px;
+  border-top: 1px solid var(--line);
 }
 
 /* ─── Error Boundary (B9) ─── */

@@ -230,16 +230,20 @@ export function DataExportRow({
         <button className="big-btn" onClick={clearTaste} style={{ flex: 1 }} title="Forget the imported taste">CLEAR</button>
         <input ref={tasteInputRef} type="file" accept=".json,application/json" onChange={importTaste} style={{ display: 'none' }} />
       </div>
-      <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
-      {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}{readThumbnail(projectFields) ? '' : ''}</div>}
-      {behind && (
-        <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>
-      )}
-      {recent.length > 0 && (
-        <div className="pipeline-hint" style={{ fontSize: 10 }}>
-          Recent: {recent.join(' · ')}
-        </div>
-      )}
+      {/* #962 (UX-2): read-only hint lines live in their own demoted zone,
+          visually separated from the tappable export buttons above. */}
+      <div className="pipeline-export-hints">
+        <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
+        {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}{readThumbnail(projectFields) ? '' : ''}</div>}
+        {behind && (
+          <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>
+        )}
+        {recent.length > 0 && (
+          <div className="pipeline-hint" style={{ fontSize: 10 }}>
+            Recent: {recent.join(' · ')}
+          </div>
+        )}
+      </div>
     </>
   );
 }

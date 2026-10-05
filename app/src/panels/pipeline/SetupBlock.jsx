@@ -27,6 +27,7 @@ export function SetupBlock() {
 
   return (
     <div className="pipeline-setup">
+      <div className="pipeline-section-label" style={{ marginTop: 2 }}>CANVAS</div>
       <div className="pipeline-row">
         <span style={{ flex: 1, fontSize: 11 }}>CANVAS PRESET</span>
         <select value={presetId} onChange={(e) => apply(e.target.value)} style={{ fontSize: 11, maxWidth: 180 }}>
@@ -62,18 +63,6 @@ export function SetupBlock() {
           {CANVAS_FPS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </div>
-      <div className="pipeline-row" title="Cabinets across and down, times pixels per cabinet. Writes the native raster.">
-        <span style={{ fontSize: 11 }}>LED</span>
-        <input type="number" value={cab.w} style={{ width: 48, fontSize: 11 }} onChange={(e) => setCab({ ...cab, w: Number(e.target.value) })} />
-        <span>×</span>
-        <input type="number" value={cab.h} style={{ width: 48, fontSize: 11 }} onChange={(e) => setCab({ ...cab, h: Number(e.target.value) })} />
-        <span style={{ fontSize: 10 }}>px</span>
-        <input type="number" value={cab.px} style={{ width: 56, fontSize: 11 }} onChange={(e) => setCab({ ...cab, px: Number(e.target.value) })} />
-        <button type="button" className="chip-btn" onClick={() => {
-          const r = ledRaster(cab.w, cab.h, cab.px);
-          setSize(r.w, r.h);
-        }}>SET SIZE</button>
-      </div>
       <div className="pipeline-row">
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, fontSize: 11 }} />
         <button type="button" className="chip-btn" onClick={() => save(name || 'My wall')}>SAVE</button>
@@ -87,7 +76,22 @@ export function SetupBlock() {
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
         {authored} at {fps}fps · {Math.round((w * h * fps) / 1e6)} Mpx/s
         {differ ? ` · not the ${actual} instrument` : ''}
-        . Syphon still does not send a frame from the browser.
+      </div>
+      <div className="pipeline-section-label" style={{ marginTop: 6 }}>LED</div>
+      <div className="pipeline-row" title="Cabinets across and down, times pixels per cabinet. Writes the native raster.">
+        <span style={{ fontSize: 11 }}>CABINETS</span>
+        <input type="number" value={cab.w} style={{ width: 48, fontSize: 11 }} onChange={(e) => setCab({ ...cab, w: Number(e.target.value) })} />
+        <span>×</span>
+        <input type="number" value={cab.h} style={{ width: 48, fontSize: 11 }} onChange={(e) => setCab({ ...cab, h: Number(e.target.value) })} />
+        <span style={{ fontSize: 10 }}>px</span>
+        <input type="number" value={cab.px} style={{ width: 56, fontSize: 11 }} onChange={(e) => setCab({ ...cab, px: Number(e.target.value) })} />
+        <button type="button" className="chip-btn" onClick={() => {
+          const r = ledRaster(cab.w, cab.h, cab.px);
+          setSize(r.w, r.h);
+        }}>SET SIZE</button>
+      </div>
+      <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
+        Syphon still does not send a frame from the browser.
       </div>
     </div>
   );
