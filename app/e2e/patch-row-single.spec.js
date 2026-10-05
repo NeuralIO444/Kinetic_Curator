@@ -13,6 +13,6 @@ test('PATCH row is disabled until there are two KC tracks', async ({ page }) => 
   const patch = page.locator('.layer-row-composite[title^="PATCH"]');
   await expect(patch.locator('select').first()).toBeDisabled();
 
-  await page.locator('.layer-row-ghost').filter({ hasText: 'KC-2' }).click();
+  await page.locator('.build-layer-stack .layer-section').nth(0).locator('.layer-add-btn').click();
   await expect(patch.locator('select').first()).toBeEnabled();
 });
