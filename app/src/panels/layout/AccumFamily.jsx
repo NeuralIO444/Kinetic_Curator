@@ -1,10 +1,9 @@
-// Toggle row: bleed / mirror / overlap / accum
-// #310: blendMode and paletteShift leave performer sight — they stay in state
-// and presets/voices still set them, but the selects are gone. (SHADING was
-// already voice-only via #268.) The engine contract falls back to 'normal'
-// for blendMode, so the hidden select changes nothing about the render.
-// ACCUM GLOW was demoted too, but Matt's #319 review restored it as a live
-// knob (remapped range from #317).
+// ACCUM trail family — extracted from ToggleRow.jsx (UX-5 reorg).
+// Trails are time behavior, not appearance: the ACCUM toggle plus the full
+// trail family (LEAVE / RIBBON / COMET, ECHOES, TRAIL FADE, tunnel / prism /
+// flow fades, ACCUM FADE, GLOW, FEEDBACK). Lives in MOTION & BEHAVIOR.
+// Matt's #319 review restored ACCUM GLOW as a live knob (remapped range
+// from #317).
 import { emit, Events } from '../../composition/eventBus.js';
 import { getTaper } from '../../components/taper.js'; // #274: shared slider curves
 import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read the single map
@@ -14,24 +13,17 @@ import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read th
 const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
 const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #317 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
 
-// #268: RECOLOR removed — nothing in the GL renderer ever read it. A
-// control that moves and changes nothing is worse than no control.
-const TOGGLES = ['bleed', 'mirror', 'overlap', 'accumulation'];
-
-export function ToggleRow({ layoutParams }) {
+export function AccumFamily({ layoutParams }) {
   return (
     <div className="toggle-row">
-      {TOGGLES.map(key => (
-        <button
-          key={key}
-          className={`tg ${layoutParams[key] ? 'tg-on' : ''}`}
-          title={key === 'accumulation' ? helpText('layout-accum') : undefined}
-          onClick={() => emit(Events.LAYOUT_PARAM, { key, value: !layoutParams[key] })}
-        >
-          <span className="tg-box">{layoutParams[key] ? '◉' : '○'}</span>
-          {key === 'accumulation' ? 'ACCUM' : key.toUpperCase()}
-        </button>
-      ))}
+      <button
+        className={`tg ${layoutParams.accumulation ? 'tg-on' : ''}`}
+        title={helpText('layout-accum')}
+        onClick={() => emit(Events.LAYOUT_PARAM, { key: 'accumulation', value: !layoutParams.accumulation })}
+      >
+        <span className="tg-box">{layoutParams.accumulation ? '◉' : '○'}</span>
+        ACCUM
+      </button>
 
       {layoutParams.accumulation && (
         <>
@@ -75,7 +67,6 @@ export function ToggleRow({ layoutParams }) {
             style={{ width: 64 }} />
         </label>
       ))}
-
 
       {layoutParams.accumulation && (
         <label
@@ -188,11 +179,6 @@ export function ToggleRow({ layoutParams }) {
           </label>
         </div>
       )}
-      {/* #310: the blendMode select is hidden but the state stays — sceneContract
-          reads layoutParams.blendMode and falls back to 'normal'; presets and
-          voices still set it. The paletteShift select left for the same reason. */}
-      {/* #268: SHADING removed — the GL renderer renders everything flat;
-          the only consumer was the retired SVG layer. */}
     </div>
   );
 }

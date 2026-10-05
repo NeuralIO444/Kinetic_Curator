@@ -1,18 +1,26 @@
-// BuildPanel shell — #248 Phase 2 absorbed LAYOUT's composition verbatim;
-// Phase 3 adds LayerStack as a second, visually distinct section (its own
-// PanelHeader-styled sub-heading, reused as-is rather than inventing new
-// section-divider CSS). Same subcomponents, same store selectors, same
-// event shapes throughout; only the title/id/tag changed. CSS class root
-// stays panel-layout on purpose (see PANEL_CONSOLIDATION_PLAN.md §5 —
-// renaming class roots to match new panel names is explicitly out of
-// scope here).
+// BuildPanel shell — UX-5 reorg: the panel reads top-down as four workflow
+// sections: ① LAYOUT (structure) → ② CAST (who paints) → ③ MOTION &
+// BEHAVIOR (how it moves) → ④ APPEARANCE (the finish). No controls cut —
+// every control that existed still exists, same store selectors, same event
+// shapes; only the grouping changed. CSS class root stays panel-layout
+// (see PANEL_CONSOLIDATION_PLAN.md §5).
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { ModeGrid } from './layout/ModeGrid.jsx';
-import { ParamBlock } from './layout/ParamBlock.jsx';
-import { ToggleRow } from './layout/ToggleRow.jsx';
+import { MixBar } from './layout/MixBar.jsx';
+import { CompositionTiles } from './layout/CompositionTiles.jsx';
+import { MotionShelf } from './layout/MotionShelf.jsx';
+import { ShapesShelf } from './layout/ShapesShelf.jsx';
+import { VoicesShelf } from './layout/VoicesShelf.jsx';
+import { LayoutSliders } from './layout/LayoutSliders.jsx';
+import { SymmetryRow, BehaveRow } from './layout/ChipRows.jsx';
+import { StructureToggles } from './layout/StructureToggles.jsx';
+import { AccumFamily } from './layout/AccumFamily.jsx';
+import { SwarmSliders } from './layout/SwarmSliders.jsx';
+import { CreatureSliders } from './layout/CreatureSliders.jsx';
+import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
 import { SunRow } from './layout/SunRow.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
+import { BuildSection } from './build/BuildSection.jsx';
 
 export function BuildPanel() {
   const { state } = useApp(s => ({
@@ -29,11 +37,38 @@ export function BuildPanel() {
         {lockCount > 0 && <span className="lock-badge">🔒 {lockCount}</span>}
       </PanelHeader>
       <div className="panel-body">
-        <ModeGrid mode={layoutParams.mode} />
-        <ParamBlock layoutParams={layoutParams} lockedParams={lockedParams} />
-        <ToggleRow layoutParams={layoutParams} />
-        <SunRow />
-        <LayerStack />
+        {/* ① LAYOUT — structure first: tiles, size/shape sliders, symmetry, bleed/mirror/overlap */}
+        <BuildSection num="1" title="Layout">
+          <CompositionTiles mode={layoutParams.mode} />
+          <LayoutSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+          <SymmetryRow layoutParams={layoutParams} />
+          <StructureToggles layoutParams={layoutParams} />
+        </BuildSection>
+
+        {/* ② CAST — who paints the stage: shapes pool, my voices, layer stack */}
+        <BuildSection num="2" title="Cast">
+          <div className="voice-row">
+            <ShapesShelf />
+            <VoicesShelf />
+            <MixBar />
+          </div>
+          <LayerStack />
+        </BuildSection>
+
+        {/* ③ MOTION & BEHAVIOR — how it moves: motion/behave chips, physics, creatures, trails */}
+        <BuildSection num="3" title="Motion & Behavior">
+          <MotionShelf layoutParams={layoutParams} />
+          <BehaveRow layoutParams={layoutParams} />
+          <SwarmSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+          <CreatureSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+          <AccumFamily layoutParams={layoutParams} />
+        </BuildSection>
+
+        {/* ④ APPEARANCE — the finish: hue, mark shape, growth, sun light */}
+        <BuildSection num="4" title="Appearance">
+          <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+          <SunRow />
+        </BuildSection>
       </div>
     </div>
   );

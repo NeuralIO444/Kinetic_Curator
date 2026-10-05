@@ -189,7 +189,7 @@ export const COMPOSITION_IDS = COMPOSITION_PRESETS.map((p) => p.id);
 
 /**
  * Numeric bounds for every scalar in DEFAULT_LAYOUT_PARAMS — the same limits
- * the sliders in panels/layout/ParamBlock.jsx and panels/stimulus enforce.
+ * the sliders in panels/layout/*Sliders.jsx and panels/stimulus enforce.
  *
  * This is the trust boundary for project JSON (#106). A project arrives from
  * a file picker, an autosave written by an older build, or `studio/render.mjs`
