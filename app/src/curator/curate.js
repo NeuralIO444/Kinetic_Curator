@@ -20,6 +20,7 @@
 import { personaCurator } from './taste.js';
 import { makeMlxCurator } from './tasteHead.js';
 import { getTaste } from './tasteStore.js';
+import { getLoisVerdict } from './loisRank.js';
 
 export const CURATE_CANDIDATES = 8;
 
@@ -92,6 +93,10 @@ export function pickCurated(candidates, curator, rng = Math.random) {
 export function curatorHint(curator, { chainFallback = false } = {}) {
   const chain = chainFallback ? ' · chain: uniform' : '';
   if (curator.status() !== 'active') return `curator untrained · dice roll${chain}`;
+  if (curator.heuristic) {
+    const line = getLoisVerdict() || 'Walk in. Show me something.';
+    return `heuristic pick: LOIS · ${line}${chain}`;
+  }
   if (curator.personaName) return `persona pick: ${curator.personaName}${chain}`;
   if (curator.name === 'mlx') return `curated pick · mlx${chain}`;
   return `curated pick${chain}`;

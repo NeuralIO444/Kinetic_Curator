@@ -12,14 +12,16 @@ import { useStore } from '../../state/store.js';
 import { getRenderProfile } from '../../curator/renderProfiles.js';
 import { getPresetsByGroup } from '../../data/presets.js';
 import {
-  PERSONA_TASTES,
+  voiceOptions,
   getActivePersonaId,
   setActivePersona,
 } from '../../curator/taste.js';
+import { getLoisVerdict } from '../../curator/loisRank.js';
 import { KineticButton } from './KineticButton.jsx';
 
 export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
+  useStore((s) => s.curatePress); // re-read the LOIS line after a pick
   const lockCount = useStore((s) => Object.values(s.lockedParams || {}).filter(Boolean).length);
   const [voice, setVoice] = useState(getActivePersonaId() ?? 'off');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -65,10 +67,12 @@ export function CuratorBar() {
     setVoice(id === 'off' ? 'off' : getActivePersonaId() ?? 'off');
     setMenuOpen(false);
   };
+  const voices = voiceOptions();
   const activeAlias =
     voice === 'off'
       ? 'off'
-      : PERSONA_TASTES.find((p) => p.id === voice)?.alias ?? voice;
+      : voices.find((p) => p.id === voice)?.alias ?? voice;
+  const loisLine = voice === 'lois' ? getLoisVerdict() : '';
   const onCurate = () => {
     emit(Events.LAYOUT_CURATE);
     // The persona brings its palette: switch the global palette to the
@@ -151,12 +155,13 @@ export function CuratorBar() {
               >
                 voice: off
               </button>
-              {PERSONA_TASTES.map((p) => (
+              {voices.map((p) => (
                 <button
                   role="menuitem"
                   key={p.id}
                   className={voice === p.id ? 'active' : ''}
                   onClick={() => pickVoice(p.id)}
+                  title={p.heuristic ? 'Hand-tuned rank: glance, distance from the pile, boldness. Not a trained eye.' : undefined}
                 >
                   voice: {p.title || p.alias}
                 </button>
@@ -167,6 +172,9 @@ export function CuratorBar() {
         <button className="randomize-btn" onClick={onCurate} title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
           Curator
         </button>
+        {loisLine && (
+          <span className="lois-verdict" title={hint}>{loisLine}</span>
+        )}
     </div>
   );
 }

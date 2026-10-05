@@ -13,9 +13,24 @@
 
 import { PERSONA_TASTES, getPersonaTaste } from './personaTastes.js';
 import { getRenderProfile, applyRenderProfile } from './renderProfiles.js';
+import { rankLois } from './loisRank.js';
 
 // Re-exported so UI code has a single import site for persona data.
 export { PERSONA_TASTES };
+
+// LOIS is a rank + voice, not a taste weight and not a render profile (#948).
+// Selectable. Not the house default — Davis stays the working creed.
+export const LOIS_VOICE = {
+  id: 'lois',
+  alias: 'LOIS',
+  title: 'LOIS',
+  heuristic: true,
+  rationale: 'Hand-tuned rank: glance, distance from the pile, boldness. Not a trained eye.',
+};
+
+export function voiceOptions() {
+  return [LOIS_VOICE, ...PERSONA_TASTES];
+}
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 // Unknown/missing feature: neutral 0.5, never 0 (0 would read as "absent").
@@ -107,6 +122,10 @@ export function pickPersona(candidates, personaId, rng = Math.random) {
 let activePersonaId = 'davis';
 
 export function setActivePersona(id) {
+  if (id === 'lois') {
+    activePersonaId = 'lois';
+    return;
+  }
   activePersonaId = getPersonaTaste(id) ? id : null;
 }
 
@@ -115,6 +134,7 @@ export function getActivePersonaId() {
 }
 
 export function getActivePersona() {
+  if (activePersonaId === 'lois') return LOIS_VOICE;
   return activePersonaId ? getPersonaTaste(activePersonaId) : null;
 }
 
@@ -138,6 +158,20 @@ export function personaCurator() {
   const persona = getActivePersona();
   if (!persona) {
     return { name: 'persona', status: () => 'untrained', pick: () => -1 };
+  }
+  // LOIS reorders the pool already rolled. No palette, no forces, no weights
+  // written into the taste model. The score is named a heuristic in the hint.
+  if (persona.id === 'lois') {
+    return {
+      name: 'persona',
+      personaName: 'LOIS',
+      personaId: 'lois',
+      heuristic: true,
+      status: () => 'active',
+      pick(candidates) {
+        return rankLois(candidates).index;
+      },
+    };
   }
   return {
     name: 'persona',

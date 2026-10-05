@@ -143,6 +143,11 @@
   transition: all 100ms;
 }
 .randomize-btn:hover { background: var(--ink); color: var(--bg); }
+.lois-verdict {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.03em;
+  color: var(--ink); max-width: 240px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .randomize-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: lowercase; }
 
 /* #942 — KINETIC button: a breathing x-axis pill. Compact at rest (a
