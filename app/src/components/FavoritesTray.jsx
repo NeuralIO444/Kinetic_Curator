@@ -1,10 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
+import { useStore } from '../state/store.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { recipeFieldsFromKept, copyTextToClipboard } from '../state/recipes.js';
 import { encodeRecipeUrl, buildShareHref } from '../state/recipeUrls.js';
+import { QUEUE_MAX_VISIBLE } from '../state/queueTransport.js';
 
-const MAX_VISIBLE = 12;
+const MAX_VISIBLE = QUEUE_MAX_VISIBLE; // #966 — the tray window IS the queue transport's setlist.
 
 /**
  * Floating Favorites / Hits setlist (#8 / #35).
@@ -19,6 +21,12 @@ export function FavoritesTray() {
   const favorites = state.favorites || [];
   const trayRef = useRef(null);
   const [cursor, setCursor] = useState(0);
+  // #966 — tap-to-jump: any tray tap moves the queue transport's index, so
+  // autoplay continues from the jumped-to hit without pausing.
+  const setQueueIndex = useStore((s) => s.setQueueIndex);
+  const bumpQueueJump = useStore((s) => s.bumpQueueJump);
+  const queuePlaying = useStore((s) => s.queuePlaying);
+  const queueIndex = useStore((s) => s.queueIndex);
   // #534 — per-hit link feedback: the chip key whose link just copied.
   const [copiedKey, setCopiedKey] = useState(null);
 
@@ -42,18 +50,24 @@ export function FavoritesTray() {
   // it never points past the end or at a shifted item.
   const cur = Math.min(cursor, Math.max(0, visible.length - 1));
 
-  const recall = useCallback((fav) => {
+  const recall = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
-  }, []);
+    // #966 — tap-to-jump: autoplay continues from the jumped-to hit.
+    if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
+  }, [setQueueIndex, bumpQueueJump]);
 
-  const evolveFrom = useCallback((fav) => {
+  const evolveFrom = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
     emit(Events.DAVIS_EVOLVE, { mode: true });
-  }, []);
+    // #966 — tap-to-jump applies to shift-recall too.
+    if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
+  }, [setQueueIndex, bumpQueueJump]);
 
-  const morphTo = useCallback((fav) => {
+  const morphTo = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'morph', favorite: fav });
-  }, []);
+    // #966 — tap-to-jump applies to alt-morph too.
+    if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
+  }, [setQueueIndex, bumpQueueJump]);
 
   const move = useCallback((fav, delta) => {
     if (!fav.id) return;
@@ -64,7 +78,7 @@ export function FavoritesTray() {
     if (visible.length === 0) return;
     const next = (cur + 1) % visible.length;
     setCursor(next);
-    recall(visible[next]);
+    recall(visible[next], next);
   }, [visible, cur, recall]);
 
   const onKeyDown = useCallback((e) => {
@@ -73,7 +87,7 @@ export function FavoritesTray() {
       if (visible[idx]) {
         e.preventDefault();
         setCursor(idx);
-        recall(visible[idx]);
+        recall(visible[idx], idx);
       }
       return;
     }
@@ -92,7 +106,7 @@ export function FavoritesTray() {
       if (visible.length === 0) return;
       const next = (cur - 1 + visible.length) % visible.length;
       setCursor(next);
-      recall(visible[next]);
+      recall(visible[next], next);
     }
   }, [visible, recall, advance, cur]);
 
@@ -122,11 +136,13 @@ export function FavoritesTray() {
         {visible.map((f, i) => {
           const isCurrent = f.seed === state.seed;
           const isCursor = i === cur;
+          // #966 — highlight the hit the queue transport is on while playing.
+          const isQueueHit = queuePlaying && i === Math.min(queueIndex, visible.length - 1);
           const seedHex = (f.seed >>> 0).toString(16).padStart(4, '0').slice(-4);
           return (
             <div
               key={f.id ?? `${f.seed}-${f.timestamp || i}`}
-              className={`fav-chip ${isCurrent ? 'active' : ''} ${isCursor ? 'setlist-cursor' : ''}`}
+              className={`fav-chip ${isCurrent ? 'active' : ''} ${isCursor ? 'setlist-cursor' : ''} ${isQueueHit ? 'queue-now' : ''}`}
               title={`Seed ${f.seed.toString(16)} · click recall · shift=evolve · alt=morph`}
               style={isCursor ? { outline: '1px solid var(--accent)' } : undefined}
             >
@@ -135,9 +151,9 @@ export function FavoritesTray() {
                 className="fav-chip-main"
                 onClick={(e) => {
                   setCursor(i);
-                  if (e.altKey) morphTo(f);
-                  else if (e.shiftKey) evolveFrom(f);
-                  else recall(f);
+                  if (e.altKey) morphTo(f, i);
+                  else if (e.shiftKey) evolveFrom(f, i);
+                  else recall(f, i); // #966 — tap-to-jump
                 }}
               >
                 <span className="fav-chip-num">{i + 1}</span>
@@ -155,7 +171,7 @@ export function FavoritesTray() {
                 type="button"
                 className="fav-chip-evolve"
                 title="Morph layout to this hit"
-                onClick={() => { setCursor(i); morphTo(f); }}
+                onClick={() => { setCursor(i); morphTo(f, i); }}
               >
                 ↔
               </button>

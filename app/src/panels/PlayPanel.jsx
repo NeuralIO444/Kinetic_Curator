@@ -11,6 +11,7 @@ import { EvolveControls } from './davis/EvolveControls.jsx';
 import { BeatRouter } from './davis/BeatRouter.jsx';
 import { MorphControls } from './davis/MorphControls.jsx';
 import { PhraseControls } from './davis/PhraseControls.jsx';
+import { QueueTransport } from './davis/QueueTransport.jsx';
 
 export function PlayPanel() {
   const { state } = useApp(s => ({
@@ -54,6 +55,9 @@ export function PlayPanel() {
     <div className="panel panel-davis">
       <PanelHeader tag="P04" title="PLAY" subtitle={evolveMode ? 'evolving' : 'paused'} />
       <div className="davis-body">
+        {/* #966 — HITS queue transport: autoplay + tap-to-jump for the setlist. */}
+        <QueueTransport />
+
         <EvolveControls
           evolveTarget={evolveTarget}
           evolveSource={evolveSource}

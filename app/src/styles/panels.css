@@ -581,3 +581,37 @@
   .shimmer-lvl-3 { outline: 2px solid var(--ink); outline-offset: 1px; }
   .shimmer-lvl-4 { outline: 3px solid var(--ink); outline-offset: 1px; }
 }
+
+/* #966 — HITS queue transport (Play panel). */
+.queue-transport {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+.queue-transport .queue-play.active {
+  border-color: #00ff88;
+  color: #00ff88;
+}
+.queue-note {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  padding-left: 2px;
+}
+/* The hit the queue transport is currently on (FavoritesTray chip). */
+.fav-chip.queue-now {
+  border-color: #00ff88;
+  box-shadow: 0 0 6px rgba(0, 255, 136, 0.35);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fav-chip.queue-now {
+    animation: queue-now-pulse 1.2s ease-in-out infinite;
+  }
+}
+@keyframes queue-now-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(0, 255, 136, 0.25); }
+  50% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.55); }
+}
