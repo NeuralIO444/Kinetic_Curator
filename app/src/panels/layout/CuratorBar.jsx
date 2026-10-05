@@ -91,12 +91,12 @@ export function CuratorBar() {
           onClick={() => setStartupMode(startupMode === 'chaos' ? 'fixed' : 'chaos')}
           title={
             startupMode === 'chaos'
-              ? 'START: CHAOS — every cold launch opens on one full wild roll. Click for a fixed, deterministic opener.'
+              ? 'START: K.O.Z. (Kinetic Operation Zone) — every cold launch opens on one full wild roll. Click for a fixed, deterministic opener.'
               : 'START: FIXED — every cold launch opens on the factory default scene. Click for chaos.'
           }
           aria-label={`Start mode ${startupMode}. Activate to switch to ${startupMode === 'chaos' ? 'fixed' : 'chaos'}`}
         >
-          START: {startupMode === 'chaos' ? 'CHAOS' : 'FIXED'}
+          START: {startupMode === 'chaos' ? 'K.O.Z.' : 'FIXED'}
         </button>
         {/* #942 — KINETIC: storm generator after the START toggle. */}
         <KineticButton />
