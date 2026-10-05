@@ -532,7 +532,10 @@ uint ihashWet(uvec2 p) {
   float paper = float(ihashWet(uvec2(gl_FragCoord.xy)) >> 16u) * 1.52587890625e-05;
   float edge = wet * (1.0 - wet) * 4.0;
   vec3 rgb = c.rgb * (1.0 - 0.45 * edge * u_wetAmount);
-  rgb += (paper - 0.5) * (1.0 - wet) * 0.12 * u_wetAmount;
+  // Granulation is multiplicative: pigment brightness varies with the paper
+  // hash. Additive grain would pump a noise floor into the feedback loop
+  // (the keep-fade amplifies any per-frame addition by 1/(1-keep)).
+  rgb *= 1.0 + (paper - 0.5) * 0.5 * (1.0 - wet) * u_wetAmount;
   o = vec4(mix(u_bg, rgb, u_keep), c.a);`,
 );
 
@@ -548,7 +551,9 @@ uniform float u_wetAmount;`,
   float paper = float(ihash(uvec2(gl_FragCoord.xy)) >> 16u) * 1.52587890625e-05;
   float edge = wet * (1.0 - wet) * 4.0;
   lit *= 1.0 - 0.28 * edge * u_wetAmount;
-  lit += (paper - 0.5) * (1.0 - wet) * 0.08 * u_wetAmount;`,
+  // Multiplicative granulation (see FADE_WET_FS): the glow pass writes back
+  // into the feedback buffer, so additive grain would accumulate.
+  lit *= 1.0 + (paper - 0.5) * 0.35 * (1.0 - wet) * u_wetAmount;`,
 );
 
 // #970 slice 5 — cheap pigment mix. Not Kubelka-Munk. Dry OVER_FS is untouched.
@@ -1011,10 +1016,12 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
         const paper = (hh & 65535) / 65535;
         const o = (y * w + x) * 4;
         const dark = 1 - 0.45 * edge * amt;
-        const gran = (paper - 0.5) * (1 - wet) * 0.12 * amt;
-        fed[o] = fed[o] * dark + gran;
-        fed[o + 1] = fed[o + 1] * dark + gran;
-        fed[o + 2] = fed[o + 2] * dark + gran;
+        // Multiplicative granulation (mirrors FADE_WET_FS): additive grain
+        // would pump a noise floor into the feedback loop.
+        const grain = 1 + (paper - 0.5) * 0.5 * (1 - wet) * amt;
+        fed[o] = fed[o] * dark * grain;
+        fed[o + 1] = fed[o + 1] * dark * grain;
+        fed[o + 2] = fed[o + 2] * dark * grain;
       }
     }
   }
