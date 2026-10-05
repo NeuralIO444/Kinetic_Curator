@@ -58,7 +58,7 @@ export function ToggleRow({ layoutParams }) {
       {layoutParams.trail === 'leave' && (
         <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
           title={helpText('layout-leave-fade')}>
-          FADE
+          TRAIL FADE
           <input type="range" min={0} max={0.2} step={0.01}
             value={layoutParams.leaveFade ?? 0}
             onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'leaveFade', value: parseFloat(e.target.value) })}
@@ -83,7 +83,7 @@ export function ToggleRow({ layoutParams }) {
           style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
           title="Trail persistence in frames of half-life (1 = strobe, 40 = long exposure)"
         >
-          FADE
+          ACCUM FADE
           <input
             type="range"
             min={0}
@@ -168,9 +168,9 @@ export function ToggleRow({ layoutParams }) {
           </label>
           <label
             style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-            title="FLOW: advects the trail buffer through the project-seed curl — the same weather as the swarm (0 = off)"
+            title="CURL: advects the trail buffer through the project-seed curl — the same weather as the swarm (0 = off)"
           >
-            FLOW
+            CURL
             <input
               type="range"
               min={0}

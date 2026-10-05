@@ -94,9 +94,9 @@ export function ParamBlock({ layoutParams, lockedParams }) {
           are gone. (MATERIAL and SHADING were already voice-only via #268.) */}
       <RangeRow label="HUE ROTATE" value={layoutParams.hueRotate} min={0} max={360}
         hint="Global hue shift applied to the whole canvas"
-        readout={`${layoutParams.hueRotate}°`} onChange={v => set('hueRotate', v)} defaultValue={0} />
+        readout={`${layoutParams.hueRotate}°`} onChange={v => set('hueRotate', v)} defaultValue={0}
+        locked={lockedParams.hueRotate} onToggleLock={() => lock('hueRotate')} />
 
-      <div className="param-subheader">🌪️ TURBULENCE & DISPLACEMENT</div>
       <RangeRow label="NOISE SPEED" value={layoutParams.noiseSpeed} min={0.1} max={3.0} step={0.1}
         hint="How fast the noise field evolves over time"
         onChange={v => set('noiseSpeed', v)} defaultValue={d('noiseSpeed', DEFAULT_LAYOUT_PARAMS.noiseSpeed)}
@@ -154,10 +154,12 @@ export function ParamBlock({ layoutParams, lockedParams }) {
           mass. Works on anything that moves. */}
       <RangeRow label="CROOKED" value={layoutParams.crooked ?? 0} min={0} max={1} step={0.01}
         hint="Zero is today's quad. Higher shears and pinches each mark from its own seed."
-        onChange={v => set('crooked', v)} defaultValue={0} />
+        onChange={v => set('crooked', v)} defaultValue={0}
+        locked={lockedParams.crooked} onToggleLock={() => lock('crooked')} />
       <RangeRow label="OPEN" value={layoutParams.open ?? 0} min={0} max={1} step={0.01}
         hint="Zero is today's ink. Higher strokes or hollows the same cell. Not the resolve plate."
-        onChange={v => set('open', v)} defaultValue={0} />
+        onChange={v => set('open', v)} defaultValue={0}
+        locked={lockedParams.open} onToggleLock={() => lock('open')} />
       <RangeRow label="SQUASH" value={layoutParams.squash ?? 0} min={0} max={1} step={0.05}
         hint="Moving marks thin across their motion as they stretch — 1 keeps their mass, 0 is stretch only"
         onChange={v => set('squash', v)} defaultValue={d('squash', DEFAULT_LAYOUT_PARAMS.squash)}

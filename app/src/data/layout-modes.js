@@ -18,7 +18,7 @@ export const LAYOUT_MODES = [
   { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
   { id: 'hype',      name: 'moth·hype', glyph: 'hype'   },
   { id: 'stratified', name: 'stratified', glyph: 'strat' },
-  { id: 'flow',      name: 'flow',       glyph: 'flow'   },
+  { id: 'flow',      name: 'wave',       glyph: 'flow'   },
   { id: 'brush',     name: 'brush line', glyph: 'brush'  },
   { id: 'layers',    name: 'layers',     glyph: 'z'      },
   { id: 'rails',     name: 'rails',      glyph: 'rail'   },
