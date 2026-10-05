@@ -166,14 +166,18 @@ function FxEffectEditor({ layer, fxOrdinal }) {
 }
 
 export function LayerStack() {
-  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId }));
-  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId } = state;
+  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId, ghostHintDismissed: s.ghostHintDismissed }));
+  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId, ghostHintDismissed } = state;
   const setLayerPatch = useStore((s) => s.setLayerPatch);
   const isAdj = (l) => isFxLayer(l) || isMathLayer(l);
   const contentCount = layers.filter((l) => !isAdj(l)).length;
   const fxCount = layers.filter(isFxLayer).length;
   const mathCount = layers.filter(isMathLayer).length;
   const singleTrack = contentCount < 2; // PATCH has nothing to point at (a patched row can still be set back to OFF)
+  // #1014 — one-line discoverability hint under the header: visible until
+  // the user arms their first track through a ghost slot (boot/shuffle
+  // system arms don't count — only ghost taps flip the flag).
+  const showGhostHint = !ghostHintDismissed;
   const ghosts = [];
   for (let n = contentCount + 1; n <= MAX_CONTENT_TRACKS; n++) ghosts.push(n);
   // #341 — FX slots get the same dimmed-until-reached-for treatment as
@@ -219,28 +223,32 @@ export function LayerStack() {
             and limited (tap-to-arm); the buttons duplicated them. */}
       </PanelHeader>
       <PatchMatrix layers={layers} ordinals={ordinals} />
+      {/* #1014 — tap-to-arm discoverability: one line until the first track is armed */}
+      {showGhostHint && (
+        <div className="ghost-hint">Tap a dimmed + row to add a track.</div>
+      )}
       <div className="layer-list">
         {mathGhosts.slice().reverse().map((n) => (
-          <div key={`ghost-math-${n}`} className="layer-row layer-row-ghost" onClick={() => emit(Events.LAYER_ADD_MATH)}>
+          <div key={`ghost-math-${n}`} className="layer-row layer-row-ghost" title={`Tap to add M ${n}`} onClick={() => emit(Events.LAYER_ADD_MATH)}>
             <div className="layer-row-main">
               <TrackNumeral n={n} kind="math" ghost />
-              <button className="layer-name" type="button">M {n}</button>
+              <button className="layer-name" type="button">+ M {n}</button>
             </div>
           </div>
         ))}
         {fxGhosts.slice().reverse().map((n) => (
-          <div key={`ghost-fx-${n}`} className="layer-row layer-row-ghost" onClick={() => emit(Events.LAYER_ADD_FX)}>
+          <div key={`ghost-fx-${n}`} className="layer-row layer-row-ghost" title={`Tap to add FX ${n}`} onClick={() => emit(Events.LAYER_ADD_FX)}>
             <div className="layer-row-main">
               <TrackNumeral n={n} kind="fx" ghost />
-              <button className="layer-name" type="button">FX {n}</button>
+              <button className="layer-name" type="button">+ FX {n}</button>
             </div>
           </div>
         ))}
         {ghosts.slice().reverse().map((n) => (
-          <div key={`ghost-kc-${n}`} className="layer-row layer-row-ghost" onClick={() => emit(Events.LAYER_ADD)}>
+          <div key={`ghost-kc-${n}`} className="layer-row layer-row-ghost" title={`Tap to add KC-${n}`} onClick={() => emit(Events.LAYER_ADD)}>
             <div className="layer-row-main">
               <TrackNumeral n={n} kind="kc" ghost />
-              <button className="layer-name" type="button">KC-{n}</button>
+              <button className="layer-name" type="button">+ KC-{n}</button>
             </div>
           </div>
         ))}
