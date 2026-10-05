@@ -10,6 +10,8 @@ import { defaultFxParams, isFxLayer, FX_MENU_KINDS } from '../../fx/fxFilters.js
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
+import { BEAT_DEFAULT_BPM, sanitizeBeatBpm, beatSeconds, beatIsHardCut } from '../../gl/beatClock.mjs';
+import { MOTION_KEYS, armedMotionParams, pinRollScope } from '../rollScope.mjs';
 import { FEEL_PRESETS } from '../../data/feels.js';
 import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS, SHAPE_MIX_MAX, MIXABLE_SHAPE_IDS, liveShapeLevels, shapeMixIds } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
@@ -155,6 +157,27 @@ export const createLayoutSlice = (set) => ({
    * motionSmoothing — deliberately outside the project document.
    */
   paletteMixSeconds: 2,
+  /**
+   * BEAT master clock (#950): the top-bar BEAT button's BPM. The transition
+   * clock derives from it — morphs are 2 beats (120 BPM → 1s). The setter
+   * writes paletteMixSeconds too, so every existing consumer (liveLoop,
+   * renderWorker) follows the master clock through the same channel; the
+   * glitch ceiling maps sub-0.75s beat times to 0 (hard cut), which the
+   * engine already honors as "cut".
+   */
+  beatBpm: BEAT_DEFAULT_BPM,
+  /**
+   * Roll scope (#964): the ModeStrip MODE/MOTION chips arm a scope for the
+   * next KINETIC roll instead of selecting outright. `armedMode` pins the
+   * layout mode (and keeps the composition too); `armedMotion` pins the
+   * motion numbers. Arms persist until disarmed — the fast,
+   * performance-friendly version of the Build panel's locks.
+   */
+  armedMode: null,
+  armedMotion: null,
+  toggleArmMode: (id) => set((state) => ({ armedMode: state.armedMode === id ? null : id })),
+  toggleArmMotion: (id) => set((state) => ({ armedMotion: state.armedMotion === id ? null : id })),
+  clearRollScope: () => set({ armedMode: null, armedMotion: null }),
   /**
    * Sleight-of-hand v2 (#624, #625): how a palette change travels. FADE melts
    * the whole picture (two-deck dissolve); WASH soaks the new tints through
@@ -411,6 +434,19 @@ export const createLayoutSlice = (set) => ({
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
   /** VJ MIX (#278): palette-switch crossfade seconds, clamped 0–8. */
   setPaletteMixSeconds: (seconds) => set({ paletteMixSeconds: sanitizeMixSeconds(seconds) }),
+  /**
+   * BEAT master clock (#950): set the BPM. Drives paletteMixSeconds (the
+   * transition clock) as 2 beats; past ~160 BPM the beat time falls through
+   * the glitch ceiling and transitions hard-cut instead of morphing.
+   */
+  setBeatBpm: (bpm) => {
+    const clean = sanitizeBeatBpm(bpm);
+    const secs = beatSeconds(clean);
+    set({
+      beatBpm: clean,
+      paletteMixSeconds: beatIsHardCut(secs) ? 0 : secs,
+    });
+  },
   /** Sleight-of-hand v2 (#624, #625): FADE | WASH | INJECT. Unknown values fall back to FADE. */
   setColorMode: (mode) => set({
     colorMode: mode === 'WASH' || mode === 'INJECT' ? mode : 'FADE',
@@ -423,8 +459,12 @@ export const createLayoutSlice = (set) => ({
   applyPreset: (preset) => set((state) => {
     const incoming = { ...preset.params, composition: preset.id };
     const merged = { ...state.layoutParams };
+    // #964: LOOKS applies inside armed motion — a Look never stomps the
+    // pinned motion numbers.
+    const motionSkip = new Set(armedMotionParams(state.armedMotion) ? MOTION_KEYS : []);
     let changed = false;
     for (const [k, v] of Object.entries(incoming)) {
+      if (motionSkip.has(k)) continue;
       if (!state.lockedParams[k] && merged[k] !== v) {
         merged[k] = v;
         changed = true;
@@ -614,11 +654,20 @@ export const createLayoutSlice = (set) => ({
 
     // 3. composition — random preset (carries composition + mode + behave +
     // density/count), preferably a different composition; locked params hold.
-    const preset = pickOtherPreset(COMPOSITION_PRESETS, state.layoutParams.composition);
-    const merged = { ...state.layoutParams, composition: preset.id };
-    for (const [k, v] of Object.entries(preset.params)) {
-      if (!state.lockedParams[k] && merged[k] !== v) merged[k] = v;
+    // #964: an armed MODE keeps the composition and pins the mode instead of
+    // dealing a fresh preset — the roll reworks everything else.
+    let merged;
+    if (state.armedMode) {
+      merged = { ...state.layoutParams };
+    } else {
+      const preset = pickOtherPreset(COMPOSITION_PRESETS, state.layoutParams.composition);
+      merged = { ...state.layoutParams, composition: preset.id };
+      for (const [k, v] of Object.entries(preset.params)) {
+        if (!state.lockedParams[k] && merged[k] !== v) merged[k] = v;
+      }
     }
+    // #964: pin the armed roll scope over whatever the roll dealt.
+    merged = pinRollScope(merged, state.armedMode, state.armedMotion);
 
     // 4. assets — random shape set, mapped through known ids like loadShapeSet.
     const shapeSet = SHAPE_SETS[die(SHAPE_SETS.length)];
@@ -699,11 +748,17 @@ export const createLayoutSlice = (set) => ({
     const undo = pushToUndo(state, true);
 
     const preset = pickRulesPreset(state.layoutParams.composition);
-    const merged = { ...state.layoutParams };
-    if (!state.lockedParams.composition) merged.composition = preset.id;
+    // #964: an armed MODE constrains RULES — keep the composition too. The
+    // rules themselves (separation, focal hierarchy, edge-bleed) still apply.
+    const scopeSkip = new Set(state.armedMode ? ['composition', 'mode'] : []);
+    const merged0 = { ...state.layoutParams };
+    if (!state.armedMode && !state.lockedParams.composition) merged0.composition = preset.id;
     for (const [k, v] of Object.entries(preset.params)) {
-      if (!state.lockedParams[k] && merged[k] !== v) merged[k] = v;
+      if (scopeSkip.has(k)) continue;
+      if (!state.lockedParams[k] && merged0[k] !== v) merged0[k] = v;
     }
+    // #964: pin the armed roll scope over whatever the pass dealt.
+    const merged = pinRollScope(merged0, state.armedMode, state.armedMotion);
 
     // Rule 1 — separation.
     if (!state.lockedParams.overlap) merged.overlap = false;

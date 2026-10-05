@@ -131,6 +131,8 @@ node src/gl/atlas.skip.selfcheck.mjs
 node src/gl/velocitySmear.selfcheck.mjs
 node src/gl/squash.selfcheck.mjs
 node src/gl/audioRoutes.selfcheck.mjs
+node src/gl/beatClock.selfcheck.mjs
+node src/state/rollScope.selfcheck.mjs
 node src/gl/hueAudio.selfcheck.mjs
 node src/gl/kinemeRateAudio.selfcheck.mjs
 node src/gl/lightAudio.selfcheck.mjs

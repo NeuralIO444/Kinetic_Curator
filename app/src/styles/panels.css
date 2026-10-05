@@ -34,6 +34,21 @@
 .chip-btn:hover { color: var(--ink); border-color: var(--ink); }
 .chip-btn.active { color: var(--bg); background: var(--ink); border-color: var(--ink); }
 
+/* #964 — armed roll scope: outline + pin glyph, deliberately distinct from
+   .active (what's on screen). An armed chip can be active too — the outline
+   reads on top of the inversion. */
+.chip-btn.armed { outline: 2px solid var(--amber, #ffd166); outline-offset: 1px; }
+.pin-glyph { font-size: 8px; margin-left: 2px; vertical-align: 1px; }
+.scope-clear {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--dim);
+  font-size: 9px;
+  cursor: pointer;
+}
+.scope-clear:hover { color: var(--ink); border-color: var(--ink); }
+
 /* #733 shape mixer: three stepped LED pips under the label. Segmented, no
    gradient, no glow, no animation; lit = filled, unlit = outline (state is
    never opacity alone). currentColor tracks the chip's own on/off inversion. */

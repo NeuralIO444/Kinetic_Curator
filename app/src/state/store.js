@@ -21,3 +21,11 @@ export const useStore = create((set, get) => ({
   ...createVoiceSlice(set, get),
   ...createMidiSlice(set, get),
 }));
+
+// Test hook (#964): e2e sets `window.__KC_EXPOSE_STORE = true` in an init
+// script so Playwright can read roll-scope and roll state through
+// `window.__kcStore.getState()`. Same shape as `window.__KC_GOVERNOR_OFF` —
+// inert in production, never read by the app itself.
+if (typeof window !== 'undefined' && window.__KC_EXPOSE_STORE === true) {
+  window.__kcStore = useStore;
+}

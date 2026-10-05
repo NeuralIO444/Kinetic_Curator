@@ -121,11 +121,9 @@
 @media (max-width: 1279px) {
   .palette-strip { gap: 6px; }
   .palette-strip .palette-switch > div { gap: 6px !important; }
-  .palette-strip .palette-mix-slider { width: 64px; }
   .palette-strip .palette-switch-label { display: none; }
 }
 @media (max-width: 1099px) {
-  .palette-strip .palette-mix-slider { width: 40px; }
   .palette-strip .palette-shuffle-word { display: none; } /* ⟳ alone; the tooltip names it */
 }
 
