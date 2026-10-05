@@ -157,6 +157,7 @@ export function PaletteStrip() {
       <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <span className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }}>
+            <BeatButton />
             <button
               type="button"
               className="palette-mix-label"
@@ -166,7 +167,6 @@ export function PaletteStrip() {
             >
               {colorMode}
             </button>
-            <BeatButton />
           </span>
           <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
             {chips}
