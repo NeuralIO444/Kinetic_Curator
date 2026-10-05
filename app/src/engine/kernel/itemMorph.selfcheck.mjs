@@ -5,6 +5,10 @@ import { matchItems, blendItems, planMorph, nodeWindow, moveFor,
 // The live loop's own easing — liveResolve feeds blendItems morphEase(raw),
 // so the #564 contract sweeps below must drive it the same way.
 import { morphEase } from '../../gl/paletteMix.mjs';
+// #951: the blends below play the plan's hero-first slot schedule, so the
+// tests read each node's window from the plan's choreo — the same window
+// blendItems actually plays — instead of the seeded nodeWindow.
+import { choreoWindow } from './beatChoreo.mjs';
 
 let n = 0, fail = 0;
 function ok(name, fn) {
@@ -419,11 +423,12 @@ const travelerTo = [{ assetId: 'b', key: 't0', x: 1000, y: 0, scale: 1, rotation
 
 /** Per-node swap frame + its window progress then. Grid fixtures pair 1:1, so out[i] is node i. */
 function swapUs(from, to, mixSeconds, seed) {
-  const { frames } = sweepT(from, to, mixSeconds, seed);
+  const { plan, frames } = sweepT(from, to, mixSeconds, seed);
   const out = [];
   for (let i = 0; i < to.length; i++) {
     const was = costume(frames[0].items[i]);
-    const { delay, dur } = nodeWindow(i, seed);
+    // #951: the window blendItems actually played — the plan's choreo slot.
+    const { delay, dur } = choreoWindow(plan.choreo.slots[i], i, seed);
     let found = -1;
     for (let f = 1; f < frames.length; f++) {
       if (costume(frames[f].items[i]) !== was) { found = f; break; }
@@ -456,12 +461,13 @@ ok('#623: every swap lands on its move\'s lowest-visibility moment (u=0.5)', () 
     const swaps = swapUs(from, to, 2, seed);
     const dense = to.length >= DENSE_COUNT;
     // widest single-frame window-progress step, for the "first frame at/after
-    // the minimum" slop
-    const { frames } = sweepT(from, to, 2, seed);
+    // the minimum" slop — per node, since #951 gives each its own window
+    const { plan, frames } = sweepT(from, to, 2, seed);
+    const durs = to.map((_, i) => choreoWindow(plan.choreo.slots[i], i, seed).dur);
     let maxDu = 0;
     for (let f = 1; f < frames.length; f++) {
-      const { dur } = nodeWindow(0, seed);
-      maxDu = Math.max(maxDu, (frames[f].t - frames[f - 1].t) / dur);
+      const step = frames[f].t - frames[f - 1].t;
+      for (const d of durs) maxDu = Math.max(maxDu, step / d);
     }
     for (let i = 0; i < to.length; i++) {
       const { u, items } = swaps[i];
@@ -653,6 +659,59 @@ ok('#572: an 800-count plan is one cheap pass, not a mid-set hitch', () => {
   assert.equal(plan.pairs.length, 800);
   // The old loop is seconds at this size; the budget is one frame with wide slack for CI.
   assert.ok(ms < 100, `800-count plan took ${ms.toFixed(1)}ms`);
+});
+
+// ── #951: hero-first, beat-quantized choreography ──────────────────────────
+// The largest mark leads on the downbeat; the chorus follows on 16th-note
+// slots ordered by distance from the hero. Per-mark color shifts (the
+// costume swap at u=0.5) ride the same windows, staggered, never faded.
+
+ok('#951: planMorph carries the hero-first slot schedule', () => {
+  const to = [
+    { assetId: 'a', x: 0, y: 0, scale: 1 },
+    { assetId: 'a', x: 100, y: 0, scale: 9 },
+    { assetId: 'a', x: 1000, y: 0, scale: 1 },
+  ];
+  const plan = planMorph([], to, 5);
+  assert.equal(plan.choreo.hero, 1, 'largest mark is the hero');
+  assert.equal(plan.choreo.slots[1], 0, 'hero moves on beat 1 (slot 0)');
+  assert.ok(plan.choreo.slots[0] >= 1 && plan.choreo.slots[2] >= 1, 'chorus follows');
+  assert.ok(plan.choreo.slots[0] <= plan.choreo.slots[2], 'nearer the hero, earlier the slot');
+});
+
+ok('#951: the hero is mid-move while the far chorus still waits', () => {
+  const mkIt = (x, scale, key) => ({ assetId: 'a', key, x, y: 0, scale, rotation: 0, alpha: 100 });
+  const from = [mkIt(-60, 1, 'h'), mkIt(100, 1, 'a'), mkIt(900, 1, 'b')];
+  const to = [mkIt(0, 8, 'h'), mkIt(100, 1, 'a'), mkIt(900, 1, 'b')];
+  const plan = planMorph(from, to, 5);
+  assert.equal(plan.choreo.hero, 0);
+  // hero slot 0 (delay 0), far mark b in the last chorus slot (delay 0.375)
+  assert.equal(plan.choreo.slots[2], 3);
+  const t = 0.2; // hero well into its window; b hasn't started
+  const out = blendItems(from, to, t, plan);
+  const hero = out.find((o) => o.key === 'h');
+  const far = out.find((o) => o.key === 'b');
+  assert.ok(hero.x > -60, `hero is traveling (x=${hero.x.toFixed(1)})`);
+  assert.equal(far.x, 900, 'far chorus has not started yet');
+});
+
+ok('#951: every choreo window still closes by t=1 — the handoff holds no frame', () => {
+  for (const seed of [0, 7, 12345]) {
+    const to = Array.from({ length: 64 }, (_, i) => ({ x: i * 13 % 500, y: i * 7 % 300, scale: 1 + (i % 5) }));
+    const plan = planMorph([], to, seed);
+    for (let i = 0; i < to.length; i++) {
+      const { delay, dur } = choreoWindow(plan.choreo.slots[i], i, seed);
+      assert.ok(delay + dur <= 1 + 1e-9, `node ${i}@${seed} closes by t=1`);
+    }
+  }
+  // …and the blend actually lands: last frame before handoff is the target pose
+  const to = Array.from({ length: 24 }, (_, i) => ({ assetId: 'a', key: 'q' + i, x: i * 40, y: 0, scale: 2, alpha: 100 }));
+  const from = to.map((o) => ({ ...o, x: o.x + 200 }));
+  const plan = planMorph(from, to, 9);
+  const last = blendItems(from, to, 0.9999, plan);
+  for (let i = 0; i < to.length; i++) {
+    assert.ok(Math.abs(last[i].x - to[i].x) < 1, `node ${i} has landed before the handoff`);
+  }
 });
 
 console.log(`itemMorph.selfcheck: ${fail === 0 ? 'OK' : 'FAIL'} (${n - fail}/${n})`);
