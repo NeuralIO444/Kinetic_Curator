@@ -12,7 +12,8 @@ test('PATCH target is pickable while OFF and survives a mode change', async ({ p
   await page.getByRole('tab', { name: /build/i }).click();
   // Mockup C (#1014 rebuild): no ghost rows — the Content section "+" arms tracks.
   const contentPlus = page.locator('.build-layer-stack .layer-section').nth(0).locator('.layer-add-btn');
-  for (const n of [2, 3]) await contentPlus.click();
+  await contentPlus.click();
+  await contentPlus.click(); // KC-2, KC-3
 
   // Section order is ascending, so KC-1 is the first content row.
   const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).first();
