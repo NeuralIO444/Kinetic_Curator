@@ -132,6 +132,7 @@ node src/gl/squash.selfcheck.mjs
 node src/gl/audioRoutes.selfcheck.mjs
 node src/gl/hueAudio.selfcheck.mjs
 node src/gl/kinemeRateAudio.selfcheck.mjs
+node src/gl/lightAudio.selfcheck.mjs
 node src/gl/bandFeed.selfcheck.mjs
 node src/gl/audioSidecar.selfcheck.mjs
 node src/gl/kineme.selfcheck.mjs
