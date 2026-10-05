@@ -47,7 +47,7 @@ export const HELP_TOPICS = [
   { id: 'output-weave', group: 'Pipeline', title: 'gate weave', text: 'A whisper of projector wobble: the whole frame drifts under one pixel. Live canvas and recordings only — still snaps stay exact. Off by default.' },
   { id: 'output-taste', group: 'Pipeline', title: 'taste', text: 'Load a taste.json trained on the Mac Studio (MLX runbook §4). The curator then picks with your taste — the bar reads "curated pick · mlx". Kept on this machine only; CLEAR forgets it.' },
   { id: 'output-loop', group: 'Pipeline', title: 'capture loop', text: 'Records a fixed-length take and exports it as a seamless looping WebM — the tail dissolves into the head so there is no visible cut.' },
-  { id: 'layout-flow', group: 'Build', title: 'flow', text: 'Curl-advects the ACCUM trail buffer as it decays — trails curl like smoke instead of just fading. 0 is off.' },
+  { id: 'layout-flow', group: 'Build', title: 'curl', text: 'Curl-advects the ACCUM trail buffer as it decays — trails curl like smoke instead of just fading. 0 is off.' },
   { id: 'layers-patch-mod', group: 'Build', title: 'mod', text: 'Source motion shoves this track — glow, fade, nudge. A still source drives nothing; strength sets how hard it pushes when things move.' },
   { id: 'layers-patch-field', group: 'Build', title: 'field', text: 'Pulls this track toward the source track\u2019s shape. Strength sets how hard each frame tugs — the hop never lands past 4px.' },
   { id: 'layers-patch-feed', group: 'Build', title: 'feed', text: 'Blends this track toward where the source was a frame ago. Strength is blend per frame — 0.16 breathes, 1.00 smears.' },
