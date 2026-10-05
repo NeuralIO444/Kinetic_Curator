@@ -1,26 +1,12 @@
-// deferredStubs.selfcheck.mjs — #607 / #608 / #617 DEFERRED stubs.
+// deferredStubs.selfcheck.mjs — #608 / #617 DEFERRED stubs.
+// (#607's stage stub was un-deferred by its Phase B build — the real
+// display/mirror modules carry their own selfchecks now.)
 // Acceptance: each stub exists, is INERT (returns a "deferred" result,
 // changes no live state, opens nothing, publishes nothing), and carries the
 // exact hardware/verification requirement in its result.
 import assert from 'node:assert';
-import { listStageDisplays, openStageOnDisplay, setStageMapping, showStageTestPattern, STAGE_MAPPING_MODES } from './panels/pipeline/stageDeferred.js';
 import { startSyphonPublish, publishSyphonFrame, stopSyphonPublish, syphonCapability } from './panels/pipeline/syphonDeferred.js';
 import { createLearnState, armLearn, cancelLearn, learnMessage, isLearnArmed } from './midi/learnDeferred.mjs';
-
-// ── #607 stage stub: inert, deferred ──────────────────────────────────────
-assert.deepStrictEqual(STAGE_MAPPING_MODES, ['fit', 'fill', '1:1']);
-{
-  const r = listStageDisplays();
-  assert.strictEqual(r.deferred, true, 'stage: display enumeration is deferred');
-  assert.deepStrictEqual(r.displays, [], 'stage: no invented displays');
-  assert.match(r.reason, /second display/i, 'stage: names the missing hardware');
-}
-for (const fn of [() => openStageOnDisplay('x'), () => setStageMapping('fit'), () => showStageTestPattern(true)]) {
-  const r = fn();
-  assert.strictEqual(r.ok, false, 'stage: nothing opens while deferred');
-  assert.strictEqual(r.deferred, true, 'stage: result is marked deferred');
-  assert.match(r.reason, /DEFERRED \(#607\)/, 'stage: reason names the issue');
-}
 
 // ── #608 syphon stub: inert, deferred ─────────────────────────────────────
 {
@@ -64,4 +50,4 @@ for (const fn of [() => openStageOnDisplay('x'), () => setStageMapping('fit'), (
   assert.strictEqual(isLearnArmed(s2), false, 'learn: cancel disarms');
 }
 
-console.log('deferred stubs: #607/#608/#617 inert + deferred — ok');
+console.log('deferred stubs: #608/#617 inert + deferred — ok');

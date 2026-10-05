@@ -958,6 +958,12 @@ export function createLiveRenderer(canvas) {
   let grainTexs = {};
   let accum = null;
 
+  // #607 — the last presented target ({tex,w,h}-like) and a monotonically
+  // increasing present counter, so the stage mirror can read back the live
+  // frame without re-rendering and skip duplicate grabs while paused.
+  let presented = null;
+  let presentedCount = 0;
+
   // #267: last live geometry, so offscreen captures can restore the
   // bridge to exactly the live size after rendering at capture size.
   let liveW = 0, liveH = 0, liveDpr = 1;
@@ -1018,6 +1024,10 @@ export function createLiveRenderer(canvas) {
 
   /** Present a composited target to the visible canvas (Y-flip resolve). */
   function present(target) {
+    // #607 — remember what was presented so the stage mirror can read back
+    // the live frame without re-rendering the scene.
+    presented = target;
+    presentedCount += 1;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.disable(gl.BLEND);
@@ -1067,6 +1077,21 @@ export function createLiveRenderer(canvas) {
    */
   function readback(target, w, h) {
     return b.resolveTargetToBytes(target, T, w, h);
+  }
+
+  /**
+   * #607 — read back the last presented frame (top-first RGBA bytes) without
+   * re-rendering. Returns null when nothing has presented yet. Safe with
+   * preserveDrawingBuffer:false — resolves through the persistent outT FBO,
+   * exactly like the capture path.
+   */
+  function readPresented() {
+    if (!presented || !T) return null;
+    const w = Math.max(1, Math.floor(presented.w || 0));
+    const h = Math.max(1, Math.floor(presented.h || 0));
+    if (!presented.tex || w < 1 || h < 1) return null;
+    const pixels = b.resolveTargetToBytes(presented, T, w, h);
+    return { pixels, width: w, height: h, n: presentedCount };
   }
 
   /** Lazily create (and keep) the ACCUM feedback pair at the render size. */
@@ -1216,7 +1241,7 @@ export function createLiveRenderer(canvas) {
     setAtlas, setGrainLuts,
     setResolveOptions: (o) => b.setResolveOptions(o),
     hasAtlas: () => !!atlasTex,
-    renderFrame, renderFrameOffscreen, present, presentUpscaled, readback,
+    renderFrame, renderFrameOffscreen, present, presentUpscaled, readback, readPresented,
     ensureAccum, dropAccum,
     snapshotHoldFrame, mixWithHold, dropMixTargets,
     getGL: () => gl,

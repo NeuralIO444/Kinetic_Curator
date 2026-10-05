@@ -29,6 +29,13 @@ import { useStore } from './state/store.js';
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
+import { StageView } from './panels/pipeline/StageView.jsx';
+
+// #607 — the stage window (`?stage=1`) renders ONLY the stage canvas: no
+// store providers, no instrument chrome, no panels. The signal arrives over
+// BroadcastChannel from the instrument window's mirror.
+const STAGE_ONLY = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('stage') === '1';
 
 const COLUMN_FRACTIONS = [0.62, 0.38];
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
@@ -278,5 +285,6 @@ function AppInner() {
 }
 
 export default function App() {
+  if (STAGE_ONLY) return <StageView />;
   return <AppProvider><AppInner /></AppProvider>;
 }

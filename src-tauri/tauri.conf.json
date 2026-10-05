@@ -15,10 +15,29 @@
       "all": false,
       "fs": {
         "all": true,
-        "scope": ["$TEMP/*", "$DOWNLOAD/*", "$DESKTOP/*", "$DOCUMENT/*", "/tmp/*", "**"]
+        "scope": [
+          "$TEMP/*",
+          "$DOWNLOAD/*",
+          "$DESKTOP/*",
+          "$DOCUMENT/*",
+          "/tmp/*",
+          "**"
+        ]
       },
       "path": {
         "all": true
+      },
+      "window": {
+        "all": false,
+        "create": true,
+        "close": true,
+        "setFullscreen": true,
+        "setDecorations": true,
+        "setPosition": true,
+        "setSize": true,
+        "setTitle": true,
+        "setFocus": true,
+        "setSkipTaskbar": true
       }
     },
     "bundle": {

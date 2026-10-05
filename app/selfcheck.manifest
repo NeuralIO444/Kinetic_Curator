@@ -215,3 +215,7 @@ node src/fx/efRackTile.selfcheck.mjs
 node src/components/motionGlyph.selfcheck.mjs
 node src/panels/build/trackNumeral.selfcheck.mjs
 node src/deferredStubs.selfcheck.mjs
+node src/panels/pipeline/stageMapping.selfcheck.mjs
+node src/panels/pipeline/stageDisplays.selfcheck.mjs
+node src/panels/pipeline/stageChannel.selfcheck.mjs
+node src/panels/pipeline/stageTestPattern.selfcheck.mjs

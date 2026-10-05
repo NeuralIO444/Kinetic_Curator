@@ -10,7 +10,7 @@ rust-version = "1.70"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.8", features = [ "fs-all", "path-all" ] }
+tauri = { version = "1.8", features = [ "fs-all", "path-all", "window-close", "window-create", "window-set-decorations", "window-set-focus", "window-set-fullscreen", "window-set-position", "window-set-size", "window-set-skip-taskbar", "window-set-title" ] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 metal = "0.31.0"
