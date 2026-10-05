@@ -49,6 +49,20 @@ def missing_hit_seeds(hit_seeds: set[int], pool_sidecars: dict[str, int]) -> lis
 # ── pool / rendering ─────────────────────────────────────────────────────
 
 
+def build_bold(labels: dict[str, int], sidecars: dict[str, int], favorite_seeds: set[int]) -> dict[str, int]:
+    """#954 — among keeps, 1 if that render's seed was favorited, else 0.
+
+    Passes are omitted. Lois learns what turns a keeper into a favorite,
+    not favorite-vs-pass (that's the taste probe's job).
+    """
+    out = {}
+    for name, lab in labels.items():
+        if int(lab) != 1 or name not in sidecars:
+            continue
+        out[name] = 1 if sidecars[name] in favorite_seeds else 0
+    return out
+
+
 def scan_pool(pool: Path) -> dict[str, int]:
     out = {}
     for png in sorted(pool.glob("*.png")):
@@ -181,6 +195,9 @@ def cmd_build(a) -> None:
 def cmd_selfcheck(_a=None) -> None:
     sidecars = {"000-a.png": 1, "001-b.png": 2, "002-c.png": 3}
     assert build_labels({2}, sidecars) == {"000-a.png": 0, "001-b.png": 1, "002-c.png": 0}
+    likes = {"000-a.png": 1, "001-b.png": 1, "002-c.png": 0}
+    assert build_bold(likes, sidecars, {1}) == {"000-a.png": 1, "001-b.png": 0}, "passes stay out"
+    assert build_bold(likes, sidecars, set()) == {"000-a.png": 0, "001-b.png": 0}
     assert build_labels(set(), sidecars) == {"000-a.png": 0, "001-b.png": 0, "002-c.png": 0}
     assert missing_hit_seeds({2, 9}, sidecars) == [9]
     assert missing_hit_seeds(set(), sidecars) == []
@@ -214,6 +231,24 @@ def cmd_selfcheck(_a=None) -> None:
     print("hits_bridge selfcheck OK")
 
 
+def cmd_bold(a) -> None:
+    labels = json.loads(Path(a.labels).read_text())
+    hits_export = json.loads(Path(a.hits).read_text())
+    hits = hits_export.get("hits") or []
+    favorite_seeds = {int(h["seed"]) & 0xFFFFFFFF for h in hits}
+    sidecars = scan_pool(Path(a.pool))
+    bold = build_bold(labels, sidecars, favorite_seeds)
+    if not bold:
+        sys.exit("no keeps matched the pool — bold.json would be empty")
+    pos = sum(bold.values())
+    if pos == 0 or pos == len(bold):
+        print(f"warning: Lois needs both sides, got {pos} favorites / {len(bold) - pos} kept-not-favorited",
+              file=sys.stderr)
+    Path(a.out).write_text(json.dumps(bold, indent=1, sort_keys=True))
+    print(f"{a.out}: {len(bold)} keeps ({pos} favorites / {len(bold) - pos} kept-not-favorited)")
+
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="hits_bridge", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -233,6 +268,13 @@ def main(argv=None) -> None:
     sp.add_argument("--pool", required=True, help="output dir for PNG + JSON sidecars")
     sp.add_argument("--res", default="1")
     sp.set_defaults(func=cmd_pool)
+
+    sp = sub.add_parser("bold", help="#954 favorites-vs-keeps labels for the Lois probe")
+    sp.add_argument("--labels", required=True, help="keep-vs-pass labels.json (1 = keep)")
+    sp.add_argument("--hits", required=True, help="↓ HITS export — the favorite set")
+    sp.add_argument("--pool", required=True, help="rendered pool (sidecars map png -> seed)")
+    sp.add_argument("--out", default="bold.json")
+    sp.set_defaults(func=cmd_bold)
 
     sub.add_parser("selfcheck", help="pure-logic checks, no rendering, no model") \
         .set_defaults(func=cmd_selfcheck)

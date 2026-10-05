@@ -53,16 +53,36 @@ export function validateTaste(raw) {
   for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
   if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
   const labels = raw.labels && typeof raw.labels === 'object' ? raw.labels : {};
-  return {
-    ok: true,
-    taste: {
-      kind: TASTE_KIND, version: TASTE_VERSION, featuresVersion: FEATURES_VERSION,
-      model: String(raw.model || ''), dims: Number(raw.dims) || 0,
-      trainedAt: String(raw.trainedAt || ''),
-      labels: { likes: Number(labels.likes) || 0, passes: Number(labels.passes) || 0 },
-      head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 },
-    },
+  const taste = {
+    kind: TASTE_KIND, version: TASTE_VERSION, featuresVersion: FEATURES_VERSION,
+    model: String(raw.model || ''), dims: Number(raw.dims) || 0,
+    trainedAt: String(raw.trainedAt || ''),
+    labels: { likes: Number(labels.likes) || 0, passes: Number(labels.passes) || 0 },
+    head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 },
   };
+  // #954 — optional second head. Absent until the boldness probe has trained.
+  // Probe weights stay on disk in taste.json; the browser only keeps the head.
+  if (raw.lois != null) {
+    const loisHead = validateHead(raw.lois.head, numKeys);
+    if (!loisHead.ok) return { ok: false, error: `lois: ${loisHead.error}` };
+    const ll = raw.lois.labels && typeof raw.lois.labels === 'object' ? raw.lois.labels : {};
+    taste.lois = {
+      labels: { favorites: Number(ll.favorites) || 0, keeps: Number(ll.keeps) || 0 },
+      head: loisHead.head,
+    };
+  }
+  return { ok: true, taste };
+}
+
+function validateHead(h, numKeys) {
+  if (!h || typeof h !== 'object') return { ok: false, error: 'has no head — train with --features' };
+  const terms = h.terms && typeof h.terms === 'object' ? h.terms : null;
+  if (!terms || Object.keys(terms).length > MAX_TERMS) return { ok: false, error: 'head terms missing or too large' };
+  const num = h.num && typeof h.num === 'object' ? h.num : {};
+  for (const [k, w] of Object.entries(terms)) if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
+  for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
+  if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
+  return { ok: true, head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 } };
 }
 
 /** Head score for one CURATE candidate (layout params only — palette/cast are constant across a press). */
@@ -99,4 +119,24 @@ export function tasteSummary(taste) {
   const f = taste.head.fidelity;
   const live = f >= HEAD_MIN_FIDELITY ? 'curating live' : 'fidelity too low — persona curator stays on';
   return `taste · ${likes} keeps / ${passes} passes · fidelity ${f.toFixed(2)} · ${live}`;
+}
+
+/**
+ * Boldness score for one candidate, or null when the Lois head isn't usable.
+ * Does not pick — taste still chooses keepers. CRIT (#948) reads this once
+ * fidelity clears the same 0.3 bar.
+ */
+export function scoreBoldness(taste, layoutParams) {
+  const head = taste && taste.lois && taste.lois.head;
+  if (!head || !(head.fidelity >= HEAD_MIN_FIDELITY)) return null;
+  return scoreLayout(head, layoutParams);
+}
+
+/** Pipeline line for the boldness probe. Absent lois is an honest "not trained". */
+export function loisSummary(taste) {
+  if (!taste || !taste.lois) return 'lois · not trained — favorites vs keeps still waiting on labels';
+  const { favorites, keeps } = taste.lois.labels;
+  const f = taste.lois.head.fidelity;
+  const live = f >= HEAD_MIN_FIDELITY ? 'boldness live' : 'fidelity too low — CRIT stays parked';
+  return `lois · ${favorites} favorites / ${keeps} kept-not-favorited · fidelity ${f.toFixed(2)} · ${live}`;
 }
