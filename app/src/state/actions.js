@@ -59,6 +59,7 @@ export const SET_IS_RECORDING    = 'SET_IS_RECORDING';
 export const SET_IS_RENDERING    = 'SET_IS_RENDERING';
 export const ADD_FAVORITE      = 'ADD_FAVORITE';
 export const REMOVE_FAVORITE   = 'REMOVE_FAVORITE';
+export const ADD_KEEP          = 'ADD_KEEP';
 export const RECALL_FAVORITE   = 'RECALL_FAVORITE';
 export const REORDER_FAVORITE = 'REORDER_FAVORITE';
 export const MORPH_TO_FAVORITE = 'MORPH_TO_FAVORITE';

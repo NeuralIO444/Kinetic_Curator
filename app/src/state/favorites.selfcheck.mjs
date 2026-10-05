@@ -11,7 +11,8 @@ globalThis.localStorage = {
 };
 const { SEED_OFFSET_GROUPS } = await import('../engine/kernel/rng.js');
 const G = SEED_OFFSET_GROUPS[0];
-const { createDavisSlice, sanitizeFavorite, FAVORITES_KEY, captureFavorite, sanitizeCast, FAVORITE_CAST_MAX } = await import('./slices/davisSlice.js');
+const { createDavisSlice, sanitizeFavorite, FAVORITES_KEY, KEEPS_KEY, captureFavorite, sanitizeCast, FAVORITE_CAST_MAX } = await import('./slices/davisSlice.js');
+const { keepsFromKeeps } = await import('./hitsExport.js');
 
 /** A tiny zustand stand-in: one slice, real set semantics. */
 function boot() {
@@ -120,6 +121,46 @@ delete globalThis.localStorage;
   d.call('addFavorite', fav(1));
   assert.strictEqual(d.get().favorites.length, 1, 'works without localStorage');
   console.warn = warn;
+}
+
+// #996 — keeps: K keeps without the star; F implies a keep; un-favoriting
+// leaves the keep. Same record shape, own storage key.
+globalThis.localStorage = {
+  getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+  setItem: (k, v) => { mem.set(k, String(v)); },
+  removeItem: (k) => mem.delete(k),
+};
+mem.delete(FAVORITES_KEY);
+mem.delete(KEEPS_KEY);
+{
+  const c = boot();
+  assert.deepStrictEqual(c.get().keeps, [], 'starts empty');
+  c.call('addKeep', fav(101));
+  assert.strictEqual(c.get().keeps.length, 1, 'K keeps the plate');
+  assert.strictEqual(c.get().favorites.length, 0, 'no star from K');
+  // F implies a keep
+  c.call('addFavorite', fav(102));
+  assert.strictEqual(c.get().favorites.length, 1, 'F stars');
+  assert.strictEqual(c.get().keeps.length, 2, 'F also keeps');
+  assert.strictEqual(c.get().keeps[1].seed, 102, 'the implied keep is the same plate');
+  // un-favoriting leaves the keep
+  const fid = c.get().favorites[0].id;
+  c.call('removeFavorite', fid);
+  assert.strictEqual(c.get().favorites.length, 0, 'star gone');
+  assert.strictEqual(c.get().keeps.length, 2, 'keep survives un-favorite');
+  // reload: keeps persist like favorites
+  const r = boot();
+  assert.deepStrictEqual(r.get().keeps.map((k) => k.seed), [101, 102], 'keeps intact after a reload');
+}
+
+// #996 — the export ledger: favorites as a subset of keeps
+{
+  const keeps = [fav(1), fav(2)];
+  const favorites = [fav(2), fav(9)]; // 9: legacy favorite, no keep row
+  const rows = keepsFromKeeps(keeps, favorites);
+  assert.deepStrictEqual(rows.map((r) => r.seed), [1, 2, 9], 'deduped by seed; legacy favorites ride along');
+  assert.deepStrictEqual(rows.map((r) => r.favorite), [false, true, true], 'favorite flags = subset of keeps');
+  assert.deepStrictEqual(keepsFromKeeps([], []), [], 'empty in, empty out');
 }
 
 console.log('favorites.selfcheck: OK');

@@ -8,7 +8,7 @@ import {
 } from './pipelineNotices.mjs';
 import { attachThumbnail, readThumbnail } from './thumbnail.mjs';
 import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
-import { hitsFromFavorites } from '../../state/hitsExport.js';
+import { hitsFromFavorites, keepsFromKeeps } from '../../state/hitsExport.js';
 import { useStore } from '../../state/store.js';
 import { helpText } from '../../data/helpCopy.js';
 
@@ -29,7 +29,7 @@ function downloadJsonBlob(obj, filename) {
 export function DataExportRow({
   seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
   enabledAssets, quality, autoQuality, assetWeightOverrides, assetKineme, audioRoutes, midiMap, customAssets, layers,
-  activeLayerId, layerSnapshots, userPalettes, favorites, onMessage,
+  activeLayerId, layerSnapshots, userPalettes, favorites, keeps, onMessage,
 }) {
   const fileInputRef = useRef(null);
   const paletteInputRef = useRef(null);
@@ -78,6 +78,9 @@ export function DataExportRow({
       version: 1,
       project: buildProjectPayload(projectFields),
       hits: hitsFromFavorites(favorites),
+      // #996 — the keeps ledger: favorites as a subset of keeps, so
+      // studio/hits_bridge.py bold can learn favorites-vs-kept.
+      keeps: keepsFromKeeps(keeps, favorites),
     }, 'kinetic-curator-hits.json');
   };
 
@@ -220,9 +223,9 @@ export function DataExportRow({
           className="big-btn dl"
           onClick={exportHits}
           style={{ width: '100%' }}
-          title={`Export ${(favorites || []).length} favourited seed(s) for studio/hits_bridge.py (issue #91)`}
+          title={`Export ${(favorites || []).length} favourited seed(s) + ${(keeps || []).length} kept seed(s) for studio/hits_bridge.py (issue #91, #996)`}
         >
-          ↓ HITS ({(favorites || []).length})
+          ↓ HITS ({(favorites || []).length}★ {(keeps || []).length}▣)
         </button>
       </div>
       <div className="pipeline-row" title={helpText('output-taste')}>

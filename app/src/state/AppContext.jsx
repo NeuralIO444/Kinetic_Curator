@@ -154,6 +154,7 @@ export function useApp(selector) {
       case A.SET_IS_RECORDING: return store.setIsRecording(payload);
       case A.SET_IS_RENDERING: return store.setIsRendering(payload);
       case A.ADD_FAVORITE: return store.addFavorite(action.favorite);
+      case A.ADD_KEEP: return store.addKeep(action.keep);
       case A.REMOVE_FAVORITE: return store.removeFavorite(action.id);
       case A.RECALL_FAVORITE: return store.recallFavorite(action.favorite);
       case A.REORDER_FAVORITE: return store.reorderFavorite(action.id, action.delta);

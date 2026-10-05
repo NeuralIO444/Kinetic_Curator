@@ -63,6 +63,28 @@ def build_bold(labels: dict[str, int], sidecars: dict[str, int], favorite_seeds:
     return out
 
 
+def build_bold_from_keeps(keeps: list[dict], sidecars: dict[str, int]) -> dict[str, int]:
+    """#996 — keeps: [{seed, favorite, ...}]. sidecars: filename -> seed.
+    -> {filename: 1/0}. Favorites are a subset of keeps, so both classes
+    appear when both actions have been used. Keeps with no pool render
+    are skipped (cmd_bold renders the missing ones first).
+    """
+    seed_to_name: dict[int, str] = {}
+    for name, seed in sidecars.items():
+        seed_to_name.setdefault(int(seed) & 0xFFFFFFFF, name)
+    out: dict[str, int] = {}
+    for k in keeps:
+        try:
+            s = int(k["seed"]) & 0xFFFFFFFF
+        except (KeyError, TypeError, ValueError):
+            continue
+        name = seed_to_name.get(s)
+        if name is None:
+            continue
+        out[name] = 1 if k.get("favorite") else 0
+    return out
+
+
 def scan_pool(pool: Path) -> dict[str, int]:
     out = {}
     for png in sorted(pool.glob("*.png")):
@@ -198,6 +220,12 @@ def cmd_selfcheck(_a=None) -> None:
     likes = {"000-a.png": 1, "001-b.png": 1, "002-c.png": 0}
     assert build_bold(likes, sidecars, {1}) == {"000-a.png": 1, "001-b.png": 0}, "passes stay out"
     assert build_bold(likes, sidecars, set()) == {"000-a.png": 0, "001-b.png": 0}
+    # #996 — favorites as a subset of keeps: both classes when both actions used
+    keeps = [{"seed": 1, "favorite": True}, {"seed": 2, "favorite": False}, {"seed": 9, "favorite": False}]
+    assert build_bold_from_keeps(keeps, sidecars) == {"000-a.png": 1, "001-b.png": 0}, "keeps without renders stay out"
+    assert build_bold_from_keeps([], sidecars) == {}
+    assert build_bold_from_keeps([{"seed": 2, "favorite": False}], sidecars) == {"001-b.png": 0}
+    assert build_bold_from_keeps([{"nope": 1}], sidecars) == {}, "junk rows skipped, never throw"
     assert build_labels(set(), sidecars) == {"000-a.png": 0, "001-b.png": 0, "002-c.png": 0}
     assert missing_hit_seeds({2, 9}, sidecars) == [9]
     assert missing_hit_seeds(set(), sidecars) == []
@@ -232,18 +260,60 @@ def cmd_selfcheck(_a=None) -> None:
 
 
 def cmd_bold(a) -> None:
-    labels = json.loads(Path(a.labels).read_text())
     hits_export = json.loads(Path(a.hits).read_text())
+    keeps = hits_export.get("keeps") or []
+    pool = Path(a.pool)
+    pool.mkdir(parents=True, exist_ok=True)
+    sidecars = scan_pool(pool)
+
+    if keeps:
+        # #996 — the export carries the keeps ledger: favorites as a subset
+        # of keeps, so both classes appear when both actions were used.
+        keep_by_seed: dict[int, dict] = {}
+        for k in keeps:
+            try:
+                s = int(k["seed"]) & 0xFFFFFFFF
+            except (KeyError, TypeError, ValueError):
+                continue
+            keep_by_seed.setdefault(s, k)
+        todo = missing_hit_seeds(set(keep_by_seed), sidecars)
+        if todo:
+            print(f"rendering {len(todo)} kept seed(s) not already in the pool...")
+            tmp_project = pool / "_keep-render.project.json"
+            for seed in todo:
+                write_hit_project(hits_export, keep_by_seed[seed], tmp_project)
+                render_hit(tmp_project, pool, seed, a.res)
+            tmp_project.unlink(missing_ok=True)
+            sidecars = scan_pool(pool)
+        bold = build_bold_from_keeps(keeps, sidecars)
+        if not bold:
+            sys.exit("no keeps matched the pool — bold.json would be empty")
+        pos = sum(bold.values())
+        if pos == 0 or pos == len(bold):
+            sys.exit(
+                f"Lois needs both sides: got {pos} favorites / {len(bold) - pos} kept-not-favorited. "
+                "Keep some plates with K and favorite others with F, then export again."
+            )
+        Path(a.out).write_text(json.dumps(bold, indent=1, sort_keys=True))
+        print(f"{a.out}: {len(bold)} keeps ({pos} favorites / {len(bold) - pos} kept-not-favorited)")
+        return
+
+    # Legacy path: exports from before #996 have no keeps ledger — every hit
+    # was a favorite, so this can only ever produce one class.
+    if not a.labels:
+        sys.exit(f"{a.hits}: no keeps ledger — pass --labels labels.json for the legacy path, or re-export from the app")
+    labels = json.loads(Path(a.labels).read_text())
     hits = hits_export.get("hits") or []
     favorite_seeds = {int(h["seed"]) & 0xFFFFFFFF for h in hits}
-    sidecars = scan_pool(Path(a.pool))
     bold = build_bold(labels, sidecars, favorite_seeds)
     if not bold:
         sys.exit("no keeps matched the pool — bold.json would be empty")
     pos = sum(bold.values())
     if pos == 0 or pos == len(bold):
-        print(f"warning: Lois needs both sides, got {pos} favorites / {len(bold) - pos} kept-not-favorited",
-              file=sys.stderr)
+        sys.exit(
+            f"Lois needs both sides: got {pos} favorites / {len(bold) - pos} kept-not-favorited. "
+            "This export predates keeps (issue #996) — keep some plates with K and favorite others with F, then export again."
+        )
     Path(a.out).write_text(json.dumps(bold, indent=1, sort_keys=True))
     print(f"{a.out}: {len(bold)} keeps ({pos} favorites / {len(bold) - pos} kept-not-favorited)")
 
@@ -270,9 +340,10 @@ def main(argv=None) -> None:
     sp.set_defaults(func=cmd_pool)
 
     sp = sub.add_parser("bold", help="#954 favorites-vs-keeps labels for the Lois probe")
-    sp.add_argument("--labels", required=True, help="keep-vs-pass labels.json (1 = keep)")
-    sp.add_argument("--hits", required=True, help="↓ HITS export — the favorite set")
+    sp.add_argument("--labels", required=False, default=None, help="keep-vs-pass labels.json (1 = keep) — legacy path only")
+    sp.add_argument("--hits", required=True, help="↓ HITS export — favorites, plus the keeps ledger (#996)")
     sp.add_argument("--pool", required=True, help="rendered pool (sidecars map png -> seed)")
+    sp.add_argument("--res", default="1")
     sp.add_argument("--out", default="bold.json")
     sp.set_defaults(func=cmd_bold)
 
