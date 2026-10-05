@@ -14,6 +14,7 @@ Everything merged to `main` since the 2026-09-28 sync.
 - **FX (#732, #744, #745, #520)** — one family per FX stack slot, signed grain, RGB split keeps source alpha, FX rack UI.
 - **Samplers (#586–#592)** — truchet, voronoi scatter, l-system, OKLCH grade, displace domain-warp, Markov weights, euclidean phrase clock.
 - **Reverted:** asset sub-animation frame strips (#699, #782).
+- **Pixel glyph stamp pack (#702)** — 32 modular 7×7 lattice stamps (emblems, stem-left letterforms, sibling variations, speck fields). Fill-only token paint. Contact sheet: `docs/pxg-contact.svg`.
 - **Tooling** — CI parallel jobs + Playwright cache (#747); e2e de-flakes (#769, #788, #798, #805); hardware research (#785), KINEME handoff (#783).
 
 ## Current — KC-1 review queue (2026-09-28)
