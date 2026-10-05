@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "events": [
+    {"t": 0, "type": "roll", "seed": 7},
+    {"t": 400, "type": "roll", "seed": 8},
+    {"t": 800, "type": "roll", "seed": 9},
+    {"t": 1200, "type": "roll", "seed": 10},
+    {"t": 1600, "type": "roll", "seed": 11},
+    {"t": 2000, "type": "roll", "seed": 12},
+    {"t": 2400, "type": "roll", "seed": 13},
+    {"t": 2800, "type": "roll", "seed": 14},
+    {"t": 3200, "type": "roll", "seed": 15},
+    {"t": 3600, "type": "roll", "seed": 16},
+    {"t": 4000, "type": "roll", "seed": 17},
+    {"t": 4400, "type": "roll", "seed": 18},
+    {"t": 4800, "type": "roll", "seed": 19},
+    {"t": 5200, "type": "roll", "seed": 20}
+  ]
+}

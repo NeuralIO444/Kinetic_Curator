@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from lois.derive import AWAY_MS, BURN_MS, derive
+from lois.journal import load
 from lois.faces import frames_between
 from lois.play import format_rows, scan, seed_in_name
 from pathlib import Path
@@ -72,6 +73,15 @@ class DeriveTests(unittest.TestCase):
         self.assertEqual(r.state, "STUCK")
         self.assertIn("14 rolls, 0 keeps", r.sentence)
         self.assertNotIn("cautious", r.sentence.lower())
+
+
+    def test_stuck_fixture_file(self):
+        journal = load(Path(__file__).resolve().parents[1] / "fixtures" / "stuck-fourteen-rolls.json")
+        now = max(int(e["t"]) for e in journal["events"])
+        r = derive(journal["events"], now)
+        self.assertEqual(r.state, "STUCK")
+        self.assertIn("14 rolls, 0 keeps", r.sentence)
+        self.assertIsNone(r.keep)
 
     def test_undo_burst_is_stuck_not_red_judgment(self):
         events = [{"t": 0, "type": "undo"}, {"t": 100, "type": "undo"}, {"t": 200, "type": "undo"}]
