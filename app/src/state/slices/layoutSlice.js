@@ -4,7 +4,7 @@ import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRe
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
 import { hasChain, markovPick } from '../../curator/transitions.js';
-import { getCatalogPalette, normalizeHex, resolvePalette, PALETTES } from '../../data/palettes.js';
+import { getCatalogPalette, normalizeHex, resolvePalette, paletteRollPoolIds } from '../../data/palettes.js';
 import { COMPOSITION_PRESETS } from '../../data/presets.js';
 import { defaultFxParams, isFxLayer, FX_MENU_KINDS } from '../../fx/fxFilters.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
@@ -649,8 +649,9 @@ export const createLayoutSlice = (set) => ({
     let seed = (Math.random() * 0xffffffff) >>> 0;
     if (seed === 0) seed = 1;
 
-    // 2. palette — random catalog id, preferably not the current one.
-    const paletteId = pickOtherId(PALETTES.map((p) => p.id), state.paletteId);
+    // 2. palette — random id from the full roll pool (#952: all 37 system
+    // palettes + saved user palettes), preferably not the current one.
+    const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
 
     // 3. composition — random preset (carries composition + mode + behave +
     // density/count), preferably a different composition; locked params hold.
@@ -722,9 +723,12 @@ export const createLayoutSlice = (set) => ({
    * RULES pass over the current piece instead of the naive full re-roll:
    * order is imposed on what's on screen, not randomness dealt fresh.
    *
-   * The DNA stays put — same seed, same palette, same asset pool, same FX
-   * chain and blend modes — so the result is recognizably related to what
-   * was on screen. What changes is the compositional order, under four
+   * The DNA stays put — same seed, same asset pool, same FX chain and blend
+   * modes — so the result is recognizably related to what was on screen.
+   * The palette DOES roll (#952): every KIN tap deals a new palette from
+   * the full pool (all 37 system palettes + saved user palettes), so the
+   * roll is the review — every palette has to survive a tap.
+   * What changes is the compositional order, under four
    * rules (each respecting lockedParams, like applyPreset):
    *
    *  1. separation — `overlap: false` (small-first paint order) plus density
@@ -746,6 +750,11 @@ export const createLayoutSlice = (set) => ({
    */
   kineticRulesPass: () => set((state) => {
     const undo = pushToUndo(state, true);
+
+    // #952 — every KIN tap deals a new palette from the full pool
+    // (37 system + saved user palettes), never the one already up.
+    // Overrides + swatch locks clear, exactly like setPaletteId.
+    const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
 
     const preset = pickRulesPreset(state.layoutParams.composition);
     // #964: an armed MODE constrains RULES — keep the composition too. The
@@ -770,6 +779,9 @@ export const createLayoutSlice = (set) => ({
 
     const next = {
       ...undo,
+      paletteId,
+      paletteOverrides: null,
+      paletteLocks: {},
       layoutParams: merged,
       voiceMix: null,
       activeVoiceId: null,
@@ -801,8 +813,9 @@ export const createLayoutSlice = (set) => ({
   kineticWeatherPass: () => set((state) => {
     const undo = pushToUndo(state, true);
 
-    // 1. Palette weather — a different sky, never the one already up.
-    const paletteId = pickOtherId(PALETTES.map((p) => p.id), state.paletteId);
+    // 1. Palette weather — a different sky, never the one already up. Rolls
+    // from the full pool (#952: all 37 system palettes + saved user palettes).
+    const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
 
     // 2. Mood — move the sun if it's out.
     let light = state.light;
