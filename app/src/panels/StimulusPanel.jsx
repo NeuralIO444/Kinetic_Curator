@@ -13,6 +13,7 @@ export function StimulusPanel() {
     audioEnabled: s.audioEnabled,
     audioGain: s.audioGain,
     audioSource: s.audioSource,
+    audioLastFile: s.audioLastFile, // UX-7: re-selectable file source
     audioMonitor: s.audioMonitor,
     audioSidecar: s.audioSidecar, // #618
     audioSidecarNote: s.audioSidecarNote,
@@ -22,7 +23,7 @@ export function StimulusPanel() {
     layoutParams: s.layoutParams,
   }));
   const {
-    audioEnabled, audioGain, audioSource,
+    audioEnabled, audioGain, audioSource, audioLastFile,
     audioMonitor, beatPulse, audioBands, layoutParams,
     audioSidecar, audioSidecarNote, audioRoutes,
   } = state;
@@ -57,6 +58,9 @@ export function StimulusPanel() {
           {/* #613 — hierarchy inverted: the METER is the hero, the MATRIX shows
               which sound drives what, live; setup and raw knobs follow. */}
           <MeterHero />
+          {/* UX-7 — FEEL macros lead: the three feels are the first thing you
+              see in Stimuli, above the route table. */}
+          <FeelPicker layoutParams={layoutParams} />
           <ModMatrix audioBands={audioBands} beatPulse={beatPulse} audioEnabled={audioEnabled}
             depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} routes={audioRoutes} />
           <div className="stim-toggle-row">
@@ -81,6 +85,7 @@ export function StimulusPanel() {
           {setupOpen && (
             <SourceControls
               audioSource={audioSource}
+              audioLastFile={audioLastFile}
               audioGain={audioGain}
               audioMonitor={audioMonitor}
               audioSidecar={audioSidecar}
@@ -89,8 +94,7 @@ export function StimulusPanel() {
             />
           )}
 
-          {/* #615 — the face is three feels; the eight raw sliders survive behind ADVANCED, unchanged. */}
-          <FeelPicker layoutParams={layoutParams} />
+          {/* #615 — the eight raw sliders survive behind ADVANCED, unchanged. */}
           <details className="stim-advanced" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
             <summary>ADVANCED</summary>
             <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} attackMs={attackMs} decayMs={decayMs} response={response} swell={swell} audioEnabled={audioEnabled} />

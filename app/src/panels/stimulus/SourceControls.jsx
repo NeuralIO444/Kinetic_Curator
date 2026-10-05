@@ -3,8 +3,12 @@ import { useStore } from '../../state/store.js';
 import { parseAudioEnvelope } from '../../gl/audioEnvelopeCore.mjs';
 import { sourceStatus, sidecarReason } from '../../gl/sourceStatus.mjs';
 
-export function SourceControls({ audioSource, audioGain, audioMonitor, devices, audioSidecar, audioSidecarNote }) {
+export function SourceControls({ audioSource, audioLastFile, audioGain, audioMonitor, devices, audioSidecar, audioSidecarNote }) {
   const status = sourceStatus(audioSource, audioSidecar, audioSidecarNote);
+  // UX-7: the last loaded file survives a switch to mic (the store stashes
+  // it instead of revoking the URL), so the dropdown's File: option can
+  // bring it back — no need to re-pick the file.
+  const fileOpt = audioSource.type === 'file' ? audioSource : audioLastFile;
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -31,10 +35,16 @@ export function SourceControls({ audioSource, audioGain, audioMonitor, devices, 
     else set({ name: file.name, env });
   };
 
-  const handleDeviceChange = (e) => {
-    if (e.target.value !== 'file') {
-      emit(Events.AUDIO_SOURCE, { type: 'device', id: e.target.value });
+  const handleSourceChange = (e) => {
+    if (e.target.value === 'file') {
+      // UX-7: the File: option is selectable — re-emit the stashed file
+      // source (same shape as a fresh pick: { type:'file', url, name }).
+      if (fileOpt && fileOpt.url) {
+        emit(Events.AUDIO_SOURCE, { type: 'file', url: fileOpt.url, name: fileOpt.name });
+      }
+      return;
     }
+    emit(Events.AUDIO_SOURCE, { type: 'device', id: e.target.value });
   };
 
   return (
@@ -52,12 +62,12 @@ export function SourceControls({ audioSource, audioGain, audioMonitor, devices, 
 
       <select
         value={audioSource.type === 'device' ? audioSource.id : 'file'}
-        onChange={handleDeviceChange}
+        onChange={handleSourceChange}
         style={{ width: '100%', marginBottom: '6px', background: 'var(--panel)', color: 'var(--ink)', border: '1px solid var(--line)', padding: '3px', fontSize: '10px' }}
       >
         <option value="default">Default Mic</option>
         {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 5)}...`}</option>)}
-        {audioSource.type === 'file' && <option value="file">File: {audioSource.name}</option>}
+        {fileOpt && fileOpt.url && <option value="file">File: {fileOpt.name}</option>}
       </select>
 
       <input type="file" accept="audio/*" onChange={handleFileChange} style={{ fontSize: '9px', color: 'var(--dim)', width: '100%' }} />

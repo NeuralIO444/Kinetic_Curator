@@ -7,6 +7,10 @@ export const createAudioSlice = (set) => ({
   // why audio silently isn't running instead of leaving it looking idle.
   audioDenied: false,
   audioSource: { type: 'device', id: 'default' },
+  // UX-7: the last loaded file, stashed when switching to a mic so the
+  // source dropdown's File: option can bring it back. Session state, like
+  // the file URL itself: not part of the project document.
+  audioLastFile: null,
   audioGain: 1.0,
   audioMonitor: false,
   audioBands: { bass: 0, mid: 0, treble: 0, rms: 0 },
@@ -25,15 +29,23 @@ export const createAudioSlice = (set) => ({
   setAudioEnabled: (enabled) => set({ audioEnabled: enabled }),
   setAudioDenied: (denied) => set({ audioDenied: !!denied }),
   setAudioSource: (source) => set((state) => {
-    // Blob URLs from file picks accumulate if never revoked. The previous
-    // source's element is torn down right after this update, so revoking
-    // here is safe — nothing will need the old URL again.
     const prev = state.audioSource;
-    if (prev && prev.type === 'file' && typeof prev.url === 'string' && prev.url !== source?.url) {
-      try { URL.revokeObjectURL(prev.url); } catch { /* already revoked */ }
+    const stashed = state.audioLastFile;
+    const revoke = (u) => { if (typeof u === 'string') { try { URL.revokeObjectURL(u); } catch { /* already revoked */ } } };
+    // UX-7: the last loaded file stays re-selectable from the source
+    // dropdown — stash the outgoing file instead of revoking its URL.
+    // Blob URLs still can't accumulate: a newly picked file revokes the
+    // stashed one, and only one file is ever stashed.
+    let audioLastFile = stashed;
+    if (source && source.type === 'file') {
+      if (stashed && stashed.url !== source.url) revoke(stashed.url);
+      if (prev && prev.type === 'file' && prev.url !== source.url) revoke(prev.url);
+      audioLastFile = source;
+    } else if (prev && prev.type === 'file') {
+      audioLastFile = prev;
     }
     // A sidecar describes ONE file: a different source invalidates it.
-    return { audioSource: source, audioSidecar: null, audioSidecarNote: '' };
+    return { audioSource: source, audioLastFile, audioSidecar: null, audioSidecarNote: '' };
   }),
   /**
    * Replace the route table (sanitized; null = the default table). One undo step

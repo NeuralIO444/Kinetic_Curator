@@ -23,12 +23,13 @@ const RESPONSE_HINTS = {
 };
 
 function MsSlider({ label, value, min, max, step, onChange, hint, disabled, disabledReason }) {
-  const title = [hint, disabled && disabledReason ? `Disabled — ${disabledReason}` : null]
+  // UX-7: "waiting for audio," not "broken" — dim, never struck through.
+  const title = [hint, disabled && disabledReason ? `Waiting for audio — ${disabledReason}` : null]
     .filter(Boolean).join(' · ') || undefined;
   return (
-    <div style={{ marginBottom: 6, opacity: disabled ? 0.38 : 1 }} title={title}>
+    <div style={{ marginBottom: 6, opacity: disabled ? 0.55 : 1 }} title={title}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.08em', marginBottom: 2 }}>
-        <span style={disabled ? { textDecoration: 'line-through' } : undefined}>{label}</span>
+        <span>{label}</span>
         <span>{Math.round(value)} ms</span>
       </div>
       <input
@@ -44,12 +45,13 @@ function MsSlider({ label, value, min, max, step, onChange, hint, disabled, disa
 
 function ResponsePicker({ value, onChange, disabled, disabledReason }) {
   const hint = `Envelope shape — ${RESPONSE_HINTS[value] ?? ''}`;
-  const title = [hint, disabled && disabledReason ? `Disabled — ${disabledReason}` : null]
+  // UX-7: "waiting for audio," not "broken" — dim, never struck through.
+  const title = [hint, disabled && disabledReason ? `Waiting for audio — ${disabledReason}` : null]
     .filter(Boolean).join(' · ') || undefined;
   return (
-    <div style={{ marginBottom: 6, opacity: disabled ? 0.38 : 1 }} title={title}>
+    <div style={{ marginBottom: 6, opacity: disabled ? 0.55 : 1 }} title={title}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.08em', marginBottom: 2 }}>
-        <span style={disabled ? { textDecoration: 'line-through' } : undefined}>RESPONSE</span>
+        <span>RESPONSE</span>
         <span>{RESPONSE_LABELS[value] ?? value}</span>
       </div>
       <div style={{ display: 'flex', gap: 4 }}>
@@ -72,8 +74,9 @@ function ResponsePicker({ value, onChange, disabled, disabledReason }) {
 
 export function ReactivityControls({ depth, scaleMod, alphaMod, life, attackMs, decayMs, response, swell, audioEnabled }) {
   // #272: DEPTH/SCALE/ALPHA are mic-driven — with the mic off they do nothing,
-  // so they say so. LIFE is a slow LFO independent of audio; it stays live.
-  const disabledReason = 'Audio is off — enable the mic';
+  // so they say so. UX-7: "waiting for audio," not "broken." LIFE is a slow
+  // LFO independent of audio; it stays live.
+  const disabledReason = 'enable the mic to drive this';
   return (
     <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '6px' }} title="Live node multiply from the mic. Does not tick the Ghost Station phrase clock.">REACTIVITY / LIFE</div>
