@@ -57,7 +57,21 @@
  * at the MIXes the instrument actually plays, degrading toward a cut below
  * roughly 0.75s — i.e. a sub-second MIX no longer has the frames to hide
  * anything and degrades toward the cut it is already asking for.
+ *
+ * #951 BEAT CHOREOGRAPHY — the seeded stagger above is now the fallback.
+ * Planned transitions play the hero-first slot schedule from
+ * engine/kernel/beatChoreo.mjs (planned once in planMorph, read every
+ * frame here): the largest mark moves on the downbeat, the chorus follows
+ * on 16th-note slots ordered by distance from the hero. The grid is
+ * relative to the transition's own 2 beats, so the BEAT clock quantizes
+ * it for free — and at high BPM the whole wave compresses into the
+ * frenetic zone. Rapid retargets (liveResolve) squeeze the duration
+ * instead of restarting it, so mashing chips accelerates but never cuts.
  */
+
+// #951 — hero-first, beat-quantized choreography. The plan carries the
+// slot schedule (computed once per transition); blendItems reads it.
+import { choreoPlan, choreoWindow } from './beatChoreo.mjs';
 
 function dist2(a, b) {
   const dx = a.x - b.x, dy = a.y - b.y;
@@ -229,7 +243,11 @@ export function planMorph(fromItems, toItems, seed = 0) {
 
   onlyFrom.push(...leftoverFrom.filter((_, i) => !usedF[i]));
   onlyTo.push(...leftoverTo.filter((_, j) => !usedT[j]).map((t) => ({ g: t.g, j: t.origIdx })));
-  return { pairs, onlyFrom, onlyTo, seed: (seed >>> 0) };
+  // #951: the hero-first slot schedule, planned once here so every frame
+  // of the transition reads the same downbeat. Computed over the flat
+  // to-list (global to-indices), so blendItems can look it up by index.
+  const choreo = choreoPlan(toItems || []);
+  return { pairs, onlyFrom, onlyTo, seed: (seed >>> 0), choreo };
 }
 
 /**
@@ -284,6 +302,28 @@ export function nodeWindow(i, seed = 0) {
 /** Transition progress -> this node's own progress, clamped to its window. */
 function nodeT(t, i, seed) {
   const { delay, dur } = nodeWindow(i, seed);
+  return windowU(t, delay, dur);
+}
+
+/**
+ * #951 — this node's window for a planned transition. When the plan
+ * carries the hero-first slot schedule, the window starts on its
+ * 16th-note slot (hero on the downbeat, chorus radiating outward);
+ * without a plan (tests, one-shot blends) it falls back to the seeded
+ * stagger, unchanged. Out-of-range indices (leavers past the to-list)
+ * also fall back.
+ */
+function winFor(plan, i, seed) {
+  const c = plan && plan.choreo;
+  if (c && Array.isArray(c.slots) && i >= 0 && i < c.slots.length) {
+    return choreoWindow(c.slots[i], i, seed);
+  }
+  return nodeWindow(i, seed);
+}
+
+/** Transition progress -> this node's own progress through its #951 window. */
+function planNodeT(t, plan, i, seed) {
+  const { delay, dur } = winFor(plan, i, seed);
   return windowU(t, delay, dur);
 }
 
@@ -490,7 +530,8 @@ export function blendItems(fromItems, toItems, t, plan = null) {
       if (!wf) wf = wavefront(toList);
       return { delay: STAGGER * (wf.ds[i] / wf.maxD), dur: DUR_MIN + DUR_JIT * hash01(i * 2 + 1, seed) };
     }
-    return nodeWindow(i, seed);
+    // #951: pop joiners ride the hero-first slot grid like everyone else.
+    return winFor(resolved, i, seed);
   };
   // to-indices with no partner: the joiners. Leavers borrow these windows.
   const joinerIdx = [];
@@ -500,7 +541,7 @@ export function blendItems(fromItems, toItems, t, plan = null) {
     const to = toList[i];
     const f = partner[i];
     const toRank = i / toLen;
-    const u = nodeT(t, i, seed);
+    const u = planNodeT(t, resolved, i, seed);
     if (f) {
       const fromRank = (idxFrom.get(f) ?? i) / fromLen;
       const g = ease(u); // travel progress — eased so the node's own move has no jerk

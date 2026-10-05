@@ -752,10 +752,17 @@ export function createLiveResolver() {
         // (life drift re-places, the warp slides); re-matching per frame
         // cost O(n^2) and flipped near-tied pairs mid-flight — items
         // darted across their group instead of gliding one straight line.
+        // #951: rapid clicks accelerate — each retarget of an in-flight
+        // transition squeezes the new duration (x0.65, floored at one
+        // beat), so mashing chips rushes the choreography forward but it
+        // always glides, never hard-cuts.
+        const inFlight = morphState.get(e.id);
+        const squeeze = inFlight ? Math.max(0.5, (inFlight.squeeze || 1) * 0.65) : 1;
         morphState.set(e.id, {
           fromItems: prevShown.items,
           startMs: nowMs,
-          dur: mixSeconds,
+          dur: mixSeconds * squeeze,
+          squeeze,
           // #564 — the director's stagger is seeded off the layer seed, so a
           // given seed always replays the same wave across the canvas.
           plan: planMorph(prevShown.items, e.items, e.morphSeed),
