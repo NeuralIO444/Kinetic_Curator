@@ -21,6 +21,7 @@ import { sanitizeAssetKineme, getKineme, DEFAULT_ASSET_KINEME } from '../../data
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../../midi/map.mjs';
+import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegions, normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 
@@ -679,6 +680,8 @@ export const createGlobalSlice = (set) => ({
       next.stageMode = canvas.stageMode;
     }
     next.midiMap = sanitizeMidiMap(doc.midiMap); // #617 — a doc without mappings maps nothing
+    next.mathMacros = sanitizeMathMacros(doc.mathMacros); // #724 — a doc without macros has none
+    next.mathLearnArmed = null; // #724 — learn never survives a load; it is a gesture
     // #651 — reimported titles persist; a doc without a title clears it.
     next.projectTitle = typeof doc.title === 'string' ? doc.title.slice(0, 80) : '';
     if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {

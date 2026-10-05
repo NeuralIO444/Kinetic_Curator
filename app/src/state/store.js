@@ -9,6 +9,7 @@ import { createLayersSlice } from './slices/layersSlice.js';
 import { createPaletteLibrarySlice } from './slices/paletteLibrarySlice.js';
 import { createVoiceSlice } from './slices/voiceSlice.js';
 import { createMidiSlice } from './slices/midiSlice.js';
+import { createMathMacrosSlice } from './slices/mathMacrosSlice.js';
 
 export const useStore = create((set, get) => ({
   ...createAudioSlice(set, get),
@@ -20,6 +21,7 @@ export const useStore = create((set, get) => ({
   ...createPaletteLibrarySlice(set, get),
   ...createVoiceSlice(set, get),
   ...createMidiSlice(set, get),
+  ...createMathMacrosSlice(set, get),
 }));
 
 // Test hook (#964): e2e sets `window.__KC_EXPOSE_STORE = true` in an init

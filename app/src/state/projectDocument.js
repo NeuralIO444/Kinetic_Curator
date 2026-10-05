@@ -11,6 +11,7 @@ import { sanitizeAssetKineme } from '../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../midi/map.mjs';
+import { sanitizeMathMacros } from '../curator/mathMacros.js';
 import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
@@ -124,6 +125,10 @@ export function serializeProject(state) {
   // project exports exactly as before.
   const midiMap = sanitizeMidiMap(state.midiMap);
   if (Object.keys(midiMap).length) doc.midiMap = midiMap;
+  // #724 — math macro setups. Written only when a macro exists: a project
+  // with no macros exports exactly as before.
+  const mathMacros = sanitizeMathMacros(state.mathMacros);
+  if (mathMacros.length) doc.mathMacros = mathMacros;
   if (Array.isArray(state.layers) && state.activeLayerId) {
     doc.layers = state.layers;
     doc.activeLayerId = state.activeLayerId;
@@ -175,6 +180,7 @@ export function parseProject(raw) {
         assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
         audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
         midiMap: sanitizeMidiMap(raw.midiMap), // #617
+        mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
         customAssets,
         layers,
         activeLayerId,
@@ -220,6 +226,7 @@ export function parseProject(raw) {
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
       midiMap: sanitizeMidiMap(raw.midiMap), // #617
+      mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
           ? raw.paletteOverrides

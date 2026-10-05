@@ -95,7 +95,15 @@ export function useApp(selector) {
       case A.CLEAR_PALETTE_OVERRIDES: return store.clearPaletteOverrides();
       case A.SET_PALETTE_MIX: return store.setPaletteMixSeconds(payload);
       case A.SET_COLOR_MODE: return store.setColorMode(payload);
-      case A.SET_LAYOUT_PARAM: return store.setLayoutParam(action.key, action.value);
+      case A.SET_LAYOUT_PARAM: {
+        // #724 — learn-mode: a slider wiggled while a macro knob is armed
+        // assigns its key to that macro ("touch the thing to assign the
+        // thing"). This funnel is UI-only: panels emit LAYOUT_PARAM on
+        // slider wiggle; programmatic writes (morphs, curator, the macro
+        // drive itself) call setLayoutParam directly and never assign.
+        if (store.mathLearnArmed) store.mathLearnAssign(action.key);
+        return store.setLayoutParam(action.key, action.value);
+      }
       case A.SET_LAYOUT_PARAMS: return store.setLayoutParams(payload);
       case A.APPLY_PRESET: return store.applyPreset(action.preset);
       case A.TOGGLE_PARAM_LOCK: return store.toggleParamLock(action.key);
