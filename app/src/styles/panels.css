@@ -363,6 +363,37 @@
 .layer-row-active { border-color: var(--accent3); }
 .layer-row-fx { border-color: #8a6cff; background: rgba(138, 108, 255, 0.07); }
 .layer-row-fx-selected { border-color: #b49aff; box-shadow: 0 0 0 1px #b49aff inset; }
+/* #1015 — reorder feedback, styled to mockup C (kc-layer-alt/c-refined.png):
+   dark rows, type-color accents (content #e8a33d, FX #35c4b5). The moved
+   row flashes its type color; labels are positional and would otherwise
+   read identically after a reorder. */
+.layer-row-moved { animation: layer-row-moved-flash 1.6s ease-out; }
+.layer-row-moved.layer-row-fx { animation-name: layer-row-moved-flash-fx; }
+@keyframes layer-row-moved-flash {
+  0% { box-shadow: 0 0 0 2px #e8a33d; background: rgba(232, 163, 61, 0.10); }
+  100% { box-shadow: none; }
+}
+@keyframes layer-row-moved-flash-fx {
+  0% { box-shadow: 0 0 0 2px #35c4b5; background: rgba(53, 196, 181, 0.10); }
+  100% { box-shadow: none; }
+}
+/* #1015 — transient "now KC-2" badge on the moved row: C's "on"-button
+   language (type-color text, type-color 40% border on #1a1a22); fades with
+   the flash. */
+.reorder-badge {
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #e8a33d; border: 1px solid #e8a33d66; background: #1a1a22;
+  padding: 3px 8px; border-radius: 3px; white-space: nowrap; align-self: center;
+  animation: reorder-badge-fade 1.6s ease-out forwards;
+}
+.reorder-badge-fx { color: #35c4b5; border-color: #35c4b566; }
+@keyframes reorder-badge-fade {
+  0% { opacity: 0; } 12% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; }
+}
+/* #1015 — DUP at cap: disabled with a tooltip instead of swallowing the
+   click. C's dimmed-button language (dimmed, no hover lift). */
+.build-layer-stack .micro-btn.dup-capped { opacity: 0.35; cursor: not-allowed; }
+.build-layer-stack .micro-btn.dup-capped:hover { background: transparent; border-color: var(--line-2); }
 .layer-row-main { display: flex; align-items: center; gap: 4px; }
 /* #716 — TX-6 numeral tile. Black block + white numeral on every row;
    the edited track inverts. Literals, not theme tokens: the tile is hardware. */

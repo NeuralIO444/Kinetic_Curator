@@ -2,7 +2,7 @@
 // verbatim from the old LayersPanel.jsx (layer rows, #341 ghost slots,
 // blend mode, opacity, PATCH row, FX effect editor). No logic changed —
 // same store selectors, same Events emissions.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
 import { useStore } from '../../state/store.js';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
@@ -212,6 +212,37 @@ export function LayerStack() {
     return hit ? hit.id : null;
   }
 
+  // #1015 — reorder feedback. `KC-n` labels are positional, so a bare
+  // reorder reads as a no-op; flash the moved row and pin a transient
+  // "now KC-2" badge next to the ▲▼ so the move confirms without looking
+  // at the canvas. MATH rows are out of scope — their reorder handlers
+  // stay exactly as before.
+  const [moveFlash, setMoveFlash] = useState(null); // { id, label } | null
+  const flashTimer = useRef(null);
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
+
+  function handleReorder(layer, i, delta) {
+    emit(Events.LAYER_REORDER, { id: layer.id, delta });
+    if (isMathLayer(layer)) return;
+    const j = i + delta;
+    // Mirror the reducer: the swap only happens between adjacent rows of
+    // the same class (content vs adjustment) inside the stack bounds. The
+    // ▲▼ buttons are disabled at the stack edges, so a j past an edge or
+    // into the other class means the reducer no-op'd — flash nothing.
+    if (j < 0 || j >= layers.length || isAdj(layers[i]) !== isAdj(layers[j])) return;
+    const fx = isFxLayer(layer);
+    const next = [...layers];
+    [next[i], next[j]] = [next[j], next[i]];
+    let n = 0;
+    for (const l of next) {
+      if (fx ? isFxLayer(l) : !isAdj(l)) n += 1;
+      if (l.id === layer.id) break;
+    }
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    setMoveFlash({ id: layer.id, label: fx ? `FX ${n}` : `KC-${n}` });
+    flashTimer.current = setTimeout(() => setMoveFlash(null), 1600);
+  }
+
   return (
     <div className="build-layer-stack">
       <PanelHeader tag="P08" title="LAYERS" subtitle={`${contentCount} / ${MAX_CONTENT_TRACKS} tracks`}>
@@ -258,14 +289,22 @@ export function LayerStack() {
           const patch = layer.patch || { mode: 'off', to: null, strength: 0.16 };
           const to = (!patch.to || patch.to === layer.id) ? otherTarget(layer) : patch.to;
           const hitsHard = math && mathTrackHitsHard(layer);
+          // #1015 — DUP at cap used to click through silently. Cap the button
+          // instead: disabled + tooltip so the cap reads instead of swallowing
+          // the click. MATH rows are out of scope — their DUP is untouched.
+          const dupCapped = math ? false : fx ? fxCount >= MAX_FX_TRACKS : contentCount >= MAX_CONTENT_TRACKS;
           return (
-            <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}`}>
+            <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}${moveFlash?.id === layer.id ? ' layer-row-moved' : ''}`}>
               <div className="layer-row-main">
                 <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : isActive} />
                 <div className="layer-reorder">
-                  <button className="micro-btn" disabled={i === layers.length - 1} onClick={() => emit(Events.LAYER_REORDER, { id: layer.id, delta: 1 })}>▲</button>
-                  <button className="micro-btn" disabled={i === 0} onClick={() => emit(Events.LAYER_REORDER, { id: layer.id, delta: -1 })}>▼</button>
+                  <button className="micro-btn" disabled={i === layers.length - 1} onClick={() => handleReorder(layer, i, 1)}>▲</button>
+                  <button className="micro-btn" disabled={i === 0} onClick={() => handleReorder(layer, i, -1)}>▼</button>
                 </div>
+                {/* #1015 — transient position badge on the moved row */}
+                {moveFlash?.id === layer.id && (
+                  <span className={`reorder-badge${fx ? ' reorder-badge-fx' : ''}`} role="status">now {moveFlash.label}</span>
+                )}
                 <button className="micro-btn" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
                 <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks (FX never solos)' : math ? 'Solo the grade: this track alone over neutral mid-grey' : undefined} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{(soloed || mathSoloed) ? 'S·' : 'S'}</button>
                 {fx && <span className="fx-badge">FX</span>}
@@ -277,7 +316,7 @@ export function LayerStack() {
                 >
                   {label}
                 </button>
-                <button className="micro-btn" onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
+                <button className={`micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : undefined} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
                 <button className="micro-btn" disabled={!isAdj(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
               </div>
               <div className="layer-row-composite">
