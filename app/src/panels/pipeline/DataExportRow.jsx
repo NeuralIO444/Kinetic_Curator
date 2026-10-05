@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { parseProject, downloadProject } from '../../state/projectDocument.js';
 import { paletteImportMessage } from './paletteImportCopy.mjs';
@@ -11,6 +11,8 @@ import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
 import { hitsFromFavorites, keepsFromKeeps } from '../../state/hitsExport.js';
 import { useStore } from '../../state/store.js';
 import { helpText } from '../../data/helpCopy.js';
+import { retrainNudge, dismissRetrainNudge } from '../../curator/tasteHead.js';
+import { getTaste } from '../../curator/tasteStore.js';
 
 function downloadJsonBlob(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
@@ -43,6 +45,15 @@ export function DataExportRow({
   const loisStatus = useStore((s) => s.loisStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const clearTaste = useStore((s) => s.clearTaste);
+  const [nudgeTick, setNudgeTick] = useState(0); // #925 — re-render after dismissing the retrain nudge
+  // #925 — one dismissible hint line under the taste status, past ~50 new
+  // keeps since the last train. Reactive on taste import (tasteStatus),
+  // keep changes (keeps), and dismissal (nudgeTick).
+  const nudgeLine = useMemo(
+    () => retrainNudge(getTaste(), keeps || []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasteStatus, keeps, nudgeTick],
+  );
   const projectTitle = useStore((s) => s.projectTitle);
   const setProjectTitle = useStore((s) => s.setProjectTitle);
 
@@ -241,6 +252,17 @@ export function DataExportRow({
         {/* #997 — the Lois boldness line sits under the taste line: not trained,
             fidelity too low, or boldness live. Honest either way; never a picker. */}
         <div className="lois-status" style={{ fontSize: 10, opacity: 0.6, margin: '0 0 6px' }}>{loisStatus}</div>
+         {/* #925 — retrain nudge: one tap dismisses, stays quiet until ~50 more keeps */}
+         {nudgeLine && (
+           <button
+             className="pipeline-hint"
+             style={{ fontSize: 10, opacity: 0.75, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: 'inherit', font: 'inherit' }}
+             title="One tap dismisses — it stays quiet until ~50 more keeps"
+             onClick={() => { dismissRetrainNudge((keeps || []).length); setNudgeTick((t) => t + 1); }}
+           >
+             {nudgeLine} ✕
+           </button>
+         )}
         {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}{readThumbnail(projectFields) ? '' : ''}</div>}
         {behind && (
           <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>

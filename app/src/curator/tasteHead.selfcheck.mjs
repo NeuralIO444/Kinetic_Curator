@@ -10,7 +10,7 @@ globalThis.localStorage = {
   setItem: (k, v) => { mem.set(k, String(v)); },
   removeItem: (k) => mem.delete(k),
 };
-const { featureTerms, validateTaste, scoreLayout, makeMlxCurator, tasteSummary, scoreBoldness, loisSummary, HEAD_MIN_FIDELITY } = await import('./tasteHead.js');
+const { featureTerms, validateTaste, scoreLayout, makeMlxCurator, tasteSummary, scoreBoldness, loisSummary, HEAD_MIN_FIDELITY, retrainNudge, dismissRetrainNudge, clearRetrainNudge, RETRAIN_NUDGE_THRESHOLD, RETRAIN_NUDGE_KEY } = await import('./tasteHead.js');
 const { importTaste, clearTaste, getTaste, TASTE_KEY } = await import('./tasteStore.js');
 const { getActiveCurator, curatorHint, pickCurated } = await import('./curate.js');
 const { FEATURES_VERSION } = await import('./recipeFeatures.js');
@@ -103,5 +103,28 @@ badLois.lois = { head: { ...badLois.head, fidelity: 9 } };
 assert.strictEqual(validateTaste(badLois).ok, false);
 // pick still follows the taste head, not the lois head
 assert.strictEqual(makeMlxCurator(imported.taste).pick([small, large]), 1);
+
+// ── #925 — retrain nudge: past ~50 new keeps, a hint not a warning ─────────
+const trained = ok.taste; // labels.likes = 42
+const keepsOf = (n) => Array.from({ length: n }, (_, i) => ({ seed: i }));
+assert.strictEqual(retrainNudge(null, keepsOf(200)), null, 'no taste: no nudge');
+assert.strictEqual(retrainNudge(trained, keepsOf(42 + RETRAIN_NUDGE_THRESHOLD - 1)), null, 'one short of the threshold: quiet');
+const nudge = retrainNudge(trained, keepsOf(42 + RETRAIN_NUDGE_THRESHOLD));
+assert.ok(nudge, 'at the threshold: the nudge appears');
+assert.match(nudge, /retrain hint/, 'reads as a hint, not a warning');
+assert.match(nudge, /50 keeps since this head was trained/, 'names the count');
+// one tap dismisses; it stays quiet until ~50 MORE keeps
+dismissRetrainNudge(42 + RETRAIN_NUDGE_THRESHOLD);
+assert.strictEqual(retrainNudge(trained, keepsOf(42 + RETRAIN_NUDGE_THRESHOLD)), null, 'dismissed: quiet');
+assert.strictEqual(retrainNudge(trained, keepsOf(42 + 2 * RETRAIN_NUDGE_THRESHOLD - 1)), null, '49 more: still quiet');
+assert.ok(retrainNudge(trained, keepsOf(42 + 2 * RETRAIN_NUDGE_THRESHOLD)), '50 more after dismissal: back');
+// a fresh import re-baselines: the dismissal must not outlive it
+const fresh = taste();
+fresh.labels.likes = 200;
+assert.ok(importTaste(fresh).ok);
+assert.strictEqual(mem.has(RETRAIN_NUDGE_KEY), false, 'import clears the dismissal');
+assert.strictEqual(retrainNudge(getTaste(), keepsOf(200 + RETRAIN_NUDGE_THRESHOLD - 1)), null, 'new head: quiet below its own baseline');
+assert.ok(retrainNudge(getTaste(), keepsOf(200 + RETRAIN_NUDGE_THRESHOLD)), 'new head: nudges past its own baseline');
+clearTaste();
 
 console.log('tasteHead.selfcheck: OK');

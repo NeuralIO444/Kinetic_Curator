@@ -140,3 +140,52 @@ export function loisSummary(taste) {
   const live = f >= HEAD_MIN_FIDELITY ? 'boldness live' : 'fidelity too low — CRIT stays parked';
   return `lois · ${favorites} favorites / ${keeps} kept-not-favorited · fidelity ${f.toFixed(2)} · ${live}`;
 }
+
+/** #925 — the retrain nudge: a hint, never a warning. Taste goes softly
+ * stale as Matt keeps more work; after ~50 new keeps since the last train,
+ * Pipeline shows one dismissible line. Zero behavior change to curation. */
+export const RETRAIN_NUDGE_THRESHOLD = 50;
+export const RETRAIN_NUDGE_KEY = 'kc:retrain-nudge:v1';
+
+/** Keep count recorded when the nudge was last dismissed (0 = never). */
+function readNudgeDismissed() {
+  try {
+    const n = Number(JSON.parse(localStorage.getItem(RETRAIN_NUDGE_KEY) ?? '0'));
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * The retrain nudge line, or null when it should stay quiet.
+ * The baseline is the higher of the head's trained like-count and the
+ * dismissed keep-count: a dismissal holds until ~50 MORE keeps, and
+ * importing a fresher taste re-baselines automatically (clearRetrainNudge).
+ */
+export function retrainNudge(taste, keeps) {
+  if (!taste) return null;
+  const cur = Array.isArray(keeps) ? keeps.length : 0;
+  const baseline = Math.max(Number(taste.labels?.likes) || 0, readNudgeDismissed());
+  const fresh = cur - baseline;
+  if (fresh < RETRAIN_NUDGE_THRESHOLD) return null;
+  return `retrain hint · ${fresh} keeps since this head was trained — a fresh train would sharpen it`;
+}
+
+/** Dismiss the nudge until ~50 more keeps. */
+export function dismissRetrainNudge(keepCount) {
+  try {
+    localStorage.setItem(RETRAIN_NUDGE_KEY, JSON.stringify(Math.max(0, Number(keepCount) || 0)));
+  } catch {
+    // private window: the nudge just comes back next visit. Honest, not fatal.
+  }
+}
+
+/** A fresh import re-baselines the nudge — a dismissal must not outlive it. */
+export function clearRetrainNudge() {
+  try {
+    localStorage.removeItem(RETRAIN_NUDGE_KEY);
+  } catch {
+    // deliberately silent
+  }
+}
