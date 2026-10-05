@@ -8,6 +8,7 @@ import { SCHEME_IDS } from '../engine/harmony.js';
 import { chipWindowStart } from './paletteChipWindow.mjs';
 import { CuratorBar } from '../panels/layout/CuratorBar.jsx';
 import { BeatButton } from './BeatButton.jsx';
+import { PaletteWing } from './PaletteWing.jsx';
 
 const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
 const COLOR_MODE_HINT = {
@@ -75,6 +76,7 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
 export function PaletteStrip() {
   const { dispatch, palette, palettes, paletteLocks } = useApp();
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
+  const [wingOpen, setWingOpen] = useState(false); // #953 — the palette lab wing
   // #624 + #625 — the color mode lives in the store now: the GL loop reads it to
   // drive the WASH/INJECT soaks. (It used to be component-local and never left.)
   const colorMode = useStore((s) => s.colorMode) || 'FADE';
@@ -180,6 +182,7 @@ export function PaletteStrip() {
           </div>
           <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
             <span className="palette-switch-label">PALETTE</span>
+            <button type="button" className="palette-save-btn" title="Palette lab — generate, edit, save, import, export" onClick={() => setWingOpen((v) => !v)} aria-expanded={wingOpen}>◈<span className="palette-shuffle-word"> LAB</span></button>
             <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
               {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
             </select>
@@ -187,6 +190,7 @@ export function PaletteStrip() {
           </span>
         </div>
       </div>
+      <PaletteWing open={wingOpen} onClose={() => setWingOpen(false)} />
     </div>
   );
 }
