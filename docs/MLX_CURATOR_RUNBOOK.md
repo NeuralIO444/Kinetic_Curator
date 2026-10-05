@@ -194,3 +194,23 @@ and a pool that varies what you actually vary, are the fixes.
 **Privacy:** `taste.json` stores content hashes of the training renders, never the
 images. It moves machines with the file; the app keeps it per machine
 (`kc:taste:v1`), never in project files.
+
+
+## 5. Lois boldness probe (#954)
+
+Taste stays keep-vs-pass. A second probe, on the same frozen embeddings,
+learns favorites vs kept-but-not-favorited — what turns a keeper into
+something exceptional. Passes are not rows in this probe.
+
+```bash
+# bold.json is keeps only: 1 = favorited seed, 0 = kept, not favorited
+python3 studio/hits_bridge.py bold --labels labels.json --hits hits.json --pool pool/ --out bold.json
+python3 studio/curator.py train --index pool/curator-index.npz --labels labels.json \
+    --features features.json --bold bold.json --out taste.json
+python3 studio/curator.py inspect taste.json
+```
+
+`inspect` prints a second line for Lois. The app keeps the head (probe
+weights stay out of the browser) and scores boldness beside taste. It does
+not pick with it. CRIT stays parked until that head's fidelity clears 0.3.
+Neither probe trains until the keep/pass labels exist (#762).

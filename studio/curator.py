@@ -340,11 +340,74 @@ def cmd_apply_sheet(a) -> None:
 # ── taste model ──────────────────────────────────────────────────────────
 
 
-def cmd_train(a) -> None:
+def fit_probe(X, y, C, folds, need_msg):
+    """Balanced logistic probe + stratified CV. Shared by taste and Lois (#954)."""
     import numpy as np
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import StratifiedKFold, cross_val_score
     from sklearn.dummy import DummyClassifier
+
+    if len(set(np.asarray(y).tolist())) < 2:
+        sys.exit(need_msg)
+    clf = LogisticRegression(C=C, max_iter=2000, class_weight="balanced")
+    n_folds = min(folds, int(np.bincount(y).min()))
+    if n_folds < 2:
+        sys.exit("need at least 2 examples of the minority class")
+    cv = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=0)
+    acc = cross_val_score(clf, X, y, cv=cv, scoring="accuracy")
+    auc = cross_val_score(clf, X, y, cv=cv, scoring="roc_auc")
+    base = cross_val_score(DummyClassifier(strategy="most_frequent"), X, y, cv=cv,
+                           scoring="accuracy")
+    clf.fit(X, y)
+    stats = {"acc": float(acc.mean()), "auc": float(auc.mean()),
+             "baseline": float(base.mean()), "folds": n_folds,
+             "acc_std": float(acc.std())}
+    return clf, stats
+
+
+def bold_rows(labels, bold, index_paths):
+    """#954 — favorites (1) vs kept-but-not-favorited (0). Passes are not rows.
+
+    bold.json is only meaningful inside the keep set. A favorite that was
+    passed, or a path the taste labels never saw, is a data error — not a
+    training example.
+    """
+    missing = [p for p in bold if p not in index_paths]
+    if missing:
+        sys.exit(f"{len(missing)} bold paths are not in the index, e.g. {missing[0]}")
+    keys, y = [], []
+    for path in sorted(bold):
+        if path not in labels or int(labels[path]) != 1:
+            sys.exit(f"{path}: bold labels must be a subset of keeps (label 1) — "
+                     "Lois learns favorite-vs-keep, never favorite-vs-pass")
+        keys.append(path)
+        y.append(int(bold[path]))
+    return keys, y
+
+
+def attach_lois(taste, idx, bold_keys, bold_y, clf, cv, C, features_path, alpha):
+    """Second probe on the same embeddings. Does not touch the taste head."""
+    import numpy as np
+
+    w = clf.coef_[0]
+    lois = {
+        "probe": {"weights": [round(float(x), 6) for x in w],
+                  "bias": round(float(clf.intercept_[0]), 6), "C": C},
+        "labels": {"favorites": int(sum(bold_y)), "keeps": int(len(bold_y) - sum(bold_y))},
+        "cv": cv,
+    }
+    if features_path:
+        feats = json.loads(Path(features_path).read_text())
+        pos = {p: i for i, p in enumerate(idx["paths"])}
+        names = [n for n in sorted(feats) if n in pos]
+        scores = idx["emb"][[pos[n] for n in names]] @ w + clf.intercept_[0]
+        lois["head"] = fit_head([feats[n] for n in names], np.asarray(scores).tolist(), alpha=alpha)
+    taste["lois"] = lois
+    return taste
+
+
+def cmd_train(a) -> None:
+    import numpy as np
 
     idx = load_index(Path(a.index))
     labels = json.loads(Path(a.labels).read_text())
@@ -355,44 +418,47 @@ def cmd_train(a) -> None:
     keys = sorted(labels)
     X = idx["emb"][[pos[k] for k in keys]]
     y = np.array([int(labels[k]) for k in keys])
-    if len(set(y.tolist())) < 2:
-        sys.exit("need both likes and passes")
-
-    # C is small on purpose: 768 dims, dozens of labels — the probe has to be
+    # C is small on purpose: 768+ dims, dozens of labels — the probe has to be
     # squeezed hard or it memorises the training set.
-    clf = LogisticRegression(C=a.C, max_iter=2000, class_weight="balanced")
-    folds = min(a.folds, int(np.bincount(y).min()))
-    if folds < 2:
-        sys.exit("need at least 2 examples of the minority class")
-    cv = StratifiedKFold(n_splits=folds, shuffle=True, random_state=0)
-    acc = cross_val_score(clf, X, y, cv=cv, scoring="accuracy")
-    auc = cross_val_score(clf, X, y, cv=cv, scoring="roc_auc")
-    # Baseline = always predict the majority class. Chance for a stratified
-    # guess is 0.5 AUC; majority-class accuracy is the harder bar, so use it.
-    base = cross_val_score(DummyClassifier(strategy="most_frequent"), X, y, cv=cv,
-                           scoring="accuracy")
-
-    clf.fit(X, y)
+    clf, stats = fit_probe(X, y, a.C, a.folds, "need both likes and passes")
     out = Path(a.out)
     if out.suffix == ".npz":  # legacy format, still readable by rank/similar
+        if a.bold:
+            sys.exit("legacy .npz cannot carry the Lois probe — write taste.json")
         np.savez(out, w=clf.coef_[0].astype("float32"),
                  b=np.float32(clf.intercept_[0]), model=idx["model"], n=len(y),
-                 cv_acc=acc.mean(), cv_auc=auc.mean(), baseline=base.mean())
+                 cv_acc=stats["acc"], cv_auc=stats["auc"], baseline=stats["baseline"])
     else:
-        taste = build_taste(idx, keys, y, clf, cv={"acc": float(acc.mean()), "auc": float(auc.mean()),
-                            "baseline": float(base.mean()), "folds": folds}, C=a.C,
-                            features_path=Path(a.features) if a.features else None, alpha=a.head_alpha)
+        taste = build_taste(idx, keys, y, clf, cv={k: stats[k] for k in ("acc", "auc", "baseline", "folds")},
+                            C=a.C, features_path=Path(a.features) if a.features else None, alpha=a.head_alpha)
+        if a.bold:
+            bold = json.loads(Path(a.bold).read_text())
+            bkeys, by = bold_rows(labels, bold, pos)
+            by = np.array(by)
+            bX = idx["emb"][[pos[k] for k in bkeys]]
+            bclf, bstats = fit_probe(bX, by, a.C, a.folds,
+                                     "Lois needs both favorites and kept-but-not-favorited")
+            attach_lois(taste, idx, bkeys, by.tolist(), bclf,
+                        {k: bstats[k] for k in ("acc", "auc", "baseline", "folds")},
+                        a.C, Path(a.features) if a.features else None, a.head_alpha)
+            lh = taste["lois"].get("head")
+            print(f"  lois {taste['lois']['labels']['favorites']} favorites / "
+                  f"{taste['lois']['labels']['keeps']} kept-not-favorited, "
+                  f"ROC-AUC {bstats['auc']:.3f}")
+            if lh:
+                print(f"  lois head fidelity {lh['fidelity']:.3f}")
+                print(f"  lois {describe_head(lh)}")
         out.write_text(json.dumps(taste, indent=1, sort_keys=True))
         h = taste.get("head")
         if h:
             print(f"  head fidelity {h['fidelity']:.3f} (Spearman vs probe on {h['fitOn']} pool renders)")
             print(f"  {describe_head(h)}")
     print(f"{len(y)} labels ({int(y.sum())} likes / {int((1 - y).sum())} passes), "
-          f"{folds}-fold CV")
-    print(f"  held-out accuracy {acc.mean():.3f} +/- {acc.std():.3f}")
-    print(f"  majority baseline {base.mean():.3f}")
-    print(f"  held-out ROC-AUC  {auc.mean():.3f}   (0.5 = chance)")
-    verdict = "BETTER THAN CHANCE" if auc.mean() > 0.6 else "NO BETTER THAN CHANCE"
+          f"{stats['folds']}-fold CV")
+    print(f"  held-out accuracy {stats['acc']:.3f} +/- {stats['acc_std']:.3f}")
+    print(f"  majority baseline {stats['baseline']:.3f}")
+    print(f"  held-out ROC-AUC  {stats['auc']:.3f}   (0.5 = chance)")
+    verdict = "BETTER THAN CHANCE" if stats["auc"] > 0.6 else "NO BETTER THAN CHANCE"
     print(f"  -> {verdict}")
     print(Path(a.out))
 
@@ -507,6 +573,21 @@ def cmd_inspect(a) -> None:
     if h.get("fidelity", 0) < HEAD_MIN_FIDELITY:
         print("  WARNING: the head can't reproduce this taste from recipe features —"
               " live curation will stay on the persona scorer")
+    lois = t.get("lois")
+    if lois:
+        lab_l = lois.get("labels") or {}
+        cv_l = lois.get("cv") or {}
+        print(f"  lois · {lab_l.get('favorites', 0)} favorites / "
+              f"{lab_l.get('keeps', 0)} kept-not-favorited"
+              f" · held-out ROC-AUC {cv_l.get('auc', 0):.3f}")
+        lh = lois.get("head")
+        if lh:
+            print(f"  lois {describe_head(lh)}")
+            print(f"  lois head fidelity {lh.get('fidelity', 0):.3f}")
+            if lh.get("fidelity", 0) < HEAD_MIN_FIDELITY:
+                print("  WARNING: the Lois head can't reproduce boldness — CRIT stays parked")
+        else:
+            print("  lois probe only — train with --features to give the app a boldness head")
 
 
 def cmd_rank(a) -> None:
@@ -647,6 +728,36 @@ def _selfcheck_taste_train() -> None:
         h = t["head"]
         assert h["terms"]["scale=large"] > 0 > h["terms"]["scale=small"], h["terms"]
         assert h["fidelity"] > 0.5, h["fidelity"]
+        # #954 — among keeps, high chroma is the favorite. Passes stay out of Lois.
+        bold = {}
+        for i, name in enumerate(paths):
+            if labels[name] != 1:
+                continue
+            fav = i % 4 == 0
+            emb[i, 1] += 3.0 if fav else -3.0
+            feats[name]["chroma"] = "high" if fav else "low"
+            bold[name] = 1 if fav else 0
+        np.savez(root / "idx.npz", root=str(root), paths=np.array(paths), emb=emb, model="m/test")
+        (root / "bold.json").write_text(json.dumps(bold))
+        (root / "features.json").write_text(json.dumps(feats))
+        main(["train", "--index", str(root / "idx.npz"), "--labels", str(root / "labels.json"),
+              "--features", str(root / "features.json"), "--bold", str(root / "bold.json"),
+              "--out", str(out)])
+        t = json.loads(out.read_text())
+        assert t["lois"]["labels"] == {"favorites": 20, "keeps": 20}, t["lois"]["labels"]
+        assert t["lois"]["head"]["terms"]["chroma=high"] > 0 > t["lois"]["head"]["terms"]["chroma=low"]
+        assert "probe" in t["lois"] and len(t["lois"]["probe"]["weights"]) == dims
+        # a pass marked bold is a contract break, not a training row
+        bad = dict(bold)
+        bad[paths[1]] = 1  # odd index is a pass
+        (root / "bold-bad.json").write_text(json.dumps(bad))
+        try:
+            main(["train", "--index", str(root / "idx.npz"), "--labels", str(root / "labels.json"),
+                  "--bold", str(root / "bold-bad.json"), "--out", str(root / "nope.json")])
+        except SystemExit as e:
+            assert "subset of keeps" in str(e)
+        else:
+            raise AssertionError("bold-on-a-pass should refuse")
         assert "large marks" in describe_head(h)
         # rank reads taste.json and refuses a mismatched index
         m = load_model(out)
@@ -705,6 +816,8 @@ def main(argv=None) -> None:
     sp.add_argument("--out", default="taste.json", help="taste.json (Taste v1) — or *.npz for the legacy file")
     sp.add_argument("--features", default=None,
                     help="#762 features.json from hits_bridge build — distils the head the app runs")
+    sp.add_argument("--bold", default=None,
+                    help="#954 bold.json: 1=favorite, 0=kept-not-favorited, keeps only")
     sp.add_argument("--head-alpha", type=float, default=1.0, help="ridge strength for the distilled head")
     sp.add_argument("--folds", type=int, default=5)
     sp.add_argument("-C", type=float, default=0.05, help="inverse L2 strength")

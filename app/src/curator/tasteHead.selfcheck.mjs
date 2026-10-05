@@ -10,7 +10,7 @@ globalThis.localStorage = {
   setItem: (k, v) => { mem.set(k, String(v)); },
   removeItem: (k) => mem.delete(k),
 };
-const { featureTerms, validateTaste, scoreLayout, makeMlxCurator, tasteSummary, HEAD_MIN_FIDELITY } = await import('./tasteHead.js');
+const { featureTerms, validateTaste, scoreLayout, makeMlxCurator, tasteSummary, scoreBoldness, loisSummary, HEAD_MIN_FIDELITY } = await import('./tasteHead.js');
 const { importTaste, clearTaste, getTaste, TASTE_KEY } = await import('./tasteStore.js');
 const { getActiveCurator, curatorHint, pickCurated } = await import('./curate.js');
 const { FEATURES_VERSION } = await import('./recipeFeatures.js');
@@ -79,5 +79,26 @@ clearTaste();
 assert.strictEqual(getTaste(), null);
 assert.strictEqual(mem.has(TASTE_KEY), false);
 assert.strictEqual(getActiveCurator().name, before, 'cleared: the previous fallback is back');
+
+// #954 — Lois is a second head. Taste pick is unchanged. Low fidelity parks boldness.
+const withLois = taste();
+withLois.lois = {
+  labels: { favorites: 12, keeps: 28 },
+  head: { ...withLois.head, terms: { ...withLois.head.terms, 'scale=large': 4 }, fidelity: 0.62 },
+  probe: { weights: [1, 2, 3], bias: 0 },
+};
+const imported = validateTaste(withLois);
+assert.strictEqual(imported.ok, true);
+assert.ok(!imported.taste.lois.probe, 'lois probe weights are dropped');
+assert.strictEqual(imported.taste.lois.labels.favorites, 12);
+assert.ok(scoreBoldness(imported.taste, large) > scoreBoldness(imported.taste, small));
+assert.match(loisSummary(imported.taste), /12 favorites \/ 28 kept-not-favorited · fidelity 0\.62 · boldness live/);
+assert.strictEqual(scoreBoldness({ ...imported.taste, lois: { ...imported.taste.lois, head: { ...imported.taste.lois.head, fidelity: 0.1 } } }, large), null);
+assert.match(loisSummary(ok.taste), /not trained/);
+const badLois = taste();
+badLois.lois = { head: { ...badLois.head, fidelity: 9 } };
+assert.strictEqual(validateTaste(badLois).ok, false);
+// pick still follows the taste head, not the lois head
+assert.strictEqual(makeMlxCurator(imported.taste).pick([small, large]), 1);
 
 console.log('tasteHead.selfcheck: OK');

@@ -47,6 +47,7 @@ A declaration is `{ tier, memoryBytes, timeMs, notes }`, optionally `memoryGate:
 - A manifest of the training renders — content hashes, never images (privacy, and it keeps the file small).
 - Label counts and timestamps.
 - `curator.py inspect` prints it in human terms ("leans warm, dense, high-chroma palettes"), not a raw weight dump. Exportable — taste moves machines with the file.
+- Optional `lois` block (#954): a second probe + distilled head trained on favorites vs kept-but-not-favorited. Absent until that probe trains. The taste head still picks; Lois only scores boldness.
 
 **Two ledgers, enforced by architecture, not policy:**
 - `performed.jsonl` — every control touched live, with context (including whether shimmer was visible at the time). Never used as training labels.
