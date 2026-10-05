@@ -340,15 +340,15 @@ export function LayerStack() {
         <div className="layer-row-main">
           <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : isActive} />
           <div className="layer-reorder">
-            <button className="micro-btn" disabled={gi === 0} onClick={() => handleMove(layer, -1)}>▲</button>
-            <button className="micro-btn" disabled={gi === group.length - 1} onClick={() => handleMove(layer, 1)}>▼</button>
+            <button className="micro-btn" disabled={gi === 0} title="Move up" onClick={() => handleMove(layer, -1)}>▲</button>
+            <button className="micro-btn" disabled={gi === group.length - 1} title="Move down" onClick={() => handleMove(layer, 1)}>▼</button>
           </div>
           {/* #1015 — transient position badge on the moved row */}
           {moveFlash?.id === layer.id && (
             <span className={`reorder-badge${fx ? ' reorder-badge-fx' : ''}`} role="status">now {moveFlash.label}</span>
           )}
-          <button className="micro-btn" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
-          <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks (FX never solos)' : math ? 'Solo the grade: this track alone over neutral mid-grey' : undefined} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{(soloed || mathSoloed) ? 'S·' : 'S'}</button>
+          <button className="micro-btn" title="Toggle visibility" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
+          <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks (FX never solos)' : math ? 'Solo the grade: this track alone over neutral mid-grey' : 'Solo'} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{(soloed || mathSoloed) ? 'S·' : 'S'}</button>
           {fx && <span className="fx-badge">FX</span>}
           {math && <span className="math-badge" title={hitsHard ? 'M — this track is changing the picture hard' : 'M — MATH track'}>M</span>}
           <button
@@ -358,8 +358,8 @@ export function LayerStack() {
           >
             {label}
           </button>
-          <button className={`micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : undefined} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
-          <button className="micro-btn" disabled={!isAdj(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
+          <button className={`micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : 'Duplicate'} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
+          <button className="micro-btn" title="Remove track (undoable)" disabled={!isAdj(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
         </div>
         <div className="layer-row-composite">
           {/* #1016 — blend modes only exist on CONTENT tracks. FX/MATH
