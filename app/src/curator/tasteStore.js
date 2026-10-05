@@ -1,7 +1,7 @@
 // tasteStore — #762: the loaded taste, per machine (`kc:taste:v1`), never in
 // project files. A module holder (not the zustand store) so curate.js can read
 // it without an import cycle; globalSlice mirrors a summary for the UI.
-import { validateTaste } from './tasteHead.js';
+import { validateTaste, clearRetrainNudge } from './tasteHead.js';
 
 export const TASTE_KEY = 'kc:taste:v1';
 
@@ -32,6 +32,7 @@ export function importTaste(raw) {
   } catch {
     // private window / quota: the session still curates with it, it just won't be remembered.
   }
+  clearRetrainNudge(); // #925 — a fresh import re-baselines the retrain nudge
   return { ok: true, taste: r.taste };
 }
 
