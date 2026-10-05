@@ -8,6 +8,7 @@ import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { EUCLID_MAX_STEPS } from '../euclid.js';
+import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
 
 /** #589 — the three phrase clock sources. */
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
@@ -135,6 +136,17 @@ export const createDavisSlice = (set) => ({
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
   beatRoute: 'both',
+
+  // #966 — HITS queue transport: autoplay walks the favorites setlist.
+  // Session-only (not persisted): it's a performance control, not curation.
+  queuePlaying: false,
+  queueIndex: 0,
+  queueSource: 'time', // 'time' = seconds per hit, 'beat' = beats per hit at BEAT tempo
+  queueSecondsPerHit: 8,
+  queueBeatsPerHit: 4,
+  // Bumped on every manual tray jump (tap / keys) so the autoplay hold
+  // restarts even when the jumped-to hit is already the current one.
+  queueJumpNonce: 0,
 
   morphEvolve: true,
   morphDurationMs: 1200,
@@ -388,4 +400,13 @@ export const createDavisSlice = (set) => ({
       morphPendingPalette: fav.config?.palette.id || null,
     };
   }),
+
+  // #966 — HITS queue transport actions.
+  setQueuePlaying: (on) => set({ queuePlaying: !!on }),
+  toggleQueuePlaying: () => set((state) => ({ queuePlaying: !state.queuePlaying })),
+  setQueueIndex: (i) => set({ queueIndex: Math.max(0, Math.floor(Number(i) || 0)) }),
+  setQueueSource: (source) => set({ queueSource: source === 'beat' ? 'beat' : 'time' }),
+  setQueueSecondsPerHit: (s) => set({ queueSecondsPerHit: sanitizeQueueSeconds(s) }),
+  setQueueBeatsPerHit: (b) => set({ queueBeatsPerHit: sanitizeQueueBeats(b) }),
+  bumpQueueJump: () => set((state) => ({ queueJumpNonce: state.queueJumpNonce + 1 })),
 });

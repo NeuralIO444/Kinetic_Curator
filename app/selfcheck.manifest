@@ -65,6 +65,7 @@ node src/data/firstLight.selfcheck.mjs
 node src/state/paletteLibrary.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
 node src/state/hitsExport.selfcheck.mjs
+node src/state/queueTransport.selfcheck.mjs
 node src/curator/recipeFeatures.selfcheck.mjs
 node src/curator/tasteHead.selfcheck.mjs
 node src/engine/mothBodies.selfcheck.mjs
