@@ -28,6 +28,7 @@ export const HELP_TOPICS = [
   { id: 'assets-import', group: 'Assets', title: 'import', text: 'Drop an SVG into the project overlay. The canon is untouched.' },
   { id: 'master-run', group: 'Master', title: 'run', text: 'Play / pause the live loop (Space).' },
   { id: 'master-beat', group: 'Master', title: 'beat', text: 'Master clock. BPM sets how long transitions take — 2 beats per morph. Past ~160 BPM transitions hard-cut instead of morphing (the glitch ceiling, on purpose).' },
+  { id: 'roll-scope', group: 'Master', title: 'roll scope', text: 'Arm a MODE or MOTION chip to pin it: the next KINETIC roll reworks everything else. Tap again to disarm, ✕ clears all. Arms persist until disarmed.' },
   { id: 'help-tour', group: 'Help', title: 'tour', text: `Replay the ${TOUR_STEPS.length}-step first-run tour (${tourStepIds().join(', ')}) — hit ? in the footer.` },
   { id: 'davis-audio', group: 'Director', title: 'clock audio', text: 'Tick on a mic attack. Held noise is not a beat — armed · no attack.' },
   { id: 'davis-metro', group: 'Director', title: 'clock metro', text: 'Internal BPM. No mic.' },

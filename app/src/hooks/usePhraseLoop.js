@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import { euclidHit } from '../state/euclid.js';
 import { loopClock, loopIntervalTick } from '../gl/loopClock.js';
+import { BEAT_DEFAULT_BPM, sanitizeBeatBpm } from '../gl/beatClock.mjs';
 
 /**
  * #458 — METRO must respect the same freeze gates the other two auto-
@@ -28,7 +29,9 @@ export function usePhraseLoop() {
   const phraseLength = useStore(s => s.phraseLength);
   const phraseMode = useStore(s => s.phraseMode);
   const phraseClock = useStore(s => s.phraseClock || 'audio');
-  const phraseBpm = useStore(s => s.phraseBpm || 120);
+  // #964: the internal clocks (METRO/EUCLID) read the BEAT master clock —
+  // one clock, not two. The old phraseBpm slider is gone from the panel.
+  const beatBpm = useStore(s => s.beatBpm ?? BEAT_DEFAULT_BPM);
   const euclidBeats = useStore(s => s.euclidBeats);
   const euclidSteps = useStore(s => s.euclidSteps);
   const euclidRotate = useStore(s => s.euclidRotate);
@@ -52,7 +55,7 @@ export function usePhraseLoop() {
     // through a freeze and re-rolls the phrase mid-stall. Same accumulator
     // shape as the EVOLVE interval (App.jsx): holds on a held clock, fires
     // at most once per threshold crossing on thaw.
-    const stepMs = 60000 / Math.max(40, Math.min(240, Number(phraseBpm) || 120));
+    const stepMs = 60000 / sanitizeBeatBpm(beatBpm);
     let raf = 0;
     let lastTick = -1;
     const tick = () => {
@@ -63,7 +66,7 @@ export function usePhraseLoop() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phraseEnabled, phraseClock, phraseBpm, phraseLength, phraseMode, slowRender, batchPaused]);
+  }, [phraseEnabled, phraseClock, beatBpm, phraseLength, phraseMode, slowRender, batchPaused]);
 
   // #589 — EUCLID rides the same interval and the same freeze gates as METRO,
   // but advances the phrase on HIT steps only: the step counter moves every
@@ -76,7 +79,7 @@ export function usePhraseLoop() {
     if (!phraseEnabled || phraseClock !== 'euclid' || !metroTickGated({ slowRender, batchPaused })) return undefined;
     // #808: same loop-time accumulator as METRO above — the euclid figure
     // holds through a freeze instead of stepping on wall time.
-    const stepMs = 60000 / Math.max(40, Math.min(240, Number(phraseBpm) || 120));
+    const stepMs = 60000 / sanitizeBeatBpm(beatBpm);
     let raf = 0;
     let lastTick = -1;
     let step = 0;
@@ -91,6 +94,6 @@ export function usePhraseLoop() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phraseEnabled, phraseClock, phraseBpm, phraseLength, phraseMode,
+  }, [phraseEnabled, phraseClock, beatBpm, phraseLength, phraseMode,
     euclidBeats, euclidSteps, euclidRotate, slowRender, batchPaused]);
 }

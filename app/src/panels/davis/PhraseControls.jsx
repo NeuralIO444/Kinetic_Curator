@@ -8,7 +8,7 @@ const PHRASE_MODES = [
 
 export function PhraseControls({
   phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseProgress,
-  layoutMode, audioEnabled, phraseClock = 'audio', phraseBpm = 120,
+  layoutMode, audioEnabled, phraseClock = 'audio', beatBpm = 120,
   beatPulse = 0, rms = 0,
   euclidBeats = 5, euclidSteps = 8, euclidRotate = 0,
 }) {
@@ -69,11 +69,9 @@ export function PhraseControls({
         </>
       )}
       {(metro || euclid) && (
-        <div className="davis-interval-row" title="Metronome speed.">
+        <div className="davis-interval-row" title="Tempo follows the top-bar BEAT clock — one clock, not two. Change it up there.">
           <span className="davis-label">BPM</span>
-          <input type="range" min={40} max={240} step={1} value={phraseBpm}
-            onChange={(e) => emit(Events.DAVIS_PHRASE, { bpm: Number(e.target.value) })} />
-          <span className="davis-readout">{phraseBpm}</span>
+          <span className="davis-readout">BEAT · {Math.round(beatBpm)}</span>
         </div>
       )}
       <div className="davis-interval-row" title="Beats in the bar before wrap.">

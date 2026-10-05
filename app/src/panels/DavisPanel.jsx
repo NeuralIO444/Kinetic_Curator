@@ -30,7 +30,7 @@ export function DavisPanel() {
     phraseLength: s.phraseLength,
     phraseBeat: s.phraseBeat,
     phraseClock: s.phraseClock,
-    phraseBpm: s.phraseBpm,
+    beatBpm: s.beatBpm,
     morphing: s.morphing,
     audioEnabled: s.audioEnabled,
     audioBands: s.audioBands,
@@ -39,7 +39,7 @@ export function DavisPanel() {
     evolveMode,
     seed, seedOffsets, layoutParams, enabledAssets,
     phraseEnabled, phraseLength, phraseBeat,
-    phraseClock, phraseBpm, morphing, audioEnabled,
+    phraseClock, beatBpm, morphing, audioEnabled,
     audioBands,
   } = state;
   const { palette } = useApp();
@@ -74,13 +74,13 @@ export function DavisPanel() {
   // The header subtitle is unchanged (#616 only moved it out of the JSX). The
   // PERFORM readout is the phrase half of it, stated on its own.
   const phraseStatus = morphing ? 'morphing…'
-    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`
+    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ BEAT ${beatBpm || 120}`
     : phraseEnabled && !audioEnabled ? 'armed · waiting for beat'
     : noAttack ? 'armed · no attack'
     : phraseEnabled ? `${phraseBeat}/${phraseLength}`
     : 'off';
   const subtitle = morphing ? 'morphing…'
-    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ ${phraseBpm || 120}`
+    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ BEAT ${beatBpm || 120}`
     : phraseEnabled && !audioEnabled ? 'phrase armed · waiting for beat'
     : noAttack ? 'armed · no attack'
     : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}`
