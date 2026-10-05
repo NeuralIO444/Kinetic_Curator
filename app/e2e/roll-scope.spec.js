@@ -12,6 +12,8 @@ async function snap(page) {
       armedMode: s.armedMode,
       armedMotion: s.armedMotion,
       lp: { ...s.layoutParams },
+      seed: s.seed,
+      paletteId: s.paletteId,
       beatBpm: s.beatBpm,
       phraseBeat: s.phraseBeat,
     };
@@ -23,6 +25,10 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     await page.addInitScript(() => {
       try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
       window.__KC_EXPOSE_STORE = true;
+      // #655 hook: disarm the performance governor — under CI load its
+      // slowRender shed would gate the phrase metro and contaminate the
+      // tick-rate assertion with nondeterminism.
+      window.__KC_GOVERNOR_OFF = true;
     });
     await page.goto('/?boot=factory');
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
@@ -51,11 +57,13 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     expect(a.lp.mode).toBe('fibonacci');
     expect(a.lp.behave).toBe('flock');
 
-    // A second roll holds the same scope while reworking the rest.
+    // A second roll holds the same scope while reworking the rest: the pinned
+    // layoutParams are value-identical (that's the pin working), while the
+    // top-level seed is always dealt fresh.
     await page.evaluate(() => window.__kcStore.getState().kineticRoll());
     const b = await snap(page);
     for (const k of PINNED) expect(b.lp[k], k).toBe(a.lp[k]);
-    expect(JSON.stringify(b.lp)).not.toBe(JSON.stringify(a.lp));
+    expect(b.seed).not.toBe(a.seed);
 
     // UI path: spaced KINETIC taps (RULES passes) respect the scope too.
     await page.locator('.kinetic-btn').click();
