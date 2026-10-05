@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
@@ -76,15 +78,18 @@ class LoisApp(App):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, events: list[dict], *, returned_after_ms: int | None = None, pace: float = 1.0):
+    def __init__(self, events: list[dict] | None = None, *, journal: Path | None = None, returned_after_ms: int | None = None, pace: float = 1.0, live: bool = False):
         super().__init__()
-        self.events = events
+        self.events = list(events or [])
+        self.journal = journal
         self.returned_after_ms = returned_after_ms
-        times = [int(e.get("t", 0)) for e in events if isinstance(e, dict)]
+        self.live = live
+        self._mtime = None
+        times = [int(e.get("t", 0)) for e in self.events if isinstance(e, dict)]
         self.start = min(times) if times else 0
         self.end = max(times) if times else 0
-        self.now = self.start
-        self.pace = pace  # ms of journal time per real second; demo compresses
+        self.now = self.end if live else self.start
+        self.pace = pace  # demo only: journal-ms per real second
         self._state: str | None = None
         self._frames: list[str] = []
         self._frame_i = 0
@@ -98,9 +103,30 @@ class LoisApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        if self.live:
+            self._reload()
+            self.set_interval(0.5, self._reload)
+            return
         self._paint(derive(self.events, self.now, returned_after_ms=self.returned_after_ms))
         if self.end > self.start:
             self.set_interval(0.25, self._tick)
+
+    def _reload(self) -> None:
+        from .journal import load
+
+        if self.journal is None or not self.journal.exists():
+            self._paint(derive([], 0))
+            return
+        mtime = self.journal.stat().st_mtime_ns
+        if mtime == self._mtime and self.events:
+            return
+        self._mtime = mtime
+        journal = load(self.journal)
+        self.events = journal["events"]
+        self.returned_after_ms = journal.get("returnedAfterMs")
+        times = [int(e.get("t", 0)) for e in self.events if isinstance(e, dict)]
+        self.now = max(times) if times else 0
+        self._paint(derive(self.events, self.now, returned_after_ms=self.returned_after_ms))
 
     def _tick(self) -> None:
         if self.now >= self.end:

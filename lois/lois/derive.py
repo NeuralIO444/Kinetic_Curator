@@ -22,12 +22,11 @@ CALC_HOLD_MS = 1500
 KILL_HOLD_MS = 8000
 NOD_HOLD_MS = 8000
 GOLD_HOLD_MS = 8000
-RETURN_BEAT_MS = 20_000
 STUCK_ROLLS = 8
 UNDO_BURST = 3
 
 RUPTURE = frozenset({"fault", "clear", "layer_remove"})
-CONVICTION = frozenset({"favorite", "export", "recall"})
+CLOSES_LOOK = frozenset({"activity", "roll", "curate", "favorite", "export", "recall", "param", "undo", "fault", "clear", "layer_remove"})
 
 
 @dataclass
@@ -75,8 +74,26 @@ def _seed(value) -> str:
     return str(value)
 
 
+def _ordered(events: list[dict], now: int) -> list[tuple[int, dict]]:
+    rows = []
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        ts = int(ev.get("t", ev.get("ts", 0)))
+        if ts > now:
+            continue
+        rows.append((ts, ev))
+    rows.sort(key=lambda row: row[0])
+    return rows
+
+
 def fold(events: list[dict], now: int) -> dict:
-    """Fold a timestamped event list into the counters the states read."""
+    """Fold a timestamped event list into the counters the states read.
+
+    Events are sorted first, so an out-of-order journal still counts.
+    A dwell or a return closes when a later action lands. Leftover flags
+    are not a current look.
+    """
     last_activity = None
     rolls: list[int] = []
     keeps: list[int] = []
@@ -88,20 +105,19 @@ def fold(events: list[dict], now: int) -> dict:
     last_recall: Keep | None = None
     dwell_ms = 0
     dwell_seed = None
+    dwell_open = False
     returned = False
     curate_at = None
     seed_set_at = None
     current_seed = None
 
-    for ev in events:
-        if not isinstance(ev, dict):
-            continue
-        ts = int(ev.get("t", ev.get("ts", 0)))
-        if ts > now:
-            continue
+    for ts, ev in _ordered(events, now):
         kind = ev.get("type")
-        if kind in ("activity", "roll", "curate", "favorite", "export", "recall", "param", "undo"):
+        if kind in CLOSES_LOOK:
             last_activity = ts
+            dwell_open = False
+            dwell_ms = 0
+            returned = False
         if kind == "activity":
             pass
         elif kind in ("roll", "curate"):
@@ -127,15 +143,24 @@ def fold(events: list[dict], now: int) -> dict:
         elif kind == "dwell":
             dwell_ms = int(ev.get("ms") or 0)
             dwell_seed = ev.get("seed", current_seed)
+            dwell_open = True
+            returned = False
         elif kind == "seed":
             new_seed = ev.get("seed")
             if current_seed is not None and new_seed == current_seed:
                 returned = True
+                dwell_seed = new_seed
+            else:
+                returned = False
+                dwell_open = False
+                dwell_ms = 0
             current_seed = new_seed
             seed_set_at = ts
         elif kind == "return_seed":
             returned = True
             dwell_seed = ev.get("seed", current_seed)
+            dwell_open = False
+            dwell_ms = 0
 
     idle = now - last_activity if last_activity is not None else now
     # An explicit idle stamp wins — tests and a paused journal can say the truth.
@@ -143,7 +168,10 @@ def fold(events: list[dict], now: int) -> dict:
         if isinstance(ev, dict) and ev.get("type") == "idle" and int(ev.get("t", 0)) <= now:
             idle = int(ev.get("ms") or 0)
 
-    chip = last_favorite or last_export
+    if not dwell_open:
+        dwell_ms = 0
+    chip_opts = [k for k in (last_favorite, last_export) if k is not None]
+    chip = max(chip_opts, key=lambda k: k.ts) if chip_opts else None
     return {
         "idle_ms": idle,
         "rolls": _count_since(rolls, ROLL_KEEP_WINDOW_MS, now),
@@ -201,14 +229,11 @@ def derive(events: list[dict], now: int, *, returned_after_ms: int | None = None
     if f["has_activity"] and idle >= AWAY_MS:
         return done("AWAY", f"You've been gone {_ago(idle)}. He's out of the room.")
 
-    # On return the beat is the timer, unless a stronger event already fired.
-    if returned_after_ms and returned_after_ms >= AWAY_MS:
-        # fall through only if a rupture/conviction is fresher than the return
-        pass
-
     rupture = f["last_rupture"]
     if rupture and now - rupture[0] <= KILL_HOLD_MS:
         kind = {"fault": "Render fault", "clear": "Confirmed clear", "layer_remove": "Layer removed"}[rupture[1]]
+        if chip is None:
+            return done("KILL", f"{kind}. The idea is dead.")
         return done("KILL", f"{kind}. The idea is dead. The chip still has the recipe.")
 
     gold = _gold_sentence(f["last_favorite"], f["last_export"], f["last_recall"], now)
@@ -239,8 +264,10 @@ def derive(events: list[dict], now: int, *, returned_after_ms: int | None = None
     if f["returned"]:
         return done("VIBE", f"Back on seed {_seed(f['dwell_seed'])}. Looking, not acting.")
 
-    # Return beat: absence as a fact, chip as the resume aid. Face is presence, not AWAY.
+    # Return beat only if nothing stronger matched. Face is presence, not AWAY.
     if returned_after_ms and returned_after_ms >= AWAY_MS:
+        if chip is None:
+            return done("LEAN", f"You were gone {_ago(returned_after_ms)}. No keep on the chip.")
         return done("LEAN", f"You were gone {_ago(returned_after_ms)}. The chip still has the last keep.")
 
     if f["curate_at"] is not None:

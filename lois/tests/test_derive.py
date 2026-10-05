@@ -118,6 +118,34 @@ class DeriveTests(unittest.TestCase):
         self.assertEqual(r.keep.seed, 5)
         self.assertIn("chip", r.sentence)
 
+
+    def test_dwell_closes_when_he_acts(self):
+        events = ev({"t": 0, "type": "dwell", "ms": 11000, "seed": 42}, {"t": 12000, "type": "roll", "seed": 42})
+        self.assertEqual(derive(events, 12000).state, "LEAN")
+        self.assertNotEqual(derive(events, 12000).state, "VIBE")
+
+    def test_out_of_order_rolls_still_count(self):
+        events = [{"t": 30, "type": "roll"}, {"t": 0, "type": "roll"}, {"t": 10, "type": "roll"}]
+        events += [{"t": i, "type": "roll"} for i in range(40, 51)]
+        r = derive(events, 60)
+        self.assertEqual(r.state, "STUCK")
+        self.assertIn("14 rolls, 0 keeps", r.sentence)
+
+    def test_later_export_wins_the_chip(self):
+        events = ev(
+            {"t": 0, "type": "favorite", "seed": 5, "paletteId": "ink", "msSinceSeed": 40000},
+            {"t": 1000, "type": "export", "seed": 9, "paletteId": "cream"},
+        )
+        r = derive(events, 1000)
+        self.assertEqual(r.keep.seed, 9)
+        self.assertEqual(r.keep.kind, "export")
+
+    def test_kill_without_a_chip_does_not_invent_a_recipe(self):
+        r = derive(ev({"t": 0, "type": "fault"}), 100)
+        self.assertEqual(r.state, "KILL")
+        self.assertNotIn("chip", r.sentence)
+        self.assertIsNone(r.keep)
+
     def test_dwell_is_vibe_without_praise(self):
         r = derive(ev({"t": 0, "type": "dwell", "ms": 11000, "seed": 42}), 0)
         self.assertEqual(r.state, "VIBE")
@@ -158,13 +186,16 @@ class PlayTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "seed-1842.png").write_bytes(b"x")
+            (root / "seed-99.webp").write_bytes(b"x")
             (root / "plate_99.webp").write_bytes(b"x")
             (root / "untitled.png").write_bytes(b"x")
             rows = scan(root, events)
         marks = {r["file"]: r["mark"] for r in rows}
         self.assertEqual(marks["seed-1842.png"], "KEPT")
-        self.assertEqual(marks["plate_99.webp"], "EXPORTED")
+        self.assertEqual(marks["seed-99.webp"], "EXPORTED")
+        self.assertEqual(marks["plate_99.webp"], "")
         self.assertEqual(marks["untitled.png"], "")
+        self.assertIsNone(seed_in_name("plate_99"))
         text = format_rows(rows)
         self.assertIn("does not rank", text)
         self.assertIsNone(seed_in_name("untitled"))

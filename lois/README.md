@@ -34,8 +34,11 @@ lois watch journal.json
 lois play ./frames --journal journal.json
 ```
 
-`play` marks frames whose filename contains a seed already kept or
-exported. Unmarked frames stay unmarked. He does not rank them.
+`watch` tails the file and shows the latest event. It does not replay.
+`demo` replays a scripted session in memory. It does not write a file.
+
+`play` marks `seed-1842.png` or `1842.png` when that seed was kept or
+exported. `plate_99` is not a seed. He does not rank the unmarked.
 
 ## Journal
 

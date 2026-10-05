@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
-SEED_RE = re.compile(r"(?:seed[-_ ]?)?(\d{2,})", re.IGNORECASE)
+SEED_RE = re.compile(r"(?:^seed[-_ ]|\bseed[-_ ])?(\d+)$", re.IGNORECASE)
 
 
 def seeds_from_journal(events: list[dict]) -> tuple[set[str], set[str]]:
@@ -31,7 +31,10 @@ def seeds_from_journal(events: list[dict]) -> tuple[set[str], set[str]]:
 
 
 def seed_in_name(name: str) -> str | None:
-    m = SEED_RE.search(name)
+    """A seed token, or a stem that is only digits. `plate_99` is not a seed."""
+    if name.isdigit():
+        return name
+    m = re.fullmatch(r"seed[-_ ](\d+)", name, re.IGNORECASE)
     return m.group(1) if m else None
 
 
