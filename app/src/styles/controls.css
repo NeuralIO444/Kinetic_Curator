@@ -242,3 +242,74 @@
 }
 .lock-badge { background: rgba(255,255,255,0.1); color: var(--ink); }
 .drift-badge { background: rgba(255,212,0,0.15); color: #ffd400; border: 1px solid rgba(255,212,0,0.3); }
+
+/* #950 — BEAT master clock button. Collapsed `[B]`, expands to `[BEAT · 120]`
+   on hover/focus/active, following the bar's breathing rules: the button
+   flexes inside the fixed-width bar (max-width transition, like .kinetic-btn),
+   so the bar never shifts. Tooltips on every abbreviated state. */
+.beat-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.beat-btn {
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 6px; min-height: 22px; min-width: 30px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  white-space: nowrap; overflow: hidden; cursor: pointer;
+  transition: max-width 180ms ease, background-color 100ms, color 100ms, border-color 100ms;
+}
+.beat-btn:hover, .beat-btn:focus-visible, .beat-btn.open {
+  background: var(--ink); color: var(--bg); border-color: var(--ink);
+  max-width: 150px;
+}
+.beat-glyph { font-size: 10px; line-height: 1; flex-shrink: 0; font-weight: 800; }
+.beat-rest {
+  display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap;
+  transition: max-width 180ms ease;
+}
+.beat-btn:hover .beat-rest, .beat-btn:focus-visible .beat-rest, .beat-btn.open .beat-rest { max-width: 90px; }
+/* The pulse readout: flashes on every beat at the dialed BPM. --beat interval
+   is set from React (animation-duration); the flash itself is pure CSS. */
+.beat-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent);
+  animation: beat-flash 0.5s ease-in-out infinite;
+}
+.beat-btn:hover .beat-dot, .beat-btn.open .beat-dot { background: currentColor; }
+@keyframes beat-flash {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  15% { opacity: 1; transform: scale(1.25); }
+  40% { opacity: 0.5; transform: scale(1); }
+}
+/* The tempo dropdown. Rendered in a portal on document.body (position: fixed
+   via inline style) because the top bar's .palette-switch clips overflow. */
+.beat-menu {
+  z-index: 60;
+  display: flex; flex-direction: column; gap: 6px; min-width: 172px; padding: 10px;
+  background: var(--bg); border: 1px solid var(--line-2);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.beat-menu-label { font-size: 8px; font-weight: 800; letter-spacing: 0.12em; color: var(--dim); }
+.beat-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.beat-preset {
+  background: transparent; border: 1px solid var(--line); color: var(--dim);
+  font-size: 10px; font-weight: 700; padding: 5px 0; cursor: pointer;
+  transition: background-color 100ms, color 100ms, border-color 100ms;
+}
+.beat-preset:hover { color: var(--ink); border-color: var(--line-2); }
+.beat-preset.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.beat-tap {
+  background: transparent; border: 1px dashed var(--line-2); color: var(--ink);
+  font-size: 10px; font-weight: 800; letter-spacing: 0.1em; padding: 8px 0; cursor: pointer;
+}
+.beat-tap:hover { border-color: var(--ink); }
+.beat-tap:active { background: var(--ink); color: var(--bg); }
+.beat-exact { display: flex; gap: 4px; }
+.beat-exact input {
+  flex: 1; min-width: 0; background: transparent; border: 1px solid var(--line);
+  color: var(--ink); font-size: 10px; padding: 5px 6px;
+}
+.beat-exact button {
+  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 5px 8px; cursor: pointer;
+}
+.beat-exact button:hover { background: var(--ink); color: var(--bg); }
+.beat-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: lowercase; }
