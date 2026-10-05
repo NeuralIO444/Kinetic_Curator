@@ -51,7 +51,7 @@ import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
 import { attachVelocities } from './velocitySmear.mjs';
-import { noteWetFrame } from './vortex.mjs';
+import { motionAmount, noteWetFrame } from './vortex.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
 import { createBallisticsState, processBallistics, resetBallistics } from './audioBallistics.mjs';
@@ -703,6 +703,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
           width: canvasW,
           height: canvasH,
           instances: contract.instances,
+          behave: layoutParams.behave,
+          motion: motionAmount(layoutParams),
         })
       : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
 

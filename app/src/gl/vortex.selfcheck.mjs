@@ -10,8 +10,10 @@ import {
   createVortex,
   emitAmbient,
   emitFromInstances,
+  emitAmbientFrom,
   hashPacked,
   hashVelocity,
+  motionAmount,
   noteWetFrame,
   packVelocity,
   stepVortex,
@@ -206,6 +208,38 @@ ok('packed texture is not the zero texture after a moving mark', () => {
   stepVortex(v);
   const packed = packVelocity(v);
   assert.notStrictEqual(hashPacked(packed), hashPacked(packVelocity(createVortex({ seed: 970 }))));
+});
+
+ok('ambient behave is seeded and changes the field', () => {
+  const a = createVortex({ seed: 11, width: 200, height: 140 });
+  const b = createVortex({ seed: 11, width: 200, height: 140 });
+  const c = createVortex({ seed: 11, width: 200, height: 140 });
+  emitAmbientFrom(a, { behave: 'orbit', motion: 0.2 });
+  emitAmbientFrom(b, { behave: 'orbit', motion: 0.2 });
+  emitAmbientFrom(c, { behave: 'scatter', motion: 0.2 });
+  assert.strictEqual(a.count, b.count);
+  for (let i = 0; i < a.count * 4; i++) assert.strictEqual(a.vortons[i], b.vortons[i]);
+  assert.notStrictEqual(a.vortons[0], c.vortons[0]);
+  assert.ok(a.count >= 4, 'orbit sheds pairs');
+});
+
+ok('motion amount reads wind, breath, and flap', () => {
+  assert.strictEqual(motionAmount({}), 0);
+  assert.strictEqual(motionAmount({ wind: 3 }), 1);
+  assert.strictEqual(motionAmount({ breath: 0.4, flap: 0.2 }), 0.4);
+});
+
+ok('noteWetFrame seeds ambient from behave without dropping the dry gate', () => {
+  const slot = {};
+  const wet = noteWetFrame(slot, {
+    wetness: 0.8, freeze: false, seed: 11, width: 200, height: 140,
+    instances: [], behave: 'orbit', motion: 0.8,
+  });
+  assert.strictEqual(wet.wetStep, 1);
+  assert.ok(slot.vortex.count >= 4, 'ambient pairs landed');
+  const dry = noteWetFrame(slot, { wetness: 0, freeze: false, seed: 11, width: 200, height: 140, instances: [] });
+  assert.strictEqual(dry.wetStep, 0);
+  assert.strictEqual(dry.wetGain, 0);
 });
 
 console.log(`vortex.selfcheck: ${n} checks passed`);

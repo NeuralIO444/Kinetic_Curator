@@ -551,6 +551,25 @@ uniform float u_wetAmount;`,
   lit += (paper - 0.5) * (1.0 - wet) * 0.08 * u_wetAmount;`,
 );
 
+// #970 slice 5 — cheap pigment mix. Not Kubelka-Munk. Dry OVER_FS is untouched.
+// While the wet mask is up, two deposits blend toward their concentration
+// average instead of stacking toward white.
+export const OVER_WET_FS = OVER_FS.replace(
+  'uniform float u_headBoost; // 1.0 = off (today\'s render, bit-identical)',
+  `uniform float u_headBoost; // 1.0 = off (today's render, bit-identical)
+uniform sampler2D u_wetMask;
+uniform float u_wetAmount;`,
+).replace(
+  'o = s + d * (1.0 - s.a);   // premultiplied source-over',
+  `vec4 over = s + d * (1.0 - s.a);
+  float wet = texture(u_wetMask, v_cuv).r * u_wetAmount;
+  vec3 sc = clamp(s.rgb / max(s.a, 1e-4), 0.0, 1.0);
+  vec3 dc = clamp(d.rgb / max(d.a, 1e-4), 0.0, 1.0);
+  vec3 pigment = (sc * s.a + dc * d.a) / max(s.a + d.a, 1e-4);
+  float mixT = wet * step(0.02, d.a);
+  o = vec4(mix(over.rgb, pigment * over.a, mixT), over.a);`,
+);
+
 
 // Frame resample for #309: the feedback pair runs at logical size, but the
 // incoming frame can be backing-store sized (live retina path). This pass
@@ -1059,12 +1078,49 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   // (u_headBoost on the incoming frame's rgb; 1.0 = off, bit-identical).
   const headBoost = p.comet ? COMET_HEAD_BOOST : 1.0;
   const comp = new Float64Array(n);
+  const mixWet = wetOn && p.wetMask && p.wetAmount > 0;
   for (let i = 0; i < n; i += 4) {
     const sa = fIn[i + 3];
-    comp[i] = fIn[i] * headBoost + faded[i] * (1 - sa);
-    comp[i + 1] = fIn[i + 1] * headBoost + faded[i + 1] * (1 - sa);
-    comp[i + 2] = fIn[i + 2] * headBoost + faded[i + 2] * (1 - sa);
-    comp[i + 3] = sa + faded[i + 3] * (1 - sa);
+    const sr = fIn[i] * headBoost;
+    const sg = fIn[i + 1] * headBoost;
+    const sb = fIn[i + 2] * headBoost;
+    const dr = faded[i];
+    const dg = faded[i + 1];
+    const db = faded[i + 2];
+    const da = faded[i + 3];
+    const or = sr + dr * (1 - sa);
+    const og = sg + dg * (1 - sa);
+    const ob = sb + db * (1 - sa);
+    const oa = sa + da * (1 - sa);
+    if (!mixWet || da <= 0.02) {
+      comp[i] = or; comp[i + 1] = og; comp[i + 2] = ob; comp[i + 3] = oa;
+      continue;
+    }
+    const px = (i / 4) % w;
+    const py = (i / 4 / w) | 0;
+    const u = (px + 0.5) / w;
+    const v = (py + 0.5) / h;
+    const mask = p.wetMask;
+    const gn = mask.n;
+    const gx = Math.max(0, Math.min(gn - 1.0001, u * (gn - 1)));
+    const gy = Math.max(0, Math.min(gn - 1.0001, v * (gn - 1)));
+    const i0 = gx | 0;
+    const j0 = gy | 0;
+    const tx = gx - i0;
+    const ty = gy - j0;
+    const i1 = Math.min(gn - 1, i0 + 1);
+    const j1 = Math.min(gn - 1, j0 + 1);
+    const at = (j, ii) => mask.rgba[(j * gn + ii) * 4] / 255;
+    const wet = ((1 - tx) * (1 - ty) * at(j0, i0) + tx * (1 - ty) * at(j0, i1)
+      + (1 - tx) * ty * at(j1, i0) + tx * ty * at(j1, i1)) * p.wetAmount;
+    const sc = [sr, sg, sb].map((c) => Math.min(1, c / Math.max(sa, 1e-4)));
+    const dc = [dr, dg, db].map((c) => Math.min(1, c / Math.max(da, 1e-4)));
+    const denom = Math.max(sa + da, 1e-4);
+    const pigment = sc.map((c, k) => (c * sa + dc[k] * da) / denom);
+    comp[i] = (1 - wet) * or + wet * pigment[0] * oa;
+    comp[i + 1] = (1 - wet) * og + wet * pigment[1] * oa;
+    comp[i + 2] = (1 - wet) * ob + wet * pigment[2] * oa;
+    comp[i + 3] = oa;
   }
   if (p.optics <= 0) return comp;
   // 5/6. glow (#308): mip-chain bloom + stipple diffusion + chromatic
@@ -1158,6 +1214,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
   buildWet('feedWet', FEED_WET_FS, 'accum.mjs:FEED_WET_FS', ['u_src', 'u_flowField', 'u_flow', 'u_flowShared', 'u_wetVel', 'u_wetGain']);
   buildWet('fadeWet', FADE_WET_FS, 'accum.mjs:FADE_WET_FS', ['u_src', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism', 'u_wetMask', 'u_wetAmount']);
   buildWet('glowWet', GLOW_WET_FS, 'accum.mjs:GLOW_WET_FS', ['u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint', 'u_wetMask', 'u_wetAmount']);
+  buildWet('overWet', OVER_WET_FS, 'accum.mjs:OVER_WET_FS', ['u_src', 'u_dst', 'u_headBoost', 'u_wetMask', 'u_wetAmount']);
 
   // Fullscreen triangle; FULL_VS maps a_pos via v_cuv = a_pos*0.5+0.5.
   const vbo = gl.createBuffer();
@@ -1449,13 +1506,24 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       }
       cur = write;
       // 3. (#308: removed) — no blur-over-time; the frame lands sharp.
-      // 4. over
+      // 4. over. Wet uses a different program so two pigments mix instead
+      // of stacking. Dry is the old source-over, texture unbound.
       write = other();
-      pass('over', write, (u, bind) => {
-        gl.uniform1i(u.u_src, bind(0, frameIn));
-        gl.uniform1i(u.u_dst, bind(1, cur.tex));
-        gl.uniform1f(u.u_headBoost, p.comet ? COMET_HEAD_BOOST : 1.0);
-      });
+      if (wetOn) {
+        passWet('overWet', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, frameIn));
+          gl.uniform1i(u.u_dst, bind(1, cur.tex));
+          gl.uniform1f(u.u_headBoost, p.comet ? COMET_HEAD_BOOST : 1.0);
+          gl.uniform1i(u.u_wetMask, bind(2, wetMaskTex));
+          gl.uniform1f(u.u_wetAmount, p.wetAmount);
+        });
+      } else {
+        pass('over', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, frameIn));
+          gl.uniform1i(u.u_dst, bind(1, cur.tex));
+          gl.uniform1f(u.u_headBoost, p.comet ? COMET_HEAD_BOOST : 1.0);
+        });
+      }
       cur = write;
       // 5/6. glow (#308): mip-chain bloom + stipple diffusion + chromatic
       // offset. No gaussian anywhere. One shared downsampled mip chain;

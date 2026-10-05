@@ -28,7 +28,7 @@ import { resolveLiveRenderState } from '../data/voices.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
-import { noteWetFrame } from './vortex.mjs';
+import { motionAmount, noteWetFrame } from './vortex.mjs';
 import { halfLifeToKeep } from '../components/taper.js';
 import { createBallisticsState, processBallistics } from './audioBallistics.mjs';
 import { comboKey } from './liveAtlas.mjs';
@@ -237,6 +237,8 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
         width: CANVAS_W,
         height: CANVAS_H,
         instances: contract.instances,
+        behave: layoutParams.behave,
+        motion: motionAmount(layoutParams),
       })
     : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
 

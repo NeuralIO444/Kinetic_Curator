@@ -216,6 +216,70 @@ export function emitAmbient(state, pairs = 4) {
   return n * 2;
 }
 
+/** Behave → ambient pair pattern. Unknown names fall back to cruise. */
+const AMBIENT = {
+  cruise:  { pairs: 1, gamma: 0.35, pattern: 'drift' },
+  flock:   { pairs: 2, gamma: 0.45, pattern: 'shear' },
+  orbit:   { pairs: 2, gamma: 0.55, pattern: 'orbit' },
+  scatter: { pairs: 3, gamma: 0.5, pattern: 'out' },
+  mold:    { pairs: 1, gamma: 0.25, pattern: 'drift' },
+  levy:    { pairs: 1, gamma: 0.3, pattern: 'stride' },
+  lorenz:  { pairs: 2, gamma: 0.4, pattern: 'orbit' },
+  seek:    { pairs: 1, gamma: 0.4, pattern: 'in' },
+  flee:    { pairs: 1, gamma: 0.5, pattern: 'out' },
+};
+
+/**
+ * Slice 4. MOTION (wind / breath / flap) and BEHAVE seed ambient pairs.
+ * Quieter than a gesture. Seeded, so the same behave and seed match.
+ * @param {ReturnType<typeof createVortex>} state
+ * @param {{behave?: string, motion?: number}} [opts]
+ */
+export function emitAmbientFrom(state, { behave = 'cruise', motion = 0 } = {}) {
+  const spec = AMBIENT[behave] || AMBIENT.cruise;
+  const m = Number.isFinite(Number(motion)) ? Math.min(1, Math.max(0, Number(motion))) : 0;
+  const pairs = spec.pairs + (m > 0.5 ? 1 : 0);
+  const gamma = spec.gamma * (0.65 + 0.7 * m);
+  const rng = state.rng;
+  const cx = state.width * 0.5;
+  const cy = state.height * 0.5;
+  const reach = Math.min(state.width, state.height);
+  for (let i = 0; i < pairs; i++) {
+    let x;
+    let y;
+    let ang;
+    if (spec.pattern === 'orbit' || spec.pattern === 'in' || spec.pattern === 'out') {
+      const t = rng() * Math.PI * 2;
+      const rad = (0.22 + rng() * 0.28) * reach;
+      x = cx + Math.cos(t) * rad;
+      y = cy + Math.sin(t) * rad;
+      ang = spec.pattern === 'in' ? t + Math.PI : spec.pattern === 'out' ? t : t + Math.PI / 2;
+    } else if (spec.pattern === 'shear') {
+      x = rng() * state.width;
+      y = (0.3 + i * 0.25) * state.height;
+      ang = 0;
+    } else {
+      x = rng() * state.width;
+      y = rng() * state.height;
+      ang = rng() * Math.PI * 2;
+    }
+    const c = Math.cos(ang) * state.pairSep * 0.5;
+    const s = Math.sin(ang) * state.pairSep * 0.5;
+    pushVorton(state, x + c, y + s, gamma);
+    pushVorton(state, x - c, y - s, -gamma);
+  }
+  return pairs * 2;
+}
+
+/** 0..1 from the motion knobs. Wind is 0..3, the others 0..1. */
+export function motionAmount(layout) {
+  const lp = layout || {};
+  const wind = Math.min(1, Math.max(0, (Number(lp.wind) || 0) / 3));
+  const breath = Math.min(1, Math.max(0, Number(lp.breath) || 0));
+  const flap = Math.min(1, Math.max(0, Number(lp.flap) || 0));
+  return Math.max(wind, breath, flap);
+}
+
 function splat(state) {
   const { n, omega, vortons, width, height, h, hy } = state;
   omega.fill(0);
@@ -435,7 +499,7 @@ export function hashPacked(packed) {
  * gain of exactly 0 so the feed hook does not bind the texture.
  * `slot` is caller-owned `{ vortex }`.
  */
-export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances }) {
+export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances, behave, motion }) {
   const step = wetnessStep(wetness);
   if (step === 0) return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
   const w = width > 0 ? width : 1000;
@@ -450,6 +514,7 @@ export function noteWetFrame(slot, { wetness, freeze, seed, width, height, insta
   if (freeze) stepVortex(slot.vortex, { freeze: true });
   else {
     emitFromInstances(slot.vortex, instances || []);
+    emitAmbientFrom(slot.vortex, { behave, motion });
     stepVortex(slot.vortex);
   }
   const amount = advectGain(wetness);
