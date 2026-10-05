@@ -19,7 +19,7 @@ test('#716 numeral tile heads every LayerStack row and inverts when edited', () 
   const jsx = readFileSync(new URL('./LayerStack.jsx', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../../styles/panels.css', import.meta.url), 'utf8');
   assert.match(jsx, /function TrackNumeral/);
-  assert.equal((jsx.match(/<TrackNumeral /g) || []).length, 4, 'live row + KC ghost + FX ghost + MATH ghost');
+  assert.equal((jsx.match(/<TrackNumeral /g) || []).length, 1, 'one shared row renderer — no ghost rows (mockup C, #1014 rebuild)');
   assert.match(jsx, /edited=\{math \? isMathSelected : fx \? isFxSelected : isActive\}/);
   assert.match(css, /\.track-numeral \{[^}]*background:\s*#0a0a0a/);
   assert.match(css, /\.track-numeral \{[^}]*color:\s*#f4f4f4/);
