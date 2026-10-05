@@ -360,6 +360,9 @@
 .layer-list { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
 .layer-row { border: 1px solid var(--line); padding: 4px; background: rgba(0,0,0,0.15); }
 .layer-row-ghost { opacity: 0.35; }
+/* #1014 — tap-to-arm hint: one dimmed line under the LAYERS header until
+   the first track is armed. */
+.ghost-hint { font-size: 9px; color: var(--dim); padding: 0 8px; line-height: 1.4; }
 .layer-row-active { border-color: var(--accent3); }
 .layer-row-fx { border-color: #8a6cff; background: rgba(138, 108, 255, 0.07); }
 .layer-row-fx-selected { border-color: #b49aff; box-shadow: 0 0 0 1px #b49aff inset; }

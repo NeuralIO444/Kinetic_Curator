@@ -69,6 +69,10 @@ export const createLayersSlice = (set) => ({
   soloStash: null,
   selectedFxLayerId: null,
   selectedMathLayerId: null,
+  // #1014 — tap-to-arm teaching hint: false until the user arms their first
+  // track through a ghost slot. The boot/shuffle flow adds an FX layer
+  // directly (layoutSlice), so this only flips on real ghost taps.
+  ghostHintDismissed: false,
 
   addLayer: () => set((state) => {
     const content = state.layers.filter((l) => !isAdjustmentLayer(l)).length;
@@ -86,6 +90,7 @@ export const createLayersSlice = (set) => ({
       layers: [...state.layers, { id, name, type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }],
       layerSnapshots: { ...state.layerSnapshots, [state.activeLayerId]: captureSnapshot(state) },
       activeLayerId: id,
+      ghostHintDismissed: true, // #1014 — first ghost arm: hint done
       ...snapshot,
     };
   }),
@@ -221,7 +226,7 @@ export const createLayersSlice = (set) => ({
     if (fxCount >= MAX_FX_TRACKS) return {};
     if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer
     const id = makeLayerId();
-    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `FX ${fxCount + 1}`, type: 'fx', visible: true, effects: defaultFxEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedFxLayerId: id };
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `FX ${fxCount + 1}`, type: 'fx', visible: true, effects: defaultFxEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedFxLayerId: id, ghostHintDismissed: true }; // #1014 — first ghost arm: hint done
   }),
 
   setSelectedFxLayer: (id) => set((state) => {
@@ -295,7 +300,7 @@ export const createLayersSlice = (set) => ({
     if (mathCount >= MAX_MATH_TRACKS) return {};
     if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer/addFxLayer
     const id = makeLayerId();
-    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `M ${mathCount + 1}`, type: 'math', visible: true, effects: defaultMathEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedMathLayerId: id };
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `M ${mathCount + 1}`, type: 'math', visible: true, effects: defaultMathEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedMathLayerId: id, ghostHintDismissed: true }; // #1014 — first ghost arm: hint done
   }),
 
   setSelectedMathLayer: (id) => set((state) => {
