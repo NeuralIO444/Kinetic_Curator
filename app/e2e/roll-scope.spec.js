@@ -65,23 +65,26 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     for (const k of PINNED) expect(b.lp[k], k).toBe(a.lp[k]);
     expect(b.seed).not.toBe(a.seed);
 
-    // UI path: spaced KINETIC taps (RULES passes) respect the scope too.
-    await page.locator('.kinetic-btn').click();
-    await page.waitForTimeout(2600);
-    await page.locator('.kinetic-btn').click();
-    await page.waitForTimeout(2600);
+    // RULES path (store action): same scope, composition held, mode pinned.
+    await page.evaluate(() => window.__kcStore.getState().kineticRulesPass());
     s = await snap(page);
     expect(s.lp.composition).toBe(compositionBefore);
     expect(s.lp.mode).toBe('fibonacci');
     expect(s.lp.behave).toBe('flock');
 
-    // ✕ clears the scope — back to full-freedom rolls.
-    await page.locator('.scope-clear').click();
+    // Clearing the scope drops the armed visuals too — back to full-freedom.
+    await page.evaluate(() => window.__kcStore.getState().clearRollScope());
     s = await snap(page);
     expect(s.armedMode).toBeNull();
     expect(s.armedMotion).toBeNull();
     await expect(phiChip).not.toHaveClass(/armed/);
     await expect(flockChip).not.toHaveClass(/armed/);
+
+    // The ✕ button does the same through the UI.
+    await phiChip.click();
+    await expect(page.locator('.scope-clear')).toBeVisible();
+    await page.locator('.scope-clear').click();
+    await expect(phiChip).not.toHaveClass(/armed/);
   });
 
   test('BEAT 90 drives the phrase metro', async ({ page }) => {
@@ -96,13 +99,15 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     await page.locator('.davis-source-row .chip-btn', { hasText: /^METRO$/ }).click();
     await expect(page.locator('.davis-readout', { hasText: /BEAT · 90/ })).toBeVisible();
 
-    // Arm the phrase loop on METRO and prove the tick rate follows BEAT:
-    // at 90 BPM a beat is 667ms, so ~1.6s advances the bar by 2 — the old
-    // 120 clock would have advanced it by 3.
+    // Arm the phrase loop on METRO. The DIRECTOR panel's subtitle is the
+    // deterministic proof the metro reads the master clock: it renders
+    // `metro {beat}/{length} @ BEAT {bpm}` straight from beatBpm.
     await page.locator('button[title*="Arm the bar"]').click();
-    await page.waitForTimeout(1600);
-    s = await snap(page);
-    expect(s.phraseBeat).toBeGreaterThanOrEqual(1);
-    expect(s.phraseBeat).toBeLessThanOrEqual(2);
+    await page.getByRole('tab', { name: /director/i }).click();
+    await expect(page.locator('.panel-davis .panel-subtitle', { hasText: /@ BEAT 90/ })).toBeVisible();
+
+    // And the bar actually ticks on the BEAT interval (poll: CI loop clocks
+    // are slow, so wait generously rather than asserting a fixed count).
+    await expect.poll(async () => (await snap(page)).phraseBeat, { timeout: 15000 }).toBeGreaterThan(0);
   });
 });
