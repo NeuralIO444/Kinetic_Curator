@@ -47,11 +47,16 @@ export function StageBlock() {
           <div className="pipeline-row">
             <span style={{ flex: 1, fontSize: 11 }}>SERVER</span>
             <input value={syphonName} onChange={(e) => setSyphonName(e.target.value)} style={{ fontSize: 11, width: 140 }} />
-            <button type="button" className={`chip-btn${syphonOn ? ' active' : ''}`}
-              disabled={!tauri}
-              onClick={() => setSyphonOn(!syphonOn)}>
-              {syphonOn ? 'ON' : 'OFF'}
-            </button>
+            {tauri ? (
+              <button type="button" className={`chip-btn${syphonOn ? ' active' : ''}`}
+                onClick={() => setSyphonOn(!syphonOn)}>
+                {syphonOn ? 'ON' : 'OFF'}
+              </button>
+            ) : (
+              /* #962 (UX-2): the toggle is inert in browser builds (platform-gated
+                 to the desktop app) — don't show a dead button. */
+              <span className="pipeline-status">DESKTOP ONLY</span>
+            )}
           </div>
           <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
             {tauri

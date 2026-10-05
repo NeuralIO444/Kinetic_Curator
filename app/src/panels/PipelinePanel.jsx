@@ -329,7 +329,7 @@ export function PipelinePanel() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <span style={{ color: 'var(--accent, #00ff88)', fontWeight: 600 }}>METAL ZERO-COPY (UMA)</span>
-            <span style={{ color: metalStats ? '#00ff88' : '#888' }}>
+            <span className="pipeline-status">
               {metalStats ? '● ACTIVE' : '○ STANDBY'}
             </span>
           </div>
@@ -338,8 +338,8 @@ export function PipelinePanel() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
               <div>DEVICE: <span style={{ color: '#fff' }}>{metalStats.device_name}</span></div>
               <div>UMA SHARED: <span style={{ color: metalStats.has_unified_memory ? '#00ff88' : '#ffaa00' }}>{metalStats.has_unified_memory ? 'YES (Coherent)' : 'NO'}</span></div>
-              <div>ACCUM PTR: <span style={{ color: '#00ff88' }}>{metalStats.accum_buffer_ptr}</span> ({((metalStats.accum_buffer_bytes) / 1048576).toFixed(2)} MB)</div>
-              <div>BOIDS PTR: <span style={{ color: '#00ff88' }}>{metalStats.boids_buffer_ptr}</span> ({((metalStats.boids_buffer_bytes) / 1024).toFixed(1)} KB)</div>
+              <div>ACCUM PTR: <span className="pipeline-hex">{metalStats.accum_buffer_ptr}</span> ({((metalStats.accum_buffer_bytes) / 1048576).toFixed(2)} MB)</div>
+              <div>BOIDS PTR: <span className="pipeline-hex">{metalStats.boids_buffer_ptr}</span> ({((metalStats.boids_buffer_bytes) / 1024).toFixed(1)} KB)</div>
               <div>FRAMES DISPATCHED: <span style={{ color: '#fff' }}>#{metalStats.frame_counter}</span> {metalDispatchTime ? `(${metalDispatchTime}ms)` : ''}</div>
             </div>
           ) : (
@@ -404,7 +404,7 @@ export function PipelinePanel() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <span style={{ color: '#ffaa00', fontWeight: 600 }}>ANE CURATION ENGINE (CORE ML)</span>
-            <span style={{ color: state.curatorActive ? '#00ff88' : '#888' }}>
+            <span className="pipeline-status">
               {state.curatorActive ? '● ANE ACTIVE' : '○ IDLE'}
             </span>
           </div>
@@ -466,7 +466,7 @@ export function PipelinePanel() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <span style={{ color: '#00e5ff', fontWeight: 600 }}>APPLE MEDIA ENGINE &amp; E-CORES</span>
-            <span style={{ color: mediaBusy || (mediaProgress && !mediaProgress.finished) ? '#00e5ff' : '#888' }}>
+            <span className="pipeline-status">
               {mediaBusy || (mediaProgress && !mediaProgress.finished) ? '● STREAMING' : '○ READY'}
             </span>
           </div>

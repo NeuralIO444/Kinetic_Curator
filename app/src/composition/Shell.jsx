@@ -32,7 +32,10 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       const saved = localStorage.getItem(TAB_STORAGE_KEY);
       if (saved && secondary.some((p) => p.id === saved)) return saved;
     } catch { /* ignore */ }
-    return secondary[0]?.id ?? 'build';
+    // #962 (UX-2): the strip order changed (Assets first) but the landing
+    // tab stays BUILD — no behavior change, and e2e startup-chaos expects
+    // the BUILD panel mounted at boot.
+    return secondary.some((p) => p.id === 'build') ? 'build' : secondary[0]?.id ?? 'build';
   });
 
   useEffect(() => {
