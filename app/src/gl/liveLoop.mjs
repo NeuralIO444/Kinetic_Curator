@@ -1194,6 +1194,23 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     return { pixels: new Uint8Array(img.data.buffer, img.data.byteOffset, img.data.byteLength), width: dw, height: dh };
   }
 
+  /**
+   * #607 — grab the last presented frame for the stage mirror. Reads back
+   * the already-composited target (no re-render), so the mirror costs one
+   * readPixels per stage frame instead of a second scene render. Returns
+   * null when the GPU session is down or nothing has presented yet — the
+   * mirror skips the frame instead of failing.
+   */
+  function grabPresentedFrame() {
+    if (contextDown) return null;
+    try {
+      if (live.getGL().isContextLost()) return null;
+    } catch { return null; }
+    try {
+      return live.readPresented();
+    } catch { return null; }
+  }
+
   function start() {
     if (running) return;
     running = true;
@@ -1274,6 +1291,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     setAccumFrozen: (f) => { accumFrozen = !!f; },
     swellAccum: () => { swellStart = performance.now(); },
     captureFrame,
+    grabPresentedFrame,
     waitForSettled,
     waitForReady,
     getCanvas: () => canvas,

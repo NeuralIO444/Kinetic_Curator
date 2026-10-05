@@ -1,5 +1,6 @@
 import { genId } from '../id.js';
 import { INSTRUMENT_CANVAS, sanitizeCanvasSpec, CANVAS_PRESETS, readUserPresets, writeUserPresets } from '../../data/canvasPresets.js';
+import { sanitizeStageMapping } from '../../panels/pipeline/stageMapping.mjs';
 
 const MAX_SNAPSHOTS = 24;
 
@@ -17,6 +18,12 @@ export const createExportSlice = (set) => ({
   stageBlackout: false,
   syphonOn: false,
   syphonName: 'Kinetic Curator',
+  // #607 STAGE Phase B — live-output settings. Deliberately NOT part of the
+  // project document: the stage is a performance-output concern, not the artwork.
+  stageDisplayId: null,
+  stageMapping: 'fit',
+  stageTestPattern: false,
+  stageError: null,
   userCanvasPresets: [],
   projectTitle: '', // #651 — optional title, used in export filenames
 
@@ -60,6 +67,10 @@ export const createExportSlice = (set) => ({
   })),
   setStageMode: (mode) => set({ stageMode: sanitizeCanvasSpec({ stageMode: mode }).stageMode }),
   setStageBlackout: (on) => set({ stageBlackout: !!on }),
+  setStageDisplayId: (id) => set({ stageDisplayId: typeof id === 'string' && id ? id : null }),
+  setStageMapping: (m) => set({ stageMapping: sanitizeStageMapping(m) }),
+  setStageTestPattern: (on) => set({ stageTestPattern: !!on }),
+  setStageError: (msg) => set({ stageError: typeof msg === 'string' && msg ? msg.slice(0, 300) : null }),
   setSyphonOn: (on) => set({ syphonOn: !!on }),
   setSyphonName: (name) => set({ syphonName: String(name || 'Kinetic Curator').slice(0, 64) }),
 });
