@@ -83,7 +83,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
 }
 
 export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
-  onChangeLow, onChangeHigh, readout, defaultLow, defaultHigh,
+  onChangeLow, onChangeHigh, onChangeRange, readout, defaultLow, defaultHigh,
   locked, onToggleLock, hint }) {
   const [editing, setEditing] = useState(false);
   const [editLow, setEditLow] = useState('');
@@ -127,8 +127,57 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
     else onChangeHigh(Math.max(v, low));
   };
 
+  // #961 — middle grab: drag the active range to slide both thumbs together,
+  // spread preserved, clamped at the ends. Zero-spread ranges move the point.
+  const grabDrag = useRef(null);
+  const shiftRange = (fromLow, fromHigh, shift) => {
+    const spread = fromHigh - fromLow;
+    const clamped = Math.max(min - fromLow, Math.min(max - fromHigh, shift));
+    const newLow = fromLow + clamped;
+    // One atomic update: the parents' onChangeLow/onChangeHigh each rebuild
+    // the pair from stale closure state, so two sequential calls race and
+    // the second wins with a half-old pair. Prefer onChangeRange when given.
+    if (onChangeRange) onChangeRange(newLow, newLow + spread);
+    else { onChangeLow(newLow); onChangeHigh(newLow + spread); }
+  };
+  const onGrabPointerDown = (e) => {
+    if (locked) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const box = e.currentTarget.parentElement.getBoundingClientRect();
+    grabDrag.current = { startX: e.clientX, startLow: low, startHigh: high, width: box.width };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onGrabPointerMove = (e) => {
+    const st = grabDrag.current;
+    if (!st) return;
+    const dv = ((e.clientX - st.startX) / st.width) * (max - min);
+    shiftRange(st.startLow, st.startHigh, Math.round(dv / step) * step);
+  };
+  const onGrabPointerUp = () => { grabDrag.current = null; };
+  const onGrabKeyDown = (e) => {
+    if (locked) return;
+    let shift;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') shift = -step;
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') shift = step;
+    else if (e.key === 'Home') shift = min - low;
+    else if (e.key === 'End') shift = max - high;
+    else return;
+    e.preventDefault();
+    shiftRange(low, high, shift);
+  };
+
   const labelTitle = [hint, defaultLow !== undefined ? `Double-click to reset (${defaultLow}–${defaultHigh})` : null]
     .filter(Boolean).join(' · ') || undefined;
+
+  // Grab handle geometry: covers the active range; zero-spread gets a 16px
+  // hit target centered on the point.
+  const loPct = ((low - min) / (max - min)) * 100;
+  const hiPct = ((high - min) / (max - min)) * 100;
+  const zeroSpread = hiPct <= loPct;
+  const grabStyle = zeroSpread
+    ? { left: `calc(${loPct}% - 8px)`, width: '16px' }
+    : { left: `${loPct}%`, width: `${hiPct - loPct}%` };
 
   return (
     <div className={`range-row ${locked ? 'range-locked' : ''}`} title={hint}>
@@ -147,6 +196,22 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
         <div className="dual-fill" style={{ left: `${((low - min) / (max - min)) * 100}%`, width: `${((high - low) / (max - min)) * 100}%` }} />
         <input type="range" min={min} max={max} step={step} value={low} onChange={e => onChangeLow(Number(e.target.value))} disabled={locked} />
         <input type="range" min={min} max={max} step={step} value={high} onChange={e => onChangeHigh(Number(e.target.value))} disabled={locked} />
+        <div
+          className="dual-grab"
+          style={grabStyle}
+          role="slider"
+          tabIndex={locked ? -1 : 0}
+          aria-label={`${label} range`}
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuetext={`${low} to ${high}`}
+          title="Drag to move the whole range"
+          onPointerDown={onGrabPointerDown}
+          onPointerMove={onGrabPointerMove}
+          onPointerUp={onGrabPointerUp}
+          onPointerCancel={onGrabPointerUp}
+          onKeyDown={onGrabKeyDown}
+        />
       </div>
       <div className="range-right">
         {editing ? (

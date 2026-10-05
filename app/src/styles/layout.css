@@ -232,7 +232,7 @@
 /* #278 — VJ MIX slider: lives inside the palette switcher, no new panel. */
 .palette-mix { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; flex-shrink: 0; }
 .palette-mix-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; }
-.palette-mix-slider { width: 90px; }
+.palette-mix-slider { width: 90px; min-width: 0; }
 .palette-chip {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 6px;

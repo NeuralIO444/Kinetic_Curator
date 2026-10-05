@@ -157,7 +157,7 @@ export function AssetPoolPanel() {
                 </button>
                 <button className="tile-solo" title="Solo" onClick={() => emit(Events.ASSETS_SOLO, { id: a.id })}>◉</button>
                 <button type="button" title="Duplicate overlay copy" onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}
-                  style={{ position: 'absolute', bottom: 22, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>DUP</button>
+                  style={{ position: 'absolute', bottom: 40, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>DUP</button>
                 {isUser && (
                   <>
                     <button type="button" title="Edit in motif kit" onClick={(e) => { e.stopPropagation(); openStudio({ id: a.id, svg: a.svg }); }}
