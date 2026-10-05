@@ -380,3 +380,84 @@ export function hashVelocity(state) {
 export function velocityTex(state) {
   return { vx: state.vx, vy: state.vy, n: state.n };
 }
+
+/** Scene units that pack to the ends of the velocity texture. */
+export const VORTEX_VEL_PACK = 32;
+
+function packByte(t) {
+  return Math.max(0, Math.min(255, Math.round(t * 255)));
+}
+
+/**
+ * RG velocity for the feed hook. Centered at 128. LINEAR upload so the
+ * 64×64 field bilinear-upsamples. Not bound when wetnessStep is 0.
+ * @param {ReturnType<typeof createVortex>} state
+ */
+export function packVelocity(state, pack = VORTEX_VEL_PACK) {
+  const n = state.n;
+  const rgba = new Uint8Array(n * n * 4);
+  const { vx, vy } = state;
+  for (let i = 0; i < n * n; i++) {
+    rgba[i * 4] = packByte(vx[i] / pack * 0.5 + 0.5);
+    rgba[i * 4 + 1] = packByte(vy[i] / pack * 0.5 + 0.5);
+    rgba[i * 4 + 3] = 255;
+  }
+  return { n, rgba, pack };
+}
+
+/** R wet mask, 0..1. LINEAR upload — nearest would read as blocks. */
+export function packWet(state) {
+  const n = state.n;
+  const rgba = new Uint8Array(n * n * 4);
+  for (let i = 0; i < n * n; i++) {
+    rgba[i * 4] = packByte(state.wet[i]);
+    rgba[i * 4 + 3] = 255;
+  }
+  return { n, rgba };
+}
+
+/** FNV-1a over the packed RG velocity. Slice 2 hashes the texture, not just the field. */
+export function hashPacked(packed) {
+  let h = 2166136261;
+  const b = packed.rgba;
+  for (let i = 0; i < b.length; i += 4) {
+    h ^= b[i];
+    h = Math.imul(h, 16777619);
+    h ^= b[i + 1];
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * One live frame of the wet hook. Freeze holds the last field (do not
+ * zero it — resume would pop). Wetness 0 does not step and returns a
+ * gain of exactly 0 so the feed hook does not bind the texture.
+ * `slot` is caller-owned `{ vortex }`.
+ */
+export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances }) {
+  const step = wetnessStep(wetness);
+  if (step === 0) return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
+  const w = width > 0 ? width : 1000;
+  const h = height > 0 ? height : 700;
+  const s = (Number(seed) | 0) || 970;
+  if (!slot.vortex || slot.seed !== s || slot.width !== w || slot.height !== h) {
+    slot.vortex = createVortex({ seed: s, width: w, height: h });
+    slot.seed = s;
+    slot.width = w;
+    slot.height = h;
+  }
+  if (freeze) stepVortex(slot.vortex, { freeze: true });
+  else {
+    emitFromInstances(slot.vortex, instances || []);
+    stepVortex(slot.vortex);
+  }
+  const amount = advectGain(wetness);
+  return {
+    wetStep: 1,
+    wetGain: amount * (VORTEX_VEL_PACK / w),
+    wetAmount: amount,
+    wetVel: packVelocity(slot.vortex),
+    wetMask: packWet(slot.vortex),
+  };
+}

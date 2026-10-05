@@ -53,6 +53,7 @@ import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kin
 import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity route → sun intensity
 import { squashWithAudio } from './squashAudio.mjs'; // #790: render.squash route → scene squash
 import { attachVelocities } from './velocitySmear.mjs';
+import { noteWetFrame } from './vortex.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
 import { createBallisticsState, processBallistics, resetBallistics } from './audioBallistics.mjs';
@@ -277,6 +278,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // frame-to-frame displacement attached as vx/vy. Cleared whenever the
   // ACCUM session ends so re-enabling starts at zero velocity.
   let velPrev = new Map();
+  const wetSlot = { vortex: null };
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
   let flowFieldSeed = null;
@@ -317,6 +319,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     accumObj = null;
     accumActive = false;
     velPrev.clear(); // #309: the retry starts at zero velocity
+    wetSlot.vortex = null;
     accumRetryAt = performance.now() + 2000;
     const now = performance.now();
     if (now - lastAccumErrTs > 5000) {
@@ -701,6 +704,18 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     if (!!layoutParams.accumulation && !s.perfTier1 && accumActive) {
       attachVelocities(contract.instances, velPrev);
     }
+    // #970: step the vortex next to attachVelocities. Freeze holds the
+    // last field. Wetness 0 does not step and does not bind a texture.
+    const wet = (!!layoutParams.accumulation && !s.perfTier1)
+      ? noteWetFrame(wetSlot, {
+          wetness: layoutParams.accumulationWetness,
+          freeze: accumFrozen || s.running === false || !!s.slowRender,
+          seed: s.seed,
+          width: canvasW,
+          height: canvasH,
+          instances: contract.instances,
+        })
+      : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
 
     // Static resources: atlas combos from the transformed instances, grain
     // LUTs keyed by FX layer id + render size (what renderFrameInto's
@@ -758,6 +773,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         prism: layoutParams.accumulationPrism,
         flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider
         flowField: (layoutParams.accumulationFlow > 0) ? flowFor(s.seed) : null,
+        wetStep: wet.wetStep,
+        wetGain: wet.wetGain,
+        wetAmount: wet.wetAmount,
+        wetVel: wet.wetVel,
+        wetMask: wet.wetMask,
         leave: isLeave(layoutParams.trail),
         ribbon: isRibbon(layoutParams.trail),
         comet: isComet(layoutParams.trail),
@@ -1050,6 +1070,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
             accumObj = null;
             accumActive = false;
             velPrev.clear(); // #309: the next session starts at zero velocity
+            wetSlot.vortex = null;
             // #268: the session ended — reset the loop's own frozen flag
             // (not the frame's read-only copy), or re-enabling ACCUM shows
             // no trails while the panel reads inactive (two-press FREEZE trap).

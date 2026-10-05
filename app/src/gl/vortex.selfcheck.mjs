@@ -10,7 +10,10 @@ import {
   createVortex,
   emitAmbient,
   emitFromInstances,
+  hashPacked,
   hashVelocity,
+  noteWetFrame,
+  packVelocity,
   stepVortex,
   wetnessStep,
   VORTEX_DECAY,
@@ -178,6 +181,31 @@ ok('vortons decay, so a held pair does not live forever', () => {
   stepVortex(v);
   assert.ok(Math.abs(v.vortons[2]) < g0, 'gamma decayed');
   assert.ok(Math.abs(Math.abs(v.vortons[2]) - g0 * VORTEX_DECAY) < 1e-3);
+});
+
+ok('packed velocity hash is stable, and freeze does not zero it', () => {
+  const slot = {};
+  const inst = [mark('a', 'k', 200, 300, 12, -4)];
+  const a = noteWetFrame(slot, { wetness: 0.6, freeze: false, seed: 970, width: 1000, height: 700, instances: inst });
+  assert.strictEqual(a.wetStep, 1);
+  assert.ok(a.wetGain > 0);
+  const h = hashPacked(a.wetVel);
+  const held = noteWetFrame(slot, { wetness: 0.6, freeze: true, seed: 970, width: 1000, height: 700, instances: inst });
+  assert.strictEqual(hashPacked(held.wetVel), h);
+  const dry = noteWetFrame(slot, { wetness: 0, freeze: false, seed: 970, width: 1000, height: 700, instances: inst });
+  assert.strictEqual(dry.wetStep, 0);
+  assert.strictEqual(dry.wetGain, 0);
+  assert.strictEqual(dry.wetVel, null);
+  const again = noteWetFrame(slot, { wetness: 0.6, freeze: true, seed: 970, width: 1000, height: 700, instances: inst });
+  assert.strictEqual(hashPacked(again.wetVel), h, 'dry frame must not drop the held field');
+});
+
+ok('packed texture is not the zero texture after a moving mark', () => {
+  const v = createVortex({ seed: 970 });
+  emitFromInstances(v, [mark('a', 'k', 400, 300, 16, 0)]);
+  stepVortex(v);
+  const packed = packVelocity(v);
+  assert.notStrictEqual(hashPacked(packed), hashPacked(packVelocity(createVortex({ seed: 970 }))));
 });
 
 console.log(`vortex.selfcheck: ${n} checks passed`);
