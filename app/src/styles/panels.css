@@ -357,8 +357,8 @@
 .fav-ts { color: var(--dim); }
 
 /* ─── Layers ─── */
-.layer-list { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
-.layer-row { border: 1px solid var(--line); padding: 4px; background: rgba(0,0,0,0.15); }
+.layer-list { padding: 4px; display: flex; flex-direction: column; gap: 3px; } /* #1016: tighter row rhythm */
+.layer-row { border: 1px solid var(--line); padding: 3px; background: rgba(0,0,0,0.15); } /* #1016: tighter row rhythm */
 /* #1014 (mockup C rebuild) — type-color accent tabs: content #e8a33d, FX
    #35c4b5 (both from #1015), MATH #b78cff. Inset box-shadow so the
    selected/active border colors never clobber the tab. */
@@ -485,10 +485,18 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .layer-row-active .layer-name { color: var(--accent3); font-weight: 700; }
-.layer-row-composite { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.layer-row-composite { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
 .layer-row-composite .blend-mode-select { flex: 1; grid-column: unset; }
 .layer-row-composite input[type=range] { flex: 1; min-width: 0; }
 .layer-opacity-readout { font-size: 9px; color: var(--dim); width: 32px; text-align: right; }
+/* #1016 — compact WET label replacing the dead "Blend —" cell on FX/MATH
+   composite rows: 9px letterspaced caps, dim, vertically centered. Not
+   interactive, so no 44px requirement — it just labels the wet slider.
+   (Type-color accent tabs already landed via #1034 — not duplicated here.) */
+.build-layer-stack .wet-label {
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--dim); align-self: center; white-space: nowrap; padding-left: 4px;
+}
 .fx-badge {
   font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #0b0b12;
   background: #8a6cff; border-radius: 2px; padding: 1px 5px; white-space: nowrap;

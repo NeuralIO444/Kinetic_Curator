@@ -1,15 +1,14 @@
-// #716 Part 2 — track identity numerals (TX-6 tile grammar, item 1).
-// KC tracks speak roman (I–IV, the instrument's four content slots).
-// FX tracks speak arabic so a glance separates the two families.
-// The edited track inverts in CSS; this module only names the glyph.
-
-const KC_ROMAN = ['I', 'II', 'III', 'IV'];
+// #1016 — one numeral system across the stack: KC, FX and MATH all speak
+// arabic, matching displayLayerName (KC-1 · FX 1 · M 1) and the PATCH
+// target dropdown. Roman is retired here (the ghost double-encoding
+// `IV` + `KC-4` dies with it); the M5 design migration will handle
+// numerals globally later. The edited track inverts in CSS; this module
+// only names the glyph.
 
 export function trackNumeral(ordinal, kind) {
   const n = Number(ordinal);
   if (!Number.isInteger(n) || n < 1) return '';
-  if (kind === 'fx' || kind === 'math') return String(n);
-  return KC_ROMAN[n - 1] || String(n);
+  return String(n);
 }
 
 export function trackNumeralTitle(ordinal, kind, { edited = false, ghost = false } = {}) {
