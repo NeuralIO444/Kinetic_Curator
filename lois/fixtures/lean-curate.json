@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "events": [
+    {"t": 0, "type": "curate"},
+    {"t": 400, "type": "roll", "seed": 1842}
+  ]
+}

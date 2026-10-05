@@ -75,6 +75,16 @@ class DeriveTests(unittest.TestCase):
         self.assertNotIn("cautious", r.sentence.lower())
 
 
+
+    def test_lean_curate_fixture_file(self):
+        journal = load(Path(__file__).resolve().parents[1] / "fixtures" / "lean-curate.json")
+        now = max(int(e["t"]) for e in journal["events"])
+        r = derive(journal["events"], now)
+        self.assertEqual(r.state, "LEAN")
+        self.assertIn("2 rolls", r.sentence)
+        self.assertIn("sizing the wall", r.sentence)
+        self.assertIsNone(r.keep)
+
     def test_stuck_fixture_file(self):
         journal = load(Path(__file__).resolve().parents[1] / "fixtures" / "stuck-fourteen-rolls.json")
         now = max(int(e["t"]) for e in journal["events"])
