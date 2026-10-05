@@ -107,7 +107,8 @@ for (let i = 1; i < METER_BANDS.length; i++) assert.strictEqual(METER_BANDS[i].l
 
   // E2: vocabulary is MIDI-addressable (dotted ids) and closed
   assert.ok(COARSE_INPUTS.length === 5 && BAND_INPUTS.length === 7 && ROUTE_INPUTS.length === 12);
-  for (const t of Object.keys(ROUTE_TARGETS)) assert.match(t, /^[a-z]+\.[a-z]+$/, `${t} is dotted`);
+  // (second segment may be camelCase: clock.kinemeRate is the issue-mandated #790 id)
+  for (const t of Object.keys(ROUTE_TARGETS)) assert.match(t, /^[a-z]+\.[a-zA-Z]+$/, `${t} is dotted`);
   for (const r of DEFAULT_ROUTES) assert.ok(ROUTE_INPUTS.includes(r.input) && ROUTE_TARGETS[r.target], 'default routes use the vocabulary');
   assert.strictEqual(Object.isFrozen(DEFAULT_ROUTES) && Object.isFrozen(DEFAULT_ROUTES[0]), true, 'defaults are immutable');
 
