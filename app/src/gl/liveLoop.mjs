@@ -51,6 +51,7 @@ import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
 import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity route → sun intensity
+import { squashWithAudio } from './squashAudio.mjs'; // #790: render.squash route → scene squash
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
@@ -621,8 +622,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     if (injectEv.injecting) applyInject(resolved, injectEv);
     lastResolved = resolved;
 
+    // #790 (render.squash): the assignable squash route's output, in [0,1],
+    // rides on top of the layout squash dial (the #594 squash-and-stretch
+    // amount, u_smear.z). 0 on the default table (routes.squash undefined)
+    // → the contract is exactly as built, today's render bit-identical.
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
