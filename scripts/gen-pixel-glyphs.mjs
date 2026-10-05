@@ -3,7 +3,11 @@
 // This script prints the contact sheet so a review can see the lattice
 // without booting the app. Run: node scripts/gen-pixel-glyphs.mjs
 import { writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ASSETS_PIXEL } from '../app/src/data/assets/assets-pixel-glyphs.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const CELL = 8;
 const cols = 8;
@@ -33,5 +37,5 @@ ASSETS_PIXEL.forEach((a, i) => {
   parts.push(`<text x="${ox}" y="${oy + tile + 12}" fill="#969696" font-family="ui-sans-serif,sans-serif" font-size="10">${a.id.replace('pxg_', '')}</text>`);
 });
 parts.push('</svg>');
-writeFileSync('docs/pxg-contact.svg', parts.join('\n'));
+writeFileSync(join(root, 'docs/pxg-contact.svg'), parts.join('\n'));
 console.log('wrote', ASSETS_PIXEL.length, 'stamps to docs/pxg-contact.svg');
