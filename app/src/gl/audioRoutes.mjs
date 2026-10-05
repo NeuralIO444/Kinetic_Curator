@@ -27,9 +27,9 @@ export const ROUTE_INPUTS = Object.freeze([...COARSE_INPUTS, ...BAND_INPUTS]);
 
 /**
  * Targets, dotted so MIDI learn (#617) can address the same ids. Only the four
- * that are safe per-frame today, plus color.hue, clock.kinemeRate and
- * light.intensity (#790); squash follows, one PR. `clamp` bounds the OUTPUT
- * (ACCUM-class targets must stay finite). glow is the DOM frame glow
+ * that are safe per-frame today, plus color.hue, clock.kinemeRate,
+ * light.intensity and render.squash (#790 — all shipped). `clamp` bounds the
+ * OUTPUT (ACCUM-class targets must stay finite). glow is the DOM frame glow
  * (box-shadow), not a GL glow. (render.hue is the #803 engine id; color.hue
  * is the shipped #790 target id — both feed the same hue output. Same for
  * render.kineme / clock.kinemeRate → the kinemeRate output, and render.sun /
