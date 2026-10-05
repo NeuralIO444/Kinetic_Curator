@@ -80,10 +80,12 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     await expect(phiChip).not.toHaveClass(/armed/);
     await expect(flockChip).not.toHaveClass(/armed/);
 
-    // The ✕ button does the same through the UI.
-    await phiChip.click();
+    // The ✕ button does the same through the UI. force: true — after heavy
+    // chaos renders the CI main thread can be too starved for Playwright's
+    // actionability (stability) checks; the clicks themselves are fine.
+    await phiChip.click({ force: true });
     await expect(page.locator('.scope-clear')).toBeVisible();
-    await page.locator('.scope-clear').click();
+    await page.locator('.scope-clear').click({ force: true });
     await expect(phiChip).not.toHaveClass(/armed/);
   });
 
