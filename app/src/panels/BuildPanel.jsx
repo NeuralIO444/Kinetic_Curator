@@ -21,6 +21,7 @@ import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
 import { SunRow } from './layout/SunRow.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
+import { MathSection } from './build/MathSection.jsx';
 
 export function BuildPanel() {
   const { state } = useApp(s => ({
@@ -68,6 +69,11 @@ export function BuildPanel() {
         <BuildSection num="4" title="Appearance">
           <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <SunRow />
+        </BuildSection>
+
+        {/* ⑤ MATH — broad strokes over the fine sliders: assignable macro knobs (#724) */}
+        <BuildSection num="5" title="Math">
+          <MathSection />
         </BuildSection>
       </div>
     </div>
