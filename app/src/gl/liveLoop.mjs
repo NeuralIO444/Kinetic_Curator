@@ -50,6 +50,7 @@ import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
+import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity route → sun intensity
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
@@ -634,6 +635,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // undefined) → the contract is exactly as built, today's render
     // bit-identical.
     applyHueAudio(contract.layers, routes.hue ?? 0);
+    // #790 (light.intensity): the assignable light route's output, in sun
+    // units (0..1). Multiplies the contract sun's base intensity up to 2.5x.
+    // 0 on the default table (routes.sun undefined) → today's intensity
+    // exactly. A sun that is OFF stays off — audio never conjures one.
+    applyLightAudio(contract, routes.sun ?? 0);
     applyParallax(contract.instances, {
       zTiers: layoutParams.zTiers,
       parallax: layoutParams.parallax,

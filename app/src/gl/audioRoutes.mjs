@@ -27,12 +27,13 @@ export const ROUTE_INPUTS = Object.freeze([...COARSE_INPUTS, ...BAND_INPUTS]);
 
 /**
  * Targets, dotted so MIDI learn (#617) can address the same ids. Only the four
- * that are safe per-frame today, plus color.hue and clock.kinemeRate (#790);
- * squash / sun follow, one PR each. `clamp` bounds the OUTPUT (ACCUM-class
- * targets must stay finite). glow is the DOM frame glow (box-shadow), not a
- * GL glow. (render.hue is the #803 engine id; color.hue is the shipped #790
- * target id — both feed the same hue output. Same for render.kineme /
- * clock.kinemeRate → the kinemeRate output.)
+ * that are safe per-frame today, plus color.hue, clock.kinemeRate and
+ * light.intensity (#790); squash follows, one PR. `clamp` bounds the OUTPUT
+ * (ACCUM-class targets must stay finite). glow is the DOM frame glow
+ * (box-shadow), not a GL glow. (render.hue is the #803 engine id; color.hue
+ * is the shipped #790 target id — both feed the same hue output. Same for
+ * render.kineme / clock.kinemeRate → the kinemeRate output, and render.sun /
+ * light.intensity → the sun output.)
  */
 export const ROUTE_TARGETS = Object.freeze({
   'render.scale': Object.freeze({ clamp: [0.5, 3] }),
@@ -46,6 +47,7 @@ export const ROUTE_TARGETS = Object.freeze({
   'clock.kinemeRate': Object.freeze({ clamp: [0, 4] }), // #790: shipped kineme-rate target id
   'render.accum': Object.freeze({ clamp: [0, 40] }),
   'render.sun': Object.freeze({ clamp: [0, 1] }),
+  'light.intensity': Object.freeze({ clamp: [0, 1] }), // #790: shipped light target id
 });
 
 /** Most routes a table may hold. */
@@ -120,7 +122,8 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
       case 'render.kineme':
       case 'clock.kinemeRate': kinemeRate += v; break;
       case 'render.accum': accum += v; break;
-      case 'render.sun': sun += v; break;
+      case 'render.sun':
+      case 'light.intensity': sun += v; break;
       default: break;
     }
   }
@@ -135,7 +138,7 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
   if (used.has('render.squash')) out.squash = clampTo(squash * depth, ROUTE_TARGETS['render.squash'].clamp);
   if (used.has('render.kineme') || used.has('clock.kinemeRate')) out.kinemeRate = clampTo(kinemeRate * depth, ROUTE_TARGETS['clock.kinemeRate'].clamp);
   if (used.has('render.accum')) out.accum = clampTo(accum * depth, ROUTE_TARGETS['render.accum'].clamp);
-  if (used.has('render.sun')) out.sun = clampTo(sun * depth, ROUTE_TARGETS['render.sun'].clamp);
+  if (used.has('render.sun') || used.has('light.intensity')) out.sun = clampTo(sun * depth, ROUTE_TARGETS['light.intensity'].clamp);
   return out;
 }
 
