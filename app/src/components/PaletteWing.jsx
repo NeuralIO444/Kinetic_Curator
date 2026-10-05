@@ -16,7 +16,7 @@ import {
   randomSeedHex,
 } from './paletteWing.mjs';
 
-const randomScheme = () => SCHEME_IDS[Math.floor(Math.random() * SCHEME_IDS.length)];
+const randomScheme = (rng = Math.random) => SCHEME_IDS[Math.floor(rng() * SCHEME_IDS.length)];
 
 function downloadJson(filename, obj) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
