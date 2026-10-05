@@ -124,6 +124,29 @@ export function ToggleRow({ layoutParams }) {
         </label>
       )}
       {layoutParams.accumulation && (
+        <label
+          className="tg"
+          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
+          title={helpText('layout-wetness')}
+        >
+          WETNESS
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={layoutParams.accumulationWetness ?? 0}
+            onChange={(e) =>
+              emit(Events.LAYOUT_PARAM, {
+                key: 'accumulationWetness',
+                value: parseFloat(e.target.value),
+              })
+            }
+            style={{ width: 64 }}
+          />
+        </label>
+      )}
+      {layoutParams.accumulation && (
         <div className="tg" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
           <span title="Feedback transforms on the trail buffer — zoom + spin light-tunnels, RGB channel drift">FEEDBACK</span>
           <label

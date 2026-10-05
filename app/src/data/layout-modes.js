@@ -87,6 +87,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulationTunnel: 0, // Phase A: feedback zoom/spin amount (TUNNEL slider)
   accumulationPrism: 0, // Phase A: chromatic drift amount (PRISM slider)
   accumulationFlow: 0, // #284 Phase B2: curl advection of the trail buffer (FLOW slider)
+  accumulationWetness: 0, // #970 WETNESS: 0 is dry paper, live-only
 
   // #585 — degrees of divergence away from the golden angle. 0 is the golden
   // angle itself, where phyllotaxis and the fibonacci tile agree exactly.
@@ -278,6 +279,7 @@ export const PARAM_SPEC = {
   accumulationTunnel: { min: 0, max: 1 },
   accumulationPrism: { min: 0, max: 1 },
   accumulationFlow: { min: 0, max: 1 }, // #284: Phase B2 curl advection amount
+  accumulationWetness: { min: 0, max: 1 }, // #970 live wetness; 0 is the dry path
   audioModDepth: { min: 0, max: 1 },
   audioScaleMod: { min: 0, max: 1 },
   audioAlphaMod: { min: 0, max: 1 },
