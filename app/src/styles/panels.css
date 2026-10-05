@@ -614,6 +614,7 @@
 @keyframes queue-now-pulse {
   0%, 100% { box-shadow: 0 0 4px rgba(0, 255, 136, 0.25); }
   50% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.55); }
+}
 /* ─── UX-5: Build panel workflow sections ─── */
 .build-section { margin-top: 16px; }
 .build-section:first-child { margin-top: 2px; }
