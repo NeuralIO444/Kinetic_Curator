@@ -43,6 +43,7 @@ import { createBridge } from './bridge/bridge.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
+import { registerMathShaders, applyMathMod } from './effects/mathShaders.mjs';
 
 // #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
@@ -369,6 +370,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   const bridge = createBridge(gl, canvas, { width: 2, height: 2, dpr: 1 });
   registerBuiltinEffects(bridge);
   registerFxShaders(bridge, gl); // Phase-2 template effects (#188): displace, tear, scanlines, solarize, edge
+  registerMathShaders(bridge, gl); // #1010: twelve tier-3 tone ops on the same contract
 
   const U = (p, n) => gl.getUniformLocation(p, n);
 
@@ -686,7 +688,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     for (const layerId of contract.compositeOrder) {
       const layer = layerById.get(layerId);
       if (!layer) throw new Error(`[gl] compositeOrder references unknown layer ${layerId}`);
-      if (layer.type === 'fx') {
+      // #1010 — MATH tracks ride the FX fold verbatim: seed the wrap with
+      // the composite below, run the chain, composite back with wet/dry
+      // opacity. No new plumbing — the branch is the same machine.
+      if (layer.type === 'fx' || layer.type === 'math') {
         const wrap = wrapByFx.get(layerId);
         if (!wrap) {
           // #192: no silent shed — an FX layer with no wrap is named in
@@ -711,9 +716,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, wRead.fb);
         gl.viewport(0, 0, w, h);
         gl.disable(gl.BLEND);
-        gl.useProgram(copyProg);
-        gl.uniform1i(U(copyProg, 'u_src'), bindTex(0, mRead.tex));
-        drawFullscreen(copyProg);
+        if (layer.type === 'math' && layer.soloGrade) {
+          // #1010 — MATH solo: the grade's contribution only, over neutral
+          // mid-grey. Opaque grey in premultiplied space.
+          gl.clearColor(0.5, 0.5, 0.5, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        } else {
+          gl.useProgram(copyProg);
+          gl.uniform1i(U(copyProg, 'u_src'), bindTex(0, mRead.tex));
+          drawFullscreen(copyProg);
+        }
         for (const pl of pending) {
           compositeLayerTo(pl, byLayer.get(pl.id) || [], wRead, wWrite);
           [wRead, wWrite] = [wWrite, wRead];
@@ -728,7 +740,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
           // must not abort the FX chain.
           return grainLuts[wrap.fxLayerId] || null;
         };
-        const preEffects = (layer.fx || []).filter((f) => !GRAIN_FAMILY_KINDS.includes(f.kind));
+        // #1010 — per-knob MOD (none/rms/flux/beatPulse) pushes routed knobs
+        // toward their catalog max on the envelope; null audio is a no-op.
+        const chainFx = layer.type === 'math' ? applyMathMod(layer.fx || [], payload.audio) : (layer.fx || []);
+        const preEffects = chainFx.filter((f) => !GRAIN_FAMILY_KINDS.includes(f.kind));
         const finEffects = (layer.fx || []).filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
         const preSteps = compileFxShaders(preEffects, { auxFor: () => null });
         const afterFx = preSteps.length ? bridge.runChain(layerId, wRead, preSteps) : wRead;

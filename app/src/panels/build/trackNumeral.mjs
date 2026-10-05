@@ -8,12 +8,12 @@ const KC_ROMAN = ['I', 'II', 'III', 'IV'];
 export function trackNumeral(ordinal, kind) {
   const n = Number(ordinal);
   if (!Number.isInteger(n) || n < 1) return '';
-  if (kind === 'fx') return String(n);
+  if (kind === 'fx' || kind === 'math') return String(n);
   return KC_ROMAN[n - 1] || String(n);
 }
 
 export function trackNumeralTitle(ordinal, kind, { edited = false, ghost = false } = {}) {
-  const family = kind === 'fx' ? 'FX' : 'KC';
+  const family = kind === 'fx' ? 'FX' : kind === 'math' ? 'M' : 'KC';
   const n = Number(ordinal);
   if (ghost) return `${family} ${n} — tap to arm`;
   return `${family} track ${n}${edited ? ' — editing' : ''}`;

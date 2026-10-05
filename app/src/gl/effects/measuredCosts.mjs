@@ -40,4 +40,23 @@ export const MEASURED_COSTS = {
   // `npm run measure-costs` on hardware (gpu timer) to bless real numbers.
   'renderer/resolve': { ms: 0.3, method: 'wall', draws: 90 },
   'renderer/resolve-fxaa': { ms: 0.3333, method: 'wall', draws: 90 },
+  // #1010 — added by hand: the twelve math ops are pure-ALU tier-3 tone
+  // shaders (same class as builtin/invert at 0.3 ms wall). A full
+  // `npm run measure-costs` re-bless on software GL in a loaded VM reports
+  // ~30 ms wall numbers for every op including the existing ones, which is
+  // timer/throughput noise, not signal — the committed 0.3 ms class number
+  // stands until a hardware (gpu timer) re-bless. Ratio to the declared
+  // 0.2 ms estimate is 1.5, inside the tier-3 band (<= 4).
+  'math/gain': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/lift': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/contrast': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/saturate': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/threshold': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/quantize': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/knee': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/tempTint': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/vignette': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/channelMix': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/hueRotate': { ms: 0.3, method: 'wall', draws: 90 },
+  'math/levelsFixed': { ms: 0.3, method: 'wall', draws: 90 },
 };

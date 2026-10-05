@@ -646,3 +646,29 @@
   border: 1px solid var(--accent2); color: var(--accent2);
   font-size: 10px; letter-spacing: 0; flex: 0 0 auto;
 }
+
+/* #1010 — MATH tracks: ink-violet strip color, distinct from FX violet-teal
+   and content amber. Same grammar as FX rows. */
+.layer-row-math { border-color: #b78cff; background: rgba(183, 140, 255, 0.07); }
+.layer-row-math-selected { border-color: #d3b8ff; box-shadow: 0 0 0 1px #d3b8ff inset; }
+.math-badge {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #0b0b12;
+  background: #b78cff; border-radius: 2px; padding: 1px 5px; white-space: nowrap;
+}
+/* Readout theater: when a MATH op changes the picture hard (threshold with a
+   hard edge, quantize ≤ 4 steps), the M badge flashes — nanosecond rule. */
+@keyframes math-hard-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.layer-row-math-hard .math-badge { animation: math-hard-flash 0.9s steps(2, jump-none) infinite; }
+.layer-row-math-hard .layer-name { color: #d3b8ff; }
+.math-editor { margin-top: 6px; border-top: 1px dashed #b78cff55; padding-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+.math-op { border: 1px solid #b78cff33; padding: 4px 6px; background: rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 2px; }
+.math-op-head { display: flex; align-items: center; gap: 4px; }
+.math-op-select { flex: 1; }
+.math-mod-select { font-size: 8px; max-width: 64px; }
+.math-warn { font-size: 8px; color: #e8b34a; letter-spacing: 0.03em; }
+.math-add-row { display: flex; gap: 4px; align-items: center; }
+.math-add-row .tg { flex: 1; }
+.math-order-note { font-size: 8px; color: var(--dim); letter-spacing: 0.03em; }

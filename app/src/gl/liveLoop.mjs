@@ -108,6 +108,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
 
   // Spine C (#389): GL-loop owned life clock, audio ballistics follower, and layered breath springs
   const ballisticsState = createBallisticsState();
+  // #1010 — flux (transient punch) for MATH per-knob MOD: previous frame's
+  // shaped rms; flux is the positive delta. Render-only, never the store.
+  let lastModRms = 0;
   const bandFeed = createBandFeed(); // #790 PR3
   let loopLifeT = 0;
   let breathScaleSmoothed = 1;
@@ -461,6 +464,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // this always ran on internal defaults, and now says so honestly.
     const ballisticsParams = {};
     const shapedAudio = processBallistics(ballisticsState, rawAudio, dtSec * 1000, ballisticsParams);
+    // #1010 — flux (transient punch) for MATH per-knob MOD: the positive
+    // frame-to-frame delta of shaped rms. Render-only overlay, no store.
+    const rmsNow = shapedAudio.rms || 0;
+    const fluxNow = Math.max(0, rmsNow - lastModRms);
+    lastModRms = rmsNow;
 
     const depth = layoutParams.audioModDepth ?? 0.65;
     const scaleModAmt = layoutParams.audioScaleMod ?? 0.45;
@@ -556,6 +564,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       layers: s.layers,
       activeLayerId: s.activeLayerId,
       layerSnapshots: s.layerSnapshots,
+      soloStash: s.soloStash, // #1010 — MATH solo: renderer seeds mid-grey
       seed: s.seed,
       seedOffsets: s.seedOffsets,
       paletteId: voiceState.paletteId,
@@ -758,6 +767,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         bg: bgCss || '#000000',
         contract,
         cells,
+        // #1010 — per-knob audio modulation for MATH ops (none/rms/flux/
+        // beatPulse). Shaped envelope, 0..1; null when audio is off so the
+        // knobs pass through untouched.
+        audio: audioOn ? {
+          rms: rmsNow,
+          flux: fluxNow,
+          beatPulse: shapedAudio.beatPulse || 0,
+        } : null,
       },
       transparent: !bgCss,
       bgCss: bgCss || activePalette.bg,
