@@ -15,7 +15,7 @@ test('#716 motion pose tracks the slider, not a clock', () => {
 });
 
 test('#716 the four motion keys wear the tile', () => {
-  const block = readFileSync(new URL('../panels/layout/ParamBlock.jsx', import.meta.url), 'utf8');
+  const block = readFileSync(new URL('../panels/layout/CreatureSliders.jsx', import.meta.url), 'utf8');
   const life = readFileSync(new URL('../panels/stimulus/ReactivityControls.jsx', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../styles/controls.css', import.meta.url), 'utf8');
   for (const kind of ['wind', 'breath', 'flap']) assert.match(block, new RegExp(`kind="${kind}"`));
