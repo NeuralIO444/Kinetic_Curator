@@ -136,6 +136,30 @@ ok('wet mask dries multiplicatively when the step runs', () => {
   assert.ok(Math.abs(after - before * VORTEX_WET_DRY) < 1e-4, `dry ${after} vs ${before * VORTEX_WET_DRY}`);
 });
 
+ok('wet mask advects downwind instead of fading in place (#998)', () => {
+  const v = createVortex({ seed: 970 });
+  const inst = [mark('a', 'k', 300, 350, 20, 0)];
+  for (let f = 0; f < 10; f++) {
+    inst[0].x += 20;
+    emitFromInstances(v, inst);
+    stepVortex(v, { wetAdvect: 0.6 });
+  }
+  const comX = () => {
+    let m = 0, cx = 0;
+    for (let j = 0; j < 64; j++) for (let i = 0; i < 64; i++) { const w = v.wet[j * 64 + i]; m += w; cx += w * i; }
+    return cx / m;
+  };
+  const x0 = comX();
+  let m0 = 0;
+  for (let i = 0; i < v.wet.length; i++) m0 += v.wet[i];
+  for (let f = 0; f < 60; f++) stepVortex(v, { wetAdvect: 0.6 });
+  const x1 = comX();
+  let m1 = 0;
+  for (let i = 0; i < v.wet.length; i++) m1 += v.wet[i];
+  assert.ok(x1 > x0 + 0.1, `mask drifted right: ${x0.toFixed(2)} -> ${x1.toFixed(2)}`);
+  assert.ok(m1 < m0, 'mask still dries while it drifts');
+});
+
 ok('ambient emission is seeded: same seed matches, different seed does not', () => {
   const a = createVortex({ seed: 7 });
   const b = createVortex({ seed: 7 });

@@ -99,6 +99,7 @@ export function createVortex(opts = {}) {
     vx: new Float32Array(cells),
     vy: new Float32Array(cells),
     wet: new Float32Array(cells),
+    wetNext: new Float32Array(cells),
     // ring, insertion order: x, y, gamma, age. head is the next write.
     vortons: new Float32Array(VORTEX_MAX * 4),
     head: 0,
@@ -378,7 +379,54 @@ function sampleV(state, x, y) {
   return [u, v];
 }
 
-function advect(state) {
+/**
+ * Semi-Lagrangian advection of the wet mask through this frame's velocity
+ * field, then the multiplicative dry. #998: the mask used to fade in place,
+ * so the edge rims and granulation gating it drives read as frozen
+ * splotches. Now blooms drift, stretch, and swirl with the fluid.
+ *
+ * `disp` scales the backtrace displacement (scene units per unit velocity).
+ * The live path passes the wet amount, so the mask moves at the same rate
+ * as the feed shader's wet UV offset (tuv += (v/32) * amount*32/w — the w
+ * cancels, leaving v*amount). Deterministic: fixed order, no RNG. Freeze
+ * skips this (stepVortex returns early), so a held frame keeps the last mask.
+ * @param {ReturnType<typeof createVortex>} state
+ * @param {number} [disp]
+ */
+function advectWet(state, disp = 1) {
+  const { n, wet, wetNext, vx, vy, width, height, h, hy } = state;
+  const dry = VORTEX_WET_DRY;
+  const gxScale = (n - 1) / width;
+  const gyScale = (n - 1) / height;
+  for (let j = 0; j < n; j++) {
+    const y = j * hy;
+    for (let i = 0; i < n; i++) {
+      const x = i * h;
+      const k = j * n + i;
+      // Backtrace through the velocity field, scaled so the mask keeps pace
+      // with the feed shader's wet offset.
+      let xb = x - vx[k] * disp;
+      let yb = y - vy[k] * disp;
+      if (xb < 0) xb = 0; else if (xb > width) xb = width;
+      if (yb < 0) yb = 0; else if (yb > height) yb = height;
+      let i0 = (xb * gxScale) | 0;
+      let j0 = (yb * gyScale) | 0;
+      if (i0 < 0) i0 = 0; else if (i0 > n - 2) i0 = n - 2;
+      if (j0 < 0) j0 = 0; else if (j0 > n - 2) j0 = n - 2;
+      const tx = xb * gxScale - i0;
+      const ty = yb * gyScale - j0;
+      const i1 = i0 + 1;
+      const j1 = j0 + 1;
+      const r0 = j0 * n;
+      const r1 = j1 * n;
+      wetNext[k] = ((wet[r0 + i0] * (1 - tx) + wet[r0 + i1] * tx) * (1 - ty)
+        + (wet[r1 + i0] * (1 - tx) + wet[r1 + i1] * tx) * ty) * dry;
+    }
+  }
+  wet.set(wetNext);
+}
+
+function advect(state, disp) {
   const { vortons, width, height, wet } = state;
   const dt = VORTEX_DT;
   const start = (state.head - state.count + VORTEX_MAX) % VORTEX_MAX;
@@ -404,14 +452,16 @@ function advect(state) {
   vortons.set(scratch.subarray(0, kept * 4));
   state.head = kept % VORTEX_MAX;
   state.count = kept;
-  for (let i = 0; i < wet.length; i++) wet[i] *= VORTEX_WET_DRY;
+  advectWet(state, disp);
 }
 
 /**
  * One fixed-dt step. Freeze holds velocity, wet mask, and vortons — the
  * last texture stays bound.
  * @param {ReturnType<typeof createVortex>} state
- * @param {{freeze?: boolean}} [opts]
+ * @param {{freeze?: boolean, wetAdvect?: number}} [opts] wetAdvect scales the
+ * wet-mask backtrace so the mask keeps pace with the feed shader's wet
+ * offset (live path passes the wet amount; default 1 is the physical rate).
  */
 export function stepVortex(state, opts = {}) {
   if (opts.freeze) {
@@ -422,7 +472,7 @@ export function stepVortex(state, opts = {}) {
   splat(state);
   poisson(state);
   velocityFromPsi(state);
-  advect(state);
+  advect(state, Number.isFinite(opts.wetAdvect) ? opts.wetAdvect : 1);
   state.steps += 1;
   return state;
 }
@@ -515,7 +565,9 @@ export function noteWetFrame(slot, { wetness, freeze, seed, width, height, insta
   else {
     emitFromInstances(slot.vortex, instances || []);
     emitAmbientFrom(slot.vortex, { behave, motion });
-    stepVortex(slot.vortex);
+    // #998: the wet mask advects at the same rate as the feed shader's wet
+    // offset, so the splotch rims travel with the smeared trails.
+    stepVortex(slot.vortex, { wetAdvect: advectGain(wetness) });
   }
   const amount = advectGain(wetness);
   return {
