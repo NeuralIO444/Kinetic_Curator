@@ -362,14 +362,19 @@ export function LayerStack() {
           <button className="micro-btn" disabled={!isAdj(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
         </div>
         <div className="layer-row-composite">
-          {adj ? (
-            <span className="fx-param" style={{ flex: 1 }}><label>Blend</label><span className="fx-param-readout" style={{ width: 'auto' }}>—</span></span>
-          ) : (
+          {/* #1016 — blend modes only exist on CONTENT tracks. FX/MATH
+              composite via wet/dry, so the old "Blend —" cell could
+              never show anything but a dash — it read as a broken
+              control holding layout alignment. Replaced with the
+              compact WET label (mockup C) so the slider keeps its
+              address in the row. */}
+          {!adj && (
             <select className="tg blend-mode-select" value={layer.layerBlendMode} title={helpText('layers-blend')}
               onChange={(e) => emit(Events.LAYER_SET_BLEND_MODE, { id: layer.id, mode: e.target.value })}>
               {BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode.toUpperCase()}</option>)}
             </select>
           )}
+          {adj && <span className="wet-label">WET</span>}
           <input type="range" min={0} max={1} step={0.01} value={layer.layerOpacity}
             title={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
             onChange={(e) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: Number(e.target.value) })} />

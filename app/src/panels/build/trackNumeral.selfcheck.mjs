@@ -3,13 +3,14 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 
-test('#716 track numerals: KC roman, FX arabic, edited title', () => {
-  assert.equal(trackNumeral(1, 'kc'), 'I');
-  assert.equal(trackNumeral(2, 'kc'), 'II');
-  assert.equal(trackNumeral(3, 'kc'), 'III');
-  assert.equal(trackNumeral(4, 'kc'), 'IV');
+test('#1016 track numerals: all arabic, roman retired', () => {
+  assert.equal(trackNumeral(1, 'kc'), '1');
+  assert.equal(trackNumeral(2, 'kc'), '2');
+  assert.equal(trackNumeral(3, 'kc'), '3');
+  assert.equal(trackNumeral(4, 'kc'), '4');
   assert.equal(trackNumeral(1, 'fx'), '1');
   assert.equal(trackNumeral(4, 'fx'), '4');
+  assert.equal(trackNumeral(2, 'math'), '2');
   assert.equal(trackNumeral(0, 'kc'), '');
   assert.equal(trackNumeralTitle(2, 'kc', { edited: true }), 'KC track 2 — editing');
   assert.equal(trackNumeralTitle(3, 'fx', { ghost: true }), 'FX 3 — tap to arm');
