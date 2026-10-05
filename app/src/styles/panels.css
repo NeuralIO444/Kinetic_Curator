@@ -197,7 +197,7 @@
 /* ─── Stimulus ─── */
 .panel-stimulus { padding: 0; }
 .panel-stimulus .stim-body { padding: 8px; flex: 1 1 auto; overflow-y: auto; min-height: 0; }
-.stim-toggle-row { display: flex; gap: 4px; margin: 0 0 6px; }
+.stim-toggle-row { display: flex; gap: 4px; margin: 0 0 8px; }
 .stim-toggle {
   flex: 1;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -212,6 +212,21 @@
 }
 .stim-toggle:hover { color: var(--ink); border-color: var(--ink); }
 .stim-toggle.on { color: #000; font-weight: 700; }
+/* Matt 2026-10-04: the AUDIO toggle shimmers while off — a slow sheen sweep
+   so it reads as the button you have to click. Subtle: 14% white, 3.2s. */
+.stim-toggle.invite { position: relative; overflow: hidden; border-color: var(--line); color: var(--ink); }
+.stim-toggle.invite::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.14) 50%, transparent 60%);
+  transform: translateX(-101%);
+  animation: stim-shimmer 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes stim-shimmer {
+  0% { transform: translateX(-101%); }
+  55%, 100% { transform: translateX(101%); }
+}
 .stim-feel { margin-bottom: 6px; }
 .stim-feel-head { display: flex; justify-content: space-between; font-size: 9px; letter-spacing: 0.1em; color: var(--dim); margin-bottom: 4px; }
 .stim-feel-state.custom { color: var(--ink); border: 1px solid var(--line-2); padding: 0 5px; }
@@ -423,6 +438,9 @@
 .big-btn:hover { background: var(--ink); color: var(--bg); }
 .big-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
 .big-btn.dl { color: var(--accent2); border-color: rgba(0,217,255,0.3); }
+/* UX-7: waiting, not broken — dim, never struck through or greyed to death. */
+.big-btn:disabled { opacity: 0.55; cursor: default; }
+.big-btn:disabled:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
 
 .snapshot-strip { display: flex; gap: 4px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--line); }
 .snap { display: flex; flex-direction: column; border: 1px solid var(--line); background: rgba(0,0,0,0.3); width: 72px; }

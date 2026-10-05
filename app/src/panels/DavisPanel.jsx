@@ -64,6 +64,12 @@ export function DavisPanel() {
     emit(Events.ACCUM_GESTURE, { action: 'freeze', value: next });
   };
   const accumOn = !!layoutParams.accumulation;
+  // UX-7: the gesture row stays mounted so ACCUM can be flipped from this
+  // panel — but the live loop drops its own frozen flag when the ACCUM
+  // session ends, so mirror that reset here or the button lies (THAW while
+  // the loop is unfrozen: the two-press FREEZE trap, panel-side).
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mirror of the loop's own reset
+  useEffect(() => { if (!accumOn) setAccumFrozen(false); }, [accumOn]);
 
   // The header subtitle is unchanged (#616 only moved it out of the JSX). The
   // PERFORM readout is the phrase half of it, stated on its own.
@@ -137,25 +143,35 @@ export function DavisPanel() {
             <i>PHRASE</i><b>{phraseStatus}</b>
           </div>
           <MidiSection />
-          {accumOn && (
-            <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
-              <button className={`big-btn ${accumFrozen ? 'active' : ''}`}
-                onClick={toggleFreeze}
-                title="FREEZE: hold the trails mid-air — no fade, no new marks">
-                {accumFrozen ? 'THAW' : 'FREEZE'}
-              </button>
-              <button className="big-btn"
-                onClick={() => emit(Events.ACCUM_GESTURE, { action: 'clear' })}
-                title={helpText('davis-clear')}>
-                CLEAR
-              </button>
-              <button className="big-btn"
-                onClick={() => emit(Events.ACCUM_GESTURE, { action: 'swell' })}
-                title="SWELL: breathe the trail length out and back over ~2 seconds">
-                SWELL
-              </button>
-            </div>
-          )}
+          {/* UX-7: the gesture row is always reachable from Director — the
+              ACCUM toggle lives here now, and FREEZE/CLEAR/SWELL wait on it
+              (dim, never dead-looking) instead of the row vanishing. */}
+          <div className="davis-section-label">TRAILS</div>
+          <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
+            <button className={`big-btn ${accumOn ? 'active' : ''}`}
+              onClick={() => emit(Events.LAYOUT_PARAM, { key: 'accumulation', value: !accumOn })}
+              title={helpText('layout-accum')}>
+              ACCUM
+            </button>
+            <button className={`big-btn ${accumFrozen ? 'active' : ''}`}
+              onClick={toggleFreeze}
+              disabled={!accumOn}
+              title={accumOn ? 'FREEZE: hold the trails mid-air — no fade, no new marks' : 'Waiting for ACCUM — turn ACCUM on to freeze the trails'}>
+              {accumFrozen ? 'THAW' : 'FREEZE'}
+            </button>
+            <button className="big-btn"
+              onClick={() => emit(Events.ACCUM_GESTURE, { action: 'clear' })}
+              disabled={!accumOn}
+              title={accumOn ? helpText('davis-clear') : 'Waiting for ACCUM — turn ACCUM on to clear the trails'}>
+              CLEAR
+            </button>
+            <button className="big-btn"
+              onClick={() => emit(Events.ACCUM_GESTURE, { action: 'swell' })}
+              disabled={!accumOn}
+              title={accumOn ? 'SWELL: breathe the trail length out and back over ~2 seconds' : 'Waiting for ACCUM — turn ACCUM on to swell the trails'}>
+              SWELL
+            </button>
+          </div>
       </div>
     </div>
   );
