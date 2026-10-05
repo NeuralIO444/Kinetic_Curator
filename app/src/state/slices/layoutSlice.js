@@ -10,6 +10,7 @@ import { defaultFxParams, isFxLayer, FX_MENU_KINDS } from '../../fx/fxFilters.js
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
+import { BEAT_DEFAULT_BPM, sanitizeBeatBpm, beatSeconds, beatIsHardCut } from '../../gl/beatClock.mjs';
 import { FEEL_PRESETS } from '../../data/feels.js';
 import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS, SHAPE_MIX_MAX, MIXABLE_SHAPE_IDS, liveShapeLevels, shapeMixIds } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
@@ -155,6 +156,15 @@ export const createLayoutSlice = (set) => ({
    * motionSmoothing — deliberately outside the project document.
    */
   paletteMixSeconds: 2,
+  /**
+   * BEAT master clock (#950): the top-bar BEAT button's BPM. The transition
+   * clock derives from it — morphs are 2 beats (120 BPM → 1s). The setter
+   * writes paletteMixSeconds too, so every existing consumer (liveLoop,
+   * renderWorker) follows the master clock through the same channel; the
+   * glitch ceiling maps sub-0.75s beat times to 0 (hard cut), which the
+   * engine already honors as "cut".
+   */
+  beatBpm: BEAT_DEFAULT_BPM,
   /**
    * Sleight-of-hand v2 (#624, #625): how a palette change travels. FADE melts
    * the whole picture (two-deck dissolve); WASH soaks the new tints through
@@ -411,6 +421,19 @@ export const createLayoutSlice = (set) => ({
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
   /** VJ MIX (#278): palette-switch crossfade seconds, clamped 0–8. */
   setPaletteMixSeconds: (seconds) => set({ paletteMixSeconds: sanitizeMixSeconds(seconds) }),
+  /**
+   * BEAT master clock (#950): set the BPM. Drives paletteMixSeconds (the
+   * transition clock) as 2 beats; past ~160 BPM the beat time falls through
+   * the glitch ceiling and transitions hard-cut instead of morphing.
+   */
+  setBeatBpm: (bpm) => {
+    const clean = sanitizeBeatBpm(bpm);
+    const secs = beatSeconds(clean);
+    set({
+      beatBpm: clean,
+      paletteMixSeconds: beatIsHardCut(secs) ? 0 : secs,
+    });
+  },
   /** Sleight-of-hand v2 (#624, #625): FADE | WASH | INJECT. Unknown values fall back to FADE. */
   setColorMode: (mode) => set({
     colorMode: mode === 'WASH' || mode === 'INJECT' ? mode : 'FADE',

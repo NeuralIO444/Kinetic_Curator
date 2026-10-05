@@ -5,14 +5,14 @@ import { useHotkeys } from '../hooks/useHotkeys.js';
 import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
-import { MIX_DEFAULT } from '../gl/paletteMix.mjs';
 import { CuratorBar } from '../panels/layout/CuratorBar.jsx';
+import { BeatButton } from './BeatButton.jsx';
 
 const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
 const COLOR_MODE_HINT = {
-  FADE: 'Whole picture melts. Slider is seconds.',
-  WASH: 'Color soaks from the middle outward — the dye front chases through the marks. Same slider.',
-  INJECT: 'The field dyes first, then the swarm catches up — the new color spreads through the moving marks. Same slider.',
+  FADE: 'Whole picture melts. BEAT is the clock — BPM sets how long.',
+  WASH: 'Color soaks from the middle outward — the dye front chases through the marks. BEAT is the clock.',
+  INJECT: 'The field dyes first, then the swarm catches up — the new color spreads through the moving marks. BEAT is the clock.',
 };
 const CHIP_CAP = 4;
 
@@ -73,7 +73,6 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
 
 export function PaletteStrip() {
   const { dispatch, palette, palettes, paletteLocks } = useApp();
-  const paletteMixSeconds = useStore((s) => s.paletteMixSeconds) ?? MIX_DEFAULT;
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
   // #624 + #625 — the color mode lives in the store now: the GL loop reads it to
   // drive the WASH/INJECT soaks. (It used to be component-local and never left.)
@@ -157,7 +156,7 @@ export function PaletteStrip() {
       <CuratorBar />
       <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          <label className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }} title={COLOR_MODE_HINT[colorMode]}>
+          <span className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }}>
             <button
               type="button"
               className="palette-mix-label"
@@ -167,21 +166,8 @@ export function PaletteStrip() {
             >
               {colorMode}
             </button>
-            <input
-              type="range"
-              className="single-slider palette-mix-slider"
-              min={0}
-              max={8}
-              step={0.5}
-              value={paletteMixSeconds}
-              onChange={(e) => dispatch({ type: A.SET_PALETTE_MIX, payload: Number(e.target.value) })}
-              onClick={(e) => e.stopPropagation()}
-              aria-label="Palette color time in seconds"
-            />
-            <span className="range-readout palette-mix-readout" style={{ display: 'inline-block', width: '3.6em', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-              {Number(paletteMixSeconds).toFixed(1)}s
-            </span>
-          </label>
+            <BeatButton />
+          </span>
           <div className="palette-chip-track" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
             {chips}
           </div>
