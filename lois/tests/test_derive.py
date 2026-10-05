@@ -76,6 +76,15 @@ class DeriveTests(unittest.TestCase):
 
 
 
+
+    def test_roll_fixture_file(self):
+        journal = load(Path(__file__).resolve().parents[1] / "fixtures" / "roll-one.json")
+        now = max(int(e["t"]) for e in journal["events"])
+        r = derive(journal["events"], now)
+        self.assertEqual(r.state, "LEAN")
+        self.assertIn("1 rolls, 0 keeps", r.sentence)
+        self.assertIsNone(r.keep)
+
     def test_lean_curate_fixture_file(self):
         journal = load(Path(__file__).resolve().parents[1] / "fixtures" / "lean-curate.json")
         now = max(int(e["t"]) for e in journal["events"])
