@@ -15,7 +15,7 @@ import {
 } from '../projectNormalize.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
-import { tasteSummary } from '../../curator/tasteHead.js';
+import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
@@ -273,15 +273,18 @@ export const createGlobalSlice = (set) => ({
   // #762 — the imported taste (kept per machine in curator/tasteStore.js). The
   // store mirrors a status line + a revision so the curator bar re-renders.
   tasteStatus: tasteSummary(getTaste()),
+  // #997 — the Lois boldness line mirrors the taste line: three honest states
+  // (not trained / fidelity too low / boldness live). Never picks, never scores.
+  loisStatus: loisSummary(getTaste()),
   tasteRev: 0,
   importTaste: (raw) => {
     const r = keepTaste(raw);
-    if (r.ok) set((s) => ({ tasteStatus: tasteSummary(r.taste), tasteRev: (s.tasteRev || 0) + 1 }));
+    if (r.ok) set((s) => ({ tasteStatus: tasteSummary(r.taste), loisStatus: loisSummary(r.taste), tasteRev: (s.tasteRev || 0) + 1 }));
     return r;
   },
   clearTaste: () => {
     dropTaste();
-    set((s) => ({ tasteStatus: tasteSummary(null), tasteRev: (s.tasteRev || 0) + 1 }));
+    set((s) => ({ tasteStatus: tasteSummary(null), loisStatus: loisSummary(null), tasteRev: (s.tasteRev || 0) + 1 }));
   },
   fxaa: readFxaa(),
   weave: readWeave(),

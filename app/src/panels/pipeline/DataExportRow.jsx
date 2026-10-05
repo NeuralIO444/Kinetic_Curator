@@ -40,6 +40,7 @@ export function DataExportRow({
   const exportedPayload = useRef(null);
   const [behind, setBehind] = useState(false);
   const tasteStatus = useStore((s) => s.tasteStatus);
+  const loisStatus = useStore((s) => s.loisStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const clearTaste = useStore((s) => s.clearTaste);
   const projectTitle = useStore((s) => s.projectTitle);
@@ -234,6 +235,9 @@ export function DataExportRow({
           visually separated from the tappable export buttons above. */}
       <div className="pipeline-export-hints">
         <div className="taste-status" style={{ fontSize: 10, opacity: 0.75, margin: '2px 0 6px' }}>{tasteStatus}</div>
+        {/* #997 — the Lois boldness line sits under the taste line: not trained,
+            fidelity too low, or boldness live. Honest either way; never a picker. */}
+        <div className="lois-status" style={{ fontSize: 10, opacity: 0.6, margin: '0 0 6px' }}>{loisStatus}</div>
         {loadedName && <div className="pipeline-hint" style={{ fontSize: 10 }}>Loaded {loadedName}{readThumbnail(projectFields) ? '' : ''}</div>}
         {behind && (
           <div className="pipeline-hint" style={{ fontSize: 10 }}>Export is behind the live piece</div>
