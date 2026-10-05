@@ -22,6 +22,11 @@ import { normalizeLayoutParams } from '../../data/layout-modes.js';
 // the composition, and the hits export format is out of scope.
 export const FAVORITES_KEY = 'kc:favorites:v1';
 const FAVORITES_MAX = 200;
+/** #996 — keeps are the performer's shelf without the star: every favorite
+ * implies a keep, but a keep is not a favorite. Own kc: key, same record
+ * shape as a favorite (seed, offsets, recipe, cast), same trust boundary. */
+export const KEEPS_KEY = 'kc:keeps:v1';
+const KEEPS_MAX = 200;
 /** #719 — cap on a kept cast (ids, not the full enabled map). */
 export const FAVORITE_CAST_MAX = 256;
 
@@ -105,6 +110,28 @@ function persistFavorites(list) {
   }
 }
 
+/** #996 — keeps persist exactly like favorites (same record shape). */
+function readKeeps() {
+  try {
+    const raw = localStorage.getItem(KEEPS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.map(sanitizeFavorite).filter(Boolean).slice(0, KEEPS_MAX)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistKeeps(list) {
+  try {
+    localStorage.setItem(KEEPS_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn('[keeps] save failed', e);
+  }
+}
+
 /**
  * #616 — stamp EVOLVE progress onto an evolve step's update: the generation
  * (only while EVOLVE runs) and the candidate seen (every tick, run or manual).
@@ -132,6 +159,10 @@ export const createDavisSlice = (set) => ({
   autoSnapshot: false,
   lastEvolveTs: 0,
   favorites: readFavorites(),
+  // #996 — keeps without the star. A favorite implies a keep (addFavorite
+  // appends both); un-favoriting leaves the keep. Session-persisted like
+  // favorites; the HITS export carries them for hits_bridge.py bold.
+  keeps: readKeeps(),
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
@@ -321,12 +352,28 @@ export const createDavisSlice = (set) => ({
     if (!entry) return {};
     const favorites = [...state.favorites, entry].slice(-FAVORITES_MAX);
     persistFavorites(favorites);
-    return { favorites };
+    // #996 — a favorite implies a keep: same plate, its own record. Removing
+    // the favorite later leaves this keep in place.
+    const keepEntry = sanitizeFavorite({ ...fav, id: genId() });
+    const keeps = keepEntry
+      ? [...state.keeps, keepEntry].slice(-KEEPS_MAX)
+      : state.keeps;
+    persistKeeps(keeps);
+    return { favorites, keeps };
   }),
   removeFavorite: (id) => set((state) => {
     const favorites = state.favorites.filter((f) => f.id !== id);
     persistFavorites(favorites);
     return { favorites };
+  }),
+  /** #996 — K keeps the current plate without starring it. Same capture as
+   * a favorite (recipe, seed, offsets, cast); no star, no tray entry. */
+  addKeep: (keep) => set((state) => {
+    const entry = sanitizeFavorite({ ...keep, id: genId() });
+    if (!entry) return {};
+    const keeps = [...state.keeps, entry].slice(-KEEPS_MAX);
+    persistKeeps(keeps);
+    return { keeps };
   }),
   reorderFavorite: (id, delta) => set((state) => {
     const idx = state.favorites.findIndex((f) => f.id === id);

@@ -176,6 +176,11 @@ function AppInner() {
       type: A.ADD_FAVORITE,
       favorite: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
     }),
+    // #996: K keeps the plate without starring it. F (above) also keeps.
+    'k': () => piped({
+      type: A.ADD_KEEP,
+      keep: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
+    }),
     'g': () => piped({ type: A.TOGGLE_FULLSCREEN }),
     // #107 §7: while recording or batch/final-rendering, N/E are debounced —
     // a seed bump or evolve toggle mid-encode changes what's being captured

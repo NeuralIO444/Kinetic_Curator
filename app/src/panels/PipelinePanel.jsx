@@ -56,6 +56,7 @@ export function PipelinePanel() {
     layerSnapshots: s.layerSnapshots,
     userPalettes: s.userPalettes,
     favorites: s.favorites,
+    keeps: s.keeps,
     watchdogTripGen: s.watchdogTripGen,
     curatorConfidence: s.curatorConfidence,
     curatorActive: s.curatorActive,
@@ -65,7 +66,7 @@ export function PipelinePanel() {
     snapshots, exportResolution, isRecording, seed, seedOffsets, layoutParams,
     quality, autoQuality, paletteId, paletteLocks, enabledAssets, assetWeightOverrides, assetKineme, audioRoutes, midiMap,
     paletteOverrides, lockedParams, caGrid, customAssets, layers, activeLayerId, layerSnapshots,
-    userPalettes, favorites, rendering, watchdogTripGen,
+    userPalettes, favorites, keeps, rendering, watchdogTripGen,
   } = state;
   const setRendering = (v) => emit(Events.EXPORT_RENDERING, v);
 
@@ -274,7 +275,7 @@ export function PipelinePanel() {
           layoutParams={layoutParams} lockedParams={lockedParams} caGrid={caGrid}
           enabledAssets={enabledAssets} quality={quality} autoQuality={autoQuality} assetWeightOverrides={assetWeightOverrides} assetKineme={assetKineme} audioRoutes={audioRoutes} midiMap={midiMap}
           customAssets={customAssets} layers={layers} activeLayerId={activeLayerId}
-          layerSnapshots={layerSnapshots} userPalettes={userPalettes} favorites={favorites}
+          layerSnapshots={layerSnapshots} userPalettes={userPalettes} favorites={favorites} keeps={keeps}
           onMessage={setMessage}
         />
 
