@@ -1,6 +1,7 @@
-import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, BLEND_MODES } from '../../data/layout-modes.js';
 import { initialEnabledAssets } from './globalSlice.js';
-import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS, availableFxKinds, fxEffectInsertIndex } from '../../fx/fxFilters.js';
+import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS, FX_MENU_KINDS, availableFxKinds, fxEffectInsertIndex } from '../../fx/fxFilters.js';
+import { kindsForFxOrdinal } from '../../fx/fxTrack.js';
 import { isMathLayer, defaultMathEffects, defaultMathParams, MATH_EFFECT_DEFS, MATH_MOD_SOURCES } from '../../fx/mathFilters.js';
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
@@ -69,12 +70,20 @@ export const createLayersSlice = (set) => ({
   soloStash: null,
   selectedFxLayerId: null,
   selectedMathLayerId: null,
-  // #1014 — tap-to-arm teaching hint: false until the user arms their first
-  // track through a ghost slot. The boot/shuffle flow adds an FX layer
-  // directly (layoutSlice), so this only flips on real ghost taps.
-  ghostHintDismissed: false,
+  // #1014 (mockup C rebuild) — "last-used defaults" for the per-section "+".
+  // Updated ONLY by real user "+" taps / chooser picks (addLayer/addFxLayer
+  // with a family). Boot/shuffle system arms build their layers directly in
+  // layoutSlice, so they never touch these.
+  // - KC: blend modes are free — one-tap replays the last-used blend.
+  // - FX: each FX ordinal is bound to one family (#520/#732: FX-1 Distort,
+  //   FX-2 Tonal, FX-3 Blur, FX-4 Finish) — one-tap replays the last-used
+  //   kind only when the new track's family can hold it, else the empty
+  //   rack. (Replaying cross-family would arm a phantom effect the row
+  //   editor can't show.) Replay goes live on remove/re-add at an ordinal.
+  lastUsedContentBlend: null, // blend-mode string
+  lastUsedFxKind: null, // fx-kind string
 
-  addLayer: () => set((state) => {
+  addLayer: (family) => set((state) => {
     const content = state.layers.filter((l) => !isAdjustmentLayer(l)).length;
     if (content >= MAX_CONTENT_TRACKS) return {};
     // #342 — tape pre-flight: refuse rather than let the governor's shed
@@ -85,12 +94,16 @@ export const createLayersSlice = (set) => ({
     const id = makeLayerId();
     const snapshot = freshSnapshot((Math.random() * 0xffffffff) | 0);
     const name = `KC-${content + 1}`;
+    // #1014 (mockup C) — one-tap "+" replays the last-used blend; a
+    // chooser pick (family = blend mode) arms with it AND records it.
+    const picked = typeof family === 'string' && BLEND_MODES.includes(family);
+    const layerBlendMode = picked ? family : (state.lastUsedContentBlend ?? 'normal');
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
-      layers: [...state.layers, { id, name, type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }],
+      layers: [...state.layers, { id, name, type: 'content', visible: true, layerBlendMode, layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }],
       layerSnapshots: { ...state.layerSnapshots, [state.activeLayerId]: captureSnapshot(state) },
       activeLayerId: id,
-      ghostHintDismissed: true, // #1014 — first ghost arm: hint done
+      ...(picked ? { lastUsedContentBlend: family } : null),
       ...snapshot,
     };
   }),
@@ -216,17 +229,45 @@ export const createLayersSlice = (set) => ({
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
   }),
 
+  // #1014 (mockup C) — the sectioned stack moves rows within their section:
+  // swap two layers' flat positions directly (one undo entry). Same class
+  // rule as reorderLayer (#732): content never crosses the adjustment line.
+  swapLayerPositions: (idA, idB) => set((state) => {
+    const i = state.layers.findIndex((l) => l.id === idA);
+    const j = state.layers.findIndex((l) => l.id === idB);
+    if (i < 0 || j < 0 || i === j) return {};
+    const a = state.layers[i];
+    const b = state.layers[j];
+    if (isAdjustmentLayer(a) !== isAdjustmentLayer(b)) return {};
+    const layers = [...state.layers];
+    [layers[i], layers[j]] = [layers[j], layers[i]];
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
+  }),
+
   toggleLayerVisible: (id) => set((state) => ({ ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: state.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)) })),
   renameLayer: (id, name) => set((state) => ({ ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: state.layers.map((l) => (l.id === id ? { ...l, name } : l)) })),
   setLayerBlendMode: (id, layerBlendMode) => set((state) => ({ ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: state.layers.map((l) => (l.id === id ? { ...l, layerBlendMode } : l)) })),
   setLayerOpacity: (id, layerOpacity) => set((state) => ({ ...pushToUndo(state, false, UNDO_KIND_LAYERS), layers: state.layers.map((l) => (l.id === id ? { ...l, layerOpacity } : l)) })),
 
-  addFxLayer: () => set((state) => {
+  addFxLayer: (family) => set((state) => {
     const fxCount = state.layers.filter(isFxLayer).length;
     if (fxCount >= MAX_FX_TRACKS) return {};
     if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer
     const id = makeLayerId();
-    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `FX ${fxCount + 1}`, type: 'fx', visible: true, effects: defaultFxEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedFxLayerId: id, ghostHintDismissed: true }; // #1014 — first ghost arm: hint done
+    // #1014 (mockup C) — the new track's family is fixed by its ordinal, so
+    // the valid kinds are the add-menu kinds in that family's slot. A
+    // chooser pick arms with it AND records it; one-tap "+" replays the
+    // last-used kind when the family can hold it, else the empty rack.
+    const slotKinds = kindsForFxOrdinal(fxCount + 1).filter((k) => FX_MENU_KINDS.includes(k));
+    const picked = typeof family === 'string' && slotKinds.includes(family);
+    const kind = picked ? family : (slotKinds.includes(state.lastUsedFxKind) ? state.lastUsedFxKind : null);
+    const effects = kind ? [{ kind, params: defaultFxParams(kind) }] : [];
+    return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+      layers: [...state.layers, { id, name: `FX ${fxCount + 1}`, type: 'fx', visible: true, effects, layerBlendMode: 'normal', layerOpacity: 1 }],
+      selectedFxLayerId: id,
+      ...(picked ? { lastUsedFxKind: family } : null),
+    };
   }),
 
   setSelectedFxLayer: (id) => set((state) => {
@@ -300,7 +341,7 @@ export const createLayersSlice = (set) => ({
     if (mathCount >= MAX_MATH_TRACKS) return {};
     if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer/addFxLayer
     const id = makeLayerId();
-    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `M ${mathCount + 1}`, type: 'math', visible: true, effects: defaultMathEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedMathLayerId: id, ghostHintDismissed: true }; // #1014 — first ghost arm: hint done
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `M ${mathCount + 1}`, type: 'math', visible: true, effects: defaultMathEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedMathLayerId: id };
   }),
 
   setSelectedMathLayer: (id) => set((state) => {

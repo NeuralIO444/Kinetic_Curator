@@ -16,10 +16,10 @@ test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
-  await page.locator('.layer-row-ghost').filter({ hasText: 'KC-2' }).click();
+  await page.locator('.build-layer-stack .layer-section').nth(0).locator('.layer-add-btn').click();
 
-  // Patch KC-1 (last content row) so its diag line is live.
-  const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).last();
+  // Patch KC-1 (first content row in the sectioned stack) so its diag line is live.
+  const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).first();
   await row.locator('.layer-row-composite[title^="PATCH"] select').first().selectOption('field');
 
   const opacity = page.locator('.layer-row input[type="range"]').first();

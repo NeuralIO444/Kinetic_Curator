@@ -88,16 +88,17 @@ export function wireEventBus(rawDispatch) {
   on(Events.EXPORT_IMPORT_LAYOUT, (preset) => dispatch({ type: A.APPLY_PRESET, preset }));
   on(Events.EXPORT_LOAD_PROJECT, (project) => dispatch({ type: A.LOAD_PROJECT, project }));
 
-  on(Events.LAYER_ADD, () => dispatch({ type: A.ADD_LAYER }));
+  on(Events.LAYER_ADD, (p) => dispatch({ type: A.ADD_LAYER, family: p?.family }));
   on(Events.LAYER_REMOVE, ({ id }) => dispatch({ type: A.REMOVE_LAYER, id }));
   on(Events.LAYER_SET_ACTIVE, ({ id }) => dispatch({ type: A.SET_ACTIVE_LAYER, id }));
   on(Events.LAYER_REORDER, ({ id, delta }) => dispatch({ type: A.REORDER_LAYER, id, delta }));
+  on(Events.LAYER_SWAP_POSITIONS, ({ idA, idB }) => dispatch({ type: A.SWAP_LAYER_POSITIONS, idA, idB }));
   on(Events.LAYER_TOGGLE_VISIBLE, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_VISIBLE, id }));
   on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
   on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));
   on(Events.LAYER_SOLO, ({ id }) => dispatch({ type: 'SOLO_LAYER', id }));
-  on(Events.LAYER_ADD_FX, () => dispatch({ type: A.ADD_FX_LAYER }));
+  on(Events.LAYER_ADD_FX, (p) => dispatch({ type: A.ADD_FX_LAYER, family: p?.family }));
   on(Events.FX_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_FX_LAYER, id }));
   on(Events.FX_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.FX_EFFECT_ADD, layerId, kind }));
   on(Events.FX_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.FX_EFFECT_REMOVE, layerId, index }));
