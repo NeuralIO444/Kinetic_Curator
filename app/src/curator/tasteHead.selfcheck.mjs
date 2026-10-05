@@ -94,6 +94,9 @@ assert.strictEqual(imported.taste.lois.labels.favorites, 12);
 assert.ok(scoreBoldness(imported.taste, large) > scoreBoldness(imported.taste, small));
 assert.match(loisSummary(imported.taste), /12 favorites \/ 28 kept-not-favorited · fidelity 0\.62 · boldness live/);
 assert.strictEqual(scoreBoldness({ ...imported.taste, lois: { ...imported.taste.lois, head: { ...imported.taste.lois.head, fidelity: 0.1 } } }, large), null);
+// #997 — the Pipeline lois line covers all three states: boldness live (above),
+// fidelity too low (here), not trained (below). It never scores, never picks.
+assert.match(loisSummary({ ...imported.taste, lois: { ...imported.taste.lois, head: { ...imported.taste.lois.head, fidelity: 0.1 } } }), /fidelity too low — CRIT stays parked/);
 assert.match(loisSummary(ok.taste), /not trained/);
 const badLois = taste();
 badLois.lois = { head: { ...badLois.head, fidelity: 9 } };
