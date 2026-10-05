@@ -376,6 +376,33 @@
 .track-numeral-edited { background: #f4f4f4; color: #0a0a0a; border-color: #f4f4f4; }
 .layer-reorder { display: flex; flex-direction: column; }
 .layer-reorder .micro-btn { padding: 0 4px; line-height: 1.1; font-size: 8px; }
+/* #1013 — 44px minimum touch targets on every layer-stack row control.
+   Rows get taller (min 44px) and every control stretches to fill; padding
+   counts as hit area, so the glyphs stay compact. Scoped to the BUILD layer
+   stack — micro-btn/range/tg styles elsewhere are untouched. */
+.build-layer-stack .layer-row-main { min-height: 44px; align-items: stretch; }
+.build-layer-stack .layer-row-main .track-numeral { align-self: center; }
+.build-layer-stack .layer-row-main .fx-badge { align-self: center; }
+/* #1013 — ▲▼ move side-by-side: stacked, each would need 44px and the row
+   would balloon to 88px. Horizontal pair keeps the row at 44px. */
+.build-layer-stack .layer-reorder { flex-direction: row; gap: 2px; align-self: center; }
+.build-layer-stack .layer-reorder .micro-btn { min-height: 44px; min-width: 44px; font-size: 8px; }
+.build-layer-stack .layer-row-main .micro-btn {
+  min-height: 44px; min-width: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.build-layer-stack .layer-name { min-height: 44px; }
+.build-layer-stack .layer-row-composite { min-height: 44px; }
+.build-layer-stack .layer-row-composite select { min-height: 44px; }
+.build-layer-stack .layer-row-composite .fx-param-readout,
+.build-layer-stack .layer-row-composite .fx-param label { align-self: center; }
+/* Native range inputs: the hit area is the element box, so give it the full
+   44px height — the track/thumb stay small and centered. */
+.build-layer-stack .layer-row-composite input[type=range],
+.build-layer-stack .fx-editor .fx-param input[type=range] { height: 44px; flex: 1; min-width: 0; }
+.build-layer-stack .fx-editor select.tg,
+.build-layer-stack .fx-editor .chip-btn { min-height: 44px; }
+.build-layer-stack .ef-bypass { min-width: 44px; min-height: 44px; }
 .layer-name {
   flex: 1; text-align: left; background: transparent; border: none;
   color: var(--dim); font-size: 10px; letter-spacing: 0.03em; padding: 2px 4px;
