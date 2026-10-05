@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "events": [
+    {"t": 0, "type": "curate"},
+    {"t": 9000, "type": "favorite", "seed": 1842, "paletteId": "mustard", "msSinceSeed": 9000}
+  ]
+}
