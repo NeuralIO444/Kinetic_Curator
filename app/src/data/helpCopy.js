@@ -35,6 +35,7 @@ export const HELP_TOPICS = [
   { id: 'davis-interval', group: 'Director', title: 'interval', text: 'Seconds between Evolve fires. Dead while SOURCE is BEAT.' },
   { id: 'davis-evolve-beat', group: 'Play', title: 'source beat', text: 'Evolve on the same attack as phrase AUDIO. Press EVOLVE to arm.' },
   { id: 'layout-accum', group: 'Build', title: 'accum', text: 'Pixel trail buffer — trails and glow render live in the WebGL canvas. CLEAR wipes the buffer only, not the canvas.' },
+  { id: 'layout-wetness', group: 'Build', title: 'wetness', text: 'Wet paper. Zero is dry — the instrument is unchanged. Up, marks bleed, the behave stirs the water, edges darken as they dry, and overlapping colors mix. Live only.' },
   { id: 'layout-trail-leave', group: 'Build', title: 'leave', text: 'Hold the stamps. The trail buffer stops fading; CLEAR is the only erase. Fade is optional.' },
   { id: 'layout-trail-ribbon', group: 'Build', title: 'ribbon', text: 'Smear the path into a line. Long hold plus a breath of flow — fast marks draw continuous ribbons.' },
   { id: 'layout-trail-comet', group: 'Build', title: 'comet', text: 'Bright head, short tail. New marks land hot, the tail dies fast.' },

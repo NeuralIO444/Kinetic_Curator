@@ -12,6 +12,7 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **Gloss LOD** | Second `<use>` skipped under PERF or when node count > 280. |
 | **Batch downloads** | Browser must allow multiple downloads; max **48** editions per run. |
 | **Audio / LFO / Evolve** | Live-only; not encoded in deterministic stills or project still fidelity. |
+| **WETNESS** | Live-only, same class as audio / LFO / Evolve. A still has no gesture history, so a wet still will not match the live frame. |
 | **Quality caps are per layer** | Each layer clamps against the quality preset independently, so N layers can draw N x `maxCount`. Deliberate: `usePerformanceGovernor` already steps quality down on FPS drop, and a shared budget would thin every layer as you add more. Decided in #93. |
 | **Evolve targets the active layer** | Evolve/morph act on whichever layer is selected, not the whole stack. The TARGET chips (seed/layout/palette/all) choose *what* jumps; the jump still writes the selected layer's state. |
 | **Life audio is global, breath is layered** | Audio ballistics (`scaleMul`/`alphaBoost`/glow) are computed once per frame in the GL loop from the canvas meters plus the active layer's mod amounts, then applied to every layer. Breath is per-agent since spine C — phase from `seedOffset`, amplitude from each layer's own `breath` param × the agent's energy — and ambient drift (jitter/displacement/noiseSpeed) has been per-layer since #425. |

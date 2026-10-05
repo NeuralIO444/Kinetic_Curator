@@ -131,7 +131,7 @@ function opticsDerived(o) {
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
  */
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', leave = false, ribbon = false, comet = false, leaveFade = 0, tunnelFade = 0, prismFade = 0, flowFade = 0 } = {}) {
+export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', leave = false, ribbon = false, comet = false, leaveFade = 0, tunnelFade = 0, prismFade = 0, flowFade = 0, wetStep = 0, wetGain = 0, wetAmount = 0, wetVel = null, wetMask = null } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
   const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
@@ -171,6 +171,13 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
     // Phase B2 — flow-advected feedback. Max UV displacement per frame at
     // flow = 1 (30px on a 1000px canvas); 0 skips the FEED pass entirely.
     flowUv: ribbon ? Math.max(0.03 * fl, 0.012) : 0.03 * fl,
+    // #970: integer gate. 0 keeps the dry feed/fade/glow programs. Gain is
+    // exactly 0 on that path so a caller cannot leak an offset.
+    wetStep: wetStep === 1 ? 1 : 0,
+    wetGain: wetStep === 1 && Number.isFinite(Number(wetGain)) ? Number(wetGain) : 0,
+    wetAmount: wetStep === 1 && Number.isFinite(Number(wetAmount)) ? Math.min(1, Math.max(0, Number(wetAmount))) : 0,
+    wetVel: wetStep === 1 ? wetVel : null,
+    wetMask: wetStep === 1 ? wetMask : null,
     // Phase B3 — echoes. echoTaps K: tap i mixes the frame from i+1 steps
     // ago (delays 1..K), additive ghosts; weights decay with age. 0 = no
     // ring, no mix pass — exactly the old composite.
@@ -491,6 +498,83 @@ void main() {
   vec3 lit = base.rgb + u_amount * u_tint * glow * gate;
   o = vec4(min(lit, vec3(1.0)), base.a);
 }`;
+
+// #970 slice 2/3 — wet programs. Built from the dry strings so FEED_FS /
+// FADE_FS / GLOW_FS stay the dry path. Not registered as cost tiers: they
+// are the same passes, used only when wetStep === 1. The dry path does not
+// bind u_wetVel or u_wetMask.
+export const FEED_WET_FS = FEED_FS.replace(
+  'uniform float u_flowShared; // 1 = sample the project-seed curl table',
+  `uniform float u_flowShared; // 1 = sample the project-seed curl table
+uniform sampler2D u_wetVel; // added velocity, bilinear. Not the dry program.
+uniform float u_wetGain;    // UV scale of the added offset`,
+).replace(
+  'vec2 tuv = v_cuv + advect * u_flow;',
+  `vec2 tuv = v_cuv + advect * u_flow;
+  vec2 wet = texture(u_wetVel, v_cuv).xy * 2.0 - 1.0;
+  tuv += wet * u_wetGain;`,
+);
+
+export const FADE_WET_FS = FADE_FS.replace(
+  'out vec4 o;',
+  `out vec4 o;
+uniform sampler2D u_wetMask; // 64x64 wet, bilinear. Not the dry program.
+uniform float u_wetAmount;
+uint ihashWet(uvec2 p) {
+  p = p * 1664525u + 1013904223u;
+  uint h = p.x ^ p.y;
+  h ^= h >> 16u; h *= 2246822519u; h ^= h >> 13u;
+  return h;
+}`,
+).replace(
+  'o = vec4(mix(u_bg, c.rgb, u_keep), c.a);',
+  `float wet = texture(u_wetMask, tuv).r;
+  float paper = float(ihashWet(uvec2(gl_FragCoord.xy)) >> 16u) * 1.52587890625e-05;
+  float edge = wet * (1.0 - wet) * 4.0;
+  vec3 rgb = c.rgb * (1.0 - 0.45 * edge * u_wetAmount);
+  // Granulation is multiplicative: pigment brightness varies with the paper
+  // hash. Additive grain would pump a noise floor into the feedback loop
+  // (the keep-fade amplifies any per-frame addition by 1/(1-keep)).
+  rgb *= 1.0 + (paper - 0.5) * 0.5 * (1.0 - wet) * u_wetAmount;
+  o = vec4(mix(u_bg, rgb, u_keep), c.a);`,
+);
+
+export const GLOW_WET_FS = GLOW_FS.replace(
+  'uniform vec3 u_tint;',
+  `uniform vec3 u_tint;
+uniform sampler2D u_wetMask;
+uniform float u_wetAmount;`,
+).replace(
+  'vec3 lit = base.rgb + u_amount * u_tint * glow * gate;',
+  `vec3 lit = base.rgb + u_amount * u_tint * glow * gate;
+  float wet = texture(u_wetMask, v_cuv).r;
+  float paper = float(ihash(uvec2(gl_FragCoord.xy)) >> 16u) * 1.52587890625e-05;
+  float edge = wet * (1.0 - wet) * 4.0;
+  lit *= 1.0 - 0.28 * edge * u_wetAmount;
+  // Multiplicative granulation (see FADE_WET_FS): the glow pass writes back
+  // into the feedback buffer, so additive grain would accumulate.
+  lit *= 1.0 + (paper - 0.5) * 0.35 * (1.0 - wet) * u_wetAmount;`,
+);
+
+// #970 slice 5 — cheap pigment mix. Not Kubelka-Munk. Dry OVER_FS is untouched.
+// While the wet mask is up, two deposits blend toward their concentration
+// average instead of stacking toward white.
+export const OVER_WET_FS = OVER_FS.replace(
+  'uniform float u_headBoost; // 1.0 = off (today\'s render, bit-identical)',
+  `uniform float u_headBoost; // 1.0 = off (today's render, bit-identical)
+uniform sampler2D u_wetMask;
+uniform float u_wetAmount;`,
+).replace(
+  'o = s + d * (1.0 - s.a);   // premultiplied source-over',
+  `vec4 over = s + d * (1.0 - s.a);
+  float wet = texture(u_wetMask, v_cuv).r * u_wetAmount;
+  vec3 sc = clamp(s.rgb / max(s.a, 1e-4), 0.0, 1.0);
+  vec3 dc = clamp(d.rgb / max(d.a, 1e-4), 0.0, 1.0);
+  vec3 pigment = (sc * s.a + dc * d.a) / max(s.a + d.a, 1e-4);
+  float mixT = wet * step(0.02, d.a);
+  o = vec4(mix(over.rgb, pigment * over.a, mixT), over.a);`,
+);
+
 
 // Frame resample for #309: the feedback pair runs at logical size, but the
 // incoming frame can be backing-store sized (live retina path). This pass
@@ -865,23 +949,79 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   // NEAREST + CLAMP_TO_EDGE, so the mirror samples the nearest texel. At
   // flow = 0 the pass is skipped and the buffer is exactly the old one.
   let fed = accum;
-  if (p.flowUv > 0) {
+  const wetOn = p.wetStep === 1 && p.wetVel;
+  if (p.flowUv > 0 || wetOn) {
     fed = new Float64Array(n);
     const nearest = (u, v, c) => {
       const sx = Math.min(w - 1, Math.max(0, Math.floor(u * w)));
       const sy = Math.min(h - 1, Math.max(0, Math.floor(v * h)));
       return accum[(sy * w + sx) * 4 + c];
     };
+    const wetVec = (u, v) => {
+      if (!wetOn) return [0, 0];
+      const field = p.wetVel;
+      const gn = field.n;
+      const gx = Math.max(0, Math.min(gn - 1.0001, u * (gn - 1)));
+      const gy = Math.max(0, Math.min(gn - 1.0001, v * (gn - 1)));
+      const i0 = gx | 0;
+      const j0 = gy | 0;
+      const tx = gx - i0;
+      const ty = gy - j0;
+      const i1 = Math.min(gn - 1, i0 + 1);
+      const j1 = Math.min(gn - 1, j0 + 1);
+      const at = (j, i, c) => field.rgba[(j * gn + i) * 4 + c] / 255;
+      const s = (c) => (1 - tx) * (1 - ty) * at(j0, i0, c) + tx * (1 - ty) * at(j0, i1, c)
+        + (1 - tx) * ty * at(j1, i0, c) + tx * ty * at(j1, i1, c);
+      return [s(0) * 2 - 1, s(1) * 2 - 1];
+    };
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const u = (x + 0.5) / w, v = (y + 0.5) / h;
-        const [fx, fy] = mirrorFlowVec(u, v, p.flowField);
-        const tu = u + fx * p.flowUv, tv = v + fy * p.flowUv;
+        const [fx, fy] = p.flowUv > 0 ? mirrorFlowVec(u, v, p.flowField) : [0, 0];
+        const [wx, wy] = wetVec(u, v);
+        const tu = u + fx * p.flowUv + wx * (p.wetGain || 0);
+        const tv = v + fy * p.flowUv + wy * (p.wetGain || 0);
         const o = (y * w + x) * 4;
         fed[o] = nearest(tu, tv, 0);
         fed[o + 1] = nearest(tu, tv, 1);
         fed[o + 2] = nearest(tu, tv, 2);
         fed[o + 3] = nearest(tu, tv, 3);
+      }
+    }
+  }
+  // #970 slice 3 — edge darkening + granulation, only on the wet path.
+  // Paper height is the same 16-bit hash the glow stipple uses. Dry skips
+  // this block, so the fade below is the old path.
+  if (wetOn && p.wetMask && p.wetAmount > 0) {
+    const mask = p.wetMask;
+    const gn = mask.n;
+    const amt = p.wetAmount;
+    const at = (j, i) => mask.rgba[(j * gn + i) * 4] / 255;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const u = (x + 0.5) / w;
+        const v = (y + 0.5) / h;
+        const gx = Math.max(0, Math.min(gn - 1.0001, u * (gn - 1)));
+        const gy = Math.max(0, Math.min(gn - 1.0001, v * (gn - 1)));
+        const i0 = gx | 0;
+        const j0 = gy | 0;
+        const tx = gx - i0;
+        const ty = gy - j0;
+        const i1 = Math.min(gn - 1, i0 + 1);
+        const j1 = Math.min(gn - 1, j0 + 1);
+        const wet = (1 - tx) * (1 - ty) * at(j0, i0) + tx * (1 - ty) * at(j0, i1)
+          + (1 - tx) * ty * at(j1, i0) + tx * ty * at(j1, i1);
+        const edge = wet * (1 - wet) * 4;
+        let hh = Math.imul((x * 1664525 + y) ^ 1013904223, 2246822519) >>> 16;
+        const paper = (hh & 65535) / 65535;
+        const o = (y * w + x) * 4;
+        const dark = 1 - 0.45 * edge * amt;
+        // Multiplicative granulation (mirrors FADE_WET_FS): additive grain
+        // would pump a noise floor into the feedback loop.
+        const grain = 1 + (paper - 0.5) * 0.5 * (1 - wet) * amt;
+        fed[o] = fed[o] * dark * grain;
+        fed[o + 1] = fed[o + 1] * dark * grain;
+        fed[o + 2] = fed[o + 2] * dark * grain;
       }
     }
   }
@@ -945,12 +1085,49 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   // (u_headBoost on the incoming frame's rgb; 1.0 = off, bit-identical).
   const headBoost = p.comet ? COMET_HEAD_BOOST : 1.0;
   const comp = new Float64Array(n);
+  const mixWet = wetOn && p.wetMask && p.wetAmount > 0;
   for (let i = 0; i < n; i += 4) {
     const sa = fIn[i + 3];
-    comp[i] = fIn[i] * headBoost + faded[i] * (1 - sa);
-    comp[i + 1] = fIn[i + 1] * headBoost + faded[i + 1] * (1 - sa);
-    comp[i + 2] = fIn[i + 2] * headBoost + faded[i + 2] * (1 - sa);
-    comp[i + 3] = sa + faded[i + 3] * (1 - sa);
+    const sr = fIn[i] * headBoost;
+    const sg = fIn[i + 1] * headBoost;
+    const sb = fIn[i + 2] * headBoost;
+    const dr = faded[i];
+    const dg = faded[i + 1];
+    const db = faded[i + 2];
+    const da = faded[i + 3];
+    const or = sr + dr * (1 - sa);
+    const og = sg + dg * (1 - sa);
+    const ob = sb + db * (1 - sa);
+    const oa = sa + da * (1 - sa);
+    if (!mixWet || da <= 0.02) {
+      comp[i] = or; comp[i + 1] = og; comp[i + 2] = ob; comp[i + 3] = oa;
+      continue;
+    }
+    const px = (i / 4) % w;
+    const py = (i / 4 / w) | 0;
+    const u = (px + 0.5) / w;
+    const v = (py + 0.5) / h;
+    const mask = p.wetMask;
+    const gn = mask.n;
+    const gx = Math.max(0, Math.min(gn - 1.0001, u * (gn - 1)));
+    const gy = Math.max(0, Math.min(gn - 1.0001, v * (gn - 1)));
+    const i0 = gx | 0;
+    const j0 = gy | 0;
+    const tx = gx - i0;
+    const ty = gy - j0;
+    const i1 = Math.min(gn - 1, i0 + 1);
+    const j1 = Math.min(gn - 1, j0 + 1);
+    const at = (j, ii) => mask.rgba[(j * gn + ii) * 4] / 255;
+    const wet = ((1 - tx) * (1 - ty) * at(j0, i0) + tx * (1 - ty) * at(j0, i1)
+      + (1 - tx) * ty * at(j1, i0) + tx * ty * at(j1, i1)) * p.wetAmount;
+    const sc = [sr, sg, sb].map((c) => Math.min(1, c / Math.max(sa, 1e-4)));
+    const dc = [dr, dg, db].map((c) => Math.min(1, c / Math.max(da, 1e-4)));
+    const denom = Math.max(sa + da, 1e-4);
+    const pigment = sc.map((c, k) => (c * sa + dc[k] * da) / denom);
+    comp[i] = (1 - wet) * or + wet * pigment[0] * oa;
+    comp[i + 1] = (1 - wet) * og + wet * pigment[1] * oa;
+    comp[i + 2] = (1 - wet) * ob + wet * pigment[2] * oa;
+    comp[i + 3] = oa;
   }
   if (p.optics <= 0) return comp;
   // 5/6. glow (#308): mip-chain bloom + stipple diffusion + chromatic
@@ -1025,6 +1202,26 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     }
   };
   build();
+
+  // #970 wet variants. Not in ACCUM_PROGRAMS — same passes, dry path never
+  // uses them, so the cost-tier list stays the 8 ACCUM ids.
+  const wetProgs = {};
+  const wetLocs = {};
+  const buildWet = (name, fs, file, uniforms) => {
+    wetProgs[name] = buildProgramChecked(gl, FULL_VS, fs, {
+      name: `accum-${name}`,
+      vsFile: 'accum.mjs:FULL_VS',
+      fsFile: file,
+    });
+    auditProgramChecked(gl, wetProgs[name], uniforms, { name: `accum-${name}`, file });
+    const L = {};
+    for (const u of uniforms) L[u] = gl.getUniformLocation(wetProgs[name], u);
+    wetLocs[name] = L;
+  };
+  buildWet('feedWet', FEED_WET_FS, 'accum.mjs:FEED_WET_FS', ['u_src', 'u_flowField', 'u_flow', 'u_flowShared', 'u_wetVel', 'u_wetGain']);
+  buildWet('fadeWet', FADE_WET_FS, 'accum.mjs:FADE_WET_FS', ['u_src', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism', 'u_wetMask', 'u_wetAmount']);
+  buildWet('glowWet', GLOW_WET_FS, 'accum.mjs:GLOW_WET_FS', ['u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint', 'u_wetMask', 'u_wetAmount']);
+  buildWet('overWet', OVER_WET_FS, 'accum.mjs:OVER_WET_FS', ['u_src', 'u_dst', 'u_headBoost', 'u_wetMask', 'u_wetAmount']);
 
   // Fullscreen triangle; FULL_VS maps a_pos via v_cuv = a_pos*0.5+0.5.
   const vbo = gl.createBuffer();
@@ -1109,6 +1306,28 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     flowKey = field.seed;
   };
 
+  // #970 velocity + wet mask. LINEAR so the 64×64 field bilinear-upsamples.
+  // Uploaded only on a wet step; the dry path does not bind them.
+  const makeLinear = () => {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 0, 255]));
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return tex;
+  };
+  const wetVelTex = makeLinear();
+  const wetMaskTex = makeLinear();
+  const uploadPacked = (tex, packed) => {
+    if (!packed) return;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, packed.n, packed.n, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed.rgba);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  };
+
   function pass(name, writeT, setup) {
     if (bridge.lost) throw new Error('[accum] context lost — chain paused');
     gl.bindFramebuffer(gl.FRAMEBUFFER, writeT.fb);
@@ -1116,6 +1335,21 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     gl.disable(gl.BLEND);
     gl.useProgram(progs[name]);
     setup(locs[name], bindTex);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disableVertexAttribArray(0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  }
+
+  function passWet(name, writeT, setup) {
+    if (bridge.lost) throw new Error('[accum] context lost — chain paused');
+    gl.bindFramebuffer(gl.FRAMEBUFFER, writeT.fb);
+    gl.viewport(0, 0, writeT.w, writeT.h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(wetProgs[name]);
+    setup(wetLocs[name], bindTex);
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -1221,24 +1455,51 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         echoHead = (echoHead + 1) % K;
         echoCount = Math.min(echoCount + 1, K);
       }
-      // 1. feed (B2) — flow-advected feedback. Skipped at flow = 0: the
-      // buffer is exactly the old one (the optics no-op precedent).
+      // 1. feed (B2). Skipped at flow = 0 and wetStep = 0: the buffer is
+      // exactly the old one. Wet adds an offset on another program and
+      // does not bind the velocity texture on the dry path.
       let write = other();
-      if (p.flowUv > 0) {
-        ensureFlow(p.flowField);
-        pass('feed', write, (u, bind) => {
-          gl.uniform1i(u.u_src, bind(0, cur.tex));
-          gl.uniform1i(u.u_flowField, bind(1, flowTex));
-          gl.uniform1f(u.u_flow, p.flowUv);
-          gl.uniform1f(u.u_flowShared, p.flowField ? 1 : 0);
-        });
+      const wetOn = p.wetStep === 1 && p.wetVel && p.wetMask;
+      if (p.flowUv > 0 || wetOn) {
+        if (p.flowUv > 0) ensureFlow(p.flowField);
+        if (wetOn) {
+          uploadPacked(wetVelTex, p.wetVel);
+          uploadPacked(wetMaskTex, p.wetMask);
+          passWet('feedWet', write, (u, bind) => {
+            gl.uniform1i(u.u_src, bind(0, cur.tex));
+            gl.uniform1i(u.u_flowField, bind(1, flowTex));
+            gl.uniform1f(u.u_flow, p.flowUv);
+            gl.uniform1f(u.u_flowShared, p.flowField ? 1 : 0);
+            gl.uniform1i(u.u_wetVel, bind(2, wetVelTex));
+            gl.uniform1f(u.u_wetGain, p.wetGain);
+          });
+        } else {
+          pass('feed', write, (u, bind) => {
+            gl.uniform1i(u.u_src, bind(0, cur.tex));
+            gl.uniform1i(u.u_flowField, bind(1, flowTex));
+            gl.uniform1f(u.u_flow, p.flowUv);
+            gl.uniform1f(u.u_flowShared, p.flowField ? 1 : 0);
+          });
+        }
         cur = write;
         write = other();
       }
       // 2. fade, or Leave: copy the held stamps. Clear is the only erase.
+      // Wet fade is a different program: edge darkening + paper granulation.
       if (p.leave && p.keep >= 1) {
         pass('copy', write, (u, bind) => {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
+        });
+      } else if (wetOn) {
+        passWet('fadeWet', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, cur.tex));
+          gl.uniform1f(u.u_keep, p.keep);
+          gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
+          gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
+          gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
+          gl.uniform1f(u.u_prism, p.prismUv);
+          gl.uniform1i(u.u_wetMask, bind(2, wetMaskTex));
+          gl.uniform1f(u.u_wetAmount, p.wetAmount);
         });
       } else {
         pass('fade', write, (u, bind) => {
@@ -1252,13 +1513,24 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       }
       cur = write;
       // 3. (#308: removed) — no blur-over-time; the frame lands sharp.
-      // 4. over
+      // 4. over. Wet uses a different program so two pigments mix instead
+      // of stacking. Dry is the old source-over, texture unbound.
       write = other();
-      pass('over', write, (u, bind) => {
-        gl.uniform1i(u.u_src, bind(0, frameIn));
-        gl.uniform1i(u.u_dst, bind(1, cur.tex));
-        gl.uniform1f(u.u_headBoost, p.comet ? COMET_HEAD_BOOST : 1.0);
-      });
+      if (wetOn) {
+        passWet('overWet', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, frameIn));
+          gl.uniform1i(u.u_dst, bind(1, cur.tex));
+          gl.uniform1f(u.u_headBoost, p.comet ? COMET_HEAD_BOOST : 1.0);
+          gl.uniform1i(u.u_wetMask, bind(2, wetMaskTex));
+          gl.uniform1f(u.u_wetAmount, p.wetAmount);
+        });
+      } else {
+        pass('over', write, (u, bind) => {
+          gl.uniform1i(u.u_src, bind(0, frameIn));
+          gl.uniform1i(u.u_dst, bind(1, cur.tex));
+          gl.uniform1f(u.u_headBoost, p.comet ? COMET_HEAD_BOOST : 1.0);
+        });
+      }
       cur = write;
       // 5/6. glow (#308): mip-chain bloom + stipple diffusion + chromatic
       // offset. No gaussian anywhere. One shared downsampled mip chain;
@@ -1270,7 +1542,9 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         buildGlowMips();
         const addGlow = (lod, amount, tint) => {
           write = other();
-          pass('glow', write, (u, bind) => {
+          const glowPass = wetOn ? passWet : pass;
+          const glowName = wetOn ? 'glowWet' : 'glow';
+          glowPass(glowName, write, (u, bind) => {
             gl.uniform1i(u.u_base, bind(0, cur.tex));
             gl.uniform1i(u.u_glow, bind(1, scratch.gm.tex));
             gl.uniform2f(u.u_glowSize, scratch.gw, scratch.gh);
@@ -1279,6 +1553,10 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
             gl.uniform1f(u.u_chromaTexels, p.chromaTexels);
             gl.uniform1f(u.u_amount, amount);
             gl.uniform3f(u.u_tint, tint[0], tint[1], tint[2]);
+            if (wetOn) {
+              gl.uniform1i(u.u_wetMask, bind(2, wetMaskTex));
+              gl.uniform1f(u.u_wetAmount, p.wetAmount);
+            }
           });
           cur = write;
         };
@@ -1311,6 +1589,9 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       scratch = null;
       freeEcho();
       for (const p of Object.values(progs)) gl.deleteProgram(p);
+      for (const prog of Object.values(wetProgs)) gl.deleteProgram(prog);
+      gl.deleteTexture(wetVelTex);
+      gl.deleteTexture(wetMaskTex);
       gl.deleteBuffer(vbo);
       // Bridge-owned feedback targets die with bridge.dispose().
     },

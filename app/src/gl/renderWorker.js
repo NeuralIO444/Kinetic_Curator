@@ -28,6 +28,7 @@ import { resolveLiveRenderState } from '../data/voices.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
+import { motionAmount, noteWetFrame } from './vortex.mjs';
 import { halfLifeToKeep } from '../components/taper.js';
 import { createBallisticsState, processBallistics } from './audioBallistics.mjs';
 import { comboKey } from './liveAtlas.mjs';
@@ -65,6 +66,7 @@ let atlasKey = null;
 let building = false;
 
 const velPrev = new Map();
+const wetSlot = { vortex: null };
 const smoothedLayoutParams = {};
 
 // #624 (WASH) + #625 (INJECT): the worker is the primary render path
@@ -227,6 +229,18 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
   if (!!layoutParams.accumulation && !s.perfTier1 && accumActive) {
     attachVelocities(contract.instances, velPrev);
   }
+  const wet = (!!layoutParams.accumulation && !s.perfTier1)
+    ? noteWetFrame(wetSlot, {
+        wetness: layoutParams.accumulationWetness,
+        freeze: accumFrozen || s.running === false || !!s.slowRender,
+        seed: s.seed,
+        width: CANVAS_W,
+        height: CANVAS_H,
+        instances: contract.instances,
+        behave: layoutParams.behave,
+        motion: motionAmount(layoutParams),
+      })
+    : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
 
   // Combos check for atlas
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
@@ -275,6 +289,11 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
       tunnel: layoutParams.accumulationTunnel,
       prism: layoutParams.accumulationPrism,
       flow: layoutParams.accumulationFlow,
+      wetStep: wet.wetStep,
+      wetGain: wet.wetGain,
+      wetAmount: wet.wetAmount,
+      wetVel: wet.wetVel,
+      wetMask: wet.wetMask,
     },
     audioBands: ballistics,
     audioOn: !!s.audioInput,
@@ -339,6 +358,7 @@ function renderTick() {
           accumObj = null;
           accumActive = false;
           velPrev.clear();
+          wetSlot.vortex = null;
           accumFrozen = false;
         }
         lastAccumOn = false;
