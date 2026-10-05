@@ -49,6 +49,7 @@ import { buildFlowField } from './flowField.mjs';
 import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
+import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
 import { attachVelocities } from './velocitySmear.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
@@ -620,7 +621,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     lastResolved = resolved;
 
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: activePalette },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
