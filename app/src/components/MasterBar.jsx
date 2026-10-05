@@ -4,6 +4,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { TapeCounter } from './TapeCounter.jsx';
 import { TallyLight } from './TallyLight.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
+import { LoisPill } from './LoisPill.jsx'; // #1001: face pill, fixed, left of LIVE
 import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import * as A from '../state/actions.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
@@ -78,6 +79,7 @@ export function MasterBar() {
   return (
     <div className="master-bar">
       <div className="master-left">
+        <LoisPill />
         {state.isRecording ? (
           <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
             title={helpText('output-webm')}>
