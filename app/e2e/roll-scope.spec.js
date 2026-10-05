@@ -39,14 +39,22 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     let s = await snap(page);
     expect(s.armedMode).toBe('fibonacci');
     expect(s.armedMotion).toBe('flock');
+    const compositionBefore = s.lp.composition;
 
-    // CHAOS path (store action, deterministic): composition + mode + motion
-    // hold while everything else moves.
-    const before = s.lp;
+    // CHAOS path (store action, deterministic): the armed MODE keeps the
+    // composition and pins the mode; the armed MOTION pins the motion
+    // numbers — everything else moves.
     await page.evaluate(() => window.__kcStore.getState().kineticRoll());
-    s = await snap(page);
-    for (const k of PINNED) expect(s.lp[k], k).toBe(before[k]);
-    expect(JSON.stringify(s.lp)).not.toBe(JSON.stringify(before));
+    const a = await snap(page);
+    expect(a.lp.composition).toBe(compositionBefore);
+    expect(a.lp.mode).toBe('fibonacci');
+    expect(a.lp.behave).toBe('flock');
+
+    // A second roll holds the same scope while reworking the rest.
+    await page.evaluate(() => window.__kcStore.getState().kineticRoll());
+    const b = await snap(page);
+    for (const k of PINNED) expect(b.lp[k], k).toBe(a.lp[k]);
+    expect(JSON.stringify(b.lp)).not.toBe(JSON.stringify(a.lp));
 
     // UI path: spaced KINETIC taps (RULES passes) respect the scope too.
     await page.locator('.kinetic-btn').click();
@@ -54,7 +62,9 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     await page.locator('.kinetic-btn').click();
     await page.waitForTimeout(2600);
     s = await snap(page);
-    for (const k of PINNED) expect(s.lp[k], k).toBe(before[k]);
+    expect(s.lp.composition).toBe(compositionBefore);
+    expect(s.lp.mode).toBe('fibonacci');
+    expect(s.lp.behave).toBe('flock');
 
     // ✕ clears the scope — back to full-freedom rolls.
     await page.locator('.scope-clear').click();
