@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from .derive import derive
-from .journal import demo_events, load, save
+from .journal import demo_events, load
 from .play import format_rows, scan
 
 
@@ -29,9 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="lois", description="LOIS — affective mirror of the session.")
     sub = parser.add_subparsers(dest="cmd")
 
-    watch = sub.add_parser("watch", help="Four-row TUI over a journal.")
+    watch = sub.add_parser("watch", help="Tail a journal. Reading is the latest event, not a replay.")
     watch.add_argument("journal", type=Path)
-    watch.add_argument("--pace", type=float, default=4.0, help="Journal-ms per real second.")
 
     demo = sub.add_parser("demo", help="Play the scripted session.")
     demo.add_argument("--pace", type=float, default=2000.0)
@@ -58,18 +57,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "demo":
-        events = demo_events()
-        save(Path("/tmp") / "lois-demo.json", events)  # harmless; TUI reads memory
         from .tui import LoisApp
 
-        LoisApp(events, pace=args.pace).run()
+        LoisApp(demo_events(), pace=args.pace).run()
         return 0
 
     if args.cmd == "watch":
-        journal = load(args.journal)
         from .tui import LoisApp
 
-        LoisApp(journal["events"], returned_after_ms=journal.get("returnedAfterMs"), pace=args.pace).run()
+        LoisApp(journal=args.journal, live=True).run()
         return 0
 
     parser.print_help()
