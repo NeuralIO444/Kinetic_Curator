@@ -354,7 +354,7 @@
 .layer-row-active .layer-name { color: var(--accent3); font-weight: 700; }
 .layer-row-composite { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .layer-row-composite .blend-mode-select { flex: 1; grid-column: unset; }
-.layer-row-composite input[type=range] { flex: 1; }
+.layer-row-composite input[type=range] { flex: 1; min-width: 0; }
 .layer-opacity-readout { font-size: 9px; color: var(--dim); width: 32px; text-align: right; }
 .fx-badge {
   font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #0b0b12;
@@ -394,7 +394,7 @@
 .ef-tile .fx-param, .ef-tile .fx-slot-family, .ef-tile .fx-stub, .ef-tile .tg, .ef-tile .chip-btn { grid-column: 1 / -1; }
 .fx-param { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .fx-param label { font-size: 9px; color: var(--dim); width: 52px; text-transform: lowercase; letter-spacing: 0.05em; }
-.fx-param input[type=range] { flex: 1; }
+.fx-param input[type=range] { flex: 1; min-width: 0; }
 .fx-param-readout { font-size: 9px; color: var(--dim); width: 40px; text-align: right; }
 /* #507 — inline PATCH diagnostic line under each patched layer row. */
 .patch-diag { font-size: 9px; color: var(--dim); padding: 1px 0 0 2px; white-space: nowrap; }

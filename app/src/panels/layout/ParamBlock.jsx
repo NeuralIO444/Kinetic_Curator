@@ -37,6 +37,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         hint="Min–max size range for each placement"
         onChangeLow={v => set('scale', [v, layoutParams.scale[1]])}
         onChangeHigh={v => set('scale', [layoutParams.scale[0], v])}
+        onChangeRange={(lo, hi) => set('scale', [lo, hi])}
         readout={`${layoutParams.scale[0].toFixed(1)}–${layoutParams.scale[1].toFixed(1)}`}
         defaultLow={d('scale', DEFAULT_LAYOUT_PARAMS.scale)[0]} defaultHigh={d('scale', DEFAULT_LAYOUT_PARAMS.scale)[1]}
         locked={lockedParams.scale} onToggleLock={() => lock('scale')} />
@@ -44,6 +45,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         min={-180} max={180} hint="Min–max rotation in degrees"
         onChangeLow={v => set('rotate', [v, layoutParams.rotate[1]])}
         onChangeHigh={v => set('rotate', [layoutParams.rotate[0], v])}
+        onChangeRange={(lo, hi) => set('rotate', [lo, hi])}
         readout={`${layoutParams.rotate[0]}°–${layoutParams.rotate[1]}°`}
         defaultLow={d('rotate', DEFAULT_LAYOUT_PARAMS.rotate)[0]} defaultHigh={d('rotate', DEFAULT_LAYOUT_PARAMS.rotate)[1]}
         locked={lockedParams.rotate} onToggleLock={() => lock('rotate')} />
@@ -51,6 +53,7 @@ export function ParamBlock({ layoutParams, lockedParams }) {
         min={0} max={100} hint="Min–max opacity (%)"
         onChangeLow={v => set('alpha', [v, layoutParams.alpha[1]])}
         onChangeHigh={v => set('alpha', [layoutParams.alpha[0], v])}
+        onChangeRange={(lo, hi) => set('alpha', [lo, hi])}
         readout={`${layoutParams.alpha[0]}–${layoutParams.alpha[1]}%`}
         defaultLow={d('alpha', DEFAULT_LAYOUT_PARAMS.alpha)[0]} defaultHigh={d('alpha', DEFAULT_LAYOUT_PARAMS.alpha)[1]}
         locked={lockedParams.alpha} onToggleLock={() => lock('alpha')} />
