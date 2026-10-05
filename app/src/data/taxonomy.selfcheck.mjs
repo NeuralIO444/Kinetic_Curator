@@ -77,7 +77,7 @@ assert.equal(params.composition, 'dusk-flock', 'load rewrites alias to canonical
   // 1.4.0 (#717): the flagship Voices' one home is DAVIS; BUILD no longer renders them.
   const voiceTiles = read('../panels/davis/VoiceTiles.jsx');
   assert.ok(/<VoiceTiles \/>/.test(read('../panels/DavisPanel.jsx')), 'DAVIS renders the flagship Voice tiles');
-  assert.ok(!/FLAGSHIP_VOICES/.test(read('../panels/layout/ModeGrid.jsx')), 'BUILD no longer renders the flagship Voices (one home)');
+  assert.ok(!/FLAGSHIP_VOICES/.test(read('../panels/layout/CompositionTiles.jsx')), 'BUILD no longer renders the flagship Voices (one home)');
   const flagshipChip = voiceTiles.slice(voiceTiles.indexOf('function FlagshipChip'), voiceTiles.indexOf('export function VoiceTiles'));
   assert.ok(flagshipChip.length > 0, 'FlagshipChip found');
   assert.ok(!/voice\.name/.test(flagshipChip), 'flagship chips print voice.title, never the SWARM/HYPE/MURM name');

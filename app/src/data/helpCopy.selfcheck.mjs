@@ -109,7 +109,7 @@ import { HELP_TOPICS, HELP_SHORTCUTS, helpText } from './helpCopy.js';
   // The four remaining areas from the issue wire their hover titles through
   // the map, so hover and the `?` overlay cannot drift.
   const wired = {
-    'panels/layout/ToggleRow.jsx': 'layout-accum',
+    'panels/layout/AccumFamily.jsx': 'layout-accum',
     'panels/pipeline/SnapRecordRow.jsx': 'output-webm',
     'components/MasterBar.jsx': 'output-webm',
     'panels/build/LayerStack.jsx': 'layers-blend',
