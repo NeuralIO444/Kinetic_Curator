@@ -86,6 +86,7 @@ export const Events = {
   LAYER_REMOVE: 'layer:remove',
   LAYER_SET_ACTIVE: 'layer:setActive',
   LAYER_REORDER: 'layer:reorder',
+  LAYER_SWAP_POSITIONS: 'layer:swapPositions',
   LAYER_TOGGLE_VISIBLE: 'layer:toggleVisible',
   LAYER_SET_BLEND_MODE: 'layer:setBlendMode',
   LAYER_SET_OPACITY: 'layer:setOpacity',

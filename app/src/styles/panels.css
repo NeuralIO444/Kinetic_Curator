@@ -359,13 +359,55 @@
 /* ─── Layers ─── */
 .layer-list { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
 .layer-row { border: 1px solid var(--line); padding: 4px; background: rgba(0,0,0,0.15); }
-.layer-row-ghost { opacity: 0.35; }
-/* #1014 — tap-to-arm hint: one dimmed line under the LAYERS header until
-   the first track is armed. */
-.ghost-hint { font-size: 9px; color: var(--dim); padding: 0 8px; line-height: 1.4; }
+/* #1014 (mockup C rebuild) — type-color accent tabs: content #e8a33d, FX
+   #35c4b5 (both from #1015), MATH #b78cff. Inset box-shadow so the
+   selected/active border colors never clobber the tab. */
+.layer-row-kc { box-shadow: inset 3px 0 0 #e8a33d; }
+.layer-row-fx { box-shadow: inset 3px 0 0 #35c4b5; }
+.layer-row-math { box-shadow: inset 3px 0 0 #b78cff; }
+/* #1014 (mockup C rebuild) — section headers: letterspaced title, n/4
+   count, dashed "+" (C's add affordance), dim hint line. */
+.layer-section { position: relative; margin-top: 6px; }
+.layer-section-head { display: flex; align-items: center; gap: 8px; padding: 2px 8px; }
+.layer-section-title { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink); }
+.layer-section-count { font-size: 10px; letter-spacing: 0.1em; color: var(--dim); }
+.layer-add-btn {
+  width: 26px; height: 26px; min-width: 26px;
+  border: 1px dashed var(--dim); border-radius: 4px;
+  background: transparent; color: var(--ink);
+  font-size: 15px; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.layer-add-btn:hover:not(:disabled) { border-color: var(--ink); color: #fff; }
+.layer-add-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.layer-section-hint { font-size: 9px; letter-spacing: 0.08em; color: var(--dim); }
+/* #1014 (mockup C rebuild) — family chooser popup: dark card over the
+   section, dimmed backdrop catches outside taps. */
+.layer-chooser-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0,0,0,0.45); border: 0; padding: 0; cursor: default;
+}
+.layer-chooser {
+  position: absolute; z-index: 41; top: 30px; left: 8px; right: 8px;
+  background: #14141c; border: 1px solid var(--line-2); border-radius: 6px;
+  padding: 8px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+}
+.layer-chooser-title { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.layer-chooser-group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.layer-chooser-group-label { width: 100%; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.layer-chooser-item {
+  font-size: 10px; letter-spacing: 0.08em;
+  color: var(--ink); background: #1a1a22;
+  border: 1px solid var(--line-2); border-radius: 3px;
+  padding: 8px 10px; min-height: 44px; cursor: pointer;
+}
+.layer-chooser-item:hover { border-color: var(--ink); color: #fff; }
+.layer-chooser-empty { font-size: 9px; color: var(--dim); line-height: 1.5; }
 .layer-row-active { border-color: var(--accent3); }
 .layer-row-fx { border-color: #8a6cff; background: rgba(138, 108, 255, 0.07); }
-.layer-row-fx-selected { border-color: #b49aff; box-shadow: 0 0 0 1px #b49aff inset; }
+.layer-row-fx-selected { border-color: #b49aff; box-shadow: inset 3px 0 0 #35c4b5, inset 0 0 0 1px #b49aff; }
 /* #1015 — reorder feedback, styled to mockup C (kc-layer-alt/c-refined.png):
    dark rows, type-color accents (content #e8a33d, FX #35c4b5). The moved
    row flashes its type color; labels are positional and would otherwise
@@ -711,7 +753,7 @@
 /* #1010 — MATH tracks: ink-violet strip color, distinct from FX violet-teal
    and content amber. Same grammar as FX rows. */
 .layer-row-math { border-color: #b78cff; background: rgba(183, 140, 255, 0.07); }
-.layer-row-math-selected { border-color: #d3b8ff; box-shadow: 0 0 0 1px #d3b8ff inset; }
+.layer-row-math-selected { border-color: #d3b8ff; box-shadow: inset 3px 0 0 #b78cff, inset 0 0 0 1px #d3b8ff; }
 .math-badge {
   font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #0b0b12;
   background: #b78cff; border-radius: 2px; padding: 1px 5px; white-space: nowrap;
