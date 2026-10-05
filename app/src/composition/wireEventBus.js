@@ -103,6 +103,14 @@ export function wireEventBus(rawDispatch) {
   on(Events.FX_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.FX_EFFECT_REMOVE, layerId, index }));
   on(Events.FX_EFFECT_REORDER, ({ layerId, index, delta }) => dispatch({ type: A.FX_EFFECT_REORDER, layerId, index, delta }));
   on(Events.FX_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.FX_EFFECT_SET_PARAM, layerId, index, key, value }));
+  on(Events.LAYER_ADD_MATH, () => dispatch({ type: A.ADD_MATH_LAYER }));
+  on(Events.MATH_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_MATH_LAYER, id }));
+  on(Events.MATH_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.MATH_EFFECT_ADD, layerId, kind }));
+  on(Events.MATH_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.MATH_EFFECT_REMOVE, layerId, index }));
+  on(Events.MATH_EFFECT_REORDER, ({ layerId, index, delta }) => dispatch({ type: A.MATH_EFFECT_REORDER, layerId, index, delta }));
+  on(Events.MATH_EFFECT_SET_KIND, ({ layerId, index, kind }) => dispatch({ type: A.MATH_EFFECT_SET_KIND, layerId, index, kind }));
+  on(Events.MATH_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.MATH_EFFECT_SET_PARAM, layerId, index, key, value }));
+  on(Events.MATH_EFFECT_SET_MOD, ({ layerId, index, key, mod }) => dispatch({ type: A.MATH_EFFECT_SET_MOD, layerId, index, key, mod }));
 
   on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
   on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));

@@ -8,6 +8,7 @@
 // engine/kernel/rng → engine/prng) and is safe to import from anywhere.
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeFxEffects } from '../fx/fxFilters.js';
+import { sanitizeMathEffects } from '../fx/mathFilters.js';
 import { ASSETS } from '../data/assets/index.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
@@ -179,7 +180,7 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     if (layers.length >= MAX_LAYERS) break;
     if (!l || typeof l !== 'object' || typeof l.id !== 'string') continue;
     if (seen.has(l.id)) continue; // duplicate IDs collide in React keys and the snapshot map
-    const type = l.type === 'fx' ? 'fx' : 'content';
+    const type = l.type === 'fx' ? 'fx' : l.type === 'math' ? 'math' : 'content';
     // #456 — the 4-content-track cap is a creation-time UI check only; a
     // document can still carry more. Skip the overflow rather than truncate
     // by raw array position, same "degrade, don't crash" posture as MAX_LAYERS.
@@ -203,6 +204,11 @@ export function normalizeLayers(rawLayers, rawActiveId) {
           console.warn(`[normalize] fx layer ${l.id}: grain-family (${kinds.join(', ')}) moved to finish position — save the project to persist the fix`);
         },
       });
+    } else if (type === 'math') {
+      // #1010 — math chains sanitize against the math catalog (unknown ops
+      // dropped, params clamped, mod routing cleaned); the op + knobs + mod
+      // routing persist in the project doc exactly like FX chains.
+      layer.effects = sanitizeMathEffects(l.effects);
     } else {
       // #456 — patches were dropped entirely on load (never copied from the
       // raw doc into the normalized layer). `to` is a stable layer id
@@ -216,8 +222,8 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     layers.push(layer);
   }
   if (layers.length === 0) return { layers: null, activeLayerId: null };
-  // FX layers are never the content-active layer; a document with no content
-  // layer at all is degenerate — treat it as invalid like an empty list.
+  // FX/MATH layers are never the content-active layer; a document with no
+  // content layer at all is degenerate — treat it as invalid like an empty list.
   if (!layers.some((l) => l.type === 'content')) return { layers: null, activeLayerId: null };
   // #456 — a patch target that no longer exists (dropped by the cap above,
   // a stale/self id, or an id pointing at an FX layer) goes inert (`to:
@@ -231,7 +237,7 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   }
   let activeLayerId = typeof rawActiveId === 'string' ? rawActiveId : null;
   const active = layers.find((l) => l.id === activeLayerId);
-  if (!active || active.type === 'fx') {
+  if (!active || active.type === 'fx' || active.type === 'math') {
     activeLayerId = layers.find((l) => l.type === 'content').id;
   }
   return { layers, activeLayerId };

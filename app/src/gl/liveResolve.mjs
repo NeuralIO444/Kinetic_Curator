@@ -7,6 +7,7 @@ import { getQualityCaps } from '../data/quality.js';
 import { shapeMixWeights, liveShapeLevels } from '../data/voices.js';
 import { getAssetCost } from '../assets/cost.js';
 import { isFxLayer } from '../fx/fxFilters.js';
+import { isMathLayer } from '../fx/mathFilters.js';
 import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
@@ -374,8 +375,18 @@ export function createLiveResolver() {
 
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
-      if (isFxLayer(layer)) {
-        out.push({ id: layer.id, isFx: true, layer, layerOpacity: layer.layerOpacity ?? 1 });
+      if (isFxLayer(layer) || isMathLayer(layer)) {
+        // #1010 — MATH tracks ride the same adjustment-layer fold as FX.
+        // soloGrade marks a soloed MATH track: the renderer seeds its wrap
+        // with neutral mid-grey so Matt sees the grade's contribution only.
+        out.push({
+          id: layer.id,
+          isFx: true,
+          isMath: isMathLayer(layer),
+          layer,
+          layerOpacity: layer.layerOpacity ?? 1,
+          soloGrade: isMathLayer(layer) && input.soloStash?.id === layer.id,
+        });
         continue;
       }
       const isActive = layer.id === input.activeLayerId;

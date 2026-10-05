@@ -9,6 +9,7 @@ import '../gl/accum.mjs';
 import '../gl/renderer.mjs';
 import { MEASURED_COSTS } from '../gl/effects/measuredCosts.mjs';
 import { FX_EFFECT_DEFS } from '../fx/fxFilters.js';
+import { MATH_EFFECT_DEFS } from '../fx/mathFilters.js';
 import {
   FX_KIND_TO_COST_ID,
   costIdForFxKind,
@@ -26,9 +27,15 @@ import {
     assert.ok(registered.has(id), `mapped id "${id}" (kind "${kind}") is not registered`);
   }
   for (const kind of Object.keys(FX_KIND_TO_COST_ID)) {
-    assert.ok(FX_EFFECT_DEFS[kind], `mapped kind "${kind}" is not a real FX kind`);
+    assert.ok(FX_EFFECT_DEFS[kind] || MATH_EFFECT_DEFS[kind], `mapped kind "${kind}" is not a real FX or MATH kind`);
   }
-  console.log('[selfcheck] sceneCost map covers all FX kinds, all registered');
+  // #1010 — every math op resolves to its registered math/<kind> id.
+  for (const kind of Object.keys(MATH_EFFECT_DEFS)) {
+    const id = costIdForFxKind(kind);
+    assert.ok(id, `MATH kind "${kind}" has no cost-id mapping`);
+    assert.ok(registered.has(id), `mapped id "${id}" (kind "${kind}") is not registered`);
+  }
+  console.log('[selfcheck] sceneCost map covers all FX + MATH kinds, all registered');
 }
 
 // A reference stack (rgbSplit + grain) sums bench-measured ms only.
@@ -64,5 +71,13 @@ import {
   ];
   assert.deepStrictEqual(activeFxKinds(layers), ['grain', 'tear'], 'visible FX layers, order kept');
   assert.deepStrictEqual(activeFxKinds(null), [], 'null layers is empty');
-  console.log('[selfcheck] sceneCost activeFxKinds reads visible FX layers only');
+  // #1010 — MATH tracks cost like FX tracks.
+  const mathLayers = [
+    { id: 'm', type: 'math', visible: true, effects: [{ kind: 'gain', params: {} }] },
+    { id: 'n', type: 'math', visible: false, effects: [{ kind: 'threshold', params: {} }] },
+  ];
+  assert.deepStrictEqual(activeFxKinds(mathLayers), ['gain'], 'visible MATH layers priced');
+  const mc = sceneFxCost(['gain', 'threshold']);
+  assert.ok(mc.totalMs > 0 && mc.unknown.length === 0, 'math ops priced from declarations');
+  console.log('[selfcheck] sceneCost activeFxKinds reads visible FX + MATH layers');
 }

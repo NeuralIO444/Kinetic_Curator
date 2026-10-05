@@ -9,9 +9,11 @@ import { PanelHeader } from '../../components/PanelHeader.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES } from '../../data/layout-modes.js';
 import { FX_EFFECT_DEFS, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
+import { isMathLayer, mathTrackHitsHard } from '../../fx/mathFilters.js';
+import { MathEffectEditor } from './MathEffectEditor.jsx';
 import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
 import { efTileFace } from '../../fx/efRackTile.mjs';
-import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS } from '../../state/slices/layersSlice.js';
+import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
@@ -164,11 +166,13 @@ function FxEffectEditor({ layer, fxOrdinal }) {
 }
 
 export function LayerStack() {
-  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId }));
-  const { layers, activeLayerId, selectedFxLayerId } = state;
+  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId }));
+  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId } = state;
   const setLayerPatch = useStore((s) => s.setLayerPatch);
-  const contentCount = layers.filter((l) => !isFxLayer(l)).length;
+  const isAdj = (l) => isFxLayer(l) || isMathLayer(l);
+  const contentCount = layers.filter((l) => !isAdj(l)).length;
   const fxCount = layers.filter(isFxLayer).length;
+  const mathCount = layers.filter(isMathLayer).length;
   const singleTrack = contentCount < 2; // PATCH has nothing to point at (a patched row can still be set back to OFF)
   const ghosts = [];
   for (let n = contentCount + 1; n <= MAX_CONTENT_TRACKS; n++) ghosts.push(n);
@@ -176,13 +180,21 @@ export function LayerStack() {
   // content tracks: virtual, tap-to-arm, cost nothing until armed.
   const fxGhosts = [];
   for (let n = fxCount + 1; n <= MAX_FX_TRACKS; n++) fxGhosts.push(n);
+  // #1010 — MATH slots get the same dimmed-until-reached-for treatment:
+  // virtual, tap-to-arm, cost nothing until armed.
+  const mathGhosts = [];
+  for (let n = mathCount + 1; n <= MAX_MATH_TRACKS; n++) mathGhosts.push(n);
 
   let contentOrdinal = 0;
   let fxOrdinal = 0;
-  const ordinals = new Map(); // content ids -> KC-n, FX ids -> FX n (separate counters)
+  let mathOrdinal = 0;
+  const ordinals = new Map(); // content ids -> KC-n, FX ids -> FX n, MATH ids -> M n (separate counters)
   const contentTargets = [];
   for (const l of layers) {
-    if (!isFxLayer(l)) {
+    if (isMathLayer(l)) {
+      mathOrdinal += 1;
+      ordinals.set(l.id, mathOrdinal);
+    } else if (!isFxLayer(l)) {
       contentOrdinal += 1;
       ordinals.set(l.id, contentOrdinal);
       contentTargets.push({ id: l.id, n: contentOrdinal });
@@ -208,6 +220,14 @@ export function LayerStack() {
       </PanelHeader>
       <PatchMatrix layers={layers} ordinals={ordinals} />
       <div className="layer-list">
+        {mathGhosts.slice().reverse().map((n) => (
+          <div key={`ghost-math-${n}`} className="layer-row layer-row-ghost" onClick={() => emit(Events.LAYER_ADD_MATH)}>
+            <div className="layer-row-main">
+              <TrackNumeral n={n} kind="math" ghost />
+              <button className="layer-name" type="button">M {n}</button>
+            </div>
+          </div>
+        ))}
         {fxGhosts.slice().reverse().map((n) => (
           <div key={`ghost-fx-${n}`} className="layer-row layer-row-ghost" onClick={() => emit(Events.LAYER_ADD_FX)}>
             <div className="layer-row-main">
@@ -227,35 +247,41 @@ export function LayerStack() {
         {[...layers].reverse().map((layer, ri) => {
           const i = layers.length - 1 - ri;
           const fx = isFxLayer(layer);
+          const math = isMathLayer(layer);
+          const adj = fx || math;
           const isActive = layer.id === activeLayerId;
           const isFxSelected = layer.id === selectedFxLayerId;
-          const soloed = !fx && layer.visible && layers.every((l) => l.id === layer.id || isFxLayer(l) || !l.visible);
+          const isMathSelected = layer.id === selectedMathLayerId;
+          const soloed = !adj && layer.visible && layers.every((l) => l.id === layer.id || isAdj(l) || !l.visible);
+          const mathSoloed = math && layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
           const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
           const patch = layer.patch || { mode: 'off', to: null, strength: 0.16 };
           const to = (!patch.to || patch.to === layer.id) ? otherTarget(layer) : patch.to;
+          const hitsHard = math && mathTrackHitsHard(layer);
           return (
-            <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''}`}>
+            <div key={layer.id} className={`layer-row ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}`}>
               <div className="layer-row-main">
-                <TrackNumeral n={ordinals.get(layer.id) || 1} kind={fx ? 'fx' : 'kc'} edited={fx ? isFxSelected : isActive} />
+                <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : isActive} />
                 <div className="layer-reorder">
                   <button className="micro-btn" disabled={i === layers.length - 1} onClick={() => emit(Events.LAYER_REORDER, { id: layer.id, delta: 1 })}>▲</button>
                   <button className="micro-btn" disabled={i === 0} onClick={() => emit(Events.LAYER_REORDER, { id: layer.id, delta: -1 })}>▼</button>
                 </div>
                 <button className="micro-btn" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
-                <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks' : undefined} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{soloed ? 'S·' : 'S'}</button>
+                <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks (FX never solos)' : math ? 'Solo the grade: this track alone over neutral mid-grey' : undefined} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{(soloed || mathSoloed) ? 'S·' : 'S'}</button>
                 {fx && <span className="fx-badge">FX</span>}
+                {math && <span className="math-badge" title={hitsHard ? 'M — this track is changing the picture hard' : 'M — MATH track'}>M</span>}
                 <button
                   className="layer-name"
-                  title={(isActive && !fx) || (isFxSelected && fx) ? `${label} — editing` : label}
-                  onClick={() => emit(fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id })}
+                  title={(isActive && !adj) || (isFxSelected && fx) || (isMathSelected && math) ? `${label} — editing` : label}
+                  onClick={() => emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id })}
                 >
                   {label}
                 </button>
                 <button className="micro-btn" onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
-                <button className="micro-btn" disabled={!isFxLayer(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
+                <button className="micro-btn" disabled={!isAdj(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
               </div>
               <div className="layer-row-composite">
-                {fx ? (
+                {adj ? (
                   <span className="fx-param" style={{ flex: 1 }}><label>Blend</label><span className="fx-param-readout" style={{ width: 'auto' }}>—</span></span>
                 ) : (
                   <select className="tg blend-mode-select" value={layer.layerBlendMode} title={helpText('layers-blend')}
@@ -264,10 +290,11 @@ export function LayerStack() {
                   </select>
                 )}
                 <input type="range" min={0} max={1} step={0.01} value={layer.layerOpacity}
+                  title={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
                   onChange={(e) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: Number(e.target.value) })} />
                 <span className="layer-opacity-readout">{Math.round(layer.layerOpacity * 100)}%</span>
               </div>
-              {!fx && (
+              {!adj && (
                 <>
                 <div className="layer-row-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
                   <span className="fx-param-readout" style={{ width: 'auto' }}>PATCH</span>
@@ -309,6 +336,7 @@ export function LayerStack() {
                 </>
               )}
               {fx && isFxSelected && <FxEffectEditor layer={layer} fxOrdinal={ordinals.get(layer.id) || 1} />}
+              {math && isMathSelected && <MathEffectEditor layer={layer} mathOrdinal={ordinals.get(layer.id) || 1} />}
             </div>
           );
         })}

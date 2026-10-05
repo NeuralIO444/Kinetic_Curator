@@ -59,6 +59,7 @@ import { buildProgramChecked, auditProgramChecked } from './diagnostics.mjs';
 import { UNIFORMS as BUILTIN_UNIFORMS } from '../bridge/builtinEffects.mjs';
 import { ACCUM_PROGRAMS } from '../accum.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
+import { MATH_SHADER_EFFECTS } from '../effects/mathShaders.mjs';
 import { createSweepLab, runEffectSweep, locMap } from './sweep.mjs';
 
 /* ------------------------------------------------------------------ */
@@ -159,6 +160,42 @@ function templateEffectDef(kind) {
         vs: TEMPLATE_VS,
         fs: injectCommon(def.fs),
         name: `sweep-fx/${kind}`,
+        vsFile: 'template.mjs:TEMPLATE_VS',
+        fsFile: def.file,
+        decls,
+      });
+      return {
+        program,
+        locs,
+        apply: (glA, locsA, c, lab, targets) => {
+          const values = c.kind === 'hostile'
+            ? rawTemplateValues(descriptor, c.params, lab.input.tex, lab.w, lab.h)
+            : uploadUniformsFor(descriptor, {
+                readTex: lab.input.tex, width: lab.w, height: lab.h, time: 0, params: c.params,
+              });
+          lab.render(program, targets.out, locsA, decls, values);
+        },
+        dispose: () => gl.deleteProgram(program),
+      };
+    },
+  };
+}
+
+/** One template-MATH sweep entry (#1010). Mirrors templateEffectDef: the
+ *  same template contract, the same sweep semantics, id math/<kind>. */
+function mathEffectDef(kind) {
+  const found = MATH_SHADER_EFFECTS.find(([k]) => k === kind);
+  if (!found) throw new Error(`[sweep] unknown math effect "${kind}"`);
+  const def = found[1];
+  const descriptor = def.descriptor;
+  const decls = uniformDecls(descriptor);
+  return {
+    id: `math/${kind}`,
+    build(gl) {
+      const { program, locs } = buildChecked(gl, {
+        vs: TEMPLATE_VS,
+        fs: injectCommon(def.fs),
+        name: `sweep-math/${kind}`,
         vsFile: 'template.mjs:TEMPLATE_VS',
         fsFile: def.file,
         decls,
@@ -404,6 +441,119 @@ export const SWEEP_EFFECTS = [
     cases: [
       // No params: always-on transform (see solarize note).
       C('always-on', {}, { costly: true }),
+    ],
+  },
+
+  // ---- template MATH (#1010: pure-ALU tone ops) ----
+  // Identity-at-defaults ops prove the noop case byte-for-byte, so a math
+  // track at defaults costs nothing until a knob moves.
+  {
+    ...mathEffectDef('gain'),
+    cases: [
+      C('identity → no-op', { exposure: 0 }, { noop: true }),
+      // HDR op: the fold is RGBA16F, so +exposure legitimately pushes past 1
+      // (that's what KNEE's shoulder is for downstream).
+      C('max', { exposure: 3 }, { costly: true, hdr: true }),
+      C('min', { exposure: -3 }),
+      H('hostile huge exposure', { exposure: 40 }),
+    ],
+  },
+  {
+    ...mathEffectDef('lift'),
+    cases: [
+      C('identity → no-op', { offset: 0 }, { noop: true }),
+      C('max', { offset: 1 }, { costly: true }),
+      C('min', { offset: -1 }),
+      H('hostile huge offset', { offset: 5 }),
+    ],
+  },
+  {
+    ...mathEffectDef('contrast'),
+    cases: [
+      C('identity → no-op', { amount: 0 }, { noop: true }),
+      C('max', { amount: 1 }, { costly: true }),
+      C('mid', { amount: 0.5 }),
+      H('hostile over-max amount', { amount: 3 }),
+    ],
+  },
+  {
+    ...mathEffectDef('saturate'),
+    cases: [
+      C('identity → no-op', { saturation: 1 }, { noop: true }),
+      C('max', { saturation: 2 }, { costly: true }),
+      C('grey', { saturation: 0 }),
+      H('hostile over-max saturation', { saturation: 8 }),
+    ],
+  },
+  {
+    ...mathEffectDef('threshold'),
+    cases: [
+      // No identity: always-on transform (see solarize note).
+      C('hard cut', { level: 0.5, softness: 0 }),
+      C('soft edge', { level: 0.5, softness: 0.4 }, { costly: true }),
+      C('low level', { level: 0.1, softness: 0 }),
+      H('hostile level above range', { level: 2, softness: 0 }),
+    ],
+  },
+  {
+    ...mathEffectDef('quantize'),
+    cases: [
+      // No identity: always-on transform (see solarize note).
+      C('hard posterize', { steps: 2 }, { costly: true }),
+      C('gentle', { steps: 8 }),
+      C('fine', { steps: 16 }),
+      H('hostile zero steps', { steps: 0 }),
+    ],
+  },
+  {
+    ...mathEffectDef('knee'),
+    cases: [
+      C('identity → no-op', { rolloff: 0 }, { noop: true }),
+      C('max', { rolloff: 1 }, { costly: true }),
+      C('mid', { rolloff: 0.5 }),
+    ],
+  },
+  {
+    ...mathEffectDef('tempTint'),
+    cases: [
+      C('identity → no-op', { temperature: 0, tint: 0 }, { noop: true }),
+      C('warm', { temperature: 1, tint: 0 }),
+      C('cool green', { temperature: -1, tint: 1 }, { costly: true }),
+      H('hostile huge temperature', { temperature: 10, tint: 0 }),
+    ],
+  },
+  {
+    ...mathEffectDef('vignette'),
+    cases: [
+      C('identity → no-op', { amount: 0, roundness: 0.5 }, { noop: true }),
+      C('max', { amount: 1, roundness: 0 }, { costly: true }),
+      C('round', { amount: 0.7, roundness: 1 }),
+    ],
+  },
+  {
+    ...mathEffectDef('channelMix'),
+    cases: [
+      C('identity → no-op', { r_to_r: 1, r_to_g: 0, r_to_b: 0 }, { noop: true }),
+      C('full red crossfade', { r_to_r: 1, r_to_g: 1, r_to_b: 1 }, { costly: true }),
+      C('no red', { r_to_r: 0, r_to_g: 0, r_to_b: 0 }),
+    ],
+  },
+  {
+    ...mathEffectDef('hueRotate'),
+    cases: [
+      // No noop case: the rgb2hsl→hsl2rgb round trip is not byte-exact at
+      // 0° (float rounding), so a byte-for-byte identity cannot hold.
+      C('full turn', { degrees: 180 }, { costly: true }),
+      C('quarter turn', { degrees: 90 }),
+      H('hostile over-range degrees', { degrees: 720 }),
+    ],
+  },
+  {
+    ...mathEffectDef('levelsFixed'),
+    cases: [
+      C('identity → no-op', { black: 0, white: 1 }, { noop: true }),
+      C('contrast stretch', { black: 0.2, white: 0.8 }, { costly: true }),
+      C('lift blacks', { black: 0, white: 0.5 }),
     ],
   },
 

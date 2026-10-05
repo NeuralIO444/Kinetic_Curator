@@ -22,6 +22,7 @@
  */
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
+import { sanitizeMathEffects, MATH_OP_KINDS, MATH_WET_CEILING } from '../fx/mathFilters.js';
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
@@ -138,12 +139,20 @@ function buildFxWraps(resolvedLayers, caps) {
   let fxIndex = 0;
   for (const rl of resolvedLayers) {
     if (rl.isFx) {
-      const fx = sanitizeFxEffects(rl.layer?.effects);
+      // #1010 — MATH tracks ride the same wrap machinery; their chain
+      // sanitizes against the math catalog instead.
+      const fx = rl.isMath ? sanitizeMathEffects(rl.layer?.effects) : sanitizeFxEffects(rl.layer?.effects);
+      let opacity = clamp01(rl.layerOpacity ?? 1);
+      if (rl.isMath && fx.some((f) => f.kind === 'hueRotate')) {
+        // HUE ROTATE's default wet ceiling: the grade can never run hotter
+        // than 50% while the dangerous op is in the chain.
+        opacity = Math.min(opacity, MATH_WET_CEILING);
+      }
       if (fxIndex < maxFx && fx.length > 0) {
         wraps.push({
           fxLayerId: rl.id,
           filterId: `fx-${String(rl.id).replace(/[^A-Za-z0-9_-]/g, '_')}`,
-          opacity: clamp01(rl.layerOpacity ?? 1),
+          opacity,
           contentLayerIds: below.map((l) => l.id),
         });
       } else if (fx.length > 0) {
@@ -219,7 +228,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
   );
 
   for (const rl of resolvedLayers) {
-    if (rl.isFx) {
+    if (rl.isFx && !rl.isMath) {
       layers.push({
         id: String(rl.id),
         name: String(rl.layer?.name ?? rl.id),
@@ -228,6 +237,22 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         opacity: clamp01(rl.layerOpacity ?? rl.layer?.layerOpacity ?? 1),
         blend: 'normal', // FX wrap groups carry no blend mode (buildLayerStack)
         fx: sanitizeFxEffects(rl.layer?.effects), // top-down, #185 order preserved
+        matte: sanitizeMatte(rl.layer?.matte),
+      });
+      continue;
+    }
+    if (rl.isMath) {
+      // #1010 — MATH tracks: same adjustment-layer contract as FX, chain
+      // sanitized against the math catalog. soloGrade seeds mid-grey.
+      layers.push({
+        id: String(rl.id),
+        name: String(rl.layer?.name ?? rl.id),
+        type: 'math',
+        visible: true, // resolved layers are pre-filtered for visibility
+        opacity: clamp01(rl.layerOpacity ?? rl.layer?.layerOpacity ?? 1),
+        blend: 'normal',
+        fx: sanitizeMathEffects(rl.layer?.effects), // top-down, #185 order preserved
+        soloGrade: !!rl.soloGrade,
         matte: sanitizeMatte(rl.layer?.matte),
       });
       continue;
@@ -366,7 +391,7 @@ export function assertSceneContract(scene) {
   for (const l of scene.layers) {
     if (!l.id || layerIds.has(l.id)) fail(`duplicate or missing layer id: ${l.id}`);
     layerIds.add(l.id);
-    if (l.type !== 'content' && l.type !== 'fx') fail(`layer ${l.id}: bad type ${l.type}`);
+    if (l.type !== 'content' && l.type !== 'fx' && l.type !== 'math') fail(`layer ${l.id}: bad type ${l.type}`);
     if (l.matte !== null && l.matte !== undefined) {
       const m = l.matte;
       if (typeof m !== 'object' || typeof m.sourceId !== 'string' || !m.sourceId) {
@@ -380,6 +405,13 @@ export function assertSceneContract(scene) {
       for (const fx of l.fx) {
         if (!FX_EFFECT_KINDS.includes(fx.kind)) fail(`fx layer ${l.id}: unknown effect kind ${fx.kind}`);
         if (!fx.params || typeof fx.params !== 'object') fail(`fx layer ${l.id}: params must be an object`);
+      }
+    }
+    if (l.type === 'math') {
+      if (!Array.isArray(l.fx)) fail(`math layer ${l.id}: fx must be an array`);
+      for (const fx of l.fx) {
+        if (!MATH_OP_KINDS.includes(fx.kind)) fail(`math layer ${l.id}: unknown math op ${fx.kind}`);
+        if (!fx.params || typeof fx.params !== 'object') fail(`math layer ${l.id}: params must be an object`);
       }
     }
   }

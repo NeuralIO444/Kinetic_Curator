@@ -37,6 +37,19 @@ export const FX_KIND_TO_COST_ID = {
   edge: 'fx/edge',
   halo: 'fx/halo',
   grade: 'fx/grade',
+  // #1010 — math ops register as math/<kind> (mathShaders.mjs).
+  gain: 'math/gain',
+  lift: 'math/lift',
+  contrast: 'math/contrast',
+  saturate: 'math/saturate',
+  threshold: 'math/threshold',
+  quantize: 'math/quantize',
+  knee: 'math/knee',
+  tempTint: 'math/tempTint',
+  vignette: 'math/vignette',
+  channelMix: 'math/channelMix',
+  hueRotate: 'math/hueRotate',
+  levelsFixed: 'math/levelsFixed',
 };
 
 /** Registry id for one layer effect kind, or null when unmapped. */
@@ -91,7 +104,8 @@ export function sceneFxCost(kinds) {
 export function activeFxKinds(layers) {
   const out = [];
   for (const l of layers || []) {
-    if (!l || l.type !== 'fx' || l.visible === false) continue;
+    // #1010 — MATH tracks cost like FX tracks (tier-3 tone ops).
+    if (!l || (l.type !== 'fx' && l.type !== 'math') || l.visible === false) continue;
     for (const fx of l.effects || []) {
       if (fx && typeof fx.kind === 'string') out.push(fx.kind);
     }

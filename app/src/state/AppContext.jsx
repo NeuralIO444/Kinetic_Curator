@@ -179,6 +179,14 @@ export function useApp(selector) {
       case A.FX_EFFECT_REMOVE: return store.fxEffectRemove(action.layerId, action.index);
       case A.FX_EFFECT_REORDER: return store.fxEffectReorder(action.layerId, action.index, action.delta);
       case A.FX_EFFECT_SET_PARAM: return store.fxEffectSetParam(action.layerId, action.index, action.key, action.value);
+      case A.ADD_MATH_LAYER: return store.addMathLayer();
+      case A.SET_SELECTED_MATH_LAYER: return store.setSelectedMathLayer(action.id);
+      case A.MATH_EFFECT_ADD: return store.mathEffectAdd(action.layerId, action.kind);
+      case A.MATH_EFFECT_REMOVE: return store.mathEffectRemove(action.layerId, action.index);
+      case A.MATH_EFFECT_REORDER: return store.mathEffectReorder(action.layerId, action.index, action.delta);
+      case A.MATH_EFFECT_SET_KIND: return store.mathEffectSetKind(action.layerId, action.index, action.kind);
+      case A.MATH_EFFECT_SET_PARAM: return store.mathEffectSetParam(action.layerId, action.index, action.key, action.value);
+      case A.MATH_EFFECT_SET_MOD: return store.mathEffectSetMod(action.layerId, action.index, action.key, action.mod);
       case A.SAVE_USER_PALETTE: return store.saveUserPalette(action.name);
       case A.DELETE_USER_PALETTE: return store.deleteUserPalette(action.id);
       case A.RENAME_USER_PALETTE: return store.renameUserPalette(action.id, action.name);

@@ -109,6 +109,7 @@ node src/state/beatArbiter.selfcheck.mjs
 node src/state/euclid.selfcheck.mjs
 node src/state/showrunner.selfcheck.mjs
 node src/fx/fxFilters.selfcheck.mjs
+node src/fx/mathFilters.selfcheck.mjs
 node src/fx/printPost.selfcheck.mjs
 node src/gl/renderFault.selfcheck.mjs
 node src/gl/sceneContract.selfcheck.mjs
@@ -123,6 +124,7 @@ node src/gl/bridge/bridge.selfcheck.mjs
 node src/gl/effects/template.selfcheck.mjs
 node src/gl/effects/chunks.selfcheck.mjs
 node src/gl/effects/fxShaders.selfcheck.mjs
+node src/gl/effects/mathShaders.selfcheck.mjs
 node src/gl/bridge/fxUniforms.selfcheck.mjs
 node src/gl/effects/oklch.selfcheck.mjs
 node src/gl/composite.selfcheck.mjs
