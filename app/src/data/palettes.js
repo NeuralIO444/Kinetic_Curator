@@ -391,3 +391,31 @@ export function resolvePalette(paletteId, overrides = null, extra = []) {
     dirty: !!(overrides && (overrides.swatches || overrides.bg || overrides.ink)),
   };
 }
+
+/**
+ * The KIN roll pool (#952): every system palette id, then saved user palette
+ * ids. System first, deduped — a user entry shadowing a catalog id resolves
+ * to the catalog palette via getCatalogPalette, so it gets one slot.
+ *
+ * @param {Array<{id?: string}>} [userPalettes]
+ * @returns {string[]}
+ */
+export function paletteRollPoolIds(userPalettes = []) {
+  const seen = new Set();
+  const ids = [];
+  for (const p of PALETTES) {
+    if (p && !seen.has(p.id)) {
+      seen.add(p.id);
+      ids.push(p.id);
+    }
+  }
+  if (Array.isArray(userPalettes)) {
+    for (const p of userPalettes) {
+      if (p && typeof p.id === 'string' && p.id && !seen.has(p.id)) {
+        seen.add(p.id);
+        ids.push(p.id);
+      }
+    }
+  }
+  return ids;
+}

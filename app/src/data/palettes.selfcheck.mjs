@@ -1,6 +1,7 @@
 // node src/data/palettes.selfcheck.mjs
 import assert from 'node:assert';
-import { PALETTES, resolvePalette, normalizeHex, getCatalogPalette } from './palettes.js';
+import { PALETTES, resolvePalette, normalizeHex, getCatalogPalette, paletteRollPoolIds } from './palettes.js';
+import { chipWindowStart } from '../components/paletteChipWindow.mjs';
 
 const id = 'praystation';
 const base = getCatalogPalette(id);
@@ -88,6 +89,49 @@ for (const [pid, name] of [['sepia-plate', 'SEPIA PLATE'], ['lithograph', 'LITHO
   }
   // The ink is in the ramp, so a lit facet and its own fill agree.
   assert.ok(cs.swatches.includes(cs.ink), 'the ink must also be a swatch');
+}
+
+// ── #952 KIN roll pool + strip window ───────────────────────────────────────
+// The roll pool is all 37 system palettes plus saved user palettes, system
+// first, deduped. The strip window always keeps the active palette visible.
+{
+  assert.strictEqual(PALETTES.length, 37, `37 system palettes ship, got ${PALETTES.length}`);
+  assert.strictEqual(new Set(PALETTES.map((p) => p.id)).size, 37, 'system ids unique');
+
+  const pool = paletteRollPoolIds();
+  assert.strictEqual(pool.length, 37, 'no user palettes → 37');
+  assert.deepStrictEqual(pool, PALETTES.map((p) => p.id), 'system ids, catalog order');
+  assert.strictEqual(pool[0], 'praystation', 'ORIGIN first');
+
+  const withUsers = paletteRollPoolIds([
+    { id: 'user-abc', name: 'MINE' },
+    { id: 'user-def', name: 'YOURS' },
+  ]);
+  assert.strictEqual(withUsers.length, 39, '37 + 2 user palettes');
+  assert.deepStrictEqual(withUsers.slice(0, 37), PALETTES.map((p) => p.id), 'system first');
+  assert.deepStrictEqual(withUsers.slice(37), ['user-abc', 'user-def'], 'user ids appended');
+
+  const deduped = paletteRollPoolIds([
+    { id: 'v01d', name: 'shadow' }, // shadows a catalog id → one slot
+    { id: 'user-abc', name: 'MINE' },
+    { id: 'user-abc', name: 'dupe' },
+    null,
+    { id: '' },
+    { name: 'no id' },
+  ]);
+  assert.strictEqual(deduped.length, 38, 'shadow + junk collapse to one user slot');
+  assert.ok(deduped.includes('user-abc'), 'valid user id kept');
+  assert.strictEqual(deduped.filter((x) => x === 'v01d').length, 1, 'no double v01d');
+
+  const CAP = 4;
+  assert.strictEqual(chipWindowStart(37, 0, CAP), 0, 'first chip → head window');
+  assert.strictEqual(chipWindowStart(37, 3, CAP), 0, 'last head chip → head window');
+  assert.strictEqual(chipWindowStart(37, 4, CAP), 1, 'chip 5 slides window to 1..4');
+  assert.strictEqual(chipWindowStart(37, 10, CAP), 7, 'chip 11 → window 7..10');
+  assert.strictEqual(chipWindowStart(37, 36, CAP), 33, 'last chip → window 33..36');
+  assert.strictEqual(chipWindowStart(3, 2, CAP), 0, 'fewer than cap → no slide');
+  assert.strictEqual(chipWindowStart(37, -1, CAP), 0, 'unknown active id → head window');
+  assert.strictEqual(chipWindowStart(37, 0, 0), 0, 'degenerate cap → 0');
 }
 
 console.log('palettes.selfcheck: OK');

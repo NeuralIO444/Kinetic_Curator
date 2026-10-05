@@ -5,6 +5,7 @@ import { useHotkeys } from '../hooks/useHotkeys.js';
 import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
+import { chipWindowStart } from './paletteChipWindow.mjs';
 import { CuratorBar } from '../panels/layout/CuratorBar.jsx';
 import { BeatButton } from './BeatButton.jsx';
 
@@ -77,7 +78,13 @@ export function PaletteStrip() {
   // #624 + #625 — the color mode lives in the store now: the GL loop reads it to
   // drive the WASH/INJECT soaks. (It used to be component-local and never left.)
   const colorMode = useStore((s) => s.colorMode) || 'FADE';
-  const visible = (palettes || []).slice(0, CHIP_CAP);
+  // #952 — the roll can land on any of the 37+ palettes, but the strip only
+  // shows CHIP_CAP chips. Slide the window so the active palette is always
+  // visible: highlight + name in the readout, tracking every KIN tap.
+  const all = palettes || [];
+  const activeIndex = all.findIndex((p) => p.id === palette.id);
+  const winStart = chipWindowStart(all.length, activeIndex, CHIP_CAP);
+  const visible = all.slice(winStart, winStart + CHIP_CAP);
   const activeChipRef = useRef(null);
 
   useEffect(() => {

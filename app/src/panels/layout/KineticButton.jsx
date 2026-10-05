@@ -3,9 +3,10 @@
 //
 // Tap routing (#945): every tap runs through the heat model
 // (routeKineticTapHeat in kineticHeat.mjs). A cool tap is a RULES pass — a
-// restrained structural reworking. A second tap while warm (~2s) is a WEATHER
-// pass — palette weather, light mood, atmospheric FX over the same structure.
-// Sustained rapid tapping (each tap <600ms after the last) builds heat; past
+// restrained structural reworking plus a fresh palette from the full pool
+// (#952: every KIN tap deals a new palette). A second tap while warm (~2s)
+// is a WEATHER pass — palette weather, light mood, atmospheric FX over the
+// same structure. Sustained rapid tapping (each tap <600ms after the last) builds heat; past
 // the weather layer it breaks the CHAOS ceiling — the full kitchen-sink
 // re-roll (kineticRoll: seed, palette, composition, mode, FX chain, blend
 // modes, assets, density/count, behave) — in one undo step.
