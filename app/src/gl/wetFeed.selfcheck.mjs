@@ -9,6 +9,8 @@ import {
   FEED_WET_FS,
   GLOW_FS,
   GLOW_WET_FS,
+  OVER_FS,
+  OVER_WET_FS,
   mirrorAccumStep,
 } from './accum.mjs';
 
@@ -87,6 +89,34 @@ ok('wet mirror moves a mark and darkens a half-dry edge', () => {
     params: accumRecipeParams({ fade: 1, wetStep: 1, wetGain: 0, wetAmount: 1, wetVel: vel, wetMask: mask }),
   });
   assert.ok(edged[0] < 0.8, `drying edge darkened (${edged[0]})`);
+});
+
+ok('dry over does not mix; wet over makes a third color', () => {
+  assert.doesNotMatch(OVER_FS, /u_wetMask/);
+  assert.match(OVER_WET_FS, /pigment/);
+  const w = 2, h = 2;
+  const frame = new Float64Array(w * h * 4);
+  const accum = new Float64Array(w * h * 4);
+  // Incoming blue over resident red, both opaque.
+  frame[2] = 1; frame[3] = 1;
+  accum[0] = 1; accum[3] = 1;
+  const mask = { n: 2, rgba: new Uint8Array(16) };
+  mask.rgba[0] = 255; mask.rgba[3] = 255;
+  const dry = mirrorAccumStep({
+    accum, frame, w, h,
+    params: accumRecipeParams({ fade: 1 }),
+  });
+  const mixed = mirrorAccumStep({
+    accum, frame, w, h,
+    params: accumRecipeParams({
+      fade: 1, wetStep: 1, wetGain: 0, wetAmount: 1, wetVel: mask, wetMask: mask,
+    }),
+  });
+  // Dry source-over keeps the incoming blue.
+  assert.ok(dry[2] > 0.9 && dry[0] < 0.05, `dry stayed blue (${dry[0]}, ${dry[2]})`);
+  // Wet mix is neither pure blue nor white.
+  assert.ok(mixed[0] > dry[0] + 0.05 && mixed[2] > 0.4, `mix kept both pigments (${mixed[0]}, ${mixed[2]})`);
+  assert.ok(mixed[0] + mixed[1] + mixed[2] < 2.2, 'mix did not stack toward white');
 });
 
 console.log(`wetFeed.selfcheck: ${n} checks passed`);
