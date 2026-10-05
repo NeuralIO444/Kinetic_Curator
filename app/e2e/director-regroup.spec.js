@@ -10,14 +10,28 @@ test('DIRECTOR: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE pr
   await page.getByRole('tab', { name: /director/i }).click();
   const panel = page.locator('.panel-davis');
 
-  // three labelled sections, in order
-  await expect(panel.locator('.davis-section-label')).toHaveText(['VOICES', 'GENERATE', 'PERFORM']);
+  // four labelled sections, in order (UX-7: TRAILS surfaces the ACCUM toggle
+  // + gestures in-panel, so FREEZE/CLEAR/SWELL are reachable from DIRECTOR)
+  await expect(panel.locator('.davis-section-label')).toHaveText(['VOICES', 'GENERATE', 'PERFORM', 'TRAILS']);
 
   // nothing deleted: every existing control is findable
   await expect(panel.locator('.voice-chip.flagship')).toHaveCount(4);
   for (const name of ['EVOLVE', 'FAVORITE', 'NEW SEED', 'SPATIAL', 'COLOR', 'ASSET', 'NOISE']) {
     await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
   }
+
+  // UX-7: the gesture row is always reachable — ACCUM toggle in-panel, and
+  // FREEZE/CLEAR/SWELL wait on ACCUM (disabled, not gone) instead of vanishing
+  const accumBtn = panel.getByRole('button', { name: 'ACCUM', exact: true });
+  await expect(accumBtn).toBeVisible();
+  for (const name of ['FREEZE', 'CLEAR', 'SWELL']) {
+    await expect(panel.getByRole('button', { name, exact: true })).toBeDisabled();
+  }
+  await accumBtn.click();
+  for (const name of ['FREEZE', 'CLEAR', 'SWELL']) {
+    await expect(panel.getByRole('button', { name, exact: true })).toBeEnabled();
+  }
+  await accumBtn.click(); // back off — the rest of the spec expects ACCUM off
 
   // stopped: honest idle
   await expect(panel.locator('.davis-progress')).toContainText('EVOLVE idle');
