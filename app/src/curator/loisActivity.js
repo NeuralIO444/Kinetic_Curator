@@ -58,6 +58,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     rolls: [], // ts of curate + KINETIC taps
     keeps: [], // ts of favorite adds
     undos: [], // ts
+    seedRevisit: false,
   };
   const unsubs = [];
   let removeDomListeners = null;
@@ -74,7 +75,9 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       s.dwells.push({ seed: s.dwell.seed, comp: s.dwell.comp, ms: at - s.dwell.startedAt });
       cap(s.dwells);
     }
+    const seen = s.dwells.some((d) => d.seed === seed);
     s.dwell = { seed, comp, startedAt: at };
+    s.seedRevisit = seen && s.seed !== seed;
     if (s.seed !== seed) {
       s.seed = seed;
       s.seedSetAt = at;
@@ -93,6 +96,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       tabHidden: s.tabHidden,
       dwellMs: s.dwell ? at - s.dwell.startedAt : 0,
       dwellSeed: s.dwell ? s.dwell.seed : null,
+      seedRevisit: !!s.seedRevisit,
       lastDwellMs: s.dwells.length ? s.dwells[s.dwells.length - 1].ms : 0,
       lastFavorite: last,
       favoriteCount: s.favorites.length,

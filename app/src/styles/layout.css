@@ -182,6 +182,22 @@
 .logo-accent { color: var(--accent); }
 .logo-version { color: var(--dimmer); font-size: 9px; margin-left: 2px; }
 
+.lois-pill {
+  display: inline-flex; align-items: center; justify-content: flex-start; gap: 4px;
+  width: 168px; height: 18px; box-sizing: border-box;
+  padding: 0 6px; flex: 0 0 168px;
+  border: 1px solid #1A1A1A; background: #1A1A1A;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  font-family: "Arial Narrow", "Helvetica Neue", Impact, sans-serif;
+  white-space: nowrap; overflow: hidden;
+}
+.lois-pill[data-tone="ink"] { color: #6b655c; }
+.lois-pill[data-tone="cream"] { color: #F2EAD8; }
+.lois-pill[data-tone="mustard"] { color: #D9A441; }
+.lois-face { flex: 0 0 78px; width: 78px; text-align: center; overflow: hidden; }
+.lois-word { flex: 0 0 32px; }
+.lois-dot { flex: 0 0 8px; text-align: center; }
+.lois-code { flex: 0 0 36px; }
 .status-pill {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 2px 7px;

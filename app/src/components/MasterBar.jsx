@@ -8,6 +8,7 @@ import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import * as A from '../state/actions.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
+import { LoisPill } from './LoisPill.jsx';
 
 export function MasterBar() {
   const { dispatch, history } = useApp();
@@ -78,6 +79,7 @@ export function MasterBar() {
   return (
     <div className="master-bar">
       <div className="master-left">
+        <LoisPill />
         {state.isRecording ? (
           <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
             title={helpText('output-webm')}>
