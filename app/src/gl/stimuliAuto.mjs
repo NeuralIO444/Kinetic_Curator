@@ -2,8 +2,12 @@
 //
 // Pure. The panel listens, folds peaks into a snapshot, and asks this module
 // what to route. Dead bands (BAND AIR with no signal) are never picked while
-// something else has energy. Silence still arms a coarse starter so the first
-// hit has somewhere to go — the panel says so.
+// something else has energy.
+//
+// Silence is a NO-OP (#980: "if audio is off or the signal is silent, say so
+// plainly, change nothing"): nothing above the floor returns `routes: null`,
+// and the panel reports it instead of arming anything. Same for RETUNE on an
+// empty table.
 //
 // A retune pass keeps live routes and only rewrites dead inputs or ~0 depths.
 
@@ -15,20 +19,27 @@ export const ENERGY_FLOOR = 0.04;
 /** A route depth this close to 0 cannot move the canvas. */
 export const DEPTH_FLOOR = 0.001;
 
-/** Visible targets, in the order a starter assigns them. */
+/** Visible targets, in the order a starter assigns them (#980 decision 4:
+ * scale, alpha, squash, breath, light, accum — `color.hue`, `clock.kinemeRate`
+ * and glow are not starter targets). At most STARTER_MAX routes are built. */
 export const STARTER_TARGETS = Object.freeze([
-  'render.scale', 'render.alpha', 'render.glow', 'color.hue',
+  'render.scale', 'render.alpha', 'render.squash', 'render.breath',
+  'light.intensity', 'render.accum',
 ]);
+
+/** A starter fills at most one slot per fair target (#980 decision 4 lists
+ * six, so the cap is six — the draft spec's "≤ 5" was a suggestion, and a cap
+ * below the target count would leave one of them unreachable). */
+export const STARTER_MAX = 6;
 
 /** Depths in the target's natural units — enough to see, inside the clamp. */
 export const STARTER_DEPTH = Object.freeze({
   'render.scale': 0.45,
   'render.alpha': 16,
-  'render.glow': 0.7,
-  'color.hue': 28,
+  'render.squash': 0.4,
   'render.breath': 0.035,
-  'clock.kinemeRate': 1.5,
   'light.intensity': 0.35,
+  'render.accum': 6,
 });
 
 const BAND_KEYS = Object.freeze(['sub', 'bass', 'mud', 'mids', 'edge', 'pres', 'air']);
@@ -88,24 +99,22 @@ function route(input, target) {
 }
 
 /**
- * Starter table from a listen snapshot.
- * @returns {{ routes: Array, heard: boolean, picked: string[] }}
+ * Starter table from a listen snapshot. Silence is a no-op: nothing above the
+ * floor returns `routes: null`, so the panel says so and changes nothing.
+ * @returns {{ routes: Array|null, heard: boolean, picked: string[] }}
  */
 export function autoSetupRoutes(snap) {
   const hot = rank(snap).filter((r) => r.energy >= ENERGY_FLOOR);
-  const heard = hot.length > 0;
-  const picked = (heard ? hot : rank(snap).filter((r) => COARSE_INPUTS.includes(r.id)).slice(0, 3))
-    .map((r) => r.id);
-  const inputs = picked.length ? picked : ['beat', 'bass', 'level'];
+  if (hot.length === 0) return { routes: null, heard: false, picked: [] };
+  const inputs = hot.map((r) => r.id).slice(0, STARTER_MAX);
   const routes = [];
   if (inputs.length === 1) {
-    for (const target of ['render.scale', 'render.alpha', 'render.glow']) routes.push(route(inputs[0], target));
+    // One hot input on three axes, all of them fair game per decision 4.
+    for (const target of ['render.scale', 'render.alpha', 'render.squash']) routes.push(route(inputs[0], target));
   } else {
-    inputs.slice(0, STARTER_TARGETS.length).forEach((input, i) => {
-      routes.push(route(input, STARTER_TARGETS[i]));
-    });
+    inputs.forEach((input, i) => routes.push(route(input, STARTER_TARGETS[i])));
   }
-  return { routes, heard, picked: inputs.slice(0, routes.length) };
+  return { routes, heard: true, picked: inputs.slice(0, routes.length) };
 }
 
 /** Indexes whose input is silent, or whose depth cannot move anything. */
@@ -129,7 +138,9 @@ export function retuneRoutes(routes, snap) {
   const table = Array.isArray(routes) ? routes.map((r) => ({ ...r })) : [];
   if (!table.length) {
     const built = autoSetupRoutes(snap);
-    return { routes: built.routes, changed: true, fixed: built.routes.length, note: built.heard ? 'armed from the live input' : 'no signal — coarse starter armed' };
+    // No signal: RETUNE changes nothing either (#980 — say so, don't arm).
+    if (!built.heard) return { routes: null, changed: false, fixed: 0, note: 'no signal — turn the mic on and play something' };
+    return { routes: built.routes, changed: true, fixed: built.routes.length, note: 'armed from the live input' };
   }
   const used = new Set(table.map((r) => r.input));
   const spare = rank(snap).filter((r) => r.energy >= ENERGY_FLOOR && !used.has(r.id));
@@ -165,5 +176,8 @@ export function starterMovesScale(routes, snap, master = { depth: 0.65, scaleMod
     mid: inputEnergy('mid', snap),
     treble: inputEnergy('treble', snap),
   }, master, routes, snap?.bands || null);
-  return out.scaleMul > 1.02 || out.alphaBoost > 0.5 || out.glow > 0.05 || Math.abs(out.hue || 0) > 1;
+  // The starter's own targets (#980 decision 4): scale, alpha, squash, breath,
+  // light, accum. glow and hue are not starter targets, so they are not read.
+  return out.scaleMul > 1.02 || out.alphaBoost > 0.5
+    || (out.squash ?? 0) > 0.05 || (out.accum ?? 0) > 0.5 || (out.sun ?? 0) > 0.05;
 }

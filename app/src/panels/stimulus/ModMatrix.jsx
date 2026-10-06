@@ -27,6 +27,9 @@ const TARGET_LABEL = { 'render.scale': 'scale', 'render.alpha': 'alpha', 'render
 const PICKABLE_TARGETS = Object.keys(ROUTE_TARGETS).filter((id) => TARGET_LABEL[id]);
 const LISTEN_MS = 1500;
 const LISTEN_CAP_MS = 8000;
+// #980 spec item 5, voice 3: what AUTO and RETUNE both say when there is
+// nothing to route. They say it and change nothing.
+const NO_SIGNAL = 'no signal — turn the mic on and play something';
 
 function Row({ row, route, index, table, onEdit }) {
   const range = routeDepthRange(route.target);
@@ -92,9 +95,11 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   useEffect(() => () => { listenRef.current += 1; }, []);
 
   // Retune agent: while audio is on, notice routes parked on silence or depth ~ 0.
-  // Suggest only — a tap applies the fix (one undo step).
+  // Suggest only — a tap applies the fix (one undo step). Nothing is cleared in
+  // the effect body (react-hooks/set-state-in-effect): with audio off there is
+  // no watch and the suggestion is simply not shown — derived at render below.
   useEffect(() => {
-    if (!audioEnabled) { setAdvice(null); return undefined; }
+    if (!audioEnabled) return undefined;
     const id = setInterval(() => {
       const live = editableRoutes(useStore.getState().audioRoutes);
       const snap = readSnap();
@@ -109,8 +114,13 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
     return () => clearInterval(id);
   }, [audioEnabled, routes]);
 
+  // Audio off ⇒ no watch ran, so any advice on file is stale (a 1s-old
+  // suggestion at worst); the interval refreshes it as soon as audio returns.
+  const shownAdvice = audioEnabled ? advice : null;
+
+  // Masters that would bury a starter. Raised only when a starter is actually
+  // applied: with audio off or with no signal, AUTO changes nothing (#980).
   const armMasters = () => {
-    if (!audioEnabled) emit(Events.AUDIO_TOGGLE, true);
     if (depth < 0.25) emit(Events.LAYOUT_PARAM, { key: 'audioModDepth', value: 0.65 });
     if (scaleMod < 0.2) emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 0.45 });
     if (alphaMod < 0.15) emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: 0.25 });
@@ -119,7 +129,9 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   };
 
   const autoSetup = () => {
-    armMasters();
+    // #980, spec item 5: audio off or signal silent ⇒ say so plainly, change
+    // nothing. The listen only runs when there is something to listen to.
+    if (!audioEnabled) { setStatus(NO_SIGNAL); return; }
     const token = ++listenRef.current;
     setStatus('listening');
     setAdvice(null);
@@ -129,11 +141,12 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       if (token !== listenRef.current) return;
       peaks = absorbPeaks(peaks, readSnap());
       const elapsed = performance.now() - started;
-      const heard = autoSetupRoutes(peaks).heard;
-      if ((heard && elapsed >= LISTEN_MS) || elapsed >= LISTEN_CAP_MS) {
+      if ((autoSetupRoutes(peaks).heard && elapsed >= LISTEN_MS) || elapsed >= LISTEN_CAP_MS) {
         const built = autoSetupRoutes(peaks);
+        if (!built.heard) { setStatus(NO_SIGNAL); return; } // silence: nothing to route
+        armMasters();
         setAudioRoutes(built.routes);
-        setStatus(built.heard ? `routed ${built.picked.map(INPUT_LABEL).join(' · ')}` : 'no signal yet — coarse starter armed');
+        setStatus(`routed ${built.picked.map(INPUT_LABEL).join(' · ')}`);
         return;
       }
       requestAnimationFrame(tick);
@@ -159,7 +172,7 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       ))}
       <div className="stim-matrix-foot">
         <button type="button" className="chip-btn" onClick={autoSetup}
-          title="Listen to the live input and build a starter routing from whatever has energy">AUTO</button>
+          title="Listen to the live input and build a starter routing from whatever has energy. No signal: it says so and changes nothing.">AUTO</button>
         <button type="button" className="chip-btn" disabled={full} onClick={() => editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; }, false)}
           title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}>+ ROUTE</button>
         <button type="button" className="chip-btn" disabled={table.length === 0} onClick={() => setAudioRoutes([])}
@@ -170,9 +183,9 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
         {unrouted.length > 0 && <span className="stim-matrix-unrouted" title="Inputs no route reads">not routed: {unrouted.map((id) => id.toUpperCase()).join(' · ')}</span>}
       </div>
       {status && <div className="stim-matrix-unrouted" role="status">{status}</div>}
-      {advice && (
+      {shownAdvice && (
         <div className="stim-matrix-unrouted" role="status">
-          {advice.names.join(' · ')} {advice.dead === 1 ? 'is' : 'are'} silent.
+          {shownAdvice.names.join(' · ')} {shownAdvice.dead === 1 ? 'is' : 'are'} silent.
           <button type="button" className="chip-btn" onClick={retune} title="Move dead routes onto inputs that have energy, and raise a depth of 0">RETUNE</button>
         </div>
       )}
