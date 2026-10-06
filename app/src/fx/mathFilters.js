@@ -217,6 +217,20 @@ export function mathTrackWetCeiling(layer) {
   return 1;
 }
 
+/**
+ * #1023 — what the wet slider may show for a track. `cap` is the ceiling the
+ * renderer enforces; `wet` is the stored value clamped to it, i.e. the value
+ * the renderer will actually honor. The STORED opacity is never rewritten, so
+ * removing HUE ROTATE brings the performer's own setting back.
+ * @returns {{cap:number, wet:number, capped:boolean}}
+ */
+export function wetDisplay(layer) {
+  const cap = mathTrackWetCeiling(layer);
+  const stored = layer && layer.layerOpacity != null ? Number(layer.layerOpacity) : NaN;
+  const base = Number.isFinite(stored) ? Math.min(1, Math.max(0, stored)) : 1;
+  return { cap, wet: Math.min(base, cap), capped: cap < 1 };
+}
+
 /** Artist-unit readout for one knob value: stops, degrees, steps, or plain. */
 export function formatMathParam(kind, key, value) {
   const p = MATH_EFFECT_DEFS[kind]?.params[key];
