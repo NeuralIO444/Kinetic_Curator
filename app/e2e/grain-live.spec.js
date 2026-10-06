@@ -3,31 +3,33 @@
 // adding GRAIN moved the slider and changed nothing on screen.
 import { test, expect } from '@playwright/test';
 
-// High-frequency energy of the frame the app just drew: mean |pixel - mean of its
-// 4 neighbours| on the live GL canvas. Film grain is high-frequency noise, so it
-// multiplies this number. The read happens in a requestAnimationFrame callback
-// queued AFTER the app's own, so it sees this frame's drawing buffer (a WebGL
-// canvas reads back blank once the frame has been composited). Reading the buffer
-// rather than a screenshot also keeps the browser's downscaling from averaging the
-// grain away.
+// High-frequency energy of the canvas as the browser shows it: mean |pixel - mean of
+// its 4 neighbours| on a screenshot of the GL canvas. Film grain is high-frequency
+// noise, so it multiplies this number. A screenshot goes through the compositor, so
+// it works wherever the page does; reading the WebGL drawing buffer from a
+// requestAnimationFrame callback returned an all-zero buffer on CI's software GL
+// (baseline 0.000) even though it worked locally, because a WebGL canvas reads back
+// blank once the frame has been composited. The viewport is large so the canvas is
+// shown at or above its native size and the browser does not downscale the grain away.
 async function hfEnergy(page) {
-  return page.evaluate(() => new Promise((resolve) => {
-    const canvas = document.querySelector('canvas.canvas-gl');
-    const gl = canvas.getContext('webgl2');
-    const read = () => {
-      const w = gl.drawingBufferWidth; const h = gl.drawingBufferHeight;
-      const px = new Uint8Array(w * h * 4);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      const L = (x, y) => { const i = (y * w + x) * 4; return 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]; };
-      let sum = 0; let n = 0;
-      for (let y = 1; y < h - 1; y += 2) for (let x = 1; x < w - 1; x += 2) {
-        sum += Math.abs(L(x, y) - (L(x - 1, y) + L(x + 1, y) + L(x, y - 1) + L(x, y + 1)) / 4);
-        n++;
-      }
-      resolve(sum / n);
-    };
-    requestAnimationFrame(() => requestAnimationFrame(read));
-  }));
+  const png = await page.locator('canvas.canvas-gl').screenshot();
+  return page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height);
+    const L = (x, y) => { const i = (y * width + x) * 4; return 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]; };
+    let sum = 0; let n = 0;
+    for (let y = 1; y < height - 1; y += 2) for (let x = 1; x < width - 1; x += 2) {
+      sum += Math.abs(L(x, y) - (L(x - 1, y) + L(x + 1, y) + L(x, y - 1) + L(x, y + 1)) / 4);
+      n++;
+    }
+    return sum / n;
+  }, png.toString('base64'));
 }
 
 async function avgEnergy(page, frames = 3) {
@@ -37,6 +39,7 @@ async function avgEnergy(page, frames = 3) {
 }
 
 test('adding GRAIN visibly changes the canvas with ACCUM off', async ({ page }) => {
+  await page.setViewportSize({ width: 2400, height: 1500 }); // canvas shown at >= native size
   await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
@@ -44,6 +47,7 @@ test('adding GRAIN visibly changes the canvas with ACCUM off', async ({ page }) 
   await page.waitForTimeout(800); // let the first frames land
 
   const before = await avgEnergy(page);
+  expect(before, 'the canvas rendered something before grain was added').toBeGreaterThan(0.05);
 
   // FX 1..4: the fourth track is the Finish family, which holds grain.
   const stack = page.locator('.build-layer-stack');
