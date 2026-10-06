@@ -11,6 +11,7 @@ import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read th
 // #273/#274: response curves at the panel→state boundary. Stored params stay
 // in physical units; only the slider position is remapped.
 const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
+import { RangeRow } from '../../components/RangeRow.jsx';
 const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #317 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
 
 export function AccumFamily({ layoutParams }) {
@@ -41,9 +42,8 @@ export function AccumFamily({ layoutParams }) {
         ))}
         <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }} title={helpText('layout-echoes')}>
           ECHOES
-          <input type="range" min={0} max={4} step={1} value={layoutParams.echoes ?? 0}
-            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'echoes', value: parseFloat(e.target.value) })}
-            style={{ width: 64 }} />
+          <RangeRow layout="bare" tone="ink" className="accum-slider" min={0} max={4} step={1} value={layoutParams.echoes ?? 0}
+            onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'echoes', value: v })} />
         </label>
         </>
       )}
@@ -51,20 +51,18 @@ export function AccumFamily({ layoutParams }) {
         <label className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
           title={helpText('layout-leave-fade')}>
           TRAIL FADE
-          <input type="range" min={0} max={0.2} step={0.01}
+          <RangeRow layout="bare" tone="ink" className="accum-slider" min={0} max={0.2} step={0.01}
             value={layoutParams.leaveFade ?? 0}
-            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: 'leaveFade', value: parseFloat(e.target.value) })}
-            style={{ width: 64 }} />
+            onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'leaveFade', value: v })} />
         </label>
       )}
       {layoutParams.trail === 'leave' && ['tunnel', 'prism', 'flow'].map((name) => (
         <label key={name} className="tg" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}
           title={`${name} fade. Zero keeps the effect. Higher lets it die. Accum is unchanged.`}>
           {name.toUpperCase()} FADE
-          <input type="range" min={0} max={1} step={0.01}
+          <RangeRow layout="bare" tone="ink" className="accum-slider" min={0} max={1} step={0.01}
             value={layoutParams[`${name}Fade`] ?? 0}
-            onChange={(e) => emit(Events.LAYOUT_PARAM, { key: `${name}Fade`, value: parseFloat(e.target.value) })}
-            style={{ width: 64 }} />
+            onChange={(v) => emit(Events.LAYOUT_PARAM, { key: `${name}Fade`, value: v })} />
         </label>
       ))}
 
@@ -75,19 +73,17 @@ export function AccumFamily({ layoutParams }) {
           title="Trail persistence in frames of half-life (1 = strobe, 40 = long exposure)"
         >
           ACCUM FADE
-          <input
-            type="range"
+          <RangeRow layout="bare" tone="ink" className="accum-slider"
             min={0}
             max={1}
             step={0.01}
             value={fadeTaper.toSlider(layoutParams.accumulationFade ?? 5.4)}
-            onChange={(e) =>
+            onChange={(v) =>
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationFade',
-                value: fadeTaper.toParam(parseFloat(e.target.value)),
+                value: fadeTaper.toParam(v),
               })
             }
-            style={{ width: 64 }}
           />
         </label>
       )}
@@ -98,19 +94,17 @@ export function AccumFamily({ layoutParams }) {
           title="ACCUM optics: bloom + halation + blur-over-time on the trail buffer (0 = off). Effective glow = slider² — full travel is usable; audio can't peg it."
         >
           GLOW
-          <input
-            type="range"
+          <RangeRow layout="bare" tone="ink" className="accum-slider"
             min={0}
             max={1}
             step={0.01}
             value={glowTaper.toSlider(layoutParams.accumulationOptics ?? 0)}
-            onChange={(e) =>
+            onChange={(v) =>
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationOptics',
-                value: glowTaper.toParam(parseFloat(e.target.value)),
+                value: glowTaper.toParam(v),
               })
             }
-            style={{ width: 64 }}
           />
         </label>
       )}
@@ -121,19 +115,17 @@ export function AccumFamily({ layoutParams }) {
           title={helpText('layout-wetness')}
         >
           WETNESS
-          <input
-            type="range"
+          <RangeRow layout="bare" tone="ink" className="accum-slider"
             min={0}
             max={1}
             step={0.01}
             value={layoutParams.accumulationWetness ?? 0}
-            onChange={(e) =>
+            onChange={(v) =>
               emit(Events.LAYOUT_PARAM, {
                 key: 'accumulationWetness',
-                value: parseFloat(e.target.value),
+                value: v,
               })
             }
-            style={{ width: 64 }}
           />
         </label>
       )}
@@ -145,19 +137,17 @@ export function AccumFamily({ layoutParams }) {
             title="TUNNEL: per-frame zoom + spin of the trail buffer — motion spirals into light-tunnels (0 = off)"
           >
             TUNNEL
-            <input
-              type="range"
+            <RangeRow layout="bare" tone="ink" className="accum-slider"
               min={0}
               max={1}
               step={0.01}
               value={layoutParams.accumulationTunnel ?? 0}
-              onChange={(e) =>
+              onChange={(v) =>
                 emit(Events.LAYOUT_PARAM, {
                   key: 'accumulationTunnel',
-                  value: parseFloat(e.target.value),
+                  value: v,
                 })
               }
-              style={{ width: 64 }}
             />
           </label>
           <label
@@ -165,19 +155,17 @@ export function AccumFamily({ layoutParams }) {
             title="PRISM: trails split into rainbow fringes that separate over time (0 = off)"
           >
             PRISM
-            <input
-              type="range"
+            <RangeRow layout="bare" tone="ink" className="accum-slider"
               min={0}
               max={1}
               step={0.01}
               value={layoutParams.accumulationPrism ?? 0}
-              onChange={(e) =>
+              onChange={(v) =>
                 emit(Events.LAYOUT_PARAM, {
                   key: 'accumulationPrism',
-                  value: parseFloat(e.target.value),
+                  value: v,
                 })
               }
-              style={{ width: 64 }}
             />
           </label>
           <label
@@ -185,19 +173,17 @@ export function AccumFamily({ layoutParams }) {
             title="CURL: advects the trail buffer through the project-seed curl — the same weather as the swarm (0 = off)"
           >
             CURL
-            <input
-              type="range"
+            <RangeRow layout="bare" tone="ink" className="accum-slider"
               min={0}
               max={1}
               step={0.01}
               value={layoutParams.accumulationFlow ?? 0}
-              onChange={(e) =>
+              onChange={(v) =>
                 emit(Events.LAYOUT_PARAM, {
                   key: 'accumulationFlow',
-                  value: parseFloat(e.target.value),
+                  value: v,
                 })
               }
-              style={{ width: 64 }}
             />
           </label>
         </div>

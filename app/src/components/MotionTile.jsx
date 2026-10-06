@@ -58,6 +58,7 @@ export function MotionTile({ kind, label, value, min = 0, max = 1, step = 0.05, 
       <input
         type="range"
         className="single-slider motion-slider"
+        data-tone="ink"
         min={min} max={max} step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}

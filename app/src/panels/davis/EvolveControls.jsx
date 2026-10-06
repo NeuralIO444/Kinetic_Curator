@@ -7,6 +7,7 @@ import {
   ariaNote,
   logShimmer,
 } from '../../shimmer/shimmer.js';
+import { RangeRow } from '../../components/RangeRow.jsx';
 
 // The four EVOLVE mutation targets. Candidate ids match the sidecar's
 // scores.json namespace: { "evolve-target:seed": percentile, ... }.
@@ -126,10 +127,10 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
       <div className="davis-interval-row" style={evolveSource !== 'time' ? { opacity: 0.4 } : undefined}
         title={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}>
         <span className="davis-label">INTERVAL</span>
-        <input type="range" min={200} max={10000} step={100} value={evolveInterval}
+        <RangeRow layout="bare" tone="ink" min={200} max={10000} step={100} value={evolveInterval}
           disabled={evolveSource !== 'time'}
-          title={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}
-          onChange={e => emit(Events.DAVIS_EVOLVE, { interval: Number(e.target.value) })} />
+          hint={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}
+          onChange={(v) => emit(Events.DAVIS_EVOLVE, { interval: v })} />
         <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
       </div>
 

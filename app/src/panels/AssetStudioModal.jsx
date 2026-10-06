@@ -6,6 +6,7 @@ import { traceSilhouette, blendContours, outerLoop, loopsToD, loopsToPath } from
 import { ingestSvg } from '../assets/ingest.js';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
+import { RangeRow } from '../components/RangeRow.jsx';
 
 let seq = 1;
 const SNAP = 10;
@@ -429,8 +430,8 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               </div>
               <label style={lbl} title="Melt the fused joins, metaball-style. 0 is a tight union.">
                 melt {melt}
-                <input type="range" min="0" max="12" step="0.5" value={melt} disabled={!merging}
-                  onChange={(e) => setMelt(+e.target.value)} style={{ width: '100%' }} />
+                <RangeRow layout="bare" tone="ink" min={0} max={12} step={0.5} value={melt} disabled={!merging}
+                  onChange={(v) => setMelt(v)} />
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 <button type="button" className="chip-btn" disabled={!merging || validSubtractKeys.length > 0}
@@ -447,8 +448,8 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               {blendOn && (
                 <label style={lbl} title="Scrub the morph by hand (pauses the animation)">
                   blend {Math.round(blendT * 100)}%
-                  <input type="range" min="0" max="1" step="0.01" value={blendT}
-                    onChange={(e) => { setBlendT(+e.target.value); setBlendHold(true); }} style={{ width: '100%' }} />
+                  <RangeRow layout="bare" tone="ink" min={0} max={1} step={0.01} value={blendT}
+                    onChange={(v) => { setBlendT(v); setBlendHold(true); }} />
                 </label>
               )}
             </div>

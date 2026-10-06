@@ -1,4 +1,5 @@
 import { emit, Events } from '../../composition/eventBus.js';
+import { RangeRow } from '../../components/RangeRow.jsx';
 import { useStore } from '../../state/store.js';
 import { parseAudioEnvelope } from '../../gl/audioEnvelopeCore.mjs';
 import { sourceStatus, sidecarReason } from '../../gl/sourceStatus.mjs';
@@ -97,16 +98,9 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
       )}
 
       <div style={{ marginTop: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '3px' }}>
-          <span>GAIN</span>
-          <span>{audioGain.toFixed(2)}x</span>
-        </div>
-        <input
-          type="range" min="0" max="5" step="0.1"
-          value={audioGain}
-          onChange={e => emit(Events.AUDIO_GAIN, parseFloat(e.target.value))}
-          style={{ width: '100%' }}
-        />
+        <RangeRow layout="stack" tone="stim" label="GAIN" min={0} max={5} step={0.1}
+          value={audioGain} readout={`${audioGain.toFixed(2)}x`} defaultValue={1}
+          onChange={v => emit(Events.AUDIO_GAIN, v)} />
       </div>
     </div>
   );
