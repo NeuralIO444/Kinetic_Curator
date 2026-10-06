@@ -6,10 +6,18 @@
 //
 // The table is scene-level (saved with the project, undoable). Untouched, it is
 // today's routes; the first edit customises it; RESET goes back to the default.
+//
+// #980 — AUTO listens to the live input and writes a starter that uses bands
+// with energy. RETUNE watches for dead routes (silent input, or depth ~ 0)
+// and offers a one-tap fix. Neither runs unless you tap.
+import { useEffect, useRef, useState } from 'react';
 import { audioMatrixRows, ROUTE_TARGETS, COARSE_INPUTS, BAND_INPUTS, MAX_ROUTES } from '../../gl/audioRoutes.mjs';
 import { getShapedBands } from '../../gl/bandFeed.mjs';
+import { absorbPeaks, autoSetupRoutes, deadRouteIndexes, ENERGY_FLOOR, inputEnergy, retuneRoutes, snapshotFromReads } from '../../gl/stimuliAuto.mjs';
+import { readMeterBandLevels } from '../../hooks/audioMeterTap.js';
 import { useStore } from '../../state/store.js';
 import { editableRoutes, nextRoute, patchRoute, removeRoute, routeDepthRange, defaultDepthFor } from '../../data/audioRoutes.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
 const fmt = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(3));
 const INPUT_LABEL = (id) => (id.startsWith('band.') ? `BAND ${id.slice(5).toUpperCase()}` : id.toUpperCase());
@@ -17,6 +25,11 @@ const INPUT_LABEL = (id) => (id.startsWith('band.') ? `BAND ${id.slice(5).toUppe
 // #790: only targets the live loop consumes get picker options (all #790 targets shipped).
 const TARGET_LABEL = { 'render.scale': 'scale', 'render.alpha': 'alpha', 'render.breath': 'breath', 'render.glow': 'frame glow', 'render.accum': 'accum trails', 'color.hue': 'hue rotate', 'clock.kinemeRate': 'kineme rate', 'light.intensity': 'light', 'render.squash': 'squash' };
 const PICKABLE_TARGETS = Object.keys(ROUTE_TARGETS).filter((id) => TARGET_LABEL[id]);
+const LISTEN_MS = 1500;
+const LISTEN_CAP_MS = 8000;
+// #980 spec item 5, voice 3: what AUTO and RETUNE both say when there is
+// nothing to route. They say it and change nothing.
+const NO_SIGNAL = 'no signal — turn the mic on and play something';
 
 function Row({ row, route, index, table, onEdit }) {
   const range = routeDepthRange(route.target);
@@ -58,6 +71,13 @@ function Row({ row, route, index, table, onEdit }) {
   );
 }
 
+function readSnap() {
+  const s = useStore.getState();
+  const shaped = getShapedBands();
+  const meter = readMeterBandLevels() || shaped;
+  return snapshotFromReads({ audioBands: s.audioBands, beatPulse: s.beatPulse, meter });
+}
+
 export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod, alphaMod, routes = null }) {
   const editAudioRoutes = useStore((s) => s.editAudioRoutes);
   const setAudioRoutes = useStore((s) => s.setAudioRoutes);
@@ -68,6 +88,79 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   const full = table.length >= MAX_ROUTES;
   const used = new Set(table.map((r) => r.input));
   const unrouted = COARSE_INPUTS.filter((id) => !used.has(id));
+  const [status, setStatus] = useState(null);
+  const [advice, setAdvice] = useState(null);
+  const listenRef = useRef(0);
+
+  useEffect(() => () => { listenRef.current += 1; }, []);
+
+  // Retune agent: while audio is on, notice routes parked on silence or depth ~ 0.
+  // Suggest only — a tap applies the fix (one undo step). Nothing is cleared in
+  // the effect body (react-hooks/set-state-in-effect): with audio off there is
+  // no watch and the suggestion is simply not shown — derived at render below.
+  useEffect(() => {
+    if (!audioEnabled) return undefined;
+    const id = setInterval(() => {
+      const live = editableRoutes(useStore.getState().audioRoutes);
+      const snap = readSnap();
+      const dead = deadRouteIndexes(live, snap);
+      const hot = inputEnergy('level', snap) >= ENERGY_FLOOR
+        || ['beat', 'bass', 'mid', 'treble'].some((id) => inputEnergy(id, snap) >= ENERGY_FLOOR)
+        || Object.values(snap.bands || {}).some((v) => v >= ENERGY_FLOOR);
+      if (!hot || dead.length === 0) { setAdvice(null); return; }
+      const names = dead.map((i) => INPUT_LABEL(live[i].input)).filter((v, i, a) => a.indexOf(v) === i);
+      setAdvice({ dead: dead.length, names });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [audioEnabled, routes]);
+
+  // Audio off ⇒ no watch ran, so any advice on file is stale (a 1s-old
+  // suggestion at worst); the interval refreshes it as soon as audio returns.
+  const shownAdvice = audioEnabled ? advice : null;
+
+  // Masters that would bury a starter. Raised only when a starter is actually
+  // applied: with audio off or with no signal, AUTO changes nothing (#980).
+  const armMasters = () => {
+    if (depth < 0.25) emit(Events.LAYOUT_PARAM, { key: 'audioModDepth', value: 0.65 });
+    if (scaleMod < 0.2) emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 0.45 });
+    if (alphaMod < 0.15) emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: 0.25 });
+    const gain = useStore.getState().audioGain;
+    if (Number.isFinite(gain) && gain < 0.4) emit(Events.AUDIO_GAIN, 1);
+  };
+
+  const autoSetup = () => {
+    // #980, spec item 5: audio off or signal silent ⇒ say so plainly, change
+    // nothing. The listen only runs when there is something to listen to.
+    if (!audioEnabled) { setStatus(NO_SIGNAL); return; }
+    const token = ++listenRef.current;
+    setStatus('listening');
+    setAdvice(null);
+    const started = performance.now();
+    let peaks = null;
+    const tick = () => {
+      if (token !== listenRef.current) return;
+      peaks = absorbPeaks(peaks, readSnap());
+      const elapsed = performance.now() - started;
+      if ((autoSetupRoutes(peaks).heard && elapsed >= LISTEN_MS) || elapsed >= LISTEN_CAP_MS) {
+        const built = autoSetupRoutes(peaks);
+        if (!built.heard) { setStatus(NO_SIGNAL); return; } // silence: nothing to route
+        armMasters();
+        setAudioRoutes(built.routes);
+        setStatus(`routed ${built.picked.map(INPUT_LABEL).join(' · ')}`);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
+  const retune = () => {
+    const built = retuneRoutes(table, readSnap());
+    if (built.changed) setAudioRoutes(built.routes);
+    setStatus(built.note);
+    setAdvice(null);
+  };
+
   return (
     <div className="stim-matrix" role="table" aria-label="Modulation matrix">
       <div className="stim-matrix-head" role="row">
@@ -78,6 +171,8 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
         <Row key={i} row={row} route={table[i]} index={i} table={table} onEdit={editAudioRoutes} />
       ))}
       <div className="stim-matrix-foot">
+        <button type="button" className="chip-btn" onClick={autoSetup}
+          title="Listen to the live input and build a starter routing from whatever has energy. No signal: it says so and changes nothing.">AUTO</button>
         <button type="button" className="chip-btn" disabled={full} onClick={() => editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; }, false)}
           title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}>+ ROUTE</button>
         <button type="button" className="chip-btn" disabled={table.length === 0} onClick={() => setAudioRoutes([])}
@@ -87,6 +182,13 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
         <span className="stim-matrix-count">{table.length}/{MAX_ROUTES}</span>
         {unrouted.length > 0 && <span className="stim-matrix-unrouted" title="Inputs no route reads">not routed: {unrouted.map((id) => id.toUpperCase()).join(' · ')}</span>}
       </div>
+      {status && <div className="stim-matrix-unrouted" role="status">{status}</div>}
+      {shownAdvice && (
+        <div className="stim-matrix-unrouted" role="status">
+          {shownAdvice.names.join(' · ')} {shownAdvice.dead === 1 ? 'is' : 'are'} silent.
+          <button type="button" className="chip-btn" onClick={retune} title="Move dead routes onto inputs that have energy, and raise a depth of 0">RETUNE</button>
+        </div>
+      )}
     </div>
   );
 }
