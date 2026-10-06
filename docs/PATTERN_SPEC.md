@@ -17,6 +17,8 @@ Two composition modes, one engine:
 
 **FIELD** (reference 3 — "Seamless Geometric Pattern") — each tile is itself a small *repeating* micro-pattern: stripe stacks, triangle fields, plus-sign grids, zigzag rows, diamond lattice, concentric arcs, pinstripes, ray bursts. Tiles are seamless — every micro-pattern wraps at the tile edge (designed on a torus), so the whole field can pan/zoom infinitely with no visible seams. No grout at all; tiles butt-joint into one continuous textile. The VJ move is slow drift across the field, not shuffling it.
 
+**ESCHER** — true interlocking tessellation à la M.C. Escher. Start with a base grid (square or hexagon); each edge gets a seeded bezier "bump" function; the bump is replicated across edges by a symmetry op — translation (opposite edges share the curve), rotation (90°/180° about a vertex or midpoint), reflection (mirror across an axis). Because edge pairs are complementary *by construction*, tiles interlock with mathematically zero gaps. Each tile is filled from the palette in alternating figure/ground roles so the creatures emerge. DRIFT becomes *Metamorphosis*: the bumps slowly morph, one tiling breathing into another.
+
 Mode is a track-level switch, persisted per track. SHUFFLE re-seeds within the current mode.
 
 ## Tile vocabulary (from the reference)
@@ -82,6 +84,16 @@ Field-mode micro-patterns (reference 3 — repeating, seamless, designed on a to
 - No grout: tiles butt-joint into a continuous field. The tile grid itself should be invisible; only the micro-patterns read.
 - Palette: full active palette allowed, but each tile uses at most 3 hues — restraint is what makes it textile, not noise.
 - Motion: slow infinite pan across the field (DRIFT controls speed/direction); at high DRIFT, per-tile micro-patterns crossfade on the BEAT clock. SHUFFLE re-seeds pattern assignment, never interrupts the pan.
+
+## Composition (ESCHER)
+
+- Base grid: SQUARE or HEX (triangular parked for v1).
+- Master tile: the base polygon with each edge replaced by a seeded bezier bump (params: BUMP amplitude, EDGE_SEED).
+- Symmetry op per track: TRANSLATE / ROTATE / REFLECT — applied to edge pairs so every shared edge is complementary. Gap-free by construction, not by tuning.
+- Fill: alternating figure/ground from two palette roles (FIGURE_GROUND controls the contrast pair); a third accent role marks tile centers at low density.
+- SHUFFLE re-rolls edge functions + symmetry assignment. DRIFT morphs bump control points continuously — one tiling breathes into another (*Metamorphosis*).
+- Params: GRID, BUMP (0–100%), EDGE_SEED, SYMMETRY, FIGURE_GROUND, MORPH (drift speed, reuses DRIFT).
+- Acceptance: render the field, sample the tile-boundary pixels — zero background-colored pixels inside the field bounds (gap-free assert); same seed = identical tiling; fills palette-conformant.
 
 ## Palette behavior
 
