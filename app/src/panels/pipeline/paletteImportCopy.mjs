@@ -8,9 +8,13 @@ import { sanitizePalette } from '../../state/slices/paletteLibrarySlice.js';
  * among the entries that survive sanitize. An all-junk file must warn, never
  * toast success.
  */
-export function paletteImportMessage(list) {
+export function paletteImportCount(list) {
   const valid = (Array.isArray(list) ? list : [list]).map(sanitizePalette).filter(Boolean);
-  const stored = new Set(valid.map((p) => p.id)).size;
+  return new Set(valid.map((p) => p.id)).size;
+}
+
+export function paletteImportMessage(list) {
+  const stored = paletteImportCount(list);
   return stored === 0
     ? 'No valid palettes in file'
     : `Imported ${stored} palette${stored === 1 ? '' : 's'}`;

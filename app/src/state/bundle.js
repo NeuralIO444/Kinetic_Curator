@@ -22,6 +22,42 @@ export const BUNDLE_PART_LABELS = Object.freeze({
 });
 
 /**
+ * How a part lands when a bundle is restored (#1064). The confirm line is built
+ * from this, so it can never promise a replace for something that merges.
+ *   replace: what is here is swapped for what the bundle holds
+ *   merge:   the bundle's entries are ADDED; ones you have stay, ones you deleted
+ *            since the export come back (palettes use the existing palette importer)
+ */
+export const BUNDLE_APPLY_MODE = Object.freeze({
+  project: 'replace', userPalettes: 'merge', userVoices: 'replace', favorites: 'replace',
+  keeps: 'replace', taste: 'replace', biology: 'replace', canvasPresets: 'replace',
+});
+
+/** Names inside a sentence ("replace the project, voices and keeps"). */
+const SENTENCE_NAMES = Object.freeze({
+  project: 'the project', userPalettes: 'palettes', userVoices: 'voices', favorites: 'favorites',
+  keeps: 'keeps', taste: 'taste', biology: 'the biology policy', canvasPresets: 'canvas presets',
+});
+
+const joinList = (items) => (items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
+
+/**
+ * The confirm line shown before ↑ BUNDLE applies anything: replaces are named as
+ * replaces, merges as merges, and unreadable parts are listed as skipped.
+ */
+export function bundleConfirmLine(fileName, summary) {
+  const nm = (n) => SENTENCE_NAMES[n] || n;
+  const replaces = summary.good.filter((g) => BUNDLE_APPLY_MODE[g] !== 'merge').map(nm);
+  const merges = summary.good.filter((g) => BUNDLE_APPLY_MODE[g] === 'merge').map(nm);
+  const bits = [];
+  if (replaces.length) bits.push(`replace ${joinList(replaces)}`);
+  if (merges.length) bits.push(`add ${joinList(merges)} (ones you deleted since the export come back; the ones you have stay)`);
+  let line = bits.length ? `${fileName} will ${bits.join(', and ')}.` : `${fileName} holds nothing readable.`;
+  if (summary.bad.length) line += ` Skipped, unreadable: ${summary.bad.map((b) => `${nm(b.name)} (${b.error})`).join('; ')}.`;
+  return line;
+}
+
+/**
  * Which localStorage key each part is the carrier of. Together with
  * BUNDLE_LEFT_OUT this must account for EVERY `kc:` key the app writes: the
  * bundle's promise is "everything a performer would be sorry to lose" (#1051),
@@ -98,7 +134,10 @@ export function parseBundle(raw, sanitizers = {}) {
     if (typeof san !== 'function') { parts[name] = { ok: false, error: 'no reader for this part' }; continue; }
     try {
       const r = san(src[name]);
-      parts[name] = r && r.ok ? { ok: true, value: r.value } : { ok: false, error: (r && r.error) || 'invalid' };
+      // `given` (how many entries the file held) lets the result line say how many were dropped.
+      parts[name] = r && r.ok
+        ? { ok: true, value: r.value, ...(Number.isFinite(r.given) ? { given: r.given } : {}) }
+        : { ok: false, error: (r && r.error) || 'invalid' };
     } catch (e) {
       parts[name] = { ok: false, error: String((e && e.message) || e).slice(0, 120) };
     }
@@ -124,11 +163,36 @@ export function bundleSummary(parsed) {
   return { good, bad };
 }
 
-/** One honest sentence for the pipeline message slot. */
-export function bundleMessage(summary, verb) {
+/**
+ * What actually landed, for one part: `voices (5)`, `palettes (+3)` for a merge,
+ * `voices (5 of 6; 1 dropped)` when entries were refused or capped. Without a
+ * count it is just the name.
+ * @param {{kept:number, given?:number}} [c]
+ */
+export function bundlePartPhrase(name, c) {
+  const label = BUNDLE_PART_LABELS[name] || name;
+  if (!c || !Number.isFinite(c.kept)) return label;
+  const lead = BUNDLE_APPLY_MODE[name] === 'merge' ? '+' : '';
+  const given = Number.isFinite(c.given) ? c.given : c.kept;
+  return given > c.kept
+    ? `${label} (${lead}${c.kept} of ${given}; ${given - c.kept} dropped)`
+    : `${label} (${lead}${c.kept})`;
+}
+
+/**
+ * One honest sentence for the pipeline message slot. `counts` is what each apply
+ * path reported: { part: { kept, given } }. A part with entries in the file of
+ * which NONE were usable is reported as skipped, not as imported.
+ */
+export function bundleMessage(summary, verb, counts = {}) {
   const lab = (n) => BUNDLE_PART_LABELS[n] || n;
-  const good = summary.good.map(lab);
   const bad = summary.bad.map((b) => `${lab(b.name)} (${b.error})`);
+  const good = [];
+  for (const name of summary.good) {
+    const c = counts[name];
+    if (c && Number.isFinite(c.kept) && c.kept === 0 && c.given > 0) bad.push(`${lab(name)} (none of ${c.given} were usable)`);
+    else good.push(bundlePartPhrase(name, c));
+  }
   const head = good.length ? `${verb}: ${good.join(', ')}` : `${verb}: nothing`;
   return bad.length ? `${head}. Skipped: ${bad.join('; ')}` : head;
 }

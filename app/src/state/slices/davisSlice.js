@@ -381,7 +381,7 @@ export const createDavisSlice = (set) => ({
    * boundary), same persistence. A list that is not an array is ignored, so
    * a refused bundle part can never wipe what is here.
    */
-  importShelf: ({ favorites, keeps } = {}) => set(() => {
+  importShelf: ({ favorites, keeps } = {}) => {
     const out = {};
     if (Array.isArray(favorites)) {
       out.favorites = favorites.map(sanitizeFavorite).filter(Boolean).slice(0, FAVORITES_MAX);
@@ -391,8 +391,10 @@ export const createDavisSlice = (set) => ({
       out.keeps = keeps.map(sanitizeFavorite).filter(Boolean).slice(0, KEEPS_MAX);
       persistKeeps(out.keeps);
     }
-    return out;
-  }),
+    if (Object.keys(out).length) set(() => out);
+    // #1064 — what actually landed, so the result line can be honest about caps.
+    return { ...(out.favorites ? { favorites: out.favorites.length } : null), ...(out.keeps ? { keeps: out.keeps.length } : null) };
+  },
   reorderFavorite: (id, delta) => set((state) => {
     const idx = state.favorites.findIndex((f) => f.id === id);
     if (idx < 0) return {};

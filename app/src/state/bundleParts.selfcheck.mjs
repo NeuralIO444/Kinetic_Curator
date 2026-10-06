@@ -114,7 +114,8 @@ ok('importShelf: a missing part leaves that list alone (a refused part never wip
 ok('importShelf caps both lists at 200', () => quiet(() => {
   const s = makeShelf();
   const many = Array.from({ length: 250 }, (_, i) => fav(i + 1));
-  s.get().importShelf({ favorites: many, keeps: many });
+  const landed = s.get().importShelf({ favorites: many, keeps: many });
+  assert.deepEqual(landed, { favorites: 200, keeps: 200 }, '#1064: the action reports what landed after the cap');
   assert.equal(s.get().favorites.length, 200);
   assert.equal(s.get().keeps.length, 200);
 }));
@@ -172,6 +173,30 @@ ok('importUserVoices: a voice that left the shelf stops being the active one', (
   assert.equal(state.activeVoiceId, 'b', 'b is still on the shelf, so it stays active');
   state.importUserVoices([voice('a')]);
   assert.equal(state.activeVoiceId, null, 'b is gone, so it is no longer active');
+}));
+
+// ── #1064: readers report how many entries the file held; actions report what landed ──
+ok('list parts report how many entries the file held, so a drop is countable', () => {
+  const b = buildBundle({ favorites: [fav(1), { seed: 'x' }, null], keeps: [fav(2)], userVoices: [voice('a'), { id: '' }], userPalettes: [{ id: 'p' }, 5], canvasPresets: [{ id: 'm', w: 1920, h: 1080, fps: 30 }, 'junk'] });
+  const r = parseBundle(b, BUNDLE_SANITIZERS);
+  assert.equal(r.parts.favorites.given, 3);
+  assert.equal(r.parts.favorites.value.length, 1);
+  assert.equal(r.parts.keeps.given, 1);
+  assert.equal(r.parts.userVoices.given, 2);
+  assert.equal(r.parts.userVoices.value.length, 1);
+  assert.equal(r.parts.userPalettes.given, 2);
+  assert.equal(r.parts.canvasPresets.given, 2);
+});
+
+ok('importShelf and importUserVoices report what landed; a refused part reports nothing', () => quiet(() => {
+  const s = makeShelf();
+  assert.deepEqual(s.get().importShelf({ favorites: [fav(1), { seed: 'x' }, fav(2)] }), { favorites: 2 });
+  assert.deepEqual(s.get().importShelf({ favorites: 'junk' }), {});
+  assert.deepEqual(s.get().importShelf(), {});
+  const v = makeVoices();
+  assert.equal(v.get().importUserVoices([voice('a'), voice('b'), { id: '' }]), 2);
+  assert.equal(v.get().importUserVoices('junk'), null);
+  assert.equal(v.get().importUserVoices(Array.from({ length: 30 }, (_, i) => voice(`v${i}`))), MAX_USER_VOICES);
 }));
 
 console.log(`bundleParts.selfcheck: ${n} checks passed`);

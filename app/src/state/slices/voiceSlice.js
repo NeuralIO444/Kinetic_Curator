@@ -325,14 +325,17 @@ export const createVoiceSlice = (set) => ({
    * the shelf (the importShelf precedent in davisSlice). A voice that is no
    * longer on the shelf stops being the active one.
    */
-  importUserVoices: (list) => set((state) => {
-    if (!Array.isArray(list)) return {};
+  importUserVoices: (list) => {
+    if (!Array.isArray(list)) return null;
     const userVoices = list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES);
     persist(userVoices);
-    const next = { userVoices };
-    if (state.activeVoiceId && !userVoices.some((v) => v.id === state.activeVoiceId)) next.activeVoiceId = null;
-    return next;
-  }),
+    set((state) => {
+      const next = { userVoices };
+      if (state.activeVoiceId && !userVoices.some((v) => v.id === state.activeVoiceId)) next.activeVoiceId = null;
+      return next;
+    });
+    return userVoices.length; // #1064 — what landed (after the cap), for the result line
+  },
 
   deleteUserVoice: (id) => set((state) => {
     const userVoices = state.userVoices.filter((v) => v.id !== id);
