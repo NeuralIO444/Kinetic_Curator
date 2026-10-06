@@ -802,11 +802,29 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.deleteBuffer(fullVbo); gl.deleteBuffer(cornerVbo); gl.deleteBuffer(instVbo);
   }
 
+  /**
+   * #1069 — run the grain-family finish chains on a composed frame.
+   *
+   * Grain is split off the FX chain on purpose (#520 Phase 2): with ACCUM on it
+   * must run AFTER the feedback step, or it compounds in the loop. That split
+   * left every path WITHOUT accumulation never applying it, so grain only
+   * showed with ACCUM on. Without accum there is no feedback loop to protect,
+   * so the chain simply runs on the finished frame. Every presenter and every
+   * readback calls this; with no chains it returns the target untouched.
+   * @param {object} target a composed frame target (`.tex`)
+   * @param {Array<{layerId:string, steps:Array}>} [chains] defaults to target.fxFinishChains
+   */
+  function applyFinishChains(target, chains = target && target.fxFinishChains) {
+    let t = target;
+    for (const { layerId, steps } of chains || []) t = bridge.runChain(layerId, t, steps);
+    return t;
+  }
+
   return {
     gl, canvas, bridge, progs, U, bindTex, drawFullscreen,
     composite, drawInstances, instanceData, renderLayerInstances,
     uploadStatic, freeStatic, makeTarget, allocFrameTargets, freeFrameTargets,
-    renderFrameInto, resolveTargetToBytes, disposeBase,
+    renderFrameInto, resolveTargetToBytes, applyFinishChains, disposeBase,
     setResolveOptions, getResolveOptions: () => resolveOpts,
   };
 }
@@ -820,7 +838,7 @@ export function createRenderer(canvas) {
   const b = createRendererBase(canvas, { alpha: false });
   const {
     gl, bridge, uploadStatic, freeStatic,
-    allocFrameTargets, freeFrameTargets, renderFrameInto, resolveTargetToBytes,
+    allocFrameTargets, freeFrameTargets, renderFrameInto, resolveTargetToBytes, applyFinishChains,
   } = b;
   /**
    * @param {object} payload
@@ -835,7 +853,8 @@ export function createRenderer(canvas) {
     const uploaded = uploadStatic(payload);
     const T = allocFrameTargets(w, h);
     try {
-      const mRead = renderFrameInto(payload, T, uploaded);
+      // #1069 — one-shot stills never accumulate, so grain runs on the finished frame.
+      const mRead = applyFinishChains(renderFrameInto(payload, T, uploaded));
       const pixels = resolveTargetToBytes(mRead, T, w, h);
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after render: 0x${err.toString(16)}`);
@@ -1219,7 +1238,8 @@ export function createLiveRenderer(canvas) {
       const mRead = b.renderFrameInto(
         { ...payload, width: w, height: h }, OT,
         { atlasTex, grainLuts: grainTexs }, { transparent });
-      return b.resolveTargetToBytes(mRead, OT, w, h);
+      // #1069 — captures (PNG stills, batch, Print Desk) get their grain too.
+      return b.resolveTargetToBytes(b.applyFinishChains(mRead), OT, w, h);
     } finally {
       // A capture can only run after the first live frame (waitForReady), so
       // liveW is set — the guard is belt-and-braces against a 0-size alloc.
@@ -1242,6 +1262,7 @@ export function createLiveRenderer(canvas) {
     setResolveOptions: (o) => b.setResolveOptions(o),
     hasAtlas: () => !!atlasTex,
     renderFrame, renderFrameOffscreen, present, presentUpscaled, readback, readPresented,
+    applyFinishChains: (target, chains) => b.applyFinishChains(target, chains),
     ensureAccum, dropAccum,
     snapshotHoldFrame, mixWithHold, dropMixTargets,
     getGL: () => gl,

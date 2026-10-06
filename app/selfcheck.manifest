@@ -231,3 +231,4 @@ node src/panels/build/patchOneLiner.selfcheck.mjs
 node src/pattern/field.selfcheck.mjs
 node src/state/layerOrder.selfcheck.mjs
 node src/panels/build/layerRows.selfcheck.mjs
+node src/gl/grainFinish.selfcheck.mjs

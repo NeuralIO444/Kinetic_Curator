@@ -1075,13 +1075,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
             } catch (e) {
               noteAccumFault(e);
               // Fall back to plain rendering so the canvas keeps moving.
-              const { target } = renderMixedFrame(payload, transparent, mix);
-              live.present(target);
+              const { target, fxFinishChains: fin } = renderMixedFrame(payload, transparent, mix);
+              live.present(live.applyFinishChains(target, fin)); // #1069
             }
           } else {
             // ACCUM unavailable this frame (enable failed or cooling down).
-            const { target } = renderMixedFrame(payload, transparent, mix);
-            live.present(target);
+            const { target, fxFinishChains: fin } = renderMixedFrame(payload, transparent, mix);
+            live.present(live.applyFinishChains(target, fin)); // #1069
           }
         } else {
           if (lastAccumOn) {
@@ -1096,8 +1096,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
             accumFrozen = false;
           }
           lastAccumOn = false;
-          const { target } = renderMixedFrame(payload, transparent, mix);
-          live.present(target);
+          // #1069 — with ACCUM off there is no feedback loop for grain to
+          // compound in, so the finish chain runs on the plain frame. It used
+          // to be read only on the accum path, so grain did nothing by default.
+          const { target, fxFinishChains: fin } = renderMixedFrame(payload, transparent, mix);
+          live.present(live.applyFinishChains(target, fin));
         }
       } finally {
         if (cpuFallback) {
