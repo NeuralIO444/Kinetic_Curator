@@ -139,11 +139,12 @@ ok('#520 Phase 2: renderer.mjs local GRAIN_FAMILY_KINDS matches fxFilters.js', (
 // #520 Phase 1b — availableFxKinds offer-list
 ok('#520 Phase 1b: availableFxKinds — empty stack offers all live kinds in slot order', () => {
   const kinds = availableFxKinds([]);
-  // EF-1 has no live kinds; EF-2, EF-3, EF-4 each have some
+  // #1022 — EF-1 holds sharpen and haze now; every slot has live kinds
+  const ef1 = FX_RACK.find(s => s.slot === 'EF-1').kinds;
   const ef2 = FX_RACK.find(s => s.slot === 'EF-2').kinds;
   const ef3 = FX_RACK.find(s => s.slot === 'EF-3').kinds;
   const ef4 = FX_RACK.find(s => s.slot === 'EF-4').kinds;
-  assert.deepEqual(kinds, [...ef2, ...ef3, ...ef4]);
+  assert.deepEqual(kinds, [...ef1, ...ef2, ...ef3, ...ef4]);
   assert.ok(!kinds.some(k => FX_RACK.find(s => s.slot === 'EF-1').stubs.includes(k)), 'no stubs in offer-list');
 });
 ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-list', () => {
@@ -156,6 +157,7 @@ ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-li
 });
 ok('#520 Phase 1b: availableFxKinds — all slots filled returns empty', () => {
   const effects = [
+    { kind: 'sharpen', params: {} },    // EF-1 (#1022)
     { kind: 'rgbSplit', params: {} },   // EF-2
     { kind: 'posterize', params: {} },  // EF-3
     { kind: 'grain', params: {} },      // EF-4
@@ -181,7 +183,8 @@ ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
   // it is the only effect in the set tuned for a dark ground. The list is an
   // explicit gate (a curated subset of the roster), so additions are a
   // deliberate edit here rather than something a data change does quietly.
-  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo']);
+  // #1022 — sharpen and haze join: the Blur / Focus slot must offer something.
+  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'sharpen', 'haze']);
   assert.ok(!FX_EFFECT_KINDS.includes('blur'), 'blur is cut from the roster');
   for (const k of FX_MENU_KINDS) assert.ok(FX_EFFECT_KINDS.includes(k), `${k} stays in the roster`);
   // The five demoted effects stay renderable: they compile, they just leave the menu.
@@ -431,6 +434,53 @@ ok('#704: the SVG halo is identity at defaults and approximates the bloom otherw
   for (const bad of [NaN, -5, null, 'x']) {
     const out = compileFxPrimitives([{ kind: 'halo', params: { amount: bad, radius: bad, threshold: bad, vignette: bad } }], {});
     assert.ok(out.length >= 1 && out.every((p) => typeof p.prim === 'string'), `halo ${bad} must still compile`);
+  }
+});
+ok('#1022: no rack slot presents as available while unable to hold an effect', () => {
+  for (const slot of FX_RACK) {
+    assert.ok(slot.kinds.length > 0, `${slot.slot} (${slot.label}) has no live kind`);
+    for (const k of slot.kinds) assert.ok(FX_EFFECT_KINDS.includes(k), `${slot.slot} kind ${k} is not in the roster`);
+  }
+  assert.deepEqual(FX_RACK.find((s) => s.slot === 'EF-1').kinds, ['sharpen', 'haze']);
+  // A slot may keep honest "planned" stubs next to live kinds (EF-4 does); what it must not do
+  // is show ONLY stubs. EF-1's two stubs are built, so it shows none.
+  assert.deepEqual(FX_RACK.find((s) => s.slot === 'EF-1').stubs, []);
+  assert.ok(!FX_EFFECT_KINDS.includes('blur'), 'no gaussian blur came back (#308/#310)');
+});
+ok('#1022: the SVG sharpen is identity at 0, a brightness-preserving cross kernel otherwise', () => {
+  const idle = compileFxPrimitives([{ kind: 'sharpen', params: { amount: 0, radius: 1 } }], {});
+  assert.deepStrictEqual(idle.map((p) => p.prim), ['feOffset'], 'amount 0 passes the layer through');
+  for (const a of [0.3, 0.6, 1, 2]) {
+    const out = compileFxPrimitives([{ kind: 'sharpen', params: { amount: a, radius: 1 } }], {});
+    assert.deepStrictEqual(out.map((p) => p.prim), ['feConvolveMatrix']);
+    assert.equal(out[0].attrs.preserveAlpha, 'true', 'a silhouette never grows');
+    const k = out[0].attrs.kernelMatrix.split(' ').map(Number);
+    assert.equal(k.length, 9);
+    assert.ok(Math.abs(k.reduce((s, v) => s + v, 0) - 1) < 1e-2, `kernel sums to 1 at amount ${a}: flat areas keep their brightness`);
+    assert.ok(k[4] > 1 && k[1] < 0 && k[3] < 0 && k[5] < 0 && k[7] < 0, 'positive centre, negative arms');
+    assert.equal(k[0] + k[2] + k[6] + k[8], 0, 'cross, not box: corners untouched');
+  }
+  for (const bad of [NaN, -5, null, 'x', 99]) {
+    const out = compileFxPrimitives([{ kind: 'sharpen', params: { amount: bad, radius: bad } }], {});
+    assert.ok(out.length >= 1 && out.every((p) => typeof p.prim === 'string'), `sharpen ${bad} must still compile`);
+  }
+});
+ok('#1022: the SVG haze is identity at 0 and pulls every channel toward the veil', () => {
+  const idle = compileFxPrimitives([{ kind: 'haze', params: { amount: 0, lift: 0.5 } }], {});
+  assert.deepStrictEqual(idle.map((p) => p.prim), ['feOffset'], 'amount 0 passes the layer through');
+  const out = compileFxPrimitives([{ kind: 'haze', params: { amount: 0.8, lift: 1 } }], {});
+  assert.deepStrictEqual(out.map((p) => p.prim), ['feComponentTransfer']);
+  assert.equal(out[0].children.length, 3);
+  for (const f of out[0].children) {
+    assert.ok(f.attrs.slope < 1 && f.attrs.slope > 0, 'contrast is reduced, never inverted');
+    assert.ok(f.attrs.intercept > 0, 'shadows lift');
+    assert.ok(f.attrs.slope + f.attrs.intercept <= 1.0001, 'white never exceeds white');
+  }
+  const smoke = compileFxPrimitives([{ kind: 'haze', params: { amount: 0.8, lift: 0 } }], {});
+  assert.ok(smoke[0].children[0].attrs.intercept < out[0].children[0].attrs.intercept, 'low lift is darker mist');
+  for (const bad of [NaN, -5, null, 'x', 99]) {
+    const o = compileFxPrimitives([{ kind: 'haze', params: { amount: bad, lift: bad } }], {});
+    assert.ok(o.length >= 1 && o.every((p) => typeof p.prim === 'string'), `haze ${bad} must still compile`);
   }
 });
 ok('#590: the SVG displace emits the identical legacy primitives at warp 0', () => {

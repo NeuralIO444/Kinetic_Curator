@@ -32,6 +32,11 @@ export const MEASURED_COSTS = {
   'fx/edge': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/grade': { ms: 0.3333, method: 'wall', draws: 90 },
   'fx/halo': { ms: 0.3333, method: 'wall', draws: 90 },
+  // #1022 — added by hand, not re-measured: both are a handful of taps of pure
+  // ALU like fx/edge and fx/solarize (tier 3, no cost band), so the number is
+  // informational. Re-bless with `npm run measure-costs` on a real GPU.
+  'fx/sharpen': { ms: 0.3, method: 'wall', draws: 90 },
+  'fx/haze': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/scanlines': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/solarize': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/tear': { ms: 0.3, method: 'wall', draws: 90 },

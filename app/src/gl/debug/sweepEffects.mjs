@@ -405,6 +405,33 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
+    ...templateEffectDef('sharpen'),
+    cases: [
+      // #1022 — amount 0 must return the source byte-for-byte.
+      C('identity → no-op', { amount: 0, radius: 1 }, { noop: true }),
+      C('default', { amount: 0.6, radius: 1 }),
+      C('strong', { amount: 1.5, radius: 2 }),
+      C('max', { amount: 2, radius: 3 }, { costly: true }),
+      C('min radius', { amount: 1, radius: 0.5 }),
+      H('hostile negative amount', { amount: -3, radius: 1 }),
+      H('hostile huge radius', { amount: 1, radius: 1e6 }),
+      H('hostile zero radius', { amount: 1, radius: 0 }),
+    ],
+  },
+  {
+    ...templateEffectDef('haze'),
+    cases: [
+      // #1022 — amount 0 must return the source byte-for-byte.
+      C('identity → no-op', { amount: 0, lift: 0.5 }, { noop: true }),
+      C('default', { amount: 0.35, lift: 0.5 }),
+      C('smoke', { amount: 0.8, lift: 0 }),
+      C('fog', { amount: 0.8, lift: 1 }, { costly: true }),
+      C('max', { amount: 1, lift: 1 }),
+      H('hostile negative amount', { amount: -4, lift: 0.5 }),
+      H('hostile over-max lift', { amount: 0.5, lift: 9 }),
+    ],
+  },
+  {
     ...templateEffectDef('halo'),
     cases: [
       // #704 — identity at defaults: amount 0 AND vignette 0 must return the
