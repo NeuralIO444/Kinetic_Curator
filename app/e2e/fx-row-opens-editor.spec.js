@@ -20,8 +20,9 @@ test('FX row body tap opens the effect editor; controls stay independent', async
   await fxPlus.click();
   const fxRows = stack.locator('.layer-row-fx');
   await expect(fxRows).toHaveCount(2);
-  const fx1 = fxRows.nth(0);
-  const fx2 = fxRows.nth(1);
+  // #1037: rows are listed frontmost first, so the newest track (FX 2) is the top row.
+  const fx1 = fxRows.nth(1);
+  const fx2 = fxRows.nth(0);
   await expect(fx2.locator('.fx-editor')).toBeVisible();
   await expect(fx1.locator('.fx-editor')).toHaveCount(0);
 
@@ -64,7 +65,8 @@ test('FX row body tap opens the effect editor; controls stay independent', async
   // the button tap.
   await fx1.getByTitle('Duplicate').click();
   await expect(stack.locator('.layer-row-fx')).toHaveCount(3);
-  await expect(fx1.locator('.fx-editor')).toHaveCount(0);
+  // Top-first order is now [FX 2, copy, FX 1]: the copy sits above the track it duplicated.
+  await expect(stack.locator('.layer-row-fx').nth(2).locator('.fx-editor')).toHaveCount(0);
   const fxCopy = stack.locator('.layer-row-fx').nth(1);
   await expect(fxCopy.locator('.fx-editor')).toBeVisible();
 
@@ -75,7 +77,7 @@ test('FX row body tap opens the effect editor; controls stay independent', async
 
   // (3) KC row behavior unchanged: name click switches the active track.
   // Add a second KC track first (factory boots with one).
-  const contentPlus = stack.locator('.layer-section').nth(0).locator('.layer-add-btn');
+  const contentPlus = stack.locator('.layer-section').last().locator('.layer-add-btn'); // CONTENT is the last section (#1037)
   await contentPlus.click();
   const kcRows = stack.locator('.layer-row-kc');
   await expect(kcRows).toHaveCount(2);

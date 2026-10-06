@@ -11,12 +11,12 @@ test('PATCH target is pickable while OFF and survives a mode change', async ({ p
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   // Mockup C (#1014 rebuild): no ghost rows — the Content section "+" arms tracks.
-  const contentPlus = page.locator('.build-layer-stack .layer-section').nth(0).locator('.layer-add-btn');
+  const contentPlus = page.locator('.build-layer-stack .layer-section').last().locator('.layer-add-btn');
   await contentPlus.click();
   await contentPlus.click(); // KC-2, KC-3
 
-  // Section order is ascending, so KC-1 is the first content row.
-  const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).first();
+  // #1037: rows are listed frontmost first, so KC-1 (the bottom track) is the LAST content row.
+  const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).last();
   const [mode, target] = await row.locator('.layer-row-composite[title^="PATCH"] select').all();
 
   await expect(target).toBeEnabled();
