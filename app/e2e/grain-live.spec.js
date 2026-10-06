@@ -40,8 +40,20 @@ async function avgEnergy(page, frames = 3) {
 
 test('adding GRAIN visibly changes the canvas with ACCUM off', async ({ page }) => {
   await page.setViewportSize({ width: 2400, height: 1500 }); // canvas shown at >= native size
-  await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
-  await page.goto('/?boot=factory');
+  // The governor's AUTO quality is seeded OFF in the project doc, exactly as the other
+  // GL specs do (accum-recording, loop-capture): on software GL (SwiftShader, CI
+  // runners) its watchdog hard-stops the render loop, the canvas freezes, and a test
+  // that waits for it to change waits forever. That is the app working as designed,
+  // not what this test measures.
+  await page.goto('/?boot=factory', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    localStorage.setItem('kc:first-run-seen', '1');
+    localStorage.setItem('kc:project:v1', JSON.stringify({
+      version: 1, savedAt: new Date().toISOString(),
+      doc: { version: 1, seed: 4242, autoQuality: false, layoutParams: { mode: 'swarm', count: 60 } },
+    }));
+  });
+  await page.reload({ waitUntil: 'load' });
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   await page.waitForTimeout(800); // let the first frames land
