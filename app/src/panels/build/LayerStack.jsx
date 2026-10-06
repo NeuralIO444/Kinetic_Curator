@@ -17,6 +17,7 @@ import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } 
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
+import { rowsTopFirst, moveNeighbor, canMoveUp, canMoveDown } from './layerRows.mjs';
 import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
 
 // #716 Part 2 — black block + white numeral heads every row. The edited
@@ -310,13 +311,13 @@ export function LayerStack() {
   const flashTimer = useRef(null);
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
 
+  // #1037 — rows are listed frontmost first, so ▲ means "later in the chain":
+  // it trades with the neighbor at the next-HIGHER array index (layerRows.mjs).
   function handleMove(layer, dir) {
     const cls = fineClass(layer);
-    const group = layers.filter((l) => fineClass(l) === cls); // flat order = section order
-    const gi = group.findIndex((l) => l.id === layer.id);
-    const ni = gi + dir;
-    if (ni < 0 || ni >= group.length) return;
-    const neighbor = group[ni];
+    const group = layers.filter((l) => fineClass(l) === cls); // array order, bottom→top
+    const neighbor = moveNeighbor(group, layer.id, dir);
+    if (!neighbor) return;
     emit(Events.LAYER_SWAP_POSITIONS, { idA: layer.id, idB: neighbor.id });
     if (isMathLayer(layer)) return;
     const newOrdinal = ordinals.get(neighbor.id) || 1;
@@ -370,8 +371,8 @@ export function LayerStack() {
         <div className="layer-row-main">
           <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : isActive} />
           <div className="layer-reorder">
-            <button className="micro-btn" disabled={gi === 0} title="Move up" onClick={() => handleMove(layer, -1)}>▲</button>
-            <button className="micro-btn" disabled={gi === group.length - 1} title="Move down" onClick={() => handleMove(layer, 1)}>▼</button>
+            <button className="micro-btn" disabled={!canMoveUp(group, layer.id)} title="Move up" onClick={() => handleMove(layer, 'up')}>▲</button>
+            <button className="micro-btn" disabled={!canMoveDown(group, layer.id)} title="Move down" onClick={() => handleMove(layer, 'down')}>▼</button>
           </div>
           {/* #1015 — transient position badge on the moved row */}
           {moveFlash?.id === layer.id && (
@@ -495,24 +496,17 @@ export function LayerStack() {
             are the add affordance (mockup C, #1014 rebuild). */}
       </PanelHeader>
       <PatchMatrix layers={layers} ordinals={ordinals} />
+      {/* #1037 — sections read MATH / FX / CONTENT top to bottom: the frontmost, last-applied track is on top. */}
       <div className="layer-section">
         {renderSectionHead({
-          title: 'Content', count: contentCount, max: MAX_CONTENT_TRACKS,
-          hint: 'one-tap add · long-press chooser',
-          addTitle: 'Add KC track', addChooserLabel: 'choose blend',
-          addDisabled: contentCount >= MAX_CONTENT_TRACKS,
-          onAdd: () => emit(Events.LAYER_ADD),
-          onOpenChooser: () => setChooser('content'),
+          title: 'Math', count: mathCount, max: MAX_MATH_TRACKS,
+          addTitle: 'Add MATH track',
+          addDisabled: mathCount >= MAX_MATH_TRACKS,
+          onAdd: () => emit(Events.LAYER_ADD_MATH),
+          onOpenChooser: null, // MATH: tap-only, unchanged add behavior
         })}
-        {chooser === 'content' && (
-          <FamilyChooser
-            section="content"
-            onClose={() => setChooser(null)}
-            onPick={(family) => { setChooser(null); emit(Events.LAYER_ADD, { family }); }}
-          />
-        )}
         <div className="layer-list">
-          {layers.filter((l) => !isAdj(l)).map((layer) => renderRow(layer))}
+          {rowsTopFirst(layers.filter(isMathLayer)).map((layer) => renderRow(layer))}
         </div>
       </div>
       <div className="layer-section">
@@ -534,19 +528,27 @@ export function LayerStack() {
           />
         )}
         <div className="layer-list">
-          {layers.filter(isFxLayer).map((layer) => renderRow(layer))}
+          {rowsTopFirst(layers.filter(isFxLayer)).map((layer) => renderRow(layer))}
         </div>
       </div>
       <div className="layer-section">
         {renderSectionHead({
-          title: 'Math', count: mathCount, max: MAX_MATH_TRACKS,
-          addTitle: 'Add MATH track',
-          addDisabled: mathCount >= MAX_MATH_TRACKS,
-          onAdd: () => emit(Events.LAYER_ADD_MATH),
-          onOpenChooser: null, // MATH: tap-only, unchanged add behavior
+          title: 'Content', count: contentCount, max: MAX_CONTENT_TRACKS,
+          hint: 'one-tap add · long-press chooser',
+          addTitle: 'Add KC track', addChooserLabel: 'choose blend',
+          addDisabled: contentCount >= MAX_CONTENT_TRACKS,
+          onAdd: () => emit(Events.LAYER_ADD),
+          onOpenChooser: () => setChooser('content'),
         })}
+        {chooser === 'content' && (
+          <FamilyChooser
+            section="content"
+            onClose={() => setChooser(null)}
+            onPick={(family) => { setChooser(null); emit(Events.LAYER_ADD, { family }); }}
+          />
+        )}
         <div className="layer-list">
-          {layers.filter(isMathLayer).map((layer) => renderRow(layer))}
+          {rowsTopFirst(layers.filter((l) => !isAdj(l))).map((layer) => renderRow(layer))}
         </div>
       </div>
     </div>
