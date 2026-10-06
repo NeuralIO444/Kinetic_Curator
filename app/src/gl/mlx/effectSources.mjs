@@ -19,11 +19,12 @@ import { declaredKinds } from './declaredCostTiers.mjs';
 
 // Builtin effects (single EFFECT_FS shader, mode-switched). param_count is the
 // number of effect params the bridge maps into u_p (see bridge/builtinEffects.mjs).
-// (#308: blur is gone — the instrument has no gaussian blur.)
+// (#1022: blur is back — #308's removal is earned back for the EF-1 rack slot.)
 const BUILTIN = {
   invert:    { paramCount: 0, passCount: 1 },
   rgbSplit:  { paramCount: 1, passCount: 1 },
   grain:     { paramCount: 1, passCount: 1 },
+  blur:      { paramCount: 1, passCount: 2 }, // two separable passes (H then V); up to 4 pairs past the 64-tap limit (#225)
   posterize: { paramCount: 1, passCount: 1 },
 };
 

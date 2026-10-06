@@ -208,19 +208,27 @@ ok('PALETTE_IDS tracks the palette catalog', () => {
   assert.ok(PALETTE_IDS.includes('vortex-rwb'), 'vortex-rwb in cycle');
 });
 
-// --- gaussian blur is gone from the GPU path (#308) ---
+// --- gaussian blur is back on the GPU path (#1022) ---
 // The old QA-H4 block pinned blur-radius pass behavior; #308 removed gaussian
-// blur by design, so the regression is now the opposite: the 'blur' kind is
-// no longer registered as a builtin, and the FX roster's Blur entry dies on
-// the GPU path until #310 cuts it from the UI.
-ok('gaussian blur is gone from the GPU builtins (#308)', () => {
+// blur by design and this regression asserted the removal. #1022 earns it
+// back for the EF-1 rack slot, so the regression now pins the reinstatement:
+// 'blur' is a registered builtin with the #225 (H,V) pass machinery, and
+// the catalog param is amount (0..1), not the old radius.
+ok('gaussian blur is back in the GPU builtins (#1022)', () => {
   const defs = {};
   registerBuiltinEffects({
     registerProgram() {},
     defineEffect: (kind, def) => { defs[kind] = def; },
   });
-  assert.ok(!('blur' in defs), 'blur is not a registered builtin effect');
-  assert.ok(!defs.blur?.passes, 'no blur pass machinery survives');
+  assert.ok('blur' in defs, 'blur is a registered builtin effect');
+  assert.equal(typeof defs.blur.passes, 'function', 'function-form passes (#225 subdivision)');
+  const passes = defs.blur.passes({ amount: 1 }, { width: 1000, height: 700 });
+  assert.deepEqual(
+    passes.map((p) => p.mode),
+    [3, 4, 3, 4, 3, 4, 3, 4],
+    'amount 1 → four (H,V) pairs at width 1000',
+  );
+  assert.deepEqual(defs.blur.passes({ amount: 0 }, { width: 1000, height: 700 }), [], 'amount 0 → no passes');
 });
 
 console.log(`\nqaRegression: ${n} checks passed`);

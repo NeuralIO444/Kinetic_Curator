@@ -24,8 +24,24 @@ test('#816 slot map matches the packers', () => {
   assert.deepEqual(pack('grain', { amount: 0.35 }), [0, 0.35, 0, 0]);
 });
 
-test('#816 RGB then grain do not leak uniforms', () => {
-  const rgb = pack('rgbSplit', { dx: 12 });
+test('#1022 blur packs amount → sigma through the function-form passes', () => {
+  const def = BUILTIN_EFFECT_DEFS.find((d) => d.kind === 'blur');
+  const step = def.make(EFFECT_IDS);
+  const passes = step.passes({ amount: 0.5 }, { width: 1000, height: 700 });
+  assert.equal(passes.length, 2, 'one (H,V) pair at σ 20');
+  assert.deepEqual(passes.map((p) => p.mode), [EFFECT_IDS.blurH, EFFECT_IDS.blurV]);
+  assert.deepEqual(passes[0].params(), [20, 0, 0, 0], 'u_p.x carries the device-px sigma');
+  assert.deepEqual(passes[1].params(), [20, 0, 0, 0]);
+  assert.deepEqual(step.passes({ amount: 0 }, { width: 1000, height: 700 }), [], 'amount 0 → no passes');
+  assert.deepEqual(
+    step.passes({ amount: 99 }, { width: 1000, height: 700 }).map((p) => p.params()[0]),
+    [20, 20, 20, 20, 20, 20, 20, 20],
+    'hostile amount clamps to the catalog range, then subdivides honestly',
+  );
+  assert.equal(EFFECT_SLOT_MAP.blur.u_p[0], 'sigma');
+});
+
+test('#816 RGB then grain do not leak uniforms', () => {  const rgb = pack('rgbSplit', { dx: 12 });
   const grain = pack('grain', { amount: 0.35 });
   assert.equal(rgb[0], 0.012);
   assert.equal(rgb[1], 0, 'grain amount must not land in dx');

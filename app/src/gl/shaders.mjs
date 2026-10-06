@@ -31,11 +31,11 @@ export function blendIdFor(mode) {
 }
 
 export const EFFECT_IDS = Object.freeze({
-  invert: 0, rgbSplit: 1, grain: 2, posterize: 5,
+  invert: 0, rgbSplit: 1, grain: 2, blurH: 3, blurV: 4, posterize: 5,
 });
-// NOTE (#308): the instrument has no gaussian blur — the blurH/blurV ids
-// are gone, not reserved. posterize keeps id 5 (ids are explicit, nothing
-// renumbers).
+// NOTE (#308): the blurH/blurV ids were removed with gaussian blur; #1022
+// reinstates them (same ids — explicit, nothing renumbers). posterize keeps
+// id 5.
 
 /** Instanced textured quads. Per-instance: (x,y,sx,sy) (rot,opacity,u0,v0) (u1,v1,0,0).
  *  Wrapped with the shared chunk library (#196) so hands can use kc_hash12
@@ -440,6 +440,7 @@ uniform sampler2D u_src;
 uniform sampler2D u_aux;
 uniform int u_effect;
 uniform vec4 u_p;
+uniform vec2 u_texel;   // #1022: 1/w, 1/h of the write target in device px (blur taps)
 uniform vec4 u_clip;
 uniform float u_clipOn;
 in vec2 v_cuv;
@@ -473,6 +474,27 @@ void main() {
     float amt = clamp(u_p.y, 0.0, 1.0);
     float k = (n - 0.5) * amt * 0.55 * s.a;  // premul: no speckle where s.a == 0
     o = vec4(clamp(s.rgb + vec3(k), 0.0, s.a), s.a);
+  } else if (u_effect == 3 || u_effect == 4) { // #1022 separable gaussian blur (restored; retired by #308)
+    float sigma = u_p.x;                      // device px
+    if (sigma <= 0.0) {
+      o = s; // amount 0 is identity (matches SVG stdDeviation=0); sigma=0
+             // would divide by zero in the kernel weights below.
+    } else {
+    // vertical pass moves in texture-v (y-up): negate for canvas y-down
+    vec2 stepv = u_effect == 3 ? vec2(u_texel.x, 0.0) : vec2(0.0, -u_texel.y);
+    int R = int(ceil(sigma * 3.0));
+    float w0 = 0.3989422804014327 / sigma;    // 1/sqrt(2pi)/sigma
+    vec4 acc = s * w0;
+    float wsum = w0;
+    for (int i = 1; i <= 64; i++) {
+      if (i > R) break;
+      float w = w0 * exp(-float(i * i) / (2.0 * sigma * sigma));
+      vec2 off = stepv * float(i);
+      acc += (texture(u_src, tuv + off) + texture(u_src, tuv - off)) * w;
+      wsum += 2.0 * w;
+    }
+    o = acc / wsum;
+    }
   } else if (u_effect == 5) {                 // posterize: discrete table in straight space
     float levels = u_p.x;
     vec3 cs = unpre(s.rgb, s.a);

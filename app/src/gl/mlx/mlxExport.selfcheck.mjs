@@ -12,7 +12,7 @@
 //   - effectSources + declaredCostTiers: the two tables cover each other
 //     exactly (assertSourcesCoverDeclared)
 //   - extractFeatures.mjs: 7 features in FEATURE_NAMES order, every builtin
-//     costs 1 pass (#308: blur is gone), EFFECT_FS shaders share source features
+//     costs its declared pass count (blur's 2 separable passes are back #1022),
 import assert from 'node:assert';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -132,8 +132,8 @@ assert.equal(FEATURE_NAMES.length, 7, '7 documented features');
 const feats = extractAllFeatures();
 assert.ok(feats.size >= 20, 'features for every effect');
 const invert = feats.get('invert');
-// (#308: blur is gone — the builtin EFFECT_FS feature-parity probe now uses
-// grain, the other surviving single-pass builtin with a mapped param.)
+// (#1022: blur is back — the builtin EFFECT_FS feature-parity probe uses
+// grain, the other single-pass builtin with a mapped param.)
 const grain = feats.get('grain');
 assert.equal(invert.length, 7, 'vector length matches FEATURE_NAMES');
 assert.deepEqual(invert.slice(0, 5), grain.slice(0, 5), 'builtin effects share EFFECT_FS -> same source features');

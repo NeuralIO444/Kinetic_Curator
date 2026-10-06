@@ -114,6 +114,20 @@ export const FX_EFFECT_DEFS = {
     hint: '3×3 convolution edge detection. Alpha channel is preserved, so transparent areas stay clean.',
     params: {},
   },
+  // #1022 — BLUR reinstated as a real effect (the #308/#310 removal is
+  // earned back: the EF-1 rack slot had zero implementable kinds). One
+  // knob: amount 0..1 maps to σ 0..40 device px at full render scale,
+  // delivered as a true separable gaussian on the GL path (#225: wide
+  // sigmas subdivide into (H,V) pass pairs at σ/√n, clamped to the honest
+  // ceiling when the governor sheds renderScale). SVG studio path is a
+  // single feGaussianBlur at the same sigma.
+  blur: {
+    label: 'Blur',
+    hint: 'True gaussian blur. Amount 1 is the honest max (σ 40px at full render scale) — wide sigmas subdivide, never truncate.',
+    params: {
+      amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0, hint: 'Blur strength. 0 is the layer untouched.' },
+    },
+  },
 };
 
 export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
@@ -132,7 +146,9 @@ export const GRAIN_FAMILY_KINDS = ['grain'];
  * rack UI as disabled placeholders so the slot is never visually empty.
  */
 export const FX_RACK = [
-  { slot: 'EF-1', label: 'Blur / Focus', kinds: [],              stubs: ['sharpen', 'haze'] },
+  // #1022 — EF-1 holds a real effect again: blur is implementable, so the
+  // slot is no longer dead. sharpen/haze stay honest disabled stubs.
+  { slot: 'EF-1', label: 'Blur / Focus', kinds: ['blur'],            stubs: ['sharpen', 'haze'] },
   { slot: 'EF-2', label: 'Distort',      kinds: ['displace', 'tear', 'rgbSplit', 'edge'], stubs: [] },
   { slot: 'EF-3', label: 'Tonal',        kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
   { slot: 'EF-4', label: 'Finish',       kinds: ['grain', 'scanlines', 'halo'],          stubs: ['dither', 'stipple'] },
@@ -148,7 +164,10 @@ export const FX_RACK = [
  */
 // #704 — halo joins the add-menu: the chiaroscuro mode needs it reachable,
 // and it is the only effect in the set tuned for a dark ground.
-export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert', 'halo'];
+// #1022 — blur rejoins the add-menu: it is a real effect again (earned back
+// from the #308/#310 removal), so every add surface (section +, family
+// chooser, slot editor) offers it like any other roster effect.
+export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'blur'];
 
 export function isFxLayer(layer) {
   return !!layer && layer.type === 'fx';
@@ -429,9 +448,15 @@ function buildGrain(params, ctx, rid, src, srcAlpha) {
   ];
 }
 
-// #310: buildBlur removed with the roster entry — #308 retired gaussian
-// blur on the GPU path, so the SVG studio builder went with it. A chain
-// carrying kind 'blur' now fails closed (unknown kind: skipped) everywhere.
+// #1022 — buildBlur reinstated (was removed by #310 with the roster entry;
+// #308 had retired gaussian blur on the GPU path, #1022 earns it back).
+// The SVG studio half: one feGaussianBlur at the catalog sigma.
+function buildBlur(params, ctx, rid, src) {
+  return [
+    { prim: 'feGaussianBlur', attrs: { in: src, stdDeviation: r3(Math.max(0, params.amount) * 40) } },
+  ];
+}
+
 function buildScanlines(params, ctx, rid, src, srcAlpha) {
   // The turbulenceOctaves tier budget clamps noise detail (#192: no FX cuts).
   const octaves = Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
@@ -489,7 +514,7 @@ function buildEdge(params, ctx, rid, src) {
   ];
 }
 
-const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
+const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge, blur: buildBlur };
 
 /**
  * Compile an effects array into filter primitives.

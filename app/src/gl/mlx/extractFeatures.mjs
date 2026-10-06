@@ -21,8 +21,8 @@
  *                        texture fetches (echo taps).
  *   5. branch_count   — count of `if (` branches. Divergence / discarded work.
  *   6. pass_count     — declared static metadata: fullscreen passes the
- *                        effect needs (1 for every builtin since #308 removed
- *                        blur's 2 separable passes).
+ *                        effect needs (1 for most builtins; 2 for blur's
+ *                        separable H/V pair, reinstated #1022).
  *   7. param_count    — declared static metadata: per-effect params mapped
  *                        into uniforms (proxy for how "driven" the pass is).
  *

@@ -30,6 +30,7 @@ export const FX_KIND_TO_COST_ID = {
   grain: 'builtin/grain',
   invert: 'builtin/invert',
   posterize: 'builtin/posterize',
+  blur: 'builtin/blur', // #1022 — reinstated
   scanlines: 'fx/scanlines',
   displace: 'fx/displace',
   tear: 'fx/tear',

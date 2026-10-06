@@ -24,9 +24,13 @@ export const MEASURED_COSTS = {
   'accum/feed': { ms: 0.3333, method: 'wall', draws: 90 },
   'accum/glow': { ms: 0.3333, method: 'wall', draws: 90 },
   'accum/over': { ms: 0.3, method: 'wall', draws: 90 },
+  // #1022 — added by hand: the separable-gaussian shader is byte-identical
+  // to the pre-#308 one this number was measured against (software GL, wall
+  // clock, max-contract-case = amount 1 → 4 (H,V) pairs). Tier 2 carries no
+  // cost band, so the ratio to the median is informational, not a gate.
+  'builtin/blur': { ms: 590.5, method: 'wall', draws: 90 },
   'builtin/grain': { ms: 0.3, method: 'wall', draws: 90 },
-  'builtin/invert': { ms: 0.3, method: 'wall', draws: 90 },
-  'builtin/posterize': { ms: 0.3, method: 'wall', draws: 90 },
+  'builtin/invert': { ms: 0.3, method: 'wall', draws: 90 },  'builtin/posterize': { ms: 0.3, method: 'wall', draws: 90 },
   'builtin/rgbSplit': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/displace': { ms: 0.4, method: 'wall', draws: 90 },
   'fx/edge': { ms: 0.3, method: 'wall', draws: 90 },

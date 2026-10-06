@@ -88,3 +88,5 @@ The last step of every item is the same: **Matt's eyes judge.** Measure → buil
 ## Pillar note (TE)
 
 *What can we remove?* The instrument gets faster the TE way: by deciding what it doesn't have. Gaussian blur is gone as a design choice, not a casualty — and the stipple that replaces it is more Kinetic_Curator than blur ever was. **Earn-back rule:** nothing cut or removed returns unless a performer reaches for it mid-set and it's not there, or Matt's eyes miss it on the demo. That's the only gate back.
+
+> 2026-10-05 (#1022): the gate opened — the layer audit found the EF-1 rack slot dead (zero implementable kinds) and Matt reinstated a real blur effect for it. The earn-back worked as designed: the removal stood until a real reach, then the capability returned with its honesty contract (#225) intact.

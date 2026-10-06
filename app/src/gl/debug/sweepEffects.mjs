@@ -28,13 +28,13 @@
  * Where the zero-no-op lives, per effect (the house pattern is "off means
  * off, provably" — flow=0 skips exactly, silence is a no-op):
  * - shader identity: displace/scale=0, tear/amount=0, scanlines/amount=0,
- *   grain/amount=0, glow/amount=0, feed/flow=0, fade/(keep=1,tz=1,ts=0,prism=0),
+ *   grain/amount=0, blur/amount=0, glow/amount=0, feed/flow=0, fade/(keep=1,tz=1,ts=0,prism=0),
  *   echo/ntaps=0, copy — byte-exact (noop: true).
- *   (#308: the instrument has no gaussian blur — the builtin blur and the
- *   accum blur/add sweep entries were deleted with the blur passes. The
- *   glow pass has a sweep entry (accum/glow: mip-chain bloom + stipple +
- *   chromatic offset, measured for the cost-tier gate) and is also covered
- *   by the GPU-vs-mirror parity checks in accum.selfcheck.mjs.)
+ *   (#1022: the builtin blur sweep entry is reinstated with the effect —
+ *   #308 had deleted it with the blur passes. The glow pass keeps its own
+ *   sweep entry (accum/glow: mip-chain bloom + stipple + chromatic offset,
+ *   measured for the cost-tier gate) and is also covered by the
+ *   GPU-vs-mirror parity checks in accum.selfcheck.mjs.)
  * - N/A (always-on, binary): solarize, edge, invert — off means dropped
  *   from the chain, so there is no zero-param identity to prove.
  * - rgbSplit at dx=0 is NOT a no-op (the screen-alpha recombine
@@ -46,7 +46,8 @@
  *   included) for contract cases; raw direct upload for hostile cases.
  * - builtins: the u_p packers from registerBuiltinEffects
  *   (builtinEffects.mjs) — invert [0,0,0,0], rgbSplit [dx/1000,0,0,0],
- *   grain [amount,0,0,0], posterize [levels,0,0,0]; u_clipOn=0,
+ *   grain [amount,0,0,0], blur [sigma,0,0,0] (separable H/V pair, amount→σ),
+ *   posterize [levels,0,0,0]; u_clipOn=0,
  *   u_aux=input except grain's LUT.
  * - ACCUM: the setup callbacks in createAccum (accum.mjs).
  */
@@ -56,7 +57,7 @@ import { RESOLVE_FS } from '../resolveFs.mjs';
 import { TEMPLATE_VS, uniformDecls, uploadUniformsFor } from '../effects/template.mjs';
 import { injectCommon } from '../effects/chunks.mjs';
 import { buildProgramChecked, auditProgramChecked } from './diagnostics.mjs';
-import { UNIFORMS as BUILTIN_UNIFORMS } from '../bridge/builtinEffects.mjs';
+import { UNIFORMS as BUILTIN_UNIFORMS, clampBlurSigma, blurSubPassSigmas } from '../bridge/builtinEffects.mjs';
 import { ACCUM_PROGRAMS } from '../accum.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
 import { MATH_SHADER_EFFECTS } from '../effects/mathShaders.mjs';
@@ -263,6 +264,53 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
       };
     },
   };
+}
+
+/** Builtin blur: (H,V) separable pass pairs, like the bridge chain (#225, #1022). */
+function builtinBlurDef() {
+  const base = builtinEffectDef('blur', 3, (c, lab) => [
+    c.params.sigmaDirect !== undefined ? c.params.sigmaDirect : (c.params.amount || 0) * 40 * (lab.w / 1000),
+    0, 0, 0,
+  ]);
+  const origBuild = base.build;
+  base.build = (gl) => {
+    const built = origBuild(gl);
+    const { program, locs } = built;
+    const decls = BUILTIN_UNIFORMS;
+    return {
+      program,
+      locs,
+      apply: (glA, locsA, c, lab, targets) => {
+        // Mirrors the bridge's honest-blur stack (#225): clamp to the
+        // ceiling, subdivide into (H,V) pairs at σ/√n so the harness tests
+        // the production path. A zero sigma is one identity pass so the
+        // noop case still lands byte-exact output in `out`.
+        const raw = c.params.sigmaDirect !== undefined
+          ? c.params.sigmaDirect
+          : (c.params.amount || 0) * 40 * (lab.w / 1000);
+        const subs = blurSubPassSigmas(clampBlurSigma(raw));
+        let src = lab.input.tex;
+        const renderPair = (s) => {
+          for (const [mode, target] of [[3, targets.tmp], [4, targets.out]]) {
+            lab.render(program, target, locsA, decls, {
+              u_src: src,
+              u_aux: lab.input.tex,
+              u_effect: mode,
+              u_p: [s, 0, 0, 0],
+              u_texel: [1 / target.w, 1 / target.h],
+              u_clip: [0, 0, 0, 0],
+              u_clipOn: 0,
+            });
+            src = target.tex;
+          }
+        };
+        if (subs.length) for (const s of subs) renderPair(s);
+        else renderPair(0);
+      },
+      dispose: built.dispose,
+    };
+  };
+  return base;
 }
 
 /* ------------------------------------------------------------------ */
@@ -586,6 +634,19 @@ export const SWEEP_EFFECTS = [
       C('max', { amount: 1 }, { costly: true }),
       C('high', { amount: 0.7 }),
       H('hostile negative amount', { amount: -0.5 }),
+    ],
+  },
+  {
+    // #1022 — reinstated with the effect (#308 deleted it with the passes).
+    ...builtinBlurDef(),
+    cases: [
+      // Catalog default is amount 0 (identity at defaults, like halo).
+      C('zero → no-op', { amount: 0 }, { noop: true }),
+      C('light', { amount: 0.25 }),
+      C('mid', { amount: 0.5 }),
+      C('max', { amount: 1 }, { costly: true }),
+      H('hostile over-max amount', { amount: 5 }),
+      H('hostile deep-loop sigma', { sigmaDirect: 25 }),
     ],
   },
   // ---- final resolve pass, FXAA off / on (#740) ----

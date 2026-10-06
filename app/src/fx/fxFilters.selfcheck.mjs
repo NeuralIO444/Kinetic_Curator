@@ -139,11 +139,13 @@ ok('#520 Phase 2: renderer.mjs local GRAIN_FAMILY_KINDS matches fxFilters.js', (
 // #520 Phase 1b — availableFxKinds offer-list
 ok('#520 Phase 1b: availableFxKinds — empty stack offers all live kinds in slot order', () => {
   const kinds = availableFxKinds([]);
-  // EF-1 has no live kinds; EF-2, EF-3, EF-4 each have some
+  // #1022 — EF-1 holds blur again; EF-2, EF-3, EF-4 each have some
+  const ef1 = FX_RACK.find(s => s.slot === 'EF-1').kinds;
   const ef2 = FX_RACK.find(s => s.slot === 'EF-2').kinds;
   const ef3 = FX_RACK.find(s => s.slot === 'EF-3').kinds;
   const ef4 = FX_RACK.find(s => s.slot === 'EF-4').kinds;
-  assert.deepEqual(kinds, [...ef2, ...ef3, ...ef4]);
+  assert.deepEqual(kinds, [...ef1, ...ef2, ...ef3, ...ef4]);
+  assert.ok(kinds.includes('blur'), 'EF-1 offers blur (#1022)');
   assert.ok(!kinds.some(k => FX_RACK.find(s => s.slot === 'EF-1').stubs.includes(k)), 'no stubs in offer-list');
 });
 ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-list', () => {
@@ -156,7 +158,8 @@ ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-li
 });
 ok('#520 Phase 1b: availableFxKinds — all slots filled returns empty', () => {
   const effects = [
-    { kind: 'rgbSplit', params: {} },   // EF-2
+    { kind: 'blur', params: {} },       // EF-1 (#1022)
+    { kind: 'rgbSplit', params: {} },  // EF-2
     { kind: 'posterize', params: {} },  // EF-3
     { kind: 'grain', params: {} },      // EF-4
   ];
@@ -176,13 +179,15 @@ ok('#520 Phase 1b: fxEffectInsertIndex — unknown kind appends', () => {
   assert.equal(fxEffectInsertIndex('vaporwave', [{ kind: 'grain', params: {} }]), 1);
 });
 
-ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
+ok('#310/#704/#1022: add-menu stays curated, roster stays renderable', () => {
   // #704 — halo joins the menu: the chiaroscuro mode needs it reachable, and
   // it is the only effect in the set tuned for a dark ground. The list is an
   // explicit gate (a curated subset of the roster), so additions are a
   // deliberate edit here rather than something a data change does quietly.
-  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo']);
-  assert.ok(!FX_EFFECT_KINDS.includes('blur'), 'blur is cut from the roster');
+  // #1022 — blur rejoins the menu: it is a real effect again (earned back
+  // from the #308/#310 removal) for the EF-1 rack slot.
+  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'blur']);
+  assert.ok(FX_EFFECT_KINDS.includes('blur'), 'blur is back in the roster (#1022)');
   for (const k of FX_MENU_KINDS) assert.ok(FX_EFFECT_KINDS.includes(k), `${k} stays in the roster`);
   // The five demoted effects stay renderable: they compile, they just leave the menu.
   for (const k of ['grain', 'scanlines', 'posterize', 'solarize', 'edge']) {
@@ -499,13 +504,21 @@ ok('project JSON round-trips fx layers exactly', () => {
   assert.equal(before, after);
 });
 
-ok('#310: blur fails closed — the roster entry is gone', () => {
-  // #308 retired gaussian blur on the GPU path; #310 cut the roster entry.
-  // A chain carrying kind 'blur' (e.g. an old project doc) compiles to
-  // nothing: unknown kinds are skipped, never crash the render.
-  const prims = compileFxPrimitives([{ kind: 'blur', params: { radius: 6 } }]);
-  assert.deepEqual(prims, []);
-  assert.deepEqual(sanitizeFxEffects([{ kind: 'blur', params: { radius: 6 } }]), []);
+ok('#1022: blur is a real effect — compiles to a single feGaussianBlur', () => {
+  // #308 retired gaussian blur on the GPU path and #310 cut the roster
+  // entry; #1022 earns it back for the EF-1 rack slot. A chain carrying
+  // kind 'blur' compiles to one primitive, params sanitized to the
+  // catalog (amount 0..1 → σ 0..40).
+  const prims = compileFxPrimitives([{ kind: 'blur', params: { amount: 0.5 } }]);
+  assert.deepEqual(prims.map((p) => p.prim), ['feGaussianBlur']);
+  assert.equal(prims[0].attrs.stdDeviation, 20);
+  const zero = compileFxPrimitives([{ kind: 'blur', params: { amount: 0 } }]);
+  assert.equal(zero[0].attrs.stdDeviation, 0, 'amount 0 is identity (matches the GL no-op)');
+  assert.deepEqual(
+    sanitizeFxEffects([{ kind: 'blur', params: { amount: 2 } }]),
+    [{ kind: 'blur', params: { amount: 1 } }],
+    'amount clamps to the catalog range',
+  );
 });
 ok('scanlines: anisotropic noise, alpha-masked, octaves shed like other turbulence', () => {
   const prims = compileFxPrimitives([{ kind: 'scanlines', params: { density: 0.35, amount: 0.5 } }]);

@@ -9,6 +9,7 @@ export const SLOT_ABBR = {
 };
 
 export const KIND_FACE = {
+  blur: { abbr: 'BLR', word: 'blur' },
   displace: { abbr: 'WRP', word: 'warp' },
   tear: { abbr: 'TEAR', word: 'tear' },
   rgbSplit: { abbr: 'SPL', word: 'split' },
