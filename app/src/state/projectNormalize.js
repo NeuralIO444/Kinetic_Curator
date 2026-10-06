@@ -8,6 +8,7 @@
 // engine/kernel/rng → engine/prng) and is safe to import from anywhere.
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeFxEffects } from '../fx/fxFilters.js';
+import { fxBeforeMath } from './layerOrder.js';
 import { sanitizeMathEffects } from '../fx/mathFilters.js';
 import { ASSETS } from '../data/assets/index.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
@@ -222,6 +223,15 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     layers.push(layer);
   }
   if (layers.length === 0) return { layers: null, activeLayerId: null };
+  // #1048 — FX folds before MATH. A project saved while the engine let them
+  // interleave is moved into that order on load; only adjustment tracks move,
+  // content keeps its place. This can change how such a project renders (a
+  // MATH grade that sat under an FX track now sits above it), so say so.
+  const ordered = fxBeforeMath(layers);
+  if (ordered.moved) {
+    layers.splice(0, layers.length, ...ordered.layers);
+    console.warn('[normalize] FX tracks moved below MATH tracks (#1048: the tone grade folds last) — this project may render differently; save it to keep the new order');
+  }
   // FX/MATH layers are never the content-active layer; a document with no
   // content layer at all is degenerate — treat it as invalid like an empty list.
   if (!layers.some((l) => l.type === 'content')) return { layers: null, activeLayerId: null };

@@ -6,12 +6,14 @@ import { isMathLayer, defaultMathEffects, defaultMathParams, MATH_EFFECT_DEFS, M
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { isTapeFull } from '../tapeBudget.js';
+import { fxBeforeMath, canTrade } from '../layerOrder.js';
 
 export const MAX_CONTENT_TRACKS = 4;
 export const MAX_FX_TRACKS = 4;
 // #1010 — MATH is a third track type: same grammar as FX (add/remove/hide/
 // solo/opacity/reorder), riding the same fold. Adjustment tracks (FX+MATH)
-// stay above KC tracks; FX and MATH interleave freely (order is creative).
+// stay above KC tracks, and since #1048 every FX track folds before every
+// MATH track (layerOrder.js) — the tone grade is applied last.
 export const MAX_MATH_TRACKS = 4;
 
 /** Adjustment track: FX or MATH — the two families that grade everything below. */
@@ -152,8 +154,9 @@ export const createLayersSlice = (set) => ({
     };
     if (isAdj) copy.effects = structuredClone(src.effects || (isMath ? defaultMathEffects() : defaultFxEffects()));
     const i = state.layers.findIndex((l) => l.id === id);
-    const layers = [...state.layers];
-    layers.splice(i + 1, 0, copy);
+    const spliced = [...state.layers];
+    spliced.splice(i + 1, 0, copy);
+    const layers = fxBeforeMath(spliced).layers; // #1048 — a copy never breaks FX-before-MATH
     if (isFx) return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, selectedFxLayerId: nid };
     if (isMath) return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, selectedMathLayerId: nid };
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: { ...state.layerSnapshots, [nid]: structuredClone(snap) } };
@@ -220,10 +223,10 @@ export const createLayersSlice = (set) => ({
     const j = i + delta;
     if (i < 0 || j < 0 || j >= state.layers.length) return {};
     // #732 — adjustment tracks (FX+MATH) stay above KC tracks. Array is
-    // bottom→top. FX and MATH interleave freely: order is creative (#1010).
+    // bottom→top. #1048 — FX never crosses MATH: the tone grade folds last.
     const a = state.layers[i];
     const b = state.layers[j];
-    if (isAdjustmentLayer(a) !== isAdjustmentLayer(b)) return {};
+    if (!canTrade(a, b)) return {};
     const layers = [...state.layers];
     [layers[i], layers[j]] = [layers[j], layers[i]];
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
@@ -238,7 +241,7 @@ export const createLayersSlice = (set) => ({
     if (i < 0 || j < 0 || i === j) return {};
     const a = state.layers[i];
     const b = state.layers[j];
-    if (isAdjustmentLayer(a) !== isAdjustmentLayer(b)) return {};
+    if (!canTrade(a, b)) return {};
     const layers = [...state.layers];
     [layers[i], layers[j]] = [layers[j], layers[i]];
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers };
@@ -264,7 +267,9 @@ export const createLayersSlice = (set) => ({
     const effects = kind ? [{ kind, params: defaultFxParams(kind) }] : [];
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
-      layers: [...state.layers, { id, name: `FX ${fxCount + 1}`, type: 'fx', visible: true, effects, layerBlendMode: 'normal', layerOpacity: 1 }],
+      // #1048 — a new FX track lands after the existing FX tracks and BELOW
+      // every MATH track, so the tone grade stays last in the fold.
+      layers: fxBeforeMath([...state.layers, { id, name: `FX ${fxCount + 1}`, type: 'fx', visible: true, effects, layerBlendMode: 'normal', layerOpacity: 1 }]).layers,
       selectedFxLayerId: id,
       ...(picked ? { lastUsedFxKind: family } : null),
     };
@@ -341,7 +346,8 @@ export const createLayersSlice = (set) => ({
     if (mathCount >= MAX_MATH_TRACKS) return {};
     if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer/addFxLayer
     const id = makeLayerId();
-    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: [...state.layers, { id, name: `M ${mathCount + 1}`, type: 'math', visible: true, effects: defaultMathEffects(), layerBlendMode: 'normal', layerOpacity: 1 }], selectedMathLayerId: id };
+    const layers = fxBeforeMath([...state.layers, { id, name: `M ${mathCount + 1}`, type: 'math', visible: true, effects: defaultMathEffects(), layerBlendMode: 'normal', layerOpacity: 1 }]).layers;
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, selectedMathLayerId: id };
   }),
 
   setSelectedMathLayer: (id) => set((state) => {
