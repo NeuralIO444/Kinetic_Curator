@@ -375,6 +375,24 @@ export const createDavisSlice = (set) => ({
     persistKeeps(keeps);
     return { keeps };
   }),
+  /**
+   * #1051 — replace the performer's shelf from an imported bundle. Same
+   * sanitizer and caps as the localStorage reader (a file is a trust
+   * boundary), same persistence. A list that is not an array is ignored, so
+   * a refused bundle part can never wipe what is here.
+   */
+  importShelf: ({ favorites, keeps } = {}) => set(() => {
+    const out = {};
+    if (Array.isArray(favorites)) {
+      out.favorites = favorites.map(sanitizeFavorite).filter(Boolean).slice(0, FAVORITES_MAX);
+      persistFavorites(out.favorites);
+    }
+    if (Array.isArray(keeps)) {
+      out.keeps = keeps.map(sanitizeFavorite).filter(Boolean).slice(0, KEEPS_MAX);
+      persistKeeps(out.keeps);
+    }
+    return out;
+  }),
   reorderFavorite: (id, delta) => set((state) => {
     const idx = state.favorites.findIndex((f) => f.id === id);
     if (idx < 0) return {};

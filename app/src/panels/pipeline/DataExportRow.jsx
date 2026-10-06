@@ -13,6 +13,14 @@ import { useStore } from '../../state/store.js';
 import { helpText } from '../../data/helpCopy.js';
 import { retrainNudge, dismissRetrainNudge } from '../../curator/tasteHead.js';
 import { getTaste } from '../../curator/tasteStore.js';
+import { getBiologyPolicy, importBiologyPolicy } from '../../biology/policy.js';
+import { readUserPresets, writeUserPresets } from '../../data/canvasPresets.js';
+import {
+  buildBundle, parseBundle, bundleSummary, bundleMessage, bundleFilename, isBundle,
+} from '../../state/bundle.js';
+import { BUNDLE_SANITIZERS } from '../../state/bundleParts.js';
+
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
 
 function downloadJsonBlob(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
@@ -36,6 +44,8 @@ export function DataExportRow({
   const fileInputRef = useRef(null);
   const paletteInputRef = useRef(null);
   const tasteInputRef = useRef(null);
+  const bundleInputRef = useRef(null);
+  const [pendingBundle, setPendingBundle] = useState(null); // #1051 — { fileName, parsed }
   const [recent, setRecent] = useState(() => readRecent());
   const [loadedName, setLoadedName] = useState(null);
   const [pendingImport, setPendingImport] = useState(null); // #647 — { fileName, doc, sanitized }
@@ -44,6 +54,7 @@ export function DataExportRow({
   const tasteStatus = useStore((s) => s.tasteStatus);
   const loisStatus = useStore((s) => s.loisStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
+  const importShelf = useStore((s) => s.importShelf); // #1051
   const clearTaste = useStore((s) => s.clearTaste);
   const [nudgeTick, setNudgeTick] = useState(0); // #925 — re-render after dismissing the retrain nudge
   // #925 — one dismissible hint line under the taste status, past ~50 new
@@ -82,6 +93,63 @@ export function DataExportRow({
     setBehind(Boolean(dirtyMessage(exportedPayload.current, JSON.stringify(buildProjectPayload(projectFields)))));
   }, [projectFields]);
 
+
+  // #1051 — everything a performer would be sorry to lose, in one file.
+  const exportBundle = () => {
+    const bundle = buildBundle({
+      project: buildProjectPayload(projectFields),
+      userPalettes: userPalettes || [],
+      favorites: favorites || [],
+      keeps: keeps || [],
+      taste: getTaste(),
+      biology: getBiologyPolicy(),
+      canvasPresets: readUserPresets(),
+      appVersion: APP_VERSION,
+    });
+    const filename = bundleFilename();
+    downloadJsonBlob(bundle, filename);
+    onMessage(`${bundleMessage({ good: Object.keys(bundle.parts), bad: [] }, 'Bundle saved')} → ${filename}`);
+  };
+
+  const importBundleFile = (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      let raw;
+      try { raw = JSON.parse(ev.target.result); } catch { onMessage('Bundle: not valid JSON'); return; }
+      if (!isBundle(raw)) { onMessage('Bundle: not a KC-1 bundle (use ↑ IMPORT for a single project file)'); return; }
+      const parsed = parseBundle(raw, BUNDLE_SANITIZERS);
+      if (!parsed.ok) { onMessage(`Bundle: ${parsed.error}`); return; }
+      setPendingBundle({ fileName: file.name, parsed });
+    };
+    reader.onerror = () => onMessage('Could not read file');
+    reader.readAsText(file);
+  };
+
+  // Each part is applied by the same path its own single import uses.
+  const applyBundle = () => {
+    if (!pendingBundle) return;
+    const { parsed } = pendingBundle;
+    const p = parsed.parts;
+    const failed = [];
+    if (p.userPalettes?.ok) emit(Events.PALETTE_IMPORT, p.userPalettes.value);
+    if (p.favorites?.ok || p.keeps?.ok) {
+      importShelf({ favorites: p.favorites?.ok ? p.favorites.value : undefined, keeps: p.keeps?.ok ? p.keeps.value : undefined });
+    }
+    if (p.taste?.ok) { const r = importTasteToStore(p.taste.value); if (!r.ok) failed.push({ name: 'taste', error: r.error }); }
+    if (p.biology?.ok) { const r = importBiologyPolicy(p.biology.value); if (!r.ok) failed.push({ name: 'biology', error: r.error }); }
+    if (p.canvasPresets?.ok) writeUserPresets(p.canvasPresets.value);
+    if (p.project?.ok) emit(Events.EXPORT_LOAD_PROJECT, p.project.value.doc);
+    const s = bundleSummary(parsed);
+    s.bad.push(...failed);
+    s.good = s.good.filter((g) => !failed.some((f) => f.name === g));
+    onMessage(bundleMessage(s, 'Bundle imported'));
+    setPendingBundle(null);
+  };
+
+  const exportBundleFirst = () => { exportBundle(); applyBundle(); };
 
   const exportPalettes = () => downloadJsonBlob(userPalettes || [], 'kinetic-curator-palettes.json');
 
@@ -240,6 +308,28 @@ export function DataExportRow({
           ↓ HITS ({(favorites || []).length}★ {(keeps || []).length}▣)
         </button>
       </div>
+      <div className="pipeline-row">
+        <button className="big-btn dl" onClick={exportBundle} style={{ flex: 1 }} title="Everything in one file: project, palettes, favorites, keeps, taste, biology policy, canvas presets">↓ BUNDLE</button>
+        <button className="big-btn" onClick={() => bundleInputRef.current?.click()} style={{ flex: 1 }} title="Restore a bundle. Replaces what is here; you confirm first.">↑ BUNDLE</button>
+        <input ref={bundleInputRef} type="file" accept=".json,application/json" onChange={importBundleFile} style={{ display: 'none' }} />
+      </div>
+      {pendingBundle && (() => {
+        const s = bundleSummary(pendingBundle.parsed);
+        const lab = { project: 'the project', userPalettes: 'palettes', favorites: 'favorites', keeps: 'keeps', taste: 'taste', biology: 'the biology policy', canvasPresets: 'canvas presets' };
+        return (
+          <div style={{ border: '1px solid #8a6d2f', padding: 8, margin: '2px 0 6px', background: '#16130c' }}>
+            <div style={{ fontSize: 11, marginBottom: 6 }}>
+              {pendingBundle.fileName} will replace {s.good.map((g) => lab[g] || g).join(', ') || 'nothing'}.
+              {s.bad.length > 0 && ` Skipped, unreadable: ${s.bad.map((b) => `${lab[b.name] || b.name} (${b.error})`).join('; ')}.`}
+            </div>
+            <div className="pipeline-row" style={{ gap: 6 }}>
+              <button className="big-btn dl" onClick={exportBundleFirst} style={{ flex: 1 }} title="Save a bundle of what is here first, then restore">Export current first</button>
+              <button className="big-btn" onClick={() => setPendingBundle(null)} style={{ flex: 1 }}>Cancel</button>
+              <button className="big-btn" onClick={applyBundle} style={{ flex: 1 }} title="Replace what is here with the bundle">Proceed</button>
+            </div>
+          </div>
+        );
+      })()}
       <div className="pipeline-row" title={helpText('output-taste')}>
         <button className="big-btn" onClick={() => tasteInputRef.current?.click()} style={{ flex: 3 }}>↑ IMPORT TASTE</button>
         <button className="big-btn" onClick={clearTaste} style={{ flex: 1 }} title="Forget the imported taste">CLEAR</button>
