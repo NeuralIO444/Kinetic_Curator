@@ -9,13 +9,21 @@ The roadmap's own rule is "no phase advances with carryover". It stopped being f
 
 Order of priorities: **true → proven → safe → honest → consistent → playable → new.**
 
+## Where we are (2026-10-05)
+
+**Phases 0 and 1 are closed. Phase 2 is open.** The PATTERN lane runs alongside.
+
+- **Phase 0, closed:** roadmap synced (PR #1054), #248 settled at six tabs, `main` protected with five required checks, a `Closes #N` line now required on every PR (PR #1055), merged branches auto-delete. One item carried: PR #1050 still needs its three fixes, and it now lives in Phase 3 with #980.
+- **Phase 1, closed on Matt's word:** Matt signed Stage 1 and Stage 2 on 2026-10-05 **without running the recorded set or the stranger link test**. Both stay available as optional checks at any time; neither blocks anything. The half-float accum audit is waived with them.
+- **Phase 2, open now:** #1052 first, then #1053, then #1051.
+
 ## Summary
 
 | Phase | Goal | Work | Exit |
 |---|---|---|---|
-| 0 | Square the books | Roadmap sync, #248, PR #1050, process fixes | Roadmap matches the tracker |
-| 1 | Prove what's built | One recorded set, one stranger link | Stage 1 and 2 signed or failed in writing |
-| 2 | Make work safe | #1051, #1052, #1053 | Wipe and restore from one file |
+| 0 ✅ | Square the books | Roadmap sync, #248, PR #1050, process fixes | Roadmap matches the tracker |
+| 1 ✅ | Prove what's built | Signed on Matt's word; the two tests were not run | Stage 1 and 2 signed |
+| 2 ← now | Make work safe | #1051, #1052, #1053 | Wipe and restore from one file |
 | 3 | Honest UI | #1023, #1022, #1046, #1048, #1037, #980 | No control shows what the engine doesn't do |
 | 4 | One look | #1027–#1033, #1043 | Design system §9 holds |
 | 5 | Playable on stage | MIDI bind, FM-1, real-GPU check, #617, #608 | One set with a controller and a projector |
