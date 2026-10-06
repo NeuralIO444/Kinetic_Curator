@@ -408,6 +408,10 @@
 .layer-row-active { border-color: var(--accent3); }
 .layer-row-fx { border-color: #8a6cff; background: rgba(138, 108, 255, 0.07); }
 .layer-row-fx-selected { border-color: #b49aff; box-shadow: inset 3px 0 0 #35c4b5, inset 0 0 0 1px #b49aff; }
+/* #1018 (F8) — the whole FX row body opens the effect editor, so the row
+   reads as tappable. Pointer cursor only; C's dark rows and type-color
+   accents are untouched. */
+.build-layer-stack .layer-row-fx { cursor: pointer; }
 /* #1015 — reorder feedback, styled to mockup C (kc-layer-alt/c-refined.png):
    dark rows, type-color accents (content #e8a33d, FX #35c4b5). The moved
    row flashes its type color; labels are positional and would otherwise
