@@ -7,6 +7,7 @@ import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
 import { FeelPicker } from './stimulus/FeelPicker.jsx';
 import { MeterHero } from './stimulus/MeterHero.jsx';
 import { ModMatrix } from './stimulus/ModMatrix.jsx';
+import { audioInputs } from '../hooks/audioLoss.mjs';
 
 export function StimulusPanel() {
   const { state } = useApp(s => ({
@@ -17,6 +18,7 @@ export function StimulusPanel() {
     audioMonitor: s.audioMonitor,
     audioSidecar: s.audioSidecar, // #618
     audioSidecarNote: s.audioSidecarNote,
+    audioLost: s.audioLost, // #1053
     audioRoutes: s.audioRoutes, // #790
     beatPulse: s.beatPulse,
     audioBands: s.audioBands,
@@ -25,15 +27,23 @@ export function StimulusPanel() {
   const {
     audioEnabled, audioGain, audioSource, audioLastFile,
     audioMonitor, beatPulse, audioBands, layoutParams,
-    audioSidecar, audioSidecarNote, audioRoutes,
+    audioSidecar, audioSidecarNote, audioRoutes, audioLost,
   } = state;
 
   const [devices, setDevices] = useState([]);
 
+  // #1053: keep the list current. A device plugged in after the panel opened
+  // used to be missing until a reload, and an unplugged one stayed listed.
   useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then(devs => {
-      setDevices(devs.filter(d => d.kind === 'audioinput'));
-    }).catch(() => {});
+    const md = navigator.mediaDevices;
+    if (!md) return undefined;
+    let alive = true;
+    const refresh = () => {
+      md.enumerateDevices().then(devs => { if (alive) setDevices(audioInputs(devs)); }).catch(() => {});
+    };
+    refresh();
+    md.addEventListener?.('devicechange', refresh);
+    return () => { alive = false; md.removeEventListener?.('devicechange', refresh); };
   }, []);
 
   const depth = layoutParams.audioModDepth ?? 0.65;
@@ -84,6 +94,7 @@ export function StimulusPanel() {
               audioMonitor={audioMonitor}
               audioSidecar={audioSidecar}
               audioSidecarNote={audioSidecarNote}
+              audioLost={audioLost}
               devices={devices}
             />
           )}

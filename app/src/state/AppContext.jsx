@@ -129,6 +129,7 @@ export function useApp(selector) {
       case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
       case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
       case A.SET_AUDIO_DENIED: return store.setAudioDenied(payload);
+      case A.SET_AUDIO_LOST: return store.setAudioLost(payload);
       case A.SET_AUDIO_GAIN: return store.setAudioGain(payload);
       case A.SET_AUDIO_SOURCE: return store.setAudioSource(payload);
       case A.SET_AUDIO_MONITOR: return store.setAudioMonitor(payload);

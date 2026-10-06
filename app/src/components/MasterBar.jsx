@@ -9,6 +9,7 @@ import * as A from '../state/actions.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { LoisPill } from './LoisPill.jsx';
+import { lostLine } from '../hooks/audioLoss.mjs';
 
 export function MasterBar() {
   const { dispatch, history } = useApp();
@@ -17,13 +18,13 @@ export function MasterBar() {
     seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
     isRecording: s.isRecording, persistStatus: s.persistStatus, frameLock: s.frameLock,
     bootNotice: s.bootNotice, setBootNotice: s.setBootNotice,
-    setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, glContext: s.glContext,
+    setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, audioLost: s.audioLost, glContext: s.glContext,
     curatorConfidence: s.curatorConfidence, curatorActive: s.curatorActive,
     layers: s.layers,
   }));
   const {
     running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
-    frameLock = false, audioDenied = false, glContext = 'ok', governorShedFps = 28,
+    frameLock = false, audioDenied = false, audioLost = null, glContext = 'ok', governorShedFps = 28,
   } = state;
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
@@ -133,6 +134,14 @@ export function MasterBar() {
             title="Browser denied mic access.">
             <span className="status-dot" style={{ background: '#ffb000' }} />
             MIC BLOCKED
+          </div>
+        )}
+
+        {audioLost && (
+          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            title={`${lostLine(audioLost.name)} — switch AUDIO on in STIMULI to reconnect.`}>
+            <span className="status-dot" style={{ background: '#ffb000' }} />
+            AUDIO INPUT LOST
           </div>
         )}
 

@@ -2,8 +2,9 @@ import { emit, Events } from '../../composition/eventBus.js';
 import { useStore } from '../../state/store.js';
 import { parseAudioEnvelope } from '../../gl/audioEnvelopeCore.mjs';
 import { sourceStatus, sidecarReason } from '../../gl/sourceStatus.mjs';
+import { lostLine, selectedInputMissing } from '../../hooks/audioLoss.mjs';
 
-export function SourceControls({ audioSource, audioLastFile, audioGain, audioMonitor, devices, audioSidecar, audioSidecarNote }) {
+export function SourceControls({ audioSource, audioLastFile, audioGain, audioMonitor, devices, audioSidecar, audioSidecarNote, audioLost = null }) {
   const status = sourceStatus(audioSource, audioSidecar, audioSidecarNote);
   // UX-7: the last loaded file survives a switch to mic (the store stashes
   // it instead of revoking the URL), so the dropdown's File: option can
@@ -67,8 +68,16 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
       >
         <option value="default">Default Mic</option>
         {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 5)}...`}</option>)}
+        {selectedInputMissing(audioSource, devices) && <option value={audioSource.id}>(not connected)</option>}
         {fileOpt && fileOpt.url && <option value="file">File: {fileOpt.name}</option>}
       </select>
+
+      {audioLost && (
+        <div className="stim-source-status" role="alert" title="The chosen input is gone. Switch AUDIO on to reconnect it; KC-1 never switches to a different input by itself.">
+          <span className="stim-source-tag">LOST</span>
+          <span>{lostLine(audioLost.name)} · switch AUDIO on to reconnect</span>
+        </div>
+      )}
 
       <input type="file" accept="audio/*" onChange={handleFileChange} style={{ fontSize: '9px', color: 'var(--dim)', width: '100%' }} />
 

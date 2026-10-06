@@ -9,6 +9,7 @@
 import { useRef, useEffect } from 'react';
 import { setAudioMeterTap } from './audioMeterTap.js';
 import { audioInputConstraints, processingStillOn } from './audioInputConstraints.mjs';
+import { classifyAudioError } from './audioLoss.mjs';
 import { METER_FFT_SIZE } from '../gl/meterBands.mjs';
 import { envelopeTick } from '../gl/audioEnvelopeCore.mjs';
 import {
@@ -25,7 +26,7 @@ import {
 // goes through the shaped envelope. Silence decays to exact zeros, so the
 // no-op contracts downstream are preserved.
 
-export function useAudioInput({ enabled, source, gain, monitor, ballistics, sidecar = null, onStimulus, onBands, onBeat, onDenied }) {
+export function useAudioInput({ enabled, source, gain, monitor, ballistics, sidecar = null, onStimulus, onBands, onBeat, onDenied, onLost }) {
   const ctxRef = useRef(null);
   const analyserRef = useRef(null);
   const sourceRef = useRef(null);
@@ -45,9 +46,9 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
   useEffect(() => { sidecarRef.current = sidecar; }, [sidecar]);
   const envPrevTRef = useRef(null);
 
-  const cbRef = useRef({ onStimulus, onBands, onBeat, onDenied });
+  const cbRef = useRef({ onStimulus, onBands, onBeat, onDenied, onLost });
   const gainRef = useRef(gain);
-  useEffect(() => { cbRef.current = { onStimulus, onBands, onBeat, onDenied }; });
+  useEffect(() => { cbRef.current = { onStimulus, onBands, onBeat, onDenied, onLost }; });
   useEffect(() => { gainRef.current = gain; }, [gain]);
   const ballisticsRef = useRef(ballistics);
   useEffect(() => { ballisticsRef.current = ballistics; }, [ballistics]);
@@ -162,6 +163,13 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
           stream = await navigator.mediaDevices.getUserMedia(audioInputConstraints(source.id));
           if (cancelled) { stream.getTracks().forEach(t => t.stop()); ctx.close().catch(() => {}); return; }
           srcNode = ctx.createMediaStreamSource(stream);
+          // #1053: an unplugged device ends its track. Without this the
+          // analyser just went silent with no word.
+          const track = stream.getAudioTracks()[0];
+          if (track) {
+            const label = track.label;
+            track.onended = () => { if (!cancelled) cbRef.current.onLost?.(label); };
+          }
           // A browser may ignore the constraints. Say so rather than fail.
           stillOn = processingStillOn(stream.getAudioTracks()[0]?.getSettings?.());
           if (stillOn.length) console.warn('[useAudioInput] input is being processed by the browser:', stillOn.join(', '));
@@ -202,9 +210,15 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
         cbRef.current.onDenied?.(false);
         rafRef.current = requestAnimationFrame(analyze);
       } catch (err) {
-        console.warn('[useAudioInput] mic/audio access denied:', err?.message ?? err);
-        deniedRef.current = true;
-        cbRef.current.onDenied?.(true);
+        if (classifyAudioError(err) === 'lost') {
+          // The chosen device is not there: that is not a refused permission.
+          console.warn('[useAudioInput] audio input not available:', err?.message ?? err);
+          cbRef.current.onLost?.(source.id === 'default' ? '' : source.id);
+        } else {
+          console.warn('[useAudioInput] mic/audio access denied:', err?.message ?? err);
+          deniedRef.current = true;
+          cbRef.current.onDenied?.(true);
+        }
       }
     })();
 
@@ -229,7 +243,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
         audioElRef.current = null;
       }
       if (sourceRef.current?.stream) {
-        sourceRef.current.stream.getTracks().forEach(t => t.stop());
+        sourceRef.current.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
       }
       sourceRef.current?.node?.disconnect();
       gainNodeRef.current?.disconnect();
