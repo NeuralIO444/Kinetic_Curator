@@ -111,6 +111,8 @@ at least two existing variants to earn its place (the "earn your surface" gate, 
 
 ### 2.6 Track rows (P08 LAYERS — the refined row-stack)
 
+- **List order (#1037):** the list reads like the fold. Sections run **MATH / FX / CONTENT** top to bottom, and inside each section the **frontmost track is on top** (KC-1, the bottom of the picture, is the last KC row). What you see on top is applied last. ▲ means later in the chain, more foreground; ▼ the reverse. FX never crosses MATH (#1048), and KC tracks never cross the effects line.
+
 - 44px collapsed row: type badge (`KC` / violet `FX` / yellow `M`) + Arabic numeral + name + reorder `▲▼` + hide `●` + solo `S` + `DUP` + `×`.
 - Track-type identity: KC = neutral ink badge; FX = violet; MATH = BUILD yellow. Arabic numerals everywhere (Matt's #1016 ruling — Roman is retired).
 - Opacity/wet slider inline (the ONE slider, §2.1).
