@@ -1,0 +1,30 @@
+name: PR body
+
+# Separate from ci.yml on purpose: this one re-runs when the PR body is
+# edited, and the heavy jobs there should not.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  # House rule (CLAUDE.md): every PR body carries a literal `Closes #N`, so
+  # the merge closes the issue. #1017 / #1018 merged without one and stayed
+  # open. Docs-only PRs with no issue write `No issue`.
+  closes-line:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Drop HTML comments first, so the template's own help text
+          # cannot satisfy the check.
+          BODY="$(printf '%s' "$BODY" | perl -0pe 's/<!--.*?-->//gs')"
+          if printf '%s' "$BODY" | grep -Eiq '(^|[^a-z])(close[sd]?|fix(e[sd])?|resolve[sd]?) #[0-9]+'; then
+            echo "ok: closing line found"
+          elif printf '%s' "$BODY" | grep -Eiq '(^|[^a-z])no issue([^a-z]|$)'; then
+            echo "ok: marked 'No issue'"
+          else
+            echo "::error::PR body needs a literal 'Closes #N' line, or 'No issue' for a PR that finishes none."
+            exit 1
+          fi
