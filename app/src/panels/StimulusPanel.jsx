@@ -8,6 +8,7 @@ import { FeelPicker } from './stimulus/FeelPicker.jsx';
 import { MeterHero } from './stimulus/MeterHero.jsx';
 import { ModMatrix } from './stimulus/ModMatrix.jsx';
 import { audioInputs } from '../hooks/audioLoss.mjs';
+import { RangeTone } from '../components/RangeTone.jsx';
 
 export function StimulusPanel() {
   const { state } = useApp(s => ({
@@ -62,6 +63,7 @@ export function StimulusPanel() {
   const [advancedOpen, setAdvancedOpen] = useState(false); // #615: raw sliders collapsed by default
 
   return (
+    <RangeTone tone="stim">
     <div className="panel panel-stimulus">
       <PanelHeader tag="P06" title="STIMULI" subtitle={audioEnabled ? 'active' : 'idle'} />
       <div className="stim-body">
@@ -116,5 +118,6 @@ export function StimulusPanel() {
 
       </div>
     </div>
+    </RangeTone>
   );
 }

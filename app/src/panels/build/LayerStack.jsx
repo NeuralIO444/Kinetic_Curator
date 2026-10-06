@@ -19,6 +19,7 @@ import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS,
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 import { rowsTopFirst, moveNeighbor, canMoveUp, canMoveDown } from './layerRows.mjs';
 import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
+import { RangeRow } from '../../components/RangeRow.jsx';
 
 // #716 Part 2 — black block + white numeral heads every row. The edited
 // track inverts (white block, black numeral).
@@ -124,9 +125,9 @@ function FxEffectEditor({ layer, fxOrdinal }) {
           {Object.entries(def.params).map(([key, p]) => (
             <div className="fx-param" key={key}>
               <label title={p.hint}>{p.label}</label>
-              <input type="range" min={p.min} max={p.max} step={p.step} value={filled.params?.[key] ?? p.def}
-                onDoubleClick={() => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: p.def })}
-                onChange={(e) => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: Number(e.target.value) })} />
+              <RangeRow layout="bare" tone="build" min={p.min} max={p.max} step={p.step} value={filled.params?.[key] ?? p.def}
+                onReset={() => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: p.def })}
+                onChange={(v) => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: v })} />
               <span className="fx-param-readout">{filled.params?.[key] ?? p.def}</span>
             </div>
           ))}
@@ -404,9 +405,9 @@ export function LayerStack() {
             </select>
           )}
           {adj && <span className="wet-label">WET</span>}
-          <input type="range" min={0} max={wet.cap} step={0.01} value={wet.wet}
-            title={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
-            onChange={(e) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: Number(e.target.value) })} />
+          <RangeRow layout="bare" tone="build" min={0} max={wet.cap} step={0.01} value={wet.wet}
+            hint={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
+            onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })} />
           <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>{Math.round(wet.wet * 100)}%{wet.capped ? ' max' : ''}</span>
         </div>
         {!adj && (
@@ -432,19 +433,19 @@ export function LayerStack() {
               ))}
             </select>
             {patch.mode === 'feed' && (
-              <input type="range" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                title={helpText('layers-patch-feed')}
-                onChange={(e) => setLayerPatch(layer.id, { mode: 'feed', to, strength: Number(e.target.value) })} />
+              <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                hint={helpText('layers-patch-feed')}
+                onChange={(v) => setLayerPatch(layer.id, { mode: 'feed', to, strength: v })} />
             )}
             {patch.mode === 'mod' && (
-              <input type="range" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                title={helpText('layers-patch-mod')}
-                onChange={(e) => setLayerPatch(layer.id, { mode: 'mod', to, strength: Number(e.target.value) })} />
+              <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                hint={helpText('layers-patch-mod')}
+                onChange={(v) => setLayerPatch(layer.id, { mode: 'mod', to, strength: v })} />
             )}
             {patch.mode === 'field' && (
-              <input type="range" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                title={helpText('layers-patch-field')}
-                onChange={(e) => setLayerPatch(layer.id, { mode: 'field', to, strength: Number(e.target.value) })} />
+              <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                hint={helpText('layers-patch-field')}
+                onChange={(v) => setLayerPatch(layer.id, { mode: 'field', to, strength: v })} />
             )}
           </div>
           {/* #1019 — one plain-language PATCH line for newcomers, shown once

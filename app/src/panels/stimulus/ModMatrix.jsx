@@ -11,6 +11,7 @@
 // with energy. RETUNE watches for dead routes (silent input, or depth ~ 0)
 // and offers a one-tap fix. Neither runs unless you tap.
 import { useEffect, useRef, useState } from 'react';
+import { RangeRow } from '../../components/RangeRow.jsx';
 import { audioMatrixRows, ROUTE_TARGETS, COARSE_INPUTS, BAND_INPUTS, MAX_ROUTES } from '../../gl/audioRoutes.mjs';
 import { getShapedBands } from '../../gl/bandFeed.mjs';
 import { absorbPeaks, autoSetupRoutes, deadRouteIndexes, ENERGY_FLOOR, inputEnergy, retuneRoutes, snapshotFromReads } from '../../gl/stimuliAuto.mjs';
@@ -55,9 +56,9 @@ function Row({ row, route, index, table, onEdit }) {
         </select>
       </span>
       <span className="stim-route-depth" title={`effective gain ×${fmt(row.depth)} after the master DEPTH / SCALE / ALPHA knobs · double-click to reset`}>
-        <input type="range" aria-label={`Route ${index + 1} depth`} min={range.min} max={range.max} step={range.step} value={shown}
-          onChange={(e) => onEdit((t) => patchRoute(t, index, { depth: Number(e.target.value) }), true)}
-          onDoubleClick={() => onEdit((t) => patchRoute(t, index, { depth: defaultDepthFor(route.input, route.target) }), false)} />
+        <RangeRow layout="bare" tone="stim" ariaLabel={`Route ${index + 1} depth`} min={range.min} max={range.max} step={range.step} value={shown}
+          onChange={(v) => onEdit((t) => patchRoute(t, index, { depth: v }), true)}
+          onReset={() => onEdit((t) => patchRoute(t, index, { depth: defaultDepthFor(route.input, route.target) }), false)} />
         <input type="number" aria-label={`Route ${index + 1} depth value`} min={range.min} max={range.max} step={range.step} value={shown}
           onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) onEdit((t) => patchRoute(t, index, { depth: v }), true); }} />
       </span>

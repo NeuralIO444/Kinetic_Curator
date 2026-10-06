@@ -183,7 +183,8 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   max-width: 40%;
 }
-.mix-slider { flex: 1; accent-color: var(--accent); }
+.mix-slider { flex: 1; min-width: 0; } /* #1027: the thumb is the house thumb, not the browser's */
+.accum-slider { width: 64px; flex: 0 0 64px; }
 .mix-pct { font-size: 9px; color: var(--dim); min-width: 30px; text-align: right; }
 .mix-btn {
   background: transparent; border: 1px solid var(--line); color: var(--dim);
@@ -476,10 +477,9 @@
 .build-layer-stack .layer-row-composite select { min-height: 44px; }
 .build-layer-stack .layer-row-composite .fx-param-readout,
 .build-layer-stack .layer-row-composite .fx-param label { align-self: center; }
-/* Native range inputs: the hit area is the element box, so give it the full
-   44px height — the track/thumb stay small and centered. */
+/* #1027: the 44px hit area is now the house slider's own default (controls.css). */
 .build-layer-stack .layer-row-composite input[type=range],
-.build-layer-stack .fx-editor .fx-param input[type=range] { height: 44px; flex: 1; min-width: 0; }
+.build-layer-stack .fx-editor .fx-param input[type=range] { flex: 1; min-width: 0; }
 .build-layer-stack .fx-editor select.tg,
 .build-layer-stack .fx-editor .chip-btn { min-height: 44px; }
 .build-layer-stack .ef-bypass { min-width: 44px; min-height: 44px; }

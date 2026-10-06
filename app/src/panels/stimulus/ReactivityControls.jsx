@@ -1,5 +1,5 @@
 import { emit, Events } from '../../composition/eventBus.js';
-import { ModSlider } from './ModSlider.jsx';
+import { RangeRow } from '../../components/RangeRow.jsx';
 import { MotionTile } from '../../components/MotionTile.jsx';
 import { BALLISTICS_CURVES } from '../../gl/audioBallistics.mjs';
 
@@ -22,25 +22,11 @@ const RESPONSE_HINTS = {
   'peak-hold': 'Punchy attacks, smooth linear falloff.',
 };
 
-function MsSlider({ label, value, min, max, step, onChange, hint, disabled, disabledReason }) {
-  // UX-7: "waiting for audio," not "broken" — dim, never struck through.
-  const title = [hint, disabled && disabledReason ? `Waiting for audio — ${disabledReason}` : null]
-    .filter(Boolean).join(' · ') || undefined;
-  return (
-    <div style={{ marginBottom: 6, opacity: disabled ? 0.55 : 1 }} title={title}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.08em', marginBottom: 2 }}>
-        <span>{label}</span>
-        <span>{Math.round(value)} ms</span>
-      </div>
-      <input
-        type="range" min={min} max={max} step={step}
-        value={value}
-        onChange={e => onChange(parseFloat(e.target.value))}
-        disabled={disabled}
-        style={{ width: '100%' }}
-      />
-    </div>
-  );
+// STIMULI's one slider (#1027): the stack layout in the STIMULI tone. A control waiting on
+// the mic is dim, never struck through (UX-7), and says what it is waiting for.
+function AudioSlider({ unit, value, ...rest }) {
+  const readout = unit === 'ms' ? `${Math.round(value)} ms` : Number(value).toFixed(2);
+  return <RangeRow layout="stack" tone="stim" value={value} readout={readout} disabledLabel="Waiting for audio" {...rest} />;
 }
 
 function ResponsePicker({ value, onChange, disabled, disabledReason }) {
@@ -81,13 +67,13 @@ export function ReactivityControls({ depth, scaleMod, alphaMod, life, attackMs, 
     <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '6px' }} title="Live node multiply from the mic. Does not tick the Ghost Station phrase clock.">REACTIVITY / LIFE</div>
 
-      <ModSlider label="DEPTH" value={depth} min={0} max={1} step={0.05}
+      <AudioSlider label="DEPTH" value={depth} min={0} max={1} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioModDepth', value: v })} hint="How hard the mic pushes scale/alpha. Not the Ghost bar."
         disabled={!audioEnabled} disabledReason={disabledReason} />
-      <ModSlider label="SCALE" value={scaleMod} min={0} max={1} step={0.05}
+      <AudioSlider label="SCALE" value={scaleMod} min={0} max={1} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: v })} hint="Bands → node size. Phrase CLOCK is a separate counter."
         disabled={!audioEnabled} disabledReason={disabledReason} />
-      <ModSlider label="ALPHA" value={alphaMod} min={0} max={1} step={0.05}
+      <AudioSlider label="ALPHA" value={alphaMod} min={0} max={1} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: v })} hint="Bands → opacity pulse."
         disabled={!audioEnabled} disabledReason={disabledReason} />
       <MotionTile kind="life" label="life" value={life} min={0} max={1} step={0.05}
@@ -96,18 +82,18 @@ export function ReactivityControls({ depth, scaleMod, alphaMod, life, attackMs, 
 
       <div style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', margin: '8px 0 6px' }} title="Attack/decay ballistics shape the mic envelope before it drives anything — smoothing jittery transient-snapping into a heavy, fluid weight.">ENVELOPE</div>
 
-      <MsSlider label="ATTACK" value={attackMs} min={0} max={500} step={5}
+      <AudioSlider unit="ms" label="ATTACK" value={attackMs} min={0} max={500} step={5}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioAttackMs', value: v })}
         hint="How fast the envelope opens on a transient. Low = snappy, high = heavy."
         disabled={!audioEnabled} disabledReason={disabledReason} />
-      <MsSlider label="DECAY" value={decayMs} min={0} max={2000} step={10}
+      <AudioSlider unit="ms" label="DECAY" value={decayMs} min={0} max={2000} step={10}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioDecayMs', value: v })}
         hint="How fast the envelope falls after the hit. Long = fluid, lingering gestures."
         disabled={!audioEnabled} disabledReason={disabledReason} />
       <ResponsePicker value={response}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioResponse', value: v })}
         disabled={!audioEnabled} disabledReason={disabledReason} />
-      <ModSlider label="SWELL" value={swell} min={0} max={1} step={0.05}
+      <AudioSlider label="SWELL" value={swell} min={0} max={1} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioSwell', value: v })}
         hint="How hard the music swells GLOW. 0 = the music never moves the glow — the washout control for loud passages at high glow."
         disabled={!audioEnabled} disabledReason={disabledReason} />

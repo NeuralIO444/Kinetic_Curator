@@ -21,6 +21,7 @@ import {
   QUEUE_BEATS_MAX,
   QUEUE_BEAT_FALLBACK_BPM,
 } from '../../state/queueTransport.js';
+import { RangeRow } from '../../components/RangeRow.jsx';
 
 export function QueueTransport() {
   const favorites = useStore((s) => s.favorites);
@@ -160,14 +161,13 @@ export function QueueTransport() {
       {queueSource === 'time' ? (
         <div className="davis-interval-row">
           <span className="davis-label">HOLD</span>
-          <input
-            type="range"
+          <RangeRow layout="bare" tone="ink"
             min={QUEUE_SECONDS_MIN}
             max={QUEUE_SECONDS_MAX}
             step={1}
             value={queueSecondsPerHit}
-            title="Seconds each hit holds before advancing."
-            onChange={(e) => setQueueSecondsPerHit(Number(e.target.value))}
+            hint="Seconds each hit holds before advancing."
+            onChange={(v) => setQueueSecondsPerHit(v)}
           />
           <span className="davis-readout">{queueSecondsPerHit}s / hit</span>
         </div>
@@ -175,14 +175,13 @@ export function QueueTransport() {
         <>
           <div className="davis-interval-row">
             <span className="davis-label">BEATS</span>
-            <input
-              type="range"
+            <RangeRow layout="bare" tone="ink"
               min={QUEUE_BEATS_MIN}
               max={QUEUE_BEATS_MAX}
               step={1}
               value={queueBeatsPerHit}
-              title="Beats each hit holds, at the BEAT button's tempo."
-              onChange={(e) => setQueueBeatsPerHit(Number(e.target.value))}
+              hint="Beats each hit holds, at the BEAT button's tempo."
+              onChange={(v) => setQueueBeatsPerHit(v)}
             />
             <span className="davis-readout">
               {queueBeatsPerHit} @ {beatBpm} BPM = {(holdMs / 1000).toFixed(1)}s

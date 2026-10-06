@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { MATH_EFFECT_DEFS, MATH_OP_KINDS, MATH_MOD_SOURCES, formatMathParam } from '../../fx/mathFilters.js';
+import { RangeRow } from '../../components/RangeRow.jsx';
 
 const MOD_LABELS = { none: '—', rms: 'RMS', flux: 'FLUX', beatPulse: 'BEAT' };
 
@@ -59,11 +60,10 @@ function MathOpRow({ layerId, index, fx, count }) {
         return (
           <div className="fx-param" key={key}>
             <label title={p.hint}>{p.label}</label>
-            <input
-              type="range" min={p.min} max={p.max} step={p.step} value={v}
-              title={p.hint}
-              onDoubleClick={() => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: p.def })}
-              onChange={(e) => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: Number(e.target.value) })}
+            <RangeRow layout="bare" tone="build" min={p.min} max={p.max} step={p.step} value={v}
+              hint={p.hint}
+              onReset={() => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: p.def })}
+              onChange={(v) => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: v })}
             />
             <span className="fx-param-readout" title={p.hint}>{formatMathParam(fx.kind, key, v)}</span>
             <ModSelect

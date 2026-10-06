@@ -200,7 +200,11 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
     assert.ok(ui.includes(s), `the matrix offers ${s}`);
   }
   assert.ok(/disabled=\{taken\(id, route\.target\)\}/.test(ui) && /disabled=\{taken\(route\.input, id\)\}/.test(ui), 'a duplicate pair cannot be picked');
-  assert.ok(/onEdit\(\(t\) => patchRoute\(t, index, \{ depth: Number\(e\.target\.value\) \}\), true\)/.test(ui), 'the depth slider edits continuously (one undo step per drag)');
+  // #1027: the depth slider is a RangeRow (bare, STIMULI tone). A drag is continuous (one undo step per drag);
+  // a double-click reset is its own discrete step, through onReset.
+  assert.ok(/<RangeRow layout="bare" tone="stim"/.test(ui), 'the depth slider is the house slider in the STIMULI tone');
+  assert.ok(/onChange=\{\(v\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: v \}\), true\)\}/.test(ui), 'the depth slider edits continuously (one undo step per drag)');
+  assert.ok(/onReset=\{\(\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: defaultDepthFor\(route\.input, route\.target\) \}\), false\)\}/.test(ui), 'double-click resets to the default depth as its own undo step');
   assert.ok(/disabled=\{full\}/.test(ui) && /disabled=\{!custom\}/.test(ui), '+ ROUTE stops at the cap; RESET only when customised');
   assert.ok(/disabled=\{table\.length === 0\} onClick=\{\(\) => setAudioRoutes\(\[\]\)\}/.test(ui), 'CLEAR empties the table (start from scratch), greyed when already empty');
   const meter = src('../panels/stimulus/MeterHero.jsx');

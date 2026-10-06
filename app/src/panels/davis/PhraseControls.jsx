@@ -1,5 +1,6 @@
 import { emit, Events } from '../../composition/eventBus.js';
 import { euclidString } from '../../state/euclid.js';
+import { RangeRow } from '../../components/RangeRow.jsx';
 
 const PHRASE_MODES = [
   { id: 'cycle-seed', label: 'CYCLE', title: 'On wrap, seed becomes origin+1 and origin follows.' },
@@ -48,20 +49,20 @@ export function PhraseControls({
         <>
           <div className="davis-interval-row" title="Hits spread as evenly as possible across the steps.">
             <span className="davis-label">HITS</span>
-            <input type="range" min={0} max={euclidSteps} step={1} value={euclidBeats}
-              onChange={(e) => emit(Events.DAVIS_PHRASE, { euclid: { beats: Number(e.target.value) } })} />
+            <RangeRow layout="bare" tone="ink" min={0} max={euclidSteps} step={1} value={euclidBeats}
+              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { beats: v } })} />
             <span className="davis-readout">{euclidBeats}/{euclidSteps}</span>
           </div>
           <div className="davis-interval-row" title="Steps in the figure. Hits redistribute.">
             <span className="davis-label">STEPS</span>
-            <input type="range" min={2} max={32} step={1} value={euclidSteps}
-              onChange={(e) => emit(Events.DAVIS_PHRASE, { euclid: { steps: Number(e.target.value) } })} />
+            <RangeRow layout="bare" tone="ink" min={2} max={32} step={1} value={euclidSteps}
+              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { steps: v } })} />
             <span className="davis-readout">{euclidSteps}</span>
           </div>
           <div className="davis-interval-row" title="Turn the figure so a different step lands on the downbeat.">
             <span className="davis-label">ROTATE</span>
-            <input type="range" min={0} max={Math.max(0, euclidSteps - 1)} step={1} value={euclidRotate}
-              onChange={(e) => emit(Events.DAVIS_PHRASE, { euclid: { rotate: Number(e.target.value) } })} />
+            <RangeRow layout="bare" tone="ink" min={0} max={Math.max(0, euclidSteps - 1)} step={1} value={euclidRotate}
+              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { rotate: v } })} />
             <span className="davis-readout" style={{ fontFamily: 'var(--font-mono, monospace)', letterSpacing: '0.12em' }}>
               {euclidString(euclidBeats, euclidSteps, euclidRotate)}
             </span>
@@ -76,8 +77,8 @@ export function PhraseControls({
       )}
       <div className="davis-interval-row" title="Beats in the bar before wrap.">
         <span className="davis-label">LENGTH</span>
-        <input type="range" min={4} max={32} step={1} value={phraseLength || 8}
-          onChange={e => emit(Events.DAVIS_PHRASE, { length: Number(e.target.value) })} />
+        <RangeRow layout="bare" tone="ink" min={4} max={32} step={1} value={phraseLength || 8}
+          onChange={(v) => emit(Events.DAVIS_PHRASE, { length: v })} />
         <span className="davis-readout">{phraseLength || 8} beats</span>
       </div>
       <div className="davis-source-row" style={{ marginTop: 4 }}>

@@ -22,6 +22,7 @@ import { SunRow } from './layout/SunRow.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
 import { MathSection } from './build/MathSection.jsx';
+import { RangeTone } from '../components/RangeTone.jsx';
 
 export function BuildPanel() {
   const { state } = useApp(s => ({
@@ -33,6 +34,7 @@ export function BuildPanel() {
   const lockCount = Object.values(lockedParams).filter(Boolean).length;
 
   return (
+    <RangeTone tone="build">
     <div className="panel panel-layout">
       <PanelHeader tag="P03" title="BUILD" subtitle={layoutParams.composition}>
         {lockCount > 0 && <span className="lock-badge">🔒 {lockCount}</span>}
@@ -77,5 +79,6 @@ export function BuildPanel() {
         </BuildSection>
       </div>
     </div>
+    </RangeTone>
   );
 }

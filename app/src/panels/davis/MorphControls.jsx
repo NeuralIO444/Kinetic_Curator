@@ -1,4 +1,5 @@
 import { emit, Events } from '../../composition/eventBus.js';
+import { RangeRow } from '../../components/RangeRow.jsx';
 
 export function MorphControls({ morphEvolve, morphDurationMs, morphing }) {
   return (
@@ -16,11 +17,10 @@ export function MorphControls({ morphEvolve, morphDurationMs, morphing }) {
       <div className="davis-interval-row" style={morphEvolve ? undefined : { opacity: 0.4 }}
         title={morphEvolve ? 'Seconds for layout targets to ease in.' : 'Dead while MORPH EVOLVE is off. It only shapes the ease.'}>
         <span className="davis-label">DURATION</span>
-        <input
-          type="range" min={300} max={4000} step={100} value={morphDurationMs || 1200}
+        <RangeRow layout="bare" tone="ink" min={300} max={4000} step={100} value={morphDurationMs || 1200}
           disabled={!morphEvolve}
-          title={morphEvolve ? 'Seconds for layout targets to ease in.' : 'Dead while MORPH EVOLVE is off. It only shapes the ease.'}
-          onChange={e => emit(Events.DAVIS_MORPH_DURATION, { duration: Number(e.target.value) })}
+          hint={morphEvolve ? 'Seconds for layout targets to ease in.' : 'Dead while MORPH EVOLVE is off. It only shapes the ease.'}
+          onChange={(v) => emit(Events.DAVIS_MORPH_DURATION, { duration: v })}
         />
         <span className="davis-readout">{((morphDurationMs || 1200) / 1000).toFixed(1)}s</span>
       </div>
