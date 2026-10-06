@@ -19,7 +19,7 @@ export default defineConfig({
   // project chain, each depending on the one before it, after everything else.
   // Everything else keeps its parallelism.
   projects: [
-    { name: 'app', testIgnore: /(accum-recording|loop-capture|midi|grain-live)\.spec\.js/ },
+    { name: 'app', testIgnore: /(accum-recording|loop-capture|midi)\.spec\.js/ },
     // The MIDI boot seeds a whole project (autoQuality off, accumulation on,
     // 40 nodes): software GL renders it at full cost, so beside the other
     // workers it starves and its boot eats a whole test timeout. It takes the
@@ -27,9 +27,6 @@ export default defineConfig({
     { name: 'midi', testMatch: /midi\.spec\.js/, dependencies: ['app'] },
     { name: 'rec-accum', testMatch: /accum-recording\.spec\.js/, dependencies: ['midi'] },
     { name: 'rec-loop', testMatch: /loop-capture\.spec\.js/, dependencies: ['rec-accum'] },
-    // #1069 — measures pixels on the live GL canvas, so on software GL it needs the CPU
-    // to itself; beside the other workers its screenshots starved and timed out.
-    { name: 'gl-pixels', testMatch: /grain-live\.spec\.js/, dependencies: ['rec-loop'] },
   ],
   webServer: {
     command: 'npm run preview -- --host 127.0.0.1 --port 4173',
