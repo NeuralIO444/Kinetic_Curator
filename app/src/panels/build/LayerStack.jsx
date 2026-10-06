@@ -336,7 +336,23 @@ export function LayerStack() {
     // the click. MATH rows are out of scope — their DUP is untouched.
     const dupCapped = math ? false : fx ? fxCount >= MAX_FX_TRACKS : contentCount >= MAX_CONTENT_TRACKS;
     return (
-      <div key={layer.id} className={`layer-row${cls === 'content' ? ' layer-row-kc' : ''} ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}${moveFlash?.id === layer.id ? ' layer-row-moved' : ''}`}>
+      <div
+        key={layer.id}
+        className={`layer-row${cls === 'content' ? ' layer-row-kc' : ''} ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}${moveFlash?.id === layer.id ? ' layer-row-moved' : ''}`}
+        // #1018 (F8) — the whole FX row arms the effect editor. The name
+        // used to be the only affordance and it reads as a label, so the
+        // editor was undiscoverable. Row-body taps anywhere on an FX row
+        // emit the same FX_SELECT the name button emits; icon buttons,
+        // the opacity slider, and the editor's own controls keep their
+        // own handlers (the closest() bail-out). KC rows are unchanged;
+        // MATH rows are out of scope (#1010).
+        onClick={(e) => {
+          if (!fx) return;
+          if (e.target.closest('button, input, select, label, a')) return;
+          emit(Events.FX_SELECT, { id: layer.id });
+        }}
+        title={fx ? `Tap to open the ${label} effect editor` : undefined}
+      >
         <div className="layer-row-main">
           <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : isActive} />
           <div className="layer-reorder">
