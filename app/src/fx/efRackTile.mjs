@@ -1,10 +1,12 @@
 // #716 — EF rack tile face; #1046 — header strip. The editor opens with one
-// line, `abbreviation · mode word · ✕` (e.g. `GRN · grain · ✕`), then only its
-// controls. There is no glyph and no reserved row: the tile is as tall as its
-// content. An empty slot's mode word is the slot's own name (`fin · finish`).
+// line of three items in a row, abbreviation, mode word, and the remove ✕ (e.g.
+// `GRN grain ✕`), then only its controls. There is no glyph and no reserved row:
+// the tile is as tall as its content. An empty slot has nothing to remove, so its
+// line is just the first two, the slot naming itself (`FIN finish`). The
+// abbreviation renders uppercase; the mode word is lowercased by CSS.
 
 export const SLOT_ABBR = {
-  'EF-1': 'BLR',
+  'EF-1': 'FOC', // Blur / Focus family, holding SHARPEN and HAZE: no claim of a blur (#1072)
   'EF-2': 'DST',
   'EF-3': 'TON',
   'EF-4': 'FIN',
