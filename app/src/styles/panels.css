@@ -512,33 +512,28 @@
 .fx-slot { border: 1px solid var(--line); padding: 4px 6px; background: rgba(0,0,0,0.25); }
 .fx-slot-empty { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 3px 6px; background: rgba(0,0,0,0.10); border: 1px dashed #8a6cff22; }
 .fx-slot-label { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #8a6cff; background: #8a6cff22; padding: 1px 4px; border-radius: 2px; white-space: nowrap; }
-.fx-slot-family { font-size: 9px; color: var(--dim); flex: 1; letter-spacing: 0.03em; }
-.fx-stub { font-size: 8px; color: #555; letter-spacing: 0.06em; border: 1px solid #444; padding: 1px 4px; border-radius: 2px; }
 .fx-effect-head { display: flex; align-items: center; gap: 4px; }
 .fx-effect-name { flex: 1; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #cdbfff; }
 /* #716 — TX-6 EF tile, the DLY ✕ WARP line:
    abbreviation top-left, ✕ top-right, glyph centre, one mode word. */
 .ef-tile {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-rows: auto 28px auto auto;
-  align-items: center;
-  gap: 2px 6px;
+  display: flex; flex-direction: column; gap: 4px;
   border: 1px solid var(--line);
-  padding: 4px 6px;
+  padding: 0 6px 4px;
   background: #0a0a0a;
   color: #f4f4f4;
 }
-.ef-abbr { grid-column: 1; grid-row: 1; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #f4f4f4; }
+/* #1046 — header strip: abbreviation · mode word · remove. It is also what
+   announces that the editor opened, so it carries the FX violet hairline. */
+.ef-head { display: flex; align-items: center; gap: 6px; min-height: 28px; border-bottom: 1px solid #8a6cff55; }
+.ef-abbr { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #f4f4f4; }
+.ef-word { flex: 1; font-size: 10px; letter-spacing: 0.08em; color: var(--dim); text-transform: lowercase; }
 .ef-bypass {
-  grid-column: 3; grid-row: 1; justify-self: end;
   background: transparent; border: none; color: #f4f4f4;
   font-size: 12px; line-height: 1; padding: 0 2px; cursor: pointer;
 }
-.ef-bypass-off { visibility: hidden; }
-.ef-glyph { grid-column: 2; grid-row: 2; width: 28px; height: 28px; justify-self: center; color: #f4f4f4; }
-.ef-word { grid-column: 1 / -1; grid-row: 3; font-size: 10px; letter-spacing: 0.08em; color: #f4f4f4; text-transform: lowercase; }
-.ef-tile .fx-param, .ef-tile .fx-slot-family, .ef-tile .fx-stub, .ef-tile .tg, .ef-tile .chip-btn { grid-column: 1 / -1; }
+.ef-tile .chip-btn { width: 100%; }
+.fx-note { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; padding: 2px 0; }
 .fx-param { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .fx-param label { font-size: 9px; color: var(--dim); width: 52px; text-transform: lowercase; letter-spacing: 0.05em; }
 .fx-param input[type=range] { flex: 1; min-width: 0; }
