@@ -8,6 +8,7 @@
 
 import { useRef, useEffect } from 'react';
 import { setAudioMeterTap } from './audioMeterTap.js';
+import { audioInputConstraints, processingStillOn } from './audioInputConstraints.mjs';
 import { METER_FFT_SIZE } from '../gl/meterBands.mjs';
 import { envelopeTick } from '../gl/audioEnvelopeCore.mjs';
 import {
@@ -144,6 +145,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
 
         let srcNode;
         let stream = null;
+        let stillOn = [];
 
         if (source.type === 'file') {
           const audio = new Audio();
@@ -155,10 +157,14 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
           await audio.play();
           if (cancelled) { audio.pause(); ctx.close().catch(() => {}); return; }
         } else {
-          const constraints = { audio: source.id === 'default' ? true : { deviceId: { exact: source.id } } };
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          // #1052: ask for the raw input — Chrome's speech processing (echo
+          // cancel / noise suppress / auto gain) pumps and ducks music.
+          stream = await navigator.mediaDevices.getUserMedia(audioInputConstraints(source.id));
           if (cancelled) { stream.getTracks().forEach(t => t.stop()); ctx.close().catch(() => {}); return; }
           srcNode = ctx.createMediaStreamSource(stream);
+          // A browser may ignore the constraints. Say so rather than fail.
+          stillOn = processingStillOn(stream.getAudioTracks()[0]?.getSettings?.());
+          if (stillOn.length) console.warn('[useAudioInput] input is being processed by the browser:', stillOn.join(', '));
         }
 
         const gainNode = ctx.createGain();
@@ -186,7 +192,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
         sourceRef.current = { node: srcNode, stream };
         gainNodeRef.current = gainNode;
         analyserRef.current = analyser;
-        setAudioMeterTap({ analyser: meterAnalyser, sampleRate: ctx.sampleRate, kind: source.type === 'file' ? 'FILE' : 'MIC' });
+        setAudioMeterTap({ analyser: meterAnalyser, sampleRate: ctx.sampleRate, kind: source.type === 'file' ? 'FILE' : (stillOn.length ? 'MIC·PROC' : 'MIC') });
         runningRef.current = true;
         // #306: fresh session, fresh envelope — never resume from stale values.
         resetBallistics(follower);

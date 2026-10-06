@@ -9,6 +9,7 @@ node src/engine/kineme.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
 node src/hooks/batchGate.selfcheck.mjs
+node src/hooks/audioInputConstraints.selfcheck.mjs
 node src/panels/pipeline/SnapshotGallery.selfcheck.mjs
 node src/panels/pipeline/paletteImportCopy.selfcheck.mjs
 node src/panels/pipeline/pipelineNotices.selfcheck.mjs

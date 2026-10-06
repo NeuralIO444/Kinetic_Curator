@@ -9,7 +9,7 @@ import { BAND_KEYS } from '../gl/bandFeed.mjs';
 
 let tap = null;
 
-/** @param {{analyser: AnalyserNode, sampleRate: number, kind: 'MIC'|'FILE'}|null} next */
+/** @param {{analyser: AnalyserNode, sampleRate: number, kind: 'MIC'|'MIC·PROC'|'FILE'}|null} next — MIC·PROC: the browser kept speech processing on (#1052) */
 export function setAudioMeterTap(next) {
   tap = next;
 }
