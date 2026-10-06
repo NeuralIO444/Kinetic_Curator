@@ -9,7 +9,7 @@ import { PanelHeader } from '../../components/PanelHeader.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES } from '../../data/layout-modes.js';
 import { FX_EFFECT_DEFS, FX_MENU_KINDS, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
-import { isMathLayer, mathTrackHitsHard } from '../../fx/mathFilters.js';
+import { isMathLayer, mathTrackHitsHard, wetDisplay } from '../../fx/mathFilters.js';
 import { MathEffectEditor } from './MathEffectEditor.jsx';
 import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
 import { efTileFace } from '../../fx/efRackTile.mjs';
@@ -332,6 +332,7 @@ export function LayerStack() {
     const fx = isFxLayer(layer);
     const math = isMathLayer(layer);
     const adj = fx || math;
+    const wet = wetDisplay(layer); // #1023: what the renderer will honor
     const cls = fineClass(layer);
     const group = layers.filter((l) => fineClass(l) === cls);
     const gi = group.findIndex((l) => l.id === layer.id);
@@ -404,10 +405,10 @@ export function LayerStack() {
             </select>
           )}
           {adj && <span className="wet-label">WET</span>}
-          <input type="range" min={0} max={1} step={0.01} value={layer.layerOpacity}
+          <input type="range" min={0} max={wet.cap} step={0.01} value={wet.wet}
             title={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
             onChange={(e) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: Number(e.target.value) })} />
-          <span className="layer-opacity-readout">{Math.round(layer.layerOpacity * 100)}%</span>
+          <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>{Math.round(wet.wet * 100)}%{wet.capped ? ' max' : ''}</span>
         </div>
         {!adj && (
           <>

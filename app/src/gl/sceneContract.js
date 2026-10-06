@@ -22,7 +22,7 @@
  */
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
-import { sanitizeMathEffects, MATH_OP_KINDS, MATH_WET_CEILING } from '../fx/mathFilters.js';
+import { sanitizeMathEffects, MATH_OP_KINDS, mathTrackWetCeiling } from '../fx/mathFilters.js';
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
@@ -143,11 +143,10 @@ function buildFxWraps(resolvedLayers, caps) {
       // sanitizes against the math catalog instead.
       const fx = rl.isMath ? sanitizeMathEffects(rl.layer?.effects) : sanitizeFxEffects(rl.layer?.effects);
       let opacity = clamp01(rl.layerOpacity ?? 1);
-      if (rl.isMath && fx.some((f) => f.kind === 'hueRotate')) {
-        // HUE ROTATE's default wet ceiling: the grade can never run hotter
-        // than 50% while the dangerous op is in the chain.
-        opacity = Math.min(opacity, MATH_WET_CEILING);
-      }
+      // HUE ROTATE's default wet ceiling: the grade can never run hotter
+      // than 50% while the dangerous op is in the chain. One rule, shared with
+      // the wet slider (#1023), so the UI cannot show what this refuses.
+      if (rl.isMath) opacity = Math.min(opacity, mathTrackWetCeiling(rl.layer));
       if (fxIndex < maxFx && fx.length > 0) {
         wraps.push({
           fxLayerId: rl.id,

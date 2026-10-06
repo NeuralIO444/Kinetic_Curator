@@ -112,6 +112,7 @@ node src/state/euclid.selfcheck.mjs
 node src/state/showrunner.selfcheck.mjs
 node src/fx/fxFilters.selfcheck.mjs
 node src/fx/mathFilters.selfcheck.mjs
+node src/fx/wetCeiling.selfcheck.mjs
 node src/fx/printPost.selfcheck.mjs
 node src/gl/renderFault.selfcheck.mjs
 node src/gl/sceneContract.selfcheck.mjs

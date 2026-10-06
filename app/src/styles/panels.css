@@ -493,6 +493,8 @@
 .layer-row-composite .blend-mode-select { flex: 1; grid-column: unset; }
 .layer-row-composite input[type=range] { flex: 1; min-width: 0; }
 .layer-opacity-readout { font-size: 9px; color: var(--dim); width: 32px; text-align: right; }
+/* #1023: "50% max" needs the room — the ceiling is shown, not hidden */
+.layer-opacity-readout.capped { width: 52px; }
 /* #1016 — compact WET label replacing the dead "Blend —" cell on FX/MATH
    composite rows: 9px letterspaced caps, dim, vertically centered. Not
    interactive, so no 44px requirement — it just labels the wet slider.
