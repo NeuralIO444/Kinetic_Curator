@@ -55,6 +55,8 @@ export function DataExportRow({
   const loisStatus = useStore((s) => s.loisStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const importShelf = useStore((s) => s.importShelf); // #1051
+  const userVoices = useStore((s) => s.userVoices); // #1063
+  const importUserVoices = useStore((s) => s.importUserVoices); // #1063
   const clearTaste = useStore((s) => s.clearTaste);
   const [nudgeTick, setNudgeTick] = useState(0); // #925 — re-render after dismissing the retrain nudge
   // #925 — one dismissible hint line under the taste status, past ~50 new
@@ -99,6 +101,7 @@ export function DataExportRow({
     const bundle = buildBundle({
       project: buildProjectPayload(projectFields),
       userPalettes: userPalettes || [],
+      userVoices: userVoices || [],
       favorites: favorites || [],
       keeps: keeps || [],
       taste: getTaste(),
@@ -135,6 +138,7 @@ export function DataExportRow({
     const p = parsed.parts;
     const failed = [];
     if (p.userPalettes?.ok) emit(Events.PALETTE_IMPORT, p.userPalettes.value);
+    if (p.userVoices?.ok) importUserVoices(p.userVoices.value); // #1063
     if (p.favorites?.ok || p.keeps?.ok) {
       importShelf({ favorites: p.favorites?.ok ? p.favorites.value : undefined, keeps: p.keeps?.ok ? p.keeps.value : undefined });
     }
@@ -309,13 +313,13 @@ export function DataExportRow({
         </button>
       </div>
       <div className="pipeline-row">
-        <button className="big-btn dl" onClick={exportBundle} style={{ flex: 1 }} title="Everything in one file: project, palettes, favorites, keeps, taste, biology policy, canvas presets">↓ BUNDLE</button>
+        <button className="big-btn dl" onClick={exportBundle} style={{ flex: 1 }} title="Everything in one file: project, palettes, voices, favorites, keeps, taste, biology policy, canvas presets">↓ BUNDLE</button>
         <button className="big-btn" onClick={() => bundleInputRef.current?.click()} style={{ flex: 1 }} title="Restore a bundle. Replaces what is here; you confirm first.">↑ BUNDLE</button>
         <input ref={bundleInputRef} type="file" accept=".json,application/json" onChange={importBundleFile} style={{ display: 'none' }} />
       </div>
       {pendingBundle && (() => {
         const s = bundleSummary(pendingBundle.parsed);
-        const lab = { project: 'the project', userPalettes: 'palettes', favorites: 'favorites', keeps: 'keeps', taste: 'taste', biology: 'the biology policy', canvasPresets: 'canvas presets' };
+        const lab = { project: 'the project', userPalettes: 'palettes', userVoices: 'voices', favorites: 'favorites', keeps: 'keeps', taste: 'taste', biology: 'the biology policy', canvasPresets: 'canvas presets' };
         return (
           <div style={{ border: '1px solid #8a6d2f', padding: 8, margin: '2px 0 6px', background: '#16130c' }}>
             <div style={{ fontSize: 11, marginBottom: 6 }}>

@@ -72,6 +72,7 @@ node src/state/favorites.selfcheck.mjs
 node src/state/enabledAssetsRoundTrip.selfcheck.mjs
 node src/state/bundle.selfcheck.mjs
 node src/state/bundleParts.selfcheck.mjs
+node src/state/bundleKeys.selfcheck.mjs
 node src/state/hitsExport.selfcheck.mjs
 node src/state/queueTransport.selfcheck.mjs
 node src/curator/recipeFeatures.selfcheck.mjs

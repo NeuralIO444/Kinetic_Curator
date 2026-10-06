@@ -16,6 +16,7 @@ const SAN = Object.fromEntries(BUNDLE_PARTS.map((p) => [p, pass(p)]));
 const PARTS = {
   project: { seed: 7, layers: [1] },
   userPalettes: [{ id: 'p1' }],
+  userVoices: [{ id: 'v1' }],
   favorites: [{ id: 'f1' }],
   keeps: [{ id: 'k1' }, { id: 'k2' }],
   taste: { version: 1 },
