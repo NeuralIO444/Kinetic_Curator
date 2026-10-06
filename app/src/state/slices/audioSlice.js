@@ -6,6 +6,10 @@ export const createAudioSlice = (set) => ({
   // #107 §5: set true when the browser denies mic access, so the UI can say
   // why audio silently isn't running instead of leaving it looking idle.
   audioDenied: false,
+  // #1053: the chosen input went away (unplugged mid-run, or already gone when
+  // AUDIO was switched on): { name } or null. Separate from audioDenied, which
+  // is a refused permission. Session state, not part of the project document.
+  audioLost: null,
   audioSource: { type: 'device', id: 'default' },
   // UX-7: the last loaded file, stashed when switching to a mic so the
   // source dropdown's File: option can bring it back. Session state, like
@@ -26,7 +30,10 @@ export const createAudioSlice = (set) => ({
   audioSidecar: null,
   audioSidecarNote: '',
 
-  setAudioEnabled: (enabled) => set({ audioEnabled: enabled }),
+  // Switching AUDIO on is the one-tap reconnect, so it clears a lost notice.
+  // Switching it off keeps one: that is how a loss shuts the graph down.
+  setAudioEnabled: (enabled) => set(enabled ? { audioEnabled: true, audioLost: null } : { audioEnabled: false }),
+  setAudioLost: (name) => set({ audioLost: name == null ? null : { name: String(name) } }),
   setAudioDenied: (denied) => set({ audioDenied: !!denied }),
   setAudioSource: (source) => set((state) => {
     const prev = state.audioSource;
@@ -45,7 +52,7 @@ export const createAudioSlice = (set) => ({
       audioLastFile = prev;
     }
     // A sidecar describes ONE file: a different source invalidates it.
-    return { audioSource: source, audioLastFile, audioSidecar: null, audioSidecarNote: '' };
+    return { audioSource: source, audioLastFile, audioSidecar: null, audioSidecarNote: '', audioLost: null };
   }),
   /**
    * Replace the route table (sanitized; null = the default table). One undo step

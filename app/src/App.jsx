@@ -214,6 +214,12 @@ function AppInner() {
     piped({ type: A.SET_AUDIO_DENIED, payload: denied });
     if (denied) piped({ type: A.SET_AUDIO_ENABLED, payload: false });
   }, [piped]);
+  // #1053: the chosen input went away. Say so, and shut audio off so the meter
+  // reads idle (zero), not a frozen last value. AUDIO ON is the reconnect.
+  const onAudioLost = useCallback((name) => {
+    piped({ type: A.SET_AUDIO_LOST, payload: name });
+    piped({ type: A.SET_AUDIO_ENABLED, payload: false });
+  }, [piped]);
   const onBeat = useCallback(() => {
     // beatPulse still drives the readouts (phrase pip, meters); the actual
     // consumers are routed through the beat arbiter so one attack is one
@@ -242,7 +248,8 @@ function AppInner() {
     onStimulus: onAudioStimulus,
     onBands: onAudioBands,
     onBeat,
-    onDenied: onAudioDenied
+    onDenied: onAudioDenied,
+    onLost: onAudioLost,
   });
 
   const { containerRef, gridTemplate, dividerProps } = useColumnResize(COLUMN_FRACTIONS, 300);
