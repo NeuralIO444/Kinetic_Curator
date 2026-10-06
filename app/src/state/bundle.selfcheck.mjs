@@ -2,7 +2,7 @@
 import assert from 'node:assert';
 import {
   BUNDLE_KIND, BUNDLE_VERSION, BUNDLE_PARTS, buildBundle, parseBundle, isBundle,
-  bundleSummary, bundleMessage, bundleFilename,
+  bundleSummary, bundleMessage, bundleFilename, bundleConfirmLine, bundlePartPhrase, BUNDLE_APPLY_MODE,
 } from './bundle.js';
 
 let n = 0;
@@ -109,6 +109,67 @@ ok('messages are plain, and the filename is stable', () => {
   assert.equal(bundleMessage(s, 'Exported'), 'Exported: project, palettes');
   assert.equal(bundleMessage({ good: [], bad: [{ name: 'taste', error: 'x' }] }, 'Imported'), 'Imported: nothing. Skipped: taste (x)');
   assert.match(bundleFilename(Date.UTC(2026, 9, 5, 12, 30)), /^kinetic-curator-bundle-2026100\d-\d{4}\.json$/);
+});
+
+// ── #1064: the confirm says what each part will DO, and the result says what landed ──
+const sum = (good, bad = []) => ({ good, bad });
+
+ok('every part has an apply mode, and only palettes merge', () => {
+  assert.deepEqual(Object.keys(BUNDLE_APPLY_MODE).sort(), [...BUNDLE_PARTS].sort());
+  assert.deepEqual(BUNDLE_PARTS.filter((p) => BUNDLE_APPLY_MODE[p] === 'merge'), ['userPalettes']);
+});
+
+ok('the confirm names replaces as replaces and merges as merges, never the other way round', () => {
+  const line = bundleConfirmLine('kc.json', sum(['project', 'userPalettes', 'userVoices', 'favorites', 'keeps', 'taste', 'biology', 'canvasPresets']));
+  assert.match(line, /^kc\.json will replace the project, voices, favorites, keeps, taste, the biology policy and canvas presets, and add palettes /);
+  assert.match(line, /ones you deleted since the export come back/);
+  const [replaceClause, addClause] = line.split(', and add ');
+  assert.ok(addClause, 'there is a separate add clause');
+  assert.ok(!/palettes/.test(replaceClause), 'palettes are never promised as a replace');
+  assert.ok(/^palettes /.test(addClause), 'palettes are the add');
+  assert.ok(!/(favorites|keeps|voices|the project|taste|canvas presets)/.test(addClause), 'replaces are never promised as an add');
+});
+
+ok('the confirm copes with only replaces, only a merge, nothing readable, and lists skipped parts', () => {
+  assert.equal(bundleConfirmLine('a.json', sum(['keeps'])), 'a.json will replace keeps.');
+  assert.match(bundleConfirmLine('a.json', sum(['userPalettes'])), /^a\.json will add palettes \(/);
+  assert.equal(bundleConfirmLine('a.json', sum([])), 'a.json holds nothing readable.');
+  const sk = bundleConfirmLine('a.json', sum(['project'], [{ name: 'taste', error: 'not valid' }]));
+  assert.match(sk, /will replace the project\. Skipped, unreadable: taste \(not valid\)\.$/);
+});
+
+ok('a part phrase carries what landed, a + for merges, and the number dropped', () => {
+  assert.equal(bundlePartPhrase('userVoices', { kept: 5, given: 5 }), 'voices (5)');
+  assert.equal(bundlePartPhrase('userVoices', { kept: 12, given: 30 }), 'voices (12 of 30; 18 dropped)');
+  assert.equal(bundlePartPhrase('userPalettes', { kept: 3, given: 3 }), 'palettes (+3)');
+  assert.equal(bundlePartPhrase('userPalettes', { kept: 3, given: 5 }), 'palettes (+3 of 5; 2 dropped)');
+  assert.equal(bundlePartPhrase('project'), 'project', 'no count, no number');
+  assert.equal(bundlePartPhrase('keeps', { kept: 7 }), 'keeps (7)', 'a count with no given is not a drop');
+});
+
+ok('the result line reports parts that were applied AND parts that were reduced, with numbers', () => {
+  const counts = { userPalettes: { kept: 3, given: 5 }, favorites: { kept: 12, given: 12 }, userVoices: { kept: 12, given: 30 } };
+  const msg = bundleMessage(sum(['project', 'userPalettes', 'favorites', 'userVoices']), 'Bundle imported', counts);
+  assert.equal(msg, 'Bundle imported: project, palettes (+3 of 5; 2 dropped), favorites (12), voices (12 of 30; 18 dropped)');
+});
+
+ok('a part whose entries were ALL refused is reported as skipped, never as imported', () => {
+  const msg = bundleMessage(sum(['userPalettes', 'keeps']), 'Bundle imported', { userPalettes: { kept: 0, given: 5 }, keeps: { kept: 2, given: 2 } });
+  assert.equal(msg, 'Bundle imported: keeps (2). Skipped: palettes (none of 5 were usable)');
+  const none = bundleMessage(sum(['userPalettes']), 'Bundle imported', { userPalettes: { kept: 0, given: 5 } });
+  assert.equal(none, 'Bundle imported: nothing. Skipped: palettes (none of 5 were usable)');
+});
+
+ok('without counts the message is exactly the old one', () => {
+  assert.equal(bundleMessage(sum(['project', 'userPalettes']), 'Exported'), 'Exported: project, palettes');
+});
+
+ok('parseBundle carries `given` through from a reader', () => {
+  const san = { ...SAN, keeps: (v) => ({ ok: true, value: v.slice(0, 1), given: v.length }) };
+  const r = parseBundle(buildBundle({ keeps: [{ id: 1 }, { id: 2 }, { id: 3 }], project: { seed: 1 } }), san);
+  assert.equal(r.parts.keeps.given, 3);
+  assert.equal(r.parts.keeps.value.length, 1);
+  assert.equal('given' in r.parts.project, false, 'a reader that reports no count adds none');
 });
 
 console.log(`bundle.selfcheck: ${n} checks passed`);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { parseProject, downloadProject } from '../../state/projectDocument.js';
-import { paletteImportMessage } from './paletteImportCopy.mjs';
+import { paletteImportMessage, paletteImportCount } from './paletteImportCopy.mjs';
 import {
   importConfirmMessage, loadedMessage, exportSavedMessage, nextExportFilename,
   missingPaletteMessage, rememberRecent, readRecent, dirtyMessage,
@@ -16,7 +16,7 @@ import { getTaste } from '../../curator/tasteStore.js';
 import { getBiologyPolicy, importBiologyPolicy } from '../../biology/policy.js';
 import { readUserPresets, writeUserPresets } from '../../data/canvasPresets.js';
 import {
-  buildBundle, parseBundle, bundleSummary, bundleMessage, bundleFilename, isBundle,
+  buildBundle, parseBundle, bundleSummary, bundleMessage, bundleConfirmLine, bundleFilename, isBundle,
 } from '../../state/bundle.js';
 import { BUNDLE_SANITIZERS } from '../../state/bundleParts.js';
 
@@ -137,19 +137,29 @@ export function DataExportRow({
     const { parsed } = pendingBundle;
     const p = parsed.parts;
     const failed = [];
-    if (p.userPalettes?.ok) emit(Events.PALETTE_IMPORT, p.userPalettes.value);
-    if (p.userVoices?.ok) importUserVoices(p.userVoices.value); // #1063
+    // #1064 — every apply path reports what actually landed, so the result line
+    // matches the screen instead of the file. `given` is how many entries the file held.
+    const counts = {};
+    const given = (name) => p[name]?.given;
+    if (p.userPalettes?.ok) {
+      // Palettes MERGE through the palette importer (the same one ↑ PALETTES uses).
+      useStore.getState().importUserPalettes(p.userPalettes.value);
+      counts.userPalettes = { kept: paletteImportCount(p.userPalettes.value), given: given('userPalettes') };
+    }
+    if (p.userVoices?.ok) counts.userVoices = { kept: importUserVoices(p.userVoices.value), given: given('userVoices') }; // #1063
     if (p.favorites?.ok || p.keeps?.ok) {
-      importShelf({ favorites: p.favorites?.ok ? p.favorites.value : undefined, keeps: p.keeps?.ok ? p.keeps.value : undefined });
+      const landed = importShelf({ favorites: p.favorites?.ok ? p.favorites.value : undefined, keeps: p.keeps?.ok ? p.keeps.value : undefined });
+      if (p.favorites?.ok) counts.favorites = { kept: landed.favorites, given: given('favorites') };
+      if (p.keeps?.ok) counts.keeps = { kept: landed.keeps, given: given('keeps') };
     }
     if (p.taste?.ok) { const r = importTasteToStore(p.taste.value); if (!r.ok) failed.push({ name: 'taste', error: r.error }); }
     if (p.biology?.ok) { const r = importBiologyPolicy(p.biology.value); if (!r.ok) failed.push({ name: 'biology', error: r.error }); }
-    if (p.canvasPresets?.ok) writeUserPresets(p.canvasPresets.value);
+    if (p.canvasPresets?.ok) counts.canvasPresets = { kept: writeUserPresets(p.canvasPresets.value).length, given: given('canvasPresets') };
     if (p.project?.ok) emit(Events.EXPORT_LOAD_PROJECT, p.project.value.doc);
     const s = bundleSummary(parsed);
     s.bad.push(...failed);
     s.good = s.good.filter((g) => !failed.some((f) => f.name === g));
-    onMessage(bundleMessage(s, 'Bundle imported'));
+    onMessage(bundleMessage(s, 'Bundle imported', counts));
     setPendingBundle(null);
   };
 
@@ -319,12 +329,10 @@ export function DataExportRow({
       </div>
       {pendingBundle && (() => {
         const s = bundleSummary(pendingBundle.parsed);
-        const lab = { project: 'the project', userPalettes: 'palettes', userVoices: 'voices', favorites: 'favorites', keeps: 'keeps', taste: 'taste', biology: 'the biology policy', canvasPresets: 'canvas presets' };
         return (
           <div style={{ border: '1px solid #8a6d2f', padding: 8, margin: '2px 0 6px', background: '#16130c' }}>
             <div style={{ fontSize: 11, marginBottom: 6 }}>
-              {pendingBundle.fileName} will replace {s.good.map((g) => lab[g] || g).join(', ') || 'nothing'}.
-              {s.bad.length > 0 && ` Skipped, unreadable: ${s.bad.map((b) => `${lab[b.name] || b.name} (${b.error})`).join('; ')}.`}
+              {bundleConfirmLine(pendingBundle.fileName, s)}
             </div>
             <div className="pipeline-row" style={{ gap: 6 }}>
               <button className="big-btn dl" onClick={exportBundleFirst} style={{ flex: 1 }} title="Save a bundle of what is here first, then restore">Export current first</button>

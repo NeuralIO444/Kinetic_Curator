@@ -18,20 +18,20 @@ export const BUNDLE_SANITIZERS = {
   // Palettes are re-sanitized and de-duplicated by importUserPalettes when applied.
   userPalettes(raw) {
     const l = asList(raw, 'palettes');
-    return l.ok ? { ok: true, value: l.list } : l;
+    return l.ok ? { ok: true, value: l.list, given: l.list.length } : l;
   },
   // #1063 — the performer's captured voices (the VOICE shelf, capped at 12).
   userVoices(raw) {
     const l = asList(raw, 'voices');
-    return l.ok ? { ok: true, value: l.list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES) } : l;
+    return l.ok ? { ok: true, value: l.list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES), given: l.list.length } : l;
   },
   favorites(raw) {
     const l = asList(raw, 'favorites');
-    return l.ok ? { ok: true, value: l.list.map(sanitizeFavorite).filter(Boolean) } : l;
+    return l.ok ? { ok: true, value: l.list.map(sanitizeFavorite).filter(Boolean), given: l.list.length } : l;
   },
   keeps(raw) {
     const l = asList(raw, 'keeps');
-    return l.ok ? { ok: true, value: l.list.map(sanitizeFavorite).filter(Boolean) } : l;
+    return l.ok ? { ok: true, value: l.list.map(sanitizeFavorite).filter(Boolean), given: l.list.length } : l;
   },
   taste(raw) {
     const r = validateTaste(raw);
@@ -43,6 +43,6 @@ export const BUNDLE_SANITIZERS = {
   },
   canvasPresets(raw) {
     const l = asList(raw, 'canvas presets');
-    return l.ok ? { ok: true, value: sanitizeUserPresets(l.list) } : l;
+    return l.ok ? { ok: true, value: sanitizeUserPresets(l.list), given: l.list.length } : l;
   },
 };
