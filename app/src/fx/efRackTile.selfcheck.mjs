@@ -16,6 +16,16 @@ test('#716 EF tile face is abbreviation + one mode word', () => {
   assert.equal(efTileFace({ slot: 'EF-4' }, null).abbr, 'FIN');
 });
 
+test('#1072 every slot abbreviation matches what the slot holds', () => {
+  // EF-1 held blur once; it holds sharpen and haze now, the opposite of a blur.
+  const ef1 = FX_RACK.find((s) => s.slot === 'EF-1');
+  assert.deepEqual(ef1.kinds, ['sharpen', 'haze']);
+  assert.ok(!ef1.kinds.includes('blur'));
+  assert.equal(efTileFace(ef1, null).abbr, 'FOC');
+  assert.notEqual(efTileFace(ef1, null).abbr, 'BLR', 'the empty slot must not claim a blur');
+  assert.deepEqual(FX_RACK.map((s) => efTileFace(s, null).abbr), ['FOC', 'DST', 'TON', 'FIN']);
+});
+
 test('#1046 an empty slot names its family, never the bare word "empty"', () => {
   for (const slot of FX_RACK) {
     const face = efTileFace(slot, null);

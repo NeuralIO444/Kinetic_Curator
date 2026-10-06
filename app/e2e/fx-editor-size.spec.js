@@ -6,8 +6,11 @@ import { test, expect } from '@playwright/test';
 
 // The chrome around the controls, which is not dead space: the .fx-editor's own
 // 6px top padding + 1px dashed top border, plus the tile's 1px top and bottom
-// borders and 4px bottom padding (the tile's top padding is 0) = 13px. Anything
-// beyond that is dead space.
+// borders and 4px bottom padding (the tile's top padding is 0) = 13px. The
+// measured slack lands on 13 for every editor state; PAD is 16 = that chrome plus
+// 3px of tolerance for subpixel and rounding on another font or DPI. Do not
+// "correct" it to 13: that leaves no tolerance against a measurement that sits
+// exactly on it. Anything beyond 16 is dead space.
 const PAD = 16;
 
 // Panel box vs the union box of everything inside the tile.
