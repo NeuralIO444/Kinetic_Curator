@@ -362,6 +362,29 @@ ok('stats expose the dev instrumentation counters', () => {
   assert.equal(s.framesRun, 1);
 });
 
+ok('#1069: a sampler is re-bound on every pass, even when its texture is the same object', () => {
+  // A texture unit's binding is global GL state that other passes rebind. The old
+  // uniform cache skipped a sampler whose value had not changed, so the grain
+  // finish pass read a stale unit-0 texture (its own render target), hit a GL
+  // feedback loop and silently drew nothing on every frame after the first.
+  const gl = makeMockGl({ nullUniforms: ['u_res'] });
+  const bridge = makeBridge(gl);
+  const L = bridge.layer('fx1');
+  const src = L.t0;
+  const binds = () => gl.withName('bindTexture').filter((c) => c.args[0] === src.tex).length;
+  bridge.runChain('fx1', src, chainOf('invert'));
+  const first = binds();
+  assert.ok(first >= 1, 'the source texture is bound on the first pass');
+  // something else (present / composite) steals unit 0 between frames
+  gl.bindTexture(gl.TEXTURE_2D, { stolen: true });
+  bridge.runChain('fx1', src, chainOf('invert'));
+  assert.ok(binds() > first, 'the SAME source texture is bound again on the second pass');
+  // a non-sampler uniform with an unchanged value is still skipped (the cache is not gone)
+  const skipsBefore = bridge.stats().uniformSkips;
+  bridge.runChain('fx1', src, chainOf('invert'));
+  assert.ok(bridge.stats().uniformSkips > skipsBefore, 'unchanged scalar uniforms are still cached');
+});
+
 ok('passes may supply a custom uniform map (#195 template)', () => {
   const gl = makeMockGl();
   const bridge = makeBridge(gl);

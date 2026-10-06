@@ -343,14 +343,15 @@ function renderTick() {
             }, { swell: audioSwell ?? 1 });
 
             accumObj.step(target.tex, rp, { width: target.w, height: target.h });
-            live.presentUpscaled(accumObj.texture());
+            // #1069 — grain-family finish chain runs post-accum, as on the main thread.
+            live.presentUpscaled(live.applyFinishChains(accumObj.texture(), target.fxFinishChains));
           } catch {
             const target = live.renderFrame(payload, { transparent, dprScale: previewScale });
-            live.present(target);
+            live.present(live.applyFinishChains(target)); // #1069
           }
         } else {
           const target = live.renderFrame(payload, { transparent, dprScale: previewScale });
-          live.present(target);
+          live.present(live.applyFinishChains(target)); // #1069
         }
       } else {
         if (lastAccumOn) {
@@ -363,7 +364,7 @@ function renderTick() {
         }
         lastAccumOn = false;
         const target = live.renderFrame(payload, { transparent, dprScale: previewScale });
-        live.present(target);
+        live.present(live.applyFinishChains(target)); // #1069
       }
     }
   }

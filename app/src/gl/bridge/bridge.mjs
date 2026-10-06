@@ -265,6 +265,24 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
       if (loc == null) { stats.uniformSkips++; continue; } // optimized out of the shader
       const key = ns + uname;
       const prev = cache.get(key);
+      // #1069 — a sampler's TEXTURE BINDING is never skipped by value. A texture
+      // unit's binding is global GL state that every other pass (present, composite,
+      // resolve) rebinds, so "same texture object as last frame" does not mean
+      // "still bound to the unit". The grain finish pass read its input through a
+      // skipped sampler: unit 0 still held last frame's output (which is the pass's
+      // own render target), the draw became a feedback loop, GL raised
+      // INVALID_OPERATION and silently dropped it, and every frame after the first
+      // drew no grain. What stays cached is the unit NUMBER (uniform1i), which never
+      // changes; the bind itself is cheap and always done.
+      if (glType.kind === 'sampler') {
+        gl.activeTexture(gl.TEXTURE0 + glType.unit);
+        gl.bindTexture(gl.TEXTURE_2D, value);
+        if (prev === glType.unit) { stats.uniformSkips++; continue; }
+        gl.uniform1i(loc, glType.unit);
+        cache.set(key, glType.unit);
+        stats.uniformUploads++;
+        continue;
+      }
       if (prev !== undefined && sameValue(prev, value)) { stats.uniformSkips++; continue; }
       setUniform(glType, loc, value);
       cache.set(key, copyValue(value));
