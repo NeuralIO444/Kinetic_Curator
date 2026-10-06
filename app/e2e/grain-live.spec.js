@@ -9,8 +9,7 @@ import { test, expect } from '@playwright/test';
 // it works wherever the page does; reading the WebGL drawing buffer from a
 // requestAnimationFrame callback returned an all-zero buffer on CI's software GL
 // (baseline 0.000) even though it worked locally, because a WebGL canvas reads back
-// blank once the frame has been composited. The viewport is large so the canvas is
-// shown at or above its native size and the browser does not downscale the grain away.
+// blank once the frame has been composited.
 async function hfEnergy(page) {
   const png = await page.locator('canvas.canvas-gl').screenshot();
   return page.evaluate(async (b64) => {
@@ -39,7 +38,7 @@ async function avgEnergy(page, frames = 3) {
 }
 
 test('adding GRAIN visibly changes the canvas with ACCUM off', async ({ page }) => {
-  await page.setViewportSize({ width: 2400, height: 1500 }); // canvas shown at >= native size
+  test.setTimeout(120_000); // software GL renders every frame on the CPU
   // The governor's AUTO quality is seeded OFF in the project doc, exactly as the other
   // GL specs do (accum-recording, loop-capture): on software GL (SwiftShader, CI
   // runners) its watchdog hard-stops the render loop, the canvas freezes, and a test
@@ -50,7 +49,7 @@ test('adding GRAIN visibly changes the canvas with ACCUM off', async ({ page }) 
     localStorage.setItem('kc:first-run-seen', '1');
     localStorage.setItem('kc:project:v1', JSON.stringify({
       version: 1, savedAt: new Date().toISOString(),
-      doc: { version: 1, seed: 4242, autoQuality: false, layoutParams: { mode: 'swarm', count: 60 } },
+      doc: { version: 1, seed: 4242, autoQuality: false, layoutParams: { mode: 'swarm', count: 12 } }, // few nodes: the test is about grain, not load
     }));
   });
   await page.reload({ waitUntil: 'load' });
