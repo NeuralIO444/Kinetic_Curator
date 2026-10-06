@@ -4,6 +4,7 @@ import { buildBundle, parseBundle, BUNDLE_PARTS } from './bundle.js';
 import { BUNDLE_SANITIZERS } from './bundleParts.js';
 import { buildProjectPayload } from '../hooks/useProjectPayload.js';
 import { sanitizeFavorite, createDavisSlice } from './slices/davisSlice.js';
+import { createVoiceSlice, sanitizeUserVoice, MAX_USER_VOICES } from './slices/voiceSlice.js';
 import { defaultBiologyPolicy } from '../biology/policy.js';
 
 let n = 0;
@@ -116,6 +117,61 @@ ok('importShelf caps both lists at 200', () => quiet(() => {
   s.get().importShelf({ favorites: many, keeps: many });
   assert.equal(s.get().favorites.length, 200);
   assert.equal(s.get().keeps.length, 200);
+}));
+
+// ── #1063: the performer's saved voices ─────────────────────────────────────
+const voice = (id, name = 'VOICE 01') => ({
+  id, name,
+  state: { params: {}, palette: { bg: '#0a0a0a', ink: '#f0f0e8', swatches: ['#ff2d6f', '#00d9ff'] }, fx: [], assets: 'all', blendSeconds: 2 },
+  createdAt: 1700000000000,
+});
+
+ok('voices round-trip through the bundle with their names, in order', () => {
+  const voices = [voice('v1', 'NIGHT'), voice('v2', 'DAWN')].map(sanitizeUserVoice);
+  const r = parseBundle(JSON.parse(JSON.stringify(buildBundle({ userVoices: voices }))), BUNDLE_SANITIZERS);
+  assert.equal(r.parts.userVoices.ok, true);
+  assert.deepEqual(r.parts.userVoices.value.map((v) => v.name), ['NIGHT', 'DAWN']);
+  assert.deepEqual(r.parts.userVoices.value, voices);
+});
+
+ok('junk entries are dropped by sanitizeUserVoice, a non-list part is refused by name, the cap holds', () => {
+  const r = parseBundle(buildBundle({ userVoices: [voice('v1'), { id: '' }, null, 7, { id: 'x' }] }), BUNDLE_SANITIZERS);
+  assert.deepEqual(r.parts.userVoices.value.map((v) => v.id), ['v1'], 'no id / no state is junk');
+  const bad = parseBundle(buildBundle({ userVoices: 'nope', favorites: [] }), BUNDLE_SANITIZERS);
+  assert.equal(bad.parts.userVoices.ok, false);
+  assert.equal(bad.parts.userVoices.error, 'voices is not a list');
+  assert.equal(bad.parts.favorites.ok, true, 'the rest still loads');
+  const many = Array.from({ length: 30 }, (_, i) => voice(`v${i}`));
+  assert.equal(parseBundle(buildBundle({ userVoices: many }), BUNDLE_SANITIZERS).parts.userVoices.value.length, MAX_USER_VOICES);
+});
+
+function makeVoices() {
+  let state = {};
+  const set = (fn) => { state = { ...state, ...(typeof fn === 'function' ? fn(state) : fn) }; };
+  state = createVoiceSlice(set);
+  return { get: () => state };
+}
+
+ok('importUserVoices replaces the shelf, sanitizes, caps; a refused part never wipes it', () => quiet(() => {
+  const s = makeVoices();
+  s.get().importUserVoices([voice('a', 'ONE'), { id: 'junk' }, voice('b', 'TWO')]);
+  assert.deepEqual(s.get().userVoices.map((v) => v.name), ['ONE', 'TWO']);
+  s.get().importUserVoices(undefined);
+  s.get().importUserVoices('junk');
+  s.get().importUserVoices(null);
+  assert.deepEqual(s.get().userVoices.map((v) => v.name), ['ONE', 'TWO'], 'a non-list leaves the shelf alone');
+  s.get().importUserVoices(Array.from({ length: 30 }, (_, i) => voice(`v${i}`)));
+  assert.equal(s.get().userVoices.length, MAX_USER_VOICES);
+}));
+
+ok('importUserVoices: a voice that left the shelf stops being the active one', () => quiet(() => {
+  let state = {};
+  const set = (fn) => { state = { ...state, ...(typeof fn === 'function' ? fn(state) : fn) }; };
+  state = { ...createVoiceSlice(set), activeVoiceId: 'b' };
+  state.importUserVoices([voice('a'), voice('b')]);
+  assert.equal(state.activeVoiceId, 'b', 'b is still on the shelf, so it stays active');
+  state.importUserVoices([voice('a')]);
+  assert.equal(state.activeVoiceId, null, 'b is gone, so it is no longer active');
 }));
 
 console.log(`bundleParts.selfcheck: ${n} checks passed`);

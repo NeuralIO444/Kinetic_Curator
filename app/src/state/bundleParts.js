@@ -3,6 +3,7 @@
 // so a bundle can never smuggle in something the individual importers refuse.
 import { parseProject } from './projectDocument.js';
 import { sanitizeFavorite } from './slices/davisSlice.js';
+import { sanitizeUserVoice, MAX_USER_VOICES } from './slices/voiceSlice.js';
 import { validateTaste } from '../curator/tasteHead.js';
 import { validateBiologyPolicy } from '../biology/policy.js';
 import { sanitizeUserPresets } from '../data/canvasPresets.js';
@@ -18,6 +19,11 @@ export const BUNDLE_SANITIZERS = {
   userPalettes(raw) {
     const l = asList(raw, 'palettes');
     return l.ok ? { ok: true, value: l.list } : l;
+  },
+  // #1063 — the performer's captured voices (the VOICE shelf, capped at 12).
+  userVoices(raw) {
+    const l = asList(raw, 'voices');
+    return l.ok ? { ok: true, value: l.list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES) } : l;
   },
   favorites(raw) {
     const l = asList(raw, 'favorites');

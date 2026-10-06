@@ -12,13 +12,47 @@ export const BUNDLE_VERSION = 1;
 
 /** Every part a bundle can carry, in apply order. */
 export const BUNDLE_PARTS = Object.freeze([
-  'project', 'userPalettes', 'favorites', 'keeps', 'taste', 'biology', 'canvasPresets',
+  'project', 'userPalettes', 'userVoices', 'favorites', 'keeps', 'taste', 'biology', 'canvasPresets',
 ]);
 
 /** Plain names for messages. */
 export const BUNDLE_PART_LABELS = Object.freeze({
-  project: 'project', userPalettes: 'palettes', favorites: 'favorites', keeps: 'keeps',
+  project: 'project', userPalettes: 'palettes', userVoices: 'voices', favorites: 'favorites', keeps: 'keeps',
   taste: 'taste', biology: 'biology policy', canvasPresets: 'canvas presets',
+});
+
+/**
+ * Which localStorage key each part is the carrier of. Together with
+ * BUNDLE_LEFT_OUT this must account for EVERY `kc:` key the app writes: the
+ * bundle's promise is "everything a performer would be sorry to lose" (#1051),
+ * and bundleKeys.selfcheck scans the source so a new key cannot slip past.
+ */
+export const BUNDLE_STORAGE_KEYS = Object.freeze({
+  project: ['kc:project:v1', 'kc:pipeline:v1'], // the autosave and the rolling pipeline record are the project document
+  userPalettes: ['kc:user-palettes:v1'],
+  userVoices: ['kc:user-voices:v1'],
+  favorites: ['kc:favorites:v1'],
+  keeps: ['kc:keeps:v1'],
+  taste: ['kc:taste:v1'],
+  biology: ['kc:biology:v1'],
+  canvasPresets: ['kc:canvas-presets'],
+});
+
+/** Keys deliberately NOT in the bundle, each with the reason. */
+export const BUNDLE_LEFT_OUT = Object.freeze({
+  'kc:weave:v1': 'per-machine display preference, not project content',
+  'kc:fxaa:v1': 'per-machine display preference, not project content',
+  'kc:pool-view:v1': 'per-machine display preference (asset pool layout)',
+  'kc:startup-mode:v1': 'per-machine startup preference',
+  'kc:active-panel-tab': 'a remembered tab, a convenience',
+  'kc:first-run-seen': 'first-run flag',
+  'kc:tour-seen': 'first-run flag',
+  'kc:patch-oneliner-seen': 'first-run flag',
+  'kc:retrain-nudge:v1': 'a derived counter, rebuilt from keeps',
+  'kc:worker': 'developer flag for the render worker',
+  'kc:pipeline:backup': 'autosave plumbing: the previous copy of the project the bundle already carries',
+  'kc:project:quarantine': 'autosave plumbing: a refused project kept for inspection',
+  'kc:project:restored-session': 'autosave plumbing: a boot notice',
 });
 
 /**

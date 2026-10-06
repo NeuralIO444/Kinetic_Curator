@@ -318,6 +318,22 @@ export const createVoiceSlice = (set) => ({
     return { userVoices };
   }),
 
+  /**
+   * #1063 — replace the shelf from an imported bundle. Same sanitizer and cap as
+   * the localStorage reader (a file is a trust boundary), same persistence. A
+   * value that is not a list is ignored, so a refused bundle part can never wipe
+   * the shelf (the importShelf precedent in davisSlice). A voice that is no
+   * longer on the shelf stops being the active one.
+   */
+  importUserVoices: (list) => set((state) => {
+    if (!Array.isArray(list)) return {};
+    const userVoices = list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES);
+    persist(userVoices);
+    const next = { userVoices };
+    if (state.activeVoiceId && !userVoices.some((v) => v.id === state.activeVoiceId)) next.activeVoiceId = null;
+    return next;
+  }),
+
   deleteUserVoice: (id) => set((state) => {
     const userVoices = state.userVoices.filter((v) => v.id !== id);
     if (userVoices.length === state.userVoices.length) return {};
