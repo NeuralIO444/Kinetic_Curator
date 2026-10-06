@@ -1,5 +1,7 @@
-// #716 — EF rack tile face. Grammar is the TX-6 line `DLY ✕ WARP`:
-// abbreviation top-left, bypass top-right, glyph centre, one mode word.
+// #716 — EF rack tile face; #1046 — header strip. The editor opens with one
+// line, `abbreviation · mode word · ✕` (e.g. `GRN · grain · ✕`), then only its
+// controls. There is no glyph and no reserved row: the tile is as tall as its
+// content. An empty slot's mode word is the slot's own name (`fin · finish`).
 
 export const SLOT_ABBR = {
   'EF-1': 'BLR',

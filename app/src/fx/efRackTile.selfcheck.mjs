@@ -49,8 +49,11 @@ test('#1046 an effect with almost nothing to set says so, and an empty slot offe
   assert.match(jsx, /no other controls/);
   assert.match(jsx, /\+ ADD \{FX_EFFECT_DEFS\[effectiveKind\]/, 'the empty-slot button names what it adds');
   assert.ok(!/>\s*empty\s*</i.test(jsx), 'no bare "empty" text node');
-  for (const k of Object.keys(FX_EFFECT_DEFS)) {
-    const n = Object.keys(FX_EFFECT_DEFS[k].params).length;
-    assert.ok(n >= 0);
-  }
+  // The notes are driven by the parameter count (LayerStack: paramCount <= 1), so pin
+  // WHICH effects get one. A new effect with <= 1 control must be added here on purpose.
+  const countOf = (k) => Object.keys(FX_EFFECT_DEFS[k].params).length;
+  const kinds = Object.keys(FX_EFFECT_DEFS);
+  assert.deepEqual(kinds.filter((k) => countOf(k) === 0).sort(), ['edge', 'invert', 'solarize'], 'these read "no controls"');
+  assert.deepEqual(kinds.filter((k) => countOf(k) === 1).sort(), ['grain', 'posterize', 'rgbSplit'], 'these read "no other controls"');
+  assert.ok(kinds.filter((k) => countOf(k) > 1).length >= 6, 'everything else shows its sliders and no note');
 });

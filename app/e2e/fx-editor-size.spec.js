@@ -4,9 +4,10 @@
 // panel may be more than half empty. Empty slots get an action, never a void.
 import { test, expect } from '@playwright/test';
 
-// The panel's own chrome around its controls: 6px top padding + the dashed top
-// border + the tile's 1px borders + 4px bottom padding = 13px. Anything beyond
-// that is dead space.
+// The chrome around the controls, which is not dead space: the .fx-editor's own
+// 6px top padding + 1px dashed top border, plus the tile's 1px top and bottom
+// borders and 4px bottom padding (the tile's top padding is 0) = 13px. Anything
+// beyond that is dead space.
 const PAD = 16;
 
 // Panel box vs the union box of everything inside the tile.
