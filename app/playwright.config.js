@@ -31,7 +31,13 @@ export default defineConfig({
   webServer: {
     command: 'npm run preview -- --host 127.0.0.1 --port 4173',
     port: 4173,
-    reuseExistingServer: !process.env.CI,
+    // #1071 — never adopt a server that is already on the port. Reusing one meant a
+    // forgotten `vite preview` from an old worktree silently served ITS build to the
+    // specs: a stale build can fail a locator exactly like a real regression, and can
+    // pass while the current tree is broken. With this off, Playwright refuses with
+    // "port 4173 is already used", which is the accurate error. Set E2E_REUSE_SERVER=1
+    // to opt in deliberately (your own dev server that you know is current).
+    reuseExistingServer: process.env.E2E_REUSE_SERVER === '1',
     timeout: 120_000,
   },
 });
