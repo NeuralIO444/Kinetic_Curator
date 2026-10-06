@@ -6,6 +6,14 @@
 
 **Ledger refresh (2026-10-03):** the stage lists below were written 2026-09-23/25 and had drifted behind the issue tracker. Items marked ✅/⚠️ were re-checked against GitHub on 2026-10-03: GitHub is the ledger, this doc is the map. Notable: **every tracked Stage 1 item is now closed**, and **#248's status is disputed** (see Stage 4) — both need Matt's word, not an agent's.
 
+**Ledger refresh (2026-10-05) — Matt's orders, recorded:** the stages below had drifted again (Stage 2's headline items shipped on 2026-10-03 and were still listed as to-do; 19 open issues sat in no stage). Matt ordered the following on 2026-10-05; the detail, issue by issue, is in [`KC1_PHASES.md`](KC1_PHASES.md).
+
+- **#248 is settled:** six secondary tabs (ASSETS / BUILD / DIRECTOR / STIMULI / PLAY / PIPELINE) plus DEV is the accepted end state. The 4-tab cap is retired; `PANEL_CONSOLIDATION_PLAN.md` Phases 6–12 are superseded.
+- **Feature freeze from 2026-10-05, except PATTERN.** New ideas are filed and parked until Phase 3 exits.
+- **Phases, one open at a time:** 0 square the books → 1 prove what's built (one recorded 30-minute set this week, one share link to a stranger) → 2 safe (#1051 export bundle, #1052 unprocessed audio input, #1053 lost audio device) → 3 honest UI (#1023, #1022, #1046, #1048, #1037, #980) → 4 one look (design system #1027–#1033, then #1043) → 5 playable on stage (#617, #608, MIDI bind, real-hardware performance check) → release.
+- **PATTERN (#1039–#1042, #1049) runs as its own lane in parallel, starting now.**
+- **Parked:** #762, #926, the two GPU fields, OSC, mobile touch work.
+
 ---
 
 ## Stage 0 — v0.9.x · DONE *(location as of 2026-09-25 evening)*
@@ -32,28 +40,28 @@
 
 ## Stage 2 — v0.11 · SHARE *(the benchmark's #1 + #2 — the highest-leverage stage)*
 
-- **Shareable recipe URLs** — seed + sub-seeds + params + palette in the hash; `…/#r=…` loads anywhere, zero account. **The single highest-leverage fix** (BENCHMARK E): turns determinism into distribution.
-- **Tour/manual re-aim + helpCopy sweep** to the four-tab world; first-five-minutes fix (gap B.2).
-- **Lowercase/label consistency pass** — TE credibility item; chips keep fixed color+shape identities.
+- **Shareable recipe URLs** — seed + sub-seeds + params + palette in the hash; `…/#r=…` loads anywhere, zero account. **The single highest-leverage fix** (BENCHMARK E): turns determinism into distribution. ✅ *(shipped: #534 closed 2026-10-03 — `state/recipeUrls.js`, share link in the favorites tray, hash boot.)*
+- **Tour/manual re-aim + helpCopy sweep** to the four-tab world; first-five-minutes fix (gap B.2). ✅ *(#535 closed 2026-10-03. Note: written for the four-tab world; six tabs is now the end state, see the 2026-10-05 refresh.)*
+- **Lowercase/label consistency pass** — TE credibility item; chips keep fixed color+shape identities. ✅ *(#536 closed 2026-10-03; the system-wide casing rule is now design-system M3, #1029.)*
 - FAVORITE/preset becomes a link you can send; gallery-lite = links in the wild (no server).
 - **Proposed addition, not yet ordered (2026-10-03):** the 12 ranked quick wins from [`UX_AUDIT_2026-10-03.md`](UX_AUDIT_2026-10-03.md) — contrast (31 of 164 small labels fail AA), disabled-slider treatment, value-column spacing, selection/accent roles, casing. Items 2/9 overlap the label-consistency pass above; the rest are independent. **Waiting on Matt's nod before anything here is assigned.**
-- *Exit:* a stranger opens your link and lands in your composition.
+- *Exit:* a stranger opens your link and lands in your composition. ⚠️ *(2026-10-05: the link exists; the stranger test has not been run. It is Phase 1.)*
 
 ## Stage 3 — v0.12 · PERFORM *(the instrument leaves the laptop)*
 
 - **MIDI/OSC build** — #228 scope doc first (WebMIDI vs `localhost:9001` OSC relay), then implement; the benchmark's gap B.3, table stakes everywhere. ✅⚠️ *(2026-10-03: **Web MIDI engine merged 2026-10-02** — PR #804, `app/src/midi/`, `useMidi`, `midiSlice`, `MidiSection`, e2e `midi.spec.js`. #617 stays open for the performance-control/*learn* remainder; OSC stays parked.)*
-- **Live-output path** — projector/second display at minimum (gap B.7). ⚠️ *(2026-10-03: PR #827 landed the SETUP/STAGE shell 2026-10-01 — canvas presets + native Tauri stage window — and **#606 is closed, but #607 (fullscreen live output) and #608 (Syphon) are both still open**: #608 reports honest "not linked" status only, sidecar unbuilt. So the path is shipped-but-unfinished, not done.)*
-- **Mobile touch pass** — #270 device pass on Matt's iPhone, then touch work (gap B.6).
+- **Live-output path** — projector/second display at minimum (gap B.7). ⚠️ *(2026-10-03: PR #827 landed the SETUP/STAGE shell 2026-10-01 — canvas presets + native Tauri stage window — and **#606 is closed, but #607 (fullscreen live output) and #608 (Syphon) are both still open**: #608 reports honest "not linked" status only, sidecar unbuilt. So the path is shipped-but-unfinished, not done.)* *(2026-10-05: **#607 is now closed**; #608 Syphon remains open, blocked on hardware.)*
+- **Mobile touch pass** — #270 device pass on Matt's iPhone, then touch work (gap B.6). *(2026-10-05: #270 closed; further touch work is parked.)*
 - **GPU fields for the Oxman/Haeckel world (ordered 2026-09-23, WebGL2 fragment ping-pong — the gpu-io shape, not a dependency):** trail field first (scent grid goes GPU: deposit + diffuse/decay texture, mold steers off taps), shared curl-wind texture second (spine F's weather as one field all tracks sample). Agents stay CPU until both fields are proven. Pattern reference: gpu-io (Amanda Ghassaei) kernels as templates; transform feedback waits until fields are proven.
 - **Vertex-shader ambient animation** — hash(seed,id)+time wobble for background layers, zero upload.
 - Tape lane + TEMPO_AND_CHIPS parked set, if Matt un-parks it post-sign-off.
-- *Exit:* KC-1 survives contact with a real set — controller, projector, phone.
+- *Exit:* KC-1 survives contact with a real set — controller, projector, phone. *(2026-10-05 additions to this exit: unprocessed audio input #1052, lost-audio-device handling #1053, a way to bind a MIDI key in the UI, and performance checked on real hardware — CI only runs a software renderer.)*
 
 ## Stage 4 — v1.0 · RELEASE
 
-- **#248 consolidation — ⚠️ status disputed, Matt's call (flagged 2026-10-03).** The original line here read *"CLOSED 2026-09-23 — four-tab end-state shipped."* Re-checked: the **issue** is closed, but (a) `PANEL_CONSOLIDATION_PLAN.md` shows only Phases 0–5 shipped, Phases 6–12 unmarked, all 12 §6 acceptance boxes unticked; (b) the running app has **6 secondary tabs** (BUILD / ASSETS / STIMULI / DIRECTOR / PLAY / PIPELINE), not the 4-tab end state (`build`, `play`, `output`, `assets`); (c) the doc header itself says *"~70%."* Two clean outcomes — **either** declare the 6-tab shape the accepted end state and close the plan doc as superseded, **or** re-open Phases 6–12 as ordered work. Nothing in Phases 6+ starts without that word; helpCopy/tour text stays a Stage 2 item either way.
+- **#248 consolidation — ✅ settled by Matt 2026-10-05: the six-tab shape is the accepted end state; the plan doc's Phases 6–12 are superseded.** *Original 2026-10-03 flag, kept for the record:* status disputed, Matt's call. The original line here read *"CLOSED 2026-09-23 — four-tab end-state shipped."* Re-checked: the **issue** is closed, but (a) `PANEL_CONSOLIDATION_PLAN.md` shows only Phases 0–5 shipped, Phases 6–12 unmarked, all 12 §6 acceptance boxes unticked; (b) the running app has **6 secondary tabs** (BUILD / ASSETS / STIMULI / DIRECTOR / PLAY / PIPELINE), not the 4-tab end state (`build`, `play`, `output`, `assets`); (c) the doc header itself says *"~70%."* Two clean outcomes — **either** declare the 6-tab shape the accepted end state and close the plan doc as superseded, **or** re-open Phases 6–12 as ordered work. Nothing in Phases 6+ starts without that word; helpCopy/tour text stays a Stage 2 item either way.
 - Community surface: share links + examples page; embed/remix only if Stage 2 proved demand.
-- Disaster recovery story (export everything / import everything round-trip honest). Open design questions carried from #537 (closed 2026-09-25 — the hits `seedOffsets` gap shipped; these did not): one export-everything bundle (project / palettes / hits / favorites are separate files today; favorites + user palettes ride nothing), and whether project JSON ever carries favorites / userPalettes (portability vs privacy). Browser-data clear is total loss (benchmark B.10).
+- Disaster recovery story (export everything / import everything round-trip honest). Open design questions carried from #537 (closed 2026-09-25 — the hits `seedOffsets` gap shipped; these did not): one export-everything bundle (project / palettes / hits / favorites are separate files today; favorites + user palettes ride nothing), and whether project JSON ever carries favorites / userPalettes (portability vs privacy). Browser-data clear is total loss (benchmark B.10). *(2026-10-05: the bundle is filed as #1051 and pulled forward to Phase 2.)*
 - Docs/examples layer (gap B.9) at the level a release implies.
 - Version bump `0.9.0 → 1.0.0`; release notes name the moat: *browser-native, deterministic, governor-honest performance visuals.*
 
@@ -62,7 +70,7 @@
 ## Principles carried through every stage
 
 - One fix per PR, CI green, feel sign-off is Matt's; docs PRs self-merge on green.
-- 4-tab cap holds; nothing deleted, controls move; no labs until the embargo note says so.
+- ~~4-tab cap holds~~ *(retired 2026-10-05: six secondary tabs plus DEV is the end state)*; nothing deleted, controls move; no labs until the embargo note says so.
 - **Phase gate (Matt, 2026-09-23): no phase advances with carryover.** Each phase ends harden → refactor → optimize → verify. A phase is done when everything in it is in, not when the interesting parts are.
 - **LIVE-or-cut (Matt, 2026-09-23): "present in code" means nothing.** At every phase gate, each mechanism is audited: LIVE = a proven call chain from the running instrument, anything else is wired or cut. No present-but-dead rides forward.
 - Coding lanes belong to the active coding agent; this roadmap is ordering surface for Matt only.
