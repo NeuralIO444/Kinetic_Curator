@@ -221,3 +221,4 @@ node src/panels/pipeline/stageMapping.selfcheck.mjs
 node src/panels/pipeline/stageDisplays.selfcheck.mjs
 node src/panels/pipeline/stageChannel.selfcheck.mjs
 node src/panels/pipeline/stageTestPattern.selfcheck.mjs
+node src/panels/build/patchOneLiner.selfcheck.mjs

@@ -17,6 +17,7 @@ import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } 
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
+import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
 
 // #716 Part 2 — black block + white numeral heads every row. The edited
 // track inverts (white block, black numeral).
@@ -251,6 +252,18 @@ export function LayerStack() {
   const fxCount = layers.filter(isFxLayer).length;
   const mathCount = layers.filter(isMathLayer).length;
   const singleTrack = contentCount < 2; // PATCH has nothing to point at (a patched row can still be set back to OFF)
+  // #1019 — PATCH one-liner for newcomers ("route one track's motion into
+  // another"): visible the first time a second KC track exists, then it gets
+  // out of the way. `seen` persists via localStorage (never nags on repeat
+  // visits); `dismissed` is the session-only ×. The flag is written the
+  // first time the line displays, so it stays up for the current session
+  // until the user taps ×, but a reload never brings it back.
+  const [onelinerSeen] = useState(() => readPatchOneLinerSeen());
+  const [onelinerDismissed, setOnelinerDismissed] = useState(false);
+  const onelinerVisible = shouldShowPatchOneLiner({ seen: onelinerSeen, dismissed: onelinerDismissed, contentCount });
+  useEffect(() => {
+    if (onelinerVisible) writePatchOneLinerSeen();
+  }, [onelinerVisible]);
   // #1014 (mockup C rebuild) — no ghost rows: each section gets a "+".
   // `chooser` is the open family picker: 'content' | 'fx' | null.
   const [chooser, setChooser] = useState(null);
@@ -418,6 +431,18 @@ export function LayerStack() {
                 onChange={(e) => setLayerPatch(layer.id, { mode: 'field', to, strength: Number(e.target.value) })} />
             )}
           </div>
+          {/* #1019 — one plain-language PATCH line for newcomers, shown once
+              (first time a second KC track exists), under the first row's
+              PATCH row. × dismisses this session; localStorage keeps it
+              from nagging on repeat visits. */}
+          {!adj && gi === 0 && onelinerVisible && (
+            <div className="patch-oneliner" role="note" title={PATCH_ONELINER_COPY}>
+              <span className="patch-oneliner-text">{PATCH_ONELINER_COPY}</span>
+              <button type="button" className="patch-oneliner-x" title="Got it — don't show again"
+                aria-label="Dismiss PATCH hint"
+                onClick={() => setOnelinerDismissed(true)}>×</button>
+            </div>
+          )}
           <PatchDiagLine layerId={layer.id} patch={patch} srcN={ordinals.get(patch.to) ?? '?'} dstN={ordinals.get(layer.id) ?? '?'} />
           </>
         )}
