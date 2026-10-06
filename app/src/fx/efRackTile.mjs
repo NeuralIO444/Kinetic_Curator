@@ -26,8 +26,9 @@ export const KIND_FACE = {
 
 export function efTileFace(slot, kind) {
   const family = SLOT_ABBR[slot?.slot] || 'EF';
-  if (!kind) return { abbr: family, word: 'empty', glyph: 'empty' };
+  // #1046: an empty slot says what the slot is for, never the bare word "empty".
+  if (!kind) return { abbr: family, word: String(slot?.label || family).toLowerCase() };
   const face = KIND_FACE[kind];
-  if (!face) return { abbr: family, word: String(kind), glyph: kind };
-  return { abbr: face.abbr, word: face.word, glyph: kind };
+  if (!face) return { abbr: family, word: String(kind) };
+  return { abbr: face.abbr, word: face.word };
 }

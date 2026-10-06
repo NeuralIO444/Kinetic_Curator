@@ -85,33 +85,26 @@ function PatchDiagLine({ layerId, patch, srcN, dstN }) {
   return <div className="patch-diag" title={line.title}>{line.text}</div>;
 }
 
-function EfGlyph({ kind }) {
-  if (kind === 'displace') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 16c4-6 6 6 10 0s6-6 10 0" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
-  if (kind === 'tear') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 8h10M14 16h10M8 24h10" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
-  if (kind === 'rgbSplit') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 10h8M14 16h8M10 22h8" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
-  if (kind === 'halo') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="4" fill="currentColor" /><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" strokeWidth="1.2" /></svg>;
-  if (kind === 'grain') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="12" r="1" fill="currentColor" /><circle cx="18" cy="10" r="1" fill="currentColor" /><circle cx="22" cy="18" r="1" fill="currentColor" /><circle cx="12" cy="20" r="1" fill="currentColor" /></svg>;
-  if (!kind || kind === 'empty') return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="8" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2" /></svg>;
-  return <svg className="ef-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
-}
-
+// #1046 — the editor is a header strip plus its controls, sized to its content.
+// The old tile reserved a glyph row and a mode-word row, so a two-slider effect
+// sat in a tall near-empty box. The header (abbreviation, mode word, ✕) is also
+// what announces "the editor opened".
 function EfTile({ slot, kind, onBypass, children }) {
   const face = efTileFace(slot, kind);
   return (
     <div className="ef-tile" title={`${slot.label} · ${face.word}`}>
-      <span className="ef-abbr">{face.abbr}</span>
-      {onBypass ? (
-        <button type="button" className="ef-bypass" onClick={onBypass} title="Remove this effect">✕</button>
-      ) : <span className="ef-bypass ef-bypass-off" aria-hidden="true" />}
-      <EfGlyph kind={face.glyph} />
-      <span className="ef-word">{face.word}</span>
+      <div className="ef-head">
+        <span className="ef-abbr">{face.abbr}</span>
+        <span className="ef-word">{face.word}</span>
+        {onBypass && <button type="button" className="ef-bypass" onClick={onBypass} title="Remove this effect">✕</button>}
+      </div>
       {children}
     </div>
   );
 }
 
 // #520 Phase 4 — rack UI: slot-driven display, one row per EF slot.
-// #716 — TX-6 tile: abbreviation, ✕, glyph, one mode word.
+// #716 — TX-6 tile; #1046 — header strip, no glyph, nothing but controls below.
 function FxEffectEditor({ layer, fxOrdinal }) {
   const [pick, setPick] = useState(null);
   const slot = rackSlotForFxOrdinal(fxOrdinal);
@@ -124,6 +117,7 @@ function FxEffectEditor({ layer, fxOrdinal }) {
   if (filled) {
     const def = FX_EFFECT_DEFS[filled.kind];
     if (!def) return null;
+    const paramCount = Object.keys(def.params).length;
     return (
       <div className="fx-editor" title={`FX ${fxOrdinal} · ${slot.label}`}>
         <EfTile slot={slot} kind={filled.kind} onBypass={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}>
@@ -136,30 +130,34 @@ function FxEffectEditor({ layer, fxOrdinal }) {
               <span className="fx-param-readout">{filled.params?.[key] ?? p.def}</span>
             </div>
           ))}
+          {/* An effect with almost nothing to set says so plainly, never a void. */}
+          {paramCount <= 1 && <div className="fx-note">{paramCount === 0 ? 'no controls' : 'no other controls'}</div>}
         </EfTile>
       </div>
     );
   }
 
+  // Empty slot: one clear call to action, never a bare "empty" and a dead control.
   const effectiveKind = slotKinds.includes(pick) ? pick : (slotKinds[0] ?? null);
   return (
     <div className="fx-editor" title={`${slot.label} · one family`}>
       <EfTile slot={slot} kind={null}>
-        <span className="fx-slot-family">{slot.label}</span>
-        {slot.stubs.map((s) => (
-          <span key={s} className="fx-stub" title="Planned — not yet available">{s.toUpperCase()}</span>
-        ))}
-        {effectiveKind && (
+        {effectiveKind ? (
           <>
             {slotKinds.length > 1 && (
-              <select className="tg" value={effectiveKind} onChange={(e) => setPick(e.target.value)}>
+              <select className="tg" aria-label={`Choose ${slot.label} effect`} value={effectiveKind} onChange={(e) => setPick(e.target.value)}>
                 {slotKinds.map((k) => <option key={k} value={k}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>)}
               </select>
             )}
             <button className="chip-btn" onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}>
-              + {slotKinds.length === 1 ? FX_EFFECT_DEFS[effectiveKind].label.toUpperCase() : 'ADD'}
+              + ADD {FX_EFFECT_DEFS[effectiveKind].label.toUpperCase()}
             </button>
           </>
+        ) : (
+          <div className="fx-note">nothing to add to this slot yet</div>
+        )}
+        {slot.stubs.length > 0 && (
+          <div className="fx-note" title="Planned — not yet available">planned: {slot.stubs.join(', ')}</div>
         )}
       </EfTile>
     </div>
