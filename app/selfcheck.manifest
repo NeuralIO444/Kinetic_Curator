@@ -69,6 +69,7 @@ node src/data/firstLight.selfcheck.mjs
 node src/state/paletteLibrary.selfcheck.mjs
 node src/components/paletteWing.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
+node src/state/enabledAssetsRoundTrip.selfcheck.mjs
 node src/state/bundle.selfcheck.mjs
 node src/state/bundleParts.selfcheck.mjs
 node src/state/hitsExport.selfcheck.mjs

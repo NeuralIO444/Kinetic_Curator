@@ -29,6 +29,20 @@ import { queueRegionDetect } from '../../assets/regionRaster.js';
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
 const initialEnabledAssets = Object.fromEntries(DEFAULT_4_ASSETS.map((id) => [id, true]));
 
+/**
+ * #1062 — a document's asset map, taken as the WHOLE set rather than an overlay
+ * on the defaults. `false` is a deliberate OFF and is kept. A map with no keys
+ * (absent, `{}`, or a hostile map the sanitizer collapsed to nothing) is read as
+ * "the document does not say" and falls back to the default four: a damaged
+ * file must not open to a blank canvas, and a genuine all-off state is stored as
+ * explicit `false` values, never as `{}`.
+ */
+function wholeEnabledAssets(map) {
+  return map && typeof map === 'object' && Object.keys(map).length > 0
+    ? { ...map }
+    : { ...initialEnabledAssets };
+}
+
 const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
 
 // #310: GRID/LIST is a remembered preference, not a live toggle. The last
@@ -644,13 +658,13 @@ export const createGlobalSlice = (set) => ({
       ingestError: null,
     };
     if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
-      const enabled = { ...initialEnabledAssets };
       // #103 Track B — apply-path defense in depth: collapse hostile maps to
       // known asset ids (+ the doc's own sanitized custom assets) before they
       // reach the store.
-      const clean = sanitizeEnabledAssets(doc.enabledAssets, next.customAssets);
-      for (const [id, on] of Object.entries(clean || {})) enabled[id] = !!on;
-      next.enabledAssets = enabled;
+      // #1062 — what the document lists IS the set. This used to seed the
+      // default four ON and overlay the document, so an asset the file never
+      // mentioned came back enabled and export -> import -> export widened.
+      next.enabledAssets = wholeEnabledAssets(sanitizeEnabledAssets(doc.enabledAssets, next.customAssets));
     }
     if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
       next.assetWeightOverrides = { ...sanitizeAssetWeightOverrides(doc.assetWeightOverrides, next.customAssets) };
@@ -706,7 +720,7 @@ export const createGlobalSlice = (set) => ({
         next.layoutParams = normalizeLayoutParams(activeSnap.layoutParams);
         next.lockedParams = activeSnap.lockedParams || {};
         next.caGrid = activeSnap.caGrid || null;
-        next.enabledAssets = { ...initialEnabledAssets, ...(activeSnap.enabledAssets || {}) };
+        next.enabledAssets = wholeEnabledAssets(activeSnap.enabledAssets); // #1062 — the snapshot is the whole set too
       }
     }
     return next;
