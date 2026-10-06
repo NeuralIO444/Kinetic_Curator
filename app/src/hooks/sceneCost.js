@@ -36,6 +36,8 @@ export const FX_KIND_TO_COST_ID = {
   solarize: 'fx/solarize',
   edge: 'fx/edge',
   halo: 'fx/halo',
+  sharpen: 'fx/sharpen',
+  haze: 'fx/haze',
   grade: 'fx/grade',
   // #1010 — math ops register as math/<kind> (mathShaders.mjs).
   gain: 'math/gain',

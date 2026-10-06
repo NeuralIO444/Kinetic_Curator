@@ -69,6 +69,26 @@ export const FX_EFFECT_DEFS = {
       lift: { label: 'Lift', min: 0.5, max: 1.5, step: 0.01, def: 1, hint: 'Scale perceptual lightness. 1 is unchanged.' },
     },
   },
+  // #1022 — the Blur / Focus family gets its two planned effects. The GL
+  // shaders are in gl/effects/fxShaders.mjs; the SVG builders below are
+  // APPROXIMATIONS (SVG has no 4-tap unsharp radius and no luminance-weighted
+  // veil), kept so the print path never silently drops them.
+  sharpen: {
+    label: 'Sharpen',
+    hint: 'Unsharp mask: edges gain contrast, flat areas stay put. Four taps, no blur pass. Amount 0 is the layer untouched.',
+    params: {
+      amount: { label: 'Amount', min: 0, max: 2, step: 0.05, def: 0.6, hint: 'Edge contrast. 0 is the layer untouched; past 1 it starts to ring.' },
+      radius: { label: 'Radius', min: 0.5, max: 3, step: 0.1, def: 1, hint: 'How wide an edge counts, in pixels.' },
+    },
+  },
+  haze: {
+    label: 'Haze',
+    hint: 'A veil of mist over the plate: shadows lift and colour drains toward the veil. Amount 0 is the layer untouched.',
+    params: {
+      amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.35, hint: 'How much mist. 0 is the layer untouched.' },
+      lift: { label: 'Lift', min: 0, max: 1, step: 0.05, def: 0.5, hint: 'How light the mist is: low is smoke, high is fog.' },
+    },
+  },
   tear: {
     label: 'Tear',
     hint: 'Horizontal scanline slice-tears: banded rows shear left/right. X-only displacement (Y is flattened).',
@@ -132,7 +152,8 @@ export const GRAIN_FAMILY_KINDS = ['grain'];
  * rack UI as disabled placeholders so the slot is never visually empty.
  */
 export const FX_RACK = [
-  { slot: 'EF-1', label: 'Blur / Focus', kinds: [],              stubs: ['sharpen', 'haze'] },
+  // #1022 — EF-1 holds real effects again; the two stubs it promised are built.
+  { slot: 'EF-1', label: 'Blur / Focus', kinds: ['sharpen', 'haze'], stubs: [] },
   { slot: 'EF-2', label: 'Distort',      kinds: ['displace', 'tear', 'rgbSplit', 'edge'], stubs: [] },
   { slot: 'EF-3', label: 'Tonal',        kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
   { slot: 'EF-4', label: 'Finish',       kinds: ['grain', 'scanlines', 'halo'],          stubs: ['dither', 'stipple'] },
@@ -148,7 +169,9 @@ export const FX_RACK = [
  */
 // #704 — halo joins the add-menu: the chiaroscuro mode needs it reachable,
 // and it is the only effect in the set tuned for a dark ground.
-export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert', 'halo'];
+// #1022 — sharpen and haze join: the Blur / Focus slot must offer something
+// from every add surface (section +, family chooser, slot editor).
+export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'sharpen', 'haze'];
 
 export function isFxLayer(layer) {
   return !!layer && layer.type === 'fx';
@@ -489,7 +512,32 @@ function buildEdge(params, ctx, rid, src) {
   ];
 }
 
-const BUILDERS = { rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
+// #1022 — SVG half of SHARPEN: a 3x3 cross unsharp kernel, centre 1+a, arms
+// -a/4. One pixel radius only (SVG convolve has no radius); preserveAlpha so a
+// silhouette never grows. Amount 0 emits the identity kernel.
+function buildSharpen(params, ctx, rid, src) {
+  const a = Math.min(2, Math.max(0, Number(params.amount) || 0));
+  if (a <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  const arm = r3(-a / 4);
+  return [{ prim: 'feConvolveMatrix', attrs: { in: src, order: 3, kernelMatrix: `0 ${arm} 0 ${arm} ${r3(1 + a)} ${arm} 0 ${arm} 0`, preserveAlpha: 'true' } }];
+}
+
+// #1022 — SVG half of HAZE: a linear pull of each channel toward the veil.
+// The GL shader weakens the veil on bright pixels; this uses the mean weight,
+// so the two agree on intent, not on pixels.
+function buildHaze(params, ctx, rid, src) {
+  const amount = Math.min(1, Math.max(0, Number(params.amount) || 0));
+  if (amount <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  const lift = Math.min(1, Math.max(0, Number.isFinite(Number(params.lift)) ? Number(params.lift) : 0.5));
+  const veil = 0.35 + (0.95 - 0.35) * lift;
+  const k = amount * 0.75;
+  return [{
+    prim: 'feComponentTransfer', attrs: { in: src },
+    children: ['R', 'G', 'B'].map((chan) => ({ prim: `feFunc${chan}`, attrs: { type: 'linear', slope: r3(1 - k), intercept: r3(k * veil) } })),
+  }];
+}
+
+const BUILDERS = { sharpen: buildSharpen, haze: buildHaze, rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
 
 /**
  * Compile an effects array into filter primitives.

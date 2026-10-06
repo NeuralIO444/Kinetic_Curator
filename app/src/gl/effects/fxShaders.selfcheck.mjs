@@ -25,6 +25,8 @@ import {
   FX_SHADER_EFFECTS,
   FX_SHADER_KINDS,
   FX_HALO_FS,
+  FX_SHARPEN_FS,
+  FX_HAZE_FS,
   FX_DISPLACE_FS,
   registerFxShaders,
   compileFxShaders,
@@ -129,8 +131,8 @@ function makeFxBridge(gl) {
   return bridge;
 }
 
-ok('all six Phase-2 kinds are declared', () => {
-  assert.deepEqual([...FX_SHADER_KINDS].sort(), ['displace', 'edge', 'grade', 'halo', 'scanlines', 'solarize', 'tear']);
+ok('all Phase-2 kinds are declared', () => {
+  assert.deepEqual([...FX_SHADER_KINDS].sort(), ['displace', 'edge', 'grade', 'halo', 'haze', 'scanlines', 'sharpen', 'solarize', 'tear']);
 });
 
 ok('descriptors validate and mirror the SVG-side FX catalog', () => {
@@ -248,6 +250,40 @@ ok('#704: halo is identity at defaults and never blurs with a gaussian', () => {
     `halo params must clamp (${JSON.stringify(p)})`);
   assert.strictEqual(compileFxShaders([{ kind: 'halo', params: { amount: NaN } }])[0].params.amount, 0,
     'a non-finite amount falls back to off');
+});
+ok('#1022: sharpen is a 4-tap unsharp mask — no blur pass, byte-identical at amount 0', () => {
+  assert.ok(!/blur\(|gaussian|for \(int/i.test(FX_SHARPEN_FS.replace(/\/\/.*$/gm, '')), 'no blur and no loop: a bounded, countable cost');
+  assert.strictEqual((FX_SHARPEN_FS.match(/texture\(u_tex/g) || []).length, 5, 'centre plus four taps');
+  assert.ok(FX_SHARPEN_FS.includes('if (u_amount > 0.0'), 'amount 0 must skip the work and return the source untouched');
+  assert.ok(FX_SHARPEN_FS.includes('o = c;'), 'the default output is the source, byte for byte');
+  assert.ok(FX_SHARPEN_FS.includes('max(a.a + b.a + d.a + e.a'), 'taps are averaged weighted by alpha, so silhouettes get no dark-rim bias');
+  const steps = compileFxShaders([{ kind: 'sharpen', params: { amount: 99, radius: 1e6 } }]);
+  assert.ok(steps[0].params.amount <= 2 && steps[0].params.radius <= 3, `sharpen params must clamp (${JSON.stringify(steps[0].params)})`);
+  const lo = compileFxShaders([{ kind: 'sharpen', params: { amount: -9, radius: -9 } }])[0].params;
+  assert.ok(lo.amount >= 0 && lo.radius >= 0.5, `sharpen params clamp low (${JSON.stringify(lo)})`);
+  assert.ok(Number.isFinite(compileFxShaders([{ kind: 'sharpen', params: { amount: NaN, radius: NaN } }])[0].params.amount));
+});
+ok('#1022: haze is a single-tap veil — no blur, byte-identical at amount 0', () => {
+  assert.strictEqual((FX_HAZE_FS.match(/texture\(u_tex/g) || []).length, 1, 'one tap: pure ALU');
+  assert.ok(!/blur|for \(int/i.test(FX_HAZE_FS.replace(/\/\/.*$/gm, '')));
+  assert.ok(FX_HAZE_FS.includes('if (u_amount > 0.0'), 'amount 0 must skip the work');
+  assert.ok(FX_HAZE_FS.includes('o = c;'), 'the default output is the source, byte for byte');
+  assert.ok(FX_HAZE_FS.includes('(1.0 - 0.5 * l)'), 'the veil is weaker on bright pixels, so shadows go furthest');
+  const p = compileFxShaders([{ kind: 'haze', params: { amount: 99, lift: 99 } }])[0].params;
+  assert.ok(p.amount <= 1 && p.lift <= 1, `haze params must clamp (${JSON.stringify(p)})`);
+  const lo = compileFxShaders([{ kind: 'haze', params: { amount: -9, lift: -9 } }])[0].params;
+  assert.ok(lo.amount >= 0 && lo.lift >= 0, `haze params clamp low (${JSON.stringify(lo)})`);
+});
+ok('#1022: both new effects declare a cost and a descriptor that mirrors the SVG catalog', () => {
+  for (const kind of ['sharpen', 'haze']) {
+    const reg = getTemplateEffect(kind);
+    assert.ok(reg && reg.descriptor, `${kind} is registered`);
+    assert.deepEqual(Object.keys(reg.descriptor.params), Object.keys(FX_EFFECT_DEFS[kind].params), `${kind} params match the SVG catalog`);
+    for (const [k, p] of Object.entries(reg.descriptor.params)) {
+      const s = FX_EFFECT_DEFS[kind].params[k];
+      assert.deepEqual([p.min, p.max, p.def], [s.min, s.max, s.def], `${kind}.${k} range and default agree`);
+    }
+  }
 });
 ok('#590: displace warp is additive — 0 is the legacy effect, and the block is guarded', () => {
   const d = getTemplateEffect('displace').descriptor;

@@ -331,6 +331,94 @@ export const FX_HALO_DESCRIPTOR = {
   },
 };
 
+export const FX_SHARPEN_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform float u_amount;
+uniform float u_radius;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec4 c = texture(u_tex, v_cuv);
+  o = c; // amount 0 returns the source byte-for-byte
+  if (u_amount > 0.0 && c.a > 1e-6) {
+    // #1022 — unsharp mask: the pixel plus its difference from a 4-tap
+    // average. NOT a gaussian: #308 retired blur from the instrument and a
+    // sharpen must not bring it back by the back door. Four taps at u_radius.
+    vec2 px = u_radius / u_res;
+    vec4 a = texture(u_tex, v_cuv + vec2( px.x, 0.0));
+    vec4 b = texture(u_tex, v_cuv + vec2(-px.x, 0.0));
+    vec4 d = texture(u_tex, v_cuv + vec2(0.0,  px.y));
+    vec4 e = texture(u_tex, v_cuv + vec2(0.0, -px.y));
+    // The chain is PREMULTIPLIED. Average the taps weighted by their own
+    // alpha, so a transparent neighbour does not drag the average to black and
+    // paint a bright rim around every silhouette.
+    vec3 blur = (a.rgb + b.rgb + d.rgb + e.rgb) / max(a.a + b.a + d.a + e.a, 1e-5);
+    vec3 s = c.rgb / c.a;
+    o = vec4(clamp(s + (s - blur) * u_amount, 0.0, 1.0) * c.a, c.a);
+  }
+}
+`;
+
+export const FX_SHARPEN_DESCRIPTOR = {
+  label: 'Sharpen',
+  hint: 'Unsharp mask: edges gain contrast, flat areas stay put. Four taps, no blur pass. Amount 0 is the layer untouched.',
+  pad: 0,
+  animated: false,
+  params: {
+    amount: {
+      type: 'float', label: 'Amount', min: 0, max: 2, step: 0.05, def: 0.6,
+      ui: 'slider', hint: 'Edge contrast. 0 is the layer untouched; past 1 it starts to ring.',
+    },
+    radius: {
+      type: 'float', label: 'Radius', min: 0.5, max: 3, step: 0.1, def: 1,
+      ui: 'slider', hint: 'How wide an edge counts, in pixels.',
+    },
+  },
+};
+
+export const FX_HAZE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res; // declared for the template contract; a pure colour op does not need it
+uniform float u_amount;
+uniform float u_lift;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec4 c = texture(u_tex, v_cuv);
+  o = c; // amount 0 returns the source byte-for-byte
+  if (u_amount > 0.0 && c.a > 1e-6) {
+    // #1022 — atmosphere without a blur: mist drawn over the plate. Shadows
+    // go furthest (the veil is weaker on bright pixels), so depth reads as
+    // distance. Single tap, pure ALU.
+    vec3 s = c.rgb / c.a;
+    float l = dot(s, vec3(0.2126, 0.7152, 0.0722));
+    float veil = mix(0.35, 0.95, clamp(u_lift, 0.0, 1.0));
+    float k = clamp(u_amount, 0.0, 1.0) * (1.0 - 0.5 * l);
+    o = vec4(mix(s, vec3(veil), k) * c.a, c.a);
+  }
+}
+`;
+
+export const FX_HAZE_DESCRIPTOR = {
+  label: 'Haze',
+  hint: 'A veil of mist over the plate: shadows lift and colour drains toward the veil. Amount 0 is the layer untouched.',
+  pad: 0,
+  animated: false,
+  params: {
+    amount: {
+      type: 'float', label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.35,
+      ui: 'slider', hint: 'How much mist. 0 is the layer untouched.',
+    },
+    lift: {
+      type: 'float', label: 'Lift', min: 0, max: 1, step: 0.05, def: 0.5,
+      ui: 'slider', hint: 'How light the mist is: low is smoke, high is fog.',
+    },
+  },
+};
+
 export const FX_GRADE_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_tex;
@@ -396,6 +484,10 @@ export const FX_SHADER_EFFECTS = [
     cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'pure ALU color op' } }],
   ['edge', { fs: FX_EDGE_FS, descriptor: FX_EDGE_DESCRIPTOR, file: 'fxShaders.mjs:edge',
     cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.4, notes: '3x3 kernel, 9 taps' } }],
+  ['sharpen', { fs: FX_SHARPEN_FS, descriptor: FX_SHARPEN_DESCRIPTOR, file: 'fxShaders.mjs:sharpen',
+    cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.35, notes: '5 taps (centre + 4), cross unsharp mask; no blur pass' } }],
+  ['haze', { fs: FX_HAZE_FS, descriptor: FX_HAZE_DESCRIPTOR, file: 'fxShaders.mjs:haze',
+    cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'single tap, pure ALU veil' } }],
   ['halo', { fs: FX_HALO_FS, descriptor: FX_HALO_DESCRIPTOR, file: 'fxShaders.mjs:halo',
     cost: { tier: 2, memoryBytes: 1920 * 1080 * 8, timeMs: 1.1, notes: '12 ring taps (two rings of six) + vignette; a quality scaler, not cosmetic — cost is the tap count' } }],
   ['grade', { fs: FX_GRADE_FS, descriptor: FX_GRADE_DESCRIPTOR, file: 'fxShaders.mjs:grade',
