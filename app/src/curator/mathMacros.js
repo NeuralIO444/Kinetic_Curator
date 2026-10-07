@@ -32,6 +32,8 @@ export const MATH_MAX_NAME = 24;
 const EXCLUDED_KEYS = new Set([
   ...ATLAS_AFFECTING_PARAMS, // count, particleCount, lsysDepth, body
   'collideMask', 'contactRadius', 'contactRestitution', 'contactRepel',
+  // #1042 — PATTERN reseeds. A macro must never sweep the seed every frame; SHUFFLE is a trigger, not a scalar.
+  'shuffle', 'seed',
 ]);
 
 const LABELS = {

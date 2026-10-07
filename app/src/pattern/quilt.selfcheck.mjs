@@ -228,13 +228,21 @@ ok('MIX 0 and 100: every motif is quilt vocabulary 1–10, never glyph or field'
   }
 });
 
-ok('MIX 0 is a two-motif checkerboard; MIX 100 uses the wider vocabulary', () => {
+ok('MIX 0 is a two-motif checkerboard (bar the #1042 quota tile); MIX 100 uses the wider vocabulary', () => {
   for (const s of SEEDS) {
     const g = assignQuilt(s, 8, 0, 0, PAL, 8);
-    const even = new Set(); const odd = new Set();
-    g.tiles.forEach((t, i) => ((((i % g.cols) + Math.floor(i / g.cols)) % 2 === 0) ? even : odd).add(t.pattern));
-    assert.equal(even.size, 1); assert.equal(odd.size, 1);
-    assert.notEqual([...even][0], [...odd][0], 'the rhythm alternates two different motifs');
+    const even = new Map(); const odd = new Map();
+    g.tiles.forEach((t, i) => {
+      const m = (((i % g.cols) + Math.floor(i / g.cols)) % 2 === 0) ? even : odd;
+      m.set(t.pattern, (m.get(t.pattern) || 0) + 1);
+    });
+    // the never-static quota may replace at most one tile per run of 16 (tail included) with a pinwheel or medallion
+    const rhythm = (m) => [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const evenM = rhythm(even); const oddM = rhythm(odd);
+    assert.notEqual(evenM, oddM, 'the rhythm alternates two different motifs');
+    const strays = g.tiles.filter((t, i) => t.pattern !== ((((i % g.cols) + Math.floor(i / g.cols)) % 2 === 0) ? evenM : oddM));
+    assert.ok(strays.length <= Math.ceil(g.tiles.length / 16), `${strays.length} tiles break the rhythm`);
+    for (const t of strays) assert.ok(['pinwheel', 'medallion'].includes(t.pattern), `${t.pattern} is not a quota tile`);
     assert.ok(new Set(assignQuilt(s, 8, 1, 0, PAL, 8).tiles.map((t) => t.pattern)).size > 4);
   }
 });
