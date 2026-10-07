@@ -336,7 +336,7 @@ export function PipelinePanel() {
           </div>
 
           {metalStats ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
               <div>DEVICE: <span style={{ color: '#fff' }}>{metalStats.device_name}</span></div>
               <div>UMA SHARED: <span style={{ color: metalStats.has_unified_memory ? '#00ff88' : '#ffaa00' }}>{metalStats.has_unified_memory ? 'YES (Coherent)' : 'NO'}</span></div>
               <div>ACCUM PTR: <span className="pipeline-hex">{metalStats.accum_buffer_ptr}</span> ({((metalStats.accum_buffer_bytes) / 1048576).toFixed(2)} MB)</div>
@@ -410,7 +410,7 @@ export function PipelinePanel() {
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
             <div>TARGET: <span style={{ color: '#fff' }}>.cpuAndNeuralEngine (16-Core ANE)</span></div>
             <div>INGEST: <span style={{ color: '#00ff88' }}>Zero-Copy CVPixelBuffer (UMA)</span></div>
             <div>
@@ -437,7 +437,7 @@ export function PipelinePanel() {
               border: '1px solid #ffaa00',
               background: 'rgba(255, 170, 0, 0.08)',
               color: '#ffaa00',
-              padding: '5px 8px',
+              padding: '6px 8px',
               cursor: curatorBusy ? 'wait' : 'pointer',
             }}
             disabled={curatorBusy}
@@ -472,7 +472,7 @@ export function PipelinePanel() {
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px', color: 'var(--text-muted, #aaa)', fontSize: '10px' }}>
             <div>VIDEO CODEC: <span style={{ color: '#fff' }}>AVAssetWriter (HEVC hvc1 / ProRes 4444)</span></div>
             <div>BATCH QUEUE: <span style={{ color: '#00e5ff' }}>Pinned to E-Cores (QOS_CLASS_BACKGROUND)</span></div>
             {mediaProgress && (
