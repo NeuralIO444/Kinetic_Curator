@@ -25,7 +25,7 @@ const fmt = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(3));
 const INPUT_LABEL = (id) => (id.startsWith('band.') ? `BAND ${id.slice(5).toUpperCase()}` : id.toUpperCase());
 // glow is the DOM frame glow (box-shadow), not a GL glow: the picker says so.
 // #790: only targets the live loop consumes get picker options (all #790 targets shipped).
-const TARGET_LABEL = { 'render.scale': 'scale', 'render.alpha': 'alpha', 'render.breath': 'breath', 'render.glow': 'frame glow', 'render.accum': 'accum trails', 'color.hue': 'hue rotate', 'clock.kinemeRate': 'kineme rate', 'light.intensity': 'light', 'render.squash': 'squash' };
+const TARGET_LABEL = { 'render.scale': 'scale', 'render.alpha': 'alpha', 'render.breath': 'breath', 'render.glow': 'frame glow', 'render.accum': 'accum trails', 'color.hue': 'hue rotate', 'clock.kinemeRate': 'kineme rate', 'light.intensity': 'light', 'render.squash': 'squash', 'pattern.drift': 'pattern drift', 'pattern.mix': 'pattern mix', 'pattern.hero': 'pattern hero', 'pattern.grout': 'pattern grout', 'pattern.density': 'pattern density' };
 const PICKABLE_TARGETS = Object.keys(ROUTE_TARGETS).filter((id) => TARGET_LABEL[id]);
 const LISTEN_MS = 1500;
 const LISTEN_CAP_MS = 8000;

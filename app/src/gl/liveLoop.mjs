@@ -50,6 +50,7 @@ import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
+import { applyPatternAudio } from './patternAudio.mjs'; // #1110: pattern.* routes → pattern track params
 import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity route → sun intensity
 import { squashWithAudio } from './squashAudio.mjs'; // #790: render.squash route → scene squash
 import { attachVelocities } from './velocitySmear.mjs';
@@ -633,6 +634,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     if (washEv.washing) applyWash(resolved, washEv);
     if (injectEv.injecting) applyInject(resolved, injectEv);
     lastResolved = resolved;
+    applyPatternAudio(resolved, routes.pattern); // #1110: audio moves a pattern track's params, per frame, never the stored block
 
     // #790 (render.squash): the assignable squash route's output, in [0,1],
     // rides on top of the layout squash dial (the #594 squash-and-stretch

@@ -65,6 +65,7 @@ export function editableRoutes(routes) {
 export const NEW_ROUTE_DEPTH = Object.freeze({
   'render.scale': 0.2, 'render.alpha': 10, 'render.breath': 0.03, 'render.glow': 0.5,
   'render.hue': 15, 'color.hue': 15, 'render.squash': 0.2, 'render.kineme': 0.5, 'clock.kinemeRate': 2, 'render.accum': 4, 'render.sun': 0.2, 'light.intensity': 0.2,
+  'pattern.drift': 0.3, 'pattern.mix': 0.3, 'pattern.hero': 0.3, 'pattern.grout': 0.05, 'pattern.density': 2, // #1110
 });
 
 /** Slider bounds and step for a target's route depth. */
