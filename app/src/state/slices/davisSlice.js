@@ -3,6 +3,7 @@ import { loopClock } from '../../gl/loopClock.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { generateLayoutTargets, MORPHABLE_KEYS, PALETTE_IDS } from '../paramUtils.js';
 import { genId } from '../id.js';
+import { stackOf, expandStack } from '../recipeStack.js'; // #1131: a keep carries the layer stack
 import { tickPhraseBeat } from '../phraseTick.js';
 import { sanitizeBeatRoute } from '../beatArbiter.js';
 import { pushToUndo } from '../history.js';
@@ -48,7 +49,9 @@ export function sanitizeCast(raw) {
  */
 export function captureFavorite(state, paletteId) {
   const enabled = state.enabledAssets || {};
+  const stack = stackOf(state); // null for a plain one-track scene: the keep is exactly what it was
   return {
+    ...(stack ? { stack } : {}),
     seed: state.seed,
     seedOffsets: { ...(state.seedOffsets || {}) },
     // #948 — full epoch ISO; legacy HH:MM:SS keeps still parse via
@@ -74,7 +77,11 @@ export function sanitizeFavorite(raw) {
   const layout = raw.config?.layout;
   const paletteId = raw.config?.palette?.id;
   const cast = sanitizeCast(raw.config?.assets);
+  // #1131 — a stored stack is trusted no further than the project normalizers trust a file: refuse it whole if
+  // it does not expand (the keep itself survives), and bound its size.
+  const stackOk = raw.stack && JSON.stringify(raw.stack).length < 60000 && expandStack(raw.stack).ok;
   return {
+    ...(stackOk ? { stack: JSON.parse(JSON.stringify(raw.stack)) } : {}),
     id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
     seed,
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'

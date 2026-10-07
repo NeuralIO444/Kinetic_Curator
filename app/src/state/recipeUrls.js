@@ -6,6 +6,8 @@
 // non-default layout params (delta-vs-defaults keeps links to hundreds of
 // chars). OUT of v1: layers/snapshots, custom assets, user-palette
 // definitions, lockedParams/caGrid, quality.
+// kc-r/2 (#1131) adds the layer stack (extra KC tracks, FX, MATH, PATTERN) as one optional
+// block (recipeStack.js). A scene with only one plain KC track still encodes as kc-r/1, byte for byte.
 //
 // Pure, node-importable: no React, no DOM, no store. Fail-closed: unknown
 // version refuses, bad payloads return { ok:false } with a plain-language
@@ -15,10 +17,12 @@
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { getCatalogPalette } from '../data/palettes.js';
 import { RECIPE_OFFSET_CHANNELS, readSeedOffsets } from './recipes.js';
+import { expandStack } from './recipeStack.js';
 
 /** Version tag — cleartext prefix of every recipe URL. Bump on format change. */
 export const RECIPE_URL_VERSION = 'kc-r/1';
 export const RECIPE_URL_PREFIX = 'kc-r/1.';
+export const RECIPE_URL_PREFIX_2 = 'kc-r/2.'; // #1131: carries the layer stack
 
 /** Hash key: the share link is `…/#r=kc-r/1.…`. */
 export const RECIPE_URL_HASH_KEY = 'r';
@@ -104,7 +108,7 @@ export function buildShareHref(payload, baseUrl) {
  */
 export function extractRecipePayload(text) {
   if (typeof text !== 'string') return null;
-  const m = /(kc-r\/1\.[A-Za-z0-9-_]+)/.exec(text);
+  const m = /(kc-r\/[12]\.[A-Za-z0-9-_]+)/.exec(text);
   return m ? m[1] : null;
 }
 
@@ -150,7 +154,8 @@ export function describePaletteFallback(paletteId, userPalettes) {
  */
 export function encodeRecipeUrl(fields) {
   const f = (fields && typeof fields === 'object') ? fields : {};
-  const payload = { v: 1, s: (f.seed >>> 0) };
+  const stack = f.stack && typeof f.stack === 'object' ? f.stack : null;
+  const payload = { v: stack ? 2 : 1, s: (f.seed >>> 0) };
 
   const offsets = readSeedOffsets({ seedOffsets: f.seedOffsets });
   const o = {};
@@ -170,7 +175,8 @@ export function encodeRecipeUrl(fields) {
   }
   if (Object.keys(l).length) payload.l = l;
 
-  return RECIPE_URL_PREFIX + b64urlEncodeBytes(_te.encode(JSON.stringify(payload)));
+  if (stack) payload.k = stack;
+  return (stack ? RECIPE_URL_PREFIX_2 : RECIPE_URL_PREFIX) + b64urlEncodeBytes(_te.encode(JSON.stringify(payload)));
 }
 
 /**
@@ -185,12 +191,12 @@ export function decodeRecipeUrl(str) {
   if (!t.startsWith('kc-r/')) {
     return fail(`Not a recipe link: it should start with "${RECIPE_URL_PREFIX}".`);
   }
-  if (!t.startsWith(RECIPE_URL_PREFIX)) {
+  if (!t.startsWith(RECIPE_URL_PREFIX) && !t.startsWith(RECIPE_URL_PREFIX_2)) {
     const m = /^kc-r\/([^.]+)\./.exec(t);
     const ver = m ? m[1] : '?';
     return fail(`Unknown recipe link version "kc-r/${ver}" — this build reads ${RECIPE_URL_VERSION} only.`);
   }
-  const b64 = t.slice(RECIPE_URL_PREFIX.length);
+  const b64 = t.slice(RECIPE_URL_PREFIX.length); // both prefixes are 7 characters
   let json;
   try {
     json = JSON.parse(_td.decode(b64urlDecodeToBytes(b64), { fatal: true }));
@@ -198,9 +204,10 @@ export function decodeRecipeUrl(str) {
     return fail('Bad recipe link: the payload is not readable. Starting from a clean scene.');
   }
   if (!isPlainObject(json)) return fail('Bad recipe link: the payload is not a recipe. Starting from a clean scene.');
-  if (json.v !== 1) {
-    return fail(`Unknown recipe link version "kc-r/${json.v}" — this build reads ${RECIPE_URL_VERSION} only.`);
+  if (json.v !== 1 && json.v !== 2) {
+    return fail(`Unknown recipe link version "kc-r/${json.v}" — this build reads kc-r/1 and kc-r/2.`);
   }
+  if (json.v !== (t.startsWith(RECIPE_URL_PREFIX_2) ? 2 : 1)) return fail('Bad recipe link: its version does not match its payload. Starting from a clean scene.');
   if (typeof json.s !== 'number' || !Number.isFinite(json.s)) {
     return fail('Bad recipe link: the seed is missing. Starting from a clean scene.');
   }
@@ -232,15 +239,22 @@ export function decodeRecipeUrl(str) {
     if (!isPlainObject(json.l)) return fail('Bad recipe link: the layout params are malformed. Starting from a clean scene.');
     layoutParams = { ...layoutParams, ...json.l };
   }
+  let stack = null;
+  if (json.v === 2) {
+    const ex = expandStack(json.k);
+    if (!ex.ok) return fail(`Bad recipe link: ${ex.error}. Starting from a clean scene.`);
+    stack = ex.stack;
+  }
   return {
     ok: true,
     recipe: {
-      version: RECIPE_URL_VERSION,
+      version: json.v === 2 ? 'kc-r/2' : RECIPE_URL_VERSION,
       seed: json.s >>> 0,
       seedOffsets,
       paletteId,
       paletteOverrides,
       layoutParams,
+      ...(stack ? { stack } : {}),
     },
   };
 }

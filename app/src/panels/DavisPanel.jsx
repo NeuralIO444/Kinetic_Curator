@@ -28,6 +28,7 @@ export function DavisPanel() {
     seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
     enabledAssets: s.enabledAssets,
+    layers: s.layers, activeLayerId: s.activeLayerId, layerSnapshots: s.layerSnapshots, // #1131: a keep carries the stack
     phraseEnabled: s.phraseEnabled,
     phraseLength: s.phraseLength,
     phraseBeat: s.phraseBeat,
@@ -40,7 +41,7 @@ export function DavisPanel() {
   }));
   const {
     evolveMode,
-    seed, seedOffsets, layoutParams, enabledAssets,
+    seed, seedOffsets, layoutParams, enabledAssets, layers, activeLayerId, layerSnapshots,
     phraseEnabled, phraseLength, phraseBeat,
     phraseClock, beatBpm, morphing, audioEnabled,
     audioBands, hitCount,
@@ -50,7 +51,7 @@ export function DavisPanel() {
   // #719: the one keep capture — seed, offsets (#305), layout, palette, cast.
   const saveFavorite = () => emit(Events.DAVIS_FAVORITE, {
     action: 'add',
-    favorite: captureFavorite({ seed, seedOffsets, layoutParams, enabledAssets }, palette.id),
+    favorite: captureFavorite({ seed, seedOffsets, layoutParams, enabledAssets, layers, activeLayerId, layerSnapshots }, palette.id),
   });
 
   const metro = phraseClock === 'metro';
