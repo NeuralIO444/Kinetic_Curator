@@ -7,6 +7,7 @@ import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { isTapeFull } from '../tapeBudget.js';
 import { fxBeforeMath, canTrade } from '../layerOrder.js';
+import { PATTERN_DEFAULT_DENSITY, PATTERN_PARAM_KEYS, defaultPattern, sanitizePattern } from '../patternTrack.js';
 
 export const MAX_CONTENT_TRACKS = 4;
 export const MAX_FX_TRACKS = 4;
@@ -18,6 +19,13 @@ export const MAX_MATH_TRACKS = 4;
 
 /** Adjustment track: FX or MATH — the two families that grade everything below. */
 export const isAdjustmentLayer = (layer) => isFxLayer(layer) || isMathLayer(layer);
+
+// #1097 — PATTERN is a third track type: it sits in the content group (composites like content,
+// rides the FX fold) but is NOT a KC track. Its parameters live on the layer (`layer.pattern`),
+// it has no snapshot, and it is never the active layer that owns BUILD's sliders and the seed.
+export const isPatternLayer = (layer) => !!layer && layer.type === 'pattern';
+/** A KC track: the only layer type that owns the BUILD sliders, the seed and a snapshot. */
+export const isKcLayer = (layer) => !!layer && !isAdjustmentLayer(layer) && !isPatternLayer(layer);
 
 function makeLayerId() {
   return `layer-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4).toString(36)}`;
@@ -51,12 +59,12 @@ export function captureSnapshot(state) {
 
 // Auto names (baked KC-n / FX n, 'Layer N', copies) carry no information the
 // position doesn't, and go stale when a delete shifts the stack.
-const AUTO_LAYER_NAME = /^(?:KC-\d+|FX \d+|M \d+|Layer(?: \d+)?)$|\scopy$/;
+const AUTO_LAYER_NAME = /^(?:KC-\d+|PT-\d+|FX \d+|M \d+|Layer(?: \d+)?)$|\scopy$/;
 
 /** Positional label (KC-n / FX n / M n) — the one naming source; a real rename shows as 'KC-n · name'. */
 export function displayLayerName(layer, ordinal) {
   if (!layer) return '';
-  const base = isFxLayer(layer) ? `FX ${ordinal}` : isMathLayer(layer) ? `M ${ordinal}` : `KC-${ordinal}`;
+  const base = isFxLayer(layer) ? `FX ${ordinal}` : isMathLayer(layer) ? `M ${ordinal}` : isPatternLayer(layer) ? `PT-${ordinal}` : `KC-${ordinal}`;
   const n = typeof layer.name === 'string' ? layer.name.trim() : '';
   return !n || AUTO_LAYER_NAME.test(n) ? base : `${base} · ${n}`;
 }
@@ -95,7 +103,7 @@ export const createLayersSlice = (set) => ({
     if (isTapeFull(state)) return {};
     const id = makeLayerId();
     const snapshot = freshSnapshot((Math.random() * 0xffffffff) | 0);
-    const name = `KC-${content + 1}`;
+    const name = `KC-${state.layers.filter(isKcLayer).length + 1}`;
     // #1014 (mockup C) — one-tap "+" replays the last-used blend; a
     // chooser pick (family = blend mode) arms with it AND records it.
     const picked = typeof family === 'string' && BLEND_MODES.includes(family);
@@ -110,9 +118,61 @@ export const createLayersSlice = (set) => ({
     };
   }),
 
+  // #1097 — PATTERN tracks. They share the content cap and the tape pre-flight with KC tracks, never
+  // become the active layer, and keep their parameters on the layer. Seed is a stored integer; SHUFFLE
+  // writes a new one (the DROP gate that decides WHEN is #1100). Every write goes through sanitizePattern.
+  addPatternLayer: (mode) => set((state) => {
+    if (state.layers.filter((l) => !isAdjustmentLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
+    if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer
+    const id = makeLayerId();
+    const n = state.layers.filter(isPatternLayer).length + 1;
+    const pattern = defaultPattern(mode, (Math.random() * 0xffffffff) >>> 0);
+    return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+      layers: [...state.layers, { id, name: `PT-${n}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern }],
+    };
+  }),
+
+  setPatternParam: (id, key, value) => set((state) => {
+    const target = state.layers.find((l) => l.id === id);
+    if (!target || !isPatternLayer(target) || !PATTERN_PARAM_KEYS.includes(key)) return {};
+    const next = sanitizePattern({ ...target.pattern, [key]: value });
+    if (next[key] === target.pattern?.[key]) return {};
+    return {
+      ...pushToUndo(state, false, UNDO_KIND_LAYERS), // slider-driven: one drag is one undo entry
+      layers: state.layers.map((l) => (l.id === id ? { ...l, pattern: next } : l)),
+    };
+  }),
+
+  setPatternMode: (id, mode) => set((state) => {
+    const target = state.layers.find((l) => l.id === id);
+    if (!target || !isPatternLayer(target)) return {};
+    const prev = sanitizePattern(target.pattern);
+    const next = sanitizePattern({ ...prev, mode });
+    if (next.mode === prev.mode) return {};
+    // A density the user never touched follows the new mode's own default (QUILT 8, GLYPH 4, FIELD 6).
+    if (prev.density === PATTERN_DEFAULT_DENSITY[prev.mode]) next.density = PATTERN_DEFAULT_DENSITY[next.mode];
+    return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+      layers: state.layers.map((l) => (l.id === id ? { ...l, pattern: next } : l)),
+    };
+  }),
+
+  shufflePattern: (id) => set((state) => {
+    const target = state.layers.find((l) => l.id === id);
+    if (!target || !isPatternLayer(target)) return {};
+    const prev = sanitizePattern(target.pattern);
+    let seed = (Math.random() * 0xffffffff) >>> 0;
+    if (seed === prev.seed) seed = (seed + 1) >>> 0;
+    return {
+      ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+      layers: state.layers.map((l) => (l.id === id ? { ...l, pattern: { ...prev, seed } } : l)),
+    };
+  }),
+
   setLayerPatch: (id, patch) => set((state) => {
     const target = state.layers.find((l) => l.id === id);
-    if (!target || isAdjustmentLayer(target)) return {};
+    if (!target || !isKcLayer(target)) return {};
     const mode = ['off', 'mod', 'field', 'feed'].includes(patch?.mode) ? patch.mode : 'off';
     // #457 — target by stable layer id, not an ordinal into whatever is
     // CURRENTLY visible: an ordinal silently retargets to a different
@@ -120,7 +180,7 @@ export const createLayersSlice = (set) => ({
     // that position elsewhere in the stack. An invalid/self/dangling id
     // falls back to the previous target rather than guessing a new one.
     const candidateTo = typeof patch?.to === 'string' ? patch.to : null;
-    const to = candidateTo && candidateTo !== id && state.layers.some((l) => l.id === candidateTo && !isAdjustmentLayer(l))
+    const to = candidateTo && candidateTo !== id && state.layers.some((l) => l.id === candidateTo && isKcLayer(l))
       ? candidateTo
       : (target.patch?.to ?? null);
     const prev = target.patch || {};
@@ -134,6 +194,14 @@ export const createLayersSlice = (set) => ({
   duplicateLayer: (id) => set((state) => {
     const src = state.layers.find((l) => l.id === id);
     if (!src) return {};
+    if (isPatternLayer(src)) { // #1097 — a copy is the same pattern (same seed), no snapshot
+      if (state.layers.filter((l) => !isAdjustmentLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
+      if (isTapeFull(state)) return {};
+      const copy = { id: makeLayerId(), name: `${src.name} copy`, type: 'pattern', visible: src.visible, layerBlendMode: src.layerBlendMode, layerOpacity: src.layerOpacity, pattern: sanitizePattern(src.pattern) };
+      const spliced = [...state.layers];
+      spliced.splice(state.layers.findIndex((l) => l.id === id) + 1, 0, copy);
+      return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: fxBeforeMath(spliced).layers };
+    }
     const isFx = isFxLayer(src);
     const isMath = isMathLayer(src);
     const isAdj = isFx || isMath;
@@ -195,7 +263,7 @@ export const createLayersSlice = (set) => ({
   removeLayer: (id) => set((state) => {
     const target = state.layers.find((l) => l.id === id);
     if (!target) return {};
-    if (!isAdjustmentLayer(target) && state.layers.filter((l) => !isAdjustmentLayer(l)).length <= 1) return {}; // last content track stays
+    if (isKcLayer(target) && state.layers.filter(isKcLayer).length <= 1) return {}; // the last KC track stays (it owns the seed and the BUILD sliders)
     // Clear patch.to pointing at the removed track (same rule as projectNormalize on load).
     const layers = state.layers.filter((l) => l.id !== id)
       .map((l) => (l.patch?.to === id ? { ...l, patch: { ...l.patch, to: null } } : l));
@@ -204,7 +272,7 @@ export const createLayersSlice = (set) => ({
     const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;
     const selectedMathLayerId = state.selectedMathLayerId === id ? null : state.selectedMathLayerId;
     if (id !== state.activeLayerId) return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, selectedFxLayerId, selectedMathLayerId };
-    const nextActive = layers.find((l) => !isFxLayer(l)) || layers[0];
+    const nextActive = layers.find(isKcLayer) || layers[0];
     const nextSnapshot = snapshots[nextActive.id] || freshSnapshot(state.seed, state.seedOffsets);
     delete snapshots[nextActive.id];
     return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, activeLayerId: nextActive.id, selectedFxLayerId, selectedMathLayerId, ...nextSnapshot };
@@ -213,7 +281,7 @@ export const createLayersSlice = (set) => ({
   setActiveLayer: (id) => set((state) => {
     if (id === state.activeLayerId) return {};
     const target = state.layers.find((l) => l.id === id);
-    if (!target || isAdjustmentLayer(target)) return {};
+    if (!target || !isKcLayer(target)) return {};
     const snapshot = state.layerSnapshots[id] || freshSnapshot(state.seed, state.seedOffsets);
     return { activeLayerId: id, layerSnapshots: { ...state.layerSnapshots, [state.activeLayerId]: captureSnapshot(state) }, ...snapshot };
   }),

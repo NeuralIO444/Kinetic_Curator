@@ -9,6 +9,7 @@
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeFxEffects } from '../fx/fxFilters.js';
 import { fxBeforeMath } from './layerOrder.js';
+import { sanitizePattern } from './patternTrack.js';
 import { sanitizeMathEffects } from '../fx/mathFilters.js';
 import { ASSETS } from '../data/assets/index.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
@@ -181,11 +182,11 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     if (layers.length >= MAX_LAYERS) break;
     if (!l || typeof l !== 'object' || typeof l.id !== 'string') continue;
     if (seen.has(l.id)) continue; // duplicate IDs collide in React keys and the snapshot map
-    const type = l.type === 'fx' ? 'fx' : l.type === 'math' ? 'math' : 'content';
+    const type = l.type === 'fx' ? 'fx' : l.type === 'math' ? 'math' : l.type === 'pattern' ? 'pattern' : 'content';
     // #456 — the 4-content-track cap is a creation-time UI check only; a
     // document can still carry more. Skip the overflow rather than truncate
     // by raw array position, same "degrade, don't crash" posture as MAX_LAYERS.
-    if (type === 'content') {
+    if (type === 'content' || type === 'pattern') { // #1097 — a PATTERN track is content-group: same cap
       if (contentCount >= MAX_CONTENT_TRACKS) continue;
       contentCount++;
     }
@@ -205,6 +206,9 @@ export function normalizeLayers(rawLayers, rawActiveId) {
           console.warn(`[normalize] fx layer ${l.id}: grain-family (${kinds.join(', ')}) moved to finish position — save the project to persist the fix`);
         },
       });
+    } else if (type === 'pattern') {
+      // #1097 — every field clamped; unknown mode -> QUILT. No patch, no snapshot: it is not a KC track.
+      layer.pattern = sanitizePattern(l.pattern);
     } else if (type === 'math') {
       // #1010 — math chains sanitize against the math catalog (unknown ops
       // dropped, params clamped, mod routing cleaned); the op + knobs + mod
@@ -234,7 +238,7 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   }
   // FX/MATH layers are never the content-active layer; a document with no
   // content layer at all is degenerate — treat it as invalid like an empty list.
-  if (!layers.some((l) => l.type === 'content')) return { layers: null, activeLayerId: null };
+  if (!layers.some((l) => l.type === 'content')) return { layers: null, activeLayerId: null }; // a PATTERN track alone is not a project: a KC track must exist
   // #456 — a patch target that no longer exists (dropped by the cap above,
   // a stale/self id, or an id pointing at an FX layer) goes inert (`to:
   // null`) rather than pointing at nothing; `liveResolve.mjs` already no-ops
@@ -247,7 +251,7 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   }
   let activeLayerId = typeof rawActiveId === 'string' ? rawActiveId : null;
   const active = layers.find((l) => l.id === activeLayerId);
-  if (!active || active.type === 'fx' || active.type === 'math') {
+  if (!active || active.type === 'fx' || active.type === 'math' || active.type === 'pattern') {
     activeLayerId = layers.find((l) => l.type === 'content').id;
   }
   return { layers, activeLayerId };
