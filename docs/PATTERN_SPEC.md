@@ -119,7 +119,7 @@ All geometry is in tile-local units, tile size = 1, origin at center. Box limit 
 
 | Mark | Draw | Roles |
 |---|---|---|
-| Sunburst | Disc r=0.10. 12 rays, length 0.18, stroke 0.015, from r=0.12. Ray count is fixed so it reads as a sun, not a dial. | MARK disc, CUT rays |
+| Sunburst | Disc r=0.10. 12 rays, length 0.16, stroke 0.015, from r=0.12, butt caps (outer reach 0.28: at 0.18 with round caps the mark kissed the box, #1041). Ray count is fixed so it reads as a sun, not a dial. | MARK disc, CUT rays |
 | Pixel cluster | 4×4 cell grid inside ±0.22. One tetromino (I, O, T, L, S, or the skew) seeded, plus 0–2 orphan cells. Cells are axis-aligned, gap 0.02. | MARK cells |
 | Slashed circle | Ring r=0.20, stroke 0.04. Diagonal bar from (−0.16,−0.16) to (0.16,0.16), stroke 0.045, round caps. Bar is a stroke, not a clip. | MARK ring, CUT bar |
 | Squiggle | One cubic wave, 1.5 periods, amplitude 0.08, across y=0, stroke 0.05, round caps. Endpoints inside the box. | MARK stroke |
