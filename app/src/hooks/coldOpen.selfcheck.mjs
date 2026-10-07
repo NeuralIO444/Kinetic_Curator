@@ -1,7 +1,7 @@
 // coldOpen.selfcheck.mjs — the top bar's cold open and its row (#1103).
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { COLD_OPEN_MS, coldOpenWanted, createColdOpen } from './coldOpen.mjs';
+import { COLD_OPEN_MS, TAP_PULSE_MS, coldOpenWanted, createColdOpen } from './coldOpen.mjs';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 let n = 0;
@@ -69,9 +69,21 @@ ok('KIN and CURATOR open on the cold open; the rest of the row does not; reduced
 
 ok('CURATOR is in capitals like the rest (the .act class does it; the source stays lowercase), and it keeps its full accessible name', () => {
   const bar = read('../panels/layout/CuratorBar.jsx');
-  assert.match(bar, /className="randomize-btn xl act"/);
+  assert.match(bar, /className=\{`randomize-btn xl act/);
   assert.match(bar, /aria-label="Curator — roll a taste-guided scene over the unlocked parameters"/);
   assert.ok(!/>\s*Curator\s*</.test(bar), 'no mixed-case "Curator" label left on the button');
+});
+
+ok('a press flashes the full name for about a second, then cools: the K key and every Curator roll, wherever the pointer is', () => {
+  assert.ok(TAP_PULSE_MS >= 800 && TAP_PULSE_MS <= 2000 && TAP_PULSE_MS < COLD_OPEN_MS, 'a flash, shorter than the cold open');
+  const kin = read('../panels/layout/KineticButton.jsx');
+  assert.match(kin, /tapOpen\.pulse\(TAP_PULSE_MS\)/);
+  assert.ok(kin.indexOf('tapOpen.pulse(TAP_PULSE_MS)') > kin.indexOf('const tap = () =>') && kin.indexOf('tapOpen.pulse(TAP_PULSE_MS)') < kin.indexOf('useHotkeys({ k: tap })'), 'the pulse is inside tap(), which both the click and the K key run');
+  const bar = read('../panels/layout/CuratorBar.jsx');
+  assert.match(bar, /on\(Events\.LAYOUT_CURATE, \(\) => \{ pulseCurator\(TAP_PULSE_MS\); curUsed\(\); \}\)/, 'subscribed to the roll event, not just the click');
+  const hook = read('./useTapOpen.js');
+  assert.match(hook, /const pulse = useCallback\(/); assert.match(hook, /clearTimeout\(timer\.current\);\n\s+timer\.current = setTimeout/, 'a second press restarts the flash instead of stacking timers');
+  assert.match(hook, /return \(\) => clearTimeout\(timer\.current\)|useEffect\(\(\) => \(\) => clearTimeout\(timer\.current\), \[\]\)/, 'and the timer is cleaned up on unmount');
 });
 
 console.log(`coldOpen.selfcheck: ${n} checks passed`);

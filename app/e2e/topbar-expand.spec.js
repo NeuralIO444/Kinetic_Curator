@@ -79,7 +79,7 @@ test('KIN still builds and sheds heat: rapid taps widen it, and it cools back', 
   await boot(page);
   const kin = group(page).locator('.kinetic-btn');
   const w0 = await width(kin);
-  for (let i = 0; i < 4; i++) { await kin.click(); await page.waitForTimeout(120); }
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('k'); await page.waitForTimeout(120); } // the K key: click() waits for the opening label to settle, and the taps would drift apart
   await expect.poll(async () => width(kin)).toBeGreaterThan(w0 + 40);
   await page.mouse.move(600, 600);
   await expect.poll(async () => width(kin), { timeout: 15_000 }).toBeLessThanOrEqual(w0 + 2);
@@ -130,4 +130,102 @@ test('the row reads START, KIN, L, V, CUR, B left to right; CURATOR is in capita
   // the click still opens the tempo menu
   await beat.click();
   await expect(page.locator('.beat-menu')).toBeVisible();
+});
+
+test('a K press flashes KINETIC in full and cools it down, with the pointer nowhere near', async ({ page }) => {
+  await boot(page);
+  await page.mouse.move(600, 600);
+  const kin = group(page).locator('.kinetic-btn');
+  const rest = await width(kin);
+  await page.keyboard.press('k');
+  await expect(kin).toHaveAttribute('data-open', 'true');
+  await expect.poll(async () => width(kin)).toBeGreaterThan(rest + 12);
+  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 3000 });   // ~1.2 s, then it cools
+  await expect.poll(async () => width(kin), { timeout: 6000 }).toBeLessThanOrEqual(rest + 2);
+});
+
+test('a CURATOR roll flashes CURATOR in full and cools it down, even when the pointer has left', async ({ page }) => {
+  await boot(page);
+  const cur = group(page).locator('.randomize-btn');
+  const rest = await width(cur);
+  await cur.click();
+  await page.mouse.move(600, 600);
+  await expect(cur).toHaveAttribute('data-open', 'true');
+  await expect.poll(async () => width(cur)).toBeGreaterThan(rest + 20);
+  await expect(cur).not.toHaveAttribute('data-open', 'true', { timeout: 3000 });
+  await expect.poll(async () => width(cur), { timeout: 3000 }).toBeLessThanOrEqual(rest + 2);
+});
+
+// ── the polish: shimmer, letters that let go one at a time, a glide instead of steps ──
+test('the sheen: KINETIC and CURATOR shimmer at rest, go quiet in use, and come back never-pressed-style only after idle', async ({ page }) => {
+  await boot(page);
+  await page.mouse.move(600, 600);
+  const kin = group(page).locator('.kinetic-btn'); const cur = group(page).locator('.randomize-btn');
+  const anim = (loc) => loc.evaluate((e) => getComputedStyle(e, '::after').animationName);
+  await expect(kin).toHaveClass(/xl-shimmer/); await expect(cur).toHaveClass(/xl-shimmer/);
+  expect(await anim(kin)).toBe('stim-shimmer'); expect(await anim(cur)).toBe('stim-shimmer');
+  for (const name of [/^Looks/, /^Voice/]) await expect(btn(page, name)).not.toHaveClass(/xl-shimmer/);
+  await expect(group(page).locator('.beat-btn')).not.toHaveClass(/xl-shimmer/);
+  await kin.hover();
+  expect(await anim(kin), 'quiet while the pointer is on it').toBe('none');
+  await page.mouse.move(600, 600);
+  await page.keyboard.press('k');                       // a press: the invitation is accepted
+  await expect(kin).not.toHaveClass(/xl-shimmer/);
+  await expect(cur).toHaveClass(/xl-shimmer/);          // CURATOR has not been pressed yet
+  await cur.click();
+  await expect(cur).not.toHaveClass(/xl-shimmer/);
+});
+
+test('no sheen with reduced motion', async ({ browser }) => {
+  const ctx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1280, height: 720 } });
+  const page = await ctx.newPage();
+  await boot(page, { settle: false });
+  const disp = await group(page).locator('.kinetic-btn').evaluate((e) => getComputedStyle(e, '::after').display);
+  expect(disp).toBe('none');
+  await ctx.close();
+});
+
+test('cooling is letter by letter, last letter first, and the width glides rather than stepping', async ({ page }) => {
+  await boot(page);
+  const kin = group(page).locator('.kinetic-btn');
+  await kin.hover();
+  await expect.poll(() => kin.locator('.xl-ch').evaluateAll((els) => els.filter((e) => parseFloat(getComputedStyle(e).opacity) > 0.95).length)).toBe(4);
+  // leave and sample the letters every 25 ms
+  await page.mouse.move(600, 600);
+  const samples = await page.evaluate(async () => {
+    const letters = [...document.querySelectorAll('.kc-topbar-curator .kinetic-btn .xl-ch')];
+    const out = [];
+    const t0 = performance.now();
+    while (performance.now() - t0 < 900) {
+      out.push(letters.map((l) => parseFloat(getComputedStyle(l).opacity)));
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    return out;
+  });
+  const visible = samples.map((row) => row.filter((o) => o > 0.5).length);
+  expect(visible[visible.length - 1], 'all four are gone at the end').toBe(0);
+  expect(new Set(visible).size, 'it passes through 3, 2, 1: not all at once').toBeGreaterThanOrEqual(3);
+  // the last letter goes before the first: the first column is the last to fade
+  const firstGone = samples.findIndex((row) => row[0] < 0.5); const lastGone = samples.findIndex((row) => row[3] < 0.5);
+  expect(lastGone, 'the last letter lets go first').toBeLessThan(firstGone);
+  for (let i = 1; i < visible.length; i++) expect(visible[i], 'letters never come back while cooling').toBeLessThanOrEqual(visible[i - 1]);
+});
+
+test('KIN cools by gliding: its width passes through many in-between values, never jumping', async ({ page }) => {
+  await boot(page);
+  const kin = group(page).locator('.kinetic-btn');
+  const rest = await width(kin);
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('k'); await page.waitForTimeout(110); } // the K key: click() waits for the opening label to settle, and the taps would drift apart
+  await expect.poll(async () => width(kin)).toBeGreaterThan(rest + 40);
+  await page.mouse.move(600, 600);
+  const widths = await page.evaluate(async () => {
+    const el = document.querySelector('.kc-topbar-curator .kinetic-btn'); const out = [];
+    const t0 = performance.now();
+    while (performance.now() - t0 < 8000) { out.push(el.getBoundingClientRect().width); await new Promise((r) => setTimeout(r, 40)); }
+    return out;
+  });
+  const distinct = new Set(widths.map((w) => Math.round(w))).size;
+  expect(distinct, 'a glide passes through many widths').toBeGreaterThan(12);
+  let maxStep = 0; for (let i = 1; i < widths.length; i++) maxStep = Math.max(maxStep, Math.abs(widths[i] - widths[i - 1]));
+  expect(maxStep, `the biggest jump between 40 ms samples was ${maxStep.toFixed(1)}px`).toBeLessThan(14);
 });
