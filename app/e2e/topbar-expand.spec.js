@@ -55,6 +55,8 @@ test('a touch opens KIN, LOOKS and VOICE, and they close by themselves', async (
   const page = await ctx.newPage();
   await boot(page);
   const kin = group(page).locator('.kinetic-btn');
+  // the cold open is still cooling on a slow runner: wait for the resting width (the 48 px floor), or w0 is sampled mid-glide
+  await expect.poll(async () => width(kin), { timeout: 8000 }).toBeLessThanOrEqual(49);
   const w0 = await width(kin);
   await kin.dispatchEvent('pointerdown', { pointerType: 'touch', bubbles: true });
   await expect(kin).toHaveAttribute('data-open', 'true');
