@@ -21,6 +21,7 @@ ok('the dice: a deal changes the picture and stays valid; reseed keeps the kind;
   for (let i = 0; i < 200; i++) {
     const d = dealPattern(base, rng); modes.add(d.mode); if (d.drift === 0) still += 1; else moving += 1;
     assert.deepEqual(d, sanitizePattern(d), 'a deal is already valid'); assert.equal(d.drop, true); assert.notEqual(d.seed, base.seed);
+    assert.equal(d.kin, 'MIX'); assert.ok(d.movers >= 0.15 && d.movers <= 0.45, 'a few movers, never the whole board');
   }
   assert.equal(modes.size, 3, 'all three modes come up'); assert.ok(still > 60 && moving > 60, `about half still (${still}/${moving})`);
   const r = reseedPattern(base, mkRng(2)); assert.equal(r.mode, 'QUILT'); assert.notEqual(r.seed, base.seed); assert.ok(Math.abs(r.density - base.density) === 1);
