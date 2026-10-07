@@ -11,9 +11,9 @@ import { FIELD_PATTERNS, samplePattern, patternParams } from './field.js';
 import { TILE_MOTIFS, HERO_MOTIFS, sampleQuilt, quiltParams } from './quilt.js';
 import { GLYPH_MARKS, FILLED_MARKS, RHYTHM_MARKS, POSES, MIN_STROKE, buildMark, sampleMark, motifRoles } from './glyph.js';
 import { rankedSwatches } from '../data/swatchWeights.js';
+import { motion, glyphPulse, fieldPan, QUILT_ROTATING, FIELD_PAN_TILES_PER_S } from './motion.js';
 
-/** FIELD pan at DRIFT 100%, in tiles per second (#1042 owns tuning). */
-export const FIELD_PAN_TILES_PER_S = 0.25;
+export { FIELD_PAN_TILES_PER_S }; // the pan speed lives in motion.js now (#1042)
 
 /** Default FIELD grid is 6 tiles across. */
 export const FIELD_DEFAULT_DENSITY = 6;
@@ -24,6 +24,8 @@ export const QUILT_DEFAULT_MIX = 0.55;
 export const QUILT_DEFAULT_GROUT = 0.03;
 export const QUILT_MAX_GROUT = 0.08;
 export const QUILT_DEFAULT_HERO = 0.25;
+/** At least one tile DRIFT can rotate per this many tiles (aligned runs, the tail run included). */
+export const QUILT_QUOTA_RUN = 16;
 
 /** GLYPH defaults (docs/PATTERN_SPEC.md, #1041). DENSITY 4 is the 5×4 poster grid. */
 export const GLYPH_DEFAULT_DENSITY = 4;
@@ -119,10 +121,7 @@ export function panAngle(seed) { return mkRng(hash32(seed, 0x9a4)) () * Math.PI 
 
 /** Pan offset in tile units at time t (seconds). Zero at DRIFT 0. */
 export function panOffset(seed, drift, t) {
-  const d = Math.min(1, Math.max(0, Number(drift) || 0));
-  const dist = d * FIELD_PAN_TILES_PER_S * (Number(t) || 0);
-  const a = panAngle(seed);
-  return { x: Math.cos(a) * dist, y: Math.sin(a) * dist };
+  return fieldPan(drift, t, panAngle(seed));
 }
 
 /**
@@ -207,6 +206,11 @@ export function assignQuilt(seed, density, mix, hero, palette, rows = density) {
     }
   }
 
+  // 1b) the never-static quota (#1042): every aligned run of 16, tail included, holds a tile DRIFT can
+  //     turn (pinwheel or medallion), or the quilt would sit still at DRIFT > 0. The last
+  //     tile of a bare run is replaced from its own stream, so the main stream above does
+  //     not shift. Hero medallions count too; they are checked after the hero walk below.
+
   // 2) hero walk: seeded shuffle of the eligible blocks.
   const blocks = [];
   for (let r = 0; r + 1 < nrows; r += 2) for (let c = 0; c + 1 < cols; c += 2) blocks.push({ c, r });
@@ -234,6 +238,22 @@ export function assignQuilt(seed, density, mix, hero, palette, rows = density) {
     for (let dr = 0; dr < 2; dr++) for (let dc = 0; dc < 2; dc++) heroAt[(b.r + dr) * cols + b.c + dc] = i;
     return { c: b.c, r: b.r, pattern: name, colors, rgba: colors.map(toRgba), params: quiltParams(name, hrng) };
   });
+
+  // 4) the quota, now that heroes are known: a medallion hero covers its four cells.
+  const turns = (i) => (heroAt[i] !== -1 ? heroes[heroAt[i]].pattern === 'medallion' : QUILT_ROTATING.includes(tiles[i].pattern));
+  // The tail run counts too: a small grid (4×3 at DENSITY 4) is all tail, and must still move.
+  for (let start = 0; start < tiles.length; start += QUILT_QUOTA_RUN) {
+    const end = Math.min(start + QUILT_QUOTA_RUN, tiles.length);
+    let has = false;
+    for (let i = start; i < end && !has; i++) has = turns(i);
+    if (has) continue;
+    let at = end - 1;
+    while (at > start && heroAt[at] !== -1) at -= 1; // never overwrite a cell a hero covers
+    const qrng = mkRng(hash32(seed, 0x3a000 + start));
+    const name = QUILT_ROTATING[Math.floor(qrng() * QUILT_ROTATING.length)];
+    const colors = motifColors(qrng, ground, brights);
+    tiles[at] = { pattern: name, colors, rgba: colors.map(toRgba), params: quiltParams(name, qrng) };
+  }
 
   return { cols, rows: nrows, tiles, heroes, heroAt, ground, groundRgba: toRgba(ground) };
 }
@@ -263,15 +283,26 @@ export function onGrout(grid, X, Y, grout) {
 }
 
 /** Which motif covers tile-space point (X, Y): a hero block or the 1×1 tile. */
-function quiltCell(grid, X, Y) {
+function quiltCell(grid, X, Y, rot = null) {
   const c = Math.min(grid.cols - 1, Math.max(0, Math.floor(X)));
   const r = Math.min(grid.rows - 1, Math.max(0, Math.floor(Y)));
   const hi = grid.heroAt[r * grid.cols + c];
+  let tile; let u; let v; let at;
   if (hi !== -1) {
-    const hero = grid.heroes[hi];
-    return { tile: hero, u: (X - hero.c) / 2, v: (Y - hero.r) / 2 };
+    tile = grid.heroes[hi]; u = (X - tile.c) / 2; v = (Y - tile.r) / 2; at = tile.r * grid.cols + tile.c;
+  } else {
+    tile = grid.tiles[r * grid.cols + c]; u = X - c; v = Y - r; at = r * grid.cols + c;
   }
-  return { tile: grid.tiles[r * grid.cols + c], u: X - c, v: Y - r };
+  // DRIFT (#1042): only the motif art turns, about the tile center. A tile's ground is the
+  // frame itself, so no corner can show through; the art is sampled, not clipped, and the
+  // pinwheel fills the whole plane, so its corners stay motif-colored at any angle.
+  const a = rot && QUILT_ROTATING.includes(tile.pattern) ? rot[at] : 0;
+  if (a) {
+    const cs = Math.cos(a); const sn = Math.sin(a);
+    const dx = u - 0.5; const dy = v - 0.5;
+    u = 0.5 + dx * cs + dy * sn; v = 0.5 - dx * sn + dy * cs;
+  }
+  return { tile, u, v };
 }
 
 /** The palette color of the quilt at tile-space point (X, Y). */
@@ -287,13 +318,15 @@ export function quiltColorAt(grid, X, Y, grout = 0) {
  * cells, grout LAST as an overlay in the darkest role. The grid does not wrap
  * and does not pan (DRIFT in QUILT is #1042).
  */
-export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0) {
+export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0) {
+  const m = motion('QUILT', drift, t, { count: grid.cols * grid.rows });
+  const rot = m.kind === 'rotate' ? Float64Array.from({ length: grid.cols * grid.rows }, (_, i) => m.angle(i)) : null;
   for (let y = 0; y < bh; y++) {
     const Y = (y + 0.5) / tileW;
     for (let x = 0; x < bw; x++) {
       const X = (x + 0.5) / tileW;
       if (onGrout(grid, X, Y, grout)) { buf[y * bw + x] = grid.groundRgba; continue; }
-      const { tile, u, v } = quiltCell(grid, X, Y);
+      const { tile, u, v } = quiltCell(grid, X, Y, rot);
       buf[y * bw + x] = tile.rgba[sampleQuilt(tile.pattern, u, v, tile.params)];
     }
   }
@@ -391,9 +424,9 @@ export function assignGlyph(seed, density, mix, palette) {
   return { cols, rows, ground, groundRgba: toRgba(ground), pool, tiles };
 }
 
-/** DRIFT pulse for tile i at time t: 1 at DRIFT 0, within [0.8, 1.2] at DRIFT 100%. */
+/** DRIFT pulse for tile i of `count` at loop time t (seconds): 1 at DRIFT 0, within [0.8, 1.2] at 100%. */
 export function glyphScale(i, count, drift, t) {
-  return 1 + GLYPH_PULSE * clamp01(drift) * Math.sin((i * Math.PI * 2) / count + (Number(t) || 0));
+  return glyphPulse(drift, t, i, count);
 }
 
 /**
@@ -491,7 +524,8 @@ const BUF_W = 512;
  * @param {CanvasRenderingContext2D} ctx
  * @param {{mode:'FIELD'|'QUILT'|'GLYPH', seed:number, density:number, mix:number, drift:number,
  *   grout?:number, hero?:number, palette:object, t:number, w:number, h:number}} o
- *   QUILT reads grout (0–0.08 of a tile) and hero (0–1); it ignores drift and t.
+ *   QUILT reads grout (0–0.08 of a tile) and hero (0–1), and drift turns its pinwheels and medallions.
+ *   t is LOOP time in seconds for every mode (the loop clock, not wall time).
  *   GLYPH letterboxes a 5:4 grid, ignores grout and hero, and pulses with drift and t.
  * Square tiles; rows fill the frame height at the same tile size (partial edge
  * tiles are fine: the field is a textile and pans). GROUT is not a parameter
@@ -518,7 +552,7 @@ export function renderPattern(ctx, o) {
     scratch = { canvas, c, image: c.createImageData(bw, bh), w: bw, h: bh };
   }
   const px = new Uint32Array(scratch.image.data.buffer);
-  if (quilt) rasterQuilt(px, bw, bh, grid, bw / density, o.grout ?? QUILT_DEFAULT_GROUT);
+  if (quilt) rasterQuilt(px, bw, bh, grid, bw / density, o.grout ?? QUILT_DEFAULT_GROUT, o.drift, o.t);
   else rasterField(px, bw, bh, grid, bw / density, panOffset(o.seed >>> 0, o.drift, o.t));
   scratch.c.putImageData(scratch.image, 0, 0);
   const smooth = ctx.imageSmoothingEnabled;

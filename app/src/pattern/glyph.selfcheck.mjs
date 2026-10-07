@@ -12,6 +12,7 @@ import {
   GLYPH_MAX_ROLES, GLYPH_QUOTA_RUN,
 } from './engine.js';
 import { QUILT_MOTIFS } from './quilt.js';
+import { GLYPH_PERIOD_S } from './motion.js';
 import { FIELD_PATTERNS } from './field.js';
 import { rankedSwatches } from '../data/swatchWeights.js';
 import { mkRng } from '../engine/prng.js';
@@ -136,7 +137,7 @@ ok('DRIFT 100%: scale stays in [0.8, 1.2], one full wave across the grid, and no
   const count = g.cols * g.rows;
   let lo = 2; let hi = 0;
   for (let k = 0; k < 64; k++) for (let i = 0; i < count; i++) {
-    const s = glyphScale(i, count, 1, (k / 64) * Math.PI * 2);
+    const s = glyphScale(i, count, 1, (k / 64) * GLYPH_PERIOD_S);
     lo = Math.min(lo, s); hi = Math.max(hi, s);
     assert.equal(glyphScale(i, count, 0, k), 1, 'DRIFT 0 is static');
   }
@@ -159,7 +160,7 @@ ok('DRIFT 100%: scale stays in [0.8, 1.2], one full wave across the grid, and no
   const bw = 320; const bh = 256;
   const { tile, x0, y0 } = glyphLayout(g, bw, bh);
   for (let k = 0; k < 8; k++) {
-    const px = rasterGlyph(new Uint32Array(bw * bh), bw, bh, g, 1, (k / 8) * Math.PI * 2);
+    const px = rasterGlyph(new Uint32Array(bw * bh), bw, bh, g, 1, (k / 8) * GLYPH_PERIOD_S);
     for (let c = 1; c < g.cols; c++) for (let y = 0; y < bh; y++) {
       const x = Math.round(x0 + c * tile);
       assert.equal(px[y * bw + x], g.groundRgba); assert.equal(px[y * bw + x - 1], g.groundRgba);
