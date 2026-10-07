@@ -98,3 +98,28 @@ test('the last KC track cannot be removed even with a pattern track present, and
   await expect(page.getByRole('button', { name: '+ pattern' })).toBeDisabled();
   expect((await state(page)).layers.filter((l) => l.type !== 'fx' && l.type !== 'math').length).toBe(4);
 });
+
+test('DROP: the toggle writes through, an armed SHUFFLE shows it and lands later; with DROP off it lands at once', async ({ page }) => {
+  await boot(page);
+  await page.getByRole('button', { name: '+ pattern' }).click();
+  const ed = page.locator('.pattern-editor');
+  const drop = ed.getByRole('button', { name: /^drop$/i });
+  const shuffle = ed.getByRole('button', { name: /^shuffle$/i });
+  await expect(drop).toHaveAttribute('aria-pressed', 'false');
+  const s0 = (await patternOf(page)).seed;
+  await shuffle.click();
+  await expect.poll(async () => (await patternOf(page)).seed, { message: 'DROP off: immediate' }).not.toBe(s0);
+  await expect(shuffle).not.toHaveAttribute('data-armed', 'true');
+
+  await drop.click();
+  await expect(drop).toHaveAttribute('aria-pressed', 'true');
+  expect((await patternOf(page)).drop).toBe(true);
+  await expect(drop).toHaveAttribute('title', /next bar.*never affected/s);
+  const s1 = (await patternOf(page)).seed;
+  await shuffle.click();
+  // armed: amber outline, the seed has not moved yet, then it lands on its own at the next bar (2 s at 120 BPM)
+  await expect(shuffle).toHaveAttribute('data-armed', 'true');
+  expect((await patternOf(page)).seed).toBe(s1);
+  await expect.poll(async () => (await patternOf(page)).seed, { timeout: 6000, message: 'lands on the bar' }).not.toBe(s1);
+  await expect(shuffle).not.toHaveAttribute('data-armed', 'true');
+});

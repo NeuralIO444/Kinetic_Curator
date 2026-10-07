@@ -833,3 +833,6 @@
 .pattern-modes .chip-btn { flex: 1; min-height: 44px; }
 .pattern-seed { display: flex; align-items: center; gap: 12px; min-height: 44px; padding-top: 4px; }
 .pattern-seed .big-btn { min-height: 44px; padding: 8px 16px; }
+.pattern-seed .chip-btn { min-height: 44px; padding: 8px 16px; }
+/* armed = waiting on the bar: caution amber, never live pink (design system 1.1) */
+.big-btn.armed { outline: 2px solid var(--kc-warn); outline-offset: 1px; }
