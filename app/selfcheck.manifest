@@ -99,6 +99,7 @@ node src/state/kineticWeatherPass.selfcheck.mjs
 node src/panels/layout/kineticHeat.selfcheck.mjs
 node src/state/startupChaos.selfcheck.mjs
 node src/state/layersPatch.selfcheck.mjs
+node src/state/patternTrack.selfcheck.mjs
 node src/state/layerNames.selfcheck.mjs
 node src/state/layersPlusPattern.selfcheck.mjs
 node src/state/tapeBudget.selfcheck.mjs

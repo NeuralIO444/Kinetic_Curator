@@ -28,7 +28,7 @@ const ALLOWED = {
   'state/paramUtils.js': { count: 4, why: 'randomizeKey default rng param + morph dice (3); result lands in layoutParams' },
   'state/slices/davisSlice.js': { count: 1, why: 'EVOLVE palette dice; result lands in paletteId' },
   'state/slices/layoutSlice.js': { count: 7, why: 'bumpSeed / mutateSeedOffset dice + #942 kineticRoll die + seed roll + #944 weather dice (3: sun intensity/ambient, glow); every result lands in seed / paletteId / layoutParams / enabledAssets / layers / light' },
-  'state/slices/layersSlice.js': { count: 2, why: 'layer id suffix (identity, not sim) + new-layer seed dice; seed lands in the snapshot' },
+  'state/slices/layersSlice.js': { count: 4, why: 'layer id suffix (identity, not sim) + new-layer seed dice (lands in the snapshot) + #1097 PATTERN track seed dice (addPatternLayer, shufflePattern: SHUFFLE writes a stored uint32 into layer.pattern.seed, serialized and undoable)' },
   'engine/ca-engine.js': { count: 1, why: 'createGrid dice; the grid is serialized (caGrid)' },
   'components/paletteWing.mjs': { count: 1, why: 'randomSeedHex default rng param; the generated set lands in paletteOverrides' },
   'components/PaletteWing.jsx': { count: 1, why: 'randomScheme default rng param (#953 generate dice); the set lands in paletteOverrides (undoable, serialized)' },

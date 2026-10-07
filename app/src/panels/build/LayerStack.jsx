@@ -13,7 +13,7 @@ import { isMathLayer, mathTrackHitsHard, wetDisplay } from '../../fx/mathFilters
 import { MathEffectEditor } from './MathEffectEditor.jsx';
 import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
 import { efTileFace } from '../../fx/efRackTile.mjs';
-import { displayLayerName, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } from '../../state/slices/layersSlice.js';
+import { displayLayerName, isPatternLayer, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } from '../../state/slices/layersSlice.js';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
@@ -277,12 +277,16 @@ export function LayerStack() {
   let contentOrdinal = 0;
   let fxOrdinal = 0;
   let mathOrdinal = 0;
+  let patternOrdinal = 0; // #1097 — PT-n, its own counter: a PATTERN track is not a KC track or a PATCH target
   const ordinals = new Map(); // content ids -> KC-n, FX ids -> FX n, MATH ids -> M n (separate counters)
   const contentTargets = [];
   for (const l of layers) {
     if (isMathLayer(l)) {
       mathOrdinal += 1;
       ordinals.set(l.id, mathOrdinal);
+    } else if (isPatternLayer(l)) {
+      patternOrdinal += 1;
+      ordinals.set(l.id, patternOrdinal);
     } else if (!isFxLayer(l)) {
       contentOrdinal += 1;
       ordinals.set(l.id, contentOrdinal);
