@@ -17,6 +17,13 @@ import {
 } from '../pattern/engine.js';
 
 export const PATTERN_MODES = Object.freeze(['QUILT', 'GLYPH', 'FIELD']);
+/**
+ * #1137 — which KINEME motion the pattern's individual elements carry while DRIFT is above 0. OFF is every track that
+ * predates the field (and today's picture, exactly); MIX gives each moving element its own, from a seeded pick. Only a
+ * share of the elements move (`movers`): a composition with moving accents, never a wallpaper that all turns at once.
+ */
+export const PATTERN_KINS = Object.freeze(['OFF', 'MIX', 'SPIN', 'ROCK', 'PULSE', 'BLINK', 'BOB']);
+export const PATTERN_MOVERS_DEFAULT = 0.3;
 export const PATTERN_DENSITY_MIN = 4;
 export const PATTERN_DENSITY_MAX = 12;
 
@@ -44,12 +51,14 @@ export function defaultPattern(mode = 'QUILT', seed = 1) {
     hero: QUILT_DEFAULT_HERO,
     drift: 0,
     drop: false,
+    kin: 'MIX', // a NEW track has moving accents once DRIFT is up; a stored one without the field stays OFF (sanitizePattern)
+    movers: PATTERN_MOVERS_DEFAULT,
   };
 }
 
 /**
  * Clamp every field; unknown modes fall back to QUILT, junk falls back to the mode's
- * default. Returns a new object with exactly the nine fields. Never throws.
+ * default. Returns a new object with exactly the eleven fields. Never throws.
  */
 export function sanitizePattern(raw) {
   const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -65,8 +74,10 @@ export function sanitizePattern(raw) {
     hero: num(r.hero, 0, 1, d.hero),
     drift: num(r.drift, 0, 1, d.drift),
     drop: r.drop === true,
+    kin: PATTERN_KINS.includes(r.kin) ? r.kin : 'OFF', // absent or junk = no element motion: the picture it always was
+    movers: num(r.movers, 0, 1, PATTERN_MOVERS_DEFAULT),
   };
 }
 
 /** The keys a caller may set one at a time. */
-export const PATTERN_PARAM_KEYS = Object.freeze(['density', 'mix', 'grout', 'hero', 'drift', 'drop']);
+export const PATTERN_PARAM_KEYS = Object.freeze(['density', 'mix', 'grout', 'hero', 'drift', 'drop', 'kin', 'movers']);

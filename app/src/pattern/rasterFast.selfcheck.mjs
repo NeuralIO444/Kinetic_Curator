@@ -7,7 +7,7 @@ import assert from 'node:assert';
 import {
   assign, assignQuilt, assignGlyph,
   rasterField, rasterFieldReference, rasterQuilt, rasterQuiltReference, rasterGlyph, rasterGlyphReference,
-  createQuiltRaster, panOffset,
+  createQuiltRaster, panOffset, quiltMoverMap, glyphMoverMap,
 } from './engine.js';
 import { createPatternFrames, patternPixels, patternDrawSize, patternBytes, PATTERN_LIVE_MAX_W } from './patternSource.js';
 import { GLYPH_MARKS, POSES, buildMark, sampleMark } from './glyph.js';
@@ -114,9 +114,10 @@ ok('createPatternFrames: every frame equals the stateless reference path, throug
   const ref = (p, pal, w, h, t) => {
     // the reference: build the grid fresh and use the slow rasterizers
     const tileW = w / p.density; const rows = Math.max(1, Math.ceil(h / tileW)); const b = alloc(w, h);
-    if (p.mode === 'GLYPH') return rasterGlyphReference(b, w, h, assignGlyph(p.seed, p.density, p.mix, pal), p.drift, t);
+    if (p.mode === 'GLYPH') { const g = assignGlyph(p.seed, p.density, p.mix, pal); return rasterGlyphReference(b, w, h, g, p.drift, t, glyphMoverMap(g, p.seed, p.kin, p.movers)); }
     if (p.mode === 'FIELD') return rasterFieldReference(b, w, h, assign(p.seed, p.density, p.mix, pal, rows), tileW, panOffset(p.seed, p.drift, t));
-    return rasterQuiltReference(b, w, h, assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows), tileW, p.grout, p.drift, t);
+    const q = assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows); // #1137: a new track carries element motion (kin MIX)
+    return rasterQuiltReference(b, w, h, q, tileW, p.grout, p.drift, t, quiltMoverMap(q, p.seed, p.kin, p.movers));
   };
   const pal2 = resolvePalette('v01d', null);
   const script = [];

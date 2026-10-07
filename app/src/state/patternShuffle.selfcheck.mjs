@@ -140,7 +140,7 @@ ok('a hand-edited or damaged PATTERN block loads repaired, never crashes', () =>
   assert.ok(parsed.ok);
   const layers = parsed.doc.layers;
   const p = layers.find((l) => l.id === id).pattern;
-  assert.deepEqual(Object.keys(p).sort(), ['density', 'drift', 'drop', 'grout', 'hero', 'mix', 'mode', 'seed']);
+  assert.deepEqual(Object.keys(p).sort(), ['density', 'drift', 'drop', 'grout', 'hero', 'kin', 'mix', 'mode', 'movers', 'seed']);
   assert.equal(p.mode, 'QUILT'); assert.equal(p.density, 12); assert.equal(p.mix, 0); assert.equal(p.drift, 0); assert.equal(p.drop, false);
 });
 

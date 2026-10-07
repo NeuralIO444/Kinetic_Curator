@@ -37,14 +37,14 @@ ok('defaults per mode: density 8 / 4 / 6, seed a stored uint32, DRIFT 0, DROP of
 
 ok('sanitizePattern clamps, defaults and never throws on junk', () => {
   const p = sanitizePattern({ mode: 'GLYPH', seed: -1, density: 99, mix: 7, grout: 5, hero: -3, drift: 'x', drop: 'yes' });
-  assert.deepEqual(p, { mode: 'GLYPH', seed: 0xffffffff, density: 12, mix: 1, grout: 0.08, hero: 0, drift: 0, drop: false });
+  assert.deepEqual(p, { mode: 'GLYPH', seed: 0xffffffff, density: 12, mix: 1, grout: 0.08, hero: 0, drift: 0, drop: false, kin: 'OFF', movers: 0.3 });
   assert.equal(sanitizePattern({ density: 1 }).density, 4);
   assert.equal(sanitizePattern({ density: 7.6 }).density, 8, 'density is an integer');
   assert.equal(sanitizePattern({ seed: 2 ** 40 }).seed, (Math.floor(2 ** 40) >>> 0));
   assert.equal(sanitizePattern({ mode: 'ESCHER' }).mode, 'QUILT', 'ESCHER is parked, not in the enum');
   for (const junk of [undefined, null, 0, 'x', [], [1, 2], NaN, () => 1, { mode: {} }, { seed: {} }, { density: [] }, { mix: '' }]) {
     const out = sanitizePattern(junk);
-    assert.deepEqual(Object.keys(out).sort(), ['density', 'drift', 'drop', 'grout', 'hero', 'mix', 'mode', 'seed']);
+    assert.deepEqual(Object.keys(out).sort(), ['density', 'drift', 'drop', 'grout', 'hero', 'kin', 'mix', 'mode', 'movers', 'seed']);
     assert.ok(Number.isInteger(out.seed) && out.seed >= 0 && out.seed <= 0xffffffff);
   }
   assert.equal(sanitizePattern({ drop: true }).drop, true);
@@ -218,7 +218,7 @@ ok('normalizeLayers keeps a valid pattern, repairs a broken one, and keeps the a
   assert.equal(activeLayerId, 'kc-a', 'an active id that points at a pattern track falls back to a KC track');
   const p1 = layers.find((l) => l.id === 'pt-1');
   assert.equal(p1.type, 'pattern'); assert.equal(p1.layerBlendMode, 'multiply'); assert.equal(p1.layerOpacity, 0.5);
-  assert.deepEqual(p1.pattern, { mode: 'FIELD', seed: 9, density: 6, mix: 0.4, grout: 0, hero: 0, drift: 0.3, drop: true });
+  assert.deepEqual(p1.pattern, { mode: 'FIELD', seed: 9, density: 6, mix: 0.4, grout: 0, hero: 0, drift: 0.3, drop: true, kin: 'OFF', movers: 0.3 });
   assert.equal(p1.patch, undefined);
   const p2 = layers.find((l) => l.id === 'pt-2');
   assert.equal(p2.pattern.mode, 'QUILT'); assert.equal(p2.pattern.density, 12); assert.equal(p2.pattern.mix, 1);

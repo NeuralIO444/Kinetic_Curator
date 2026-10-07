@@ -16,7 +16,7 @@ ok('the editor offers every mode and the signed range; sliders are the house Ran
   assert.match(ed, /min=\{PATTERN_DENSITY_MIN\} max=\{PATTERN_DENSITY_MAX\}/);
   assert.equal(PATTERN_DENSITY_MIN, 4); assert.equal(PATTERN_DENSITY_MAX, 12);
   assert.ok(!/<input\b/.test(ed), 'no native <input>');
-  assert.equal((ed.match(/<RangeRow\b/g) || []).length, 5, 'density, mix, grout, hero, drift');
+  assert.equal((ed.match(/<RangeRow\b/g) || []).length, 6, 'density, mix, grout, hero, drift, movers');
   for (const tone of ed.match(/tone="[a-z]+"/g)) assert.equal(tone, 'tone="build"', 'BUILD is yellow');
 });
 
