@@ -24,11 +24,14 @@ ok('honest UI: what a mode ignores is disabled WITH a reason, never hidden and n
   assert.match(ed, /ariaLabel="Pattern grout" disabled=\{!quilt\} disabledLabel="Quilt only" disabledReason="only QUILT has grout"/);
   assert.match(ed, /ariaLabel="Pattern hero" disabled=\{!quilt\} disabledLabel="Quilt only" disabledReason="only QUILT has hero tiles"/);
   assert.match(ed, /quilt \? `\$\{\(p\.grout \* 100\)\.toFixed\(1\)\}%` : '—'/, 'a disabled control reads a dash, not a stale number');
-  assert.ok(!/DROP|\bdrop\b/i.test(ed.replace(/\/\/.*$/gm, '')), 'DROP is not shown until it does something (#1100)');
+  assert.match(ed, /setParam\(id, 'drop', !p\.drop\)/, 'DROP is shown now that it does something (#1100)');
+  assert.match(ed, /DRIFT is never affected/, 'and says it never touches DRIFT');
 });
 
 ok('every control writes through the slice, which sanitizes; nothing calls the store with raw values', () => {
-  for (const act of ['setPatternMode', 'setPatternParam', 'shufflePattern']) assert.match(ed, new RegExp(`s\\.${act}`));
+  for (const act of ['setPatternMode', 'setPatternParam']) assert.match(ed, new RegExp(`s\\.${act}`));
+  assert.match(ed, /requestPatternShuffle\(id\)/, 'SHUFFLE goes through the DROP gate, never straight to the seed');
+  assert.ok(!/s\.shufflePattern/.test(ed));
   assert.match(ed, /setParam\(id, 'grout', v \/ 100\)/, 'percent in the UI, fractions in the store');
   assert.ok(!/setState|useStore\.getState/.test(ed));
 });
@@ -37,7 +40,7 @@ ok('no inline style, no emoji, no hardcoded case; casing is the .act / .lbl clas
   assert.ok(!/\bstyle=/.test(ed));
   assert.ok(!/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(ed));
   assert.ok(!/toUpperCase|toLowerCase/.test(ed), 'case is never decided in JSX (M3)');
-  assert.match(ed, /className="big-btn act"/); assert.match(ed, /className=\{`chip-btn act/);
+  assert.match(ed, /className=\{`big-btn act/); assert.match(ed, /className=\{`chip-btn act/);
 });
 
 ok('LayerStack: + pattern in the Content head, the whole row opens the editor, the PATCH row is hidden, a lone KC cannot be removed', () => {

@@ -1,14 +1,17 @@
+import { useSyncExternalStore } from 'react';
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { useStore } from '../../state/store.js';
 import {
   PATTERN_MODES, PATTERN_DENSITY_MIN, PATTERN_DENSITY_MAX, sanitizePattern,
 } from '../../state/patternTrack.js';
 import { QUILT_MAX_GROUT } from '../../pattern/engine.js';
+import { requestPatternShuffle, subscribePending, pendingSnapshot } from '../../state/patternShuffle.js';
+import { barMs } from '../../pattern/shuffleGate.js';
 
 // The PATTERN track's editor (#1099). It opens under the row like the FX editor, and every control
 // writes through the slice (which sanitizes). Controls a mode ignores are DISABLED with the reason,
 // never hidden and never live: the UI cannot show what the renderer does not read.
-// DROP is not here yet: it gates SHUFFLE to the bar, and the gate arrives with the live loop (#1100).
+// DROP gates SHUFFLE to the bar (state/patternShuffle.js). It never touches DRIFT.
 const MODE_HINT = {
   QUILT: 'Dense tessellation: grout, 2×2 hero tiles, the full palette.',
   GLYPH: 'A poster: one bold mark per tile on a letterboxed 5:4 grid.',
@@ -29,7 +32,8 @@ function Param({ label, hint, children, readout }) {
 export function PatternEditor({ layer, ordinal }) {
   const setMode = useStore((s) => s.setPatternMode);
   const setParam = useStore((s) => s.setPatternParam);
-  const shuffle = useStore((s) => s.shufflePattern);
+  const bpm = useStore((s) => s.beatBpm);
+  const pending = useSyncExternalStore(subscribePending, pendingSnapshot).has(layer.id);
   const p = sanitizePattern(layer.pattern);
   const quilt = p.mode === 'QUILT';
   const id = layer.id;
@@ -66,7 +70,11 @@ export function PatternEditor({ layer, ordinal }) {
           ariaLabel="Pattern drift" onChange={(v) => setParam(id, 'drift', v / 100)} />
       </Param>
       <div className="pattern-seed">
-        <button type="button" className="big-btn act" title="A new seed in the same mode" onClick={() => shuffle(id)}>shuffle</button>
+        <button type="button" className={`big-btn act${pending ? ' armed' : ''}`} data-armed={pending ? 'true' : undefined}
+          title={pending ? 'Armed: the new seed lands on the next bar' : 'A new seed in the same mode'} onClick={() => requestPatternShuffle(id)}>shuffle</button>
+        <button type="button" className={`chip-btn act${p.drop ? ' active' : ''}`} aria-pressed={p.drop}
+          title={`DROP: SHUFFLE waits for the next bar (4 beats, ${(barMs(bpm) / 1000).toFixed(2)} s at ${bpm} BPM) so the change lands on the beat. DRIFT is never affected.`}
+          onClick={() => setParam(id, 'drop', !p.drop)}>drop</button>
         <span className="fx-param-readout name" title="The stored seed: the same seed and settings always draw the same pattern">seed {p.seed.toString(16)}</span>
       </div>
     </div>
