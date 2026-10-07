@@ -13,7 +13,7 @@
 - **Phases, one open at a time:** 0 square the books → 1 prove what's built (one recorded 30-minute set this week, one share link to a stranger) → 2 safe (#1051 export bundle, #1052 unprocessed audio input, #1053 lost audio device) → 3 honest UI (#1023, #1022, #1046, #1048, #1037, #980) → 4 one look (design system #1027–#1033, then #1043) → 5 playable on stage (#617, #608, MIDI bind, real-hardware performance check) → release.
 - **PATTERN (#1039–#1042, #1049) runs as its own lane in parallel, starting now.**
 - **Parked:** #762, #926, the two GPU fields, OSC, mobile touch work.
-- **Stage 1 and Stage 2 exits signed by Matt, 2026-10-05**, on his word: the recorded set and the stranger link test were not run and remain optional. Phases 0 and 1 are closed; **Phase 2 is open.** `main` is now protected (five required checks, no bypass) and every PR body needs a `Closes #N` line or `No issue`.
+- **Stage 1 and Stage 2 exits signed by Matt, 2026-10-05**, on his word: the recorded set and the stranger link test were not run and remain optional. Phases 0 to 3 are closed (2026-10-06); **Phase 4 is open.** `main` is now protected (five required checks, no bypass) and every PR body needs a `Closes #N` line or `No issue`.
 
 ---
 
