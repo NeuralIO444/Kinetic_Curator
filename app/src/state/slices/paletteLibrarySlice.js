@@ -1,6 +1,7 @@
 // User palette library (#55) + palette FADE seconds (#278).
 // FADE is a feel pref, not project JSON.
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
+import { validWeights } from '../../data/swatchWeights.js';
 import { sanitizeMixSeconds, MIX_DEFAULT } from '../../gl/paletteMix.mjs';
 
 export const USER_PALETTES_KEY = 'kc:user-palettes:v1';
@@ -21,6 +22,9 @@ export function sanitizePalette(raw) {
     : [];
   if (swatches.length === 0) return null;
   const id = typeof raw.id === 'string' && raw.id ? raw.id : nextFallbackPaletteId();
+  // #1049 — keep hand-set weights only when no swatch was dropped above and they are usable.
+  const kept = { swatches, weights: raw.weights };
+  const weights = Array.isArray(raw.swatches) && raw.swatches.length === swatches.length && validWeights(kept) ? { weights: raw.weights.slice() } : {};
   return {
     id,
     name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 40) : 'UNTITLED',
@@ -28,6 +32,7 @@ export function sanitizePalette(raw) {
     bg: normalizeHex(raw.bg) || '#0a0a0a',
     ink: normalizeHex(raw.ink) || '#f0f0e8',
     swatches,
+    ...weights,
     user: true,
   };
 }
