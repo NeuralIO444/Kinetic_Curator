@@ -65,7 +65,7 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
       <select
         value={audioSource.type === 'device' ? audioSource.id : 'file'}
         onChange={handleSourceChange}
-        style={{ width: '100%', marginBottom: '6px', background: 'var(--panel)', color: 'var(--ink)', border: '1px solid var(--line)', padding: '3px', fontSize: '10px' }}
+        style={{ width: '100%', marginBottom: '6px' }}
       >
         <option value="default">Default Mic</option>
         {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${d.deviceId.slice(0, 5)}...`}</option>)}

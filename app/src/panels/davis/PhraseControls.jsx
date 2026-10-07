@@ -112,7 +112,7 @@ export function PhraseControls({
             </span>
             <button className="micro-btn act" title="Jump to beat 0." onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>reset now</button>
           </div>
-          <div style={{ position: 'relative', height: 4, background: 'var(--line-2)', borderRadius: 2, overflow: 'hidden' }}
+          <div style={{ position: 'relative', height: 4, background: 'var(--line-2)', overflow: 'hidden' }}
             title="Bar fill = count. White pip = last audio attack.">
             <div style={{
               height: '100%', width: `${phraseProgress}%`,

@@ -42,7 +42,7 @@
 }
 .dual-slider input[type=range]::-moz-range-thumb {
   pointer-events: all; width: 14px; height: 18px;
-  background: var(--range-thumb); border: none; border-radius: 0; cursor: ew-resize;
+  background: var(--range-thumb); border: none; cursor: ew-resize;
 }
 .dual-track { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 3px; background: var(--line-2); }
 .dual-fill { position: absolute; top: 50%; transform: translateY(-50%); height: 3px; background: var(--range-thumb); }
@@ -69,7 +69,7 @@
   -webkit-appearance: none; margin-top: -8px;
   width: 14px; height: 18px; background: var(--range-thumb); border: none; cursor: ew-resize;
 }
-.single-slider::-moz-range-thumb { width: 14px; height: 18px; background: var(--range-thumb); border: none; border-radius: 0; cursor: ew-resize; }
+.single-slider::-moz-range-thumb { width: 14px; height: 18px; background: var(--range-thumb); border: none; cursor: ew-resize; }
 
 .range-label-group { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
 .range-right { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
@@ -218,7 +218,7 @@
 }
 .start-mode-btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .start-mode-btn::before {
-  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  content: ''; width: 6px; height: 6px;
   border: 1px solid var(--dim); flex-shrink: 0;
 }
 .start-mode-btn[data-mode="chaos"]::before { background: var(--accent); border-color: var(--accent); }
@@ -246,7 +246,7 @@
 .curator-voice-menu.preset-menu { min-width: 260px; max-height: 60vh; overflow-y: auto; padding: 8px; }
 
 .lock-badge, .drift-badge {
-  font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 2px;
+  font-size: 8px; font-weight: 700; padding: 1px 5px;
   letter-spacing: 0.05em; text-transform: uppercase;
 }
 .lock-badge { background: rgba(255,255,255,0.1); color: var(--ink); }
@@ -278,7 +278,7 @@
 /* The pulse readout: flashes on every beat at the dialed BPM. --beat interval
    is set from React (animation-duration); the flash itself is pure CSS. */
 .beat-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  width: 6px; height: 6px; flex-shrink: 0;
   background: var(--accent);
   animation: beat-flash 0.5s ease-in-out infinite;
 }

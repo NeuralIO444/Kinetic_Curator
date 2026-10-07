@@ -56,7 +56,19 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 button { font-family: inherit; cursor: pointer; }
-input, select { font-family: inherit; font-size: 11px; }
+input { font-family: inherit; font-size: 11px; }
+/* #1033 (M8) — one dropdown (docs/DESIGN_SYSTEM.md §2.5). The native arrow stays; the
+   open list is OS-drawn. Live-path selects (route matrix, layer rows) override to 44px. */
+select {
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line);
+  font: 9px var(--mono); letter-spacing: 0.04em;
+  padding: 2px 4px; min-height: 28px;
+  color-scheme: dark;
+}
+select:hover { border-color: var(--line-2); }
+select:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
+select:disabled { color: var(--dimmer); cursor: default; }
 .mono { font-family: var(--mono); letter-spacing: 0.02em; }
 
 @keyframes pulse { 50% { opacity: 0.5; } }
@@ -64,5 +76,5 @@ input, select { font-family: inherit; font-size: 11px; }
 /* Scrollbar styling — compact and unobtrusive */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.24); }

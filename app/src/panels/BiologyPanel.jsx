@@ -112,7 +112,7 @@ export function BiologyPanel() {
         </div>
       )}
       {entries.map(([id, s]) => (
-        <div key={id} style={{ marginTop: 8, padding: 8, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4 }}>
+        <div key={id} style={{ marginTop: 8, padding: 8, border: '1px solid rgba(255,255,255,0.12)' }}>
           <div style={ROW}>
             <span><b>{s.mode}</b> <span style={KEY}>gen {s.gen}</span></span>
             <span style={KEY}>tick {s.tick}</span>

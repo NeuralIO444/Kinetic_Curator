@@ -73,6 +73,8 @@ node src/state/favorites.selfcheck.mjs
 node src/components/rangeRow.selfcheck.mjs
 node src/components/pinkDiscipline.selfcheck.mjs
 node src/components/densityScale.selfcheck.mjs
+node src/styles/radii.selfcheck.mjs
+node src/styles/selects.selfcheck.mjs
 node src/components/retiredEmoji.selfcheck.mjs
 node src/components/casingInCss.selfcheck.mjs
 node src/state/enabledAssetsRoundTrip.selfcheck.mjs

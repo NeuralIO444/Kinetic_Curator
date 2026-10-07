@@ -372,7 +372,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
                 <button key={id} type="button" className="chip-btn" title={`Add a ${id} shape`} onClick={() => add(id)}>{id}</button>
               ))}
               <button type="button" className="chip-btn act" onClick={() => add('poly')}>poly</button>
-              <select value={sides} onChange={(e) => setSides(+e.target.value)} style={field} title="polygon sides">
+              <select value={sides} onChange={(e) => setSides(+e.target.value)} title="polygon sides">
                 {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
@@ -455,7 +455,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
             </div>
             <label style={lbl} title="Which family the saved asset lands in.">
               family
-              <select value={category} title="Which family the saved asset lands in." onChange={(e) => setCategory(e.target.value)} style={field}>
+              <select value={category} title="Which family the saved asset lands in." onChange={(e) => setCategory(e.target.value)}>
                 {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>

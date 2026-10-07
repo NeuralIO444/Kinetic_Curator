@@ -71,7 +71,7 @@ function ThresholdRow({ label, value, setValue, min, max, hint }) {
         max={max}
         onChange={(e) => setValue(e.target.value)}
         title={hint}
-        style={{ width: 64, background: '#141414', color: '#fff', border: '1px solid #2a2a2a', borderRadius: 4, padding: '2px 6px' }}
+        style={{ width: 64, background: '#141414', color: '#fff', border: '1px solid #2a2a2a', padding: '2px 6px' }}
       />
       <span style={{ color: '#8a93a6' }}>fps</span>
       <span style={{ color: '#5a6272', fontSize: 11 }}>{hint}</span>
@@ -138,7 +138,6 @@ export function GovernorTunePanel() {
               height: `${Math.max(2, (c / maxCount) * 84)}px`,
               background: i * BUCKET_MS >= 33.3 ? 'var(--kc-warn)' : '#7cc7ff',
               opacity: 0.85,
-              borderRadius: '2px 2px 0 0',
             }}
           />
         ))}

@@ -51,7 +51,7 @@ export function RenderFinalBlock({
         <select
           value={exportResolution}
           onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value, 10))}
-          style={{ padding: '4px', fontSize: '10px', background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', flex: 1 }}
+          style={{ flex: 1 }}
         >
           <option value={1}>1x (1000×700@1x)</option>
           <option value={2}>2x (1000×700@2x)</option>

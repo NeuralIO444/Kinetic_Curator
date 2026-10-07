@@ -183,7 +183,7 @@ export function PaletteStrip() {
           <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
             <span className="palette-switch-label lbl">palette</span>
             <button type="button" className="palette-save-btn" title="Palette lab — generate, edit, save, import, export" onClick={() => setWingOpen((v) => !v)} aria-expanded={wingOpen}>◈<span className="palette-shuffle-word lbl"> lab</span></button>
-            <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
+            <select className="palette-harmony" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
               {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
             </select>
             <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳<span className="palette-shuffle-word lbl"> shuffle</span></button>

@@ -59,7 +59,7 @@
 
 /* #536: chip-identity fixed shapes */
 .chip-btn.chip-behave {
-  border-radius: 9999px;
+
   padding: 1px 7px;
 }
 .chip-btn.chip-behave.active {
@@ -68,7 +68,7 @@
   border-color: var(--ink);
 }
 .chip-btn.chip-symmetry {
-  border-radius: 2px;
+
 }
 
 /* ─── Preset + Mode ─── */
@@ -137,7 +137,7 @@
   padding: 7px 4px 6px;
 }
 .voice-dots { display: flex; gap: 3px; }
-.voice-dots i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.voice-dots i { width: 8px; height: 8px; display: inline-block; }
 .voice-name { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-align: center; line-height: 1.2; }
 .voice-shelf { display: flex; flex-direction: column; gap: 3px; }
 .shelf-label { font-size: 8px; letter-spacing: 0.12em; color: var(--dim); }
@@ -266,7 +266,7 @@
 .stim-matrix-head { min-height: 28px; color: var(--dim); border-bottom: 1px solid var(--line); letter-spacing: 0.1em; }
 .stim-matrix-row.unrouted { color: var(--dim); }
 .stim-route-pick { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.stim-route-pick select { flex: 1; min-width: 0; font: 9px var(--mono); padding: 1px 2px; grid-column: unset; border-radius: 0; background: var(--panel-2, var(--panel)); border: 1px solid var(--line); color: var(--ink); }
+.stim-route-pick select { flex: 1; min-width: 0; min-height: 44px; grid-column: unset; }
 .stim-route-depth { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .stim-route-depth input[type=range] { flex: 1; min-width: 0; }
 .stim-route-depth input[type=number] { width: 52px; font-size: 9px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 1px 2px; font-variant-numeric: tabular-nums; }
@@ -376,7 +376,7 @@
 .layer-section-count { font-size: 10px; letter-spacing: 0.1em; color: var(--dim); }
 .layer-add-btn {
   width: 26px; height: 26px; min-width: 26px;
-  border: 1px dashed var(--dim); border-radius: 4px;
+  border: 1px dashed var(--dim);
   background: transparent; color: var(--ink);
   font-size: 15px; line-height: 1; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
@@ -393,7 +393,7 @@
 }
 .layer-chooser {
   position: absolute; z-index: 41; top: 30px; left: 8px; right: 8px;
-  background: #14141c; border: 1px solid var(--line-2); border-radius: 6px;
+  background: #14141c; border: 1px solid var(--line-2);
   padding: 8px; display: flex; flex-direction: column; gap: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.55);
 }
@@ -403,7 +403,7 @@
 .layer-chooser-item {
   font-size: 10px; letter-spacing: 0.08em;
   color: var(--ink); background: #1a1a22;
-  border: 1px solid var(--line-2); border-radius: 3px;
+  border: 1px solid var(--line-2);
   padding: 8px 10px; min-height: 44px; cursor: pointer;
 }
 .layer-chooser-item:hover { border-color: var(--ink); color: #fff; }
@@ -435,7 +435,7 @@
 .reorder-badge {
   font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
   color: #e8a33d; border: 1px solid #e8a33d66; background: #1a1a22;
-  padding: 3px 8px; border-radius: 3px; white-space: nowrap; align-self: center;
+  padding: 3px 8px; white-space: nowrap; align-self: center;
   animation: reorder-badge-fade 1.6s ease-out forwards;
 }
 .reorder-badge-fx { color: #35c4b5; border-color: #35c4b566; }
@@ -482,7 +482,7 @@
 /* #1027: the 44px hit area is now the house slider's own default (controls.css). */
 .build-layer-stack .layer-row-composite input[type=range],
 .build-layer-stack .fx-editor .fx-param input[type=range] { flex: 1; min-width: 0; }
-.build-layer-stack .fx-editor select.tg,
+.build-layer-stack .fx-editor select,
 .build-layer-stack .fx-editor .chip-btn { min-height: 44px; }
 .build-layer-stack .ef-bypass { min-width: 44px; min-height: 44px; }
 .layer-name {
@@ -507,13 +507,13 @@
 }
 .fx-badge {
   font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #0b0b12;
-  background: #8a6cff; border-radius: 2px; padding: 1px 5px; white-space: nowrap;
+  background: #8a6cff; padding: 1px 5px; white-space: nowrap;
 }
 .fx-editor { margin-top: 6px; border-top: 1px dashed #8a6cff55; padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
 /* #520 Phase 4 — rack UI: slot rows replace the flat effect list */
 .fx-slot { border: 1px solid var(--line); padding: 4px 6px; background: rgba(0,0,0,0.25); }
 .fx-slot-empty { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 3px 6px; background: rgba(0,0,0,0.10); border: 1px dashed #8a6cff22; }
-.fx-slot-label { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #8a6cff; background: #8a6cff22; padding: 1px 4px; border-radius: 2px; white-space: nowrap; }
+.fx-slot-label { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #8a6cff; background: #8a6cff22; padding: 1px 4px; white-space: nowrap; }
 .fx-effect-head { display: flex; align-items: center; gap: 4px; }
 .fx-effect-name { flex: 1; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; color: #cdbfff; }
 /* #716 — TX-6 EF tile, the DLY ✕ WARP line:
@@ -771,9 +771,8 @@
 }
 .build-section-num {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 1px solid var(--accent2); color: var(--accent2);
-  font-size: 10px; letter-spacing: 0; flex: 0 0 auto;
+  color: var(--accent2);
+  font-size: 14px; letter-spacing: 0; flex: 0 0 auto;
 }
 
 /* #1010 — MATH tracks: ink-violet strip color, distinct from FX violet-teal
@@ -782,7 +781,7 @@
 .layer-row-math-selected { border-color: #d3b8ff; box-shadow: inset 3px 0 0 #b78cff, inset 0 0 0 1px #d3b8ff; }
 .math-badge {
   font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: #0b0b12;
-  background: #b78cff; border-radius: 2px; padding: 1px 5px; white-space: nowrap;
+  background: #b78cff; padding: 1px 5px; white-space: nowrap;
 }
 /* Readout theater: when a MATH op changes the picture hard (threshold with a
    hard edge, quantize ≤ 4 steps), the M badge flashes — nanosecond rule. */
@@ -796,8 +795,8 @@
 .math-op { border: 1px solid #b78cff33; padding: 4px 6px; background: rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 2px; }
 .math-op-head { display: flex; align-items: center; gap: 4px; }
 .math-op-select { flex: 1; }
-.math-mod-select { font-size: 8px; max-width: 64px; }
+.math-mod-select { max-width: 64px; }
 .math-warn { font-size: 8px; color: #e8b34a; letter-spacing: 0.03em; }
 .math-add-row { display: flex; gap: 4px; align-items: center; }
-.math-add-row .tg { flex: 1; }
+.math-add-row select { flex: 1; }
 .math-order-note { font-size: 8px; color: var(--dim); letter-spacing: 0.03em; }

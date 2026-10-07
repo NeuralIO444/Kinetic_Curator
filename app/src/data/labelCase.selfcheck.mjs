@@ -95,9 +95,10 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
     /\.randomize-hint\s*\{[^}]*text-transform:\s*lowercase/s.test(controlsCss),
     'controls.css must define text-transform: lowercase on .randomize-hint'
   );
+  // #1033 (M8): square corners everywhere — the BEHAVE chip lost its pill radius.
   assert.ok(
-    /\.chip-btn\.chip-behave\s*\{[^}]*border-radius:\s*9999px/s.test(panelsCss),
-    'panels.css must define pill shape for .chip-btn.chip-behave'
+    !/\.chip-btn\.chip-behave\s*\{[^}]*border-radius/s.test(panelsCss),
+    '.chip-btn.chip-behave must not set a border-radius (M8, square corners)'
   );
 
   console.log('[ok] CSS micro-label transforms and chip identities verified');
