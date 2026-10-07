@@ -4,11 +4,13 @@
 import { test, expect } from '@playwright/test';
 
 // `settle` waits out the cold open (the verbs show their full names for ~2 s), so rest-state tests measure rest.
-async function boot(page, { settle = true, coldMs = 0 } = {}) {
-  await page.addInitScript((ms) => { if (ms) window.__KC_COLD_OPEN_MS = ms; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } }, coldMs);
+// `hold` stretches every timed window in the app (cold open, press flash, touch hold) by that factor, so a starved CI
+// runner cannot miss one; the specs that watch a window pass it and scale their own waits to match.
+async function boot(page, { settle = true, hold = 1 } = {}) {
+  await page.addInitScript((x) => { if (x > 1) window.__KC_HOLD_X = x; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } }, hold);
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
-  if (settle) await expect(page.locator('.kc-topbar-curator .kinetic-btn')).not.toHaveAttribute('data-open', 'true', { timeout: 6000 });
+  if (settle) await expect(page.locator('.kc-topbar-curator .kinetic-btn')).not.toHaveAttribute('data-open', 'true', { timeout: 6000 * hold });
 }
 const group = (page) => page.locator('.kc-topbar-curator');
 const btn = (page, name) => group(page).getByRole('button', { name });
@@ -53,7 +55,7 @@ test('keyboard focus opens them; the accessible name is the full word at every s
 test('a touch opens KIN, LOOKS and VOICE, and they close by themselves', async ({ browser }) => {
   const ctx = await browser.newContext({ hasTouch: true, viewport: { width: 1280, height: 720 } });
   const page = await ctx.newPage();
-  await boot(page);
+  await boot(page, { hold: 4 });
   const kin = group(page).locator('.kinetic-btn');
   // the cold open is still cooling on a slow runner: wait for the resting width (the 48 px floor), or w0 is sampled mid-glide
   await expect.poll(async () => width(kin), { timeout: 8000 }).toBeLessThanOrEqual(49);
@@ -61,7 +63,7 @@ test('a touch opens KIN, LOOKS and VOICE, and they close by themselves', async (
   await kin.dispatchEvent('pointerdown', { pointerType: 'touch', bubbles: true });
   await expect(kin).toHaveAttribute('data-open', 'true');
   await expect.poll(async () => width(kin)).toBeGreaterThan(w0 + 15);
-  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 4000 });
+  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 10000 }); // 1.5 s × 4
   await ctx.close();
 });
 
@@ -88,7 +90,7 @@ test('KIN still builds and sheds heat: rapid taps widen it, and it cools back', 
 });
 
 test('cold open: KINETIC and CURATOR show their full names, then cool down to KIN and CUR; L and V stay L and V', async ({ page }) => {
-  await boot(page, { settle: false, coldMs: 7000 }); // a longer window than the real 2.2 s, so a slow runner cannot miss it
+  await boot(page, { settle: false, hold: 4 }); // 4× the real 2.2 s, so a slow runner cannot miss it
   const kin = group(page).locator('.kinetic-btn');
   const cur = group(page).locator('.randomize-btn');
   await expect(kin).toHaveAttribute('data-open', 'true');
@@ -100,7 +102,7 @@ test('cold open: KINETIC and CURATOR show their full names, then cool down to KI
   const opened = { kin: await width(kin), cur: await width(cur) };
   expect(await text(btn(page, /^Looks/)), 'L is not part of the cold open').toBe('l');
   expect(await text(btn(page, /^Voice/))).toBe('v');
-  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 12000 });
+  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 15000 });
   await expect(cur).not.toHaveAttribute('data-open', 'true');
   await expect.poll(async () => width(kin), { timeout: 3000 }).toBeLessThan(opened.kin - 8);
   await expect.poll(async () => width(cur), { timeout: 3000 }).toBeLessThan(opened.cur - 8);
@@ -139,27 +141,27 @@ test('the row reads START, KIN, L, V, CUR, B left to right; CURATOR is in capita
 });
 
 test('a K press flashes KINETIC in full and cools it down, with the pointer nowhere near', async ({ page }) => {
-  await boot(page);
+  await boot(page, { hold: 4 });
   await page.mouse.move(600, 600);
   const kin = group(page).locator('.kinetic-btn');
   const rest = await width(kin);
   await page.keyboard.press('k');
   await expect(kin).toHaveAttribute('data-open', 'true');
   await expect.poll(async () => width(kin)).toBeGreaterThan(rest + 12);
-  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 3000 });   // ~1.2 s, then it cools
+  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 8000 });   // ~1.2 s (×4 here), then it cools
   await expect.poll(async () => width(kin), { timeout: 6000 }).toBeLessThanOrEqual(rest + 2);
 });
 
 test('a CURATOR roll flashes CURATOR in full and cools it down, even when the pointer has left', async ({ page }) => {
-  await boot(page);
+  await boot(page, { hold: 4 });
   const cur = group(page).locator('.randomize-btn');
   const rest = await width(cur);
   await cur.click();
   await page.mouse.move(600, 600);
   await expect(cur).toHaveAttribute('data-open', 'true');
   await expect.poll(async () => width(cur)).toBeGreaterThan(rest + 20);
-  await expect(cur).not.toHaveAttribute('data-open', 'true', { timeout: 3000 });
-  await expect.poll(async () => width(cur), { timeout: 3000 }).toBeLessThanOrEqual(rest + 2);
+  await expect(cur).not.toHaveAttribute('data-open', 'true', { timeout: 8000 });
+  await expect.poll(async () => width(cur), { timeout: 4000 }).toBeLessThanOrEqual(rest + 2);
 });
 
 // ── the polish: shimmer, letters that let go one at a time, a glide instead of steps ──
