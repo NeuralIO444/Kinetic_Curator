@@ -93,7 +93,9 @@ test('cold open: KINETIC and CURATOR show their full names, then cool down to KI
   const cur = group(page).locator('.randomize-btn');
   await expect(kin).toHaveAttribute('data-open', 'true');
   await expect(cur).toHaveAttribute('data-open', 'true');
-  const opened = { kin: await width(kin), cur: await width(cur) };
+  // measure the OPEN width only once the letters have finished arriving (a slow runner samples mid-open)
+  const settled = async (loc) => { let w = await width(loc); let max = w; for (let i = 0; i < 8; i++) { await page.waitForTimeout(120); const n = await width(loc); max = Math.max(max, n); if (n === w) break; w = n; } return max; };
+  const opened = { kin: await settled(kin), cur: await settled(cur) };
   expect(await text(btn(page, /^Looks/)), 'L is not part of the cold open').toBe('l');
   expect(await text(btn(page, /^Voice/))).toBe('v');
   await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 6000 });
