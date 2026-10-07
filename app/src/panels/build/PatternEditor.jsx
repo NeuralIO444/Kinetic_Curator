@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { useStore } from '../../state/store.js';
 import {
-  PATTERN_MODES, PATTERN_DENSITY_MIN, PATTERN_DENSITY_MAX, sanitizePattern,
+  PATTERN_MODES, PATTERN_DENSITY_MIN, PATTERN_DENSITY_MAX, PATTERN_KINS, sanitizePattern,
 } from '../../state/patternTrack.js';
 import { QUILT_MAX_GROUT } from '../../pattern/engine.js';
 import { requestPatternShuffle, subscribePending, pendingSnapshot } from '../../state/patternShuffle.js';
@@ -18,6 +18,8 @@ const MODE_HINT = {
   FIELD: 'A wallpaper: ten micro-patterns that wrap, and pan.',
 };
 const pct = (v) => Math.round(v * 100);
+// #1137 — the KINEME motion the pattern's individual elements take while DRIFT is up.
+const KIN_HINT = 'Which KINEME motion a few of the pattern\'s elements carry while DRIFT is up: spin, rock, pulse, blink, bob, or mix (each its own). Off holds them still.';
 
 function Param({ label, hint, children, readout }) {
   return (
@@ -68,6 +70,18 @@ export function PatternEditor({ layer, ordinal }) {
       <Param label="drift" hint="Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans. Zero holds still." readout={`${pct(p.drift)}%`}>
         <RangeRow layout="bare" tone="build" min={0} max={100} step={1} value={pct(p.drift)}
           ariaLabel="Pattern drift" onChange={(v) => setParam(id, 'drift', v / 100)} />
+      </Param>
+      <Param label="motion" hint={KIN_HINT} readout={p.mode === 'FIELD' ? '—' : p.kin}>
+        <select className="blend-mode-select" aria-label="Element motion" value={p.kin} disabled={p.mode === 'FIELD'}
+          title={p.mode === 'FIELD' ? 'FIELD is one continuous field: it has no separate elements to move' : KIN_HINT}
+          onChange={(e) => setParam(id, 'kin', e.target.value)}>
+          {PATTERN_KINS.map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+      </Param>
+      <Param label="movers" hint="How many of the elements move. A few is a composition with accents; all of them is wallpaper." readout={p.mode === 'FIELD' || p.kin === 'OFF' ? '—' : `${pct(p.movers)}%`}>
+        <RangeRow layout="bare" tone="build" min={0} max={100} step={1} value={pct(p.movers)}
+          ariaLabel="Pattern movers" disabled={p.mode === 'FIELD' || p.kin === 'OFF'} disabledLabel="No element motion" disabledReason={p.mode === 'FIELD' ? 'FIELD has no separate elements' : 'motion is off'}
+          onChange={(v) => setParam(id, 'movers', v / 100)} />
       </Param>
       <div className="pattern-seed">
         <button type="button" className={`big-btn act${pending ? ' armed' : ''}`} data-armed={pending ? 'true' : undefined}

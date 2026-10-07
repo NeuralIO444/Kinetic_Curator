@@ -13,7 +13,7 @@
 // shader drawers, checked against these references.
 
 import {
-  assign, assignQuilt, assignGlyph, rasterField, rasterGlyph, createQuiltRaster, panOffset,
+  assign, assignQuilt, assignGlyph, rasterField, rasterGlyph, createQuiltRaster, panOffset, quiltMoverMap, glyphMoverMap,
 } from './engine.js';
 import { sanitizePattern } from '../state/patternTrack.js';
 
@@ -34,7 +34,9 @@ export function patternKey(pattern, palette, w, h, t = 0) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   const time = p.drift > 0 ? Number(t) || 0 : 0;
-  return JSON.stringify([p.mode, p.seed, p.density, p.mix, p.grout, p.hero, p.drift, time, pal.swatches, pal.bg, pal.weights ?? null, w, h]);
+  // kin and movers change pixels only while the pattern moves, and not at all in FIELD (no discrete elements)
+  const el = p.drift > 0 && p.mode !== 'FIELD' ? [p.kin, p.movers] : null;
+  return JSON.stringify([p.mode, p.seed, p.density, p.mix, p.grout, p.hero, p.drift, time, pal.swatches, pal.bg, pal.weights ?? null, w, h, el]);
 }
 
 /**
@@ -52,7 +54,7 @@ export function patternDrawSize(drift, w, h) {
 }
 
 /** What decides the PICTURE (everything but time): the key a still frame, and a drifting frame's tables, are cached on. */
-const staticKey = (p, pal, w, h) => JSON.stringify([p.mode, p.seed, p.density, p.mix, p.grout, p.hero, pal.swatches, pal.bg, pal.weights ?? null, w, h]);
+const staticKey = (p, pal, w, h) => JSON.stringify([p.mode, p.seed, p.density, p.mix, p.grout, p.hero, pal.swatches, pal.bg, pal.weights ?? null, w, h, p.mode === 'FIELD' ? null : [p.kin, p.movers]]);
 
 function buildGrid(p, pal, bw, bh) {
   const tileW = bw / p.density;
@@ -82,7 +84,9 @@ export function createPatternFrames() {
       const k = staticKey(p, pal, bw, bh);
       if (k !== sKey) {
         const { tileW, grid } = buildGrid(p, pal, bw, bh);
-        plan = { tileW, grid, quilt: p.mode === 'QUILT' ? createQuiltRaster(grid, bw, bh, tileW, p.grout) : null };
+        // #1137: the seeded few elements that carry a KINEME motion (null = none, the picture as it was)
+        const movers = p.mode === 'QUILT' ? quiltMoverMap(grid, p.seed, p.kin, p.movers) : p.mode === 'GLYPH' ? glyphMoverMap(grid, p.seed, p.kin, p.movers) : null;
+        plan = { tileW, grid, movers, quilt: p.mode === 'QUILT' ? createQuiltRaster(grid, bw, bh, tileW, p.grout, movers) : null };
         sKey = k; still = null;
         if (!out || out.length !== bw * bh) out = new Uint32Array(bw * bh);
       }
@@ -96,7 +100,7 @@ export function createPatternFrames() {
         return { pixels: still, w: bw, h: bh, key };
       }
       if (p.mode === 'QUILT') plan.quilt.draw(out, p.drift, t);
-      else if (p.mode === 'GLYPH') rasterGlyph(out, bw, bh, plan.grid, p.drift, t);
+      else if (p.mode === 'GLYPH') rasterGlyph(out, bw, bh, plan.grid, p.drift, t, plan.movers);
       else rasterField(out, bw, bh, plan.grid, plan.tileW, panOffset(p.seed, p.drift, t));
       return { pixels: out, w: bw, h: bh, key };
     },

@@ -12,6 +12,7 @@ import { TILE_MOTIFS, HERO_MOTIFS, sampleQuilt, quiltSampler, quiltParams } from
 import { GLYPH_MARKS, FILLED_MARKS, RHYTHM_MARKS, POSES, MIN_STROKE, MARK_BOX, buildMark, sampleMark, motifRoles } from './glyph.js';
 import { rankedSwatches } from '../data/swatchWeights.js';
 import { motion, glyphPulse, fieldPan, QUILT_ROTATING, FIELD_PAN_TILES_PER_S } from './motion.js';
+import { pickMovers, elementXform, isRest } from './elements.js'; // #1137: KINEME motion per element
 
 export { FIELD_PAN_TILES_PER_S }; // the pan speed lives in motion.js now (#1042)
 
@@ -307,7 +308,7 @@ export function onGrout(grid, X, Y, grout) {
 }
 
 /** Which motif covers tile-space point (X, Y): a hero block or the 1×1 tile. */
-function quiltCell(grid, X, Y, rot = null) {
+function quiltCell(grid, X, Y, rot = null, xf = null) {
   const c = Math.min(grid.cols - 1, Math.max(0, Math.floor(X)));
   const r = Math.min(grid.rows - 1, Math.max(0, Math.floor(Y)));
   const hi = grid.heroAt[r * grid.cols + c];
@@ -320,20 +321,61 @@ function quiltCell(grid, X, Y, rot = null) {
   // DRIFT (#1042): only the motif art turns, about the tile center. A tile's ground is the
   // frame itself, so no corner can show through; the art is sampled, not clipped, and the
   // pinwheel fills the whole plane, so its corners stay motif-colored at any angle.
-  const a = rot && QUILT_ROTATING.includes(tile.pattern) ? rot[at] : 0;
-  if (a) {
+  // #1137 — an element that carries a KINEME motion also takes its own transform: it turns (SPIN / ROCK, only art drawn
+  // to turn), breathes (PULSE), drops out (BLINK) or bobs (BOB). Pulse and bob sample past the tile's own square, which
+  // is the ground, so the art shrinks into its frame instead of smearing. No element transform: the code below is the
+  // original path, number for number.
+  const turns = QUILT_ROTATING.includes(tile.pattern);
+  const x = xf ? xf.get(at) : null;
+  if (x && !x.vis) return { tile, u, v, ground: true };
+  const a = turns ? (rot ? (x ? rot[at] + x.a : rot[at]) : (x ? x.a : 0)) : 0;
+  const moved = !!x && (x.s !== 1 || x.dy !== 0);
+  if (a || moved) {
     const cs = Math.cos(a); const sn = Math.sin(a);
-    const dx = u - 0.5; const dy = v - 0.5;
+    let dx = u - 0.5; let dy = v - 0.5;
+    if (moved) { dx /= x.s; dy = (dy - x.dy) / x.s; }
     u = 0.5 + dx * cs + dy * sn; v = 0.5 - dx * sn + dy * cs;
+    if (moved && (u < 0 || u >= 1 || v < 0 || v >= 1)) return { tile, u, v, ground: true };
   }
   return { tile, u, v };
 }
 
 /** The palette color of the quilt at tile-space point (X, Y). `rot` = per-cell angles (radians), as rasterQuilt takes them. */
-export function quiltColorAt(grid, X, Y, grout = 0, rot = null) {
+export function quiltColorAt(grid, X, Y, grout = 0, rot = null, xf = null) {
   if (onGrout(grid, X, Y, grout)) return grid.ground;
-  const { tile, u, v } = quiltCell(grid, X, Y, rot);
-  return tile.colors[sampleQuilt(tile.pattern, u, v, tile.params)];
+  const { tile, u, v, ground } = quiltCell(grid, X, Y, rot, xf);
+  return ground ? tile.colors[0] : tile.colors[sampleQuilt(tile.pattern, u, v, tile.params)];
+}
+
+/** Every element of a quilt: each 1x1 tile not under a hero, and each hero block, with its anchor cell index `at`. */
+function quiltElementList(grid) {
+  const out = [];
+  grid.tiles.forEach((tl, i) => { if (grid.heroAt[i] === -1) out.push({ tile: tl, c: i % grid.cols, r: (i / grid.cols) | 0, span: 1, at: i }); });
+  grid.heroes.forEach((h) => out.push({ tile: h, c: h.c, r: h.r, span: 2, at: h.r * grid.cols + h.c }));
+  return out;
+}
+
+/**
+ * #1137 — which quilt elements carry a KINEME motion (Map at -> {kind, phase}), or null for none. A pure function of
+ * (grid, seed, kin, movers): only a seeded share moves, and rotating kinds go only to art drawn to turn.
+ */
+export function quiltMoverMap(grid, seed, kin, movers) {
+  if (!kin || kin === 'OFF') return null;
+  const cands = quiltElementList(grid).map((e) => ({ at: e.at, turns: QUILT_ROTATING.includes(e.tile.pattern) }));
+  const m = pickMovers(seed, kin, movers, cands);
+  return m.size ? m : null;
+}
+
+/** The frame's element transforms (Map at -> {a, s, vis, dy}), only the ones that are not at rest; null when none. */
+function quiltXforms(movers, drift, t) {
+  if (!movers || !(drift > 0)) return null;
+  let out = null;
+  for (const [at, mv] of movers) {
+    const x = elementXform(mv, drift, t);
+    if (isRest(x)) continue;
+    (out ||= new Map()).set(at, x);
+  }
+  return out;
 }
 
 /** Per-cell rotation angles for a frame, or null when nothing moves. */
@@ -347,15 +389,16 @@ function quiltAngles(grid, drift, t) {
  * spec (draw order: tiles to the full rect, heroes over their cells, grout last). Slow (it allocates per
  * pixel). rasterQuilt is the fast one and is proven pixel-identical to this (quilt.selfcheck, rasterFast.selfcheck).
  */
-export function rasterQuiltReference(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0) {
+export function rasterQuiltReference(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0, movers = null) {
   const rot = quiltAngles(grid, drift, t);
+  const xf = quiltXforms(movers, drift, t);
   for (let y = 0; y < bh; y++) {
     const Y = (y + 0.5) / tileW;
     for (let x = 0; x < bw; x++) {
       const X = (x + 0.5) / tileW;
       if (onGrout(grid, X, Y, grout)) { buf[y * bw + x] = grid.groundRgba; continue; }
-      const { tile, u, v } = quiltCell(grid, X, Y, rot);
-      buf[y * bw + x] = tile.rgba[sampleQuilt(tile.pattern, u, v, tile.params)];
+      const { tile, u, v, ground } = quiltCell(grid, X, Y, rot, xf);
+      buf[y * bw + x] = ground ? tile.rgba[0] : tile.rgba[sampleQuilt(tile.pattern, u, v, tile.params)];
     }
   }
   return buf;
@@ -398,20 +441,34 @@ function quiltPlan(grid, bw, bh, tileW, grout) {
 const ROT_SET = new Set(QUILT_ROTATING);
 
 /** Paint one tile (span 1) or one hero (span 2) into the pixel rect it owns, turned by `a` radians. */
-function quiltPaint(buf, plan, tile, c0, r0, span, a) {
+function quiltPaint(buf, plan, tile, c0, r0, span, a, el = null) {
   const xs = plan.colA[c0]; const xe = plan.colB[c0 + span - 1];
   const ys = plan.rowA[r0]; const ye = plan.rowB[r0 + span - 1];
   if (xs < 0 || ys < 0) return; // this cell is past the bottom or right of the frame
   const fn = quiltSampler(tile.pattern); const params = tile.params; const rgba = tile.rgba;
   const { Xf, Yf, bw } = plan;
-  const turn = a !== 0 && ROT_SET.has(tile.pattern);
-  const cs = turn ? Math.cos(a) : 1; const sn = turn ? Math.sin(a) : 0;
+  const ground = rgba[0];
+  // #1137 — the element's own KINEME transform (see quiltCell, whose numbers this repeats)
+  if (el && !el.vis) {
+    for (let y = ys; y < ye; y++) buf.fill(ground, y * bw + xs, y * bw + xe);
+    return;
+  }
+  const rotates = ROT_SET.has(tile.pattern);
+  const at = rotates ? (el ? a + el.a : a) : 0;
+  const moved = !!el && (el.s !== 1 || el.dy !== 0);
+  const turn = at !== 0 && rotates;
+  const cs = turn || moved ? Math.cos(at) : 1; const sn = turn || moved ? Math.sin(at) : 0;
   for (let y = ys; y < ye; y++) {
     const v0 = span === 2 ? (Yf[y] - r0) / 2 : Yf[y] - r0;
     const row = y * bw;
     for (let x = xs; x < xe; x++) {
       let u = span === 2 ? (Xf[x] - c0) / 2 : Xf[x] - c0; let v = v0;
-      if (turn) { const dx = u - 0.5; const dy = v - 0.5; u = 0.5 + dx * cs + dy * sn; v = 0.5 - dx * sn + dy * cs; }
+      if (turn || moved) {
+        let dx = u - 0.5; let dy = v - 0.5;
+        if (moved) { dx /= el.s; dy = (dy - el.dy) / el.s; }
+        u = 0.5 + dx * cs + dy * sn; v = 0.5 - dx * sn + dy * cs;
+        if (moved && (u < 0 || u >= 1 || v < 0 || v >= 1)) { buf[row + x] = ground; continue; }
+      }
       buf[row + x] = rgba[fn(u, v, params)];
     }
   }
@@ -441,17 +498,18 @@ function quiltMovers(grid) {
  * Rasterize the quilt into a Uint32Array (RGBA, little-endian) of bw × bh. Same pixels as
  * rasterQuiltReference. Draw order is the spec's: tiles, heroes over their cells, grout last.
  */
-export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0) {
+export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0, movers = null) {
   const rot = quiltAngles(grid, drift, t);
+  const xf = quiltXforms(movers, drift, t);
   const plan = quiltPlan(grid, bw, bh, tileW, grout);
   const { cols, rows, tiles, heroes, heroAt } = grid;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c;
-      if (heroAt[i] === -1) quiltPaint(buf, plan, tiles[i], c, r, 1, rot ? rot[i] : 0);
+      if (heroAt[i] === -1) quiltPaint(buf, plan, tiles[i], c, r, 1, rot ? rot[i] : 0, xf ? xf.get(i) : null);
     }
   }
-  for (const h of heroes) quiltPaint(buf, plan, h, h.c, h.r, 2, rot ? rot[h.r * cols + h.c] : 0);
+  for (const h of heroes) quiltPaint(buf, plan, h, h.c, h.r, 2, rot ? rot[h.r * cols + h.c] : 0, xf ? xf.get(h.r * cols + h.c) : null);
   quiltGrout(buf, plan, grid, 0, bw, 0, bh);
   return buf;
 }
@@ -461,21 +519,27 @@ export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 
  * quilt moves, so a frame is: copy the still picture, repaint the few pinwheels and medallions at their angle,
  * lay their grout again. `draw(out, drift, t)` returns `out`, pixel-identical to rasterQuilt for that frame.
  */
-export function createQuiltRaster(grid, bw, bh, tileW, grout = 0) {
+export function createQuiltRaster(grid, bw, bh, tileW, grout = 0, kinMovers = null) {
   const base = new Uint32Array(bw * bh);
   rasterQuilt(base, bw, bh, grid, tileW, grout, 0, 0);
   const plan = quiltPlan(grid, bw, bh, tileW, grout);
-  const movers = quiltMovers(grid);
+  // The elements that can differ from the still picture: the pinwheels and medallions DRIFT turns, and (#1137) the
+  // seeded few that carry a KINEME motion. Everything else is the base, copied.
+  const turning = quiltMovers(grid);
+  const seen = new Set(turning.map((m) => m.at));
+  const movers = [...turning, ...(kinMovers ? quiltElementList(grid).filter((e) => kinMovers.has(e.at) && !seen.has(e.at)) : [])];
   return {
     base, movers: movers.length,
     draw(out, drift, t) {
       const rot = quiltAngles(grid, drift, t);
+      const xf = quiltXforms(kinMovers, drift, t);
       out.set(base);
-      if (!rot) return out;
+      if (!rot && !xf) return out;
       for (const m of movers) {
-        const a = rot[m.at];
-        if (a === 0) continue;
-        quiltPaint(out, plan, m.tile, m.c, m.r, m.span, a);
+        const a = rot ? rot[m.at] : 0;
+        const x = xf ? xf.get(m.at) || null : null;
+        if (!x && (a === 0 || !ROT_SET.has(m.tile.pattern))) continue;
+        quiltPaint(out, plan, m.tile, m.c, m.r, m.span, a, x);
         quiltGrout(out, plan, grid, plan.colA[m.c], plan.colB[m.c + m.span - 1], plan.rowA[m.r], plan.rowB[m.r + m.span - 1]);
       }
       return out;
@@ -597,7 +661,7 @@ export function glyphLayout(grid, bw, bh) {
  * never enters the mark box, and a mark never reaches a seam (72% of the tile
  * at most). Ground on ground draws nothing, so there is nothing to draw.
  */
-export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0) {
+export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0, movers = null) {
   const { cols, rows, tiles, groundRgba } = grid;
   const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
   const count = cols * rows;
@@ -606,8 +670,12 @@ export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0) {
   // so each tile samples just its own box. Same pixels as walking the whole frame, a fraction of the work (#1101).
   for (let i = 0; i < count; i++) {
     const c = i % cols; const r = (i / cols) | 0;
-    const scale = glyphScale(i, count, drift, t);
-    const half = MARK_BOX * scale * tile;
+    // #1137 — this glyph's own KINEME transform (null: the original path, number for number)
+    const xe = movers && drift > 0 ? glyphXform(movers.get(i), drift, t) : null;
+    if (xe && !xe.vis) continue; // blinked out: the ground shows
+    const scale = xe ? glyphScale(i, count, drift, t) * xe.s : glyphScale(i, count, drift, t);
+    // a turned mark needs the diagonal of its box; a bobbing one reaches |dy| tiles further down or up
+    const half = MARK_BOX * scale * tile * (xe && xe.a !== 0 ? Math.SQRT2 : 1) + (xe ? Math.abs(xe.dy) * tile : 0);
     const cx = x0 + (c + 0.5) * tile; const cy = y0 + (r + 0.5) * tile;
     const xa = Math.max(0, Math.floor(cx - half) - 1); const xb = Math.min(bw - 1, Math.ceil(cx + half) + 1);
     const ya = Math.max(0, Math.floor(cy - half) - 1); const yb = Math.min(bh - 1, Math.ceil(cy + half) + 1);
@@ -618,7 +686,7 @@ export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0) {
       for (let x = xa; x <= xb; x++) {
         const gx = (x + 0.5 - x0) / tile;
         if (Math.floor(gx) !== c) continue;
-        const role = sampleMark(tl.ops, gx - c - 0.5, gy - r - 0.5, scale);
+        const role = xe ? sampleMarkXf(tl.ops, gx - c - 0.5, gy - r - 0.5, scale, xe) : sampleMark(tl.ops, gx - c - 0.5, gy - r - 0.5, scale);
         if (role) buf[y * bw + x] = tl.rgba[role];
       }
     }
@@ -626,19 +694,47 @@ export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0) {
   return buf;
 }
 
+/**
+ * #1137 — which glyphs carry a KINEME motion (Map tile index -> {kind, phase}), or null for none. Every glyph is drawn
+ * to be turned, so every kind is open to every glyph; only a seeded share moves.
+ */
+export function glyphMoverMap(grid, seed, kin, movers) {
+  if (!kin || kin === 'OFF') return null;
+  const m = pickMovers(seed, kin, movers, grid.tiles.map((_, i) => ({ at: i, turns: true })));
+  return m.size ? m : null;
+}
+
+/** A glyph's element transform at (drift, t), or null at rest. */
+function glyphXform(mv, drift, t) {
+  if (!mv) return null;
+  const x = elementXform(mv, drift, t);
+  return isRest(x) ? null : x;
+}
+
+/** sampleMark through a glyph's element transform: offset down by dy tiles, then turn by a about the mark's center. */
+function sampleMarkXf(ops, lx, ly, scale, xe) {
+  const dy = ly - xe.dy;
+  if (xe.a === 0) return sampleMark(ops, lx, dy, scale);
+  const cs = Math.cos(xe.a); const sn = Math.sin(xe.a);
+  return sampleMark(ops, lx * cs + dy * sn, -lx * sn + dy * cs, scale);
+}
+
 /** The REFERENCE glyph raster: every pixel of the frame, one at a time. rasterGlyph is proven identical to it. */
-export function rasterGlyphReference(buf, bw, bh, grid, drift = 0, t = 0) {
+export function rasterGlyphReference(buf, bw, bh, grid, drift = 0, t = 0, movers = null) {
   const { cols, rows, tiles, groundRgba } = grid;
   const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
   const count = cols * rows;
-  const scales = tiles.map((_, i) => glyphScale(i, count, drift, t));
+  const xes = tiles.map((_, i) => (movers && drift > 0 ? glyphXform(movers.get(i), drift, t) : null));
+  const scales = tiles.map((_, i) => (xes[i] ? glyphScale(i, count, drift, t) * xes[i].s : glyphScale(i, count, drift, t)));
   for (let y = 0; y < bh; y++) {
     const gy = (y + 0.5 - y0) / tile; const r = Math.floor(gy);
     for (let x = 0; x < bw; x++) {
       const gx = (x + 0.5 - x0) / tile; const c = Math.floor(gx);
       if (c < 0 || c >= cols || r < 0 || r >= rows) { buf[y * bw + x] = groundRgba; continue; }
       const i = r * cols + c;
-      const role = sampleMark(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i]);
+      const xe = xes[i];
+      if (xe && !xe.vis) { buf[y * bw + x] = groundRgba; continue; }
+      const role = xe ? sampleMarkXf(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i], xe) : sampleMark(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i]);
       buf[y * bw + x] = role ? tiles[i].rgba[role] : groundRgba;
     }
   }
