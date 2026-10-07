@@ -222,9 +222,9 @@ ok('a project with no pattern track is untouched: normalize output is identical 
   assert.ok(layers.every((l) => !('pattern' in l)));
 });
 
-ok('a PATTERN track resolves to nothing until the renderer draws it (#1098): liveResolve skips it', () => {
+ok('a PATTERN track never takes the KC content path: liveResolve gives it its own entry (#1098 draws it)', () => {
   const src = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
-  assert.match(src, /if \(layer\.type === 'pattern'\) continue;/);
+  assert.match(src, /if \(layer\.type === 'pattern'\) \{[\s\S]*?isPattern: true[\s\S]*?continue;\s*\}/);
 });
 
 console.log(`patternTrack.selfcheck: ${n} checks passed`);

@@ -375,9 +375,24 @@ export function createLiveResolver() {
 
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
-      // #1097 — a PATTERN track is not a KC track: it has no snapshot, so the content path below would
-      // draw a phantom copy of the active KC. #1098 draws it; until then it resolves to nothing.
-      if (layer.type === 'pattern') continue;
+      // #1097/#1098 — a PATTERN track is not a KC track: it has no snapshot (the content path below
+      // would draw a phantom copy of the active KC), so it resolves here, to its own block and the
+      // ACTIVE palette. It is drawn by the renderer as one generated texture.
+      if (layer.type === 'pattern') {
+        out.push({
+          id: layer.id,
+          isPattern: true,
+          layer,
+          pattern: layer.pattern,
+          palette: resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
+          t: (input.loopTimeMs ?? 0) / 1000,
+          layerBlendMode: layer.layerBlendMode || 'normal',
+          layerOpacity: layer.layerOpacity ?? 1,
+          layoutParams: {},
+          items: [],
+        });
+        continue;
+      }
       if (isFxLayer(layer) || isMathLayer(layer)) {
         // #1010 — MATH tracks ride the same adjustment-layer fold as FX.
         // soloGrade marks a soloed MATH track: the renderer seeds its wrap

@@ -153,6 +153,16 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
       if (isFxLayer(layer)) {
         return { id: layer.id, isFx: true, layer, layerOpacity: layer.layerOpacity ?? 1 };
       }
+      // #1098 — a PATTERN track draws from its own block and the ACTIVE palette, not a snapshot.
+      if (layer.type === 'pattern') {
+        return {
+          id: layer.id, isPattern: true, layer, pattern: layer.pattern,
+          palette: resolvePalette(doc.paletteId || 'praystation', doc.paletteOverrides || null),
+          t: Number(doc.patternTime) || 0,
+          layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1,
+          layoutParams: { ...DEFAULT_LAYOUT_PARAMS }, items: [],
+        };
+      }
       const isActive = layer.id === '__single' || layer.id === doc.activeLayerId;
       const src = isActive ? topLevelSource(doc) : (snapshots[layer.id] || topLevelSource(doc));
 
