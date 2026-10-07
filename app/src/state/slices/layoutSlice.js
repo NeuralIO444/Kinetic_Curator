@@ -20,6 +20,8 @@ import { ASSETS } from '../../data/assets/index.js';
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
+import { rollPatternLayers } from '../../pattern/patternRoll.js'; // PATTERN is part of the KIN and CURATOR systems
+import { mkRng } from '../../engine/prng.js';
 
 /** One honest die for #942's naive roll — every result lands in serialized state. */
 const die = (n) => (Math.random() * n) | 0;
@@ -615,8 +617,12 @@ export const createLayoutSlice = (set) => ({
     }
     const { index } = pickCurated(candidates, curator, rng);
     if (index < 0) return {};
+    // PATTERN tracks are curated too, on their own seeded stream keyed by the same (seed, press #): the same press
+    // deals the same patterns again. (The taste engine scores layout params, not patterns: this is seeded dice.)
+    const pat = rollPatternLayers(state.layers, 'curate', rngForIndex(state.seed, CH.curate, press + 0x10000, state.seedOffsets));
     return {
-      ...pushToUndo(state, true),
+      ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
+      ...(pat.changed ? { layers: pat.layers } : {}),
       layoutParams: candidates[index],
       curatePress: press + 1,
       // Honest flag: if any chain had no row for the current value this press
@@ -708,6 +714,13 @@ export const createLayoutSlice = (set) => ({
       return l;
     });
 
+    // PATTERN tracks are dealt too, from a stream derived from this roll's seed (so a roll stays one seeded event),
+    // and with none on the page a chaos roll may add one (patternRoll.js).
+    layers = rollPatternLayers(layers, 'chaos', mkRng(((seed ^ 0x51ed270b) >>> 0) || 1), {
+      canAdd: !isTapeFull({ ...state, layers }),
+      makeId: () => `pt-${seed.toString(36)}`,
+    }).layers;
+
     return {
       ...undo,
       seed,
@@ -754,7 +767,10 @@ export const createLayoutSlice = (set) => ({
    * kineticRoll stays for #945's heat ceiling.
    */
   kineticRulesPass: () => set((state) => {
-    const undo = pushToUndo(state, true);
+    // PATTERN tracks join the pass: a new tessellation of the same kind. The roll's own entry is a whole-document
+    // one when it touched a layer, an edit one otherwise (as before).
+    const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
+    const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
 
     // #952 — every KIN tap deals a new palette from the full pool
     // (37 system + saved user palettes), never the one already up.
@@ -784,6 +800,7 @@ export const createLayoutSlice = (set) => ({
 
     const next = {
       ...undo,
+      ...(pat.changed ? { layers: pat.layers } : {}),
       paletteId,
       paletteOverrides: null,
       paletteLocks: {},
@@ -816,7 +833,9 @@ export const createLayoutSlice = (set) => ({
    * from the stored state + seed (#710), not from the pass itself.
    */
   kineticWeatherPass: () => set((state) => {
-    const undo = pushToUndo(state, true);
+    // PATTERN tracks join the pass: same picture, the air moves (DRIFT and MIX nudge; a still pattern stays still).
+    const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
+    const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
 
     // 1. Palette weather — a different sky, never the one already up. Rolls
     // from the full pool (#952: all 37 system palettes + saved user palettes).
@@ -842,6 +861,7 @@ export const createLayoutSlice = (set) => ({
 
     return {
       ...undo,
+      ...(pat.changed ? { layers: pat.layers } : {}),
       paletteId,
       paletteOverrides: null,
       paletteLocks: {},
