@@ -111,5 +111,6 @@ export const Events = {
   PALETTE_IMPORT: 'palette:import',
   PALETTE_LOCK: 'palette:lock',
   PALETTE_HARMONY: 'palette:harmony',
+  ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
 };

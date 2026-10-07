@@ -10,6 +10,7 @@ import { FX_MENU_KINDS, defaultFxParams, isFxLayer } from './fxFilters.js';
 import { BLEND_MODES, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { useStore } from '../state/store.js';
 import { isMathLayer } from './mathFilters.js';
+import { frameHealth, isDeadFrame } from './frameHealth.js';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -66,21 +67,8 @@ const luma = (px) => {
   return { mean: l.reduce((a, v) => a + v, 0) / l.length, range: q(0.95) - q(0.05) };
 };
 
-// "Ink": everything noticeably different from the background (the most common colour). A dead frame has
-// almost no ink, or ink that sits within a hair of the background's brightness (pale on pale, dark on dark).
-const ink = (px) => {
-  const h = new Map();
-  for (let i = 0; i < px.length; i += 4) { const k = (px[i] >> 3) * 1024 + (px[i + 1] >> 3) * 32 + (px[i + 2] >> 3); h.set(k, (h.get(k) || 0) + 1); }
-  const [bk] = [...h.entries()].sort((a, b) => b[1] - a[1])[0];
-  const br = ((bk >> 10) << 3) + 4; const bgc = (((bk >> 5) & 31) << 3) + 4; const bb = ((bk & 31) << 3) + 4;
-  const bl = (0.2126 * br + 0.7152 * bgc + 0.0722 * bb) / 255;
-  let n = 0; let gap = 0;
-  for (let i = 0; i < px.length; i += 4) {
-    if (Math.abs(px[i] - br) + Math.abs(px[i + 1] - bgc) + Math.abs(px[i + 2] - bb) <= 36) continue;
-    n += 1; gap += Math.abs((0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255 - bl);
-  }
-  return { coverage: n / (px.length / 4), lumaGap: n ? gap / n : 0 };
-};
+// The measure is shared with the live roll guard (fx/frameHealth.js, #1107): one definition of a dead frame.
+const ink = (px) => frameHealth(px);
 
 try {
   const { renderCandidate, closeCandidate } = await import('../gl/candidate.mjs');
@@ -144,7 +132,34 @@ try {
     assert.deepEqual(bad, [], `dead frames:\n${bad.join('\n')}`);
     gaps.sort((a, b) => a - b);
     assert.ok(gaps[Math.floor(gaps.length / 2)] >= 0.25, `median ink gap ${gaps[Math.floor(gaps.length / 2)].toFixed(2)}`);
-    console.log(`    info: ${dim} of ${judged} rolls are dim-on-dark (ink gap < 0.15) — tracked in #1107`);
+    console.log(`    info: ${dim} of ${judged} unguarded rolls are dim-on-dark (ink gap < 0.15)`);
+  });
+  // #1107: the live guard. Same rolls, but a dead frame is dealt again (up to MAX_REDEALS) like the app does.
+  await okA('the guard: re-dealing dead frames leaves (almost) no dead roll standing, on every palette', async () => {
+    Math.random = mulberry32(777);
+    const { MAX_REDEALS } = await import('./rollGuard.js');
+    const GROWS = new Set(['dla', 'eden', 'ca', 'swarm', 'hype']);
+    const look = async () => frameHealth((await renderCandidate({ doc: serializeProject(useStore.getState()) }, { width: 96 })).pixels);
+    let judged = 0; let rawDead = 0; let guardedDead = 0; let redeals = 0;
+    try {
+      for (let i = 0; i < 120 && judged < 40; i++) {
+        useStore.getState().kineticRoll();
+        if (GROWS.has(useStore.getState().layoutParams.mode)) continue;
+        judged += 1;
+        let h = await look();
+        if (isDeadFrame(h)) rawDead += 1;
+        for (let k = 0; isDeadFrame(h) && k < MAX_REDEALS; k++) {
+          useStore.getState().undo(); useStore.getState().kineticRoll(); redeals += 1;
+          if (GROWS.has(useStore.getState().layoutParams.mode)) break;
+          h = await look();
+        }
+        if (isDeadFrame(h) && !GROWS.has(useStore.getState().layoutParams.mode)) guardedDead += 1;
+      }
+    } finally { Math.random = realRandom; }
+    console.log(`    info: ${judged} rolls, ${rawDead} dead as dealt, ${guardedDead} still dead after the guard (${redeals} re-deals)`);
+    assert.ok(judged >= 30);
+    assert.ok(guardedDead <= Math.max(1, Math.floor(judged * 0.05)), `${guardedDead} of ${judged} still dead after the guard`);
+    assert.ok(guardedDead <= rawDead);
   });
   await closeCandidate();
 } catch (e) {

@@ -1,6 +1,7 @@
 // Debounced project autosave + boot restore (#33).
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
+import { Events, emit } from '../composition/eventBus.js';
 import {
   serializeProject,
   writePipelineAutosave,
@@ -44,6 +45,7 @@ function applyStartupChaos() {
   const st = useStore.getState();
   st.kineticRoll();
   st.setRunning(true);
+  emit(Events.ROLL_GUARD, { kind: 'chaos' }); // #1107: the cold-open roll is judged like any other
 }
 
 // Module-scope once-guard: the `restored` ref below already makes the boot
