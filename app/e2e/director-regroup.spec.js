@@ -3,7 +3,7 @@
 // generation counting itself is selfchecked: it depends on real time + the governor).
 import { test, expect } from '@playwright/test';
 
-test('DIRECTOR: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE progress', async ({ page }) => {
+test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE progress', async ({ page }) => {
   await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });

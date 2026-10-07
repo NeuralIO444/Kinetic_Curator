@@ -1,4 +1,4 @@
-// #1031 (M6): one density scale. STIMULI matrix, PIPELINE and DIRECTOR rules use only
+// #1031 (M6): one density scale. STIMULI matrix, PIPELINE and DIRECTORS rules use only
 // the 2/4/6/8/12/16/24 gaps; the route row is 44px, the matrix header and PIPELINE rows 28px.
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
