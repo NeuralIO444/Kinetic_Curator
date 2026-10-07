@@ -215,12 +215,16 @@ export function warnUnsupportedMaterials(resolvedLayers) {
   }
 }
 
+/** #1127 — a layer's ROTATE spin in rev/s: finite, 0..1, anything else is still. */
+const spinOf = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0; };
+
 export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = null }) {
   if (!doc || typeof doc !== 'object') throw new TypeError('buildSceneContract: doc required');
   if (!Array.isArray(resolvedLayers)) throw new TypeError('buildSceneContract: resolvedLayers required');
 
   const layers = [];
   const instances = [];
+  const spinning = new Map(); // #1127: instance -> ROTATE spin (rev/s) of its layer
   const assetIds = new Set();
   // Doc layers are looked up by id for fields resolveLayers() doesn't
   // forward (matte); the app model itself is untouched (#189).
@@ -291,9 +295,12 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         hueRotate: Number(rl.layoutParams?.hueRotate) || 0,
       },
     });
+    const layerSpin = spinOf(rl.layoutParams?.rotateSpin);
     for (const item of rl.items || []) {
       assetIds.add(String(item.assetId));
-      instances.push(toInstance(item, layerId, itemBlend));
+      const inst = toInstance(item, layerId, itemBlend);
+      if (layerSpin) spinning.set(inst, layerSpin);
+      instances.push(inst);
     }
   }
 
@@ -302,12 +309,15 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
   // the motion time ride on the contract ONLY when something moves, so every
   // motionless contract (and its hash) is exactly what it was before.
   const kinemeFields = (() => {
-    const map = sanitizeAssetKineme(doc.assetKineme);
-    if (!map) return {};
+    const map = sanitizeAssetKineme(doc.assetKineme) || {};
     const table = [];
     const slot = new Map();
     for (const inst of instances) {
-      const k = getKineme(map[inst.asset]);
+      // #1127 — an asset with its own kineme keeps it; every other mark takes the layer's ROTATE spin, if it has one.
+      // Phase 0 (not the per-instance hash): at motion time 0 the mark sits exactly on its static angle.
+      const rev = spinning.get(inst);
+      const own = getKineme(map[inst.asset]);
+      const k = own || (rev ? { id: `rotate-spin@${rev}`, kind: 'spin', period: 1 / rev, amp: 0 } : null);
       if (!k) continue;
       if (!slot.has(k.id)) {
         if (table.length >= KINEME_TABLE_MAX) continue; // ponytail: 16-slot cap; a bigger library needs a texture table
@@ -315,7 +325,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         table.push({ kind: KINEME_KINDS[k.kind], period: k.period, amp: k.amp });
       }
       inst.kineme = slot.get(k.id);
-      inst.kinemePhase = kinemePhase(inst.seedOffset, inst.key);
+      inst.kinemePhase = own ? kinemePhase(inst.seedOffset, inst.key) : 0;
     }
     if (!table.length) return {};
     const t = Number(doc.kinemeTime);
