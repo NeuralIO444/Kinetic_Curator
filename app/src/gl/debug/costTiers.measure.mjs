@@ -22,15 +22,15 @@
  * stale file is recognizable.
  */
 import http from 'node:http';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { glStaticHandler } from '../parity/glStaticServer.mjs';
 
 const DEBUG_DIR = path.dirname(fileURLToPath(import.meta.url));
 const GL_DIR = path.join(DEBUG_DIR, '..');
 const OUT_FILE = path.join(GL_DIR, 'effects', 'measuredCosts.mjs');
-const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript' };
 
 // Must match measureCosts.mjs (duplicated here so the driver doesn't have
 // to evaluate page-side constants before the measurer exists).
@@ -44,18 +44,7 @@ function median(xs) {
 }
 
 async function main() {
-  const server = http.createServer(async (req, res) => {
-    try {
-      const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-      const file = path.normalize(path.join(GL_DIR, urlPath));
-      if (!file.startsWith(GL_DIR)) { res.writeHead(403); res.end(); return; }
-      const data = await readFile(file);
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
-      res.end(data);
-    } catch {
-      res.writeHead(404); res.end('nf');
-    }
-  });
+  const server = http.createServer(glStaticHandler(GL_DIR));
 
   let browser = null;
   try {

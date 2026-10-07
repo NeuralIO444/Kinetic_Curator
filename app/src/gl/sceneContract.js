@@ -28,6 +28,8 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
 import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme } from '../data/kinemes.js';
 import { resolvePalette } from '../data/palettes.js';
+import { sanitizePattern } from '../state/patternTrack.js';
+import { patternPalette } from '../pattern/patternSource.js';
 
 export const GL_CONTRACT_VERSION = 1;
 
@@ -256,6 +258,24 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       });
       continue;
     }
+    if (rl.isPattern) {
+      // #1098 — a PATTERN track: no instances, one generated texture. It composites like a content
+      // track (blend, opacity, matte, the FX fold above it). `t` rides the block ONLY while it
+      // drifts, so a static pattern's contract and hash do not change from frame to frame.
+      const pattern = sanitizePattern(rl.pattern);
+      layers.push({
+        id: String(rl.id),
+        name: String(rl.layer?.name ?? rl.id),
+        type: 'pattern',
+        visible: true,
+        opacity: clamp01(rl.layerOpacity ?? 1),
+        blend: KNOWN_BLENDS.has(rl.layerBlendMode) ? rl.layerBlendMode : 'normal',
+        matte: sanitizeMatte(docLayerById.get(String(rl.id))?.matte),
+        pattern: pattern.drift > 0 ? { ...pattern, t: Number.isFinite(Number(rl.t)) ? Math.round(Number(rl.t) * 1000) / 1000 : 0 } : pattern,
+        palette: patternPalette(rl.palette),
+      });
+      continue;
+    }
     const layerId = String(rl.id);
     const itemBlend = rl.layoutParams?.blendMode || 'normal';
     layers.push({
@@ -390,7 +410,11 @@ export function assertSceneContract(scene) {
   for (const l of scene.layers) {
     if (!l.id || layerIds.has(l.id)) fail(`duplicate or missing layer id: ${l.id}`);
     layerIds.add(l.id);
-    if (l.type !== 'content' && l.type !== 'fx' && l.type !== 'math') fail(`layer ${l.id}: bad type ${l.type}`);
+    if (l.type !== 'content' && l.type !== 'fx' && l.type !== 'math' && l.type !== 'pattern') fail(`layer ${l.id}: bad type ${l.type}`);
+    if (l.type === 'pattern') {
+      if (!l.pattern || typeof l.pattern !== 'object') fail(`pattern layer ${l.id}: pattern block required`);
+      if (!l.palette || !Array.isArray(l.palette.swatches)) fail(`pattern layer ${l.id}: palette required`);
+    }
     if (l.matte !== null && l.matte !== undefined) {
       const m = l.matte;
       if (typeof m !== 'object' || typeof m.sourceId !== 'string' || !m.sourceId) {

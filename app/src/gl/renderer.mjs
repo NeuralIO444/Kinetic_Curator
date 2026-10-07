@@ -44,6 +44,7 @@ import { attachVelocities } from './velocitySmear.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { registerMathShaders, applyMathMod } from './effects/mathShaders.mjs';
+import { patternKey, patternBytesGL } from '../pattern/patternSource.js'; // #1098: a PATTERN track's frame
 
 // #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
@@ -593,6 +594,35 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   }
 
   /** Frame targets (16F premultiplied; RGBA8 for final output). */
+  // #1098 — one texture per PATTERN track, re-uploaded only when its frame changes. A static pattern
+  // (DRIFT 0) uploads once and is reused every frame; `patternKey` is what decides.
+  const patternTex = new Map(); // layerId -> { tex, key }
+  let patternSeen = new Set();
+  function patternTexture(layer, w, h) {
+    patternSeen.add(layer.id);
+    const key = patternKey(layer.pattern, layer.palette, w, h, layer.pattern.t);
+    let e = patternTex.get(layer.id);
+    if (!e) {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      e = { tex, key: null };
+      patternTex.set(layer.id, e);
+    }
+    if (e.key !== key) {
+      gl.bindTexture(gl.TEXTURE_2D, e.tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, patternBytesGL(layer.pattern, layer.palette, w, h, layer.pattern.t));
+      e.key = key;
+    }
+    return e.tex;
+  }
+  function sweepPatternTextures() {
+    for (const [id, e] of patternTex) {
+      if (!patternSeen.has(id)) { gl.deleteTexture(e.tex); patternTex.delete(id); }
+    }
+  }
+
   function allocFrameTargets(w, h) {
     const layerT = makeTarget(gl, w, h, true);
     const scratchT = makeTarget(gl, w, h, true);
@@ -625,6 +655,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const { atlasTex, grainLuts } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];
+    patternSeen = new Set();
 
     const byLayer = new Map();
     for (const it of contract.instances) {
@@ -669,9 +700,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       // hueRotate (#262): implemented in the composite shader via the
       // SVG feColorMatrix hue-rotation matrix; 0 is pixel-identical to off.
       const hueRotate = (layer.layout && layer.layout.hueRotate) || 0;
-      renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h);
+      // #1098 — a PATTERN track is one generated texture, not instances: it skips the layer target
+      // and composites straight from its own texture, with the same blend / opacity / matte.
+      const srcTex = layer.type === 'pattern' ? patternTexture(layer, w, h) : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
       composite(
-        compProg, compU, layerT.tex, dRead, dWrite,
+        compProg, compU, srcTex, dRead, dWrite,
         blendIdFor(layer.blend), layer.opacity, null, maskFor(layer.id), hueRotate
       );
     };
@@ -771,6 +804,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // arrived — a mid-frame crash for a field with no producer. The renderer now
     // never reads it; wiring live text later is a deliberate change here AND in
     // sceneContract.js (whose selfcheck pins the field to [] so it can't drift in).
+    sweepPatternTextures(); // #1098: a pattern track that left the scene frees its texture
     return { ...mRead, fxFinishChains };
   }
 
@@ -798,6 +832,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   function disposeBase() {
     bridge.dispose();
+    for (const e of patternTex.values()) gl.deleteTexture(e.tex);
+    patternTex.clear();
     for (const p of [quadProg, compProg, resProg, copyProg]) gl.deleteProgram(p);
     gl.deleteBuffer(fullVbo); gl.deleteBuffer(cornerVbo); gl.deleteBuffer(instVbo);
   }

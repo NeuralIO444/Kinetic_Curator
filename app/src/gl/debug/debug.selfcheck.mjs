@@ -6,30 +6,18 @@
  * on any failed case. Registered in package.json `selfcheck`.
  */
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { glStaticHandler } from '../parity/glStaticServer.mjs';
 
 const DEBUG_DIR = path.dirname(fileURLToPath(import.meta.url));
 const GL_DIR = path.join(DEBUG_DIR, '..');
-const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript' };
 
 async function main() {
   // --sweep-only runs just the uniform-sweep section (npm run selfcheck:sweep).
   const sweepOnly = process.argv.includes('--sweep-only');
-  const server = http.createServer(async (req, res) => {
-    try {
-      const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-      const file = path.normalize(path.join(GL_DIR, urlPath));
-      if (!file.startsWith(GL_DIR)) { res.writeHead(403); res.end(); return; }
-      const data = await readFile(file);
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
-      res.end(data);
-    } catch {
-      res.writeHead(404); res.end('nf');
-    }
-  });
+  const server = http.createServer(glStaticHandler(GL_DIR));
 
   let browser = null;
   try {

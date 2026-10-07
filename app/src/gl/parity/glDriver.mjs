@@ -10,11 +10,11 @@
  */
 
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { bakeAtlas, bakeGrainLut, comboKey } from '../atlas.mjs';
+import { glStaticHandler } from './glStaticServer.mjs';
 
 const PARITY_DIR = path.dirname(fileURLToPath(import.meta.url));
 const GL_DIR = path.join(PARITY_DIR, '..'); // serve src/gl; harness at /parity/glHarness.html
@@ -24,7 +24,6 @@ let browser = null;
 let page = null;
 const atlasCache = new Map();
 
-const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript' };
 
 // Single page.evaluate arguments much past ~100MB never arrive ("Target page,
 // context or browser has been closed"). Combo-heavy scenes bake 3000px+
@@ -93,18 +92,7 @@ async function evaluateChunked(pg, fnName, payload) {
 
 async function ensurePage() {
   if (page) return page;
-  server = http.createServer(async (req, res) => {
-    try {
-      const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-      const file = path.normalize(path.join(GL_DIR, urlPath));
-      if (!file.startsWith(GL_DIR)) { res.writeHead(403); res.end(); return; }
-      const data = await readFile(file);
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
-      res.end(data);
-    } catch {
-      res.writeHead(404); res.end('nf');
-    }
-  });
+  server = http.createServer(glStaticHandler(GL_DIR));
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   try {
