@@ -8,6 +8,9 @@
 /** How long the verbs hold their full names. */
 export const COLD_OPEN_MS = 2200;
 
+/** How long a press (a K tap, a CURATOR roll) flashes the full name before it cools down. */
+export const TAP_PULSE_MS = 1200;
+
 /**
  * Should the cold open happen at all? Not for someone who asked for less motion, and not on a stage.
  * @param {{reducedMotion?: boolean, stage?: boolean}} env
