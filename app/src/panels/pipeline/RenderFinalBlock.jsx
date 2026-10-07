@@ -75,7 +75,7 @@ export function RenderFinalBlock({
         {rendering && !batchActive ? 'RENDERING…' : accumOn ? '▶ RENDER ACCUM' : '▶ RENDER FINAL'}
       </button>
       {renderError && (
-        <div className="pipeline-hint" style={{ marginTop: 6, color: '#ff2d6f' }} title={renderError}>
+        <div className="pipeline-hint" style={{ marginTop: 6, color: 'var(--kc-warn)' }} title={renderError}>
           Render failed — {renderError.slice(0, 80)}
         </div>
       )}

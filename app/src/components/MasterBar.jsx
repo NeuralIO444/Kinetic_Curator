@@ -82,20 +82,25 @@ export function MasterBar() {
       <div className="master-left">
         <LoisPill />
         {state.isRecording ? (
-          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: '#ff2d6f', borderColor: '#ff2d6f' }}
+          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: 'var(--kc-live)', borderColor: 'var(--kc-live)' }}
             title={helpText('output-webm')}>
-            <span className="status-dot beat-flash" style={{ background: '#ff2d6f', animationIterationCount: 'infinite' }} />
+            <span className="status-dot beat-flash" style={{ background: 'var(--kc-live)', animationIterationCount: 'infinite' }} />
             REC WEBM
           </div>
         ) : (
-          <div className="status-pill" title={running ? 'Live loop is running — Space pauses' : 'Live loop is paused — Space resumes'}>
-            <span className={`status-dot ${running ? 'live' : ''}`} />
+          <div className="status-pill"
+            style={running
+              ? { background: 'rgba(255, 45, 111, 0.2)', color: 'var(--kc-live)', borderColor: 'var(--kc-live)' }
+              : { background: 'rgba(0, 255, 136, 0.12)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' }}
+            title={running ? 'Live loop is running — Space pauses' : 'Live loop is paused — Space resumes'}>
+            <span className={`status-dot ${running ? 'live' : ''}`}
+              style={{ background: running ? 'var(--kc-live)' : 'var(--kc-ok)', boxShadow: running ? '0 0 5px rgba(255,45,111,0.7)' : 'none' }} />
             {running ? 'LIVE' : 'PAUSED'}
           </div>
         )}
 
         {persistStatus !== 'ok' && (
-          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title={persistStatus === 'quarantined' ? 'Last autosave could not be read.' : 'Autosave is failing.'}>
             <span className="status-dot" style={{ background: '#ffb000' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
@@ -103,7 +108,7 @@ export function MasterBar() {
         )}
 
         {showSaved && (
-          <div className="status-pill" style={{ background: 'rgba(0, 255, 136, 0.12)', color: '#00ff88', borderColor: '#00ff88' }}
+          <div className="status-pill" style={{ background: 'rgba(0, 255, 136, 0.12)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' }}
             title="Project autosaved to pipeline backup.">
             <span className="status-dot" style={{ background: '#00ff88' }} />
             SAVED
@@ -120,17 +125,15 @@ export function MasterBar() {
 
         {glContext !== 'ok' && (
           <div className="status-pill"
-            style={glContext === 'lost'
-              ? { background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' }
-              : { background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+            style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title={glContext === 'lost' ? 'GPU context lost' : 'GPU context restored — rebuilding'}>
-            <span className="status-dot" style={{ background: glContext === 'lost' ? '#ff2d6f' : '#ffb000' }} />
+            <span className="status-dot" style={{ background: 'var(--kc-warn)' }} />
             {glContext === 'lost' ? 'GL CONTEXT LOST' : 'GL RESTORING'}
           </div>
         )}
 
         {audioDenied && (
-          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title="Browser denied mic access.">
             <span className="status-dot" style={{ background: '#ffb000' }} />
             MIC BLOCKED
@@ -138,7 +141,7 @@ export function MasterBar() {
         )}
 
         {audioLost && (
-          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' }}
+          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title={`${lostLine(audioLost.name)} — switch AUDIO on in STIMULI to reconnect.`}>
             <span className="status-dot" style={{ background: '#ffb000' }} />
             AUDIO INPUT LOST

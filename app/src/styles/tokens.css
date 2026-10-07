@@ -5,6 +5,10 @@
   --accent: #ff2d6f;
   --accent2: #00d9ff;
   --accent3: #ffd400;
+  /* #1030 (M4) — pink means live, green means paused/ok, amber means caution/fault. */
+  --kc-live: var(--accent);
+  --kc-ok: #00ff88;
+  --kc-warn: #ffb000;
   --panel: #111114;
   --panel-2: #16161b;
   --line: rgba(255,255,255,0.08);

@@ -80,7 +80,7 @@ export function LoopCaptureBlock({ glLoopRef, seed, rendering, setRendering }) {
           onClick={() => { if (capturing) cancelRef.current = true; else start(); }}
           disabled={rendering}
           title="Record a fixed-length take of the live canvas and export it as a seamless looping WebM — the tail dissolves into the head so there is no visible cut. What plays is what loops."
-          style={capturing ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
+          style={capturing ? { background: 'var(--kc-live)', color: '#fff', borderColor: 'var(--kc-live)', flex: 2 } : { flex: 2 }}
         >
           {capturing ? '⏹ CANCEL LOOP' : '⏺ CAPTURE LOOP'}
         </button>

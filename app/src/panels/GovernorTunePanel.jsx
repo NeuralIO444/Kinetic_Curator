@@ -136,7 +136,7 @@ export function GovernorTunePanel() {
             style={{
               flex: 1,
               height: `${Math.max(2, (c / maxCount) * 84)}px`,
-              background: i * BUCKET_MS >= 33.3 ? '#ff2d6f' : '#7cc7ff',
+              background: i * BUCKET_MS >= 33.3 ? 'var(--kc-warn)' : '#7cc7ff',
               opacity: 0.85,
               borderRadius: '2px 2px 0 0',
             }}
@@ -156,7 +156,7 @@ export function GovernorTunePanel() {
       <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#8a93a6', marginTop: 4 }}>
         <span><span style={{ color: '#ffb454' }}>│</span> shed &lt; {shedFps}fps</span>
         <span><span style={{ color: '#9fe870' }}>│</span> recover ≥ {recoverFps}fps</span>
-        <span><span style={{ color: '#ff2d6f' }}>■</span> slower than 30fps</span>
+        <span><span style={{ color: 'var(--kc-warn)' }}>■</span> slower than 30fps</span>
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>Thresholds — live override</h4>
@@ -205,7 +205,7 @@ export function GovernorTunePanel() {
         <div key={f.cutKind} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '2px 0' }}>
           <span style={{ flex: 1 }}>{f.cutKind}</span>
           <span style={{ color: '#8a93a6' }}>{f.cycles} cycle{f.cycles === 1 ? '' : 's'}</span>
-          <span style={{ color: f.flapping ? '#ff2d6f' : '#9fe870', fontWeight: 'bold' }}>
+          <span style={{ color: f.flapping ? 'var(--kc-warn)' : '#9fe870', fontWeight: 'bold' }}>
             {f.flapping ? 'FLAPPING' : 'stable'}
           </span>
         </div>
