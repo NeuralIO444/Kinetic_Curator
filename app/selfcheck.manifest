@@ -72,6 +72,7 @@ node src/state/paletteLibrary.selfcheck.mjs
 node src/components/paletteWing.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
 node src/components/rangeRow.selfcheck.mjs
+node src/components/sliderDialog.selfcheck.mjs
 node src/hooks/coldOpen.selfcheck.mjs
 node src/hooks/invite.selfcheck.mjs
 node src/components/expandLabel.selfcheck.mjs

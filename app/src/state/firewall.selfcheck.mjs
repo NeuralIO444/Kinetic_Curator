@@ -91,7 +91,7 @@ function makeStore() {
   s.setLayoutParam('zTiers', 99.6);
   assert.strictEqual(s.lp().zTiers, 12, 'zTiers should clamp and stay integral');
   s.setLayoutParam('scale', [-5, 900]);
-  assert.deepStrictEqual(s.lp().scale, [0.1, 3.0], 'range ends clamp');
+  assert.deepStrictEqual(s.lp().scale, [0.05, 6.0], 'range ends clamp to the HARD limits (#1127: the tap-name dialog can stretch a slider that far)');
   // Numeric strings still work; older projects wrote some fields that way.
   s.setLayoutParam('density', '55');
   assert.strictEqual(s.lp().density, 55);

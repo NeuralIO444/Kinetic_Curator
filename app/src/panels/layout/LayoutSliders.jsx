@@ -2,7 +2,7 @@
 // Structure-first knobs: COUNT, SCALE, ROTATE, ALPHA, JITTER, DENSITY,
 // DIVERGENCE.
 import { RangeRow, DualRangeRow } from '../../components/RangeRow.jsx';
-import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, RANGE_SPEC, RANGE_HARD, PARAM_SPEC } from '../../data/layout-modes.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
@@ -21,7 +21,8 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
         onChange={v => set('count', v)} defaultValue={d('count', DEFAULT_LAYOUT_PARAMS.count)}
         locked={lockedParams.count} onToggleLock={() => lock('count')} />
       <DualRangeRow label="SCALE" low={layoutParams.scale[0]} high={layoutParams.scale[1]}
-        min={0.1} max={3.0} step={0.05}
+        min={RANGE_SPEC.scale.min} max={RANGE_SPEC.scale.max} step={0.05}
+        dialog={{ key: 'layout.scale', title: 'SCALE', hard: RANGE_HARD.scale }}
         hint="Min–max size range for each placement"
         onChangeLow={v => set('scale', [v, layoutParams.scale[1]])}
         onChangeHigh={v => set('scale', [layoutParams.scale[0], v])}
@@ -30,7 +31,9 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
         defaultLow={d('scale', DEFAULT_LAYOUT_PARAMS.scale)[0]} defaultHigh={d('scale', DEFAULT_LAYOUT_PARAMS.scale)[1]}
         locked={lockedParams.scale} onToggleLock={() => lock('scale')} />
       <DualRangeRow label="ROTATE" low={layoutParams.rotate[0]} high={layoutParams.rotate[1]}
-        min={-180} max={180} hint="Min–max rotation in degrees"
+        min={RANGE_SPEC.rotate.min} max={RANGE_SPEC.rotate.max} hint="Min–max rotation in degrees. Spin: how fast the marks turn (tap the name)"
+        dialog={{ key: 'layout.rotate', title: 'ROTATE', hard: RANGE_HARD.rotate,
+          spin: { value: layoutParams.rotateSpin ?? 0, onChange: (v) => set('rotateSpin', v), defaultValue: DEFAULT_LAYOUT_PARAMS.rotateSpin, max: PARAM_SPEC.rotateSpin.max } }}
         onChangeLow={v => set('rotate', [v, layoutParams.rotate[1]])}
         onChangeHigh={v => set('rotate', [layoutParams.rotate[0], v])}
         onChangeRange={(lo, hi) => set('rotate', [lo, hi])}
@@ -38,7 +41,8 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
         defaultLow={d('rotate', DEFAULT_LAYOUT_PARAMS.rotate)[0]} defaultHigh={d('rotate', DEFAULT_LAYOUT_PARAMS.rotate)[1]}
         locked={lockedParams.rotate} onToggleLock={() => lock('rotate')} />
       <DualRangeRow label="ALPHA" low={layoutParams.alpha[0]} high={layoutParams.alpha[1]}
-        min={0} max={100} hint="Min–max opacity (%)"
+        min={RANGE_SPEC.alpha.min} max={RANGE_SPEC.alpha.max} hint="Min–max opacity (%)"
+        dialog={{ key: 'layout.alpha', title: 'ALPHA', hard: RANGE_HARD.alpha }}
         onChangeLow={v => set('alpha', [v, layoutParams.alpha[1]])}
         onChangeHigh={v => set('alpha', [layoutParams.alpha[0], v])}
         onChangeRange={(lo, hi) => set('alpha', [lo, hi])}
