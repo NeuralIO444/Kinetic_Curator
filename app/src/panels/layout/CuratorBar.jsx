@@ -120,7 +120,7 @@ export function CuratorBar() {
             onMouseLeave={() => setLooksUsed(true)}
             onBlur={() => setLooksUsed(true)}
             {...looksTap.props}
-            aria-label="Looks — apply a complete layout"
+            aria-label="Looks — pick a complete layout"
             aria-haspopup="menu"
             aria-expanded={presetMenuOpen}
             title="Apply a Look — layout only; your palette and marks stay put"

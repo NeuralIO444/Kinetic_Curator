@@ -43,7 +43,7 @@ ok('LOOKS, VOICE and KIN use the shared label, with the full word as the accessi
   const bar = read('../panels/layout/CuratorBar.jsx');
   assert.match(bar, /<ExpandLabel mode="swap" short=\{looksUsed \? 'lok' : 'l'\} full="looks ▾" \/>/);
   assert.match(bar, /<ExpandLabel mode="swap" short=\{voiceUsed \? 'voi' : 'v'\}/);
-  assert.match(bar, /aria-label="Looks — apply a complete layout"/);
+  assert.match(bar, /aria-label="Looks — pick a complete layout"/);
   assert.match(bar, /aria-label=\{`Voice: \$\{activeAlias\}/);
   assert.match(bar, /onMouseLeave=\{\(\) => setLooksUsed\(true\)\}/, 'used is marked when the pointer leaves, so the cool-down animates');
   assert.ok(!/looksUsed|voiceUsed/.test(read('../state/store.js')), 'used is session state in the component, not persisted');

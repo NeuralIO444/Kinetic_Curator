@@ -42,7 +42,7 @@ test('LOOKS and VOICE rest as L and V, open to the full word on hover, then cool
 test('keyboard focus opens them; the accessible name is the full word at every size', async ({ page }) => {
   await boot(page);
   const looks = btn(page, /^Looks/);
-  await expect(looks).toHaveAttribute('aria-label', 'Looks — apply a complete layout');
+  await expect(looks).toHaveAttribute('aria-label', 'Looks — pick a complete layout');
   const before = await width(looks);
   await looks.focus();
   await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab'); // keyboard modality => :focus-visible
