@@ -95,7 +95,7 @@ export function PaletteWing({ open, onClose }) {
   return (
     <div className="palette-wing" role="dialog" aria-label="Palette lab">
       <div className="palette-wing-head">
-        <span className="palette-wing-title">PALETTE LAB</span>
+        <span className="palette-wing-title ttl">palette lab</span>
         <button type="button" className="palette-wing-close" title="Close (Esc)" onClick={onClose}>×</button>
       </div>
 
@@ -111,13 +111,13 @@ export function PaletteWing({ open, onClose }) {
       />
 
       <div className="palette-wing-row">
-        <button type="button" className="palette-wing-btn primary" onClick={generate} title="Random harmony scheme + seed color → lands here unsaved">
-          ⚄ GENERATE
+        <button type="button" className="palette-wing-btn act primary" onClick={generate} title="Random harmony scheme + seed color → lands here unsaved">
+          ⚄ generate
         </button>
         {lastGen && <span className="palette-wing-gen-note" title="Last generation">{lastGen}</span>}
       </div>
 
-      <div className="palette-wing-label">SWATCHES — click to edit, canvas follows live</div>
+      <div className="palette-wing-label lbl">swatches — click to edit, canvas follows live</div>
       <div className="palette-wing-swatches">
         {swatches.map((sw, i) => (
           <label key={i} className="palette-wing-sw" style={{ background: sw }} title={`S${i + 1} ${sw}`}>
@@ -142,31 +142,31 @@ export function PaletteWing({ open, onClose }) {
       <div className="palette-wing-row">
         <button
           type="button"
-          className="palette-wing-btn primary"
+          className="palette-wing-btn act primary"
           onClick={save}
           disabled={!canSave}
           title={canSave ? `Save “${name.trim()}” to your library` : 'Name it first — a palette without a name doesn’t save'}
         >
-          ↓ SAVE
+          ↓ save
         </button>
-        <button type="button" className="palette-wing-btn" onClick={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })} title="Drop unsaved tweaks, back to the catalog">
-          ↻ RESET
+        <button type="button" className="palette-wing-btn act" onClick={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })} title="Drop unsaved tweaks, back to the catalog">
+          ↻ reset
         </button>
       </div>
 
       <div className="palette-wing-row">
-        <button type="button" className="palette-wing-btn" onClick={exportPalette} title="Download this palette as a standalone JSON file">
-          ⤓ EXPORT
+        <button type="button" className="palette-wing-btn act" onClick={exportPalette} title="Download this palette as a standalone JSON file">
+          ⤓ export
         </button>
-        <button type="button" className="palette-wing-btn" onClick={() => fileRef.current?.click()} title="Import a palette JSON file">
-          ⤒ IMPORT
+        <button type="button" className="palette-wing-btn act" onClick={() => fileRef.current?.click()} title="Import a palette JSON file">
+          ⤒ import
         </button>
         <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importFile} />
       </div>
 
       {msg && <div className="palette-wing-msg">{msg}</div>}
 
-      <div className="palette-wing-label">YOUR PALETTES — click to load, × to delete</div>
+      <div className="palette-wing-label lbl">your palettes — click to load, × to delete</div>
       <div className="palette-wing-library">
         {(userPalettes || []).length === 0 && (
           <span className="palette-wing-empty">Nothing saved yet. Generate one, name it, save it.</span>

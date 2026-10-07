@@ -64,16 +64,16 @@ import { useStore } from '../state/store.js';
 {
   const panel = readFileSync(new URL('../panels/DavisPanel.jsx', import.meta.url), 'utf8');
   const at = (s) => { const i = panel.indexOf(s); assert.ok(i >= 0, `DavisPanel has ${s}`); return i; };
-  assert.ok(at('>VOICES<') < at('>GENERATE<') && at('>GENERATE<') < at('>PERFORM<'), 'VOICES → GENERATE → PERFORM, in order');
-  const generate = panel.slice(at('>GENERATE<'), at('>PERFORM<'));
+  assert.ok(at('>voices<') < at('>generate<') && at('>generate<') < at('>perform<'), 'VOICES → GENERATE → PERFORM, in order');
+  const generate = panel.slice(at('>generate<'), at('>perform<'));
   for (const s of ['DAVIS_EVOLVE, { toggle: true }', 'saveFavorite', 'bumpSeed: true', 'SUB_SEED_STREAMS.map', 'DAVIS_MUTATE_STREAM, { reset: true }', '<EvolveProgress />']) {
     assert.ok(generate.includes(s), `GENERATE still holds ${s}`);
   }
-  const perform = panel.slice(at('>PERFORM<'));
+  const perform = panel.slice(at('>perform<'));
   for (const s of ['ACCUM_GESTURE, { action: \'freeze\'', "action: 'clear'", "action: 'swell'", 'davis-phrase-status']) {
     assert.ok(perform.includes(s) || panel.includes(s), `PERFORM still holds ${s}`);
   }
-  const voices = panel.slice(at('>VOICES<'), at('>GENERATE<'));
+  const voices = panel.slice(at('>voices<'), at('>generate<'));
   assert.ok(voices.includes('<VoiceTiles />') && voices.includes('<BehaveReadout'), 'VOICES holds the tiles and the behave readout');
   assert.ok(/subtitle=\{subtitle\}/.test(panel), 'the header status line is kept');
   // nothing new that controls phrase/MIDI: the panel reports, it does not duplicate PLAY

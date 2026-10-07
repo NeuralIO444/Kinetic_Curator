@@ -11,13 +11,11 @@ Order of priorities: **true → proven → safe → honest → consistent → pl
 
 ## Where we are (2026-10-05)
 
-**Phases 0 to 3 are closed. Phase 4 is open.** The PATTERN lane runs alongside.
+**Phases 0 and 1 are closed. Phase 2 is open.** The PATTERN lane runs alongside.
 
 - **Phase 0, closed:** roadmap synced (PR #1054), #248 settled at six tabs, `main` protected with five required checks, a `Closes #N` line now required on every PR (PR #1055), merged branches auto-delete. One item carried: PR #1050 still needs its three fixes, and it now lives in Phase 3 with #980.
 - **Phase 1, closed on Matt's word:** Matt signed Stage 1 and Stage 2 on 2026-10-05 **without running the recorded set or the stranger link test**. Both stay available as optional checks at any time; neither blocks anything. The half-float accum audit is waived with them.
-- **Phase 2, closed 2026-10-06:** #1052, #1053 and #1051 shipped.
-- **Phase 3, closed 2026-10-06:** #1023, #1022, #1046, #1048, #1037 and #980 shipped.
-- **Phase 4, open now:** M1 (#1027) and M2 (#1028) shipped; M3 onward next.
+- **Phase 2, open now:** #1052 first, then #1053, then #1051.
 
 ## Summary
 

@@ -122,7 +122,7 @@ export function BeatButton() {
           aria-label="Beat tempo"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
         >
-          <div className="beat-menu-label">TEMPO</div>
+          <div className="beat-menu-label ttl">tempo</div>
           <div className="beat-presets">
             {BEAT_PRESETS.map((p) => (
               <button
@@ -154,7 +154,7 @@ export function BeatButton() {
               aria-label="Exact BPM"
               onChange={(e) => setExact(e.target.value)}
             />
-            <button type="submit">SET</button>
+            <button className="act" type="submit">set</button>
           </form>
           <div className="beat-hint">
             {bpmLabel > 160

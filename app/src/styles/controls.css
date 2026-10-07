@@ -322,3 +322,12 @@
 }
 .beat-exact button:hover { background: var(--ink); color: var(--bg); }
 .beat-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: lowercase; }
+
+/* #1029 (M3) — casing lives in CSS. JSX chrome strings are written lowercase; the
+   element's role class decides the case (docs/DESIGN_SYSTEM.md §5).
+   .lbl labels/hints · .act commands · .ttl panel + section titles · .name proper names. */
+.lbl { text-transform: lowercase; }
+.act { text-transform: uppercase; }
+.ttl { text-transform: uppercase; }
+:where(.ttl) { letter-spacing: 0.12em; }
+.name { text-transform: none; }

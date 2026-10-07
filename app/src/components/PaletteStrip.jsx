@@ -61,11 +61,11 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
       )}
       {overflow && (<button type="button" className="palette-nav-btn" title="Next swatches" disabled={s >= maxStart} onClick={slide(1)}>›</button>)}
       <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.bg }} title={`BG ${palette.bg}`} onClick={(e) => e.stopPropagation()}>
-        <span className="palette-meta-label">BG</span>
+        <span className="palette-meta-label lbl">bg</span>
         <input type="color" className="palette-color-input" value={palette.bg} onChange={(e) => onBg(e.target.value)} onClick={(e) => e.stopPropagation()} />
       </label>
       <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.ink }} title={`INK ${palette.ink}`} onClick={(e) => e.stopPropagation()}>
-        <span className="palette-meta-label">INK</span>
+        <span className="palette-meta-label lbl">ink</span>
         <input type="color" className="palette-color-input" value={palette.ink} onChange={(e) => onInk(e.target.value)} onClick={(e) => e.stopPropagation()} />
       </label>
       {dirty && (<button type="button" className="palette-reset-btn" title="Reset to catalog colors" onClick={(e) => { e.stopPropagation(); onReset(); }}>↻</button>)}
@@ -169,7 +169,7 @@ export function PaletteStrip() {
             <BeatButton />
             <button
               type="button"
-              className="palette-mix-label"
+              className="palette-mix-label act"
               onClick={cycleColorMode}
               title={COLOR_MODE_HINT[colorMode]}
               style={{ background: 'transparent', border: 0, padding: 0, color: 'inherit', letterSpacing: '0.1em', fontSize: 9, cursor: 'pointer', minWidth: '4.6em', textAlign: 'left' }}
@@ -181,12 +181,12 @@ export function PaletteStrip() {
             {chips}
           </div>
           <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
-            <span className="palette-switch-label">PALETTE</span>
-            <button type="button" className="palette-save-btn" title="Palette lab — generate, edit, save, import, export" onClick={() => setWingOpen((v) => !v)} aria-expanded={wingOpen}>◈<span className="palette-shuffle-word"> LAB</span></button>
+            <span className="palette-switch-label lbl">palette</span>
+            <button type="button" className="palette-save-btn" title="Palette lab — generate, edit, save, import, export" onClick={() => setWingOpen((v) => !v)} aria-expanded={wingOpen}>◈<span className="palette-shuffle-word lbl"> lab</span></button>
             <select className="palette-harmony-select" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
               {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
             </select>
-            <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳<span className="palette-shuffle-word"> SHUFFLE</span></button>
+            <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳<span className="palette-shuffle-word lbl"> shuffle</span></button>
           </span>
         </div>
       </div>

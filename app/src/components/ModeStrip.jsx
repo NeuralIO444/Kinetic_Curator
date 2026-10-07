@@ -30,7 +30,7 @@ export function ModeStrip() {
 
   return (
     <div className="mode-strip">
-      <span className="mode-strip-label">MODE</span>
+      <span className="mode-strip-label lbl">mode</span>
       <div className="mode-strip-chips">
         {MODE_FAVORITES.map((m, i) => {
           const isArmed = armedMode === m.id;
@@ -51,7 +51,7 @@ export function ModeStrip() {
           );
         })}
       </div>
-      <span className="mode-strip-label">MOTION</span>
+      <span className="mode-strip-label lbl">motion</span>
       <div className="mode-strip-chips">
         {MOTION_MODES.map((m) => {
           const isArmed = armedMotion === m.id;
@@ -59,14 +59,14 @@ export function ModeStrip() {
             <button
               key={m.id}
               type="button"
-              className={`chip-btn ${isMotionActive(layoutParams, m) ? 'active' : ''}${isArmed ? ' armed' : ''}`}
+              className={`chip-btn act ${isMotionActive(layoutParams, m) ? 'active' : ''}${isArmed ? ' armed' : ''}`}
               onClick={() => toggleArmMotion(m.id)}
               title={isArmed
                 ? `${m.name} — ARMED as roll scope. Tap again to disarm.`
                 : `${m.name} — ${m.vibe} Arm as roll scope: the next KINETIC roll pins this motion.`}
               aria-pressed={isArmed}
             >
-              {m.name.toUpperCase()}
+              {m.name}
               {isArmed && <span className="pin-glyph" aria-hidden="true">📌</span>}
             </button>
           );

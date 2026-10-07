@@ -131,7 +131,7 @@ export function AccumFamily({ layoutParams }) {
       )}
       {layoutParams.accumulation && (
         <div className="tg" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-          <span title="Feedback transforms on the trail buffer — zoom + spin light-tunnels, RGB channel drift">FEEDBACK</span>
+          <span className="lbl" title="Feedback transforms on the trail buffer — zoom + spin light-tunnels, RGB channel drift">feedback</span>
           <label
             style={{ display: 'flex', alignItems: 'center', gap: 4 }}
             title="TUNNEL: per-frame zoom + spin of the trail buffer — motion spirals into light-tunnels (0 = off)"

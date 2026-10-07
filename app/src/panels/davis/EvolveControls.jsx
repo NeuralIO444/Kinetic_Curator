@@ -85,7 +85,7 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
   return (
     <>
       <div className={rowClass} title="What jumps when Evolve fires. Shimmer is the taste model's read — a guess, not an order.">
-        <span className="davis-label">TARGET</span>
+        <span className="davis-label lbl">target</span>
         {TARGETS.map((t, i) => {
           const id = `evolve-target:${t.value}`;
           const level = mode === 'off' ? 0 : levelFor(scores, id);
@@ -115,18 +115,18 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
       {/* #310: SHIMMER row removed — the whisper stays ON as a hidden default.
           AUTO-SNAP removed the same way (hidden default: off). */}
       <div className="davis-source-row">
-        <span className="davis-label">SOURCE</span>
-        <button className={`chip-btn ${evolveSource === 'time' ? 'active' : ''}`}
+        <span className="davis-label lbl">source</span>
+        <button className={`act chip-btn ${evolveSource === 'time' ? 'active' : ''}`}
           title="Fire Evolve on INTERVAL. No mic."
-          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'time' })}>TIME</button>
-        <button className={`chip-btn ${evolveSource === 'beat' ? 'active' : ''}`}
+          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'time' })}>time</button>
+        <button className={`act chip-btn ${evolveSource === 'beat' ? 'active' : ''}`}
           title="Fire Evolve on a mic attack. Same edge as phrase AUDIO. INTERVAL is ignored."
-          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'beat' })}>BEAT</button>
+          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'beat' })}>beat</button>
       </div>
 
       <div className="davis-interval-row" style={evolveSource !== 'time' ? { opacity: 0.4 } : undefined}
         title={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}>
-        <span className="davis-label">INTERVAL</span>
+        <span className="davis-label lbl">interval</span>
         <RangeRow layout="bare" tone="ink" min={200} max={10000} step={100} value={evolveInterval}
           disabled={evolveSource !== 'time'}
           hint={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}

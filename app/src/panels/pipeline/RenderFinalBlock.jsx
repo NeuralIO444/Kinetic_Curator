@@ -46,7 +46,7 @@ export function RenderFinalBlock({
 
   return (
     <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>RENDER · FINAL STILL</div>
+      <div className="ttl" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>render · final still</div>
       <div className="pipeline-row" style={{ marginBottom: 6 }}>
         <select
           value={exportResolution}

@@ -90,7 +90,7 @@ export function CuratorBar() {
         {/* #946 — START mode toggle: what a cold launch opens on. Sits left of KIN: [logo] [START] [KIN]. */}
         <button
           type="button"
-          className="start-mode-btn"
+          className="start-mode-btn act"
           data-mode={startupMode}
           onClick={() => setStartupMode(startupMode === 'chaos' ? 'fixed' : 'chaos')}
           title={
@@ -100,7 +100,7 @@ export function CuratorBar() {
           }
           aria-label={`Start mode ${startupMode}. Activate to switch to ${startupMode === 'chaos' ? 'fixed' : 'chaos'}`}
         >
-          START: {startupMode === 'chaos' ? 'K.O.Z.' : 'FIXED'}
+          start: {startupMode === 'chaos' ? 'k.o.z.' : 'fixed'}
         </button>
         {/* #942 — KINETIC: storm generator after the START toggle. */}
         <KineticButton />

@@ -17,7 +17,7 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
     <div className="hotkey-overlay" onClick={onClose}>
       <div className="hotkey-card" onClick={(e) => e.stopPropagation()} style={{ minWidth: 360, maxWidth: 440 }}>
         <div className="hotkey-card-header">
-          <span>HELP</span>
+          <span className="ttl">help</span>
           <button className="micro-btn" onClick={onClose}>✕</button>
         </div>
         <div className="davis-source-row" style={{ margin: '8px 0' }}>

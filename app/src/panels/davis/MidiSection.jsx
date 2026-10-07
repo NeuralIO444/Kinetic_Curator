@@ -19,7 +19,7 @@ export function MidiSection() {
   return (
     <div className="davis-midi" role="group" aria-label="MIDI">
       <div className="davis-midi-head">
-        <i>MIDI</i>
+        <i className="lbl">midi</i>
         <button type="button" className={`chip-btn ${enabled ? 'active' : ''}`} aria-pressed={enabled}
           onClick={() => setMidiEnabled(!enabled)}
           title={enabled ? 'Disconnect MIDI' : 'Connect a MIDI controller (the browser will ask for access)'}>

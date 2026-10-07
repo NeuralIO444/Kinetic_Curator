@@ -52,13 +52,13 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
   return (
     <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-        <span style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em' }}>AUDIO SRC</span>
+        <span className="lbl" style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em' }}>audio src</span>
         <button
-          className={`micro-btn ${audioMonitor ? 'active' : ''}`}
+          className={`micro-btn act ${audioMonitor ? 'active' : ''}`}
           onClick={() => emit(Events.AUDIO_MONITOR, !audioMonitor)}
           style={audioMonitor ? { background: '#00ff88', color: '#000', borderColor: '#00ff88' } : {}}
         >
-          {audioMonitor ? '((·)) MON ON' : '((·)) MON OFF'}
+          {audioMonitor ? '((·)) mon on' : '((·)) mon off'}
         </button>
       </div>
 
@@ -89,7 +89,7 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
       </div>
       {audioSource.type === 'file' && (
         <label className="stim-sidecar-pick" title="A kc-audio-envelope/1 JSON written by studio/audio_envelope.py (librosa, Mac Studio)">
-          <span>SIDECAR</span>
+          <span className="lbl">sidecar</span>
           <input type="file" accept=".json,application/json" onChange={handleSidecarChange} style={{ fontSize: '9px', color: 'var(--dim)' }} />
           {audioSidecar && (
             <button type="button" className="micro-btn" onClick={() => useStore.getState().setAudioSidecar(null)} title="Drop the sidecar and go back to live analysis">✕</button>

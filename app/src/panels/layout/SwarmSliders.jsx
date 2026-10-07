@@ -20,7 +20,7 @@ export function SwarmSliders({ layoutParams, lockedParams }) {
 
   return (
     <div className="param-block">
-      <div className="param-subheader">🧬 SWARM PHYSIC FORCES</div>
+      <div className="param-subheader ttl">🧬 swarm physic forces</div>
       <RangeRow label="PARTICLES" value={layoutParams.particleCount} min={10} max={500} step={5}
         hint="Particle count in swarm mode — organism count in hype mode"
         disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"

@@ -72,19 +72,19 @@ export function StimulusPanel() {
           <div className="stim-toggle-row">
             {/* #310: VIDEO (soon) removed — dead control, nothing reads motionEnergy. */}
             <button
-              className={`stim-toggle ${audioEnabled ? 'on' : 'invite'}`}
+              className={`stim-toggle act ${audioEnabled ? 'on' : 'invite'}`}
               style={audioEnabled ? { background: '#00d9ff', borderColor: '#00d9ff' } : {}}
               onClick={() => emit(Events.AUDIO_TOGGLE, !audioEnabled)}
             >
-              {audioEnabled ? '◉' : '○'} AUDIO
+              {audioEnabled ? '◉' : '○'} audio
             </button>
             <button
-              className={`stim-toggle ${setupOpen ? 'on' : ''}`}
+              className={`stim-toggle act ${setupOpen ? 'on' : ''}`}
               onClick={() => setSetupOpen(o => !o)}
               title="Audio setup: source mic/file, monitor, gain"
               aria-expanded={setupOpen}
             >
-              ≡ SETUP {setupOpen ? '▾' : '▸'}
+              ≡ setup {setupOpen ? '▾' : '▸'}
             </button>
           </div>
 
@@ -112,7 +112,7 @@ export function StimulusPanel() {
 
           {/* #615 — the eight raw sliders survive behind ADVANCED, unchanged. */}
           <details className="stim-advanced" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
-            <summary>ADVANCED</summary>
+            <summary className="ttl">advanced</summary>
             <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} attackMs={attackMs} decayMs={decayMs} response={response} swell={swell} audioEnabled={audioEnabled} />
           </details>
 

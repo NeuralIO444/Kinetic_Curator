@@ -113,7 +113,7 @@ export function FavoritesTray() {
   if (visible.length === 0) {
     return (
       <div className="favorites-tray favorites-tray-empty" title="Press F to favorite a hit">
-        <span className="favorites-tray-label">HITS</span>
+        <span className="favorites-tray-label ttl">hits</span>
         <span className="favorites-tray-hint">
           F to save · Enter advances setlist
         </span>
@@ -130,8 +130,8 @@ export function FavoritesTray() {
       role="toolbar"
       aria-label="Favorite hits setlist"
     >
-      <span className="favorites-tray-label">HITS</span>
-      {state.morphing && <span className="favorites-tray-hint" style={{ color: 'var(--accent)' }}>MORPH…</span>}
+      <span className="favorites-tray-label ttl">hits</span>
+      {state.morphing && <span className="favorites-tray-hint lbl" style={{ color: 'var(--accent)' }}>morph…</span>}
       <div className="favorites-tray-chips">
         {visible.map((f, i) => {
           const isCurrent = f.seed === state.seed;

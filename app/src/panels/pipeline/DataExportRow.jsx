@@ -293,8 +293,8 @@ export function DataExportRow({
           title="Project title — used in export filenames"
           style={{ flex: 2, fontSize: 11 }}
         />
-        <button className="big-btn dl" onClick={exportProject} style={{ flex: 1 }} title="Export full project (X)">↓ PROJECT</button>
-        <button className="big-btn" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ IMPORT</button>
+        <button className="big-btn dl act" onClick={exportProject} style={{ flex: 1 }} title="Export full project (X)">↓ project</button>
+        <button className="big-btn act" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }} title="Import project JSON">↑ import</button>
         <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
       </div>
       {pendingImport && (
@@ -308,8 +308,8 @@ export function DataExportRow({
         </div>
       )}
       <div className="pipeline-row">
-        <button className="big-btn dl" onClick={exportPalettes} style={{ flex: 1 }} title={`Export your ${(userPalettes || []).length} saved palettes`}>↓ PALETTES</button>
-        <button className="big-btn" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Import palette library JSON">↑ PALETTES</button>
+        <button className="big-btn dl act" onClick={exportPalettes} style={{ flex: 1 }} title={`Export your ${(userPalettes || []).length} saved palettes`}>↓ palettes</button>
+        <button className="big-btn act" onClick={() => paletteInputRef.current?.click()} style={{ flex: 1 }} title="Import palette library JSON">↑ palettes</button>
         <input ref={paletteInputRef} type="file" accept=".json,application/json" onChange={importPalettes} style={{ display: 'none' }} />
       </div>
       <div className="pipeline-row">
@@ -323,8 +323,8 @@ export function DataExportRow({
         </button>
       </div>
       <div className="pipeline-row">
-        <button className="big-btn dl" onClick={exportBundle} style={{ flex: 1 }} title="Everything in one file: project, palettes, voices, favorites, keeps, taste, biology policy, canvas presets">↓ BUNDLE</button>
-        <button className="big-btn" onClick={() => bundleInputRef.current?.click()} style={{ flex: 1 }} title="Restore a bundle. Replaces what is here; you confirm first.">↑ BUNDLE</button>
+        <button className="big-btn dl act" onClick={exportBundle} style={{ flex: 1 }} title="Everything in one file: project, palettes, voices, favorites, keeps, taste, biology policy, canvas presets">↓ bundle</button>
+        <button className="big-btn act" onClick={() => bundleInputRef.current?.click()} style={{ flex: 1 }} title="Restore a bundle. Replaces what is here; you confirm first.">↑ bundle</button>
         <input ref={bundleInputRef} type="file" accept=".json,application/json" onChange={importBundleFile} style={{ display: 'none' }} />
       </div>
       {pendingBundle && (() => {
@@ -343,8 +343,8 @@ export function DataExportRow({
         );
       })()}
       <div className="pipeline-row" title={helpText('output-taste')}>
-        <button className="big-btn" onClick={() => tasteInputRef.current?.click()} style={{ flex: 3 }}>↑ IMPORT TASTE</button>
-        <button className="big-btn" onClick={clearTaste} style={{ flex: 1 }} title="Forget the imported taste">CLEAR</button>
+        <button className="big-btn act" onClick={() => tasteInputRef.current?.click()} style={{ flex: 3 }}>↑ import taste</button>
+        <button className="big-btn act" onClick={clearTaste} style={{ flex: 1 }} title="Forget the imported taste">clear</button>
         <input ref={tasteInputRef} type="file" accept=".json,application/json" onChange={importTaste} style={{ display: 'none' }} />
       </div>
       {/* #962 (UX-2): read-only hint lines live in their own demoted zone,

@@ -112,7 +112,7 @@ export function QueueTransport() {
   return (
     <div className="queue-transport">
       <div className="davis-source-row">
-        <span className="davis-label">QUEUE</span>
+        <span className="davis-label lbl">queue</span>
         <button
           type="button"
           className={`chip-btn queue-play${queuePlaying ? ' active' : ''}`}
@@ -137,7 +137,7 @@ export function QueueTransport() {
       </div>
 
       <div className="davis-source-row">
-        <span className="davis-label">ADVANCE</span>
+        <span className="davis-label lbl">advance</span>
         <button
           type="button"
           className={`chip-btn${queueSource === 'time' ? ' active' : ''}`}
@@ -160,7 +160,7 @@ export function QueueTransport() {
 
       {queueSource === 'time' ? (
         <div className="davis-interval-row">
-          <span className="davis-label">HOLD</span>
+          <span className="davis-label lbl">hold</span>
           <RangeRow layout="bare" tone="ink"
             min={QUEUE_SECONDS_MIN}
             max={QUEUE_SECONDS_MAX}
@@ -174,7 +174,7 @@ export function QueueTransport() {
       ) : (
         <>
           <div className="davis-interval-row">
-            <span className="davis-label">BEATS</span>
+            <span className="davis-label lbl">beats</span>
             <RangeRow layout="bare" tone="ink"
               min={QUEUE_BEATS_MIN}
               max={QUEUE_BEATS_MAX}

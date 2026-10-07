@@ -257,11 +257,11 @@ export function PrintDeskModal({ onClose }) {
     <div style={veil} onClick={cancel} role="presentation">
       <div className="print-desk" style={sheet} onClick={(e) => e.stopPropagation()}>
         <header style={head}>
-          <span>PRINT DESK</span>
+          <span className="ttl">print desk</span>
           <span style={{ color: 'var(--dim)', fontSize: 9 }}>
             seed {seedStr} · {res}× · {sidecar ? 'posted' : stale ? 'stack changed' : 'source still'}
           </span>
-          <button type="button" className="chip-btn" onClick={cancel} title="Close the desk (CANCEL drops the temp files)">ESC</button>
+          <button type="button" className="chip-btn act" onClick={cancel} title="Close the desk (CANCEL drops the temp files)">esc</button>
         </header>
         <div style={body}>
           <div style={previewWrap}>
@@ -282,7 +282,7 @@ export function PrintDeskModal({ onClose }) {
             )}
           </div>
           <div style={side}>
-            <div style={sectLabel}>STILL</div>
+            <div className="ttl" style={sectLabel}>still</div>
             <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
               {[1, 2].map((r) => (
                 <button

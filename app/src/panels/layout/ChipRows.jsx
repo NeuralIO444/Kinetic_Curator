@@ -8,7 +8,7 @@ const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
 export function SymmetryRow({ layoutParams }) {
   return (
     <div className="davis-source-row" style={{ marginTop: 6 }}>
-      <span className="davis-label">SYMMETRY</span>
+      <span className="davis-label lbl">symmetry</span>
       {SYMMETRY_MODES.map((s) => (
         <button key={s} type="button" className={`chip-btn chip-symmetry ${(layoutParams.symmetry || 'none') === s ? 'active' : ''}`} onClick={() => set('symmetry', s)}>{s.toUpperCase()}</button>
       ))}
@@ -19,7 +19,7 @@ export function SymmetryRow({ layoutParams }) {
 export function BehaveRow({ layoutParams }) {
   return (
     <div className="davis-source-row" style={{ marginTop: 6 }}>
-      <span className="davis-label">BEHAVE</span>
+      <span className="davis-label lbl">behave</span>
       {BEHAVE_MODES.map((s) => (
         <button key={s} type="button" className={`chip-btn chip-behave ${(layoutParams.behave || 'cruise') === s ? 'active' : ''}`} onClick={() => set('behave', s)}>{s.toUpperCase()}</button>
       ))}

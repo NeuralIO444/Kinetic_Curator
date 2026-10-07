@@ -60,7 +60,7 @@ export function VoiceDish({ voice, onClose }) {
       <div className="voice-dish-assets" title="The voice's cast">{assetIds.join(' · ') || 'all assets'}</div>
 
       <details className="voice-dish-more">
-        <summary>MORE</summary>
+        <summary className="ttl">more</summary>
         {Object.keys(PARAM_SPEC).filter((k) => numericParam(k) && !VISIBLE.some((v) => v.key === k))
           .map((k) => knob(k, k.toUpperCase()))}
         <RangeRow label="GLOW" value={draft.fx.glow} min={0} max={1} step={0.01} onChange={(v) => setFx('glow', v)} />
@@ -86,7 +86,7 @@ export function VoiceDish({ voice, onClose }) {
           title={full ? `MY VOICES is full (${MAX_USER_VOICES})` : 'Save this copy as a new voice in MY VOICES and load it'}>
           {full ? 'MY VOICES FULL' : 'SAVE AS VOICE'}
         </button>
-        <button type="button" className="big-btn" onClick={onClose}>CANCEL</button>
+        <button type="button" className="big-btn act" onClick={onClose}>cancel</button>
       </div>
     </div>
   );
