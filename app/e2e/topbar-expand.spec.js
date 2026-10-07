@@ -4,8 +4,8 @@
 import { test, expect } from '@playwright/test';
 
 // `settle` waits out the cold open (the verbs show their full names for ~2 s), so rest-state tests measure rest.
-async function boot(page, { settle = true } = {}) {
-  await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+async function boot(page, { settle = true, coldMs = 0 } = {}) {
+  await page.addInitScript((ms) => { if (ms) window.__KC_COLD_OPEN_MS = ms; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } }, coldMs);
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   if (settle) await expect(page.locator('.kc-topbar-curator .kinetic-btn')).not.toHaveAttribute('data-open', 'true', { timeout: 6000 });
@@ -88,17 +88,19 @@ test('KIN still builds and sheds heat: rapid taps widen it, and it cools back', 
 });
 
 test('cold open: KINETIC and CURATOR show their full names, then cool down to KIN and CUR; L and V stay L and V', async ({ page }) => {
-  await boot(page, { settle: false });
+  await boot(page, { settle: false, coldMs: 7000 }); // a longer window than the real 2.2 s, so a slow runner cannot miss it
   const kin = group(page).locator('.kinetic-btn');
   const cur = group(page).locator('.randomize-btn');
   await expect(kin).toHaveAttribute('data-open', 'true');
   await expect(cur).toHaveAttribute('data-open', 'true');
-  // measure the OPEN width only once the letters have finished arriving (a slow runner samples mid-open)
-  const settled = async (loc) => { let w = await width(loc); let max = w; for (let i = 0; i < 8; i++) { await page.waitForTimeout(120); const n = await width(loc); max = Math.max(max, n); if (n === w) break; w = n; } return max; };
-  const opened = { kin: await settled(kin), cur: await settled(cur) };
+  // measure the OPEN width only once every letter has arrived (a slow runner starts the opening late, so a width
+  // read right after data-open can still be the resting one)
+  const arrived = (loc) => expect.poll(() => loc.locator('.xl-ch').evaluateAll((els) => els.length > 0 && els.every((e) => parseFloat(getComputedStyle(e).opacity) > 0.99)), { timeout: 4000 }).toBe(true);
+  await arrived(kin); await arrived(cur);
+  const opened = { kin: await width(kin), cur: await width(cur) };
   expect(await text(btn(page, /^Looks/)), 'L is not part of the cold open').toBe('l');
   expect(await text(btn(page, /^Voice/))).toBe('v');
-  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 6000 });
+  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 12000 });
   await expect(cur).not.toHaveAttribute('data-open', 'true');
   await expect.poll(async () => width(kin), { timeout: 3000 }).toBeLessThan(opened.kin - 8);
   await expect.poll(async () => width(cur), { timeout: 3000 }).toBeLessThan(opened.cur - 8);

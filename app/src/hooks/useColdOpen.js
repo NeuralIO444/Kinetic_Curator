@@ -2,7 +2,9 @@ import { useSyncExternalStore } from 'react';
 import { createColdOpen } from './coldOpen.mjs';
 
 // One cold open per page load, shared by every top-bar button.
-const coldOpen = createColdOpen();
+// `window.__KC_COLD_OPEN_MS` is a test hook (like __KC_EXPOSE_STORE): a starved CI runner can take longer than the
+// real 2.2 s just to get to the first assertion, so the e2e stretches the window instead of racing it.
+const coldOpen = createColdOpen({ ms: (typeof window !== 'undefined' && Number(window.__KC_COLD_OPEN_MS)) || undefined });
 let begun = false;
 const begin = () => {
   if (begun || typeof window === 'undefined') return;
