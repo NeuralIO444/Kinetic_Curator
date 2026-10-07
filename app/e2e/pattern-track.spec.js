@@ -21,6 +21,8 @@ test('a PATTERN track draws in every mode, still and drifting, without faulting 
   await expect(page.locator('.panel-canvas canvas').first()).toBeVisible();
   const kcLayers = await page.evaluate(() => window.__kcStore.getState().layers.length);
 
+  await page.waitForTimeout(1500);
+  const before = { pills: await pillText(page), fps: await frames() };
   await st('addPatternLayer', 'QUILT');
   const id = await page.evaluate(() => window.__kcStore.getState().layers.find((l) => l.type === 'pattern').id);
   expect(await page.evaluate(() => window.__kcStore.getState().layers.length)).toBe(kcLayers + 1);
@@ -30,7 +32,7 @@ test('a PATTERN track draws in every mode, still and drifting, without faulting 
     for (const drift of [0, 0.6]) {
       await st('setPatternParam', id, 'drift', drift);
       await page.waitForTimeout(900);
-      expect(await faulted(page), `${mode} drift ${drift}: a fault pill is showing: ${JSON.stringify(await pillText(page))} ${JSON.stringify(errors.slice(0, 4))}`).toBe(0);
+      expect(await faulted(page), `${mode} drift ${drift}: a fault pill is showing: ${JSON.stringify(await pillText(page))} before-add ${JSON.stringify(before)} fps ${await frames()} ${JSON.stringify(errors.slice(0, 4))}`).toBe(0);
     }
     await st('shufflePattern', id);
     await page.waitForTimeout(500);
