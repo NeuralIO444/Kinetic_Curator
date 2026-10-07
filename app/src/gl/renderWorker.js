@@ -31,6 +31,10 @@ import { attachVelocities } from './velocitySmear.mjs';
 import { motionAmount, noteWetFrame } from './vortex.mjs';
 import { halfLifeToKeep } from '../components/taper.js';
 import { createBallisticsState, processBallistics } from './audioBallistics.mjs';
+import { audioRoutes } from './audioRoutes.mjs'; // #1110: the worker evaluates the route table itself
+import { applyHueAudio } from './hueAudio.mjs';
+import { applyLightAudio } from './lightAudio.mjs';
+import { applyPatternAudio } from './patternAudio.mjs';
 import { comboKey } from './liveAtlas.mjs';
 import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
 import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
@@ -42,6 +46,7 @@ let canvas = null;
 let live = null;
 let resolver = null;
 let ballisticsState = null;
+let routeBallisticsState = null; // #1110: its own state, so the route inputs never disturb the layout ballistics
 
 let running = false;
 let rafId = 0;
@@ -94,6 +99,7 @@ function handleInit(data) {
   live = createLiveRenderer(canvas);
   resolver = createLiveResolver();
   ballisticsState = createBallisticsState();
+  routeBallisticsState = createBallisticsState();
 
   self.postMessage({ type: 'READY' });
   startLoop();
@@ -205,6 +211,23 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
   if (injectEv.injecting) applyInject(resolved, injectEv);
   lastResolved = resolved;
 
+  // #1110 — the route table, evaluated here: the worker used to ignore it, so hue / light routes only
+  // worked in the main-thread fallback. Same inputs as liveLoop (store bands + beat, gated by audioEnabled,
+  // shaped on the worker clock). The 7 meter bands (band.*) are read from the main-thread meter, so a
+  // band.* route reads 0 in the worker. Scale / alpha / glow / squash / kineme / accum stay main-thread.
+  const audioOn = !!s.audioEnabled;
+  const routeAudio = processBallistics(routeBallisticsState, {
+    rms: audioOn ? (s.audioBands?.rms || 0) : 0,
+    bass: audioOn ? (s.audioBands?.bass || 0) : 0,
+    mid: audioOn ? (s.audioBands?.mid || 0) : 0,
+    treble: audioOn ? (s.audioBands?.treble || 0) : 0,
+    beatPulse: audioOn ? (s.beatPulse || 0) : 0,
+  }, dtMs);
+  const routes = audioRoutes(routeAudio, {
+    depth: layoutParams.audioModDepth ?? 0.65, scaleMod: layoutParams.audioScaleMod ?? 0.45, alphaMod: layoutParams.audioAlphaMod ?? 0.25,
+  }, s.audioRoutes, null);
+  applyPatternAudio(resolved, routes.pattern);
+
   // Scene contract
   const contract = buildSceneContract({
     doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(frameTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: tintTargetPalette },
@@ -212,6 +235,8 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
     caps: null,
     accum: null,
   });
+  applyHueAudio(contract.layers, routes.hue ?? 0);
+  applyLightAudio(contract, routes.sun ?? 0);
 
   // Viewport transforms
   const zoom = view.zoom || 1;

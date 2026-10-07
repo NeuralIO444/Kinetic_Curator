@@ -48,7 +48,17 @@ export const ROUTE_TARGETS = Object.freeze({
   'render.accum': Object.freeze({ clamp: [0, 40] }),
   'render.sun': Object.freeze({ clamp: [0, 1] }),
   'light.intensity': Object.freeze({ clamp: [0, 1] }), // #790: shipped light target id
+  // #1110 — PATTERN tracks. The output is an OFFSET added to the track's own value (then clamped to that
+  // param's range by sanitizePattern), applied to every pattern track. density is in tiles.
+  'pattern.drift': Object.freeze({ clamp: [-1, 1] }),
+  'pattern.mix': Object.freeze({ clamp: [-1, 1] }),
+  'pattern.hero': Object.freeze({ clamp: [-1, 1] }),
+  'pattern.grout': Object.freeze({ clamp: [-1, 1] }),
+  'pattern.density': Object.freeze({ clamp: [-8, 8] }),
 });
+
+/** The pattern params a route may move, in output order. */
+export const PATTERN_ROUTE_PARAMS = Object.freeze(['drift', 'mix', 'hero', 'grout', 'density']);
 
 /** Most routes a table may hold. */
 export const MAX_ROUTES = 16;
@@ -109,6 +119,7 @@ export function routesUseBands(routes) {
 export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands = null) {
   const c = compile(routes);
   let scale = 0, alpha = 0, breath = 0, glow = 0, hue = 0, squash = 0, kinemeRate = 0, accum = 0, sun = 0;
+  const pat = {};
   for (let i = 0; i < c.n; i++) {
     const v = c.read[i](a, bands) * c.depth[i];
     switch (c.target[i]) {
@@ -124,7 +135,9 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
       case 'render.accum': accum += v; break;
       case 'render.sun':
       case 'light.intensity': sun += v; break;
-      default: break;
+      default:
+        if (c.target[i].startsWith('pattern.')) pat[c.target[i].slice(8)] = (pat[c.target[i].slice(8)] || 0) + v;
+        break;
     }
   }
   const out = {
@@ -139,6 +152,8 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
   if (used.has('render.kineme') || used.has('clock.kinemeRate')) out.kinemeRate = clampTo(kinemeRate * depth, ROUTE_TARGETS['clock.kinemeRate'].clamp);
   if (used.has('render.accum')) out.accum = clampTo(accum * depth, ROUTE_TARGETS['render.accum'].clamp);
   if (used.has('render.sun') || used.has('light.intensity')) out.sun = clampTo(sun * depth, ROUTE_TARGETS['light.intensity'].clamp);
+  // #1110 — only the pattern params a route targets appear, so a table without one adds no key
+  for (const k of Object.keys(pat)) (out.pattern ||= {})[k] = clampTo(pat[k] * depth, ROUTE_TARGETS[`pattern.${k}`].clamp);
   return out;
 }
 

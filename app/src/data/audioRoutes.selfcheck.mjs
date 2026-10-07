@@ -128,8 +128,13 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   assert.deepStrictEqual(nextRoute([], 'band.mud'), { input: 'band.mud', target: 'render.scale', depth: NEW_ROUTE_DEPTH['render.scale'] }, 'a clicked band starts on the first target');
   assert.deepStrictEqual(nextRoute([R('band.mud', 'render.scale', 0.1)], 'band.mud').target, 'render.alpha', '… then the next free one for that band');
   assert.strictEqual(nextRoute([], null).input, 'band.air', "'+ ROUTE' starts on AIR");
-  const allMud = Object.keys(ROUTE_TARGETS).map((t) => R('band.mud', t, 0.01));
-  assert.notStrictEqual(nextRoute(allMud, 'band.mud').input, 'band.mud', 'a band with every target taken moves on to another input');
+  // (#1110: there are now more targets than MAX_ROUTES, so one band can no longer hold them all; a table that
+  // is one short of full still hands its clicked band the next free target, and a full one hands out nothing)
+  const targets = Object.keys(ROUTE_TARGETS);
+  assert.ok(targets.length > MAX_ROUTES, 'more targets than a table can hold');
+  const mud = targets.slice(0, MAX_ROUTES - 1).map((t) => R('band.mud', t, 0.01));
+  assert.deepStrictEqual(nextRoute(mud, 'band.mud').target, targets[MAX_ROUTES - 1], 'a band with most targets taken gets the next free one');
+  assert.strictEqual(nextRoute(targets.slice(0, MAX_ROUTES).map((t) => R('band.mud', t, 0.01)), 'band.mud'), null, 'a full table hands out nothing');
   assert.strictEqual(nextRoute(Array.from({ length: MAX_ROUTES }, (_, i) => R(ROUTE_INPUTS[i % 12], Object.keys(ROUTE_TARGETS)[i % 4], 0.01))), null, 'full table: nothing to add');
   for (const t of Object.keys(ROUTE_TARGETS)) {
     const rg = routeDepthRange(t);
