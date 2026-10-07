@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
+import { useStore } from '../../state/store.js';
+import { stackOf } from '../../state/recipeStack.js'; // #1131: a snapshot's recipe carries the layer stack
 import { captureStill, useVideoRecorder } from '../../hooks/useMediaExport.js';
 import { resolutionLabel } from '../../data/quality.js';
 import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read the single map
@@ -36,6 +38,7 @@ export function SnapRecordRow({
           resolution: `${resolutionLabel(exportResolution)}${accumOn ? ' · ACCUM' : ''}${up ? ` · upscaled ${up.width}×${up.height}→${exportResolution}x` : ''}`,
           timestamp: new Date().toISOString().slice(11, 19),
           config: { layout: { ...layoutParams }, palette: { id: palette.id } },
+          ...((s) => (s ? { stack: s } : {}))(stackOf(useStore.getState())),
           thumb,
         });
       },

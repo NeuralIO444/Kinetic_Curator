@@ -8,11 +8,15 @@
 //   - recipeToProjectDoc(recipe) -> a doc for the existing EXPORT_LOAD_PROJECT
 //     path, so pasting a recipe back restores the exact scene.
 //
+import { stackOf, expandStack } from './recipeStack.js';
+
 // Pure, node-importable: no React, no DOM, no store. The selfcheck covers the
 // round-trip. Node-safe: copyTextToClipboard guards navigator/document.
 
 /** Version tag — the first line of every recipe. Bump on format change. */
 export const RECIPE_VERSION = 'kc-recipe/1';
+/** A recipe that also carries the layer stack (#1131). Scenes with nothing beyond one plain KC track stay /1. */
+export const RECIPE_VERSION_2 = 'kc-recipe/2';
 
 /**
  * Sub-seed offset channels. Issue #305 stores these at state.seedOffsets as
@@ -57,7 +61,14 @@ export function recipeFieldsFromKept(kept) {
     paletteId: typeof palette.id === 'string' && palette.id ? palette.id
       : (typeof k.paletteId === 'string' && k.paletteId ? k.paletteId : null),
     layoutParams: { ...layout },
+    ...stackField(k),
   };
+}
+
+// #1131 — the layer stack rides along when the carrier has one (a live store, or a keep that stored it).
+function stackField(k) {
+  const stack = stackOf(k);
+  return stack ? { stack } : {};
 }
 
 /** Encode one value for a recipe line: JSON-first so numbers, booleans,
@@ -87,12 +98,14 @@ export function encodeRecipe(fields) {
   const seed = (f.seed >>> 0).toString(16);
   const offsets = readSeedOffsets({ seedOffsets: f.seedOffsets });
   const layout = (f.layoutParams && typeof f.layoutParams === 'object') ? f.layoutParams : {};
-  const lines = [RECIPE_VERSION, `seed: 0x${seed}`];
+  const stack = f.stack && typeof f.stack === 'object' ? f.stack : null;
+  const lines = [stack ? RECIPE_VERSION_2 : RECIPE_VERSION, `seed: 0x${seed}`];
   lines.push(`palette: ${typeof f.paletteId === 'string' && f.paletteId ? encodeValue(f.paletteId) : 'null'}`);
   for (const ch of RECIPE_OFFSET_CHANNELS) lines.push(`seedOffset.${ch}: ${offsets[ch]}`);
   for (const key of Object.keys(layout).sort()) {
     lines.push(`layout.${key}: ${encodeValue(layout[key])}`);
   }
+  if (stack) lines.push(`stack: ${JSON.stringify(stack)}`); // one JSON line: layers, active track, the other tracks' save states
   return lines.join('\n');
 }
 
@@ -135,11 +148,11 @@ export function parseRecipe(text) {
   if (typeof text !== 'string' || !text.trim()) return fail('Empty recipe — paste kc-recipe/1 text first.');
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   const [head, ...rest] = lines;
-  if (head !== RECIPE_VERSION) {
-    return fail(`Not a recipe: the first line must be "${RECIPE_VERSION}".`);
+  if (head !== RECIPE_VERSION && head !== RECIPE_VERSION_2) {
+    return fail(`Not a recipe: the first line must be "${RECIPE_VERSION}" or "${RECIPE_VERSION_2}".`);
   }
   const recipe = {
-    version: RECIPE_VERSION,
+    version: head,
     seed: null,
     seedOffsets: readSeedOffsets(null),
     paletteId: null,
@@ -167,6 +180,12 @@ export function parseRecipe(text) {
       const param = key.slice('layout.'.length);
       if (!param || param.includes('.')) return fail(`Bad layout key "${key}".`);
       recipe.layoutParams[param] = parseValue(rawVal);
+    } else if (key === 'stack' && head === RECIPE_VERSION_2) {
+      let raw;
+      try { raw = JSON.parse(rawVal); } catch { return fail('Bad stack line: it is not readable.'); }
+      const ex = expandStack(raw);
+      if (!ex.ok) return fail(`Bad stack line: ${ex.error}.`);
+      recipe.stack = ex.stack;
     } else {
       return fail(`Unknown recipe key "${key}".`);
     }
@@ -189,6 +208,7 @@ export function recipeToProjectDoc(recipe) {
     paletteId: recipe.paletteId,
     layoutParams: { ...recipe.layoutParams },
     seedOffsets: { ...recipe.seedOffsets },
+    ...(recipe.stack ? { layers: recipe.stack.layers, activeLayerId: recipe.stack.activeLayerId, layerSnapshots: recipe.stack.layerSnapshots } : {}),
   };
 }
 

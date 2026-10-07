@@ -140,7 +140,7 @@ const FIELDS = {
     ['', 'empty'],
     ['   ', 'blank'],
     ['seed: 0x1', 'missing version tag'],
-    ['kc-recipe/2\nseed: 0x1', 'wrong version'],
+    ['kc-recipe/3\nseed: 0x1', 'wrong version'],
     ['kc-recipe/1', 'no seed line'],
     ['kc-recipe/1\nno colon here', 'line without colon'],
     ['kc-recipe/1\nseed: xyz!', 'bad seed'],

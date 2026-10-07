@@ -30,7 +30,7 @@ export const MIDI_TARGETS = Object.freeze([
       const s = ctx.getState();
       ctx.emit(ctx.Events.DAVIS_FAVORITE, {
         action: 'add',
-        favorite: captureFavorite({ seed: s.seed, seedOffsets: s.seedOffsets, layoutParams: s.layoutParams, enabledAssets: s.enabledAssets }, s.paletteId),
+        favorite: captureFavorite({ seed: s.seed, seedOffsets: s.seedOffsets, layoutParams: s.layoutParams, enabledAssets: s.enabledAssets, layers: s.layers, activeLayerId: s.activeLayerId, layerSnapshots: s.layerSnapshots }, s.paletteId),
       });
     },
   },
