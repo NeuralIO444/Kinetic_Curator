@@ -5,6 +5,7 @@
 import { test, expect } from '@playwright/test';
 
 const faulted = (page) => page.locator('.status-pill', { hasText: /RENDER FAULT|GL CONTEXT LOST|PERF PAUSED/i }).count();
+const pillText = (page) => page.locator('.status-pill').allInnerTexts();
 
 test('a PATTERN track draws in every mode, still and drifting, without faulting the renderer', async ({ page }) => {
   const errors = [];
@@ -29,7 +30,7 @@ test('a PATTERN track draws in every mode, still and drifting, without faulting 
     for (const drift of [0, 0.6]) {
       await st('setPatternParam', id, 'drift', drift);
       await page.waitForTimeout(900);
-      expect(await faulted(page), `${mode} drift ${drift}: a fault pill is showing`).toBe(0);
+      expect(await faulted(page), `${mode} drift ${drift}: a fault pill is showing: ${JSON.stringify(await pillText(page))} ${JSON.stringify(errors.slice(0, 4))}`).toBe(0);
     }
     await st('shufflePattern', id);
     await page.waitForTimeout(500);
