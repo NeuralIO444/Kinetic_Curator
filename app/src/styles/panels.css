@@ -636,42 +636,67 @@
   position: fixed; inset: 0; z-index: 1000;
   display: flex; align-items: center; justify-content: center;
   background: rgba(0,0,0,0.7);
+  /* #1043 — recorded exception to DESIGN_SYSTEM.md §1.4 ("no blur"): the scrim keeps its
+     backdrop blur so the instrument behind the Help modal stays out of focus (Matt, 2026-10-06). */
   backdrop-filter: blur(4px);
   animation: fadeIn 120ms ease-out;
 }
 @keyframes fadeIn { from { opacity: 0; } }
+/* #1043 — sized in viewport percent, type scales with it, nothing ever leaves the screen. */
 .hotkey-card {
+  display: flex; flex-direction: column;
+  width: 70vw; min-width: min(560px, 92vw); max-width: 92vw;
+  max-height: 90vh;
+  font-size: clamp(13px, 1.1vw, 22px);
   background: var(--panel);
   border: 1px solid var(--line-2);
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-  min-width: 280px;
-  max-width: 380px;
 }
 .hotkey-card-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 12px;
+  padding: 8px 16px;
   background: var(--panel-2);
   border-bottom: 1px solid var(--line);
-  font-size: 10px; font-weight: 800; letter-spacing: 0.1em; color: var(--dim);
+  font-size: 0.9em; font-weight: 800; letter-spacing: 0.1em; color: var(--dim);
 }
-.hotkey-list { padding: 6px 12px; }
+.hotkey-close { min-width: 44px; min-height: 44px; font-size: 1.4em; }
+.hotkey-tabs { display: flex; gap: 4px; padding: 12px 16px; flex: 0 0 auto; }
+.hotkey-tabs .chip-btn { min-height: 44px; padding: 8px 16px; font-size: 0.9em; }
+.hotkey-tools { display: flex; gap: 12px; align-items: center; padding: 0 16px 12px; flex: 0 0 auto; }
+.hotkey-search { flex: 1; min-height: 44px; padding: 8px 12px; font-size: 1em; background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.hotkey-tour { min-height: 44px; padding: 8px 16px; font-size: 0.9em; white-space: nowrap; }
+.hotkey-list { padding: 4px 16px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
 .hotkey-row {
-  display: grid; grid-template-columns: 56px 1fr;
-  align-items: center; gap: 10px;
-  padding: 4px 0;
+  display: grid; grid-template-columns: minmax(7em, 14em) 1fr;
+  align-items: center; gap: 16px;
+  min-height: 44px; padding: 8px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 1em;
 }
+.hotkey-row-top { align-items: start; }
 .hotkey-row:last-child { border-bottom: none; }
 .hotkey-key {
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 2px 8px;
+  padding: 4px 8px;
   background: rgba(255,255,255,0.06);
   border: 1px solid var(--line-2);
   color: var(--ink); font-family: var(--mono);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  font-size: 0.95em; font-weight: 700; letter-spacing: 0.06em;
+  overflow-wrap: anywhere; text-align: center;
 }
-.hotkey-desc { color: var(--dim); }
+.hotkey-desc { color: var(--dim); line-height: 1.5; }
+.hotkey-empty { padding: 12px 0; }
+.hotkey-prose { padding: 8px 16px 16px; margin: 0; }
+.hotkey-about { display: grid; grid-template-columns: minmax(120px, 24%) 1fr; gap: 24px; padding: 8px 16px 16px; overflow-y: auto; min-height: 0; }
+.hotkey-about-photo { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border: 1px solid var(--line-2); }
+.hotkey-about-body { min-width: 0; }
+.hotkey-about-body .hotkey-prose { padding: 0 0 12px; }
+.hotkey-about-title { margin: 0 0 4px; font-size: 1.4em; font-weight: 800; letter-spacing: 0.04em; color: var(--ink); }
+.hotkey-about-tagline { margin: 0 0 12px; color: var(--dim); font-style: italic; }
+.hotkey-about-links { margin: 8px 0 12px; }
+.hotkey-link { display: flex; align-items: center; min-height: 44px; color: var(--accent2); text-decoration: none; overflow-wrap: anywhere; }
+.hotkey-link:hover { text-decoration: underline; }
+.hotkey-version { font-size: 0.8em; letter-spacing: 0.04em; }
+@media (max-width: 720px) { .hotkey-about { grid-template-columns: 1fr; } .hotkey-about-photo { max-width: 240px; } }
 
 /* ─── Custom Animations ─── */
 @keyframes beatFlash {
