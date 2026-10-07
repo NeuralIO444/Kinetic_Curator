@@ -70,6 +70,7 @@ node src/state/paletteLibrary.selfcheck.mjs
 node src/components/paletteWing.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
 node src/components/rangeRow.selfcheck.mjs
+node src/components/pinkDiscipline.selfcheck.mjs
 node src/components/retiredEmoji.selfcheck.mjs
 node src/state/enabledAssetsRoundTrip.selfcheck.mjs
 node src/state/bundle.selfcheck.mjs

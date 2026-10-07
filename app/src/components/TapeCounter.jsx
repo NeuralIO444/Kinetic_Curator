@@ -33,8 +33,8 @@ function lastShedLabel() {
   return null;
 }
 
-const RED = { background: 'rgba(255, 45, 111, 0.18)', color: '#ff2d6f', borderColor: '#ff2d6f' };
-const AMBER = { background: 'rgba(255, 176, 0, 0.18)', color: '#ffb000', borderColor: '#ffb000' };
+const GREEN = { background: 'rgba(0, 255, 136, 0.14)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' };
+const AMBER = { background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' };
 
 export function TapeCounter() {
   const { state } = useApp((s) => ({
@@ -94,24 +94,24 @@ export function TapeCounter() {
   // --- state 1: render fault (hard-stop class, red, explicit) ---
   if (renderFault) {
     return (
-      <div className="status-pill" style={RED}
+      <div className="status-pill" style={AMBER}
         title={renderFaultReason
           ? `Render fault: ${renderFaultReason}. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.`
           : 'Render fault: a deterministic per-frame failure stopped presenting. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.'}
       >
-        <span className="status-dot" style={{ background: '#ff2d6f' }} />
+        <span className="status-dot" style={{ background: 'var(--kc-warn)' }} />
         RENDER FAULT
       </div>
     );
   }
 
-  // --- state 2: watchdog hard stop (red — never auto-resumes) ---
+  // --- state 2: watchdog hard stop (green: paused is safe to look away — never auto-resumes) ---
   if (watchdog) {
     return (
-      <div className="status-pill" style={RED}
+      <div className="status-pill" style={GREEN}
         title="Watchdog tripped: running and evolve are off and will not resume on their own. Press space or ▶ RUN to resume."
       >
-        <span className="status-dot" style={{ background: '#ff2d6f' }} />
+        <span className="status-dot" style={{ background: 'var(--kc-ok)' }} />
         PERF PAUSED
       </div>
     );

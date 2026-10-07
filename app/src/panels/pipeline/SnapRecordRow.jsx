@@ -54,7 +54,7 @@ export function SnapRecordRow({
         onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
         disabled={rendering}
         title={helpText('output-webm')}
-        style={isRecording ? { background: '#ff2d6f', color: '#fff', borderColor: '#ff2d6f', flex: 2 } : { flex: 2 }}
+        style={isRecording ? { background: 'var(--kc-live)', color: '#fff', borderColor: 'var(--kc-live)', flex: 2 } : { flex: 2 }}
       >
         {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}
       </button>

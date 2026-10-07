@@ -117,7 +117,7 @@ export function AssetPoolPanel() {
         </div>
       </PanelHeader>
       {ingestError && <div style={{ color: 'var(--accent)', fontSize: 11, padding: '4px 10px' }}>INGEST: {ingestError}</div>}
-      {studioError && <div style={{ color: '#ff2d6f', fontSize: 11, padding: '4px 10px' }}>STUDIO failed to load — reload the page to retry. ({studioError})</div>}
+      {studioError && <div style={{ color: 'var(--kc-warn)', fontSize: 11, padding: '4px 10px' }}>STUDIO failed to load — reload the page to retry. ({studioError})</div>}
       <div className="pool-controls">
         <div className="cat-filter">
           <button className={`cat-chip ${catFilter === 'all' ? 'active' : ''}`} onClick={() => emit(Events.ASSETS_CAT_FILTER, 'all')}>
