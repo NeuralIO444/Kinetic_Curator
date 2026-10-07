@@ -1,7 +1,5 @@
-// engine.js — PATTERN engine, mode-agnostic core + FIELD (#1039) + QUILT (#1040).
-//
-// GLYPH (#1041) plugs into the same tile grid, seed, palette sampling and
-// renderer later; ESCHER stays parked.
+// engine.js — PATTERN engine, mode-agnostic core + FIELD (#1039) + QUILT (#1040)
+// + GLYPH (#1041). ESCHER stays parked.
 //
 // Everything that decides WHAT is drawn is pure and seeded: `assign` is a pure
 // function of (seed, density, mix, palette), the pan offset is a pure function
@@ -11,6 +9,8 @@
 import { mkRng } from '../engine/prng.js';
 import { FIELD_PATTERNS, samplePattern, patternParams } from './field.js';
 import { TILE_MOTIFS, HERO_MOTIFS, sampleQuilt, quiltParams } from './quilt.js';
+import { GLYPH_MARKS, FILLED_MARKS, RHYTHM_MARKS, POSES, MIN_STROKE, buildMark, sampleMark, motifRoles } from './glyph.js';
+import { rankedSwatches } from '../data/swatchWeights.js';
 
 /** FIELD pan at DRIFT 100%, in tiles per second (#1042 owns tuning). */
 export const FIELD_PAN_TILES_PER_S = 0.25;
@@ -24,6 +24,16 @@ export const QUILT_DEFAULT_MIX = 0.55;
 export const QUILT_DEFAULT_GROUT = 0.03;
 export const QUILT_MAX_GROUT = 0.08;
 export const QUILT_DEFAULT_HERO = 0.25;
+
+/** GLYPH defaults (docs/PATTERN_SPEC.md, #1041). DENSITY 4 is the 5×4 poster grid. */
+export const GLYPH_DEFAULT_DENSITY = 4;
+export const GLYPH_DEFAULT_MIX = 0.55;
+/** GLYPH draws from at most this many of the palette's strongest swatches. */
+export const GLYPH_MAX_ROLES = 6;
+/** DRIFT pulse depth: scale = 1 + 0.2 × DRIFT × sin(phase + t). */
+export const GLYPH_PULSE = 0.2;
+/** The filled-mark quota: at least one per aligned run of this many tiles. */
+export const GLYPH_QUOTA_RUN = 8;
 
 /** uint32 mix of (seed, i): one independent rng stream per tile. */
 export function hash32(seed, i) {
@@ -290,29 +300,216 @@ export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0) {
   return buf;
 }
 
+// ── GLYPH (#1041) ───────────────────────────────────────────────────────────
+
+/** cols × rows for a DENSITY: 5:4, clamped. DENSITY 4 → 5×4, 8 → 10×8, 12 → 15×12. */
+export function glyphGrid(density) {
+  const d = Number(density) || GLYPH_DEFAULT_DENSITY;
+  return {
+    cols: Math.min(16, Math.max(4, Math.round((5 * d) / 4))),
+    rows: Math.min(12, Math.max(3, Math.round(d))),
+  };
+}
+
+/**
+ * The restricted set: the palette's strongest swatches by weight (#1049), at
+ * most GLYPH_MAX_ROLES, duplicates dropped. Ground is the darkest OF THAT SET;
+ * the rest is the MARK / CUT / ACCENT pool, strongest first.
+ */
+export function glyphRoles(palette) {
+  const set = [...new Set(rankedSwatches(palette))].slice(0, GLYPH_MAX_ROLES);
+  const all = set.length ? set : [palette?.bg || '#000000', palette?.ink || '#ffffff'];
+  let gi = 0;
+  all.forEach((c, i) => { if (lum(c) < lum(all[gi])) gi = i; });
+  return { ground: all[gi], pool: all.filter((_, i) => i !== gi) };
+}
+
+/**
+ * The glyph assignment: pure function of its inputs.
+ *
+ * Marks and colors are two independent seeded walks. MIX is mark entropy only:
+ * low MIX alternates sunburst / crossed disc, MIX is the per-tile probability
+ * of a free draw from all thirteen. The filled-mark quota then repairs any
+ * aligned run of 8 that has no distance anchor. The color walk is row-major
+ * and never gives a tile the MARK color of its left or upper neighbor.
+ *
+ * No heroes: HERO is not a parameter here.
+ *
+ * @returns {{cols, rows, ground, groundRgba, pool, tiles}} tiles row-major, each
+ *   {mark, pose, ops, roles:{mark,cut,accent,ground}, rgba:{...}, used:string[]}.
+ */
+export function assignGlyph(seed, density, mix, palette) {
+  const { cols, rows } = glyphGrid(density);
+  const count = cols * rows;
+  const { ground, pool } = glyphRoles(palette);
+  const m = clamp01(mix);
+
+  // 1) marks
+  const mrng = mkRng(hash32(seed, 0x61f));
+  const marks = [];
+  for (let i = 0; i < count; i++) {
+    const draw = mrng(); const free = Math.floor(mrng() * GLYPH_MARKS.length);
+    const c = i % cols; const r = Math.floor(i / cols);
+    marks.push(draw < m ? GLYPH_MARKS[free] : RHYTHM_MARKS[(c + r) % 2]);
+  }
+  // quota: every full aligned run of 8 holds a filled mark; a trailing partial run is exempt.
+  for (let start = 0; start + GLYPH_QUOTA_RUN <= count; start += GLYPH_QUOTA_RUN) {
+    const pickFilled = FILLED_MARKS[Math.floor(mrng() * FILLED_MARKS.length)]; // drawn every run: the stream does not depend on the repair
+    const run = marks.slice(start, start + GLYPH_QUOTA_RUN);
+    if (!run.some((n) => FILLED_MARKS.includes(n))) marks[start + GLYPH_QUOTA_RUN - 1] = pickFilled;
+  }
+
+  // 2) color walk
+  const crng = mkRng(hash32(seed, 0xc01));
+  const flip = crng() < 0.5 ? 0 : 1; // pool of two: which role takes even parity
+  const markCol = [];
+  for (let i = 0; i < count; i++) {
+    const c = i % cols; const r = Math.floor(i / cols);
+    const roll = crng();
+    if (pool.length <= 1) { markCol.push(pool[0] ?? ground); continue; } // rule waived
+    if (pool.length === 2) { markCol.push(pool[(c + r + flip) % 2]); continue; }
+    const left = c > 0 ? markCol[i - 1] : null; const up = r > 0 ? markCol[i - cols] : null;
+    const ok = pool.filter((p) => p !== left && p !== up);
+    markCol.push(ok[Math.floor(roll * ok.length)]);
+  }
+
+  // 3) pose, variant, secondary roles — one stream per tile
+  const tiles = marks.map((mark, i) => {
+    const trng = mkRng(hash32(seed, 0x7000 + i));
+    const pose = POSES[Math.floor(trng() * POSES.length)];
+    const ops = buildMark(mark, trng, pose);
+    const others = pool.filter((p) => p !== markCol[i]);
+    // CUT and ACCENT are distinct from MARK and from each other while the pool allows it.
+    const cut = others.length ? others[Math.floor(trng() * others.length)] : markCol[i];
+    const rest = others.filter((p) => p !== cut);
+    const accent = rest.length ? rest[Math.floor(trng() * rest.length)] : cut;
+    const roles = { mark: markCol[i], cut, accent, ground };
+    const used = [...new Set(motifRoles(ops).map((k) => roles[k]))];
+    return { mark, pose, ops, roles, rgba: { mark: toRgba(roles.mark), cut: toRgba(cut), accent: toRgba(accent), ground: toRgba(ground) }, used };
+  });
+
+  return { cols, rows, ground, groundRgba: toRgba(ground), pool, tiles };
+}
+
+/** DRIFT pulse for tile i at time t: 1 at DRIFT 0, within [0.8, 1.2] at DRIFT 100%. */
+export function glyphScale(i, count, drift, t) {
+  return 1 + GLYPH_PULSE * clamp01(drift) * Math.sin((i * Math.PI * 2) / count + (Number(t) || 0));
+}
+
+/**
+ * Where the grid sits in a bw × bh frame: square tiles, centered, letterboxed.
+ * @returns {{tile, x0, y0}} tile size and top-left of the grid, in pixels.
+ */
+export function glyphLayout(grid, bw, bh) {
+  const tile = Math.min(bw / grid.cols, bh / grid.rows);
+  return { tile, x0: (bw - tile * grid.cols) / 2, y0: (bh - tile * grid.rows) / 2 };
+}
+
+/**
+ * Rasterize the glyph board into a Uint32Array (RGBA, little-endian) of bw × bh.
+ * Frame outside the grid is the ground role. The grid does not pan; DRIFT is a
+ * per-tile scale pulse about the tile center.
+ *
+ * GROUT is not a parameter: in GLYPH it is a hairline in the GROUND role that
+ * never enters the mark box, and a mark never reaches a seam (72% of the tile
+ * at most). Ground on ground draws nothing, so there is nothing to draw.
+ */
+export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0) {
+  const { cols, rows, tiles, groundRgba } = grid;
+  const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
+  const count = cols * rows;
+  const scales = tiles.map((_, i) => glyphScale(i, count, drift, t));
+  for (let y = 0; y < bh; y++) {
+    const gy = (y + 0.5 - y0) / tile; const r = Math.floor(gy);
+    for (let x = 0; x < bw; x++) {
+      const gx = (x + 0.5 - x0) / tile; const c = Math.floor(gx);
+      if (c < 0 || c >= cols || r < 0 || r >= rows) { buf[y * bw + x] = groundRgba; continue; }
+      const i = r * cols + c;
+      const role = sampleMark(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i]);
+      buf[y * bw + x] = role ? tiles[i].rgba[role] : groundRgba;
+    }
+  }
+  return buf;
+}
+
+/**
+ * Draw the glyph board with canvas paths: the same ops, the same layout and the
+ * same DRIFT scale as rasterGlyph, at the output resolution. rasterGlyph is the
+ * reference the selfcheck proves; this is what the screen gets, because a board
+ * of thin strokes has to stay sharp at any size and animate at frame rate.
+ */
+export function drawGlyph(ctx, grid, w, h, drift = 0, t = 0) {
+  const { cols, rows, tiles, ground } = grid;
+  const { tile, x0, y0 } = glyphLayout(grid, w, h);
+  const count = cols * rows;
+  ctx.fillStyle = ground;
+  ctx.fillRect(0, 0, w, h); // tiles and letterbox are one ground
+  tiles.forEach((tl, i) => {
+    const scale = glyphScale(i, count, drift, t);
+    const k = tile * scale; // tile-local units → pixels
+    const ox = x0 + ((i % cols) + 0.5) * tile; const oy = y0 + (Math.floor(i / cols) + 0.5) * tile;
+    const X = (v) => ox + v * k; const Y = (v) => oy + v * k;
+    const width = (v) => Math.max(v * scale, MIN_STROKE) * tile; // the floor holds after the scale
+    for (const op of tl.ops) {
+      const color = tl.roles[op.role];
+      ctx.beginPath();
+      if (op.type === 'disc') {
+        ctx.arc(X(op.cx), Y(op.cy), op.r * k, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+      } else if (op.type === 'ring') {
+        ctx.arc(X(op.cx), Y(op.cy), op.r * k, 0, Math.PI * 2);
+        ctx.strokeStyle = color; ctx.lineWidth = width(op.w); ctx.stroke();
+      } else if (op.type === 'seg') {
+        ctx.moveTo(X(op.x1), Y(op.y1)); ctx.lineTo(X(op.x2), Y(op.y2));
+        ctx.strokeStyle = color; ctx.lineWidth = width(op.w); ctx.lineCap = op.cap; ctx.stroke();
+      } else if (op.type === 'poly') {
+        op.pts.forEach(([px, py], j) => (j ? ctx.lineTo(X(px), Y(py)) : ctx.moveTo(X(px), Y(py))));
+        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+      } else if (op.type === 'lens') {
+        // two arcs of radius R whose centers sit d either side of the long axis
+        const R = (op.a * op.a + op.h * op.h) / (2 * op.h); const d = R - op.h;
+        const half = Math.asin(op.a / R);
+        if (op.vertical) {
+          ctx.arc(X(d), Y(0), R * k, Math.PI - half, Math.PI + half);
+          ctx.arc(X(-d), Y(0), R * k, -half, half);
+        } else {
+          ctx.arc(X(0), Y(d), R * k, -Math.PI / 2 - half, -Math.PI / 2 + half);
+          ctx.arc(X(0), Y(-d), R * k, Math.PI / 2 - half, Math.PI / 2 + half);
+        }
+        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+      }
+    }
+  });
+}
+
 // Renderer scratch: one small offscreen surface, reused, never reallocated per frame.
 let scratch = null;
 const BUF_W = 512;
 
 /**
- * Draw a FIELD or QUILT frame to a 2D canvas context.
+ * Draw a FIELD, QUILT or GLYPH frame to a 2D canvas context.
  * @param {CanvasRenderingContext2D} ctx
- * @param {{mode:'FIELD'|'QUILT', seed:number, density:number, mix:number, drift:number,
+ * @param {{mode:'FIELD'|'QUILT'|'GLYPH', seed:number, density:number, mix:number, drift:number,
  *   grout?:number, hero?:number, palette:object, t:number, w:number, h:number}} o
  *   QUILT reads grout (0–0.08 of a tile) and hero (0–1); it ignores drift and t.
+ *   GLYPH letterboxes a 5:4 grid, ignores grout and hero, and pulses with drift and t.
  * Square tiles; rows fill the frame height at the same tile size (partial edge
  * tiles are fine: the field is a textile and pans). GROUT is not a parameter
  * here: FIELD forces it to 0.
  */
 export function renderPattern(ctx, o) {
-  if (o.mode !== 'FIELD' && o.mode !== 'QUILT') throw new Error(`renderPattern: mode ${o.mode} is not built yet`);
+  if (o.mode !== 'FIELD' && o.mode !== 'QUILT' && o.mode !== 'GLYPH') throw new Error(`renderPattern: mode ${o.mode} is not built yet`);
   const quilt = o.mode === 'QUILT';
-  const density = Math.max(1, Math.round(o.density || (quilt ? QUILT_DEFAULT_DENSITY : FIELD_DEFAULT_DENSITY)));
+  const glyph = o.mode === 'GLYPH';
+  const density = Math.max(1, Math.round(o.density || (quilt ? QUILT_DEFAULT_DENSITY : glyph ? GLYPH_DEFAULT_DENSITY : FIELD_DEFAULT_DENSITY)));
   const tileW = o.w / density;
   const rows = Math.max(1, Math.ceil(o.h / tileW));
-  const grid = quilt
-    ? assignQuilt(o.seed >>> 0, density, o.mix ?? QUILT_DEFAULT_MIX, o.hero ?? QUILT_DEFAULT_HERO, o.palette, rows)
-    : assign(o.seed >>> 0, density, o.mix, o.palette, rows);
+  const grid = glyph
+    ? assignGlyph(o.seed >>> 0, density, o.mix ?? GLYPH_DEFAULT_MIX, o.palette)
+    : quilt
+      ? assignQuilt(o.seed >>> 0, density, o.mix ?? QUILT_DEFAULT_MIX, o.hero ?? QUILT_DEFAULT_HERO, o.palette, rows)
+      : assign(o.seed >>> 0, density, o.mix, o.palette, rows);
+  if (glyph) { drawGlyph(ctx, grid, o.w, o.h, o.drift, o.t); return; }
   const bw = Math.min(BUF_W, Math.max(1, Math.round(o.w)));
   const bh = Math.max(1, Math.round(bw * (o.h / o.w)));
   if (!scratch || scratch.w !== bw || scratch.h !== bh) {
