@@ -67,7 +67,7 @@ assert.equal(params.composition, 'dusk-flock', 'load rewrites alias to canonical
   const here = dirname(fileURLToPath(import.meta.url));
   const read = (rel) => readFileSync(join(here, rel), 'utf8');
   const curatorBar = read('../panels/layout/CuratorBar.jsx');
-  assert.ok(/>\s*looks ▾\s*</.test(curatorBar), 'CuratorBar button says looks ▾');
+  assert.ok(/full="looks ▾"/.test(curatorBar), 'CuratorBar button says looks ▾ (its full form, via ExpandLabel #1103)');
   assert.ok(!/>\s*presets\s*▾/i.test(curatorBar), 'no "presets ▾" on the face');
   // 1.3.0 (#716): the Curator cluster's one home is the top bar, next to KC-1.
   assert.ok(/<CuratorBar \/>/.test(read('../components/PaletteStrip.jsx')), 'top bar renders the Curator cluster');
