@@ -33,6 +33,8 @@ import { Events, emit } from '../../composition/eventBus.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
 import { useColdOpen } from '../../hooks/useColdOpen.js';
+import { TAP_PULSE_MS } from '../../hooks/coldOpen.mjs';
+import { useInvite } from '../../hooks/useInvite.js';
 
 export function KineticButton() {
   const kineticRulesPass = useStore((s) => s.kineticRulesPass);
@@ -44,8 +46,10 @@ export function KineticButton() {
   const runRef = useRef({ heat: 0, taps: 0, lastTapAt: 0 });
   const coolTimerRef = useRef(null);
   const [heat, setHeat] = useState(0);
+  const [cooling, setCooling] = useState(false); // #1103 — heating is instant; only cooling glides
   const tapOpen = useTapOpen(); // #1103 — touch has no hover
   const cold = useColdOpen(); // #1103 — the first ~2 s of a page load show the full name
+  const [shimmer, markUsed] = useInvite('kinetic'); // #1103 — the sheen invites a press until it gets one
 
   const restartCooling = () => {
     if (coolTimerRef.current) clearInterval(coolTimerRef.current);
@@ -57,8 +61,10 @@ export function KineticButton() {
         coolTimerRef.current = null;
         runRef.current = { ...run, heat: 0 };
         setHeat(0);
+        setCooling(false);
       } else {
         setHeat(h);
+        setCooling(true);
       }
     }, 150);
   };
@@ -81,6 +87,9 @@ export function KineticButton() {
     else if (r.layer === 'weather') kineticWeatherPass();
     else kineticRulesPass();
     restartCooling();
+    setCooling(false);
+    tapOpen.pulse(TAP_PULSE_MS); // #1103 — the button AND the K key flash the full name, then cool down
+    markUsed();
   };
   // useHotkeys matches e.key then e.key.toLowerCase(), so 'k' covers 'K'.
   useHotkeys({ k: tap });
@@ -89,8 +98,9 @@ export function KineticButton() {
   return (
     <button
       type="button"
-      className="kinetic-btn xl"
+      className={`kinetic-btn xl${shimmer ? ' xl-shimmer' : ''}`}
       data-heat-level={level}
+      data-cooling={cooling ? 'true' : undefined}
       data-open={tapOpen.open || cold ? 'true' : undefined}
       {...tapOpen.props}
       style={{ '--heat': heat.toFixed(3) }}

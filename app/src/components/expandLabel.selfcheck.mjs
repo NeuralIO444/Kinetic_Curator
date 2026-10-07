@@ -36,7 +36,7 @@ ok('every expanding button opens on hover, keyboard focus AND touch; no pixel wi
     assert.match(r.sel, /\[data-open="true"\]/, 'a touch opens it');
     assert.ok(!/\d+px/.test(r.body), 'a width is a character count, not pixels');
   }
-  assert.match(css, /prefers-reduced-motion: reduce\) \{[^}]*\.xl-tail/, 'reduced motion drops the transition');
+  assert.match(css, /prefers-reduced-motion: reduce\) \{[^}]*\.xl-ch/, 'reduced motion drops the transition');
 });
 
 ok('LOOKS, VOICE and KIN use the shared label, with the full word as the accessible name', () => {
@@ -51,7 +51,7 @@ ok('LOOKS, VOICE and KIN use the shared label, with the full word as the accessi
   assert.match(kin, /<ExpandLabel short="KIN" full="KINETIC" tailClass="kinetic-rest" \/>/);
   const lbl = read('./ExpandLabel.jsx');
   assert.match(lbl, /aria-hidden="true"/, 'the short form is hidden from assistive tech');
-  assert.ok(!/\bstyle=\{\{(?!\s*'--xl-)/.test(lbl), 'the only inline style is the character-count custom property');
+  assert.ok(!/\bstyle=\{\{(?!\s*'--(xl-|i'|n'))/.test(lbl), 'the only inline styles are character-count custom properties');
 });
 
 ok('KIN keeps its heat model: nothing in kineticHeat or the cooling loop changed', () => {
@@ -59,7 +59,7 @@ ok('KIN keeps its heat model: nothing in kineticHeat or the cooling loop changed
   for (const k of ['routeKineticTapHeat', 'decayHeat', 'heatLevel', "setInterval", "'--heat'"]) assert.ok(kin.includes(k), `${k} is still there`);
   const css = read('../styles/controls.css');
   assert.match(css, /min-width: calc\(48px \+ var\(--heat, 0\) \* 102px\)/, 'width is still the heat meter');
-  assert.match(css, /\.kinetic-btn\[data-heat-level="hot"\] \.kinetic-rest \{ max-width: calc\(var\(--xl-tail\) \* var\(--xl-ch\)\); \}/, 'hot still holds the full word');
+  assert.match(css, /\.kinetic-btn\[data-heat-level="hot"\] \.xl-ch/, 'hot still holds the full word');
 });
 
 console.log(`expandLabel.selfcheck: ${n} checks passed`);

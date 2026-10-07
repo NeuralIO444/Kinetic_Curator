@@ -6,7 +6,7 @@
 // state and the hint rides the Curator button's tooltip. The looks popup (#735: Looks, never "presets", on the face) (also left of Curator) applies a named,
 // complete scene directly — a different action from taste-biased random.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { emit, Events } from '../../composition/eventBus.js';
+import { emit, on, Events } from '../../composition/eventBus.js';
 import { getActiveCurator, curatorHint } from '../../curator/curate.js';
 import { useStore } from '../../state/store.js';
 import { getRenderProfile } from '../../curator/renderProfiles.js';
@@ -21,6 +21,8 @@ import { KineticButton } from './KineticButton.jsx';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
 import { useColdOpen } from '../../hooks/useColdOpen.js';
+import { TAP_PULSE_MS } from '../../hooks/coldOpen.mjs';
+import { useInvite } from '../../hooks/useInvite.js';
 import { BeatButton } from '../../components/BeatButton.jsx';
 
 export function CuratorBar() {
@@ -50,6 +52,12 @@ export function CuratorBar() {
   // performance situations that need a known first frame.
   const startupMode = useStore((s) => s.startupMode);
   const setStartupMode = useStore((s) => s.setStartupMode);
+
+  // #1103 — every Curator roll (the button, and anything else that emits LAYOUT_CURATE) flashes CURATOR's full
+  // name, then it cools down. Subscribed to the event, not the click, so a roll from anywhere is acknowledged.
+  const pulseCurator = curTap.pulse;
+  const [curShimmer, curUsed] = useInvite('curator'); // #1103 — same sheen as KINETIC, until it is pressed
+  useEffect(() => on(Events.LAYOUT_CURATE, () => { pulseCurator(TAP_PULSE_MS); curUsed(); }), [pulseCurator, curUsed]);
 
   // Close either popup on outside click or Escape.
   useEffect(() => {
@@ -195,7 +203,7 @@ export function CuratorBar() {
             </div>
           )}
         </div>
-        <button className="randomize-btn xl act" onClick={onCurate}
+        <button className={`randomize-btn xl act${curShimmer ? ' xl-shimmer' : ''}`} onClick={onCurate}
           data-open={curTap.open || cold ? 'true' : undefined}
           {...curTap.props}
           aria-label="Curator — roll a taste-guided scene over the unlocked parameters"
