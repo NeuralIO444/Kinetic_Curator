@@ -113,6 +113,25 @@ ok('keeps: a favorite carries the stack, survives its own sanitizer, and gives t
   assert.ok(!('stack' in plain), 'a plain keep is unchanged');
 });
 
+ok('clicking a keep brings its tracks back (recall and morph), in one undo; a plain keep changes nothing', () => {
+  const fav = captureFavorite({ ...live, enabledAssets: live.enabledAssets }, live.paletteId);
+  const wantTypes = types(live); const wantPattern = live.layers.find((l) => l.type === 'pattern').pattern;
+  const plainLayers = [{ id: 'solo', name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } }];
+  const reset = () => useStore.setState({ layers: plainLayers, activeLayerId: 'solo', layerSnapshots: {}, historyUndoStack: [], historyRedoStack: [] });
+  for (const act of ['recallFavorite', 'morphToFavorite']) {
+    reset(); S()[act](JSON.parse(JSON.stringify(fav)));
+    assert.equal(types(S()), wantTypes, `${act}: the tracks are back`);
+    assert.deepEqual(S().layers.find((l) => l.type === 'pattern').pattern, wantPattern, `${act}: the PATTERN block is back`);
+    assert.equal(S().activeLayerId, live.activeLayerId);
+    assert.ok(S().layerSnapshots[second], `${act}: the other KC track has its own state`);
+    S().undo(); assert.deepEqual(S().layers.map((l) => l.id), ['solo'], `${act}: one undo gives the old stack back`);
+  }
+  reset(); const plain = captureFavorite({ seed: 5, seedOffsets: {}, layoutParams: { ...live.layoutParams }, enabledAssets: {} }, 'praystation');
+  S().recallFavorite(plain); assert.deepEqual(S().layers.map((l) => l.id), ['solo'], 'a keep with no stack leaves the tracks alone');
+  S().recallFavorite({ ...plain, stack: { l: 'junk' } }); assert.deepEqual(S().layers.map((l) => l.id), ['solo'], 'a damaged stack is ignored; the look still restores');
+  assert.equal(S().seed, 5);
+});
+
 ok('expandStack never returns raw input: layers are normalized', () => {
   const ex = expandStack({ l: [{ id: 'k', type: 'content', layerOpacity: 9, junk: 1 }], a: 'k' });
   assert.ok(ex.ok); assert.equal(ex.stack.layers[0].layerOpacity, 1); assert.ok(!('junk' in ex.stack.layers[0]));
