@@ -6,7 +6,9 @@ import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/
 import { hasChain, markovPick } from '../../curator/transitions.js';
 import { getCatalogPalette, normalizeHex, resolvePalette, paletteRollPoolIds } from '../../data/palettes.js';
 import { COMPOSITION_PRESETS } from '../../data/presets.js';
-import { defaultFxParams, isFxLayer, FX_MENU_KINDS } from '../../fx/fxFilters.js';
+import { isFxLayer, FX_MENU_KINDS } from '../../fx/fxFilters.js';
+import { rollFxKinds, rollFxParams, rollBlend } from '../../fx/rollSafety.js';
+import { isMathLayer } from '../../fx/mathFilters.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
 import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
@@ -695,11 +697,14 @@ export const createLayoutSlice = (set) => ({
       layers = [...layers, fxLayer];
       selectedFxLayerId = fxLayer.id;
     }
-    const fxKinds = shuffle(FX_MENU_KINDS).slice(0, die(4));
-    const effects = fxKinds.map((kind) => ({ kind, params: defaultFxParams(kind) }));
+    const fxKinds = shuffle(rollFxKinds(FX_MENU_KINDS)).slice(0, die(4)); // #1107: never INVERT in a roll
+    const effects = fxKinds.map((kind) => ({ kind, params: rollFxParams(kind) })); // ... and a gentle HAZE
+    // The LOWEST content layer composites over the bare canvas background, so it has nothing to blend
+    // with and stays normal (fx/rollSafety.js says why, with the measurements).
+    const bottomContent = layers.find((l) => !isFxLayer(l) && !isMathLayer(l));
     layers = layers.map((l) => {
       if (fxLayer && l.id === fxLayer.id) return { ...l, effects };
-      if (!isFxLayer(l)) return { ...l, layerBlendMode: pick(BLEND_MODES) };
+      if (!isFxLayer(l)) return { ...l, layerBlendMode: rollBlend(l === bottomContent, () => pick(BLEND_MODES)) };
       return l;
     });
 
