@@ -26,7 +26,7 @@ import { sanitizeMathEffects, MATH_OP_KINDS, mathTrackWetCeiling } from '../fx/m
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
-import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme } from '../data/kinemes.js';
+import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, spinKineme, spinVariant } from '../data/kinemes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { sanitizePattern } from '../state/patternTrack.js';
 import { patternPalette } from '../pattern/patternSource.js';
@@ -314,10 +314,11 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     const slot = new Map();
     for (const inst of instances) {
       // #1127 — an asset with its own kineme keeps it; every other mark takes the layer's ROTATE spin, if it has one.
-      // Phase 0 (not the per-instance hash): at motion time 0 the mark sits exactly on its static angle.
+      // Each mark spins at its own speed and direction (kinemes.js spinVariant). Phase stays 0, so at motion time 0
+      // every mark sits exactly on its static angle.
       const rev = spinning.get(inst);
       const own = getKineme(map[inst.asset]);
-      const k = own || (rev ? { id: `rotate-spin@${rev}`, kind: 'spin', period: 1 / rev, amp: 0 } : null);
+      const k = own || (rev ? spinKineme(rev, spinVariant(inst.seedOffset, inst.key)) : null);
       if (!k) continue;
       if (!slot.has(k.id)) {
         if (table.length >= KINEME_TABLE_MAX) continue; // ponytail: 16-slot cap; a bigger library needs a texture table

@@ -27,6 +27,25 @@ export const KINEMES = Object.freeze([
   { id: 'bob', kind: 'bob', period: 3.0, amp: 6 },
 ].map(Object.freeze));
 
+/**
+ * #1127 — ROTATE spin gives every mark its OWN speed and direction, so a field of marks does not turn as one wheel.
+ * Eight variants (four speeds, each both ways) around the layer's rev/s; a mark picks one from a hash of its own
+ * identity, so the choice is stable per seed and the mix is about half clockwise, half counter. The average speed
+ * is the dial's rev/s. A negative `amp` on a spin kineme means "turn the other way" (library spins have amp 0).
+ */
+export const SPIN_SPEEDS = Object.freeze([0.4, 0.7, 1.0, 1.5]);
+export const SPIN_VARIANTS = SPIN_SPEEDS.length * 2;
+/** The variant [0, SPIN_VARIANTS) a mark spins with. */
+export function spinVariant(seedOffset, key) {
+  return Math.min(SPIN_VARIANTS - 1, Math.floor(kinemePhase(seedOffset, key) * SPIN_VARIANTS));
+}
+/** The spin kineme for one variant of a layer's rev/s: { id, kind, period, amp }. */
+export function spinKineme(rev, variant) {
+  const speed = SPIN_SPEEDS[variant % SPIN_SPEEDS.length];
+  const reverse = variant >= SPIN_SPEEDS.length;
+  return { id: `rotate-spin@${rev}@${variant}`, kind: 'spin', period: 1 / (rev * speed), amp: reverse ? -1 : 0 };
+}
+
 /** Most kinemes one frame may reference — the QUAD_VS uniform table size. */
 export const KINEME_TABLE_MAX = 16;
 

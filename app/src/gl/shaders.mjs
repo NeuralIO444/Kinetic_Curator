@@ -57,7 +57,7 @@ uniform vec4 u_sun;       // x, y (scene units), height above the plane, w = on 
 uniform vec4 u_sunLight;  // rgb = palette-slot colour, a = intensity
 uniform float u_ambient;  // light that reaches a mark facing away from the sun
 // #781 KINEME: whole-mark motion. Slot i = (kind, period s, amp); kinds
-// 1 spin, 2 osc (± deg), 3 pulse (± scale), 4 blink (duty), 5 bob (± units).
+// 1 spin (amp < 0: reversed), 2 osc (± deg), 3 pulse (± scale), 4 blink (duty), 5 bob (± units).
 // Per instance a_inst4.z = slot + 1 (0 = still), a_inst4.w = phase [0,1).
 uniform vec3 u_kineme[16];
 uniform float u_kinemeTime;
@@ -112,7 +112,7 @@ void main() {
     float ph = fract(u_kinemeTime / per + a_inst4.w);
     float wav = sin(ph * 6.28318530718);
     int kind = int(km.x + 0.5);
-    if (kind == 1) kDeg = ph * 360.0;
+    if (kind == 1) kDeg = (km.z < 0.0 ? -ph : ph) * 360.0; // #1127: a negative amp turns the other way
     else if (kind == 2) kDeg = km.z * wav;
     else if (kind == 3) c *= 1.0 + km.z * wav;
     else if (kind == 4) kVis = ph < km.z ? 1.0 : 0.0;
