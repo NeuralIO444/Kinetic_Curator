@@ -6,7 +6,7 @@ import { genId } from '../id.js';
 import { stackOf, expandStack } from '../recipeStack.js'; // #1131: a keep carries the layer stack
 import { tickPhraseBeat } from '../phraseTick.js';
 import { sanitizeBeatRoute } from '../beatArbiter.js';
-import { pushToUndo } from '../history.js';
+import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { EUCLID_MAX_STEPS } from '../euclid.js';
 import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
@@ -63,6 +63,18 @@ export function captureFavorite(state, paletteId) {
       assets: sanitizeCast(Object.keys(enabled).filter((k) => enabled[k])),
     },
   };
+}
+
+/**
+ * #1131 — a keep that carries a layer stack brings its tracks back with it: extra KC tracks, FX, MATH, PATTERN, the
+ * active track, and the other tracks' own save states. One undo entry (the whole document). A stack that does not
+ * expand is ignored (the keep still restores its look); a keep without one changes nothing, as before.
+ */
+export function keepStackPatch(state, fav) {
+  if (!fav || !fav.stack) return {};
+  const ex = expandStack(fav.stack);
+  if (!ex.ok) return {};
+  return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers: ex.stack.layers, activeLayerId: ex.stack.activeLayerId, layerSnapshots: ex.stack.layerSnapshots };
 }
 
 /** #719 — a kept cast back to the store's enabledAssets map (ids on, nothing else). */
@@ -413,7 +425,8 @@ export const createDavisSlice = (set) => ({
     persistFavorites(next);
     return { favorites: next };
   }),
-  recallFavorite: (fav) => set({
+  recallFavorite: (fav) => set((state) => ({
+    ...keepStackPatch(state, fav),
     seed: fav.seed,
     // #305 — a kept recipe replays its stream offsets too.
     seedOffsets: normalizeSeedOffsets(fav.seedOffsets),
@@ -421,8 +434,8 @@ export const createDavisSlice = (set) => ({
     ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
     // #719 — the kept cast comes back too; legacy keeps (no cast) leave the pool alone.
     ...(fav.config?.assets?.length ? { enabledAssets: castToEnabled(fav.config.assets) } : {}),
-  }),
-  morphToFavorite: (fav) => set((state) => {
+  })),
+  morphToFavorite: (fav) => set((state) => ({ ...((state) => {
     const target = fav.config?.layout;
     // #305 — old favorites carry no offsets → zeros, like a fresh project.
     const favOffsets = normalizeSeedOffsets(fav.seedOffsets);
@@ -473,7 +486,7 @@ export const createDavisSlice = (set) => ({
       morphPendingSeedOffsets: favOffsets,
       morphPendingPalette: fav.config?.palette.id || null,
     };
-  }),
+  })(state), ...keepStackPatch(state, fav) })), // the stack's whole-document undo entry wins over the morph's edit one
 
   // #966 — HITS queue transport actions.
   setQueuePlaying: (on) => set({ queuePlaying: !!on }),
