@@ -214,12 +214,38 @@ export function buildMark(name, rng, pose = 0) {
   if (!BUILD[name]) throw new Error(`unknown glyph mark: ${name}`);
   if (!POSES.includes(pose)) throw new Error(`glyph pose ${pose} is not a quarter turn`);
   const q = pose / 90;
-  return BUILD[name](rng).map((op) => poseOp(op, q));
+  return BUILD[name](rng).map((op) => withBox(poseOp(op, q)));
 }
+
+// A conservative axis-aligned box around one op (#1101): the sampler walks every pixel of the mark box, and
+// most pixels are nowhere near most ops (a sunburst is thirteen ops). A pixel outside an op's box cannot hit
+// it, so it skips the op. The box only ever errs outward (strokes use a half-width that covers any DRIFT
+// scale down to 0.4), so culling never changes a pixel.
+const BOX_PAD = 1e-9;
+function opBox(op) {
+  switch (op.type) {
+    case 'disc': return [op.cx - op.r, op.cy - op.r, op.cx + op.r, op.cy + op.r];
+    case 'ring': { const e = op.r + Math.max(op.w, MIN_STROKE / 0.4) / 2; return [op.cx - e, op.cy - e, op.cx + e, op.cy + e]; }
+    case 'seg': {
+      const h = Math.max(op.w, MIN_STROKE / 0.4) / 2;
+      return [Math.min(op.x1, op.x2) - h, Math.min(op.y1, op.y2) - h, Math.max(op.x1, op.x2) + h, Math.max(op.y1, op.y2) + h];
+    }
+    case 'poly': {
+      let a = Infinity; let b = Infinity; let c = -Infinity; let d = -Infinity;
+      for (const [x, y] of op.pts) { a = Math.min(a, x); b = Math.min(b, y); c = Math.max(c, x); d = Math.max(d, y); }
+      return [a, b, c, d];
+    }
+    case 'lens': return op.vertical ? [-op.h, -op.a, op.h, op.a] : [-op.a, -op.h, op.a, op.h];
+    default: return null;
+  }
+}
+const withBox = (op) => { const b = opBox(op); return b ? { ...op, bb: [b[0] - BOX_PAD, b[1] - BOX_PAD, b[2] + BOX_PAD, b[3] + BOX_PAD] } : op; };
 
 const strokeW = (w, scale) => Math.max(w, MIN_STROKE / scale);
 
 function hit(op, x, y, scale) {
+  const bb = op.bb; // hand-built ops (tests) have no box and are tested directly
+  if (bb !== undefined && (x < bb[0] || x > bb[2] || y < bb[1] || y > bb[3])) return false;
   switch (op.type) {
     case 'disc': { const a = x - op.cx; const b = y - op.cy; return a * a + b * b < op.r * op.r; }
     case 'ring': {
@@ -239,7 +265,8 @@ function hit(op, x, y, scale) {
     case 'poly': {
       let inside = false; const p = op.pts;
       for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
-        const [xi, yi] = p[i]; const [xj, yj] = p[j];
+        const pi = p[i]; const pj = p[j]; // indexed, not destructured: this runs once per pixel
+        const xi = pi[0]; const yi = pi[1]; const xj = pj[0]; const yj = pj[1];
         if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
       }
       return inside;
@@ -263,7 +290,11 @@ export function sampleMark(ops, x, y, scale = 1) {
   // Nothing is ever painted outside the mark box, and most of a tile is negative space:
   // leave before walking the ops.
   if (sx <= -MARK_BOX || sx >= MARK_BOX || sy <= -MARK_BOX || sy >= MARK_BOX) return null;
-  for (let i = ops.length - 1; i >= 0; i--) if (hit(ops[i], sx, sy, scale)) return ops[i].role;
+  for (let i = ops.length - 1; i >= 0; i--) {
+    const op = ops[i]; const bb = op.bb;
+    if (bb !== undefined && (sx < bb[0] || sx > bb[2] || sy < bb[1] || sy > bb[3])) continue; // not even a call for a shape this pixel cannot touch
+    if (hit(op, sx, sy, scale)) return op.role;
+  }
   return null;
 }
 

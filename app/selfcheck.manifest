@@ -248,6 +248,7 @@ node src/pattern/quilt.selfcheck.mjs
 node src/pattern/glyph.selfcheck.mjs
 node src/pattern/motion.selfcheck.mjs
 node src/pattern/patternRender.selfcheck.mjs
+node src/pattern/rasterFast.selfcheck.mjs
 node src/panels/build/patternEditor.selfcheck.mjs
 node src/state/layerOrder.selfcheck.mjs
 node src/panels/build/layerRows.selfcheck.mjs
