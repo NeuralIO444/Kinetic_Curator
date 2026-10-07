@@ -120,7 +120,9 @@ try {
         const s = useStore.getState();
         if (!dark.has(s.paletteId) || GROWS.has(s.layoutParams.mode) || ['swarm', 'hype'].includes(s.layoutParams.mode)) continue;
         judged += 1;
-        const px = (await renderCandidate({ doc: serializeProject(s) }, { width: 140 })).pixels;
+        // This check is about the roll's own rules (blend, INVERT, HAZE). A PATTERN track a roll deals is a veil over
+        // the picture and is judged by the guard check below, with the patterns left in.
+        const px = (await renderCandidate({ doc: serializeProject({ ...s, layers: s.layers.filter((l) => l.type !== 'pattern') }) }, { width: 140 })).pixels;
         const m = ink(px);
         gaps.push(m.lumaGap);
         if (m.lumaGap < 0.15) dim += 1;
