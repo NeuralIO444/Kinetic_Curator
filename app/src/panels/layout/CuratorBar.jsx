@@ -18,6 +18,8 @@ import {
 } from '../../curator/taste.js';
 import { getLoisVerdict } from '../../curator/loisRank.js';
 import { KineticButton } from './KineticButton.jsx';
+import { ExpandLabel } from '../../components/ExpandLabel.jsx';
+import { useTapOpen } from '../../hooks/useTapOpen.js';
 
 export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
@@ -26,6 +28,12 @@ export function CuratorBar() {
   const [voice, setVoice] = useState(getActivePersonaId() ?? 'off');
   const [menuOpen, setMenuOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
+  // #1103 — LOOKS and VOICE rest as [L] / [V]. Once opened to the full word they cool down to a
+  // 3-letter form ([LOK] / [VOI]) for the rest of the session: a button you have used stays more readable.
+  const [looksUsed, setLooksUsed] = useState(false);
+  const [voiceUsed, setVoiceUsed] = useState(false);
+  const looksTap = useTapOpen();
+  const voiceTap = useTapOpen();
   const wrapRef = useRef(null);
   const presetWrapRef = useRef(null);
   useStore((s) => s.tasteRev); // #762: re-resolve the engine when a taste is imported/cleared
@@ -106,11 +114,18 @@ export function CuratorBar() {
         <KineticButton />
         <div className="curator-voice-wrap" ref={presetWrapRef}>
           <button
-            className="curator-voice-btn"
-            onClick={() => setPresetMenuOpen((o) => !o)}
+            className="curator-voice-btn xl act"
+            data-open={looksTap.open ? 'true' : undefined}
+            onClick={() => { setPresetMenuOpen((o) => !o); setLooksUsed(true); }}
+            onMouseLeave={() => setLooksUsed(true)}
+            onBlur={() => setLooksUsed(true)}
+            {...looksTap.props}
+            aria-label="Looks — apply a complete layout"
+            aria-haspopup="menu"
+            aria-expanded={presetMenuOpen}
             title="Apply a Look — layout only; your palette and marks stay put"
           >
-            looks ▾
+            <ExpandLabel mode="swap" short={looksUsed ? 'lok' : 'l'} full="looks ▾" />
           </button>
           {presetMenuOpen && (
             <div className="curator-voice-menu preset-menu" role="menu">
@@ -140,11 +155,18 @@ export function CuratorBar() {
         </div>
         <div className="curator-voice-wrap" ref={wrapRef}>
           <button
-            className="curator-voice-btn"
-            onClick={() => setMenuOpen((o) => !o)}
+            className="curator-voice-btn xl act"
+            data-open={voiceTap.open ? 'true' : undefined}
+            onClick={() => { setMenuOpen((o) => !o); setVoiceUsed(true); }}
+            onMouseLeave={() => setVoiceUsed(true)}
+            onBlur={() => setVoiceUsed(true)}
+            {...voiceTap.props}
+            aria-label={`Voice: ${activeAlias}. Persona voice tasting the candidates`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
             title="Persona voice tasting the candidates — off means a plain dice roll"
           >
-            voice: {activeAlias} ▾
+            <ExpandLabel mode="swap" short={voiceUsed ? 'voi' : 'v'} full={`voice: ${activeAlias} ▾`} />
           </button>
           {menuOpen && (
             <div className="curator-voice-menu" role="menu">

@@ -30,6 +30,8 @@ import {
   heatLevel,
 } from './kineticHeat.mjs';
 import { Events, emit } from '../../composition/eventBus.js';
+import { ExpandLabel } from '../../components/ExpandLabel.jsx';
+import { useTapOpen } from '../../hooks/useTapOpen.js';
 
 export function KineticButton() {
   const kineticRulesPass = useStore((s) => s.kineticRulesPass);
@@ -41,6 +43,7 @@ export function KineticButton() {
   const runRef = useRef({ heat: 0, taps: 0, lastTapAt: 0 });
   const coolTimerRef = useRef(null);
   const [heat, setHeat] = useState(0);
+  const tapOpen = useTapOpen(); // #1103 — touch has no hover
 
   const restartCooling = () => {
     if (coolTimerRef.current) clearInterval(coolTimerRef.current);
@@ -84,18 +87,17 @@ export function KineticButton() {
   return (
     <button
       type="button"
-      className="kinetic-btn"
+      className="kinetic-btn xl"
       data-heat-level={level}
+      data-open={tapOpen.open ? 'true' : undefined}
+      {...tapOpen.props}
       style={{ '--heat': heat.toFixed(3) }}
       onClick={tap}
       title="KINETIC — tap: recompose under design rules; warm tap: drift the atmosphere; hammer it: chaos (K)"
       aria-label={`Kinetic — heat ${level}. Tap to recompose, warm tap drifts the atmosphere, rapid hammering breaks into chaos`}
     >
       <span className="kinetic-glyph" aria-hidden="true">◉</span>
-      <span className="kinetic-word" aria-hidden="true">
-        <span className="kinetic-short">KIN</span>
-        <span className="kinetic-rest">ETIC</span>
-      </span>
+      <ExpandLabel short="KIN" full="KINETIC" tailClass="kinetic-rest" />
     </button>
   );
 }

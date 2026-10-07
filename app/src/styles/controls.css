@@ -177,18 +177,12 @@
   max-width: 150px;
 }
 .kinetic-glyph { font-size: 10px; line-height: 1; flex-shrink: 0; }
-.kinetic-word { display: inline-flex; overflow: hidden; }
-.kinetic-rest {
-  display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap;
-  transition: max-width 180ms ease;
-}
-.kinetic-btn:hover .kinetic-rest,
-.kinetic-btn:active .kinetic-rest,
-.kinetic-btn:focus-visible .kinetic-rest { max-width: 60px; }
+
+.kinetic-btn:active .kinetic-rest { max-width: calc(var(--xl-tail) * var(--xl-ch)); } /* #1103: hover / focus / tap open via .xl */
 
 /* #945 — at max heat the button earns its full name: the expansion reads as
    the word arriving, not empty space. */
-.kinetic-btn[data-heat-level="hot"] .kinetic-rest { max-width: 60px; }
+.kinetic-btn[data-heat-level="hot"] .kinetic-rest { max-width: calc(var(--xl-tail) * var(--xl-ch)); }
 
 /* #945 — heat kineme (backup readout beside the width-as-meter): the glyph
    pulses while warm, faster when hot. Cool buttons stay still (#942 chrome). */
@@ -334,3 +328,18 @@
 
 /* #1032 (M7) — voice 1: LOIS at her bluntest, one line per panel, empty room only. */
 .lois-line { padding: 6px 0; color: var(--dim); font-size: 9px; letter-spacing: 0.04em; line-height: 1.5; }
+
+/* #1103 — one expanding label for the top bar. The parent has `.xl`; the label rests short and
+   opens on hover, keyboard focus, `.open` or a touch (`data-open`). The face is monospace, so a
+   width is a character count: --xl-tail / --xl-short / --xl-full are counts, never pixels. */
+.xl { --xl-ch: calc(1ch + 0.06em); }
+.xl-word { display: inline-flex; overflow: hidden; }
+.xl-tail { display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap; transition: max-width 180ms ease; }
+.xl:hover .xl-tail, .xl:focus-visible .xl-tail, .xl.open .xl-tail, .xl[data-open="true"] .xl-tail { max-width: calc(var(--xl-tail) * var(--xl-ch)); }
+.xl-swap { position: relative; display: inline-flex; overflow: hidden; width: calc(var(--xl-short) * var(--xl-ch)); transition: width 180ms ease; }
+.xl-swap-short, .xl-swap-full { white-space: nowrap; transition: opacity 120ms ease; }
+.xl-swap-full { position: absolute; left: 0; opacity: 0; }
+.xl:hover .xl-swap, .xl:focus-visible .xl-swap, .xl.open .xl-swap, .xl[data-open="true"] .xl-swap { width: calc(var(--xl-full) * var(--xl-ch)); }
+.xl:hover .xl-swap-short, .xl:focus-visible .xl-swap-short, .xl.open .xl-swap-short, .xl[data-open="true"] .xl-swap-short { opacity: 0; }
+.xl:hover .xl-swap-full, .xl:focus-visible .xl-swap-full, .xl.open .xl-swap-full, .xl[data-open="true"] .xl-swap-full { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .xl-tail, .xl-swap, .xl-swap-short, .xl-swap-full { transition: none; } }
