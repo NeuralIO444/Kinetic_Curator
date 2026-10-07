@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIRECTOR — DAVIS affective system · KC-1 DS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --amber: #ffcd82; --te: #ff4d00; --pink: #ff2d78; }
+  body { background: #141414; color: #e8e4da; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #8a8578; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #5c584e; margin-bottom: 14px; max-width: 920px; line-height: 1.7; }
+  .panel { background: #0c0c0c; border: 1px solid #262626; border-radius: 8px; padding: 18px;
+           max-width: 780px; margin-bottom: 18px; }
+  .phead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .ptag { font-size: 9px; letter-spacing: .1em; color: #000; background: #888; border-radius: 3px;
+          padding: 3px 7px; }
+  .ptitle { font-size: 12px; letter-spacing: .16em; color: #bbb; }
+  .pstate { font-size: 10px; color: #5c584e; letter-spacing: .08em; }
+  /* the two personas */
+  .duel { display: flex; gap: 12px; margin: 14px 0; }
+  .persona { flex: 1; border: 1px solid #2c2c2c; border-radius: 8px; padding: 14px; position: relative; }
+  .persona .who { font-size: 9px; letter-spacing: .16em; margin-bottom: 10px; }
+  .lois .who { color: #999; }
+  .davis .who { color: var(--amber); }
+  .loisface { font-size: 22px; color: #ddd; margin-bottom: 8px; }
+  .davisface { width: 48px; height: 48px; margin-bottom: 8px; border-radius: 50%; background: #101010;
+               border: 1px solid #2c2c2c; }
+  .kaleido { animation: krot linear infinite; }
+  @keyframes krot { to { transform: rotate(360deg); } }
+  .pstatelabel { font-size: 11px; letter-spacing: .12em; margin-bottom: 4px; }
+  .lois .pstatelabel { color: #ddd; } .davis .pstatelabel { color: var(--amber); }
+  .pdesc { font-size: 9px; color: #5c584e; line-height: 1.7; min-height: 44px; }
+  .vs { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #4a4a4a;
+        letter-spacing: .1em; padding: 0 2px; }
+  /* verdict strip */
+  .verdict { margin-top: 4px; border: 1px solid #2c2c2c; border-radius: 8px; padding: 12px 14px;
+             display: flex; align-items: center; gap: 12px; }
+  .verdict .vlab { font-size: 9px; letter-spacing: .14em; color: #666; }
+  .verdict .vtext { font-size: 11px; letter-spacing: .06em; }
+  .verdict.agree { border-color: #3a4a2a; } .verdict.agree .vtext { color: #9dc184; }
+  .verdict.clash { border-color: #5a2a1a; } .verdict.clash .vtext { color: var(--amber); }
+  /* generate section */
+  .gen { display: flex; gap: 8px; margin-top: 14px; }
+  .gen button { flex: 1; background: #141414; border: 1px solid #333; color: #bbb; border-radius: 6px;
+                font-family: inherit; font-size: 11px; letter-spacing: .14em; padding: 12px; cursor: pointer; }
+  .gen button:hover { border-color: #666; color: #fff; }
+  .gen button.dv { border-color: #5a4a2a; } .gen button.dv:hover { border-color: var(--amber); color: var(--amber); }
+  .gen button.lo { border-color: #333; } .gen button.lo:hover { border-color: var(--te); color: var(--te); }
+  .controls { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; max-width: 780px; }
+  .ctl-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #8a8578; flex-wrap: wrap; }
+  .ctl-row .lbl { width: 220px; letter-spacing: .06em; }
+  button.ctl { background: #1e1e1e; color: #b9b3a4; border: 1px solid #333; border-radius: 4px;
+           font-family: inherit; font-size: 10px; letter-spacing: .06em; padding: 5px 10px; cursor: pointer; }
+  button.ctl.on { border-color: #c98f3d; color: var(--amber); background: #2a2417; }
+  button.ctl.on.te { border-color: var(--te); color: var(--te); background: #2a1408; }
+  .note { font-size: 10px; color: #5c584e; line-height: 1.9; letter-spacing: .04em; max-width: 920px; margin-top: 14px; }
+  .note b.t { color: var(--te); font-weight: normal; } .note b.a { color: var(--amber); font-weight: normal; }
+</style></head>
+<body>
+<h2>DIRECTOR — DAVIS · A SEPARATE AFFECTIVE SYSTEM</h2>
+<p class="sub">LOIS judges the <b style="color:#ddd;font-weight:normal">product</b>. Davis loves the
+<b style="color:var(--amber);font-weight:normal">process</b>. Same honest-feed rule, opposite philosophy —
+and the UI lets them disagree out loud.</p>
+
+<div class="panel">
+  <div class="phead"><span class="ptag">P07</span><span class="ptitle">DIRECTORS</span>
+    <span class="pstate" id="panelstate">paused</span></div>
+
+  <div class="duel">
+    <div class="persona lois">
+      <div class="who">LOIS · THE CRITIC</div>
+      <div class="loisface" id="loisface">( ̄—̄ )</div>
+      <div class="pstatelabel" id="loisstate">NOD</div>
+      <div class="pdesc" id="loisdesc">That's the one. Keep it. Don't touch anything.</div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="persona davis">
+      <div class="who">DAVIS · THE GENERATOR</div>
+      <canvas class="davisface kaleido" id="sigil" width="96" height="96"></canvas>
+      <div class="pstatelabel" id="davisstate">FLOW</div>
+      <div class="pdesc" id="davisdesc">Rolling steady. The system is surprising me today.</div>
+    </div>
+  </div>
+
+  <div class="verdict clash" id="verdict">
+    <span class="vlab">THE ROOM</span>
+    <span class="vtext" id="verdicttext">LOIS: keep this · DAVIS: roll again — don't get precious</span>
+  </div>
+
+  <div class="gen">
+    <button class="dv" id="b-evolve">EVOLVE</button>
+    <button class="dv" id="b-seed">NEW SEED</button>
+    <button class="lo" id="b-fav">FAVORITE</button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="ctl-row"><span class="lbl">Davis state (honest signals)</span>
+    <button class="ctl on" data-d="flow">FLOW · rolling steady</button>
+    <button class="ctl" data-d="seedling">SEEDLING · fresh seed</button>
+    <button class="ctl" data-d="ugly">UGLY · sifting passes</button>
+    <button class="ctl" data-d="stuck">STUCK · same seed, no keeps</button>
+    <button class="ctl" data-d="bloom">BLOOM · keep after ugly</button></div>
+  <div class="ctl-row"><span class="lbl">LOIS state</span>
+    <button class="ctl on te" data-l="nod">NOD · keep it</button>
+    <button class="ctl te" data-l="vibe">VIBE · idling</button>
+    <button class="ctl te" data-l="burn">BURN · chain-smoking</button>
+    <button class="ctl te" data-l="away">AWAY · gone</button></div>
+</div>
+
+<div class="note">
+  <b class="a">The fight:</b> they know each other's names and each other's moves. LOIS calls him "the gardener"
+  — said with respect, because the garden is where the keep came from. Davis calls him "George" — said with
+  respect, because the pointing is usually right. Strong disagreement, never contempt.<br>
+  <b class="t">Try the clashes:</b> NOD + UGLY ("he found his one in my compost pile"), NOD + STUCK
+  ("forty rolls to find what I saw on roll three"), AWAY + anything (Davis gets the room to himself).<br>
+  <b class="a">The kaleidoscope:</b> Davis has no fixed face — his mark is a generative mandala drawn
+  from the seed (8-fold mirror symmetry, ornate rings, seeded ornament). New seed, new mandala.
+  And it <i>behaves</i>: the medallion rotates at the tempo of his state — slow in FLOW, agitated in
+  UGLY, barely turning in STUCK. LOIS has one face and judges; Davis has infinite faces and generates.
+</div>
+
+<script>
+  // seeded PRNG + generative KALEIDOSCOPE (Davis's face — a mandala from the seed)
+  function rng(seed){ let a=seed>>>0; return function(){ a|=0; a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296; }; }
+  const cv=document.getElementById('sigil'), cx=cv.getContext('2d');
+  let seed=0x8bea;
+  function drawKaleido(){
+    const R=rng(seed), S=96, C=S/2, K=8, wedge=Math.PI*2/K;
+    cx.clearRect(0,0,S,S);
+    cx.save(); cx.translate(C,C);
+    // ornamental rings (rotationally symmetric — invisible to the spin)
+    cx.strokeStyle='rgba(255,205,130,0.28)'; cx.lineWidth=1;
+    [13,25,37].forEach(r=>{ cx.beginPath(); cx.arc(0,0,r,0,7); cx.stroke(); });
+    // generative elements in one wedge, stamped K times with mirror
+    const els=[], n=24+Math.floor(R()*18);
+    for(let i=0;i<n;i++) els.push({ r:8+R()*32, a:R()*wedge, s:1+R()*3.2, o:0.25+R()*0.65,
+      ring:R()<0.3 });
+    for(let k=0;k<K;k++){
+      cx.save(); cx.rotate(k*wedge);
+      els.forEach(e=>{
+        const x=Math.cos(e.a)*e.r, y=Math.sin(e.a)*e.r;
+        cx.fillStyle=`rgba(255,205,130,${e.o.toFixed(2)})`;
+        cx.beginPath(); cx.arc(x,y,e.s,0,7); cx.fill();
+        cx.beginPath(); cx.arc(x,-y,e.s*0.65,0,7); cx.fill(); // mirror
+        if(e.ring){ cx.strokeStyle=`rgba(255,205,130,${(e.o*0.7).toFixed(2)})`;
+          cx.beginPath(); cx.arc(x,y,e.s+2.5,0,7); cx.stroke(); }
+      });
+      cx.restore();
+    }
+    cx.fillStyle='rgba(255,205,130,0.95)';
+    cx.beginPath(); cx.arc(0,0,3.2,0,7); cx.fill();
+    cx.restore();
+  }
+  drawKaleido();
+  // the face behaves the state — rotation tempo per Davis state
+  const TEMPO={ flow:14, seedling:6, ugly:4, stuck:40, bloom:9 };
+  function setTempo(s){ cv.style.animationDuration=TEMPO[s]+'s'; }
+  setTempo('flow');
+  const D={
+    // Davis lines: [his state][lois state] — he always knows what LOIS is doing
+    flow:{
+      nod:"He's pointing at one. I'm still rolling — the next one might be the one after the one.",
+      vibe:"Quiet room, good rolls. This is the job.",
+      burn:"He's burning and I'm flowing. This is the peak — ride it.",
+      away:"No critic in the room. The system dreams better unwatched."},
+    seedling:{
+      nod:"Fresh seed and he's already pointing? He points fast. I plant anyway.",
+      vibe:"New seed, quiet room. Anything could happen — that's the point.",
+      burn:"Burning on a fresh seed? Bold. I like it.",
+      away:"New seed, nobody watching. My favorite audience."},
+    ugly:{
+      nod:"He found his one in my compost pile. You're welcome, George.",
+      vibe:"Sifting. The ugly is not the enemy — the stopping is.",
+      burn:"Burning through the ugly — now we're sifting at speed.",
+      away:"Nobody watching the ugly. Good. It needs privacy."},
+    stuck:{
+      nod:"He's pointing at a seed I've rolled forty times. Fine — he's right. Take it.",
+      vibe:"Same seed, nothing kept. The system is bored. I am bored. Roll.",
+      burn:"Burning but stuck? That's spinning the wheels hot. Roll something new.",
+      away:"Stuck and alone. The honest place. Roll."},
+    bloom:{
+      nod:"The ugly paid off. He can point at this one — we both earned it.",
+      vibe:"A keep after the ugly. Savor it for exactly one minute, then roll.",
+      burn:"Bloom at full burn. Remember this one.",
+      away:"Found one and he's not even here to see it. Typical."},
+  };
+  const L={
+    // LOIS lines: [his state][davis state] — he always knows what Davis is doing
+    nod:{
+      flow:"That's the one. Tell the gardener to put the hose down.",
+      seedling:"Already? Fine — new seed. But I'm watching this one.",
+      ugly:"Stop digging through the compost. It's right there.",
+      stuck:"Forty rolls to find what I saw on roll three. Keep it. You're welcome.",
+      bloom:"Even the gardener finds one eventually. This one's real — keep it."},
+    vibe:{
+      flow:"Quiet. He's rolling, I'm watching. This is how it works.",
+      seedling:"New seed. I'll wait. I can wait — I just can't watch you get precious.",
+      ugly:"Digging. I'll allow it — for now.",
+      stuck:"Stuck. Say the word and I'll pick one for you.",
+      bloom:"Good. Now stop before you ruin it."},
+    burn:{
+      flow:"You're on fire and he's flowing. Don't stop. Don't think. Roll.",
+      seedling:"Burning already? Good. Strike while it's hot.",
+      ugly:"Burn through it. The ugly can't survive this pace.",
+      stuck:"All this heat and nowhere to go? Pick one. Move.",
+      bloom:"That's the one. At full burn. Keep it forever."},
+    away:{ flow:"", seedling:"", ugly:"", stuck:"", bloom:"" }, // away = no signal, no line
+  };
+  const DFACE={ flow:'FLOW', seedling:'SEEDLING', ugly:'UGLY', stuck:'STUCK', bloom:'BLOOM' };
+  const LFACE={ nod:['( ̄—̄ )','NOD'], vibe:['( ─‿─ )','VIBE'],
+    burn:['( ◉‿◉ )','BURN'], away:['( ── )','AWAY'] };
+  let dS='flow', lS='nod';
+  function setBtns(btn){ btn.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on'); }
+  function verdict(){
+    const v=document.getElementById('verdict'), t=document.getElementById('verdicttext');
+    const agree=(lS==='nod'&&dS==='bloom');
+    const fullburn=(lS==='burn'&&dS==='flow');
+    const clash=(lS==='nod'&&dS!=='bloom');
+    const solo=(lS==='away');
+    v.className='verdict '+((agree||fullburn)?'agree':clash?'clash':'');
+    t.textContent = agree ? 'AGREEMENT — the ugly paid off. They both earned this one.'
+      : fullburn ? 'FULL BURN — the critic and the generator, both barrels. Ride it.'
+      : clash ? 'THE CLASH — the critic points, the generator rolls. Neither backs down.'
+      : solo ? 'DAVIS ALONE — no critic in the room. The system dreams unwatched.'
+      : 'THE ROOM — working. They know each other\'s moves.';
+  }
+  document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{ setBtns(b); dS=b.dataset.d;
+    document.getElementById('davisstate').textContent=DFACE[dS];
+    document.getElementById('davisdesc').textContent=D[dS][lS]; setTempo(dS); verdict(); });
+  document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{ setBtns(b); lS=b.dataset.l;
+    document.getElementById('loisface').textContent=LFACE[lS][0];
+    document.getElementById('loisstate').textContent=LFACE[lS][1];
+    document.getElementById('loisdesc').textContent=L[lS][dS]||'—';
+    document.getElementById('davisdesc').textContent=D[dS][lS]; verdict(); });
+  document.getElementById('b-seed').onclick=()=>{ seed=(Math.random()*0xffffff)>>>0; drawKaleido();
+    document.querySelector('[data-d="seedling"]').click(); };
+  document.getElementById('b-evolve').onclick=()=>document.querySelector('[data-d="flow"]').click();
+  document.getElementById('b-fav').onclick=()=>{ document.querySelector('[data-l="nod"]').click();
+    if(dS==='ugly') document.querySelector('[data-d="bloom"]').click(); };
+  verdict();
+</script>
+</body></html>
