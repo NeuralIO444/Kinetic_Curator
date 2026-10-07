@@ -1,7 +1,7 @@
 // #158: the single source of truth. Hover `title` attributes and the `?`
 // overlay both read through this, so the two can never drift.
 // #535: group names match the panel titles the user actually sees
-// (CANVAS/BUILD/ASSETS/STIMULI/DIRECTOR/PLAY/PIPELINE; Master = the top bar,
+// (CANVAS/BUILD/ASSETS/STIMULI/DIRECTORS/PLAY/PIPELINE; Master = the top bar,
 // Help = the ? overlay). Tour-derived copy reads TOUR_STEPS, never hardcodes.
 import { TOUR_STEPS, tourStepIds } from './tour.js';
 
@@ -14,14 +14,14 @@ export const HELP_TOPICS = [
   { id: 'stimuli-decay', group: 'Stimuli', title: 'decay', text: 'How fast the audio envelope falls after the hit. Long is fluid and lingering.' },
   { id: 'stimuli-response', group: 'Stimuli', title: 'response', text: 'Envelope shape — linear, exponential (heavy), logarithmic (lifts quiet swells), or peak-hold (punchy attacks, smooth falloff).' },
   { id: 'stimuli-swell', group: 'Stimuli', title: 'swell', text: 'How hard the music swells GLOW. 0 means the music never moves the glow — the washout control for loud passages at high glow.' },
-  { id: 'stimuli-audio', group: 'Stimuli', title: 'audio', text: 'Mic on. Drives reactivity and the Director AUDIO / BEAT clocks.' },
+  { id: 'stimuli-audio', group: 'Stimuli', title: 'audio', text: 'Mic on. Drives reactivity and the DIRECTORS AUDIO / BEAT clocks.' },
   { id: 'davis-evolve', group: 'Play', title: 'evolve', text: 'Re-roll the picture. TIME fires on INTERVAL; BEAT fires on a mic attack.' },
-  { id: 'davis-favorite', group: 'Director', title: 'favorite', text: 'Save the current seed as a hit (F). A favorite also keeps the plate.' },
-  { id: 'davis-keep', group: 'Director', title: 'keep', text: 'Keep the current plate without starring it (K). Keeps feed the Lois boldness probe; un-favoriting leaves the keep.' },
-  { id: 'davis-new-seed', group: 'Director', title: 'new seed', text: 'Jump to a fresh random seed (N).' },
+  { id: 'davis-favorite', group: 'Directors', title: 'favorite', text: 'Save the current seed as a hit (F). A favorite also keeps the plate.' },
+  { id: 'davis-keep', group: 'Directors', title: 'keep', text: 'Keep the current plate without starring it (K). Keeps feed the Lois boldness probe; un-favoriting leaves the keep.' },
+  { id: 'davis-new-seed', group: 'Directors', title: 'new seed', text: 'Jump to a fresh random seed (N).' },
   { id: 'davis-morph', group: 'Play', title: 'morph evolve', text: 'Ease layout changes over DURATION instead of hard-jumping. Seed and palette still snap.' },
   { id: 'layout-randomize', group: 'Build', title: 'curator', text: 'Re-roll every unlocked param and keep the taste model\'s pick. Until the MLX curator is trained, it\'s an honest dice roll — the bar says so.' },
-  { id: 'layout-mode', group: 'Build', title: 'mode', text: 'How placements are arranged. Cellular enables the Director CA wrap mode.' },
+  { id: 'layout-mode', group: 'Build', title: 'mode', text: 'How placements are arranged. Cellular enables the DIRECTORS CA wrap mode.' },
   { id: 'layout-blend', group: 'Build', title: 'blend', text: 'How shapes mix where they overlap.' },
   { id: 'output-render', group: 'Pipeline', title: 'render final', text: 'Save the current frame as PNG at the chosen resolution.' },
   { id: 'output-snap', group: 'Pipeline', title: 'snap', text: 'Quick PNG snapshot (S).' },
@@ -31,9 +31,9 @@ export const HELP_TOPICS = [
   { id: 'master-beat', group: 'Master', title: 'beat', text: 'Master clock. BPM sets how long transitions take — 2 beats per morph. Past ~160 BPM transitions hard-cut instead of morphing (the glitch ceiling, on purpose).' },
   { id: 'roll-scope', group: 'Master', title: 'roll scope', text: 'Arm a MODE or MOTION chip to pin it: the next KINETIC roll reworks everything else. Tap again to disarm, ✕ clears all. Arms persist until disarmed.' },
   { id: 'help-tour', group: 'Help', title: 'tour', text: `Replay the ${TOUR_STEPS.length}-step first-run tour (${tourStepIds().join(', ')}) — hit ? in the footer.` },
-  { id: 'davis-audio', group: 'Director', title: 'clock audio', text: 'Tick on a mic attack. Held noise is not a beat — armed · no attack.' },
-  { id: 'davis-metro', group: 'Director', title: 'clock metro', text: 'Internal BPM. No mic.' },
-  { id: 'davis-interval', group: 'Director', title: 'interval', text: 'Seconds between Evolve fires. Dead while SOURCE is BEAT.' },
+  { id: 'davis-audio', group: 'Directors', title: 'clock audio', text: 'Tick on a mic attack. Held noise is not a beat — armed · no attack.' },
+  { id: 'davis-metro', group: 'Directors', title: 'clock metro', text: 'Internal BPM. No mic.' },
+  { id: 'davis-interval', group: 'Directors', title: 'interval', text: 'Seconds between Evolve fires. Dead while SOURCE is BEAT.' },
   { id: 'davis-evolve-beat', group: 'Play', title: 'source beat', text: 'Evolve on the same attack as phrase AUDIO. Press EVOLVE to arm.' },
   { id: 'layout-accum', group: 'Build', title: 'accum', text: 'Pixel trail buffer — trails and glow render live in the WebGL canvas. CLEAR wipes the buffer only, not the canvas.' },
   { id: 'layout-wetness', group: 'Build', title: 'wetness', text: 'Wet paper. Zero is dry — the instrument is unchanged. Up, marks bleed, the behave stirs the water, edges darken as they dry, and overlapping colors mix. Live only.' },
@@ -44,7 +44,7 @@ export const HELP_TOPICS = [
   { id: 'layout-leave-fade', group: 'Build', title: 'leave fade', text: 'LEAVE fade. Zero holds the stamps. Higher lets them decay. Clear still wipes.' },
   { id: 'output-webm', group: 'Pipeline', title: 'rec webm', text: 'Records the live WebGL canvas to WebM — ACCUM trails included. What plays is what exports.' },
   { id: 'output-recipe', group: 'Pipeline', title: 'recipe', text: 'Each snapshot has a copy button for its recipe as plain text (seed, params, sub-seed offsets). Paste it back with PASTE RECIPE to restore the exact scene.' },
-  { id: 'davis-clear', group: 'Director', title: 'clear', text: 'Wipe the trail buffer to the background.' },
+  { id: 'davis-clear', group: 'Directors', title: 'clear', text: 'Wipe the trail buffer to the background.' },
   { id: 'layout-sun', group: 'Build', title: 'sun', text: 'One sun lights the whole scene (every layer). Marks facing it brighten, marks facing away fall to AMBIENT. Colour is a palette slot. Lights the live canvas and GL exports; SVG studio stills stay flat.' },
   { id: 'layers-blend', group: 'Build', title: 'blend', text: 'How this layer composites onto the stack below.' },
   { id: 'output-fxaa', group: 'Pipeline', title: 'edge aa', text: 'FXAA smooths hard stair-stepped edges on the final frame — grid, letterforms, paused shots. Applies to the live canvas and to exports. Costs a little GPU — the governor drops it first if the frame rate sags, and brings it back when it recovers.' },

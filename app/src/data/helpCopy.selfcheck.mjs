@@ -163,7 +163,7 @@ import { HELP_TOPICS, HELP_SHORTCUTS, helpText } from './helpCopy.js';
 
   // Tour bodies + help texts must not name retired tabs: these are the names
   // that actually went stale before (#535) — OUTPUT→PIPELINE (#542),
-  // DAVIS→DIRECTOR (#830), LAYOUT/LAYERS→BUILD (#443/#445), GHOST retired.
+  // DAVIS→DIRECTOR (#830, renamed DIRECTORS #1126), LAYOUT/LAYERS→BUILD (#443/#445), GHOST retired.
   // A denylist (not an ALLCAPS scan) so file formats like PNG don't trip it.
   const staleNames = ['OUTPUT', 'DAVIS', 'LAYOUT', 'LAYERS', 'GHOST'];
   const tourBodies = [...read('data/tour.js').matchAll(/body:\s*'([^']+)'/g)].map((m) => m[1]);

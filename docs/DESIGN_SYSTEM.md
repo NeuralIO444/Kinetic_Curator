@@ -122,7 +122,7 @@ at least two existing variants to earn its place (the "earn your surface" gate, 
 
 ### 2.7 Panel chrome
 
-- **Tabs:** geometric glyph + ALL-CAPS label (`◆ CANVAS ◇ ASSETS ■ BUILD ◎ DIRECTOR ▸ STIMULI ▶ PLAY ⇌ PIPELINE ⬢ DEV`). Active = `--kc-live` flat fill.
+- **Tabs:** geometric glyph + ALL-CAPS label (`◆ CANVAS ◇ ASSETS ■ BUILD ◎ DIRECTORS ▸ STIMULI ▶ PLAY ⇌ PIPELINE ⬢ DEV`). Active = `--kc-live` flat fill.
 - **Panel header:** 28px, tag chip (`P01`…) + title + dim subtitle. Uniform across panels.
 - **Section headers (BUILD):** circled Arabic numeral + uppercase + 2.4px letter-spacing (`① LAYOUT`).
 - **Tiles:** two-line — bold name + dim lowercase subtitle; selected = inverted.
