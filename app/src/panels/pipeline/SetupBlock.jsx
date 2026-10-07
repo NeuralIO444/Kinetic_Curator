@@ -30,7 +30,7 @@ export function SetupBlock() {
       <div className="pipeline-section-label ttl" style={{ marginTop: 2 }}>canvas</div>
       <div className="pipeline-row">
         <span className="lbl" style={{ flex: 1, fontSize: 11 }}>canvas preset</span>
-        <select value={presetId} onChange={(e) => apply(e.target.value)} style={{ fontSize: 11, maxWidth: 180 }}>
+        <select value={presetId} onChange={(e) => apply(e.target.value)} style={{ maxWidth: 180 }}>
           {CANVAS_PRESETS.map((p) => (
             <option key={p.id} value={p.id}>{p.group} · {p.label}</option>
           ))}
@@ -59,7 +59,7 @@ export function SetupBlock() {
       </div>
       <div className="pipeline-row" title="Capture timestep. Live raf still follows the display.">
         <span className="lbl" style={{ flex: 1, fontSize: 11 }}>capture fps</span>
-        <select value={fps} onChange={(e) => setFps(Number(e.target.value))} style={{ fontSize: 11 }}>
+        <select value={fps} onChange={(e) => setFps(Number(e.target.value))} >
           {CANVAS_FPS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </div>

@@ -133,7 +133,7 @@ export function RegionPicker({ assetId, onClose }) {
             <div className="ttl" style={secTitle}>slot assignments</div>
             {REGION_SLOTS.map((s) => (
               <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
-                <span style={{ width: 14, height: 14, borderRadius: 3, background: SLOT_COLORS[s], display: 'inline-block' }} />
+                <span style={{ width: 14, height: 14, background: SLOT_COLORS[s], display: 'inline-block' }} />
                 <span style={{ fontWeight: 700, width: 12 }}>{s}</span>
                 <span style={{ color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                   {slots[s] || '—'}
@@ -153,7 +153,7 @@ export function RegionPicker({ assetId, onClose }) {
                     style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-start', textAlign: 'left' }}
                     title={`Assign to slot ${activeSlot}`}
                     onClick={() => emit(Events.ASSETS_REGION_SLOT, { id: asset.id, slot: activeSlot, regionId: r.id })}>
-                    <span style={{ width: 12, height: 12, borderRadius: 2, background: `#${r.color}`, display: 'inline-block', flex: '0 0 auto' }} />
+                    <span style={{ width: 12, height: 12, background: `#${r.color}`, display: 'inline-block', flex: '0 0 auto' }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.id}</span>
                     {s && (
                       <span style={{ marginLeft: 'auto', fontWeight: 700, color: SLOT_COLORS[s], flex: '0 0 auto' }}>{s}</span>

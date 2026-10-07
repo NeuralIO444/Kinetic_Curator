@@ -298,7 +298,7 @@ export function DataExportRow({
         <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={importProject} style={{ display: 'none' }} />
       </div>
       {pendingImport && (
-        <div style={{ border: '1px solid #8a6d2f', borderRadius: 4, padding: 8, margin: '2px 0 6px', background: '#16130c' }}>
+        <div style={{ border: '1px solid #8a6d2f', padding: 8, margin: '2px 0 6px', background: '#16130c' }}>
           <div style={{ fontSize: 11, marginBottom: 6 }}>{importConfirmMessage(pendingImport.fileName, pendingImport.doc.seed)}</div>
           <div className="pipeline-row" style={{ gap: 6 }}>
             <button className="big-btn dl" onClick={exportFirstImport} style={{ flex: 1 }} title="Save the current piece to a file first, then import">Export current first</button>

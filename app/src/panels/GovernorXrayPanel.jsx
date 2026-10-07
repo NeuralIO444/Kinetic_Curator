@@ -130,7 +130,7 @@ export function GovernorXrayPanel() {
       ))}
 
       <h4 style={{ margin: '10px 0 4px' }}>Pass chain — per-pass cost ({passes.length} passes)</h4>
-      <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid #2a2a2a', borderRadius: 4 }}>
+      <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid #2a2a2a' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
             <tr style={{ position: 'sticky', top: 0, background: '#141414' }}>
@@ -182,7 +182,7 @@ export function GovernorXrayPanel() {
           clear
         </button>
       </div>
-      <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #2a2a2a', borderRadius: 4, padding: '0 6px' }}>
+      <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #2a2a2a', padding: '0 6px' }}>
         {events.length === 0 && (
           <div style={{ color: '#8a93a6', fontSize: 11, padding: '6px 0' }}>
             No governor events yet this session — sheds and restores appear here as they happen.

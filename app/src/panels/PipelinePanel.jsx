@@ -323,7 +323,6 @@ export function PipelinePanel() {
             padding: '8px',
             background: 'rgba(0, 255, 136, 0.04)',
             border: '1px solid rgba(0, 255, 136, 0.25)',
-            borderRadius: '4px',
             fontSize: '11px',
             fontFamily: 'var(--font-mono, monospace)',
           }}
@@ -398,7 +397,6 @@ export function PipelinePanel() {
             padding: '8px',
             background: 'rgba(255, 170, 0, 0.04)',
             border: '1px solid rgba(255, 170, 0, 0.25)',
-            borderRadius: '4px',
             fontSize: '11px',
             fontFamily: 'var(--font-mono, monospace)',
           }}
@@ -460,7 +458,6 @@ export function PipelinePanel() {
             padding: '8px',
             background: 'rgba(0, 229, 255, 0.04)',
             border: '1px solid rgba(0, 229, 255, 0.25)',
-            borderRadius: '4px',
             fontSize: '11px',
             fontFamily: 'var(--font-mono, monospace)',
           }}
@@ -484,7 +481,7 @@ export function PipelinePanel() {
           </div>
 
           {mediaProgress && (
-            <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '8px' }}>
+            <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden', marginBottom: '8px' }}>
               <div
                 style={{
                   width: `${Math.min(100, Math.round((mediaProgress.completed / Math.max(1, mediaProgress.total)) * 100))}%`,

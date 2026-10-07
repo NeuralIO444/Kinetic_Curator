@@ -146,7 +146,7 @@ function FxEffectEditor({ layer, fxOrdinal }) {
         {effectiveKind ? (
           <>
             {slotKinds.length > 1 && (
-              <select className="tg" aria-label={`Choose ${slot.label} effect`} value={effectiveKind} onChange={(e) => setPick(e.target.value)}>
+              <select aria-label={`Choose ${slot.label} effect`} value={effectiveKind} onChange={(e) => setPick(e.target.value)}>
                 {slotKinds.map((k) => <option key={k} value={k}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>)}
               </select>
             )}
@@ -399,7 +399,7 @@ export function LayerStack() {
               compact WET label (mockup C) so the slider keeps its
               address in the row. */}
           {!adj && (
-            <select className="tg blend-mode-select" value={layer.layerBlendMode} title={helpText('layers-blend')}
+            <select className="blend-mode-select" value={layer.layerBlendMode} title={helpText('layers-blend')}
               onChange={(e) => emit(Events.LAYER_SET_BLEND_MODE, { id: layer.id, mode: e.target.value })}>
               {BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode.toUpperCase()}</option>)}
             </select>
@@ -414,7 +414,7 @@ export function LayerStack() {
           <>
           <div className="layer-row-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
             <span className="fx-param-readout lbl" style={{ width: 'auto' }}>patch</span>
-            <select className="tg blend-mode-select" value={patch.mode} disabled={singleTrack && patch.mode === 'off'}
+            <select className="blend-mode-select" value={patch.mode} disabled={singleTrack && patch.mode === 'off'}
               onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to, strength: patch.strength })}>
               <option value="off">OFF</option>
               {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
@@ -426,7 +426,7 @@ export function LayerStack() {
               <option value="field">✦ FIELD</option>
               <option value="feed">↻ FEED</option>
             </select>
-            <select className="tg blend-mode-select" value={to || ''} disabled={singleTrack}
+            <select className="blend-mode-select" value={to || ''} disabled={singleTrack}
               onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: e.target.value, strength: patch.strength })}>
               {contentTargets.map((t) => (
                 <option key={t.id} value={t.id} disabled={t.id === layer.id}>KC-{t.n}</option>

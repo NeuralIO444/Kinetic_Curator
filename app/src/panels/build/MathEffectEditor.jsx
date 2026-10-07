@@ -17,7 +17,7 @@ const MOD_LABELS = { none: '—', rms: 'RMS', flux: 'FLUX', beatPulse: 'BEAT' };
 function ModSelect({ value, title, onChange }) {
   return (
     <select
-      className="tg math-mod-select"
+      className="math-mod-select"
       value={value || 'none'}
       title={title}
       onChange={(e) => onChange(e.target.value)}
@@ -37,7 +37,7 @@ function MathOpRow({ layerId, index, fx, count }) {
     <div className="math-op" title={`${def.label} — ${def.hint}`}>
       <div className="math-op-head">
         <select
-          className="tg math-op-select"
+          className="math-op-select"
           value={fx.kind}
           title={`Op — ${def.hint}`}
           onChange={(e) => emit(Events.MATH_EFFECT_SET_KIND, { layerId, index, kind: e.target.value })}
@@ -93,7 +93,7 @@ export function MathEffectEditor({ layer, mathOrdinal }) {
         <MathOpRow key={`${fx.kind}-${i}`} layerId={layer.id} index={i} fx={fx} count={effects.length} />
       ))}
       <div className="math-add-row">
-        <select className="tg" value={pick} onChange={(e) => setPick(e.target.value)} title="Op to add">
+        <select value={pick} onChange={(e) => setPick(e.target.value)} title="Op to add">
           {MATH_OP_KINDS.map((k) => (
             <option key={k} value={k}>{MATH_EFFECT_DEFS[k].label.toUpperCase()}</option>
           ))}

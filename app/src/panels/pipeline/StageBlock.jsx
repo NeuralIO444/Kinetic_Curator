@@ -54,7 +54,7 @@ export function StageBlock() {
   return (
     <div className="pipeline-stage">
       {stageError && (
-        <div className="pipeline-row" style={{ background: 'rgba(200,30,30,0.16)', border: '1px solid rgba(200,30,30,0.55)', borderRadius: 4, padding: '6px 8px' }}>
+        <div className="pipeline-row" style={{ background: 'rgba(200,30,30,0.16)', border: '1px solid rgba(200,30,30,0.55)', padding: '6px 8px' }}>
           <span style={{ flex: 1, fontSize: 11, color: '#ff9a9a' }}>⚠ {stageError}</span>
           <button type="button" className="chip-btn act" onClick={() => setStageError(null)}>dismiss</button>
         </div>
@@ -81,7 +81,7 @@ export function StageBlock() {
                 <select
                   value={stageDisplayId || ''}
                   onChange={(e) => setStageDisplayId(e.target.value || null)}
-                  style={{ fontSize: 11, maxWidth: 220 }}
+                  style={{ maxWidth: 220 }}
                   title={REFRESH_RATE_UNAVAILABLE}
                 >
                   {displays.length === 0 && <option value="">— no displays —</option>}
