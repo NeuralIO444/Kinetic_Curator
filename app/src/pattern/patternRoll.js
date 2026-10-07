@@ -37,6 +37,8 @@ export function dealPattern(prev, rng) {
     hero: rng(),
     grout: between(rng, 0, QUILT_MAX_GROUT),
     drift: rng() < 0.5 ? 0 : between(rng, 0.15, 0.9),
+    kin: 'MIX', // #1137: a dealt pattern has a few moving accents once DRIFT is up
+    movers: between(rng, 0.15, 0.45),
   });
 }
 
