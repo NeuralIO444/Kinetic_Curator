@@ -1,8 +1,7 @@
 // BeatButton (#950) — the BEAT master clock in the top bar.
 //
-// Collapsed `[B]`, expands to `[BEAT · 120]` on hover/focus/active, following
-// the bar's breathing rules (the kinetic-btn pattern: max-width transition,
-// fixed bar width, tooltips on every abbreviated state). Click opens the
+// Collapsed `[•B]`, expands to `[•BEAT · 120]` on hover / focus / touch / open, through the
+// shared ExpandLabel (#1103) like KIN, LOOKS, VOICE and CURATOR. Click opens the
 // dropdown: BPM presets, a tap-tempo pad (tap 4×), exact BPM entry.
 //
 // BPM is the master clock: the store's setBeatBpm derives the transition
@@ -17,6 +16,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../state/store.js';
 import { helpText } from '../data/helpCopy.js';
+import { ExpandLabel } from './ExpandLabel.jsx';
+import { useTapOpen } from '../hooks/useTapOpen.js';
 import {
   BEAT_DEFAULT_BPM,
   BEAT_PRESETS,
@@ -28,6 +29,7 @@ export function BeatButton() {
   const beatBpm = useStore((s) => s.beatBpm) ?? BEAT_DEFAULT_BPM;
   const setBeatBpm = useStore((s) => s.setBeatBpm);
   const [open, setOpen] = useState(false);
+  const tapOpen = useTapOpen(); // #1103 — touch has no hover
   const [taps, setTaps] = useState([]);
   const [exact, setExact] = useState('');
   const [menuPos, setMenuPos] = useState(null);
@@ -100,7 +102,9 @@ export function BeatButton() {
       <button
         type="button"
         ref={btnRef}
-        className={`beat-btn ${open ? 'open' : ''}`}
+        className={`beat-btn xl act ${open ? 'open' : ''}`}
+        data-open={tapOpen.open ? 'true' : undefined}
+        {...tapOpen.props}
         onClick={() => setOpen((o) => !o)}
         title={helpText('master-beat')}
         aria-label={`Beat clock ${bpmLabel} BPM. Activate to change tempo.`}
@@ -111,8 +115,7 @@ export function BeatButton() {
           style={{ animationDuration: `${beatIntervalS}s` }}
           aria-hidden="true"
         />
-        <span className="beat-glyph">B</span>
-        <span className="beat-rest" aria-hidden="true">EAT · {bpmLabel}</span>
+        <ExpandLabel short="b" full={`beat · ${bpmLabel}`} />
       </button>
       {open && menuPos && createPortal(
         <div

@@ -20,6 +20,8 @@ import { getLoisVerdict } from '../../curator/loisRank.js';
 import { KineticButton } from './KineticButton.jsx';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
+import { useColdOpen } from '../../hooks/useColdOpen.js';
+import { BeatButton } from '../../components/BeatButton.jsx';
 
 export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
@@ -34,6 +36,8 @@ export function CuratorBar() {
   const [voiceUsed, setVoiceUsed] = useState(false);
   const looksTap = useTapOpen();
   const voiceTap = useTapOpen();
+  const curTap = useTapOpen();
+  const cold = useColdOpen(); // #1103 — [KINETIC] and [CURATOR] show their full names for the first ~2 s
   const wrapRef = useRef(null);
   const presetWrapRef = useRef(null);
   useStore((s) => s.tasteRev); // #762: re-resolve the engine when a taste is imported/cleared
@@ -191,9 +195,15 @@ export function CuratorBar() {
             </div>
           )}
         </div>
-        <button className="randomize-btn" onClick={onCurate} title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
-          Curator
+        <button className="randomize-btn xl act" onClick={onCurate}
+          data-open={curTap.open || cold ? 'true' : undefined}
+          {...curTap.props}
+          aria-label="Curator — roll a taste-guided scene over the unlocked parameters"
+          title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
+          <ExpandLabel short="cur" full="curator" />
         </button>
+        {/* #1103 — BEAT sits right of CURATOR: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
+        <BeatButton />
         {loisLine && (
           <span className="lois-verdict" title={hint}>{loisLine}</span>
         )}

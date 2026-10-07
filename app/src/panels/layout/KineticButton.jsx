@@ -32,6 +32,7 @@ import {
 import { Events, emit } from '../../composition/eventBus.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
+import { useColdOpen } from '../../hooks/useColdOpen.js';
 
 export function KineticButton() {
   const kineticRulesPass = useStore((s) => s.kineticRulesPass);
@@ -44,6 +45,7 @@ export function KineticButton() {
   const coolTimerRef = useRef(null);
   const [heat, setHeat] = useState(0);
   const tapOpen = useTapOpen(); // #1103 — touch has no hover
+  const cold = useColdOpen(); // #1103 — the first ~2 s of a page load show the full name
 
   const restartCooling = () => {
     if (coolTimerRef.current) clearInterval(coolTimerRef.current);
@@ -89,7 +91,7 @@ export function KineticButton() {
       type="button"
       className="kinetic-btn xl"
       data-heat-level={level}
-      data-open={tapOpen.open ? 'true' : undefined}
+      data-open={tapOpen.open || cold ? 'true' : undefined}
       {...tapOpen.props}
       style={{ '--heat': heat.toFixed(3) }}
       onClick={tap}
