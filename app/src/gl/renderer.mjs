@@ -44,7 +44,7 @@ import { attachVelocities } from './velocitySmear.mjs';
 import { registerBuiltinEffects } from './bridge/builtinEffects.mjs';
 import { registerFxShaders, compileFxShaders } from './effects/fxShaders.mjs';
 import { registerMathShaders, applyMathMod } from './effects/mathShaders.mjs';
-import { patternKey, patternBytesGL } from '../pattern/patternSource.js'; // #1098: a PATTERN track's frame
+import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/patternSource.js'; // #1098/#1101: a PATTERN track's frame
 
 // #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
@@ -595,25 +595,33 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   /** Frame targets (16F premultiplied; RGBA8 for final output). */
   // #1098 — one texture per PATTERN track, re-uploaded only when its frame changes. A static pattern
-  // (DRIFT 0) uploads once and is reused every frame; `patternKey` is what decides.
-  const patternTex = new Map(); // layerId -> { tex, key }
+  // (DRIFT 0) draws once and uploads once. #1101: each track owns a frame source that remembers what does not
+  // change between frames (a moving quilt repaints only its turning tiles), a moving pattern is drawn at no
+  // more than the scene's own width and scaled up by the GPU, and the upload flips the rows on the GPU.
+  const patternTex = new Map(); // layerId -> { tex, key, frames }
   let patternSeen = new Set();
   function patternTexture(layer, w, h) {
     patternSeen.add(layer.id);
-    const key = patternKey(layer.pattern, layer.palette, w, h, layer.pattern.t);
     let e = patternTex.get(layer.id);
     if (!e) {
       const tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
-      e = { tex, key: null };
+      for (const [k, v] of [[gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      e = { tex, key: null, frames: createPatternFrames() };
       patternTex.set(layer.id, e);
     }
-    if (e.key !== key) {
+    const size = patternDrawSize(layer.pattern.drift, w, h);
+    const f = e.frames.frame(layer.pattern, layer.palette, size.w, size.h, layer.pattern.t);
+    if (e.key !== f.key) {
       gl.bindTexture(gl.TEXTURE_2D, e.tex);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, patternBytesGL(layer.pattern, layer.palette, w, h, layer.pattern.t));
-      e.key = key;
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // the frame is top row first; GL wants bottom row first
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, f.w, f.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, patternBytes(f));
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // every other upload in this file expects the default
+      // hard edges at the size it was drawn; a capped (moving) pattern is smoothed on the way up
+      const filter = size.scaled ? gl.LINEAR : gl.NEAREST;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+      e.key = f.key;
     }
     return e.tex;
   }
