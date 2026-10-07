@@ -19,6 +19,7 @@ import { readMeterBandLevels } from '../../hooks/audioMeterTap.js';
 import { useStore } from '../../state/store.js';
 import { editableRoutes, nextRoute, patchRoute, removeRoute, routeDepthRange, defaultDepthFor } from '../../data/audioRoutes.js';
 import { emit, Events } from '../../composition/eventBus.js';
+import { LOIS_LINES } from '../loisLines.mjs';
 
 const fmt = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(3));
 const INPUT_LABEL = (id) => (id.startsWith('band.') ? `BAND ${id.slice(5).toUpperCase()}` : id.toUpperCase());
@@ -167,7 +168,7 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       <div className="stim-matrix-head" role="row">
         <span className="lbl">route</span><span className="lbl">depth</span><span className="lbl">live</span><span />
       </div>
-      {table.length === 0 && <div className="stim-matrix-empty">No routes: sound drives nothing. Add one below, or click a band in the meter.</div>}
+      {table.length === 0 && <div className="stim-matrix-empty name">{LOIS_LINES.stimuli}</div>}
       {rows.map((row, i) => (
         <Row key={i} row={row} route={table[i]} index={i} table={table} onEdit={editAudioRoutes} />
       ))}

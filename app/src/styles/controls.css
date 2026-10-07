@@ -331,3 +331,6 @@
 .ttl { text-transform: uppercase; }
 :where(.ttl) { letter-spacing: 0.12em; }
 .name { text-transform: none; }
+
+/* #1032 (M7) — voice 1: LOIS at her bluntest, one line per panel, empty room only. */
+.lois-line { padding: 6px 0; color: var(--dim); font-size: 9px; letter-spacing: 0.04em; line-height: 1.5; }

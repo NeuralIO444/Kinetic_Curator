@@ -54,7 +54,7 @@ test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) 
   await expect(clear).toBeEnabled();
   await clear.click();
   await expect(rows).toHaveCount(0);
-  await expect(page.locator('.stim-matrix-empty')).toContainText('sound drives nothing');
+  await expect(page.locator('.stim-matrix-empty')).toContainText('SILENT — sound is in the room and nothing is listening.');
   await expect(clear).toBeDisabled();
   await expect(add).toBeEnabled();
   // …and build up from nothing with + ROUTE
