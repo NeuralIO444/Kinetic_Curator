@@ -13,7 +13,8 @@ import { isMathLayer, mathTrackHitsHard, wetDisplay } from '../../fx/mathFilters
 import { MathEffectEditor } from './MathEffectEditor.jsx';
 import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
 import { efTileFace } from '../../fx/efRackTile.mjs';
-import { displayLayerName, isPatternLayer, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } from '../../state/slices/layersSlice.js';
+import { displayLayerName, isPatternLayer, isKcLayer, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } from '../../state/slices/layersSlice.js';
+import { PatternEditor } from './PatternEditor.jsx';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
@@ -243,15 +244,18 @@ function FamilyChooser({ section, fxOrdinal, fxSlotKinds, fxSlotLabel, onPick, o
 }
 
 export function LayerStack() {
-  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId }));
-  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId } = state;
+  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId, selectedPatternLayerId: s.selectedPatternLayerId }));
+  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId } = state;
   const setLayerPatch = useStore((s) => s.setLayerPatch);
+  const addPatternLayer = useStore((s) => s.addPatternLayer);
+  const selectPatternLayer = useStore((s) => s.selectPatternLayer);
   const isAdj = (l) => isFxLayer(l) || isMathLayer(l);
   const fineClass = (l) => (isMathLayer(l) ? 'math' : isFxLayer(l) ? 'fx' : 'content');
   const contentCount = layers.filter((l) => !isAdj(l)).length;
   const fxCount = layers.filter(isFxLayer).length;
   const mathCount = layers.filter(isMathLayer).length;
-  const singleTrack = contentCount < 2; // PATCH has nothing to point at (a patched row can still be set back to OFF)
+  const kcCount = layers.filter(isKcLayer).length; // #1099 — a PATTERN track is content for the cap, but not a KC track
+  const singleTrack = kcCount < 2; // PATCH has nothing to point at (a patched row can still be set back to OFF)
   // #1019 — PATCH one-liner for newcomers ("route one track's motion into
   // another"): visible the first time a second KC track exists, then it gets
   // out of the way. `seen` persists via localStorage (never nags on repeat
@@ -343,6 +347,8 @@ export function LayerStack() {
     const isActive = layer.id === activeLayerId;
     const isFxSelected = layer.id === selectedFxLayerId;
     const isMathSelected = layer.id === selectedMathLayerId;
+    const pat = isPatternLayer(layer); // #1099
+    const isPatSelected = layer.id === selectedPatternLayerId;
     const soloed = !adj && layer.visible && layers.every((l) => l.id === layer.id || isAdj(l) || !l.visible);
     const mathSoloed = math && layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
     const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
@@ -356,7 +362,7 @@ export function LayerStack() {
     return (
       <div
         key={layer.id}
-        className={`layer-row${cls === 'content' ? ' layer-row-kc' : ''} ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}${moveFlash?.id === layer.id ? ' layer-row-moved' : ''}`}
+        className={`layer-row${cls === 'content' ? ' layer-row-kc' : ''} ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${pat ? 'layer-row-pattern' : ''} ${isPatSelected ? 'layer-row-pattern-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}${moveFlash?.id === layer.id ? ' layer-row-moved' : ''}`}
         // #1018 (F8) — the whole FX row arms the effect editor. The name
         // used to be the only affordance and it reads as a label, so the
         // editor was undiscoverable. Row-body taps anywhere on an FX row
@@ -365,14 +371,15 @@ export function LayerStack() {
         // own handlers (the closest() bail-out). KC rows are unchanged;
         // MATH rows are out of scope (#1010).
         onClick={(e) => {
-          if (!fx) return;
+          if (!fx && !pat) return;
           if (e.target.closest('button, input, select, label, a')) return;
+          if (pat) { selectPatternLayer(layer.id); return; } // #1099 — the whole PATTERN row opens its editor
           emit(Events.FX_SELECT, { id: layer.id });
         }}
-        title={fx ? `Tap to open the ${label} effect editor` : undefined}
+        title={fx ? `Tap to open the ${label} effect editor` : pat ? `Tap to open the ${label} pattern editor` : undefined}
       >
         <div className="layer-row-main">
-          <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : isActive} />
+          <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : pat ? 'pattern' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : pat ? isPatSelected : isActive} />
           <div className="layer-reorder">
             <button className="micro-btn" disabled={!canMoveUp(group, layer.id)} title="Move up" onClick={() => handleMove(layer, 'up')}>▲</button>
             <button className="micro-btn" disabled={!canMoveDown(group, layer.id)} title="Move down" onClick={() => handleMove(layer, 'down')}>▼</button>
@@ -387,13 +394,13 @@ export function LayerStack() {
           {math && <span className="math-badge" title={hitsHard ? 'M — this track is changing the picture hard' : 'M — MATH track'}>M</span>}
           <button
             className="layer-name"
-            title={(isActive && !adj) || (isFxSelected && fx) || (isMathSelected && math) ? `${label} — editing` : label}
-            onClick={() => emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id })}
+            title={(isActive && !adj && !pat) || (isFxSelected && fx) || (isMathSelected && math) || (isPatSelected && pat) ? `${label} — editing` : label}
+            onClick={() => (pat ? selectPatternLayer(layer.id) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }))}
           >
             {label}
           </button>
           <button className={`act micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : 'Duplicate'} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>dup</button>
-          <button className="micro-btn" title="Remove track (undoable)" disabled={!isAdj(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
+          <button className="micro-btn" title="Remove track (undoable)" disabled={isKcLayer(layer) && kcCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
         </div>
         <div className="layer-row-composite">
           {/* #1016 — blend modes only exist on CONTENT tracks. FX/MATH
@@ -414,7 +421,7 @@ export function LayerStack() {
             onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })} />
           <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>{Math.round(wet.wet * 100)}%{wet.capped ? ' max' : ''}</span>
         </div>
-        {!adj && (
+        {!adj && !pat && (
           <>
           <div className="layer-row-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
             <span className="fx-param-readout lbl" style={{ width: 'auto' }}>patch</span>
@@ -469,13 +476,14 @@ export function LayerStack() {
         )}
         {fx && isFxSelected && <FxEffectEditor layer={layer} fxOrdinal={ordinals.get(layer.id) || 1} />}
         {math && isMathSelected && <MathEffectEditor layer={layer} mathOrdinal={ordinals.get(layer.id) || 1} />}
+        {pat && isPatSelected && <PatternEditor layer={layer} ordinal={ordinals.get(layer.id) || 1} />}
       </div>
     );
   }
 
   // #1014 (mockup C) — section header: title, n/4 count, "+" (tap = add
   // with last-used defaults, long-press = family chooser), hint line.
-  function renderSectionHead({ title, count, max, hint, addTitle, addChooserLabel, addDisabled, onAdd, onOpenChooser }) {
+  function renderSectionHead({ title, count, max, hint, addTitle, addChooserLabel, addDisabled, onAdd, onOpenChooser, extra }) {
     return (
       <div className="layer-section-head">
         <span className="layer-section-title">{title}</span>
@@ -487,6 +495,7 @@ export function LayerStack() {
           onAdd={onAdd}
           onOpenChooser={onOpenChooser}
         />
+        {extra}
         {hint && <span className="layer-section-hint">{hint}</span>}
       </div>
     );
@@ -542,6 +551,12 @@ export function LayerStack() {
           addDisabled: contentCount >= MAX_CONTENT_TRACKS,
           onAdd: () => emit(Events.LAYER_ADD),
           onOpenChooser: () => setChooser('content'),
+          // #1099 — a PATTERN track is added beside the KC one, and opens its editor.
+          extra: (
+            <button type="button" className="micro-btn act layer-add-pattern" disabled={contentCount >= MAX_CONTENT_TRACKS}
+              title={contentCount >= MAX_CONTENT_TRACKS ? 'Track cap reached' : 'Add PATTERN track — a generated tessellation, glyph poster or field'}
+              onClick={() => addPatternLayer('QUILT')}>+ pattern</button>
+          ),
         })}
         {chooser === 'content' && (
           <FamilyChooser

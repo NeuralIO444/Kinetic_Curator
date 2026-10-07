@@ -825,3 +825,11 @@
 .math-add-row { display: flex; gap: 4px; align-items: center; }
 .math-add-row select { flex: 1; }
 .math-order-note { font-size: 8px; color: var(--dim); letter-spacing: 0.03em; }
+
+/* #1099 — the PATTERN track: a content-group row with its own editor (reuses .fx-editor / .fx-param). */
+.layer-row-pattern-selected { border-color: var(--accent3); box-shadow: inset 3px 0 0 var(--accent3), inset 0 0 0 1px var(--accent3); }
+.layer-add-pattern { min-height: 28px; padding: 4px 8px; }
+.pattern-modes { display: flex; gap: 4px; padding: 4px 0 8px; }
+.pattern-modes .chip-btn { flex: 1; min-height: 44px; }
+.pattern-seed { display: flex; align-items: center; gap: 12px; min-height: 44px; padding-top: 4px; }
+.pattern-seed .big-btn { min-height: 44px; padding: 8px 16px; }
