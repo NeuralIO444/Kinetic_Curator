@@ -126,14 +126,18 @@ ok('contract: a static pattern keeps one hash across time; a drifting one carrie
   assert.ok(!('patternTime' in plain));
 });
 
-ok('the renderer: one texture per pattern track, re-uploaded only when the frame changes, freed when the track goes', () => {
+ok('the renderer: one texture + one frame source per pattern track, re-uploaded only when the frame changes, freed when the track goes', () => {
   const src = read('../gl/renderer.mjs');
   assert.match(src, /layer\.type === 'pattern' \? patternTexture\(layer, w, h\)/, 'compositeLayerTo draws a pattern from its own texture');
-  assert.match(src, /const key = patternKey\(layer\.pattern, layer\.palette, w, h, layer\.pattern\.t\)/);
-  assert.match(src, /if \(e\.key !== key\)/, 'upload only on change');
+  assert.match(src, /frames: createPatternFrames\(\)/, 'each track owns a frame source (#1101)');
+  assert.match(src, /const size = patternDrawSize\(layer\.pattern\.drift, w, h\)/);
+  assert.match(src, /e\.frames\.frame\(layer\.pattern, layer\.palette, size\.w, size\.h, layer\.pattern\.t\)/);
+  assert.match(src, /if \(e\.key !== f\.key\)/, 'upload only on change');
   assert.match(src, /sweepPatternTextures\(\); \/\/ #1098/, 'a track that left the scene frees its texture');
   assert.match(src, /for \(const e of patternTex\.values\(\)\) gl\.deleteTexture\(e\.tex\)/, 'and dispose frees them all');
-  assert.ok(!/UNPACK_FLIP_Y_WEBGL, true/.test(src));
+  // the flip is turned on for this upload only: every other upload in the file expects the default
+  assert.match(src, /UNPACK_FLIP_Y_WEBGL, true\);[^]*?texImage2D[^]*?UNPACK_FLIP_Y_WEBGL, false\);/);
+  assert.match(src, /size\.scaled \? gl\.LINEAR : gl\.NEAREST/, 'a capped (moving) pattern is smoothed up, a full-size one stays hard-edged');
 });
 
 // ── browser: the actual pixels ──────────────────────────────────────────────
@@ -204,6 +208,20 @@ try {
 
   const again = await renderCandidate(docWith([kcLayer, { id: 'pt', name: 'PT-1', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern }]), { width: W });
   await okA('same scene, same pixels (deterministic through the GL path)', async () => assert.ok(withPt.pixels.equals(again.pixels)));
+
+  for (const [mode, drift] of [['QUILT', 0.8], ['GLYPH', 1], ['FIELD', 0.6]]) {
+    const moving = P({ mode, density: mode === 'GLYPH' ? 4 : 6, drift });
+    const t = 2.5;
+    const got = await renderCandidate(docWith([kcLayer, { id: 'pt', name: 'PT-1', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern: moving }], { patternTime: t }), { width: W });
+    await okA(`GL ${mode} drifting (t = 2.5 s): the frame is the engine's frame at that time, and it differs from the still one`, async () => {
+      const px = new Uint8Array(patternPixels(moving, pal, W, H, t).buffer);
+      const want = new Uint8Array(px.length);
+      for (let i = 0; i < px.length; i += 4) { want[i] = aces(px[i]); want[i + 1] = aces(px[i + 1]); want[i + 2] = aces(px[i + 2]); want[i + 3] = 255; }
+      const d = worst(got.pixels, want);
+      assert.ok(d.off < 0.002, `${(d.off * 100).toFixed(2)}% of pixels are off by more than 2 (worst ${d.m})`);
+      assert.ok(!got.pixels.equals((await renderCandidate(docWith([kcLayer, { id: 'pt', name: 'PT-1', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern: { ...moving, drift: 0 } }]), { width: W })).pixels), 'drifting is not still');
+    });
+  }
 
   const other = await renderCandidate(docWith([kcLayer, { id: 'pt', name: 'PT-1', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern: P({ seed: 99 }) }]), { width: W });
   await okA('a new seed is a new frame', async () => assert.ok(!other.pixels.equals(withPt.pixels)));

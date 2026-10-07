@@ -7,9 +7,9 @@
 // SEED is the stored integer, never a hidden rng state.
 
 import { mkRng } from '../engine/prng.js';
-import { FIELD_PATTERNS, samplePattern, patternParams } from './field.js';
-import { TILE_MOTIFS, HERO_MOTIFS, sampleQuilt, quiltParams } from './quilt.js';
-import { GLYPH_MARKS, FILLED_MARKS, RHYTHM_MARKS, POSES, MIN_STROKE, buildMark, sampleMark, motifRoles } from './glyph.js';
+import { FIELD_PATTERNS, samplePattern, fieldSampler, patternParams } from './field.js';
+import { TILE_MOTIFS, HERO_MOTIFS, sampleQuilt, quiltSampler, quiltParams } from './quilt.js';
+import { GLYPH_MARKS, FILLED_MARKS, RHYTHM_MARKS, POSES, MIN_STROKE, MARK_BOX, buildMark, sampleMark, motifRoles } from './glyph.js';
 import { rankedSwatches } from '../data/swatchWeights.js';
 import { motion, glyphPulse, fieldPan, QUILT_ROTATING, FIELD_PAN_TILES_PER_S } from './motion.js';
 
@@ -143,6 +143,30 @@ export function fieldColorAt(grid, X, Y) {
  * `tileW` is the tile width in buffer pixels.
  */
 export function rasterField(buf, bw, bh, grid, tileW, offset = { x: 0, y: 0 }) {
+  const { cols, rows, tiles } = grid;
+  // The sampler is looked up once per TILE (not per pixel), and a run of pixels inside one tile reuses it (#1101).
+  const fns = tiles.map((tl) => fieldSampler(tl.pattern));
+  for (let y = 0; y < bh; y++) {
+    const Y = (y + 0.5) / tileW + offset.y;
+    const fy = Math.floor(Y); const v = Y - fy;
+    const rowBase = (((fy % rows) + rows) % rows) * cols;
+    const out = y * bw;
+    let lastFx = NaN; let fn = null; let rgba = null; let params = null;
+    for (let x = 0; x < bw; x++) {
+      const X = (x + 0.5) / tileW + offset.x;
+      const fx = Math.floor(X);
+      if (fx !== lastFx) {
+        const i = rowBase + (((fx % cols) + cols) % cols);
+        const tl = tiles[i]; fn = fns[i]; rgba = tl.rgba; params = tl.params; lastFx = fx;
+      }
+      buf[out + x] = rgba[fn(X - fx, v, params)];
+    }
+  }
+  return buf;
+}
+
+/** The REFERENCE field raster: one pixel at a time through samplePattern. rasterField is proven identical to it. */
+export function rasterFieldReference(buf, bw, bh, grid, tileW, offset = { x: 0, y: 0 }) {
   const { cols, rows, tiles } = grid;
   for (let y = 0; y < bh; y++) {
     const Y = (y + 0.5) / tileW + offset.y;
@@ -305,22 +329,26 @@ function quiltCell(grid, X, Y, rot = null) {
   return { tile, u, v };
 }
 
-/** The palette color of the quilt at tile-space point (X, Y). */
-export function quiltColorAt(grid, X, Y, grout = 0) {
+/** The palette color of the quilt at tile-space point (X, Y). `rot` = per-cell angles (radians), as rasterQuilt takes them. */
+export function quiltColorAt(grid, X, Y, grout = 0, rot = null) {
   if (onGrout(grid, X, Y, grout)) return grid.ground;
-  const { tile, u, v } = quiltCell(grid, X, Y);
+  const { tile, u, v } = quiltCell(grid, X, Y, rot);
   return tile.colors[sampleQuilt(tile.pattern, u, v, tile.params)];
 }
 
-/**
- * Rasterize the quilt into a Uint32Array (RGBA, little-endian) of bw × bh.
- * Draw order is the spec's: tiles to the full tile rect, heroes over their four
- * cells, grout LAST as an overlay in the darkest role. The grid does not wrap
- * and does not pan (DRIFT in QUILT is #1042).
- */
-export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0) {
+/** Per-cell rotation angles for a frame, or null when nothing moves. */
+function quiltAngles(grid, drift, t) {
   const m = motion('QUILT', drift, t, { count: grid.cols * grid.rows });
-  const rot = m.kind === 'rotate' ? Float64Array.from({ length: grid.cols * grid.rows }, (_, i) => m.angle(i)) : null;
+  return m.kind === 'rotate' ? Float64Array.from({ length: grid.cols * grid.rows }, (_, i) => m.angle(i)) : null;
+}
+
+/**
+ * The REFERENCE quilt raster: one pixel at a time, through quiltCell / onGrout / sampleQuilt, which ARE the
+ * spec (draw order: tiles to the full rect, heroes over their cells, grout last). Slow (it allocates per
+ * pixel). rasterQuilt is the fast one and is proven pixel-identical to this (quilt.selfcheck, rasterFast.selfcheck).
+ */
+export function rasterQuiltReference(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0) {
+  const rot = quiltAngles(grid, drift, t);
   for (let y = 0; y < bh; y++) {
     const Y = (y + 0.5) / tileW;
     for (let x = 0; x < bw; x++) {
@@ -331,6 +359,128 @@ export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 
     }
   }
   return buf;
+}
+
+// ── the fast quilt raster (#1101) ───────────────────────────────────────────
+// The reference allocates an object per pixel and looks the motif up by name per pixel. This works by CELL:
+// the sampler is found once per tile, a pixel's tile-space position comes from a table, and grout is only
+// asked about pixels that can possibly be on a seam. Every number it computes is the one the reference
+// computes, so the pixels are identical.
+
+/** Per-(grid, size, grout) pixel tables: tile-space positions, each cell's pixel span, the grout band flags. */
+function quiltPlan(grid, bw, bh, tileW, grout) {
+  const { cols, rows } = grid;
+  const Xf = new Float64Array(bw); const Yf = new Float64Array(bh);
+  const colA = new Int32Array(cols).fill(-1); const colB = new Int32Array(cols);
+  const rowA = new Int32Array(rows).fill(-1); const rowB = new Int32Array(rows);
+  for (let x = 0; x < bw; x++) {
+    Xf[x] = (x + 0.5) / tileW;
+    const c = Math.min(cols - 1, Math.max(0, Math.floor(Xf[x])));
+    if (colA[c] < 0) colA[c] = x;
+    colB[c] = x + 1;
+  }
+  for (let y = 0; y < bh; y++) {
+    Yf[y] = (y + 0.5) / tileW;
+    const r = Math.min(rows - 1, Math.max(0, Math.floor(Yf[y])));
+    if (rowA[r] < 0) rowA[r] = y;
+    rowB[r] = y + 1;
+  }
+  const g = Math.min(QUILT_MAX_GROUT, Math.max(0, Number(grout) || 0));
+  const half = g / 2;
+  const bandX = new Uint8Array(bw); const bandY = new Uint8Array(bh);
+  if (g > 0) {
+    for (let x = 0; x < bw; x++) { const k = Math.round(Xf[x]); bandX[x] = Math.abs(Xf[x] - k) < half && k > 0 && k < cols ? 1 : 0; }
+    for (let y = 0; y < bh; y++) { const k = Math.round(Yf[y]); bandY[y] = Math.abs(Yf[y] - k) < half && k > 0 && k < rows ? 1 : 0; }
+  }
+  return { bw, bh, Xf, Yf, colA, colB, rowA, rowB, bandX, bandY, grout, hasGrout: g > 0 };
+}
+
+const ROT_SET = new Set(QUILT_ROTATING);
+
+/** Paint one tile (span 1) or one hero (span 2) into the pixel rect it owns, turned by `a` radians. */
+function quiltPaint(buf, plan, tile, c0, r0, span, a) {
+  const xs = plan.colA[c0]; const xe = plan.colB[c0 + span - 1];
+  const ys = plan.rowA[r0]; const ye = plan.rowB[r0 + span - 1];
+  if (xs < 0 || ys < 0) return; // this cell is past the bottom or right of the frame
+  const fn = quiltSampler(tile.pattern); const params = tile.params; const rgba = tile.rgba;
+  const { Xf, Yf, bw } = plan;
+  const turn = a !== 0 && ROT_SET.has(tile.pattern);
+  const cs = turn ? Math.cos(a) : 1; const sn = turn ? Math.sin(a) : 0;
+  for (let y = ys; y < ye; y++) {
+    const v0 = span === 2 ? (Yf[y] - r0) / 2 : Yf[y] - r0;
+    const row = y * bw;
+    for (let x = xs; x < xe; x++) {
+      let u = span === 2 ? (Xf[x] - c0) / 2 : Xf[x] - c0; let v = v0;
+      if (turn) { const dx = u - 0.5; const dy = v - 0.5; u = 0.5 + dx * cs + dy * sn; v = 0.5 - dx * sn + dy * cs; }
+      buf[row + x] = rgba[fn(u, v, params)];
+    }
+  }
+}
+
+/** Lay grout over a pixel rect: only pixels that can be on a seam ask onGrout, and onGrout decides. */
+function quiltGrout(buf, plan, grid, xs, xe, ys, ye) {
+  if (!plan.hasGrout) return;
+  const { Xf, Yf, bw, bandX, bandY } = plan;
+  for (let y = Math.max(0, ys); y < ye; y++) {
+    const all = bandY[y] === 1; const row = y * bw;
+    for (let x = Math.max(0, xs); x < xe; x++) {
+      if ((all || bandX[x] === 1) && onGrout(grid, Xf[x], Yf[y], plan.grout)) buf[row + x] = grid.groundRgba;
+    }
+  }
+}
+
+/** The cell index and angle of every cell the DRIFT can turn: 1x1 pinwheels / medallions, and medallion heroes. */
+function quiltMovers(grid) {
+  const out = [];
+  grid.tiles.forEach((tl, i) => { if (grid.heroAt[i] === -1 && ROT_SET.has(tl.pattern)) out.push({ tile: tl, c: i % grid.cols, r: (i / grid.cols) | 0, span: 1, at: i }); });
+  grid.heroes.forEach((h) => { if (ROT_SET.has(h.pattern)) out.push({ tile: h, c: h.c, r: h.r, span: 2, at: h.r * grid.cols + h.c }); });
+  return out;
+}
+
+/**
+ * Rasterize the quilt into a Uint32Array (RGBA, little-endian) of bw × bh. Same pixels as
+ * rasterQuiltReference. Draw order is the spec's: tiles, heroes over their cells, grout last.
+ */
+export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 0) {
+  const rot = quiltAngles(grid, drift, t);
+  const plan = quiltPlan(grid, bw, bh, tileW, grout);
+  const { cols, rows, tiles, heroes, heroAt } = grid;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      if (heroAt[i] === -1) quiltPaint(buf, plan, tiles[i], c, r, 1, rot ? rot[i] : 0);
+    }
+  }
+  for (const h of heroes) quiltPaint(buf, plan, h, h.c, h.r, 2, rot ? rot[h.r * cols + h.c] : 0);
+  quiltGrout(buf, plan, grid, 0, bw, 0, bh);
+  return buf;
+}
+
+/**
+ * A quilt that is drawn ONCE and then only its turning tiles are redrawn each frame (#1101). Nothing else in a
+ * quilt moves, so a frame is: copy the still picture, repaint the few pinwheels and medallions at their angle,
+ * lay their grout again. `draw(out, drift, t)` returns `out`, pixel-identical to rasterQuilt for that frame.
+ */
+export function createQuiltRaster(grid, bw, bh, tileW, grout = 0) {
+  const base = new Uint32Array(bw * bh);
+  rasterQuilt(base, bw, bh, grid, tileW, grout, 0, 0);
+  const plan = quiltPlan(grid, bw, bh, tileW, grout);
+  const movers = quiltMovers(grid);
+  return {
+    base, movers: movers.length,
+    draw(out, drift, t) {
+      const rot = quiltAngles(grid, drift, t);
+      out.set(base);
+      if (!rot) return out;
+      for (const m of movers) {
+        const a = rot[m.at];
+        if (a === 0) continue;
+        quiltPaint(out, plan, m.tile, m.c, m.r, m.span, a);
+        quiltGrout(out, plan, grid, plan.colA[m.c], plan.colB[m.c + m.span - 1], plan.rowA[m.r], plan.rowB[m.r + m.span - 1]);
+      }
+      return out;
+    },
+  };
 }
 
 // ── GLYPH (#1041) ───────────────────────────────────────────────────────────
@@ -448,6 +598,36 @@ export function glyphLayout(grid, bw, bh) {
  * at most). Ground on ground draws nothing, so there is nothing to draw.
  */
 export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0) {
+  const { cols, rows, tiles, groundRgba } = grid;
+  const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
+  const count = cols * rows;
+  buf.fill(groundRgba); // the frame, the letterbox and every tile's negative space
+  // Only the pixels inside a tile's mark box can be anything but ground (sampleMark returns null outside it),
+  // so each tile samples just its own box. Same pixels as walking the whole frame, a fraction of the work (#1101).
+  for (let i = 0; i < count; i++) {
+    const c = i % cols; const r = (i / cols) | 0;
+    const scale = glyphScale(i, count, drift, t);
+    const half = MARK_BOX * scale * tile;
+    const cx = x0 + (c + 0.5) * tile; const cy = y0 + (r + 0.5) * tile;
+    const xa = Math.max(0, Math.floor(cx - half) - 1); const xb = Math.min(bw - 1, Math.ceil(cx + half) + 1);
+    const ya = Math.max(0, Math.floor(cy - half) - 1); const yb = Math.min(bh - 1, Math.ceil(cy + half) + 1);
+    const tl = tiles[i];
+    for (let y = ya; y <= yb; y++) {
+      const gy = (y + 0.5 - y0) / tile;
+      if (Math.floor(gy) !== r) continue; // a margin pixel that belongs to the next tile
+      for (let x = xa; x <= xb; x++) {
+        const gx = (x + 0.5 - x0) / tile;
+        if (Math.floor(gx) !== c) continue;
+        const role = sampleMark(tl.ops, gx - c - 0.5, gy - r - 0.5, scale);
+        if (role) buf[y * bw + x] = tl.rgba[role];
+      }
+    }
+  }
+  return buf;
+}
+
+/** The REFERENCE glyph raster: every pixel of the frame, one at a time. rasterGlyph is proven identical to it. */
+export function rasterGlyphReference(buf, bw, bh, grid, drift = 0, t = 0) {
   const { cols, rows, tiles, groundRgba } = grid;
   const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
   const count = cols * rows;

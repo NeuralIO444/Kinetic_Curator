@@ -113,6 +113,9 @@ export function samplePattern(name, x, y, p) {
   return G[name](x, y, p);
 }
 
+/** The pattern's sampler itself, so a hot loop looks it up once per tile instead of once per pixel (#1101). */
+export const fieldSampler = (name) => G[name];
+
 // ── params, drawn from the tile's seeded rng ────────────────────────────────
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 

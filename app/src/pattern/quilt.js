@@ -125,6 +125,9 @@ export function sampleQuilt(name, u, v, p) {
   return Q[name](u, v, p);
 }
 
+/** The motif's sampler itself, so a hot loop looks it up once per tile instead of once per pixel (#1101). */
+export const quiltSampler = (name) => Q[name];
+
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 
 /** Fresh params for a motif, drawn from the tile's seeded rng. */
