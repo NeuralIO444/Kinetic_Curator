@@ -48,7 +48,7 @@ export function SnapRecordRow({
 
   return (
     <div className="pipeline-row">
-      <button className="big-btn" onClick={addSnapshot} style={{ flex: 2 }} disabled={rendering}>↓ SNAP</button>
+      <button className="big-btn act" onClick={addSnapshot} style={{ flex: 2 }} disabled={rendering}>↓ snap</button>
       <button
         className="big-btn"
         onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}

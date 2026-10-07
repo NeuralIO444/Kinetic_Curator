@@ -22,7 +22,7 @@ export function CreatureSliders({ layoutParams, lockedParams }) {
 
   return (
     <div className="param-block">
-      <div className="param-subheader">🦋 MOTH / HYPE</div>
+      <div className="param-subheader ttl">🦋 moth / hype</div>
       <RangeRow label="BODY" value={layoutParams.body ?? 3} min={1} max={7} step={1}
         hint="Spine length. 1 = spore, 3–7 = bug. Physics count unchanged."
         disabled={!isHype} disabledReason="Moth bodies only (hype mode)"

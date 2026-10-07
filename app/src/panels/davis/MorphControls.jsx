@@ -5,7 +5,7 @@ export function MorphControls({ morphEvolve, morphDurationMs, morphing }) {
   return (
     <div style={{ marginTop: 8, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span className="davis-label" style={{ margin: 0 }}>MORPH EVOLVE</span>
+        <span className="davis-label lbl" style={{ margin: 0 }}>morph evolve</span>
         <button
           className={`chip-btn ${morphEvolve ? 'active' : ''}`}
           onClick={() => emit(Events.DAVIS_MORPH, { enabled: !morphEvolve })}
@@ -16,7 +16,7 @@ export function MorphControls({ morphEvolve, morphDurationMs, morphing }) {
       </div>
       <div className="davis-interval-row" style={morphEvolve ? undefined : { opacity: 0.4 }}
         title={morphEvolve ? 'Seconds for layout targets to ease in.' : 'Dead while MORPH EVOLVE is off. It only shapes the ease.'}>
-        <span className="davis-label">DURATION</span>
+        <span className="davis-label lbl">duration</span>
         <RangeRow layout="bare" tone="ink" min={300} max={4000} step={100} value={morphDurationMs || 1200}
           disabled={!morphEvolve}
           hint={morphEvolve ? 'Seconds for layout targets to ease in.' : 'Dead while MORPH EVOLVE is off. It only shapes the ease.'}

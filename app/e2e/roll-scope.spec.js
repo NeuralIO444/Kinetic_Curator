@@ -33,7 +33,7 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
   test('arming phi + FLOCK pins mode/motion across KINETIC rolls', async ({ page }) => {
     const phiChip = page.locator('.mode-strip .chip-btn[title*="fibonacci"]');
     // NOTE: no ^$ anchors — arming appends the 📌 pin glyph to the chip text.
-    const flockChip = page.locator('.mode-strip .chip-btn', { hasText: /FLOCK/ });
+    const flockChip = page.locator('.mode-strip .chip-btn', { hasText: /flock/i });
     await phiChip.click();
     await flockChip.click();
     await expect(phiChip).toHaveClass(/armed/);
@@ -94,7 +94,7 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
 
     // Play panel drops its own BPM slider for a BEAT readout (metro only).
     await page.getByRole('tab', { name: /play/i }).click();
-    await page.locator('.davis-source-row .chip-btn', { hasText: /^METRO$/ }).click();
+    await page.locator('.davis-source-row .chip-btn', { hasText: /^metro$/i }).click();
     await expect(page.locator('.davis-readout', { hasText: /BEAT · 90/ })).toBeVisible();
 
     // Arm the phrase loop on METRO. The DIRECTOR panel's subtitle is the

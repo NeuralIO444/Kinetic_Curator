@@ -28,7 +28,7 @@ export function DisplayBlock() {
         </button>
       </div>
       <div className="pipeline-row" title={helpText('output-weave')}>
-        <span style={{ flex: 1, fontSize: 11 }}>FILM · GATE WEAVE</span>
+        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>film · gate weave</span>
         <button
           type="button"
           className={`chip-btn${weave ? ' active' : ''}`}

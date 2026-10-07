@@ -56,11 +56,11 @@ export function StageBlock() {
       {stageError && (
         <div className="pipeline-row" style={{ background: 'rgba(200,30,30,0.16)', border: '1px solid rgba(200,30,30,0.55)', borderRadius: 4, padding: '6px 8px' }}>
           <span style={{ flex: 1, fontSize: 11, color: '#ff9a9a' }}>⚠ {stageError}</span>
-          <button type="button" className="chip-btn" onClick={() => setStageError(null)}>DISMISS</button>
+          <button type="button" className="chip-btn act" onClick={() => setStageError(null)}>dismiss</button>
         </div>
       )}
       <div className="pipeline-row">
-        <span style={{ flex: 1, fontSize: 11 }}>STAGE MODE</span>
+        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>stage mode</span>
         {['preview', 'fullscreen', 'syphon'].map((m) => (
           <button key={m} type="button" className={`chip-btn${mode === m ? ' active' : ''}`}
             onClick={() => pickMode(m)}>
@@ -77,7 +77,7 @@ export function StageBlock() {
           {tauri ? (
             <>
               <div className="pipeline-row">
-                <span style={{ flex: 1, fontSize: 11 }}>DISPLAY</span>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>display</span>
                 <select
                   value={stageDisplayId || ''}
                   onChange={(e) => setStageDisplayId(e.target.value || null)}
@@ -94,7 +94,7 @@ export function StageBlock() {
                 </button>
               </div>
               <div className="pipeline-row">
-                <span style={{ flex: 1, fontSize: 11 }}>NATIVE RASTER</span>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>native raster</span>
                 <span className="pipeline-status" style={{ fontSize: 11 }}>
                   {activeDisplay ? `${activeDisplay.w}×${activeDisplay.h}` : '—'}
                 </span>
@@ -104,7 +104,7 @@ export function StageBlock() {
                 </button>
               </div>
               <div className="pipeline-row">
-                <span style={{ flex: 1, fontSize: 11 }}>MAPPING</span>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>mapping</span>
                 {STAGE_MAPPINGS.map((mp) => (
                   <button key={mp} type="button" className={`chip-btn${mapping === mp ? ' active' : ''}`}
                     onClick={() => setMapping(mp)}
@@ -114,7 +114,7 @@ export function StageBlock() {
                 ))}
               </div>
               <div className="pipeline-row">
-                <span style={{ flex: 1, fontSize: 11 }}>TEST PATTERN</span>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>test pattern</span>
                 <button type="button" className={`chip-btn${testPattern ? ' active' : ''}`} onClick={() => setTestPattern(!testPattern)}>
                   {testPattern ? 'ON' : 'OFF'}
                 </button>
@@ -128,7 +128,7 @@ export function StageBlock() {
             </div>
           )}
           <div className="pipeline-row">
-            <span style={{ flex: 1, fontSize: 11 }}>BLACKOUT</span>
+            <span className="lbl" style={{ flex: 1, fontSize: 11 }}>blackout</span>
             <button type="button" className={`chip-btn${blackout ? ' active' : ''}`} onClick={() => setBlackout(!blackout)}
               title="Stage goes black instantly. The UI stays live; toggling back recovers without re-creating the window.">
               {blackout ? 'ON' : 'OFF'}
@@ -140,7 +140,7 @@ export function StageBlock() {
       {mode === 'syphon' && (
         <>
           <div className="pipeline-row">
-            <span style={{ flex: 1, fontSize: 11 }}>SERVER</span>
+            <span className="lbl" style={{ flex: 1, fontSize: 11 }}>server</span>
             <input value={syphonName} onChange={(e) => setSyphonName(e.target.value)} style={{ fontSize: 11, width: 140 }} />
             {tauri ? (
               <button type="button" className={`chip-btn${syphonOn ? ' active' : ''}`}
@@ -150,7 +150,7 @@ export function StageBlock() {
             ) : (
               /* #962 (UX-2): the toggle is inert in browser builds (platform-gated
                  to the desktop app) — don't show a dead button. */
-              <span className="pipeline-status">DESKTOP ONLY</span>
+              <span className="pipeline-status lbl">desktop only</span>
             )}
           </div>
           <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>

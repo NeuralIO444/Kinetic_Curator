@@ -90,7 +90,7 @@ export function BehaveReadout({ layoutParams }) {
   return (
     <div className="davis-source-row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}
       title="The resolved BEHAVE steering profile actually driving motion — edit a field to override this layer's table row; RESET clears every override back to the chip's default.">
-      <span className="davis-label">PROFILE</span>
+      <span className="davis-label lbl">profile</span>
       <div className="behave-readout">
         {FIELDS.map(([key, label]) => {
           const overridden = layoutParams[overrideKey(key)] != null;

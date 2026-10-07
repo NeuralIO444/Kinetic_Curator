@@ -1,7 +1,7 @@
 export function PrintDeskBlock({ rendering, onOpen }) {
   return (
     <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>PRINT DESK</div>
+      <div className="ttl" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>print desk</div>
       <button
         type="button"
         className="big-btn"

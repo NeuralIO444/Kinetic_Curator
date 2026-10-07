@@ -37,7 +37,7 @@ function ResponsePicker({ value, onChange, disabled, disabledReason }) {
   return (
     <div style={{ marginBottom: 6, opacity: disabled ? 0.55 : 1 }} title={title}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)', letterSpacing: '0.08em', marginBottom: 2 }}>
-        <span>RESPONSE</span>
+        <span className="lbl">response</span>
         <span>{RESPONSE_LABELS[value] ?? value}</span>
       </div>
       <div style={{ display: 'flex', gap: 4 }}>
@@ -65,7 +65,7 @@ export function ReactivityControls({ depth, scaleMod, alphaMod, life, attackMs, 
   const disabledReason = 'enable the mic to drive this';
   return (
     <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
-      <div style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '6px' }} title="Live node multiply from the mic. Does not tick the Ghost Station phrase clock.">REACTIVITY / LIFE</div>
+      <div className="ttl" style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '6px' }} title="Live node multiply from the mic. Does not tick the Ghost Station phrase clock.">reactivity / life</div>
 
       <AudioSlider label="DEPTH" value={depth} min={0} max={1} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioModDepth', value: v })} hint="How hard the mic pushes scale/alpha. Not the Ghost bar."
@@ -80,7 +80,7 @@ export function ReactivityControls({ depth, scaleMod, alphaMod, life, attackMs, 
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'lifeDrift', value: v })}
         hint="Slow LFO while RUN is on. Independent of phrase and evolve." />
 
-      <div style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', margin: '8px 0 6px' }} title="Attack/decay ballistics shape the mic envelope before it drives anything — smoothing jittery transient-snapping into a heavy, fluid weight.">ENVELOPE</div>
+      <div className="ttl" style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', margin: '8px 0 6px' }} title="Attack/decay ballistics shape the mic envelope before it drives anything — smoothing jittery transient-snapping into a heavy, fluid weight.">envelope</div>
 
       <AudioSlider unit="ms" label="ATTACK" value={attackMs} min={0} max={500} step={5}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioAttackMs', value: v })}

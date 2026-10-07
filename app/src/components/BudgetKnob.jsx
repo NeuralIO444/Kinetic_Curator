@@ -43,7 +43,7 @@ export function BudgetKnob() {
     <div className="undo-group" role="group" aria-label="Performance budget ceiling"
       title={autoQuality ? armedTitle : disarmedTitle}
       style={autoQuality ? undefined : { opacity: 0.55 }}>
-      <span className="meter-label" style={{ marginRight: 2 }}>BUDGET</span>
+      <span className="meter-label lbl" style={{ marginRight: 2 }}>budget</span>
       {CEILING_ORDER.map((tierId) => {
         const preset = QUALITY_PRESETS[tierId];
         const active = quality === tierId && autoQuality;

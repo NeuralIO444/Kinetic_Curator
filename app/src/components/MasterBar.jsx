@@ -150,7 +150,7 @@ export function MasterBar() {
         <TapeCounter />
 
         <div className="meter" title={headroomTitle}>
-          <span className="meter-label">FPS</span>
+          <span className="meter-label lbl">fps</span>
           <div className={`fps-bar ${fpsClass}`}>
             <span className="fps-bar-fill" style={{ width: `${fpsWidth}%` }} />
             <span className={`fps-needle ${needleState}`} style={{ left: `${needlePct}%` }} />
@@ -159,12 +159,12 @@ export function MasterBar() {
         </div>
 
         <div className="meter" title="Live placement / instance count">
-          <span className="meter-label">NODES</span>
+          <span className="meter-label lbl">nodes</span>
           <span className={`meter-value ${nodeClass}`}>{nodeCount}</span>
         </div>
 
         <div className="meter" title={fxTitle}>
-          <span className="meter-label">FX MS</span>
+          <span className="meter-label lbl">fx ms</span>
           <span className="meter-value">{fxCost.count > 0 ? fxCost.totalMs.toFixed(0) : '—'}</span>
         </div>
 

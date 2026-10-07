@@ -12,7 +12,7 @@ export function FeelPicker({ layoutParams }) {
   return (
     <div className="stim-feel" role="group" aria-label="Audio feel">
       <div className="stim-feel-head">
-        <span>FEEL</span>
+        <span className="lbl">feel</span>
         <span className={`stim-feel-state ${active === 'custom' ? 'custom' : ''}`}>{active === 'custom' ? 'CUSTOM' : ''}</span>
       </div>
       <div className="stim-feel-row">

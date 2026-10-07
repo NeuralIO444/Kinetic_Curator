@@ -352,9 +352,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     <div style={veil} onClick={() => onClose(false)} role="presentation">
       <div ref={sheetRef} style={sheet} onClick={(e) => e.stopPropagation()} onPaste={onPaste}>
         <header style={head}>
-          <span>ASSET STUDIO</span>
+          <span className="ttl">asset studio</span>
           <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · snap {SNAP} · undo {undoDepth}/{UNDO_CAP}</span>
-          <button type="button" className="chip-btn" title="Close without saving" onClick={() => onClose(false)}>ESC</button>
+          <button type="button" className="chip-btn act" title="Close without saving" onClick={() => onClose(false)}>esc</button>
         </header>
         <div style={body}>
           <svg ref={svgRef} viewBox="0 0 100 100" style={stage}
@@ -371,7 +371,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               {Object.keys(PRIMITIVES).map((id) => (
                 <button key={id} type="button" className="chip-btn" title={`Add a ${id} shape`} onClick={() => add(id)}>{id}</button>
               ))}
-              <button type="button" className="chip-btn" onClick={() => add('poly')}>POLY</button>
+              <button type="button" className="chip-btn act" onClick={() => add('poly')}>poly</button>
               <select value={sides} onChange={(e) => setSides(+e.target.value)} style={field} title="polygon sides">
                 {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
@@ -391,16 +391,16 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               <button type="button" className="chip-btn" disabled={picked < 0} title="Stretch the picked shape vertically" onClick={() => bump('sy', 0.1)}>Sy+</button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Paint the picked shape ink" onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}>INK</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Paint the picked shape accent" onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}>ACCENT</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Flip the picked shape between filled and outline" onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}>FILL/STROKE</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Duplicate the picked shape" onClick={dup}>DUP</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Delete the picked shape" onClick={delSel}>DEL</button>
+              <button type="button" className="chip-btn act" disabled={picked < 0} title="Paint the picked shape ink" onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}>ink</button>
+              <button type="button" className="chip-btn act" disabled={picked < 0} title="Paint the picked shape accent" onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}>accent</button>
+              <button type="button" className="chip-btn act" disabled={picked < 0} title="Flip the picked shape between filled and outline" onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}>fill/stroke</button>
+              <button type="button" className="chip-btn act" disabled={picked < 0} title="Duplicate the picked shape" onClick={dup}>dup</button>
+              <button type="button" className="chip-btn act" disabled={picked < 0} title="Delete the picked shape" onClick={delSel}>del</button>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Send the picked shape one step back" onClick={() => zShift(-1)}>Z-</button>
               <button type="button" className="chip-btn" disabled={picked < 0} title="Bring the picked shape one step forward" onClick={() => zShift(1)}>Z+</button>
             </div>
             <div style={mergeBox}>
-              <div style={mergeTitle}>MERGE</div>
+              <div className="ttl" style={mergeTitle}>merge</div>
               {parts.length === 0 && <span style={dimNote}>add 2+ shapes, then tick them to fuse</span>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 96, overflowY: 'auto' }}>
                 {parts.map((p, i) => {
@@ -470,10 +470,10 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
           </div>
         </div>
         <footer style={foot}>
-          <button type="button" className="chip-btn" title="Remove the last added shape" onClick={undo} disabled={!undoDepth}>UNDO</button>
-          <button type="button" className="chip-btn" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); setMergeKeys([]); setSubtractKeys([]); setBlendOn(false); setBlendHold(false); }}>CLEAR</button>
-          <button type="button" className="chip-btn" title="Download the motif as an SVG file" onClick={exportSvg} disabled={!parts.length && !seedSvg}>EXPORT SVG</button>
-          <button type="button" className="chip-btn" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length && !seedSvg} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>SAVE TO POOL</button>
+          <button type="button" className="chip-btn act" title="Remove the last added shape" onClick={undo} disabled={!undoDepth}>undo</button>
+          <button type="button" className="chip-btn act" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); setMergeKeys([]); setSubtractKeys([]); setBlendOn(false); setBlendHold(false); }}>clear</button>
+          <button type="button" className="chip-btn act" title="Download the motif as an SVG file" onClick={exportSvg} disabled={!parts.length && !seedSvg}>export svg</button>
+          <button type="button" className="chip-btn act" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length && !seedSvg} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>save to pool</button>
         </footer>
       </div>
     </div>

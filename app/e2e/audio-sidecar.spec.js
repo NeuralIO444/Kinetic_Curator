@@ -25,7 +25,7 @@ test('FILE source: sidecar status, refusal reasons, and drop', async ({ page }) 
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /stimuli/i }).click();
-  await page.getByRole('button', { name: /SETUP/ }).click();
+  await page.getByRole('button', { name: /setup/i }).click();
   const status = page.locator('.stim-source-status');
 
   await expect(status).toContainText('MIC · live analysis');

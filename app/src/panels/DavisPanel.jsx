@@ -99,19 +99,19 @@ export function DavisPanel() {
               left beatCollision's inputs selected here for PLAY to read. */}
           {/* #616 — the panel reads in three labelled sections. Nothing was
               removed or re-wired: same controls, same events, new headings. */}
-          <div className="davis-section-label">VOICES</div>
+          <div className="davis-section-label ttl">voices</div>
           {/* #717 — the flagship Voices' one home: load through the voice MIX. */}
           <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
 
-          <div className="davis-section-label">GENERATE</div>
+          <div className="davis-section-label ttl">generate</div>
           <div className="davis-actions">
             <button className={`big-btn ${evolveMode ? 'active' : ''}`}
               onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>
               {evolveMode ? 'STOP' : 'EVOLVE'}
             </button>
-            <button className="big-btn" onClick={saveFavorite}>FAVORITE</button>
-            <button className="big-btn" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>NEW SEED</button>
+            <button className="big-btn act" onClick={saveFavorite}>favorite</button>
+            <button className="big-btn act" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>new seed</button>
           </div>
 
           {/* #305 — mutate one sub-seed stream. Same seed control area, no
@@ -138,15 +138,15 @@ export function DavisPanel() {
 
           <EvolveProgress />
 
-          <div className="davis-section-label">PERFORM</div>
+          <div className="davis-section-label ttl">perform</div>
           <div className="davis-phrase-status" title="Phrase clock status. The controls live in PLAY; this panel only reports.">
-            <i>PHRASE</i><b>{phraseStatus}</b>
+            <i className="lbl">phrase</i><b>{phraseStatus}</b>
           </div>
           <MidiSection />
           {/* UX-7: the gesture row is always reachable from Director — the
               ACCUM toggle lives here now, and FREEZE/CLEAR/SWELL wait on it
               (dim, never dead-looking) instead of the row vanishing. */}
-          <div className="davis-section-label">TRAILS</div>
+          <div className="davis-section-label ttl">trails</div>
           <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
             <button className={`big-btn ${accumOn ? 'active' : ''}`}
               onClick={() => emit(Events.LAYOUT_PARAM, { key: 'accumulation', value: !accumOn })}

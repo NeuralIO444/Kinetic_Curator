@@ -14,7 +14,7 @@ export function BeatRouter({ beatRoute = 'both' }) {
   return (
     <div className="davis-source-row" style={{ marginTop: 8 }}
       title="One mic attack, two consumers. Pick who answers the beat.">
-      <span className="davis-label">BEAT</span>
+      <span className="davis-label lbl">beat</span>
       {ROUTES.map(r => (
         <button
           key={r.id}

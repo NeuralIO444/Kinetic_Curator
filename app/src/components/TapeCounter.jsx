@@ -161,7 +161,7 @@ export function TapeCounter() {
       title={`Budget tape: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : 'no data yet'} vs a ${FRAME_BUDGET_MS.toFixed(1)}ms (60fps) frame budget.${fxNote} Fill is live-measured, never decorative.${autoQuality ? ' Governor armed — defending the budget.' : ' Governor off — nothing is defended (AUTO is off).'}`}
     >
       <span className="status-dot" style={{ background: autoQuality ? '#00ff88' : '#5a5a5a' }} />
-      <span className="meter-label">TAPE</span>
+      <span className="meter-label lbl">tape</span>
       <span className="tape-bar" aria-hidden="true">
         <span className="tape-bar-fill" style={{ width: `${Math.min(100, fillPct)}%` }} />
       </span>

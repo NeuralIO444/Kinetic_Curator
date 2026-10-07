@@ -165,21 +165,21 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   return (
     <div className="stim-matrix" role="table" aria-label="Modulation matrix">
       <div className="stim-matrix-head" role="row">
-        <span>ROUTE</span><span>DEPTH</span><span>LIVE</span><span />
+        <span className="lbl">route</span><span className="lbl">depth</span><span className="lbl">live</span><span />
       </div>
       {table.length === 0 && <div className="stim-matrix-empty">No routes: sound drives nothing. Add one below, or click a band in the meter.</div>}
       {rows.map((row, i) => (
         <Row key={i} row={row} route={table[i]} index={i} table={table} onEdit={editAudioRoutes} />
       ))}
       <div className="stim-matrix-foot">
-        <button type="button" className="chip-btn" onClick={autoSetup}
-          title="Listen to the live input and build a starter routing from whatever has energy. No signal: it says so and changes nothing.">AUTO</button>
-        <button type="button" className="chip-btn" disabled={full} onClick={() => editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; }, false)}
-          title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}>+ ROUTE</button>
-        <button type="button" className="chip-btn" disabled={table.length === 0} onClick={() => setAudioRoutes([])}
-          title={table.length === 0 ? 'Already empty' : 'Remove every route: start from scratch'}>CLEAR</button>
-        <button type="button" className="chip-btn" disabled={!custom} onClick={() => setAudioRoutes(null)}
-          title={custom ? 'Back to the default routes' : 'Already the default routes'}>RESET</button>
+        <button type="button" className="chip-btn act" onClick={autoSetup}
+          title="Listen to the live input and build a starter routing from whatever has energy. No signal: it says so and changes nothing.">auto</button>
+        <button type="button" className="chip-btn act" disabled={full} onClick={() => editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; }, false)}
+          title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}>+ route</button>
+        <button type="button" className="chip-btn act" disabled={table.length === 0} onClick={() => setAudioRoutes([])}
+          title={table.length === 0 ? 'Already empty' : 'Remove every route: start from scratch'}>clear</button>
+        <button type="button" className="chip-btn act" disabled={!custom} onClick={() => setAudioRoutes(null)}
+          title={custom ? 'Back to the default routes' : 'Already the default routes'}>reset</button>
         <span className="stim-matrix-count">{table.length}/{MAX_ROUTES}</span>
         {unrouted.length > 0 && <span className="stim-matrix-unrouted" title="Inputs no route reads">not routed: {unrouted.map((id) => id.toUpperCase()).join(' · ')}</span>}
       </div>
@@ -187,7 +187,7 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       {shownAdvice && (
         <div className="stim-matrix-unrouted" role="status">
           {shownAdvice.names.join(' · ')} {shownAdvice.dead === 1 ? 'is' : 'are'} silent.
-          <button type="button" className="chip-btn" onClick={retune} title="Move dead routes onto inputs that have energy, and raise a depth of 0">RETUNE</button>
+          <button type="button" className="chip-btn act" onClick={retune} title="Move dead routes onto inputs that have energy, and raise a depth of 0">retune</button>
         </div>
       )}
     </div>

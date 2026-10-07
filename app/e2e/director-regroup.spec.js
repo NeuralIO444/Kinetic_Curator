@@ -12,11 +12,11 @@ test('DIRECTOR: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE pr
 
   // four labelled sections, in order (UX-7: TRAILS surfaces the ACCUM toggle
   // + gestures in-panel, so FREEZE/CLEAR/SWELL are reachable from DIRECTOR)
-  await expect(panel.locator('.davis-section-label')).toHaveText(['VOICES', 'GENERATE', 'PERFORM', 'TRAILS']);
+  await expect(panel.locator('.davis-section-label')).toHaveText(['voices', 'generate', 'perform', 'trails']);
 
   // nothing deleted: every existing control is findable
   await expect(panel.locator('.voice-chip.flagship')).toHaveCount(4);
-  for (const name of ['EVOLVE', 'FAVORITE', 'NEW SEED', 'SPATIAL', 'COLOR', 'ASSET', 'NOISE']) {
+  for (const name of ['EVOLVE', 'favorite', 'new seed', 'SPATIAL', 'COLOR', 'ASSET', 'NOISE']) {
     await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
   }
 

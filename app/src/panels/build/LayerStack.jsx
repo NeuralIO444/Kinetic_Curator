@@ -43,7 +43,7 @@ function PatchMatrix({ layers, ordinals }) {
   if (!pairs.length) return null;
   return (
     <div className="patch-matrix" title="Patch matrix — every live cross-layer link. Edit in the rows below.">
-      <span className="fx-param-readout" style={{ width: 'auto' }}>MATRIX</span>
+      <span className="fx-param-readout lbl" style={{ width: 'auto' }}>matrix</span>
       {pairs.map((p) => (
         <div key={p.dstId} className="patch-diag">{formatMatrixRow(p, ordinals)}</div>
       ))}
@@ -388,7 +388,7 @@ export function LayerStack() {
           >
             {label}
           </button>
-          <button className={`micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : 'Duplicate'} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>DUP</button>
+          <button className={`act micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : 'Duplicate'} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>dup</button>
           <button className="micro-btn" title="Remove track (undoable)" disabled={!isAdj(layer) && contentCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
         </div>
         <div className="layer-row-composite">
@@ -404,7 +404,7 @@ export function LayerStack() {
               {BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode.toUpperCase()}</option>)}
             </select>
           )}
-          {adj && <span className="wet-label">WET</span>}
+          {adj && <span className="wet-label lbl">wet</span>}
           <RangeRow layout="bare" tone="build" min={0} max={wet.cap} step={0.01} value={wet.wet}
             hint={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
             onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })} />
@@ -413,7 +413,7 @@ export function LayerStack() {
         {!adj && (
           <>
           <div className="layer-row-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
-            <span className="fx-param-readout" style={{ width: 'auto' }}>PATCH</span>
+            <span className="fx-param-readout lbl" style={{ width: 'auto' }}>patch</span>
             <select className="tg blend-mode-select" value={patch.mode} disabled={singleTrack && patch.mode === 'off'}
               onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to, strength: patch.strength })}>
               <option value="off">OFF</option>

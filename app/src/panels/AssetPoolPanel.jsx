@@ -110,8 +110,8 @@ export function AssetPoolPanel() {
         }} />
       <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active${overlayCount ? ` · ${overlayCount} user` : ''}`}>
         <div className="header-tools">
-          <button className="chip-btn" title="Motif kit — overlay only" onClick={() => openStudio(null)}>NEW</button>
-          <button className="chip-btn" title="Import SVG into project overlay" onClick={() => fileRef.current?.click()}>IMPORT</button>
+          <button className="chip-btn act" title="Motif kit — overlay only" onClick={() => openStudio(null)}>new</button>
+          <button className="chip-btn act" title="Import SVG into project overlay" onClick={() => fileRef.current?.click()}>import</button>
           {/* #310: GRID/LIST is a remembered preference now (persisted across
               sessions) — no live toggle. poolView still drives the layout. */}
         </div>
@@ -132,8 +132,8 @@ export function AssetPoolPanel() {
             </button>
           ))}
           <span style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-            <button className="chip-btn" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, true)}>ALL ON</button>
-            <button className="chip-btn" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, false)}>ALL OFF</button>
+            <button className="chip-btn act" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, true)}>all on</button>
+            <button className="chip-btn act" onClick={() => emit(Events.ASSETS_TOGGLE_ALL, false)}>all off</button>
           </span>
         </div>
         <div className="pool-search">
@@ -156,28 +156,28 @@ export function AssetPoolPanel() {
                   {WEIGHT_LABEL[w]}
                 </button>
                 <button className="tile-solo" title="Solo" onClick={() => emit(Events.ASSETS_SOLO, { id: a.id })}>◉</button>
-                <button type="button" title="Duplicate overlay copy" onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}
-                  style={{ position: 'absolute', bottom: 40, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>DUP</button>
+                <button className="act" type="button" title="Duplicate overlay copy" onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}
+                  style={{ position: 'absolute', bottom: 40, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>dup</button>
                 {isUser && (
                   <>
-                    <button type="button" title="Edit in motif kit" onClick={(e) => { e.stopPropagation(); openStudio({ id: a.id, svg: a.svg }); }}
-                      style={{ position: 'absolute', bottom: 22, left: 28, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>EDIT</button>
-                    <button type="button" title="Region mattes — pick regions for slots A/B/C/D" onClick={(e) => { e.stopPropagation(); openPicker(a.id); }}
-                      style={{ position: 'absolute', bottom: 22, left: 58, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>REG</button>
-                    <button type="button" title="Rename overlay id" onClick={(e) => {
+                    <button className="act" type="button" title="Edit in motif kit" onClick={(e) => { e.stopPropagation(); openStudio({ id: a.id, svg: a.svg }); }}
+                      style={{ position: 'absolute', bottom: 22, left: 28, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>edit</button>
+                    <button className="act" type="button" title="Region mattes — pick regions for slots A/B/C/D" onClick={(e) => { e.stopPropagation(); openPicker(a.id); }}
+                      style={{ position: 'absolute', bottom: 22, left: 58, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>reg</button>
+                    <button className="act" type="button" title="Rename overlay id" onClick={(e) => {
                       e.stopPropagation();
                       const name = window.prompt('Overlay id (no user: prefix)', a.id.replace(/^user:/, ''));
                       if (name) emit(Events.ASSETS_RENAME, { id: a.id, name });
-                    }} style={{ position: 'absolute', bottom: 22, left: 2, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>REN</button>
-                    <button type="button" title="Replace SVG" onClick={(e) => {
+                    }} style={{ position: 'absolute', bottom: 22, left: 2, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>ren</button>
+                    <button className="act" type="button" title="Replace SVG" onClick={(e) => {
                       e.stopPropagation();
                       swapId.current = a.id;
                       swapRef.current?.click();
-                    }} style={{ position: 'absolute', top: 2, right: 18, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>SWAP</button>
-                    <button type="button" title="Delete from overlay (canon untouched)" onClick={(e) => {
+                    }} style={{ position: 'absolute', top: 2, right: 18, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>swap</button>
+                    <button className="act" type="button" title="Delete from overlay (canon untouched)" onClick={(e) => {
                       e.stopPropagation();
                       if (window.confirm(`Remove ${a.id}?`)) emit(Events.ASSETS_REMOVE, { id: a.id });
-                    }} style={{ position: 'absolute', top: 2, right: 2, fontSize: 8, padding: '2px 3px', border: '1px solid var(--accent)', color: 'var(--accent)', background: 'rgba(0,0,0,0.55)', zIndex: 2 }}>DEL</button>
+                    }} style={{ position: 'absolute', top: 2, right: 2, fontSize: 8, padding: '2px 3px', border: '1px solid var(--accent)', color: 'var(--accent)', background: 'rgba(0,0,0,0.55)', zIndex: 2 }}>del</button>
                   </>
                 )}
                 <div className="tile-meta">

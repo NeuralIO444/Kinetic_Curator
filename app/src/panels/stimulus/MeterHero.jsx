@@ -125,7 +125,7 @@ export function MeterHero() {
   return (
     <div className="stim-meter-hero">
       <div className="stim-meter-head">
-        <span>METER <em className="stim-meter-hint">click a band to route it</em></span>
+        <span className="lbl">meter <em className="stim-meter-hint">click a band to route it</em></span>
         <span className={`stim-source ${source === 'IDLE' ? 'idle' : ''}`} title="Where the sound comes from">{source}</span>
       </div>
       <canvas ref={canvasRef} className="stim-meter-canvas" style={{ height: H, cursor: 'pointer' }} onClick={routeBand} aria-label="Audio meter: waveform, seven bands, beat. Click a band to add a route for it." />

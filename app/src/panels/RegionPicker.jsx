@@ -102,9 +102,9 @@ export function RegionPicker({ assetId, onClose }) {
     <div style={veil} onClick={() => onClose()} role="presentation">
       <div style={sheet} onClick={(e) => e.stopPropagation()}>
         <header style={head}>
-          <span>REGION MATTES</span>
+          <span className="ttl">region mattes</span>
           <span style={{ color: 'var(--dim)', fontSize: 9 }}>{asset.id} · {regions.length} regions</span>
-          <button type="button" className="chip-btn" title="Close" onClick={onClose}>ESC</button>
+          <button type="button" className="chip-btn act" title="Close" onClick={onClose}>esc</button>
         </header>
         <div style={body}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
@@ -130,7 +130,7 @@ export function RegionPicker({ assetId, onClose }) {
             </div>
           </div>
           <div style={{ flex: '1 1 auto', minWidth: 200, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={secTitle}>SLOT ASSIGNMENTS</div>
+            <div className="ttl" style={secTitle}>slot assignments</div>
             {REGION_SLOTS.map((s) => (
               <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
                 <span style={{ width: 14, height: 14, borderRadius: 3, background: SLOT_COLORS[s], display: 'inline-block' }} />

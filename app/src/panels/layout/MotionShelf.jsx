@@ -7,7 +7,7 @@ export function MotionShelf({ layoutParams }) {
   const loadMotion = useStore((s) => s.loadMotion);
   return (
     <div className="voice-shelf">
-      <span className="shelf-label">MOTION</span>
+      <span className="shelf-label ttl">motion</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
         {MOTION_MODES.map((m) => (
           <button

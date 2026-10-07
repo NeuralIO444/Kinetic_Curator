@@ -27,9 +27,9 @@ export function SetupBlock() {
 
   return (
     <div className="pipeline-setup">
-      <div className="pipeline-section-label" style={{ marginTop: 2 }}>CANVAS</div>
+      <div className="pipeline-section-label ttl" style={{ marginTop: 2 }}>canvas</div>
       <div className="pipeline-row">
-        <span style={{ flex: 1, fontSize: 11 }}>CANVAS PRESET</span>
+        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>canvas preset</span>
         <select value={presetId} onChange={(e) => apply(e.target.value)} style={{ fontSize: 11, maxWidth: 180 }}>
           {CANVAS_PRESETS.map((p) => (
             <option key={p.id} value={p.id}>{p.group} · {p.label}</option>
@@ -54,22 +54,22 @@ export function SetupBlock() {
             const nw = lock ? Math.round(nh * (w / h)) : w;
             setSize(nw, nh);
           }} />
-        <button type="button" className={`chip-btn${lock ? ' active' : ''}`} onClick={() => setLock(!lock)}>LOCK</button>
-        <button type="button" className="chip-btn" onClick={swap}>SWAP</button>
+        <button type="button" className={`act chip-btn${lock ? ' active' : ''}`} onClick={() => setLock(!lock)}>lock</button>
+        <button type="button" className="chip-btn act" onClick={swap}>swap</button>
       </div>
       <div className="pipeline-row" title="Capture timestep. Live raf still follows the display.">
-        <span style={{ flex: 1, fontSize: 11 }}>CAPTURE FPS</span>
+        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>capture fps</span>
         <select value={fps} onChange={(e) => setFps(Number(e.target.value))} style={{ fontSize: 11 }}>
           {CANVAS_FPS.map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </div>
       <div className="pipeline-row">
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, fontSize: 11 }} />
-        <button type="button" className="chip-btn" onClick={() => save(name || 'My wall')}>SAVE</button>
+        <button type="button" className="chip-btn act" onClick={() => save(name || 'My wall')}>save</button>
         {String(presetId).startsWith('mine-') && (
           <>
-            <button type="button" className="chip-btn" onClick={() => rename(presetId, name || 'My wall')}>RENAME</button>
-            <button type="button" className="chip-btn" onClick={() => remove(presetId)}>DELETE</button>
+            <button type="button" className="chip-btn act" onClick={() => rename(presetId, name || 'My wall')}>rename</button>
+            <button type="button" className="chip-btn act" onClick={() => remove(presetId)}>delete</button>
           </>
         )}
       </div>
@@ -77,18 +77,18 @@ export function SetupBlock() {
         {authored} at {fps}fps · {Math.round((w * h * fps) / 1e6)} Mpx/s
         {differ ? ` · not the ${actual} instrument` : ''}
       </div>
-      <div className="pipeline-section-label" style={{ marginTop: 6 }}>LED</div>
+      <div className="pipeline-section-label ttl" style={{ marginTop: 6 }}>led</div>
       <div className="pipeline-row" title="Cabinets across and down, times pixels per cabinet. Writes the native raster.">
-        <span style={{ fontSize: 11 }}>CABINETS</span>
+        <span className="lbl" style={{ fontSize: 11 }}>cabinets</span>
         <input type="number" value={cab.w} style={{ width: 48, fontSize: 11 }} onChange={(e) => setCab({ ...cab, w: Number(e.target.value) })} />
         <span>×</span>
         <input type="number" value={cab.h} style={{ width: 48, fontSize: 11 }} onChange={(e) => setCab({ ...cab, h: Number(e.target.value) })} />
         <span style={{ fontSize: 10 }}>px</span>
         <input type="number" value={cab.px} style={{ width: 56, fontSize: 11 }} onChange={(e) => setCab({ ...cab, px: Number(e.target.value) })} />
-        <button type="button" className="chip-btn" onClick={() => {
+        <button type="button" className="chip-btn act" onClick={() => {
           const r = ledRaster(cab.w, cab.h, cab.px);
           setSize(r.w, r.h);
-        }}>SET SIZE</button>
+        }}>set size</button>
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
         Syphon still does not send a frame from the browser.

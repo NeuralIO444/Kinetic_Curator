@@ -10,7 +10,7 @@ test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) 
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /stimuli/i }).click();
   const rows = page.locator('.stim-route');
-  const reset = page.getByRole('button', { name: 'RESET', exact: true });
+  const reset = page.getByRole('button', { name: 'reset', exact: true });
   const add = page.getByRole('button', { name: '+ ROUTE' });
 
   // untouched: today's seven routes, RESET greyed, MID / TREBLE honestly not routed
@@ -50,7 +50,7 @@ test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) 
   await expect(reset).toBeDisabled();
 
   // CLEAR: start from scratch in one click: audio drives nothing, and it says so
-  const clear = page.getByRole('button', { name: 'CLEAR', exact: true });
+  const clear = page.getByRole('button', { name: 'clear', exact: true });
   await expect(clear).toBeEnabled();
   await clear.click();
   await expect(rows).toHaveCount(0);

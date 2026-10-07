@@ -18,7 +18,7 @@ export function MixBar() {
 
   return (
     <div className="mix-bar" role="group" aria-label="Voice mix">
-      <span className="mix-label">MIX</span>
+      <span className="mix-label lbl">mix</span>
       <span className="mix-names" title="Crossfading between voices">
         {voiceMix.targetName || 'VOICE'}
       </span>

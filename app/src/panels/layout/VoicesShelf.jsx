@@ -97,7 +97,7 @@ export function VoicesShelf() {
 
   return (
     <div className="voice-shelf">
-      <span className="shelf-label">MY VOICES</span>
+      <span className="shelf-label ttl">my voices</span>
       <div className="shelf-chips">
         {userVoices.map((v) => (
           <UserChip

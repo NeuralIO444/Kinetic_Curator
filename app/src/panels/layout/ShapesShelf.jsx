@@ -10,7 +10,7 @@ export function ShapesShelf() {
   const enabledAssets = useStore((s) => s.enabledAssets);
   return (
     <div className="voice-shelf">
-      <span className="shelf-label">SHAPES</span>
+      <span className="shelf-label ttl">shapes</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
         {SHAPE_SETS.map((x) => {
           if (!MIXABLE_SHAPE_IDS.includes(x.id)) {
