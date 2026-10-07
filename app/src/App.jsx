@@ -20,6 +20,7 @@ import { usePhraseLoop } from './hooks/usePhraseLoop.js';
 import { useMorphEvolve } from './hooks/useMorphEvolve.js';
 import { useVoiceMixDriver } from './hooks/useVoiceMixDriver.js';
 import { useProjectAutosave } from './hooks/useProjectAutosave.js';
+import { useRollGuard } from './hooks/useRollGuard.js'; // #1107
 import { useCuratorIPC } from './hooks/useCuratorIPC.js';
 import { loopClock, loopIntervalTick } from './gl/loopClock.js';
 import { captureStill } from './hooks/useMediaExport.js';
@@ -91,6 +92,7 @@ function AppInner() {
   usePhraseLoop();
   useMorphEvolve();
   useVoiceMixDriver();
+  useRollGuard(glLoopRef); // before the autosave/boot effect, so the cold-open roll finds its listener
   useProjectAutosave();
 
   const [showHotkeys, setShowHotkeys] = useState(false);

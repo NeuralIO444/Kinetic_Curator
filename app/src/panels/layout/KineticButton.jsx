@@ -86,6 +86,7 @@ export function KineticButton() {
     if (r.layer === 'chaos') kineticRoll();
     else if (r.layer === 'weather') kineticWeatherPass();
     else kineticRulesPass();
+    emit(Events.ROLL_GUARD, { kind: r.layer === 'chaos' || r.layer === 'weather' ? r.layer : 'rules' }); // #1107
     restartCooling();
     setCooling(false);
     tapOpen.pulse(TAP_PULSE_MS); // #1103 — the button AND the K key flash the full name, then cool down

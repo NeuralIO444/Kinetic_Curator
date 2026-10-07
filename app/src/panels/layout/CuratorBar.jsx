@@ -95,6 +95,7 @@ export function CuratorBar() {
   const loisLine = voice === 'lois' ? getLoisVerdict() : '';
   const onCurate = () => {
     emit(Events.LAYOUT_CURATE);
+    emit(Events.ROLL_GUARD, { kind: 'curate' }); // #1107: look at the frame it landed
     // The persona brings its palette: switch the global palette to the
     // profile's catalog entry so the color jumps with the voice. Skipped
     // when already there — repeat presses don't wipe swatch overrides or
