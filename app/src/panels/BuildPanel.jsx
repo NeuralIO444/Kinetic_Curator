@@ -23,13 +23,15 @@ import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
 import { MathSection } from './build/MathSection.jsx';
 import { RangeTone } from '../components/RangeTone.jsx';
+import { LOIS_LINES } from './loisLines.mjs';
 
 export function BuildPanel() {
   const { state } = useApp(s => ({
     layoutParams: s.layoutParams,
     lockedParams: s.lockedParams,
+    trackCount: s.layers.length,
   }));
-  const { layoutParams, lockedParams } = state;
+  const { layoutParams, lockedParams, trackCount } = state;
 
   const lockCount = Object.values(lockedParams).filter(Boolean).length;
 
@@ -50,6 +52,8 @@ export function BuildPanel() {
 
         {/* ② CAST — who paints the stage: shapes pool, my voices, layer stack */}
         <BuildSection num="2" title="Cast">
+          {/* #1032 — voice 1, bare-stage moment: one track and nothing else. A second track hides it. */}
+          {trackCount <= 1 && <div className="lois-line name">{LOIS_LINES.build}</div>}
           <div className="voice-row">
             <ShapesShelf />
             <VoicesShelf />

@@ -8,6 +8,8 @@ import { EvolveProgress } from './davis/EvolveProgress.jsx';
 import { MidiSection } from './davis/MidiSection.jsx';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { captureFavorite } from '../state/slices/davisSlice.js';
+import { LOIS_LINES } from './loisLines.mjs';
+import { visibleQueue } from '../state/queueTransport.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -34,13 +36,14 @@ export function DavisPanel() {
     morphing: s.morphing,
     audioEnabled: s.audioEnabled,
     audioBands: s.audioBands,
+    hitCount: visibleQueue(s.favorites).length,
   }));
   const {
     evolveMode,
     seed, seedOffsets, layoutParams, enabledAssets,
     phraseEnabled, phraseLength, phraseBeat,
     phraseClock, beatBpm, morphing, audioEnabled,
-    audioBands,
+    audioBands, hitCount,
   } = state;
   const { palette } = useApp();
 
@@ -105,6 +108,8 @@ export function DavisPanel() {
           <BehaveReadout layoutParams={layoutParams} />
 
           <div className="davis-section-label ttl">generate</div>
+          {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
+          {hitCount === 0 && <div className="lois-line name">{LOIS_LINES.director}</div>}
           <div className="davis-actions">
             <button className={`big-btn ${evolveMode ? 'active' : ''}`}
               onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>

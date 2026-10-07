@@ -8,6 +8,7 @@
 // when MORPH EVOLVE is on — playback is sequencing, not new rendering.
 import { useCallback, useEffect } from 'react';
 import { useStore } from '../../state/store.js';
+import { LOIS_LINES } from '../loisLines.mjs';
 import { emit, Events } from '../../composition/eventBus.js';
 import {
   visibleQueue,
@@ -111,6 +112,8 @@ export function QueueTransport() {
 
   return (
     <div className="queue-transport">
+      {/* #1032 — voice 1: the empty setlist, before the first keep. */}
+      {empty && <div className="lois-line name">{LOIS_LINES.play}</div>}
       <div className="davis-source-row">
         <span className="davis-label lbl">queue</span>
         <button
