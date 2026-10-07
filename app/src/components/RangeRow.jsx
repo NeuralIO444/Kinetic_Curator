@@ -14,6 +14,13 @@
 import { useState, useRef, useEffect, useContext } from 'react';
 import { getTaper } from './taper.js';
 import { RANGE_TONES, RangeToneContext } from './rangeTones.js';
+import { SliderDialog } from './SliderDialog.jsx';
+import { fitRange } from './sliderBounds.mjs';
+import { sliderBounds, useSliderBounds } from '../hooks/useSliderBounds.js';
+
+// #1127 — a single tap on a slider's NAME opens its dialog; a double-click still resets, so the tap waits a beat
+// to be sure a second click is not coming.
+const TAP_NAME_MS = 240;
 
 export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange, readout,
   defaultValue, locked, onToggleLock, hint, taper, taperOpts, disabled, disabledReason,
@@ -126,9 +133,16 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
   );
 }
 
-export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
+// `dialog` (optional) turns on the tap-name dialog (#1127): { key, hard: {min,max}, title, spin? }. `spin` makes the row a
+// SPIN | RANGE row (ROTATE): { value, onChange, defaultValue, max }. Spin on shows one rev/s slider instead of the handles.
+export function DualRangeRow({ label, low, high, min: minProp = 0, max: maxProp = 100, step = 1,
   onChangeLow, onChangeHigh, onChangeRange, readout, defaultLow, defaultHigh,
-  locked, onToggleLock, hint, tone }) {
+  locked, onToggleLock, hint, tone, dialog }) {
+  const [min, max] = useSliderBounds(dialog?.key || '', [minProp, maxProp]); // the performer's span, session only
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const tapTimer = useRef(null);
+  useEffect(() => () => clearTimeout(tapTimer.current), []);
+  const spinOn = !!(dialog?.spin && dialog.spin.value > 0);
   const panelTone = useContext(RangeToneContext);
   const wanted = tone ?? panelTone;
   const toneName = RANGE_TONES.includes(wanted) ? wanted : 'ink';
@@ -138,9 +152,26 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
   const lowRef = useRef(null);
 
   const handleDoubleClick = () => {
+    clearTimeout(tapTimer.current); // a double-click is a reset, not a dialog
     if (locked) return;
     if (defaultLow !== undefined) onChangeLow(defaultLow);
     if (defaultHigh !== undefined) onChangeHigh(defaultHigh);
+  };
+  const tapName = () => {
+    if (!dialog) return;
+    clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => setDialogOpen(true), TAP_NAME_MS);
+  };
+  const applySpan = (mn, mx, rev) => {
+    sliderBounds.set(dialog.key, mn, mx);
+    const [fl, fh] = fitRange(low, high, mn, mx);
+    if (fl !== low || fh !== high) (onChangeRange || ((a, b) => { onChangeLow(a); onChangeHigh(b); }))(fl, fh);
+    if (rev !== null && dialog.spin) dialog.spin.onChange(rev);
+  };
+  const resetAll = () => {
+    sliderBounds.reset(dialog.key);
+    if (defaultLow !== undefined && defaultHigh !== undefined) (onChangeRange || ((a, b) => { onChangeLow(a); onChangeHigh(b); }))(defaultLow, defaultHigh);
+    if (dialog.spin) dialog.spin.onChange(dialog.spin.defaultValue);
   };
 
   const startEdit = () => {
@@ -234,10 +265,20 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
             {locked ? '▪' : '▫'}
           </button>
         )}
-        <span className="range-label" onDoubleClick={handleDoubleClick} title={labelTitle}>
+        <span className={`range-label${dialog ? ' range-label-tap' : ''}`} onDoubleClick={handleDoubleClick} title={dialog ? `${labelTitle ? `${labelTitle} · ` : ''}Tap the name for options` : labelTitle}
+          {...(dialog ? { role: 'button', tabIndex: 0, onClick: tapName, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDialogOpen(true); } } } : {})}>
           {label}
         </span>
+        {dialogOpen && (
+          <SliderDialog title={dialog.title || label} span={[min, max]} hard={dialog.hard}
+            spin={dialog.spin ? { value: dialog.spin.value, fallback: dialog.spin.defaultValue, max: dialog.spin.max } : null}
+            onApplySpan={applySpan} onResetAll={resetAll} onClose={() => setDialogOpen(false)} />
+        )}
       </div>
+      {spinOn ? (
+        <RangeRow layout="bare" value={dialog.spin.value} min={0} max={dialog.spin.max} step={0.01}
+          onChange={dialog.spin.onChange} ariaLabel={`${label} spin, revolutions per second`} />
+      ) : (
       <div className="dual-slider" onDoubleClick={handleDoubleClick} onPointerDown={onTrackPointer} title={hint}>
         <div className="dual-track" />
         <div className="dual-fill" style={{ left: `${((low - min) / (max - min)) * 100}%`, width: `${((high - low) / (max - min)) * 100}%` }} />
@@ -260,6 +301,7 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
           onKeyDown={onGrabKeyDown}
         />
       </div>
+      )}
       <div className="range-right">
         {editing ? (
           <span className="range-edit-dual">
@@ -274,6 +316,8 @@ export function DualRangeRow({ label, low, high, min = 0, max = 100, step = 1,
               onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
             />
           </span>
+        ) : spinOn ? (
+          <span className="range-readout spin-readout"><span className="spin-glyph" aria-hidden="true">↻</span> {dialog.spin.value.toFixed(2)} rev/s</span>
         ) : (
           <span className="range-readout" onClick={startEdit} title="Click to type value">{readout ?? `${low}–${high}`}</span>
         )}

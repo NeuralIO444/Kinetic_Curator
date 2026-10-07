@@ -365,3 +365,24 @@
   .xl-ch, .xl-swap, .xl-swap-short, .xl-swap-full { transition: none; }
   .xl-shimmer::after { display: none; }
 }
+
+/* #1127 — the tap-name dialog. A slider's NAME is a button (tap it); the dialog is square-cornered like everything
+   else, 44px targets, and pink stays for "live": the spinner is amber. */
+.range-label-tap { cursor: pointer; }
+.range-label-tap:hover, .range-label-tap:focus-visible { text-decoration: underline dotted; text-underline-offset: 3px; }
+.slider-dialog-scrim { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(6, 6, 8, 0.72); }
+.slider-dialog { width: min(340px, calc(100vw - 32px)); padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5); }
+.slider-dialog-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.slider-dialog-field .range-edit { width: 110px; min-height: 36px; text-align: right; }
+.slider-dialog-seg { display: flex; }
+.slider-dialog-seg .act { min-height: 44px; min-width: 76px; }
+.slider-dialog-seg .act[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.slider-dialog-note { margin: 0; color: var(--dim); font-size: 11px; line-height: 1.4; }
+.slider-dialog-error { margin: 0; color: var(--kc-warn); font-size: 11px; }
+.slider-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.slider-dialog-actions .act { min-height: 44px; }
+.slider-dialog-apply { border-color: var(--ink); }
+.spin-readout { color: var(--kc-warn); }
+.spin-glyph { display: inline-block; animation: kc-spin-glyph 3.2s linear infinite; }
+@keyframes kc-spin-glyph { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin-glyph { animation: none; } }

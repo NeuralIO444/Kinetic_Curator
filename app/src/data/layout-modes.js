@@ -322,6 +322,16 @@ export const RANGE_SPEC = {
   alpha: { min: 0, max: 100 },
 };
 
+/**
+ * #1127 — how far the tap-name dialog may stretch a dual slider. The sliders REST on RANGE_SPEC (and macros, defaults
+ * and the randomizer keep using it); a performer can widen the span up to here, so the engine accepts these ends.
+ */
+export const RANGE_HARD = {
+  scale: { min: 0.05, max: 6.0 },
+  rotate: { min: -720, max: 720 },
+  alpha: { min: 0, max: 100 },
+};
+
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
 const BOOL_KEYS = ['bleed', 'mirror', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker']; // #268: recolor removed
 
@@ -430,7 +440,7 @@ export function normalizeLayoutParams(partial) {
 
   for (const key of RANGE_KEYS) {
     const v = next[key];
-    const spec = RANGE_SPEC[key];
+    const spec = RANGE_HARD[key];
     // QA (2026-09-16): length was checked but entries were not, so
     // {scale:['a','b']} from a hand-edited or corrupted project JSON
     // passed through unchanged and fed NaN/strings into transform math
