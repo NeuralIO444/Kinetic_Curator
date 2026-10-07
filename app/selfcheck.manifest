@@ -71,6 +71,7 @@ node src/state/paletteLibrary.selfcheck.mjs
 node src/components/paletteWing.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
 node src/components/rangeRow.selfcheck.mjs
+node src/components/helpModal.selfcheck.mjs
 node src/panels/loisLines.selfcheck.mjs
 node src/components/pinkDiscipline.selfcheck.mjs
 node src/components/densityScale.selfcheck.mjs
