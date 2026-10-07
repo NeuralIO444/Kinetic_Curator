@@ -58,7 +58,14 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   const url = encodeRecipeUrl(FIELDS);
   const payload = url.slice(RECIPE_URL_PREFIX.length);
   const json = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-  assert.deepStrictEqual(Object.keys(json.l).sort(), [...changedKeys].sort(), 'only non-default params encoded');
+  // rotateSpin is the one exception (#1127): always written, because a link without it predates spin and means 0
+  assert.deepStrictEqual(Object.keys(json.l).filter((k) => k !== 'rotateSpin').sort(), [...changedKeys].sort(), 'only non-default params encoded');
+  assert.equal(json.l.rotateSpin, FIELDS.layoutParams.rotateSpin, 'spin is written even at its default');
+  // a carrier that never had the field (an old keep) writes 0, and a link without the key decodes as 0
+  const old = JSON.parse(JSON.stringify(FIELDS)); delete old.layoutParams.rotateSpin;
+  assert.equal(decodeRecipeUrl(encodeRecipeUrl(old)).recipe.layoutParams.rotateSpin, 0, 'no spin in, 0 out');
+  const bare = 'kc-r/1.' + Buffer.from(JSON.stringify({ v: 1, s: 5 })).toString('base64url');
+  assert.equal(decodeRecipeUrl(bare).recipe.layoutParams.rotateSpin, 0, 'an old link (no layout block) loads static');
   assert.deepStrictEqual(json.o, { color: 7, noise: 123456 }, 'only nonzero offsets encoded');
   assert.ok(!('po' in json), 'null overrides omitted');
   // A near-default composition stays in the hundreds of chars.

@@ -121,6 +121,11 @@ export const DEFAULT_LAYOUT_PARAMS = {
   body: 3,
   flap: 0.35,
   kinemeRate: 1, // #781 KINEME RATE: 1 = each kineme's own tempo, 0 freezes
+  // #1127 ROTATE spin: every mark that has no kineme of its own turns this many revolutions per second, on top of
+  // its static angle (the ROTATE range stays the spread of starting angles). 0 = static, today's behaviour. A
+  // project or link saved before this field existed loads as 0 (see normalizeLayoutParams): spin is the default
+  // for NEW scenes only. At loop time 0 a still is pixel-identical either way.
+  rotateSpin: 0.05,
   // Kineme living-motion driver amounts (v1: curated four). 0 = today's
   // render exactly — the drivers hard-gate, so untouched projects behave
   // byte-identically. Boil fps: 8 default, 6–12 exposed (Matt decision 2).
@@ -245,6 +250,7 @@ export const PARAM_SPEC = {
   crooked: { min: 0, max: 1 },
   open: { min: 0, max: 1 },
   kinemeRate: { min: 0, max: 4 }, // #781 KINEME RATE
+  rotateSpin: { min: 0, max: 1 }, // #1127 ROTATE spin, rev/s
   kinemeBreath: { min: 0, max: 1 },
   kinemeDrift: { min: 0, max: 1 },
   kinemePulse: { min: 0, max: 1 },
@@ -457,6 +463,9 @@ export function normalizeLayoutParams(partial) {
       next.accumulationFade = Math.min(40, Math.max(1, hl));
     }
   }
+
+  // #1127 — a document that predates ROTATE spin keeps its static rotation: absent means 0, not the new default.
+  if (!Object.prototype.hasOwnProperty.call(src, 'rotateSpin')) next.rotateSpin = 0;
 
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);
