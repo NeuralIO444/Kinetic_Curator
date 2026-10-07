@@ -76,7 +76,7 @@ export function StimulusPanel() {
               style={audioEnabled ? { background: '#00d9ff', borderColor: '#00d9ff' } : {}}
               onClick={() => emit(Events.AUDIO_TOGGLE, !audioEnabled)}
             >
-              🎤 AUDIO {audioEnabled ? 'ON' : 'OFF'}
+              {audioEnabled ? '◉' : '○'} AUDIO
             </button>
             <button
               className={`stim-toggle ${setupOpen ? 'on' : ''}`}
@@ -84,7 +84,7 @@ export function StimulusPanel() {
               title="Audio setup: source mic/file, monitor, gain"
               aria-expanded={setupOpen}
             >
-              ⚙ SETUP {setupOpen ? '▾' : '▸'}
+              ≡ SETUP {setupOpen ? '▾' : '▸'}
             </button>
           </div>
 

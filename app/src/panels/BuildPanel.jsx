@@ -37,7 +37,7 @@ export function BuildPanel() {
     <RangeTone tone="build">
     <div className="panel panel-layout">
       <PanelHeader tag="P03" title="BUILD" subtitle={layoutParams.composition}>
-        {lockCount > 0 && <span className="lock-badge">🔒 {lockCount}</span>}
+        {lockCount > 0 && <span className="lock-badge">▪ {lockCount}</span>}
       </PanelHeader>
       <div className="panel-body">
         {/* ① LAYOUT — structure first: tiles, size/shape sliders, symmetry, bleed/mirror/overlap */}
