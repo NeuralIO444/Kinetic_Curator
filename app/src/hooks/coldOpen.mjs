@@ -5,6 +5,13 @@
 // length, who is spared it, and the (module-level) state every top-bar button reads, so it happens once per
 // page load, not once per remount. Pure and DOM-free: the browser binds it in useColdOpen.js.
 
+/**
+ * Test hook: `window.__KC_HOLD_X` stretches every hold below. A starved CI runner (the watchdog trips at boot)
+ * can take longer than a real 1.2 s just to reach the next assertion, so the e2e lengthens the window instead of
+ * racing it. Unset (every real user) it is 1.
+ */
+export const hold = (ms) => ms * (Number(globalThis.__KC_HOLD_X) > 1 ? Number(globalThis.__KC_HOLD_X) : 1);
+
 /** How long the verbs hold their full names. */
 export const COLD_OPEN_MS = 2200;
 

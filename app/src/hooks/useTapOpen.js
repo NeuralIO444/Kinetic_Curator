@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { hold } from './coldOpen.mjs';
 
 // Touch has no hover, and this is a stage instrument (#1103): a touch on an expanding button
 // opens it, and it closes by itself after `ms`. Mouse and keyboard keep using :hover / :focus.
@@ -13,7 +14,7 @@ export function useTapOpen(ms = 1500) {
   const pulse = useCallback((dur = ms) => {
     setOpen(true);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setOpen(false), dur);
+    timer.current = setTimeout(() => setOpen(false), hold(dur));
   }, [ms]);
   return {
     open,
