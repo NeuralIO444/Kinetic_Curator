@@ -67,7 +67,7 @@ export function MotionTile({ kind, label, value, min = 0, max = 1, step = 0.05, 
       />
       {onToggleLock && (
         <button type="button" className={`lock-btn ${locked ? 'locked' : ''}`} onClick={onToggleLock} title={locked ? 'Unlock' : 'Lock'}>
-          {locked ? '🔒' : '🔓'}
+          {locked ? '▪' : '▫'}
         </button>
       )}
     </div>

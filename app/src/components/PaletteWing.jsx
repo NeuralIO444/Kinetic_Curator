@@ -112,7 +112,7 @@ export function PaletteWing({ open, onClose }) {
 
       <div className="palette-wing-row">
         <button type="button" className="palette-wing-btn primary" onClick={generate} title="Random harmony scheme + seed color → lands here unsaved">
-          🎲 GENERATE
+          ⚄ GENERATE
         </button>
         {lastGen && <span className="palette-wing-gen-note" title="Last generation">{lastGen}</span>}
       </div>

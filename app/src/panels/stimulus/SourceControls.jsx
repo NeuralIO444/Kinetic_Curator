@@ -58,7 +58,7 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
           onClick={() => emit(Events.AUDIO_MONITOR, !audioMonitor)}
           style={audioMonitor ? { background: '#00ff88', color: '#000', borderColor: '#00ff88' } : {}}
         >
-          {audioMonitor ? '🔊 MON ON' : '🔈 MON OFF'}
+          {audioMonitor ? '((·)) MON ON' : '((·)) MON OFF'}
         </button>
       </div>
 
