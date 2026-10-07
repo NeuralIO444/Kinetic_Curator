@@ -3,11 +3,12 @@
 // them moves by a pixel.
 import { test, expect } from '@playwright/test';
 
-async function boot(page, opts = {}) {
+// `settle` waits out the cold open (the verbs show their full names for ~2 s), so rest-state tests measure rest.
+async function boot(page, { settle = true } = {}) {
   await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
-  return opts;
+  if (settle) await expect(page.locator('.kc-topbar-curator .kinetic-btn')).not.toHaveAttribute('data-open', 'true', { timeout: 6000 });
 }
 const group = (page) => page.locator('.kc-topbar-curator');
 const btn = (page, name) => group(page).getByRole('button', { name });
@@ -82,4 +83,51 @@ test('KIN still builds and sheds heat: rapid taps widen it, and it cools back', 
   await expect.poll(async () => width(kin)).toBeGreaterThan(w0 + 40);
   await page.mouse.move(600, 600);
   await expect.poll(async () => width(kin), { timeout: 15_000 }).toBeLessThanOrEqual(w0 + 2);
+});
+
+test('cold open: KINETIC and CURATOR show their full names, then cool down to KIN and CUR; L and V stay L and V', async ({ page }) => {
+  await boot(page, { settle: false });
+  const kin = group(page).locator('.kinetic-btn');
+  const cur = group(page).locator('.randomize-btn');
+  await expect(kin).toHaveAttribute('data-open', 'true');
+  await expect(cur).toHaveAttribute('data-open', 'true');
+  const opened = { kin: await width(kin), cur: await width(cur) };
+  expect(await text(btn(page, /^Looks/)), 'L is not part of the cold open').toBe('l');
+  expect(await text(btn(page, /^Voice/))).toBe('v');
+  await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 6000 });
+  await expect(cur).not.toHaveAttribute('data-open', 'true');
+  await expect.poll(async () => width(kin), { timeout: 3000 }).toBeLessThan(opened.kin - 8);
+  await expect.poll(async () => width(cur), { timeout: 3000 }).toBeLessThan(opened.cur - 8);
+});
+
+test('reduced motion: no cold open at all', async ({ browser }) => {
+  const ctx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1280, height: 720 } });
+  const page = await ctx.newPage();
+  await boot(page, { settle: false });
+  await page.waitForTimeout(400);
+  await expect(group(page).locator('.kinetic-btn')).not.toHaveAttribute('data-open', 'true');
+  await expect(group(page).locator('.randomize-btn')).not.toHaveAttribute('data-open', 'true');
+  await ctx.close();
+});
+
+test('the row reads START, KIN, L, V, CUR, B left to right; CURATOR is in capitals; BEAT is [•B] and opens to BEAT · 120', async ({ page }) => {
+  await boot(page);
+  const parts = await group(page).locator('.start-mode-btn, .kinetic-btn, .curator-voice-btn, .randomize-btn, .beat-btn').evaluateAll((els) => els.map((e) => ({ cls: e.className.split(' ')[0], x: Math.round(e.getBoundingClientRect().left) })));
+  expect(parts.map((p) => p.cls)).toEqual(['start-mode-btn', 'kinetic-btn', 'curator-voice-btn', 'curator-voice-btn', 'randomize-btn', 'beat-btn']);
+  expect(parts.map((p) => p.x)).toEqual([...parts.map((p) => p.x)].sort((a, b) => a - b));
+  const cur = group(page).locator('.randomize-btn');
+  expect(await cur.evaluate((e) => getComputedStyle(e.querySelector('.xl-head')).textTransform), 'CURATOR is in capitals').toBe('uppercase');
+  await expect(cur).toHaveAttribute('aria-label', /^Curator/);
+  await expect(page.locator('.palette-strip .palette-mix .beat-btn'), 'BEAT left the palette strip').toHaveCount(0);
+  const beat = group(page).locator('.beat-btn');
+  await expect(beat.locator('.beat-dot')).toBeVisible();
+  const rest = await width(beat);
+  await beat.hover();
+  await expect.poll(async () => width(beat)).toBeGreaterThan(rest + 30);
+  await expect(beat).toContainText(/beat · 120/i);
+  await page.mouse.move(600, 600);
+  await expect.poll(async () => width(beat)).toBeLessThanOrEqual(rest + 1);
+  // the click still opens the tempo menu
+  await beat.click();
+  await expect(page.locator('.beat-menu')).toBeVisible();
 });

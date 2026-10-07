@@ -263,12 +263,6 @@
   background: var(--ink); color: var(--bg); border-color: var(--ink);
   max-width: 150px;
 }
-.beat-glyph { font-size: 10px; line-height: 1; flex-shrink: 0; font-weight: 800; }
-.beat-rest {
-  display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap;
-  transition: max-width 180ms ease;
-}
-.beat-btn:hover .beat-rest, .beat-btn:focus-visible .beat-rest, .beat-btn.open .beat-rest { max-width: 90px; }
 /* The pulse readout: flashes on every beat at the dialed BPM. --beat interval
    is set from React (animation-duration); the flash itself is pure CSS. */
 .beat-dot {

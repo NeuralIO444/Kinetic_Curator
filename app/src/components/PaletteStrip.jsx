@@ -7,7 +7,6 @@ import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
 import { chipWindowStart } from './paletteChipWindow.mjs';
 import { CuratorBar } from '../panels/layout/CuratorBar.jsx';
-import { BeatButton } from './BeatButton.jsx';
 import { PaletteWing } from './PaletteWing.jsx';
 
 const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
@@ -166,7 +165,6 @@ export function PaletteStrip() {
       <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <span className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }}>
-            <BeatButton />
             <button
               type="button"
               className="palette-mix-label act"
