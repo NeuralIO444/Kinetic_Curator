@@ -15,7 +15,7 @@ const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 
 const kc = (id, extra = {}) => ({ id, name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 }, ...extra });
 const seed = (layers = [kc('kc-a')], activeLayerId = 'kc-a') => {
-  useStore.setState({ layers, activeLayerId, layerSnapshots: {}, historyUndoStack: [], historyRedoStack: [] });
+  useStore.setState({ layers, activeLayerId, layerSnapshots: {}, selectedPatternLayerId: null, historyUndoStack: [], historyRedoStack: [] });
 };
 const S = () => useStore.getState();
 const pt = () => S().layers.find(isPatternLayer);
@@ -180,6 +180,24 @@ ok('duplicate: a copy of a PATTERN track is the same pattern, no snapshot; the c
   S().soloLayer(ps[0].id);
   assert.ok(S().layers.find((l) => l.id === ps[0].id).visible);
   assert.ok(!S().layers.find((l) => l.id === 'kc-a').visible, 'solo hides the other content tracks');
+});
+
+ok('selection: adding a PATTERN track opens its editor; only a pattern id can be selected; removing clears it', () => {
+  seed([kc('kc-a'), kc('kc-b')]);
+  assert.equal(S().selectedPatternLayerId, null);
+  S().addPatternLayer();
+  const id = pt().id;
+  assert.equal(S().selectedPatternLayerId, id, 'a new pattern track opens its editor, like a new FX track');
+  S().selectPatternLayer('kc-a');
+  assert.equal(S().selectedPatternLayerId, null, 'a KC id is not a pattern id');
+  S().selectPatternLayer(id);
+  assert.equal(S().selectedPatternLayerId, id);
+  S().selectPatternLayer('missing');
+  assert.equal(S().selectedPatternLayerId, null);
+  S().selectPatternLayer(id);
+  S().removeLayer(id);
+  assert.equal(S().selectedPatternLayerId, null, 'removing the track clears the selection');
+  assert.equal(S().activeLayerId, 'kc-a', 'and the KC track stays the active one throughout');
 });
 
 ok('names: PT-n is positional, a rename keeps the position visible', () => {

@@ -12,7 +12,7 @@ export function trackNumeral(ordinal, kind) {
 }
 
 export function trackNumeralTitle(ordinal, kind, { edited = false, ghost = false } = {}) {
-  const family = kind === 'fx' ? 'FX' : kind === 'math' ? 'M' : 'KC';
+  const family = kind === 'fx' ? 'FX' : kind === 'math' ? 'M' : kind === 'pattern' ? 'PT' : 'KC';
   const n = Number(ordinal);
   if (ghost) return `${family} ${n} — tap to arm`;
   return `${family} track ${n}${edited ? ' — editing' : ''}`;

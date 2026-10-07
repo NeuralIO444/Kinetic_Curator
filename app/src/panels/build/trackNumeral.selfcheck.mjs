@@ -14,6 +14,7 @@ test('#1016 track numerals: all arabic, roman retired', () => {
   assert.equal(trackNumeral(0, 'kc'), '');
   assert.equal(trackNumeralTitle(2, 'kc', { edited: true }), 'KC track 2 — editing');
   assert.equal(trackNumeralTitle(3, 'fx', { ghost: true }), 'FX 3 — tap to arm');
+  assert.equal(trackNumeralTitle(2, 'pattern', { edited: true }), 'PT track 2 — editing'); // #1099
 });
 
 test('#716 numeral tile heads every LayerStack row and inverts when edited', () => {
@@ -21,7 +22,7 @@ test('#716 numeral tile heads every LayerStack row and inverts when edited', () 
   const css = readFileSync(new URL('../../styles/panels.css', import.meta.url), 'utf8');
   assert.match(jsx, /function TrackNumeral/);
   assert.equal((jsx.match(/<TrackNumeral /g) || []).length, 1, 'one shared row renderer — no ghost rows (mockup C, #1014 rebuild)');
-  assert.match(jsx, /edited=\{math \? isMathSelected : fx \? isFxSelected : isActive\}/);
+  assert.match(jsx, /edited=\{math \? isMathSelected : fx \? isFxSelected : pat \? isPatSelected : isActive\}/); // #1099: a PATTERN row inverts when its editor is open
   assert.match(css, /\.track-numeral \{[^}]*background:\s*#0a0a0a/);
   assert.match(css, /\.track-numeral \{[^}]*color:\s*#f4f4f4/);
   assert.match(css, /\.track-numeral-edited \{[^}]*background:\s*#f4f4f4/);

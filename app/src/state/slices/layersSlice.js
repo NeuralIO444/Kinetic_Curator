@@ -80,6 +80,7 @@ export const createLayersSlice = (set) => ({
   soloStash: null,
   selectedFxLayerId: null,
   selectedMathLayerId: null,
+  selectedPatternLayerId: null, // #1099 — the PATTERN track whose editor is open (like selectedFxLayerId)
   // #1014 (mockup C rebuild) — "last-used defaults" for the per-section "+".
   // Updated ONLY by real user "+" taps / chooser picks (addLayer/addFxLayer
   // with a family). Boot/shuffle system arms build their layers directly in
@@ -130,7 +131,13 @@ export const createLayersSlice = (set) => ({
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: [...state.layers, { id, name: `PT-${n}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern }],
+      selectedPatternLayerId: id,
     };
+  }),
+
+  selectPatternLayer: (id) => set((state) => {
+    const l = state.layers.find((x) => x.id === id);
+    return { selectedPatternLayerId: l && isPatternLayer(l) ? id : null };
   }),
 
   setPatternParam: (id, key, value) => set((state) => {
@@ -271,11 +278,12 @@ export const createLayersSlice = (set) => ({
     delete snapshots[id];
     const selectedFxLayerId = state.selectedFxLayerId === id ? null : state.selectedFxLayerId;
     const selectedMathLayerId = state.selectedMathLayerId === id ? null : state.selectedMathLayerId;
-    if (id !== state.activeLayerId) return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, selectedFxLayerId, selectedMathLayerId };
+    const selectedPatternLayerId = state.selectedPatternLayerId === id ? null : state.selectedPatternLayerId;
+    if (id !== state.activeLayerId) return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId };
     const nextActive = layers.find(isKcLayer) || layers[0];
     const nextSnapshot = snapshots[nextActive.id] || freshSnapshot(state.seed, state.seedOffsets);
     delete snapshots[nextActive.id];
-    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, activeLayerId: nextActive.id, selectedFxLayerId, selectedMathLayerId, ...nextSnapshot };
+    return { ...pushToUndo(state, true, UNDO_KIND_LAYERS), layers, layerSnapshots: snapshots, activeLayerId: nextActive.id, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId, ...nextSnapshot };
   }),
 
   setActiveLayer: (id) => set((state) => {
