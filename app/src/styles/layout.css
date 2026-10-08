@@ -804,11 +804,21 @@
 
 /* ─── #1122 — top-bar affective shape grammar (KC-1 DS) ───
    continuous → Davis (amber breath/shimmer); discrete → TE (red detents/digits).
-   Silence is default: every accent below is dark until its signal says otherwise. */
+   Silence is default: every accent below is dark until its signal says otherwise.
+
+   LAYOUT RULE: the always-visible accents are absolute-positioned pips on the
+   pill edges — zero flex width, so the bar never shifts (the topbar-expand e2e
+   contract: nothing around an expanding pill moves by a pixel). Detail text
+   (look name, voice id, ledger) stays in-flow but only renders on real state,
+   so the resting bar is byte-identical in width to before. */
+
+/* the pills are positioning contexts for their pips */
+.kc-logo, .curator-voice-btn, .randomize-btn, .kinetic-btn { position: relative; }
 
 /* ◆ diamond — LOIS presence. Dark until a real taste.json clears fidelity 0.3. */
 .taste-diamond {
-  width: 11px; height: 11px; flex-shrink: 0;
+  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
+  width: 9px; height: 9px; pointer-events: none; z-index: 1;
   transform: rotate(45deg);
   background: #3a3a3a;
   transition: background .8s, box-shadow .8s;
@@ -831,15 +841,16 @@
 }
 @keyframes taste-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
-/* ● KIN layer — discrete → TE micro-label beside the heat glyph */
+/* ● KIN layer — discrete → TE micro-label beside the heat glyph (in-flow, only while warm) */
 .kinetic-layer {
   font-size: 9px; color: var(--kc-red); letter-spacing: .1em;
   min-width: 10px; line-height: 1; flex-shrink: 0;
 }
 
-/* L — structure → TE: hollow / solid-red / half-fill + look name */
+/* L — structure → TE pip: hollow / solid-red / half-fill. The look name rides in-flow when applied. */
 .look-sq {
-  width: 11px; height: 11px; flex-shrink: 0;
+  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
+  width: 9px; height: 9px; pointer-events: none; z-index: 1;
   border: 2px solid #444;
   transition: all .12s steps(2);
 }
@@ -850,9 +861,10 @@
 }
 .look-name { font-size: 9px; color: #777; letter-spacing: .08em; white-space: nowrap; }
 
-/* V — drift → Davis: breathes at the persona's drift rate; off = no dot at all */
+/* V — drift → Davis pip: breathes at the persona's drift rate; off = no pip at all */
 .voice-drift {
-  width: 11px; height: 11px; flex-shrink: 0;
+  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
+  width: 9px; height: 9px; pointer-events: none; z-index: 1;
   border: 2px solid rgba(var(--kc-davis-rgb), .75);
   box-shadow: 0 0 8px rgba(var(--kc-davis-rgb), .35);
   animation: voice-breath 6s ease-in-out infinite;
@@ -860,9 +872,10 @@
 @keyframes voice-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 .voice-id { font-size: 9px; color: #777; letter-spacing: .08em; }
 
-/* CUR — verdict → TE: detent-step diamond + keep/favorite ledger digit */
+/* CUR — verdict → TE pip: detent-step diamond. The keep/favorite ledger rides in-flow when non-zero. */
 .cur-detent {
-  width: 11px; height: 11px; flex-shrink: 0;
+  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
+  width: 9px; height: 9px; pointer-events: none; z-index: 1;
   border: 2px solid #444; transform: rotate(45deg);
   transition: transform .12s steps(2), background .12s steps(2), border-color .12s steps(2);
 }
@@ -870,24 +883,28 @@
 .cur-detent.v4 { transform: rotate(225deg); background: var(--kc-red); border-color: var(--kc-red); }
 .cur-ledger { font-size: 9px; color: #777; letter-spacing: .06em; white-space: nowrap; }
 
-/* ▪ locks — discrete → TE: glyph + count; the nub shows armed roll scope (tap to disarm) */
-.lock-chip {
-  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-  padding: 2px 4px; font-size: 11px; color: #b9b3a4;
+/* ▪ locks — discrete → TE pip on CUR's right edge: glyph + count; red nub = armed roll
+   scope (the pip is a button when armed: tap to disarm). Zero layout width. */
+.lock-badge {
+  position: absolute; right: -7px; top: 50%; margin-top: -7px; z-index: 1;
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--panel-2); border: 1px solid var(--line-2);
+  padding: 1px 4px; font-size: 9px; line-height: 1; color: #b9b3a4;
+  cursor: default; white-space: nowrap;
 }
-.lock-glyph { color: #888; line-height: 1; }
-.lock-digit { font-size: 11px; color: #ddd; min-width: 10px; }
-.lock-nub {
-  width: 8px; height: 14px; padding: 0; cursor: pointer;
-  border: 2px solid #444; background: transparent; position: relative;
-}
-.lock-nub::after {
-  content: ''; position: absolute; left: 1px; right: 1px; top: 1px; height: 4px;
-  background: var(--kc-red);
+button.lock-badge { cursor: pointer; }
+.lock-badge .lock-glyph { color: #888; }
+.lock-badge .lock-digit { color: #ddd; }
+.lock-badge .lock-nubdot {
+  width: 6px; height: 6px; background: var(--kc-red); flex-shrink: 0;
 }
 
 /* Precedence: a lit accent that lost the cut renders subdued, never competing. */
 [data-subdued="true"] { opacity: .38; }
+
+/* #1122 — the grammar accents sit inline in the bar buttons with a fixed gap,
+   so JSX whitespace never decides the spacing (and the bar keeps its slack). */
+.curator-voice-btn, .randomize-btn { display: inline-flex; align-items: center; gap: 0.5em; }
 
 /* Reduced motion: every breath/shimmer collapses to its static encoding. */
 @media (prefers-reduced-motion: reduce) {
