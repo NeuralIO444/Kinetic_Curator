@@ -134,7 +134,7 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
 }
 
 // `dialog` (optional) turns on the tap-name dialog (#1127): { key, hard: {min,max}, title, spin? }. `spin` makes the row a
-// SPIN | RANGE row (ROTATE): { value, onChange, defaultValue, max }. Spin on shows one rev/s slider instead of the handles.
+// SPIN | RANGE row (ROTATE): { value, onChange, defaultValue, startValue, max } (startValue: the speed SPIN opens on). Spin on shows one rev/s slider instead of the handles.
 export function DualRangeRow({ label, low, high, min: minProp = 0, max: maxProp = 100, step = 1,
   onChangeLow, onChangeHigh, onChangeRange, readout, defaultLow, defaultHigh,
   locked, onToggleLock, hint, tone, dialog }) {
@@ -271,7 +271,7 @@ export function DualRangeRow({ label, low, high, min: minProp = 0, max: maxProp 
         </span>
         {dialogOpen && (
           <SliderDialog title={dialog.title || label} span={[min, max]} hard={dialog.hard}
-            spin={dialog.spin ? { value: dialog.spin.value, fallback: dialog.spin.defaultValue, max: dialog.spin.max } : null}
+            spin={dialog.spin ? { value: dialog.spin.value, fallback: dialog.spin.startValue ?? dialog.spin.defaultValue, max: dialog.spin.max } : null}
             onApplySpan={applySpan} onResetAll={resetAll} onClose={() => setDialogOpen(false)} />
         )}
       </div>

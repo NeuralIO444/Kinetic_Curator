@@ -122,15 +122,16 @@ export const DEFAULT_LAYOUT_PARAMS = {
   flap: 0.35,
   kinemeRate: 1, // #781 KINEME RATE: 1 = each kineme's own tempo, 0 freezes
   // #1127 ROTATE spin: every mark that has no kineme of its own turns this many revolutions per second, on top of
-  // its static angle (the ROTATE range stays the spread of starting angles). 0 = static, today's behaviour. A
-  // project or link saved before this field existed loads as 0 (see normalizeLayoutParams): spin is the default
-  // for NEW scenes only. At loop time 0 a still is pixel-identical either way.
-  rotateSpin: 0.05,
-  // Kineme living-motion driver amounts (v1: curated four). 0 = today's
-  // render exactly — the drivers hard-gate, so untouched projects behave
-  // byte-identically. Boil fps: 8 default, 6–12 exposed (Matt decision 2).
-  kinemeBreath: 0,
-  kinemeDrift: 0,
+  // its static angle (the ROTATE range stays the spread of starting angles). Off by default since #1128: the
+  // living-motion floor below (breath and drift) is what a fresh scene gives, and spin is CHOSEN in the ROTATE
+  // dialog (Matt, 2026-10-07: spin is chosen, drift is given).
+  rotateSpin: 0,
+  // Kineme living-motion drivers (#1128): the floor that makes "nothing is ever 100% frozen" (#721) architectural.
+  // A NEW scene breathes (0.3) and drifts (0.5), each mark on its own phase from the seed. A project, keep or link
+  // saved before these defaults existed loads with both at 0 (normalizeLayoutParams): it opens as it was saved.
+  // Amount 0 is a hard gate: the maths is skipped, not multiplied by zero. Boil fps: 8 default, 6–12 exposed.
+  kinemeBreath: 0.3,
+  kinemeDrift: 0.5,
   kinemePulse: 0,
   kinemeBrushWobble: 0,
   kinemeBoilFps: 8,
@@ -326,6 +327,9 @@ export const RANGE_SPEC = {
  * #1127 — how far the tap-name dialog may stretch a dual slider. The sliders REST on RANGE_SPEC (and macros, defaults
  * and the randomizer keep using it); a performer can widen the span up to here, so the engine accepts these ends.
  */
+/** #1128 — the speed the ROTATE dialog offers when you choose SPIN (the default itself is 0: spin is chosen, drift is given). */
+export const ROTATE_SPIN_START = 0.05;
+
 export const RANGE_HARD = {
   scale: { min: 0.05, max: 6.0 },
   rotate: { min: -720, max: 720 },
@@ -475,7 +479,8 @@ export function normalizeLayoutParams(partial) {
   }
 
   // #1127 — a document that predates ROTATE spin keeps its static rotation: absent means 0, not the new default.
-  if (!Object.prototype.hasOwnProperty.call(src, 'rotateSpin')) next.rotateSpin = 0;
+  // #1128 — the same rule for the living-motion floor: a document that predates it opens exactly as it was saved.
+  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
 
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);

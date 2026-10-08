@@ -416,16 +416,16 @@ test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', 
   const r = createLiveResolver();
   const snapA = {
     seed: 111, paletteId: 'bone', paletteOverrides: null,
-    layoutParams: { ...A425, lifeDrift: 0 },
+    layoutParams: { ...A425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     caGrid: null, enabledAssets: null, lockedParams: {},
   };
   const aActive111 = (loopTimeMs = 1000) => r.resolveLayers(input425({
-    activeLayerId: 'lyr-a', layoutParams: { ...A425, lifeDrift: 0 }, seed: 111,
+    activeLayerId: 'lyr-a', layoutParams: { ...A425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 }, seed: 111,
     lockedParams: {}, layerSnapshots: {}, focusSwap: false, loopTimeMs,
   }));
   const clickToB = (seed, focusSwap) => r.resolveLayers(input425({
     activeLayerId: 'lyr-b',
-    layoutParams: { ...B425, lifeDrift: 0 },
+    layoutParams: { ...B425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     seed, // the swapped-in layer's different seed
     lockedParams: {},
     layerSnapshots: { 'lyr-a': snapA },
@@ -453,7 +453,7 @@ test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', 
 test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   const r = createLiveResolver();
   const mk = (mode, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     mixSeconds: 0.5,
     loopTimeMs,
   });
@@ -512,7 +512,7 @@ test('#564: swapping an overlay asset SVG under the same id fires the director',
   const poolV1 = [userAsset('<path d="M0 0 L10 10"/>')];
   const poolV2 = [userAsset('<circle cx="5" cy="5" r="4"/>')];
   const mk = (customAssets, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     customAssets, mixSeconds: 0.5, loopTimeMs,
   });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
@@ -532,7 +532,7 @@ test('#564: swapping an overlay asset SVG under the same id fires the director',
 test('#564: an asset weight edit fires the director', () => {
   const r = createLiveResolver();
   const mk = (assetWeightOverrides, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     assetWeightOverrides, mixSeconds: 0.5, loopTimeMs,
   });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
@@ -554,7 +554,7 @@ test('#564: a governor asset shed is NOT a transition — different class', () =
   // on top of the load that caused it.
   const r = createLiveResolver();
   const mk = (assetThin, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     assetThin, mixSeconds: 0.5, loopTimeMs,
   });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
@@ -633,7 +633,7 @@ test('#622: a palette-only change is NOT a transition — no scale swap, colours
   const r = createLiveResolver();
   const mk = (paletteId, loopTimeMs) => baseInput({
     paletteId,
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     mixSeconds: 2, loopTimeMs,
   });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
@@ -656,7 +656,7 @@ test('#622: mode still fires the director while palette does not', () => {
   const r = createLiveResolver();
   const mk = (mode, paletteId, loopTimeMs) => baseInput({
     paletteId,
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     mixSeconds: 0.5, loopTimeMs,
   });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
@@ -677,7 +677,7 @@ test('#471: a seed change alone now glides through item-morph, not a hard snap',
   const r = createLiveResolver();
   const mk = (seed, loopTimeMs) => baseInput({
     seed,
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     mixSeconds: 0.5,
     loopTimeMs,
   });
@@ -742,7 +742,7 @@ test('#455: a continuously-lerped paletteOverrides during an auto-MIX must not r
     swatches: ['#112233'],
   });
   const mk = (mode, loopTimeMs, paletteOverrides) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     mixSeconds: 0.5,
     loopTimeMs,
     paletteOverrides,
@@ -776,7 +776,7 @@ test('#427: adopt-on-enter — a chip into a live swarm mode starts from the pri
   const orgAssets = ASSETS.filter((a) => /^(org_|geo_tri_)/.test(a.id)).map((a) => a.id);
   const enabledAssets = Object.fromEntries(orgAssets.map((id) => [id, true]));
   const mk = (mode, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0 },
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
     enabledAssets,
     mixSeconds: 0, // #419's morph is orthogonal to this — isolate the init-time adopt itself
     loopTimeMs,
@@ -827,7 +827,7 @@ test('#427: adopt-on-enter — a chip into a live swarm mode starts from the pri
 // delta (curDx - baseDx) is exactly zero there — that frame's positions
 // ARE the static (pre-warp) reference, with no separate probe needed.
 
-const WARP442_LP = { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 6, lifeDrift: 0, displacement: 40 };
+const WARP442_LP = { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 6, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0, displacement: 40 };
 const warp442Items = (out) => out.find((l) => l.id === 'lyr-a').items;
 function assertWarpMatches(staticPos, after, { seed, noiseFreq, displacement, ntLive, nt0 }, msg) {
   const noise = createNoise(seed >>> 0);

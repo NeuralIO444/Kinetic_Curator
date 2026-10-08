@@ -181,7 +181,7 @@ export function buildPlacements({
   // Kineme living-motion drivers (slice 2): per-instance scale/position
   // deltas folded into the stage-C channels. Ephemeral — the geometry and
   // bind caches above are untouched, and amount 0 is bit-identical.
-  if (kineme) applyKinemeDrivers(soa, kineme);
+  const undoKineme = kineme ? applyKinemeDrivers(soa, kineme) : null; // #1128: puts the cached x/y back once the items are built
 
   // ── Stage D+E: asset bind + colour. Both are functions of (seed, index)
   // plus the asset pool / palette / strategy — never of the ranges — so they
@@ -302,6 +302,7 @@ export function buildPlacements({
     mapped = [...mapped, ...mirrored];
   }
 
+  if (undoKineme) undoKineme();
   return { preset, items: mapped, safeCount };
 }
 
