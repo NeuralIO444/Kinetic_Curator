@@ -22,11 +22,14 @@ import {
   captureLiveVoiceState,
   VOICE_SWATCH_COUNT,
 } from '../../data/voices.js';
-import { pushToUndo } from '../history.js';
+import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
+import { stackOf, expandStack } from '../recipeStack.js'; // #1153: a voice can carry the layer stack
+import { EARNED_SLOTS, isEarned, earnedName, earnedCaption, mintEarned, sanitizeEarned } from '../earnedVoices.js';
 import { loopClock } from '../../gl/loopClock.js';
 
 export const USER_VOICES_KEY = 'kc:user-voices:v1';
-export const MAX_USER_VOICES = 12;
+export const MAX_USER_VOICES = 12; // voices the performer made by hand; earned voices have their own four slots (earnedVoices.js)
+const handMade = (list) => (list || []).filter((v) => !isEarned(v));
 
 function swatchesN(colors) {
   const clean = (Array.isArray(colors) ? colors : []).map((c) => normalizeHex(c)).filter(Boolean);
@@ -53,10 +56,15 @@ export function sanitizeUserVoice(raw) {
     : (st.assets && typeof st.assets === 'object'
       ? Object.fromEntries(Object.entries(st.assets).filter(([, v]) => typeof v === 'boolean').slice(0, 400))
       : 'all');
+  // #1153 — the layer stack an earned voice brings back: refused whole if it does not expand, and bounded in size
+  const stack = st.stack && JSON.stringify(st.stack).length < 60000 && expandStack(st.stack).ok ? JSON.parse(JSON.stringify(st.stack)) : null;
+  const earned = sanitizeEarned(raw.earned);
   return {
     id,
     name,
+    ...(earned ? { earned } : {}),
     state: {
+      ...(stack ? { stack } : {}),
       params,
       palette: {
         bg: normalizeHex(pal.bg) || '#0a0a0a',
@@ -138,6 +146,8 @@ export function findVoiceDef(id, userVoices) {
       fx: u.state.fx,
       assets: u.state.assets,
       blendSeconds: u.state.blendSeconds,
+      stack: u.state.stack,
+      earned: u.earned,
     };
   }
   return null;
@@ -229,6 +239,9 @@ export const createVoiceSlice = (set) => ({
     const to = mix.to;
     const next = { ...pushToUndo(state, true) };
     next.layoutParams = { ...to.params };
+    // #1153 — an earned voice brings its tracks (PATTERN, FX, extra KC) back with it, as one whole-document undo
+    const ex = to.stack ? expandStack(to.stack) : null;
+    if (ex && ex.ok) Object.assign(next, pushToUndo(state, true, UNDO_KIND_LAYERS), { layers: ex.stack.layers, activeLayerId: ex.stack.activeLayerId, layerSnapshots: ex.stack.layerSnapshots });
     // Voices are catalog-independent (freeform colors), so they always land
     // as an override blob — unchanged from day one. A preset mix (#284-style
     // "morph, don't cut") instead pairs a real catalog id: `to.paletteId` set
@@ -268,7 +281,7 @@ export const createVoiceSlice = (set) => ({
    * Returns {} when the shelf is full — the UI disables + at the cap.
    */
   captureUserVoice: () => set((state) => {
-    if (state.userVoices.length >= MAX_USER_VOICES) return {};
+    if (handMade(state.userVoices).length >= MAX_USER_VOICES) return {};
     const entry = sanitizeUserVoice({
       id: `uv-${Date.now().toString(36)}`,
       name: nextVoiceName(state.userVoices),
@@ -289,7 +302,7 @@ export const createVoiceSlice = (set) => ({
    * id is refused). Refused when the shelf is full, like the + chip.
    */
   forkVoice: ({ id, name, state: draft }) => set((state) => {
-    if (state.userVoices.length >= MAX_USER_VOICES) return {};
+    if (handMade(state.userVoices).length >= MAX_USER_VOICES) return {};
     if (!id || state.userVoices.some((v) => v.id === id)) return {};
     const entry = sanitizeUserVoice({ id, name: forkName(name, state.userVoices), state: draft, createdAt: Date.now() });
     if (!entry) return {};
@@ -327,7 +340,8 @@ export const createVoiceSlice = (set) => ({
    */
   importUserVoices: (list) => {
     if (!Array.isArray(list)) return null;
-    const userVoices = list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES);
+    const clean = list.map(sanitizeUserVoice).filter(Boolean);
+    const userVoices = [...handMade(clean).slice(0, MAX_USER_VOICES), ...clean.filter(isEarned).slice(0, EARNED_SLOTS)];
     persist(userVoices);
     set((state) => {
       const next = { userVoices };
@@ -336,6 +350,28 @@ export const createVoiceSlice = (set) => ({
     });
     return userVoices.length; // #1064 — what landed (after the cap), for the result line
   },
+
+  /**
+   * #1153 — the triad mints a voice from a find: a keep after a run of the artist's own rolls (Davis's BLOOM). Shelves
+   * the live scene, with its layer stack and the roll count. A shallower find than a full shelf's shallowest, a repeat,
+   * or fewer than EARNED_MIN_ROLLS rolls changes nothing.
+   */
+  mintEarnedVoice: ({ rolls, at } = {}) => set((state) => {
+    const createdAt = Number.isFinite(at) ? at : Date.now(); // a stamp for the shelf, not a clock the sim reads
+    const stack = stackOf(state);
+    const entry = sanitizeUserVoice({
+      id: `ev-${(state.seed >>> 0).toString(16)}-${Math.floor(Number(rolls) || 0)}`,
+      name: earnedName(state),
+      state: { ...captureLiveVoiceState(state), ...(stack ? { stack } : {}) },
+      earned: { rolls, at: createdAt, caption: earnedCaption({ rolls, count: state.layoutParams && state.layoutParams.count, seed: state.seed }) },
+      createdAt,
+    });
+    if (!entry) return {};
+    const out = mintEarned(state.userVoices, entry);
+    if (!out.minted) return {};
+    persist(out.list);
+    return { userVoices: out.list };
+  }),
 
   deleteUserVoice: (id) => set((state) => {
     const userVoices = state.userVoices.filter((v) => v.id !== id);
