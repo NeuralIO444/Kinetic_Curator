@@ -8,6 +8,7 @@ import { getAudioMeterTap } from '../../hooks/audioMeterTap.js';
 import { METER_BANDS, meterBandLevels, holdPeaks } from '../../gl/meterBands.mjs';
 import { useStore } from '../../state/store.js';
 import { nextRoute } from '../../data/audioRoutes.js';
+import { createBeatTracker } from '../../curator/beatConfidence.mjs';
 
 const H = 132;
 const WAVE_H = 52;
@@ -26,6 +27,9 @@ export function MeterHero() {
     let freq = null;
     let wave = null;
     let shownSource = 'IDLE';
+    // #1139 — beat-lock detector: two confident attacks (≥ 0.62). The amber
+    // wash below is beat-lock only, in the DS amber (--kc-davis), never lean.
+    const beatTracker = createBeatTracker();
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const cv = canvasRef.current;
@@ -39,6 +43,7 @@ export function MeterHero() {
       const ink = css.getPropertyValue('--ink').trim() || '#e8e8e0';
       const dim = css.getPropertyValue('--line-2').trim() || '#333';
       const accent = css.getPropertyValue('--accent').trim() || '#ff2d6f';
+      const davisRgb = css.getPropertyValue('--kc-davis-rgb').trim() || '255, 205, 130';
       g.clearRect(0, 0, w, h);
 
       const now = performance.now();
@@ -98,6 +103,21 @@ export function MeterHero() {
 
       // beat pulse
       const beat = tap ? beatRef.current : 0;
+      beatTracker.push(beat);
+      // #1139 — beat-lock: a faint amber wash behind the beat dot when the
+      // last two attacks were confident. Beat-lock only, never lean.
+      if (beatTracker.confident) {
+        const bx = w - 8 * dpr;
+        const by = 8 * dpr;
+        const rr = 14 * dpr;
+        const grad = g.createRadialGradient(bx, by, 0, bx, by, rr);
+        grad.addColorStop(0, `rgba(${davisRgb},0.22)`);
+        grad.addColorStop(1, `rgba(${davisRgb},0)`);
+        g.fillStyle = grad;
+        g.beginPath();
+        g.arc(bx, by, rr, 0, Math.PI * 2);
+        g.fill();
+      }
       if (beat > 0.02) {
         g.fillStyle = accent;
         g.globalAlpha = Math.min(1, beat);

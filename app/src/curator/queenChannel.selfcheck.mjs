@@ -128,7 +128,9 @@ ok('no UI-surface file references the channel', () => {
   const allowed = new Set([
     'curator/queenChannel.js',
     'curator/queenChannel.selfcheck.mjs',
-    // PR-2's sway module will import it and extend this set deliberately.
+    // PR-2's sway module reads the channel (GATE_OPEN) — added deliberately.
+    'curator/queenLean.mjs',
+    'curator/queenLean.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

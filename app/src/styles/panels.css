@@ -295,6 +295,22 @@
 .stim-matrix-count { color: var(--dim); font-variant-numeric: tabular-nums; }
 .stim-matrix-unrouted { color: var(--dim); margin-left: auto; }
 .stim-meter-hint { font-style: normal; margin-left: 6px; letter-spacing: 0.04em; text-transform: lowercase; opacity: 0.85; }
+/* #1139 — the whisper line: deadpan-warm lowercase, tiny, there and gone.
+   No attribution, no name. Fades via the component's timer. */
+.whisper-line {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  color: var(--dim);
+  opacity: 0.9;
+  padding: 3px 6px;
+  min-height: 16px;
+  animation: whisper-in 0.8s ease-out;
+}
+@keyframes whisper-in {
+  from { opacity: 0; }
+  to { opacity: 0.9; }
+}
 .stim-matrix-depth { color: var(--dim); font-variant-numeric: tabular-nums; }
 .stim-matrix-live { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
 .stim-matrix-bar { flex: 1; height: 4px; background: var(--line-2); position: relative; }

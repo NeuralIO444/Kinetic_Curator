@@ -90,6 +90,7 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
   'kc:pipeline:backup': 'autosave plumbing: the previous copy of the project the bundle already carries',
   'kc:project:quarantine': 'autosave plumbing: a refused project kept for inspection',
   'kc:project:restored-session': 'autosave plumbing: a boot notice',
+  'kc:queen:trace': '#1139: developer trace flag for the sway module (off by default), never project content',
 });
 
 /**
