@@ -78,10 +78,12 @@ assert.equal(params.composition, 'dusk-flock', 'load rewrites alias to canonical
   const voiceTiles = read('../panels/davis/VoiceTiles.jsx');
   assert.ok(/<VoiceTiles \/>/.test(read('../panels/DavisPanel.jsx')), 'DAVIS renders the flagship Voice tiles');
   assert.ok(!/FLAGSHIP_VOICES/.test(read('../panels/layout/CompositionTiles.jsx')), 'BUILD no longer renders the flagship Voices (one home)');
-  const flagshipChip = voiceTiles.slice(voiceTiles.indexOf('function FlagshipChip'), voiceTiles.indexOf('export function VoiceTiles'));
-  assert.ok(flagshipChip.length > 0, 'FlagshipChip found');
-  assert.ok(!/voice\.name/.test(flagshipChip), 'flagship chips print voice.title, never the SWARM/HYPE/MURM name');
-  assert.ok(/\{voice\.title\}/.test(flagshipChip), 'flagship chips print voice.title');
+  // #1153: the picker holds earned voices and one starter; the starter prints its title, an earned voice its deadpan name,
+  // never the SWARM/HYPE/MURM chassis id
+  assert.ok(voiceTiles.indexOf('function Tile') > 0, 'Tile found');
+  assert.ok(/name=\{STARTER\.title\}/.test(voiceTiles), 'the starter prints its title');
+  assert.ok(/name=\{v\.name\}/.test(voiceTiles), 'an earned voice prints its deadpan name');
+  assert.ok(!/STARTER\.name|voice\.name/.test(voiceTiles), 'no tile prints a chassis name (SWARM/HYPE/MURM)');
   const voiceSlice = read('../state/slices/voiceSlice.js');
   assert.ok(/displayName: f\.title\b/.test(voiceSlice), 'MIX bar names a flagship by its title');
   for (const v of FLAGSHIP_VOICES) {

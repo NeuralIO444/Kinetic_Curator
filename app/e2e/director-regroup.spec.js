@@ -15,7 +15,7 @@ test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE p
   await expect(panel.locator('.davis-section-label')).toHaveText(['voices', 'generate', 'perform', 'trails', 'the room']); // #1126: the two Directors close the panel
 
   // nothing deleted: every existing control is findable
-  await expect(panel.locator('.voice-chip.flagship')).toHaveCount(4);
+  await expect(panel.locator('.voice-chip.starter')).toHaveCount(1); // #1153: one starter until the first find
   for (const name of ['EVOLVE', 'favorite', 'new seed', 'SPATIAL', 'COLOR', 'ASSET', 'NOISE']) {
     await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
   }

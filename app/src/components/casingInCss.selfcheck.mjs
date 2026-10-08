@@ -10,7 +10,7 @@ const BASELINE = {
   'components/HotkeyOverlay.jsx': 2, 'components/PaletteStrip.jsx': 1, 'components/PaletteWing.jsx': 2,
   'components/TapeCounter.jsx': 1, 'panels/AssetPoolPanel.jsx': 3, 'panels/CanvasPanel.jsx': 1,
   'panels/build/LayerStack.jsx': 6, 'panels/build/MathEffectEditor.jsx': 3, 'panels/davis/BehaveReadout.jsx': 2,
-  'panels/davis/EvolveControls.jsx': 1, 'panels/davis/VoiceDish.jsx': 1, 'panels/layout/AccumFamily.jsx': 2,
+  'panels/davis/EvolveControls.jsx': 1, 'panels/layout/AccumFamily.jsx': 2,
   'panels/layout/ChipRows.jsx': 2, 'panels/layout/StructureToggles.jsx': 1, 'panels/pipeline/StageView.jsx': 1,
   'panels/stimulus/MeterHero.jsx': 1, 'panels/stimulus/ModMatrix.jsx': 3,
 };

@@ -19,7 +19,6 @@ const WALL_OK = [
   'src/gl/debug/costTiers.measure.mjs',
   'src/gl/debug/measureCosts.mjs',
   'src/gl/phase6.selfcheck.mjs',
-  'src/panels/davis/VoiceDish.jsx',
 ];
 
 const LOOP_OWNERS = [
