@@ -430,7 +430,7 @@ void main() {
 
 /**
  * Single-effect fullscreen pass. u_effect selects the effect; u_p carries
- * params. u_aux is the grain noise LUT (NEAREST, y-down sampling).
+ * params. u_aux is unused by grain (hash noise from gl_FragCoord; #1079).
  * Premultiplied in/out; effects that need straight values unpremultiply
  * internally (invert/posterize math verified against resvg probes).
  */

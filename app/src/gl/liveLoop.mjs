@@ -36,7 +36,7 @@ import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
 import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // #624: WASH tint adoption state machine
 import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
-import { bakeLiveAtlas, bakeLiveGrainLut, comboKey } from './liveAtlas.mjs';
+import { bakeLiveAtlas, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { applyParallax } from './parallax.mjs';
 import { resolvePalette } from '../data/palettes.js';
@@ -67,16 +67,12 @@ import {
 
 /**
  * #265 — the atlas is resolution-independent (asset/color combos only), so
- * render-size changes must NOT rebake it. The grain LUTs ARE baked at the
- * render size, so they get their own key. A renderScale shed step now
- * rebakes only grain — not the whole sequential-SVG atlas bake.
+ * render-size changes must NOT rebake it. Grain needs no bake at all: the
+ * shader is procedural hash noise (#1079).
  */
 function atlasKeyFor(combos, fxLayerIds) {
   const ck = combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join(';');
   return `${[...fxLayerIds].sort().join(',')}|${ck}`;
-}
-function grainKeyFor(fxLayerIds, w, h) {
-  return `${w}x${h}|${[...fxLayerIds].sort().join(',')}`;
 }
 
 /**
@@ -158,7 +154,6 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     building = false;
     cells = null;
     atlasKey = null;
-    grainKey = null;
     accumObj = null;
     accumActive = false;
     accumRetryAt = 0;
@@ -266,7 +261,6 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // what renderFrameInto's instanceData reads.
   let cells = null;
   let atlasKey = null;
-  let grainKey = null;
   let building = false;
   let buildToken = 0;
   let svgPool = null; // Map asset id -> svg fragment, rebuilt on customAssets change
@@ -730,11 +724,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         })
       : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
 
-    // Static resources: atlas combos from the transformed instances, grain
-    // LUTs keyed by FX layer id + render size (what renderFrameInto's
-    // auxFor reads). The atlas key excludes the render size — it is
-    // resolution-independent, so a governor renderScale step rebakes grain
-    // only (#265).
+    // Static resource: the atlas, keyed by the combos the transformed instances use.
     const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
     const fxLayerIds = new Set((contract.fxWraps || []).map((w) => w.fxLayerId));
 
@@ -743,9 +733,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const rh = Math.max(2, Math.round(canvasH * renderScale));
 
     const aKey = atlasKeyFor(combos, fxLayerIds);
-    const gKey = grainKeyFor(fxLayerIds, rw, rh);
-    if ((aKey !== atlasKey || gKey !== grainKey) && !building && performance.now() >= bakeRetryAt) {
-      startStaticBuild(combos, fxLayerIds, rw, rh, aKey, gKey);
+    if (aKey !== atlasKey && !building && performance.now() >= bakeRetryAt) {
+      startStaticBuild(combos, aKey);
     }
     // Spine B (#388): never return null just because a bake is in flight.
     // Keep resolving + simulating + presenting last-good atlas cells.
@@ -835,7 +824,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     };
   }
 
-  async function startStaticBuild(combos, fxLayerIds, rw, rh, aKey, gKey) {
+  async function startStaticBuild(combos, aKey) {
     building = true;
     const token = ++buildToken;
     try {
@@ -849,16 +838,6 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         live.setAtlas(atlas.pixels, atlas.width, atlas.height, atlas.mipmaps);
         cells = Object.fromEntries(atlas.cells);
         atlasKey = aKey;
-      }
-      if (gKey !== grainKey) {
-        const luts = {};
-        for (const id of fxLayerIds) {
-          luts[id] = await bakeLiveGrainLut(rw, rh);
-          if (token !== buildToken) return;
-        }
-        if (token !== buildToken) return;
-        live.setGrainLuts(luts);
-        grainKey = gKey;
       }
       if (token !== buildToken) return;
       bakeConsecFails = 0; // #266 — a good bake resets the failure streak
