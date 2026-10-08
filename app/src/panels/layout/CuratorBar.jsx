@@ -18,7 +18,8 @@ import {
 } from '../../curator/taste.js';
 import { getLoisVerdict, getLoisVerdictParts } from '../../curator/loisRank.js';
 import { getPersonaTaste } from '../../curator/personaTastes.js';
-import { verdictDetent, voiceBreathS, litPills } from '../../curator/topbarTaste.mjs';
+import { verdictDetent, voiceBreathS, voiceLevel, litPills } from '../../curator/topbarTaste.mjs';
+import { loisActivity } from '../../curator/loisActivity.js';
 import { KineticButton } from './KineticButton.jsx';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
@@ -109,6 +110,16 @@ export function CuratorBar() {
   const voiceOn = voice !== 'off';
   const driftW = voiceOn ? getPersonaTaste(voice)?.weights?.drift : undefined;
   const breathS = voiceBreathS(driftW);
+  // #1122: V breathes only after the voice rolled, then decays to still. Read the honest feed once a second.
+  const [voiceLvl, setVoiceLvl] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror of the feed, read on mount and each second
+    if (!voiceOn) { setVoiceLvl(0); return undefined; }
+    const tick = () => setVoiceLvl(voiceLevel(loisActivity.snapshot().lastRollAgoMs));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [voiceOn]);
   const curDetent = voice === 'lois' ? verdictDetent(getLoisVerdictParts()) : 0;
   const armed = armedMode != null || armedMotion != null;
   // Precedence keeps the bar quiet: CUR > locks > V > L; over the cap, the
@@ -118,7 +129,8 @@ export function CuratorBar() {
   // An accent that is lit but lost the precedence cut renders subdued.
   const subdued = (key, isLit) => (isLit && !lit.has(key) ? 'true' : undefined);
 
-  const onCurate = () => {    emit(Events.LAYOUT_CURATE);
+  const onCurate = () => {
+    emit(Events.LAYOUT_CURATE);
     emit(Events.ROLL_GUARD, { kind: 'curate' }); // #1107: look at the frame it landed
     // The persona brings its palette: switch the global palette to the
     // profile's catalog entry so the color jumps with the voice. Skipped
@@ -224,7 +236,7 @@ export function CuratorBar() {
           >
             {/* #1122 — V is drift → Davis: the circle breathes at the persona's drift
                 rate; hollow and dark when off */}
-            <span className={`tb-voice${voiceOn ? ' on' : ''}`} data-subdued={subdued('voice', voiceOn)}
+            <span className={`tb-voice${voiceOn ? ' on' : ''}${voiceLvl ? ` lvl${voiceLvl}` : ''}`} data-subdued={subdued('voice', voiceOn)}
               style={voiceOn ? { animationDuration: `${breathS.toFixed(1)}s` } : undefined} aria-hidden="true" />
             <ExpandLabel mode="swap" short={voiceUsed ? 'voi' : 'v'} full={`voice: ${activeAlias} ▾`} />
             {voiceOn && <span className="tb-micro">{voice}</span>}

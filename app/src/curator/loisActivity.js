@@ -149,6 +149,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       favoriteCount: s.favorites.length,
       recallCount: s.recalls.length,
       exportCount: s.exports.length,
+      lastRollAgoMs: s.rolls.length ? at - s.rolls[s.rolls.length - 1] : null, // #1122: the V pill breathes only after a real roll
       rollsLast5m: countSince(s.rolls, LOIS_ROLL_KEEP_WINDOW_MS, at),
       keepsLast5m: countSince(s.keeps, LOIS_ROLL_KEEP_WINDOW_MS, at),
       undosLast10s: countSince(s.undos, LOIS_UNDO_BURST_WINDOW_MS, at),

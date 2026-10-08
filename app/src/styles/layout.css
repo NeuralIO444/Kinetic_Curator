@@ -843,7 +843,7 @@
 /* shapes — in-flow, mockup sizes */
 .tb-diamond {
   width: 11px; height: 11px; transform: rotate(45deg);
-  background: #3a3a3a; flex-shrink: 0;
+  background: var(--dimmer); flex-shrink: 0;
   transition: background .8s, box-shadow .8s;
 }
 .tb-diamond.lvl1 { background: rgba(var(--kc-davis-rgb), .35); }
@@ -871,21 +871,21 @@
 
 /* ● KIN circle — Davis glow driven by the button's heat level */
 .tb-circle {
-  width: 13px; height: 13px; border-radius: 50%; background: #3a3a3a;
+  width: 13px; height: 13px; border-radius: 50%; background: var(--dimmer);
   flex-shrink: 0; transition: background 1.2s, box-shadow 1.2s;
 }
 .kinetic-btn[data-heat-level="warm"] .tb-circle {
-  background: #8a6a3a; box-shadow: 0 0 10px rgba(255,205,130,.4);
+  background: rgba(var(--kc-davis-rgb), .55); box-shadow: 0 0 10px rgba(var(--kc-davis-rgb), .4);
   animation: kinetic-heat-pulse 0.9s ease-in-out infinite;
 }
 .kinetic-btn[data-heat-level="hot"] .tb-circle {
-  background: var(--kc-davis); box-shadow: 0 0 18px rgba(255,205,130,.9);
+  background: var(--kc-davis); box-shadow: 0 0 18px rgba(var(--kc-davis-rgb), .9);
   animation: kinetic-heat-pulse 0.45s ease-in-out infinite;
 }
 
 /* □ L — structure → TE: hollow / solid-red / half-fill */
 .tb-looksq {
-  width: 11px; height: 11px; border: 2px solid #444;
+  width: 11px; height: 11px; border: 2px solid var(--dimmer);
   flex-shrink: 0; transition: all .12s steps(2);
 }
 .tb-looksq.clean { border-color: var(--kc-red); background: var(--kc-red); }
@@ -894,33 +894,33 @@
   background: linear-gradient(to top, var(--kc-red) 50%, transparent 50%);
 }
 
-/* ○ V — drift → Davis: breathes at the persona's drift rate; off = hollow dark */
+/* ○ V — drift → Davis: a ring in the voice's colour; it breathes ONLY after the voice rolled (lvl1..4 decays to still, #1122) */
 .tb-voice {
-  width: 11px; height: 11px; border-radius: 50%; border: 2px solid #444;
-  flex-shrink: 0; transition: border-color .8s;
+  width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--dimmer);
+  flex-shrink: 0; transition: border-color .8s, box-shadow .8s;
 }
-.tb-voice.on {
-  border-color: rgba(var(--kc-davis-rgb), .75);
-  box-shadow: 0 0 8px rgba(var(--kc-davis-rgb), .35);
-  animation: tb-breath 6s ease-in-out infinite;
-}
+.tb-voice.on { border-color: rgba(var(--kc-davis-rgb), .5); }
+.tb-voice.on.lvl1 { box-shadow: 0 0 5px rgba(var(--kc-davis-rgb), .25); animation: tb-breath 6s ease-in-out infinite; }
+.tb-voice.on.lvl2 { border-color: rgba(var(--kc-davis-rgb), .65); box-shadow: 0 0 8px rgba(var(--kc-davis-rgb), .4); animation: tb-breath 6s ease-in-out infinite; }
+.tb-voice.on.lvl3 { border-color: rgba(var(--kc-davis-rgb), .8); box-shadow: 0 0 11px rgba(var(--kc-davis-rgb), .55); animation: tb-breath 6s ease-in-out infinite; }
+.tb-voice.on.lvl4 { border-color: var(--kc-davis); box-shadow: 0 0 14px rgba(var(--kc-davis-rgb), .7); animation: tb-breath 6s ease-in-out infinite; }
 
 /* ◇ CUR — verdict → TE detent */
 .tb-curdia {
-  width: 11px; height: 11px; border: 2px solid #444; transform: rotate(45deg); flex-shrink: 0;
+  width: 11px; height: 11px; border: 2px solid var(--dimmer); transform: rotate(45deg); flex-shrink: 0;
   transition: transform .12s steps(2), background .12s steps(2), border-color .12s steps(2);
 }
-.tb-curdia.v2 { transform: rotate(135deg); border-color: #888; }
+.tb-curdia.v2 { transform: rotate(135deg); border-color: var(--dim); }
 .tb-curdia.v4 { transform: rotate(225deg); background: var(--kc-red); border-color: var(--kc-red); }
 
 /* ▫ locks — discrete → TE: square + count; red nub = armed roll scope */
 .tb-locksq {
-  width: 12px; height: 12px; border: 2px solid #666;
+  width: 12px; height: 12px; border: 2px solid var(--dim);
   flex-shrink: 0; transition: background .12s steps(2);
 }
-.tb-locksq.fill { background: #999; }
+.tb-locksq.fill { background: var(--dim); }
 .tb-nub {
-  width: 8px; height: 14px; border: 2px solid #444;
+  width: 8px; height: 14px; border: 2px solid var(--dimmer);
   position: relative; flex-shrink: 0;
 }
 .tb-nub::after {
@@ -929,7 +929,7 @@
 }
 
 /* micro-labels: layer / look name / voice id / ledger / lock count */
-.tb-micro { font-size: 9px; color: #777; letter-spacing: .08em; white-space: nowrap; }
+.tb-micro { font-size: 9px; color: var(--dim); letter-spacing: .08em; white-space: nowrap; }
 .tb-micro.red { color: var(--kc-red); }
 
 /* Precedence: a lit accent that lost the cut renders subdued, never competing. */
@@ -938,7 +938,7 @@
 /* Reduced motion: every breath/shimmer collapses to its static encoding. */
 @media (prefers-reduced-motion: reduce) {
   .tb-diamond.lvl2, .tb-diamond.lvl3, .tb-diamond.lvl4,
-  .tb-voice.on,
+  .tb-voice.on.lvl1, .tb-voice.on.lvl2, .tb-voice.on.lvl3, .tb-voice.on.lvl4,
   .kinetic-btn[data-heat-level="warm"] .tb-circle,
   .kinetic-btn[data-heat-level="hot"] .tb-circle { animation: none; opacity: .85; }
 }

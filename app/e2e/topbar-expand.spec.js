@@ -57,8 +57,10 @@ test('a touch opens KIN, LOOKS and VOICE, and they close by themselves', async (
   const page = await ctx.newPage();
   await boot(page, { hold: 4 });
   const kin = group(page).locator('.kinetic-btn');
-  // the cold open is still cooling on a slow runner: wait for the resting width (the 48 px floor), or w0 is sampled mid-glide
-  await expect.poll(async () => width(kin), { timeout: 8000 }).toBeLessThanOrEqual(49);
+  // the cold open is still cooling on a slow runner: wait for the resting width (two equal samples; the pill's own
+  // padding sets the floor since #1122), or w0 is sampled mid-glide
+  let prev = -1;
+  await expect.poll(async () => { const w = await width(kin); const same = w === prev; prev = w; return same; }, { timeout: 8000 }).toBe(true);
   const w0 = await width(kin);
   await kin.dispatchEvent('pointerdown', { pointerType: 'touch', bubbles: true });
   await expect(kin).toHaveAttribute('data-open', 'true');
@@ -120,7 +122,7 @@ test('reduced motion: no cold open at all', async ({ browser }) => {
 
 test('the row reads START, KIN, L, V, CUR, B left to right; CURATOR is in capitals; BEAT is [•B] and opens to BEAT · 120', async ({ page }) => {
   await boot(page);
-  const parts = await group(page).locator('.start-mode-btn, .kinetic-btn, .curator-voice-btn, .randomize-btn, .beat-btn').evaluateAll((els) => els.map((e) => ({ cls: e.className.split(' ')[0], x: Math.round(e.getBoundingClientRect().left) })));
+  const parts = await group(page).locator('.start-mode-btn, .kinetic-btn, .curator-voice-btn, .randomize-btn, .beat-btn').evaluateAll((els) => els.map((e) => ({ cls: ['start-mode-btn', 'kinetic-btn', 'curator-voice-btn', 'randomize-btn', 'beat-btn'].find((c) => e.classList.contains(c)), x: Math.round(e.getBoundingClientRect().left) })));
   expect(parts.map((p) => p.cls)).toEqual(['start-mode-btn', 'kinetic-btn', 'curator-voice-btn', 'curator-voice-btn', 'randomize-btn', 'beat-btn']);
   expect(parts.map((p) => p.x)).toEqual([...parts.map((p) => p.x)].sort((a, b) => a - b));
   const cur = group(page).locator('.randomize-btn');

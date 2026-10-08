@@ -42,6 +42,17 @@ export function voiceBreathS(driftWeight) {
 }
 
 /**
+ * V voice level 0..4 from the honest feed: how long ago the last roll was (null = none this session). The voice
+ * breathes only AFTER it did something and decays to still over VOICE_ACT_MS: a time-based Davis signal that
+ * traces to a real roll, never a permanent animation (rule 3).
+ */
+export const VOICE_ACT_MS = 20000;
+export function voiceLevel(lastRollAgoMs) {
+  if (typeof lastRollAgoMs !== 'number' || !Number.isFinite(lastRollAgoMs) || lastRollAgoMs < 0 || lastRollAgoMs >= VOICE_ACT_MS) return 0;
+  return Math.max(1, Math.min(4, Math.ceil((1 - lastRollAgoMs / VOICE_ACT_MS) * 4)));
+}
+
+/**
  * Bar-quiet precedence (#1122): when more pills are lit than the cap allows,
  * the lowest-precedence accents go subdued. Order: CUR > locks > KIN > V > L > diamond.
  * Returns the set of pill keys that stay lit.
