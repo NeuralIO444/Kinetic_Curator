@@ -20,6 +20,7 @@
 import { personaCurator } from './taste.js';
 import { makeMlxCurator } from './tasteHead.js';
 import { getTaste } from './tasteStore.js';
+import { experimentalOn } from './tasteGate.js';
 import { getLoisVerdict } from './loisRank.js';
 
 export const CURATE_CANDIDATES = 8;
@@ -39,7 +40,7 @@ export function nullCurator() {
  * faithful enough; otherwise null, and the persona scorer takes over.
  */
 function mlxCurator() {
-  return makeMlxCurator(getTaste());
+  return makeMlxCurator(getTaste(), { experimental: experimentalOn() });
 }
 
 /**
@@ -98,6 +99,6 @@ export function curatorHint(curator, { chainFallback = false } = {}) {
     return `heuristic pick: LOIS · ${line}${chain}`;
   }
   if (curator.personaName) return `persona pick: ${curator.personaName}${chain}`;
-  if (curator.name === 'mlx') return `curated pick · mlx${chain}`;
+  if (curator.name === 'mlx') return `curated pick · mlx${curator.experimental ? ' · experimental' : ''}${chain}`;
   return `curated pick${chain}`;
 }

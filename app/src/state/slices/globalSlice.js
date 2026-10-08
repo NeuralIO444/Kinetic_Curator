@@ -16,6 +16,7 @@ import {
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
+import { experimentalOn, setExperimental } from '../../curator/tasteGate.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
@@ -289,14 +290,25 @@ export const createGlobalSlice = (set) => ({
   poolView: readPoolView(),
   // #762 — the imported taste (kept per machine in curator/tasteStore.js). The
   // store mirrors a status line + a revision so the curator bar re-renders.
-  tasteStatus: tasteSummary(getTaste()),
+  tasteStatus: tasteSummary(getTaste(), { experimental: experimentalOn() }),
   // #997 — the Lois boldness line mirrors the taste line: three honest states
   // (not trained / fidelity too low / boldness live). Never picks, never scores.
-  loisStatus: loisSummary(getTaste()),
+  loisStatus: loisSummary(getTaste(), { experimental: experimentalOn() }),
   tasteRev: 0,
+  // #762 — the artist's experimental switch (curator/tasteGate.js): a below-bar taste may steer, and says so.
+  tasteExperimental: experimentalOn(),
+  setTasteExperimental: (value) => {
+    const experimental = setExperimental(value);
+    set((s) => ({
+      tasteExperimental: experimental,
+      tasteStatus: tasteSummary(getTaste(), { experimental }),
+      loisStatus: loisSummary(getTaste(), { experimental }),
+      tasteRev: (s.tasteRev || 0) + 1,
+    }));
+  },
   importTaste: (raw) => {
     const r = keepTaste(raw);
-    if (r.ok) set((s) => ({ tasteStatus: tasteSummary(r.taste), loisStatus: loisSummary(r.taste), tasteRev: (s.tasteRev || 0) + 1 }));
+    if (r.ok) set((s) => ({ tasteStatus: tasteSummary(r.taste, { experimental: experimentalOn() }), loisStatus: loisSummary(r.taste, { experimental: experimentalOn() }), tasteRev: (s.tasteRev || 0) + 1 }));
     return r;
   },
   clearTaste: () => {
