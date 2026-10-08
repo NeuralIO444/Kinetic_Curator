@@ -136,7 +136,6 @@ export const DEFAULT_LAYOUT_PARAMS = {
   kinemeBoilFps: 8,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   crooked: 0, // Crooked Hand. 0 is today's quad.
-  open: 0, // Open Hand. 0 is today's ink.
   tight: 0.55,
   wind: 1,
   symmetry: 'none',
@@ -248,7 +247,6 @@ export const PARAM_SPEC = {
   // motion while the #309 smear stretches it along — 1 holds its area.
   squash: { min: 0, max: 1 },
   crooked: { min: 0, max: 1 },
-  open: { min: 0, max: 1 },
   kinemeRate: { min: 0, max: 4 }, // #781 KINEME RATE
   rotateSpin: { min: 0, max: 1 }, // #1127 ROTATE spin, rev/s
   kinemeBreath: { min: 0, max: 1 },
