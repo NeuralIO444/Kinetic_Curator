@@ -28,4 +28,20 @@ assert.deepStrictEqual(hitsFromFavorites(undefined), []);
   assert.deepStrictEqual(withCast.assets, ['xsh01', 'xsh07']);
   assert.ok(!('assets' in legacy), 'legacy row: no cast key');
 }
+// #1140 — session context rides the hit rows; legacy rows omit it
+{
+  const [withCtx, legacy] = hitsFromFavorites([
+    { seed: 11, timestamp: 't', config: { layout: {}, palette: { id: 'x' } },
+      context: { audio: 0.62, paletteWarmth: 0.7, dwellMs: 4500 } },
+    { seed: 12, timestamp: 't', config: { layout: {}, palette: { id: 'x' } } },
+  ]);
+  assert.deepStrictEqual(withCtx.context, { audio: 0.62, paletteWarmth: 0.7, dwellMs: 4500 });
+  assert.ok(!('context' in legacy), 'legacy row: no context key');
+  // hostile context normalizes on the way out too
+  const [h] = hitsFromFavorites([
+    { seed: 13, timestamp: 't', config: {}, context: { audio: 'x', dwellMs: -1 } },
+  ]);
+  assert.strictEqual(h.context.audio, null);
+  assert.strictEqual(h.context.dwellMs, 0);
+}
 console.log('hitsExport.selfcheck: OK');

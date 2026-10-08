@@ -163,4 +163,37 @@ mem.delete(KEEPS_KEY);
   assert.deepStrictEqual(keepsFromKeeps([], []), [], 'empty in, empty out');
 }
 
+// #1140 — per-keep session context: audio/palette-warmth/dwell descriptors.
+// In node there is no meter tap (audio honestly null) and no dwell window.
+{
+  const { captureKeepContext, sanitizeKeepContext, paletteWarmth, audioEnergyNow, dwellMsNow } =
+    await import('../curator/keepContext.js');
+  assert.strictEqual(audioEnergyNow(), null, 'no meter tap in node -> null, not 0');
+  assert.strictEqual(dwellMsNow(), 0, 'no dwell window in node -> 0');
+  const warm = paletteWarmth('chiaroscuro');
+  assert.ok(warm == null || (warm >= 0 && warm <= 1), 'warmth is 0..1 or null');
+  // unknown ids fall back to the catalog default, same as rendering — deterministic, not invented
+  assert.strictEqual(paletteWarmth('no-such-palette'), paletteWarmth('praystation'));
+
+  const live = { seed: 77, seedOffsets: { [G]: 5 }, layoutParams: { mode: 'grid' }, enabledAssets: {} };
+  const f = captureFavorite(live, 'chiaroscuro');
+  assert.ok(f.context && typeof f.context === 'object', 'captureFavorite records context');
+  assert.strictEqual(f.context.audio, null, 'silent in node -> null');
+  assert.strictEqual(f.context.dwellMs, 0, 'no dwell in node -> 0');
+  if (warm != null) assert.strictEqual(f.context.paletteWarmth, warm, 'warmth is deterministic per palette');
+
+  // sanitize round-trips context; legacy keeps (no context key) stay without it
+  const kept = sanitizeFavorite({ ...f, id: 'k' });
+  assert.deepStrictEqual(kept.context, f.context, 'context survives sanitize');
+  assert.ok(!('context' in sanitizeFavorite(fav(5))), 'legacy keep: no context key, never invented');
+  // hostile context normalizes, never crashes
+  const hostile = sanitizeFavorite({ seed: 6, context: { audio: 'loud', paletteWarmth: 99, dwellMs: -5, extra: 1 } });
+  assert.strictEqual(hostile.context.audio, null, 'non-numeric audio -> null');
+  assert.strictEqual(hostile.context.paletteWarmth, 1, 'warmth clamps to 0..1');
+  assert.strictEqual(hostile.context.dwellMs, 0, 'negative dwell -> 0');
+  assert.ok(!('extra' in hostile.context), 'unknown fields dropped');
+  assert.strictEqual(sanitizeKeepContext(null), undefined, 'null -> undefined (key omitted)');
+  assert.strictEqual(sanitizeKeepContext('junk'), undefined, 'non-object -> undefined');
+}
+
 console.log('favorites.selfcheck: OK');

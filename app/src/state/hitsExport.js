@@ -2,6 +2,7 @@
 // Pure so a selfcheck covers it without the panel.
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { recipeFeatures } from '../curator/recipeFeatures.js';
+import { sanitizeKeepContext } from '../curator/keepContext.js';
 
 /**
  * #537 — a recipe is only deterministic with its stream offsets (#305), so a
@@ -9,11 +10,15 @@ import { recipeFeatures } from '../curator/recipeFeatures.js';
  * rather than invent zeros (hits_bridge treats "absent" as "the project's own").
  */
 function hitRow(f) {
+  const context = sanitizeKeepContext(f.context);
   return {
     seed: f.seed >>> 0,
     ...(f.seedOffsets && typeof f.seedOffsets === 'object'
       ? { seedOffsets: normalizeSeedOffsets(f.seedOffsets) } : {}),
     timestamp: f.timestamp,
+    // #1140 — the keep's session context (audio/palette-warmth/dwell); legacy
+    // rows omit it (hits_bridge treats "absent" as "not instrumented").
+    ...(context ? { context } : {}),
     layoutParams: f.config?.layout || null,
     paletteId: f.config?.palette?.id || null,
     // #719 — the kept cast; legacy keeps omit it (hits_bridge then keeps the project's own).
