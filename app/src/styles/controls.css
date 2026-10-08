@@ -178,21 +178,13 @@
 }
 /* #1103 — while cooling, min-width eases between the 150 ms ticks: one continuous glide, not steps. Heating stays instant. */
 .kinetic-btn[data-cooling="true"] { transition: max-width 180ms ease, min-width 160ms linear, background-color 100ms, color 100ms, border-color 100ms, box-shadow 220ms ease; }
-.kinetic-glyph { font-size: 10px; line-height: 1; flex-shrink: 0; }
 
 
 /* #945 — at max heat the button earns its full name: the expansion reads as
    the word arriving, not empty space. */
 
-/* #945 — heat kineme (backup readout beside the width-as-meter): the glyph
-   pulses while warm, faster when hot. Cool buttons stay still (#942 chrome). */
-.kinetic-btn[data-heat-level="warm"] .kinetic-glyph,
-.kinetic-btn[data-heat-level="hot"] .kinetic-glyph {
-  animation: kinetic-heat-pulse 0.9s ease-in-out infinite;
-}
-.kinetic-btn[data-heat-level="hot"] .kinetic-glyph {
-  animation-duration: 0.45s;
-}
+/* #945 — heat kineme: the ● circle pulses while warm, faster when hot.
+   Cool buttons stay still (#942 chrome). */
 @keyframes kinetic-heat-pulse {
   0%, 100% { transform: scale(1); opacity: 0.8; }
   50% { transform: scale(1.3); opacity: 1; }

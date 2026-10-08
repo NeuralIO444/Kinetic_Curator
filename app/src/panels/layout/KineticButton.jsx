@@ -101,7 +101,7 @@ export function KineticButton() {
   return (
     <button
       type="button"
-      className={`kinetic-btn xl${shimmer ? ' xl-shimmer' : ''}`}
+      className={`kinetic-btn xl tb-pill${shimmer ? ' xl-shimmer' : ''}`}
       data-heat-level={level}
       data-cooling={cooling ? 'true' : undefined}
       data-open={tapOpen.open || cold ? 'true' : undefined}
@@ -111,11 +111,12 @@ export function KineticButton() {
       title="KINETIC — tap: recompose under design rules; warm tap: drift the atmosphere; hammer it: chaos (K)"
       aria-label={`Kinetic — heat ${level}. Tap to recompose, warm tap drifts the atmosphere, rapid hammering breaks into chaos`}
     >
-      <span className="kinetic-glyph" aria-hidden="true">◉</span>
+      {/* #1122 — ● is heat → Davis: the circle glows with the run's heat */}
+      <span className="tb-circle" aria-hidden="true" />
       <ExpandLabel short="KIN" full="KINETIC" tailClass="kinetic-rest" />
       {/* #1122 — the layer is discrete → TE micro-label; visible while the run is warm */}
       {heat > 0.01 && lastLayer && (
-        <span className="kinetic-layer" title={`last tap ran the ${lastLayer} layer`}>
+        <span className="tb-micro red" title={`last tap ran the ${lastLayer} layer`}>
           {lastLayer === 'chaos' ? 'C' : lastLayer === 'weather' ? 'W' : 'R'}
         </span>
       )}

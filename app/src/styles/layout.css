@@ -805,113 +805,132 @@
 }
 .math-add:hover { color: var(--ink); border-color: var(--ink); }
 
-/* ─── #1122 — top-bar affective shape grammar (KC-1 DS) ───
+/* ─── #1122 — mockup pill bar (KC-1 DS) ───
+   Each semantic unit is ONE bordered pill: shape + label, uniform 10px gaps,
+   thin separators between groups. No annotation tags (legend, not UI).
    continuous → Davis (amber breath/shimmer); discrete → TE (red detents/digits).
-   Silence is default: every accent below is dark until its signal says otherwise.
+   Silence is default: every shape below is dark until its signal says otherwise.
+   (Replaces the edge-pip approach: shapes now live inside the pills at mockup size.) */
 
-   LAYOUT RULE: the always-visible accents are absolute-positioned pips on the
-   pill edges — zero flex width, so the bar never shifts (the topbar-expand e2e
-   contract: nothing around an expanding pill moves by a pixel). Detail text
-   (look name, voice id, ledger) stays in-flow but only renders on real state,
-   so the resting bar is byte-identical in width to before. */
+/* pill chrome — scoped 0,2,0 so it wins over the per-button bases in controls.css */
+.kc-topbar-curator .tb-pill,
+.palette-strip .tb-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid var(--line-2); border-radius: 5px;
+  background: transparent; color: var(--ink);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  font-family: inherit; white-space: nowrap; flex-shrink: 0; cursor: pointer;
+  min-height: 0;
+}
+/* the logo pill and the lock readout are not controls */
+.palette-strip .tb-pill.kc-logo,
+.kc-topbar-curator span.tb-pill { cursor: default; }
+.kc-topbar-curator .tb-pill:hover { border-color: var(--ink); }
+.kc-topbar-curator .tb-sep,
+.palette-strip .tb-sep {
+  width: 1px; height: 22px; background: var(--line-2); flex-shrink: 0;
+}
 
-/* the pills are positioning contexts for their pips */
-.kc-logo, .curator-voice-btn, .randomize-btn, .kinetic-btn { position: relative; }
-
-/* ◆ diamond — LOIS presence. Dark until a real taste.json clears fidelity 0.3. */
-.taste-diamond {
-  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
-  width: 9px; height: 9px; pointer-events: none; z-index: 1;
-  transform: rotate(45deg);
-  background: #3a3a3a;
+/* shapes — in-flow, mockup sizes */
+.tb-diamond {
+  width: 11px; height: 11px; transform: rotate(45deg);
+  background: #3a3a3a; flex-shrink: 0;
   transition: background .8s, box-shadow .8s;
 }
-.taste-diamond.lvl1 { background: rgba(var(--kc-davis-rgb), .35); }
-.taste-diamond.lvl2 {
+.tb-diamond.lvl1 { background: rgba(var(--kc-davis-rgb), .35); }
+.tb-diamond.lvl2 {
   background: rgba(var(--kc-davis-rgb), .6);
   box-shadow: 0 0 10px rgba(var(--kc-davis-rgb), .45);
-  animation: taste-breath 10s ease-in-out infinite;
+  animation: tb-breath 10s ease-in-out infinite;
 }
-.taste-diamond.lvl3 {
+.tb-diamond.lvl3 {
   background: rgba(var(--kc-davis-rgb), .8);
   box-shadow: 0 0 13px rgba(var(--kc-davis-rgb), .6);
-  animation: taste-breath 10s ease-in-out infinite;
+  animation: tb-breath 10s ease-in-out infinite;
 }
-.taste-diamond.lvl4 {
+.tb-diamond.lvl4 {
   background: var(--kc-davis);
   box-shadow: 0 0 16px rgba(var(--kc-davis-rgb), .8);
-  animation: taste-breath 10s ease-in-out infinite;
+  animation: tb-breath 10s ease-in-out infinite;
 }
-@keyframes taste-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes tb-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
-/* ● KIN layer — discrete → TE micro-label beside the heat glyph (in-flow, only while warm) */
-.kinetic-layer {
-  font-size: 9px; color: var(--kc-red); letter-spacing: .1em;
-  min-width: 10px; line-height: 1; flex-shrink: 0;
+/* ■ START marker — doubles as the mode indicator (accent in CHAOS) */
+.kc-topbar-curator .start-mode-btn::before {
+  width: 11px; height: 11px;
 }
 
-/* L — structure → TE pip: hollow / solid-red / half-fill. The look name rides in-flow when applied. */
-.look-sq {
-  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
-  width: 9px; height: 9px; pointer-events: none; z-index: 1;
-  border: 2px solid #444;
-  transition: all .12s steps(2);
+/* ● KIN circle — Davis glow driven by the button's heat level */
+.tb-circle {
+  width: 13px; height: 13px; border-radius: 50%; background: #3a3a3a;
+  flex-shrink: 0; transition: background 1.2s, box-shadow 1.2s;
 }
-.look-sq.clean { border-color: var(--kc-red); background: var(--kc-red); }
-.look-sq.dirty {
+.kinetic-btn[data-heat-level="warm"] .tb-circle {
+  background: #8a6a3a; box-shadow: 0 0 10px rgba(255,205,130,.4);
+  animation: kinetic-heat-pulse 0.9s ease-in-out infinite;
+}
+.kinetic-btn[data-heat-level="hot"] .tb-circle {
+  background: var(--kc-davis); box-shadow: 0 0 18px rgba(255,205,130,.9);
+  animation: kinetic-heat-pulse 0.45s ease-in-out infinite;
+}
+
+/* □ L — structure → TE: hollow / solid-red / half-fill */
+.tb-looksq {
+  width: 11px; height: 11px; border: 2px solid #444;
+  flex-shrink: 0; transition: all .12s steps(2);
+}
+.tb-looksq.clean { border-color: var(--kc-red); background: var(--kc-red); }
+.tb-looksq.dirty {
   border-color: var(--kc-red);
   background: linear-gradient(to top, var(--kc-red) 50%, transparent 50%);
 }
-.look-name { font-size: 9px; color: #777; letter-spacing: .08em; white-space: nowrap; }
 
-/* V — drift → Davis pip: breathes at the persona's drift rate; off = no pip at all */
-.voice-drift {
-  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
-  width: 9px; height: 9px; pointer-events: none; z-index: 1;
-  border: 2px solid rgba(var(--kc-davis-rgb), .75);
-  box-shadow: 0 0 8px rgba(var(--kc-davis-rgb), .35);
-  animation: voice-breath 6s ease-in-out infinite;
+/* ○ V — drift → Davis: breathes at the persona's drift rate; off = hollow dark */
+.tb-voice {
+  width: 11px; height: 11px; border-radius: 50%; border: 2px solid #444;
+  flex-shrink: 0; transition: border-color .8s;
 }
-@keyframes voice-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-.voice-id { font-size: 9px; color: #777; letter-spacing: .08em; }
+.tb-voice.on {
+  border-color: rgba(var(--kc-davis-rgb), .75);
+  box-shadow: 0 0 8px rgba(var(--kc-davis-rgb), .35);
+  animation: tb-breath 6s ease-in-out infinite;
+}
 
-/* CUR — verdict → TE pip: detent-step diamond. The keep/favorite ledger rides in-flow when non-zero. */
-.cur-detent {
-  position: absolute; left: -4.5px; top: 50%; margin-top: -4.5px;
-  width: 9px; height: 9px; pointer-events: none; z-index: 1;
-  border: 2px solid #444; transform: rotate(45deg);
+/* ◇ CUR — verdict → TE detent */
+.tb-curdia {
+  width: 11px; height: 11px; border: 2px solid #444; transform: rotate(45deg); flex-shrink: 0;
   transition: transform .12s steps(2), background .12s steps(2), border-color .12s steps(2);
 }
-.cur-detent.v2 { transform: rotate(135deg); border-color: #888; }
-.cur-detent.v4 { transform: rotate(225deg); background: var(--kc-red); border-color: var(--kc-red); }
-.cur-ledger { font-size: 9px; color: #777; letter-spacing: .06em; white-space: nowrap; }
+.tb-curdia.v2 { transform: rotate(135deg); border-color: #888; }
+.tb-curdia.v4 { transform: rotate(225deg); background: var(--kc-red); border-color: var(--kc-red); }
 
-/* ▪ locks — discrete → TE pip on CUR's right edge: glyph + count; red nub = armed roll
-   scope (the pip is a button when armed: tap to disarm). Zero layout width. */
-.lock-badge {
-  position: absolute; right: -7px; top: 50%; margin-top: -7px; z-index: 1;
-  display: inline-flex; align-items: center; gap: 3px;
-  background: var(--panel-2); border: 1px solid var(--line-2);
-  padding: 1px 4px; font-size: 9px; line-height: 1; color: #b9b3a4;
-  cursor: default; white-space: nowrap;
+/* ▫ locks — discrete → TE: square + count; red nub = armed roll scope */
+.tb-locksq {
+  width: 12px; height: 12px; border: 2px solid #666;
+  flex-shrink: 0; transition: background .12s steps(2);
 }
-button.lock-badge, .lock-badge[role="button"] { cursor: pointer; }
-.lock-badge[role="button"]:focus-visible { outline: 2px solid var(--focus); }
-.lock-badge .lock-glyph { color: #888; }
-.lock-badge .lock-digit { color: #ddd; }
-.lock-badge .lock-nubdot {
-  width: 6px; height: 6px; background: var(--kc-red); flex-shrink: 0;
+.tb-locksq.fill { background: #999; }
+.tb-nub {
+  width: 8px; height: 14px; border: 2px solid #444;
+  position: relative; flex-shrink: 0;
 }
+.tb-nub::after {
+  content: ''; position: absolute; left: 1px; right: 1px; top: 1px;
+  height: 4px; background: var(--kc-red);
+}
+
+/* micro-labels: layer / look name / voice id / ledger / lock count */
+.tb-micro { font-size: 9px; color: #777; letter-spacing: .08em; white-space: nowrap; }
+.tb-micro.red { color: var(--kc-red); }
 
 /* Precedence: a lit accent that lost the cut renders subdued, never competing. */
 [data-subdued="true"] { opacity: .38; }
 
-/* #1122 — the grammar accents sit inline in the bar buttons with a fixed gap,
-   so JSX whitespace never decides the spacing (and the bar keeps its slack). */
-.curator-voice-btn, .randomize-btn { display: inline-flex; align-items: center; gap: 0.5em; }
-
 /* Reduced motion: every breath/shimmer collapses to its static encoding. */
 @media (prefers-reduced-motion: reduce) {
-  .taste-diamond.lvl2, .taste-diamond.lvl3, .taste-diamond.lvl4,
-  .voice-drift { animation: none; opacity: .85; }
+  .tb-diamond.lvl2, .tb-diamond.lvl3, .tb-diamond.lvl4,
+  .tb-voice.on,
+  .kinetic-btn[data-heat-level="warm"] .tb-circle,
+  .kinetic-btn[data-heat-level="hot"] .tb-circle { animation: none; opacity: .85; }
 }

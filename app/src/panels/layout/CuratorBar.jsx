@@ -130,12 +130,27 @@ export function CuratorBar() {
       if (st.paletteId !== profile.paletteId) st.setPaletteId(profile.paletteId);
     }
   };
+
+  // #1122 — the lock pill: its own bordered pill now (mockup ■ slot; BEAT owns
+  // "b" in the app). A real button only when armed (tap to disarm); otherwise
+  // a quiet status readout.
+  const lockPillInner = (
+    <>
+      <span className={`tb-locksq${lockCount > 0 ? ' fill' : ''}`} aria-hidden="true" />
+      {lockCount > 0 && <span className="tb-micro">{lockCount}</span>}
+      {armed && <span className="tb-nub" aria-hidden="true" />}
+    </>
+  );
+  const lockTitle = armed
+    ? 'roll scope armed — tap to disarm'
+    : lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}` : 'no locked params';
   return (
     <div className="curator-left-group kc-topbar-curator">
-        {/* #946 — START mode toggle: what a cold launch opens on. Sits left of KIN: [logo] [START] [KIN]. */}
+        {/* #946 — START mode toggle: what a cold launch opens on. Sits left of KIN: [logo] [START] [KIN].
+            The ::before square is the ■ marker — accent-filled in CHAOS. */}
         <button
           type="button"
-          className="start-mode-btn act"
+          className="tb-pill start-mode-btn act"
           data-mode={startupMode}
           onClick={() => setStartupMode(startupMode === 'chaos' ? 'fixed' : 'chaos')}
           title={
@@ -147,11 +162,12 @@ export function CuratorBar() {
         >
           start: {startupMode === 'chaos' ? 'k.o.z.' : 'fixed'}
         </button>
+        <span className="tb-sep" aria-hidden="true" />
         {/* #942 — KINETIC: storm generator after the START toggle. */}
         <KineticButton />
         <div className="curator-voice-wrap" ref={presetWrapRef}>
           <button
-            className="curator-voice-btn xl act"
+            className="tb-pill curator-voice-btn xl act"
             data-open={looksTap.open ? 'true' : undefined}
             onClick={() => { setPresetMenuOpen((o) => !o); setLooksUsed(true); }}
             onMouseLeave={() => setLooksUsed(true)}
@@ -163,9 +179,9 @@ export function CuratorBar() {
             title="Apply a Look — layout only; your palette and marks stay put"
           >
             {/* #1122 — L is structure → TE: hollow / solid-red / half-fill + look name */}
-            <span className={`look-sq ${lookState}`} data-subdued={subdued('look', lookState !== 'none')} aria-hidden="true" />
-            {lookState !== 'none' && <span className="look-name">{lookName}</span>}
+            <span className={`tb-looksq ${lookState}`} data-subdued={subdued('look', lookState !== 'none')} aria-hidden="true" />
             <ExpandLabel mode="swap" short={looksUsed ? 'lok' : 'l'} full="looks ▾" />
+            {lookState !== 'none' && <span className="tb-micro">{lookName}</span>}
           </button>
           {presetMenuOpen && (
             <div className="curator-voice-menu preset-menu" role="menu">
@@ -195,7 +211,7 @@ export function CuratorBar() {
         </div>
         <div className="curator-voice-wrap" ref={wrapRef}>
           <button
-            className="curator-voice-btn xl act"
+            className="tb-pill curator-voice-btn xl act"
             data-open={voiceTap.open ? 'true' : undefined}
             onClick={() => { setMenuOpen((o) => !o); setVoiceUsed(true); }}
             onMouseLeave={() => setVoiceUsed(true)}
@@ -206,13 +222,12 @@ export function CuratorBar() {
             aria-expanded={menuOpen}
             title="Persona voice tasting the candidates — off means a plain dice roll"
           >
-            {/* #1122 — V is drift → Davis: breathes at the persona's drift rate; off = dark */}
-            {voiceOn && (
-              <span className="voice-drift" data-subdued={subdued('voice', true)}
-                style={{ animationDuration: `${breathS.toFixed(1)}s` }} aria-hidden="true" />
-            )}
-            {voiceOn && <span className="voice-id">{voice}</span>}
+            {/* #1122 — V is drift → Davis: the circle breathes at the persona's drift
+                rate; hollow and dark when off */}
+            <span className={`tb-voice${voiceOn ? ' on' : ''}`} data-subdued={subdued('voice', voiceOn)}
+              style={voiceOn ? { animationDuration: `${breathS.toFixed(1)}s` } : undefined} aria-hidden="true" />
             <ExpandLabel mode="swap" short={voiceUsed ? 'voi' : 'v'} full={`voice: ${activeAlias} ▾`} />
+            {voiceOn && <span className="tb-micro">{voice}</span>}
           </button>
           {menuOpen && (
             <div className="curator-voice-menu" role="menu">
@@ -237,41 +252,38 @@ export function CuratorBar() {
             </div>
           )}
         </div>
-        <button className={`randomize-btn xl act${curShimmer ? ' xl-shimmer' : ''}`} onClick={onCurate}
+        <button className={`tb-pill randomize-btn xl act${curShimmer ? ' xl-shimmer' : ''}`} onClick={onCurate}
           data-open={curTap.open || cold ? 'true' : undefined}
           {...curTap.props}
           aria-label="Curator — roll a taste-guided scene over the unlocked parameters"
           title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
-          {/* #1122 — CUR is verdict → TE: detent-step pip + keep/favorite ledger digit.
+          {/* #1122 — CUR is verdict → TE: detent-step diamond + keep/favorite ledger.
               The ledger stays silent at 0/0 (silence is default); it appears with the first keep. */}
-          <span className={`cur-detent v${curDetent}`} data-subdued={subdued('cur', curDetent > 0)} aria-hidden="true" />
-          {(keepsCount > 0 || favoritesCount > 0) && (
-            <span className="cur-ledger" title={`${keepsCount} keeps / ${favoritesCount} favorites`}>{keepsCount}/{favoritesCount}</span>
-          )}
+          <span className={`tb-curdia v${curDetent}`} data-subdued={subdued('cur', curDetent > 0)} aria-hidden="true" />
           <ExpandLabel short="cur" full="curator" />
-          {/* #1122 — locks are discrete → TE: a pip on CUR's right edge (glyph + count).
-              Red nub = armed roll scope. The pip is actionable when armed: tap to disarm.
-              (A real <button> can't nest inside the CUR button, so this is a span with
-              button semantics when armed. The mockup's ■ B assumed B was free; the
-              BEAT clock owns "b" now.) */}
-          <span
-            className="lock-badge"
-            data-subdued={subdued('locks', lockCount > 0 || armed)}
-            title={armed ? 'roll scope armed — tap to disarm' : lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}` : 'no locked params'}
-            {...(armed ? {
-              role: 'button',
-              tabIndex: 0,
-              'aria-label': 'disarm roll scope',
-              onClick: (e) => { e.stopPropagation(); clearRollScope(); },
-              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); clearRollScope(); } },
-            } : {})}
-          >
-            <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
-            {lockCount > 0 && <span className="lock-digit">{lockCount}</span>}
-            {armed && <span className="lock-nubdot" aria-hidden="true" />}
-          </span>
+          {(keepsCount > 0 || favoritesCount > 0) && (
+            <span className="tb-micro" title={`${keepsCount} keeps / ${favoritesCount} favorites`}>{keepsCount}/{favoritesCount}</span>
+          )}
         </button>
-        {/* #1103 — BEAT sits right of CURATOR: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
+        <span className="tb-sep" aria-hidden="true" />
+        {armed ? (
+          <button
+            type="button"
+            className="tb-pill lock-pill act"
+            data-subdued={subdued('locks', true)}
+            title={lockTitle}
+            aria-label="disarm roll scope"
+            onClick={(e) => { e.stopPropagation(); clearRollScope(); }}
+          >
+            {lockPillInner}
+          </button>
+        ) : (
+          <span className="tb-pill" data-subdued={subdued('locks', lockCount > 0)}
+            title={lockTitle} role="img" aria-label={lockTitle}>
+            {lockPillInner}
+          </span>
+        )}
+        {/* #1103 — BEAT sits right of the locks: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
         <BeatButton />
         {loisLine && (
           <span className="lois-verdict" title={hint}>{loisLine}</span>

@@ -82,7 +82,7 @@ function TasteDiamond() {
   const level = tasteLevel(getTaste());
   return (
     <span
-      className={`taste-diamond lvl${level}`}
+      className={`tb-diamond lvl${level}`}
       role="img"
       aria-label={level === 0 ? 'no taste signal' : `taste confidence level ${level} of 4`}
       title={level === 0 ? 'taste: no signal — the diamond stays dark until a real taste.json clears fidelity 0.3' : `taste confidence ${level}/4`}
@@ -222,17 +222,17 @@ export function PaletteStrip() {
 
   return (
     <div className={`palette-strip${anyFit ? ' taste-on' : ''}`}>
-      <div className="kc-logo" title="KINETIC_CURATOR v0.9.0">
-        {/* #1122 — ◆ is LOIS presence → Davis: amber shimmer at the taste model's
-            confidence, dark/silent until a real taste.json clears the 0.3 bar (rule 3). */}
+      {/* #1122 — ◆ KC-1 is one bordered pill (mockup). The diamond is the taste
+          signal: dark/silent until a real taste.json clears the 0.3 bar (rule 3). */}
+      <div className="kc-logo tb-pill" title="KINETIC_CURATOR v0.9.0">
         <TasteDiamond />
-        <span className="logo-mark">◈</span>
         <span className="kc-name kc-compact">KC-1</span>
         <span className="kc-name kc-full">
           <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
           <span className="logo-version">v0.9.0</span>
         </span>
       </div>
+      <span className="tb-sep" aria-hidden="true" />
       {/* #716 — the Curator is the instrument's main verb: a global control,
           not a BUILD-panel one. Same popups, new address. */}
       <CuratorBar />

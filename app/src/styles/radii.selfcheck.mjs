@@ -4,7 +4,14 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const SRC = new URL('..', import.meta.url).pathname;
-const ALLOW = [];
+// #1122 — deliberate exceptions to square-corners: the mockup's pill chrome
+// (5px pill rectangles Matt approved) and the two true circles (KIN heat,
+// voice drift). Everything else stays square.
+const ALLOW = [
+  'styles/layout.css:820', // .tb-pill — mockup pill rectangle, 5px
+  'styles/layout.css:865', // .tb-circle — KIN heat circle
+  'styles/layout.css:890', // .tb-voice — voice drift circle
+];
 const walk = (d) => readdirSync(d).flatMap((n) => {
   const p = join(d, n);
   return statSync(p).isDirectory() ? walk(p) : [p];

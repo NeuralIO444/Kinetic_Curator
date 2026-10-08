@@ -102,7 +102,7 @@ export function BeatButton() {
       <button
         type="button"
         ref={btnRef}
-        className={`beat-btn xl act ${open ? 'open' : ''}`}
+        className={`beat-btn xl act tb-pill ${open ? 'open' : ''}`}
         data-open={tapOpen.open ? 'true' : undefined}
         {...tapOpen.props}
         onClick={() => setOpen((o) => !o)}
