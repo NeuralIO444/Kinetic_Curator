@@ -7,7 +7,7 @@ import {
   createLoisActivity,
   parseFavoriteTimestamp,
   LOIS_AWAY_MS,
-  LOIS_BURN_MS,
+  LOIS_BURN_KEEPS,
 } from './loisActivity.js';
 
 // --- timestamp honesty -------------------------------------------------
@@ -153,7 +153,7 @@ import {
   act.stop();
 }
 
-// --- instrument 1: heartbeat / AWAY / BURN --------------------------------
+// --- instrument 1: heartbeat / AWAY ------------------------------------------
 {
   let now = 6_000_000;
   const act = createLoisActivity({ now: () => now });
@@ -165,15 +165,80 @@ import {
   now += LOIS_AWAY_MS + 1;
   snap = act.snapshot();
   assert.strictEqual(snap.away, true);
-  assert.strictEqual(snap.burning, false);
+  assert.strictEqual(snap.burning, false, 'five minutes of nothing is AWAY, never BURN');
 
-  now += LOIS_BURN_MS; // fifteen more minutes of nothing
-  assert.strictEqual(act.snapshot().burning, true);
+  now += 60 * 60 * 1000; // an hour of nothing is still not a hot streak (BURN used to mean this)
+  assert.strictEqual(act.snapshot().burning, false);
 
   act.beat(); // any input resets the clock
   snap = act.snapshot();
   assert.strictEqual(snap.idleMs, 0);
   assert.strictEqual(snap.away, false);
+  act.stop();
+}
+
+// --- BURN is a hot streak, and keeps are counted from EVERY door (#1126) -------
+// F, the star and K dispatch straight to the store and never touch the bus; the store's own lists growing is the
+// signal that never misses. The bus star and the store growth are one keep, not two.
+{
+  let now = 8_000_000;
+  const subs = [];
+  const fakeState = { seed: 1, layoutParams: { composition: 'flow' }, historyUndoStack: [], historyRedoStack: [], favorites: [], keeps: [] };
+  const fakeStore = { getState: () => fakeState, subscribe: (fn) => { subs.push(fn); return () => {}; } };
+  const fire = () => subs.forEach((fn) => fn(fakeState));
+  const act = createLoisActivity({ now: () => now });
+  act.start({ store: fakeStore });
+  assert.strictEqual(act.snapshot().frameKept, false);
+  const keep = (i) => ({ id: `k${i}`, seed: 1, config: { palette: { id: 'v01d' } } });
+
+  // K: the keeps list grows by one, nothing on the bus
+  fakeState.keeps = [keep(1)]; now += 1000; fire();
+  let snap = act.snapshot();
+  assert.strictEqual(snap.keepsLast5m, 1); assert.strictEqual(snap.frameKept, true, 'NOD while the kept frame is current');
+  assert.strictEqual(snap.burning, false);
+
+  // F: favorites AND keeps grow together in one update: one keep
+  fakeState.favorites = [keep(2)]; fakeState.keeps = [keep(1), keep(3)]; now += 1000; fire();
+  snap = act.snapshot();
+  assert.strictEqual(snap.keepsLast5m, 2); assert.strictEqual(snap.favoriteCount, 1);
+  assert.strictEqual(snap.burning, false, 'two keeps is not yet a streak');
+
+  // the star over the bus AND the store in the same tick: still one keep
+  now += 1000;
+  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: keep(4) });
+  fakeState.favorites = [...fakeState.favorites, keep(4)]; fakeState.keeps = [...fakeState.keeps, keep(5)]; fire();
+  snap = act.snapshot();
+  assert.strictEqual(snap.keepsLast5m, LOIS_BURN_KEEPS); assert.strictEqual(snap.favoriteCount, 2, 'the bus and the store are one favorite');
+  assert.strictEqual(snap.burning, true, `${LOIS_BURN_KEEPS} keeps inside the window is a hot streak`);
+
+  // an import lands many entries at once: not a keep
+  fakeState.keeps = Array.from({ length: 12 }, (_, i) => keep(100 + i)); now += 1000; fire();
+  assert.strictEqual(act.snapshot().keepsLast5m, LOIS_BURN_KEEPS, 'a bundle import is not a hot streak');
+
+  // the streak ends when the window does
+  now += 6 * 60 * 1000; assert.strictEqual(act.snapshot().burning, false);
+  act.stop();
+}
+
+// --- frameKept: NOD holds until the next roll or seed change --------------------
+{
+  let now = 9_000_000;
+  const act = createLoisActivity({ now: () => now });
+  act.start();
+  act.noteSeed(5, 'flow');
+  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 5, config: { palette: { id: 'v01d' } } } });
+  assert.strictEqual(act.snapshot().frameKept, true);
+  now += 10 * 60 * 1000; // minutes pass: still the kept frame (the pill, not the feed, applies AWAY)
+  assert.strictEqual(act.snapshot().frameKept, true, 'it holds while the frame is current');
+  emit(Events.LAYOUT_CURATE);
+  assert.strictEqual(act.snapshot().frameKept, false, 'a roll moves off it');
+  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 5, config: {} } }); now += 1000;
+  assert.strictEqual(act.snapshot().frameKept, true);
+  act.noteSeed(6, 'flow');
+  assert.strictEqual(act.snapshot().frameKept, false, 'a new seed does too');
+  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 6, config: {} } }); now += 1000;
+  act.noteSeed(6, 'rails');
+  assert.strictEqual(act.snapshot().frameKept, false, 'and so does a new composition');
   act.stop();
 }
 

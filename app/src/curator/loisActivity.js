@@ -13,7 +13,12 @@ import { Events, on } from '../composition/eventBus.js';
 
 // Feed tunables — surfaces read these, nothing else sets them.
 export const LOIS_AWAY_MS = 5 * 60 * 1000; // AWAY: "he's out of the room" is literally true
-export const LOIS_BURN_MS = 15 * 60 * 1000; // BURN: chain-smoker
+// BURN: a hot streak, chain-smoking: this many keeps inside the rolls-vs-keeps window below (#1126; it used to mean
+// fifteen minutes of nothing, which contradicted the word).
+export const LOIS_BURN_KEEPS = 3;
+// A keep reaches the feed from two doors (the bus event, and the store's own list growing, which F / the star / K
+// use directly). Two notes this close together are the one keep.
+const KEEP_DEDUPE_MS = 250;
 export const LOIS_VIBE_DWELL_MS = 8000; // VIBE starting point: lingered this long, no action (tune by feel)
 export const LOIS_ROLL_KEEP_WINDOW_MS = 5 * 60 * 1000; // rolls-vs-keeps window
 export const LOIS_UNDO_BURST_WINDOW_MS = 10 * 1000; // undo-burst window
@@ -56,7 +61,10 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     recalls: [], // { ts, seed }
     exports: [], // { ts, seed, paletteId }
     rolls: [], // ts of curate + KINETIC taps
-    keeps: [], // ts of favorite adds
+    keeps: [], // ts of keeps (any door: F, the star, K)
+    frameKept: false, // the frame on screen was kept: true from a keep until the next roll or seed change (#1126: NOD)
+    keepNote: { at: -Infinity, door: null },
+    favNote: { at: -Infinity, door: null },
     undos: [], // ts
     seedRevisit: false,
   };
@@ -77,11 +85,29 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     }
     const seen = s.dwells.some((d) => d.seed === seed);
     s.dwell = { seed, comp, startedAt: at };
+    s.frameKept = false; // a new seed or composition is not the frame that was kept
     s.seedRevisit = seen && s.seed !== seed;
     if (s.seed !== seed) {
       s.seed = seed;
       s.seedSetAt = at;
     }
+  }
+
+  // One keep, however it arrived. The bus carries the DAVIS star; F, the star and K also dispatch straight to the
+  // store, so the store's own lists growing is the signal that never misses (#1001 found the same gap for the pill).
+  function noteKeep(door, at) {
+    if (s.keepNote.door !== door && at - s.keepNote.at < KEEP_DEDUPE_MS) return;
+    s.keepNote = { at, door };
+    s.keeps.push(at);
+    cap(s.keeps);
+    s.frameKept = true;
+    beat();
+  }
+  function noteFavorite(fav, at, door) {
+    if (s.favNote.door !== door && at - s.favNote.at < KEEP_DEDUPE_MS) return;
+    s.favNote = { at, door };
+    s.favorites.push({ ts: at, msSinceSeed: at - s.seedSetAt, seed: fav.seed ?? null, paletteId: fav.config?.palette?.id ?? null });
+    cap(s.favorites);
   }
 
   function snapshot() {
@@ -92,7 +118,8 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       now: at,
       idleMs,
       away: idleMs >= LOIS_AWAY_MS,
-      burning: idleMs >= LOIS_BURN_MS,
+      burning: countSince(s.keeps, LOIS_ROLL_KEEP_WINDOW_MS, at) >= LOIS_BURN_KEEPS,
+      frameKept: s.frameKept,
       tabHidden: s.tabHidden,
       dwellMs: s.dwell ? at - s.dwell.startedAt : 0,
       dwellSeed: s.dwell ? s.dwell.seed : null,
@@ -133,16 +160,8 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
         if (!p || typeof p !== 'object') return;
         const at = t();
         if (p.action === 'add' && p.favorite) {
-          s.favorites.push({
-            ts: at,
-            msSinceSeed: at - s.seedSetAt,
-            seed: p.favorite.seed ?? null,
-            paletteId: p.favorite.config?.palette?.id ?? null,
-          });
-          cap(s.favorites);
-          s.keeps.push(at);
-          cap(s.keeps);
-          beat();
+          noteFavorite(p.favorite, at, 'bus');
+          noteKeep('bus', at);
         } else if (p.action === 'recall' && p.favorite) {
           s.recalls.push({ ts: at, seed: p.favorite.seed ?? null });
           cap(s.recalls);
@@ -164,6 +183,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     const noteRoll = () => {
       s.rolls.push(t());
       cap(s.rolls);
+      s.frameKept = false; // rolling moves off the kept frame
       beat();
     };
     unsubs.push(on(Events.LAYOUT_CURATE, noteRoll));
@@ -179,13 +199,20 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
         comp: st.layoutParams?.composition ?? null,
         undoDepth: Array.isArray(st.historyUndoStack) ? st.historyUndoStack.length : 0,
         redoDepth: Array.isArray(st.historyRedoStack) ? st.historyRedoStack.length : 0,
+        favIds: new Set((Array.isArray(st.favorites) ? st.favorites : []).map((f) => f && f.id)),
+        keepIds: new Set((Array.isArray(st.keeps) ? st.keeps : []).map((k) => k && k.id)),
       });
+      // exactly one new entry is a keep; an import or a restore lands many at once and is not one
+      const fresh = (list, before) => (Array.isArray(list) ? list.filter((e) => e && !before.has(e.id)) : []);
       const init = read(store.getState());
       noteSeed(init.seed, init.comp);
       let prev = init;
       unsubs.push(
         store.subscribe((st) => {
           const cur = read(st);
+          const newFav = fresh(st.favorites, prev.favIds); const newKeep = fresh(st.keeps, prev.keepIds);
+          if (newFav.length === 1 && cur.favIds.size > prev.favIds.size - 1) noteFavorite(newFav[0], t(), 'store');
+          if (newKeep.length === 1) noteKeep('store', t());
           if (cur.seed !== prev.seed || cur.comp !== prev.comp) noteSeed(cur.seed, cur.comp);
           if (cur.undoDepth === prev.undoDepth - 1 && cur.redoDepth >= prev.redoDepth) {
             s.undos.push(t());
