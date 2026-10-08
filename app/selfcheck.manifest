@@ -205,6 +205,7 @@ node src/curator/taste.selfcheck.mjs
 node src/curator/loisRank.selfcheck.mjs
 node src/curator/renderProfiles.selfcheck.mjs
 node src/curator/loisActivity.selfcheck.mjs
+node src/curator/davisState.selfcheck.mjs
 node src/curator/loisFace.selfcheck.mjs
 node src/curator/mathMacros.selfcheck.mjs
 node src/gl/mlx/mlxExport.selfcheck.mjs
