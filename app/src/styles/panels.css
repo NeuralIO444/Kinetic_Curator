@@ -807,20 +807,6 @@
   color: var(--dim);
   padding-left: 2px;
 }
-/* The hit the queue transport is currently on (FavoritesTray chip). */
-.fav-chip.queue-now {
-  border-color: #00ff88;
-  box-shadow: 0 0 6px rgba(0, 255, 136, 0.35);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .fav-chip.queue-now {
-    animation: queue-now-pulse 1.2s ease-in-out infinite;
-  }
-}
-@keyframes queue-now-pulse {
-  0%, 100% { box-shadow: 0 0 4px rgba(0, 255, 136, 0.25); }
-  50% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.55); }
-}
 /* ─── UX-5: Build panel workflow sections ─── */
 .build-section { margin-top: 16px; }
 .build-section:first-child { margin-top: 2px; }
@@ -877,12 +863,12 @@
 /* #1126 — the panel fits without a scroll: one row each for the three generate verbs, the four trail gestures, and
    phrase beside midi. */
 .davis-body { gap: 2px; }
-.panel-davis .davis-body { padding: 6px 8px; }
+.panel-davis .davis-body { padding: 4px 8px; }
 .davis-actions-3 { grid-template-columns: repeat(3, 1fr); }
 .davis-actions-4 { grid-template-columns: repeat(4, 1fr); }
 /* #1128: the motion row costs 25px; the panel pays for it here, so it still fits 1280x720 with no scroll */
 .panel-davis .voice-row { margin-bottom: 2px; }
-.panel-davis .davis-section-label { margin-top: 3px; padding-top: 3px; }
+.panel-davis .davis-section-label { margin-top: 2px; padding-top: 3px; }
 .panel-davis .davis-section-label:first-child { margin-top: 0; padding-top: 0; }
 .davis-actions-motion { grid-template-columns: auto repeat(3, 1fr); align-items: center; } /* #1128: the label shares the row, so the panel keeps its no-scroll fit */
 .davis-actions-motion .lbl { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); font-style: normal; text-transform: uppercase; padding-right: 4px; }
@@ -910,6 +896,17 @@
 @keyframes davis-sigil-turn { to { transform: rotate(360deg); } }
 /* stillness is a state (rule 7): with less motion he does not turn, and the label still says what he is doing */
 @media (prefers-reduced-motion: reduce) { .davis-sigil.turning { animation: none; } }
+/* #1124: on a short window (1280x720 and the like) DIRECTORS must still fit without a scroll now that the HITS row and the
+   motion row take their share. The room and the starter tile give up a little height; text wraps differ by platform font, so
+   the budget is generous (CI's Linux font was 19px taller than the Mac's). */
+@media (max-height: 760px) {
+  .duel-side { grid-template-columns: 92px 1fr; min-height: 78px; padding: 3px 8px; }
+  .duel-face { font-size: 20px; line-height: 68px; height: 68px; }
+  .davis-sigil { width: 68px; height: 68px; }
+  .duel-desc { line-height: 1.25; }
+  .voice-chip.starter, .voice-chip.earned { padding: 4px 4px 3px; gap: 1px; }
+  .panel-davis .davis-section-label { font-size: 8px; padding-top: 2px; }
+}
 
 /* #1126 — the buttons belong to a tribe, and the colour says whose verb it is (KC-1 DS rules 5 and 6). EVOLVE and NEW
    SEED are Davis's: the generator rolls, so the amber of the probabilistic family. FAVORITE is LOIS's: the critic
