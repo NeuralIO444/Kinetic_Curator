@@ -5,6 +5,10 @@ import { heatStep, publishShownHeat, shownHeat, KINETIC_CHAOS_HEAT } from '../pa
 import { captureFavorite, sanitizeFavorite } from '../state/slices/davisSlice.js';
 import { resolvePalette } from '../data/palettes.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { useStore } from '../state/store.js';
+
+// the store persists to localStorage; node has none, so give it a place to write that goes nowhere
+globalThis.localStorage ??= { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -48,6 +52,20 @@ ok('a keep from before the bands existed draws its palette and a cool heat band,
   assert.equal(b.h, 0); assert.deepEqual(b.c, dominantColors(resolvePalette('praystation', null)));
   const unknown = bandsFor({ config: { palette: { id: 'no-such-palette' } } });
   assert.equal(unknown.c.length, 3);
+});
+
+ok('duplicating a pill copies the recipe right after it, with its own id, and mints no new keep (two-ledger rule)', () => {
+  const st = useStore.getState();
+  const mk = (seed) => captureFavorite({ seed, seedOffsets: {}, layoutParams: { ...DEFAULT_LAYOUT_PARAMS }, enabledAssets: {} }, 'praystation');
+  useStore.setState({ favorites: [], keeps: [] });
+  st.addFavorite(mk(11)); st.addFavorite(mk(22));
+  const [a, b] = useStore.getState().favorites; const keeps0 = useStore.getState().keeps.length;
+  useStore.getState().duplicateFavorite(a.id);
+  const f = useStore.getState().favorites;
+  assert.equal(f.length, 3); assert.equal(f[1].seed, 11); assert.notEqual(f[1].id, a.id); assert.deepEqual(f[1].bands, a.bands, 'the copy keeps the frozen bands');
+  assert.equal(f[2].id, b.id, 'the rest keep their order');
+  assert.equal(useStore.getState().keeps.length, keeps0, 'copying a pill is not finding anything');
+  useStore.getState().duplicateFavorite('no-such-id'); assert.equal(useStore.getState().favorites.length, 3);
 });
 
 console.log(`hitBands.selfcheck: ${n} checks passed`);

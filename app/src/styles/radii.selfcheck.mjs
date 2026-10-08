@@ -11,6 +11,9 @@ const ALLOW = [
   'styles/layout.css:844', // .tb-pill — mockup pill rectangle, 5px
   'styles/layout.css:890', // .tb-circle — KIN heat circle
   'styles/layout.css:915', // .tb-voice — voice drift circle
+  'styles/ux-polish.css:175', // .hit-pill — HITS slot is a real pill (Matt 2026-10-08)
+  'styles/ux-polish.css:191', // .hit-pill-main — its left end follows the pill
+  'styles/ux-polish.css:212', // .hit-pill-act — round hover on the two actions
 ];
 const walk = (d) => readdirSync(d).flatMap((n) => {
   const p = join(d, n);

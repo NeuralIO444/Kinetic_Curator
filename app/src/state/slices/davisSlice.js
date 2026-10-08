@@ -398,6 +398,19 @@ export const createDavisSlice = (set) => ({
     persistFavorites(favorites);
     return { favorites };
   }),
+  /**
+   * #1124 — a setlist copy: the same recipe right after the original, its own id. It is NOT a new keep: the keeps
+   * ledger is the artist's own finds (two-ledger rule), and copying a pill is not finding anything.
+   */
+  duplicateFavorite: (id) => set((state) => {
+    const idx = state.favorites.findIndex((f) => f.id === id);
+    if (idx < 0) return {};
+    const copy = sanitizeFavorite({ ...state.favorites[idx], id: genId() });
+    if (!copy) return {};
+    const next = [...state.favorites.slice(0, idx + 1), copy, ...state.favorites.slice(idx + 1)].slice(-FAVORITES_MAX);
+    persistFavorites(next);
+    return { favorites: next };
+  }),
   /** #996 — K keeps the current plate without starring it. Same capture as
    * a favorite (recipe, seed, offsets, cast); no star, no tray entry. */
   addKeep: (keep) => set((state) => {
