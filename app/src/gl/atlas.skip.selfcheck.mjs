@@ -25,7 +25,7 @@ test('#817 missing cell is skipped and the frame continues', () => {
     inst({ asset: 'ghost' }),
     inst(),
   ], cells);
-  assert.equal(packed.length, 20, 'the present combo still packs');
+  assert.equal(packed.length, 21, 'the present combo still packs (21-float stride since #1129 PR2)');
   assert.ok(Math.abs(packed[6] - 0.1) < 1e-6, 'uv survived the skip');
   assert.ok(packed[12] > 0, 'ink is an attribute, not a rebaked cell');
   assert.equal(packInstanceData([inst({ asset: 'ghost' })], cells).length, 0);
