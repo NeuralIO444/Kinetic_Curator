@@ -8,9 +8,9 @@ const SRC = new URL('..', import.meta.url).pathname;
 // (5px pill rectangles Matt approved) and the two true circles (KIN heat,
 // voice drift). Everything else stays square.
 const ALLOW = [
-  'styles/layout.css:828', // .tb-pill — mockup pill rectangle, 5px
-  'styles/layout.css:874', // .tb-circle — KIN heat circle
-  'styles/layout.css:899', // .tb-voice — voice drift circle
+  'styles/layout.css:844', // .tb-pill — mockup pill rectangle, 5px
+  'styles/layout.css:890', // .tb-circle — KIN heat circle
+  'styles/layout.css:915', // .tb-voice — voice drift circle
 ];
 const walk = (d) => readdirSync(d).flatMap((n) => {
   const p = join(d, n);

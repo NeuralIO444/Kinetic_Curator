@@ -121,6 +121,22 @@
 @media (max-width: 1100px) {
   .kc-topbar-curator { width: auto; }
 }
+/* #1122 — the pill bar needs ~1760px as drawn. Below 1760px it goes compact so the palette row keeps fitting (1280 is
+   a supported window): tighter pills, the look name and voice id drop (the shapes and counters stay), the
+   reserved hover width shrinks to match (one expanded pill fits; two hovered at once spill a few px over the palette gap), START drops its prefix, and the palette row loses its redundant label and narrows its harmony select. */
+@media (max-width: 1759px) {
+  .kc-topbar-curator { width: 480px; }
+  .kc-topbar-curator .tb-pill, .palette-strip .tb-pill { padding: 4px 6px; gap: 5px; }
+  .curator-left-group { gap: 5px; }
+  .curator-voice-btn .tb-micro, .tb-start-key { display: none; }
+  .palette-harmony { width: 76px; margin-left: 0; }
+  .palette-strip { gap: 6px; }
+  .palette-strip .palette-switch > div { gap: 6px !important; }
+  .palette-strip .palette-switch-label { display: none; }
+}
+@media (max-width: 1100px) {
+  .kc-topbar-curator { width: auto; }
+}
 .kc-topbar-curator .curator-voice-menu { top: calc(100% + 4px); bottom: auto; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
 /* #716 — narrow-width rule: palette chips shrink to swatches before anything
    wraps (names cost ~170px, so they go first, below 1440), then the time

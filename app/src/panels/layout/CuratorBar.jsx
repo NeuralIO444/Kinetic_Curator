@@ -172,7 +172,7 @@ export function CuratorBar() {
           }
           aria-label={`Start mode ${startupMode}. Activate to switch to ${startupMode === 'chaos' ? 'fixed' : 'chaos'}`}
         >
-          start: {startupMode === 'chaos' ? 'k.o.z.' : 'fixed'}
+          <span className="tb-start-key">start: </span>{startupMode === 'chaos' ? 'k.o.z.' : 'fixed'}
         </button>
         <span className="tb-sep" aria-hidden="true" />
         {/* #942 — KINETIC: storm generator after the START toggle. */}
