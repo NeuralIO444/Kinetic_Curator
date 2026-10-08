@@ -159,6 +159,8 @@ ok('no UI-surface file references the director scheduler', () => {
     'curator/curate.js',
     'state/slices/layoutSlice.js',
     'App.jsx',
+    // the rng guard's allowlist names blendPick's default param (deliberate)
+    'engine/mathRandomGuard.selfcheck.mjs',
   ]);
   const ids = ['directorGains', 'getDirector', 'blendPick', 'directorSense', 'directorTable', 'effectiveTemp', 'initDirectorBeat', 'directorTrace'];
   const hits = [];
