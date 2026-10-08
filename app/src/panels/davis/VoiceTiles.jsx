@@ -1,53 +1,52 @@
-// Voice tiles (#717) — the flagship Voices' one home: DAVIS, the composition
-// machine. Night Migration / Chrome Parade / Deep Water / Dark Glass load
-// their sealed factory state through the existing voice MIX (loadVoice →
-// blendSeconds). Load only: no second mixer, no save-in-place, no edit badge
-// on the chip itself. #734: the ✎ badge opens a dish that forks a copy. The
-// MIX bar below is the same readout BUILD shows.
-import { useState } from 'react';
+// Voice tiles (#717, #1153) — the voices the triad has EARNED.
+//
+// The four factory flagships are retired from the picker (they still open an old project that names one). A tile
+// here is a find: Davis's BLOOM minted it from the artist's own work (state/earnedVoices.js), and it reads as frozen
+// history (KC-1 DS rule 9): the palette's four swatches, a deadpan name from the scene, and the number of rolls it
+// took, a count and never a tier word. Nothing on a tile breathes. Until the first find there is ONE starter voice so
+// the row is never empty; it retires itself when the first find lands. Tap loads through the existing voice MIX (a
+// voice carrying a layer stack brings its tracks back when the MIX lands, in one undo).
 import { useStore } from '../../state/store.js';
 import { FLAGSHIP_VOICES } from '../../data/voices.js';
+import { earnedVoices } from '../../state/earnedVoices.js';
 import { MixBar } from '../layout/MixBar.jsx';
-import { VoiceDish } from './VoiceDish.jsx';
 
-function FlagshipChip({ voice, active, onTap }) {
-  const dots = voice.palette.swatches.slice(0, 4);
+// the one built-in left in the picker: the first flagship, as the starter
+const STARTER = FLAGSHIP_VOICES[0];
+
+function Tile({ id, swatches, name, line, title, active, kind, onTap }) {
   return (
-    <button
-      className={`voice-chip flagship${active ? ' active' : ''}`}
-      onClick={onTap}
-      title={`${voice.title} — ${voice.vibe}`}
-    >
-      <span className="voice-dots" aria-hidden="true">
-        {dots.map((c, i) => (
-          <i key={i} style={{ background: c }} />
-        ))}
-      </span>
-      {/* #735: the face prints the Voice title. SWARM/HYPE/MURM are ids and
-          chassis names, banned as face labels (docs/TAXONOMY.md). */}
-      <span className="voice-name">{voice.title}</span>
-    </button>
+    <div className="voice-tile">
+      <button className={`voice-chip ${kind}${active ? ' active' : ''}`} onClick={onTap} title={title} data-voice-id={id}>
+        <span className="voice-dots" aria-hidden="true">
+          {swatches.slice(0, 4).map((c, i) => (<i key={i} style={{ background: c }} />))}
+        </span>
+        {/* #735: the face prints the Voice title or its deadpan name, never a chassis id (SWARM/HYPE/MURM) */}
+        <span className="voice-name">{name}</span>
+        <span className="voice-rolls name">{line}</span>
+      </button>
+    </div>
   );
 }
 
 export function VoiceTiles() {
   const activeVoiceId = useStore((s) => s.activeVoiceId);
   const loadVoice = useStore((s) => s.loadVoice);
-  const [editing, setEditing] = useState(null);
-  const editVoice = FLAGSHIP_VOICES.find((v) => v.id === editing);
+  const userVoices = useStore((s) => s.userVoices);
+  const found = earnedVoices(userVoices);
   return (
     <div className="voice-row davis-voices">
       <div className="voice-flagships">
-        {FLAGSHIP_VOICES.map((v) => (
-          <div key={v.id} className="voice-tile">
-            <FlagshipChip voice={v} active={activeVoiceId === v.id} onTap={() => loadVoice(v.id)} />
-            <button type="button" className={`voice-edit-badge ${editing === v.id ? 'active' : ''}`}
-              aria-label={`Edit a copy of ${v.title}`} title={`Edit a copy of ${v.title} — saves as a new voice`}
-              onClick={() => setEditing(editing === v.id ? null : v.id)}>✎</button>
-          </div>
+        {found.length === 0 ? (
+          <Tile id={STARTER.id} kind="starter" swatches={STARTER.palette.swatches} name={STARTER.title} line="starter"
+            title={`${STARTER.title} — ${STARTER.vibe} The starter voice: it steps aside when the first find is made.`}
+            active={activeVoiceId === STARTER.id} onTap={() => loadVoice(STARTER.id)} />
+        ) : found.map((v) => (
+          <Tile key={v.id} id={v.id} kind="earned" swatches={v.state.palette.swatches} name={v.name}
+            line={`after ${v.earned.rolls} · ${v.state.params.count}`} title={`${v.name} — ${v.earned.caption || `after ${v.earned.rolls} rolls`}`}
+            active={activeVoiceId === v.id} onTap={() => loadVoice(v.id)} />
         ))}
       </div>
-      {editVoice && <VoiceDish key={editVoice.id} voice={editVoice} onClose={() => setEditing(null)} />}
       <MixBar />
     </div>
   );

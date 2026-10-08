@@ -26,14 +26,14 @@ test.describe('Mode personas', () => {
     await expect(page.locator('.davis-voices')).toBeVisible({ timeout: 10_000 });
   };
 
-  test('flagship chips live on DIRECTORS, not BUILD', async ({ page }) => {
-    await expect(page.locator('.panel-layout .voice-chip.flagship')).toHaveCount(0);
+  // #1153: the factory four are retired; DIRECTORS holds the earned voices and, until the first find, ONE starter.
+  test('the starter voice lives on DIRECTORS, not BUILD; the other three are gone from the picker', async ({ page }) => {
+    await expect(page.locator('.panel-layout .voice-chip.starter')).toHaveCount(0);
     await openDavis(page);
-    await expect(page.locator('.voice-chip.flagship')).toHaveCount(4);
+    await expect(page.locator('.voice-chip.starter')).toHaveCount(1);
+    await expect(page.locator('.voice-chip.earned')).toHaveCount(0);
     await expect(page.locator('.voice-flagships')).toContainText(/Night Migration/);
-    await expect(page.locator('.voice-flagships')).toContainText(/Chrome Parade/);
-    await expect(page.locator('.voice-flagships')).toContainText(/Deep Water/);
-    await expect(page.locator('.voice-flagships')).toContainText(/Dark Glass/);
+    for (const gone of [/Chrome Parade/, /Deep Water/, /Dark Glass/]) await expect(page.locator('.voice-flagships')).not.toContainText(gone);
   });
 
   test('BUILD keeps the stub tiles, the dice tile, and the + chip', async ({ page }) => {
@@ -45,7 +45,7 @@ test.describe('Mode personas', () => {
 
   test('tapping Night Migration crossfades through MIX and lands the voice', async ({ page }) => {
     await openDavis(page);
-    await page.locator('.voice-chip.flagship', { hasText: 'Night Migration' }).click();
+    await page.locator('.voice-chip.starter', { hasText: 'Night Migration' }).click();
     // MIX bar appears while the crossfade runs
     const mixBar = page.locator('.mix-bar');
     await expect(mixBar).toBeVisible({ timeout: 5_000 });
@@ -53,7 +53,7 @@ test.describe('Mode personas', () => {
     // 4s signature blend — wait for the commit to land
     await expect(mixBar).toBeHidden({ timeout: 15_000 });
     // Chip stays lit and the canvas reports the voice's mode
-    await expect(page.locator('.voice-chip.flagship.active', { hasText: 'Night Migration' })).toBeVisible();
+    await expect(page.locator('.voice-chip.starter.active', { hasText: 'Night Migration' })).toBeVisible();
     await expect(page.locator('.canvas-corner.tr').first()).toContainText(/swarm/i, { timeout: 10_000 });
   });
 

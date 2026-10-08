@@ -38,3 +38,21 @@ test('the find carries the tracks: a PATTERN track on the page comes back when t
   await page.evaluate(() => { const s = window.__kcStore.getState(); s.loadVoice(s.userVoices[0].id); s.commitVoiceMix(); });
   expect(await page.evaluate(() => window.__kcStore.getState().layers.some((l) => l.type === 'pattern'))).toBe(true);
 });
+
+test('the tiles: a find replaces the starter, reads as a roll count, loads on tap, and never shows on the BUILD shelf', async ({ page }) => {
+  await boot(page);
+  await page.getByRole('tab', { name: /directors/i }).click();
+  await expect(page.locator('.voice-chip.starter')).toHaveCount(1);
+  for (let i = 0; i < 6; i++) { await curator(page).click(); await page.waitForTimeout(120); }
+  await page.keyboard.press('f');
+  const tile = page.locator('.voice-chip.earned');
+  await expect(tile).toHaveCount(1);
+  await expect(page.locator('.voice-chip.starter')).toHaveCount(0); // the starter retires itself
+  await expect(tile.locator('.voice-rolls')).toHaveText(/^after 6 · \d+$/); // rolls, then marks: counts, never a tier word
+  await expect(tile).toHaveAttribute('title', /after 6 rolls · \d+ marks · seed [0-9a-f]+/);
+  expect(await tile.locator('.voice-dots i').count()).toBe(4);
+  await tile.click();
+  await expect(page.locator('.mix-bar')).toBeVisible({ timeout: 5_000 });
+  await page.getByRole('tab', { name: /build/i }).click();
+  await expect(page.locator('.voice-chip.user')).toHaveCount(0); // the BUILD shelf is the performer's own hands
+});
