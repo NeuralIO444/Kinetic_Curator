@@ -119,14 +119,29 @@ def phase1(p, args):
         p.report["synthetic"] = True
         if "labels-synthetic" not in p.report["steps"]:
             p.report["steps"]["labels-synthetic"] = "ok"
+    elif args.hits and Path(args.hits).exists():
+        # A fresh HITS export rebuilds labels — never silently ignore it.
+        # Only skip when the existing labels are newer than the HITS file.
+        hits_p = Path(args.hits)
+        if not p.force and labels.exists() and hits_p.stat().st_mtime <= labels.stat().st_mtime:
+            print(f"\n== labels ==\n   labels.json is newer than {args.hits} — skipping")
+            p.report["steps"]["labels"] = "skipped"
+        else:
+            if labels.exists():
+                bak = Path("labels.real.json.bak")
+                i = 1
+                while bak.exists():
+                    i += 1
+                    bak = Path(f"labels.real.json.bak.{i}")
+                labels.rename(bak)
+                print(f"   (backed up existing labels.json -> {bak})")
+            if p.run("labels-from-hits",
+                     [sys.executable, "studio/hits_bridge.py", "build",
+                      "--hits", args.hits, "--pool", str(pool), "--out", "labels.json"]) is None:
+                return
     elif not p.force and labels.exists():
         print(f"\n== labels ==\n   labels.json exists — skipping")
         p.report["steps"]["labels"] = "skipped"
-    elif args.hits and Path(args.hits).exists():
-        if p.run("labels-from-hits",
-                 [sys.executable, "studio/hits_bridge.py", "build",
-                  "--hits", args.hits, "--pool", str(pool), "--out", "labels.json"]) is None:
-            return
     else:
         p.need_human(
             "no labels.json and no --hits given. Either:\n"
