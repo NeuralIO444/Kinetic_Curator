@@ -218,6 +218,10 @@ node src/curator/davisState.selfcheck.mjs
 node src/curator/davisSigil.selfcheck.mjs
 node src/curator/dice.selfcheck.mjs
 node src/curator/directorsMatrix.selfcheck.mjs
+node src/curator/directorSense.selfcheck.mjs
+node src/curator/directorTable.selfcheck.mjs
+node src/curator/effectiveTemp.selfcheck.mjs
+node src/curator/director.selfcheck.mjs
 node src/curator/loisFace.selfcheck.mjs
 node src/curator/mathMacros.selfcheck.mjs
 node src/gl/mlx/mlxExport.selfcheck.mjs

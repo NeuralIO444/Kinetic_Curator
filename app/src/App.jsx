@@ -30,6 +30,7 @@ import { routeBeat } from './state/beatArbiter.js';
 import { useStore } from './state/store.js';
 import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
+import { initDirectorBeat } from './curator/director.js'; // #1145
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -68,6 +69,7 @@ function AppInner() {
   // whisper.js; the lines ship copy-only while the sway gate stays closed.
   useEffect(() => {
     initWhisperTriggers(useStore.getState, useStore.subscribe);
+    initDirectorBeat(useStore.subscribe); // #1145: the Director's beat input
   }, []);
 
   const { state } = useApp(s => ({

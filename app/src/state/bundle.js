@@ -91,6 +91,7 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
   'kc:project:quarantine': 'autosave plumbing: a refused project kept for inspection',
   'kc:project:restored-session': 'autosave plumbing: a boot notice',
   'kc:queen:trace': '#1139: developer trace flag for the sway module (off by default), never project content',
+  'kc:director:trace': '#1145: developer trace flag for the Director scheduler (off by default), never project content',
 });
 
 /**
