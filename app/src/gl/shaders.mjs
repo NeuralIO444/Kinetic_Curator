@@ -9,6 +9,7 @@
  */
 
 import { injectCommon } from './effects/chunks.mjs';
+import { GLASS_BEVEL } from './glassBevel.mjs';
 
 export const BLEND_IDS = Object.freeze({
   normal: 0, multiply: 1, screen: 2, overlay: 3, darken: 4, lighten: 5,
@@ -47,6 +48,7 @@ layout(location=2) in vec4 a_inst1;
 layout(location=3) in vec4 a_inst2;
 layout(location=4) in vec4 a_inst3;
 layout(location=5) in vec4 a_inst4;
+layout(location=6) in float a_glass;   // #1129 PR2: 1 = glass voice instance, 0 = enamel path
 uniform vec2 u_canvas;
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
@@ -71,6 +73,7 @@ out vec3 v_light;
 out vec2 v_world;   // #594 PR2: fragment position (scene units) for per-texel light
 out vec4 v_rot;     // cos, sin of the instance rotation; x/y mirror signs
 out vec4 v_cell;    // the instance's atlas cell (u0, v0, u1, v1): bevel taps never leave it
+out float v_glass;    // #1129 PR2: per-instance glass flag — selects the soft-bevel variant
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -152,6 +155,7 @@ void main() {
   float my = (a_inst0.w < 0.0 ? -1.0 : 1.0) * (a_inst2.y < a_inst1.w ? -1.0 : 1.0);
   v_rot = vec4(co, si, mx, my);
   v_cell = vec4(a_inst1.zw, a_inst2.xy);
+  v_glass = a_glass;   // #1129 PR2: constant across the instance — no interpolation error
   // #594 PR1: per-instance diffuse from the one sun, flat normal (0,0,1), at the
   // instance centre. Off → exactly vec3(1.0), so the unlit path is byte-identical.
   if (u_sun.w > 0.5) {
@@ -183,6 +187,7 @@ in float v_opacity;
 in vec3 v_ink;
 in vec3 v_accent;
 in vec3 v_light;
+in float v_glass;     // #1129 PR2: 1 = soft-bevel (glass), 0 = exact existing enamel path
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
@@ -248,23 +253,31 @@ void main() {
       vec2 lo = min(v_cell.xy, v_cell.zw) + 0.5 * tx;
       vec2 hi = max(v_cell.xy, v_cell.zw) - 0.5 * tx;
       // Taps 2 texels out: a 1-texel slope turns 8-bit alpha steps into banding.
-      vec2 st = 2.0 * tx;
+      // #1129 PR2: the glass variant spreads the taps (GLASS_BEVEL.tapTexels),
+      // gentles the slope (bevelScale) and broadens the specular (specPow) —
+      // frosted volume, not enamel edge. Non-glass keeps the exact existing
+      // values: mix(x, y, 0.0) is bit-identical to x, so the enamel path below
+      // is untouched.
+      vec2 st = mix(2.0, ${GLASS_BEVEL.tapTexels.toFixed(1)}, v_glass) * tx;
       float aL = texture(u_atlas, clamp(v_uv - vec2(st.x, 0.0), lo, hi)).a;
       float aR = texture(u_atlas, clamp(v_uv + vec2(st.x, 0.0), lo, hi)).a;
       float aU = texture(u_atlas, clamp(v_uv - vec2(0.0, st.y), lo, hi)).a;
       float aD = texture(u_atlas, clamp(v_uv + vec2(0.0, st.y), lo, hi)).a;
       // Dead zone: slopes under ~2 alpha steps are quantization noise on a flat
       // face, not an edge — they read as flat instead of as fine stripes.
+      // #1129 PR2: preserved exactly in the wide-tap variant. On a flat face
+      // the gradient is ~0 at any tap distance, so the same threshold still
+      // kills banding; on an edge the wider taps only ever make |g| larger.
       vec2 g = vec2(aL - aR, aU - aD);
       g = sign(g) * max(abs(g) - 2.0 / 255.0, 0.0);
-      float k = u_sunMat.x * 6.0;
+      float k = u_sunMat.x * 6.0 * mix(1.0, ${GLASS_BEVEL.bevelScale.toFixed(2)}, v_glass);
       vec3 n = normalize(vec3(g * k, 1.0));
       n.xy *= v_rot.zw;                                               // mirror
       n.xy = vec2(n.x * v_rot.x - n.y * v_rot.y, n.x * v_rot.y + n.y * v_rot.x); // rotate
       vec3 L = normalize(vec3(u_sun.xy - v_world, u_sun.z));
       float diff = max(dot(n, L), 0.0);
       vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));                   // viewer straight on
-      float spec = u_sunMat.y * pow(max(dot(n, H), 0.0), 48.0);      // tight, enamel-like
+      float spec = u_sunMat.y * pow(max(dot(n, H), 0.0), mix(48.0, ${GLASS_BEVEL.specPow.toFixed(1)}, v_glass)); // tight, enamel-like; broad for glass
       float wrap = max(diff * 0.65 + 0.35, 0.0);
       vec3 lit = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * wrap);
       o.rgb = min(o.rgb * lit + u_sunLight.rgb * (spec * u_sunLight.a) * o.a, vec3(o.a));
