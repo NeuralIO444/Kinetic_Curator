@@ -44,7 +44,7 @@ const LABELS = {
   trailCount: 'TRAILS', wobbleAmp: 'WOBBLE AMP', wobbleFreq: 'WOBBLE FREQ',
   displacement: 'DISPLACE', swarmCohesion: 'COHESION', gravityWells: 'GRAVITY',
   damping: 'DAMPING', flap: 'FLAP', squash: 'SQUASH', crooked: 'CROOKED',
-  open: 'OPEN', kinemeRate: 'KINEME RATE', kinemeBreath: 'KINEME BREATH',
+  kinemeRate: 'KINEME RATE', kinemeBreath: 'KINEME BREATH',
   kinemeDrift: 'KINEME DRIFT', kinemePulse: 'KINEME PULSE',
   kinemeBrushWobble: 'BRUSH WOBBLE', kinemeBoilFps: 'BOIL FPS', tight: 'TIGHT',
   wind: 'WIND', behaveSep: 'SEP', behaveAli: 'ALI', behaveCoh: 'COH',
