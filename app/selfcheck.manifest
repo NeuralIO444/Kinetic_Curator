@@ -70,6 +70,7 @@ node src/data/taxonomy.selfcheck.mjs
 node src/data/firstLight.selfcheck.mjs
 node src/state/paletteLibrary.selfcheck.mjs
 node src/components/paletteWing.selfcheck.mjs
+node src/components/paletteTasteFit.selfcheck.mjs
 node src/state/favorites.selfcheck.mjs
 node src/components/rangeRow.selfcheck.mjs
 node src/components/sliderDialog.selfcheck.mjs

@@ -28,7 +28,7 @@ ok('no hand-written amber is left: it is the token or nothing', () => {
 
 ok('amber means one thing: only these files may use it, and a new one has to be added here on purpose', () => {
   const users = files.filter((f) => /--kc-davis/.test(f.src) && f.rel !== 'styles/tokens.css').map((f) => f.rel).sort();
-  assert.deepEqual(users, ['components/DavisSigil.jsx', 'styles/controls.css', 'styles/panels.css'],
+  assert.deepEqual(users, ['components/DavisSigil.jsx', 'styles/controls.css', 'styles/layout.css', 'styles/panels.css'],
     'amber is the probabilistic family (Davis, taste, time-based armed outlines, the spinner). If this list needs a new file, rule 5 has a question to answer first.');
   const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8'); const controls = readFileSync(join(SRC, 'styles/controls.css'), 'utf8');
   assert.match(panels, /\.chip-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/); assert.match(panels, /\.big-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/);
