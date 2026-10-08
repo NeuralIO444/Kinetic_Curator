@@ -64,3 +64,13 @@ test('with less motion he does not turn, and the label still says what he is doi
   expect(await page.locator('.davis-sigil').evaluate((cv) => getComputedStyle(cv).animationName)).toBe('none');
   await ctx.close();
 });
+
+test('the panel fits without a scroll at common window heights, and the room closes it', async ({ page }) => {
+  for (const [w, h] of [[1280, 720], [1366, 768], [1280, 800], [1440, 900]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await boot(page);
+    const fit = await page.locator('.davis-body').evaluate((el) => ({ client: el.clientHeight, scroll: el.scrollHeight }));
+    expect(fit.scroll, `${w}x${h}: content ${fit.scroll} in ${fit.client}`).toBeLessThanOrEqual(fit.client + 1);
+    await expect(page.locator('.panel-davis .davis-section-label').last()).toHaveText('the room');
+  }
+});

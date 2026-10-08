@@ -295,7 +295,7 @@
 .davis-readout { color: var(--ink); min-width: 32px; text-align: right; font-size: 10px; }
 .davis-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px; }
 /* #616 — section labels + EVOLVE progress + phrase status. */
-.davis-section-label { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line-2); }
+.davis-section-label { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); margin-top: 5px; padding-top: 4px; border-top: 1px solid var(--line-2); }
 .davis-section-label:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .davis-progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 4px 6px; border: 1px solid var(--line); font-size: 9px; font-variant-numeric: tabular-nums; }
 .davis-progress:not(.running) { grid-template-columns: 3fr 1fr; color: var(--dim); }
@@ -303,6 +303,8 @@
 .davis-progress-cell i, .davis-phrase-status i { font-style: normal; font-size: 8px; letter-spacing: 0.1em; color: var(--dim); }
 .davis-progress-cell b, .davis-phrase-status b { font-weight: 400; color: var(--ink); }
 .davis-progress.running { border-color: var(--ink); }
+/* idle: the label and its value share a line, so the resting box is one row, not two (#1126 fits the panel without a scroll) */
+.davis-progress:not(.running) .davis-progress-cell { flex-direction: row; align-items: baseline; justify-content: space-between; }
 /* #617 MIDI */
 .davis-midi { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px; border: 1px solid var(--line); font-size: 9px; }
 .davis-midi-head { display: flex; justify-content: space-between; align-items: center; }
@@ -837,16 +839,29 @@
 /* armed = waiting on the bar: caution amber, never live pink (design system 1.1) */
 .big-btn.armed { outline: 2px solid var(--kc-warn); outline-offset: 1px; }
 
-/* #1126 — the two Directors, readout only. Square corners, one border; Davis in his own colour. */
-.directors-duel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.duel-side { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border: 1px solid var(--line-2); min-height: 154px; text-align: center; }
-.duel-who { align-self: flex-start; color: var(--dim); }
+/* #1126 — the panel fits without a scroll: one row each for the three generate verbs, the four trail gestures, and
+   phrase beside midi. */
+.davis-body { gap: 4px; }
+.davis-actions-3 { grid-template-columns: repeat(3, 1fr); }
+.davis-actions-4 { grid-template-columns: repeat(4, 1fr); }
+.davis-perform-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; align-items: stretch; }
+
+/* #1126 — the two Directors, readout only. Square corners, one border; Davis in his own colour. Each side is a row:
+   the face on the left, who and what on the right, so the whole room is about 100 px tall. */
+.directors-duel { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.duel-side {
+  display: grid; grid-template-columns: 112px 1fr; grid-template-rows: auto auto 1fr; column-gap: 8px; row-gap: 2px;
+  align-items: center; padding: 6px 8px; border: 1px solid var(--line-2); min-height: 100px; text-align: left;
+}
+.duel-who { grid-column: 2; grid-row: 1; color: var(--dim); align-self: end; }
+.duel-face, .davis-sigil { grid-column: 1; grid-row: 1 / span 3; justify-self: center; }
+.duel-state { grid-column: 2; grid-row: 2; min-height: 14px; }
+.duel-desc { grid-column: 2; grid-row: 3; align-self: start; color: var(--dim); font-size: 10px; line-height: 1.35; }
 .duel-davis .duel-who, .duel-davis .duel-state { color: var(--kc-davis); }
-.duel-face { font-size: 22px; line-height: 48px; height: 48px; color: var(--ink); white-space: nowrap; }
-.duel-state { min-height: 14px; }
-.duel-desc { min-height: 28px; color: var(--dim); font-size: 10px; line-height: 1.4; }
+/* the kaomoji, as large as the 112 px cell holds in one line (seven characters) */
+.duel-face { font-size: 24px; line-height: 88px; height: 88px; color: var(--ink); white-space: nowrap; }
 /* square corners everywhere (M8): the canvas has no frame of its own, so only the round art turns, never a box */
-.davis-sigil { width: 48px; height: 48px; opacity: 0.55; }
+.davis-sigil { width: 88px; height: 88px; opacity: 0.55; }
 .davis-sigil.turning { opacity: 1; animation: davis-sigil-turn linear infinite; }
 @keyframes davis-sigil-turn { to { transform: rotate(360deg); } }
 /* stillness is a state (rule 7): with less motion he does not turn, and the label still says what he is doing */

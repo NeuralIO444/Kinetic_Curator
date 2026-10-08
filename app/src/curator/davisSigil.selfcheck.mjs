@@ -10,7 +10,7 @@ const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 // a recording 2D context: no canvas needed to prove the structure
 const rec = () => {
   const calls = []; const ctx = { fillStyle: '', strokeStyle: '', lineWidth: 0 };
-  for (const m of ['clearRect', 'save', 'restore', 'translate', 'rotate', 'beginPath', 'arc', 'fill', 'stroke']) ctx[m] = (...a) => calls.push([m, ...a]);
+  for (const m of ['clearRect', 'save', 'restore', 'scale', 'translate', 'rotate', 'beginPath', 'arc', 'fill', 'stroke']) ctx[m] = (...a) => calls.push([m, ...a]);
   return { ctx, calls };
 };
 const draw = (seed) => { const r = rec(); drawSigil(r.ctx, sigilGeometry(seed)); return r.calls; };
@@ -36,6 +36,16 @@ ok('eight-fold: one wedge of 24..41 ornaments, stamped eight times with its mirr
     const arcs = calls.filter((c) => c[0] === 'arc').length;
     assert.equal(arcs, SIGIL_RINGS.length + SIGIL_FOLDS * (g.els.length * 2 + rings) + 1, 'rings + 8 x (dot + mirror dot + any halo) + the centre');
   }
+});
+
+ok('fidelity: the same picture at any pixel density, the canvas just gets more real pixels', () => {
+  const at = (px) => { const r = rec(); drawSigil(r.ctx, sigilGeometry(5), '255,205,130', px); return r.calls; };
+  const lo = at(96); const hi = at(96 * 4);
+  assert.deepEqual(lo.filter((c) => c[0] === 'arc'), hi.filter((c) => c[0] === 'arc'), 'every arc is placed identically: only the scale differs');
+  assert.deepEqual(lo.find((c) => c[0] === 'scale'), ['scale', 1, 1]); assert.deepEqual(hi.find((c) => c[0] === 'scale'), ['scale', 4, 4]);
+  assert.deepEqual(hi.find((c) => c[0] === 'clearRect'), ['clearRect', 0, 0, 384, 384], 'the whole backing store is cleared');
+  const src = readFileSync(new URL('../components/DavisSigil.jsx', import.meta.url), 'utf8');
+  assert.match(src, /Math\.min\(5, Math\.max\(3, /); assert.match(src, /width=\{px\} height=\{px\}/);
 });
 
 ok('drawn only from the seed: no Math.random, no clock, in the module or its component', () => {
