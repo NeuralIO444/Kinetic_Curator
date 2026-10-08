@@ -11,6 +11,9 @@
 //   - roles read from asset metadata; new packs auto-absorb (no pack lists)
 //   - wildness from Davis's state: UGLY wilder, FLOW calmer
 //   - same-category weak prior + learned co-occurrence from the crown log
+//
+// #1145: a room may pass kinFreedom (0..1). Absent, wildnessForDavis stands,
+// so existing rolls are unchanged.
 import { STUB_VOICES } from '../data/voices.js';
 
 /** Candidates dealt per roll before shortlisting (the Lois pass: show this count). */
@@ -136,11 +139,13 @@ export function dealCast(assets, size, rng, wildness, crowns) {
  * Roll the dice.
  * @returns {{ candidates, finalists, rolled, kept, wildness, davisCode }}
  * candidates: every proposal with its score; finalists: top 3 by score.
+ * kinFreedom, when a room scheduled it, replaces wildnessForDavis for this roll.
  */
-export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, crowns = [] }) {
+export function rollDice({ assets, rng = Math.random, davisCode = null, kinFreedom = null, scorer, crowns = [] }) {
   if (!assets || !assets.length) throw new Error('[dice] no assets to deal from');
   if (!scorer || typeof scorer.score !== 'function') throw new Error('[dice] scorer missing');
-  const wildness = wildnessForDavis(davisCode);
+  const scheduled = typeof kinFreedom === 'number' && Number.isFinite(kinFreedom) ? kinFreedom : null;
+  const wildness = scheduled == null ? wildnessForDavis(davisCode) : Math.min(1, Math.max(0, scheduled));
   const n = DICE_CANDIDATES_BASE + Math.round(wildness * DICE_CANDIDATES_WILD);
   const candidates = [];
   for (let i = 0; i < n; i++) {
