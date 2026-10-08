@@ -54,7 +54,7 @@ as a mechanism (`setAssetKineme(id, null)` → static path) but has no UI.
 - Governor already designs for this: "shed = freeze motion / pin to cell 0."
 
 ### 1f. Stale docs to not trust
-`docs/KINEME.md` "no build authorized" status predates the #784 merge;
+`docs/archive/KINEME.md` "no build authorized" status predates the #784 merge;
 §6 stepped-cell question still open; brush-wobble has no stage-C consumer
 until brush mode (#894/#897).
 
@@ -122,4 +122,4 @@ default-map expansion.
 `app/src/data/kinemes.js`, `app/src/gl/sceneContract.js:279-300`,
 `app/src/panels/DavisPanel.jsx`, `app/src/curator/loisRank.js:16`,
 `app/src/curator/loisActivity.js`, `app/src/data/layout-modes.js:123-127`,
-`docs/ALWAYS_ALIVE.md`, `docs/KINEME.md` (partially stale — see §1f).
+`docs/ALWAYS_ALIVE.md`, `docs/archive/KINEME.md` (partially stale — see §1f).

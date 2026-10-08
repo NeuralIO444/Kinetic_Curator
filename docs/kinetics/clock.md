@@ -116,9 +116,9 @@ start `:342-355`), `itemMorph.selfcheck` (#419 plan-once + t-boundaries `:41-53`
 assertions.** Nothing tests dt-clamp bounds, loopTimeMs monotonicity, the freeze matrix,
 or capture-frame time.
 
-**Spec docs** — `docs/ENGINE_PLAN.md` §3 spine A `:82-96`, §6 acceptance `:209-223`
+**Spec docs** — `docs/archive/ENGINE_PLAN.md` §3 spine A `:82-96`, §6 acceptance `:209-223`
 (all code-verified, Matt's feel sign-off pending), §7 file map `:225-243`;
-`docs/SPINE_REVIEW_C_F.md` (errata `:10-15`: two GPU suites fail pre-spine-A);
+`docs/archive/SPINE_REVIEW_C_F.md` (errata `:10-15`: two GPU suites fail pre-spine-A);
 `docs/KINETICS.md:24-33`; `docs/EMBARGO.md`; parked tempo clock `docs/TEMPO_AND_CHIPS.md`.
 
 ## 3. Failure modes
@@ -279,7 +279,7 @@ one-writer file — single-owner staging**.
 7. **Gate consolidation (Q2):** one `autoTriggerGate(state)` shared by evolve-TIME,
    beatArbiter, and phrase-METRO (adds `slowRender|batchPaused` to METRO); state files,
    not one-writer, but do not bundle with 5/6.
-8. **Docs:** update `docs/KINETICS.md` CLOCK section + `ENGINE_PLAN §7` file map; no
+8. **Docs:** update `docs/KINETICS.md` CLOCK section + `archive/ENGINE_PLAN.md §7` file map; no
    §6 boxes ticked (no spine letter). Sequence: 1 → 2 → 3 → 4 ∥ 7 → 5 → 6 → 8.
 
 ## 7. Open questions for Matt

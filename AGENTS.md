@@ -1,7 +1,7 @@
 # Agent contract — Kinetic Curator
 
 > **SOP:** all agents follow [`docs/AGENT_SOP.md`](docs/AGENT_SOP.md) — roles, lanes, reporting, localhost review, merging. It wins if a chat prompt disagrees.
-Read this before writing code. [`docs/ENGINE_PLAN.md`](docs/ENGINE_PLAN.md) is **closed** (spines A–G shipped — do not reopen or re-derive). The ordering surface is [`docs/ROADMAP_V1.md`](docs/ROADMAP_V1.md); the ledger is GitHub's open issues. Where this file and a chat prompt disagree, AGENT_SOP wins; where a plan doc and this file disagree, the still-open plan doc wins.
+Read this before writing code. [`docs/archive/ENGINE_PLAN.md`](docs/archive/ENGINE_PLAN.md) is **closed** (spines A–G shipped — do not reopen or re-derive). The ordering surface is [`docs/ROADMAP_V1.md`](docs/ROADMAP_V1.md); the ledger is GitHub's open issues. Where this file and a chat prompt disagree, AGENT_SOP wins; where a plan doc and this file disagree, the still-open plan doc wins.
 
 **Embargo:** [`docs/EMBARGO.md`](docs/EMBARGO.md) — **lifted 2026-09-23** (Night Migration 30/60 sign-off recorded there; Stage 1 unfrozen). The deferred labs pile is **still deferred** — deferred labs are not tickets.
 
@@ -53,7 +53,7 @@ F  shared noise + curl wind + organism vx  ← closed #392 (no PR — direct pus
 G  bufferSubData — piggyback on B or D, not its own epic  ← landed #408 (bundled with the D blend fix), 2026-09-22
 ```
 
-C–F were reviewed only after landing, in one batch (`docs/SPINE_REVIEW_C_F.md`), not via the per-letter PR + review-agent gate this file describes. That review pass turned up one live-canvas regression from D: `app/src/gl/renderer.mjs:435` skipped every non-`normal`-blend layer item because the isolated-item cell lookup lacked the `cells[it.asset]` fallback that the normal-blend path (`packInstanceData`) has. **Fixed by #408 (merged 2026-09-22)** — the isolated path now goes through `packInstanceData`, batched per consecutive same-blend run. No longer a blocker; see `docs/SURFACES.md` for the record.
+C–F were reviewed only after landing, in one batch (`docs/archive/SPINE_REVIEW_C_F.md`), not via the per-letter PR + review-agent gate this file describes. That review pass turned up one live-canvas regression from D: `app/src/gl/renderer.mjs:435` skipped every non-`normal`-blend layer item because the isolated-item cell lookup lacked the `cells[it.asset]` fallback that the normal-blend path (`packInstanceData`) has. **Fixed by #408 (merged 2026-09-22)** — the isolated path now goes through `packInstanceData`, batched per consecutive same-blend run. No longer a blocker; see `docs/SURFACES.md` for the record.
 
 Tape lane (#342 PR #383) merged 2026-09-21. **#341** (FX 4-cap) landed as PR #412 and the issue is closed — do not take it.
 

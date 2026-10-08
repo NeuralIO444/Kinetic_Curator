@@ -8,7 +8,7 @@ Planning pass — September 17, 2026. Research only, no code.
 Apple-Silicon-only. Kinetic_Curator is a browser web app with a public Pages
 demo. MLX can never run inside the app itself. Every MLX capability below is
 therefore a **local superpower**: it runs on Matt's Mac Studio in the
-`studio/` sidecar track (the "Tier 1+" local install from `docs/BACKEND_V2_PLAN.md`),
+`studio/` sidecar track (the "Tier 1+" local install from `archive/BACKEND_V2_PLAN.md`),
 and its *outputs* — embedding indexes, taste weights, shortlists — are what
 cross into the browser, mostly as plain data files. Anything that needs to work
 in the public demo must work from precomputed data, or not at all.
@@ -30,7 +30,7 @@ in the public demo must work from precomputed data, or not at all.
   split already says heavy compute leaves the browser.
 
 **The head start nobody has to build from scratch:** `studio/curator.py`
-already implements the taste-model pipeline (issue #75, `docs/BACKEND_V2_PLAN.md`
+already implements the taste-model pipeline (issue #75, `archive/BACKEND_V2_PLAN.md`
 §B: *"The Curator — highest product value"*): batch-render PNGs → CLIP-embed →
 label from HITS favorites → train a linear probe on his likes vs passes →
 rank / "more like this". `studio/hits_bridge.py` already bridges app favorites
