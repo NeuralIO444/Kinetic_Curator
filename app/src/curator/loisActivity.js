@@ -16,6 +16,8 @@ export const LOIS_AWAY_MS = 5 * 60 * 1000; // AWAY: "he's out of the room" is li
 // BURN: a hot streak, chain-smoking: this many keeps inside the rolls-vs-keeps window below (#1126; it used to mean
 // fifteen minutes of nothing, which contradicted the word).
 export const LOIS_BURN_KEEPS = 3;
+// Davis reads the same feed through his own windows (#1126); the thresholds live with his states, in davisState.js.
+import { DAVIS_UGLY_PASSES, DAVIS_UGLY_WINDOW_MS, DAVIS_FLOW_WINDOW_MS } from './davisState.js';
 // A keep reaches the feed from two doors (the bus event, and the store's own list growing, which F / the star / K
 // use directly). Two notes this close together are the one keep.
 const KEEP_DEDUPE_MS = 250;
@@ -62,6 +64,12 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     exports: [], // { ts, seed, paletteId }
     rolls: [], // ts of curate + KINETIC taps
     keeps: [], // ts of keeps (any door: F, the star, K)
+    passes: [], // ts of rolls that replaced a frame nobody kept (a roll while frameKept was false): Davis's UGLY
+    evolves: [], // ts of EVOLVE fires: the generator rolling with nobody at the controls
+    seedChanges: [], // ts the seed value changed
+    rollsSinceSeed: 0,
+    bloomAt: null, // ts of a keep that followed a run of passes: the ugly paid off
+    muted: 0, // >0 while the machine (the dead-frame guard) is re-dealing: not the artist, not noted
     frameKept: false, // the frame on screen was kept: true from a keep until the next roll or seed change (#1126: NOD)
     keepNote: { at: -Infinity, door: null },
     favNote: { at: -Infinity, door: null },
@@ -87,9 +95,12 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     s.dwell = { seed, comp, startedAt: at };
     s.frameKept = false; // a new seed or composition is not the frame that was kept
     s.seedRevisit = seen && s.seed !== seed;
+    const first = s.seed === null;
     if (s.seed !== seed) {
       s.seed = seed;
       s.seedSetAt = at;
+      s.rollsSinceSeed = 0;
+      if (first === false) { s.seedChanges.push(at); cap(s.seedChanges); } // loading a seed is not dropping one
     }
   }
 
@@ -98,6 +109,8 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
   function noteKeep(door, at) {
     if (s.keepNote.door !== door && at - s.keepNote.at < KEEP_DEDUPE_MS) return;
     s.keepNote = { at, door };
+    // a keep after a run of passes is the payoff (Davis BLOOM); count the passes BEFORE this keep lands
+    if (countSince(s.passes, DAVIS_UGLY_WINDOW_MS, at) >= DAVIS_UGLY_PASSES) s.bloomAt = at;
     s.keeps.push(at);
     cap(s.keeps);
     s.frameKept = true;
@@ -132,6 +145,15 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       rollsLast5m: countSince(s.rolls, LOIS_ROLL_KEEP_WINDOW_MS, at),
       keepsLast5m: countSince(s.keeps, LOIS_ROLL_KEEP_WINDOW_MS, at),
       undosLast10s: countSince(s.undos, LOIS_UNDO_BURST_WINDOW_MS, at),
+      // Davis's inputs (#1126)
+      rollsLastMinute: countSince(s.rolls, DAVIS_FLOW_WINDOW_MS, at),
+      passesLast2m: countSince(s.passes, DAVIS_UGLY_WINDOW_MS, at),
+      seedAgeMs: s.seed == null ? 0 : at - s.seedSetAt,
+      seedDropped: s.seedChanges.length > 0, // a seed was dropped this session (the first one was only loaded)
+      rollsSinceSeed: s.rollsSinceSeed,
+      keptThisSeed: s.keeps.some((k) => k >= s.seedSetAt),
+      bloomAgeMs: s.bloomAt == null ? null : at - s.bloomAt,
+      evolveCount: s.evolves.length,
     };
   }
 
@@ -180,14 +202,17 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     );
 
     // Instrument 6 — rolls-per-keep: curate taps and KINETIC taps vs keeps.
-    const noteRoll = () => {
-      s.rolls.push(t());
+    const noteRoll = (kind) => {
+      const at = t();
+      s.rolls.push(at);
       cap(s.rolls);
+      if (!s.frameKept) { s.passes.push(at); cap(s.passes); } // it replaced a frame nobody kept
+      s.rollsSinceSeed += 1;
       s.frameKept = false; // rolling moves off the kept frame
-      beat();
+      if (kind !== 'evolve') beat(); // an EVOLVE fire is the generator at work, not the artist: it must not wake LOIS
     };
-    unsubs.push(on(Events.LAYOUT_CURATE, noteRoll));
-    unsubs.push(on(Events.KINETIC_TAP, noteRoll));
+    unsubs.push(on(Events.LAYOUT_CURATE, () => noteRoll('curate')));
+    unsubs.push(on(Events.KINETIC_TAP, () => noteRoll('kin')));
 
     // Passive store subscription: dwell windows (5) + undo bursts (7).
     // Undo pops exactly one entry AND pushes it onto the redo stack; an
@@ -199,6 +224,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
         comp: st.layoutParams?.composition ?? null,
         undoDepth: Array.isArray(st.historyUndoStack) ? st.historyUndoStack.length : 0,
         redoDepth: Array.isArray(st.historyRedoStack) ? st.historyRedoStack.length : 0,
+        evolveTs: st.lastEvolveTs ?? null,
         favIds: new Set((Array.isArray(st.favorites) ? st.favorites : []).map((f) => f && f.id)),
         keepIds: new Set((Array.isArray(st.keeps) ? st.keeps : []).map((k) => k && k.id)),
       });
@@ -210,9 +236,11 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       unsubs.push(
         store.subscribe((st) => {
           const cur = read(st);
+          if (s.muted) { prev = cur; return; } // the machine, not the artist (the dead-frame guard re-dealing)
           const newFav = fresh(st.favorites, prev.favIds); const newKeep = fresh(st.keeps, prev.keepIds);
           if (newFav.length === 1 && cur.favIds.size > prev.favIds.size - 1) noteFavorite(newFav[0], t(), 'store');
           if (newKeep.length === 1) noteKeep('store', t());
+          if (cur.evolveTs != null && cur.evolveTs !== prev.evolveTs) { s.evolves.push(t()); cap(s.evolves); noteRoll('evolve'); }
           if (cur.seed !== prev.seed || cur.comp !== prev.comp) noteSeed(cur.seed, cur.comp);
           if (cur.undoDepth === prev.undoDepth - 1 && cur.redoDepth >= prev.redoDepth) {
             s.undos.push(t());
@@ -241,7 +269,13 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     }
   }
 
-  const api = { start, stop, beat, noteSeed, snapshot };
+  /** Run `fn` as the MACHINE: the store changes it makes (a re-deal, its undo) are not the artist and are not noted. */
+  function machine(fn) {
+    s.muted += 1;
+    try { return fn(); } finally { s.muted -= 1; }
+  }
+
+  const api = { start, stop, beat, noteSeed, snapshot, machine };
   return api;
 }
 

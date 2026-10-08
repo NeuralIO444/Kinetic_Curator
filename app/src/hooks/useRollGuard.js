@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useStore } from '../state/store.js';
 import { Events, on } from '../composition/eventBus.js';
 import { createRollGuard } from '../fx/rollGuard.js';
+import { loisActivity } from '../curator/loisActivity.js';
 
 // #1107 — binds fx/rollGuard.js to the running app. After a roll (KIN, CURATOR, the cold-open roll) it waits for
 // the new frame to bake and present, reads a 96-px copy of it, and silently deals again if it is dead.
@@ -32,9 +33,12 @@ export function useRollGuard(loopRef) {
       },
       unchanged: (before) => same(before, snap()),
       redeal: (kind) => {
-        const s = useStore.getState();
-        if (s.historyUndoStack?.length) s.undo(); // the dead roll leaves; the new one takes its single undo slot
-        (REDEAL[kind] || REDEAL.chaos)(useStore.getState());
+        // the MACHINE re-deals, not the artist: the honest feed must not read the new seed, the undo or the roll as theirs
+        loisActivity.machine(() => {
+          const s = useStore.getState();
+          if (s.historyUndoStack?.length) s.undo(); // the dead roll leaves; the new one takes its single undo slot
+          (REDEAL[kind] || REDEAL.chaos)(useStore.getState());
+        });
         return snap();
       },
     });
