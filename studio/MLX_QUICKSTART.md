@@ -7,6 +7,7 @@ On the **Mac Studio**, from the repo root:
 bash studio/mlx_setup.sh
 
 # 2. run the pipeline (resumable; re-run any time)
+#    base.project.json = any project exported from the app (Pipeline → ↓ PROJECT)
 python3 studio/mlx_run.py --phase 1 --pool pool --count 200 --hits hits.json
 
 # 3. check the gates

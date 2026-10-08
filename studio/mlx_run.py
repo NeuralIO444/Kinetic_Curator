@@ -68,12 +68,20 @@ def pngs(d):
 
 def phase1(p, args):
     pool = Path(args.pool)
+    base = Path(args.base)
+    if not base.exists():
+        p.need_human(
+            f"Phase 1 needs a starting project: in the app, Pipeline \u2192 \u2193 PROJECT, "
+            f"save it as {args.base} in the repo root, then re-run.")
+        if not p.dry_run:
+            return
+        print("   (dry-run: continuing to show the remaining steps)")
     # 1. render the pool
     if not p.force and pngs(pool):
         print(f"\n== batch ==\n   pool/ has {len(pngs(pool))} PNGs — skipping (use --force to re-render)")
         p.report["steps"]["batch"] = "skipped"
     else:
-        out = p.run("batch", [sys.executable, "studio/studio.py", "batch",
+        out = p.run("batch", [sys.executable, "studio/studio.py", "batch", str(base),
                               "-o", str(pool), "--count", str(args.count)])
         if out is None:
             return
@@ -119,7 +127,7 @@ def phase1(p, args):
     if not p.force and pngs(pool2):
         p.report["steps"]["rank-batch"] = "skipped"
     else:
-        if p.run("rank-batch", [sys.executable, "studio/studio.py", "batch",
+        if p.run("rank-batch", [sys.executable, "studio/studio.py", "batch", str(base),
                                 "-o", str(pool2), "--count", str(args.count),
                                 "--start-seed", "10000"]) is None:
             return
@@ -190,7 +198,7 @@ def main():
     ap.add_argument("--count", type=int, default=200)
     ap.add_argument("--hits", default=None, help="hits.json from the app (Pipeline -> HITS)")
     ap.add_argument("--recipes", default="pool-recipes", help="phase 2 recipe dir")
-    ap.add_argument("--base", default="base.project.json", help="phase 2 starting project")
+    ap.add_argument("--base", default="base.project.json", help="starting project JSON (app -> Pipeline -> PROJECT)")
     ap.add_argument("--force", action="store_true", help="redo steps whose outputs exist")
     ap.add_argument("--dry-run", action="store_true", help="print commands without running")
     args = ap.parse_args()
