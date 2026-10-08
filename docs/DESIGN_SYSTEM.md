@@ -73,6 +73,7 @@ Scale: `2 / 4 / 6 / 8 / 12 / 16 / 24` px. No other gaps.
 - **Radii = 0.** Square corners everywhere. (Any 2–4px leftovers get zeroed in migration.)
 - **No glow, no drop shadows.** Depth comes from `--kc-panel` → `--kc-panel-2` → `--kc-line` layering, not blur.
 - The single permitted glow: `--kc-live` fill on the active tab / RUN — flat fill, not a shadow.
+- **Top-bar pills (#1122, Matt 2026-10-08):** the bar's semantic pills carry a 5px radius, and its two true circles (KIN heat, V voice) stay round. Nothing else. Inside them, continuous Davis signals (taste, heat, voice) may glow amber because the glow IS the signal (KC-1 DS rule 3); discrete TE shapes stay flat and square. Pinned by `radii.selfcheck.mjs`.
 
 ---
 

@@ -1,6 +1,6 @@
 // topbarTaste.selfcheck.mjs — the bar stays quiet unless a real signal says otherwise (#1122).
 import assert from 'node:assert';
-import { tasteLevel, verdictDetent, voiceBreathS, litPills, TOPBAR_LIT_CAP } from './topbarTaste.mjs';
+import { tasteLevel, verdictDetent, voiceBreathS, voiceLevel, VOICE_ACT_MS, litPills, TOPBAR_LIT_CAP } from './topbarTaste.mjs';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -46,6 +46,13 @@ ok('voice breath is slower for calm personas, faster for drifty ones', () => {
   const wild = voiceBreathS(1);
   assert.ok(calm > mid && mid > wild, `${calm} > ${mid} > ${wild}`);
   assert.equal(voiceBreathS(undefined), voiceBreathS(0.25), 'no weight → neutral, never dark while active');
+});
+
+ok('V breathes only after a real roll and decays to still (rule 3)', () => {
+  for (const none of [null, undefined, NaN, -1, 'x']) assert.equal(voiceLevel(none), 0, 'no roll: still');
+  assert.equal(voiceLevel(0), 4); assert.equal(voiceLevel(VOICE_ACT_MS / 2), 2); assert.equal(voiceLevel(VOICE_ACT_MS - 1), 1);
+  assert.equal(voiceLevel(VOICE_ACT_MS), 0, 'decayed: still again');
+  let prev = 5; for (let ms = 0; ms < VOICE_ACT_MS; ms += 500) { const l = voiceLevel(ms); assert.ok(l <= prev); prev = l; }
 });
 
 ok('precedence caps lit pills: CUR > locks > KIN > V > L > diamond', () => {
