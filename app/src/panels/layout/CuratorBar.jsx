@@ -242,22 +242,31 @@ export function CuratorBar() {
           {...curTap.props}
           aria-label="Curator — roll a taste-guided scene over the unlocked parameters"
           title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
-          {/* #1122 — CUR is verdict → TE: detent-step diamond + keep/favorite ledger digit */}
+          {/* #1122 — CUR is verdict → TE: detent-step pip + keep/favorite ledger digit.
+              The ledger stays silent at 0/0 (silence is default); it appears with the first keep. */}
           <span className={`cur-detent v${curDetent}`} data-subdued={subdued('cur', curDetent > 0)} aria-hidden="true" />
-          <span className="cur-ledger" title={`${keepsCount} keeps / ${favoritesCount} favorites`}>{keepsCount}/{favoritesCount}</span>
-          <ExpandLabel short="cur" full="curator" />
-        </button>
-        {/* #1122 — locks are discrete → TE: ▪/▫ + count; the nub shows armed roll scope, tap to disarm.
-            (The mockup's ■ B assumed B was free; the BEAT clock owns "b" now, so locks ride a ▪ chip.) */}
-        <span className="lock-chip" data-subdued={subdued('locks', lockCount > 0 || armed)}
-          title={lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}${armed ? ' · roll scope armed' : ''}` : 'no locked params'}>
-          <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
-          <span className="lock-digit">{lockCount}</span>
-          {armed && (
-            <button type="button" className="lock-nub" onClick={clearRollScope}
-              title="roll scope armed — tap to disarm" aria-label="disarm roll scope" />
+          {(keepsCount > 0 || favoritesCount > 0) && (
+            <span className="cur-ledger" title={`${keepsCount} keeps / ${favoritesCount} favorites`}>{keepsCount}/{favoritesCount}</span>
           )}
-        </span>
+          <ExpandLabel short="cur" full="curator" />
+          {/* #1122 — locks are discrete → TE: a pip on CUR's right edge (glyph + count).
+              Red nub = armed roll scope. The pip is a button when armed: tap to disarm.
+              (The mockup's ■ B assumed B was free; the BEAT clock owns "b" now.) */}
+          {armed ? (
+            <button type="button" className="lock-badge" data-subdued={subdued('locks', true)}
+              onClick={clearRollScope} title="roll scope armed — tap to disarm" aria-label="disarm roll scope">
+              <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
+              {lockCount > 0 && <span className="lock-digit">{lockCount}</span>}
+              <span className="lock-nubdot" aria-hidden="true" />
+            </button>
+          ) : (
+            <span className="lock-badge" data-subdued={subdued('locks', lockCount > 0)}
+              title={lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}` : 'no locked params'}>
+              <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
+              {lockCount > 0 && <span className="lock-digit">{lockCount}</span>}
+            </span>
+          )}
+        </button>
         {/* #1103 — BEAT sits right of CURATOR: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
         <BeatButton />
         {loisLine && (
