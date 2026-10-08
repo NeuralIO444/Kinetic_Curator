@@ -24,6 +24,7 @@ import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
 import { getBiologyPolicy } from '../biology/policy.js';
 import { fadeForAge } from '../biology/lifecycle.js';
+import { sortGlassInstances } from './glassSort.mjs';
 import {
   pickWeightedIndexStable,
 } from './kernel/rng.js';
@@ -307,6 +308,18 @@ export function buildPlacements({
     }));
     mapped = [...mapped, ...mirrored];
   }
+
+  // #1129 PR1 — translucent sort. Flag glass-type instances from the voice
+  // param, then order the glass set back-to-front by z-tier so overlapping
+  // alpha layers composite in depth order under the premultiplied single
+  // pass (gl.ONE, gl.ONE_MINUS_SRC_ALPHA). sortGlassInstances returns a new
+  // array and moves glass items only relative to each other: non-glass
+  // order (the RULES small-first sort above, #565's z-fight fix) is
+  // untouched, and the pool keeps soa-slot order because the sorted array is
+  // never stashed in cache.itemPool (same guard as the overlap sort above).
+  const glassOn = !!layoutParams.glass;
+  for (const it of mapped) it.glass = glassOn;
+  if (glassOn) mapped = sortGlassInstances(mapped);
 
   if (undoKineme) undoKineme();
   return { preset, items: mapped, safeCount };
