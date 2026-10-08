@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Top bar — organic (Davis) mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #141414; color: #e8e4da; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #8a8578; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #5c584e; margin-bottom: 14px; }
+  .bar { display: flex; align-items: center; gap: 10px; background: #0c0c0c; border: 1px solid #262626;
+         border-radius: 8px; padding: 10px 14px; font-size: 12px; letter-spacing: .08em; }
+  .sep { width: 1px; height: 20px; background: #262626; }
+  .pill { display: flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid #2c2c2c;
+          border-radius: 5px; color: #b9b3a4; white-space: nowrap; }
+  .pill.dim { color: #5c584e; }
+  /* ◆ diamond — LOIS presence shimmer */
+  .diamond { width: 11px; height: 11px; background: #3a3a3a; transform: rotate(45deg); border-radius: 1px;
+             transition: background .8s, box-shadow .8s; }
+  .diamond.lvl2 { background: #c98f3d; box-shadow: 0 0 10px rgba(255,205,130,.45); animation: breath 10s ease-in-out infinite; }
+  .diamond.lvl4 { background: #ffcd82; box-shadow: 0 0 16px rgba(255,205,130,.8); animation: breath 10s ease-in-out infinite; }
+  @keyframes breath { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  /* ● circle — session vitality */
+  .circle { width: 13px; height: 13px; border-radius: 50%; background: #3a3a3a; transition: all 1.2s; }
+  .circle.burn { background: #ffcd82; box-shadow: 0 0 18px rgba(255,205,130,.9); }
+  .circle.vibe { background: #8a6a3a; box-shadow: 0 0 10px rgba(255,205,130,.4); animation: breath 10s ease-in-out infinite; }
+  .circle.away { background: transparent; border: 1px solid #3a3a3a; box-shadow: none; animation: none; }
+  .circle.cool { background: #6b5a40; box-shadow: 0 0 8px rgba(255,205,130,.35); animation: coolpulse 4s ease-in-out infinite; }
+  @keyframes coolpulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+  /* ■ square — structure */
+  .square { width: 12px; height: 12px; border: 1px solid #6b675c; border-radius: 1px; position: relative; transition: all .5s; }
+  .square.locks2::after { content:''; position: absolute; inset: 0; background: linear-gradient(to top, #8a8578 50%, transparent 50%); }
+  .square.locks4 { background: #b9b3a4; }
+  .square .pin { display: none; position: absolute; top: -7px; right: -7px; font-size: 9px; }
+  .square.armed .pin { display: block; }
+  .controls { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .ctl-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #8a8578; }
+  .ctl-row .lbl { width: 150px; letter-spacing: .08em; }
+  button { background: #1e1e1e; color: #b9b3a4; border: 1px solid #333; border-radius: 4px;
+           font-family: inherit; font-size: 10px; letter-spacing: .06em; padding: 5px 10px; cursor: pointer; }
+  button.on { background: #3a2f1d; border-color: #c98f3d; color: #ffcd82; }
+</style></head>
+<body>
+<h2>◆ / ● / ■ — ORGANIC (DAVIS)</h2>
+<p class="sub">shimmer whisper · cooldown decay · subtle glow — readouts only, silence is default</p>
+
+<div class="bar">
+  <span class="pill"><span class="diamond" id="diamond"></span>KC-1</span>
+  <span class="sep"></span>
+  <span class="pill dim">■ START: K.O.Z.</span>
+  <span class="sep"></span>
+  <span class="pill"><span class="circle cool" id="circle"></span>KIN</span>
+  <span class="pill dim">L</span>
+  <span class="pill dim">V</span>
+  <span class="pill dim">CUR</span>
+  <span class="sep"></span>
+  <span class="pill"><span class="square" id="square"><span class="pin">📌</span></span>B</span>
+</div>
+
+<div class="controls">
+  <div class="ctl-row"><span class="lbl">◆ diamond · LOIS presence</span>
+    <button data-d="0" class="on">dark</button><button data-d="2">shimmer 2</button><button data-d="4">shimmer 4</button></div>
+  <div class="ctl-row"><span class="lbl">● circle · session vitality</span>
+    <button data-c="cool" class="on">cooling</button><button data-c="burn">burn</button><button data-c="vibe">vibe</button><button data-c="away">away</button></div>
+  <div class="ctl-row"><span class="lbl">■ square · structure</span>
+    <button data-s="0" class="on">0 locks</button><button data-s="2">2 locks</button><button data-s="4">4 locks</button><button data-s="armed">armed ⌖</button></div>
+</div>
+
+<script>
+  const d = document.getElementById('diamond'), c = document.getElementById('circle'), s = document.getElementById('square');
+  function setBtns(row, btn){ row.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn)); }
+  document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{ setBtns(b.parentNode,b);
+    d.className='diamond'+(b.dataset.d==='2'?' lvl2':b.dataset.d==='4'?' lvl4':''); });
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{ setBtns(b.parentNode,b); c.className='circle '+b.dataset.c; });
+  document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ setBtns(b.parentNode,b);
+    s.className='square'+(b.dataset.s==='2'?' locks2':b.dataset.s==='4'?' locks4':b.dataset.s==='armed'?' armed':''); });
+</script>
+</body></html>

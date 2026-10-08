@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Top bar — TE mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --te: #ff4d00; }
+  body { background: #161616; color: #d8d8d8; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #777; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #555; margin-bottom: 14px; }
+  .bar { display: flex; align-items: center; gap: 10px; background: #0e0e0e; border: 1px solid #2a2a2a;
+         border-radius: 6px; padding: 12px 14px 16px; font-size: 12px; letter-spacing: .08em; }
+  .sep { width: 1px; height: 22px; background: #2a2a2a; }
+  .pill { display: flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid #2e2e2e;
+          border-radius: 3px; color: #aaa; white-space: nowrap; position: relative; }
+  .pill.dim { color: #555; }
+  .tag { position: absolute; bottom: -13px; left: 50%; transform: translateX(-50%);
+         font-size: 8px; letter-spacing: .14em; color: #666; white-space: nowrap; }
+  /* ◆ diamond — detent switch, 4 hard steps */
+  .diamond { width: 11px; height: 11px; border: 2px solid #444; transform: rotate(45deg); border-radius: 1px;
+             transition: transform .12s steps(2), background .12s steps(2), border-color .12s steps(2); }
+  .diamond.s1 { transform: rotate(90deg); border-color: #666; }
+  .diamond.s2 { transform: rotate(135deg); border-color: #888; }
+  .diamond.s3 { transform: rotate(180deg); border-color: var(--te); }
+  .diamond.s4 { transform: rotate(225deg); background: var(--te); border-color: var(--te); }
+  /* ● circle — VU meter with ticks */
+  .vu { display: flex; align-items: center; gap: 6px; }
+  .vucircle { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #444; position: relative;
+              transition: border-color .15s steps(2); }
+  .vucircle .needle { position: absolute; left: 50%; top: 50%; width: 2px; height: 6px; background: #777;
+                      transform-origin: bottom center; transform: translate(-50%,-100%) rotate(-60deg);
+                      transition: transform .18s steps(3), background .15s steps(2); }
+  .vucircle.hot { border-color: var(--te); } .vucircle.hot .needle { background: var(--te); transform: translate(-50%,-100%) rotate(55deg); }
+  .vucircle.mid .needle { transform: translate(-50%,-100%) rotate(0deg); }
+  .vucircle.out { border-color: #333; } .vucircle.out .needle { background: #333; transform: translate(-50%,-100%) rotate(-60deg); }
+  .ticks { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
+  .ticks i { width: 2px; background: #3a3a3a; display: block; }
+  .ticks i:nth-child(1){height:5px}.ticks i:nth-child(2){height:8px}.ticks i:nth-child(3){height:11px}
+  .ticks i:nth-child(4){height:14px}.ticks i:nth-child(5){height:11px}.ticks i:nth-child(6){height:8px}.ticks i:nth-child(7){height:5px}
+  .ticks i.lit { background: var(--te); }
+  .vulabel { font-size: 9px; color: #777; letter-spacing: .1em; min-width: 26px; }
+  .vulabel.hot { color: var(--te); }
+  /* ■ square — structure + digit */
+  .square { width: 13px; height: 13px; border: 2px solid #666; border-radius: 1px; position: relative;
+            transition: background .12s steps(2); }
+  .square.fill { background: #999; }
+  .digit { font-size: 11px; color: #ddd; min-width: 10px; }
+  .nub { width: 8px; height: 14px; border: 2px solid #444; border-radius: 4px; position: relative; display: none; }
+  .nub::after { content:''; position: absolute; left: 1px; right: 1px; top: 1px; height: 4px; background: var(--te); border-radius: 2px; }
+  .nub.show { display: block; }
+  .controls { margin-top: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .ctl-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #777; }
+  .ctl-row .lbl { width: 170px; letter-spacing: .08em; }
+  button { background: #1c1c1c; color: #999; border: 1px solid #333; border-radius: 3px;
+           font-family: inherit; font-size: 10px; letter-spacing: .06em; padding: 5px 10px; cursor: pointer; }
+  button.on { background: #2a1408; border-color: var(--te); color: var(--te); }
+</style></head>
+<body>
+<h2>◆ / ● / ■ — TEENAGE ENGINEERING</h2>
+<p class="sub">detents · labels · one red — feel inside, read outside</p>
+
+<div class="bar">
+  <span class="pill"><span class="diamond" id="diamond"></span>KC-1<span class="tag">TASTE</span></span>
+  <span class="sep"></span>
+  <span class="pill dim">■ START: K.O.Z.</span>
+  <span class="sep"></span>
+  <span class="pill"><span class="vu">
+      <span class="vucircle mid" id="vu"><span class="needle"></span></span>
+      <span class="ticks" id="ticks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="vulabel" id="vulabel">—</span>
+    </span>KIN<span class="tag">HEAT</span></span>
+  <span class="pill dim">L</span>
+  <span class="pill dim">V</span>
+  <span class="pill dim">CUR</span>
+  <span class="sep"></span>
+  <span class="pill"><span class="square" id="square"></span><span class="digit" id="digit">0</span><span class="nub" id="nub"></span>B<span class="tag">LOCK</span></span>
+</div>
+
+<div class="controls">
+  <div class="ctl-row"><span class="lbl">◆ diamond · detent 0–4</span>
+    <button data-d="0" class="on">0</button><button data-d="1">1</button><button data-d="2">2</button><button data-d="3">3</button><button data-d="4">4</button></div>
+  <div class="ctl-row"><span class="lbl">● VU · session state</span>
+    <button data-v="mid" class="on">— idle</button><button data-v="hot">HOT burn</button><button data-v="out">OUT away</button></div>
+  <div class="ctl-row"><span class="lbl">■ square · locks + arm</span>
+    <button data-s="0" class="on">0</button><button data-s="2">2</button><button data-s="4">4</button><button data-s="arm">arm ⌖</button></div>
+</div>
+
+<script>
+  const d=document.getElementById('diamond'), vu=document.getElementById('vu'),
+        vl=document.getElementById('vulabel'), ticks=document.getElementById('ticks'),
+        sq=document.getElementById('square'), dg=document.getElementById('digit'), nub=document.getElementById('nub');
+  const bars=ticks.querySelectorAll('i');
+  function setBtns(row,btn){ row.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===btn)); }
+  function setTicks(n){ bars.forEach((b,i)=>b.classList.toggle('lit', i<n)); }
+  setTicks(3);
+  document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{ setBtns(b.parentNode,b);
+    d.className='diamond'+(b.dataset.d==='0'?'':' s'+b.dataset.d); });
+  document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{ setBtns(b.parentNode,b);
+    const v=b.dataset.v; vu.className='vucircle '+v;
+    vl.textContent = v==='hot'?'HOT':v==='out'?'OUT':'—';
+    vl.classList.toggle('hot', v==='hot');
+    setTicks(v==='hot'?7:v==='out'?0:3); });
+  document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{ setBtns(b.parentNode,b);
+    const v=b.dataset.s;
+    if(v==='arm'){ nub.classList.add('show'); return; }
+    nub.classList.remove('show');
+    dg.textContent=v; sq.classList.toggle('fill', v!=='0'); });
+</script>
+</body></html>

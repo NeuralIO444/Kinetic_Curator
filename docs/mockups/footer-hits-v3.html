@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HITS — resistor pill · KC-1 DS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --amber: #ffcd82; --te: #ff4d00; --pink: #ff2d78; }
+  body { background: #141414; color: #e8e4da; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #8a8578; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #5c584e; margin-bottom: 14px; }
+  .footer { background: #0a0a0a; border: 1px solid #222; border-radius: 8px; max-width: 1180px; }
+  .hitsrow { display: flex; align-items: center; gap: 8px; padding: 12px; border-bottom: 1px solid #1c1c1c;
+             overflow-x: auto; min-height: 64px; }
+  .hitslabel { font-size: 10px; letter-spacing: .14em; color: #777; padding: 0 4px; white-space: nowrap; }
+  .tbtn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+          background: #161616; border: 1px solid #333; border-radius: 14px; color: #ccc;
+          font-size: 11px; cursor: pointer; flex: 0 0 auto; transition: all .12s steps(2); }
+  .tbtn.playing { border-color: var(--te); color: var(--te); }
+  /* ── resistor pill ── */
+  .rpill { display: flex; align-items: center; gap: 10px; background: #141414;
+           border: 1px solid #2c2c2c; border-radius: 999px; padding: 6px 8px 6px 14px;
+           flex: 0 0 auto; position: relative; cursor: grab;
+           transition: border-color .12s steps(2); }
+  .rpill:active { cursor: grabbing; }
+  .rpill.dragging { opacity: .4; }
+  .rpill .num { font-size: 12px; color: #888; }
+  .rpill .name { font-size: 11px; letter-spacing: .1em; color: #ddd; }
+  .rpill .recall { display: flex; align-items: center; gap: 8px; background: none; border: none;
+                   color: inherit; font: inherit; cursor: pointer; padding: 0; }
+  .bands { display: flex; gap: 4px; padding: 0 2px; }
+  .band { width: 9px; height: 22px; border-radius: 2px; }
+  .rpill .acts { display: flex; align-items: center; gap: 2px; }
+  .rpill .mini { background: none; border: none; color: #4a4a4a; font-size: 12px; cursor: pointer;
+                 padding: 4px 6px; border-radius: 6px; font-family: inherit; transition: color .12s; }
+  .rpill .mini:hover { color: #eee; background: #1e1e1e; }
+  .rpill .mini.del:hover { color: var(--te); }
+  .rpill .grip { color: #3a3a3a; font-size: 10px; letter-spacing: 2px; padding: 0 2px; cursor: grab; }
+  .rpill.playing { border-color: var(--te); }
+  .rpill.playing .num { color: var(--te); }
+  /* hover detail card */
+  .detail { display: none; position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+            background: #161616; border: 1px solid #333; border-radius: 8px; padding: 12px 14px;
+            width: 230px; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+  .rpill:hover .detail { display: block; }
+  .detail h4 { font-size: 11px; letter-spacing: .1em; color: #ddd; margin-bottom: 2px; font-weight: normal; }
+  .detail .seed { font-size: 9px; color: #5c584e; margin-bottom: 8px; }
+  .detail .legend { font-size: 9px; color: #8a8578; line-height: 1.9; margin-bottom: 8px; }
+  .detail .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+  .detail .more { display: flex; gap: 6px; }
+  .detail .more button { flex: 1; background: #1e1e1e; border: 1px solid #333; color: #bbb; border-radius: 4px;
+                         font-family: inherit; font-size: 9px; letter-spacing: .06em; padding: 6px 4px; cursor: pointer; }
+  .detail .more button:hover { border-color: #666; color: #fff; }
+  .detail::after { content:''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+                   border: 6px solid transparent; border-top-color: #333; }
+  /* transport row */
+  .transport { display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-size: 11px;
+               letter-spacing: .06em; color: #999; overflow-x: auto; border-radius: 0 0 8px 8px; }
+  .sep { width: 1px; height: 18px; background: #222; flex: 0 0 auto; }
+  .lois { display: flex; align-items: center; gap: 7px; color: #bbb; white-space: nowrap; }
+  .live { background: var(--pink); color: #000; font-weight: 700; font-size: 10px; padding: 4px 9px;
+          border-radius: 3px; letter-spacing: .1em; }
+  .stat { display: flex; align-items: center; gap: 6px; white-space: nowrap; color: #777; }
+  .stat b { color: #bbb; font-weight: normal; }
+  .sq { width: 8px; height: 8px; background: #3ddc84; border-radius: 1px; }
+  .tagbtn { border: 1px solid #333; border-radius: 3px; padding: 3px 8px; color: #999; white-space: nowrap; }
+  .tagbtn.hot { border-color: var(--pink); color: var(--pink); }
+  .spacer { flex: 1; }
+  .stop { background: var(--pink); color: #000; font-weight: 700; border: none; border-radius: 4px;
+          padding: 7px 16px; font-family: inherit; font-size: 11px; letter-spacing: .1em; cursor: pointer; }
+  .controls { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; max-width: 1180px; }
+  .ctl-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #8a8578; flex-wrap: wrap; }
+  .ctl-row .lbl { width: 250px; letter-spacing: .06em; }
+  .ctl-row .lbl i { font-style: normal; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-right: 6px; }
+  .lbl i.d { background: #3a2f1d; color: var(--amber); } .lbl i.t { background: #2a1408; color: var(--te); }
+  button.ctl { background: #1e1e1e; color: #b9b3a4; border: 1px solid #333; border-radius: 4px;
+           font-family: inherit; font-size: 10px; letter-spacing: .06em; padding: 5px 10px; cursor: pointer; }
+  button.ctl.on { border-color: #c98f3d; color: var(--amber); background: #2a2417; }
+  .key { margin-top: 14px; font-size: 10px; color: #5c584e; letter-spacing: .05em; line-height: 2; max-width: 1180px; }
+  .key b { color: #999; font-weight: normal; }
+  .key b.a { color: var(--amber); } .key b.t { color: var(--te); }
+</style></head>
+<body>
+<h2>HITS — RESISTOR PILL</h2>
+<p class="sub">the bands are the vibe, frozen at capture · hover for the rest</p>
+
+<div class="footer">
+  <div class="hitsrow" id="hitsrow">
+    <span class="hitslabel">HITS</span>
+    <button class="tbtn" id="seqplay" title="play hits sequencer">▶</button>
+    <button class="tbtn" id="seqstop" title="stop hits sequencer">■</button>
+  </div>
+  <div class="transport">
+    <span class="lois">( ̄—̄ )&nbsp; LOIS <span style="color:#444">·</span> VIBE</span>
+    <span class="live">◉ LIVE</span>
+    <span class="sep"></span>
+    <span class="stat"><span class="sq"></span> tape <b>3%</b> AUTO</span>
+    <span class="sep"></span>
+    <span class="stat">fps <b>60.2</b> nodes <b>510</b> fx ms <b>1</b></span>
+    <span class="sep"></span>
+    <span class="stat">budget <b>FULL</b></span>
+    <span class="tagbtn hot">SHOW</span>
+    <span class="tagbtn">LEAN</span>
+    <span class="spacer"></span>
+    <button class="stop">■ STOP</button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="ctl-row"><span class="lbl"><i class="t">TE</i>try it</span>
+    <button class="ctl" id="c-play">▶ play sequencer</button>
+    <button class="ctl" id="c-add">＋ F — add hit</button>
+    <span style="font-size:10px;color:#5c584e">drag pills to reorder · hover a pill for details</span></div>
+</div>
+
+<div class="key">
+  <b>bands</b> — 3× dominant palette colors at capture + 1× heat (dark→amber→red, 4 steps) · frozen history, so TE: stepped, readable<br>
+  <b>visible</b> — duplicate <b>⧉</b> · delete <b>×</b> · drag <b>⋮⋮</b> · <b class="t">red edge</b> = playing<br>
+  <b>hover</b> — seed, captured age, band legend, share / morph / evolve<br>
+  <b>F</b> adds the current canvas as a new pill — bands sampled from the live palette at that instant
+</div>
+
+<script>
+  const row = document.getElementById('hitsrow');
+  const NAMES = ['EMBER','NOIR','BLOOM','ASH','VELVET','DRIFT','HALO','ONYX','PALE','RUST','GLOW','MOSS'];
+  const PALS = [
+    ['#e0245e','#7ed321','#e8e4da'], ['#8a6a45','#6b4f30','#a08050'], ['#e8823c','#d94f30','#4a90d9'],
+    ['#b89a6a','#8a6f45','#6b5a40'], ['#c9a0dc','#5b8dd9','#e8e4da'], ['#3ddc84','#1a7a4a','#0c2c1a'],
+  ];
+  const HEAT = ['#2a2a2a','#8a6a3a','#c98f3d','#ff4d00'];
+  let seed = 0;
+  const pills = [];
+  function hex4(){ return (Math.floor(Math.random()*0xffff)).toString(16).padStart(4,'0'); }
+  function addPill(name, pal, heat){
+    const p = document.createElement('div');
+    p.className = 'rpill'; p.draggable = true;
+    const hx = hex4(), age = Math.floor(Math.random()*50)+1;
+    const bands = pal.map(c=>`<span class="band" style="background:${c}"></span>`).join('')
+                + `<span class="band" style="background:${HEAT[heat]}" title="heat ${heat}/3 at capture"></span>`;
+    p.innerHTML = `
+      <button class="recall" title="click recall · shift evolve · alt morph">
+        <span class="num">${pills.length+1}</span><span class="name">${name}</span></button>
+      <span class="bands" title="vibe at capture">${bands}</span>
+      <span class="acts">
+        <button class="mini dup" title="duplicate">⧉</button>
+        <button class="mini del" title="delete">×</button>
+      </span>
+      <span class="grip" title="drag to reorder">⋮⋮</span>
+      <div class="detail">
+        <h4>${name}</h4><div class="seed">seed ${hx} · captured ${age}m ago</div>
+        <div class="legend">${pal.map((c,i)=>`<i style="background:${c}"></i>palette ${i+1}<br>`).join('')}
+          <i style="background:${HEAT[heat]}"></i>heat ${heat}/3 at capture</div>
+        <div class="more"><button>⧉ share</button><button>↔ morph</button><button>↻ evolve</button></div>
+      </div>`;
+    p.querySelector('.del').onclick = e => { e.stopPropagation(); p.remove();
+      pills.splice(pills.indexOf(p),1); renumber(); };
+    p.querySelector('.dup').onclick = e => { e.stopPropagation();
+      addPill(name, pal, heat); };
+    // drag-drop reorder
+    p.addEventListener('dragstart', ()=> p.classList.add('dragging'));
+    p.addEventListener('dragend', ()=>{ p.classList.remove('dragging'); renumber(); });
+    row.appendChild(p); pills.push(p); renumber();
+  }
+  function renumber(){ pills.forEach((p,i)=>{ if(p.isConnected) p.querySelector('.num').textContent = i+1; }); }
+  row.addEventListener('dragover', e=>{
+    e.preventDefault();
+    const d = row.querySelector('.dragging'); if(!d) return;
+    const after = [...row.querySelectorAll('.rpill:not(.dragging)')]
+      .find(el => e.clientX < el.getBoundingClientRect().left + el.offsetWidth/2);
+    const items = pills.filter(p=>p.isConnected && p!==d);
+    pills.length = 0;
+    if(after){ row.insertBefore(d, after); }
+    else { row.appendChild(d); }
+    // rebuild order
+    [...row.querySelectorAll('.rpill')].forEach(p=>pills.push(p));
+  });
+  // seed a few
+  addPill('EMBER', PALS[0], 3); addPill('NOIR', PALS[1], 1);
+  addPill('BLOOM', PALS[2], 2); addPill('ASH', PALS[3], 0);
+  // sequencer
+  let timer=null, cur=-1;
+  function mark(i){ pills.forEach((p,k)=>p.classList.toggle('playing', p.isConnected && k===i)); }
+  function play(){ document.getElementById('seqplay').classList.add('playing');
+    if(timer) return; const live=pills.filter(p=>p.isConnected);
+    cur=(cur+1)%live.length; mark(pills.indexOf(live[cur]));
+    timer=setInterval(()=>{ const l=pills.filter(p=>p.isConnected);
+      cur=(cur+1)%l.length; mark(pills.indexOf(l[cur])); }, 900); }
+  function stop(){ document.getElementById('seqplay').classList.remove('playing');
+    clearInterval(timer); timer=null; cur=-1; mark(-1); }
+  document.getElementById('seqplay').onclick=play;
+  document.getElementById('seqstop').onclick=stop;
+  document.getElementById('c-play').onclick=play;
+  document.getElementById('c-add').onclick=()=>{
+    addPill(NAMES[Math.floor(Math.random()*NAMES.length)],
+            PALS[Math.floor(Math.random()*PALS.length)], Math.floor(Math.random()*4)); };
+</script>
+</body></html>
