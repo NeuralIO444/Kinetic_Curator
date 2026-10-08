@@ -14,6 +14,10 @@
 import { PERSONA_TASTES, getPersonaTaste } from './personaTastes.js';
 import { getRenderProfile, applyRenderProfile } from './renderProfiles.js';
 import { rankLois } from './loisRank.js';
+import { loisActivity } from './loisActivity.js';
+import { resolveLoisFace } from './loisFace.js';
+import { resolveDavisState } from './davisState.js';
+import { noteRoom, TEMP_BASELINE, TEMP_MIN, TEMP_MAX } from './roomScheduler.js';
 
 // Re-exported so UI code has a single import site for persona data.
 export { PERSONA_TASTES };
@@ -84,15 +88,21 @@ export function scoreCandidate(features, weights) {
   return s;
 }
 
+function clampTemp(temperature) {
+  const t = typeof temperature === 'number' && Number.isFinite(temperature) ? temperature : TEMP_BASELINE;
+  return Math.min(TEMP_MAX, Math.max(TEMP_MIN, t));
+}
 
 /**
  * Pick a candidate index for a persona. Scores all candidates, takes the
- * top 3, and softmax-samples among them (temperature 0.4) so the best
- * usually wins but the pick doesn't feel robotic. rng is injectable:
- * pass a seeded RNG for determinism (same seed → same pick); production
- * passes Math.random. Returns -1 for empty input. Never mutates candidates.
+ * top 3, and softmax-samples among them so the best usually wins but the
+ * pick doesn't feel robotic. Temperature defaults to the baseline 0.4
+ * (no room noted). A room schedule (#1145) may pass its own value — that
+ * is the weight LOIS moves. rng is injectable: pass a seeded RNG for
+ * determinism (same seed → same pick); production passes Math.random.
+ * Returns -1 for empty input. Never mutates candidates.
  */
-export function pickPersona(candidates, personaId, rng = Math.random) {
+export function pickPersona(candidates, personaId, rng = Math.random, temperature) {
   const n = candidates.length;
   if (n === 0) return -1;
   const taste = getPersonaTaste(personaId);
@@ -103,8 +113,7 @@ export function pickPersona(candidates, personaId, rng = Math.random) {
   }));
   scored.sort((a, b) => b.s - a.s);
   const top = scored.slice(0, Math.min(3, n));
-  // softmax over the top-k
-  const T = 0.4;
+  const T = clampTemp(temperature);
   const exps = top.map((t) => Math.exp(t.s / T));
   const sum = exps.reduce((a, b) => a + b, 0) || 1;
   let r = rng() * sum;
@@ -140,6 +149,13 @@ export function getActivePersona() {
 
 export function personaIds() {
   return PERSONA_TASTES.map((p) => p.id);
+}
+
+/** Sample the room from the honest feed and return the temperature the picker should use. */
+function roomTemperature() {
+  const feed = loisActivity.snapshot();
+  const gain = noteRoom(resolveLoisFace(feed).code, resolveDavisState(feed)?.code ?? null);
+  return gain.temperature;
 }
 
 /**
@@ -184,6 +200,6 @@ export function personaCurator() {
         candidates[i] = applyRenderProfile(candidates[i], persona.id, rng);
       }
     },
-    pick: (candidates, rng) => pickPersona(candidates, persona.id, rng),
+    pick: (candidates, rng) => pickPersona(candidates, persona.id, rng, roomTemperature()),
   };
 }
