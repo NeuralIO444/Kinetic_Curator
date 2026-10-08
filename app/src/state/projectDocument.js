@@ -7,7 +7,7 @@ import { normalizeSnapshots, normalizeLayers } from './projectNormalize.js';
 export { normalizeSnapshots, normalizeLayers };
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
-import { sanitizeAssetKineme } from '../data/kinemes.js';
+import { sanitizeAssetKineme, sanitizeAssetStill } from '../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../midi/map.mjs';
@@ -109,6 +109,9 @@ export function serializeProject(state) {
   // motionless piece exports exactly as before.
   const kineme = sanitizeAssetKineme(state.assetKineme);
   if (kineme) doc.assetKineme = kineme;
+  // #1128 — assets pinned still (the living-motion floor skips them). Written only when set.
+  const still = sanitizeAssetStill(state.assetStill);
+  if (still) doc.assetStill = still;
   // #790 — the scene's audio routes. Written only when customised (null = the
   // default table), so an untouched piece exports exactly as before. [] is saved.
   const audioRoutes = sanitizeAudioRoutes(state.audioRoutes);
@@ -178,6 +181,7 @@ export function parseProject(raw) {
         paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
         light: sanitizeLight(raw.light), // #594 — absent → null (off)
         assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
+        assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
         audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
         midiMap: sanitizeMidiMap(raw.midiMap), // #617
         mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
@@ -224,6 +228,7 @@ export function parseProject(raw) {
       assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
       light: sanitizeLight(raw.light), // #594 — absent → null (off)
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
+      assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
       midiMap: sanitizeMidiMap(raw.midiMap), // #617
       mathMacros: sanitizeMathMacros(raw.mathMacros), // #724

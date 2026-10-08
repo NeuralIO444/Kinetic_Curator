@@ -585,6 +585,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // governor's slowRender uses) and the tick holds the last frame.
       slowRender: s.slowRender || !s.running,
       beatDrive: audioOn ? shapedAudio.beatPulse : null, // #1128 THUMP: a real beat or nothing
+      assetStill: s.assetStill, // #1128: assets the artist pinned still
       scaleMul,
       alphaBoost,
       effectiveScale,

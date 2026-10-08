@@ -85,6 +85,20 @@ export function sanitizeAssetKineme(raw) {
 }
 
 /**
+ * #1128 — assets the artist pinned still: the living-motion floor (breath, drift) leaves their marks where they were
+ * placed. { assetId: true }; anything else is dropped. Null when nothing is pinned (a doc without it is unchanged).
+ */
+export function sanitizeAssetStill(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  let n = 0;
+  for (const [assetId, v] of Object.entries(raw)) {
+    if (v === true && typeof assetId === 'string' && assetId && assetId.length <= 120 && n < 400) { out[assetId] = true; n++; }
+  }
+  return n ? out : null;
+}
+
+/**
  * Per-instance phase in [0, 1) from instance identity, so copies of one asset
  * never move in lockstep. Deterministic: same (seedOffset, key) → same phase.
  */

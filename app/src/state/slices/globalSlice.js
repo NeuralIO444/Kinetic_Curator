@@ -17,7 +17,7 @@ import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { sanitizeLight } from '../../data/light.js';
-import { sanitizeAssetKineme, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
+import { sanitizeAssetKineme, sanitizeAssetStill, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../../midi/map.mjs';
@@ -269,6 +269,8 @@ export const createGlobalSlice = (set) => ({
   assetWeightOverrides: {},
   /** #781 KINEME — { assetId: kinemeId }: which assets move, and how. Assets stay static sources. */
   assetKineme: { ...DEFAULT_ASSET_KINEME }, // #705 — micro-HUD ornaments move out of the box
+  /** #1128 — { assetId: true }: assets pinned still. The living-motion floor (breath, drift) leaves their marks where they were placed. */
+  assetStill: {},
   customAssets: [],
   ingestError: null,
   /**
@@ -588,6 +590,13 @@ export const createGlobalSlice = (set) => ({
    * Unknown kineme ids are ignored. The UI arrives with the DAVIS perform
    * surface; until then this is the store/test entry point.
    */
+  /** #1128 — pin an asset still, or let it move again. The artist's own choice, so it rides the document. */
+  toggleAssetStill: (assetId) => set((state) => {
+    if (!assetId || typeof assetId !== 'string') return {};
+    const cur = state.assetStill || {};
+    if (cur[assetId]) { const next = { ...cur }; delete next[assetId]; return { assetStill: next }; }
+    return { assetStill: { ...cur, [assetId]: true } };
+  }),
   setAssetKineme: (assetId, kinemeId) => set((state) => {
     const cur = state.assetKineme || {};
     if (!assetId) return {};
@@ -683,6 +692,7 @@ export const createGlobalSlice = (set) => ({
     // around the swatches the designer pinned.
     next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
+    next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
     next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
     next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
     {

@@ -178,11 +178,6 @@ export function buildPlacements({
     }
   }
 
-  // Kineme living-motion drivers (slice 2): per-instance scale/position
-  // deltas folded into the stage-C channels. Ephemeral — the geometry and
-  // bind caches above are untouched, and amount 0 is bit-identical.
-  const undoKineme = kineme ? applyKinemeDrivers(soa, kineme) : null; // #1128: puts the cached x/y back once the items are built
-
   // ── Stage D+E: asset bind + colour. Both are functions of (seed, index)
   // plus the asset pool / palette / strategy — never of the ranges — so they
   // ride on the geometry cache plus their own inputs.
@@ -235,6 +230,17 @@ export function buildPlacements({
     cache.accents = accents;
     cache.keys = keys;
   }
+
+  // Kineme living-motion drivers (slice 2): per-instance scale/position deltas folded into the stage-C channels.
+  // Ephemeral: the geometry and bind caches are untouched, and amount 0 is bit-identical. They run AFTER the asset
+  // bind (#1128) because the artist can pin an asset still, and which asset a mark is only known once it is bound
+  // (neither bind nor colour reads x, y or scale). The applier returns an undo that puts the cached x/y back.
+  let stillMarks = null;
+  if (kineme && kineme.stillAssets && kineme.stillAssets.size) {
+    stillMarks = new Uint8Array(soa.n);
+    for (let k = 0; k < soa.n; k++) if (kineme.stillAssets.has(assetIds[k])) stillMarks[k] = 1;
+  }
+  const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay

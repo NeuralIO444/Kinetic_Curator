@@ -61,6 +61,7 @@ export const Events = {
   ASSETS_CAT_FILTER: 'assets:catFilter',
   ASSETS_POOL_VIEW: 'assets:poolView',
   ASSETS_WEIGHT_CYCLE: 'assets:weightCycle',
+  ASSETS_STILL_TOGGLE: 'assets:stillToggle', // #1128
   ASSETS_WEIGHT_SET: 'assets:weightSet',
   ASSETS_CATEGORY_WEIGHT: 'assets:categoryWeight',
   ASSETS_WEIGHT_CLEAR: 'assets:weightClear',

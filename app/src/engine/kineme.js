@@ -303,7 +303,7 @@ export function evaluateKineme(soa, ctx) {
 const BASE_XY = new WeakMap();
 
 /** Applies the drivers; returns a function that restores the cached positions, or null when nothing moved. */
-export function applyKinemeDrivers(soa, ctx) {
+export function applyKinemeDrivers(soa, ctx, still = null) {
   if (!soa || !ctx) return null;
   if ((ctx.shedTier | 0) >= 3) return null;
   const d = evaluateKineme(soa, ctx);
@@ -313,6 +313,7 @@ export function applyKinemeDrivers(soa, ctx) {
   if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; BASE_XY.set(soa, base); }
   for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
   for (let k = 0; k < n; k++) {
+    if (still && still[k]) continue; // #1128: pinned still by the artist: this mark stays where it was placed
     soa.scale[k] *= 1 + d.dScale[k];
     soa.x[k] += d.dx[k];
     soa.y[k] += d.dy[k];
