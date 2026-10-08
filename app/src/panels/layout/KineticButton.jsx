@@ -47,6 +47,7 @@ export function KineticButton() {
   const coolTimerRef = useRef(null);
   const [heat, setHeat] = useState(0);
   const [cooling, setCooling] = useState(false); // #1103 — heating is instant; only cooling glides
+  const [lastLayer, setLastLayer] = useState(null); // #1122 — TE micro-label: the layer the last tap ran
   const tapOpen = useTapOpen(); // #1103 — touch has no hover
   const cold = useColdOpen(); // #1103 — the first ~2 s of a page load show the full name
   const [shimmer, markUsed] = useInvite('kinetic'); // #1103 — the sheen invites a press until it gets one
@@ -81,6 +82,7 @@ export function KineticButton() {
     const r = routeKineticTapHeat(runRef.current, now);
     runRef.current = { heat: r.heat, taps: r.taps, lastTapAt: r.lastTapAt };
     setHeat(r.heat);
+    setLastLayer(r.layer); // #1122 — the layer is discrete: RULES / WEATHER / CHAOS
     // LOIS honest feed: the single observable for a KINETIC tap (button + K).
     emit(Events.KINETIC_TAP, { kind: r.layer });
     if (r.layer === 'chaos') kineticRoll();
@@ -111,6 +113,12 @@ export function KineticButton() {
     >
       <span className="kinetic-glyph" aria-hidden="true">◉</span>
       <ExpandLabel short="KIN" full="KINETIC" tailClass="kinetic-rest" />
+      {/* #1122 — the layer is discrete → TE micro-label; visible while the run is warm */}
+      {heat > 0.01 && lastLayer && (
+        <span className="kinetic-layer" title={`last tap ran the ${lastLayer} layer`}>
+          {lastLayer === 'chaos' ? 'C' : lastLayer === 'weather' ? 'W' : 'R'}
+        </span>
+      )}
     </button>
   );
 }

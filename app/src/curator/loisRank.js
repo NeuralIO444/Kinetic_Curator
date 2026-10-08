@@ -12,13 +12,20 @@ const GLANCE_KEYS = ['markSize', 'coverage', 'opacity', 'markDensity', 'disorder
 const BOLD_KEYS = ['disorder', 'sizeVariety', 'rotationSpread', 'flowEnergy', 'windPush', 'markSize'];
 
 let lastVerdict = '';
+let lastParts = null; // #1122 — the CUR detent reads the verdict's real score
 
 export function getLoisVerdict() {
   return lastVerdict;
 }
 
+/** The { score, glance, originality, boldness } behind the last verdict, or null. */
+export function getLoisVerdictParts() {
+  return lastParts;
+}
+
 export function clearLoisVerdict() {
   lastVerdict = '';
+  lastParts = null;
 }
 
 function meanOf(rows) {
@@ -66,6 +73,7 @@ export function rankLois(candidates) {
   const n = candidates?.length ?? 0;
   if (n === 0) {
     lastVerdict = '';
+    lastParts = null;
     return { index: -1, verdict: '', parts: null };
   }
   const feats = candidates.map((c) => extractFeatures(c));
@@ -81,5 +89,6 @@ export function rankLois(candidates) {
   }
   const verdict = loisVerdict(bestParts);
   lastVerdict = verdict;
+  lastParts = bestParts;
   return { index: best, verdict, parts: bestParts };
 }
