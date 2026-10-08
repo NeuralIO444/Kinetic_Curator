@@ -113,6 +113,14 @@
 .palette-strip > .palette-switch { overflow: hidden; }
 /* #716 — Curator cluster in the top bar: menus open downward. */
 .kc-topbar-curator { flex-shrink: 0; }
+/* e2e contract (topbar-expand.spec.js): the curator group's OUTER width never changes —
+   hover ExpandLabel growth is absorbed inside this fixed budget, so the palette
+   chips/controls anchors never shift. Sized from measured rest (~524px) + max hover
+   expansion (~101px) + buffer. Released below 1100px where the phone layout wraps. */
+.kc-topbar-curator { width: 660px; }
+@media (max-width: 1100px) {
+  .kc-topbar-curator { width: auto; }
+}
 .kc-topbar-curator .curator-voice-menu { top: calc(100% + 4px); bottom: auto; box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
 /* #716 — narrow-width rule: palette chips shrink to swatches before anything
    wraps (names cost ~170px, so they go first, below 1440), then the time
