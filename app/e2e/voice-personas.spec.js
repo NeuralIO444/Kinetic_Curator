@@ -36,9 +36,10 @@ test.describe('Mode personas', () => {
     await expect(page.locator('.voice-flagships')).toContainText(/Dark Glass/);
   });
 
-  test('BUILD keeps the stub tiles and the + chip', async ({ page }) => {
-    // 14 stub tiles keep the mode grid (12 + DLA growth + Eden growth)
-    await expect(page.locator('.mode-grid .mode-tile')).toHaveCount(14);
+  test('BUILD keeps the stub tiles, the dice tile, and the + chip', async ({ page }) => {
+    // 14 stub tiles keep the mode grid (12 + DLA growth + Eden growth); the dice tile rolls 3 finalists
+    await expect(page.locator('.mode-grid .mode-tile:not(.dice-tile)')).toHaveCount(14);
+    await expect(page.locator('.mode-grid .dice-tile')).toBeVisible();
     await expect(page.locator('.plus-chip')).toBeVisible();
   });
 
