@@ -225,8 +225,8 @@
   background: rgba(255,255,255,0.22);
   transition: left 0.25s, background-color 0.25s, box-shadow 0.25s;
 }
-.fps-needle.warn { background: #ffb000; box-shadow: 0 0 3px rgba(255,176,0,0.8); }
-.fps-needle.bad { background: var(--kc-warn); box-shadow: 0 0 4px rgba(255,176,0,0.9); }
+.fps-needle.warn { background: var(--kc-red); box-shadow: 0 0 3px rgba(255,77,0,0.8); }
+.fps-needle.bad { background: var(--kc-warn); box-shadow: 0 0 4px rgba(255,77,0,0.9); }
 
 /* #295: the budget tape — fill is measured frame cost, never decorative.
    Sprocket ticks on the track for the tape-counter read. */

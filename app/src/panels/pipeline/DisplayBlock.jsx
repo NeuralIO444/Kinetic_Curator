@@ -16,7 +16,7 @@ export function DisplayBlock() {
       <div className="pipeline-row" title={helpText('output-fxaa')}>
         <span style={{ flex: 1, fontSize: 11 }}>
           EDGE AA · FXAA
-          {fxaa && shed && <em style={{ marginLeft: 6, color: '#ffb000' }}>shed by governor</em>}
+          {fxaa && shed && <em style={{ marginLeft: 6, color: 'var(--kc-red)' }}>shed by governor</em>}
         </span>
         <button
           type="button"

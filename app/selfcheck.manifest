@@ -79,6 +79,7 @@ node src/components/expandLabel.selfcheck.mjs
 node src/components/helpModal.selfcheck.mjs
 node src/panels/loisLines.selfcheck.mjs
 node src/components/pinkDiscipline.selfcheck.mjs
+node src/components/colorTribes.selfcheck.mjs
 node src/components/densityScale.selfcheck.mjs
 node src/styles/radii.selfcheck.mjs
 node src/styles/selects.selfcheck.mjs

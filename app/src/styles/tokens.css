@@ -5,10 +5,12 @@
   --accent: #ff2d6f;
   --accent2: #00d9ff;
   --accent3: #ffd400;
-  /* #1030 (M4) — pink means live, green means paused/ok, amber means caution/fault. */
+  /* #1030 (M4) — pink means live, green means paused/ok. #1126 (KC-1 DS rules 5 and 6): amber is the probabilistic
+     family (Davis, taste, presence, time-based things), and a FAULT is the structure red, so amber means one thing. */
   --kc-live: var(--accent);
   --kc-ok: #00ff88;
-  --kc-warn: #ffb000;
+  --kc-red: #ff4d00; /* structure / action / faults: LOIS's red, a different hue from live pink */
+  --kc-warn: var(--kc-red); /* a fault or warning IS the structure red (it used to be amber) */
   /* #1126 — Davis's colour: the probabilistic family (taste, presence, the generator). KC-1 DS rules 5 and 6. */
   --kc-davis: #ffcd82;
   --kc-davis-rgb: 255, 205, 130; /* the same colour as r,g,b for the canvas */

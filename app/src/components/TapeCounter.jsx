@@ -34,7 +34,7 @@ function lastShedLabel() {
 }
 
 const GREEN = { background: 'rgba(0, 255, 136, 0.14)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' };
-const AMBER = { background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' };
+const FAULT = { background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' };
 
 export function TapeCounter() {
   const { state } = useApp((s) => ({
@@ -94,7 +94,7 @@ export function TapeCounter() {
   // --- state 1: render fault (hard-stop class, red, explicit) ---
   if (renderFault) {
     return (
-      <div className="status-pill" style={AMBER}
+      <div className="status-pill" style={FAULT}
         title={renderFaultReason
           ? `Render fault: ${renderFaultReason}. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.`
           : 'Render fault: a deterministic per-frame failure stopped presenting. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.'}
@@ -127,10 +127,10 @@ export function TapeCounter() {
   // is what's load-bearing here. ---
   if (isTapeFull({ stageTimings, fps })) {
     return (
-      <div className="status-pill" style={AMBER}
+      <div className="status-pill" style={FAULT}
         title={`Tape full: measured frame cost ${frameMs.toFixed(1)}ms is already at ${fillPct}% of the ${FRAME_BUDGET_MS.toFixed(1)}ms (60fps) budget. A new track or FX slot is refused rather than silently degrading the render — drop the ceiling, free a track, or wait for headroom.`}
       >
-        <span className="status-dot" style={{ background: '#ffb000' }} />
+        <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
         TAPE FULL · {fillPct}%
       </div>
     );
@@ -142,13 +142,13 @@ export function TapeCounter() {
     // performed stage name), else the deepest active cut from the summary.
     const stageName = eventLabel || summary[summary.length - 1].toUpperCase();
     return (
-      <div className="status-pill" style={AMBER}
+      <div className="status-pill" style={FAULT}
         title={`Showrunner shed active: ${summary.join('; ')}.${fxNote} Auto-clears on recovery (watchdog needs manual resume). Tape fill: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : '—'} vs ${FRAME_BUDGET_MS.toFixed(1)}ms budget.`}
       >
-        <span className="status-dot" style={{ background: '#ffb000' }} />
+        <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
         <span key={stageName} className="tape-click">{stageName}</span>
         <span className="tape-bar" aria-hidden="true">
-          <span className="tape-bar-fill" style={{ width: `${Math.min(100, fillPct)}%`, background: '#ffb000' }} />
+          <span className="tape-bar-fill" style={{ width: `${Math.min(100, fillPct)}%`, background: 'var(--kc-red)' }} />
         </span>
         <span className="meter-value">{fillPct}%</span>
       </div>

@@ -100,9 +100,9 @@ export function MasterBar() {
         )}
 
         {persistStatus !== 'ok' && (
-          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title={persistStatus === 'quarantined' ? 'Last autosave could not be read.' : 'Autosave is failing.'}>
-            <span className="status-dot" style={{ background: '#ffb000' }} />
+            <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
           </div>
         )}
@@ -125,7 +125,7 @@ export function MasterBar() {
 
         {glContext !== 'ok' && (
           <div className="status-pill"
-            style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+            style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title={glContext === 'lost' ? 'GPU context lost' : 'GPU context restored — rebuilding'}>
             <span className="status-dot" style={{ background: 'var(--kc-warn)' }} />
             {glContext === 'lost' ? 'GL CONTEXT LOST' : 'GL RESTORING'}
@@ -133,17 +133,17 @@ export function MasterBar() {
         )}
 
         {audioDenied && (
-          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title="Browser denied mic access.">
-            <span className="status-dot" style={{ background: '#ffb000' }} />
+            <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             MIC BLOCKED
           </div>
         )}
 
         {audioLost && (
-          <div className="status-pill" style={{ background: 'rgba(255, 176, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
             title={`${lostLine(audioLost.name)} — switch AUDIO on in STIMULI to reconnect.`}>
-            <span className="status-dot" style={{ background: '#ffb000' }} />
+            <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             AUDIO INPUT LOST
           </div>
         )}
