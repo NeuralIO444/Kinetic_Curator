@@ -478,6 +478,8 @@ export function resolveVoiceState(def) {
     fx: sanitizeFx(def.fx),
     assets: def.assets === 'all' ? 'all' : { ...(def.assets || {}) },
     blendSeconds: Number.isFinite(def.blendSeconds) && def.blendSeconds > 0 ? def.blendSeconds : 2,
+    // #1153: an earned voice's layer stack (compact, already sanitized by the shelf); factory voices carry none
+    stack: def.stack && typeof def.stack === 'object' ? def.stack : null,
   };
 }
 

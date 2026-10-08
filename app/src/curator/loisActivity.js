@@ -9,7 +9,7 @@
 // performers — same pattern as the kinetic button's useRef). It subscribes
 // to the existing event bus plus one passive store subscription; it writes
 // nothing, renders nothing, changes nothing visible.
-import { Events, on } from '../composition/eventBus.js';
+import { Events, on, emit } from '../composition/eventBus.js';
 
 // Feed tunables — surfaces read these, nothing else sets them.
 export const LOIS_AWAY_MS = 5 * 60 * 1000; // AWAY: "he's out of the room" is literally true
@@ -69,6 +69,8 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     seedChanges: [], // ts the seed value changed
     rollsSinceSeed: 0,
     bloomAt: null, // ts of a keep that followed a run of passes: the ugly paid off
+    bloomDepth: 0, // how many rolls (passes) that run held: the number an earned voice carries (#1153)
+    passRun: 0, // the artist's own passes (CURATOR, KIN) since the last keep; EVOLVE fires are Davis's and do not count
     muted: 0, // >0 while the machine (the dead-frame guard) is re-dealing: not the artist, not noted
     frameKept: false, // the frame on screen was kept: true from a keep until the next roll or seed change (#1126: NOD)
     keepNote: { at: -Infinity, door: null },
@@ -110,11 +112,16 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     if (s.keepNote.door !== door && at - s.keepNote.at < KEEP_DEDUPE_MS) return;
     s.keepNote = { at, door };
     // a keep after a run of passes is the payoff (Davis BLOOM); count the passes BEFORE this keep lands
-    if (countSince(s.passes, DAVIS_UGLY_WINDOW_MS, at) >= DAVIS_UGLY_PASSES) s.bloomAt = at;
+    const bloomed = countSince(s.passes, DAVIS_UGLY_WINDOW_MS, at) >= DAVIS_UGLY_PASSES;
+    const rolls = s.passRun;
+    if (bloomed) { s.bloomAt = at; s.bloomDepth = rolls; }
+    s.passRun = 0;
     s.keeps.push(at);
     cap(s.keeps);
     s.frameKept = true;
     beat();
+    // announced AFTER the ledgers are updated and while the kept frame is still the live one (#1153 mints from it)
+    if (bloomed) emit(Events.BLOOM, { rolls, at });
   }
   function noteFavorite(fav, at, door) {
     if (s.favNote.door !== door && at - s.favNote.at < KEEP_DEDUPE_MS) return;
@@ -153,6 +160,8 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       rollsSinceSeed: s.rollsSinceSeed,
       keptThisSeed: s.keeps.some((k) => k >= s.seedSetAt),
       bloomAgeMs: s.bloomAt == null ? null : at - s.bloomAt,
+      bloomAt: s.bloomAt,
+      bloomDepth: s.bloomDepth,
       evolveCount: s.evolves.length,
     };
   }
@@ -206,7 +215,11 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       const at = t();
       s.rolls.push(at);
       cap(s.rolls);
-      if (!s.frameKept) { s.passes.push(at); cap(s.passes); } // it replaced a frame nobody kept
+      if (!s.frameKept) {
+        s.passes.push(at); cap(s.passes); // it replaced a frame nobody kept
+        // the number an earned voice carries is the ARTIST's rolls: an EVOLVE left running overnight must not farm depth
+        if (kind !== 'evolve') s.passRun += 1;
+      }
       s.rollsSinceSeed += 1;
       s.frameKept = false; // rolling moves off the kept frame
       if (kind !== 'evolve') beat(); // an EVOLVE fire is the generator at work, not the artist: it must not wake LOIS
@@ -236,18 +249,22 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
       unsubs.push(
         store.subscribe((st) => {
           const cur = read(st);
-          if (s.muted) { prev = cur; return; } // the machine, not the artist (the dead-frame guard re-dealing)
-          const newFav = fresh(st.favorites, prev.favIds); const newKeep = fresh(st.keeps, prev.keepIds);
-          if (newFav.length === 1 && cur.favIds.size > prev.favIds.size - 1) noteFavorite(newFav[0], t(), 'store');
-          if (newKeep.length === 1) noteKeep('store', t());
-          if (cur.evolveTs != null && cur.evolveTs !== prev.evolveTs) { s.evolves.push(t()); cap(s.evolves); noteRoll('evolve'); }
-          if (cur.seed !== prev.seed || cur.comp !== prev.comp) noteSeed(cur.seed, cur.comp);
-          if (cur.undoDepth === prev.undoDepth - 1 && cur.redoDepth >= prev.redoDepth) {
+          // `prev` moves on BEFORE anything is noted: a note can announce an event (BLOOM) whose handler writes the
+          // store, which re-enters this listener, and that re-entry must see this update as already seen.
+          const was = prev;
+          prev = cur;
+          if (s.muted) return; // the machine, not the artist (the dead-frame guard re-dealing)
+          const newFav = fresh(st.favorites, was.favIds); const newKeep = fresh(st.keeps, was.keepIds);
+          if (newFav.length === 1 && cur.favIds.size > was.favIds.size - 1) noteFavorite(newFav[0], t(), 'store');
+          if (cur.evolveTs != null && cur.evolveTs !== was.evolveTs) { s.evolves.push(t()); cap(s.evolves); noteRoll('evolve'); }
+          if (cur.seed !== was.seed || cur.comp !== was.comp) noteSeed(cur.seed, cur.comp);
+          if (cur.undoDepth === was.undoDepth - 1 && cur.redoDepth >= was.redoDepth) {
             s.undos.push(t());
             cap(s.undos);
             beat();
           }
-          prev = cur;
+          // last: a keep can announce BLOOM, and its handler may write the store
+          if (newKeep.length === 1) noteKeep('store', t());
         }),
       );
     }
