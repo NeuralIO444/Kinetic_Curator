@@ -1,6 +1,6 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount } from '../engine/buildPlacements.js';
-import { createDriverClock, driverTimeSec } from '../engine/kineme.js'; // #1128: the living-motion floor
+import { createDriverClock, driverTimeSec, patternAmounts } from '../engine/kineme.js'; // #1128: the living-motion floor
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -120,9 +120,11 @@ export function nodePhase(base, it) {
  * asks) from the layer's own layout, evaluated FROM rest so the first frame is the placed picture. null when every
  * amount is 0 (the hard gate: nothing is computed), and null under shed tier 3 (the governor froze motion: identity).
  */
-function livingMotion(layoutParams, seed, driverSec, W, H, slowRender) {
+function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive) {
   if (slowRender) return null;
-  const amounts = { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse };
+  const amounts = patternAmounts(
+    { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
+    layoutParams.kinemePattern, beatDrive);
   if (!(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0)) return null;
   return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true };
 }
@@ -538,7 +540,7 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
-          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender),
+          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).

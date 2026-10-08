@@ -4,6 +4,7 @@ import { BEHAVE_IDS } from '../engine/organisms/behave.js';
 import { COMPOSITION_PRESETS } from './presets.js';
 import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
+import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
 
 export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
@@ -133,6 +134,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   kinemeBreath: 0.3,
   kinemeDrift: 0.5,
   kinemePulse: 0,
+  kinemePattern: 'DRIFT', // #1128 DIRECTOR pattern: DRIFT | SWELL | THUMP (re-weights the amounts; an unknown name is DRIFT)
   kinemeBrushWobble: 0,
   kinemeBoilFps: 8,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
@@ -367,6 +369,7 @@ const ENUM_SPEC = {
   behave: BEHAVE_MODES,
   contactMode: CONTACT_MODES,
   audioResponse: AUDIO_RESPONSE_IDS, // #306
+  kinemePattern: KINEME_PATTERNS, // #1128
 };
 
 /** True when `value` is a number we can meaningfully clamp. */
@@ -498,6 +501,7 @@ export function normalizeLayoutParams(partial) {
   next.behave = pickEnum(next.behave, BEHAVE_MODES, 'cruise');
   next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
   next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
+  next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
 
   return next;
 }
