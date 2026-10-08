@@ -864,6 +864,12 @@
 .panel-davis .davis-body { padding: 6px 8px; }
 .davis-actions-3 { grid-template-columns: repeat(3, 1fr); }
 .davis-actions-4 { grid-template-columns: repeat(4, 1fr); }
+/* #1128: the motion row costs 25px; the panel pays for it here, so it still fits 1280x720 with no scroll */
+.panel-davis .voice-row { margin-bottom: 2px; }
+.panel-davis .davis-section-label { margin-top: 3px; padding-top: 3px; }
+.panel-davis .davis-section-label:first-child { margin-top: 0; padding-top: 0; }
+.davis-actions-motion { grid-template-columns: auto repeat(3, 1fr); align-items: center; } /* #1128: the label shares the row, so the panel keeps its no-scroll fit */
+.davis-actions-motion .lbl { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); font-style: normal; text-transform: uppercase; padding-right: 4px; }
 .davis-perform-row { display: grid; grid-template-columns: 1fr 2fr; gap: 4px; align-items: stretch; }
 
 /* #1126 — the two Directors, readout only. Square corners, one border; Davis in his own colour. Each side is a row:

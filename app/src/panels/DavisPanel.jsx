@@ -11,6 +11,7 @@ import { captureFavorite } from '../state/slices/davisSlice.js';
 import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
 import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
+import { KINEME_PATTERNS } from '../engine/kineme.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -180,6 +181,24 @@ export function DavisPanel() {
               title={accumOn ? 'SWELL: breathe the trail length out and back over ~2 seconds' : 'Waiting for ACCUM — turn ACCUM on to swell the trails'}>
               SWELL
             </button>
+          </div>
+
+          {/* #1128 — the DIRECTOR's motion pattern: which way the always-on breath and drift lean. A discrete choice, so it
+              renders TE (rule 2). THUMP needs a real beat; without audio it plays DRIFT, and says so. */}
+          <div className="davis-actions davis-actions-motion" role="group" aria-label="motion pattern">
+            <i className="lbl">motion</i>
+            {KINEME_PATTERNS.map((p) => {
+              const on = (layoutParams.kinemePattern || 'DRIFT') === p;
+              return (
+                <button key={p} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${p} pattern`}
+                  title={p === 'DRIFT' ? 'DRIFT: the floor — marks breathe and drift as set'
+                    : p === 'SWELL' ? 'SWELL: breath leads, drift steps back'
+                    : `THUMP: marks pulse on the beat${audioEnabled ? '' : ' — needs audio on; plays DRIFT until then'}`}
+                  onClick={() => emit(Events.LAYOUT_PARAM, { key: 'kinemePattern', value: p })}>
+                  {p}
+                </button>
+              );
+            })}
           </div>
 
           {/* #1126 — the two Directors, at the foot of the panel (Matt): readout only, what the honest feed says each is doing */}

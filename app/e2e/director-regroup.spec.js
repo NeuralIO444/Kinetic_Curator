@@ -20,6 +20,16 @@ test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE p
     await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
   }
 
+  // #1128: the DIRECTOR's motion pattern — a discrete TE choice, DRIFT (the floor) until another is picked
+  const pat = (name) => panel.getByRole('group', { name: 'motion pattern' }).getByRole('button', { name: `${name} pattern`, exact: true });
+  await expect(pat('DRIFT')).toHaveAttribute('aria-pressed', 'true');
+  await expect(pat('THUMP')).toHaveAttribute('title', /needs audio on; plays DRIFT until then/);
+  await pat('SWELL').click();
+  await expect(pat('SWELL')).toHaveAttribute('aria-pressed', 'true');
+  await expect(pat('DRIFT')).toHaveAttribute('aria-pressed', 'false');
+  await pat('DRIFT').click();
+  await expect(pat('DRIFT')).toHaveAttribute('aria-pressed', 'true');
+
   // UX-7: the gesture row is always reachable — ACCUM toggle in-panel, and
   // FREEZE/CLEAR/SWELL wait on ACCUM (disabled, not gone) instead of vanishing
   const accumBtn = panel.getByRole('button', { name: 'ACCUM', exact: true });

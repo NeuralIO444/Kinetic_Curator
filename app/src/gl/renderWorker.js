@@ -179,6 +179,7 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
     slowRender: s.slowRender || s.running === false,
     attractor: view.attractor,
     audioBands: ballistics,
+    beatDrive: audioBands ? ballistics.beatPulse : null, // #1128 THUMP: a real beat or nothing
     dtSec,
     loopTimeMs: frameTimeMs,
   });
