@@ -250,22 +250,26 @@ export function CuratorBar() {
           )}
           <ExpandLabel short="cur" full="curator" />
           {/* #1122 — locks are discrete → TE: a pip on CUR's right edge (glyph + count).
-              Red nub = armed roll scope. The pip is a button when armed: tap to disarm.
-              (The mockup's ■ B assumed B was free; the BEAT clock owns "b" now.) */}
-          {armed ? (
-            <button type="button" className="lock-badge" data-subdued={subdued('locks', true)}
-              onClick={clearRollScope} title="roll scope armed — tap to disarm" aria-label="disarm roll scope">
-              <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
-              {lockCount > 0 && <span className="lock-digit">{lockCount}</span>}
-              <span className="lock-nubdot" aria-hidden="true" />
-            </button>
-          ) : (
-            <span className="lock-badge" data-subdued={subdued('locks', lockCount > 0)}
-              title={lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}` : 'no locked params'}>
-              <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
-              {lockCount > 0 && <span className="lock-digit">{lockCount}</span>}
-            </span>
-          )}
+              Red nub = armed roll scope. The pip is actionable when armed: tap to disarm.
+              (A real <button> can't nest inside the CUR button, so this is a span with
+              button semantics when armed. The mockup's ■ B assumed B was free; the
+              BEAT clock owns "b" now.) */}
+          <span
+            className="lock-badge"
+            data-subdued={subdued('locks', lockCount > 0 || armed)}
+            title={armed ? 'roll scope armed — tap to disarm' : lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}` : 'no locked params'}
+            {...(armed ? {
+              role: 'button',
+              tabIndex: 0,
+              'aria-label': 'disarm roll scope',
+              onClick: (e) => { e.stopPropagation(); clearRollScope(); },
+              onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); clearRollScope(); } },
+            } : {})}
+          >
+            <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
+            {lockCount > 0 && <span className="lock-digit">{lockCount}</span>}
+            {armed && <span className="lock-nubdot" aria-hidden="true" />}
+          </span>
         </button>
         {/* #1103 — BEAT sits right of CURATOR: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
         <BeatButton />
