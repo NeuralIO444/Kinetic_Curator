@@ -397,6 +397,21 @@ def require_project(project_arg) -> Path:
         raise UserError(
             f"project not found: {project}",
             "in the app: OUTPUT → save project, then pass that file path.")
+    # #1172 — a Pipeline HITS export ({hits, keeps, project, version}) is an
+    # envelope, not a renderable project. Rendering it anyway reads
+    # doc.layoutParams etc. off the envelope, gets defaults, and silently
+    # produces identical-per-seed output. Refuse with the fix instead.
+    try:
+        doc = json.loads(project.read_text())
+    except (OSError, ValueError):
+        doc = None
+    if isinstance(doc, dict) and "hits" in doc and "project" in doc:
+        raise UserError(
+            f"not a renderable project: {project}",
+            "that file is a Pipeline HITS export envelope "
+            "({hits, keeps, project, version}). Extract a renderable project "
+            "first — see write_hit_project() in studio/hits_bridge.py, e.g. "
+            "one project per hit, then render those.")
     return project
 
 
