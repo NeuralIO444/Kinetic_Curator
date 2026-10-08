@@ -24,7 +24,7 @@ const u8ToB64 = (u8) => {
 
 /**
  * payload: { width, height, bg, contract, cells, atlasB64, atlasW, atlasH,
- *            grainLuts: {id:{b64,w,h}} }
+ *            atlasMips }
  * returns { pixelsB64, width, height } — pixels are top-first RGBA bytes.
  */
 function renderArgs(payload) {
@@ -32,10 +32,6 @@ function renderArgs(payload) {
   const atlasMips = (payload.atlasMips || []).map((m) => ({
     pixels: b64ToU8(m.b64), width: m.w, height: m.h,
   }));
-  const grainLuts = {};
-  for (const [id, lut] of Object.entries(payload.grainLuts || {})) {
-    grainLuts[id] = { pixels: b64ToU8(lut.b64), width: lut.w, height: lut.h };
-  }
   return {
     width: payload.width,
     height: payload.height,
@@ -43,7 +39,6 @@ function renderArgs(payload) {
     contract: payload.contract,
     cells: payload.cells,
     atlas: { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips },
-    grainLuts,
   };
 }
 
@@ -57,7 +52,7 @@ window.__kcRender = async (payload) => {
  * ACCUM trail still (#190). payload:
  *   { width, height, bg, fade, optics, tunnel, prism, flow, echoes,
  *     audioFrames: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
- *     atlasB64, atlasW, atlasH, atlasMips, cells, grainLuts,
+ *     atlasB64, atlasW, atlasH, atlasMips, cells,
  *     frames: [{ contract }] }   // atlas shared across frames
  * Runs the whole sequence through the shared recipe (accum.mjs) and returns
  * the final buffer as top-first RGBA bytes.
@@ -68,10 +63,6 @@ window.__kcAccum = async (payload) => {
   const atlasMips = (payload.atlasMips || []).map((m) => ({
     pixels: b64ToU8(m.b64), width: m.w, height: m.h,
   }));
-  const grainLuts = {};
-  for (const [id, lut] of Object.entries(payload.grainLuts || {})) {
-    grainLuts[id] = { pixels: b64ToU8(lut.b64), width: lut.w, height: lut.h };
-  }
   const atlas = { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips };
   const frames = payload.frames.map((f) => ({
     width: payload.width,
@@ -80,7 +71,6 @@ window.__kcAccum = async (payload) => {
     contract: f.contract,
     cells: payload.cells,
     atlas,
-    grainLuts,
   }));
   const { pixels, width, height } = renderer.renderAccumSequence(frames, {
     fade: payload.fade,

@@ -515,9 +515,9 @@ export function registerFxShaders(bridge, gl) {
 /**
  * compileFxPrimitives (SVG) -> compileFxShaders (GL): the GL-side effect
  * compiler. Sanitizes the layer's effects array and maps it to bridge
- * chain steps { kind, params, aux }. Unknown kinds are dropped and
+ * chain steps { kind, params }. Unknown kinds are dropped and
  * params are clamped/defaulted — fail closed, never throws.
- * auxFor(kind) supplies per-kind aux textures (grain LUT); null otherwise.
+ * Grain is procedural (#1079): no aux texture exists for any kind.
  *
  * Template effects sanitize against their own descriptors (single source
  * of truth, mirroring the SVG catalog ranges). The five Phase-1 builtin
@@ -540,12 +540,12 @@ function sanitizeOne(fx) {
   return { kind, params: sanitizeParams(descriptor, src) };
 }
 
-export function compileFxShaders(effects, { auxFor = () => null } = {}) {
+export function compileFxShaders(effects) {
   if (!Array.isArray(effects)) return [];
   return effects
     .map(sanitizeOne)
     .filter(Boolean)
-    .map((fx) => ({ kind: fx.kind, params: fx.params, aux: auxFor(fx.kind) }));
+    .map((fx) => ({ kind: fx.kind, params: fx.params }));
 }
 
 /** Test helper: which shared chunks does each effect actually call? */

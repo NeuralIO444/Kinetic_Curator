@@ -67,8 +67,8 @@ import {
 
 /**
  * #265 — the atlas is resolution-independent (asset/color combos only), so
- * render-size changes must NOT rebake it. Grain needs no bake at all: the
- * shader is procedural hash noise (#1079).
+ * render-size changes must NOT rebake it. #1079: the grain LUT bake is gone
+ * (grain is procedural), so there is no second bake key anymore.
  */
 function atlasKeyFor(combos, fxLayerIds) {
   const ck = combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join(';');
@@ -256,7 +256,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   let prevTime = 0;
   let loopTimeMs = 0;
 
-  // Static resources (atlas + grain LUTs), uploaded once per combo set.
+  // Static resources (atlas), uploaded once per combo set.
   // cells is a plain object: "asset|tint|accent" -> {u0,v0,u1,v1}, exactly
   // what renderFrameInto's instanceData reads.
   let cells = null;
@@ -831,7 +831,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       const svgById = getPool(getState().customAssets);
       // #265 — rebake only what changed: the atlas is resolution-
       // independent, so a renderScale step skips the heavy sequential-SVG
-      // bake and only the (cheap) grain LUTs rebuild.
+      // bake entirely (#1079: the grain LUT bake is gone).
       if (aKey !== atlasKey) {
         const atlas = await bakeLiveAtlas(combos, svgById, gradientPool);
         if (token !== buildToken) return; // superseded

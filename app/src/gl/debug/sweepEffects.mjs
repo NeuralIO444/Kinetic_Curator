@@ -46,8 +46,8 @@
  *   included) for contract cases; raw direct upload for hostile cases.
  * - builtins: the u_p packers from registerBuiltinEffects
  *   (builtinEffects.mjs) — invert [0,0,0,0], rgbSplit [dx/1000,0,0,0],
- *   grain [amount,0,0,0], posterize [levels,0,0,0]; u_clipOn=0,
- *   u_aux=input except grain's LUT.
+ *   grain [amount,0,0,0], posterize [levels,0,0,0]; u_clipOn=0
+ *   (#1079: grain is procedural — no aux texture).
  * - ACCUM: the setup callbacks in createAccum (accum.mjs).
  */
 
@@ -70,25 +70,6 @@ function solidTexture(gl, w, h, r, g, b, a) {
   const bytes = new Uint8Array(w * h * 4);
   for (let k = 0; k < bytes.length; k += 4) {
     bytes[k] = r; bytes[k + 1] = g; bytes[k + 2] = b; bytes[k + 3] = a;
-  }
-  const tex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
-  gl.bindTexture(gl.TEXTURE_2D, null);
-  return tex;
-}
-
-/** Deterministic stand-in for the baked grain LUT (sweep needs finite noise, not the resvg bake). */
-function grainLutTexture(gl, w, h) {
-  const bytes = new Uint8Array(w * h * 4);
-  let s = 0x51ed2703;
-  for (let k = 0; k < bytes.length; k++) {
-    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
-    bytes[k] = (s >>> 8) & 255;
   }
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -227,7 +208,7 @@ const S = (unit) => ({ kind: 'sampler', unit });
  * One builtin-FX sweep entry. `mode` is the EFFECT_FS u_effect id;
  * `pack(c, lab)` returns u_p exactly as registerBuiltinEffects packs it.
  */
-function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
+function builtinEffectDef(id, mode, pack) {
   const decls = BUILTIN_UNIFORMS;
   return {
     id: `builtin/${id}`,
@@ -240,11 +221,9 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
         fsFile: 'shaders.mjs:EFFECT_FS',
         decls,
       });
-      const auxTex = aux ? grainLutTexture(gl, 32, 32) : null;
       const upload = (glA, locsA, c, lab, target) => {
         lab.render(program, target, locsA, decls, {
           u_src: lab.input.tex,
-          u_aux: auxTex || lab.input.tex,
           u_effect: mode,
           u_p: pack(c, lab),
           u_texel: [1 / target.w, 1 / target.h],
@@ -258,7 +237,6 @@ function builtinEffectDef(id, mode, pack, { aux = false } = {}) {
         apply: (glA, locsA, c, lab, targets) => upload(glA, locsA, c, lab, targets.out),
         dispose: () => {
           gl.deleteProgram(program);
-          if (auxTex) gl.deleteTexture(auxTex);
         },
       };
     },
@@ -606,7 +584,7 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
-    ...builtinEffectDef('grain', 2, (c) => [c.params.amount ?? 0.4, 0, 0, 0], { aux: true }),
+    ...builtinEffectDef('grain', 2, (c) => [c.params.amount ?? 0.4, 0, 0, 0]),
     cases: [
       C('defaults', { amount: 0.4 }),
       C('zero → no-op', { amount: 0 }, { noop: true }),

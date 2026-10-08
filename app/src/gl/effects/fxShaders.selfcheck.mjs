@@ -303,14 +303,13 @@ ok('#590: displace warp is additive — 0 is the legacy effect, and the block is
     'a non-finite warp falls back to the legacy default');
 });
 
-ok('compileFxShaders wires aux textures per kind', () => {
-  const fakeAux = { tex: 'lut' };
+ok('compileFxShaders emits kind+params steps, no aux (#1079)', () => {
   const steps = compileFxShaders(
     [{ kind: 'grain', params: { amount: 0.4 } }, { kind: 'edge', params: {} }],
-    { auxFor: (kind) => (kind === 'grain' ? fakeAux : null) },
   );
-  assert.equal(steps[0].aux, fakeAux, 'grain gets its aux');
-  assert.equal(steps[1].aux, null, 'edge gets none');
+  assert.equal(steps[0].kind, 'grain');
+  assert.deepEqual(Object.keys(steps[0]).sort(), ['kind', 'params'], 'no aux texture on any step');
+  assert.ok(!('aux' in steps[1]), 'edge has no aux either');
 });
 
 ok('noise comes from the shared chunk library — never reimplemented', () => {

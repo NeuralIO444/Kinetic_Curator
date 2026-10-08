@@ -13,7 +13,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { bakeAtlas, bakeGrainLut, comboKey } from '../atlas.mjs';
+import { bakeAtlas, comboKey } from '../atlas.mjs';
 import { glStaticHandler } from './glStaticServer.mjs';
 
 const PARITY_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -155,29 +155,11 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
   const atlas = getAtlas(combos);
   const cells = {};
   for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1 };
-  // One grain LUT per render: the reference turbulence is region-independent
-  // (filter region only clips), so a single full-canvas bake serves every wrap.
-  let lutB64 = null, lutW = 0, lutH = 0;
-  const needsGrain = (contract.fxWraps || []).some((wrap) => {
-    const layer = contract.layers.find((l) => l.id === wrap.fxLayerId);
-    return layer?.fx?.some((f) => f.kind === 'grain');
-  });
-  if (needsGrain) {
-    const lut = bakeGrainLut(width, height);
-    lutB64 = b64(lut.pixels); lutW = lut.width; lutH = lut.height;
-  }
-  const grainLuts = {};
-  for (const wrap of contract.fxWraps || []) {
-    const layer = contract.layers.find((l) => l.id === wrap.fxLayerId);
-    if (layer?.fx?.some((f) => f.kind === 'grain') && lutB64) {
-      grainLuts[wrap.fxLayerId] = { b64: lutB64, w: lutW, h: lutH };
-    }
-  }
+  // #1079: grain is procedural — no LUT is baked or shipped.
   return {
     width, height, bg, contract, cells,
     atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
     atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
-    grainLuts,
   };
 }
 
@@ -207,24 +189,7 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
   const atlas = getAtlas(combos);
   const cells = {};
   for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1 };
-  const needsGrain = frameContracts.some((contract) =>
-    (contract.fxWraps || []).some((wrap) => {
-      const layer = contract.layers.find((l) => l.id === wrap.fxLayerId);
-      return layer?.fx?.some((f) => f.kind === 'grain');
-    })
-  );
-  const grainLuts = {};
-  if (needsGrain) {
-    const lut = bakeGrainLut(width, height);
-    for (const contract of frameContracts) {
-      for (const wrap of contract.fxWraps || []) {
-        const layer = contract.layers.find((l) => l.id === wrap.fxLayerId);
-        if (layer?.fx?.some((f) => f.kind === 'grain') && !grainLuts[wrap.fxLayerId]) {
-          grainLuts[wrap.fxLayerId] = { b64: b64(lut.pixels), w: lut.width, h: lut.height };
-        }
-      }
-    }
-  }
+  // #1079: grain is procedural — no LUT is baked or shipped.
   const payload = {
     width, height, bg, fade, optics, tunnel, prism, flow, echoes,
     audioFrames: audio,
@@ -232,7 +197,6 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
     cells,
     atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
     atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
-    grainLuts,
     frames: frameContracts.map((contract) => ({
       contract,
     })),

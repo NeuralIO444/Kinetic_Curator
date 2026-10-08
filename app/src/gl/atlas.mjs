@@ -156,28 +156,3 @@ export function buildMipmaps(pixels, width, height) {
   }
   return levels;
 }
-
-/**
- * Bake the grain noise LUT — the exact feTurbulence the reference path
- * uses for the grain effect (fractalNoise, baseFrequency 0.9, 2 octaves,
- * seed 3), rendered over the full canvas in user space at the target
- * device size. Sampling this at exact texel centers reproduces the
- * reference noise bit-for-bit (same rasterizer, same seed, same grid).
- *
- * @returns {{pixels: Buffer, width: number, height: number}} premultiplied RGBA
- */
-export function bakeGrainLut(width, height) {
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 1000 700">` +
-    `<defs><filter id="n" filterUnits="userSpaceOnUse" x="0" y="0" width="1000" height="700" ` +
-    `color-interpolation-filters="sRGB">` +
-    `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/>` +
-    `</filter></defs>` +
-    `<rect x="0" y="0" width="1000" height="700" filter="url(#n)"/>` +
-    `</svg>`;
-  const img = new Resvg(svg, { fitTo: { mode: 'width', value: width } }).render();
-  if (img.width !== width || img.height !== height) {
-    throw new Error(`[atlas] grain LUT size mismatch: ${img.width}x${img.height} != ${width}x${height}`);
-  }
-  return { pixels: Buffer.from(img.pixels), width: img.width, height: img.height };
-}

@@ -576,21 +576,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   }
 
   /**
-   * Upload the per-render static textures (atlas + grain LUTs). Shared by
+   * Upload the per-render static textures (atlas). Shared by
    * renderScene and renderAccumSequence — a sequence uploads once.
    */
   function uploadStatic(payload) {
     const atlasTex = uploadTexture(gl, payload.atlas.pixels, payload.atlas.width, payload.atlas.height, { mipmaps: payload.atlas.mipmaps || null });
-    const grainLuts = {};
-    for (const [id, lut] of Object.entries(payload.grainLuts || {})) {
-      grainLuts[id] = uploadTexture(gl, lut.pixels, lut.width, lut.height, { nearest: true });
-    }
-    return { atlasTex, grainLuts };
+    return { atlasTex };
   }
 
   function freeStatic(uploaded) {
     gl.deleteTexture(uploaded.atlasTex);
-    for (const k of Object.keys(uploaded.grainLuts)) gl.deleteTexture(uploaded.grainLuts[k]);
   }
 
   /** Frame targets (16F premultiplied; RGBA8 for final output). */
@@ -660,7 +655,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     squash = contract.squash || 0; // #594 PR3
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
-    const { atlasTex, grainLuts } = uploaded;
+    const { atlasTex } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];
     patternSeen = new Set();
@@ -775,21 +770,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         // #520 Phase 2: split FX chain at GRAIN_FAMILY_KINDS — grain-family
         // effects belong in EF-4 FINISH and must run post-accum so they don't
         // compound in the feedback loop. Non-grain steps still run pre-accum.
-        const auxForGrain = (kind) => {
-          if (kind !== 'grain') return null;
-          // #749 / #748: procedural grain does not need a LUT; a missing bake
-          // must not abort the FX chain.
-          return grainLuts[wrap.fxLayerId] || null;
-        };
+        // #1079: grain is procedural hash speckle — no aux texture exists.
         // #1010 — per-knob MOD (none/rms/flux/beatPulse) pushes routed knobs
         // toward their catalog max on the envelope; null audio is a no-op.
         const chainFx = layer.type === 'math' ? applyMathMod(layer.fx || [], payload.audio) : (layer.fx || []);
         const preEffects = chainFx.filter((f) => !GRAIN_FAMILY_KINDS.includes(f.kind));
         const finEffects = (layer.fx || []).filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
-        const preSteps = compileFxShaders(preEffects, { auxFor: () => null });
+        const preSteps = compileFxShaders(preEffects);
         const afterFx = preSteps.length ? bridge.runChain(layerId, wRead, preSteps) : wRead;
         if (finEffects.length) {
-          fxFinishChains.push({ layerId, steps: compileFxShaders(finEffects, { auxFor: auxForGrain }) });
+          fxFinishChains.push({ layerId, steps: compileFxShaders(finEffects) });
         }
         // An FX layer's own matte masks the wrap result at composite time.
         // #227: no region clip — the FX output is defined over the whole
@@ -1018,7 +1008,6 @@ export function createLiveRenderer(canvas) {
   let T = null;
   let TW = 0, TH = 0;
   let atlasTex = null;
-  let grainTexs = {};
   let accum = null;
 
   // #607 — the last presented target ({tex,w,h}-like) and a monotonically
@@ -1060,14 +1049,6 @@ export function createLiveRenderer(canvas) {
     });
   }
 
-  function setGrainLuts(luts) {
-    for (const t of Object.values(grainTexs)) gl.deleteTexture(t);
-    grainTexs = {};
-    for (const [k, lut] of Object.entries(luts || {})) {
-      grainTexs[k] = uploadTexture(gl, lut.pixels, lut.width, lut.height, { nearest: true });
-    }
-  }
-
   /**
    * Render one frame into the persistent targets.
    * payload: { width, height, bg, contract, cells, transparent? } —
@@ -1082,7 +1063,7 @@ export function createLiveRenderer(canvas) {
     ensureTargets(payload.width, payload.height, dprScale);
     // Draw at backing-store size; u_canvas stays 1000×700 so the scene
     // layout is identical — the extra pixels are pure sharpness.
-    return b.renderFrameInto({ ...payload, width: TW, height: TH }, T, { atlasTex, grainLuts: grainTexs }, { transparent });
+    return b.renderFrameInto({ ...payload, width: TW, height: TH }, T, { atlasTex }, { transparent });
   }
 
   /** Present a composited target to the visible canvas (Y-flip resolve). */
@@ -1281,7 +1262,7 @@ export function createLiveRenderer(canvas) {
       // pure sharpness, same trick governor renderScale uses below 1x.
       const mRead = b.renderFrameInto(
         { ...payload, width: w, height: h }, OT,
-        { atlasTex, grainLuts: grainTexs }, { transparent });
+        { atlasTex }, { transparent });
       // #1069 — captures (PNG stills, batch, Print Desk) get their grain too.
       return b.resolveTargetToBytes(b.applyFinishChains(mRead), OT, w, h);
     } finally {
@@ -1295,14 +1276,13 @@ export function createLiveRenderer(canvas) {
     dropAccum();
     dropMixTargets();
     if (atlasTex) gl.deleteTexture(atlasTex);
-    for (const t of Object.values(grainTexs)) gl.deleteTexture(t);
     if (T) b.freeFrameTargets(T);
     if (OT) b.freeFrameTargets(OT);
     b.disposeBase();
   }
 
   return {
-    setAtlas, setGrainLuts,
+    setAtlas,
     setResolveOptions: (o) => b.setResolveOptions(o),
     hasAtlas: () => !!atlasTex,
     renderFrame, renderFrameOffscreen, present, presentUpscaled, readback, readPresented,

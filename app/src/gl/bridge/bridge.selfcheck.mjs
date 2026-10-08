@@ -127,7 +127,7 @@ ok('programs compile once across frames; locations cached', () => {
   const L = bridge.layer('fx1');
   for (let i = 0; i < 3; i++) bridge.runChain('fx1', L.t0, chainOf('invert', 'rgbSplit'));
   assert.equal(gl.count('createProgram'), 1, 'one program for three frames');
-  for (const uname of ['u_src', 'u_aux', 'u_effect', 'u_p', 'u_texel', 'u_clipOn']) {
+  for (const uname of ['u_src', 'u_effect', 'u_p', 'u_texel', 'u_clipOn']) {
     const c = gl.withName('getUniformLocation').filter((x) => x.args[0] === uname).length;
     assert.equal(c, 1, `location cached for ${uname}`);
   }

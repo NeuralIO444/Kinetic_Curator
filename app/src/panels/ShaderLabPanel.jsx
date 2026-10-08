@@ -31,7 +31,7 @@ import { RESOLVE_FS } from '../gl/resolveFs.mjs';
 const PROGRAMS = [
   { name: 'quad', vs: QUAD_VS, fs: QUAD_FS, set: ['u_canvas', 'u_atlas'] },
   { name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS, set: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn'] },
-  { name: 'effect', vs: FULL_VS, fs: EFFECT_FS, set: ['u_src', 'u_aux', 'u_effect', 'u_p', 'u_texel', 'u_clip', 'u_clipOn'] },
+  { name: 'effect', vs: FULL_VS, fs: EFFECT_FS, set: ['u_src', 'u_effect', 'u_p', 'u_texel', 'u_clip', 'u_clipOn'] },
   { name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS, set: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave'] },
   { name: 'copy', vs: FULL_VS, fs: COPY_FS, set: ['u_src'] },
 ];
