@@ -74,3 +74,32 @@ test('the panel fits without a scroll at common window heights, and the room clo
     await expect(page.locator('.panel-davis .davis-section-label').last()).toHaveText('the room');
   }
 });
+
+test('the room: both in a state, each says the matrix line and the strip names the room; with no Davis state, silence', async ({ page }) => {
+  await boot(page);
+  await expect(page.locator('.duel-verdict')).toHaveCount(0); // no Davis state, no room
+  for (let i = 0; i < 3; i++) { await curator(page).click(); await page.waitForTimeout(150); }
+  await expect(davis(page)).toHaveAttribute('data-code', 'FLOW');
+  const strip = page.locator('.duel-verdict');
+  await expect(strip).toHaveAttribute('data-verdict', 'THE ROOM');
+  await expect(strip.locator('.duel-verdict-name')).toHaveText('THE ROOM');
+  await expect(strip.locator('.duel-verdict-line')).toHaveText('working. They know each other\'s moves.');
+  await expect(lois(page).locator('.duel-desc')).toHaveText('Quiet. He\'s rolling, I\'m watching. This is how it works.'); // room 6, verbatim
+  await expect(davis(page).locator('.duel-desc')).toHaveText('Quiet room, good rolls. This is the job.');
+  await page.keyboard.press('f'); // LOIS nods: the critic points, the generator rolls
+  await expect(strip).toHaveAttribute('data-verdict', 'THE CLASH');
+  await expect(lois(page).locator('.duel-desc')).toHaveText('That\'s the one. Tell the gardener to put the hose down.'); // room 1
+  expect(await page.locator('.directors-duel button, .directors-duel [role="button"]').count()).toBe(0); // still only a readout
+});
+
+test('with the room talking the panel still fits without a scroll', async ({ page }) => {
+  for (const [w, h] of [[1280, 720], [1366, 768], [1280, 800]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await boot(page);
+    for (let i = 0; i < 3; i++) { await curator(page).click(); await page.waitForTimeout(120); }
+    await page.keyboard.press('f');
+    await expect(page.locator('.duel-verdict')).toBeVisible();
+    const fit = await page.locator('.davis-body').evaluate((el) => ({ client: el.clientHeight, scroll: el.scrollHeight }));
+    expect(fit.scroll, `${w}x${h}: content ${fit.scroll} in ${fit.client}`).toBeLessThanOrEqual(fit.client + 1);
+  }
+});
