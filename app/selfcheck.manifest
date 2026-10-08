@@ -208,6 +208,7 @@ node src/curator/renderProfiles.selfcheck.mjs
 node src/curator/loisActivity.selfcheck.mjs
 node src/curator/davisState.selfcheck.mjs
 node src/curator/davisSigil.selfcheck.mjs
+node src/curator/dice.selfcheck.mjs
 node src/curator/directorsMatrix.selfcheck.mjs
 node src/curator/loisFace.selfcheck.mjs
 node src/curator/mathMacros.selfcheck.mjs
