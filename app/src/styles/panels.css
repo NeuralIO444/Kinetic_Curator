@@ -880,6 +880,17 @@
 @keyframes davis-sigil-turn { to { transform: rotate(360deg); } }
 /* stillness is a state (rule 7): with less motion he does not turn, and the label still says what he is doing */
 @media (prefers-reduced-motion: reduce) { .davis-sigil.turning { animation: none; } }
+/* #1124: on a short window (1280x720 and the like) DIRECTORS must still fit without a scroll now that the HITS row and the
+   motion row take their share. The room and the starter tile give up a little height; text wraps differ by platform font, so
+   the budget is generous (CI's Linux font was 19px taller than the Mac's). */
+@media (max-height: 760px) {
+  .duel-side { grid-template-columns: 92px 1fr; min-height: 78px; padding: 3px 8px; }
+  .duel-face { font-size: 20px; line-height: 68px; height: 68px; }
+  .davis-sigil { width: 68px; height: 68px; }
+  .duel-desc { line-height: 1.25; }
+  .voice-chip.starter, .voice-chip.earned { padding: 4px 4px 3px; gap: 1px; }
+  .panel-davis .davis-section-label { font-size: 8px; padding-top: 2px; }
+}
 
 /* #1126 — the buttons belong to a tribe, and the colour says whose verb it is (KC-1 DS rules 5 and 6). EVOLVE and NEW
    SEED are Davis's: the generator rolls, so the amber of the probabilistic family. FAVORITE is LOIS's: the critic
