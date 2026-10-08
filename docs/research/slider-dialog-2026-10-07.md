@@ -28,7 +28,7 @@ offers the *other* natures as modes.
 
 ## 2. Sub-animation work found (KINEME)
 
-- **KINEME** (`app/src/engine/kineme.js`, `docs/KINEME.md`): decoupled
+- **KINEME** (`app/src/engine/kineme.js`, `docs/archive/KINEME.md`): decoupled
   animation system. **#784 merged** per-instance primitives: spin, rock,
   pulse, blink, bob. Time model: one clock for phrases, morphs, sequencer,
   kineme; boil drivers at 6–12fps for the hand-drawn look.
@@ -69,5 +69,5 @@ values → TE. The dialog toggles between them.
 - `app/src/components/RangeRow.jsx` (44px hit area, click-to-type,
   double-click reset — the label already handles double-click)
 - `app/src/components/MotionTile.jsx`, `app/src/engine/kineme.js`,
-  `docs/KINEME.md`
+  `docs/archive/KINEME.md`
 - Mockup: `~/workspace/kc-topbar-mockups/slider-dialog.html`

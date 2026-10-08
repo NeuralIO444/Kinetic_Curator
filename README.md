@@ -131,7 +131,7 @@ Pages is already on **GitHub Actions** → [live site](https://neuralio444.githu
 
 ## Docs
 
-- [Engine plan](docs/ENGINE_PLAN.md) — spine A–G, do not redo shipped MIX/MOD
+- [Engine plan](docs/archive/ENGINE_PLAN.md) — spine A–G, do not redo shipped MIX/MOD
 - [Embargo](docs/EMBARGO.md) · [Two planes](docs/TWO_PLANES.md) · [Tempo](docs/TEMPO_AND_CHIPS.md)
 - [GL contract](docs/GL_CONTRACT.md) · [ACCUM](docs/ACCUM.md) · [Showrunner](docs/SHOWRUNNER.md)
 - [Organic motion](docs/ORGANIC_MOTION.md) · [Noise](docs/NOISE_AND_LAYERS.md) · [Tracks](docs/KC1_LAYERS.md)

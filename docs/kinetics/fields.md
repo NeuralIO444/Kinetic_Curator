@@ -42,7 +42,7 @@ Testable invariants:
 | Piece | Location | Selfcheck / spec |
 |---|---|---|
 | Seeded 3D simplex + fBm + curl2, perm isolation, legacy `_default(444)` | `engine/noise.js:16-29,115-129,135-151,158-168,171` | `engine/kernel/noise.selfcheck.mjs` (AC1-AC3, octave pin); Rust mirror `kernel/bake/swarmWasm.selfcheck.mjs:53`, `rust/swarm-bake/src/lib.rs:733` |
-| worldNoise lifecycle (per-project, focusSwap adopt vs reseed) | `gl/liveResolve.mjs:69-70,197-209,431-432` | `gl/liveResolve.selfcheck.mjs` #425 (held vs rerolled, :320-356); `docs/SPINE_REVIEW_C_F.md` :58 |
+| worldNoise lifecycle (per-project, focusSwap adopt vs reseed) | `gl/liveResolve.mjs:69-70,197-209,431-432` | `gl/liveResolve.selfcheck.mjs` #425 (held vs rerolled, :320-356); `docs/archive/SPINE_REVIEW_C_F.md` :58 |
 | Displacement warp, nt0 + accumulated warpPhase (#432/#436) | `gl/liveResolve.mjs:81,287-327` (nt0 :298, phase :300-304, samples :317-320) | `gl/spineF.selfcheck.mjs` :189-255 (breathes; t0==slowRender), :257-291 (layers bands) |
 | warpPhase/cache prune on layer death | `gl/liveResolve.mjs:83-89` (warpPhase :88), call `:420` | **none** |
 | Baked placement fBm (own instance, frozen nt) | `engine/placement.js:106-109,134-139`; stage split header `:9-22` | `goldenPlacement.selfcheck.mjs` (4 hashes incl. displacement + noiseOffset), `buildPlacements.selfcheck.mjs`, `engine/stagedEval.selfcheck.mjs` |
@@ -56,7 +56,7 @@ Testable invariants:
 | Downstream pack (array order = draw order) | `gl/renderer.mjs:254-284` (spine-B skip `:268`) | `sceneContract.selfcheck.mjs`; #444 exemplar |
 
 Spec docs: `docs/NOISE_AND_LAYERS.md` (§2.1-2.4 = the FIELDS plan of record), `docs/ACCUM.md`,
-`docs/SPINE_REVIEW_C_F.md`, `docs/ENGINE_PLAN.md` §3F + §6 (:213-223, all shipped),
+`docs/archive/SPINE_REVIEW_C_F.md`, `docs/archive/ENGINE_PLAN.md` §3F + §6 (:213-223, all shipped),
 `docs/KINETICS.md` :73-85.
 
 ## 3. Failure modes

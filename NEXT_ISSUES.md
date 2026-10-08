@@ -29,7 +29,7 @@ See `NEXTGEN_SPEC.md` for the full reasoning.
 | #56 P5 | Harmony tools | **Shipped** |
 
 **Backend v2 (`studio/`) complete.** Epic #73 closed. See
-[docs/BACKEND_V2_PLAN.md](docs/BACKEND_V2_PLAN.md).
+[docs/archive/BACKEND_V2_PLAN.md](docs/archive/BACKEND_V2_PLAN.md).
 
 | # | Title | Outcome |
 |---|--------|---------|
@@ -47,7 +47,7 @@ setlist, CI).
 ## Open — what matters next
 
 Authoritative sequencing and issue map:
-**[docs/NEXT_PHASE.md](docs/NEXT_PHASE.md)** (kernel v2 remainder, studio harden, live survivability).
+**[docs/archive/NEXT_PHASE.md](docs/archive/NEXT_PHASE.md)** (kernel v2 remainder, studio harden, live survivability).
 
 Primary tracks:
 
@@ -89,4 +89,4 @@ Everything above shipped. Current sequencing lives in [`docs/ROADMAP_V1.md`](doc
 - Continuous high-res accumulation (memory cost)
 - Expose `stratified` in Layout mode UI
 
-See [docs/BUGLIST.md](docs/BUGLIST.md) and [docs/NEXT_PHASE.md](docs/NEXT_PHASE.md).
+See [docs/BUGLIST.md](docs/BUGLIST.md) and [docs/archive/NEXT_PHASE.md](docs/archive/NEXT_PHASE.md).

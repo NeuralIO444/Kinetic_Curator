@@ -1,6 +1,6 @@
 # studio — headless render farm
 
-Backend A of [`docs/BACKEND_V2_PLAN.md`](../docs/BACKEND_V2_PLAN.md) §3.A ([#74](https://github.com/NeuralIO444/Kinetic_Curator/issues/74)).
+Backend A of [`docs/archive/BACKEND_V2_PLAN.md`](../docs/archive/BACKEND_V2_PLAN.md) §3.A ([#74](https://github.com/NeuralIO444/Kinetic_Curator/issues/74)).
 Renders project JSON to PNG/MP4 offline (headless Chromium — no visible browser, no tab).
 
 ```

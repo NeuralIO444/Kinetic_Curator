@@ -1,5 +1,13 @@
 # Bio-Drives: Oxman's biology, peppered into the instrument
 
+> **Status update 2026-10-07:** the "Plan only — no code" header below is stale.
+> The six mechanisms (§1: DRIVES, SCENT FIELD, LEAK, MOLD, GRAZE, SWELL) plus the
+> radial-symmetry fan (§6.1) were built as **#287** — proven by
+> `app/src/engine/bioDrives.selfcheck.mjs` (10 behaviors against the real
+> `ParticleSystem`). The Haeckel body sections (§5–§6.4: ornamental asset shelf,
+> specimen-plate voices, plate palettes) remain seasoning, not yet built. The
+> killed list (§2) and sequencing (§3) are historical.
+
 *Plan only — no code. September 17, 2026.*
 
 Matt's direction: give the moth/creature systems behavior, instinct, desire, agency — mechanisms like build, destroy, mold, swell, leak. Explicitly **not** a dedicated tab; peppered around the existing instrument. Standing bars: systems that build systems (never kitchen sink), and the manifesto's Oxman gate — *does it grow, or does it stamp?*
