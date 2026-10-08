@@ -60,3 +60,16 @@ test('the keyboard moves a hit: Alt+Right puts the cursor hit later in the setli
   const seeds = (await state(page)).seeds;
   expect(seeds.slice(0, 3)).toEqual([22, 11, 33]);
 });
+
+test('a long setlist scrolls inside the HITS row: the page never grows wider than the window', async ({ page }) => {
+  await page.setViewportSize({ width: 1890, height: 960 });
+  await boot(page);
+  await page.evaluate(() => {
+    const s = window.__kcStore.getState();
+    for (let i = 0; i < 12; i++) s.addFavorite({ seed: 1000 + i * 977, seedOffsets: {}, timestamp: new Date().toISOString(), config: { layout: {}, palette: { id: 'praystation' } } });
+  });
+  await expect(pills(page)).toHaveCount(12);
+  const w = await page.evaluate(() => ({ vw: innerWidth, doc: document.documentElement.scrollWidth, topbar: Math.round(document.querySelector('.palette-strip').getBoundingClientRect().right) }));
+  expect(w.doc).toBeLessThanOrEqual(w.vw);
+  expect(w.topbar).toBeLessThanOrEqual(w.vw);
+});
