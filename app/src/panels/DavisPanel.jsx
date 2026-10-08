@@ -109,14 +109,10 @@ export function DavisPanel() {
           <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
 
-          {/* #1126 — the two Directors, readout only: what the honest feed says each of them is doing */}
-          <div className="davis-section-label ttl">the room</div>
-          <DirectorsDuel />
-
           <div className="davis-section-label ttl">generate</div>
           {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
           {hitCount === 0 && <div className="lois-line name">{LOIS_LINES.director}</div>}
-          <div className="davis-actions">
+          <div className="davis-actions davis-actions-3">
             <button className={`big-btn ${evolveMode ? 'active' : ''}`}
               onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>
               {evolveMode ? 'STOP' : 'EVOLVE'}
@@ -150,15 +146,17 @@ export function DavisPanel() {
           <EvolveProgress />
 
           <div className="davis-section-label ttl">perform</div>
+          <div className="davis-perform-row">
           <div className="davis-phrase-status" title="Phrase clock status. The controls live in PLAY; this panel only reports.">
             <i className="lbl">phrase</i><b>{phraseStatus}</b>
           </div>
           <MidiSection />
+          </div>
           {/* UX-7: the gesture row is always reachable from Director — the
               ACCUM toggle lives here now, and FREEZE/CLEAR/SWELL wait on it
               (dim, never dead-looking) instead of the row vanishing. */}
           <div className="davis-section-label ttl">trails</div>
-          <div className="davis-actions" title="ACCUM gestures — play the trail buffer">
+          <div className="davis-actions davis-actions-4" title="ACCUM gestures — play the trail buffer">
             <button className={`big-btn ${accumOn ? 'active' : ''}`}
               onClick={() => emit(Events.LAYOUT_PARAM, { key: 'accumulation', value: !accumOn })}
               title={helpText('layout-accum')}>
@@ -183,6 +181,10 @@ export function DavisPanel() {
               SWELL
             </button>
           </div>
+
+          {/* #1126 — the two Directors, at the foot of the panel (Matt): readout only, what the honest feed says each is doing */}
+          <div className="davis-section-label ttl">the room</div>
+          <DirectorsDuel />
       </div>
     </div>
   );

@@ -27,12 +27,15 @@ export function sigilGeometry(seed) {
 
 /**
  * Draw the mandala. `rgb` is the colour as 'r,g,b'; the caller (a component) reads it from the design token.
+ * The art is laid out on a SIGIL_SIZE square; `px` is the canvas's real pixel size, so a sharper screen gets a sharper
+ * mandala (the coordinates scale, the picture does not change).
  * @param {CanvasRenderingContext2D} cx
  */
-export function drawSigil(cx, geom, rgb = '255,205,130', size = SIGIL_SIZE) {
+export function drawSigil(cx, geom, rgb = '255,205,130', px = SIGIL_SIZE) {
+  const size = SIGIL_SIZE; const k = px / size;
   const C = size / 2; const { wedge, els } = geom;
-  cx.clearRect(0, 0, size, size);
-  cx.save(); cx.translate(C, C);
+  cx.clearRect(0, 0, px, px);
+  cx.save(); cx.scale(k, k); cx.translate(C, C);
   // ornamental rings: rotationally symmetric, so invisible to the spin
   cx.strokeStyle = `rgba(${rgb},0.28)`; cx.lineWidth = 1;
   for (const r of SIGIL_RINGS) { cx.beginPath(); cx.arc(0, 0, r, 0, 7); cx.stroke(); }
