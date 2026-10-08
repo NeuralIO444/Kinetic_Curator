@@ -14,8 +14,16 @@ if [ "$(uname -m)" != "arm64" ] || [ "$(uname)" != "Darwin" ]; then
   echo "  WARN  not Apple Silicon macOS — MLX needs it; continuing anyway"
 fi
 
-echo "-- install curator extras"
-if python3 -m pip install -e ".[curator]"; then pass "pip install -e .[curator]"; else fail "pip install"; fi
+echo "-- install curator deps (mirrors [project.optional-dependencies] curator)"
+# NOTE: not `pip install -e ".[curator]"` — studio/ is a script collection, not a
+# package, and setuptools flat-layout discovery refuses the editable install.
+if python3 -m pip install \
+    "mlx-embeddings>=0.1; sys_platform=='darwin'" \
+    "pillow>=11" "numpy>=2" "scikit-learn>=1.5"; then
+  pass "curator deps (mlx-embeddings, pillow, numpy, scikit-learn)"
+else
+  fail "pip install"
+fi
 
 echo "-- model prefetch (~2 GB, one time, ~/.cache/huggingface)"
 if python3 -c "

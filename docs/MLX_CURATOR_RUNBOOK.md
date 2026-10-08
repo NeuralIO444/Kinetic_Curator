@@ -20,7 +20,9 @@ Everything below runs on the Mac Studio. Nothing here touches the web app.
 
 ```bash
 cd Kinetic_Curator/studio
-pip install -e ".[curator]"     # mlx-embeddings + pillow + numpy + scikit-learn
+# studio/ is a script collection, not a package — install the deps directly
+# (setuptools flat-layout discovery refuses `pip install -e .` here).
+python3 -m pip install "mlx-embeddings>=0.1" "pillow>=11" "numpy>=2" "scikit-learn>=1.5"
 ```
 
 First `embed` run downloads the SigLIP weights from Hugging Face (~2 GB,
