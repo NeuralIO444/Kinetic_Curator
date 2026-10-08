@@ -8,6 +8,7 @@ import { SCHEME_IDS } from '../engine/harmony.js';
 import { chipWindowStart } from './paletteChipWindow.mjs';
 import { paletteTasteFit, fitLevel } from './paletteTasteFit.mjs';
 import { getTaste } from '../curator/tasteStore.js';
+import { tasteLevel } from '../curator/topbarTaste.mjs';
 import { CuratorBar } from '../panels/layout/CuratorBar.jsx';
 import { PaletteWing } from './PaletteWing.jsx';
 
@@ -71,6 +72,21 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
       </label>
       {dirty && (<button type="button" className="palette-reset-btn" title="Reset to catalog colors" onClick={(e) => { e.stopPropagation(); onReset(); }}>↻</button>)}
     </span>
+  );
+}
+
+// #1122 — the ◆ diamond: LOIS presence. Reads the imported taste's fidelity
+// (tasteStore); re-renders when a taste is imported/cleared (tasteRev).
+function TasteDiamond() {
+  useStore((s) => s.tasteRev);
+  const level = tasteLevel(getTaste());
+  return (
+    <span
+      className={`taste-diamond lvl${level}`}
+      role="img"
+      aria-label={level === 0 ? 'no taste signal' : `taste confidence level ${level} of 4`}
+      title={level === 0 ? 'taste: no signal — the diamond stays dark until a real taste.json clears fidelity 0.3' : `taste confidence ${level}/4`}
+    />
   );
 }
 
@@ -207,6 +223,9 @@ export function PaletteStrip() {
   return (
     <div className={`palette-strip${anyFit ? ' taste-on' : ''}`}>
       <div className="kc-logo" title="KINETIC_CURATOR v0.9.0">
+        {/* #1122 — ◆ is LOIS presence → Davis: amber shimmer at the taste model's
+            confidence, dark/silent until a real taste.json clears the 0.3 bar (rule 3). */}
+        <TasteDiamond />
         <span className="logo-mark">◈</span>
         <span className="kc-name kc-compact">KC-1</span>
         <span className="kc-name kc-full">

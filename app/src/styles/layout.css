@@ -801,3 +801,96 @@
   align-self: center;
 }
 .math-add:hover { color: var(--ink); border-color: var(--ink); }
+
+/* ─── #1122 — top-bar affective shape grammar (KC-1 DS) ───
+   continuous → Davis (amber breath/shimmer); discrete → TE (red detents/digits).
+   Silence is default: every accent below is dark until its signal says otherwise. */
+
+/* ◆ diamond — LOIS presence. Dark until a real taste.json clears fidelity 0.3. */
+.taste-diamond {
+  width: 11px; height: 11px; flex-shrink: 0;
+  transform: rotate(45deg);
+  background: #3a3a3a;
+  transition: background .8s, box-shadow .8s;
+}
+.taste-diamond.lvl1 { background: rgba(var(--kc-davis-rgb), .35); }
+.taste-diamond.lvl2 {
+  background: rgba(var(--kc-davis-rgb), .6);
+  box-shadow: 0 0 10px rgba(var(--kc-davis-rgb), .45);
+  animation: taste-breath 10s ease-in-out infinite;
+}
+.taste-diamond.lvl3 {
+  background: rgba(var(--kc-davis-rgb), .8);
+  box-shadow: 0 0 13px rgba(var(--kc-davis-rgb), .6);
+  animation: taste-breath 10s ease-in-out infinite;
+}
+.taste-diamond.lvl4 {
+  background: var(--kc-davis);
+  box-shadow: 0 0 16px rgba(var(--kc-davis-rgb), .8);
+  animation: taste-breath 10s ease-in-out infinite;
+}
+@keyframes taste-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* ● KIN layer — discrete → TE micro-label beside the heat glyph */
+.kinetic-layer {
+  font-size: 9px; color: var(--kc-red); letter-spacing: .1em;
+  min-width: 10px; line-height: 1; flex-shrink: 0;
+}
+
+/* L — structure → TE: hollow / solid-red / half-fill + look name */
+.look-sq {
+  width: 11px; height: 11px; flex-shrink: 0;
+  border: 2px solid #444;
+  transition: all .12s steps(2);
+}
+.look-sq.clean { border-color: var(--kc-red); background: var(--kc-red); }
+.look-sq.dirty {
+  border-color: var(--kc-red);
+  background: linear-gradient(to top, var(--kc-red) 50%, transparent 50%);
+}
+.look-name { font-size: 9px; color: #777; letter-spacing: .08em; white-space: nowrap; }
+
+/* V — drift → Davis: breathes at the persona's drift rate; off = no dot at all */
+.voice-drift {
+  width: 11px; height: 11px; flex-shrink: 0;
+  border: 2px solid rgba(var(--kc-davis-rgb), .75);
+  box-shadow: 0 0 8px rgba(var(--kc-davis-rgb), .35);
+  animation: voice-breath 6s ease-in-out infinite;
+}
+@keyframes voice-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.voice-id { font-size: 9px; color: #777; letter-spacing: .08em; }
+
+/* CUR — verdict → TE: detent-step diamond + keep/favorite ledger digit */
+.cur-detent {
+  width: 11px; height: 11px; flex-shrink: 0;
+  border: 2px solid #444; transform: rotate(45deg);
+  transition: transform .12s steps(2), background .12s steps(2), border-color .12s steps(2);
+}
+.cur-detent.v2 { transform: rotate(135deg); border-color: #888; }
+.cur-detent.v4 { transform: rotate(225deg); background: var(--kc-red); border-color: var(--kc-red); }
+.cur-ledger { font-size: 9px; color: #777; letter-spacing: .06em; white-space: nowrap; }
+
+/* ▪ locks — discrete → TE: glyph + count; the nub shows armed roll scope (tap to disarm) */
+.lock-chip {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  padding: 2px 4px; font-size: 11px; color: #b9b3a4;
+}
+.lock-glyph { color: #888; line-height: 1; }
+.lock-digit { font-size: 11px; color: #ddd; min-width: 10px; }
+.lock-nub {
+  width: 8px; height: 14px; padding: 0; cursor: pointer;
+  border: 2px solid #444; background: transparent; position: relative;
+}
+.lock-nub::after {
+  content: ''; position: absolute; left: 1px; right: 1px; top: 1px; height: 4px;
+  background: var(--kc-red);
+}
+
+/* Precedence: a lit accent that lost the cut renders subdued, never competing. */
+[data-subdued="true"] { opacity: .38; }
+
+/* Reduced motion: every breath/shimmer collapses to its static encoding. */
+@media (prefers-reduced-motion: reduce) {
+  .taste-diamond.lvl2, .taste-diamond.lvl3, .taste-diamond.lvl4,
+  .voice-drift { animation: none; opacity: .85; }
+}

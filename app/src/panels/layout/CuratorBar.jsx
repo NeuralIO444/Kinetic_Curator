@@ -16,7 +16,9 @@ import {
   getActivePersonaId,
   setActivePersona,
 } from '../../curator/taste.js';
-import { getLoisVerdict } from '../../curator/loisRank.js';
+import { getLoisVerdict, getLoisVerdictParts } from '../../curator/loisRank.js';
+import { getPersonaTaste } from '../../curator/personaTastes.js';
+import { verdictDetent, voiceBreathS, litPills } from '../../curator/topbarTaste.mjs';
 import { KineticButton } from './KineticButton.jsx';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
@@ -29,7 +31,14 @@ export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
   useStore((s) => s.curatePress); // re-read the LOIS line after a pick
   const lockCount = useStore((s) => Object.values(s.lockedParams || {}).filter(Boolean).length);
+  const armedMode = useStore((s) => s.armedMode);
+  const armedMotion = useStore((s) => s.armedMotion);
+  const clearRollScope = useStore((s) => s.clearRollScope);
+  const keepsCount = useStore((s) => s.keeps?.length ?? 0);
+  const favoritesCount = useStore((s) => s.favorites?.length ?? 0);
   const [voice, setVoice] = useState(getActivePersonaId() ?? 'off');
+  // #1122 — the look this button applied; dirty = composition moved since.
+  const [appliedLook, setAppliedLook] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   // #1103 — LOOKS and VOICE rest as [L] / [V]. Once opened to the full word they cool down to a
@@ -79,6 +88,7 @@ export function CuratorBar() {
 
   const pickPreset = (p) => {
     emit(Events.LAYOUT_PRESET, p);
+    setAppliedLook({ id: p.id, name: p.name }); // #1122 — L tracks what it applied
     setPresetMenuOpen(false);
   };
 
@@ -93,8 +103,22 @@ export function CuratorBar() {
       ? 'off'
       : voices.find((p) => p.id === voice)?.alias ?? voice;
   const loisLine = voice === 'lois' ? getLoisVerdict() : '';
-  const onCurate = () => {
-    emit(Events.LAYOUT_CURATE);
+  // #1122 — affective grammar derivations. Every one traces to a real signal:
+  const lookState = !appliedLook ? 'none' : composition === appliedLook.id ? 'clean' : 'dirty';
+  const lookName = appliedLook?.name ?? '';
+  const voiceOn = voice !== 'off';
+  const driftW = voiceOn ? getPersonaTaste(voice)?.weights?.drift : undefined;
+  const breathS = voiceBreathS(driftW);
+  const curDetent = voice === 'lois' ? verdictDetent(getLoisVerdictParts()) : 0;
+  const armed = armedMode != null || armedMotion != null;
+  // Precedence keeps the bar quiet: CUR > locks > V > L; over the cap, the
+  // lowest-precedence lit accents go subdued. (KIN heat and the ◆ diamond
+  // manage their own decay/silence in their components.)
+  const lit = litPills({ cur: curDetent > 0, locks: lockCount > 0, voice: voiceOn, look: lookState !== 'none' });
+  // An accent that is lit but lost the precedence cut renders subdued.
+  const subdued = (key, isLit) => (isLit && !lit.has(key) ? 'true' : undefined);
+
+  const onCurate = () => {    emit(Events.LAYOUT_CURATE);
     emit(Events.ROLL_GUARD, { kind: 'curate' }); // #1107: look at the frame it landed
     // The persona brings its palette: switch the global palette to the
     // profile's catalog entry so the color jumps with the voice. Skipped
@@ -138,6 +162,9 @@ export function CuratorBar() {
             aria-expanded={presetMenuOpen}
             title="Apply a Look — layout only; your palette and marks stay put"
           >
+            {/* #1122 — L is structure → TE: hollow / solid-red / half-fill + look name */}
+            <span className={`look-sq ${lookState}`} data-subdued={subdued('look', lookState !== 'none')} aria-hidden="true" />
+            {lookState !== 'none' && <span className="look-name">{lookName}</span>}
             <ExpandLabel mode="swap" short={looksUsed ? 'lok' : 'l'} full="looks ▾" />
           </button>
           {presetMenuOpen && (
@@ -179,6 +206,12 @@ export function CuratorBar() {
             aria-expanded={menuOpen}
             title="Persona voice tasting the candidates — off means a plain dice roll"
           >
+            {/* #1122 — V is drift → Davis: breathes at the persona's drift rate; off = dark */}
+            {voiceOn && (
+              <span className="voice-drift" data-subdued={subdued('voice', true)}
+                style={{ animationDuration: `${breathS.toFixed(1)}s` }} aria-hidden="true" />
+            )}
+            {voiceOn && <span className="voice-id">{voice}</span>}
             <ExpandLabel mode="swap" short={voiceUsed ? 'voi' : 'v'} full={`voice: ${activeAlias} ▾`} />
           </button>
           {menuOpen && (
@@ -209,8 +242,22 @@ export function CuratorBar() {
           {...curTap.props}
           aria-label="Curator — roll a taste-guided scene over the unlocked parameters"
           title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
+          {/* #1122 — CUR is verdict → TE: detent-step diamond + keep/favorite ledger digit */}
+          <span className={`cur-detent v${curDetent}`} data-subdued={subdued('cur', curDetent > 0)} aria-hidden="true" />
+          <span className="cur-ledger" title={`${keepsCount} keeps / ${favoritesCount} favorites`}>{keepsCount}/{favoritesCount}</span>
           <ExpandLabel short="cur" full="curator" />
         </button>
+        {/* #1122 — locks are discrete → TE: ▪/▫ + count; the nub shows armed roll scope, tap to disarm.
+            (The mockup's ■ B assumed B was free; the BEAT clock owns "b" now, so locks ride a ▪ chip.) */}
+        <span className="lock-chip" data-subdued={subdued('locks', lockCount > 0 || armed)}
+          title={lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}${armed ? ' · roll scope armed' : ''}` : 'no locked params'}>
+          <span className="lock-glyph" aria-hidden="true">{lockCount > 0 ? '▪' : '▫'}</span>
+          <span className="lock-digit">{lockCount}</span>
+          {armed && (
+            <button type="button" className="lock-nub" onClick={clearRollScope}
+              title="roll scope armed — tap to disarm" aria-label="disarm roll scope" />
+          )}
+        </span>
         {/* #1103 — BEAT sits right of CURATOR: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
         <BeatButton />
         {loisLine && (
