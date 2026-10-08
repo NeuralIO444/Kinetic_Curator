@@ -6,6 +6,7 @@ import { SourceControls } from './stimulus/SourceControls.jsx';
 import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
 import { FeelPicker } from './stimulus/FeelPicker.jsx';
 import { MeterHero } from './stimulus/MeterHero.jsx';
+import { WhisperLine } from '../components/WhisperLine.jsx';
 import { ModMatrix } from './stimulus/ModMatrix.jsx';
 import { audioInputs } from '../hooks/audioLoss.mjs';
 import { RangeTone } from '../components/RangeTone.jsx';
@@ -104,6 +105,8 @@ export function StimulusPanel() {
           {/* #613 — hierarchy inverted: the METER is the hero, the MATRIX shows
               which sound drives what, live; setup and raw knobs follow. */}
           <MeterHero />
+          {/* #1139 — the whisper line lives under the meter, speaks rarely. */}
+          <WhisperLine slot="stimuli" />
           {/* UX-7 — FEEL macros lead: the three feels are the first thing you
               see in Stimuli, above the route table. */}
           <FeelPicker layoutParams={layoutParams} />

@@ -28,6 +28,8 @@ import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import { routeBeat } from './state/beatArbiter.js';
 import { useStore } from './state/store.js';
+import { say } from './curator/whisper.js'; // #1139
+import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -60,6 +62,12 @@ function AppInner() {
   useEffect(() => {
     loisActivity.start({ store: useStore });
     return () => loisActivity.stop();
+  }, []);
+
+  // #1139 — whisper triggers (deniable transition lines). Budgets live in
+  // whisper.js; the lines ship copy-only while the sway gate stays closed.
+  useEffect(() => {
+    initWhisperTriggers(useStore.getState, useStore.subscribe);
   }, []);
 
   const { state } = useApp(s => ({
@@ -223,6 +231,7 @@ function AppInner() {
   const onAudioLost = useCallback((name) => {
     piped({ type: A.SET_AUDIO_LOST, payload: name });
     piped({ type: A.SET_AUDIO_ENABLED, payload: false });
+    say('LOST'); // #1139 — "input's gone. i'm still listening."
   }, [piped]);
   const onBeat = useCallback(() => {
     // beatPulse still drives the readouts (phrase pip, meters); the actual

@@ -28,8 +28,12 @@ ok('no hand-written amber is left: it is the token or nothing', () => {
 
 ok('amber means one thing: only these files may use it, and a new one has to be added here on purpose', () => {
   const users = files.filter((f) => /--kc-davis/.test(f.src) && f.rel !== 'styles/tokens.css').map((f) => f.rel).sort();
-  assert.deepEqual(users, ['components/DavisSigil.jsx', 'styles/controls.css', 'styles/layout.css', 'styles/panels.css', 'styles/ux-polish.css'],
-    'amber is the probabilistic family (Davis, taste, time-based armed outlines, the spinner). If this list needs a new file, rule 5 has a question to answer first. (ux-polish.css, #1124: the HITS heat band keeps the KIN heat hue, amber, frozen and stepped. Heat is Davis; freezing it changes how it renders, TE, not what it is.)');
+  // #1139: MeterHero's beat-lock wash is amber on purpose — beat-lock is a
+  // probabilistic/time-based signal (confidence in the beat), which is
+  // amber's family per rules 5/6. It is beat-lock only, never lean.
+  // (ux-polish.css, #1124: the HITS heat band keeps the KIN heat hue, amber, frozen and stepped. Heat is Davis; freezing it changes how it renders, TE, not what it is.)
+  assert.deepEqual(users, ['components/DavisSigil.jsx', 'panels/stimulus/MeterHero.jsx', 'styles/controls.css', 'styles/layout.css', 'styles/panels.css', 'styles/ux-polish.css'],
+    'amber is the probabilistic family (Davis, taste, time-based armed outlines, the spinner). If this list needs a new file, rule 5 has a question to answer first.');
   const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8'); const controls = readFileSync(join(SRC, 'styles/controls.css'), 'utf8');
   assert.match(panels, /\.chip-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/); assert.match(panels, /\.big-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/);
   assert.match(controls, /\.spin-readout \{ color: var\(--kc-davis\)/);
