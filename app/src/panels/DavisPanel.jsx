@@ -186,7 +186,7 @@ export function DavisPanel() {
           {/* #1128 — the DIRECTOR's motion pattern: which way the always-on breath and drift lean. A discrete choice, so it
               renders TE (rule 2). THUMP needs a real beat; without audio it plays DRIFT, and says so. */}
           <div className="davis-actions davis-actions-motion" role="group" aria-label="motion pattern">
-            <i className="lbl">motion</i>
+            <i className="lbl" title="THUMP follows a live audio beat; with none it plays DRIFT">{(layoutParams.kinemePattern === 'THUMP' && !audioEnabled) ? 'no beat' : 'motion'}</i>
             {KINEME_PATTERNS.map((p) => {
               const on = (layoutParams.kinemePattern || 'DRIFT') === p;
               return (

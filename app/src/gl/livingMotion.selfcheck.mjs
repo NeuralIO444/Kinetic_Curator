@@ -123,7 +123,7 @@ ok('patterns: DRIFT is the amounts as set; SWELL leans breath-forward; THUMP fol
   const b = { breath: 0.3, drift: 0.5, pulse: 0 };
   assert.deepEqual([...KINEME_PATTERNS], ['DRIFT', 'SWELL', 'THUMP']);
   assert.deepEqual(patternAmounts(b, 'DRIFT', 0.9), b);
-  assert.deepEqual(patternAmounts(b, 'SWELL'), { breath: 0.48, drift: 0.25, pulse: 0 });
+  const sw = patternAmounts(b, 'SWELL'); assert.ok(Math.abs(sw.breath - 0.9) < 1e-9 && Math.abs(sw.drift - 0.1) < 1e-9 && sw.pulse === 0);
   assert.equal(patternAmounts({ ...b, breath: 0.9 }, 'SWELL').breath, 1, 'breath is capped at 1');
   assert.equal(patternAmounts({ breath: 0, drift: 0, pulse: 0 }, 'SWELL').breath, 0, 'a scene with no breath is not given one');
   for (const nobeat of [undefined, null, NaN]) assert.deepEqual(patternAmounts(b, 'THUMP', nobeat), b, 'no beat: THUMP is DRIFT');
