@@ -113,12 +113,12 @@ export function DavisPanel() {
           {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
           {hitCount === 0 && <div className="lois-line name">{LOIS_LINES.director}</div>}
           <div className="davis-actions davis-actions-3">
-            <button className={`big-btn ${evolveMode ? 'active' : ''}`}
+            <button className={`big-btn tribe-davis ${evolveMode ? 'active' : ''}`}
               onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>
               {evolveMode ? 'STOP' : 'EVOLVE'}
             </button>
-            <button className="big-btn act" onClick={saveFavorite}>favorite</button>
-            <button className="big-btn act" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>new seed</button>
+            <button className="big-btn act tribe-lois" onClick={saveFavorite}>favorite</button>
+            <button className="big-btn act tribe-davis" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>new seed</button>
           </div>
 
           {/* #305 — mutate one sub-seed stream. Same seed control area, no
