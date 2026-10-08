@@ -50,9 +50,12 @@ test('fresh boot fires one full chaos roll and is alive', async ({ page }) => {
   expect(seed).toBeTruthy();
   expect(seed).not.toBe(FACTORY_SEED);
 
-  // The canvas is alive: nodes are placed and counted.
-  const nodes = await page.locator('body').textContent().then((t) => t.match(/(\d+) NODES/)?.[1]);
-  expect(parseInt(nodes, 10)).toBeGreaterThan(50);
+  // The canvas is alive: nodes are placed and counted. Not "more than 50": a rolled composition can legitimately
+  // place fewer (the smallest preset places 24, and some modes grow from a seed), so a threshold made this flaky
+  // on about one boot in six. Alive means placed, and the count is polled because the roll lands a moment after load.
+  await expect
+    .poll(async () => parseInt(await page.locator('body').textContent().then((t) => t.match(/(\d+) NODES/)?.[1] ?? '0'), 10), { timeout: 10_000 })
+    .toBeGreaterThan(0);
 });
 
 test('two cold launches open differently', async ({ browser }) => {
