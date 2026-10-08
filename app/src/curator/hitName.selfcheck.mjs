@@ -1,6 +1,6 @@
 // hitName.selfcheck.mjs — a hit's name comes from its seed and nothing else (#1124).
 import assert from 'node:assert';
-import { HIT_WORDS, hitName } from './hitName.js';
+import { HIT_WORDS, hitName, hitAge } from './hitName.js';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -24,6 +24,12 @@ ok('the pill word is the high byte, the card pairs it with the low byte, and hex
 
 ok('junk in is a name out, never a throw', () => {
   for (const bad of [undefined, null, NaN, 'x', -1, 1e12]) assert.ok(hitName(bad).short.length > 0);
+});
+
+ok('capture age reads in the coarsest honest unit, and says nothing when the time is unknown', () => {
+  const t = 1_000_000_000_000;
+  assert.equal(hitAge(t, t + 5_000), 'just now'); assert.equal(hitAge(t, t + 5 * 60_000), '5m ago'); assert.equal(hitAge(t, t + 3 * 3_600_000), '3h ago'); assert.equal(hitAge(t, t + 2 * 86_400_000), '2d ago');
+  for (const bad of [null, undefined, NaN]) assert.equal(hitAge(bad, t), null); assert.equal(hitAge(t, t - 1), null, 'a time in the future is unknown, not negative');
 });
 
 console.log(`hitName.selfcheck: ${n} checks passed`);

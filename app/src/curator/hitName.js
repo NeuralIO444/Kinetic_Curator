@@ -27,6 +27,16 @@ const WORDS = (
 
 export const HIT_WORDS = Object.freeze(WORDS);
 
+/** "5m" / "2h" / "3d": how long ago a keep was captured, from its stored time (ms epoch or null = unknown). */
+export function hitAge(capturedMs, nowMs) {
+  if (!Number.isFinite(capturedMs) || !Number.isFinite(nowMs) || nowMs < capturedMs) return null;
+  const m = Math.floor((nowMs - capturedMs) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  if (m < 1440) return `${Math.floor(m / 60)}h ago`;
+  return `${Math.floor(m / 1440)}d ago`;
+}
+
 /**
  * The pill name for a seed: the high byte of its 16-bit hex picks the first word, the low byte the second.
  * @returns {{ short: string, full: string, hex: string }} short = the pill's word, full = both words, hex = the

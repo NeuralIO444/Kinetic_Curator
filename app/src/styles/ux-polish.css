@@ -133,10 +133,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 10px;
+  padding: 2px 10px;
   background: var(--panel-2);
   border-top: 1px solid var(--line);
-  min-height: 32px;
+  min-height: 38px; /* the same with or without a hit: the first keep must not push the panels up */
   outline: none;
 }
 .favorites-tray:focus {
@@ -164,49 +164,80 @@
   min-width: 0;
   padding: 2px 0;
 }
-.fav-chip {
-  display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  flex-shrink: 0;
-}
-.fav-chip.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(255, 45, 111, 0.25);
-}
-.fav-chip-main {
+.hit-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 0 4px 0 0;
+  border: 1px solid var(--line-2);
+  border-radius: 999px; /* Matt 2026-10-08: the HITS slot is a real pill; the mockup's resistor */
+  background: var(--panel);
+  cursor: grab;
+}
+.hit-pill:active { cursor: grabbing; }
+.hit-pill[data-dragging="true"] { opacity: 0.4; }
+.hit-pill.active { border-color: var(--ink); }
+/* playing = a flat red edge: a discrete fact, so TE (KC-1 DS rule 5): no glow, no pulse */
+.hit-pill[data-playing="true"] { border-color: var(--kc-red); }
+.hit-pill[data-playing="true"] .hit-pill-num { color: var(--kc-red); }
+.hit-pill-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 6px 0 16px;
+  border-radius: 999px 0 0 999px;
   background: transparent;
   border: none;
   color: var(--ink);
   font-size: 10px;
 }
-.fav-chip-main:hover { background: rgba(255,255,255,0.04); }
-.fav-chip-num {
-  color: var(--dim);
-  font-size: 9px;
-  font-weight: 700;
-}
-.fav-chip-seed {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-}
-.fav-chip-evolve {
-  padding: 0 5px;
+.hit-pill-main:hover { background: rgba(255,255,255,0.04); }
+.hit-pill-num { color: var(--dim); font-size: 9px; font-weight: 700; }
+.hit-pill-name { letter-spacing: 0.1em; text-transform: uppercase; }
+.hit-bands { display: inline-flex; gap: 3px; }
+.hit-band { width: 7px; height: 18px; }
+.hit-band.heat, .hit-detail-legend i.heat { background: var(--line-2); }
+.hit-band.h1, .hit-detail-legend i.h1 { background: rgba(var(--kc-davis-rgb), .45); }
+.hit-band.h2, .hit-detail-legend i.h2 { background: var(--kc-davis); }
+.hit-band.h3, .hit-detail-legend i.h3 { background: var(--kc-red); }
+.hit-pill-act {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
   background: transparent;
   border: none;
-  border-left: 1px solid var(--line);
+  border-radius: 50%;
   color: var(--dim);
-  font-size: 11px;
+  font-size: 17px;
+  line-height: 1;
 }
-.fav-chip-evolve:hover {
-  color: var(--accent2);
-  background: rgba(0, 217, 255, 0.08);
+.hit-pill-act:hover:not(:disabled) { color: var(--ink); background: rgba(255,255,255,0.06); }
+.hit-pill-act.del:hover:not(:disabled) { color: var(--kc-red); }
+.hit-pill-act:disabled { opacity: 0.3; cursor: default; }
+.hit-pill-grip { color: var(--dimmer); font-size: 10px; letter-spacing: 2px; padding: 0 2px; }
+/* hover / focus detail: the rest of a hit, drawn in the page above its pill (the tray sits at the foot and scrolls) */
+.hit-detail {
+  position: fixed;
+  width: 230px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  z-index: 30;
 }
+.hit-detail-name { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+.hit-detail-seed { font-size: 9px; color: var(--dim); margin: 2px 0 8px; }
+.hit-detail-legend { list-style: none; margin: 0 0 8px; padding: 0; font-size: 9px; color: var(--dim); line-height: 1.9; }
+.hit-detail-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; }
+.hit-detail-more { display: flex; gap: 6px; }
+.hit-detail-more button {
+  flex: 1; min-height: 28px;
+  background: transparent; border: 1px solid var(--line-2); color: var(--dim);
+  font-size: 9px; letter-spacing: 0.06em;
+}
+.hit-detail-more button:hover { border-color: var(--ink); color: var(--ink); }
 
 .app-fullscreen .favorites-tray { display: none; }
 
