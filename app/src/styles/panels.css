@@ -836,3 +836,18 @@
 .pattern-seed .chip-btn { min-height: 44px; padding: 8px 16px; }
 /* armed = waiting on the bar: caution amber, never live pink (design system 1.1) */
 .big-btn.armed { outline: 2px solid var(--kc-warn); outline-offset: 1px; }
+
+/* #1126 — the two Directors, readout only. Square corners, one border; Davis in his own colour. */
+.directors-duel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.duel-side { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border: 1px solid var(--line-2); min-height: 154px; text-align: center; }
+.duel-who { align-self: flex-start; color: var(--dim); }
+.duel-davis .duel-who, .duel-davis .duel-state { color: var(--kc-davis); }
+.duel-face { font-size: 22px; line-height: 48px; height: 48px; color: var(--ink); white-space: nowrap; }
+.duel-state { min-height: 14px; }
+.duel-desc { min-height: 28px; color: var(--dim); font-size: 10px; line-height: 1.4; }
+/* square corners everywhere (M8): the canvas has no frame of its own, so only the round art turns, never a box */
+.davis-sigil { width: 48px; height: 48px; opacity: 0.55; }
+.davis-sigil.turning { opacity: 1; animation: davis-sigil-turn linear infinite; }
+@keyframes davis-sigil-turn { to { transform: rotate(360deg); } }
+/* stillness is a state (rule 7): with less motion he does not turn, and the label still says what he is doing */
+@media (prefers-reduced-motion: reduce) { .davis-sigil.turning { animation: none; } }

@@ -10,6 +10,7 @@ import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the s
 import { captureFavorite } from '../state/slices/davisSlice.js';
 import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
+import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -107,6 +108,10 @@ export function DavisPanel() {
           {/* #717 — the flagship Voices' one home: load through the voice MIX. */}
           <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
+
+          {/* #1126 — the two Directors, readout only: what the honest feed says each of them is doing */}
+          <div className="davis-section-label ttl">the room</div>
+          <DirectorsDuel />
 
           <div className="davis-section-label ttl">generate</div>
           {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
