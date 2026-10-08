@@ -52,7 +52,7 @@ ok('cancel closes it at once and drops the timer', () => {
 ok('the row: START, KINETIC, L, V, CURATOR, B — in that order, with BEAT out of the palette strip', () => {
   const bar = read('../panels/layout/CuratorBar.jsx');
   const at = (re) => { const m = bar.search(re); assert.ok(m >= 0, `${re} is in CuratorBar`); return m; };
-  const order = [at(/className="start-mode-btn act"/), at(/<KineticButton \/>/), at(/<ExpandLabel mode="swap" short=\{looksUsed/), at(/<ExpandLabel mode="swap" short=\{voiceUsed/), at(/<ExpandLabel short="cur" full="curator" \/>/), at(/<BeatButton \/>/)];
+  const order = [at(/className="tb-pill start-mode-btn act"/), at(/<KineticButton \/>/), at(/<ExpandLabel mode="swap" short=\{looksUsed/), at(/<ExpandLabel mode="swap" short=\{voiceUsed/), at(/<ExpandLabel short="cur" full="curator" \/>/), at(/<BeatButton \/>/)];
   assert.deepEqual(order, [...order].sort((a, b) => a - b), 'START < KIN < L < V < CUR < B');
   assert.ok(!/BeatButton/.test(read('../components/PaletteStrip.jsx')), 'BEAT is not in the palette strip any more');
   assert.match(read('../components/BeatButton.jsx'), /<ExpandLabel short="b" full=\{`beat · \$\{bpmLabel\}`\} \/>/);
@@ -69,7 +69,7 @@ ok('KIN and CURATOR open on the cold open; the rest of the row does not; reduced
 
 ok('CURATOR is in capitals like the rest (the .act class does it; the source stays lowercase), and it keeps its full accessible name', () => {
   const bar = read('../panels/layout/CuratorBar.jsx');
-  assert.match(bar, /className=\{`randomize-btn xl act/);
+  assert.match(bar, /className=\{`tb-pill randomize-btn xl act/);
   assert.match(bar, /aria-label="Curator — roll a taste-guided scene over the unlocked parameters"/);
   assert.ok(!/>\s*Curator\s*</.test(bar), 'no mixed-case "Curator" label left on the button');
 });
