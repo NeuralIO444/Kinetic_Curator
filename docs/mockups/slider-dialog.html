@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slider dialog — ROTATE · KC-1 DS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --amber: #ffcd82; --te: #ff4d00; }
+  body { background: #141414; color: #e8e4da; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #8a8578; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #5c584e; margin-bottom: 14px; max-width: 900px; line-height: 1.7; }
+  .panel { background: #0c0c0c; border: 1px solid #262626; border-radius: 8px; padding: 20px;
+           max-width: 720px; margin-bottom: 18px; }
+  .sec-label { font-size: 10px; letter-spacing: .16em; color: #777; margin-bottom: 16px; }
+  .sec-label b { color: #bbb; font-weight: normal; }
+  /* slider row */
+  .srow { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .sname { font-size: 11px; letter-spacing: .12em; color: #bbb; cursor: pointer; padding: 8px 6px;
+           border-radius: 4px; min-width: 86px; }
+  .sname:hover { color: #fff; background: #1a1a1a; }
+  .sname .hint { display: block; font-size: 8px; color: #4a4a4a; letter-spacing: .06em; margin-top: 2px; }
+  .track { flex: 1; height: 3px; background: #2a2a2a; border-radius: 2px; position: relative; }
+  .track .fill { position: absolute; top: 0; bottom: 0; background: var(--amber); border-radius: 2px; }
+  .thumb { position: absolute; top: 50%; width: 14px; height: 18px; background: var(--amber);
+           border-radius: 3px; transform: translate(-50%,-50%); }
+  .sval { font-size: 11px; color: #888; min-width: 110px; text-align: right; }
+  /* spin indicator */
+  .spinind { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #3a3a3a;
+             border-top-color: var(--amber); flex: 0 0 auto; }
+  .spinning { animation: rot linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  /* dialog — TE panel */
+  .dlg { display: none; background: #101010; border: 1px solid #3a3a3a; border-radius: 8px;
+         padding: 16px; margin-top: 12px; max-width: 560px; box-shadow: 0 12px 32px rgba(0,0,0,.6); }
+  .dlg.open { display: block; }
+  .dlg h3 { font-size: 11px; letter-spacing: .14em; color: #ddd; font-weight: normal; margin-bottom: 2px; }
+  .dlg .dsub { font-size: 9px; color: #5c584e; margin-bottom: 14px; }
+  .modeseg { display: flex; gap: 0; margin-bottom: 14px; border: 1px solid #333; border-radius: 6px;
+             overflow: hidden; width: fit-content; }
+  .modeseg button { background: #161616; border: none; color: #777; font-family: inherit; font-size: 10px;
+                    letter-spacing: .1em; padding: 8px 16px; cursor: pointer; }
+  .modeseg button.sel { background: #2a1408; color: var(--te); }
+  .modeseg button.seld { background: #2a2417; color: var(--amber); }
+  .frow { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 8px; letter-spacing: .14em; color: #666; }
+  .field input { background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #ddd;
+                 font-family: inherit; font-size: 12px; padding: 7px 9px; width: 90px; }
+  .field input:focus { border-color: var(--te); outline: none; }
+  .dfoot { display: flex; gap: 8px; margin-top: 4px; }
+  .dbtn { background: #1a1a1a; border: 1px solid #333; color: #999; border-radius: 4px;
+          font-family: inherit; font-size: 10px; letter-spacing: .08em; padding: 7px 14px; cursor: pointer; }
+  .dbtn:hover { color: #fff; border-color: #555; }
+  .dbtn.go { border-color: var(--te); color: var(--te); }
+  .note { font-size: 10px; color: #5c584e; line-height: 1.9; letter-spacing: .04em; max-width: 900px; }
+  .note b.t { color: var(--te); font-weight: normal; } .note b.a { color: var(--amber); font-weight: normal; }
+  table.rev { border-collapse: collapse; font-size: 10px; margin: 14px 0 18px; max-width: 900px; }
+  table.rev th { text-align: left; font-weight: normal; letter-spacing: .12em; color: #666; font-size: 9px;
+                 padding: 6px 12px 6px 0; border-bottom: 1px solid #2a2a2a; }
+  table.rev td { padding: 5px 12px 5px 0; border-bottom: 1px solid #1c1c1c; color: #999; letter-spacing: .04em; }
+  table.rev td.n { color: #ddd; letter-spacing: .08em; }
+  .pill { font-size: 8px; padding: 2px 7px; border-radius: 3px; letter-spacing: .1em; }
+  .pill.t { background: #2a1408; color: var(--te); } .pill.d { background: #2a2417; color: var(--amber); }
+</style></head>
+<body>
+<h2>SLIDER DIALOG — ROTATE · TAP THE NAME</h2>
+<p class="sub">Single-tap the slider name opens its dialog (double-click still resets — existing behavior).
+The dialog is TE: segmented modes, numeric fields, stepped controls. ROTATE's new default is
+<b style="color:var(--amber);font-weight:normal">SPIN</b>, wired to the KINEME spin primitive (#784).</p>
+
+<div class="panel">
+  <div class="sec-label"><b>① LAYOUT</b> · ROTATE</div>
+  <div class="srow">
+    <div class="sname" id="sname">ROTATE<span class="hint">tap for dialog · 2×click resets</span></div>
+    <div class="spinind spinning" id="spinind" style="animation-duration:3s"></div>
+    <div class="track" id="track" style="display:none"><div class="fill" id="fill"></div>
+      <div class="thumb" id="th1"></div><div class="thumb" id="th2"></div></div>
+    <div class="sval" id="sval">spin · 0.33 rev/s</div>
+  </div>
+  <div class="dlg" id="dlg">
+    <h3>ROTATE</h3><div class="dsub">per-placement rotation · KINEME spin primitive</div>
+    <div class="modeseg" id="modeseg">
+      <button data-m="spin" class="seld">SPIN</button><button data-m="range">RANGE</button><button data-m="step">STEPPED</button>
+    </div>
+    <div class="frow" id="f-spin">
+      <div class="field"><label>SPEED rev/s</label><input id="in-speed" type="number" value="0.33" step="0.01"></div>
+      <div class="field"><label>DIRECTION</label><input id="in-dir" type="text" value="CW" readonly style="width:70px"></div>
+    </div>
+    <div class="frow" id="f-range" style="display:none">
+      <div class="field"><label>MIN °</label><input type="number" value="-70" step="1"></div>
+      <div class="field"><label>MAX °</label><input type="number" value="70" step="1"></div>
+    </div>
+    <div class="frow" id="f-step" style="display:none">
+      <div class="field"><label>STEP °</label><input type="number" value="15" step="1"></div>
+      <div class="field"><label>COUNT</label><input type="number" value="24" step="1"></div>
+    </div>
+    <div class="dfoot">
+      <button class="dbtn go" id="apply">APPLY</button>
+      <button class="dbtn" id="reset">RESET DEFAULT</button>
+      <button class="dbtn" id="close">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-label"><b>ALL SLIDERS</b> · NATURE REVIEW (KC-1 DS)</div>
+  <table class="rev">
+    <tr><th>SLIDER</th><th>SECTION</th><th>NATURE</th><th>DIALOG MODES</th></tr>
+    <tr><td class="n">COUNT</td><td>layout</td><td><span class="pill t">TE · integer</span></td><td>range expand · step</td></tr>
+    <tr><td class="n">SCALE</td><td>layout</td><td><span class="pill t">TE · frozen range</span></td><td>range expand · stepped</td></tr>
+    <tr><td class="n">ROTATE</td><td>layout</td><td><span class="pill d">DAVIS · spin default</span></td><td>spin · range · stepped</td></tr>
+    <tr><td class="n">ALPHA</td><td>layout</td><td><span class="pill t">TE · frozen range</span></td><td>range expand</td></tr>
+    <tr><td class="n">JITTER / DENSITY</td><td>layout</td><td><span class="pill t">TE · integers</span></td><td>range expand · step</td></tr>
+    <tr><td class="n">DIVERGENCE</td><td>layout</td><td><span class="pill d">DAVIS · continuous</span></td><td>range expand · speed</td></tr>
+    <tr><td class="n">PARTICLES</td><td>swarm</td><td><span class="pill t">TE · integer</span></td><td>range expand · step</td></tr>
+    <tr><td class="n">COHESION / GRAVITY / DAMPING / NOISE SPEED</td><td>swarm</td><td><span class="pill d">DAVIS · physics</span></td><td>range expand</td></tr>
+    <tr><td class="n">BODY</td><td>creature</td><td><span class="pill t">TE · integer</span></td><td>range expand · step</td></tr>
+    <tr><td class="n">flap / breath / wind</td><td>creature</td><td><span class="pill d">DAVIS · MotionTile</span></td><td>speed · range expand</td></tr>
+    <tr><td class="n">METABOLISM</td><td>creature</td><td><span class="pill d">DAVIS · continuous</span></td><td>range expand · speed</td></tr>
+    <tr><td class="n">HUE ROTATE</td><td>appearance</td><td><span class="pill d">DAVIS · continuous</span></td><td>spin · range · stepped</td></tr>
+    <tr><td class="n">CROOKED / OPEN / SQUASH / BRANCHING</td><td>appearance</td><td><span class="pill d">DAVIS · 0–1</span></td><td>range expand</td></tr>
+    <tr><td class="n">GROWTH RATE</td><td>appearance</td><td><span class="pill d">DAVIS · continuous</span></td><td>range expand · speed</td></tr>
+  </table>
+  <div class="note">Rule: a slider's <b class="t">nature</b> decides its default rendering (TE numbers vs Davis motion),
+  and the dialog offers the <i>other</i> natures as modes. The dialog itself is always TE —
+  segmented, labeled, numeric. Tap name opens · double-click resets (existing) · no mode change without APPLY.</div>
+</div>
+
+<script>
+  const dlg=document.getElementById('dlg'), sval=document.getElementById('sval'),
+        spinind=document.getElementById('spinind'), track=document.getElementById('track');
+  let mode='spin';
+  document.getElementById('sname').onclick=()=>dlg.classList.toggle('open');
+  document.getElementById('close').onclick=()=>dlg.classList.remove('open');
+  const segs=[...document.querySelectorAll('#modeseg button')];
+  segs.forEach(b=>b.onclick=()=>{
+    segs.forEach(x=>x.classList.remove('sel','seld'));
+    b.classList.add(b.dataset.m==='spin'?'seld':'sel');
+    mode=b.dataset.m;
+    ['spin','range','step'].forEach(m=>document.getElementById('f-'+m).style.display=m===mode?'flex':'none');
+  });
+  function paintRange(){
+    const t=track; t.style.display='block'; spinind.style.display='none';
+    document.getElementById('fill').style.cssText='left:15%;right:25%;position:absolute;top:0;bottom:0;background:var(--amber);border-radius:2px;';
+    document.getElementById('th1').style.left='15%'; document.getElementById('th2').style.left='75%';
+    sval.textContent='-70° – 70°';
+  }
+  function paintSpin(sp){
+    track.style.display='none'; spinind.style.display='block';
+    spinind.style.animationDuration=(1/Math.max(sp,0.01))+'s';
+    spinind.classList.add('spinning');
+    sval.textContent=`spin · ${sp.toFixed(2)} rev/s`;
+  }
+  document.getElementById('apply').onclick=()=>{
+    if(mode==='spin'){ paintSpin(parseFloat(document.getElementById('in-speed').value)||0.33); }
+    else if(mode==='range'){ spinind.classList.remove('spinning'); paintRange(); }
+    else { track.style.display='none'; spinind.style.display='block';
+      spinind.classList.remove('spinning'); spinind.style.borderTopColor='#3a3a3a';
+      sval.textContent='stepped · 15° × 24'; }
+    dlg.classList.remove('open');
+  };
+  document.getElementById('reset').onclick=()=>{
+    segs.forEach(x=>x.classList.remove('sel','seld')); segs[0].classList.add('seld'); mode='spin';
+    ['spin','range','step'].forEach(m=>document.getElementById('f-'+m).style.display=m==='spin'?'flex':'none');
+    document.getElementById('in-speed').value='0.33'; paintSpin(0.33);
+  };
+</script>
+</body></html>

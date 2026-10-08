@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIRECTOR — Living Motion · KC-1 DS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --amber: #ffcd82; --te: #ff4d00; }
+  body { background: #141414; color: #e8e4da; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #8a8578; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #5c584e; margin-bottom: 14px; max-width: 900px; line-height: 1.7; }
+  .panel { background: #0c0c0c; border: 1px solid #262626; border-radius: 8px; padding: 18px;
+           max-width: 760px; margin-bottom: 18px; }
+  .phead { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .phead .ico { width: 26px; height: 26px; border: 2px solid #888; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center; font-size: 12px; color: #bbb; }
+  .phead .t { font-size: 12px; letter-spacing: .16em; color: #bbb; }
+  .sec { margin-bottom: 18px; }
+  .sec .cap { font-size: 9px; letter-spacing: .16em; color: #666; margin-bottom: 8px; }
+  .sec .cap b { font-weight: normal; }
+  .sec .cap b.t { color: var(--te); } .sec .cap b.a { color: var(--amber); }
+  .patgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .pat { background: #141414; border: 1px solid #2c2c2c; border-radius: 6px; padding: 10px 8px;
+         cursor: pointer; text-align: center; transition: all .12s steps(2); }
+  .pat:hover { border-color: #555; }
+  .pat.sel { border-color: var(--te); background: #1c1008; }
+  .pat .pn { font-size: 10px; letter-spacing: .08em; color: #bbb; display: block; margin-bottom: 6px; }
+  .pat.sel .pn { color: var(--te); }
+  .pat .pd { font-size: 8px; color: #5c584e; line-height: 1.5; }
+  .pat .mini { height: 26px; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3a3a3a; }
+  .pat[data-p="drift"] .mini .dot { animation: drift 4s ease-in-out infinite; }
+  .pat[data-p="hero"] .mini .dot:nth-child(2) { background: var(--amber); animation: spin 2s linear infinite; border-radius: 2px; }
+  .pat[data-p="pulse"] .mini .dot { animation: pulse 2s ease-in-out infinite; }
+  .pat[data-p="pulse"] .mini .dot:nth-child(2){ animation-delay:.3s } .pat[data-p="pulse"] .mini .dot:nth-child(3){ animation-delay:.6s }
+  .pat[data-p="boil"] .mini .dot { animation: boil .5s steps(2) infinite; background: #6a5a3a; }
+  @keyframes drift { 0%,100%{ transform: translateX(-3px);} 50%{ transform: translateX(3px);} }
+  @keyframes spin { to { transform: rotate(360deg);} }
+  @keyframes pulse { 0%,100%{ transform: scale(.7); opacity:.5;} 50%{ transform: scale(1.25); opacity:1;} }
+  @keyframes boil { 0%{ transform: translate(0,0);} 50%{ transform: translate(2px,-2px);} }
+  /* curator amount — Davis slider */
+  .srow { display: flex; align-items: center; gap: 14px; }
+  .sval { font-size: 11px; color: var(--amber); min-width: 40px; }
+  .track { flex: 1; height: 3px; background: #2a2a2a; border-radius: 2px; position: relative; cursor: pointer; }
+  .track .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--amber); border-radius: 2px; }
+  .thumb { position: absolute; top: 50%; width: 14px; height: 18px; background: var(--amber);
+           border-radius: 3px; transform: translate(-50%,-50%); }
+  .slbl { font-size: 9px; color: #5c584e; letter-spacing: .08em; margin-top: 6px; line-height: 1.6; }
+  /* precedence chain */
+  .chain { display: flex; align-items: center; gap: 0; margin-top: 4px; }
+  .link { padding: 8px 14px; font-size: 10px; letter-spacing: .1em; border: 1px solid #333;
+          background: #141414; color: #999; }
+  .link:first-child { border-radius: 6px 0 0 6px; }
+  .link:last-child { border-radius: 0 6px 6px 0; }
+  .link.hi { border-color: var(--te); color: var(--te); background: #1c1008; }
+  .link.mid { border-color: #6a5a3a; color: var(--amber); }
+  .gt { padding: 8px 6px; color: #4a4a4a; font-size: 12px; }
+  /* overrides */
+  .ovrow { display: flex; align-items: center; gap: 10px; font-size: 11px; color: #999; }
+  .ovtoggle { display: flex; gap: 6px; }
+  .ovtoggle button { background: #161616; border: 1px solid #333; color: #777; border-radius: 4px;
+                     font-family: inherit; font-size: 10px; padding: 6px 12px; cursor: pointer;
+                     letter-spacing: .08em; }
+  .ovtoggle button.sel { border-color: var(--te); color: var(--te); }
+  .note { font-size: 10px; color: #5c584e; line-height: 1.9; letter-spacing: .04em; max-width: 900px; }
+  .note b.t { color: var(--te); font-weight: normal; } .note b.a { color: var(--amber); font-weight: normal; }
+</style></head>
+<body>
+<h2>DIRECTOR ◎ — LIVING MOTION</h2>
+<p class="sub">Every placed instance gets a KINEME rig by default. <b style="color:var(--te);font-weight:normal">Director</b>
+choreographs the pattern · <b style="color:var(--amber);font-weight:normal">Curator</b> scales the amount by taste ·
+seed decorrelates phase · you override per instance. Floor is drift, never zero.</p>
+
+<div class="panel">
+  <div class="phead"><span class="ico">◎</span><span class="t">DIRECTOR</span></div>
+
+  <div class="sec">
+    <div class="cap"><b class="t">DIRECTOR</b> · CHOREOGRAPHY PATTERN (discrete → TE)</div>
+    <div class="patgrid" id="pats">
+      <div class="pat sel" data-p="drift"><div class="mini"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="pn">DRIFT</span><span class="pd">uniform gentle drift<br>the floor</span></div>
+      <div class="pat" data-p="swell"><div class="mini"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="pn">SWELL</span><span class="pd">breath-forward<br>slow swell</span></div>
+      <div class="pat" data-p="thump"><div class="mini"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="pn">THUMP</span><span class="pd">pulse-forward<br>beat-driven</span></div>
+      <div class="pat" data-p="off" style="opacity:.45"><div class="mini"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <span class="pn">BOIL</span><span class="pd">cut from v1<br>no consumer yet</span></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="cap"><b class="a">CURATOR</b> · TASTE → MOTION AMOUNT (continuous → Davis)</div>
+    <div class="srow">
+      <div class="track" id="amt-track"><div class="fill" id="amt-fill" style="width:65%"></div>
+        <div class="thumb" id="amt-thumb" style="left:65%"></div></div>
+      <div class="sval" id="amt-val">0.65</div>
+    </div>
+    <div class="slbl">High-taste instances move more · low-taste sink toward the drift floor ·
+    no taste.json → seed-based amounts, quiet, never performed</div>
+  </div>
+
+  <div class="sec">
+    <div class="cap"><b class="t">OVERRIDE</b> · PER INSTANCE (discrete → TE)</div>
+    <div class="ovrow">
+      <span>142 instances · 3 overridden</span>
+      <span class="ovtoggle"><button class="sel">ALL ON</button><button>SELECT…</button></span>
+      <span style="font-size:9px;color:#5c584e">tap instance on canvas to toggle its rig (needs canvas picking)</span>
+    </div>
+  </div>
+
+  <div class="sec" style="margin-bottom:0">
+    <div class="cap">PRECEDENCE</div>
+    <div class="chain">
+      <span class="link hi">HUMAN</span><span class="gt">›</span>
+      <span class="link hi">DIRECTOR</span><span class="gt">›</span>
+      <span class="link mid">CURATOR</span><span class="gt">›</span>
+      <span class="link">SEED</span>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b class="t">Honesty (rule 3):</b> Director patterns need a real driver (voice/beat) — no driver, no choreography,
+  just DRIFT. Curator amounts need taste.json — no signal, seed-based amounts.<br>
+  <b class="a">The floor:</b> your #721 law — subtle motion always, never static. DRIFT is the default pattern,
+  so "off" means "drift like everything else," not "freeze."<br>
+  <b class="t">Open:</b> per-instance canvas picking UI doesn't exist yet — the override row is specced, not built.
+</div>
+
+<script>
+  document.querySelectorAll('.pat').forEach(p=>p.onclick=()=>{
+    document.querySelectorAll('.pat').forEach(x=>x.classList.remove('sel'));
+    p.classList.add('sel');
+  });
+  const tr=document.getElementById('amt-track'), fl=document.getElementById('amt-fill'),
+        th=document.getElementById('amt-thumb'), vv=document.getElementById('amt-val');
+  function setAmt(x){ x=Math.max(0,Math.min(1,x));
+    fl.style.width=(x*100)+'%'; th.style.left=(x*100)+'%'; vv.textContent=x.toFixed(2); }
+  tr.onclick=e=>{ const r=tr.getBoundingClientRect(); setAmt((e.clientX-r.left)/r.width); };
+  document.querySelectorAll('.ovtoggle button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.ovtoggle button').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel');
+  });
+</script>
+</body></html>

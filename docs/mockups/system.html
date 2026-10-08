@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KC-1 design system — full bar mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --amber: #ffcd82; --te: #ff4d00; }
+  body { background: #141414; color: #e8e4da; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #8a8578; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #5c584e; margin-bottom: 6px; }
+  p.rule { font-size: 11px; color: #8a8578; margin-bottom: 14px; }
+  p.rule b.a { color: var(--amber); font-weight: normal; } p.rule b.t { color: var(--te); font-weight: normal; }
+  .bar { display: flex; align-items: center; gap: 10px; background: #0c0c0c; border: 1px solid #262626;
+         border-radius: 8px; padding: 12px 14px 18px; font-size: 12px; letter-spacing: .08em; flex-wrap: wrap; }
+  .sep { width: 1px; height: 22px; background: #262626; }
+  .pill { display: flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid #2c2c2c;
+          border-radius: 5px; color: #b9b3a4; white-space: nowrap; position: relative; }
+  .pill.dim { color: #5c584e; }
+  .tag { position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%);
+         font-size: 8px; letter-spacing: .14em; color: #666; white-space: nowrap; }
+  .tag.a { color: #8a6f42; } .tag.t { color: #8a4a30; }
+
+  /* ◆ diamond — CONTINUOUS (taste confidence, probabilistic) → Davis: amber shimmer */
+  .diamond { width: 11px; height: 11px; background: #3a3a3a; transform: rotate(45deg); border-radius: 1px;
+             transition: background .8s, box-shadow .8s; }
+  .diamond.lvl2 { background: #c98f3d; box-shadow: 0 0 10px rgba(255,205,130,.45); animation: breath 10s ease-in-out infinite; }
+  .diamond.lvl4 { background: var(--amber); box-shadow: 0 0 16px rgba(255,205,130,.8); animation: breath 10s ease-in-out infinite; }
+  @keyframes breath { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+
+  /* ● KIN circle — CONTINUOUS (heat, time-based) → Davis glow; layer is DISCRETE → TE label */
+  .circle { width: 13px; height: 13px; border-radius: 50%; background: #3a3a3a; transition: all 1.2s; }
+  .circle.warm { background: #8a6a3a; box-shadow: 0 0 10px rgba(255,205,130,.4); }
+  .circle.hot { background: var(--amber); box-shadow: 0 0 18px rgba(255,205,130,.9); }
+  .layer { font-size: 9px; color: var(--te); min-width: 12px; letter-spacing: .1em; }
+
+  /* L looks — DISCRETE (applied/clean/dirty/none) → TE */
+  .looksq { width: 11px; height: 11px; border: 2px solid #444; border-radius: 1px; transition: all .12s steps(2); }
+  .looksq.clean { border-color: var(--te); background: var(--te); }
+  .looksq.dirty { border-color: var(--te); background: linear-gradient(to top, var(--te) 50%, transparent 50%); }
+  .lookname { font-size: 9px; color: #777; letter-spacing: .08em; }
+
+  /* V voice — CONTINUOUS (drift) → Davis breath; id label → TE */
+  .voice { width: 11px; height: 11px; border-radius: 50%; border: 2px solid #444; transition: border-color .8s; }
+  .voice.on { border-color: #c98f3d; animation: breath 6s ease-in-out infinite; box-shadow: 0 0 8px rgba(255,205,130,.35); }
+  .voiceid { font-size: 9px; color: #777; letter-spacing: .08em; }
+
+  /* CUR — verdict DISCRETE → TE detent + keep/pass digit */
+  .curdia { width: 11px; height: 11px; border: 2px solid #444; transform: rotate(45deg); border-radius: 1px;
+            transition: transform .12s steps(2), background .12s steps(2), border-color .12s steps(2); }
+  .curdia.v2 { transform: rotate(135deg); border-color: #888; }
+  .curdia.v4 { transform: rotate(225deg); background: var(--te); border-color: var(--te); }
+  .ledger { font-size: 9px; color: #777; letter-spacing: .06em; }
+
+  /* ■ B — DISCRETE (locks, armed) → TE */
+  .bsq { width: 12px; height: 12px; border: 2px solid #666; border-radius: 1px; position: relative; transition: background .12s steps(2); }
+  .bsq.fill { background: #999; }
+  .digit { font-size: 11px; color: #ddd; min-width: 10px; }
+  .nub { width: 8px; height: 14px; border: 2px solid #444; border-radius: 4px; position: relative; display: none; }
+  .nub::after { content:''; position: absolute; left: 1px; right: 1px; top: 1px; height: 4px; background: var(--te); border-radius: 2px; }
+  .nub.show { display: block; }
+
+  .controls { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .ctl-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #8a8578; flex-wrap: wrap; }
+  .ctl-row .lbl { width: 210px; letter-spacing: .06em; }
+  .ctl-row .lbl i { font-style: normal; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-right: 6px; }
+  .lbl i.d { background: #3a2f1d; color: var(--amber); } .lbl i.t { background: #2a1408; color: var(--te); }
+  button { background: #1e1e1e; color: #b9b3a4; border: 1px solid #333; border-radius: 4px;
+           font-family: inherit; font-size: 10px; letter-spacing: .06em; padding: 5px 10px; cursor: pointer; }
+  button.on { border-color: #c98f3d; color: var(--amber); background: #2a2417; }
+  button.on.te { border-color: var(--te); color: var(--te); background: #2a1408; }
+  .legend { margin-top: 18px; font-size: 10px; color: #5c584e; letter-spacing: .06em; line-height: 1.9; }
+  .legend b.a { color: var(--amber); font-weight: normal; } .legend b.t { color: var(--te); font-weight: normal; }
+</style></head>
+<body>
+<h2>KC-1 DESIGN SYSTEM — FULL BAR</h2>
+<p class="sub">the instrument contract · honest signals only · silence is default</p>
+<p class="rule"><b class="a">continuous → Davis</b> (amber · breath · shimmer · decay) &nbsp;·&nbsp; <b class="t">discrete → TE</b> (red · detents · labels · digits)</p>
+
+<div class="bar">
+  <span class="pill"><span class="diamond" id="diamond"></span>KC-1<span class="tag a">TASTE · cont</span></span>
+  <span class="sep"></span>
+  <span class="pill dim">■ START: K.O.Z.</span>
+  <span class="sep"></span>
+  <span class="pill"><span class="circle" id="circle"></span>KIN<span class="layer" id="layer"></span><span class="tag a">HEAT · cont</span></span>
+  <span class="pill"><span class="looksq" id="looksq"></span>L<span class="lookname" id="lookname">—</span><span class="tag t">LOOK · disc</span></span>
+  <span class="pill"><span class="voice" id="voice"></span>V<span class="voiceid" id="voiceid">off</span><span class="tag a">DRIFT · cont</span></span>
+  <span class="pill"><span class="curdia" id="curdia"></span>CUR<span class="ledger" id="ledger">0/0</span><span class="tag t">VERDICT · disc</span></span>
+  <span class="sep"></span>
+  <span class="pill"><span class="bsq" id="bsq"></span><span class="digit" id="digit">0</span><span class="nub" id="nub"></span>B<span class="tag t">LOCK · disc</span></span>
+</div>
+
+<div class="controls">
+  <div class="ctl-row"><span class="lbl"><i class="d">DAVIS</i>◆ taste confidence</span>
+    <button data-k="d" data-v="0" class="on">dark</button><button data-k="d" data-v="2">shimmer 2</button><button data-k="d" data-v="4">shimmer 4</button></div>
+  <div class="ctl-row"><span class="lbl"><i class="d">DAVIS</i>● heat + <i class="t">TE</i>layer</span>
+    <button data-k="c" data-v="cool" class="on">cool</button><button data-k="c" data-v="warm">warm</button><button data-k="c" data-v="hot">hot</button>
+    <button data-k="l" data-v="" class="on te">·</button><button data-k="l" data-v="R" class="te">R</button><button data-k="l" data-v="W" class="te">W</button><button data-k="l" data-v="C" class="te">C</button></div>
+  <div class="ctl-row"><span class="lbl"><i class="t">TE</i>L look state</span>
+    <button data-k="look" data-v="none" class="on te">none</button><button data-k="look" data-v="clean" class="te">applied ✓</button><button data-k="look" data-v="dirty" class="te">dirty ◐</button></div>
+  <div class="ctl-row"><span class="lbl"><i class="d">DAVIS</i>V voice drift</span>
+    <button data-k="v" data-v="off" class="on">off</button><button data-k="v" data-v="aria">aria ~</button><button data-k="v" data-v="rook">rook ~</button></div>
+  <div class="ctl-row"><span class="lbl"><i class="t">TE</i>CUR verdict + ledger</span>
+    <button data-k="cur" data-v="0" class="on te">no signal</button><button data-k="cur" data-v="2" class="te">lean 2</button><button data-k="cur" data-v="4" class="te">strong 4</button>
+    <button data-k="led" data-v="3/11" class="te">3/11</button><button data-k="led" data-v="9/12" class="te">9/12</button></div>
+  <div class="ctl-row"><span class="lbl"><i class="t">TE</i>■ locks + arm</span>
+    <button data-k="b" data-v="0" class="on te">0</button><button data-k="b" data-v="2" class="te">2</button><button data-k="b" data-v="4" class="te">4</button><button data-k="arm" data-v="1" class="te">arm ⌖</button></div>
+</div>
+
+<div class="legend">
+  <b class="a">amber breathes</b> — taste, heat, drift: probabilistic / time-based, rendered organic<br>
+  <b class="t">red steps</b> — verdicts, locks, layers, looks: countable / true-false, rendered mechanical<br>
+  every state traces to a real signal · reduced-motion collapses all of it to static encodings
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  function row(btn){ return btn.parentNode; }
+  function setBtns(btn, te){ row(btn).querySelectorAll('button').forEach(b=>{ if(b.dataset.k===btn.dataset.k){ b.classList.remove('on','te'); }});
+    btn.classList.add('on'); if(te) btn.classList.add('te'); }
+  document.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.k, v=b.dataset.v, te=b.classList.contains('te')||b.dataset.k==='l';
+    setBtns(b, b.classList.contains('te'));
+    if(k==='d') $('diamond').className='diamond'+(v==='0'?'':' lvl'+v);
+    if(k==='c') $('circle').className='circle'+(v==='cool'?'':' '+v);
+    if(k==='l') $('layer').textContent=v;
+    if(k==='look'){ $('looksq').className='looksq'+(v==='none'?'':' '+v);
+      $('lookname').textContent = v==='none'?'—':v==='clean'?'NOIR':'NOIR*'; }
+    if(k==='v'){ const on=v!=='off'; $('voice').className='voice'+(on?' on':''); $('voiceid').textContent=v; }
+    if(k==='cur') $('curdia').className='curdia'+(v==='0'?'':' v'+v);
+    if(k==='led') $('ledger').textContent=v;
+    if(k==='b'){ $('digit').textContent=v; $('bsq').classList.toggle('fill', v!=='0'); $('nub').classList.remove('show'); }
+    if(k==='arm') $('nub').classList.add('show');
+  });
+</script>
+</body></html>
