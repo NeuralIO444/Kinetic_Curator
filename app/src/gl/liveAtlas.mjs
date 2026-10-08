@@ -180,32 +180,3 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null) {
   const mipmaps = buildMipmaps(pixels, width, height);
   return { pixels, width, height, cells, mipmaps };
 }
-
-/**
- * Bake the grain noise LUT at the render size. Same feTurbulence recipe as
- * the offline bake (fractalNoise, baseFrequency 0.9, 2 octaves, seed 3) —
- * browsers render their own noise, which is fine for grain.
- * @returns {Promise<{pixels:Uint8Array,width:number,height:number}>} premultiplied RGBA
- */
-export async function bakeLiveGrainLut(width, height) {
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 1000 700">` +
-    `<defs><filter id="n" filterUnits="userSpaceOnUse" x="0" y="0" width="1000" height="700" ` +
-    `color-interpolation-filters="sRGB">` +
-    `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/>` +
-    `</filter></defs>` +
-    `<rect x="0" y="0" width="1000" height="700" filter="url(#n)"/>` +
-    `</svg>`;
-  const img = await rasterizeSvg(svg, width, height);
-  const d = img.data;
-  const out = new Uint8Array(width * height * 4);
-  for (let i = 0, n = width * height; i < n; i++) {
-    const o = i * 4;
-    const a = d[o + 3];
-    out[o] = Math.round((d[o] * a) / 255);
-    out[o + 1] = Math.round((d[o + 1] * a) / 255);
-    out[o + 2] = Math.round((d[o + 2] * a) / 255);
-    out[o + 3] = a;
-  }
-  return { pixels: out, width, height };
-}

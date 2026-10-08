@@ -43,3 +43,9 @@ test('#816 missing grain LUT does not abort the chain', () => {
   assert.match(renderer, /return grainLuts\[wrap\.fxLayerId\] \|\| null/);
   assert.match(renderer, /fxFinishChains\.push/);
 });
+
+test('#1079 the live loop bakes no grain LUT: the shader is procedural, the bake was pure main-thread cost', () => {
+  assert.doesNotMatch(read('../liveLoop.mjs'), /bakeLiveGrainLut|setGrainLuts|grainKey/);
+  assert.doesNotMatch(read('../liveAtlas.mjs'), /bakeLiveGrainLut/);
+  assert.doesNotMatch(read('../shaders.mjs'), /texture\(u_aux/);
+});
