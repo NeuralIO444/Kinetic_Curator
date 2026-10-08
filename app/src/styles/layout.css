@@ -892,7 +892,8 @@
   padding: 1px 4px; font-size: 9px; line-height: 1; color: #b9b3a4;
   cursor: default; white-space: nowrap;
 }
-button.lock-badge { cursor: pointer; }
+button.lock-badge, .lock-badge[role="button"] { cursor: pointer; }
+.lock-badge[role="button"]:focus-visible { outline: 2px solid var(--focus); }
 .lock-badge .lock-glyph { color: #888; }
 .lock-badge .lock-digit { color: #ddd; }
 .lock-badge .lock-nubdot {
