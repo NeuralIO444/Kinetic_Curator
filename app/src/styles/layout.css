@@ -2,6 +2,9 @@
 .app {
   height: 100vh;
   display: grid;
+  /* one column that may shrink to the window: without minmax(0, 1fr) the column grows to its widest child's minimum, and a
+     long HITS row (12 pills) pushed the whole page 700px wider than the window, hiding the top bar and clipping the panels */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 38px 26px 1fr 38px auto 20px;
   background: radial-gradient(circle at 20% 0%, rgba(255,255,255,0.02), transparent 40%), var(--bg);
 }

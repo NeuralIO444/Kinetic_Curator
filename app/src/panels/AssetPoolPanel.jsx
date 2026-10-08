@@ -24,6 +24,7 @@ export function AssetPoolPanel() {
   // network request — only a reload recovers, and the message says so. Cleared at the
   // start of each open so a fresh failure replaces, rather than stacks on, the old one.
   const [studioError, setStudioError] = useState(null);
+  const [menu, setMenu] = useState(null); // the user overlay whose actions are open (#1128 tidy: no hover-only controls)
   const { assets } = useApp();
   const { state } = useApp(s => ({
     enabled: s.enabledAssets,
@@ -148,51 +149,53 @@ export function AssetPoolPanel() {
             const w = effectiveWeight(a);
             const isUser = String(a.id).startsWith('user:');
             return (
-              <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}`} style={isUser ? { outline: '1px dashed var(--accent)' } : undefined}>
+              <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}${enabled[a.id] && still[a.id] ? ' pinned' : ''}`} style={isUser ? { outline: '1px dashed var(--accent)' } : undefined}>
                 <button className="tile-toggle" onClick={(e) => e.altKey ? emit(Events.ASSETS_SOLO, { id: a.id }) : emit(Events.ASSETS_TOGGLE, { id: a.id })}>
                   <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40" dangerouslySetInnerHTML={{ __html: a.svg }} />
                 </button>
-                <button className="tile-weight" title={WEIGHT_TITLE[w]} onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_WEIGHT_CYCLE, { id: a.id }); }}
-                  style={{ position: 'absolute', top: 2, left: 2, fontSize: 9, fontWeight: 700, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.5)', color: 'var(--dim)', zIndex: 2 }}>
+                <button className="tile-weight" title={WEIGHT_TITLE[w]} aria-label={`weight ${w}: ${WEIGHT_TITLE[w]}. Tap to change`}
+                  onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_WEIGHT_CYCLE, { id: a.id }); }}>
                   {WEIGHT_LABEL[w]}
                 </button>
-                <button className="tile-solo" title="Solo" onClick={() => emit(Events.ASSETS_SOLO, { id: a.id })}>◉</button>
-                <button className="act" type="button" title="Duplicate overlay copy" onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}
-                  style={{ position: 'absolute', bottom: 40, right: 2, fontSize: 8, padding: '2px 4px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>dup</button>
-                {isUser && (
-                  <>
-                    <button className="act" type="button" title="Edit in motif kit" onClick={(e) => { e.stopPropagation(); openStudio({ id: a.id, svg: a.svg }); }}
-                      style={{ position: 'absolute', bottom: 22, left: 28, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>edit</button>
-                    <button className="act" type="button" title="Region mattes — pick regions for slots A/B/C/D" onClick={(e) => { e.stopPropagation(); openPicker(a.id); }}
-                      style={{ position: 'absolute', bottom: 22, left: 58, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>reg</button>
-                    <button className="act" type="button" title="Rename overlay id" onClick={(e) => {
+                <div className="tile-meta" title={`${a.id} · ${isUser ? 'user' : a.category}`}>
+                  <span className="tile-id">{a.id}</span>
+                </div>
+                {/* #1128 — pin this asset still: a discrete on/off, so TE (rule 2). Only assets in use have one. */}
+                {(enabled[a.id] || isUser) && (
+                  <div className="tile-foot">
+                    {enabled[a.id] && (
+                      <>
+                        <button type="button" className={`tile-still${still[a.id] ? ' on' : ''}`} aria-pressed={!!still[a.id]}
+                          aria-label={`${a.id}: ${still[a.id] ? 'pinned still' : 'moves'}`}
+                          title={still[a.id] ? 'Pinned still: this asset stays where it is placed. Tap to let it move again.' : 'Moves with the living-motion floor. Tap to pin it still.'}
+                          onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_STILL_TOGGLE, { id: a.id }); }}>
+                          <i aria-hidden="true" />still
+                        </button>
+                        <button type="button" className="tile-dup" aria-label={`Duplicate ${a.id}`} title="Duplicate overlay copy"
+                          onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}>dup</button>
+                      </>
+                    )}
+                    {isUser && (
+                      <button type="button" className="tile-more" aria-expanded={menu === a.id} aria-label={`More actions for ${a.id}`}
+                        title="Edit, region mattes, rename, swap, delete" onClick={(e) => { e.stopPropagation(); setMenu(menu === a.id ? null : a.id); }}>···</button>
+                    )}
+                  </div>
+                )}
+                {isUser && menu === a.id && (
+                  <div className="tile-menu" role="group" aria-label={`Actions for ${a.id}`}>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); openStudio({ id: a.id, svg: a.svg }); }}>edit</button>
+                    <button type="button" title="Region mattes: pick regions for slots A/B/C/D" onClick={(e) => { e.stopPropagation(); openPicker(a.id); }}>regions</button>
+                    <button type="button" onClick={(e) => {
                       e.stopPropagation();
                       const name = window.prompt('Overlay id (no user: prefix)', a.id.replace(/^user:/, ''));
                       if (name) emit(Events.ASSETS_RENAME, { id: a.id, name });
-                    }} style={{ position: 'absolute', bottom: 22, left: 2, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>ren</button>
-                    <button className="act" type="button" title="Replace SVG" onClick={(e) => {
-                      e.stopPropagation();
-                      swapId.current = a.id;
-                      swapRef.current?.click();
-                    }} style={{ position: 'absolute', top: 2, right: 18, fontSize: 8, padding: '2px 3px', border: '1px solid var(--line)', background: 'rgba(0,0,0,0.55)', color: 'var(--dim)', zIndex: 2 }}>swap</button>
-                    <button className="act" type="button" title="Delete from overlay (canon untouched)" onClick={(e) => {
+                    }}>rename</button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); swapId.current = a.id; swapRef.current?.click(); }}>swap</button>
+                    <button type="button" className="del" onClick={(e) => {
                       e.stopPropagation();
                       if (window.confirm(`Remove ${a.id}?`)) emit(Events.ASSETS_REMOVE, { id: a.id });
-                    }} style={{ position: 'absolute', top: 2, right: 2, fontSize: 8, padding: '2px 3px', border: '1px solid var(--accent)', color: 'var(--accent)', background: 'rgba(0,0,0,0.55)', zIndex: 2 }}>del</button>
-                  </>
-                )}
-                <div className="tile-meta">
-                  <span className="tile-id">{a.id}</span>
-                  <span className="tile-cat">{isUser ? 'user' : a.category}</span>
-                </div>
-                {/* #1128 — pin this asset still: a discrete on/off, so TE (rule 2). Only assets in use have one. */}
-                {enabled[a.id] && (
-                  <button type="button" className={`tile-still${still[a.id] ? ' on' : ''}`} aria-pressed={!!still[a.id]}
-                    aria-label={`${a.id}: ${still[a.id] ? 'pinned still' : 'moves'}`}
-                    title={still[a.id] ? 'Pinned still: this asset stays where it is placed. Tap to let it move again.' : 'Moves with the living-motion floor. Tap to pin it still.'}
-                    onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_STILL_TOGGLE, { id: a.id }); }}>
-                    <i aria-hidden="true" />still
-                  </button>
+                    }}>delete</button>
+                  </div>
                 )}
               </div>
             );

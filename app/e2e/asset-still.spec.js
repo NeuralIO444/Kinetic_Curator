@@ -26,3 +26,27 @@ test('only assets in use have a STILL toggle; it is 44px tall and flips the proj
   await expect(first).toHaveAttribute('aria-pressed', 'false');
   expect(await page.evaluate(() => Object.keys(window.__kcStore.getState().assetStill).length)).toBe(0);
 });
+
+test('DUP sits next to STILL on a tile in use; nothing depends on hover; a tile that is off is only a picture', async ({ page }) => {
+  await boot(page);
+  const used = page.locator('.tile.tile-on').first();
+  await expect(used.locator('.tile-foot .tile-dup')).toBeVisible();
+  expect((await used.locator('.tile-dup').boundingBox()).height).toBeGreaterThanOrEqual(44);
+  const off = page.locator('.tile').nth(12); // fixed by position: a locator on 'not tile-on' would slide to the next tile once this one is on
+  await expect(off).not.toHaveClass(/tile-on/);
+  await expect(off.locator('.tile-foot')).toHaveCount(0);
+  await off.hover();
+  await expect(off.getByRole('button', { name: /dup/i })).toHaveCount(0); // no hover strip any more
+  await expect(off.locator('.tile-solo')).toHaveCount(0);
+  await off.locator('.tile-toggle').click({ position: { x: 40, y: 28 } });
+  await expect(off).toHaveClass(/tile-on/);
+});
+
+test('pinning marks the picture too (a red corner), so a scan of the grid sees what is held still', async ({ page }) => {
+  await boot(page);
+  const used = page.locator('.tile.tile-on').first();
+  await used.locator('.tile-still').click();
+  await expect(used).toHaveClass(/\bpinned\b/);
+  const mark = await used.evaluate((el) => getComputedStyle(el, '::after').backgroundColor);
+  expect(mark).not.toBe('rgba(0, 0, 0, 0)');
+});

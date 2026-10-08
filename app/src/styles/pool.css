@@ -30,8 +30,9 @@
 .pool-body { flex: 1; overflow: auto; min-height: 0; }
 .pool-body.grid .asset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  align-items: start; /* a tile with a STILL strip is taller; the others do not stretch to match */
+  gap: 4px;
   padding: 6px;
 }
 .tile {
@@ -49,31 +50,52 @@
 }
 .tile.tile-on .tile-toggle { background: rgba(255,255,255,0.03); }
 .tile:not(.tile-on) .tile-svg { opacity: 0.28; filter: grayscale(0.7); }
-.tile-solo {
-  position: absolute; top: 2px; right: 2px;
-  width: 14px; height: 14px;
-  display: flex; align-items: center; justify-content: center;
+.tile-weight {
+  position: absolute; top: 3px; left: 3px; z-index: 2;
+  min-width: 18px; padding: 2px 4px;
   background: rgba(0,0,0,0.5); border: 1px solid var(--line);
-  color: var(--dim); font-size: 8px; line-height: 1;
-  opacity: 0; transition: opacity 100ms, color 100ms, border-color 100ms;
+  color: var(--dim); font-size: 9px; font-weight: 700; line-height: 1;
 }
-.tile:hover .tile-solo { opacity: 1; }
-.tile-solo:hover { color: var(--accent2); border-color: var(--accent2); }
+.tile-weight:hover { color: var(--ink); border-color: var(--line-2); }
+.tile.pinned::after {
+  /* the pin shows on the picture too, so a scan of the grid can see what is held still */
+  content: ''; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; background: var(--kc-red);
+}
 .tile-meta {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding: 2px 4px;
+  display: flex; align-items: center;
+  padding: 3px 5px;
   border-top: 1px solid var(--line);
-  font-size: 8px; color: var(--dim);
+  font-size: 9px; color: var(--dim);
 }
+.tile-id { color: var(--ink); letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+.tile-foot { display: flex; border-top: 1px solid var(--line); }
+.tile-more {
+  flex: 0 0 44px; min-height: 44px;
+  background: transparent; border: none; border-left: 1px solid var(--line);
+  color: var(--dim); font-size: 12px; letter-spacing: 0.1em;
+}
+.tile-more:hover, .tile-more[aria-expanded="true"] { color: var(--ink); }
+.tile-menu { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
+.tile-menu button {
+  min-height: 44px; background: transparent; border: none; border-bottom: 1px solid var(--line);
+  color: var(--dim); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.tile-menu button:nth-child(odd) { border-right: 1px solid var(--line); }
+.tile-menu button:hover { color: var(--ink); }
+.tile-menu .del { color: var(--kc-red); grid-column: 1 / -1; }
+.tile-dup {
+  flex: 0 0 38%; min-height: 44px;
+  background: transparent; border: none; border-left: 1px solid var(--line);
+  color: var(--dim); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.tile-dup:hover { color: var(--ink); }
 .tile-still {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: 100%; min-height: 44px;
-  background: transparent; border: none; border-top: 1px solid var(--line);
+  flex: 1; min-height: 44px;
+  background: transparent; border: none;
   color: var(--dim); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
 }
 .tile-still i { width: 8px; height: 8px; border: 1px solid var(--dim); }
 .tile-still:hover { color: var(--ink); }
-.tile-still.on { color: var(--ink); border-top-color: var(--kc-red); }
+.tile-still.on { color: var(--ink); box-shadow: inset 0 2px 0 var(--kc-red); } /* a flat red edge, not a glow */
 .tile-still.on i { background: var(--kc-red); border-color: var(--kc-red); }
-.tile-id { color: var(--ink); letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
-.tile-cat { color: var(--accent3); font-size: 8px; letter-spacing: 0.04em; }
