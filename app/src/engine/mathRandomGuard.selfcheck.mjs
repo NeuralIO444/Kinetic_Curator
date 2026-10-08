@@ -23,6 +23,7 @@ const ALLOWED = {
   'data/firstLight.js': { count: 1, why: 'rollLivingBoot default rng param; the roll lands in layoutParams/paletteId/enabledAssets (#707)' },
   'curator/renderProfiles.js': { count: 1, why: 'applyRenderProfile default rng param; seeded by CURATE' },
   'curator/taste.js': { count: 1, why: 'pickPersona default rng param; seeded by CURATE' },
+  'curator/director.js': { count: 1, why: 'blendPick default rng param; the pick path passes CURATE\u2019s seeded (seed, press #) stream (#518)' },
   'curator/dice.js': { count: 1, why: 'rollDice default rng param; the performer gesture lands its crown in layoutParams.mode / enabledAssets / the keep ledger + crown log' },
   'curator/transitions.js': { count: 1, why: 'markovPick default rng param; CURATE always injects the seeded (seed, press #) stream, and the drawn value lands in layoutParams' },
   'engine/harmony.js': { count: 1, why: 'buildHarmony default rng param' },

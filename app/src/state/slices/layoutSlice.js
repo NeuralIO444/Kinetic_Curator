@@ -21,6 +21,8 @@ import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
 import { rollPatternLayers } from '../../pattern/patternRoll.js'; // PATTERN is part of the KIN and CURATOR systems
+import { getDirector } from '../../curator/director.js'; // #1145: the room scales the candidate count
+import { loisActivity } from '../../curator/loisActivity.js'; // #1145: the honest feed
 import { mkRng } from '../../engine/prng.js';
 
 /** One honest die for #942's naive roll — every result lands in serialized state. */
@@ -614,13 +616,19 @@ export const createLayoutSlice = (set) => ({
     const press = state.curatePress | 0;
     const rng = rngForIndex(state.seed, CH.curate, press, state.seedOffsets);
     const candidates = [];
+    // #1145 — Davis's primaries: the room's kin_weight scales how many
+    // candidates each CURATOR press rolls (unleashed rooms roll more,
+    // settled rooms roll fewer). Silence → 1 → yesterday's 8. Deterministic
+    // given the same room; a different room is a different deal.
+    const kinWeight = getDirector().tick({ feed: loisActivity.snapshot() }).gains.kinWeight;
+    const candidateCount = Math.max(2, Math.min(16, Math.round(CURATE_CANDIDATES * kinWeight)));
     // #592 — the discrete choices are drawn from a transition chain
     // conditioned on the value that LAST LANDED (the live layoutParams), so
     // presses relate to each other instead of being strangers. Everything
     // else still rolls uniform. Same rng, so the whole press stays one
     // seeded stream and (seed, offsets, press #) still replays exactly.
     let chainFellBack = false;
-    for (let n = 0; n < CURATE_CANDIDATES; n++) {
+    for (let n = 0; n < candidateCount; n++) {
       const rp = { ...state.layoutParams };
       for (const key of unlocked) {
         if (hasChain(key)) {
