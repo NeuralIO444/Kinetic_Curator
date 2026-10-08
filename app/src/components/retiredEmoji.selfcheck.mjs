@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const RETIRED = [0x1F3A4, 0x2699, 0x1F50A, 0x1F509, 0x1F3B2, 0x1F512, 0x1F513, 0xFE0F];
-const EXEMPT = new Set(['LoisPill.jsx', 'loisFace.js']);
+const EXEMPT = new Set(['LoisPill.jsx', 'loisFace.js', 'DiceRoller.jsx']); // DiceRoller: the dice tile's glyph is Matt-directed, not creep
 const EXT = /\.(jsx?|mjs|css)$/;
 
 const walk = (d) => readdirSync(d).flatMap((n) => {

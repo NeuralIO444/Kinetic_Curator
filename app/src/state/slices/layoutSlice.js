@@ -532,6 +532,24 @@ export const createLayoutSlice = (set) => ({
   }),
 
   /**
+   * Tasteful dice — crown a finalist's cast. Same single-axis contract as
+   * loadShapeSet: shapes only (the dice calls loadStubMode for the layout
+   * axis separately), undoable, unknown ids refused, custom assets honored.
+   */
+  loadDiceCast: (assetIds) => set((state) => {
+    if (!Array.isArray(assetIds) || !assetIds.length) return {};
+    const known = new Set(ASSETS.map((a) => a.id));
+    for (const c of state.customAssets || []) known.add(c.id);
+    const map = {};
+    for (const assetId of assetIds) if (known.has(assetId)) map[assetId] = true;
+    if (!Object.keys(map).length) return {};
+    const cur = state.enabledAssets || {};
+    const curOn = Object.keys(cur).filter((k) => cur[k]);
+    if (curOn.length === Object.keys(map).length && curOn.every((k) => map[k])) return {};
+    return { ...pushToUndo(state, true), enabledAssets: map };
+  }),
+
+  /**
    * Shape mixer (#733): tap a shape chip → off → 1 → 2 → 3 → off. Up to
    * SHAPE_MIX_MAX chips on; a fifth is refused (no-op, never evicts). The pool
    * becomes the union of the on-chips' sets and `shapeLevels` carries the
