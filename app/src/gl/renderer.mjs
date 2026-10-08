@@ -303,11 +303,12 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
 
-  // 20 floats/instance (80-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
-  // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase).
+  // 21 floats/instance (84-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass).
   // #781: kineme 0 = still (exactly the old zeros).
+  // #1129 PR2: glass is 1 for glass-voice instances (soft bevel), else 0.
   const maxLen = instances.length;
-  const buf = new Float32Array(maxLen * 20);
+  const buf = new Float32Array(maxLen * 21);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = instances[i];
@@ -332,7 +333,8 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     const acc = hexToRgb(it.accent);
     buf[o + 12] = ink[0]; buf[o + 13] = ink[1]; buf[o + 14] = ink[2]; buf[o + 15] = acc[0];
     buf[o + 16] = acc[1]; buf[o + 17] = acc[2]; buf[o + 18] = it.kineme || 0; buf[o + 19] = it.kinemePhase || 0;
-    o += 20;
+    buf[o + 20] = it.glass ? 1 : 0; // #1129 PR2: missing flag (old producers) reads 0 = enamel
+    o += 21;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
@@ -498,15 +500,19 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     for (let i = 1; i <= 5; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 80, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 84, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
+    // #1129 PR2: a_glass — single float at byte 80 (21-float stride).
+    gl.enableVertexAttribArray(6);
+    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 84, 80);
+    gl.vertexAttribDivisor(6, 1);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 20);
-    for (let i = 0; i <= 5; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 21);
+    for (let i = 0; i <= 6; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
 
