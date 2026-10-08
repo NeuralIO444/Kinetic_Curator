@@ -155,6 +155,13 @@ assert.deepStrictEqual(sanitizeFx(null), sanitizeFx({}));
   for (const [k, v] of Object.entries(look.params)) {
     assert.deepStrictEqual(st.params[k], v, `params.${k} = CHIAROSCURO Look`);
   }
+  // #1129 PR1 — dark-glass is the glass voice: its instances sort
+  // back-to-front by z-tier. No other flagship may claim the flag.
+  assert.strictEqual(st.params.glass, true, 'dark-glass is flagged glass');
+  for (const v of FLAGSHIP_VOICES) {
+    if (v.id === 'dark-glass') continue;
+    assert.strictEqual(resolveVoiceState(v).params.glass, false, `${v.id} is not glass`);
+  }
   console.log('voices.selfcheck: dark-glass — 4 crystalline gradient facets, CHIAROSCURO palette + Look');
 }
 

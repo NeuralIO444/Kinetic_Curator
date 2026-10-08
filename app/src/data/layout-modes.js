@@ -72,6 +72,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   previewDownscale: false,
   renderWorker: false,
   overlap: true,
+  glass: false, // #1129 PR1 — glass-body material: translucent instances sort back-to-front by z-tier
   blendMode: 'normal',
   hueRotate: 0,
   paletteShift: 'auto',
@@ -337,7 +338,7 @@ export const RANGE_HARD = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'mirror', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker']; // #268: recolor removed
+const BOOL_KEYS = ['bleed', 'mirror', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker', 'glass']; // #268: recolor removed
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);

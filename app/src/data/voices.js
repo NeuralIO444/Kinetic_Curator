@@ -288,6 +288,10 @@ export const FLAGSHIP_VOICES = [
       rotate: [-180, 180],
       alpha: [70, 100],
       zTiers: 5,
+      // #1129 PR1 — glass body: this voice's instances are translucent bodies;
+      // the placement pass flags them and sorts the set back-to-front by
+      // z-tier so overlaps composite in depth order.
+      glass: true,
       jitter: 42,
       density: 50,
       bleed: false,
