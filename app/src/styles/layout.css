@@ -93,7 +93,10 @@
    (PR #347 follow-up); the tape/status bar stays below it. */
 .palette-strip {
   display: flex;
-  justify-content: space-between;
+  /* #1122 — mockup grouping: tight pill row, uniform 10px gaps. The
+     palette-switch keeps margin-left:auto so it stays pinned right. */
+  justify-content: flex-start;
+  gap: 10px;
   align-items: center;
   padding: 0 10px;
   background: var(--panel-2);

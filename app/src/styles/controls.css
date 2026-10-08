@@ -198,7 +198,8 @@
   50% { transform: scale(1.3); opacity: 1; }
 }
 
-.curator-left-group { display: flex; align-items: center; gap: 6px; }
+/* #1122 — mockup pill rhythm: uniform 10px between bar pills. */
+.curator-left-group { display: flex; align-items: center; gap: 10px; }
 
 /* #946 — START: CHAOS / FIXED toggle. Sits next to the KIN button in the
    top bar: plainly named, one click, remembered across sessions. CHAOS is
