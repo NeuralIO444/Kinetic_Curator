@@ -15,6 +15,8 @@ import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
 import { captureKeepContext, sanitizeKeepContext } from '../../curator/keepContext.js'; // #1140: per-keep session context
+import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #1124
+import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
 // lived in memory only: a reload silently emptied the tray. Same pattern as the
@@ -57,6 +59,7 @@ export function captureFavorite(state, paletteId) {
     ...(stack ? { stack } : {}),
     seed: state.seed,
     seedOffsets: { ...(state.seedOffsets || {}) },
+    bands: captureBands(paletteId, state.paletteOverrides, state.userPalettes, heatStep(shownHeat())), // #1124: the vibe, frozen
     // #948 — full epoch ISO; legacy HH:MM:SS keeps still parse via
     // loisActivity.parseFavoriteTimestamp (date unknown -> null, honestly).
     timestamp: new Date().toISOString(),
@@ -95,10 +98,12 @@ export function sanitizeFavorite(raw) {
   const cast = sanitizeCast(raw.config?.assets);
   // #1131 — a stored stack is trusted no further than the project normalizers trust a file: refuse it whole if
   // it does not expand (the keep itself survives), and bound its size.
+  const bands = sanitizeBands(raw.bands); // #1124: kept only if it is exactly what a keep writes
   const stackOk = raw.stack && JSON.stringify(raw.stack).length < 60000 && expandStack(raw.stack).ok;
   const context = sanitizeKeepContext(raw.context);
   return {
     ...(stackOk ? { stack: JSON.parse(JSON.stringify(raw.stack)) } : {}),
+    ...(bands ? { bands } : {}),
     id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
     seed,
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'
