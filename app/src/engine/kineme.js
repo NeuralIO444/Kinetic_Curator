@@ -23,7 +23,7 @@ import { kinemePhase as hashPhase, createKinemeClock } from '../data/kinemes.js'
  * #1128 — the DIRECTOR's driver patterns. The Curator's amounts (kinemeBreath/Drift/Pulse) are the scene-level
  * scale; a pattern only RE-WEIGHTS them, it never invents motion a scene did not already have:
  *   DRIFT  the floor: the amounts as set.
- *   SWELL  breath-forward: breath x1.6 (capped at 1), drift x0.5.
+ *   SWELL  breath-forward: breath x3 (capped at 1), drift x0.2: the marks visibly breathe and hardly wander.
  *   THUMP  pulse-forward and driven by a REAL beat (audio on): the pulse amount is THUMP_PULSE x the live beat
  *          envelope, so it thumps when the room does and rests between. With no audio it IS DRIFT (a reduction).
  * An unknown name is DRIFT. beatDrive is the shaped beat pulse 0..1, or null/undefined when nothing is listening.
@@ -32,7 +32,7 @@ export const KINEME_PATTERNS = Object.freeze(['DRIFT', 'SWELL', 'THUMP']);
 export const THUMP_PULSE = 0.6;
 export function patternAmounts(base, pattern, beatDrive) {
   const { breath, drift, pulse } = base;
-  if (pattern === 'SWELL') return { breath: Math.min(1, breath * 1.6), drift: drift * 0.5, pulse };
+  if (pattern === 'SWELL') return { breath: Math.min(1, breath * 3), drift: drift * 0.2, pulse };
   if (pattern === 'THUMP' && Number.isFinite(beatDrive)) {
     return { breath, drift, pulse: THUMP_PULSE * Math.min(1, Math.max(0, beatDrive)) };
   }
