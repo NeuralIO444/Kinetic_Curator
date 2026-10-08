@@ -791,20 +791,6 @@
   color: var(--dim);
   padding-left: 2px;
 }
-/* The hit the queue transport is currently on (FavoritesTray chip). */
-.fav-chip.queue-now {
-  border-color: #00ff88;
-  box-shadow: 0 0 6px rgba(0, 255, 136, 0.35);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .fav-chip.queue-now {
-    animation: queue-now-pulse 1.2s ease-in-out infinite;
-  }
-}
-@keyframes queue-now-pulse {
-  0%, 100% { box-shadow: 0 0 4px rgba(0, 255, 136, 0.25); }
-  50% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.55); }
-}
 /* ─── UX-5: Build panel workflow sections ─── */
 .build-section { margin-top: 16px; }
 .build-section:first-child { margin-top: 2px; }
@@ -861,12 +847,12 @@
 /* #1126 — the panel fits without a scroll: one row each for the three generate verbs, the four trail gestures, and
    phrase beside midi. */
 .davis-body { gap: 2px; }
-.panel-davis .davis-body { padding: 6px 8px; }
+.panel-davis .davis-body { padding: 4px 8px; }
 .davis-actions-3 { grid-template-columns: repeat(3, 1fr); }
 .davis-actions-4 { grid-template-columns: repeat(4, 1fr); }
 /* #1128: the motion row costs 25px; the panel pays for it here, so it still fits 1280x720 with no scroll */
 .panel-davis .voice-row { margin-bottom: 2px; }
-.panel-davis .davis-section-label { margin-top: 3px; padding-top: 3px; }
+.panel-davis .davis-section-label { margin-top: 2px; padding-top: 3px; }
 .panel-davis .davis-section-label:first-child { margin-top: 0; padding-top: 0; }
 .davis-actions-motion { grid-template-columns: auto repeat(3, 1fr); align-items: center; } /* #1128: the label shares the row, so the panel keeps its no-scroll fit */
 .davis-actions-motion .lbl { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); font-style: normal; text-transform: uppercase; padding-right: 4px; }
