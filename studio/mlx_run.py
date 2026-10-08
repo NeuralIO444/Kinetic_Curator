@@ -112,6 +112,14 @@ def phase1(p, args):
         if not p.dry_run:
             return
         print("   (dry-run: continuing to show the remaining steps)")
+    # 3b. the HITS bridge may have rendered missing keeps into the pool AFTER the
+    # index was built — re-embed when labels.json is newer than the index.
+    labels_p = Path("labels.json")
+    if not p.force and labels_p.exists() and (
+            not index.exists() or labels_p.stat().st_mtime > index.stat().st_mtime):
+        print(f"\n== embed (refresh) ==\n   labels.json is newer than the index — re-embedding")
+        if p.run("embed-refresh", [sys.executable, "studio/curator.py", "embed", str(pool)]) is None:
+            return
     # 4. train
     out = p.run("train", [sys.executable, "studio/curator.py", "train",
                           "--index", str(index), "--labels", "labels.json",
