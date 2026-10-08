@@ -28,6 +28,7 @@ import {
   routeKineticTapHeat,
   decayHeat,
   heatLevel,
+  publishShownHeat,
 } from './kineticHeat.mjs';
 import { Events, emit } from '../../composition/eventBus.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
@@ -61,9 +62,11 @@ export function KineticButton() {
         clearInterval(coolTimerRef.current);
         coolTimerRef.current = null;
         runRef.current = { ...run, heat: 0 };
+        publishShownHeat(0);
         setHeat(0);
         setCooling(false);
       } else {
+        publishShownHeat(h);
         setHeat(h);
         setCooling(true);
       }
@@ -81,6 +84,7 @@ export function KineticButton() {
     const now = Date.now();
     const r = routeKineticTapHeat(runRef.current, now);
     runRef.current = { heat: r.heat, taps: r.taps, lastTapAt: r.lastTapAt };
+    publishShownHeat(r.heat);
     setHeat(r.heat);
     setLastLayer(r.layer); // #1122 — the layer is discrete: RULES / WEATHER / CHAOS
     // LOIS honest feed: the single observable for a KINETIC tap (button + K).
