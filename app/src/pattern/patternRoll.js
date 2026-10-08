@@ -1,8 +1,8 @@
 // patternRoll.js — what KINETIC and CURATOR do to PATTERN tracks (#1042 follow-up, Matt 2026-10-07).
 //
-// PATTERN is part of the KIN and CURATOR systems, not a bystander:
+// PATTERN is part of the KIN and CURATOR systems, not a bystander (but it is rare, and never a loud overlay; see CHAOS_ADD_CHANCE):
 //   chaos   (hammered KIN)   every PATTERN track is dealt fresh (seed, mode, density, mix, hero, grout, drift), and
-//                            with no PATTERN track on the page a chaos roll may add one (30%), within the track cap
+//                            with no PATTERN track on the page a chaos roll may add one (8%), within the track cap
 //   rules   (calm KIN tap)   a new tessellation of the same kind: new seed, density nudged a step
 //   weather (warm KIN tap)   same picture, the air changes: DRIFT and MIX nudged
 //   curate  (CURATOR)        every PATTERN track is dealt, on the Curator's own seeded stream: a given (seed, offsets,
@@ -15,9 +15,12 @@ import { isFxLayer } from '../fx/fxFilters.js';
 import { isMathLayer } from '../fx/mathFilters.js';
 import { MAX_CONTENT_TRACKS } from '../state/projectNormalize.js';
 
-export const CHAOS_ADD_CHANCE = 0.3;
-/** A pattern a roll adds is a veil, not a wall: at full opacity a tessellation would hide the whole KC picture. */
-export const BORN_OPACITY = 0.45;
+// Matt 2026-10-08: a tessellation laid over the marks reads as a flat 2D overlay (the 1995 layer-mix look), and KIN was
+// dealing one 30% of the time on a hammered tap. It is rare now (8%), and a quiet veil when it does come. CURATOR never
+// adds one (only chaos does). Making patterns and marks interact instead of mix is its own piece of work.
+export const CHAOS_ADD_CHANCE = 0.08;
+/** A pattern a roll adds is a whisper, not a wall: it must never carry the picture. */
+export const BORN_OPACITY = 0.3;
 
 const isPattern = (l) => !!l && l.type === 'pattern';
 const u32 = (rng) => (Math.floor(rng() * 0xffffffff) >>> 0) || 1;

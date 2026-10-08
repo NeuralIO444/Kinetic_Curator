@@ -38,13 +38,18 @@ ok('rollPatternLayers: nothing changes without PATTERN tracks (chaos aside); exi
   assert.deepEqual(rollPatternLayers(withP, 'nope', mkRng(1)), { layers: withP, changed: false });
 });
 
-ok('chaos may add ONE, about 30% of the time, only when none exists, never past the cap, as a translucent veil', () => {
+ok('a pattern is rare and quiet (Matt: no 2D overlay look): at most 1 in 10 hammered taps adds one, as a veil no stronger than 0.3, and CURATOR never adds one', () => {
+  assert.ok(CHAOS_ADD_CHANCE <= 0.1, `chance ${CHAOS_ADD_CHANCE}`); assert.ok(BORN_OPACITY <= 0.3, `opacity ${BORN_OPACITY}`);
+  for (let i = 1; i <= 200; i++) assert.deepEqual(rollPatternLayers([{ id: 'kc1', type: 'content' }], 'curate', mkRng(i * 31)).layers.length, 1, 'curate adds nothing');
+});
+
+ok('chaos may add ONE, at CHAOS_ADD_CHANCE, only when none exists, never past the cap, as a translucent veil', () => {
   let added = 0; const N = 400;
   for (let i = 1; i <= N; i++) {
     const r = rollPatternLayers([{ id: 'kc1', type: 'content' }], 'chaos', mkRng(i * 7919), { makeId: () => `pt-${i}` });
     if (r.changed) { added += 1; assert.equal(r.layers.length, 2); const p = r.layers[1]; assert.equal(p.type, 'pattern'); assert.equal(p.layerOpacity, BORN_OPACITY); assert.equal(p.id, `pt-${i}`); assert.deepEqual(p.pattern, sanitizePattern(p.pattern)); }
   }
-  assert.ok(Math.abs(added / N - CHAOS_ADD_CHANCE) < 0.07, `${added}/${N} added`);
+  assert.ok(Math.abs(added / N - CHAOS_ADD_CHANCE) < 0.04, `${added}/${N} added`);
   const has = [{ id: 'kc1', type: 'content' }, PT('p1')];
   for (let i = 1; i < 50; i++) assert.equal(rollPatternLayers(has, 'chaos', mkRng(i)).layers.filter((l) => l.type === 'pattern').length, 1, 'never a second one');
   const full = ['a', 'b', 'c', 'd'].map((id) => ({ id, type: 'content' }));
@@ -74,10 +79,10 @@ ok('the Curator is seeded: the same (seed, press #) deals the same patterns; the
   assert.equal(run(3), run(3)); assert.notEqual(run(3), run(4));
 });
 
-ok('a chaos roll sometimes brings a PATTERN track with it, and the roll is still one undo', () => {
+ok('a chaos roll rarely brings a PATTERN track with it, and the roll is still one undo', () => {
   let born = 0;
-  for (let i = 0; i < 80; i++) { reset(); S().kineticRoll(); if (pat().length) { born += 1; assert.equal(pat()[0].layerOpacity, BORN_OPACITY); assert.equal(S().historyUndoStack.length, 1); S().undo(); assert.equal(pat().length, 0, 'undo takes it away again'); } }
-  assert.ok(born > 8 && born < 45, `${born}/80 chaos rolls added a PATTERN track`);
+  for (let i = 0; i < 300; i++) { reset(); S().kineticRoll(); if (pat().length) { born += 1; assert.equal(pat()[0].layerOpacity, BORN_OPACITY); assert.equal(S().historyUndoStack.length, 1); S().undo(); assert.equal(pat().length, 0, 'undo takes it away again'); } }
+  assert.ok(born > 6 && born < 55, `${born}/300 chaos rolls added a PATTERN track`);
 });
 
 console.log(`patternRoll.selfcheck: ${n} checks passed`);
