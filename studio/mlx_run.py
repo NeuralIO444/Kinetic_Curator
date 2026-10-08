@@ -80,24 +80,6 @@ def phase1(p, args):
     if not p.force and pngs(pool):
         print(f"\n== batch ==\n   pool/ has {len(pngs(pool))} PNGs — skipping (use --force to re-render)")
         p.report["steps"]["batch"] = "skipped"
-    elif args.synthetic:
-        import random
-        rng = random.Random(7)
-        names = sorted(x.name for x in pngs(pool))
-        if len(names) < 40:
-            return p._fail("labels-synthetic", f"need 40+ pool renders, have {len(names)}")
-        likes = set(rng.sample(names, 20))
-        passes = set(rng.sample([n for n in names if n not in likes], 20))
-        if labels.exists():
-            labels.rename("labels.real.json.bak")
-            print("   (backed up real labels.json -> labels.real.json.bak)")
-        labels.write_text(json.dumps(
-            {n: (1 if n in likes else 0) for n in sorted(likes | passes)},
-            indent=1, sort_keys=True))
-        print("\n!! SYNTHETIC LABELS — plumbing test only (seed 7: 20 random likes / 20 random passes).")
-        print("!! The trained taste is MEANINGLESS. Restore labels.real.json.bak for a real model.")
-        p.report["synthetic"] = True
-        p.report["steps"]["labels-synthetic"] = "ok"
     else:
         out = p.run("batch", [sys.executable, "studio/studio.py", "batch", str(base),
                               "-o", str(pool), "--count", str(args.count)])
@@ -111,9 +93,33 @@ def phase1(p, args):
     else:
         if p.run("embed", [sys.executable, "studio/curator.py", "embed", str(pool)]) is None:
             return
-    # 3. labels — the one human step, bootstrapped from HITS when possible
+    # 3. labels — the one human step, bootstrapped from HITS when possible.
+    # --synthetic is a plumbing test: seeded random labels, MEANINGLESS taste.
     labels = Path("labels.json")
-    if not p.force and labels.exists():
+    if args.synthetic:
+        import random
+        rng = random.Random(7)
+        names = sorted(x.name for x in pngs(pool))
+        if len(names) < 40:
+            return p._fail("labels-synthetic", f"need 40+ pool renders, have {len(names)}")
+        if p.dry_run:
+            print("   (dry-run: would write 20 synthetic likes / 20 synthetic passes to labels.json)")
+            p.report["steps"]["labels-synthetic"] = "dry-run"
+        else:
+            likes = set(rng.sample(names, 20))
+            passes = set(rng.sample([n for n in names if n not in likes], 20))
+            if labels.exists():
+                labels.rename("labels.real.json.bak")
+                print("   (backed up real labels.json -> labels.real.json.bak)")
+            labels.write_text(json.dumps(
+                {n: (1 if n in likes else 0) for n in sorted(likes | passes)},
+                indent=1, sort_keys=True))
+        print("\n!! SYNTHETIC LABELS — plumbing test only (seed 7: 20 random likes / 20 random passes).")
+        print("!! The trained taste is MEANINGLESS. Restore labels.real.json.bak for a real model.")
+        p.report["synthetic"] = True
+        if "labels-synthetic" not in p.report["steps"]:
+            p.report["steps"]["labels-synthetic"] = "ok"
+    elif not p.force and labels.exists():
         print(f"\n== labels ==\n   labels.json exists — skipping")
         p.report["steps"]["labels"] = "skipped"
     elif args.hits and Path(args.hits).exists():
