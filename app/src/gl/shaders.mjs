@@ -430,14 +430,13 @@ void main() {
 
 /**
  * Single-effect fullscreen pass. u_effect selects the effect; u_p carries
- * params. u_aux is unused by grain (hash noise from gl_FragCoord; #1079).
+ * params. Grain is procedural hash speckle (#744) — no noise texture.
  * Premultiplied in/out; effects that need straight values unpremultiply
  * internally (invert/posterize math verified against resvg probes).
  */
 export const EFFECT_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
-uniform sampler2D u_aux;
 uniform int u_effect;
 uniform vec4 u_p;
 uniform vec4 u_clip;

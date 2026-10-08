@@ -336,7 +336,6 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
           ? pass.uniforms(step, { read, wTarget, time })
           : {
             u_src: read.tex,
-            u_aux: step.aux || read.tex,
             u_effect: pass.mode,
             u_p: pass.params(step.params || {}, { width: wTarget.w, height: wTarget.h }),
             u_texel: [1 / wTarget.w, 1 / wTarget.h],

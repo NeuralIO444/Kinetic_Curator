@@ -1,11 +1,12 @@
-// #816 — one wrap chain: per-pass uniforms, missing LUT does not abort.
+// #816 — one wrap chain: per-pass uniforms. #1079: grain is procedural,
+// there is no LUT and no aux texture anywhere in the pipeline.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { EFFECT_IDS } from '../shaders.mjs';
-import { BUILTIN_EFFECT_DEFS, EFFECT_SLOT_MAP } from './builtinEffects.mjs';
+import { BUILTIN_EFFECT_DEFS, EFFECT_SLOT_MAP, UNIFORMS } from './builtinEffects.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(DIR, rel), 'utf8');
@@ -35,13 +36,17 @@ test('#816 RGB then grain do not leak uniforms', () => {
   assert.equal(pack('grain', { amount: 0.35 })[1], 0.35, 'packs are fresh arrays');
 });
 
-test('#816 missing grain LUT does not abort the chain', () => {
+test('#1079 grain has no LUT plumbing anywhere', () => {
   const bridge = read('bridge.mjs');
   const renderer = read('../renderer.mjs');
-  assert.match(bridge, /u_aux: step\.aux \|\| read\.tex/);
-  assert.doesNotMatch(bridge, /if \(!step\.aux\) throw/);
-  assert.match(renderer, /return grainLuts\[wrap\.fxLayerId\] \|\| null/);
-  assert.match(renderer, /fxFinishChains\.push/);
+  const fx = read('../effects/fxShaders.mjs');
+  const shader = read('../shaders.mjs');
+  assert.doesNotMatch(shader, /uniform sampler2D u_aux/);
+  assert.doesNotMatch(bridge, /u_aux/);
+  assert.doesNotMatch(renderer, /grainLuts|setGrainLuts|bakeLiveGrainLut|grainKeyFor/);
+  assert.doesNotMatch(fx, /auxFor/);
+  assert.ok(!('u_aux' in UNIFORMS), 'u_aux removed from the effect uniform set');
+  assert.match(shader, /Grain is procedural/);
 });
 
 test('#1079 the live loop bakes no grain LUT: the shader is procedural, the bake was pure main-thread cost', () => {

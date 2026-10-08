@@ -16,7 +16,6 @@ import { registerCostTier } from '../costTiers.mjs';
 /** Declared upload set for the builtin 'effect' program — also the harness audit list. */
 export const UNIFORMS = {
   u_src: { kind: 'sampler', unit: 0 },
-  u_aux: { kind: 'sampler', unit: 1 },
   u_effect: { kind: 'int' },
   u_p: { kind: 'vec4' },
   u_texel: { kind: 'vec2' },
@@ -63,8 +62,8 @@ const knob = (v, lo, hi, def) => {
  *    rgbSplit  u_effect 1   u_p.x = dx/1000 (canvas uv), yzw 0
  *    grain     u_effect 2   u_p.x = 0, u_p.y = amount (not dx)
  *    posterize u_effect 5   u_p.x = levels
- *  Missing grain aux is not a throw: the chain step still runs, u_aux
- *  falls back to the source texture (bridge.runChain).
+ *  Missing grain aux is not a throw: grain is fully procedural hash
+ *  speckle, so there is no aux texture at all (#1079).
  */
 export const EFFECT_SLOT_MAP = Object.freeze({
   invert: { u_effect: 0, u_p: ['unused', 'unused', 'unused', 'unused'] },
