@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Palette row — KC-1 DS mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --amber: #ffcd82; --te: #ff4d00; }
+  body { background: #141414; color: #e8e4da; font-family: ui-monospace, Menlo, monospace; padding: 18px; }
+  h2 { font-size: 13px; font-weight: normal; letter-spacing: .12em; color: #8a8578; margin-bottom: 4px; }
+  p.sub { font-size: 11px; color: #5c584e; margin-bottom: 14px; }
+  .row { display: flex; align-items: center; gap: 8px; background: #0c0c0c; border: 1px solid #262626;
+         border-radius: 8px; padding: 10px 12px; font-size: 11px; letter-spacing: .06em; flex-wrap: wrap; }
+  .pill { display: flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px solid #2c2c2c;
+          border-radius: 5px; color: #b9b3a4; white-space: nowrap; cursor: pointer; position: relative;
+          transition: border-color .12s steps(2); }
+  .pill.dim { color: #5c584e; }
+  .pill.static { cursor: default; }
+  /* active palette → TE red marker */
+  .pill.active { border-color: var(--te); }
+  .pill.active::after { content:''; position: absolute; left: 6px; right: 6px; bottom: -1px; height: 2px;
+                        background: var(--te); border-radius: 1px; }
+  .chips { display: flex; gap: 3px; }
+  .chip { width: 13px; height: 13px; border-radius: 2px; }
+  /* taste-fit shimmer → Davis amber, per-palette levels */
+  .taste-on .pal[data-fit="3"] .chip { animation: breath 10s ease-in-out infinite;
+      box-shadow: 0 0 7px rgba(255,205,130,.5); }
+  .taste-on .pal[data-fit="2"] .chip { animation: breath 10s ease-in-out infinite;
+      box-shadow: 0 0 5px rgba(255,205,130,.3); }
+  .taste-on .pal[data-fit="1"] .chip { animation: breath 10s ease-in-out infinite; opacity: .85;
+      box-shadow: 0 0 3px rgba(255,205,130,.18); }
+  @keyframes breath { 0%,100% { filter: brightness(.82); } 50% { filter: brightness(1.08); } }
+  /* FADE → Davis: dot breathes with fade depth */
+  .fadedot { width: 8px; height: 8px; border-radius: 50%; background: #3a3a3a; transition: all .8s; }
+  .fading .fadedot { background: var(--amber); box-shadow: 0 0 10px rgba(255,205,130,.7);
+                     animation: breath 4s ease-in-out infinite; }
+  .digit { color: #777; font-size: 10px; }
+  .thumb { width: 22px; height: 14px; border-radius: 2px;
+           background: linear-gradient(135deg, #8a6a45, #d9b878 60%, #5c4630); }
+  .caret { color: #5c584e; }
+  select { background: #1e1e1e; color: #b9b3a4; border: 1px solid #333; border-radius: 4px;
+           font-family: inherit; font-size: 10px; letter-spacing: .06em; padding: 5px 6px; }
+  .controls { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .ctl-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #8a8578; flex-wrap: wrap; }
+  .ctl-row .lbl { width: 230px; letter-spacing: .06em; }
+  .ctl-row .lbl i { font-style: normal; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-right: 6px; }
+  .lbl i.d { background: #3a2f1d; color: var(--amber); } .lbl i.t { background: #2a1408; color: var(--te); }
+  button { background: #1e1e1e; color: #b9b3a4; border: 1px solid #333; border-radius: 4px;
+           font-family: inherit; font-size: 10px; letter-spacing: .06em; padding: 5px 10px; cursor: pointer; }
+  button.on { border-color: #c98f3d; color: var(--amber); background: #2a2417; }
+  button.on.te { border-color: var(--te); color: var(--te); background: #2a1408; }
+  .note { margin-top: 14px; font-size: 10px; color: #5c584e; letter-spacing: .05em; line-height: 1.8; }
+  .note b.a { color: var(--amber); font-weight: normal; } .note b.t { color: var(--te); font-weight: normal; }
+</style></head>
+<body>
+<h2>PALETTE ROW — KC-1 DS</h2>
+<p class="sub">active = TE red marker · taste-fit = Davis amber shimmer · no signal, no shimmer</p>
+
+<div class="row" id="row">
+  <span class="pill static" id="fade"><span class="fadedot"></span>FADE</span>
+  <span class="pill pal static" data-fit="0"><span class="chips">
+    <span class="chip" style="background:#e0245e"></span><span class="chip" style="background:#7ed321"></span><span class="chip" style="background:#e8e4da"></span><span class="chip" style="background:#f5e663"></span><span class="chip" style="background:#4a90d9"></span>
+  </span></span>
+  <span class="pill pal active" data-fit="3" data-name="COMPRESSION">COMPRESSION <span class="digit">2</span><span class="chips">
+    <span class="chip" style="background:#8a6a45"></span><span class="chip" style="background:#6b4f30"></span><span class="chip" style="background:#a08050"></span>
+  </span></span>
+  <span class="pill pal" data-fit="1" data-name="CROWN">CROWN <span class="digit">3</span><span class="chips">
+    <span class="chip" style="background:#e8823c"></span><span class="chip" style="background:#d94f30"></span><span class="chip" style="background:#4a90d9"></span>
+  </span></span>
+  <span class="pill pal dim" data-fit="0" data-name="VORTEX">VORTEX<span class="chips">
+    <span class="chip" style="background:#b89a6a"></span><span class="chip" style="background:#8a6f45"></span><span class="chip" style="background:#6b5a40"></span>
+  </span><span class="caret">›</span></span>
+  <span class="pill pal" data-fit="2" data-name="SEPIA PLATE">SEPIA PLATE <span class="thumb"></span></span>
+  <span class="pill static dim">⚗ palette</span>
+  <span class="pill static dim">lab</span>
+  <select><option>ANALOGOUS</option><option>COMPLEMENT</option><option>TRIADIC</option></select>
+  <span class="pill static">⇄ shuffle</span>
+</div>
+
+<div class="controls">
+  <div class="ctl-row"><span class="lbl"><i class="t">TE</i>active palette (click a palette)</span>
+    <button data-act="COMPRESSION" class="on te">COMPRESSION</button><button data-act="CROWN" class="te">CROWN</button><button data-act="VORTEX" class="te">VORTEX</button><button data-act="SEPIA PLATE" class="te">SEPIA PLATE</button></div>
+  <div class="ctl-row"><span class="lbl"><i class="d">DAVIS</i>taste signal (taste.json)</span>
+    <button data-taste="off" class="on">no signal — quiet</button><button data-taste="on">signal live</button></div>
+  <div class="ctl-row"><span class="lbl"><i class="d">DAVIS</i>FADE transit</span>
+    <button data-fade="off" class="on">idle</button><button data-fade="on">fading…</button></div>
+</div>
+
+<div class="note">
+  <b class="t">red underline</b> = active palette (discrete, instant) ·
+  <b class="a">amber shimmer</b> = LOIS taste-fit per palette (continuous, breathing) ·
+  kill the signal and the row goes quiet — that's rule 3 working
+</div>
+
+<script>
+  const row = document.getElementById('row');
+  const pals = [...row.querySelectorAll('.pal[data-name]')];
+  function setBtns(btn, te){ btn.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on','te'));
+    btn.classList.add('on'); if(te||btn.classList.contains('te')&&btn.dataset.act) btn.classList.add('te'); }
+  document.querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>{
+    setBtns(b,true);
+    pals.forEach(p=>p.classList.toggle('active', p.dataset.name===b.dataset.act));
+  });
+  document.querySelectorAll('[data-taste]').forEach(b=>b.onclick=()=>{
+    setBtns(b,false);
+    row.classList.toggle('taste-on', b.dataset.taste==='on');
+  });
+  document.querySelectorAll('[data-fade]').forEach(b=>b.onclick=()=>{
+    setBtns(b,false);
+    document.getElementById('fade').classList.toggle('fading', b.dataset.fade==='on');
+  });
+</script>
+</body></html>
