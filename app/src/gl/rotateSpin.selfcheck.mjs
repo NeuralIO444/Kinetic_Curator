@@ -16,8 +16,8 @@ const item = (assetId, key, x = 500) => ({ assetId, x, y: 350, scale: 1.4, rotat
 const layer = (items, rotateSpin) => [{ id: 'L', isFx: false, items, layoutParams: rotateSpin === undefined ? {} : { rotateSpin } }];
 const contract = (doc, items, rotateSpin) => buildSceneContract({ doc: { seed: 1, ...doc }, resolvedLayers: layer(items, rotateSpin) });
 
-ok('the default is a slow spin; a document that predates the field is static; a given value is kept and clamped', () => {
-  assert.equal(DEFAULT_LAYOUT_PARAMS.rotateSpin, 0.05); assert.deepEqual(PARAM_SPEC.rotateSpin, { min: 0, max: 1 });
+ok('spin is chosen, not given (#1128: the default is 0); a document that predates the field is static; a given value is kept and clamped', () => {
+  assert.equal(DEFAULT_LAYOUT_PARAMS.rotateSpin, 0); assert.deepEqual(PARAM_SPEC.rotateSpin, { min: 0, max: 1 });
   assert.equal(normalizeLayoutParams({}).rotateSpin, 0, 'no field in the document = the old static rotation');
   assert.equal(normalizeLayoutParams({ rotate: [-10, 10] }).rotateSpin, 0);
   assert.equal(normalizeLayoutParams({ rotateSpin: 0.3 }).rotateSpin, 0.3);

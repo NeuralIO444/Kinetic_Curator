@@ -69,23 +69,23 @@ test('a span past the hard limit, or backwards, is refused in words and nothing 
   await expect(row(page, 'SCALE').locator('input[type="range"]').first()).toHaveAttribute('max', '3');
 });
 
-test('ROTATE is a spin row by default: an amber rev/s readout and one slider; RANGE gives the handles back; SPIN takes a speed', async ({ page }) => {
+test('ROTATE is a range row by default (#1128: spin is chosen, drift is given); SPIN opens on a speed, takes another, and RESET returns to RANGE', async ({ page }) => {
   await boot(page);
   const rot = row(page, 'ROTATE');
+  await expect.poll(() => spinOf(page)).toBe(0);
+  await expect(rot.locator('.spin-readout')).toHaveCount(0);
+  await expect(rot.locator('input[type="range"]')).toHaveCount(2);
+
+  await rot.locator('.range-label').click();
+  await expect(dialog(page).getByRole('button', { name: 'RANGE', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await dialog(page).getByRole('button', { name: 'SPIN', exact: true }).click();
+  await expect(dialog(page).getByLabel('SPEED (REV/S)')).toHaveValue('0.05'); // the offered start, not the default 0
+  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.05, 5);
   await expect(rot.locator('.spin-readout')).toContainText('0.05 rev/s');
   await expect(rot.locator('input[type="range"]')).toHaveCount(1);
 
   await rot.locator('.range-label').click();
-  await dialog(page).getByRole('button', { name: 'RANGE', exact: true }).click();
-  await expect(dialog(page).getByLabel('SPEED (REV/S)')).toHaveCount(0);
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
-  await expect.poll(() => spinOf(page)).toBe(0);
-  await expect(rot.locator('input[type="range"]')).toHaveCount(2);
-  await expect(rot.locator('.spin-readout')).toHaveCount(0);
-
-  await rot.locator('.range-label').click();
-  await dialog(page).getByRole('button', { name: 'SPIN', exact: true }).click();
   await dialog(page).getByLabel('SPEED (REV/S)').fill('0.2');
   await dialog(page).getByRole('button', { name: 'APPLY' }).click();
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.2, 5);
@@ -96,5 +96,6 @@ test('ROTATE is a spin row by default: an amber rev/s readout and one slider; RA
   await dialog(page).getByRole('button', { name: 'APPLY' }).click();
   await expect(dialog(page).getByRole('alert')).toContainText(/SPEED/);
   await dialog(page).getByRole('button', { name: 'RESET DEFAULT' }).click();
-  await expect.poll(() => spinOf(page)).toBeCloseTo(0.05, 5);
+  await expect.poll(() => spinOf(page)).toBe(0);
+  await expect(rot.locator('input[type="range"]')).toHaveCount(2);
 });

@@ -1,5 +1,6 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount } from '../engine/buildPlacements.js';
+import { createDriverClock, driverTimeSec } from '../engine/kineme.js'; // #1128: the living-motion floor
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -114,6 +115,18 @@ export function nodePhase(base, it) {
   return base * (Number.isFinite(speed) && speed > 0 ? speed : 1) + (Number.isFinite(phase) ? phase : 0);
 }
 
+/**
+ * #1128 — the living-motion floor for one layer: breath and drift (and pulse, which is off until a Director pattern
+ * asks) from the layer's own layout, evaluated FROM rest so the first frame is the placed picture. null when every
+ * amount is 0 (the hard gate: nothing is computed), and null under shed tier 3 (the governor froze motion: identity).
+ */
+function livingMotion(layoutParams, seed, driverSec, W, H, slowRender) {
+  if (slowRender) return null;
+  const amounts = { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse };
+  if (!(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0)) return null;
+  return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true };
+}
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -123,6 +136,9 @@ export function createLiveResolver() {
   let H = CANVAS_H;
   let worldNoise = null;
   let worldNoiseSeed = null;
+  // #1128: ONE anchored clock for the living-motion floor. RATE 0 freezes it where it is, a RATE change re-anchors it
+  // (no jump), and a held loop clock (pause) holds it: the same contract as the library kinemes.
+  const driverClock = createDriverClock();
 
   // Item-level morph (chip clicks): per content layer, the last shown
   // (post-morph) items + the signature they were shown for, and any
@@ -331,6 +347,7 @@ export function createLiveResolver() {
         .filter((a) => a && typeof a === 'object')
         .map((a) => [String(a.id), hashStr(String(a.svg || ''))]));
     }
+    const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     const aliveIds = new Set();
@@ -521,6 +538,7 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
+          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).

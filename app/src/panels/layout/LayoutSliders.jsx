@@ -2,7 +2,7 @@
 // Structure-first knobs: COUNT, SCALE, ROTATE, ALPHA, JITTER, DENSITY,
 // DIVERGENCE.
 import { RangeRow, DualRangeRow } from '../../components/RangeRow.jsx';
-import { DEFAULT_LAYOUT_PARAMS, RANGE_SPEC, RANGE_HARD, PARAM_SPEC } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, RANGE_SPEC, RANGE_HARD, PARAM_SPEC, ROTATE_SPIN_START } from '../../data/layout-modes.js';
 import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
@@ -33,7 +33,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
       <DualRangeRow label="ROTATE" low={layoutParams.rotate[0]} high={layoutParams.rotate[1]}
         min={RANGE_SPEC.rotate.min} max={RANGE_SPEC.rotate.max} hint="Min–max rotation in degrees. Spin: how fast the marks turn (tap the name)"
         dialog={{ key: 'layout.rotate', title: 'ROTATE', hard: RANGE_HARD.rotate,
-          spin: { value: layoutParams.rotateSpin ?? 0, onChange: (v) => set('rotateSpin', v), defaultValue: DEFAULT_LAYOUT_PARAMS.rotateSpin, max: PARAM_SPEC.rotateSpin.max } }}
+          spin: { value: layoutParams.rotateSpin ?? 0, onChange: (v) => set('rotateSpin', v), defaultValue: DEFAULT_LAYOUT_PARAMS.rotateSpin, startValue: ROTATE_SPIN_START, max: PARAM_SPEC.rotateSpin.max } }}
         onChangeLow={v => set('rotate', [v, layoutParams.rotate[1]])}
         onChangeHigh={v => set('rotate', [layoutParams.rotate[0], v])}
         onChangeRange={(lo, hi) => set('rotate', [lo, hi])}

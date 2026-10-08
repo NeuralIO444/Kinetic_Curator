@@ -66,6 +66,27 @@ export function kinemePhase2(seed, index) {
   return [hashPhase(seed, `n:${index}`), hashPhase(seed, `b:${index}`)];
 }
 
+// #1128 — the per-instance phases are a pure function of (seed, index) and the live path asks for them for every
+// instance on every frame: building two djb2 strings per instance per frame is wasted allocation at 800 marks. Cache
+// them per seed (a handful of seeds, a bounded map); the values are bit-identical to kinemePhase2.
+const PHASE_CACHE = new Map();
+const PHASE_CACHE_MAX = 8;
+function phasesFor(seed, index) {
+  let c = PHASE_CACHE.get(seed);
+  if (!c) {
+    if (PHASE_CACHE.size >= PHASE_CACHE_MAX) PHASE_CACHE.delete(PHASE_CACHE.keys().next().value);
+    c = { n: new Float64Array(0), b: new Float64Array(0), have: new Uint8Array(0) };
+    PHASE_CACHE.set(seed, c);
+  }
+  if (index >= c.have.length) {
+    const len = Math.max(index + 1, c.have.length * 2, 64);
+    const grow = (a, T) => { const o = new T(len); o.set(a); return o; };
+    c.n = grow(c.n, Float64Array); c.b = grow(c.b, Float64Array); c.have = grow(c.have, Uint8Array);
+  }
+  if (!c.have[index]) { const p = kinemePhase2(seed, index); c.n[index] = p[0]; c.b[index] = p[1]; c.have[index] = 1; }
+  return c;
+}
+
 /** The anchored performer clock. One instance per loop owner. */
 export function createDriverClock() {
   return createKinemeClock();
@@ -162,6 +183,9 @@ function num01(v) {
  *   boilStep,        // boil-driver frame (held by the caller on shed tier 1+)
  *   amounts,         // { breath, drift, pulse, brushWobble } 0..1
  *   canvasW, canvasH // drift units
+ *   anchored,        // #1128: every driver is measured FROM its rest pose: at driver time 0 each delta is exactly 0,
+ *                    // so a still (time 0) is byte-identical to a scene with no drivers, and a living canvas leaves
+ *                    // its placed position instead of starting off it
  * }
  *
  * soa: the stage-C SoA ({ n, index } read; channels written by the applier).
@@ -189,13 +213,15 @@ export function evaluateKineme(soa, ctx) {
   const step = ctx.boilStep | 0;
   const amounts = ctx.amounts || {};
   const seed = ctx.seed | 0;
+  const anchored = !!ctx.anchored;
 
   const breath = num01(amounts.breath);
   if (breath > 0) {
     out.active = true;
     for (let k = 0; k < n; k++) {
-      const [uN] = kinemePhase2(seed, soa.index[k]);
-      out.dScale[k] += breath * BREATH_DEPTH * Math.sin(TAU * (BREATH_HZ * t + uN));
+      const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
+      const s = Math.sin(TAU * (BREATH_HZ * t + uN));
+      out.dScale[k] += breath * BREATH_DEPTH * (anchored ? s - Math.sin(TAU * uN) : s);
     }
   }
 
@@ -206,9 +232,10 @@ export function evaluateKineme(soa, ctx) {
     const reach = drift * DRIFT_REACH * m;
     if (reach > 0) {
       for (let k = 0; k < n; k++) {
-        const [uN, uB] = kinemePhase2(seed, soa.index[k]);
-        out.dx[k] += reach * Math.sin(TAU * (DRIFT_HZ_X * t + uN));
-        out.dy[k] += reach * Math.sin(TAU * (DRIFT_HZ_Y * t + uB));
+        const ph = phasesFor(seed, soa.index[k]); const uN = ph.n[soa.index[k]]; const uB = ph.b[soa.index[k]];
+        const sx = Math.sin(TAU * (DRIFT_HZ_X * t + uN)); const sy = Math.sin(TAU * (DRIFT_HZ_Y * t + uB));
+        out.dx[k] += reach * (anchored ? sx - Math.sin(TAU * uN) : sx);
+        out.dy[k] += reach * (anchored ? sy - Math.sin(TAU * uB) : sy);
       }
     }
   }
@@ -217,10 +244,12 @@ export function evaluateKineme(soa, ctx) {
   if (pulse > 0) {
     out.active = true;
     for (let k = 0; k < n; k++) {
-      const [uN] = kinemePhase2(seed, soa.index[k]);
+      const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
       const ph = (((PULSE_HZ * t + uN) % 1) + 1) % 1;
       const thump = (1 - ph) * (1 - ph) * (1 - ph);
-      out.dScale[k] += pulse * PULSE_DEPTH * thump;
+      const rph = ((uN % 1) + 1) % 1; // the phase at driver time 0, written exactly as above so the difference is exactly 0
+      const rest = (1 - rph) * (1 - rph) * (1 - rph);
+      out.dScale[k] += pulse * PULSE_DEPTH * (anchored ? thump - rest : thump);
     }
   }
 
@@ -246,17 +275,29 @@ export function evaluateKineme(soa, ctx) {
  * ctx.shedTier >= 3 (pin-to-rest / zero-amounts) → identity, channels
  * untouched. !active → identity, channels untouched (the hard gate).
  */
+// #1128 — x and y live in the CACHED geometry SoA (stage C rewrites scale, rotation and alpha every frame, but never
+// the positions). A driver that nudged them in place nudged the cache: every frame stacked on the last, and the
+// placed picture walked away for good (found the first time the drivers were wired live: x 133, 142, 151 on three
+// identical frames, and still displaced with the drivers off). So the applier hands back an UNDO that puts the
+// cached positions back; buildPlacements calls it once the frame's items have been built.
+const BASE_XY = new WeakMap();
+
+/** Applies the drivers; returns a function that restores the cached positions, or null when nothing moved. */
 export function applyKinemeDrivers(soa, ctx) {
-  if (!soa || !ctx) return;
-  if ((ctx.shedTier | 0) >= 3) return;
+  if (!soa || !ctx) return null;
+  if ((ctx.shedTier | 0) >= 3) return null;
   const d = evaluateKineme(soa, ctx);
-  if (!d.active) return;
+  if (!d.active) return null;
   const n = soa.n | 0;
+  let base = BASE_XY.get(soa);
+  if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; BASE_XY.set(soa, base); }
+  for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
   for (let k = 0; k < n; k++) {
     soa.scale[k] *= 1 + d.dScale[k];
     soa.x[k] += d.dx[k];
     soa.y[k] += d.dy[k];
   }
+  return () => { for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; } };
   // dWobble: no consumer on main — brush mode (#894/#897) applies it when
   // it lands. Evaluated and tested here, wired defensively (no-op absent).
 }

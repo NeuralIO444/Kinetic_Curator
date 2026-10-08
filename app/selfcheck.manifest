@@ -178,6 +178,7 @@ node src/gl/bandFeed.selfcheck.mjs
 node src/gl/audioSidecar.selfcheck.mjs
 node src/gl/kineme.selfcheck.mjs
 node src/gl/rotateSpin.selfcheck.mjs
+node src/gl/livingMotion.selfcheck.mjs
 node src/gl/audioBallistics.selfcheck.mjs
 node src/gl/audioPipeline.selfcheck.mjs
 node src/gl/spineC.selfcheck.mjs
