@@ -382,7 +382,7 @@
 .slider-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .slider-dialog-actions .act { min-height: 44px; }
 .slider-dialog-apply { border-color: var(--ink); }
-.spin-readout { color: var(--kc-warn); }
+.spin-readout { color: var(--kc-davis); }
 .spin-glyph { display: inline-block; animation: kc-spin-glyph 3.2s linear infinite; }
 @keyframes kc-spin-glyph { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin-glyph { animation: none; } }

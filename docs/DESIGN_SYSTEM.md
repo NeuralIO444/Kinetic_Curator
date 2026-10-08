@@ -31,7 +31,9 @@ that duplicates one already in this document.
 | `--kc-build` | `#ffd400` | **BUILD's working color.** BUILD sliders, active symmetry, BLEED/OVERLAP, MATH track badges. The color of making. |
 | `--kc-stim` | `#00d9ff` | **STIMULI + generate.** STIMULI selections, GENERATE, palette wing generate. The color of input. |
 | `--kc-ok` | `#00ff88` | **OK / paused-safe.** PAUSED chips, meter fills, TAPE. Green means "safe to look away." |
-| `--kc-warn` | `#ffb000` | **Warnings / armed outlines.** Drift badges, caution. Never for "go". |
+| `--kc-red` | `#ff4d00` | **Structure, action, faults** (rule 6). LOIS's red: FAVORITE, and every fault or warning (RENDER FAULT, TAPE FULL, errors). A different hue from live pink. |
+| `--kc-warn` | `var(--kc-red)` | **A fault or warning is the structure red.** (It was amber until #1126; amber is now only the probabilistic family.) Never for "go". |
+| `--kc-davis` | `#ffcd82` | **Davis, taste, presence, time-based things** (rules 5 and 6): the Davis face, EVOLVE and NEW SEED, armed outlines (waiting for the bar), the ROTATE spinner. Amber means this and nothing else. |
 | `--kc-fx` | `#8a6cff` | **FX track identity.** Violet borders/badges; `#b49aff` when selected. |
 | `--kc-kc` | `var(--kc-ink)` | **Content track identity.** KC tracks are neutral — the content *is* the color. The `KC` badge carries identity. |
 

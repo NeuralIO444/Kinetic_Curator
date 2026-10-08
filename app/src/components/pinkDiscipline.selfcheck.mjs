@@ -1,5 +1,5 @@
 // #1030 (M4): pink means live. Chrome never hardcodes the live pink — it uses
-// var(--kc-live) (live/armed/executing) and var(--kc-warn) / var(--kc-ok) for the rest.
+// var(--kc-live) (live/armed/executing) and var(--kc-red) / var(--kc-davis) / var(--kc-ok) for the rest.
 // tokens.css defines it; palettes and the MeterHero canvas fallback own their own hex.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -20,8 +20,8 @@ for (const p of walk(SRC)) {
   });
 }
 const tok = readFileSync(join(SRC, 'styles/tokens.css'), 'utf8');
-for (const t of ['--kc-live', '--kc-ok', '--kc-warn']) if (!tok.includes(t + ':')) bad.push(`tokens.css missing ${t}`);
+for (const t of ['--kc-live', '--kc-ok', '--kc-warn', '--kc-red', '--kc-davis']) if (!tok.includes(t + ':')) bad.push(`tokens.css missing ${t}`);
 const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8');
-if (!/\.chip-btn\.armed\s*\{[^}]*var\(--kc-warn\)/.test(panels)) bad.push('.chip-btn.armed must use --kc-warn');
+if (!/\.chip-btn\.armed\s*\{[^}]*var\(--kc-davis\)/.test(panels)) bad.push('.chip-btn.armed must use --kc-davis (armed = waiting, time-based: the amber family)');
 if (bad.length) { console.error('pink discipline:\n' + bad.join('\n')); process.exit(1); }
 console.log('pinkDiscipline.selfcheck: ok');

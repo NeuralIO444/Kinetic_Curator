@@ -37,7 +37,7 @@
 /* #964 — armed roll scope: outline + pin glyph, deliberately distinct from
    .active (what's on screen). An armed chip can be active too — the outline
    reads on top of the inversion. */
-.chip-btn.armed { outline: 2px solid var(--kc-warn); outline-offset: 1px; }
+.chip-btn.armed { outline: 2px solid var(--kc-davis); outline-offset: 1px; }
 .pin-glyph { font-size: 8px; margin-left: 2px; vertical-align: 1px; }
 .scope-clear {
   padding: 2px 6px;
@@ -837,7 +837,7 @@
 .pattern-seed .big-btn { min-height: 44px; padding: 8px 16px; }
 .pattern-seed .chip-btn { min-height: 44px; padding: 8px 16px; }
 /* armed = waiting on the bar: caution amber, never live pink (design system 1.1) */
-.big-btn.armed { outline: 2px solid var(--kc-warn); outline-offset: 1px; }
+.big-btn.armed { outline: 2px solid var(--kc-davis); outline-offset: 1px; }
 
 /* #1126 — the panel fits without a scroll: one row each for the three generate verbs, the four trail gestures, and
    phrase beside midi. */
@@ -869,3 +869,11 @@
 @keyframes davis-sigil-turn { to { transform: rotate(360deg); } }
 /* stillness is a state (rule 7): with less motion he does not turn, and the label still says what he is doing */
 @media (prefers-reduced-motion: reduce) { .davis-sigil.turning { animation: none; } }
+
+/* #1126 — the buttons belong to a tribe, and the colour says whose verb it is (KC-1 DS rules 5 and 6). EVOLVE and NEW
+   SEED are Davis's: the generator rolls, so the amber of the probabilistic family. FAVORITE is LOIS's: the critic
+   keeps, so the structure red. Pink stays for "live": a running EVOLVE is pink, as before. */
+.big-btn.tribe-davis:not(.active) { border-color: var(--kc-davis); }
+.big-btn.tribe-davis:not(.active):hover { background: var(--kc-davis); border-color: var(--kc-davis); color: var(--bg); }
+.big-btn.tribe-lois { border-color: var(--kc-red); }
+.big-btn.tribe-lois:hover { background: var(--kc-red); border-color: var(--kc-red); color: var(--bg); }
