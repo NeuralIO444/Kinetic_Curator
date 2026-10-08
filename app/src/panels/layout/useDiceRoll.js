@@ -5,6 +5,9 @@
 // the wildness. LOIS shortlists 3 via the scorer interface; the performer
 // crowns one. The crown lands in the keep ledger (future training data) and
 // the dice's own crown log (learned compatibility).
+//
+// #1145: a roll samples the room from the same feed the Directors read, notes
+// the gain, and passes KIN freedom through. The verdict strip is not involved.
 import { useState } from 'react';
 import { useStore } from '../../state/store.js';
 import { ASSETS } from '../../data/assets/index.js';
@@ -13,6 +16,8 @@ import { createPersonaScorer } from '../../curator/diceScorer.js';
 import { readCrowns, recordCrown } from '../../curator/diceCrowns.js';
 import { loisActivity } from '../../curator/loisActivity.js';
 import { resolveDavisState } from '../../curator/davisState.js';
+import { resolveLoisFace } from '../../curator/loisFace.js';
+import { noteRoom } from '../../curator/roomScheduler.js';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 // The scorer is an interface ({ id, score }) — the MLX head swaps in here later.
@@ -26,8 +31,17 @@ export function useDiceRoll() {
   const addKeep = useStore((s) => s.addKeep);
 
   const roll = () => {
-    const davisCode = resolveDavisState(loisActivity.snapshot())?.code ?? null;
-    setTray(rollDice({ assets: ASSETS, davisCode, scorer, crowns: readCrowns() }));
+    const feed = loisActivity.snapshot();
+    const davisCode = resolveDavisState(feed)?.code ?? null;
+    const loisCode = resolveLoisFace(feed)?.code ?? null;
+    const gain = noteRoom(loisCode, davisCode);
+    setTray(rollDice({
+      assets: ASSETS,
+      davisCode,
+      kinFreedom: gain.room ? gain.kinFreedom : null,
+      scorer,
+      crowns: readCrowns(),
+    }));
   };
 
   const crown = (finalist) => {
