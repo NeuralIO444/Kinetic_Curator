@@ -71,6 +71,23 @@ export function validateTaste(raw) {
       head: loisHead.head,
     };
   }
+  // #1140 — optional third head (inclination). Absent until trained, and an
+  // unreadable section neutralizes her without touching the other heads: a
+  // bad lois section still refuses (everything stands on it); a bad queen
+  // section only means she stays neutral. Never a refusal — her absence must
+  // never break the heads that exist.
+  if (raw.queen != null) {
+    const queenHead = validateHead(raw.queen.head, numKeys);
+    if (queenHead.ok) {
+      const ql = raw.queen.labels && typeof raw.queen.labels === 'object' ? raw.queen.labels : {};
+      const labels = {};
+      for (const [k, v] of Object.entries(ql)) {
+        if (Object.keys(labels).length >= 32) break;
+        if (typeof k === 'string' && finite(v)) labels[k] = v;
+      }
+      taste.queen = { labels, head: queenHead.head };
+    }
+  }
   return { ok: true, taste };
 }
 
