@@ -58,7 +58,7 @@ assert.deepStrictEqual(h.castCategories, ['unknown', 'user']);
     assert.ok(Number.isFinite(v) && v >= 0 && v <= 1, 'hostile input stays in 0–1');
   }
   assert.deepStrictEqual(Object.keys(n), Object.keys(recipeFeatures().num), 'stable key order');
-  assert.strictEqual(FEATURES_VERSION, 2);
+  assert.strictEqual(FEATURES_VERSION, 3);
 }
 
 console.log('recipeFeatures.selfcheck: OK');

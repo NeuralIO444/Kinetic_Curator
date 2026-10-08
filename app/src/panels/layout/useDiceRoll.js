@@ -13,6 +13,7 @@ import { createPersonaScorer } from '../../curator/diceScorer.js';
 import { readCrowns, recordCrown } from '../../curator/diceCrowns.js';
 import { loisActivity } from '../../curator/loisActivity.js';
 import { resolveDavisState } from '../../curator/davisState.js';
+import { captureKeepContext } from '../../curator/keepContext.js';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 // The scorer is an interface ({ id, score }) — the MLX head swaps in here later.
@@ -36,9 +37,13 @@ export function useDiceRoll() {
     loadStubMode(finalist.layoutId);
     loadDiceCast(finalist.assetIds);
     // The keep ledger: what was crowned, as crowned (not a mid-blend snapshot).
+    // #1140 — same record contract as captureFavorite: stream offsets (#305)
+    // plus the session context. The crown used to drop the offsets.
     addKeep({
       seed: s.seed,
+      seedOffsets: { ...(s.seedOffsets || {}) },
       timestamp: new Date().toISOString(),
+      context: captureKeepContext(s.paletteId),
       config: {
         layout: { ...s.layoutParams, mode: finalist.layoutId },
         palette: { id: s.paletteId },

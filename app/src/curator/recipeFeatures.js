@@ -9,15 +9,19 @@
 //
 // Recipe-level and seed-independent on purpose: features name the choices a
 // performer made (system, symmetry, palette, cast, density), not what the seed
-// happened to draw. Bump FEATURES_VERSION whenever a key or bucket edge changes
-// — the model must never mix two definitions under one name.
+// happened to draw. Bump FEATURES_VERSION whenever a key or bucket edge changes,
+// or when the keep record schema changes (#1140: session context) — the model
+// must never mix two definitions under one name, and the trainer must never mix
+// instrumented keeps with uninstrumented ones under one version.
 import { ASSETS } from '../data/assets/index.js';
 import { normalizeLayoutParams, PARAM_SPEC } from '../data/layout-modes.js';
 import { RANDOMIZABLE_KEYS } from '../state/paramUtils.js';
 
 // v2 (#762): + `num`, the continuous layout keys CURATE actually varies,
 // normalized 0–1 — the buckets alone are too coarse to tell 8 candidates apart.
-export const FEATURES_VERSION = 2;
+// v3 (#1140): keep records carry session context (audio/palette-warmth/dwell);
+// the feature keys are unchanged, but training data is now instrumented.
+export const FEATURES_VERSION = 3;
 
 // The three pair params have no PARAM_SPEC range; these bounds are the dice's
 // own (state/paramUtils.js randomizeKey), so 0–1 spans what CURATE can roll.

@@ -14,6 +14,7 @@ import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
 /** #589 — the three phrase clock sources. */
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
+import { captureKeepContext, sanitizeKeepContext } from '../../curator/keepContext.js'; // #1140: per-keep session context
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
 // lived in memory only: a reload silently emptied the tray. Same pattern as the
@@ -46,6 +47,8 @@ export function sanitizeCast(raw) {
  * #719 — the ONE place a keep is captured, so every keep path (DAVIS ★, the
  * `f` hotkey) records the full recipe: seed, stream offsets (#305), layout,
  * palette and the cast. The hotkey used to drop the offsets.
+ * #1140 — plus the session context (audio/palette-warmth/dwell): what was in
+ * the air when it was loved. Descriptors only, never raw audio/MIDI.
  */
 export function captureFavorite(state, paletteId) {
   const enabled = state.enabledAssets || {};
@@ -57,6 +60,7 @@ export function captureFavorite(state, paletteId) {
     // #948 — full epoch ISO; legacy HH:MM:SS keeps still parse via
     // loisActivity.parseFavoriteTimestamp (date unknown -> null, honestly).
     timestamp: new Date().toISOString(),
+    context: captureKeepContext(paletteId),
     config: {
       layout: { ...state.layoutParams },
       palette: { id: paletteId },
@@ -92,6 +96,7 @@ export function sanitizeFavorite(raw) {
   // #1131 — a stored stack is trusted no further than the project normalizers trust a file: refuse it whole if
   // it does not expand (the keep itself survives), and bound its size.
   const stackOk = raw.stack && JSON.stringify(raw.stack).length < 60000 && expandStack(raw.stack).ok;
+  const context = sanitizeKeepContext(raw.context);
   return {
     ...(stackOk ? { stack: JSON.parse(JSON.stringify(raw.stack)) } : {}),
     id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
@@ -99,6 +104,9 @@ export function sanitizeFavorite(raw) {
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'
       ? { seedOffsets: normalizeSeedOffsets(raw.seedOffsets) } : {}),
     timestamp: typeof raw.timestamp === 'string' ? raw.timestamp.slice(0, 32) : '',
+    // #1140 — session context rides along when present; legacy keeps (no
+    // context key) stay without it — never invented.
+    ...(context ? { context } : {}),
     config: {
       ...(layout && typeof layout === 'object' && !Array.isArray(layout)
         ? { layout: normalizeLayoutParams(layout) } : {}),
