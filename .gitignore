@@ -25,3 +25,16 @@ mlx_data/
 /scripts/pr-launcher.mjs
 /trails.png
 /trails-swarm.png
+
+# MLX pipeline run report (regenerated every run) — local only.
+mlx-report.json
+
+# MLX pipeline working data (local runs) — not committed.
+/pool/
+/pool2/
+/labels.json
+/labels.real.json.bak
+/hits.json
+/base.project.json
+/taste.npz
+/taste.json

@@ -20,7 +20,9 @@ Everything below runs on the Mac Studio. Nothing here touches the web app.
 
 ```bash
 cd Kinetic_Curator/studio
-pip install -e ".[curator]"     # mlx-embeddings + pillow + numpy + scikit-learn
+# studio/ is a script collection, not a package — install the deps directly
+# (setuptools flat-layout discovery refuses `pip install -e .` here).
+python3 -m pip install "mlx-embeddings>=0.1" "pillow>=11" "numpy>=2" "scikit-learn>=1.5"
 ```
 
 First `embed` run downloads the SigLIP weights from Hugging Face (~2 GB,
@@ -85,7 +87,7 @@ Either way, write both numbers down — they're the baseline for future phases.
 **a) Render a pool** (200 is a good first size; more is better for training):
 
 ```bash
-python3 studio/studio.py batch -o pool/ --count 200
+python3 studio/studio.py batch base.project.json -o pool/ --count 200
 ```
 
 **b) Embed it** (this is the new MLX step):
@@ -125,7 +127,7 @@ If it's ~0.5, you need more labels (or more varied ones).
 **e) Rank a fresh batch and look at the top 20:**
 
 ```bash
-python3 studio/studio.py batch -o pool2/ --count 200 --start-seed 10000
+python3 studio/studio.py batch base.project.json -o pool2/ --count 200 --start-seed 10000
 python3 studio/curator.py embed pool2/
 python3 studio/curator.py rank --index pool2/curator-index.npz \
     --model taste.npz -k 20 --open
