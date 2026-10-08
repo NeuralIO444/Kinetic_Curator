@@ -120,6 +120,7 @@ export function useApp(selector) {
       case A.SET_CATEGORY_WEIGHT: return store.setCategoryWeight(action.category, action.weight);
       case A.CLEAR_WEIGHT_OVERRIDES: return store.clearWeightOverrides();
       case 'CYCLE_ASSET_WEIGHT': return store.cycleAssetWeight(action.id);
+      case 'TOGGLE_ASSET_STILL': return store.toggleAssetStill(action.id); // #1128
       case 'DUPLICATE_ASSET': return store.duplicateAsset(action.id);
       case 'INGEST_ASSET': return store.ingestAsset(action.svg, action.hint, { category: action.category, source: action.source });
       case 'REMOVE_CUSTOM_ASSET': return store.removeCustomAsset(action.id);

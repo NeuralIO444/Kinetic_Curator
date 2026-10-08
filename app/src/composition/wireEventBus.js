@@ -66,6 +66,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_CAT_FILTER, (cat) => dispatch({ type: A.SET_CAT_FILTER, payload: cat }));
   on(Events.ASSETS_POOL_VIEW, (view) => dispatch({ type: A.SET_POOL_VIEW, payload: view }));
   on(Events.ASSETS_WEIGHT_CYCLE, ({ id }) => dispatch({ type: 'CYCLE_ASSET_WEIGHT', id }));
+  on(Events.ASSETS_STILL_TOGGLE, ({ id }) => dispatch({ type: 'TOGGLE_ASSET_STILL', id })); // #1128
   on(Events.ASSETS_WEIGHT_SET, ({ id, weight }) => dispatch({ type: A.SET_ASSET_WEIGHT, id, weight }));
   on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) => dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }));
   on(Events.ASSETS_WEIGHT_CLEAR, () => dispatch({ type: A.CLEAR_WEIGHT_OVERRIDES }));

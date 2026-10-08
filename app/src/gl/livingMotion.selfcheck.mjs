@@ -11,6 +11,9 @@ import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-mod
 import { ASSETS } from '../data/assets/index.js';
 import { resolvePalette } from '../data/palettes.js';
 import { encodeRecipeUrl, decodeRecipeUrl } from '../state/recipeUrls.js';
+import { sanitizeAssetStill } from '../data/kinemes.js';
+import { serializeProject, parseProject } from '../state/projectDocument.js';
+import { useStore } from '../state/store.js';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -151,6 +154,39 @@ ok('live: SWELL moves marks differently from DRIFT; THUMP is exactly DRIFT with 
   assert.deepEqual(at('THUMP', 0), drift, 'a beat at rest adds nothing');
   assert.notDeepEqual(at('THUMP', 1), drift, 'on a beat, THUMP pulses');
   assert.deepEqual(at('DRIFT', 1), drift, 'a beat does not move a DRIFT scene');
+});
+
+// ── #1128 PR3: the artist can pin an asset still ──
+ok('pinned-still: junk is dropped, null when nothing is pinned, the store toggles, and the document carries it only when set', () => {
+  assert.equal(sanitizeAssetStill(null), null); assert.equal(sanitizeAssetStill([]), null); assert.equal(sanitizeAssetStill({ a: false, b: 'yes', '': true }), null);
+  assert.deepEqual(sanitizeAssetStill({ a: true, b: 1, c: true }), { a: true, c: true });
+  globalThis.localStorage ??= { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  const st = useStore.getState();
+  st.toggleAssetStill('org_blob_01'); assert.deepEqual(useStore.getState().assetStill, { org_blob_01: true });
+  const doc = serializeProject(useStore.getState()); assert.deepEqual(doc.assetStill, { org_blob_01: true });
+  st.toggleAssetStill('org_blob_01'); assert.deepEqual(useStore.getState().assetStill, {});
+  assert.equal('assetStill' in serializeProject(useStore.getState()), false, 'an unpinned piece exports exactly as before');
+  st.toggleAssetStill(''); st.toggleAssetStill(null); assert.deepEqual(useStore.getState().assetStill, {});
+  const parsed = parseProject(doc); assert.ok(parsed.ok); assert.deepEqual(parsed.doc.assetStill, { org_blob_01: true }, 'the pin survives save and load');
+  assert.deepEqual(parseProject({ ...doc, assetStill: undefined }).doc.assetStill, {}, 'a document from before pins moves everything');
+});
+
+ok('live: a pinned asset\'s marks stay exactly where they were placed while every other mark moves', () => {
+  const items = (r, over) => r.resolveLayers(base(over)).find((l) => l.id === 'L').items.map((i) => ({ a: i.assetId, x: i.x, y: i.y, s: i.scale }));
+  const placed = items(createLiveResolver(), { loopTimeMs: 0, layoutParams: OFF });
+  const ids = [...new Set(placed.map((i) => i.a))]; assert.ok(ids.length >= 2, `${ids.length} assets in the fixture`);
+  const pin = ids[0];
+  const moving = items(createLiveResolver(), { loopTimeMs: 6500 });
+  const pinned = items(createLiveResolver(), { loopTimeMs: 6500, assetStill: { [pin]: true } });
+  const ref = items(createLiveResolver(), { loopTimeMs: 6500, layoutParams: OFF });
+  let still = 0; let moved = 0;
+  for (let i = 0; i < pinned.length; i++) {
+    assert.equal(pinned[i].a, moving[i].a, 'the same marks, in the same order');
+    if (pinned[i].a === pin) { still += 1; assert.equal(pinned[i].x, ref[i].x); assert.equal(pinned[i].y, ref[i].y); assert.equal(pinned[i].s, ref[i].s); assert.notDeepEqual([moving[i].x, moving[i].y, moving[i].s], [ref[i].x, ref[i].y, ref[i].s], 'unpinned, it moves'); }
+    else { moved += 1; assert.deepEqual(pinned[i], moving[i], 'every other asset moves exactly as before'); }
+  }
+  assert.ok(still > 0 && moved > 0, `${still} pinned marks, ${moved} others`);
+  assert.deepEqual(items(createLiveResolver(), { loopTimeMs: 6500, assetStill: {} }), moving, 'an empty pin set changes nothing');
 });
 
 console.log(`livingMotion.selfcheck: ${n} checks passed`);

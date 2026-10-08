@@ -65,5 +65,15 @@
   border-top: 1px solid var(--line);
   font-size: 8px; color: var(--dim);
 }
+.tile-still {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; min-height: 44px;
+  background: transparent; border: none; border-top: 1px solid var(--line);
+  color: var(--dim); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.tile-still i { width: 8px; height: 8px; border: 1px solid var(--dim); }
+.tile-still:hover { color: var(--ink); }
+.tile-still.on { color: var(--ink); border-top-color: var(--kc-red); }
+.tile-still.on i { background: var(--kc-red); border-color: var(--kc-red); }
 .tile-id { color: var(--ink); letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .tile-cat { color: var(--accent3); font-size: 8px; letter-spacing: 0.04em; }

@@ -31,9 +31,10 @@ export function AssetPoolPanel() {
     catFilter: s.catFilter,
     poolView: s.poolView,
     weightOverrides: s.assetWeightOverrides || {},
+    still: s.assetStill || {},
     ingestError: s.ingestError,
   }));
-  const { enabled, search, catFilter, poolView, weightOverrides, ingestError } = state;
+  const { enabled, search, catFilter, poolView, weightOverrides, still, ingestError } = state;
 
   const openStudio = async (seed) => {
     setStudioError(null);
@@ -184,6 +185,15 @@ export function AssetPoolPanel() {
                   <span className="tile-id">{a.id}</span>
                   <span className="tile-cat">{isUser ? 'user' : a.category}</span>
                 </div>
+                {/* #1128 — pin this asset still: a discrete on/off, so TE (rule 2). Only assets in use have one. */}
+                {enabled[a.id] && (
+                  <button type="button" className={`tile-still${still[a.id] ? ' on' : ''}`} aria-pressed={!!still[a.id]}
+                    aria-label={`${a.id}: ${still[a.id] ? 'pinned still' : 'moves'}`}
+                    title={still[a.id] ? 'Pinned still: this asset stays where it is placed. Tap to let it move again.' : 'Moves with the living-motion floor. Tap to pin it still.'}
+                    onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_STILL_TOGGLE, { id: a.id }); }}>
+                    <i aria-hidden="true" />still
+                  </button>
+                )}
               </div>
             );
           })}

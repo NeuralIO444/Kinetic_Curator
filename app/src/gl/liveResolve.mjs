@@ -120,13 +120,14 @@ export function nodePhase(base, it) {
  * asks) from the layer's own layout, evaluated FROM rest so the first frame is the placed picture. null when every
  * amount is 0 (the hard gate: nothing is computed), and null under shed tier 3 (the governor froze motion: identity).
  */
-function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive) {
+function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive, assetStill) {
   if (slowRender) return null;
   const amounts = patternAmounts(
     { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
     layoutParams.kinemePattern, beatDrive);
   if (!(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0)) return null;
-  return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true };
+  const pinned = assetStill && typeof assetStill === 'object' ? Object.keys(assetStill) : null;
+  return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
 }
 
 export function createLiveResolver() {
@@ -540,7 +541,7 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
-          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive),
+          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).

@@ -180,6 +180,7 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
     attractor: view.attractor,
     audioBands: ballistics,
     beatDrive: audioBands ? ballistics.beatPulse : null, // #1128 THUMP: a real beat or nothing
+    assetStill: s.assetStill, // #1128
     dtSec,
     loopTimeMs: frameTimeMs,
   });
