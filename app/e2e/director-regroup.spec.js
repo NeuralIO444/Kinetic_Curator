@@ -10,9 +10,9 @@ test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE p
   await page.getByRole('tab', { name: /director/i }).click();
   const panel = page.locator('.panel-davis');
 
-  // four labelled sections, in order (UX-7: TRAILS surfaces the ACCUM toggle
+  // five labelled sections, in order (UX-7: TRAILS surfaces the ACCUM toggle
   // + gestures in-panel, so FREEZE/CLEAR/SWELL are reachable from DIRECTOR)
-  await expect(panel.locator('.davis-section-label')).toHaveText(['voices', 'generate', 'perform', 'trails']);
+  await expect(panel.locator('.davis-section-label')).toHaveText(['voices', 'the room', 'generate', 'perform', 'trails']); // #1126: the two Directors sit between VOICES and GENERATE
 
   // nothing deleted: every existing control is findable
   await expect(panel.locator('.voice-chip.flagship')).toHaveCount(4);
