@@ -25,3 +25,6 @@ mlx_data/
 /scripts/pr-launcher.mjs
 /trails.png
 /trails-swarm.png
+
+# MLX pipeline run report (regenerated every run) — local only.
+mlx-report.json
