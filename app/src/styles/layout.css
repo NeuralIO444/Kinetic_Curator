@@ -246,6 +246,49 @@
 /* #278 — VJ MIX slider: lives inside the palette switcher, no new panel. */
 .palette-mix { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; flex-shrink: 0; }
 .palette-mix-label { color: var(--dim); font-size: 9px; letter-spacing: 0.1em; }
+/* #1123 — KC-1 DS: FADE is Davis (continuous). The dot sits dark until a
+   fade is in transit, then breathes amber — glow depth tracks the fade depth
+   (--fade-depth, 1 at strike → 0 at land), slow pulse while it travels. */
+.palette-mix-label { display: inline-flex; align-items: center; gap: 5px; }
+.palette-fade-dot {
+  width: 7px; height: 7px;
+  background: var(--line-2); flex-shrink: 0;
+  transition: background 300ms;
+}
+.palette-mix-label.fading .palette-fade-dot {
+  background: var(--kc-davis);
+  animation: palette-fade-breath 4s ease-in-out infinite;
+}
+@keyframes palette-fade-breath {
+  0%, 100% { box-shadow: 0 0 calc(10px * var(--fade-depth, 1)) rgba(var(--kc-davis-rgb),0.25); filter: brightness(0.85); }
+  50% { box-shadow: 0 0 calc(10px * var(--fade-depth, 1)) rgba(var(--kc-davis-rgb),0.8); filter: brightness(1.1); }
+}
+/* #1123 — KC-1 DS: palette chip taste-fit is Davis (continuous). Amber
+   shimmer at 4 compressive levels, capped dim. Gated on .taste-on: no real
+   taste signal, no shimmer (rule 3) — the row reads clean and quiet. */
+.palette-strip.taste-on .palette-chip[data-fit="4"] .palette-chip-sw,
+.palette-strip.taste-on .palette-chip[data-fit="4"] .palette-sw-full {
+  animation: palette-taste-breath 9s ease-in-out infinite; box-shadow: 0 0 7px rgba(var(--kc-davis-rgb),0.45);
+}
+.palette-strip.taste-on .palette-chip[data-fit="3"] .palette-chip-sw,
+.palette-strip.taste-on .palette-chip[data-fit="3"] .palette-sw-full {
+  animation: palette-taste-breath 9s ease-in-out infinite; box-shadow: 0 0 5px rgba(var(--kc-davis-rgb),0.3);
+}
+.palette-strip.taste-on .palette-chip[data-fit="2"] .palette-chip-sw,
+.palette-strip.taste-on .palette-chip[data-fit="2"] .palette-sw-full {
+  animation: palette-taste-breath 9s ease-in-out infinite; box-shadow: 0 0 3px rgba(var(--kc-davis-rgb),0.18);
+}
+.palette-strip.taste-on .palette-chip[data-fit="1"] .palette-chip-sw,
+.palette-strip.taste-on .palette-chip[data-fit="1"] .palette-sw-full {
+  animation: palette-taste-breath 9s ease-in-out infinite; opacity: 0.9; box-shadow: 0 0 2px rgba(var(--kc-davis-rgb),0.12);
+}
+@keyframes palette-taste-breath {
+  0%, 100% { filter: brightness(0.82); }
+  50% { filter: brightness(1.06); }
+}
+/* #1123 — KC-1 DS: ANALOGOUS/shuffle keep their controls; red discipline for
+   an active (non-default) harmony selection. */
+.palette-harmony[data-scheme]:not([data-scheme="analogous"]) { border-color: var(--kc-red); color: var(--kc-red); }
 .palette-mix-slider { width: 90px; min-width: 0; }
 .palette-chip {
   display: inline-flex; align-items: center; gap: 6px;
@@ -255,9 +298,16 @@
   color: var(--dim);
   font-size: 10px; letter-spacing: 0.06em;
   transition: all 100ms;
+  position: relative; /* #1123 — the active marker rides ::after */
 }
 .palette-chip:hover { color: var(--ink); border-color: var(--line-2); }
-.palette-chip.active { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,0.04); }
+/* #1123 — KC-1 DS: the active palette is TE (discrete). Hard red edge + red
+   underline marker — never a glow, and amber never means "selected" (rule 5). */
+.palette-chip.active { color: var(--ink); border-color: var(--kc-red); background: rgba(255,77,0,0.06); }
+.palette-chip.active::after {
+  content: ''; position: absolute; left: 6px; right: 6px; bottom: -1px;
+  height: 2px; background: var(--kc-red);
+}
 .palette-chip.dirty { border-color: var(--accent2); }
 .palette-chip-wrap { display: inline-flex; align-items: center; }
 /* #357 — tiny key-hint numeral on each palette chip; quiet on purpose. */

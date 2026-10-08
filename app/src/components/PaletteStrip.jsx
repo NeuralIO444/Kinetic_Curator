@@ -6,6 +6,8 @@ import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
 import { chipWindowStart } from './paletteChipWindow.mjs';
+import { paletteTasteFit, fitLevel } from './paletteTasteFit.mjs';
+import { getTaste } from '../curator/tasteStore.js';
 import { CuratorBar } from '../panels/layout/CuratorBar.jsx';
 import { PaletteWing } from './PaletteWing.jsx';
 
@@ -79,6 +81,58 @@ export function PaletteStrip() {
   // #624 + #625 — the color mode lives in the store now: the GL loop reads it to
   // drive the WASH/INJECT soaks. (It used to be component-local and never left.)
   const colorMode = useStore((s) => s.colorMode) || 'FADE';
+  // #1123 — KC-1 DS: FADE is Davis (continuous). The dot breathes while a
+  // fade is in transit. The real dissolve runs in the GL crossfade state
+  // machine (gl/paletteMix.mjs) for paletteMixSeconds after a palette
+  // change — this mirrors that duration (rAF-driven --fade-depth, 1 at
+  // strike → 0 at land) so the dot lands when the dissolve does. MIX=0 is
+  // a hard cut: no transit, no breath.
+  const paletteId = useStore((s) => s.paletteId);
+  const paletteOverrides = useStore((s) => s.paletteOverrides);
+  const mixSeconds = useStore((s) => s.paletteMixSeconds) ?? 0;
+  const [fadeDepth, setFadeDepth] = useState(0);
+  const palSigRef = useRef(null);
+  const transitRef = useRef(null);
+  useEffect(() => {
+    const sig = `${paletteId}|${paletteOverrides ? 'o' : ''}`;
+    if (palSigRef.current === sig) return;
+    const first = palSigRef.current === null;
+    palSigRef.current = sig;
+    if (transitRef.current) { cancelAnimationFrame(transitRef.current); transitRef.current = null; }
+    if (!first && colorMode === 'FADE' && mixSeconds > 0) {
+      const durMs = mixSeconds * 1000;
+      const t0 = performance.now();
+      let last = -1;
+      const tick = (now) => {
+        const t = Math.min(1, (now - t0) / durMs);
+        // Quantize: the glow depth moves slowly, so only re-render when the
+        // displayed value actually changes — not 60fps for a cosmetic dot.
+        const d = Math.round((1 - t) * 40) / 40;
+        if (d !== last) { last = d; setFadeDepth(d); }
+        transitRef.current = t < 1 ? requestAnimationFrame(tick) : null;
+      };
+      transitRef.current = requestAnimationFrame(tick);
+    } else {
+      setFadeDepth(0);
+    }
+    return () => {
+      if (transitRef.current) { cancelAnimationFrame(transitRef.current); transitRef.current = null; }
+    };
+  }, [paletteId, paletteOverrides, colorMode, mixSeconds]);
+  // #1123 — KC-1 DS rule 3: chip taste-fit shimmer only on a real taste
+  // signal. paletteTasteFit returns null until a real per-palette scorer
+  // lands (#762), so the row stays quiet; when it lands, the strip gets
+  // .taste-on and chips get data-fit 1..4.
+  useStore((s) => s.tasteRev); // re-render on taste import/clear
+  const taste = getTaste();
+  const fits = {};
+  let anyFit = false;
+  if (taste) {
+    for (const p of (palettes || [])) {
+      const lvl = fitLevel(paletteTasteFit(p.id, taste));
+      if (lvl > 0) { fits[p.id] = lvl; anyFit = true; }
+    }
+  }
   // #952 — the roll can land on any of the 37+ palettes, but the strip only
   // shows CHIP_CAP chips. Slide the window so the active palette is always
   // visible: highlight + name in the readout, tracking every KIN tap.
@@ -102,9 +156,10 @@ export function PaletteStrip() {
   const chips = visible.map((p, i) => {
     const active = p.id === palette.id;
     const num = <span className="palette-chip-num" aria-hidden="true">{i + 1}</span>;
+    const fit = fits[p.id] || 0;
     if (active) {
       return (
-        <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} title={`${p.name} — key ${i + 1}`}>
+        <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} data-fit={fit > 0 ? fit : undefined} title={`${p.name} — key ${i + 1}`}>
           {num}
           <ActivePaletteStrip
             key={palette.id}
@@ -123,7 +178,7 @@ export function PaletteStrip() {
     }
     return (
       <span key={p.id} className="palette-chip-wrap">
-        <button type="button" className="palette-chip" onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={`${p.name} — key ${i + 1}`}>
+        <button type="button" className="palette-chip" data-fit={fit > 0 ? fit : undefined} onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={`${p.name} — key ${i + 1}`}>
           {num}
           <CompactSwatches swatches={p.swatches || []} />
           <span className="palette-chip-name">{p.name}</span>
@@ -150,7 +205,7 @@ export function PaletteStrip() {
   });
 
   return (
-    <div className="palette-strip">
+    <div className={`palette-strip${anyFit ? ' taste-on' : ''}`}>
       <div className="kc-logo" title="KINETIC_CURATOR v0.9.0">
         <span className="logo-mark">◈</span>
         <span className="kc-name kc-compact">KC-1</span>
@@ -167,11 +222,12 @@ export function PaletteStrip() {
           <span className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }}>
             <button
               type="button"
-              className="palette-mix-label act"
+              className={`palette-mix-label act${fadeDepth > 0 ? ' fading' : ''}`}
               onClick={cycleColorMode}
               title={COLOR_MODE_HINT[colorMode]}
-              style={{ background: 'transparent', border: 0, padding: 0, color: 'inherit', letterSpacing: '0.1em', fontSize: 9, cursor: 'pointer', minWidth: '4.6em', textAlign: 'left' }}
+              style={{ background: 'transparent', border: 0, padding: 0, color: 'inherit', letterSpacing: '0.1em', fontSize: 9, cursor: 'pointer', minWidth: '4.6em', textAlign: 'left', '--fade-depth': fadeDepth.toFixed(3) }}
             >
+              <span className="palette-fade-dot" aria-hidden="true" />
               {colorMode}
             </button>
           </span>
@@ -181,7 +237,7 @@ export function PaletteStrip() {
           <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
             <span className="palette-switch-label lbl">palette</span>
             <button type="button" className="palette-save-btn" title="Palette lab — generate, edit, save, import, export" onClick={() => setWingOpen((v) => !v)} aria-expanded={wingOpen}>◈<span className="palette-shuffle-word lbl"> lab</span></button>
-            <select className="palette-harmony" value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
+            <select className="palette-harmony" data-scheme={harmonyScheme} value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
               {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
             </select>
             <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳<span className="palette-shuffle-word lbl"> shuffle</span></button>
