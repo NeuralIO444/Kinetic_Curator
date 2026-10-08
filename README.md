@@ -25,7 +25,15 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - Flagship voices, 4 content-track cap, track patch round-trip + cap on load, H/M/L asset locker, FADE on the palette bar.
 - ACCUM trails, GPU FX (chain compiler + template effects + cost tiers + measured costs), showrunner shed ladder behind one tape readout (budget knob, named stages, FX-stack weight).
 - Behave profiles + bio-drives (drives, scent, mold, graze, leak, swell) on one integrator. Seven verbs: cruise, flock, orbit, scatter, mold, levy, lorenz. Audio ballistics shape mic input and the GL loop.
-- **Director panel** (formerly DAVIS, #830) — VOICES / GENERATE / PERFORM: flagship voices live here (load-only, ✎ fork dish into MY VOICES), Evolve with live progress, phrase clock readout, ACCUM gestures.
+- **DIRECTORS panel** (#1126; formerly DAVIS, #830) — LOIS (NOD / VIBE / BURN / AWAY) vs Davis (FLOW / SEEDLING / UGLY / STUCK / BLOOM), both reading the honest feed; the panel hosts the argument. VOICES / GENERATE / PERFORM live here (flagship voices load-only, ✎ fork dish into MY VOICES), Evolve with live progress, phrase clock readout, ACCUM gestures.
+- **PATTERN tracks** (#1039–#1042) — FIELD / QUILT / GLYPH modes in BUILD (add / edit / shuffle), with per-mode DRIFT, DROP gate, bar-quantized shuffle, and per-element kinemes; KIN and CURATOR rolls deal element motion too.
+- **Slider dialogs** (#1127) — tap a slider's name for range expansion and mode switch; ROTATE defaults to continuous SPIN in rev/s, every mark with its own speed and direction.
+- **Keep recall + recipes** (#996) — clicking a keep brings its tracks back (recall + morph, one undo); K keeps without starring; share links, recipe text and keeps carry the whole layer stack.
+- **Web MIDI** (#617) — engine merged, mappings saved in the project; learn/bind remainder open, BLE-MIDI path needed for iPad.
+- **Palette lab** (#953) — generate / edit / save / import / export; 37 palettes on the KIN strip.
+- **WET engine** (#970) — standalone wetness service (WETNESS slider, vortex-particle core); ACCUM is one consumer.
+- **MATH track** (#1010) — 12 tone ops on the FX fold, assignable macro knobs (#724).
+- **Top bar** (#1103) — cold open, CUR and BEAT beside it; BEAT is the BPM master clock.
 - **Pipeline SETUP + STAGE** (#606–#608) — canvas presets (VJ and social sizes), W×H lock/swap, capture fps. The live raster *and* the scene follow the authored size: a new aspect reveals more or less canvas, it never stretches the content. Stage: preview / fullscreen (Tauri stage window when native) / Syphon (honest not-linked status for now).
 - **Audio as data** (#790, #613, #615, #618) — METER with seven named bands, an editable modulation MATRIX (band → target → depth, up to 16 routes, saved with the project, undoable), FEEL presets (Gentle / Punchy / Violent), and a FILE source with a `kc-audio-envelope/1` sidecar for deterministic reactivity.
 - **CHIAROSCURO sun** (#594) — one scene-level light with per-instance diffuse, bevel-from-alpha normals, and squash-and-stretch (SQUASH) so moving marks keep their mass. DARK GLASS voice (#704). Gate weave (#741), FXAA (#740), ACES + Bayer resolve (#532).
@@ -47,7 +55,7 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - Evolve seed-jitter glide, editable BEHAVE weights (#471 / #479).
 - Syphon / NDI output (STAGE shows an honest not-linked state), colour space waits on #532 ACES.
 - Per-asset sub-animation frame strips (#699 — reverted; kinemes are the path).
-- Shareable recipe URLs, MIDI/OSC build, mobile pass, live-output path (roadmap Stages 2–3).
+- OSC build, MIDI learn/bind remainder (#617; BLE-MIDI path needed for iPad), mobile pass, live-output path (roadmap Stages 2–3).
 - Matt-only: icons (#346), M3 calibration (#298), iPhone pass (#270).
 
 **Embargo:** lifted 2026-09-23 (Night Migration sign-off). Stage 1 unfrozen; deferred pile still waits. Plan: [docs/EMBARGO.md](docs/EMBARGO.md). Agents: [AGENTS.md](AGENTS.md) + [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md).

@@ -1,5 +1,28 @@
 # Changelog
 
+## Current — Directors, patterns, keeps (2026-10-07)
+
+Everything merged to `main` since the 2026-10-01 sync.
+
+- **DIRECTORS (#1126)** — the Director panel now hosts the argument: LOIS reads NOD / VIBE / BURN / AWAY and Davis reads FLOW / SEEDLING / UGLY / STUCK / BLOOM, both driven by the honest feed. LOIS voice (heuristic rank + blunt verdict, #948), terminal companion (#956), boldness line (#997). Personae triad codified (`docs/PERSONAE_TRIAD.md`).
+- **PATTERN system (#1039–#1042, #1097–#1100, #1110, #1137)** — PATTERN tracks join the layer model and BUILD (add / edit / shuffle). Three modes: FIELD (ten torus-proven micro-patterns), QUILT (ten motifs, hero lattice, grout overlay), GLYPH (13 constructed marks on a 5:4 board, baked + derived swatch weights). Motion: DRIFT per mode, DROP gate, bar-quantized shuffle, MOD routing, per-element KINEMEs; KIN and CURATOR rolls deal element motion too.
+- **Sliders (#1027, #1127)** — one slider everywhere in the panel's thumb color; tap a slider's name for its dialog (range expansion, mode switch); ROTATE defaults to continuous SPIN in rev/s, every mark with its own speed and direction.
+- **Keeps + recipes (#996, kc-r/2)** — K keeps without starring; clicking a keep recalls its tracks (recall + morph, one undo); share links, recipe text and keeps carry the whole layer stack.
+- **Top bar (#1103, #950, #964)** — cold open, CUR and BEAT beside it; one expanding label (KIN / LOOKS / VOICE); tap pulse, sheen, letter-by-letter cooldown; BEAT is the BPM master clock with MODE/MOTION roll-scope chips and hero-first beat-quantized transitions (#951).
+- **Rolls (#1107, #1108)** — the roller looks at the frame after a roll and silently re-deals if it's dead; chaos roll never deals a dead frame (bottom blend, INVERT, HAZE).
+- **MIDI (#617)** — Web MIDI engine merged (mappings saved in the project, connection status, 9-pad test project). Learn/bind remainder still open; BLE-MIDI path needed for iPad.
+- **Palette lab (#952, #953)** — generate / edit / save / import / export wing; 37 palettes hooked into KIN click + strip.
+- **WET engine (#970, #1078)** — WETNESS slider, vortex-particle core, ambient eddies, wet pigment mix; WET is now a standalone service and ACCUM is one consumer.
+- **MATH (#1010, #724)** — MATH track type with 12 tone ops on the FX fold; assignable math-macro knobs over fine-grain sliders.
+- **Pipeline (#1051, #1059, #607)** — export-everything bundle (one file out, one file in); STAGE Phase B fullscreen live output window.
+- **FX (#1022)** — SHARPEN and HAZE fill the Blur / Focus slot.
+- **Stimuli (#980)** — one-tap auto-setup and dead-route retune.
+- **HITS (#966)** — queue transport: autoplay + tap-to-jump.
+- **DLA / Eden (#720, #793)** — growth sampler, lifecycle policy for living forms, picker tiles + LIVING REEF look.
+- **Design system M1–M8 (#1027–#1033)** — one slider, system glyphs (no retired emoji), casing in CSS, pink = live / green = paused / amber = fault, one density scale, one LOIS line per panel, zero radii + one dropdown style. Help modal (#1043).
+- **Docs** — personae/affective research set (`docs/research/`), DIRECTORS copy matrix + interactive mockup, BUILD payline research, topbar mockups, palette-row mockup.
+- **Tooling** — iteration gate (3 selfcheck / 3 playwright / 3 QA), clock inventory + selfcheck, swarm/accum/atlas inventories, e2e de-flakes.
+
 ## Current — Pipeline, audio routes, light (2026-10-01)
 
 Everything merged to `main` since the 2026-09-28 sync.
