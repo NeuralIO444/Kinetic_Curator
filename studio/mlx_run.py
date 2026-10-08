@@ -80,6 +80,24 @@ def phase1(p, args):
     if not p.force and pngs(pool):
         print(f"\n== batch ==\n   pool/ has {len(pngs(pool))} PNGs — skipping (use --force to re-render)")
         p.report["steps"]["batch"] = "skipped"
+    elif args.synthetic:
+        import random
+        rng = random.Random(7)
+        names = sorted(x.name for x in pngs(pool))
+        if len(names) < 40:
+            return p._fail("labels-synthetic", f"need 40+ pool renders, have {len(names)}")
+        likes = set(rng.sample(names, 20))
+        passes = set(rng.sample([n for n in names if n not in likes], 20))
+        if labels.exists():
+            labels.rename("labels.real.json.bak")
+            print("   (backed up real labels.json -> labels.real.json.bak)")
+        labels.write_text(json.dumps(
+            {n: (1 if n in likes else 0) for n in sorted(likes | passes)},
+            indent=1, sort_keys=True))
+        print("\n!! SYNTHETIC LABELS — plumbing test only (seed 7: 20 random likes / 20 random passes).")
+        print("!! The trained taste is MEANINGLESS. Restore labels.real.json.bak for a real model.")
+        p.report["synthetic"] = True
+        p.report["steps"]["labels-synthetic"] = "ok"
     else:
         out = p.run("batch", [sys.executable, "studio/studio.py", "batch", str(base),
                               "-o", str(pool), "--count", str(args.count)])
@@ -208,6 +226,8 @@ def main():
     ap.add_argument("--recipes", default="pool-recipes", help="phase 2 recipe dir")
     ap.add_argument("--base", default="base.project.json", help="starting project JSON (app -> Pipeline -> PROJECT)")
     ap.add_argument("--force", action="store_true", help="redo steps whose outputs exist")
+    ap.add_argument("--synthetic", action="store_true",
+                        help="phase 1 plumbing test: 20 seeded-random likes/passes (MEANINGLESS taste)")
     ap.add_argument("--dry-run", action="store_true", help="print commands without running")
     args = ap.parse_args()
 
