@@ -95,6 +95,7 @@ node src/state/hitsExport.selfcheck.mjs
 node src/state/queueTransport.selfcheck.mjs
 node src/curator/recipeFeatures.selfcheck.mjs
 node src/curator/tasteHead.selfcheck.mjs
+node src/curator/queenChannel.selfcheck.mjs
 node src/engine/mothBodies.selfcheck.mjs
 node src/engine/mathRandomGuard.selfcheck.mjs
 node src/engine/harmony.selfcheck.mjs
