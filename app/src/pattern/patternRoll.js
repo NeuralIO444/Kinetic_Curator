@@ -1,8 +1,8 @@
 // patternRoll.js — what KINETIC and CURATOR do to PATTERN tracks (#1042 follow-up, Matt 2026-10-07).
 //
-// PATTERN is part of the KIN and CURATOR systems, not a bystander (but it is rare, and never a loud overlay; see CHAOS_ADD_CHANCE):
+// PATTERN is part of the KIN and CURATOR systems once the artist has added one (patterns on request: KIN never adds the first):
 //   chaos   (hammered KIN)   every PATTERN track is dealt fresh (seed, mode, density, mix, hero, grout, drift), and
-//                            with no PATTERN track on the page a chaos roll may add one (8%), within the track cap
+//                            KIN never adds a PATTERN track itself (CHAOS_ADD_CHANCE is 0); the artist adds the first
 //   rules   (calm KIN tap)   a new tessellation of the same kind: new seed, density nudged a step
 //   weather (warm KIN tap)   same picture, the air changes: DRIFT and MIX nudged
 //   curate  (CURATOR)        every PATTERN track is dealt, on the Curator's own seeded stream: a given (seed, offsets,
@@ -18,7 +18,7 @@ import { MAX_CONTENT_TRACKS } from '../state/projectNormalize.js';
 // Matt 2026-10-08: a tessellation laid over the marks reads as a flat 2D overlay (the 1995 layer-mix look), and KIN was
 // dealing one 30% of the time on a hammered tap. It is rare now (8%), and a quiet veil when it does come. CURATOR never
 // adds one (only chaos does). Making patterns and marks interact instead of mix is its own piece of work.
-export const CHAOS_ADD_CHANCE = 0.08;
+export const CHAOS_ADD_CHANCE = 0; // Matt, 2026-10-08: patterns on request. KIN never adds one; once the artist has added one, KIN and CURATOR work with it
 /** A pattern a roll adds is a whisper, not a wall: it must never carry the picture. */
 export const BORN_OPACITY = 0.3;
 
@@ -65,7 +65,7 @@ const BY_KIND = { chaos: dealPattern, curate: dealPattern, rules: reseedPattern,
  * Apply a roll of `kind` to a layer list. Returns { layers, changed }. `canAdd` is the caller's pre-flight (tape not
  * full) and only matters for chaos; the track cap is checked here. `makeId` names an added track from the roll.
  */
-export function rollPatternLayers(layers, kind, rng, { canAdd = true, makeId = () => 'pt-roll' } = {}) {
+export function rollPatternLayers(layers, kind, rng, { canAdd = true, makeId = () => 'pt-roll', addChance = CHAOS_ADD_CHANCE } = {}) {
   const fn = BY_KIND[kind];
   if (!fn || !Array.isArray(layers)) return { layers, changed: false };
   let changed = false;
@@ -78,7 +78,7 @@ export function rollPatternLayers(layers, kind, rng, { canAdd = true, makeId = (
     const content = out.filter((l) => !isFxLayer(l) && !isMathLayer(l)).length;
     // draw the dice unconditionally, so the rest of the stream does not depend on the cap
     const roll = rng(); const born = dealPattern(undefined, rng); const id = makeId();
-    if (roll < CHAOS_ADD_CHANCE && content < MAX_CONTENT_TRACKS) {
+    if (roll < addChance && content < MAX_CONTENT_TRACKS) {
       out = [...out, { id, name: `PT-${out.filter(isPattern).length + 1}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: BORN_OPACITY, pattern: born }];
       changed = true;
     }
