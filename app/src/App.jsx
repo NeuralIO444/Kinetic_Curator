@@ -200,8 +200,9 @@ function AppInner() {
       type: A.ADD_FAVORITE,
       favorite: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
     }),
-    // #996: K keeps the plate without starring it. F (above) also keeps.
-    'k': () => piped({
+    // #996: J keeps the plate without starring it. F (above) also keeps.
+    // #1147: keep moved off K — K is KINETIC's tap (KineticButton.jsx).
+    'j': () => piped({
       type: A.ADD_KEEP,
       keep: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
     }),

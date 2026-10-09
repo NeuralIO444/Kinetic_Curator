@@ -63,7 +63,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     recalls: [], // { ts, seed }
     exports: [], // { ts, seed, paletteId }
     rolls: [], // ts of curate + KINETIC taps
-    keeps: [], // ts of keeps (any door: F, the star, K)
+    keeps: [], // ts of keeps (any door: F, the star, J)
     passes: [], // ts of rolls that replaced a frame nobody kept (a roll while frameKept was false): Davis's UGLY
     evolves: [], // ts of EVOLVE fires: the generator rolling with nobody at the controls
     seedChanges: [], // ts the seed value changed
