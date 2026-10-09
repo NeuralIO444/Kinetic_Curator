@@ -4,7 +4,6 @@
 // Mode-gated per #272; locks ride on the button.
 // #716 — wind/breath/flap keep the MotionTile glyph (the tile visualizes
 // the value); the rest are TE value buttons.
-import { RangeRow } from '../../components/RangeRow.jsx';
 import { MotionTile } from '../../components/MotionTile.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { ValueButton } from '../build/te/ValueButton.jsx';

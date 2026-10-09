@@ -4,15 +4,8 @@
 // open via the useDock() hook: open({ title, open }) where `open` is a
 // function returning the editor node. The dock is position:absolute inside
 // the panel — it NEVER covers the canvas. Escape or tap-outside dismisses.
-import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-
-const DockContext = createContext(null);
-
-export function useDock() {
-  const ctx = useContext(DockContext);
-  if (!ctx) throw new Error('useDock must be used inside DockProvider');
-  return ctx;
-}
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { DockContext } from './DockContext.js';
 
 export function DockProvider({ children }) {
   const [editor, setEditor] = useState(null);

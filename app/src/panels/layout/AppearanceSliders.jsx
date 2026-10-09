@@ -2,18 +2,13 @@
 // The finish: HUE ROTATE (dial — angular), CROOKED / SQUASH (mark shape),
 // GROWTH RATE / BRANCHING (DLA / Eden organisms, mode-gated per #272).
 // Locks ride on the button.
-import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
-import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { ValueButton } from '../build/te/ValueButton.jsx';
 import { SliderEditor, DialEditor } from '../build/te/editors.jsx';
 
 export function AppearanceSliders({ layoutParams, lockedParams }) {
-  const preset = getPreset(layoutParams.composition);
-  const defaults = preset.params;
   const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
-  const d = (key, fallback) => defaults[key] !== undefined ? defaults[key] : fallback;
   const mode = layoutParams.mode;
   const growthGated = mode !== 'dla' && mode !== 'eden';
 

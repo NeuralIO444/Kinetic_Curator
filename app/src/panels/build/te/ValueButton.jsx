@@ -3,7 +3,7 @@
 // Values render amber (KC-1 DS #1121 r6); discrete states never do (r5).
 // Tap opens the dock editor; the readout is always the live value. A lock
 // pip marks life-drift-locked params — tap it to unlock without opening.
-import { useDock } from './ValueDock.jsx';
+import { useDock } from './useDock.js';
 
 export function ValueButton({
   label,
