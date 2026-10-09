@@ -27,7 +27,7 @@ import {
   normalizePhaseTime,
   createIntensityTracker,
 } from './directorSense.mjs';
-import { effectiveTemp, TEMP_DEFAULT } from './effectiveTemp.js';
+import { effectiveTemp, TEMP_DEFAULT, TEMP_CAP } from './effectiveTemp.js';
 import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
@@ -47,6 +47,17 @@ export const TILT_GATE_OPEN = false;
 // closed it is exactly zero. A pull that throws must never take CURATOR down with it, so the whole derivation is
 // wrapped: any failure is the neutral answer.
 export const NEUTRAL_VIEW = Object.freeze({ temperatureDelta: 0 });
+
+/**
+ * M2 (temperature warming): the room's gains with the pull's warming added on top, never past the cap. effectiveTemp()
+ * stays the single base source (its header says M2 composes at the pick site and must not be folded in there); this is
+ * that site. A zero delta returns the SAME gains object, so with the gate closed nothing is even reallocated.
+ */
+export function applySway(gains, view) {
+  const d = view && Number.isFinite(view.temperatureDelta) ? view.temperatureDelta : 0;
+  if (!(d > 0)) return gains;
+  return { ...gains, temperature: Math.min(TEMP_CAP, gains.temperature + d) };
+}
 
 /** A keep that carries a PATTERN layer: the artist has said they dislike that look, so the pull does not learn from it. */
 const hasPatternLayer = (keep) => Array.isArray(keep?.stack?.l) && keep.stack.l.some((l) => l && l.type === 'pattern');
@@ -193,11 +204,13 @@ export function createDirector({ now = () => Date.now() } = {}) {
   function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now() } = {}) {
     const face = resolveLoisFace(feed);
     const davis = resolveDavisState(feed);
-    const gains = directorGains({
+    const base = directorGains({
       loisCode: face ? face.code : null,
       davisCode: davis ? davis.code : null,
       phase,
     });
+    const sway = deriveSway({ keeps: pull.keeps, richness: richnessFrom(pull), allowance: base.swayAllowance });
+    const gains = applySway(base, sway);
     // Strong user action ends relax early (L4D: relax ends early on movement).
     if (keep) relaxUntil = 0;
     const audioN = audio == null ? liveAudio() : clamp01(audio);
@@ -230,9 +243,8 @@ export function createDirector({ now = () => Date.now() } = {}) {
       room: out.room ? `${out.room.n} ${out.room.verdict}` : 'silence',
       level: +level.toFixed(2),
       directorPhase,
-      temp: +out.temperature.toFixed(2),
+      temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
     });
-    const sway = deriveSway({ keeps: pull.keeps, richness: richnessFrom(pull), allowance: gains.swayAllowance });
     return { gains: out, intensity: level, directorPhase, sway };
   }
 

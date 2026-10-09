@@ -2,9 +2,11 @@
 // With the gates closed nothing may change: tick() gains/intensity/phase are what they were, and `sway` is exactly zero.
 // The open path is exercised ONLY here, by passing the mechanics in as an argument: no live override exists.
 import assert from 'node:assert';
-import { createDirector, deriveSway, pullKeeps, richnessFrom, directorGains, NEUTRAL_VIEW, SWAY_GATE_OPEN } from './director.js';
+import { readFileSync } from 'node:fs';
+import { createDirector, deriveSway, applySway, pullKeeps, richnessFrom, directorGains, NEUTRAL_VIEW, SWAY_GATE_OPEN, RELAX_TEMP } from './director.js';
 import { DIRECTOR_TABLE } from './directorTable.js';
 import { swayOpen, swayBiases, MIN_KEEPS, M2_CAP, M2_FLOOR } from './queenLean.mjs';
+import { TEMP_CAP } from './effectiveTemp.js';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -79,6 +81,41 @@ ok('richness is the spread of the bands times the level; audio off, a file, or j
     const r = richnessFrom(bad); assert.ok(Number.isFinite(r) && r >= 0 && r <= 1);
   }
   assert.ok(richnessFrom({ bands: { bass: 5, mid: -3, treble: 9, rms: 7 }, enabled: true, sourceType: 'device' }) <= 1);
+});
+
+// ── PR 3: M2 composed at the pick site (effectiveTemp stays the single base) ──
+ok('M2: a neutral view returns the SAME gains object (nothing reallocated, nothing changed) for every room', () => {
+  for (const key of Object.keys(DIRECTOR_TABLE)) {
+    const [lois, davis] = key.split('×');
+    const g = directorGains({ loisCode: lois, davisCode: davis });
+    assert.strictEqual(applySway(g, NEUTRAL_VIEW), g, key);
+    assert.strictEqual(applySway(g, { temperatureDelta: 0 }), g);
+    assert.strictEqual(applySway(g, { temperatureDelta: -0.1 }), g, 'a pull never cools');
+    for (const junk of [null, undefined, {}, { temperatureDelta: NaN }, { temperatureDelta: 'hot' }]) assert.strictEqual(applySway(g, junk), g);
+  }
+});
+
+ok('M2 open path, harness only: for all 20 rooms the pick temperature rises by at most 0.15 x the room allowance, never past 0.55, and nothing else changes', () => {
+  const hot = deriveSway; // the open mechanics are passed in, never reachable live
+  for (const [key, row] of Object.entries(DIRECTOR_TABLE)) {
+    const [lois, davis] = key.split('×');
+    const g = directorGains({ loisCode: lois, davisCode: davis });
+    const view = hot({ keeps: keepsOf(12), richness: 1, allowance: row.sway_allowance }, swayOpen);
+    const w = applySway(g, view);
+    assert.ok(w.temperature >= g.temperature - 1e-12 && w.temperature <= TEMP_CAP + 1e-12, `${key}: ${g.temperature} -> ${w.temperature}`);
+    assert.ok(w.temperature - g.temperature <= (M2_CAP - M2_FLOOR) * row.sway_allowance + 1e-12, `${key}: delta bound`);
+    assert.deepEqual({ ...w, temperature: 0 }, { ...g, temperature: 0 }, `${key}: only the temperature moves`);
+  }
+  const burn = directorGains({ loisCode: 'BURN', davisCode: 'FLOW' }); // the warmest room: 0.55 already
+  assert.equal(applySway(burn, { temperatureDelta: 0.15 }).temperature, TEMP_CAP, 'the cap holds');
+});
+
+ok('M2 and the relax machine: the pull is added BEFORE relax clamps, so a relaxing room still cools hard (source order)', () => {
+  const src = readFileSync(new URL('./director.js', import.meta.url), 'utf8');
+  const tick = src.slice(src.indexOf('function tick('));
+  assert.ok(tick.indexOf('applySway(') > -1 && tick.indexOf('applySway(') < tick.indexOf('RELAX_TEMP'), 'applySway runs before the relax clamp');
+  assert.ok(RELAX_TEMP <= 0.3);
+  assert.match(tick, /temp: \+base\.temperature/, 'the trace logs the room\'s own temperature, never the pull');
 });
 
 console.log(`directorSway.selfcheck: ${n} checks passed`);
