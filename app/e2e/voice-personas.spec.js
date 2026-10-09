@@ -70,25 +70,25 @@ test.describe('Mode personas', () => {
 
   test('+ captures a user voice, persists across reload', async ({ page }) => {
     await page.locator('.te-cell[aria-label="Capture current state as a voice"]').click();
-    const chip = page.locator('.voice-chip.user', { hasText: 'VOICE 01' });
+    const chip = page.locator('.te-matrix[aria-label="My voices"] span.te-cell', { hasText: 'VOICE 01' });
     await expect(chip).toBeVisible();
     // Loading it crossfades like a built-in
-    await chip.locator('.user-chip-main').click();
+    await chip.getByRole('button', { name: 'VOICE 01' }).click();
     await expect(page.locator('.mix-bar')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.mix-bar')).toBeHidden({ timeout: 15_000 });
     // Shelf survives a reload
     await page.reload();
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
     await page.getByRole('tab', { name: /build/i }).click();
-    await expect(page.locator('.voice-chip.user', { hasText: 'VOICE 01' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.te-matrix[aria-label="My voices"] span.te-cell', { hasText: 'VOICE 01' })).toBeVisible({ timeout: 10_000 });
   });
 
   test('delete removes a user voice after confirm', async ({ page }) => {
     await page.locator('.te-cell[aria-label="Capture current state as a voice"]').click();
-    const chip = page.locator('.voice-chip.user', { hasText: 'VOICE 01' });
+    const chip = page.locator('.te-matrix[aria-label="My voices"] span.te-cell', { hasText: 'VOICE 01' });
     await expect(chip).toBeVisible();
     page.on('dialog', (d) => d.accept());
     await chip.locator('.user-chip-x').click();
-    await expect(page.locator('.voice-chip.user')).toHaveCount(0);
+    await expect(page.locator('.te-matrix[aria-label="My voices"] span.te-cell')).toHaveCount(0);
   });
 });

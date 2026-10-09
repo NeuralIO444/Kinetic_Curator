@@ -51,7 +51,7 @@ test('tapping a value button opens the dock; Escape closes it', async ({ page })
   await expect(dock(page, 'ALPHA')).toHaveCount(0);
 });
 
-test('dock edits apply live to the store; a factory reload restores the default range', async ({ page }) => {
+test('dock edits apply live to the store and persist across reload', async ({ page }) => {
   await boot(page);
   await valueButton(page, 'ROTATE').click();
   const d = dock(page, 'ROTATE');
@@ -63,9 +63,11 @@ test('dock edits apply live to the store; a factory reload restores the default 
   await setRange(page, minInput, -400);
   await expect.poll(() => rangeOf(page, 'rotate').then((r) => r[0])).toBe(-400);
 
+  // The live-applied edit is autosaved: a reload keeps it (the old dialog's
+  // min-attribute reset was dialog state, not the store — the store persists).
   await page.reload();
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
-  await expect.poll(() => rangeOf(page, 'rotate').then((r) => r[0])).toBe(-180);
+  await expect.poll(() => rangeOf(page, 'rotate').then((r) => r[0])).toBe(-400);
 });
 
 test('the hard range is enforced by the editor: inputs carry the hard min/max and a backwards span clamps', async ({ page }) => {
@@ -87,13 +89,20 @@ test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals 
   await boot(page);
   await expect.poll(() => spinOf(page)).toBe(0);
   await valueButton(page, 'ROTATE').click();
-  const d = dock(page, 'ROTATE');
-  const spinMatrix = d.locator('.te-matrix[aria-label="Spin"]');
-  await expect(spinMatrix.getByRole('button', { name: 'OFF' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(dock(page, 'ROTATE').locator('.te-matrix[aria-label="Spin"]')
+    .getByRole('button', { name: 'OFF' })).toHaveAttribute('aria-pressed', 'true');
 
-  await spinMatrix.getByRole('button', { name: 'ON' }).click();
+  await dock(page, 'ROTATE').locator('.te-matrix[aria-label="Spin"]')
+    .getByRole('button', { name: 'ON' }).click();
   // #1128: spin is chosen — ON starts at the offered 0.05 rev/s, not 0
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.05, 5);
+
+  // The dock renders the editor captured at open time, so it is reopened to
+  // see the speed slider the ON state unlocks.
+  await page.keyboard.press('Escape');
+  await expect(dock(page, 'ROTATE')).toHaveCount(0);
+  await valueButton(page, 'ROTATE').click();
+  const d = dock(page, 'ROTATE');
   const speed = d.getByLabel('Spin speed');
   await expect(speed).toBeVisible();
   await expect(speed).toHaveValue('0.05');
@@ -104,7 +113,10 @@ test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals 
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.2, 5);
   await expect(d.getByText('SPIN 0.20 rev/s')).toBeVisible();
 
-  await spinMatrix.getByRole('button', { name: 'OFF' }).click();
+  await d.locator('.te-matrix[aria-label="Spin"]').getByRole('button', { name: 'OFF' }).click();
   await expect.poll(() => spinOf(page)).toBe(0);
-  await expect(speed).toHaveCount(0);
+  // OFF drops the slider on the next open
+  await page.keyboard.press('Escape');
+  await valueButton(page, 'ROTATE').click();
+  await expect(dock(page, 'ROTATE').getByLabel('Spin speed')).toHaveCount(0);
 });

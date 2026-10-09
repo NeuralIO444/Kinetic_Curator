@@ -61,8 +61,12 @@ export function BuildPanel() {
 
   return (
     <RangeTone tone="build">
-    <DockProvider>
     <div className="panel panel-layout">
+    {/* #1227: the dock must live INSIDE the panel — .panel-layout's
+        overflow:clip only contains descendants, and the always-mounted
+        .te-dock (translated 228px off-canvas when closed) widened the
+        real page until it did. */}
+    <DockProvider>
       <PanelHeader tag="P03" title="BUILD" subtitle={layoutParams.composition}>
         {lockCount > 0 && <span className="lock-badge">▪ {lockCount}</span>}
         <RollButton onRoll={dice.roll} />
@@ -114,8 +118,8 @@ export function BuildPanel() {
           <MathSection />
         </BuildSection>
       </div>
-    </div>
     </DockProvider>
+    </div>
     </RangeTone>
   );
 }
