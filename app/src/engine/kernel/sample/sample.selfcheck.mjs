@@ -12,6 +12,7 @@ const required = [
   'ca', 'orbit', 'abacus', 'noise', 'hype', 'stratified', 'random',
   'dla', 'eden', // #720
   'brush', // flow-field trail stamping
+  'poisson', // #1193 — Poisson-disc blue noise
 ];
 
 for (const id of required) {

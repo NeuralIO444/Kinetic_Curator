@@ -7,6 +7,7 @@
 import { makeCaField, sampleFieldPoint } from '../field/index.js';
 import { CH, hashU01, hashU32, rngForIndex } from '../rng.js';
 import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
+import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { createNoise } from '../../noise.js';
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
@@ -597,6 +598,7 @@ function brush(ctx) {
 
 registerSampler('brush', brush);
 registerSampler('stratified', stratified);
+registerSampler('poisson', poisson); // #1193
 
 export {
   random,
@@ -618,4 +620,5 @@ export {
   abacus,
   stratified,
   brush,
+  poisson, // #1193
 };
