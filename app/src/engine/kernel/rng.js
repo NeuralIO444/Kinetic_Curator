@@ -111,6 +111,9 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #587 — the Voronoi mask places points, so it rides the spatial stream:
   // re-rolling SPATIAL must move the veins, and re-rolling colour must not.
   voronoi: 'spatial',
+  // #1193 — the Poisson-disc scatter places points, so it rides the spatial
+  // stream too: re-rolling SPATIAL re-rolls the scatter, colour must not.
+  poisson: 'spatial',
   // #720 — the DLA/Eden aggregate places points, so it rides the spatial
   // stream too: re-rolling SPATIAL regrows the organism, colour must not.
   growth: 'spatial',
