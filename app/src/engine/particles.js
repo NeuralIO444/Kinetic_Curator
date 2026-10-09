@@ -108,6 +108,10 @@ export class ParticleSystem {
     this._step = 0;
     // Cold columns — never touched by the physics inner loops.
     this.color = [];
+    // #1237 — palette slot per particle, riding with color[]. Accent
+    // derivation reads the slot, never indexOf(color), so duplicate hexes
+    // in different slots keep their own accent (see kernel/color).
+    this.colorSlot = [];
     this.spine = [];
     this._grid = null;
     // Contact state (#167). alive gates every loop; _dead is the freelist
@@ -235,6 +239,7 @@ export class ParticleSystem {
     this._cellOf = grow(this._cellOf);
     this._order = grow(this._order);
     this.color.length = newCap;
+    this.colorSlot.length = newCap;
     this.spine.length = newCap;
     // _cellStart/_fill are sized per grid build; they reallocate as needed.
     this._cap = newCap;
@@ -289,6 +294,7 @@ export class ParticleSystem {
     this._authoredCount = count;
     this._floatCount = count;
     this.color = new Array(count);
+    this.colorSlot = new Array(count);
     this.spine = new Array(count);
     this._spawnRange(0, count, activeAssets, palette, seed, seedOffsets, opts);
     // A population (re)init clears all contact state: dead slots, the
@@ -376,6 +382,7 @@ export class ParticleSystem {
       this.alive[i] = 1;
       this.cgroup[i] = (i % activeAssets.length) % 32;
       this.color[i] = swatches[i % swatches.length];
+      this.colorSlot[i] = i % swatches.length; // #1237 — the slot rides with the color
       this.spine[i] = [{ x, y }];
       // #287 bio-drives: a fresh cast starts sated and curious. The grazer
       // draw is a separate hash (not a 7th r() draw) so the six load-bearing
@@ -676,6 +683,9 @@ export class ParticleSystem {
     this.cgroup[cs] = r4 < 0.5 ? this.cgroup[i] : this.cgroup[j];
     this.alive[cs] = 1;
     this.color[cs] = r3 < 0.5 ? this.color[i] : this.color[j];
+    // #1237 — the slot follows the inherited color (same r3 coin flip), so
+    // a bred child of a duplicate-hex parent keeps the parent's slot.
+    this.colorSlot[cs] = r3 < 0.5 ? this.colorSlot[i] : this.colorSlot[j];
     this.spine[cs] = [{ x: mx, y: my }];
     // #287 bio-drives — inner life is heritable: energy/drive average
     // (the child starts between its parents' states), grazer follows the
@@ -768,7 +778,11 @@ export class ParticleSystem {
         this._colorSig = sig;
         const n = this.n;
         const cols = this.color;
-        for (let i = 0; i < n; i++) cols[i] = swatches[i % swatches.length];
+        for (let i = 0; i < n; i++) {
+          const s = i % swatches.length;
+          cols[i] = swatches[s];
+          this.colorSlot[i] = s; // #1237 — keep the slot with the re-resolved color
+        }
       }
     }
     const noise = this._noise;
@@ -1342,6 +1356,7 @@ export class ParticleSystem {
           rotation: this.rotation[i], alpha,
           asset: activeAssets[this.assetIndex[i] % activeAssets.length],
           color: this.color[i], u: this.u[i],
+          colorSlot: this.colorSlot[i], // #1237 — palette slot for accent derivation
           // #287 — grazer flag rides the item so the instance mapping can
           // stamp grazers in the palette bg (eroders).
           graze: this.grazer[i] === 1,
@@ -1389,6 +1404,7 @@ export class ParticleSystem {
           x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), baseScale: pbaseScale * (1 - s * 0.1),
           rotation: protation,
           alpha: palpha * (1 - s * 0.08), asset, color: pcolor, u: pu,
+          colorSlot: this.colorSlot[i], // #1237
           key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
           vx, vy,
           seedOffset: this.seedOffset[i],
@@ -1407,12 +1423,14 @@ export class ParticleSystem {
           x: px - pyh * reach, y: py + pxh * reach,
           scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation + amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
+          colorSlot: this.colorSlot[i], // #1237
           ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i], ...this._uniqueness(i),
         });
         items.push({
           x: px + pyh * reach, y: py - pxh * reach,
           scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation - amp * 18,
           alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
+          colorSlot: this.colorSlot[i], // #1237
           ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i], ...this._uniqueness(i),
         });
       } else {
@@ -1437,6 +1455,7 @@ export class ParticleSystem {
               rotation: protation + (mirrored ? -amp * 18 : amp * 18),
               alpha: palpha, asset, color: pcolor, u: pu,
               key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
+              colorSlot: this.colorSlot[i], // #1237
               vx, vy,
               seedOffset: this.seedOffset[i],
               ...this._uniqueness(i),

@@ -27,6 +27,10 @@
 import { ParticleSystem } from '../../particles.js';
 import { ensureSwarmWasm, getSwarmWasm, runSwarmWasm, resolveWasmParams, wasmBakeEligible, wasmForcedOff, contactsActive } from './swarmWasm.mjs';
 import { noiseSeedFor } from '../rng.js';
+import { ACCENT_OFFSET } from '../color/index.js';
+// #1237 — the accent offset is kernel-local (kernel/color); bake reuses it so
+// bake and the live path derive accents from the same slot arithmetic. No
+// bake → panel import: kernel/color only pulls in the colour engine + rng.
 
 // Re-exported so the studio render path can preload the wasm fast path
 // without importing the loader module directly.
@@ -161,11 +165,20 @@ export function bakeSwarmItems(opts) {
   // the ACCUM over-composite erases beneath them.
   const bg = opts.palette?.bg;
   return items.map((item) => {
-    const i = swatches.indexOf(item.color);
+    // #1237 — derive the accent from the particle's palette SLOT, the same
+    // derivation the live path uses (kernel/color assignColor). The old
+    // swatches.indexOf(item.color) was O(items·swatches) per still and, on
+    // duplicate hexes, silently returned the first slot — every duplicate
+    // got the wrong accent. The swarm system threads colorSlot through
+    // getItems; the indexOf fallback only covers foreign items that never
+    // rode through it.
+    const slot = Number.isInteger(item.colorSlot)
+      ? item.colorSlot
+      : swatches.indexOf(item.color);
     return {
       ...item,
       assetId: item.asset?.id,
-      accent: item.graze ? bg : (swatches[(i + 3) % swatches.length] || swatches[0]),
+      accent: item.graze ? bg : (swatches[(slot + ACCENT_OFFSET) % swatches.length] || swatches[0]),
       color: item.graze ? bg : item.color,
     };
   });
