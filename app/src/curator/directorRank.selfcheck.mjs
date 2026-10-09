@@ -1,6 +1,7 @@
 // directorRank.selfcheck.mjs — M1 (the rank bias) wired through rankLois's optional chooser (#1139 wiring, PR 4).
-// With the gate closed rankLois is today's argmax, bit for bit; the open path is exercised only by passing `open: true`
-// into the pure builder. No live override exists.
+// Without a chooser rankLois is today's argmax, bit for bit. The sway gate opened on 2026-10-08, so the live Director now
+// hands out a chooser when the room allows one and 8 keeps count; the closed case stays proven with `open: false`.
+// No live override exists.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { rankLois } from './loisRank.js';
@@ -54,16 +55,22 @@ ok('a chooser that throws, or answers junk, is no chooser: the argmax stands', (
   for (const bad of [() => { throw new Error('x'); }, () => NaN, () => 99, () => -2, () => 1.5, () => 'a', () => null, () => undefined]) assert.deepEqual(rankLois(c, bad), base);
 });
 
-ok('gate closed (live): the Director hands out NO chooser however many keeps and however hot, so the pick is unchanged', () => {
-  const d = createDirector({ now: () => 1000 });
+ok('gate open (live): the Director hands out a chooser only when the room allows one and 8 keeps count; `open: false` is always null', () => {
   const layout = cand();
+  const d = createDirector({ now: () => 1000 });
+  assert.equal(d.rankChooser(), null, 'before any tick the allowance is 0');
   d.setPullInputs({ keeps: keepsLike(layout, 20), bands: { bass: 1, mid: 0, treble: 0.2, rms: 1 }, enabled: true, sourceType: 'device' });
   d.tick({ feed: { burning: true, rollsLastMinute: 5, keepsLast5m: 3 }, audio: 1, nowTs: 1000 });
-  assert.equal(d.rankChooser(), null);
-  assert.equal(makeRankChooser({ keeps: keepsLike(layout, 20), allowance: 0.9 }), null, 'the builder defaults to the live gate: closed');
+  assert.equal(typeof d.rankChooser(), 'function', 'a room with an allowance, 20 keeps');
+  const few = createDirector({ now: () => 1000 });
+  few.setPullInputs({ keeps: keepsLike(layout, MIN_KEEPS - 1) });
+  few.tick({ feed: { burning: true, rollsLastMinute: 5, keepsLast5m: 3 }, audio: 1, nowTs: 1000 });
+  assert.equal(few.rankChooser(), null, '7 keeps: none');
+  assert.equal(makeRankChooser({ keeps: keepsLike(layout, 20), allowance: 0.9, open: false }), null, 'a closed gate is always null');
+  assert.equal(typeof makeRankChooser({ keeps: keepsLike(layout, 20), allowance: 0.9 }), 'function', 'the builder defaults to the live gate: open');
 });
 
-ok('open path, harness only: no chooser under MIN_KEEPS (7 keeps), at zero allowance, or without a centroid; pattern keeps do not count', () => {
+ok('no chooser under MIN_KEEPS (7 keeps), at zero allowance, or without a centroid; pattern keeps do not count', () => {
   const layout = cand();
   assert.equal(makeRankChooser({ keeps: keepsLike(layout, MIN_KEEPS - 1), allowance: 0.9, open: true }), null);
   assert.equal(makeRankChooser({ keeps: keepsLike(layout, 12), allowance: 0, open: true }), null);

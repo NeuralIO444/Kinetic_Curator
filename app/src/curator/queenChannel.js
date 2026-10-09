@@ -6,17 +6,17 @@
 // biases ONLY — the visible consumers pick() and scoreBoldness() are never
 // touched (queenChannel.selfcheck.mjs asserts the import graph).
 //
-// The channel is INERT until #762's proof gate clears (overlay question
-// answered, taste.json trusted). GATE_OPEN is flipped by a future PR; the
-// selfcheck tripwires it so the flip is always deliberate. PR-2's sway module
-// (queenLean.mjs) reads through hiddenBias(); the open path is defined there.
+// The channel was INERT until #762's proof gate cleared. It cleared on 2026-10-08 (taste.json trusted: fidelity 0.733,
+// held out 0.595, Matt approved the picks) and Matt opened the rank and temperature sway the same day. GATE_OPEN is
+// still a CONSTANT, never a runtime value, and the selfcheck tripwires it so any flip is deliberate. The sway module
+// (queenLean.mjs) reads it; the Director hosts the consumers.
 import { HEAD_MIN_FIDELITY } from './tasteHead.js';
 
 /**
- * #762 proof gate — false until the overlay question is answered and the
- * artifact is trusted. Flipped by a future PR, never at runtime.
+ * #762 proof gate: OPEN since 2026-10-08 (Matt: "open it, rank + temperature"). A constant, flipped by a PR, never at
+ * runtime. Opening it does not make anything visible: nothing on any surface reads it.
  */
-export const GATE_OPEN = false;
+export const GATE_OPEN = true;
 
 /** The hidden-bias knobs PR-2's M1–M5 read. All zero = she is not leaning. */
 export const NEUTRAL_BIAS = Object.freeze({

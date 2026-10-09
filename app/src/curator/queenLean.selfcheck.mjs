@@ -145,12 +145,13 @@ ok(`identity below ${MIN_KEEPS} keeps (proven on the ungated path)`, () => {
   assert.ok(live.reactivity > 1.0, 'M5 leans in');
 });
 
-// ─── gate closed → neutral ───
-ok('gate closed: public output is neutral', () => {
-  assert.equal(GATE_OPEN, false);
+// ─── gate open (2026-10-08) → the public output IS the open computation; the MIN_KEEPS floor still holds ───
+ok('gate open: public output is the open computation, and neutral below the minimum or without signals', () => {
+  assert.equal(GATE_OPEN, true);
   const signals = { richness: 1, attackPeaks: [0.9, 0.9], audioReturned: true, phraseProgress: 0, source: 'mic' };
-  assert.deepEqual(swayBiases(eightKeeps, signals), NEUTRAL_SWAY);
-  assert.deepEqual(swayBiases(eightKeeps, null), NEUTRAL_SWAY);
+  assert.deepEqual(swayBiases(eightKeeps, signals), swayOpen(eightKeeps, signals));
+  assert.deepEqual(swayBiases(eightKeeps.slice(0, 7), signals), NEUTRAL_SWAY, '7 keeps: provably neutral');
+  assert.deepEqual(swayBiases(eightKeeps, null), swayOpen(eightKeeps, null));
   assert.ok(Object.isFrozen(NEUTRAL_SWAY), 'neutral is frozen');
 });
 
