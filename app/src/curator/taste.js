@@ -175,7 +175,7 @@ export function personaCurator() {
       heuristic: true,
       status: () => 'active',
       pick(candidates) {
-        return rankLois(candidates).index;
+        return rankLois(candidates, getDirector().rankChooser()).index;
       },
     };
   }
@@ -198,7 +198,7 @@ export function personaCurator() {
       const { gains } = getDirector().tick({ feed: loisActivity.snapshot() });
       const davisIndex = pickPersona(candidates, persona.id, rng, gains.temperature);
       if (gains.loisWeight <= 0 || gains.room == null) return davisIndex;
-      const loisIndex = rankLois(candidates).index;
+      const loisIndex = rankLois(candidates, getDirector().rankChooser()).index;
       return blendPick({
         davisIndex,
         loisIndex: loisIndex < 0 ? davisIndex : loisIndex,

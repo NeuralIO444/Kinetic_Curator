@@ -132,6 +132,8 @@ ok('no UI-surface file references the channel', () => {
     'curator/queenLean.mjs',
     'curator/queenLean.selfcheck.mjs',
     'curator/queenDeniability.selfcheck.mjs', // the import-graph guard names the modules it guards
+    'curator/director.js', // the Director hosts the pull (it runs at pick time and never renders)
+    'curator/directorRank.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

@@ -227,6 +227,7 @@ node src/curator/directorTable.selfcheck.mjs
 node src/curator/effectiveTemp.selfcheck.mjs
 node src/curator/director.selfcheck.mjs
 node src/curator/directorSway.selfcheck.mjs
+node src/curator/directorRank.selfcheck.mjs
 node src/curator/loisFace.selfcheck.mjs
 node src/curator/mathMacros.selfcheck.mjs
 node src/gl/mlx/mlxExport.selfcheck.mjs
