@@ -31,6 +31,7 @@ import { useStore } from './state/store.js';
 import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { initDirectorBeat } from './curator/director.js'; // #1145
+import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -70,6 +71,7 @@ function AppInner() {
   useEffect(() => {
     initWhisperTriggers(useStore.getState, useStore.subscribe);
     initDirectorBeat(useStore.subscribe); // #1145: the Director's beat input
+    initPhase(useStore.subscribe); // #1144: explore / refine, from what the artist does
   }, []);
 
   const { state } = useApp(s => ({
