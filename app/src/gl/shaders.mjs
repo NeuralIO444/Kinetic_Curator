@@ -11,6 +11,7 @@
 import { injectCommon } from './effects/chunks.mjs';
 import { GLASS_BEVEL } from './glassBevel.mjs';
 import { GLASS_CAUSTIC } from './glassCaustic.mjs';
+import { GLASS_STRIATION } from './glassStriation.mjs';
 
 export const BLEND_IDS = Object.freeze({
   normal: 0, multiply: 1, screen: 2, overlay: 3, darken: 4, lighten: 5,
@@ -288,7 +289,23 @@ void main() {
       // enamel specular below is untouched.
       float causticN = kc_vnoise(v_uv * ${GLASS_CAUSTIC.freq.toFixed(1)} + v_seed * 17.0);
       spec *= mix(1.0, ${GLASS_CAUSTIC.base.toFixed(2)} + ${GLASS_CAUSTIC.amp.toFixed(2)} * causticN, v_glass);
-      float wrap = max(diff * 0.65 + 0.35, 0.0);
+      // #1129 PR4: internal striations — faint vertical luminance banding
+      // inside the glass body, via local-y modulation of the diffuse term.
+      // Noise-warped (shared kc_vnoise chunk, procedural: no texture, no
+      // upload, per the #1079 lesson) so the bands read as layered depth,
+      // not surface paint. Masked by the body's own alpha (o.a) so bands
+      // never paint outside the silhouette; per-instance offset via v_seed
+      // so bodies don't share a pattern. Glass-gated: mix(1.0, s, 0.0) is
+      // bit-identical to 1.0 (s is finite — sine, clamp and a finite warp —
+      // so s * 0.0 is +0.0 and 1.0 + 0.0 is 1.0), so the enamel diffuse
+      // below is untouched.
+      vec2 sLo = min(v_cell.xy, v_cell.zw);
+      vec2 sHi = max(v_cell.xy, v_cell.zw);
+      vec2 sLocal = (v_uv - sLo) / max(sHi - sLo, vec2(1e-4));
+      float strWarp = kc_vnoise(v_uv * ${GLASS_STRIATION.warpFreq.toFixed(1)} + v_seed * ${GLASS_STRIATION.seedOffset.toFixed(1)});
+      float strBand = sin((sLocal.y * ${GLASS_STRIATION.freq.toFixed(1)} + strWarp * ${GLASS_STRIATION.warpAmp.toFixed(1)}) * 6.28318530718);
+      float strMul = mix(1.0, 1.0 + ${GLASS_STRIATION.amp.toFixed(3)} * strBand * clamp(o.a, 0.0, 1.0), v_glass);
+      float wrap = max(diff * 0.65 + 0.35, 0.0) * strMul;
       vec3 lit = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * wrap);
       o.rgb = min(o.rgb * lit + u_sunLight.rgb * (spec * u_sunLight.a) * o.a, vec3(o.a));
       if (u_pool > 0.0) {
