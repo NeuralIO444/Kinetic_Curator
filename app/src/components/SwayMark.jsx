@@ -6,33 +6,21 @@
 // source for her identifiers; this file references none of them.)
 //
 // Behavior: present and breathing amber (Davis — sway is a continuous signal)
-// when the last Director tick's sway clears the threshold; fully absent
-// below it (silence is default, not a dimmed ghost). The Director ticks at
-// pick time (roll/keep/seed/evolve), never per frame, so the mark reflects
-// the steering of the last pick. Reduced motion: static mark, no pulse.
+// when the sway magnitude in the store clears the threshold; fully absent
+// below it (silence is default, not a dimmed ghost). The pick path publishes
+// the magnitude on every CURATE press. The component never references the
+// scheduler (director.selfcheck: "the Director never renders") — it reads
+// the store, which the allowed pick path writes. Reduced motion: static
+// mark, no pulse.
 import { useStore } from '../state/store.js';
-import { getDirector } from '../curator/director.js';
-import { swayMagnitude, swayVisible } from './swayMark.mjs';
-
-/** The last tick's sway view, or null when the Director is unreachable. */
-function readSwayView() {
-  try {
-    return getDirector().lastSway;
-  } catch {
-    return null;
-  }
-}
+import { SWAY_VISIBLE_THRESHOLD } from '../curator/swayView.mjs';
 
 export function SwayMark() {
-  // Re-render whenever a pick could have run the Director. The tick writes
-  // lastSway before the store update commits, so the read below is fresh.
-  // Values unused — subscription is the point.
-  useStore((s) => s.curatePress);
-  useStore((s) => (Array.isArray(s.keeps) ? s.keeps.length : 0));
-  useStore((s) => s.seed);
-  const swayView = readSwayView();
-  if (!swayVisible(swayView)) return null;
-  const mag = swayMagnitude(swayView);
+  // The store carries the magnitude; the component re-renders when the pick
+  // path publishes a new one (same commit as curatePress).
+  const mag = useStore((s) => s.swayMagnitude);
+  const visible = Number.isFinite(mag) && mag > SWAY_VISIBLE_THRESHOLD;
+  if (!visible) return null;
   return (
     <span
       className="sway-mark"
