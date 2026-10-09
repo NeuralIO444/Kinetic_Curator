@@ -25,6 +25,7 @@ node src/hooks/governorHostileScene.selfcheck.mjs
 node src/hooks/sceneCost.selfcheck.mjs
 node src/hooks/usePhraseLoop.selfcheck.mjs
 node src/engine/goldenPlacement.selfcheck.mjs
+node src/engine/kernel/version.selfcheck.mjs
 node src/engine/kernel/rng.selfcheck.mjs
 node src/engine/kernel/noise.selfcheck.mjs
 node src/engine/kernel/cache.selfcheck.mjs
