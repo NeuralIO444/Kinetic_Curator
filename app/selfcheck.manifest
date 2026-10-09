@@ -29,7 +29,10 @@ node src/engine/kernel/version.selfcheck.mjs
 node src/engine/kernel/rng.selfcheck.mjs
 node src/engine/kernel/noise.selfcheck.mjs
 node src/engine/kernel/cache.selfcheck.mjs
+node src/engine/kernel/registry.selfcheck.mjs
+node src/engine/kernel/dish.selfcheck.mjs
 node src/engine/kernel/sample/sample.selfcheck.mjs
+node src/engine/kernel/sample/registry.selfcheck.mjs
 node src/engine/kernel/sample/growth.selfcheck.mjs
 node src/engine/kernel/sample/growth.nullaudio.selfcheck.mjs
 node src/engine/kernel/sample/poisson.selfcheck.mjs
@@ -38,6 +41,7 @@ node src/engine/kernel/sample/quadtreeSignal.selfcheck.mjs
 node src/biology/biology.selfcheck.mjs
 node src/engine/kernel/field/field.selfcheck.mjs
 node src/engine/kernel/field/caBlur.selfcheck.mjs
+node src/engine/kernel/field/registry.selfcheck.mjs
 node src/engine/kernel/field/scent.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.field.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.noop.selfcheck.mjs

@@ -139,6 +139,19 @@ export function fieldColorAt(grid, X, Y) {
 }
 
 /**
+ * The ground color of the tile at tile-space (X, Y): tile.colors[0] — the
+ * color the renderer paints where no motif lands. One pure function (#1183
+ * slice 1): the dish ground channel is built on it, so the renderer and
+ * mark sampling can never disagree on what "ground" means. Wraps like
+ * fieldColorAt; any real X, Y is valid.
+ */
+export function groundColorAt(grid, X, Y) {
+  const tc = ((Math.floor(X) % grid.cols) + grid.cols) % grid.cols;
+  const tr = ((Math.floor(Y) % grid.rows) + grid.rows) % grid.rows;
+  return grid.tiles[tr * grid.cols + tc].colors[0];
+}
+
+/**
  * Rasterize the field into a Uint32Array (RGBA, little-endian) of bw × bh.
  * Pixel centers are sampled; no antialiasing; hard edges.
  * `tileW` is the tile width in buffer pixels.

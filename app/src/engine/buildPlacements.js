@@ -18,7 +18,8 @@
 
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
 import { applyKinemeDrivers } from './kineme.js';
-import { assignColor, resolveStrategy } from './kernel/color/index.js';
+import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
+import { fillDishPoints } from './kernel/dish.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
@@ -143,6 +144,11 @@ export function buildPlacements({
   growthTick = 0,
   audioEnergy = null,
   kineme = null,
+  // #1183 slice 1 — the dish. The orchestrator fills it once per placement
+  // call (never per frame); `lean` (0..1) mixes mark colors toward
+  // dish.ground. Both are ephemeral: no dish/lean → today's path exactly.
+  dish = null,
+  lean = 0,
   // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
@@ -285,6 +291,33 @@ export function buildPlacements({
     cache.colors = colors;
     cache.accents = accents;
     cache.keys = keys;
+  }
+
+  // #1183 slice 1 — the dish + tile-color lean. The orchestrator fills the
+  // dish once per placement call (never per frame): every mark lands as an
+  // addressable entity { id, family: 'mark', source: assetId }. Ephemeral
+  // like kineme: the bind cache keeps the BASE colors, and the lean applies
+  // to a fresh array, so a lean change can never serve stale cache.
+  // lean = 0 (or no dish.ground) is byte-identical to the old path —
+  // applyLean returns the input untouched. The dish holds the unmirrored
+  // placement set; mirror is a render-time reflection applied below.
+  if (dish) {
+    const entities = new Array(soa.n);
+    for (let k = 0; k < soa.n; k++) {
+      entities[k] = {
+        id: keys[k],
+        family: 'mark',
+        source: assetIds[k],
+        x: soa.x[k],
+        y: soa.y[k],
+        index: soa.index[k],
+        t: soa.t[k],
+      };
+    }
+    fillDishPoints(dish, 'marks', entities);
+    if (dish.ground && lean > 0) {
+      colors = colors.map((c, k) => applyLean(c, dish.ground(soa.x[k], soa.y[k]), lean));
+    }
   }
 
   // Kineme living-motion drivers (slice 2): per-instance scale/position deltas folded into the stage-C channels.

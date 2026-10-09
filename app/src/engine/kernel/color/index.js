@@ -54,3 +54,36 @@ export function resolveStrategy(layoutParams, preset) {
   if (chosen && chosen !== 'auto') return chosen;
   return preset?.paletteShift || 'band';
 }
+
+/** '#rrggbb' (or '#rgb') → [r, g, b]. Local: kernel must not import pattern/. */
+function parseHexColor(hex) {
+  const s = String(hex).replace('#', '');
+  const f = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
+  const n = parseInt(f.slice(0, 6), 16);
+  return Number.isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : [0, 0, 0];
+}
+
+function toHexColor(r, g, b) {
+  const h = (v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/**
+ * Tile-color lean (#1183 slice 1): mix a mark's color toward the pattern
+ * ground color by `lean` (0..1, clamped).
+ *
+ * lean = 0 returns the input string UNTOUCHED — byte-identical, not
+ * re-encoded — so the lean path at 0 is provably today's render. lean = 1
+ * returns the ground color exactly.
+ */
+export function applyLean(color, groundHex, lean) {
+  if (!(lean > 0)) return color;
+  const t = Math.min(1, lean);
+  const [r1, g1, b1] = parseHexColor(color);
+  const [r2, g2, b2] = parseHexColor(groundHex);
+  return toHexColor(
+    r1 + (r2 - r1) * t,
+    g1 + (g2 - g1) * t,
+    b1 + (b2 - b1) * t,
+  );
+}

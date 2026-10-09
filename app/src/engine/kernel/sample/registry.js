@@ -1,9 +1,17 @@
-// Kernel K2 — sampler registry (#60)
+// Kernel K2 — sampler registry (#60); declared entries (#1183 dish contract).
 // Sampler: (ctx) => { x, y, t? }
 // ctx: { i, count, w, h, rng, jitter, seed, caGrid }
 // Pure; no React. Jitter/bleed/displacement applied in placement orchestrator optional —
 // legacy modes still apply their own jitter for visual parity.
+//
+// Every sampler declares, at registration: id, family ('sampler'), reads,
+// writes, costTier — the dish contract's module shape. Two call shapes:
+//   registerSampler(id, fn) — legacy; the declaration is filled with
+//     reads ['seed'], writes ['points'], costTier 0 (structural: placement
+//     is init-time CPU, never shed).
+//   registerSampler({ id, reads, writes, costTier, fn }) — declared.
 
+import { createRegistry } from '../registry.js';
 import { makeCaField, sampleFieldPoint } from '../field/index.js';
 import { CH, hashU01, hashU32, rngForIndex } from '../rng.js';
 import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
@@ -13,27 +21,37 @@ import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
 
-/** @type {Record<string, (ctx: SampleCtx) => { x: number, y: number, t?: number }>} */
-export const SAMPLERS = {};
+const _reg = createRegistry('sampler', {
+  payloadKey: 'fn',
+  defaults: { reads: ['seed'], writes: ['points'], costTier: 0 },
+});
 
-export function registerSampler(id, fn) {
-  SAMPLERS[id] = fn;
+export function registerSampler(idOrDecl, fn) {
+  if (typeof idOrDecl === 'string') {
+    // Legacy shape — the compatibility shim. Zero breakage: the declaration
+    // is filled with the sampler defaults.
+    return _reg.register({ id: idOrDecl, fn });
+  }
+  return _reg.register(idOrDecl);
 }
 
 export function getSampler(mode) {
-  // Own-property check, not a bare index. `SAMPLERS['__proto__']` returns
-  // Object.prototype — truthy but not callable — so a poisoned project's mode
-  // threw "sample is not a function" from inside the placement loop, taking
-  // down a studio batch or the live canvas. normalizeLayoutParams allow-lists
-  // `mode` now; this is the second line of defence for callers that assemble
-  // layoutParams themselves (#106).
-  return Object.hasOwn(SAMPLERS, mode) && typeof SAMPLERS[mode] === 'function'
-    ? SAMPLERS[mode]
-    : SAMPLERS.random;
+  // Map-backed: `get('__proto__')` is simply undefined, so the poisoned-mode
+  // vector the old Object.hasOwn guard defended against (#106) is gone
+  // structurally. Unknown modes still fall back to `random` — the second
+  // line of defence for callers that assemble layoutParams themselves.
+  const decl = _reg.get(mode);
+  if (decl && typeof decl.fn === 'function') return decl.fn;
+  return _reg.get('random').fn;
+}
+
+/** The full declaration for a sampler id, or undefined when undeclared. */
+export function getSamplerDecl(mode) {
+  return _reg.get(mode);
 }
 
 export function listSamplers() {
-  return Object.keys(SAMPLERS);
+  return _reg.list();
 }
 
 // ── Legacy mode adapters (same math as the retired placement/modes.js) ─────
