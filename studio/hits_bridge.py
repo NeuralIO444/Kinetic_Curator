@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""studio/hits_bridge.py — favourites ("HITS" export) -> curator.py labels.json (issue #91).
+"""studio/hits_bridge.py — favourites ("HITS" feed) -> curator.py labels.json (issue #91).
 
-    app "↓ HITS" export -> hits_bridge.py build -> labels.json -> curator.py train
+    app EXPORT (the bundle carries the hits feed) -> hits_bridge.py build -> labels.json -> curator.py train
 
 Bridges the app's favourited seeds to curator.py's label format without hand-
 editing JSON. Likes = favourited seeds. Passes = every other seed already
@@ -16,7 +16,8 @@ back to the pool's base project for anything it doesn't carry) — exactly the
 Full workflow:
 
     studio.py batch base.project.json -o pool/ --count 200      # the "passes" pool
-    python3 studio/hits_bridge.py build --hits hits.json --pool pool/ --out labels.json
+    python3 studio/hits_bridge.py build --hits export.json --pool pool/ --out labels.json
+    (any app EXPORT file works — the hits feed rides in the bundle; legacy ↓ HITS files too)
     python3 studio/curator.py embed pool/
     python3 studio/curator.py train --index pool/curator-index.npz --labels labels.json
 """
@@ -325,7 +326,7 @@ def main(argv=None) -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("build", help="hits export + rendered pool -> labels.json")
-    sp.add_argument("--hits", required=True, help="JSON from the app's ↓ HITS export")
+    sp.add_argument("--hits", required=True, help="the app's EXPORT file (bundle) or a legacy ↓ HITS file")
     sp.add_argument("--pool", required=True, help="studio.py batch output dir (PNG + JSON sidecars)")
     sp.add_argument("--out", default="labels.json")
     sp.add_argument("--features-out", default=None,

@@ -16,6 +16,7 @@ node src/hooks/batchGate.selfcheck.mjs
 node src/hooks/audioInputConstraints.selfcheck.mjs
 node src/hooks/audioLoss.selfcheck.mjs
 node src/panels/pipeline/SnapshotGallery.selfcheck.mjs
+node src/panels/pipeline/bundleFile.selfcheck.mjs
 node src/panels/pipeline/paletteImportCopy.selfcheck.mjs
 node src/panels/pipeline/pipelineNotices.selfcheck.mjs
 node src/hooks/useMediaExport.selfcheck.mjs

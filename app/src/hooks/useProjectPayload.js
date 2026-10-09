@@ -1,8 +1,8 @@
 import { serializeProject } from '../state/projectDocument.js';
 
 /**
- * exportProject and exportHits in DataExportRow each called serializeProject
- * with the same fourteen fields, built independently. One call site now.
+ * The one-file envelope (buildExportBundle) and the hits feed each serialize
+ * the project from the same fields, built independently. One call site now.
  */
 export function buildProjectPayload({
   seed, seedOffsets, paletteId, paletteOverrides, paletteLocks, layoutParams, lockedParams, caGrid,
