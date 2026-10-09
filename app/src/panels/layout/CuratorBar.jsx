@@ -27,6 +27,7 @@ import { useColdOpen } from '../../hooks/useColdOpen.js';
 import { TAP_PULSE_MS } from '../../hooks/coldOpen.mjs';
 import { useInvite } from '../../hooks/useInvite.js';
 import { BeatButton } from '../../components/BeatButton.jsx';
+import { SwayMark } from '../../components/SwayMark.jsx';
 
 export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
@@ -297,6 +298,8 @@ export function CuratorBar() {
         )}
         {/* #1103 — BEAT sits right of the locks: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
         <BeatButton />
+        {/* #1258 — the presence mark sits immediately right of BEATS. Never named: no title, no tooltip, no label. */}
+        <SwayMark />
         {loisLine && (
           <span className="lois-verdict" title={hint}>{loisLine}</span>
         )}

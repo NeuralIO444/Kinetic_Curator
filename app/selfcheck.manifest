@@ -86,6 +86,7 @@ node src/components/sliderDialog.selfcheck.mjs
 node src/hooks/coldOpen.selfcheck.mjs
 node src/hooks/invite.selfcheck.mjs
 node src/components/expandLabel.selfcheck.mjs
+node src/components/swayMark.selfcheck.mjs
 node src/components/helpModal.selfcheck.mjs
 node src/panels/loisLines.selfcheck.mjs
 node src/components/pinkDiscipline.selfcheck.mjs

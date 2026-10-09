@@ -22,6 +22,7 @@ import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
 import { rollPatternLayers } from '../../pattern/patternRoll.js'; // PATTERN is part of the KIN and CURATOR systems
 import { getDirector } from '../../curator/director.js'; // #1145: the room scales the candidate count
+import { swayMagnitude, setSwayMagnitude } from '../../curator/swayView.mjs'; // #1258: publish sway for the presence mark (ephemeral, not store state)
 import { loisActivity } from '../../curator/loisActivity.js'; // #1145: the honest feed
 import { mkRng } from '../../engine/prng.js';
 
@@ -646,6 +647,12 @@ export const createLayoutSlice = (set) => ({
     }
     const { index } = pickCurated(candidates, curator, rng);
     if (index < 0) return {};
+    // #1258: publish the sway from the latest Director tick (the persona
+    // picks above ticked during pickCurated) for the top-bar presence mark.
+    // Ephemeral module signal, NOT store state (deniability law: she must
+    // not appear in state). Written synchronously before the store commit
+    // below, so the mark's re-render reads it fresh.
+    setSwayMagnitude(swayMagnitude(getDirector().lastSway));
     // PATTERN tracks are curated too, on their own seeded stream keyed by the same (seed, press #): the same press
     // deals the same patterns again. (The taste engine scores layout params, not patterns: this is seeded dice.)
     const pat = rollPatternLayers(state.layers, 'curate', rngForIndex(state.seed, CH.curate, press + 0x10000, state.seedOffsets));

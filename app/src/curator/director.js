@@ -237,6 +237,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
   let pull = { keeps: [], bands: null, enabled: false, sourceType: null }; // fed by setPullInputs (store subscription)
   let lastAllowance = 0; // the room's allowance as of the last tick (a pick reads it; it never recomputes the room)
   let lastTilt = 0; // the room's tilt as of the last tick: 0 unless the tilt gate is open and the phase is explore
+  let lastSway = { temperatureDelta: 0 }; // the sway view of the last tick, for the UI presence mark (#1258). Retained here, never rendered here.
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
@@ -256,6 +257,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
     lastAllowance = base.swayAllowance;
     lastTilt = base.tiltLimit;
     const sway = deriveSway({ keeps: pull.keeps, richness: richnessFrom(pull), allowance: base.swayAllowance });
+    lastSway = sway;
     const gains = applySway(base, sway);
     // Strong user action ends relax early (L4D: relax ends early on movement).
     if (keep) relaxUntil = 0;
@@ -310,6 +312,10 @@ export function createDirector({ now = () => Date.now() } = {}) {
     },
     get intensity() {
       return intensity.value;
+    },
+    /** The sway view ({ temperatureDelta }) of the last tick, for the UI presence mark (#1258). Neutral until a tick runs. */
+    get lastSway() {
+      return lastSway;
     },
     reset() {
       intensity.reset();
