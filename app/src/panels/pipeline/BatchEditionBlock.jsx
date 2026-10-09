@@ -170,6 +170,11 @@ export function BatchEditionBlock({
           </button>
         )}
       </div>
+      {!batchGate.ok && !batchProgress && (
+        <div className="pipeline-hint" style={{ marginTop: 6 }}>
+          {batchGate.reason}
+        </div>
+      )}
     </div>
   );
 }
