@@ -90,6 +90,23 @@ Either way, write both numbers down — they're the baseline for future phases.
 python3 studio/studio.py batch base.project.json -o pool/ --count 200
 ```
 
+> **The pass pool must be VARIED (learned the hard way, 2026-10-08, #762).** `studio.py batch` re-renders ONE project with a
+> new seed each time, so every pass shares its mode, palette and behaviour. That has two effects: the probe separates the
+> keeps from the passes trivially (ROC-AUC 1.000 is an artifact, not skill), and the distilled head, which is fitted on this
+> pool, has nothing to learn from (head fidelity 0.172, below the 0.3 bar). Use the synthetic rig instead; it rolls the
+> WHOLE scene with the instrument's own chaos roll (mode, palette, behaviour, symmetry, fx), headless and seeded:
+>
+> ```bash
+> # six parallel shards of 80 = 480 varied passes; about 15 minutes. Different --seed per shard, one --prefix each.
+> for k in 1 2 3 4 5 6; do node studio/pool_rig.mjs --count 80 --seed $((100+k)) --prefix s$k --out pool/ & done; wait
+> # features.json for the head: merge the shards' s*-features.json (they are already at the app's current feature version)
+> ```
+>
+> Likes are the keeps' **original exported PNGs** (one per distinct keep; repeated exports of one scene count once). The pass
+> renders then come from the rig and the likes from your own exports, so label them yourself (`keep-<hex>.png` = 1, the rest = 0).
+> First result with this process: 23 keeps / 480 passes gave head fidelity 0.733 (held-out 0.595) and probe ROC-AUC 0.830.
+> Rule of thumb: aim for 30+ keeps across at least 5 different systems, and 400+ varied passes.
+
 **b) Embed it** (this is the new MLX step):
 
 ```bash
