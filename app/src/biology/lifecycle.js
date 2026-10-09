@@ -13,21 +13,23 @@
 // layers (the same alpha channel stage C already owns — the render path is
 // untouched).
 
-import { GrowthHooks } from '../engine/kernel/sample/growth.js';
+import { GrowthHooks, liveCount, liveCell } from '../engine/kernel/sample/growth.js';
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /**
  * Read the vital signs of one aggregate at its current tick.
  * O(cells) — trivial next to the growth itself.
+ * Reads the LIVE window only (#1242): cells[0..head) have aged out and
+ * must not count toward population, age, or saturation.
  */
 export function assessAggregate(agg) {
   const tick = agg.tick;
-  const n = agg.cells.length;
+  const n = liveCount(agg);
   let oldestAge = 0;
   let sumAge01 = 0;
   for (let k = 0; k < n; k++) {
-    const cell = agg.cells[k];
+    const cell = liveCell(agg, k);
     const age = GrowthHooks.cellAge(cell, tick);
     if (age > oldestAge) oldestAge = age;
     sumAge01 += GrowthHooks.age01(cell.birth, tick);
