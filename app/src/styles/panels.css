@@ -967,6 +967,11 @@ details.ds-dev > summary:hover { color: var(--dim); }
    dock editors (r6). Square corners everywhere — radii law #1033.
    No border-radius is declared in this block, on purpose. */
 
+/* The value dock is always mounted (aria-hidden until opened): its
+   off-canvas box must not widen the real page (#1227). overflow:clip —
+   never hidden — so nothing inside can start scrolling. */
+.panel-layout { overflow: clip; }
+
 .te-matrix {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));

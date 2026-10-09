@@ -82,13 +82,11 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
 
   // COUNT is a stage-A input: if the geometry cache went stale, changing it
   // would not move the node count. Node count cannot be faked by animation.
-  // Scope the lookup through the build panel's COUNT label, not bare
-  // document order: the master bar now hosts its own input[type=range]
-  // (the #278 palette MIX slider), which sorts first in the DOM and broke
-  // the old .first() lookup.
-  const count = page.locator('.param-block .range-row', {
-    has: page.locator('.range-label', { hasText: /^COUNT$/ }),
-  }).locator('input[type="range"]');
+  // #1202: COUNT is a TE value button now — click it to open the docked
+  // editor, then drive the dock's slider (the house RangeRow, a native
+  // input[type=range] in bare layout) with the setRange helper.
+  await page.locator('.panel-layout .te-value-btn', { hasText: 'COUNT' }).click();
+  const count = page.locator('.te-dock.open input[type="range"]');
   await expect(count).toBeVisible({ timeout: 15_000 });
 
   // CI load: COUNT=700 under SwiftShader saturates the runner's main thread —

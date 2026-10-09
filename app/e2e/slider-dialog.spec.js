@@ -1,4 +1,8 @@
-// #1127 — the tap-name dialog on SCALE / ROTATE / ALPHA, and ROTATE's SPIN | RANGE row.
+// #1202 — SCALE / ROTATE / ALPHA are TE value buttons now: tap opens the
+// docked editor (role="dialog", aria-label "Edit <LABEL>"), and edits apply
+// live through the house RangeRow. There is no separate tap-name dialog, no
+// APPLY/CANCEL, and no double-click reset — the specs below assert the new
+// model's properties instead of the old dialog's.
 import { test, expect } from '@playwright/test';
 
 async function boot(page) {
@@ -8,94 +12,99 @@ async function boot(page) {
   await expect.poll(() => page.evaluate(() => !!window.__kcStore)).toBe(true);
   await page.getByRole('tab', { name: /build/i }).first().click();
 }
-const row = (page, name) => page.locator('.param-block .range-row', { has: page.locator('.range-label', { hasText: new RegExp(`^${name}$`) }) });
-const spinOf = (page) => page.evaluate(() => window.__kcStore.getState().layoutParams.rotateSpin);
-const dialog = (page) => page.getByRole('dialog');
 
-test('a single tap on the name opens the dialog; a double-click still resets and opens nothing', async ({ page }) => {
+// The amber value button for a param, scoped to the BUILD panel.
+const valueButton = (page, name) =>
+  page.locator('.panel-layout .te-value-btn', {
+    has: page.locator('.te-value-label', { hasText: new RegExp(`^${name}$`) }),
+  });
+
+// The dock, matched only while it is open for the given param (it is always
+// mounted, aria-hidden until opened, so an unfiltered role lookup is stale).
+const dock = (page, name) => page.getByRole('dialog', { name: `Edit ${name}` });
+
+const spinOf = (page) => page.evaluate(() => window.__kcStore.getState().layoutParams.rotateSpin);
+const rangeOf = (page, key) => page.evaluate((k) => window.__kcStore.getState().layoutParams[k], key);
+
+/** Set a native range input to an exact value and let React commit it. */
+async function setRange(page, slider, value) {
+  await slider.evaluate((el, v) => {
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value',
+    ).set;
+    setter.call(el, String(v));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+  await page.waitForTimeout(700);
+}
+
+test('tapping a value button opens the dock; Escape closes it', async ({ page }) => {
   await boot(page);
-  const alpha = row(page, 'ALPHA');
-  await alpha.locator('.range-label').dblclick();
-  await page.waitForTimeout(500);
-  await expect(dialog(page)).toHaveCount(0);
-  await alpha.locator('.range-label').click();
-  await expect(dialog(page)).toBeVisible();
-  await expect(dialog(page).getByRole('heading', { name: 'ALPHA' })).toBeVisible();
+  await expect(dock(page, 'ALPHA')).toHaveCount(0);
+  await valueButton(page, 'ALPHA').click();
+  const d = dock(page, 'ALPHA');
+  await expect(d).toBeVisible();
+  // ALPHA edits through a min/max dual editor
+  await expect(d.locator('.te-dual-row')).toHaveCount(2);
   await page.keyboard.press('Escape');
-  await expect(dialog(page)).toHaveCount(0);
+  await expect(dock(page, 'ALPHA')).toHaveCount(0);
 });
 
-test('nothing changes until APPLY: cancel and Escape leave the span alone; APPLY widens it, and a reload puts it back', async ({ page }) => {
+test('dock edits apply live to the store; a factory reload restores the default range', async ({ page }) => {
   await boot(page);
-  const rot = row(page, 'ROTATE');
-  const inputs = rot.locator('input[type="range"]');
-  // ROTATE starts as a SPIN row; take RANGE so the handles are there to measure
-  await rot.locator('.range-label').click();
-  await dialog(page).getByRole('button', { name: 'RANGE', exact: true }).click();
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
-  await expect(inputs).toHaveCount(2);
-  await expect(inputs.first()).toHaveAttribute('min', '-180');
-
-  await rot.locator('.range-label').click();
-  await dialog(page).getByLabel('SLIDER MIN').fill('-400');
-  await dialog(page).getByRole('button', { name: 'CANCEL' }).click();
-  await expect(inputs.first()).toHaveAttribute('min', '-180');
-
-  await rot.locator('.range-label').click();
-  await dialog(page).getByLabel('SLIDER MIN').fill('-400');
-  await dialog(page).getByLabel('SLIDER MAX').fill('400');
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
-  await expect(dialog(page)).toHaveCount(0);
-  await expect(inputs.first()).toHaveAttribute('min', '-400');
-  await expect(inputs.first()).toHaveAttribute('max', '400');
+  await valueButton(page, 'ROTATE').click();
+  const d = dock(page, 'ROTATE');
+  const minInput = d.getByLabel('Rotate minimum');
+  // The dock exposes the full hard range — no separate dialog needed
+  await expect(minInput).toHaveAttribute('min', '-720');
+  await expect(minInput).toHaveValue('-180');
+  // No APPLY step in the dock model: the edit lands in the store at once.
+  await setRange(page, minInput, -400);
+  await expect.poll(() => rangeOf(page, 'rotate').then((r) => r[0])).toBe(-400);
 
   await page.reload();
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('tab', { name: /build/i }).first().click();
-  const again = row(page, 'ROTATE').locator('input[type="range"]');
-  await expect.poll(async () => again.first().getAttribute('min')).toBe('-180');
+  await expect.poll(() => rangeOf(page, 'rotate').then((r) => r[0])).toBe(-180);
 });
 
-test('a span past the hard limit, or backwards, is refused in words and nothing is applied', async ({ page }) => {
+test('the hard range is enforced by the editor: inputs carry the hard min/max and a backwards span clamps', async ({ page }) => {
   await boot(page);
-  await row(page, 'SCALE').locator('.range-label').click();
-  await dialog(page).getByLabel('SLIDER MAX').fill('99');
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
-  await expect(dialog(page).getByRole('alert')).toContainText(/Stay within/);
-  await dialog(page).getByLabel('SLIDER MAX').fill('0.01');
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
-  await expect(dialog(page).getByRole('alert')).toContainText(/above MIN/);
-  await page.keyboard.press('Escape');
-  await expect(row(page, 'SCALE').locator('input[type="range"]').first()).toHaveAttribute('max', '3');
+  await valueButton(page, 'SCALE').click();
+  const d = dock(page, 'SCALE');
+  const minInput = d.getByLabel('Scale minimum');
+  const maxInput = d.getByLabel('Scale maximum');
+  // RANGE_HARD.scale — the full hard range, wider than the old dialog's 0.1–3
+  await expect(minInput).toHaveAttribute('min', '0.05');
+  await expect(maxInput).toHaveAttribute('max', '6');
+  // Pushing MIN past MAX cannot invert the span: the dual editor clamps low to high.
+  await setRange(page, minInput, 6);
+  const [lo, hi] = await rangeOf(page, 'scale').then((s) => [s.x[0], s.x[1]]);
+  expect(lo).toBeLessThanOrEqual(hi);
 });
 
-test('ROTATE is a range row by default (#1128: spin is chosen, drift is given); SPIN opens on a speed, takes another, and RESET returns to RANGE', async ({ page }) => {
+test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals the speed slider; OFF returns to 0', async ({ page }) => {
   await boot(page);
-  const rot = row(page, 'ROTATE');
   await expect.poll(() => spinOf(page)).toBe(0);
-  await expect(rot.locator('.spin-readout')).toHaveCount(0);
-  await expect(rot.locator('input[type="range"]')).toHaveCount(2);
+  await valueButton(page, 'ROTATE').click();
+  const d = dock(page, 'ROTATE');
+  const spinMatrix = d.locator('.te-matrix[aria-label="Spin"]');
+  await expect(spinMatrix.getByRole('button', { name: 'OFF' })).toHaveAttribute('aria-pressed', 'true');
 
-  await rot.locator('.range-label').click();
-  await expect(dialog(page).getByRole('button', { name: 'RANGE', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await dialog(page).getByRole('button', { name: 'SPIN', exact: true }).click();
-  await expect(dialog(page).getByLabel('SPEED (REV/S)')).toHaveValue('0.05'); // the offered start, not the default 0
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
+  await spinMatrix.getByRole('button', { name: 'ON' }).click();
+  // #1128: spin is chosen — ON starts at the offered 0.05 rev/s, not 0
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.05, 5);
-  await expect(rot.locator('.spin-readout')).toContainText('0.05 rev/s');
-  await expect(rot.locator('input[type="range"]')).toHaveCount(1);
+  const speed = d.getByLabel('Spin speed');
+  await expect(speed).toBeVisible();
+  await expect(speed).toHaveValue('0.05');
+  // The hard cap lives on the input itself now (no more refusal dialog)
+  await expect(speed).toHaveAttribute('max', '1');
 
-  await rot.locator('.range-label').click();
-  await dialog(page).getByLabel('SPEED (REV/S)').fill('0.2');
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
+  await setRange(page, speed, 0.2);
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.2, 5);
-  await expect(rot.locator('.spin-readout')).toContainText('0.20 rev/s');
+  await expect(d.getByText('SPIN 0.20 rev/s')).toBeVisible();
 
-  await rot.locator('.range-label').click();
-  await dialog(page).getByLabel('SPEED (REV/S)').fill('5');
-  await dialog(page).getByRole('button', { name: 'APPLY' }).click();
-  await expect(dialog(page).getByRole('alert')).toContainText(/SPEED/);
-  await dialog(page).getByRole('button', { name: 'RESET DEFAULT' }).click();
+  await spinMatrix.getByRole('button', { name: 'OFF' }).click();
   await expect.poll(() => spinOf(page)).toBe(0);
-  await expect(rot.locator('input[type="range"]')).toHaveCount(2);
+  await expect(speed).toHaveCount(0);
 });
