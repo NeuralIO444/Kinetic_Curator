@@ -1,14 +1,19 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { panelsByZone } from './PanelRegistry.js';
-import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
-import { DrawerOverlay } from '../components/DrawerOverlay.jsx';
-import { useStore } from '../state/store.js';
-import { downloadProject } from '../state/projectDocument.js';
-import { buildProjectPayload } from '../hooks/useProjectPayload.js';
-import { shouldExportOnKey, nextExportFilename, exportSavedMessage } from '../panels/pipeline/pipelineNotices.mjs';
-import { attachThumbnail } from '../panels/pipeline/thumbnail.mjs';
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { panelsByZone } from "./PanelRegistry.js";
+import { ErrorBoundary } from "../components/ErrorBoundary.jsx";
+import { DrawerOverlay } from "../components/DrawerOverlay.jsx";
+import { useStore } from "../state/store.js";
+import {
+  shouldExportOnKey,
+  exportSavedMessage,
+} from "../panels/pipeline/pipelineNotices.mjs";
+import {
+  buildExportBundle,
+  downloadJsonFile,
+  exportEnvelopeFilename,
+} from "../panels/pipeline/bundleFile.js";
 
-const TAB_STORAGE_KEY = 'kc:active-panel-tab';
+const TAB_STORAGE_KEY = "kc:active-panel-tab";
 
 /**
  * Composition root — zero business logic.
@@ -16,14 +21,19 @@ const TAB_STORAGE_KEY = 'kc:active-panel-tab';
  * The secondary zone is a tab strip: one panel visible at a time, and the
  * tab is the only show/hide control in the app.
  */
-export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }) {
-  const primary = panelsByZone('primary');
-  const secondary = panelsByZone('secondary');
+export function Shell({
+  dispatchPipe,
+  containerRef,
+  gridTemplate,
+  dividerProps,
+}) {
+  const primary = panelsByZone("primary");
+  const secondary = panelsByZone("secondary");
   // #248 Phase 1 mechanism, kept generic: drawer-zone panels open as an
   // overlay from whichever tab is active, closing back to it, one at a
   // time. No panel claims the zone since #467 moved ASSETS back into the
   // strip — this block renders nothing until one does.
-  const drawers = panelsByZone('drawer');
+  const drawers = panelsByZone("drawer");
   const [openDrawerId, setOpenDrawerId] = useState(null);
   const openDrawer = drawers.find((p) => p.id === openDrawerId) ?? null;
 
@@ -31,36 +41,47 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
     try {
       const saved = localStorage.getItem(TAB_STORAGE_KEY);
       if (saved && secondary.some((p) => p.id === saved)) return saved;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     // #962 (UX-2): the strip order changed (Assets first) but the landing
     // tab stays BUILD — no behavior change, and e2e startup-chaos expects
     // the BUILD panel mounted at boot.
-    return secondary.some((p) => p.id === 'build') ? 'build' : secondary[0]?.id ?? 'build';
+    return secondary.some((p) => p.id === "build")
+      ? "build"
+      : (secondary[0]?.id ?? "build");
   });
 
   useEffect(() => {
     try {
       localStorage.setItem(TAB_STORAGE_KEY, activeTab);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [activeTab]);
 
   const tabRefs = useRef({});
   const selectTab = useCallback((id) => setActiveTab(id), []);
 
   // Arrow / Home / End navigation — expected of any role="tablist".
-  const onTabKeyDown = useCallback((e) => {
-    const ids = secondary.map((p) => p.id);
-    const i = ids.indexOf(activeTab);
-    let next = null;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = ids[(i + 1) % ids.length];
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = ids[(i - 1 + ids.length) % ids.length];
-    else if (e.key === 'Home') next = ids[0];
-    else if (e.key === 'End') next = ids[ids.length - 1];
-    if (!next) return;
-    e.preventDefault();
-    setActiveTab(next);
-    tabRefs.current[next]?.focus();
-  }, [secondary, activeTab]);
+  const onTabKeyDown = useCallback(
+    (e) => {
+      const ids = secondary.map((p) => p.id);
+      const i = ids.indexOf(activeTab);
+      let next = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown")
+        next = ids[(i + 1) % ids.length];
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
+        next = ids[(i - 1 + ids.length) % ids.length];
+      else if (e.key === "Home") next = ids[0];
+      else if (e.key === "End") next = ids[ids.length - 1];
+      if (!next) return;
+      e.preventDefault();
+      setActiveTab(next);
+      tabRefs.current[next]?.focus();
+    },
+    [secondary, activeTab],
+  );
 
   const activePanel = secondary.find((p) => p.id === activeTab) ?? secondary[0];
 
@@ -68,33 +89,47 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
   useEffect(() => {
     if (!import.meta.env.DEV) return undefined;
     const onKey = async (e) => {
-      if (e.key !== '`' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (e.key !== "`" || e.metaKey || e.ctrlKey || e.altKey || e.repeat)
+        return;
       const t = e.target;
       const tag = t?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
-      if (!secondary.some((p) => p.id === 'dev')) return;
+      if (
+        tag === "INPUT" ||
+        tag === "SELECT" ||
+        tag === "TEXTAREA" ||
+        t?.isContentEditable
+      )
+        return;
+      if (!secondary.some((p) => p.id === "dev")) return;
       e.preventDefault();
       // DEV-gated dynamic import, same dead-code-elimination pattern as the
       // registry's lazy chunks — no dev chunk leaks into the prod bundle.
-      const { requestDevTab } = await import('../panels/devTabs.mjs');
-      requestDevTab('shaderlab');
-      setActiveTab('dev');
+      const { requestDevTab } = await import("../panels/devTabs.mjs");
+      requestDevTab("shaderlab");
+      setActiveTab("dev");
     };
     const onUnits = async (e) => {
-      if (e.key !== 'u' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (e.key !== "u" || e.metaKey || e.ctrlKey || e.altKey || e.repeat)
+        return;
       const tag = e.target?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
-      if (!secondary.some((p) => p.id === 'dev')) return;
+      if (
+        tag === "INPUT" ||
+        tag === "SELECT" ||
+        tag === "TEXTAREA" ||
+        e.target?.isContentEditable
+      )
+        return;
+      if (!secondary.some((p) => p.id === "dev")) return;
       e.preventDefault();
-      const { requestDevTab } = await import('../panels/devTabs.mjs');
-      requestDevTab('units');
-      setActiveTab('dev');
+      const { requestDevTab } = await import("../panels/devTabs.mjs");
+      requestDevTab("units");
+      setActiveTab("dev");
     };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('keydown', onUnits);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onUnits);
     return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('keydown', onUnits);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onUnits);
     };
   }, [secondary]);
 
@@ -102,22 +137,23 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
     const onExport = (ev) => {
       if (!shouldExportOnKey(ev)) return;
       ev.preventDefault();
+      // #1216 — X exports the one file, same as ↓ EXPORT.
       const s = useStore.getState();
-      let payload = buildProjectPayload(s);
-      const canvas = document.querySelector('canvas');
-      if (canvas?.toDataURL) {
-        try { payload = attachThumbnail(payload, canvas.toDataURL('image/jpeg', 0.4)); } catch { /* hold last frame */ }
-      }
-      const filename = nextExportFilename(payload);
-      downloadProject(payload, filename);
+      const bundle = buildExportBundle(s);
+      const filename = exportEnvelopeFilename();
+      downloadJsonFile(bundle, filename);
       s.setStatus?.(exportSavedMessage(filename));
     };
-    window.addEventListener('keydown', onExport);
-    return () => window.removeEventListener('keydown', onExport);
+    window.addEventListener("keydown", onExport);
+    return () => window.removeEventListener("keydown", onExport);
   }, []);
 
   return (
-    <div className="grid" ref={containerRef} style={{ gridTemplateColumns: gridTemplate }}>
+    <div
+      className="grid"
+      ref={containerRef}
+      style={{ gridTemplateColumns: gridTemplate }}
+    >
       <div className="col col-canvas">
         {primary.map((p) => {
           const Comp = p.component;
@@ -130,24 +166,33 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       </div>
       <div className="col-divider" {...dividerProps(0)} />
       <div className="col col-panels">
-        <div className="panel-tabs" role="tablist" aria-label="Control panels" onKeyDown={onTabKeyDown}>
+        <div
+          className="panel-tabs"
+          role="tablist"
+          aria-label="Control panels"
+          onKeyDown={onTabKeyDown}
+        >
           {secondary.map((p) => {
             const selected = p.id === activeTab;
             return (
               <button
                 key={p.id}
-                ref={(el) => { tabRefs.current[p.id] = el; }}
+                ref={(el) => {
+                  tabRefs.current[p.id] = el;
+                }}
                 type="button"
                 role="tab"
                 id={`kc-tab-${p.id}`}
                 aria-controls={`kc-tabpanel-${p.id}`}
                 aria-selected={selected}
                 tabIndex={selected ? 0 : -1}
-                className={`panel-tab ${selected ? 'active' : ''}`}
+                className={`panel-tab ${selected ? "active" : ""}`}
                 onClick={() => selectTab(p.id)}
                 title={p.title}
               >
-                <span className="panel-tab-icon" aria-hidden="true">{p.icon}</span>
+                <span className="panel-tab-icon" aria-hidden="true">
+                  {p.icon}
+                </span>
                 <span className="panel-tab-label">{p.title}</span>
               </button>
             );
@@ -163,7 +208,9 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
                 onClick={() => setOpenDrawerId(p.id)}
                 title={`Open ${p.title}`}
               >
-                <span className="panel-tab-icon" aria-hidden="true">{p.icon}</span>
+                <span className="panel-tab-icon" aria-hidden="true">
+                  {p.icon}
+                </span>
                 <span className="panel-tab-label">{p.title}</span>
               </button>
             ))}
@@ -180,8 +227,17 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
             {(() => {
               const Comp = activePanel.component;
               return (
-                <ErrorBoundary key={activePanel.id} label={`panel:${activePanel.id}`}>
-                  <Suspense fallback={<div style={{ padding: 12, opacity: 0.6 }}>loading panel…</div>}>
+                <ErrorBoundary
+                  key={activePanel.id}
+                  label={`panel:${activePanel.id}`}
+                >
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 12, opacity: 0.6 }}>
+                        loading panel…
+                      </div>
+                    }
+                  >
                     <Comp dispatch={dispatchPipe} />
                   </Suspense>
                 </ErrorBoundary>
@@ -193,7 +249,10 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       {openDrawer && (
         <ErrorBoundary label={`panel:${openDrawer.id}`}>
           <Suspense fallback={null}>
-            <DrawerOverlay Comp={openDrawer.component} onClose={() => setOpenDrawerId(null)} />
+            <DrawerOverlay
+              Comp={openDrawer.component}
+              onClose={() => setOpenDrawerId(null)}
+            />
           </Suspense>
         </ErrorBoundary>
       )}

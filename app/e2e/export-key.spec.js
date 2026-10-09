@@ -1,7 +1,8 @@
 // #652 — X downloads the project. E still toggles Evolve and does not download.
+// #1216 — X now exports the one file (the bundle, which carries the hits feed).
 import { test, expect } from '@playwright/test';
 
-test('X exports the project, E still evolves', async ({ page }) => {
+test('X exports the one file, E still evolves', async ({ page }) => {
   await page.addInitScript(() => {
     try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
   });
@@ -17,6 +18,6 @@ test('X exports the project, E still evolves', async ({ page }) => {
   const downloadPromise = page.waitForEvent('download', { timeout: 5_000 });
   await page.keyboard.press('x');
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/project\.json$/);
+  expect(download.suggestedFilename()).toMatch(/kinetic-curator-bundle-.*\.json$/);
   await expect(evolve).toHaveText('STOP');
 });

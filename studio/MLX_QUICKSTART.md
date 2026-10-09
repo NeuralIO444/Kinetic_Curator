@@ -7,8 +7,8 @@ On the **Mac Studio**, from the repo root:
 bash studio/mlx_setup.sh
 
 # 2. run the pipeline (resumable; re-run any time)
-#    base.project.json = any project exported from the app (Pipeline → ↓ PROJECT)
-python3 studio/mlx_run.py --phase 1 --pool pool --count 200 --hits hits.json
+#    export.json = the app's EXPORT file (Pipeline → EXPORT); the bundle carries the hits feed
+python3 studio/mlx_run.py --phase 1 --pool pool --count 200 --hits export.json
 
 # 3. check the gates
 python3 studio/mlx_verify.py
@@ -19,7 +19,7 @@ What each does:
 - **mlx_setup.sh** — installs `.[curator]`, prefetches the SigLIP weights, runs the selfcheck.
 - **mlx_run.py** — orchestrates the runbook: render pool → embed → labels → train → rank.
   Skips steps whose outputs exist (`--force` to redo, `--dry-run` to preview).
-  Labels bootstrap from your HITS export (`--hits hits.json`); without it, it tells you
+  Labels bootstrap from your EXPORT file (`--hits export.json` — the bundle carries the hits feed); without it, it tells you
   the two manual options instead of guessing.
 - **mlx_verify.py** — the simplified test: selfcheck, index exists, ≥20 likes/passes,
   taste artifact exists, ROC-AUC > 0.6, head fidelity ≥ 0.3. PASS/FAIL per gate.
@@ -28,9 +28,9 @@ Phase 2 (taste.json → the app, #762):
 
 ```bash
 python3 studio/mlx_run.py --phase 2 --pool pool --recipes pool-recipes \
-    --hits hits.json --base base.project.json
+    --hits export.json --base base.project.json
 python3 studio/mlx_verify.py --taste taste.json
-# then: app → Pipeline → IN → IMPORT TASTE → taste.json
+# then: app → Pipeline → PROJECT → IMPORT → taste.json (IMPORT sniffs the kind)
 ```
 
 The human parts that stay human: labeling (unless HITS covers it) and the final
