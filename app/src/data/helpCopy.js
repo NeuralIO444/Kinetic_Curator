@@ -17,7 +17,7 @@ export const HELP_TOPICS = [
   { id: 'stimuli-audio', group: 'Stimuli', title: 'audio', text: 'Mic on. Drives reactivity and the DIRECTORS AUDIO / BEAT clocks.' },
   { id: 'davis-evolve', group: 'Play', title: 'evolve', text: 'Re-roll the picture. TIME fires on INTERVAL; BEAT fires on a mic attack.' },
   { id: 'davis-favorite', group: 'Directors', title: 'favorite', text: 'Save the current seed as a hit (F). A favorite also keeps the plate.' },
-  { id: 'davis-keep', group: 'Directors', title: 'keep', text: 'Keep the current plate without starring it (K). Keeps feed the Lois boldness probe; un-favoriting leaves the keep.' },
+  { id: 'davis-keep', group: 'Directors', title: 'keep', text: 'Keep the current plate without starring it (J). Keeps feed the Lois boldness probe; un-favoriting leaves the keep.' },
   { id: 'davis-new-seed', group: 'Directors', title: 'new seed', text: 'Jump to a fresh random seed (N).' },
   { id: 'davis-morph', group: 'Play', title: 'morph evolve', text: 'Ease layout changes over DURATION instead of hard-jumping. Seed and palette still snap.' },
   { id: 'layout-randomize', group: 'Build', title: 'curator', text: 'Re-roll every unlocked param and keep the taste model\'s pick. Until the MLX curator is trained, it\'s an honest dice roll — the bar says so.' },
