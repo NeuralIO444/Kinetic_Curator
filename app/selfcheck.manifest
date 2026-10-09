@@ -294,3 +294,6 @@ node src/state/layerOrder.selfcheck.mjs
 node src/panels/build/layerRows.selfcheck.mjs
 node src/gl/grainFinish.selfcheck.mjs
 node src/engine/kernel/tracks/feedDelay.selfcheck.mjs
+node src/engine/kernel/tracks/feedOps.selfcheck.mjs
+node src/engine/kernel/tracks/applyField.neighbors.selfcheck.mjs
+node src/engine/kernel/tracks/feedDelay.delay1.selfcheck.mjs
