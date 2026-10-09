@@ -40,6 +40,7 @@
 
 import { hashU32 } from '../rng.js';
 import { mkRng } from '../../prng.js';
+import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
 
 /** Lattice the aggregate lives on. 128^2 = 16k cells of address space. */
 const GROWTH_GRID = 128;
@@ -296,8 +297,9 @@ function advanceTo(agg, targetTick, opts) {
 // Cached per (seed, mode): the aggregate is a living process, so the cache
 // holds the stream state and advances it. A miss REPLAYS from tick 0 with
 // the same stream — eviction can never change what (seed, tick) looks like.
-// Small Map, same reentrancy rationale as the CA field and Voronoi caches.
-const _growthCache = new Map();
+// Small cache, same reentrancy rationale as the CA field and Voronoi caches.
+// #1243: cap + evict-oldest (see kernel/cache.js).
+const _growthCache = makeSmallCache(8);
 
 function growthKey(seed, mode, seedOffsets) {
   const off = (seedOffsets && seedOffsets.spatial) || 0;
@@ -313,7 +315,6 @@ export function ensureAggregate(seed, mode, tick, opts) {
   let agg = _growthCache.get(key);
   if (!agg || agg.tick > tick) {
     agg = newAggregate(seed, mode, opts && opts.seedOffsets);
-    if (_growthCache.size > 8) _growthCache.clear();
     _growthCache.set(key, agg);
   }
   if (agg.tick < tick) advanceTo(agg, tick, opts);

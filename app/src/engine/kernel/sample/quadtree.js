@@ -1,3 +1,5 @@
+import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
+
 // #721 — quadtree sampler core: adaptive subdivision scatter.
 //
 // Pure; no React, no audio imports. The tree answers "where is point i"
@@ -21,10 +23,14 @@ export const QUAD_MAX_DEPTH = 6;
  * turning a busy field uniform).
  */
 export const QUAD_THRESHOLD = 0.22;
-/** Cache size: the family's small-evicting-Map discipline (cf. lsystem). */
+/**
+ * Cache size, shared with the family's other small kernel caches (#1243:
+ * cap + evict-oldest, see kernel/cache.js). Formerly a hand-rolled
+ * FIFO-ish single delete on a Map.
+ */
 const QUAD_CACHE_SIZE = 8;
 
-const _quadCache = new Map();
+const _quadCache = makeSmallCache(QUAD_CACHE_SIZE);
 
 /**
  * Build (or fetch from cache) the leaf array for one interestingness signal.
@@ -65,10 +71,7 @@ export function buildQuadtree(opts) {
   let leaves = _quadCache.get(key);
   if (!leaves) {
     leaves = subdivide(interestingness, depth, budget, threshold);
-    if (_quadCache.size >= QUAD_CACHE_SIZE) {
-      _quadCache.delete(_quadCache.keys().next().value);
-    }
-    _quadCache.set(key, leaves);
+    _quadCache.set(key, leaves); // evicts oldest when full (kernel/cache.js)
   }
   return leaves;
 }
