@@ -117,4 +117,56 @@ ok('both pick sites pass the Director\'s chooser, and the picker names nothing o
   for (const id of ['queenLean', 'queenChannel', 'swayBiases', 'rankBiases', 'applyRankBias']) assert.ok(!taste.includes(id), `taste.js must not name ${id}`);
 });
 
+// ── tilt (#1144): explore runs the same instrument in reverse. The gate is shut: these prove the mechanic, not the feel ──
+ok('tilt 0 is exactly M1: the same choices over 300 seeded pools', () => {
+  const layout = cand(); const keeps = keepsLike(layout, 12);
+  for (let t = 0; t < 300; t++) {
+    const c = pool(3 + (t % 6)); let seen = null;
+    const m1 = makeRankChooser({ keeps, allowance: 0.7, open: true });
+    const withZero = makeRankChooser({ keeps, allowance: 0.7, tilt: 0, open: true });
+    const a = rankLois(c, (s, cs) => { seen = s; return m1(s, cs); }); const b = rankLois(c, withZero);
+    assert.equal(b.index, a.index, `pool ${t}`); assert.ok(seen);
+  }
+});
+
+ok('tilt open (harness only): promotes ONLY candidates that are not near the keeps, by one adjacent swap inside the top 3, within its margin, never at random', () => {
+  const layout = cand(); const keeps = keepsLike(layout, 12); const centroid = keptCentroid(keeps);
+  let moved = 0;
+  for (let t = 0; t < 400; t++) {
+    const c = pool(3 + (t % 6)); const chooser = makeRankChooser({ keeps, allowance: 1, tilt: 0.04, open: true });
+    let seen = null;
+    const r = rankLois(c, (s, cs) => { seen = s; return chooser(s, cs); });
+    const again = rankLois(c, makeRankChooser({ keeps, allowance: 1, tilt: 0.04, open: true }));
+    assert.equal(again.index, r.index, 'no randomness: the same pool, the same answer');
+    const order = seen.map((_, i) => i).sort((a, b) => (seen[b] - seen[a]) || (a - b));
+    assert.ok(r.index === order[0] || r.index === order[1], `pool ${t}: the argmax or the runner-up`);
+    if (r.index !== order[0]) {
+      moved += 1;
+      assert.equal(rankBiases(c, centroid)[r.index], 0, 'the promoted candidate is NOT near the keeps');
+      assert.ok(seen[order[0]] - seen[r.index] < 0.04 + 1e-12, 'and it was within the tilt of the top');
+    }
+  }
+  assert.ok(moved > 0, 'it does something');
+});
+
+ok('tilt is clamped to 0.05, junk is no tilt, it needs 8 counting keeps and an open pull, and a zero allowance can still tilt', () => {
+  const layout = cand(); const keeps = keepsLike(layout, 12);
+  assert.equal(makeRankChooser({ keeps: keepsLike(layout, MIN_KEEPS - 1), tilt: 0.04, open: true }), null);
+  assert.equal(makeRankChooser({ keeps, tilt: 0.04, open: false }), null);
+  assert.equal(makeRankChooser({ keeps, allowance: 0, tilt: 0, open: true }), null, 'nothing asked for: none');
+  assert.equal(typeof makeRankChooser({ keeps, allowance: 0, tilt: 0.03, open: true }), 'function');
+  for (const bad of [NaN, -1, 'x', null, undefined]) assert.equal(makeRankChooser({ keeps, allowance: 0, tilt: bad, open: true }), null, `${bad}`);
+  let wild = 0; const huge = makeRankChooser({ keeps, allowance: 0, tilt: 99, open: true }); const capped = makeRankChooser({ keeps, allowance: 0, tilt: 0.05, open: true });
+  for (let t = 0; t < 200; t++) { const c = pool(5); const sc = c.map((_, i) => i); if (huge(sc, c) !== capped(sc, c)) wild += 1; }
+  assert.equal(wild, 0, 'a huge tilt behaves as 0.05');
+});
+
+ok('live: the tilt gate is a shut constant, the Director feeds the room\'s tilt (and nothing else) into the chooser, and a Director that has never ticked tilts nothing', () => {
+  const src = readFileSync(new URL('./director.js', import.meta.url), 'utf8');
+  assert.match(src, /export const TILT_GATE_OPEN = false;/);
+  assert.match(src, /lastTilt = base\.tiltLimit;/);
+  assert.match(src, /tilt: lastTilt/);
+  assert.equal(createDirector({ now: () => 1000 }).rankChooser(), null);
+});
+
 console.log(`directorRank.selfcheck: ${n} checks passed`);
