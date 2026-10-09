@@ -73,7 +73,7 @@ test.describe('Mode personas', () => {
     const chip = page.locator('.te-matrix[aria-label="My voices"] span.te-cell', { hasText: 'VOICE 01' });
     await expect(chip).toBeVisible();
     // Loading it crossfades like a built-in
-    await chip.getByRole('button', { name: 'VOICE 01' }).click();
+    await chip.getByRole('button', { name: 'VOICE 01', exact: true }).click();
     await expect(page.locator('.mix-bar')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.mix-bar')).toBeHidden({ timeout: 15_000 });
     // Shelf survives a reload

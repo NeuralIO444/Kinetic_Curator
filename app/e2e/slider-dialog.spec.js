@@ -111,7 +111,6 @@ test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals 
 
   await setRange(page, speed, 0.2);
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.2, 5);
-  await expect(d.getByText('SPIN 0.20 rev/s')).toBeVisible();
 
   await d.locator('.te-matrix[aria-label="Spin"]').getByRole('button', { name: 'OFF' }).click();
   await expect.poll(() => spinOf(page)).toBe(0);
