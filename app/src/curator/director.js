@@ -32,7 +32,8 @@ import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
-import { swayBiases, M2_FLOOR, MIN_KEEPS } from './queenLean.mjs';
+import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias } from './queenLean.mjs';
+import { GATE_OPEN } from './queenChannel.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
 // #762's proof is not done: the Queen's taste-derived columns (sway_allowance,
@@ -71,6 +72,36 @@ export function pullKeeps(keeps) {
   lastKeeps = keeps;
   lastKept = keeps.filter((k) => !hasPatternLayer(k));
   return lastKept;
+}
+
+let centroidFor = null;
+let centroidMemo = null;
+/** The kept-taste centroid, memoised on the filtered ledger's identity (a pick must not rebuild it). */
+function centroidOf(kept) {
+  if (kept === centroidFor) return centroidMemo;
+  centroidFor = kept;
+  centroidMemo = keptCentroid(kept);
+  return centroidMemo;
+}
+
+/**
+ * M1 (rank bias): the chooser handed to rankLois, or null. Null is the answer whenever the pull is closed, the room
+ * allows none, fewer than MIN_KEEPS keeps count, or there is nothing to lean toward: rankLois(candidates, null) IS
+ * today's argmax. `open` defaults to the gate; a selfcheck passes true to exercise the open path (no live override).
+ * The chooser only ever promotes inside the top 3 by one adjacent swap (applyRankBias), scaled by the room's allowance.
+ */
+export function makeRankChooser({ keeps = [], allowance = 0, open = GATE_OPEN } = {}) {
+  try {
+    const a = clamp01(allowance);
+    if (!open || !(a > 0)) return null;
+    const kept = pullKeeps(keeps);
+    if (kept.length < MIN_KEEPS) return null;
+    const centroid = centroidOf(kept);
+    if (!centroid) return null;
+    return (scores, candidates) => applyRankBias(scores, rankBiases(candidates, centroid).map((b) => b * a))[0];
+  } catch {
+    return null;
+  }
 }
 
 /** Spectral richness 0..1 from the live bands: how far apart bass, mid and treble are, times the level. A file is not a room: 0. */
@@ -193,6 +224,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
   let relaxUntil = 0;
   let lastCoolAt = now();
   let pull = { keeps: [], bands: null, enabled: false, sourceType: null }; // fed by setPullInputs (store subscription)
+  let lastAllowance = 0; // the room's allowance as of the last tick (a pick reads it; it never recomputes the room)
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
@@ -209,6 +241,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
       davisCode: davis ? davis.code : null,
       phase,
     });
+    lastAllowance = base.swayAllowance;
     const sway = deriveSway({ keeps: pull.keeps, richness: richnessFrom(pull), allowance: base.swayAllowance });
     const gains = applySway(base, sway);
     // Strong user action ends relax early (L4D: relax ends early on movement).
@@ -250,6 +283,10 @@ export function createDirector({ now = () => Date.now() } = {}) {
 
   return {
     tick,
+    /** The chooser for rankLois, or null (today's argmax). */
+    rankChooser() {
+      return makeRankChooser({ keeps: pull.keeps, allowance: lastAllowance });
+    },
     /** The store's view for the pull (keeps, bands, source): cheap references only, read at pick time. */
     setPullInputs(next) {
       pull = { ...pull, ...next };

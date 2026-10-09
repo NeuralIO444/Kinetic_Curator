@@ -155,6 +155,7 @@ ok('no UI-surface file references the director scheduler', () => {
     'curator/directorTable.selfcheck.mjs',
     'curator/effectiveTemp.selfcheck.mjs',
     'curator/directorSway.selfcheck.mjs',
+    'curator/directorRank.selfcheck.mjs',
     // deliberate wiring: the pick path and the candidate count (logic, not surface)
     'curator/taste.js',
     'curator/curate.js',
