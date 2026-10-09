@@ -272,6 +272,25 @@
   15% { opacity: 1; transform: scale(1.25); }
   40% { opacity: 0.5; transform: scale(1); }
 }
+/* #1258 — the presence mark next to BEATS. Davis rendering: sway is a
+   continuous signal, so it breathes amber — never a TE blink. The glow and
+   the breath depth scale with --sway (0..1). Square like everything else
+   (law #1033): no border-radius anywhere near it. Below threshold the mark
+   renders as null, not dimmed — silence is default. */
+.sway-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 15px; line-height: 1; flex-shrink: 0;
+  filter: drop-shadow(0 0 calc(2px + 6px * var(--sway, 0)) rgba(255, 205, 130, calc(0.25 + 0.55 * var(--sway, 0))));
+  animation: sway-breathe 3.2s ease-in-out infinite;
+  pointer-events: none; /* never named, never interactive: no hover, no tooltip */
+}
+@keyframes sway-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sway-mark { animation: none; opacity: 0.85; filter: none; }
+}
 /* The tempo dropdown. Rendered in a portal on document.body (position: fixed
    via inline style) because the top bar's .palette-switch clips overflow. */
 .beat-menu {
