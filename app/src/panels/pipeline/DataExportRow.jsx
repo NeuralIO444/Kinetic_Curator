@@ -19,8 +19,8 @@ import { useStore } from "../../state/store.js";
 import { helpText } from "../../data/helpCopy.js";
 import { retrainNudge, dismissRetrainNudge } from "../../curator/tasteHead.js";
 import { getTaste } from "../../curator/tasteStore.js";
-import { getBiologyPolicy, importBiologyPolicy } from "../../biology/policy.js";
-import { readUserPresets, writeUserPresets } from "../../data/canvasPresets.js";
+import { importBiologyPolicy } from "../../biology/policy.js";
+import { writeUserPresets } from "../../data/canvasPresets.js";
 import {
   parseBundle,
   bundleSummary,
