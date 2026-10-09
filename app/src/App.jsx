@@ -28,6 +28,7 @@ import { captureStill } from './hooks/useMediaExport.js';
 import { useApp } from './state/AppContext.jsx';
 import { routeBeat } from './state/beatArbiter.js';
 import { useStore } from './state/store.js';
+import { useMetroPulse } from './hooks/useMetroPulse.js';
 import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { initDirectorBeat } from './curator/director.js'; // #1145
@@ -246,6 +247,11 @@ function AppInner() {
     if (tickPhrase) s.tickPhraseBeat();
     if (fireEvolve) s.triggerEvolve({ loopTimeMs: glLoopRef?.current?.getLoopTimeMs?.() });
   }, [piped]);
+  // #1144 — the BEAT dial's honest pulse: the dialed BPM as a real beatPulse when audio is not the beat (artist's switch, off by default)
+  const beatMetro = useStore((s) => s.beatMetro);
+  const beatBpm = useStore((s) => s.beatBpm);
+  const running = useStore((s) => s.running);
+  useMetroPulse({ beatMetro, audioEnabled: state.audioEnabled, running, beatBpm, onBeat });
   useMidi(); // #617: Web MIDI engine, while MIDI is enabled in DAVIS
   useAudioInput({
     enabled: state.audioEnabled,
