@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hierarchy biology mockup — moth pilot</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #08090c; overflow: hidden; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 20px; left: 24px; color: #cfd4dc;
+    font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    user-select: none; pointer-events: none;
+  }
+  #ui .dim { color: #5b616b; }
+  #ui .amber { color: #ffb347; }
+  #ui .part { color: #ece7d9; }
+  #ui .title { letter-spacing: 3px; font-size: 11px; color: #8a8f98; }
+  #grammar { margin-top: 10px; font-size: 12.5px; }
+  #rule2 { margin-top: 4px; font-size: 12px; color: #5b616b; }
+  #toggle {
+    background: none;
+    border: 1px solid #3a3f4a; color: #cfd4dc;
+    font: 12px ui-monospace, Menlo, monospace; padding: 8px 16px;
+    cursor: pointer; border-radius: 3px; letter-spacing: 1px;
+  }
+  #toggle.on { border-color: #ffb347; color: #ffb347; }
+  #controls {
+    position: fixed; top: 20px; right: 24px;
+    display: flex; gap: 14px; align-items: center; user-select: none;
+  }
+  #densityLabel {
+    color: #8a8f98; font: 11px ui-monospace, Menlo, monospace; letter-spacing: 1px;
+    display: flex; gap: 8px; align-items: center;
+  }
+  #density { width: 110px; accent-color: #ffb347; cursor: pointer; }
+  #dval { color: #ffb347; min-width: 18px; text-align: right; }
+  #note {
+    position: fixed; bottom: 16px; left: 24px; color: #4a4f59;
+    font: 11px ui-monospace, Menlo, monospace; user-select: none;
+  }
+  #kc {
+    position: fixed; bottom: 16px; right: 24px; color: #4a4f59;
+    font: 11px ui-monospace, Menlo, monospace; letter-spacing: 3px; user-select: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="title">HIERARCHY · BIOLOGIES</div>
+  <div id="grammar"><span class="dim">grammar&nbsp;&nbsp;</span><span class="part">BODY</span> <span class="dim">[</span> <span class="amber">@wingL</span> <span class="part">WING</span> <span class="dim">]</span> <span class="dim">[</span> <span class="amber">@wingR</span> <span class="part">WING</span> <span class="dim">]</span> <span class="amber">@head</span> <span class="part">HEAD</span></div>
+  <div id="rule2"><span class="dim">spine&nbsp;&nbsp;&nbsp;&nbsp;</span>SEGMENT → NODE [ @legL LEG ] [ @legR LEG ] @tail SEGMENT</div>
+</div>
+<div id="controls">
+  <label id="densityLabel">density <input id="density" type="range" min="0" max="12" value="5"><span id="dval">5</span></label>
+  <button id="toggle">anchors</button>
+</div>
+<div id="note">sketch — hierarchy.js math, canvas 2D. wing = 9-feather fan, mirrored. not the engine.</div>
+<div id="kc">KC-1</div>
+<script>
+'use strict';
+// ---- #1206 transform math, verbatim (per-axis scale) ----
+function compose(parent, local) {
+  const r = parent.rot * Math.PI / 180;
+  const c = Math.cos(r), s = Math.sin(r);
+  const sx = local.dx * parent.scaleX;
+  const sy = local.dy * parent.scaleY;
+  return {
+    x: parent.x + (sx * c - sy * s),
+    y: parent.y + (sx * s + sy * c),
+    rot: parent.rot + (local.dRot || 0),          // shear approximation, documented
+    scaleX: parent.scaleX * (local.dScaleX || 1),
+    scaleY: parent.scaleY * (local.dScaleY || 1),
+    depth: parent.depth + 1
+  };
+}
+// ---- deterministic rng ----
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// Poisson-ish scatter in a local box (wing-local space, per #1206 §5)
+function scatter(rng, x0, y0, x1, y1, count, minDist) {
+  const pts = [];
+  let guard = 0;
+  while (pts.length < count && guard++ < count * 60) {
+    const x = x0 + rng() * (x1 - x0), y = y0 + rng() * (y1 - y0);
+    let ok = true;
+    for (const p of pts) {
+      const dx = p.x - x, dy = p.y - y;
+      if (dx * dx + dy * dy < minDist * minDist) { ok = false; break; }
+    }
+    if (ok) pts.push({ x, y, r: rng() * 360, s: 0.55 + rng() * 0.8, a: 0.16 + rng() * 0.34 });
+  }
+  return pts;
+}
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', () => { resize(); buildAliens(currentDensity()); });
+resize();
+
+const rng = mulberry32(20261008); // (reserved stream; wings are feather fans now)
+
+// ---------- generative alien creatures (Spore-leaning) ----------
+// Same hierarchy math, no designed recipe: parts attach at anchors around a
+// body, some parts carry depth-2 sub-children. Nothing is placed by hand.
+const ALIEN_PALS = [
+  ['#3d4a3f', '#121815'], // sickly green-gray
+  ['#4a3d55', '#16131d'], // violet
+  ['#3a4a52', '#11181c'], // slate teal
+  ['#54423a', '#1b1411']  // rust
+];
+const ALIEN_PARTS = {
+  eye(p, t) {
+    ctx.strokeStyle = 'rgba(190,180,200,0.5)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(2, -10, 0, -16); ctx.stroke();
+    const g = ctx.createRadialGradient(0, -22, 1, 0, -22, 9);
+    g.addColorStop(0, '#f4ede0'); g.addColorStop(1, '#8f8a9a');
+    ctx.beginPath(); ctx.arc(0, -22, 8.5, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -22, 4.2, 0, Math.PI * 2); ctx.fillStyle = '#ffb347'; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -22, 2, 0, Math.PI * 2); ctx.fillStyle = '#0a0a0c'; ctx.fill();
+    ctx.beginPath(); ctx.arc(-2.5, -24.5, 1.4, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+  },
+  spike(p, t) {
+    const len = 26 * p.s, w = 7 * p.s;
+    const g = ctx.createLinearGradient(0, 0, 0, -len);
+    g.addColorStop(0, '#3a3542'); g.addColorStop(1, '#cfc4b4');
+    ctx.beginPath(); ctx.moveTo(-w, 0); ctx.lineTo(w, 0); ctx.lineTo(0, -len); ctx.closePath();
+    ctx.fillStyle = g; ctx.fill();
+  },
+  limb(p, t) {
+    const l1 = 20 * p.s, l2 = 16 * p.s;
+    const bend = Math.sin(t * 3 + p.ph) * 4;
+    ctx.strokeStyle = 'rgba(160,150,170,0.75)'; ctx.lineWidth = 3.4 * p.s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -l1); ctx.lineTo(bend, -l1 - l2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bend, -l1 - l2, 2.6 * p.s, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,179,71,0.65)'; ctx.fill();
+  },
+  wing(p, t) {
+    const w = 44 * p.s;
+    const g = ctx.createLinearGradient(0, 0, w, -30 * p.s);
+    g.addColorStop(0, 'rgba(150,190,180,0.28)'); g.addColorStop(1, 'rgba(150,190,180,0.03)');
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(w * 0.5, -34 * p.s, w, -18 * p.s);
+    ctx.quadraticCurveTo(w * 0.6, 6 * p.s, 0, 10 * p.s);
+    ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = 'rgba(150,190,180,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+  },
+  tail(p, t) {
+    const len = 40 * p.s;
+    const tipX = Math.sin(t * 2 + p.ph) * 10 * p.s;
+    ctx.strokeStyle = 'rgba(140,130,160,0.6)'; ctx.lineWidth = 5 * p.s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(10 * p.s, -len * 0.6, tipX, -len); ctx.stroke();
+    ctx.beginPath(); ctx.arc(tipX, -len, 3 * p.s, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,179,71,0.7)'; ctx.fill();
+  },
+  antenna(p, t) {
+    const len = 30 * p.s;
+    const tipX = Math.sin(t * 4 + p.ph) * 8 * p.s;
+    ctx.strokeStyle = 'rgba(200,190,170,0.55)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(6 * p.s, -len * 0.6, tipX, -len); ctx.stroke();
+    ctx.beginPath(); ctx.arc(tipX, -len, 2.2 * p.s, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,179,71,0.8)'; ctx.fill();
+  }
+};
+const ALIEN_TYPES = ['eye', 'eye', 'spike', 'spike', 'limb', 'limb', 'wing', 'tail', 'antenna'];
+
+function drawAlienBody(b) {
+  ctx.beginPath();
+  if (b.kind === 0) {
+    ctx.ellipse(0, 0, b.r, b.r * 0.82, 0, 0, Math.PI * 2);
+  } else if (b.kind === 1) {
+    ctx.ellipse(0, 0, b.r * 0.7, b.r * 1.25, 0, 0, Math.PI * 2);
+  } else {
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const rr = b.r * (0.75 + 0.35 * Math.sin(i * 2.3 + b.ph));
+      const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+      if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    }
+    ctx.closePath();
+  }
+  const g = ctx.createRadialGradient(-b.r * 0.3, -b.r * 0.3, 2, 0, 0, b.r * 1.3);
+  g.addColorStop(0, b.c1); g.addColorStop(1, b.c2);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = 'rgba(150,140,170,0.30)'; ctx.lineWidth = 1.2; ctx.stroke();
+}
+
+function makeAlien(r, x, y) {
+  const pal = ALIEN_PALS[Math.floor(r() * ALIEN_PALS.length)];
+  const body = {
+    kind: Math.floor(r() * 3), r: 16 + r() * 20,
+    c1: pal[0], c2: pal[1], ph: r() * 10
+  };
+  const n = 4 + Math.floor(r() * 6);
+  const kids = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + (r() - 0.5) * 0.7;
+    const dist = body.r * (0.8 + r() * 0.25);
+    const k = {
+      type: ALIEN_TYPES[Math.floor(r() * ALIEN_TYPES.length)],
+      dx: Math.cos(a) * dist, dy: Math.sin(a) * dist,
+      dRot: a * 180 / Math.PI + 90 + (r() - 0.5) * 36, // local -Y points outward
+      s: 0.55 + r() * 0.85, ph: r() * 10, sub: null
+    };
+    if (r() < 0.35) { // depth-2 sub-child
+      k.sub = {
+        type: r() < 0.5 ? 'spike' : 'eye',
+        dx: 0, dy: -24 * k.s, dRot: (r() - 0.5) * 50,
+        s: k.s * 0.55, ph: r() * 10
+      };
+    }
+    kids.push(k);
+  }
+  return {
+    x, y, rot: r() * 360, spin: (r() - 0.5) * 6, scale: 0.8 + r() * 0.7,
+    bobA: 4 + r() * 8, bobS: 0.5 + r() * 1.2, ph: r() * 10,
+    body, kids
+  };
+}
+
+let aliens = [];
+function buildAliens(count) {
+  aliens = [];
+  const r = mulberry32(9000 + count * 131);
+  const cols = 4, rows = 3;
+  const x0 = W * 0.56, x1 = W * 0.94, y0 = H * 0.14, y1 = H * 0.88;
+  const order = [];
+  for (let i = 0; i < cols * rows; i++) order.push(i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+  }
+  for (let n = 0; n < count && n < order.length; n++) {
+    const s = order[n];
+    const cx = x0 + (s % cols) * ((x1 - x0) / (cols - 1)) + (r() - 0.5) * 70;
+    const cy = y0 + Math.floor(s / cols) * ((y1 - y0) / (rows - 1)) + (r() - 0.5) * 70;
+    aliens.push(makeAlien(r, cx, cy));
+  }
+}
+
+let showAnchors = false;
+document.getElementById('toggle').addEventListener('click', function () {
+  showAnchors = !showAnchors;
+  this.classList.toggle('on', showAnchors);
+});
+
+function part(world, fn) {
+  ctx.save();
+  ctx.translate(world.x, world.y);
+  ctx.rotate(world.rot * Math.PI / 180);
+  ctx.scale(world.scaleX, world.scaleY);
+  fn();
+  ctx.restore();
+}
+
+function drawFeather(p) {
+  const len = 62 * p.s, w = 17 * p.s;
+  const alt = p.alt;
+  const g = ctx.createLinearGradient(0, 0, 0, -len);
+  g.addColorStop(0, alt ? 'rgba(96,32,20,0.66)' : 'rgba(150,54,28,0.60)');
+  g.addColorStop(1, alt ? 'rgba(205,92,48,0.30)' : 'rgba(235,122,64,0.26)');
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-w, -len * 0.4, -w * 0.35, -len);
+  ctx.quadraticCurveTo(0, -len * 1.08, w * 0.35, -len);
+  ctx.quadraticCurveTo(w, -len * 0.4, 0, 0);
+  ctx.closePath();
+  ctx.fillStyle = g;
+  ctx.fill();
+  // shaft
+  ctx.strokeStyle = 'rgba(245,205,165,0.55)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, -len); ctx.stroke();
+  // striations — the micro-detail layer
+  ctx.strokeStyle = 'rgba(255,190,130,0.30)';
+  ctx.lineWidth = 0.8;
+  for (let i = 1; i <= 5; i++) {
+    const y = -len * i / 6;
+    const ww = w * (1 - i / 7) * 0.8;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.quadraticCurveTo(-ww * 0.5, y - 4, -ww, y - 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.quadraticCurveTo(ww * 0.5, y - 4, ww, y - 8); ctx.stroke();
+  }
+  // accent tip on every third feather
+  if (p.accent) {
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.3, -len * 0.78);
+    ctx.lineTo(w * 0.3, -len * 0.78);
+    ctx.lineTo(0, -len * 1.02);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,150,70,0.65)';
+    ctx.fill();
+  }
+}
+
+// A wing is a composite: FAN feather children at a fan anchor, mirrored.
+// Feather geometry extends -Y; dRot = localDirection + 90 aims it.
+function drawFeatherFan(wingW, dir) {
+  const FAN = 9;
+  const list = [];
+  for (let i = 0; i < FAN; i++) {
+    const f = i / (FAN - 1);
+    const phi = dir === 1 ? (-60 + f * 110) : (240 - f * 110); // mirrored fan
+    const sc = 0.55 + Math.sin(f * Math.PI) * 0.75 + f * 0.2;  // graduated
+    const fw = compose(wingW, {
+      dx: dir * (f * 12 - 6), dy: 8 - f * 10,
+      dRot: phi + 90, dScaleX: sc, dScaleY: sc
+    });
+    list.push({ w: fw, sc: sc, s: sc, alt: i % 2 === 0, accent: i % 3 === 1 });
+  }
+  list.sort((a, b) => b.sc - a.sc); // large = behind: translucency stacking
+  for (const it of list) part(it.w, () => drawFeather(it));
+}
+
+function drawBody() {
+  const g = ctx.createLinearGradient(-13, 0, 13, 0);
+  g.addColorStop(0, '#101216');
+  g.addColorStop(0.5, '#262b34');
+  g.addColorStop(1, '#101216');
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 13, 35, 0, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,130,145,0.35)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // segmentation
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-11, i * 14);
+    ctx.quadraticCurveTo(0, i * 14 + 5, 11, i * 14);
+    ctx.stroke();
+  }
+  // thorax fuzz
+  const fr = mulberry32(77);
+  ctx.strokeStyle = 'rgba(205,195,180,0.35)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 26; i++) {
+    const a = fr() * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 12, Math.sin(a) * 33);
+    ctx.lineTo(Math.cos(a) * 17, Math.sin(a) * 39);
+    ctx.stroke();
+  }
+}
+
+function drawHead() {
+  ctx.beginPath();
+  ctx.arc(0, 0, 9, 0, Math.PI * 2);
+  ctx.fillStyle = '#20242c';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,130,145,0.35)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // antennae
+  ctx.strokeStyle = 'rgba(200,190,170,0.5)';
+  ctx.lineWidth = 1.2;
+  for (const d of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(d * 4, -7);
+    ctx.quadraticCurveTo(d * 18, -26, d * 30, -30);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(d * 30, -30, 1.6, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,179,71,0.7)';
+    ctx.fill();
+  }
+}
+
+function anchorDot(world, label) {
+  ctx.beginPath();
+  ctx.arc(world.x, world.y, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffb347';
+  ctx.fill();
+  ctx.font = '10px ui-monospace, Menlo, monospace';
+  ctx.fillStyle = 'rgba(255,179,71,0.8)';
+  ctx.fillText(label, world.x + 8, world.y + 3);
+}
+function boneLine(a, b) {
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.strokeStyle = 'rgba(255,179,71,0.22)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ---- anchors (body-local) ----
+const ANCHORS = {
+  wingL: { dx: -12, dy: -8, dRot: -32 },
+  wingR: { dx: 12, dy: -8, dRot: 32 },
+  head: { dx: 0, dy: -37, dRot: 0 }
+};
+
+let t = 0, last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  t += dt;
+
+  ctx.clearRect(0, 0, W, H);
+  // faint vignette
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.45)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  // ---- moth ----
+  const cx = W * 0.38, cy = H * 0.46;
+  const flap = Math.sin(t * 2.4) * 9;                    // primary driver: wing flap
+  const bodyW = {
+    x: cx + Math.sin(t * 0.6) * 8,
+    y: cy + Math.sin(t * 0.9) * 12,
+    rot: Math.sin(t * 0.5) * 4,
+    scaleX: 1.12, scaleY: 1.12, depth: 0
+  };
+  const wingRw = compose(bodyW, { dx: ANCHORS.wingR.dx, dy: ANCHORS.wingR.dy, dRot: ANCHORS.wingR.dRot + flap });
+  const wingLw = compose(bodyW, { dx: ANCHORS.wingL.dx, dy: ANCHORS.wingL.dy, dRot: ANCHORS.wingL.dRot - flap });
+  const headW = compose(bodyW, ANCHORS.head);
+
+  drawFeatherFan(wingRw, 1);
+  drawFeatherFan(wingLw, -1);
+  part(bodyW, drawBody);
+  part(headW, drawHead);
+
+  if (showAnchors) {
+    const aL = compose(bodyW, { dx: ANCHORS.wingL.dx, dy: ANCHORS.wingL.dy });
+    const aR = compose(bodyW, { dx: ANCHORS.wingR.dx, dy: ANCHORS.wingR.dy });
+    const aH = compose(bodyW, { dx: ANCHORS.head.dx, dy: ANCHORS.head.dy });
+    boneLine(bodyW, wingLw); boneLine(bodyW, wingRw); boneLine(bodyW, headW);
+    anchorDot(aL, 'wingL'); anchorDot(aR, 'wingR'); anchorDot(aH, 'head');
+  }
+
+  // ---- centipede (spine grammar, lower right) ----
+  const segs = 6;
+  let node = {
+    x: W * 0.80 + Math.sin(t * 1.1) * 10,
+    y: H * 0.76 + Math.cos(t * 0.8) * 8,
+    rot: -14 + Math.sin(t * 1.5) * 5,
+    scaleX: 1, scaleY: 1, depth: 0
+  };
+  const drawn = [node];
+  for (let i = 1; i < segs; i++) {
+    node = compose(node, { dx: 0, dy: -30, dRot: Math.sin(t * 3 - i * 0.65) * 8 });
+    drawn.push(node);
+  }
+  // draw tail-first so head overlaps
+  for (let i = drawn.length - 1; i >= 0; i--) {
+    const n = drawn[i];
+    part(n, () => {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 11, 15, 0, 0, Math.PI * 2);
+      ctx.fillStyle = i === drawn.length - 1 ? '#2a2419' : '#1b1e25';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(130,140,155,0.30)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // legs inherit the node transform — hierarchy doing its job
+      ctx.strokeStyle = 'rgba(190,170,140,0.45)';
+      ctx.lineWidth = 1.4;
+      for (const s of [-1, 1]) {
+        const wig = Math.sin(t * 6 + i * 1.3 + s) * 4;
+        ctx.beginPath();
+        ctx.moveTo(s * 9, 2);
+        ctx.lineTo(s * 24, 12 + wig);
+        ctx.stroke();
+      }
+      if (i === drawn.length - 1) {
+        ctx.strokeStyle = 'rgba(200,190,170,0.5)';
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(s * 4, -13);
+          ctx.quadraticCurveTo(s * 10, -24, s * 16, -26);
+          ctx.stroke();
+        }
+      }
+    });
+  }
+  if (showAnchors) {
+    for (let i = 0; i < drawn.length - 1; i++) boneLine(drawn[i], drawn[i + 1]);
+  }
+
+  // ---- alien field (generative; density-controlled) ----
+  for (const al of aliens) {
+    const w = {
+      x: al.x + Math.sin(t * al.bobS + al.ph) * al.bobA,
+      y: al.y + Math.cos(t * al.bobS * 0.8 + al.ph) * al.bobA,
+      rot: al.rot + Math.sin(t * 0.4 + al.ph) * al.spin,
+      scaleX: al.scale, scaleY: al.scale, depth: 0
+    };
+    part(w, () => drawAlienBody(al.body));
+    for (const k of al.kids) {
+      const jig = Math.sin(t * 2.2 + k.ph) * 6; // Jiggles: passive secondary motion
+      const kw = compose(w, { dx: k.dx, dy: k.dy, dRot: k.dRot + jig, dScaleX: k.s, dScaleY: k.s });
+      part(kw, () => ALIEN_PARTS[k.type](k, t));
+      if (k.sub) {
+        const sw = compose(kw, {
+          dx: k.sub.dx, dy: k.sub.dy,
+          dRot: k.sub.dRot + Math.sin(t * 3.1 + k.sub.ph) * 10,
+          dScaleX: k.sub.s, dScaleY: k.sub.s
+        });
+        part(sw, () => ALIEN_PARTS[k.sub.type](k.sub, t));
+      }
+      if (showAnchors) {
+        boneLine(w, kw);
+        anchorDot({ x: kw.x, y: kw.y }, k.type);
+      }
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function currentDensity() { return parseInt(document.getElementById('density').value, 10); }
+document.getElementById('density').addEventListener('input', (e) => {
+  document.getElementById('dval').textContent = e.target.value;
+  buildAliens(parseInt(e.target.value, 10));
+});
+window.addEventListener('resize', () => { resize(); buildAliens(currentDensity()); });
+buildAliens(currentDensity());
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
