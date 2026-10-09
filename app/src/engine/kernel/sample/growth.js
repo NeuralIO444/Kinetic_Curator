@@ -94,6 +94,10 @@ function newAggregate(seed, mode, seedOffsets) {
     seedOffsets,
     tick: -1,
     cells: [], // { gx, gy, ux, uy, birth }, birth order
+    head: 0, // dead-prefix index: cells[0..head) have aged out (#1242).
+             // Live cells are cells[head..]; iterate from the head, never
+             // from 0. ageOut compacts lazily when the dead prefix crosses
+             // the threshold, so the raw array stays bounded.
     occ: new Uint8Array(GROWTH_GRID * GROWTH_GRID),
     frontierArr: [], // Eden: encoded empty neighbours of the form
     frontierIdx: new Map(), // Eden: encoded -> index into frontierArr
@@ -123,11 +127,36 @@ function occupy(agg, gx, gy, birth) {
   return true;
 }
 
-/** FIFO age-out past the cap. A bound, not a policy — see module header. */
-function ageOut(agg) {
+/** Number of live (not aged-out) cells. */
+export function liveCount(agg) {
+  return agg.cells.length - (agg.head | 0);
+}
+
+/** The i-th live cell (0 = oldest living). */
+export function liveCell(agg, i) {
+  return agg.cells[(agg.head | 0) + i];
+}
+
+/**
+ * FIFO age-out past the cap. A bound, not a policy — see module header.
+ *
+ * #1242: the dequeue is a head index, not cells.shift(). shift() is O(n)
+ * per aged-out cell on a 2048-cell array; the head advance is O(1). Byte-
+ * identical to the old dequeue: the surviving sequence and its birth order
+ * are unchanged — only the dead prefix is skipped instead of copied.
+ *
+ * The dead prefix is compacted lazily once it crosses COMPACT_HEAD cells,
+ * so the raw array can never grow without bound: between compactions the
+ * array holds at most MAX_GROWTH_CELLS live cells + COMPACT_HEAD dead ones,
+ * and each O(live) copy is amortized against >= COMPACT_HEAD O(1) dequeues.
+ */
+const COMPACT_HEAD = MAX_GROWTH_CELLS;
+export function ageOut(agg) {
   const G = GROWTH_GRID;
-  while (agg.cells.length > MAX_GROWTH_CELLS) {
-    const old = agg.cells.shift();
+  let head = agg.head | 0;
+  const cells = agg.cells;
+  while (cells.length - head > MAX_GROWTH_CELLS) {
+    const old = cells[head++];
     const code = old.gy * G + old.gx;
     agg.occ[code] = 0;
     if (agg.mode === 'eden') {
@@ -144,6 +173,12 @@ function ageOut(agg) {
         }
       }
     }
+  }
+  agg.head = head;
+  if (head > COMPACT_HEAD) {
+    // Lazy compaction: one O(live) copy, amortized over the dequeues.
+    agg.cells = cells.slice(head);
+    agg.head = 0;
   }
 }
 
@@ -211,7 +246,8 @@ function dlaAddCell(agg, birth) {
   // Walk budget exhausted (pathological): drop onto a free neighbour of a
   // random existing cell so the tick always terminates with a new cell.
   for (let attempt = 0; attempt < 32; attempt++) {
-    const src = agg.cells[(stream() * agg.cells.length) | 0];
+    const n = liveCount(agg);
+    const src = liveCell(agg, (stream() * n) | 0);
     for (let d = 0; d < 8; d++) {
       const nx = src.gx + DX8[d];
       const ny = src.gy + DY8[d];
@@ -298,9 +334,9 @@ export function sampleGrowthPoint(ctx, mode) {
     audioEnergy: ctx.audioEnergy == null ? null : Number(ctx.audioEnergy),
     seedOffsets,
   });
-  const n = agg.cells.length;
+  const n = liveCount(agg);
   if (!n) return { x: w / 2, y: h / 2, t: 0 };
-  const cell = agg.cells[i % n];
+  const cell = liveCell(agg, i % n);
   const fit = Math.min(w, h) * 0.92;
   return {
     x: w / 2 + (cell.ux - 0.5) * fit + (rng() - 0.5) * jitter,

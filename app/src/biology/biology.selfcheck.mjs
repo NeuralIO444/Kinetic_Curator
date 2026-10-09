@@ -11,7 +11,7 @@ import {
 } from './policy.js';
 import { assessAggregate, decideLifecycle, fadeForAge } from './lifecycle.js';
 import {
-  ensureAggregate, cellsPerTick, GrowthHooks,
+  ensureAggregate, cellsPerTick, liveCount, liveCell, GrowthHooks,
 } from '../engine/kernel/sample/growth.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
 
@@ -138,10 +138,18 @@ const fresh = (seed, mode, tick, opts = {}) => {
   // Determinism: the reborn form is the same organism (same seed, same tick).
   const again = fresh(seed, 'dla', 120);
   const once = ensureAggregate(seed, 'dla', 120, OPTS);
-  assert.strictEqual(again.cells.length, once.cells.length, 'rebirth is deterministic');
+  assert.strictEqual(liveCount(again), liveCount(once), 'rebirth is deterministic');
+  const liveSeq = (agg) => {
+    const out = [];
+    for (let i = 0, n = liveCount(agg); i < n; i++) {
+      const c = liveCell(agg, i);
+      out.push([c.gx, c.gy, c.birth]);
+    }
+    return out;
+  };
   assert.deepStrictEqual(
-    again.cells.map((c) => [c.gx, c.gy, c.birth]),
-    once.cells.map((c) => [c.gx, c.gy, c.birth]),
+    liveSeq(again),
+    liveSeq(once),
     'rebirth cell-for-cell identical',
   );
 
@@ -149,7 +157,7 @@ const fresh = (seed, mode, tick, opts = {}) => {
   assert.ok(cellsPerTick(0, null) >= 1, 'silent rate-0 still creeps');
   // Never saturated: the hard cap holds no matter the drive.
   const hot = fresh(0x794, 'eden', 400, { growthRate: 12, audioEnergy: 1 });
-  assert.ok(hot.cells.length <= MAX_GROWTH_CELLS, 'hard cap holds at max drive');
+  assert.ok(liveCount(hot) <= MAX_GROWTH_CELLS, 'hard cap holds at max drive');
 }
 
 // ── 7. Fade reaches the items: old cells dim through the alpha channel ─────
