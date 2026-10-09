@@ -290,3 +290,4 @@ node src/panels/build/patternEditor.selfcheck.mjs
 node src/state/layerOrder.selfcheck.mjs
 node src/panels/build/layerRows.selfcheck.mjs
 node src/gl/grainFinish.selfcheck.mjs
+node src/engine/kernel/tracks/feedDelay.selfcheck.mjs
