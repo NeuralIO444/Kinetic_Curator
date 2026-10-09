@@ -151,7 +151,6 @@ node src/fx/mathFilters.selfcheck.mjs
 node src/fx/rollSafety.selfcheck.mjs
 node src/fx/rollGuard.selfcheck.mjs
 node src/fx/wetCeiling.selfcheck.mjs
-node src/fx/printPost.selfcheck.mjs
 node src/gl/renderFault.selfcheck.mjs
 node src/gl/sceneContract.selfcheck.mjs
 node src/gl/resolve.selfcheck.mjs

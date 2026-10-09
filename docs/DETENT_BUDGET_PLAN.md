@@ -53,7 +53,7 @@ When the budget shrinks, detents are removed from the **most expensive currently
 ## 2. Blast radius
 
 - **Governor** — new cut kind + restore entry; reuses 28/30 thresholds.
-- **Slider UI** (`RangeRow`, `taper.js`) — `detents`/`maxDetent` props, snap in `onChange`; PrintDesk POST chips get it free (same component).
+- **Slider UI** (`RangeRow`, `taper.js`) — `detents`/`maxDetent` props, snap in `onChange`.
 - **Param firewall** (`PARAM_SPEC`/`validateLayoutParams`) — detent metadata + cap enforcement at the funnel covers sliders, recipes, project loads, randomize, morph/evolve targets.
 - **Presets** — load as-authored (decision required, §6 Q3). Over-budget → red meter + "what would give" hints, never silent rewrite.
 - **Audio** — no path change. Optics can't exceed the slider ceiling (#273) → audio respects detent caps automatically. Audio never steals detents on a transient; sustained breach handled by the reactive half. Meter shows an AUDIO segment.
@@ -82,7 +82,7 @@ When the budget shrinks, detents are removed from the **most expensive currently
 - **KC-1 track arming** — FITS, flat-tax model. Arming a track costs a flat budget chunk; MOD/FIELD/FEED patch strength gets detents. Single global budget for v1.
 - **Asset resolution** — NEEDS THOUGHT. Needs multi-res atlas bakes for unclear gain. Park.
 - **Capture resolution/framerate** — DOESN'T FIT. Capture is progress-driven, not realtime; it already has explicit res choices.
-- **PrintDesk POST chips** — FITS for feel, not budget (export-time; governor coupling meaningless).
+- ~~**PrintDesk POST chips** — FITS for feel, not budget (export-time; governor coupling meaningless).~~ Removed with the print desk cut (#1213).
 - **Palette mix / crossfade, layer opacity** — DON'T FIT budget (flat/~free cost).
 
 ---

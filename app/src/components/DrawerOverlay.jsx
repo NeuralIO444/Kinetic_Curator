@@ -1,6 +1,6 @@
 // DrawerOverlay — generic veil+sheet chrome for any zone:'drawer' registry
-// entry (#248 Phase 1, first use: ASSETS). Same visual pattern
-// PrintDeskModal already uses for OUTPUT's print desk; Shell.jsx supplies
+// entry (#248 Phase 1, first use: ASSETS). Same visual pattern other modals
+// use; Shell.jsx supplies
 // the panel component, this file owns none of them — "the Shell knows
 // nothing about features" extends to the drawer zone too.
 import { useEffect } from 'react';
