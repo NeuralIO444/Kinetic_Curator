@@ -10,6 +10,7 @@
 
 import { injectCommon } from './effects/chunks.mjs';
 import { GLASS_BEVEL } from './glassBevel.mjs';
+import { GLASS_CAUSTIC } from './glassCaustic.mjs';
 
 export const BLEND_IDS = Object.freeze({
   normal: 0, multiply: 1, screen: 2, overlay: 3, darken: 4, lighten: 5,
@@ -168,7 +169,7 @@ void main() {
 
 export const QUAD_VS = injectCommon(QUAD_VS_SRC);
 
-export const QUAD_FS = `#version 300 es
+const QUAD_FS_SRC = `#version 300 es
 precision highp float;
 uniform sampler2D u_atlas;
 uniform float u_liveTint;
@@ -278,6 +279,15 @@ void main() {
       float diff = max(dot(n, L), 0.0);
       vec3 H = normalize(L + vec3(0.0, 0.0, 1.0));                   // viewer straight on
       float spec = u_sunMat.y * pow(max(dot(n, H), 0.0), mix(48.0, ${GLASS_BEVEL.specPow.toFixed(1)}, v_glass)); // tight, enamel-like; broad for glass
+      // #1129 PR3: caustic shimmer — one octave of the shared kc_vnoise chunk
+      // (#196, procedural: no texture, no upload, per the #1079 lesson) breaks
+      // the broad glass specular into luminous micro-variation. Per-instance
+      // offset via v_seed so bodies don't share a noise pattern; the sun sweep
+      // provides the motion (no time uniform). Glass-gated: mix(1.0, c, 0.0)
+      // is bit-identical to 1.0 (c is finite, so c * 0.0 is +0.0), so the
+      // enamel specular below is untouched.
+      float causticN = kc_vnoise(v_uv * ${GLASS_CAUSTIC.freq.toFixed(1)} + v_seed * 17.0);
+      spec *= mix(1.0, ${GLASS_CAUSTIC.base.toFixed(2)} + ${GLASS_CAUSTIC.amp.toFixed(2)} * causticN, v_glass);
       float wrap = max(diff * 0.65 + 0.35, 0.0);
       vec3 lit = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * wrap);
       o.rgb = min(o.rgb * lit + u_sunLight.rgb * (spec * u_sunLight.a) * o.a, vec3(o.a));
@@ -293,6 +303,12 @@ void main() {
     }
   }
 }`;
+
+// #1129 PR3: the fragment stage joins the shared chunk library (#196) so the
+// caustic term can use kc_vnoise instead of an inline noise duplicate (the
+// chunk selfcheck bans those). Unused chunks compile out; the unlit path is
+// unaffected — see glassCaustic.selfcheck.mjs.
+export const QUAD_FS = injectCommon(QUAD_FS_SRC);
 
 /** Fullscreen pass: v_cuv is y-down canvas UV. */
 export const FULL_VS = `#version 300 es
