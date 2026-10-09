@@ -66,10 +66,15 @@ export function loisVerdict(parts) {
 }
 
 /**
- * Rank an existing pool. Argmax — the provocateur does not dither.
+ * Rank an existing pool. Argmax — the provocateur does not dither (first of equals wins).
  * Returns -1 on empty input. Never mutates candidates.
+ *
+ * `choose(scores, candidates)` is an optional chooser (the Director's, when it has one): it receives every
+ * candidate's score and returns the index to take. A bad answer (not an index into the pool) falls back to the
+ * argmax, so a chooser can never break the pick. The verdict always describes the candidate actually chosen.
+ * Without a chooser this is exactly the argmax it always was.
  */
-export function rankLois(candidates) {
+export function rankLois(candidates, choose = null) {
   const n = candidates?.length ?? 0;
   if (n === 0) {
     lastVerdict = '';
@@ -78,15 +83,18 @@ export function rankLois(candidates) {
   }
   const feats = candidates.map((c) => extractFeatures(c));
   const mean = meanOf(feats);
+  const allParts = feats.map((f) => scoreLoisHeuristic(f, mean));
   let best = 0;
-  let bestParts = scoreLoisHeuristic(feats[0], mean);
-  for (let i = 1; i < n; i++) {
-    const parts = scoreLoisHeuristic(feats[i], mean);
-    if (parts.score > bestParts.score) {
-      best = i;
-      bestParts = parts;
+  for (let i = 1; i < n; i++) if (allParts[i].score > allParts[best].score) best = i;
+  if (typeof choose === 'function') {
+    try {
+      const picked = choose(allParts.map((p) => p.score), candidates);
+      if (Number.isInteger(picked) && picked >= 0 && picked < n) best = picked;
+    } catch {
+      /* a chooser that throws is no chooser: the argmax stands */
     }
   }
+  const bestParts = allParts[best];
   const verdict = loisVerdict(bestParts);
   lastVerdict = verdict;
   lastParts = bestParts;
