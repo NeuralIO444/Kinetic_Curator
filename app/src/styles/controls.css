@@ -130,11 +130,6 @@
 /* The desk's side column is 230px, so the default 84px/1fr/96px range-row
  * grid starves the chip sliders — re-balance to label/slider/readout so the
  * slider has real travel. #1027: one thumb and one 44px row everywhere. */
-.print-desk .range-row { grid-template-columns: 56px 1fr 64px; gap: 8px; }
-.print-desk .range-label { font-size: 10px; font-weight: 700; color: var(--ink); }
-.print-desk details summary::-webkit-details-marker { display: none; }
-.print-desk details summary::before { content: '▸ '; color: var(--accent); }
-.print-desk details[open] summary::before { content: '▾ '; }
 
 .randomize-bar {
   display: flex; align-items: center; justify-content: space-between;
