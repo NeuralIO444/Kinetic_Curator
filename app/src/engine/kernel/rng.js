@@ -77,7 +77,7 @@ export function noiseSeedFor(seed, seedOffsets) {
  *   zero/missing offset is the identity, so existing seeds are bit-identical.
  */
 export function hashU32(seed, channel, index = 0, offsets = null) {
-  const ch = typeof channel === 'number' ? channel | 0 : hashChannel(String(channel));
+  const ch = resolveChannel(channel);
   const off = offsetForChannel(ch, offsets);
   let h = (seed | 0) ^ Math.imul(ch, 0x9e3779b9) ^ Math.imul(index | 0, 0x85ebca6b)
     ^ Math.imul(off, 0x27d4eb2d);
@@ -95,6 +95,45 @@ function hashChannel(s) {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
+}
+
+/**
+ * #1238 — test-only observation of string channels. `null` in production:
+ * the string path behaves exactly as before (pure, no side effects). The
+ * rng selfcheck installs an observer, exercises the kernel's string-channel
+ * paths, then asserts every observed name is registered in
+ * STRING_CHANNEL_GROUPS — so a future sampler that hashes an unregistered
+ * channel fails CI instead of silently locking to offset 0 (the old
+ * 'field'/'ca' identical-streams bug class).
+ */
+let stringChannelObserver = null;
+
+/** Record a string channel name when an observer is installed. */
+function resolveChannel(channel) {
+  if (typeof channel === 'number') return channel | 0;
+  const name = String(channel);
+  if (stringChannelObserver) stringChannelObserver.add(name);
+  return hashChannel(name);
+}
+
+/**
+ * #1238 — start recording every string channel name passed to the hash
+ * functions. Returns the live set; pass it back to
+ * endStringChannelObservation to stop and collect. Selfcheck-only.
+ */
+export function startStringChannelObservation() {
+  stringChannelObserver = new Set();
+  return stringChannelObserver;
+}
+
+/**
+ * #1238 — stop recording; returns the recorded names, sorted.
+ * Selfcheck-only.
+ */
+export function endStringChannelObservation() {
+  const names = stringChannelObserver ? [...stringChannelObserver].sort() : [];
+  stringChannelObserver = null;
+  return names;
 }
 
 /**
@@ -149,8 +188,7 @@ function offsetForChannel(ch, offsets) {
  * @returns {number} the uint32 offset (0 = identity)
  */
 export function channelSeedOffset(channel, offsets) {
-  const ch = typeof channel === 'number' ? channel | 0 : hashChannel(String(channel));
-  return offsetForChannel(ch, offsets);
+  return offsetForChannel(resolveChannel(channel), offsets);
 }
 
 /** Uniform [0, 1). */

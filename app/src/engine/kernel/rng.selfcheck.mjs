@@ -2,10 +2,11 @@
 // Kernel K0 acceptance (#58)
 
 import assert from 'node:assert';
-import { CH, STRING_CHANNEL_GROUPS, hashU01, hashU32, rngForIndex, colorRngForIndex, pickWeightedIndexStable, noiseSeedFor } from './rng.js';
+import { CH, STRING_CHANNEL_GROUPS, hashU01, hashU32, rngForIndex, colorRngForIndex, pickWeightedIndexStable, noiseSeedFor, startStringChannelObservation, endStringChannelObservation } from './rng.js';
 import { computePlacements } from '../placement.js';
 import { buildPlacements } from '../buildPlacements.js';
 import { assignColor } from './color/index.js';
+import { makeCaField, sampleFieldPoint } from './field/index.js';
 
 const seed = 0x1a4f;
 
@@ -116,4 +117,37 @@ console.log('kernel/rng.selfcheck: OK (K0)');
   const base = hashU32(1, 'field', 0, { spatial: 0, color: 0, asset: 0, noise: 0 });
   const moved = hashU32(1, 'field', 0, { spatial: 99, color: 0, asset: 0, noise: 0 });
   assert.notStrictEqual(base, moved, 'spatial offset must move field channel');
+}
+
+// #1238 — every string channel the kernel hashes must be registered in
+// STRING_CHANNEL_GROUPS. An unregistered channel silently locks to offset 0
+// (the old 'field'/'ca' identical-streams bug class); this fails CI at the
+// hash site instead of shipping silent stream correlation.
+{
+  const observed = startStringChannelObservation();
+  const base = {
+    mode: 'grid', seed, count: 12, scale: [0.4, 0.8], rotate: [0, 45],
+    alpha: [60, 100], jitter: 10, density: 100, zTiers: 1, bleed: false,
+    canvasW: 1000, canvasH: 700,
+  };
+  computePlacements({ ...base, mode: 'voronoi' });              // hashes 'voronoi'
+  const grid = Array.from({ length: 8 }, () => Array(8).fill(1));
+  computePlacements({ ...base, mode: 'ca', caGrid: grid });     // hashes 'ca'
+  computePlacements({ ...base, mode: 'poisson' });              // hashes 'poisson' (#1193)
+  computePlacements({ ...base, mode: 'dla', growthTick: 2 });   // hashes 'growth' (#720)
+  sampleFieldPoint(makeCaField(grid, { softness: 0 }), seed, 3);// default 'field'
+  const seen = endStringChannelObservation();
+  assert.ok(seen.length > 0, 'expected to observe string channels');
+  const unregistered = seen.filter((n) => !Object.hasOwn(STRING_CHANNEL_GROUPS, n));
+  assert.deepStrictEqual(unregistered, [],
+    `unregistered RNG string channels (silently locked to offset 0): ${unregistered.join(', ')}`);
+  console.log(`kernel/rng.selfcheck: OK (#1238 — ${seen.length} string channels registered: ${seen.join(', ')})`);
+
+  // Negative control: the tripwire must actually flag an unregistered channel.
+  startStringChannelObservation();
+  hashU32(seed, 'definitely-not-a-registered-channel', 0);
+  const flagged = endStringChannelObservation()
+    .filter((n) => !Object.hasOwn(STRING_CHANNEL_GROUPS, n));
+  assert.deepStrictEqual(flagged, ['definitely-not-a-registered-channel'],
+    'the #1238 tripwire must flag an unregistered channel');
 }
