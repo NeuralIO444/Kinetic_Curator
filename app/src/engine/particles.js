@@ -30,7 +30,7 @@ import { createNoise } from './noise.js';
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
-import { CONTACT_MODES, isOrganismMode } from '../data/layout-modes.js';
+import { CONTACT_MODES, isOrganismMode, symmetryParts } from '../data/layout-modes.js';
 import {
   resolveEffectiveBehave, resolveWindMode, orbitForce,
   levyStep, LEVY_FLIGHT_FRAMES,
@@ -790,7 +790,7 @@ export class ParticleSystem {
     const domainOffsetY = Number(layoutParams.noiseDomainOffsetY ?? layoutParams.noiseDomainOffset ?? (seedOffsets?.noise ? seedOffsets.noise * 100 : 0)) || 0;
     const {
       noiseFreq = 0.005, noiseSpeed = 0.5, swarmCohesion = 1.5,
-      gravityWells = 1.0, damping = 0.95, scale = [0.4, 1.6], alpha = [40, 100],
+      gravityWells = 1.0, damping = 0.95, scale: scaleParam = [0.4, 1.6], alpha = [40, 100],
       wind = 1, body = 3, tight = 0.55,
       // #167 — organism contacts. radius 0 disables the pass entirely.
       contactRadius = 0, contactRestitution = 0.5, contactRepel = 0,
@@ -856,6 +856,9 @@ export class ParticleSystem {
     const leakOn = organism && leak > 0;
     const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
     const damp = organism ? Math.max(damping, 0.97) : damping;
+    // #1202 — scale is {x, y} now; the particle system is scalar, so it
+    // reads the X range (linked = today's behavior, provable no-op).
+    const scale = Array.isArray(scaleParam) ? scaleParam : (scaleParam?.x ?? [0.4, 1.6]);
     const [minScale, maxScale] = scale;
     const [minAlpha, maxAlpha] = alpha;
     // Spine A (#387): `time` is now loop-accumulated milliseconds (not
@@ -1435,24 +1438,28 @@ export class ParticleSystem {
         });
       } else {
         // #287 — radial fans. The bilateral pair above generalizes to an
-        // N-fold fan around the heading: alternating attachments are
-        // _mirrored (the same alternating-mirror convention the fan
-        // inherits from the wing pair), ladders round-robin per arm so
-        // adjacent arms can blend different wing-open frames.
-        const rm = /^radial-(\d+)$/.exec(symmetry || '');
-        const folds = rm ? parseInt(rm[1], 10) : 0;
-        if (folds >= 3) {
+        // N-fold fan around the heading. #1202 — RADIAL is pure cyclic
+        // rotation (no mirrors); KALEIDO is true dihedral: odd arms are
+        // mirrors of their even neighbors across the fold axis (position
+        // mirrored, rotation mirrored as 2*fold - rotation, chirality
+        // flipped). Ladders round-robin per arm so adjacent arms can blend
+        // different wing-open frames.
+        const { kind: symKind, folds } = symmetryParts(symmetry);
+        if ((symKind === 'radial' || symKind === 'kaleido') && folds >= 3) {
           const heading = protation * (Math.PI / 180);
           const amp = flap * Math.sin(this.phase[i] * TAU + this.seedOffset[i]);
           const reach = 16 + Math.abs(amp) * 20;
           for (let k = 0; k < folds; k++) {
             const a = heading - Math.PI / 2 + (TAU * k) / folds;
-            const mirrored = k % 2 === 1;
+            const mirrored = symKind === 'kaleido' && k % 2 === 1;
+            // Fold axis between arm k-1 and arm k, in degrees (world frame).
+            const foldDeg = (heading - Math.PI / 2 + (TAU * (k - 0.5)) / folds) * 180 / Math.PI;
+            const evenRot = protation + amp * 18;
             const ladderId = MOTH_LADDERS[(i + k) % MOTH_LADDERS.length].id;
             items.push({
               x: px + Math.cos(a) * reach, y: py + Math.sin(a) * reach,
               scale: pscale * 0.7, baseScale: pbaseScale * 0.7,
-              rotation: protation + (mirrored ? -amp * 18 : amp * 18),
+              rotation: mirrored ? 2 * foldDeg - evenRot : evenRot,
               alpha: palpha, asset, color: pcolor, u: pu,
               key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
               colorSlot: this.colorSlot[i], // #1237

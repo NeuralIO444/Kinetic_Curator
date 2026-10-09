@@ -22,7 +22,8 @@ assert.strictEqual(doc.seed, 0x1a4f);
 assert.strictEqual(doc.enabledAssets.b, false);
 assert.strictEqual(doc.layoutParams.mode, 'grid');
 assert.strictEqual(doc.layoutParams.count, 120);
-assert.strictEqual(doc.layoutParams.mirror, true);
+// #1202 — mirror is a 4-state enum now; a legacy boolean migrates (true → 'x').
+assert.strictEqual(doc.layoutParams.mirror, 'x');
 assert.strictEqual(doc.layoutParams.jitter, DEFAULT_LAYOUT_PARAMS.jitter);
 assert.strictEqual(doc.layoutParams.accumulation, false);
 

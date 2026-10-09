@@ -1,5 +1,6 @@
-// SHAPES chips + LED mix — extracted from ModeGrid.jsx (UX-5 reorg).
-// Swap the asset pool only. Mixable sets get the 4-state LED chip (#733).
+// SHAPES as a TE button matrix (#1202). Swap the asset pool only.
+// Mixable sets keep the 4-state LED chip (#733): three stepped pips under
+// the label, tap cycles off → 1 → 2 → 3 → off.
 import { useStore } from '../../state/store.js';
 import { SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isShapeSetActive, liveShapeLevels } from '../../data/voices.js';
 
@@ -8,39 +9,35 @@ export function ShapesShelf() {
   const cycleShapeLevel = useStore((s) => s.cycleShapeLevel);
   const shapeLevels = liveShapeLevels(useStore((s) => s.shapeLevels), useStore((s) => s.enabledAssets));
   const enabledAssets = useStore((s) => s.enabledAssets);
+
+  // TeaMatrix is single-select; the shelf is multi-select with LED levels,
+  // so it renders its own grid on the same te-cell language.
   return (
     <div className="voice-shelf">
       <span className="shelf-label ttl">shapes</span>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+      <div className="te-matrix" role="group" aria-label="Shapes" style={{ marginBottom: 8 }}>
         {SHAPE_SETS.map((x) => {
-          if (!MIXABLE_SHAPE_IDS.includes(x.id)) {
-            return (
-              <button
-                key={x.id}
-                type="button"
-                className={`chip-btn ${isShapeSetActive(enabledAssets, x) ? 'active' : ''}`}
-                onClick={() => loadShapeSet(x.id)}
-                title={`${x.name} — ${x.ids.length} shapes`}
-              >
-                {x.name}
-              </button>
-            );
-          }
-          // #733 — 4-state LED chip: three stepped pips under the label.
+          const mixable = MIXABLE_SHAPE_IDS.includes(x.id);
           const lv = shapeLevels[x.id] || 0;
+          const active = mixable ? lv > 0 : isShapeSetActive(enabledAssets, x);
           return (
             <button
               key={x.id}
               type="button"
-              className={`chip-btn shape-mix ${lv ? 'active' : ''}`}
-              onClick={() => cycleShapeLevel(x.id)}
-              aria-label={`${x.name}, level ${lv} of 3`}
-              title={`${x.name} — level ${lv}/3. Tap: off → 1 → 2 → 3 → off. Up to ${SHAPE_MIX_MAX} on.`}
+              className={`te-cell${active ? ' sel' : ''}`}
+              aria-pressed={active}
+              aria-label={mixable ? `${x.name}, level ${lv} of 3` : x.name}
+              title={mixable
+                ? `${x.name} — level ${lv}/3. Tap: off → 1 → 2 → 3 → off. Up to ${SHAPE_MIX_MAX} on.`
+                : `${x.name} — ${x.ids.length} shapes`}
+              onClick={() => (mixable ? cycleShapeLevel(x.id) : loadShapeSet(x.id))}
             >
-              {x.name}
-              <span className="shape-pips" aria-hidden="true">
-                {[1, 2, 3].map((n) => <i key={n} className={lv >= n ? 'lit' : ''} />)}
-              </span>
+              <span className="te-cell-label">{x.name}</span>
+              {mixable && (
+                <span className="te-pips" aria-hidden="true">
+                  {[1, 2, 3].map((n) => <i key={n} className={lv >= n ? 'lit' : ''} />)}
+                </span>
+              )}
             </button>
           );
         })}

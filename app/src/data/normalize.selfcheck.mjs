@@ -104,7 +104,20 @@ for (const [label, patch] of POISON) {
   }
 
   // 2. Ranges are finite pairs inside their bounds.
+  // #1202 — scale is {x:[lo,hi], y:[lo,hi]} now; the other ranges stay arrays.
   for (const [key, spec] of Object.entries(RANGE_SPEC)) {
+    if (key === 'scale') {
+      const sc = lp[key];
+      assert.ok(sc && typeof sc === 'object' && !Array.isArray(sc), `${label}: scale shape`);
+      for (const axis of ['x', 'y']) {
+        assert.ok(Array.isArray(sc[axis]) && sc[axis].length === 2, `${label}: scale.${axis} shape`);
+        for (const v of sc[axis]) {
+          assert.ok(Number.isFinite(v), `${label}: scale.${axis} end not finite`);
+          assert.ok(v >= spec.min && v <= spec.max, `${label}: scale.${axis} end ${v} outside bounds`);
+        }
+      }
+      continue;
+    }
     assert.ok(Array.isArray(lp[key]) && lp[key].length === 2, `${label}: ${key} shape`);
     for (const v of lp[key]) {
       assert.ok(Number.isFinite(v), `${label}: ${key} end not finite`);
@@ -122,9 +135,11 @@ for (const [label, patch] of POISON) {
   }
 
   // 4. Booleans are booleans — 'false' is truthy, and used to stay a string.
-  for (const key of ['bleed', 'mirror', 'overlap', 'accumulation']) { // #268: recolor removed
+  // #1202 — mirror is a 4-state enum now (off/x/y/xy), not a boolean.
+  for (const key of ['bleed', 'overlap', 'accumulation']) { // #268: recolor removed
     assert.strictEqual(typeof lp[key], 'boolean', `${label}: ${key} must be boolean`);
   }
+  assert.ok(['off', 'x', 'y', 'xy'].includes(lp.mirror), `${label}: mirror must be a 4-state enum`);
 
   // 5. Nothing shadowed Object.prototype.
   assert.strictEqual({}.polluted, undefined, `${label}: prototype was polluted`);
@@ -181,7 +196,9 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
 {
   const lp = normalizeLayoutParams(DEFAULT_LAYOUT_PARAMS);
   for (const [k, v] of Object.entries(DEFAULT_LAYOUT_PARAMS)) {
-    if (Array.isArray(v)) assert.deepStrictEqual(lp[k], v, `defaults changed: ${k}`);
+    // #1202 — scale is {x, y}; deep-compare the object, not the reference.
+    if (k === 'scale') assert.deepStrictEqual(lp[k], v, `defaults changed: ${k}`);
+    else if (Array.isArray(v)) assert.deepStrictEqual(lp[k], v, `defaults changed: ${k}`);
     else assert.strictEqual(lp[k], v, `defaults changed: ${k}`);
   }
   // …and so must a hand-authored project using the extremes of each slider.
@@ -195,16 +212,19 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
   };
   const norm = normalizeLayoutParams(extremes);
   for (const [k, v] of Object.entries(extremes)) {
-    if (Array.isArray(v)) assert.deepStrictEqual(norm[k], v, `slider extreme clamped: ${k}`);
+    // #1202 — a legacy array scale normalizes to a linked {x, y} pair.
+    if (k === 'scale') assert.deepStrictEqual(norm[k], { x: v, y: v }, `slider extreme clamped: ${k}`);
+    else if (Array.isArray(v)) assert.deepStrictEqual(norm[k], v, `slider extreme clamped: ${k}`);
     else assert.strictEqual(norm[k], v, `slider extreme clamped: ${k}`);
   }
 }
 
 // A reversed range runs the lerp backwards on purpose; normalizing must not
 // "helpfully" reorder it, or existing compositions change.
+// #1202 — a legacy array scale normalizes to a linked {x, y} pair.
 {
   const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, scale: [1.6, 0.4] });
-  assert.deepStrictEqual(lp.scale, [1.6, 0.4], 'reversed range must survive');
+  assert.deepStrictEqual(lp.scale, { x: [1.6, 0.4], y: [1.6, 0.4] }, 'reversed range must survive');
 }
 
 // #479 Option B — BEHAVE override round-trip and validation.

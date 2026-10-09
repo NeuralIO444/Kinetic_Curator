@@ -65,7 +65,10 @@ const bucket = (v, edges, names) => {
 export function recipeFeatures({ layoutParams, paletteId, assets } = {}) {
   const p = normalizeLayoutParams(layoutParams && typeof layoutParams === 'object' ? layoutParams : {});
   const bodies = LIVE_MODES.has(p.mode) ? p.particleCount : p.count;
-  const [s0, s1] = Array.isArray(p.scale) ? p.scale : [1, 1];
+  // #1202 — scale is {x, y} now; the feature reads the X range (linked =
+  // today's behavior). A legacy array still works.
+  const scalePair = Array.isArray(p.scale) ? p.scale : (p.scale?.x ?? [1, 1]);
+  const [s0, s1] = scalePair;
   const cast = Array.isArray(assets) && assets.length
     ? [...new Set(assets.filter((x) => typeof x === 'string'))].sort()
     : null;
@@ -78,7 +81,8 @@ export function recipeFeatures({ layoutParams, paletteId, assets } = {}) {
     paletteShift: p.paletteShift,
     palette: typeof paletteId === 'string' && paletteId ? paletteId : null,
     accum: !!p.accumulation,
-    mirror: !!p.mirror,
+    // #1202 — mirror is a 4-state enum; a legacy boolean still reads (true → on).
+    mirror: p.mirror === true || (typeof p.mirror === 'string' && p.mirror !== 'off'),
     bleed: !!p.bleed,
     overlap: !!p.overlap,
     bodies: bucket(bodies, [60, 200], ['sparse', 'mid', 'dense']),

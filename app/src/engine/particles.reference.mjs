@@ -125,7 +125,7 @@ export class ReferenceParticleSystem {
     const domainOffsetY = Number(layoutParams.noiseDomainOffsetY ?? layoutParams.noiseDomainOffset) || 0;
     const {
       noiseFreq = 0.005, noiseSpeed = 0.5, swarmCohesion = 1.5,
-      gravityWells = 1.0, damping = 0.95, scale = [0.4, 1.6], alpha = [40, 100],
+      gravityWells = 1.0, damping = 0.95, scale: scaleParam = [0.4, 1.6], alpha = [40, 100],
       wind = 1, body = 3, tight = 0.55,
     } = layoutParams;
 
@@ -133,6 +133,9 @@ export class ReferenceParticleSystem {
     const profile = organism ? resolveBehave(layoutParams.behave) : null;
     const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
     const damp = organism ? Math.max(damping, 0.97) : damping;
+    // #1202 — scale is {x, y} now; the reference system is scalar, so it
+    // reads the X range (linked = today's behavior).
+    const scale = Array.isArray(scaleParam) ? scaleParam : (scaleParam?.x ?? [0.4, 1.6]);
     const [minScale, maxScale] = scale;
     const [minAlpha, maxAlpha] = alpha;
     const nt = time * noiseSpeed * 0.001;

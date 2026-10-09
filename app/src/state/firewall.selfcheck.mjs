@@ -70,7 +70,8 @@ function makeStore() {
   }
   for (const bad of [[null, null], ['a', 'b'], [1], 'big', null]) {
     s.setLayoutParam('scale', bad);
-    assert.deepStrictEqual(s.lp().scale, [0.5, 2.5], `scale ${JSON.stringify(bad)} should be rejected`);
+    // #1202 — scale is {x, y} now; a legacy array write normalizes to linked.
+    assert.deepStrictEqual(s.lp().scale, { x: [0.5, 2.5], y: [0.5, 2.5] }, `scale ${JSON.stringify(bad)} should be rejected`);
   }
   // A rejected write must not push an undo entry either — Ctrl-Z has to line
   // up with edits the operator actually made.
@@ -91,7 +92,7 @@ function makeStore() {
   s.setLayoutParam('zTiers', 99.6);
   assert.strictEqual(s.lp().zTiers, 12, 'zTiers should clamp and stay integral');
   s.setLayoutParam('scale', [-5, 900]);
-  assert.deepStrictEqual(s.lp().scale, [0.05, 6.0], 'range ends clamp to the HARD limits (#1127: the tap-name dialog can stretch a slider that far)');
+  assert.deepStrictEqual(s.lp().scale, { x: [0.05, 6.0], y: [0.05, 6.0] }, 'range ends clamp to the HARD limits (#1127: the tap-name dialog can stretch a slider that far)');
   // Numeric strings still work; older projects wrote some fields that way.
   s.setLayoutParam('density', '55');
   assert.strictEqual(s.lp().density, 55);
@@ -105,12 +106,14 @@ function makeStore() {
   s.setLayoutParam('count', 321);
   assert.strictEqual(s.lp().count, 321);
   s.setLayoutParam('scale', [0.5, 2.5]);
-  assert.deepStrictEqual(s.lp().scale, [0.5, 2.5]);
+  // #1202 — scale is {x, y} now; a legacy array write normalizes to linked.
+  assert.deepStrictEqual(s.lp().scale, { x: [0.5, 2.5], y: [0.5, 2.5] });
   s.setLayoutParam('mirror', true);
-  assert.strictEqual(s.lp().mirror, true);
+  // #1202 — mirror is a 4-state enum now; a legacy boolean migrates (true → 'x').
+  assert.strictEqual(s.lp().mirror, 'x');
   // Reversed ranges are legitimate authoring and must survive the firewall.
   s.setLayoutParam('scale', [2.0, 0.4]);
-  assert.deepStrictEqual(s.lp().scale, [2.0, 0.4], 'reversed range must survive');
+  assert.deepStrictEqual(s.lp().scale, { x: [2.0, 0.4], y: [2.0, 0.4] }, 'reversed range must survive');
 }
 
 // ── §1: clamping to the current value is not an edit ──────────────────────

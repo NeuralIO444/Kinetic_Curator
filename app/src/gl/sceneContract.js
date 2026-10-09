@@ -75,13 +75,16 @@ function hexColor(c, fallback = '#000000') {
 function toInstance(item, layerId, itemBlend) {
   const s = Number(item.scale) || 0;
   const mirrored = !!item._mirrored;
+  // #1202 — non-uniform scale: item.scaleY rides the Y range when X/Y are
+  // unlinked, and falls back to the X scale when linked (or absent).
+  const sy = Number(item.scaleY ?? s) || 0;
   return {
     asset: String(item.assetId),
     layer: layerId,
     x: r3(item.x),
     y: r3(item.y),
     scaleX: r3(mirrored ? -s : s),
-    scaleY: r3(s),
+    scaleY: r3(sy),
     rotation: r3(item.rotation), // degrees, clockwise (SVG convention)
     tint: hexColor(item.color),
     accent: hexColor(item.accent),

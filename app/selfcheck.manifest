@@ -62,6 +62,7 @@ node src/state/firewall.selfcheck.mjs
 node src/state/watchdog.selfcheck.mjs
 node src/state/renderFault.selfcheck.mjs
 node src/data/normalize.selfcheck.mjs
+node src/data/te1202.selfcheck.mjs
 node src/components/taper.selfcheck.mjs
 node src/data/helpCopy.selfcheck.mjs
 node src/data/labelCase.selfcheck.mjs

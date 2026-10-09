@@ -36,17 +36,21 @@ ok('the engine accepts a widened span (and no further); the resting spans, macro
   assert.deepEqual(RANGE_SPEC.rotate, { min: -180, max: 180 }); assert.deepEqual(RANGE_SPEC.scale, { min: 0.1, max: 3 });
   assert.deepEqual(normalizeLayoutParams({ rotate: [-400, 700] }).rotate, [-400, 700]);
   assert.deepEqual(normalizeLayoutParams({ rotate: [-9999, 9999] }).rotate, [-720, 720]);
-  assert.deepEqual(normalizeLayoutParams({ scale: [0.06, 5.5] }).scale, [0.06, 5.5]);
+  // #1202 — a legacy array scale normalizes to a linked {x, y} pair.
+  assert.deepEqual(normalizeLayoutParams({ scale: [0.06, 5.5] }).scale, { x: [0.06, 5.5], y: [0.06, 5.5] });
   assert.deepEqual(normalizeLayoutParams({ alpha: [-5, 150] }).alpha, [0, 100], 'alpha cannot exceed 100');
   assert.deepEqual(normalizeLayoutParams({}).rotate, DEFAULT_LAYOUT_PARAMS.rotate);
   for (const k of ['rotate', 'scale', 'alpha']) assert.ok(RANGE_HARD[k].min <= RANGE_SPEC[k].min && RANGE_HARD[k].max >= RANGE_SPEC[k].max, `${k}: hard limits contain the resting span`);
 });
 
-ok('wiring: SCALE, ROTATE and ALPHA open the dialog; a single tap waits for a double-click; ROTATE carries SPIN|RANGE; nothing is saved', () => {
+ok('wiring: SCALE, ROTATE and ALPHA reach the hard range via the dock; ROTATE carries SPIN; nothing is saved', () => {
   const r = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
   const ls = r('../panels/layout/LayoutSliders.jsx');
-  for (const k of ['scale', 'rotate', 'alpha']) assert.match(ls, new RegExp(`dialog=\\{\\{ key: 'layout\\.${k}', title: '${k.toUpperCase()}', hard: RANGE_HARD\\.${k}`));
-  assert.match(ls, /spin: \{ value: layoutParams\.rotateSpin \?\? 0, onChange: \(v\) => set\('rotateSpin', v\)/);
+  // #1202 — the tap-name dialogs moved into the dock: the dock DualEditors
+  // use RANGE_HARD directly (full range, no separate dialog needed).
+  for (const k of ['scale', 'rotate', 'alpha']) assert.match(ls, new RegExp(`RANGE_HARD\\.${k}`));
+  assert.match(ls, /SPIN/);
+  assert.match(ls, /rotateSpin/);
   const rr = r('./RangeRow.jsx');
   assert.match(rr, /const TAP_NAME_MS = 240;/); assert.match(rr, /clearTimeout\(tapTimer\.current\); \/\/ a double-click is a reset, not a dialog/);
   assert.match(rr, /\{dialogOpen && \(/); assert.match(rr, /onApplySpan=\{applySpan\}/);

@@ -497,9 +497,18 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
 
     const glow = routes.glow;
 
+    // #1202 — the breath swells the whole mark: X and Y ranges get the same
+    // multiplier. A legacy array scale reads as linked (Y = X).
+    const sc = layoutParams.scale;
+    const scX = Array.isArray(sc) ? sc : (sc?.x ?? [0.4, 1.6]);
+    const scY = Array.isArray(sc) ? sc : (sc?.y ?? scX);
     const effectiveScale = [
-      (layoutParams.scale?.[0] ?? 0.4) * scaleMul,
-      (layoutParams.scale?.[1] ?? 1.6) * scaleMul,
+      (scX[0] ?? 0.4) * scaleMul,
+      (scX[1] ?? 1.6) * scaleMul,
+    ];
+    const effectiveScaleY = [
+      (scY[0] ?? 0.4) * scaleMul,
+      (scY[1] ?? 1.6) * scaleMul,
     ];
     const effectiveAlpha = [
       Math.min(100, (layoutParams.alpha?.[0] ?? 40) + alphaBoost * 0.4),
@@ -592,6 +601,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       scaleMul,
       alphaBoost,
       effectiveScale,
+      effectiveScaleY, // #1202
       effectiveAlpha,
       motionSmoothing: s.motionSmoothing,
       phraseWrapGen: s.phraseWrapGen || 0,
