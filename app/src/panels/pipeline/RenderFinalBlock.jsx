@@ -1,11 +1,19 @@
-import { useState, useRef } from 'react';
-import { emit, Events } from '../../composition/eventBus.js';
-import { renderFinal } from '../../hooks/useMediaExport.js';
-import { resolutionLabel } from '../../data/quality.js';
+import { useState, useRef } from "react";
+import { emit, Events } from "../../composition/eventBus.js";
+import { renderFinal } from "../../hooks/useMediaExport.js";
+import { resolutionLabel } from "../../data/quality.js";
+import { DsMatrix, DsChip } from "./ds.jsx";
 
 export function RenderFinalBlock({
-  glLoopRef, palette, seed, layoutParams, exportResolution,
-  accumOn, rendering, setRendering, batchActive,
+  glLoopRef,
+  palette,
+  seed,
+  layoutParams,
+  exportResolution,
+  accumOn,
+  rendering,
+  setRendering,
+  batchActive,
 }) {
   const resLabel = resolutionLabel(exportResolution);
   // #570 — surface render failures like SNAP does (was console.warn only).
@@ -26,16 +34,20 @@ export function RenderFinalBlock({
         onThumbnail: (thumb) => {
           emit(Events.EXPORT_SNAPSHOT, {
             seed,
-            format: 'PNG',
+            format: "PNG",
             resolution: accumOn ? `${resLabel} · ACCUM` : `${resLabel} · FINAL`,
             timestamp: new Date().toISOString().slice(11, 19),
-            config: { layout: { ...layoutParams }, palette: { id: palette.id }, ...(accumOn ? { accum: true } : {}) },
+            config: {
+              layout: { ...layoutParams },
+              palette: { id: palette.id },
+              ...(accumOn ? { accum: true } : {}),
+            },
             thumb,
           });
         },
       });
     } catch (e) {
-      console.warn('[RENDER]', e);
+      console.warn("[RENDER]", e);
       setRenderError(e && e.message ? e.message : String(e));
       if (errTimer.current) clearTimeout(errTimer.current);
       errTimer.current = setTimeout(() => setRenderError(null), 6000);
@@ -45,18 +57,39 @@ export function RenderFinalBlock({
   };
 
   return (
-    <div style={{ marginBottom: 8, padding: 8, border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
-      <div className="ttl" style={{ fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', marginBottom: 6 }}>render · final still</div>
+    <div
+      style={{
+        marginBottom: 8,
+        padding: 8,
+        border: "1px solid var(--line-2)",
+        background: "rgba(255,255,255,0.02)",
+      }}
+    >
+      <div
+        className="ttl"
+        style={{
+          fontSize: 9,
+          letterSpacing: "0.12em",
+          color: "var(--dim)",
+          marginBottom: 6,
+        }}
+      >
+        render · still
+      </div>
       <div className="pipeline-row" style={{ marginBottom: 6 }}>
-        <select
+        <DsMatrix
+          label="export resolution"
+          options={[
+            { value: 1, label: "1X" },
+            { value: 2, label: "2X" },
+            { value: 4, label: "4X" },
+          ]}
           value={exportResolution}
-          onChange={e => emit(Events.EXPORT_RESOLUTION, parseInt(e.target.value, 10))}
-          style={{ flex: 1 }}
-        >
-          <option value={1}>1x (1000×700@1x)</option>
-          <option value={2}>2x (1000×700@2x)</option>
-          <option value={4}>4x (1000×700@4x)</option>
-        </select>
+          onChange={(v) => emit(Events.EXPORT_RESOLUTION, v)}
+        />
+        <DsChip tone={accumOn ? "amber" : undefined}>
+          {accumOn ? "ACCUM ON" : "ACCUM OFF"}
+        </DsChip>
       </div>
       <button
         type="button"
@@ -64,25 +97,29 @@ export function RenderFinalBlock({
         onClick={runRenderFinal}
         disabled={rendering}
         style={{
-          width: '100%',
-          background: rendering ? 'var(--line)' : 'var(--accent)',
-          color: rendering ? 'var(--dim)' : '#000',
-          borderColor: 'var(--accent)',
+          width: "100%",
+          background: rendering ? "var(--line)" : "var(--accent)",
+          color: rendering ? "var(--dim)" : "#000",
+          borderColor: "var(--accent)",
           fontWeight: 800,
-          letterSpacing: '0.08em',
+          letterSpacing: "0.08em",
         }}
       >
-        {rendering && !batchActive ? 'RENDERING…' : accumOn ? '▶ RENDER ACCUM' : '▶ RENDER FINAL'}
+        {rendering && !batchActive ? "RENDERING…" : "▶ RENDER STILL"}
       </button>
       {renderError && (
-        <div className="pipeline-hint" style={{ marginTop: 6, color: 'var(--kc-warn)' }} title={renderError}>
+        <div
+          className="pipeline-hint"
+          style={{ marginTop: 6, color: "var(--kc-warn)" }}
+          title={renderError}
+        >
           Render failed — {renderError.slice(0, 80)}
         </div>
       )}
       <div className="pipeline-hint" style={{ marginTop: 6 }}>
         {accumOn
-          ? 'ACCUM on — export captures the live trail buffer.'
-          : 'Matches live preview. Denser 4K/8K finals: studio.py render --uncapped.'}
+          ? "ACCUM on — export captures the live trail buffer."
+          : "Matches live preview. Denser 4K/8K finals: studio.py render --uncapped."}
       </div>
     </div>
   );
