@@ -261,8 +261,16 @@
 .beat-dot {
   width: 6px; height: 6px; flex-shrink: 0;
   background: var(--accent);
-  animation: beat-flash 0.5s ease-in-out infinite;
+  opacity: 0.45; /* still: no real beat is driving the stage */
 }
+.beat-dot.live { animation: beat-flash 0.5s ease-in-out infinite; }
+.beat-metro {
+  min-height: 44px; width: 100%;
+  background: transparent; border: 1px solid var(--line-2); color: var(--dim);
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.beat-metro:hover { color: var(--ink); border-color: var(--ink); }
+.beat-metro.active { color: var(--ink); border-color: var(--kc-red); box-shadow: inset 0 2px 0 var(--kc-red); }
 .beat-btn:hover .beat-dot, .beat-btn.open .beat-dot { background: currentColor; }
 @keyframes beat-flash {
   0%, 100% { opacity: 0.25; transform: scale(0.8); }

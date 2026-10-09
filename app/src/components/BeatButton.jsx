@@ -23,11 +23,15 @@ import {
   BEAT_PRESETS,
   sanitizeBeatBpm,
   tapBpm,
+  beatDotLive,
 } from '../gl/beatClock.mjs';
 
 export function BeatButton() {
   const beatBpm = useStore((s) => s.beatBpm) ?? BEAT_DEFAULT_BPM;
   const setBeatBpm = useStore((s) => s.setBeatBpm);
+  const beatMetro = useStore((s) => s.beatMetro);
+  const setBeatMetro = useStore((s) => s.setBeatMetro);
+  const audioEnabled = useStore((s) => s.audioEnabled);
   const [open, setOpen] = useState(false);
   const tapOpen = useTapOpen(); // #1103 — touch has no hover
   const [taps, setTaps] = useState([]);
@@ -110,8 +114,9 @@ export function BeatButton() {
         aria-label={`Beat clock ${bpmLabel} BPM. Activate to change tempo.`}
         aria-expanded={open}
       >
+        {/* the dot flashes only while a real beat is driving the stage (the metro or live audio): a still dot is the honest readout of a dial that is only setting morph times (KC-1 DS rule 3) */}
         <span
-          className="beat-dot"
+          className={`beat-dot${beatDotLive({ beatMetro, audioEnabled }) ? ' live' : ''}`}
           style={{ animationDuration: `${beatIntervalS}s` }}
           aria-hidden="true"
         />
@@ -159,6 +164,15 @@ export function BeatButton() {
             />
             <button className="act" type="submit">set</button>
           </form>
+          <button
+            type="button"
+            className={`beat-metro ${beatMetro ? 'active' : ''}`}
+            aria-pressed={beatMetro}
+            onClick={() => setBeatMetro(!beatMetro)}
+            title="Pulse: the dialed tempo becomes a real beat the stage can feel when there is no audio. Audio always wins. Off by default."
+          >
+            pulse
+          </button>
           <div className="beat-hint">
             {bpmLabel > 160
               ? 'past the glitch ceiling — transitions cut, they don\u2019t morph'

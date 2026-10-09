@@ -77,3 +77,24 @@ export function tapBpm(tapTimes) {
   if (!(avgIntervalMs > 0)) return null;
   return sanitizeBeatBpm(60000 / avgIntervalMs);
 }
+
+// ── the metro pulse (#1144 part 2: beat honesty) ─────────────────────────
+// Without audio the BEAT dial used to do nothing a viewer could see (it only sets morph durations), yet its dot flashed
+// at the dialed tempo: a readout performing a liveness the stage does not have (KC-1 DS rule 3). The metro pulse is the
+// honest version: the dialed BPM, as a real beatPulse the stage can feel, through the same attack the audio onsets use.
+// It is the artist's own switch (off by default), runs only while the instrument runs, and audio always wins.
+
+/** Milliseconds between metro attacks at a BPM (the sanitized dial: 30..300 BPM is 2000..200 ms). */
+export function metroIntervalMs(bpm) {
+  return 60000 / sanitizeBeatBpm(bpm);
+}
+
+/** Does the metro fire right now? Only when the artist turned it on, the instrument is running, and audio is NOT the beat. */
+export function metroRunning({ beatMetro = false, audioEnabled = false, running = true } = {}) {
+  return !!beatMetro && !audioEnabled && !!running;
+}
+
+/** Is the BEAT button's dot allowed to flash? Only when a real beat is driving the stage: the metro, or live audio. */
+export function beatDotLive({ beatMetro = false, audioEnabled = false } = {}) {
+  return !!beatMetro || !!audioEnabled;
+}

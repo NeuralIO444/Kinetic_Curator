@@ -172,6 +172,9 @@ export const createLayoutSlice = (set) => ({
    * engine already honors as "cut".
    */
   beatBpm: BEAT_DEFAULT_BPM,
+  /** #1144 — the metro pulse: the dialed BPM as a real beatPulse when audio is off. The artist's own switch; off by default. */
+  beatMetro: false,
+  setBeatMetro: (on) => set({ beatMetro: !!on }),
   /**
    * Roll scope (#964): the ModeStrip MODE/MOTION chips arm a scope for the
    * next KINETIC roll instead of selecting outright. `armedMode` pins the
