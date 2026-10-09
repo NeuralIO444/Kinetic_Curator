@@ -2,7 +2,7 @@
 // #594 — the ONE scene sun (CHIAROSCURO). Scene-level, not per layer: it
 // lights every layer's marks. Colour is a palette slot, never a free hex.
 import { useStore } from '../../state/store.js';
-import { LIGHT_DEFAULT, LIGHT_SLOTS } from '../../data/light.js';
+import { LIGHT_SLOTS } from '../../data/light.js';
 import { helpText } from '../../data/helpCopy.js';
 import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
 import { ValueButton } from '../build/te/ValueButton.jsx';

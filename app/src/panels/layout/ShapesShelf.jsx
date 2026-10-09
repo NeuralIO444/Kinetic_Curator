@@ -3,7 +3,6 @@
 // the label, tap cycles off → 1 → 2 → 3 → off.
 import { useStore } from '../../state/store.js';
 import { SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isShapeSetActive, liveShapeLevels } from '../../data/voices.js';
-import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
 
 export function ShapesShelf() {
   const loadShapeSet = useStore((s) => s.loadShapeSet);

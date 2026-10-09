@@ -2,8 +2,7 @@
 // (slider/dual/dial/stepper per DS #1121 r2); discrete = ink/red, values =
 // amber (r5/r6). Locks ride on the button; the tap-name dialogs for
 // SCALE/ROTATE/ALPHA move into the dock as range editors.
-import { DEFAULT_LAYOUT_PARAMS, RANGE_SPEC, RANGE_HARD, PARAM_SPEC, ROTATE_SPIN_START, MIRROR_STATES, mirrorMultiplier } from '../../data/layout-modes.js';
-import { getPreset } from '../../data/presets.js';
+import { RANGE_HARD, PARAM_SPEC, ROTATE_SPIN_START, MIRROR_STATES, mirrorMultiplier } from '../../data/layout-modes.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { ValueButton } from '../build/te/ValueButton.jsx';
 import { SliderEditor, DualEditor } from '../build/te/editors.jsx';
@@ -29,11 +28,8 @@ function scaleDisplay(scale) {
 }
 
 export function LayoutSliders({ layoutParams, lockedParams }) {
-  const preset = getPreset(layoutParams.composition);
-  const defaults = preset.params;
   const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
-  const d = (key, fallback) => defaults[key] !== undefined ? defaults[key] : fallback;
   const mode = layoutParams.mode;
 
   const { x: sx, y: sy, linked } = scaleRanges(layoutParams.scale);
