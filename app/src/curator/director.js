@@ -32,6 +32,7 @@ import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
+import { swayBiases, M2_FLOOR, MIN_KEEPS } from './queenLean.mjs';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
 // #762's proof is not done: the Queen's taste-derived columns (sway_allowance,
@@ -39,6 +40,56 @@ import { audioEnergyNow } from './keepContext.js';
 // when the proof clears — the selfcheck tripwires both constants.
 export const SWAY_GATE_OPEN = false;
 export const TILT_GATE_OPEN = false;
+
+// ─── the pull's inputs (#1139 wiring, PR 2) ────────────────────────────────
+// The Director is where the hidden pull is hosted: it already runs at pick time (never per frame) and never renders.
+// PR 2 only COLLECTS what the pull will read and returns it as `sway`; nothing reads it yet, and with the gate
+// closed it is exactly zero. A pull that throws must never take CURATOR down with it, so the whole derivation is
+// wrapped: any failure is the neutral answer.
+export const NEUTRAL_VIEW = Object.freeze({ temperatureDelta: 0 });
+
+/** A keep that carries a PATTERN layer: the artist has said they dislike that look, so the pull does not learn from it. */
+const hasPatternLayer = (keep) => Array.isArray(keep?.stack?.l) && keep.stack.l.some((l) => l && l.type === 'pattern');
+
+let lastKeeps = null;
+let lastKept = [];
+/** The keeps the pull may learn from. Memoised on the array's identity: a pick must not re-filter a long ledger. */
+export function pullKeeps(keeps) {
+  if (!Array.isArray(keeps)) return [];
+  if (keeps === lastKeeps) return lastKept;
+  lastKeeps = keeps;
+  lastKept = keeps.filter((k) => !hasPatternLayer(k));
+  return lastKept;
+}
+
+/** Spectral richness 0..1 from the live bands: how far apart bass, mid and treble are, times the level. A file is not a room: 0. */
+export function richnessFrom({ bands = null, enabled = false, sourceType = null } = {}) {
+  if (!enabled || sourceType === 'file' || !bands) return 0;
+  const { bass, mid, treble, rms } = bands;
+  const v = [bass, mid, treble].map((x) => (Number.isFinite(x) ? clamp01(x) : 0));
+  const mean = (v[0] + v[1] + v[2]) / 3;
+  const variance = ((v[0] - mean) ** 2 + (v[1] - mean) ** 2 + (v[2] - mean) ** 2) / 3;
+  const r = clamp01(Math.sqrt(variance) * 2 * (Number.isFinite(rms) ? clamp01(rms) : 0));
+  return Math.round(r * 1e6) / 1e6; // a flat spectrum is zero, not float dust
+}
+
+/**
+ * What the pull would do right now, scaled by the room's allowance. Pure: `sway` is the mechanics (injectable ONLY
+ * here, so a selfcheck can drive the open path with swayOpen without a live override existing anywhere).
+ * Gate closed: swayBiases() is neutral and the allowance is 0, so this is the neutral view.
+ */
+export function deriveSway({ keeps = [], richness = 0, allowance = 0 } = {}, sway = swayBiases) {
+  try {
+    const a = clamp01(allowance);
+    const kept = pullKeeps(keeps);
+    if (a === 0 || kept.length < MIN_KEEPS) return NEUTRAL_VIEW;
+    const out = sway(kept, { richness: clamp01(richness) });
+    const t = Number(out && out.temperature);
+    return { temperatureDelta: Number.isFinite(t) ? Math.max(0, (t - M2_FLOOR) * a) : 0 };
+  } catch {
+    return NEUTRAL_VIEW;
+  }
+}
 
 /** During relax the room cools to at most this (the Queen's structural hand). */
 export const RELAX_TEMP = 0.3;
@@ -130,6 +181,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
   const beats = createBeatTracker();
   let relaxUntil = 0;
   let lastCoolAt = now();
+  let pull = { keeps: [], bands: null, enabled: false, sourceType: null }; // fed by setPullInputs (store subscription)
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
@@ -180,11 +232,16 @@ export function createDirector({ now = () => Date.now() } = {}) {
       directorPhase,
       temp: +out.temperature.toFixed(2),
     });
-    return { gains: out, intensity: level, directorPhase };
+    const sway = deriveSway({ keeps: pull.keeps, richness: richnessFrom(pull), allowance: gains.swayAllowance });
+    return { gains: out, intensity: level, directorPhase, sway };
   }
 
   return {
     tick,
+    /** The store's view for the pull (keeps, bands, source): cheap references only, read at pick time. */
+    setPullInputs(next) {
+      pull = { ...pull, ...next };
+    },
     /** Feed the beat tracker (wired to the store in App via initDirectorBeat). */
     pushBeat(pulse) {
       beats.push(pulse);
@@ -222,5 +279,6 @@ export function initDirectorBeat(subscribe) {
   subscribe((s) => {
     const b = s && typeof s.beatPulse === 'number' ? s.beatPulse : 0;
     d.pushBeat(b);
+    if (s) d.setPullInputs({ keeps: s.keeps, bands: s.audioBands, enabled: !!s.audioEnabled, sourceType: s.audioSource && s.audioSource.type });
   });
 }
