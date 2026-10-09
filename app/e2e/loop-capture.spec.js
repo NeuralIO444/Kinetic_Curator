@@ -1,8 +1,8 @@
-// e2e/loop-capture.spec.js — #284: CAPTURE LOOP exports a fixed-length,
+// e2e/loop-capture.spec.js — #284/#1217: RENDER MOVIE exports a fixed-length,
 // seamless-looping WebM.
 //
-// What this proves (and how): drives the real UI (OUTPUT tab -> 2s ->
-// CAPTURE LOOP), taps the downloaded WebM blob via URL.createObjectURL,
+// What this proves (and how): drives the real UI (OUTPUT tab -> 2s via the
+// amber loop-seconds stepper -> RENDER MOVIE), taps the downloaded WebM blob via URL.createObjectURL,
 // then decodes it in-page. Assertions:
 //   1. the blob is a real WebM of non-trivial size (the recorder ran —
 //      note: on software GL the captured frames can be near-black, which
@@ -47,7 +47,7 @@ async function installBlobTap(page) {
   });
 }
 
-test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, testInfo) => {
+test('RENDER MOVIE exports a fixed-length seamless-loop WebM', async ({ page }, testInfo) => {
   // Software GL (SwiftShader, CI) renders each captured frame on the CPU
   // (~1s/frame): a 2s take is 90 grabbed frames, so the wall clock is
   // minutes while the exported video is still exactly 2s at 30fps.
@@ -66,16 +66,25 @@ test('CAPTURE LOOP exports a fixed-length seamless-loop WebM', async ({ page }, 
   await page.reload({ waitUntil: 'load' });
   await page.locator('.app').waitFor({ timeout: 30_000 });
 
-  // OUTPUT tab -> 2s loop -> CAPTURE LOOP -> wait for the blob.
+  // OUTPUT tab -> 2s loop via the amber stepper -> RENDER MOVIE -> wait for the blob.
   await page.getByRole('tab', { name: /pipeline|output/i }).click();
   await page.locator('.panel-output').waitFor({ timeout: 10_000 });
   await page.waitForTimeout(2000); // let trails build up
-  await page.getByRole('button', { name: /^2s$/ }).click();
+  const loopSecs = page.getByRole('button', { name: 'loop seconds' });
+  await loopSecs.click();
+  const stepper = page.getByRole('dialog', { name: 'loop seconds' });
+  for (let i = 0; i < 30; i++) {
+    const txt = (await loopSecs.textContent()).trim();
+    if (txt === '2s') break;
+    const dir = parseInt(txt, 10) > 2 ? 'decrease' : 'increase';
+    await stepper.getByRole('button', { name: dir }).click();
+  }
+  expect((await loopSecs.textContent()).trim()).toBe('2s');
   // Wall-clock the take: on software GL each grabbed frame renders on the
   // CPU (~1s/frame), so the take stretches with the wall clock. The fixed-
   // length assertion below only applies when the machine kept up.
   const takeT0 = Date.now();
-  await page.getByRole('button', { name: /CAPTURE LOOP/ }).click();
+  await page.getByRole('button', { name: /RENDER MOVIE/ }).click();
   // 2s loop + 1s dissolve lead-in, plus encode/finalize headroom —
   // generous on software GL (see above).
   await page.waitForFunction(() => window.__webmBlobs.length > 0, null, { timeout: 300_000 });
