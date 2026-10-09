@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline panel study — capture first</title>
+<style>
+  html, body { margin: 0; min-height: 100%; background: #08090c; }
+  body {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 28px 16px 60px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #cfd4dc; -webkit-font-smoothing: antialiased;
+  }
+  #panel {
+    width: 360px; max-width: 94vw; background: #0e1013;
+    border: 1px solid #1e222a; border-radius: 6px; overflow: hidden;
+  }
+  .p-head {
+    padding: 12px 14px; border-bottom: 1px solid #1e222a;
+    font-size: 11px; letter-spacing: 3px; color: #8a8f98;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .p-head .dim { color: #4a4f59; letter-spacing: 1px; }
+  .p-body { max-height: 78vh; overflow-y: auto; padding: 0 12px 14px; }
+  .p-body::-webkit-scrollbar { width: 8px; }
+  .p-body::-webkit-scrollbar-thumb { background: #232830; border-radius: 4px; }
+  .sec { padding: 12px 2px 4px; border-bottom: 1px solid #15181d; }
+  .sec:last-child { border-bottom: none; }
+  .sec-label {
+    font-size: 9px; letter-spacing: 3px; color: #5b616b; margin-bottom: 8px;
+  }
+  .hero {
+    width: 100%; padding: 14px; margin-bottom: 8px;
+    background: #00ff88; color: #000; border: none; border-radius: 3px;
+    font: 800 13px ui-monospace, Menlo, monospace; letter-spacing: 2px;
+    cursor: pointer;
+  }
+  .hero:disabled { background: #232830; color: #5b616b; cursor: wait; }
+  .bar { height: 3px; background: #1a1e24; border-radius: 2px; margin: -4px 0 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: #00ff88; transition: width 0.1s linear; }
+  .row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .matrix { display: flex; gap: 4px; flex: 1; }
+  .mbtn {
+    flex: 1; padding: 8px 4px; background: #12151a; color: #8a8f98;
+    border: 1px solid #232830; border-radius: 3px; cursor: pointer;
+    font: 11px ui-monospace, Menlo, monospace; letter-spacing: 1px;
+  }
+  .mbtn.sel { border-color: #ff4d4d; color: #ff6b6b; background: #171114; }
+  .btn {
+    flex: 1; padding: 9px 4px; background: #12151a; color: #cfd4dc;
+    border: 1px solid #2a2f38; border-radius: 3px; cursor: pointer;
+    font: 11px ui-monospace, Menlo, monospace; letter-spacing: 1px;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost { color: #8a8f98; border-style: dashed; }
+  .btn.rec { border-color: #ff4d4d; color: #ff6b6b; }
+  .btn.rec.on { background: #2a0f0f; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { background: #3a1414; } }
+  .chip {
+    font-size: 10px; letter-spacing: 1px; padding: 7px 10px;
+    border: 1px solid #2a2f38; border-radius: 20px; color: #5b616b; white-space: nowrap;
+  }
+  .chip.amber { color: #ffb347; border-color: #4a3a20; }
+  .amber-val {
+    flex: 0 0 auto; min-width: 52px; padding: 9px 8px; background: #12151a;
+    color: #ffb347; border: 1px solid #4a3a20; border-radius: 3px; cursor: pointer;
+    font: 11px ui-monospace, Menlo, monospace;
+  }
+  .hint { font-size: 10px; color: #4a4f59; margin: 2px 0 4px; line-height: 1.5; }
+  .kv {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: #8a8f98; margin-bottom: 6px;
+  }
+  .kv .matrix { flex: 0 0 130px; }
+  .kv.dim, .dim-sec { color: #4a4f59; }
+  .log {
+    font-size: 10px; line-height: 1.7; color: #5b616b;
+    background: #0a0c0f; border: 1px solid #15181d; border-radius: 3px;
+    padding: 8px 10px; margin-bottom: 8px;
+  }
+  .log .ok { color: #3d7a5c; }
+  .thumbs { display: flex; gap: 6px; margin-bottom: 8px; }
+  .thumb {
+    flex: 1; aspect-ratio: 4/3; border-radius: 3px;
+    border: 1px solid #1e222a;
+    background:
+      radial-gradient(circle at 35% 40%, #2a3340 0%, transparent 55%),
+      radial-gradient(circle at 65% 60%, #1d2b33 0%, transparent 50%),
+      #101318;
+  }
+  #pop {
+    position: fixed; z-index: 50; background: #14171c; border: 1px solid #4a3a20;
+    border-radius: 4px; padding: 8px; display: flex; gap: 8px; align-items: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  }
+  #pop button {
+    width: 34px; height: 34px; background: #1d2127; color: #ffb347;
+    border: 1px solid #4a3a20; border-radius: 3px; font-size: 16px; cursor: pointer;
+  }
+  #pop .pv { min-width: 44px; text-align: center; color: #ffb347; font-size: 14px; }
+  #pop .plabel { position: absolute; top: -18px; left: 0; font-size: 9px; letter-spacing: 2px; color: #5b616b; }
+  #note { margin-top: 18px; font-size: 11px; color: #4a4f59; max-width: 360px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div class="p-head"><span>P05 · PIPELINE</span><span class="dim">12 snaps</span></div>
+  <div class="p-body">
+
+    <div class="sec">
+      <div class="sec-label">CAPTURE</div>
+      <button class="hero" id="renderBtn">▶ RENDER STILL</button>
+      <div class="bar"><i id="renderBar"></i></div>
+      <div class="row">
+        <div class="matrix" data-group="res">
+          <button class="mbtn" data-v="1">1X</button><button class="mbtn sel" data-v="2">2X</button><button class="mbtn" data-v="4">4X</button>
+        </div>
+        <div class="chip amber">ACCUM ON</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="movieBtn">▶ RENDER MOVIE</button>
+        <button class="amber-val" id="loopN" title="loop seconds — tap to edit">6s</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="snapBtn">SNAP</button>
+      </div>
+      <div class="hint">Still captures the live frame (trail buffer when ACCUM is on).<br>Movie exports WebM — loop seconds, seamless.</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">EXPORT</div>
+      <div class="row">
+        <button class="btn" id="batchBtn">BATCH</button>
+        <button class="amber-val" id="batchN" title="tap to edit">12</button>
+        <button class="btn">PRINT</button>
+        <button class="btn">HEVC</button>
+      </div>
+      <div class="hint">Batch count is an editable value — tap the amber number.</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">PROJECT</div>
+      <div class="row">
+        <button class="btn" id="exportBtn">EXPORT</button>
+        <button class="btn" id="importBtn">IMPORT</button>
+      </div>
+      <div class="hint">one file — project, hits, taste, palettes.<br>the system takes what it needs.</div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-label">SETUP</div>
+      <div class="kv"><span>canvas step</span><button class="amber-val" data-static>16ms</button></div>
+      <div class="kv"><span>FXAA</span>
+        <div class="matrix" data-group="fxaa"><button class="mbtn sel">ON</button><button class="mbtn">OFF</button></div>
+      </div>
+      <div class="kv"><span>weave</span>
+        <div class="matrix" data-group="weave"><button class="mbtn">ON</button><button class="mbtn sel">OFF</button></div>
+      </div>
+      <div class="kv dim"><span>stage raster</span><span>1440 × 900</span></div>
+    </div>
+
+    <div class="sec dim-sec">
+      <div class="sec-label">DIAGNOSTICS · READ ONLY</div>
+      <div class="log" id="log">
+        <div><span class="ok">✓</span> render done — 2x · ACCUM</div>
+        <div><span class="ok">✓</span> snapshot saved 21:42:07</div>
+        <div>watchdog clear · 60fps</div>
+      </div>
+      <div class="thumbs"><div class="thumb"></div><div class="thumb"></div><div class="thumb"></div><div class="thumb"></div></div>
+      <div class="row"><button class="btn ghost" id="devToggle">DEV ▸</button></div>
+      <div id="devBody" hidden>
+        <div class="kv dim"><span>metal dispatch</span><span>ready · 2.1ms</span></div>
+        <div class="kv dim"><span>ANE curator</span><span>84.2% · 3.4ms</span></div>
+        <div class="kv dim"><span>native I/O</span><span>ok</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="pop" hidden>
+  <span class="plabel">BATCH</span>
+  <button id="popMinus">−</button><span class="pv" id="popVal">12</span><button id="popPlus">+</button>
+</div>
+
+<div id="note">pipeline panel study — capture first, diagnostics last.<br>matrices for discrete, amber for values, DEV behind a disclosure.<br>not the app.</div>
+
+<script>
+'use strict';
+// button matrices: one hard state per group (discrete = ink/red, TE)
+document.querySelectorAll('.matrix').forEach(function (m) {
+  m.addEventListener('click', function (e) {
+    var b = e.target.closest('.mbtn');
+    if (!b) return;
+    m.querySelectorAll('.mbtn').forEach(function (x) { x.classList.remove('sel'); });
+    b.classList.add('sel');
+  });
+});
+
+// hero render: simulated pass with progress + log line
+var renderBtn = document.getElementById('renderBtn');
+var renderBar = document.getElementById('renderBar');
+var log = document.getElementById('log');
+function stamp() {
+  var d = new Date();
+  return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
+}
+function addLog(html) {
+  var div = document.createElement('div');
+  div.innerHTML = html;
+  log.prepend(div);
+  while (log.children.length > 5) log.removeChild(log.lastChild);
+}
+renderBtn.addEventListener('click', function () {
+  if (renderBtn.disabled) return;
+  renderBtn.disabled = true;
+  renderBtn.textContent = 'RENDERING…';
+  var p = 0;
+  var iv = setInterval(function () {
+    p += 8 + Math.random() * 10;
+    renderBar.style.width = Math.min(100, p) + '%';
+    if (p >= 100) {
+      clearInterval(iv);
+      setTimeout(function () {
+        renderBtn.disabled = false;
+        renderBtn.textContent = '▶ RENDER STILL';
+        renderBar.style.width = '0';
+        addLog('<span class="ok">✓</span> render done — 2x · ACCUM · ' + stamp());
+      }, 250);
+    }
+  }, 110);
+});
+
+// movie: webm export with loop length
+var movieBtn = document.getElementById('movieBtn');
+var loopSec = 6;
+movieBtn.addEventListener('click', function () {
+  if (movieBtn.disabled) return;
+  movieBtn.disabled = true;
+  var label = movieBtn.textContent;
+  movieBtn.textContent = 'WORKING…';
+  setTimeout(function () {
+    movieBtn.disabled = false;
+    movieBtn.textContent = label;
+    addLog('<span class="ok">✓</span> movie saved — webm · ' + loopSec + 's loop · ' + stamp());
+  }, 900);
+});
+
+// snap: log line
+document.getElementById('snapBtn').addEventListener('click', function () {
+  addLog('<span class="ok">✓</span> snapshot saved ' + stamp());
+});
+
+// project: one file in, one file out
+document.getElementById('exportBtn').addEventListener('click', function () {
+  addLog('<span class="ok">✓</span> project exported — 1 file · ' + stamp());
+});
+document.getElementById('importBtn').addEventListener('click', function () {
+  addLog('import — project · hits · taste · palettes applied · ' + stamp());
+});
+
+// DEV disclosure
+var devToggle = document.getElementById('devToggle');
+var devBody = document.getElementById('devBody');
+devToggle.addEventListener('click', function () {
+  var open = devBody.hidden;
+  devBody.hidden = !open;
+  devToggle.textContent = open ? 'DEV ▾' : 'DEV ▸';
+});
+
+// amber value → panel-edge stepper popup (BUILD-panel language)
+var pop = document.getElementById('pop');
+var popVal = document.getElementById('popVal');
+var popLabel = pop.querySelector('.plabel');
+var batchN = document.getElementById('batchN');
+var batchCount = 12;
+function openPop(anchor, get, set, opts) {
+  opts = opts || {};
+  var min = opts.min != null ? opts.min : 1;
+  var max = opts.max != null ? opts.max : 99;
+  var fmt = opts.fmt || String;
+  popLabel.textContent = opts.label || '';
+  function show() { popVal.textContent = fmt(get()); }
+  show();
+  var r = anchor.getBoundingClientRect();
+  pop.style.left = Math.max(8, r.left + r.width / 2 - 80) + 'px';
+  pop.style.top = (r.bottom + 26) + 'px';
+  pop.hidden = false;
+  document.getElementById('popMinus').onclick = function () { set(Math.max(min, get() - 1)); show(); };
+  document.getElementById('popPlus').onclick = function () { set(Math.min(max, get() + 1)); show(); };
+  setTimeout(function () {
+    document.addEventListener('click', function h(e) {
+      if (!pop.contains(e.target) && e.target !== anchor) {
+        pop.hidden = true;
+        document.removeEventListener('click', h);
+      }
+    });
+  }, 0);
+}
+batchN.addEventListener('click', function (e) {
+  e.stopPropagation();
+  openPop(batchN,
+    function () { return batchCount; },
+    function (v) { batchCount = v; batchN.textContent = v; },
+    { label: 'BATCH' });
+});
+var loopN = document.getElementById('loopN');
+loopN.addEventListener('click', function (e) {
+  e.stopPropagation();
+  openPop(loopN,
+    function () { return loopSec; },
+    function (v) { loopSec = v; },
+    { min: 0, max: 60, fmt: function (v) { return v + 's'; }, label: 'LOOP' });
+});
+</script>
+</body>
+</html>
