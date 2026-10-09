@@ -6,6 +6,11 @@
 // configs fall back to JS exactly, and the 400x120 workload is faster than
 // the JS engine it replaces.
 //
+// #1235 — the checked-in wasm must match the checked-in Rust source: the
+// gate in section 0 recomputes the source hash of rust/swarm-bake and fails
+// unless it equals the swarm_bake.wasm.sha256 sidecar recorded by
+// scripts/build-swarm-wasm.sh. A stale or hand-rebuilt wasm fails CI.
+//
 // On fidelity: the swarm is chaotic, and the wasm module evaluates sin/cos/
 // atan2 with libm while JS uses V8's implementations (~1 ulp apart — the same
 // gap the engine already documents between x64 and arm64 in kernel/bake's
@@ -14,6 +19,10 @@
 // the same macroscopic distribution. The gates below assert exactly that:
 // bit-exact noise, near-exact short bakes, distribution-level long bakes.
 import assert from 'node:assert';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { bakeParticles } from './index.js';
 import {
   ensureSwarmWasm,
@@ -36,6 +45,54 @@ const base = {
   canvasH: 700,
   steps: 120,
 };
+
+// --- 0. #1235: checked-in wasm matches the checked-in Rust source --------
+// Source-hash spec — MUST match scripts/build-swarm-wasm.sh (keep in sync):
+//   files  = Cargo.toml, Cargo.lock, every *.rs under src/ (recursive),
+//            paths relative to rust/swarm-bake/, sorted byte-wise;
+//   digest input per file = "<relpath>\n" + raw file bytes + "\n".
+const SELFCHECK_DIR = dirname(fileURLToPath(import.meta.url));
+const SWARM_BAKE_DIR = join(SELFCHECK_DIR, '..', '..', '..', '..', '..', 'rust', 'swarm-bake');
+const SOURCE_HASH_SIDECAR = join(SELFCHECK_DIR, '..', 'wasm', 'swarm_bake.wasm.sha256');
+
+function swarmBakeSourceHash(srcDir) {
+  const files = ['Cargo.toml', 'Cargo.lock'];
+  const walkRs = (dir) => {
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walkRs(p);
+      else if (name.endsWith('.rs')) files.push(relative(srcDir, p));
+    }
+  };
+  walkRs(join(srcDir, 'src'));
+  files.sort();
+  const h = createHash('sha256');
+  for (const rel of files) {
+    h.update(`${rel}\n`);
+    h.update(readFileSync(join(srcDir, rel)));
+    h.update('\n');
+  }
+  return h.digest('hex');
+}
+
+{
+  let recorded;
+  try {
+    recorded = readFileSync(SOURCE_HASH_SIDECAR, 'utf8').trim();
+  } catch (e) {
+    assert.fail(
+      `swarm_bake.wasm.sha256 sidecar is missing — run ./scripts/build-swarm-wasm.sh: ${e.message}`,
+    );
+  }
+  const current = swarmBakeSourceHash(SWARM_BAKE_DIR);
+  assert.strictEqual(
+    current,
+    recorded,
+    `checked-in swarm_bake.wasm does not match the Rust source (run ./scripts/build-swarm-wasm.sh):\n` +
+      `  recorded: ${recorded}\n  current:  ${current}`,
+  );
+  console.log(`[ok] checked-in wasm matches Rust source (source hash ${current.slice(0, 12)}…)`);
+}
 
 const wasm = await ensureSwarmWasm();
 assert.ok(wasm, `swarm wasm must load in Node (checked-in artifact): ${swarmWasmLoadError()}`);
