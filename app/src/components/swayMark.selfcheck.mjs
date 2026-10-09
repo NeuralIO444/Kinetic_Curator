@@ -1,7 +1,7 @@
 // swayMark.selfcheck.mjs — the presence mark next to BEATS (#1258).
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { swayMagnitude, SWAY_DELTA_MAX, SWAY_VISIBLE_THRESHOLD } from '../curator/swayView.mjs';
+import { swayMagnitude, SWAY_DELTA_MAX, SWAY_VISIBLE_THRESHOLD, setSwayMagnitude, getSwayMagnitude } from '../curator/swayView.mjs';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 let n = 0;
@@ -44,20 +44,32 @@ ok('never named on the surface: no title, no tooltip, no label', () => {
   assert.ok(jsx.includes('aria-hidden="true"'), 'screen readers skip the glyph');
 });
 
-ok('the Director never renders: the mark reads the store, not the scheduler', () => {
+ok('the ephemeral holder: publish then read, garbage stays 0', () => {
+  setSwayMagnitude(0.5);
+  assert.equal(getSwayMagnitude(), 0.5);
+  setSwayMagnitude(-1);
+  assert.equal(getSwayMagnitude(), 0);
+  setSwayMagnitude(99);
+  assert.equal(getSwayMagnitude(), 1);
+  setSwayMagnitude(0);
+  assert.equal(getSwayMagnitude(), 0);
+});
+
+ok('the Director never renders: the mark reads the holder, not the scheduler', () => {
   // (The canonical guard is director.selfcheck's "no UI-surface file
   // references the director scheduler" — this just pins the architecture:
   // the mark imports no scheduler module and reads the published magnitude.)
   const jsx = read('./SwayMark.jsx');
   assert.ok(!jsx.includes('curator/director'), 'no scheduler import');
-  assert.ok(jsx.includes('s.swayMagnitude'), 'reads the magnitude from the store');
+  assert.ok(jsx.includes('getSwayMagnitude()'), 'reads the ephemeral holder');
+  assert.ok(jsx.includes('s.curatePress'), 're-renders on every pick');
 });
 
-ok('the pick path publishes sway to the store', () => {
+ok('the pick path publishes sway to the holder (never store state)', () => {
   const slice = read('../state/slices/layoutSlice.js');
-  assert.ok(slice.includes('swayMagnitude: 0'), 'initial state carries the field');
-  assert.ok(/swayMagnitude\(.*\.lastSway\)/.test(slice), 'curate publishes the latest tick sway');
+  assert.ok(/setSwayMagnitude\(swayMagnitude\(.*\.lastSway\)\)/.test(slice), 'curate publishes the latest tick sway');
   assert.ok(slice.includes("from '../../curator/swayView.mjs'"), 'magnitude via the sanctioned view reader');
+  assert.ok(!/swayMagnitude\s*:/.test(slice), 'no sway key in store state (deniability law)');
 });
 
 ok('placement: the mark sits immediately right of BEATS in the top bar', () => {

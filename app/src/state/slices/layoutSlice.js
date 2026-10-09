@@ -22,7 +22,7 @@ import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
 import { rollPatternLayers } from '../../pattern/patternRoll.js'; // PATTERN is part of the KIN and CURATOR systems
 import { getDirector } from '../../curator/director.js'; // #1145: the room scales the candidate count
-import { swayMagnitude } from '../../curator/swayView.mjs'; // #1258: the pick path publishes sway for the presence mark
+import { swayMagnitude, setSwayMagnitude } from '../../curator/swayView.mjs'; // #1258: publish sway for the presence mark (ephemeral, not store state)
 import { loisActivity } from '../../curator/loisActivity.js'; // #1145: the honest feed
 import { mkRng } from '../../engine/prng.js';
 
@@ -134,12 +134,6 @@ export const createLayoutSlice = (set) => ({
   seedOffsets: defaultSeedOffsets(),
   /** CURATE press counter (#518) — session-only, never serialized. */
   curatePress: 0,
-  /**
-   * Queen sway magnitude 0..1 for the presence mark (#1258) — written by the
-   * pick path on every CURATE press, read by the top-bar mark. Session-only,
-   * never serialized. The mark shows above its threshold; 0 is silence.
-   */
-  swayMagnitude: 0,
   // #592 — did the last CURATE press fall back to an unconditioned roll?
   curateChainFallback: false,
   paletteId: 'praystation',
@@ -653,6 +647,12 @@ export const createLayoutSlice = (set) => ({
     }
     const { index } = pickCurated(candidates, curator, rng);
     if (index < 0) return {};
+    // #1258: publish the sway from the latest Director tick (the persona
+    // picks above ticked during pickCurated) for the top-bar presence mark.
+    // Ephemeral module signal, NOT store state (deniability law: she must
+    // not appear in state). Written synchronously before the store commit
+    // below, so the mark's re-render reads it fresh.
+    setSwayMagnitude(swayMagnitude(getDirector().lastSway));
     // PATTERN tracks are curated too, on their own seeded stream keyed by the same (seed, press #): the same press
     // deals the same patterns again. (The taste engine scores layout params, not patterns: this is seeded dice.)
     const pat = rollPatternLayers(state.layers, 'curate', rngForIndex(state.seed, CH.curate, press + 0x10000, state.seedOffsets));
@@ -661,10 +661,6 @@ export const createLayoutSlice = (set) => ({
       ...(pat.changed ? { layers: pat.layers } : {}),
       layoutParams: candidates[index],
       curatePress: press + 1,
-      // #1258: publish the sway from the latest Director tick (the persona
-      // picks above ticked during pickCurated) for the top-bar presence mark.
-      // The mark reads this, never the scheduler.
-      swayMagnitude: swayMagnitude(getDirector().lastSway),
       // Honest flag: if any chain had no row for the current value this press
       // had no memory behind it, and the bar says so.
       curateChainFallback: chainFellBack,

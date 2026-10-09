@@ -30,3 +30,20 @@ export function swayMagnitude(view) {
   if (!Number.isFinite(d) || d <= 0) return 0;
   return Math.min(1, Math.max(0, d / SWAY_DELTA_MAX));
 }
+
+// ─── the ephemeral current magnitude (NOT store state) ───
+// Deniability law (queenDeniability.selfcheck): "state is data, so she must
+// not appear in it" — no store key may be named sway/queen/lean. The sway
+// signal is ephemeral, not data, so it lives here: the pick path publishes
+// it, the presence mark reads it. Never serialized, never in devtools.
+let currentMagnitude = 0;
+
+/** Called by the pick path after the Director ticks. */
+export function setSwayMagnitude(n) {
+  currentMagnitude = Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
+}
+
+/** Called by the presence mark on render. */
+export function getSwayMagnitude() {
+  return currentMagnitude;
+}

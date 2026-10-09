@@ -6,19 +6,21 @@
 // source for her identifiers; this file references none of them.)
 //
 // Behavior: present and breathing amber (Davis — sway is a continuous signal)
-// when the sway magnitude in the store clears the threshold; fully absent
-// below it (silence is default, not a dimmed ghost). The pick path publishes
-// the magnitude on every CURATE press. The component never references the
-// scheduler (director.selfcheck: "the Director never renders") — it reads
-// the store, which the allowed pick path writes. Reduced motion: static
+// when the sway magnitude clears the threshold; fully absent below it
+// (silence is default, not a dimmed ghost). The pick path publishes the
+// magnitude to an ephemeral module holder on every CURATE press (deniability
+// law: she must not appear in store state). The component never references
+// the scheduler (director.selfcheck: "the Director never renders") — it
+// re-renders on curatePress and reads the holder. Reduced motion: static
 // mark, no pulse.
 import { useStore } from '../state/store.js';
-import { SWAY_VISIBLE_THRESHOLD } from '../curator/swayView.mjs';
+import { SWAY_VISIBLE_THRESHOLD, getSwayMagnitude } from '../curator/swayView.mjs';
 
 export function SwayMark() {
-  // The store carries the magnitude; the component re-renders when the pick
-  // path publishes a new one (same commit as curatePress).
-  const mag = useStore((s) => s.swayMagnitude);
+  // Re-render on every pick; the pick path wrote the holder synchronously
+  // before this store commit, so the read below is fresh.
+  useStore((s) => s.curatePress);
+  const mag = getSwayMagnitude();
   const visible = Number.isFinite(mag) && mag > SWAY_VISIBLE_THRESHOLD;
   if (!visible) return null;
   return (
