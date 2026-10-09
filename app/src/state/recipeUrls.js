@@ -175,7 +175,8 @@ export function encodeRecipeUrl(fields) {
   }
   // #1127 — ROTATE spin is always written, even at its default: a link that lacks it predates the field and means 0.
   // #1128: so are the two living-motion amounts (breath, drift): a link without them predates the floor.
-  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift']) l[k] = Number.isFinite(layout[k]) ? layout[k] : 0;
+  // #1151: palette-breath likewise.
+  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) l[k] = Number.isFinite(layout[k]) ? layout[k] : 0;
   if (Object.keys(l).length) payload.l = l;
 
   if (stack) payload.k = stack;
@@ -237,7 +238,7 @@ export function decodeRecipeUrl(str) {
     if (!isPlainObject(json.po)) return fail('Bad recipe link: the palette overrides are malformed. Starting from a clean scene.');
     paletteOverrides = json.po;
   }
-  let layoutParams = { ...DEFAULT_LAYOUT_PARAMS, rotateSpin: 0, kinemeBreath: 0, kinemeDrift: 0 }; // #1127/#1128: absent in a link = it predates them
+  let layoutParams = { ...DEFAULT_LAYOUT_PARAMS, rotateSpin: 0, kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0 }; // #1127/#1128/#1151: absent in a link = it predates them
   if (json.l !== undefined) {
     if (!isPlainObject(json.l)) return fail('Bad recipe link: the layout params are malformed. Starting from a clean scene.');
     layoutParams = { ...layoutParams, ...json.l };

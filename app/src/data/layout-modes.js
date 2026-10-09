@@ -132,9 +132,12 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // A NEW scene breathes (0.3) and drifts (0.5), each mark on its own phase from the seed. A project, keep or link
   // saved before these defaults existed loads with both at 0 (normalizeLayoutParams): it opens as it was saved.
   // Amount 0 is a hard gate: the maths is skipped, not multiplied by zero. Boil fps: 8 default, 6–12 exposed.
+  // #1151 — palette-breath joins the floor: a per-instance palette sweep (color domain). Default 0.12 ≈ ±12% of
+  // the palette — shimmer, not strobe. Reduced motion damps it to zero.
   kinemeBreath: 0.3,
   kinemeDrift: 0.5,
   kinemePulse: 0,
+  kinemePaletteBreath: 0.12,
   kinemePattern: 'DRIFT', // #1128 DIRECTOR pattern: DRIFT | SWELL | THUMP (re-weights the amounts; an unknown name is DRIFT)
   kinemeBrushWobble: 0,
   kinemeBoilFps: 8,
@@ -256,6 +259,7 @@ export const PARAM_SPEC = {
   kinemeBreath: { min: 0, max: 1 },
   kinemeDrift: { min: 0, max: 1 },
   kinemePulse: { min: 0, max: 1 },
+  kinemePaletteBreath: { min: 0, max: 1 },
   kinemeBrushWobble: { min: 0, max: 1 },
   kinemeBoilFps: { min: 6, max: 12 },
   tight: { min: 0.05, max: 0.95 },
@@ -482,7 +486,8 @@ export function normalizeLayoutParams(partial) {
 
   // #1127 — a document that predates ROTATE spin keeps its static rotation: absent means 0, not the new default.
   // #1128 — the same rule for the living-motion floor: a document that predates it opens exactly as it was saved.
-  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
+  // #1151 — palette-breath likewise: absent means 0, not the new default.
+  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
 
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);

@@ -26,7 +26,7 @@ const base = (over = {}) => ({
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 40, lifeDrift: 0, jitter: 0, displacement: 0, ...(over.layoutParams || {}) }, ...over, ...(over.layoutParams ? { layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 40, lifeDrift: 0, jitter: 0, displacement: 0, ...over.layoutParams } } : {}),
 });
 const frame = (r, over) => r.resolveLayers(base(over)).find((l) => l.id === 'L').items.map((i) => [i.x, i.y, i.scale]);
-const OFF = { kinemeBreath: 0, kinemeDrift: 0 };
+const OFF = { kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0 };
 
 ok('new scenes get the floor (breath 0.3, drift 0.5, spin off); a document that predates it opens as saved', () => {
   assert.equal(DEFAULT_LAYOUT_PARAMS.kinemeBreath, 0.3); assert.equal(DEFAULT_LAYOUT_PARAMS.kinemeDrift, 0.5);

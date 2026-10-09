@@ -70,7 +70,7 @@ import {
 } from './kineme.js';
 
 // declarations
-assert.strictEqual(KINEME_DRIVERS.length, 4, 'curated v1 set (Matt decision 6)');
+assert.strictEqual(KINEME_DRIVERS.length, 5, 'v1 set + palette-breath (Matt decision 6, extended #1151)');
 for (const d of KINEME_DRIVERS) {
   assert.ok(typeof d.id === 'string' && d.id, 'stable id');
   assert.ok(Array.isArray(d.targets) && d.targets.length, `${d.id}: targets`);
@@ -84,6 +84,18 @@ assert.strictEqual(getKinemeDriver('breath').clock, 'smooth');
 assert.strictEqual(getKinemeDriver('brush-wobble').clock, 'boil');
 assert.strictEqual(getKinemeDriver('nope'), undefined);
 assert.ok(isKinemeDriver('drift') && !isKinemeDriver('nope'));
+// #1151 — palette-breath declaration
+{
+  const d = getKinemeDriver('palette-breath');
+  assert.ok(d, 'palette-breath registered');
+  assert.deepStrictEqual(d.targets, ['paletteShift']);
+  assert.strictEqual(d.amountMeaning, 'palette sweep reach, fraction of palette length');
+  assert.deepStrictEqual(d.amountRange, [0, 1]);
+  assert.strictEqual(d.phaseMode, 'per-instance');
+  assert.strictEqual(d.clock, 'smooth');
+  assert.strictEqual(d.costTier, 'cpu-cheap');
+  assert.ok(isKinemeDriver('palette-breath'));
+}
 
 const mkSoa = (n, seed) => ({
   n,
@@ -150,6 +162,87 @@ const ctx0 = {
   const d = evaluateKineme(soa, { ...c, boilStep: 27 }).dWobble;
   assert.ok(!a.every((v, k) => v === d[k]), 'jumps on the next frame');
   assert.ok(a.every((v) => v >= -1 && v <= 1), '±1 edge-band fraction');
+}
+
+// #1151 — palette-breath: bounded sweep in slots, periodic, per-instance
+{
+  const soa = mkSoa(8);
+  const pal = { swatches: ['#111', '#222', '#333', '#444'] };
+  const d = evaluateKineme(soa, { ...ctx0, amounts: { paletteBreath: 1 }, palette: pal });
+  assert.ok(d.active);
+  assert.ok(d.dPalette.every((v) => Math.abs(v) <= 4 + 1e-12), 'reach = amount × palette length (slots)');
+  assert.ok(new Set([...d.dPalette].map((v) => v.toFixed(6))).size > 4, 'phases differ: traveling waves');
+  const d2 = evaluateKineme(soa, { ...ctx0, driverSec: 3.25 + 25, amounts: { paletteBreath: 1 }, palette: pal });
+  for (let k = 0; k < 8; k++) assert.ok(Math.abs(d.dPalette[k] - d2.dPalette[k]) < 1e-9, 'one period (25s) returns');
+  const d0 = evaluateKineme(soa, { ...ctx0, driverSec: 0, anchored: true, amounts: { paletteBreath: 1 }, palette: pal });
+  assert.ok(d0.dPalette.every((v) => v === 0), 'anchored: t=0 is rest, byte-identical still');
+  // amount 0 / no palette → hard gate: zeros
+  const off = evaluateKineme(soa, { ...ctx0, amounts: { paletteBreath: 0 }, palette: pal });
+  assert.ok(off.dPalette.every((v) => v === 0), 'amount 0: no deltas');
+  const nopal = evaluateKineme(soa, { ...ctx0, amounts: { paletteBreath: 1 } });
+  assert.ok(nopal.dPalette.every((v) => v === 0), 'no palette: no deltas');
+}
+
+// #1151 — palette-breath applier: slots wrap modulo length, undo restores
+{
+  const soa = mkSoa(8);
+  soa.palSlot = [0, 1, 2, 3, 0, 1, 2, 3];
+  const swatches = ['#111', '#222', '#333', '#444'];
+  const baseColors = soa.palSlot.map((s) => swatches[s]);
+  const baseAccents = soa.palSlot.map((s) => swatches[(s + 3) % 4]);
+  const colors = [...baseColors];
+  const accents = [...baseAccents];
+  const ctx = {
+    ...ctx0, seed: 42, driverSec: 3.25, anchored: true,
+    amounts: { paletteBreath: 1 }, palette: { swatches }, colorArrays: { colors, accents },
+  };
+  const undo = applyKinemeDrivers(soa, ctx);
+  assert.ok(typeof undo === 'function', 'applier ran with palette ctx');
+  const d = evaluateKineme(soa, ctx);
+  let moved = 0;
+  for (let k = 0; k < 8; k++) {
+    const s = (((soa.palSlot[k] + Math.round(d.dPalette[k])) % 4) + 4) % 4;
+    assert.strictEqual(colors[k], swatches[s], `k=${k}: slot wraps modulo length`);
+    assert.strictEqual(accents[k], swatches[(s + 3) % 4], `k=${k}: accent re-derives from shifted slot`);
+    assert.ok(swatches.includes(colors[k]), `k=${k}: shifted color is a swatch`);
+    if (colors[k] !== baseColors[k]) moved++;
+  }
+  assert.ok(moved > 0, 'full-reach sweep visibly moves marks');
+  undo();
+  assert.deepStrictEqual(colors, baseColors, 'undo restores base colors (no accumulation)');
+  assert.deepStrictEqual(accents, baseAccents, 'undo restores base accents');
+}
+
+// #1151 — still-marked instances keep their placed color; shed tier 3 is identity
+{
+  const swatches = ['#111', '#222', '#333', '#444'];
+  const mkPal = () => {
+    const soa = mkSoa(4);
+    soa.palSlot = [0, 1, 2, 3];
+    const colors = ['#111', '#222', '#333', '#444'];
+    const accents = ['#444', '#111', '#222', '#333'];
+    return { soa, colors, accents };
+  };
+  const base = (p) => ({ ...ctx0, amounts: { paletteBreath: 1 }, palette: { swatches }, colorArrays: { colors: p.colors, accents: p.accents } });
+  {
+    const p = mkPal();
+    const undo = applyKinemeDrivers(p.soa, base(p), new Uint8Array([1, 0, 0, 0]));
+    assert.strictEqual(p.colors[0], '#111', 'still mark keeps its placed color');
+    if (undo) undo();
+  }
+  {
+    const p = mkPal();
+    const before = [...p.colors];
+    const r = applyKinemeDrivers(p.soa, { ...base(p), shedTier: 3 });
+    assert.strictEqual(r, null, 'shed tier 3: applier returns null');
+    assert.deepStrictEqual(p.colors, before, 'shed tier 3: colors untouched');
+  }
+  {
+    const p = mkPal();
+    const before = [...p.colors];
+    applyKinemeDrivers(p.soa, { ...base(p), amounts: { paletteBreath: 0 } });
+    assert.deepStrictEqual(p.colors, before, 'amount 0: colors bit-identical');
+  }
 }
 
 // shed tiers 3/4 → identity even with amounts up
@@ -220,6 +313,18 @@ import { buildPlacements } from './buildPlacements.js';
     assert.strictEqual(pinned[i].x, plain[i].x, 'shed pin: x identical');
     assert.strictEqual(pinned[i].scale, plain[i].scale, 'shed pin: scale identical');
   }
+
+  // #1151 — palette-breath integration: colors move with amount up, bit-identical at 0
+  const palKin = (amounts, extra = {}) => kin({ ...zero, ...amounts }, extra);
+  const plainColors = plain.map((it) => it.color);
+  const zeroPal = buildPlacements({ ...base, kineme: palKin({ paletteBreath: 0 }) }).items;
+  for (let i = 0; i < plain.length; i++) {
+    assert.strictEqual(zeroPal[i].color, plainColors[i], 'amount 0: color bit-identical');
+  }
+  const alivePal = buildPlacements({ ...base, kineme: palKin({ paletteBreath: 1 }) }).items;
+  let colorMoved = 0;
+  for (let i = 0; i < plain.length; i++) if (alivePal[i].color !== plainColors[i]) colorMoved++;
+  assert.ok(colorMoved > 0, 'palette-breath moves some marks');
 }
 
 console.log('kineme.selfcheck: OK (placements integration)');

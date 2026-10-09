@@ -60,7 +60,7 @@ ok('patternKey: a static pattern ignores time; a drifting one keys on it; palett
 const input = (layers, over = {}) => ({
   layers, activeLayerId: 'kc', layerSnapshots: {}, seed: 1234, paletteId: 'v01d', paletteOverrides: null, userPalettes: [],
   // the KC track's living-motion floor (#1128) is off here: these checks are about the PATTERN track's own contract
-  layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 20, kinemeBreath: 0, kinemeDrift: 0 }, caGrid: null, enabledAssets: null, assetWeightOverrides: {},
+  layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 20, kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0 }, caGrid: null, enabledAssets: null, assetWeightOverrides: {},
   customAssets: [], quality: 'balanced', lockedParams: {}, batchPaused: false, focusSwap: false, loopTimeMs: 2500, perfClampOverride: null,
   perfTier1: false, assetThin: false, slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100],
   phraseWrapGen: 0, attractor: null, ...over,
