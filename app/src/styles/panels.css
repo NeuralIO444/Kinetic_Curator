@@ -916,13 +916,14 @@
 .big-btn.tribe-lois { border-color: var(--kc-red); }
 .big-btn.tribe-lois:hover { background: var(--kc-red); border-color: var(--kc-red); color: var(--bg); }
 
-/* ─── KC-1 DS primitives — pipeline panel (#1215) ─── */
+
+/* ─── KC-1 DS primitives — pipeline panel (#1215). Square corners per #1033. ─── */
 .ds-matrix { display: inline-flex; gap: 4px; }
 .ds-mbtn {
   padding: 6px 12px; background: rgba(255,255,255,0.03);
   border: 1px solid var(--line); color: var(--dim);
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
-  cursor: pointer; border-radius: 3px;
+  cursor: pointer;
 }
 .ds-mbtn:hover { color: var(--ink); border-color: var(--line-2); }
 .ds-mbtn.sel {
@@ -933,28 +934,28 @@
 .ds-amber {
   padding: 6px 10px; background: transparent;
   border: 1px solid rgba(255,205,130,0.45); color: var(--kc-davis);
-  font-family: var(--mono); font-size: 11px; cursor: pointer; border-radius: 3px;
+  font-family: var(--mono); font-size: 11px; cursor: pointer;
 }
 .ds-amber:disabled { opacity: 0.4; cursor: default; }
 .ds-pop {
   position: absolute; z-index: 30; top: calc(100% + 6px); left: 50%;
   transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
   padding: 6px 10px; background: var(--panel-2);
-  border: 1px solid rgba(255,205,130,0.45); border-radius: 4px;
+  border: 1px solid rgba(255,205,130,0.45);
   box-shadow: 0 8px 24px rgba(0,0,0,0.55); white-space: nowrap;
 }
 .ds-pop button {
   width: 30px; height: 30px; background: rgba(255,205,130,0.08);
-  border: 1px solid rgba(255,205,130,0.45); border-radius: 3px;
+  border: 1px solid rgba(255,205,130,0.45);
   color: var(--kc-davis); font-size: 15px; cursor: pointer;
 }
 .ds-pop-val { color: var(--kc-davis); font-family: var(--mono); font-size: 13px; min-width: 40px; text-align: center; }
 .ds-chip {
   display: inline-block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
-  color: var(--dimmer); border: 1px solid var(--line); border-radius: 12px; padding: 5px 10px;
+  color: var(--dimmer); border: 1px solid var(--line); padding: 5px 10px;
 }
 .ds-chip.tone-amber { color: var(--kc-davis); border-color: rgba(255,205,130,0.45); }
-details.ds-dev { margin-top: 8px; border: 1px dashed var(--line-2); border-radius: 3px; padding: 6px 8px; }
+details.ds-dev { margin-top: 8px; border: 1px dashed var(--line-2); padding: 6px 8px; }
 details.ds-dev > summary {
   cursor: pointer; font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em;
   color: var(--dimmer); user-select: none;
