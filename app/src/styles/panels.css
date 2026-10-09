@@ -961,3 +961,139 @@ details.ds-dev > summary {
   color: var(--dimmer); user-select: none;
 }
 details.ds-dev > summary:hover { color: var(--dim); }
+/* ─── TE compaction (#1202) ───
+   Teenage-Engineering model: discrete choices are ONE button matrix
+   (ink/red, DS #1121 r5); continuous values are amber buttons that open
+   dock editors (r6). Square corners everywhere — radii law #1033.
+   No border-radius is declared in this block, on purpose. */
+
+.te-matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 2px;
+}
+.te-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  min-height: 30px;
+  padding: 3px 4px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--dim);
+  font-size: 8px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer;
+}
+.te-cell:hover { color: var(--ink); border-color: var(--ink); }
+.te-cell.sel { color: var(--bg); background: var(--ink); border-color: var(--ink); }
+.te-cell.sel-red { color: var(--bg); background: var(--kc-red); border-color: var(--kc-red); }
+.te-glyph { font-size: 11px; line-height: 1; }
+.te-cell-label { line-height: 1.2; }
+.te-pips { display: flex; gap: 2px; }
+.te-pips i { width: 8px; height: 3px; box-sizing: border-box; border: 1px solid currentColor; background: transparent; }
+.te-pips i.lit { background: currentColor; }
+
+/* Amber value button: label left, live readout right, lock pip. */
+.te-value { display: flex; gap: 2px; align-items: stretch; }
+.te-value-btn {
+  flex: 1 1 auto;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--kc-davis);
+  cursor: pointer;
+  min-height: 30px;
+}
+.te-value-btn:hover { border-color: var(--kc-davis); }
+.te-value-label { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: var(--dim); text-transform: uppercase; }
+.te-value-display { font-size: 11px; font-weight: 700; color: var(--kc-davis); font-variant-numeric: tabular-nums; }
+.te-value.is-disabled .te-value-btn { opacity: 0.45; cursor: not-allowed; }
+.te-value.is-disabled .te-value-btn:hover { border-color: var(--line-2); }
+.te-lock {
+  flex: 0 0 auto;
+  width: 26px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--dim);
+  font-size: 10px;
+  cursor: pointer;
+}
+.te-lock:hover { color: var(--ink); border-color: var(--ink); }
+.te-lock.locked { color: var(--kc-davis); border-color: var(--kc-davis); }
+
+/* Value dock: absolute inside the panel root, pinned to the panel's right
+   edge. It overlays panel content, NEVER the canvas. */
+.panel { position: relative; }
+.te-dock {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: 228px;
+  background: var(--panel-2);
+  border-left: 1px solid var(--line);
+  z-index: 20;
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 140ms ease-out;
+  pointer-events: none;
+}
+.te-dock.open { transform: translateX(0); pointer-events: auto; }
+.te-dock-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.te-dock-kicker { font-size: 8px; font-weight: 700; letter-spacing: 0.12em; color: var(--dim); }
+.te-dock-title { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--kc-davis); text-transform: uppercase; }
+.te-dock-close {
+  background: transparent; border: 1px solid var(--line-2); color: var(--dim);
+  width: 24px; height: 24px; font-size: 14px; line-height: 1; cursor: pointer;
+}
+.te-dock-close:hover { color: var(--ink); border-color: var(--ink); }
+.te-dock-body { padding: 12px 10px; overflow-y: auto; flex: 1 1 auto; }
+
+/* Dock editors. */
+.te-editor { display: flex; flex-direction: column; gap: 10px; }
+.te-editor-readout {
+  font-size: 20px; font-weight: 800; color: var(--kc-davis);
+  font-variant-numeric: tabular-nums; text-align: center;
+}
+.te-editor-scale { display: flex; justify-content: space-between; font-size: 9px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.te-editor-hint { font-size: 9px; color: var(--dim); text-align: center; }
+.te-slider { width: 100%; accent-color: var(--kc-davis); height: 28px; }
+.te-dual-row { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 6px; font-size: 8px; font-weight: 700; letter-spacing: 0.08em; color: var(--dim); }
+.te-stepper { flex-direction: row; align-items: center; justify-content: space-between; }
+.te-step-btn {
+  width: 44px; height: 44px;
+  background: transparent; border: 1px solid var(--line-2); color: var(--kc-davis);
+  font-size: 20px; cursor: pointer;
+}
+.te-step-btn:hover:not(:disabled) { border-color: var(--kc-davis); }
+.te-step-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.te-dial-wrap { align-items: center; }
+.te-dial { cursor: ns-resize; outline: none; }
+.te-dial:focus-visible { outline: 1px solid var(--kc-davis); outline-offset: 2px; }
+.te-dial-face {
+  width: 84px; height: 84px;
+  border: 2px solid var(--kc-davis);
+  position: relative;
+}
+.te-dial-needle {
+  position: absolute; left: 50%; top: 50%;
+  width: 2px; height: 36px;
+  background: var(--kc-davis);
+  transform-origin: 50% 0%;
+  translate: -50% 0;
+}
+/* Link toggle (SCALE X/Y). */
+.te-link-row { display: flex; justify-content: center; }
+.te-link-btn {
+  padding: 4px 10px;
+  background: transparent; border: 1px solid var(--line-2); color: var(--dim);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.08em; cursor: pointer;
+}
+.te-link-btn.linked { color: var(--bg); background: var(--kc-davis); border-color: var(--kc-davis); }
+
+@media (prefers-reduced-motion: reduce) {
+  .te-dock { transition: none; }
+  .te-cell { transition: none; }
+}

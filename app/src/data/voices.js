@@ -518,6 +518,20 @@ function lerpParamValue(from, to, t) {
   if (isNumArray(from) && isNumArray(to) && from.length === to.length) {
     return from.map((f, i) => f + (to[i] - f) * t);
   }
+  // #1202 — scale is {x:[lo,hi], y:[lo,hi]}; interpolate both axes. A legacy
+  // array mixes against a linked pair.
+  const fromPair = Array.isArray(from) ? { x: from, y: from } : from;
+  const toPair = Array.isArray(to) ? { x: to, y: to } : to;
+  if (fromPair && toPair && typeof fromPair === 'object' && typeof toPair === 'object' &&
+      isNumArray(fromPair.x) && isNumArray(toPair.x)) {
+    const lerpAxis = (a, b) => (isNumArray(a) && isNumArray(b) && a.length === b.length)
+      ? a.map((v, i) => v + (b[i] - v) * t)
+      : (t <= 0 ? a : b);
+    return {
+      x: lerpAxis(fromPair.x, toPair.x),
+      y: lerpAxis(fromPair.y ?? fromPair.x, toPair.y ?? toPair.x),
+    };
+  }
   // Spine E: stop snapping enums at 0.5. At t=0 return `from`; for t>0 return `to`
   // so the live target renders while the held outgoing frame dissolves over it.
   return t <= 0 ? from : (to !== undefined ? to : from);

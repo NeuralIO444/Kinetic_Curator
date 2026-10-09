@@ -155,9 +155,12 @@ export function resolveWasmParams(layoutParams = {}, canvasW = 0, canvasH = 0) {
     swarmCohesion = 1.5,
     gravityWells = 1.0,
     damping = 0.95,
-    scale = [0.4, 1.6],
+    scale: scaleParam = [0.4, 1.6],
     alpha = [40, 100],
   } = layoutParams;
+  // #1202 — scale is {x, y} now; the WASM kernel is scalar, so it reads the
+  // X range (linked = today's behavior, provable no-op).
+  const scale = Array.isArray(scaleParam) ? scaleParam : (scaleParam?.x ?? [0.4, 1.6]);
   const [minScale, maxScale] = scale;
   const [minAlpha, maxAlpha] = alpha;
   return [

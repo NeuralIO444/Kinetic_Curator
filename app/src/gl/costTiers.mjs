@@ -141,8 +141,9 @@ export function allCostTiers() {
  * #333's `_organismItems` can both read. Data + selfcheck only — no
  * ladder behavior change.
  */
+// #1202 — kaleido fans cost like radial fans (same arm count).
 export function radialFanMultiplier(symmetry, bodyLen = 2) {
-  const m = /^radial-(\d+)$/.exec(String(symmetry ?? ''));
+  const m = /^(?:radial|kaleido)-(\d+)$/.exec(String(symmetry ?? ''));
   if (!m) return 1;
   const folds = parseInt(m[1], 10);
   if (!Number.isFinite(folds) || folds < 3) return 1;

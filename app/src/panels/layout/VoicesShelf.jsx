@@ -37,7 +37,10 @@ function UserChip({ voice, active, onTap, onOverwrite, onRename, onDelete }) {
   };
 
   return (
-    <span className={`voice-chip user${active ? ' active' : ''}`}>
+    // #1202 — the shelf renders on the te-cell language (discrete = ink).
+    // Interactions unchanged: tap loads, long-press overwrites, double-click
+    // renames, × deletes.
+    <span className={`te-cell${active ? ' sel' : ''}`} style={{ position: 'relative' }}>
       {renaming ? (
         <input
           className="voice-rename"
@@ -55,7 +58,8 @@ function UserChip({ voice, active, onTap, onOverwrite, onRename, onDelete }) {
         />
       ) : (
         <button
-          className="user-chip-main"
+          className="te-cell-label"
+          style={{ background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
           onPointerDown={startPress}
           onPointerUp={cancelPress}
           onPointerLeave={cancelPress}
@@ -100,7 +104,7 @@ export function VoicesShelf() {
   return (
     <div className="voice-shelf">
       <span className="shelf-label ttl">my voices</span>
-      <div className="shelf-chips">
+      <div className="te-matrix" role="group" aria-label="My voices">
         {userVoices.map((v) => (
           <UserChip
             key={v.id}
@@ -113,13 +117,13 @@ export function VoicesShelf() {
           />
         ))}
         <button
-          className="voice-chip plus-chip"
+          className="te-cell"
           onClick={captureUserVoice}
           disabled={shelfFull}
           title={shelfFull ? 'Voice shelf is full (12)' : 'Capture the current live state as a new voice'}
           aria-label="Capture current state as a voice"
         >
-          +
+          <span className="te-cell-label" style={{ fontSize: 14 }}>+</span>
         </button>
       </div>
     </div>

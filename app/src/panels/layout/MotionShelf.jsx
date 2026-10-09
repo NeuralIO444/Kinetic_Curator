@@ -1,26 +1,24 @@
-// MOTION chips — extracted from ModeGrid.jsx (UX-5 reorg).
+// MOTION chips as a TE button matrix (#1202).
 // Change the animation only, not the arrangement.
 import { useStore } from '../../state/store.js';
 import { MOTION_MODES, isMotionActive } from '../../data/voices.js';
+import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
 
 export function MotionShelf({ layoutParams }) {
   const loadMotion = useStore((s) => s.loadMotion);
   return (
     <div className="voice-shelf">
       <span className="shelf-label ttl">motion</span>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
-        {MOTION_MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={`chip-btn ${isMotionActive(layoutParams, m) ? 'active' : ''}`}
-            onClick={() => loadMotion(m.id)}
-            title={m.vibe}
-          >
-            {m.name}
-          </button>
-        ))}
-      </div>
+      <TeaMatrix
+        ariaLabel="Motion"
+        value={MOTION_MODES.find((m) => isMotionActive(layoutParams, m))?.id}
+        onChange={(id) => loadMotion(id)}
+        options={MOTION_MODES.map((m) => ({
+          id: m.id,
+          label: m.name,
+          title: m.vibe,
+        }))}
+      />
     </div>
   );
 }

@@ -31,6 +31,7 @@ import { CH, hashU01, hashU32, rngForIndex } from './kernel/rng.js';
  * @property {Float64Array} x
  * @property {Float64Array} y
  * @property {Float64Array} scale
+ * @property {Float64Array} scaleY   per-item Y scale (#1202; equals scale when X/Y linked)
  * @property {Float64Array} rotation
  * @property {Float64Array} alpha
  * @property {Float64Array} t
@@ -38,6 +39,7 @@ import { CH, hashU01, hashU32, rngForIndex } from './kernel/rng.js';
  * @property {Uint16Array} zTier
  * @property {Float64Array} depth    zTier depth factor (stage A; scale multiplier)
  * @property {Float64Array} uScale   unit attribute draw, scale    (stage A)
+ * @property {Float64Array} uScaleY  unit attribute draw, Y scale  (stage A, #1202)
  * @property {Float64Array} uRot     unit attribute draw, rotation (stage A)
  * @property {Float64Array} uAlpha   unit attribute draw, alpha    (stage A)
  */
@@ -54,6 +56,7 @@ function allocSoA(capacity) {
     x: new Float64Array(capacity),
     y: new Float64Array(capacity),
     scale: new Float64Array(capacity),
+    scaleY: new Float64Array(capacity), // #1202 — per-item Y scale; equals scale when X/Y linked
     rotation: new Float64Array(capacity),
     alpha: new Float64Array(capacity),
     t: new Float64Array(capacity),
@@ -61,10 +64,16 @@ function allocSoA(capacity) {
     zTier: new Uint16Array(capacity),
     depth: new Float64Array(capacity),
     uScale: new Float64Array(capacity),
+    uScaleY: new Float64Array(capacity), // #1202 — independent Y-scale draw
     uRot: new Float64Array(capacity),
     uAlpha: new Float64Array(capacity),
   };
 }
+
+// #1202 — the Y-scale draw lives on its own index stream: base 2**26 plus
+// the item index can never collide with the i*3(+1,+2) attribute draws above
+// (20k items top out near 60k; the base clears 67M).
+const Y_SCALE_INDEX_BASE = 0x4000000;
 
 /**
  * Stage A + B — everything that does NOT depend on the scale/rotate/alpha
@@ -178,6 +187,7 @@ export function computeGeometrySoA({
     soa.zTier[n] = zTier;
     soa.depth[n] = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
     soa.uScale[n] = hashU01(seed, CH.attr, i * 3, seedOffsets);
+    soa.uScaleY[n] = hashU01(seed, CH.attr, Y_SCALE_INDEX_BASE + i, seedOffsets);
     // Brush stamps aim along their trail tangent: the sampler returns the
     // tangent as a unit draw; every other mode keeps the hash draw, so this
     // is a no-op for them.
@@ -208,8 +218,16 @@ export function computeGeometrySoA({
  * @param {PlacementSoA} soa mutated in place
  */
 export function applyAttributes(soa, { scale, rotate, alpha }) {
-  const scale0 = scale[0];
-  const scaleD = scale[1] - scale[0];
+  // #1202 — scale is { x:[lo,hi], y:[lo,hi] }; a legacy [lo,hi] array reads
+  // as linked. Linked (the default): Y is bit-identical to X — the provable
+  // no-op. Unlinked: Y samples its own independent draw (uScaleY).
+  const sx = Array.isArray(scale) ? scale : scale.x;
+  const sy = Array.isArray(scale) ? null : scale.y;
+  const scale0 = sx[0];
+  const scaleD = sx[1] - sx[0];
+  const linked = !sy || (sy[0] === sx[0] && sy[1] === sx[1]);
+  const sy0 = linked ? 0 : sy[0];
+  const syD = linked ? 0 : sy[1] - sy[0];
   // #269 — null guard: a raw caller (or corrupt snapshot) with rotate:null
   // must degrade to zero rotation, not TypeError and freeze the frame loop.
   const rot0 = rotate?.[0] ?? 0;
@@ -217,12 +235,14 @@ export function applyAttributes(soa, { scale, rotate, alpha }) {
   const alpha0 = alpha[0];
   const alphaD = alpha[1] - alpha[0];
 
-  const { n, uScale, uRot, uAlpha, depth } = soa;
+  const { n, uScale, uScaleY, uRot, uAlpha, depth } = soa;
   for (let k = 0; k < n; k++) {
     // Same expression and the same FP operation order as the fused kernel —
     // `(base + delta * u) * depth`. Any reassociation here moves the golden
     // hash.
-    soa.scale[k] = (scale0 + scaleD * uScale[k]) * depth[k];
+    const s = (scale0 + scaleD * uScale[k]) * depth[k];
+    soa.scale[k] = s;
+    soa.scaleY[k] = linked ? s : (sy0 + syD * uScaleY[k]) * depth[k];
     soa.rotation[k] = rot0 + rotD * uRot[k];
     soa.alpha[k] = alpha0 + alphaD * uAlpha[k];
   }

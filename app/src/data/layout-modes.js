@@ -45,8 +45,31 @@ export function isOrganismMode(mode) {
   return mode === 'hype';
 }
 
-export const SYMMETRY_MODES = ['none', 'bilateral', 'radial-4', 'radial-6', 'radial-8', 'stamp'];
+export const SYMMETRY_MODES = ['none', 'bilateral', 'radial-4', 'radial-6', 'radial-8', 'radial-12', 'kaleido-6', 'kaleido-8', 'kaleido-12'];
 export const BEHAVE_MODES = BEHAVE_IDS;
+
+/** #1202 — MIRROR is a 4-state reflection mode, not a boolean.
+ *  OFF = no reflection, X/Y = single-axis (2× items), XY = both axes (4×). */
+export const MIRROR_STATES = ['off', 'x', 'y', 'xy'];
+
+/** Reflection multiplier: how many copies each source item becomes. */
+export function mirrorMultiplier(mirror) {
+  if (mirror === 'xy') return 4;
+  if (mirror === 'x' || mirror === 'y' || mirror === true) return 2; // legacy boolean true = X
+  return 1;
+}
+
+/** Parse a symmetry id into { kind, folds }.
+ *  kind: 'none' | 'bilateral' | 'radial' (cyclic, rotation-only) | 'kaleido' (dihedral, alternating mirrors). */
+export function symmetryParts(symmetry) {
+  const s = String(symmetry ?? 'none');
+  if (s === 'bilateral') return { kind: 'bilateral', folds: 0 };
+  let m = /^radial-(\d+)$/.exec(s);
+  if (m) return { kind: 'radial', folds: parseInt(m[1], 10) };
+  m = /^kaleido-(\d+)$/.exec(s);
+  if (m) return { kind: 'kaleido', folds: parseInt(m[1], 10) };
+  return { kind: 'none', folds: 0 };
+}
 
 /** #167 — onContact response per overlapping pair. */
 export const CONTACT_MODES = ['none', 'bounce', 'swap', 'stick', 'die', 'breed'];
@@ -61,14 +84,14 @@ export const DEFAULT_LAYOUT_PARAMS = {
   composition: 'praystation',
   mode: 'fibonacci',
   count: 240,
-  scale: [0.4, 1.6],
+  scale: { x: [0.4, 1.6], y: [0.4, 1.6] }, // #1202 — non-uniform scale: linked default = the old pair twice
   rotate: [-180, 180],
   alpha: [40, 100],
   zTiers: 4,
   jitter: 24,
   density: 78,
   bleed: false,
-  mirror: false,
+  mirror: 'off', // #1202 — 4-state reflection: off | x | y | xy
   previewDownscale: false,
   renderWorker: false,
   overlap: true,
@@ -342,7 +365,7 @@ export const RANGE_HARD = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'mirror', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker', 'glass']; // #268: recolor removed
+const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker', 'glass']; // #268: recolor removed; #1202: mirror is a 4-state enum now
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -371,6 +394,7 @@ const ENUM_SPEC = {
   blendMode: BLEND_MODES,
   paletteShift: PALETTE_SHIFTS,
   symmetry: SYMMETRY_MODES,
+  mirror: MIRROR_STATES, // #1202 — 4-state reflection
   behave: BEHAVE_MODES,
   contactMode: CONTACT_MODES,
   audioResponse: AUDIO_RESPONSE_IDS, // #306
@@ -418,11 +442,20 @@ export function validateLayoutParams(partial) {
       const nullable = DEFAULT_LAYOUT_PARAMS[key] === null;
       if (!(nullable && value === null) && !isNumericish(value)) rejected.push(key);
     } else if (RANGE_SPEC[key]) {
-      const usable = Array.isArray(value) && value.length >= 2
-        && isNumericish(value[0]) && isNumericish(value[1]);
+      // #1202 — scale validates as {x:[lo,hi], y:[lo,hi]}; a legacy array
+      // still validates (normalize migrates it to a linked pair).
+      const isPair = (p) => Array.isArray(p) && p.length >= 2 && isNumericish(p[0]) && isNumericish(p[1]);
+      const usable = key === 'scale'
+        ? (isPair(value) || (value && typeof value === 'object' && isPair(value.x) && isPair(value.y ?? value.x)))
+        : (Array.isArray(value) && value.length >= 2 && isNumericish(value[0]) && isNumericish(value[1]));
       if (!usable) rejected.push(key);
     } else if (ENUM_SPEC[key]) {
-      if (!pickEnumOk(value, ENUM_SPEC[key])) rejected.push(key);
+      // #1202 — mirror accepts legacy booleans; normalize migrates them
+      // (true→'x', false→'off'), so they are not rejections.
+      const ok = key === 'mirror' && typeof value === 'boolean'
+        ? true
+        : pickEnumOk(value, ENUM_SPEC[key]);
+      if (!ok) rejected.push(key);
     }
     // Booleans coerce rather than reject; unknown keys are passed through
     // untouched, same as normalizeLayoutParams.
@@ -449,6 +482,7 @@ export function normalizeLayoutParams(partial) {
   }
 
   for (const key of RANGE_KEYS) {
+    if (key === 'scale') continue; // #1202 — scale is {x,y} now, normalized below
     const v = next[key];
     const spec = RANGE_HARD[key];
     // QA (2026-09-16): length was checked but entries were not, so
@@ -464,6 +498,37 @@ export function normalizeLayoutParams(partial) {
       ? [clampNum(v[0], spec, DEFAULT_LAYOUT_PARAMS[key][0]),
         clampNum(v[1], spec, DEFAULT_LAYOUT_PARAMS[key][1])]
       : DEFAULT_LAYOUT_PARAMS[key].slice();
+  }
+
+  // #1202 — SCALE is { x:[lo,hi], y:[lo,hi] }. A legacy array migrates to a
+  // linked {x, y} pair (identical values) — the linked default is
+  // behavior-identical to the old pair, provable no-op.
+  {
+    const v = next.scale;
+    const dx = DEFAULT_LAYOUT_PARAMS.scale.x, dy = DEFAULT_LAYOUT_PARAMS.scale.y;
+    const pair = (p, fb) => {
+      const usable = Array.isArray(p) && p.length >= 2
+        && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1]));
+      return usable
+        ? [clampNum(p[0], RANGE_HARD.scale, fb[0]), clampNum(p[1], RANGE_HARD.scale, fb[1])]
+        : fb.slice();
+    };
+    if (Array.isArray(v)) {
+      const p = pair(v, dx);
+      next.scale = { x: p, y: p.slice() };
+    } else if (v && typeof v === 'object') {
+      const x = pair(v.x, dx);
+      next.scale = { x, y: pair(v.y ?? v.x, dy) };
+    } else {
+      next.scale = { x: dx.slice(), y: dy.slice() };
+    }
+  }
+
+  // #1202 — MIRROR is a 4-state enum. Legacy boolean: true → 'x' (the old
+  // X-only mirror), false → 'off'.
+  {
+    const v = next.mirror;
+    next.mirror = typeof v === 'boolean' ? (v ? 'x' : 'off') : pickEnum(v, MIRROR_STATES, 'off');
   }
 
   // #274: legacy fade migration — accumulationFade was stored as a keep
@@ -494,6 +559,15 @@ export function normalizeLayoutParams(partial) {
   }
 
   for (const key of BOOL_KEYS) next[key] = !!next[key];
+
+  // #1202 — legacy 'stamp' symmetry was organism-path X-mirroring. It becomes
+  // the unified X mirror (the placement pipeline never had it; unification
+  // is the point of the bilateral/mirror reconciliation). Runs before the
+  // symmetry enum clamp below, which would otherwise swallow it to 'none'.
+  if (next.symmetry === 'stamp') {
+    next.symmetry = 'none';
+    if (next.mirror === 'off') next.mirror = 'x';
+  }
 
   // Enums. `mode` is the one with teeth: getSampler indexed SAMPLERS
   // directly, so {"mode": "__proto__"} resolved to Object.prototype — truthy,

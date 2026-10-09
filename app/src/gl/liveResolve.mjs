@@ -1,5 +1,5 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
-import { buildPlacements, clampCount } from '../engine/buildPlacements.js';
+import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
 import { createDriverClock, driverTimeSec, patternAmounts } from '../engine/kineme.js'; // #1128: the living-motion floor
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
@@ -335,9 +335,12 @@ export function createLiveResolver() {
     // size keeps stacking order settled unless the items' designed sizes
     // actually differ, or a placement rebuild changes them.
     if (!ctx.layoutParams.overlap) items = [...items].sort((a, b) => a.baseScale - b.baseScale);
-    const stamp = ctx.layoutParams.mirror || ctx.layoutParams.symmetry === 'stamp';
-    if (stamp && ctx.caps.allowMirror) {
-      items = [...items, ...items.map((item) => ({ ...item, x: W - item.x, rotation: -item.rotation, _mirrored: true, key: item.key ? `${item.key}-stamp` : undefined, seedOffset: item.seedOffset }))];
+    // #1202 — 4-state reflection on the organism path (was X-only stamp).
+    // A legacy 'stamp' symmetry still reads as X here; normalize promotes
+    // it to mirror:'x' for new documents.
+    const stampState = ctx.layoutParams.symmetry === 'stamp' ? 'x' : ctx.layoutParams.mirror;
+    if (ctx.caps.allowMirror) {
+      items = mirrorItems(items, stampState, W, H);
     }
     return items;
   }
@@ -448,7 +451,8 @@ export function createLiveResolver() {
           });
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
-      if (input.perfTier1 && layoutParams.mirror) layoutParams.mirror = false;
+      // #1202 — mirror is a 4-state enum; 'off' is truthy, so compare explicitly.
+      if (input.perfTier1 && layoutParams.mirror !== 'off') layoutParams.mirror = 'off';
       // #425 — life drift per layer (see applyLifeDrift): own base, own
       // lifeDrift, own locks — top-level for the active layer, the snapshot
       // for the rest. Life pauses the same two ways it used to: slowRender
@@ -542,7 +546,7 @@ export function createLiveResolver() {
         items = buildPlacements({
           layoutParams, seed, seedOffsets, activeAssets, palette,
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
-          scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
+          scale: input.effectiveScale, scaleY: input.effectiveScaleY, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
           kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
         }).items;
@@ -690,11 +694,14 @@ export function createLiveResolver() {
       // NOT the local layoutParams: that one is already clamped by the
       // governor (`perfTier1 && mirror -> false`, above), and a perf-tier
       // drop is the same class of change as an assetThin shed — it must not
-      // spend a MIX-long swap wave on top of the load that caused it. !! so an
-      // unset mirror and an explicit false hash the same.
+      // spend a MIX-long swap wave on top of the load that caused it.
+      // #1202 — mirror is a 4-state string now; a legacy boolean still reads
+      // (true → 'x'), and an unset mirror hashes as 'off' like before.
+      const srcMirror = src.layoutParams?.mirror;
       const morphSig = [
         layoutParams.mode, layoutParams.behave, seed, assetSig,
-        !!(src.layoutParams?.mirror), src.layoutParams?.symmetry ?? 'none',
+        srcMirror === true ? 'x' : (typeof srcMirror === 'string' ? srcMirror : 'off'),
+        src.layoutParams?.symmetry ?? 'none',
       ].join('|');
       out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
     }

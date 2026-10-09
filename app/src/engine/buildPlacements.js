@@ -22,6 +22,7 @@ import { assignColor, resolveStrategy } from './kernel/color/index.js';
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
+import { mirrorMultiplier } from '../data/layout-modes.js';
 import { getBiologyPolicy } from '../biology/policy.js';
 import { fadeForAge } from '../biology/lifecycle.js';
 import { sortGlassInstances } from './glassSort.mjs';
@@ -66,17 +67,55 @@ function sameSignature(a, b) {
  * #269 — absolute placement ceiling, defense-in-depth. clampCount trusted the
  * caller's count via caps alone, so a hostile/erroneous count of 1e7
  * allocated until the V8 heap died — uncatchable. The richest tier (FINAL)
- * tops out at maxCount 800 and mirror doubles items to ~1600, so 4096 leaves
- * real headroom while no raw caller can OOM the process. Clamp, don't throw;
- * valid inputs are unaffected.
+ * tops out at maxCount 800; the mirror multiplier (1/2/2/4) is priced into
+ * clampCount below, so 4096 leaves real headroom while no raw caller can
+ * OOM the process. Clamp, don't throw; valid inputs are unaffected.
  */
 export const MAX_ABSOLUTE_COUNT = 4096;
 
 export function clampCount(count, mirror, caps) {
-  const maxForMirror = mirror
-    ? (caps.maxCountMirrored ?? caps.maxCount ?? 420)
-    : (caps.maxCount ?? 420);
+  // #1202 — the cap scales with the reflection multiplier so the ITEM budget
+  // stays constant: maxCountMirrored is sized for 2×, so 4× (XY) halves it.
+  const mult = mirrorMultiplier(mirror);
+  const base = mult > 1 ? (caps.maxCountMirrored ?? caps.maxCount ?? 420) : (caps.maxCount ?? 420);
+  const maxForMirror = mult > 2 ? Math.floor((base * 2) / mult) : base;
   return Math.min(MAX_ABSOLUTE_COUNT, Math.max(1, Number(count) || 1), maxForMirror);
+}
+
+/**
+ * #1202 — reflect items across canvas axes. Pure: returns a new array with
+ * the mirrored copies appended (the source list is never mutated).
+ *  'x'  → 2×: (x → W−x, rotation negated, _mirrored)
+ *  'y'  → 2×: (y → H−y, rotation negated, _mirrored)
+ *  'xy' → 4×: x-mirror + y-mirror + the 180° turn (x → W−x, y → H−y,
+ *           rotation unchanged — two reflections restore chirality)
+ * 'off' (or anything unrecognized) → the list unchanged.
+ */
+export function mirrorItems(items, mirrorState, W, H) {
+  // Legacy boolean true reads as X (the old X-only mirror).
+  const st = mirrorState === true ? 'x' : mirrorState;
+  if (st !== 'x' && st !== 'y' && st !== 'xy') return items;
+  const out = [...items];
+  const mirrored = (item, fx, fy) => ({
+    ...item,
+    x: fx ? W - item.x : item.x,
+    y: fy ? H - item.y : item.y,
+    // A single reflection flips chirality (negate rotation, flip scaleX via
+    // _mirrored); two reflections are a 180° turn — chirality restored.
+    rotation: fx !== fy ? -item.rotation : item.rotation,
+    ...(fx !== fy ? { _mirrored: true } : null),
+    key: item.key ? `${item.key}-m${fx ? 'x' : ''}${fy ? 'y' : ''}` : undefined,
+  });
+  if (st === 'x' || st === 'xy') {
+    for (const item of items) out.push(mirrored(item, true, false));
+  }
+  if (st === 'y' || st === 'xy') {
+    for (const item of items) out.push(mirrored(item, false, true));
+  }
+  if (st === 'xy') {
+    for (const item of items) out.push(mirrored(item, true, true));
+  }
+  return out;
 }
 
 /**
@@ -93,6 +132,7 @@ export function buildPlacements({
   canvasW,
   canvasH,
   scale: scaleOverride,
+  scaleY: scaleYOverride, // #1202 — breath-modulated Y range (array) or undefined
   alpha: alphaOverride,
   cache,
   // #720 — DLA / Eden growth. growthTick advances the aggregate one step
@@ -119,11 +159,20 @@ export function buildPlacements({
     return { preset, items: [], safeCount: 0 };
   }
 
-  const mirror = !!layoutParams.mirror;
-  const safeCount = clampCount(layoutParams.count, mirror, caps);
+  // #1202 — mirror is a 4-state enum now ('off'|'x'|'y'|'xy'); a legacy
+  // boolean still reads (true → 'x') via mirrorMultiplier.
+  const mirrorState = typeof layoutParams.mirror === 'boolean'
+    ? (layoutParams.mirror ? 'x' : 'off')
+    : (layoutParams.mirror ?? 'off');
+  const safeCount = clampCount(layoutParams.count, mirrorState, caps);
   const countInt = Math.ceil(safeCount);
   const countFrac = safeCount - Math.floor(safeCount);
-  const scale = scaleOverride ?? layoutParams.scale;
+  // #1202 — resolve X/Y ranges. Breath overrides (arrays) win per-axis;
+  // otherwise the authored {x, y} pair (a legacy array reads as linked).
+  const sc = layoutParams.scale;
+  const xRange = scaleOverride ?? (Array.isArray(sc) ? sc : sc?.x) ?? [0.4, 1.6];
+  const yRange = scaleYOverride ?? (Array.isArray(sc) ? sc : sc?.y) ?? xRange;
+  const scale = { x: xRange, y: yRange };
   const alpha = alphaOverride ?? layoutParams.alpha;
 
   const geoParams = {
@@ -277,6 +326,7 @@ export function buildPlacements({
       item.x = soa.x[k];
       item.y = soa.y[k];
       item.scale = soa.scale[k];
+      item.scaleY = soa.scaleY[k]; // #1202 — equals scale when X/Y linked
       item.rotation = soa.rotation[k];
       item.alpha = soa.alpha[k];
     }
@@ -287,6 +337,7 @@ export function buildPlacements({
         x: soa.x[k],
         y: soa.y[k],
         scale: soa.scale[k],
+        scaleY: soa.scaleY[k], // #1202
         rotation: soa.rotation[k],
         alpha: soa.alpha[k],
         index: soa.index[k],
@@ -312,14 +363,9 @@ export function buildPlacements({
     cache.itemPool = mapped;
   }
 
-  if (mirror && caps.allowMirror) {
-    const mirrored = mapped.map((item) => ({
-      ...item,
-      x: canvasW - item.x,
-      _mirrored: true,
-      key: `${item.key}-m`,
-    }));
-    mapped = [...mapped, ...mirrored];
+  // #1202 — 4-state reflection via the shared helper (off/x/y/xy).
+  if (caps.allowMirror) {
+    mapped = mirrorItems(mapped, mirrorState, canvasW, canvasH);
   }
 
   // #1129 PR1 — translucent sort. Flag glass-type instances from the voice

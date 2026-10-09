@@ -1,67 +1,75 @@
-// Creature / moth sliders — extracted from ParamBlock.jsx (UX-5 reorg).
+// Creature / moth as amber TE value buttons (#1202).
 // The hype/moth family: BODY, flap, TIGHT, breath, wind, METABOLISM.
 // (CROOKED / OPEN / SQUASH are mark-shape — they live in APPEARANCE.)
+// Mode-gated per #272; locks ride on the button.
+// #716 — wind/breath/flap keep the MotionTile glyph (the tile visualizes
+// the value); the rest are TE value buttons.
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { MotionTile } from '../../components/MotionTile.jsx';
-import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
-import { getPreset } from '../../data/presets.js';
 import { emit, Events } from '../../composition/eventBus.js';
+import { ValueButton } from '../build/te/ValueButton.jsx';
+import { SliderEditor } from '../build/te/editors.jsx';
+
+const fmt2 = (v) => (Math.round(v * 100) / 100).toString();
 
 export function CreatureSliders({ layoutParams, lockedParams }) {
-  const preset = getPreset(layoutParams.composition);
-  const defaults = preset.params;
   const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
-  const d = (key, fallback) => defaults[key] !== undefined ? defaults[key] : fallback;
   const mode = layoutParams.mode;
   const isSwarm = mode === 'swarm' || mode === 'murmuration';
   const isHype = mode === 'hype';
   const bilateral = (layoutParams.symmetry ?? 'none') === 'bilateral';
   // #287 — flap drives bilateral wings and the radial-N fans alike.
-  const radial = (layoutParams.symmetry ?? 'none').startsWith('radial-');
+  // #1202 — kaleido fans flap too.
+  const radial = /^(?:radial|kaleido)-\d+$/.test(layoutParams.symmetry ?? 'none');
+
+  const btn = (label, key, display, editor, { disabled, disabledReason } = {}) => (
+    <ValueButton
+      label={label}
+      display={display}
+      locked={lockedParams[key]}
+      onToggleLock={() => lock(key)}
+      disabled={disabled}
+      disabledReason={disabledReason}
+      onOpen={() => editor}
+    />
+  );
 
   return (
     <div className="param-block">
       <div className="param-subheader ttl">🦋 moth / hype</div>
-      <RangeRow label="BODY" value={layoutParams.body ?? 3} min={1} max={7} step={1}
-        hint="Spine length. 1 = spore, 3–7 = bug. Physics count unchanged."
-        disabled={!isHype} disabledReason="Moth bodies only (hype mode)"
-        onChange={v => set('body', v)} defaultValue={d('body', DEFAULT_LAYOUT_PARAMS.body)}
-        locked={lockedParams.body} onToggleLock={() => lock('body')} />
-      <MotionTile kind="flap" label="flap" value={layoutParams.flap ?? 0.35} min={0} max={1} step={0.05}
-        hint="Wing beat amplitude on bilateral wings and radial fans"
-        disabled={!(isHype && (bilateral || radial))} disabledReason="Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)"
-        onChange={v => set('flap', v)} defaultValue={d('flap', DEFAULT_LAYOUT_PARAMS.flap)}
-        locked={lockedParams.flap} onToggleLock={() => lock('flap')} />
-      <RangeRow label="TIGHT" value={layoutParams.tight ?? 0.55} min={0.05} max={0.95} step={0.05}
-        hint="How stiff the spine follows the leader"
-        disabled={!isHype} disabledReason="Moth bodies only (hype mode)"
-        onChange={v => set('tight', v)} defaultValue={d('tight', DEFAULT_LAYOUT_PARAMS.tight)}
-        locked={lockedParams.tight} onToggleLock={() => lock('tight')} />
-      {/* #287 — BREATH: the second of the two new sliders. Breathing swell
-          on body scale; amplitude follows each creature's energy, so tired
-          creatures breathe shallow. Scale is universal — it works on swarm
-          dots, moths and stamps alike. */}
-      <MotionTile kind="breath" label="breath" value={layoutParams.breath ?? 0} min={0} max={1} step={0.05}
-        hint="Breathing swell on body scale — amplitude follows each creature's energy, so tired creatures breathe shallow"
-        disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"
-        onChange={v => set('breath', v)} defaultValue={d('breath', DEFAULT_LAYOUT_PARAMS.breath)}
-        locked={lockedParams.breath} onToggleLock={() => lock('breath')} />
-      <MotionTile kind="wind" label="wind" value={layoutParams.wind ?? 1} min={0} max={3} step={0.1}
-        hint="Hype-only multiplier on the noise wind"
-        disabled={!isHype} disabledReason="Hype mode only"
-        onChange={v => set('wind', v)} defaultValue={d('wind', DEFAULT_LAYOUT_PARAMS.wind)}
-        locked={lockedParams.wind} onToggleLock={() => lock('wind')} />
-      {/* #287 — METABOLISM: the first of the two new sliders. Speed of the
-          creatures' inner life — hunger, fatigue, curiosity. 0 = drives off
-          (classic behavior); higher = the cast tires visibly across a set. */}
-      <RangeRow label="METABOLISM" value={layoutParams.metabolism ?? 0} min={0} max={2} step={0.1}
-        hint="Speed of the creatures' inner life — hunger, fatigue and curiosity. 0 = drives off (classic behavior)"
-        disabled={!isHype} disabledReason="Hype mode only"
-        onChange={v => set('metabolism', v)} defaultValue={d('metabolism', DEFAULT_LAYOUT_PARAMS.metabolism)}
-        locked={lockedParams.metabolism} onToggleLock={() => lock('metabolism')} />
-      {/* #268: MATERIAL removed — the GL backend renders every instance
-          flat; the buttons changed nothing in the live instrument. */}
+      <div className="slider-stack">
+        {btn('BODY', 'body', `${layoutParams.body ?? 3}`,
+          <SliderEditor ariaLabel="Body" value={layoutParams.body ?? 3}
+            min={1} max={7} step={1} onChange={(v) => set('body', Math.round(v))} />,
+          { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' })}
+        {/* #716 — the motion keys wear the tile (glyph visualizes the value). */}
+        <MotionTile kind="flap" label="flap" value={layoutParams.flap ?? 0.35} min={0} max={1} step={0.05}
+          hint="Wing beat amplitude on bilateral wings and radial fans"
+          disabled={!(isHype && (bilateral || radial))} disabledReason="Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)"
+          onChange={v => set('flap', v)}
+          locked={lockedParams.flap} onToggleLock={() => lock('flap')} />
+        {btn('TIGHT', 'tight', fmt2(layoutParams.tight ?? 0.55),
+          <SliderEditor ariaLabel="Tight" value={layoutParams.tight ?? 0.55}
+            min={0.05} max={0.95} step={0.05} format={fmt2} onChange={(v) => set('tight', v)} />,
+          { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' })}
+        <MotionTile kind="breath" label="breath" value={layoutParams.breath ?? 0} min={0} max={1} step={0.05}
+          hint="Breathing swell on body scale — amplitude follows each creature's energy, so tired creatures breathe shallow"
+          disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"
+          onChange={v => set('breath', v)}
+          locked={lockedParams.breath} onToggleLock={() => lock('breath')} />
+        <MotionTile kind="wind" label="wind" value={layoutParams.wind ?? 1} min={0} max={3} step={0.1}
+          hint="Hype-only multiplier on the noise wind"
+          disabled={!isHype} disabledReason="Hype mode only"
+          onChange={v => set('wind', v)}
+          locked={lockedParams.wind} onToggleLock={() => lock('wind')} />
+        {btn('METABOLISM', 'metabolism', fmt2(layoutParams.metabolism ?? 0),
+          <SliderEditor ariaLabel="Metabolism" value={layoutParams.metabolism ?? 0}
+            min={0} max={2} step={0.1} format={fmt2} onChange={(v) => set('metabolism', v)} />,
+          { disabled: !isHype, disabledReason: 'Hype mode only' })}
+        {/* #268: MATERIAL removed — the GL backend renders every instance
+            flat; the buttons changed nothing in the live instrument. */}
+      </div>
     </div>
   );
 }

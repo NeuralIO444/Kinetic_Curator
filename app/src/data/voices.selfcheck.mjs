@@ -99,7 +99,8 @@ const optB = b.params.accumulationOptics;
 assert.strictEqual(mid.params.accumulationOptics, optA + (optB - optA) * 0.5);
 // int params round: swarm particleCount 120 → hype 90
 assert.strictEqual(mid.params.particleCount, 105);
-assert.deepStrictEqual(mid.params.scale, [0.75, 1.85]);
+// #1202 — scale is {x, y} now; mix interpolates both axes.
+assert.deepStrictEqual(mid.params.scale, { x: [0.75, 1.85], y: [0.75, 1.85] });
 assert.strictEqual(mixVoiceState(a, b, 0).params.mode, 'swarm');
 assert.strictEqual(mixVoiceState(a, b, 0.49).params.mode, 'hype');
 assert.strictEqual(mid.params.mode, 'hype');
@@ -153,7 +154,15 @@ assert.deepStrictEqual(sanitizeFx(null), sanitizeFx({}));
   assert.strictEqual(st.palette.ink, cat.ink.toLowerCase(), 'ink = CHIAROSCURO palette');
   const look = COMPOSITION_PRESETS.find((p) => p.id === 'chiaroscuro');
   for (const [k, v] of Object.entries(look.params)) {
-    assert.deepStrictEqual(st.params[k], v, `params.${k} = CHIAROSCURO Look`);
+    // #1202 — a legacy array scale normalizes to a linked {x, y} pair; a
+    // legacy boolean mirror migrates to the 4-state enum.
+    if (k === 'scale' && Array.isArray(v)) {
+      assert.deepStrictEqual(st.params[k], { x: v, y: v }, `params.${k} = CHIAROSCURO Look`);
+    } else if (k === 'mirror' && typeof v === 'boolean') {
+      assert.strictEqual(st.params[k], v ? 'x' : 'off', `params.${k} = CHIAROSCURO Look`);
+    } else {
+      assert.deepStrictEqual(st.params[k], v, `params.${k} = CHIAROSCURO Look`);
+    }
   }
   // #1129 PR1 — dark-glass is the glass voice: its instances sort
   // back-to-front by z-tier. No other flagship may claim the flag.

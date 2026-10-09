@@ -1,9 +1,10 @@
 // BuildPanel shell — UX-5 reorg: the panel reads top-down as four workflow
 // sections: ① LAYOUT (structure) → ② CAST (who paints) → ③ MOTION &
-// BEHAVIOR (how it moves) → ④ APPEARANCE (the finish). No controls cut —
-// every control that existed still exists, same store selectors, same event
-// shapes; only the grouping changed. CSS class root stays panel-layout
-// (see PANEL_CONSOLIDATION_PLAN.md §5).
+// BEHAVIOR (how it moves) → ④ APPEARANCE (the finish). #1202 compacts it on
+// the Teenage Engineering model: one button matrix for discrete choices,
+// popup value editors docked to the panel edge. No controls cut — every
+// control that existed still exists; only the rendering changed. CSS class
+// root stays panel-layout (see PANEL_CONSOLIDATION_PLAN.md §5).
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { MixBar } from './layout/MixBar.jsx';
@@ -23,7 +24,29 @@ import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
 import { MathSection } from './build/MathSection.jsx';
 import { RangeTone } from '../components/RangeTone.jsx';
+import { DockProvider } from './build/te/ValueDock.jsx';
+import { useDiceRoll } from './layout/useDiceRoll.js';
 import { LOIS_LINES } from './loisLines.mjs';
+
+// #1202 — ROLL lives in the panel header. The dice honors
+// prefers-reduced-motion: with reduced motion the tray appears without the
+// rolling shuffle (the tray itself is the static equivalent).
+// (The dice emoji is retired #1028; the header uses a geometric glyph.)
+function RollButton({ onRoll }) {
+  return (
+    <button
+      type="button"
+      className="te-cell"
+      style={{ minHeight: 24, padding: '2px 10px', flexDirection: 'row', gap: 4 }}
+      onClick={onRoll}
+      title="Roll the tasteful dice — 3 finalists, you crown one"
+      aria-label="Roll the dice"
+    >
+      <span aria-hidden="true">▣</span>
+      <span className="te-cell-label">ROLL</span>
+    </button>
+  );
+}
 
 export function BuildPanel() {
   const { state } = useApp(s => ({
@@ -32,19 +55,28 @@ export function BuildPanel() {
     trackCount: s.layers.length,
   }));
   const { layoutParams, lockedParams, trackCount } = state;
+  const dice = useDiceRoll();
 
   const lockCount = Object.values(lockedParams).filter(Boolean).length;
 
   return (
     <RangeTone tone="build">
+    <DockProvider>
     <div className="panel panel-layout">
       <PanelHeader tag="P03" title="BUILD" subtitle={layoutParams.composition}>
         {lockCount > 0 && <span className="lock-badge">▪ {lockCount}</span>}
+        <RollButton onRoll={dice.roll} />
       </PanelHeader>
       <div className="panel-body">
         {/* ① LAYOUT — structure first: tiles, size/shape sliders, symmetry, bleed/mirror/overlap */}
         <BuildSection num="1" title="Layout">
-          <CompositionTiles mode={layoutParams.mode} />
+          <CompositionTiles
+            mode={layoutParams.mode}
+            tray={dice.tray}
+            onCrown={dice.crown}
+            onReroll={dice.roll}
+            onDismiss={dice.dismiss}
+          />
           <LayoutSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <SymmetryRow layoutParams={layoutParams} />
           <StructureToggles layoutParams={layoutParams} />
@@ -83,6 +115,7 @@ export function BuildPanel() {
         </BuildSection>
       </div>
     </div>
+    </DockProvider>
     </RangeTone>
   );
 }

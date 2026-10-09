@@ -120,7 +120,8 @@ test('perfTier1 sheds mirror on every visible layer', () => {
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 40, mirror: true },
   });
   const out = r.resolveLayers(input);
-  assert.equal(out[0].layoutParams.mirror, false);
+  // #1202 — mirror is a 4-state enum now; perfTier1 sheds to 'off' (was false).
+  assert.equal(out[0].layoutParams.mirror, 'off');
   r.dispose();
 });
 

@@ -220,7 +220,8 @@ ok('breath swells scale around the base value; breath 0 is constant', () => {
   assert.equal(calm2.ps.scale[0], s0);
 });
 
-ok('radial-6 emits a 6-fold alternating-mirror fan; bilateral unchanged', () => {
+ok('radial-6 emits a 6-fold pure-rotation fan; kaleido-6 mirrors; bilateral unchanged', () => {
+  // #1202 — RADIAL is pure cyclic rotation (no mirrors); KALEIDO is true dihedral.
   const radial = makeSystem(40, { symmetry: 'radial-6', body: 3 });
   const items = syncedItems(radial.ps, radial.lp);
   // 3 body segments + 6 fan arms per organism.
@@ -228,10 +229,15 @@ ok('radial-6 emits a 6-fold alternating-mirror fan; bilateral unchanged', () => 
   const wings = items.filter((it) => it.role === 'wing');
   assert.equal(wings.length, 40 * 6);
   const mirrored = wings.filter((w) => w._mirrored).length;
-  assert.equal(mirrored, 40 * 3, 'odd arms mirror, even arms do not');
+  assert.equal(mirrored, 0, 'radial: pure rotation, no mirrors');
   const keys = new Set(wings.map((w) => w.key));
   assert.equal(keys.size, 40 * 6, 'fan keys must be unique');
   assert.ok(wings.every((w) => typeof w.ladderId === 'string'), 'fan reuses MOTH_LADDERS');
+
+  const kal = makeSystem(40, { symmetry: 'kaleido-6', body: 3 });
+  const kalWings = syncedItems(kal.ps, kal.lp).filter((it) => it.role === 'wing');
+  assert.equal(kalWings.length, 40 * 6);
+  assert.equal(kalWings.filter((w) => w._mirrored).length, 40 * 3, 'kaleido: odd arms mirror, even arms do not');
 
   const bi = makeSystem(40, { symmetry: 'bilateral', body: 3 });
   const biItems = syncedItems(bi.ps, bi.lp);

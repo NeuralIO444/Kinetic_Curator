@@ -67,10 +67,18 @@ assert.ok(cs.params.accumulationOptics <= 0.15,
 
 // Every param must survive the firewall unchanged — a preset that gets clamped
 // on apply is not the preset anyone authored.
+// #1202 — a legacy array scale normalizes to a linked {x, y} pair (values
+// unchanged); a legacy boolean mirror migrates to the 4-state enum.
 {
   const applied = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, ...cs.params });
   for (const [k, v] of Object.entries(cs.params)) {
-    assert.deepStrictEqual(applied[k], v, `preset param ${k} must survive normalization`);
+    if (k === 'scale' && Array.isArray(v)) {
+      assert.deepStrictEqual(applied[k], { x: v, y: v }, `preset param ${k} must survive normalization`);
+    } else if (k === 'mirror' && typeof v === 'boolean') {
+      assert.strictEqual(applied[k], v ? 'x' : 'off', `preset param ${k} must survive normalization`);
+    } else {
+      assert.deepStrictEqual(applied[k], v, `preset param ${k} must survive normalization`);
+    }
   }
 }
 
