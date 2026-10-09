@@ -43,6 +43,7 @@ node src/engine/kernel/tracks/trackGraph.mod.selfcheck.mjs
 node src/engine/kernel/tracks/feedLive.selfcheck.mjs
 node src/engine/kernel/color/color.selfcheck.mjs
 node src/engine/kernel/bake/bake.selfcheck.mjs
+node src/engine/kernel/bake/bake.accent.selfcheck.mjs
 node src/engine/kernel/bake/bake.parity.selfcheck.mjs
 node src/engine/kernel/bake/swarm.inventory.selfcheck.mjs
 node src/engine/kernel/bake/bake.contacts.selfcheck.mjs
