@@ -102,6 +102,17 @@ function validateHead(h, numKeys) {
   return { ok: true, head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 } };
 }
 
+/**
+ * May this head steer? At or above the bar: yes. Below it: only with the artist's experimental switch on
+ * (curator/tasteGate.js), and never when it is not positively correlated with the taste at all.
+ * Pure: the switch is passed in.
+ */
+export function headUsable(head, experimental = false) {
+  const f = head && head.fidelity;
+  if (!finite(f)) return false;
+  return f >= HEAD_MIN_FIDELITY || (!!experimental && f > 0);
+}
+
 /** Head score for one CURATE candidate (layout params only — palette/cast are constant across a press). */
 export function scoreLayout(head, layoutParams) {
   const f = recipeFeatures({ layoutParams });
@@ -112,11 +123,12 @@ export function scoreLayout(head, layoutParams) {
 }
 
 /** The `mlx` curator engine, or null when there's no usable taste (→ persona / null fallback). */
-export function makeMlxCurator(taste) {
-  if (!taste || !taste.head || !(taste.head.fidelity >= HEAD_MIN_FIDELITY)) return null;
+export function makeMlxCurator(taste, { experimental = false } = {}) {
+  if (!taste || !taste.head || !headUsable(taste.head, experimental)) return null;
   const { head } = taste;
   return {
     name: 'mlx',
+    experimental: !(head.fidelity >= HEAD_MIN_FIDELITY), // steering below the bar: every readout must say so
     status: () => 'active',
     pick(candidates) {
       let best = -1, bestScore = -Infinity;
@@ -130,11 +142,13 @@ export function makeMlxCurator(taste) {
 }
 
 /** One status line for the Pipeline: counts + fidelity (curator.py inspect has the words). */
-export function tasteSummary(taste) {
+export function tasteSummary(taste, { experimental = false } = {}) {
   if (!taste) return 'no taste loaded — the persona curator is choosing';
   const { likes, passes } = taste.labels;
   const f = taste.head.fidelity;
-  const live = f >= HEAD_MIN_FIDELITY ? 'curating live' : 'fidelity too low — persona curator stays on';
+  const live = f >= HEAD_MIN_FIDELITY ? 'curating live'
+    : headUsable(taste.head, experimental) ? `EXPERIMENTAL: steering below the ${HEAD_MIN_FIDELITY.toFixed(1)} bar`
+    : 'fidelity too low — persona curator stays on';
   return `taste · ${likes} keeps / ${passes} passes · fidelity ${f.toFixed(2)} · ${live}`;
 }
 
@@ -143,18 +157,20 @@ export function tasteSummary(taste) {
  * Does not pick — taste still chooses keepers. CRIT (#948) reads this once
  * fidelity clears the same 0.3 bar.
  */
-export function scoreBoldness(taste, layoutParams) {
+export function scoreBoldness(taste, layoutParams, { experimental = false } = {}) {
   const head = taste && taste.lois && taste.lois.head;
-  if (!head || !(head.fidelity >= HEAD_MIN_FIDELITY)) return null;
+  if (!head || !headUsable(head, experimental)) return null;
   return scoreLayout(head, layoutParams);
 }
 
 /** Pipeline line for the boldness probe. Absent lois is an honest "not trained". */
-export function loisSummary(taste) {
+export function loisSummary(taste, { experimental = false } = {}) {
   if (!taste || !taste.lois) return 'lois · not trained — favorites vs keeps still waiting on labels';
   const { favorites, keeps } = taste.lois.labels;
   const f = taste.lois.head.fidelity;
-  const live = f >= HEAD_MIN_FIDELITY ? 'boldness live' : 'fidelity too low — CRIT stays parked';
+  const live = f >= HEAD_MIN_FIDELITY ? 'boldness live'
+    : headUsable(taste.lois.head, experimental) ? 'EXPERIMENTAL: boldness below the bar'
+    : 'fidelity too low — CRIT stays parked';
   return `lois · ${favorites} favorites / ${keeps} kept-not-favorited · fidelity ${f.toFixed(2)} · ${live}`;
 }
 

@@ -127,4 +127,38 @@ assert.strictEqual(retrainNudge(getTaste(), keepsOf(200 + RETRAIN_NUDGE_THRESHOL
 assert.ok(retrainNudge(getTaste(), keepsOf(200 + RETRAIN_NUDGE_THRESHOLD)), 'new head: nudges past its own baseline');
 clearTaste();
 
+// ── #762 experimental switch: the 0.3 bar stays the rule; the artist's own switch lets a thin head steer, and says so ──
+{
+  const { headUsable } = await import('./tasteHead.js');
+  const { experimentalOn, setExperimental, EXPERIMENTAL_KEY } = await import('./tasteGate.js');
+  const thin = taste(); thin.head.fidelity = 0.17; // Matt's first real model (2026-10-08)
+  const t = validateTaste(thin).taste;
+  // the rule, unchanged
+  assert.strictEqual(experimentalOn(), false, 'off by default');
+  assert.strictEqual(headUsable(t.head), false); assert.strictEqual(makeMlxCurator(t), null, 'below the bar: no curator');
+  assert.match(tasteSummary(t), /fidelity too low/);
+  // the switch
+  assert.strictEqual(headUsable(t.head, true), true);
+  const cur = makeMlxCurator(t, { experimental: true });
+  assert.ok(cur && cur.name === 'mlx' && cur.experimental === true, 'steers, and is marked experimental');
+  assert.strictEqual(cur.pick([{ scale: [0.1, 0.3], count: 400 }, { scale: [2, 3], count: 40 }]), 1, 'it really uses the head: large and few wins');
+  assert.match(tasteSummary(t, { experimental: true }), /EXPERIMENTAL: steering below the 0\.3 bar/);
+  // never noise: a head that is not positively correlated does not steer, switch or no switch
+  for (const f of [0, -0.2]) { const bad = { ...t.head, fidelity: f }; assert.strictEqual(headUsable(bad, true), false, `fidelity ${f}`); }
+  assert.strictEqual(headUsable({ fidelity: NaN }, true), false); assert.strictEqual(headUsable(null, true), false);
+  // a head at or above the bar is not "experimental", with the switch on or off
+  const good = validateTaste(taste()).taste;
+  assert.strictEqual(makeMlxCurator(good, { experimental: true }).experimental, false);
+  assert.match(tasteSummary(good, { experimental: true }), /curating live/);
+  // the store holder: persists per machine, read by the live curator
+  assert.ok(importTaste(thin).ok);
+  assert.notStrictEqual(getActiveCurator().name, 'mlx', 'switch off: the persona curator keeps the button');
+  assert.strictEqual(setExperimental(true), true); assert.strictEqual(mem.get(EXPERIMENTAL_KEY), '1');
+  const live = getActiveCurator();
+  assert.strictEqual(live.name, 'mlx'); assert.match(curatorHint(live), /mlx · experimental/, 'the hint says so');
+  setExperimental(false); assert.strictEqual(mem.has(EXPERIMENTAL_KEY), false);
+  assert.notStrictEqual(getActiveCurator().name, 'mlx', 'off again: back to the rule');
+  clearTaste();
+}
+
 console.log('tasteHead.selfcheck: OK');

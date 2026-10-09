@@ -85,6 +85,7 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
   'kc:tour-seen': 'first-run flag',
   'kc:patch-oneliner-seen': 'first-run flag',
   'kc:retrain-nudge:v1': 'a derived counter, rebuilt from keeps',
+  'kc:taste:experimental:v1': 'a per-machine opt-in: a bundle opened elsewhere must never switch a below-bar taste on by itself',
   'kc:dice-crowns:v1': 'dice affinity index; the crowns themselves persist in the keeps ledger',
   'kc:worker': 'developer flag for the render worker',
   'kc:pipeline:backup': 'autosave plumbing: the previous copy of the project the bundle already carries',

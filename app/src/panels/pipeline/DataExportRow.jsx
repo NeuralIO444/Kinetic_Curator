@@ -52,6 +52,8 @@ export function DataExportRow({
   const exportedPayload = useRef(null);
   const [behind, setBehind] = useState(false);
   const tasteStatus = useStore((s) => s.tasteStatus);
+  const tasteExperimental = useStore((s) => s.tasteExperimental);
+  const setTasteExperimental = useStore((s) => s.setTasteExperimental);
   const loisStatus = useStore((s) => s.loisStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const importShelf = useStore((s) => s.importShelf); // #1051
@@ -346,6 +348,15 @@ export function DataExportRow({
         <button className="big-btn act" onClick={() => tasteInputRef.current?.click()} style={{ flex: 3 }}>↑ import taste</button>
         <button className="big-btn act" onClick={clearTaste} style={{ flex: 1 }} title="Forget the imported taste">clear</button>
         <input ref={tasteInputRef} type="file" accept=".json,application/json" onChange={importTaste} style={{ display: 'none' }} />
+      </div>
+      {/* #762 — the artist's own switch: the 0.3 fidelity rule stays the default; ON lets a thin, below-bar taste
+          steer anyway, and the status line below says EXPERIMENTAL for as long as it does. Discrete, so TE. */}
+      <div className="pipeline-row">
+        <button type="button" className={`big-btn ${tasteExperimental ? 'active' : ''}`} aria-pressed={tasteExperimental}
+          onClick={() => setTasteExperimental(!tasteExperimental)} style={{ flex: 1 }}
+          title="Experimental taste: let a taste that scores below the 0.3 fidelity bar steer CURATOR anyway. Off by default; the bar itself does not change.">
+          experimental taste
+        </button>
       </div>
       {/* #962 (UX-2): read-only hint lines live in their own demoted zone,
           visually separated from the tappable export buttons above. */}
