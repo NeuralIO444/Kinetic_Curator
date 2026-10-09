@@ -1,11 +1,12 @@
 // directorSway.selfcheck.mjs — the Director collects what the hidden pull will read (#1139 wiring, PR 2).
-// With the gates closed nothing may change: tick() gains/intensity/phase are what they were, and `sway` is exactly zero.
-// The open path is exercised ONLY here, by passing the mechanics in as an argument: no live override exists.
+// The sway gate opened on 2026-10-08 (Matt: rank + temperature). The CLOSED behaviour stays proven by injecting a closed pull
+// (NEUTRAL_SWAY) and by the floors that are still absolute: under MIN_KEEPS and at zero allowance the view is exactly zero.
+// The live path is checked against its bounds. No live override exists anywhere.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { createDirector, deriveSway, applySway, pullKeeps, richnessFrom, directorGains, NEUTRAL_VIEW, SWAY_GATE_OPEN, RELAX_TEMP } from './director.js';
 import { DIRECTOR_TABLE } from './directorTable.js';
-import { swayOpen, swayBiases, MIN_KEEPS, M2_CAP, M2_FLOOR } from './queenLean.mjs';
+import { swayOpen, swayBiases, MIN_KEEPS, M2_CAP, M2_FLOOR, NEUTRAL_SWAY } from './queenLean.mjs';
 import { TEMP_CAP } from './effectiveTemp.js';
 
 let n = 0;
@@ -16,34 +17,39 @@ const patterned = (i) => ({ ...plain(i), stack: { l: [{ id: 'kc1', type: 'conten
 const keepsOf = (plainN, patternN = 0) => [...Array.from({ length: plainN }, (_, i) => plain(i)), ...Array.from({ length: patternN }, (_, i) => patterned(100 + i))];
 const HOT = { bands: { bass: 1, mid: 0, treble: 0.2, rms: 1 }, enabled: true, sourceType: 'device' };
 
-ok('gate closed: for every one of the 20 rooms, 12 keeps and a hot room produce exactly the neutral view', () => {
-  assert.equal(SWAY_GATE_OPEN, false);
+ok('sway gate open: every one of the 20 rooms carries its table allowance, and a CLOSED pull is exactly the neutral view in all of them', () => {
+  assert.equal(SWAY_GATE_OPEN, true);
   let rooms = 0;
-  for (const key of Object.keys(DIRECTOR_TABLE)) {
-    const [lois, davis] = key.split('×');
+  for (const [key, row] of Object.entries(DIRECTOR_TABLE)) {
+    const [lois, davis] = key.split('\u00d7');
     const g = directorGains({ loisCode: lois, davisCode: davis });
-    assert.equal(g.swayAllowance, 0, `${key}: the room's allowance is held at zero`);
-    assert.deepEqual(deriveSway({ keeps: keepsOf(12), richness: 1, allowance: g.swayAllowance }), NEUTRAL_VIEW, key);
+    assert.equal(g.swayAllowance, row.sway_allowance, `${key}: the room's allowance is live`);
+    assert.deepEqual(deriveSway({ keeps: keepsOf(12), richness: 1, allowance: g.swayAllowance }, () => NEUTRAL_SWAY), NEUTRAL_VIEW, `${key}: a closed pull is neutral`);
+    assert.deepEqual(deriveSway({ keeps: keepsOf(12), richness: 1, allowance: 0 }), NEUTRAL_VIEW, `${key}: zero allowance is neutral`);
     rooms += 1;
   }
   assert.equal(rooms, 20);
 });
 
-ok('gate closed: tick() is what it was (gains, intensity, phase) and its sway is zero, however hot the inputs', () => {
-  const a = createDirector({ now: () => 1000 }); const b = createDirector({ now: () => 1000 });
-  b.setPullInputs({ keeps: keepsOf(20), ...HOT });
+ok('tick() under the open gate: gains stay in the room\'s own bounds; below MIN_KEEPS it is exactly what it was; the pull only ever warms', () => {
   const feed = { burning: true, rollsLastMinute: 5, keepsLast5m: 3 };
-  const ra = a.tick({ feed, audio: 1, nowTs: 1000 }); const rb = b.tick({ feed, audio: 1, nowTs: 1000 });
-  assert.deepEqual(rb.gains, ra.gains); assert.equal(rb.intensity, ra.intensity); assert.equal(rb.directorPhase, ra.directorPhase);
-  assert.deepEqual(ra.sway, NEUTRAL_VIEW); assert.deepEqual(rb.sway, NEUTRAL_VIEW);
+  const a = createDirector({ now: () => 1000 }); const few = createDirector({ now: () => 1000 }); const many = createDirector({ now: () => 1000 });
+  few.setPullInputs({ keeps: keepsOf(MIN_KEEPS - 1), ...HOT }); many.setPullInputs({ keeps: keepsOf(20), ...HOT });
+  const ra = a.tick({ feed, audio: 1, nowTs: 1000 }); const rf = few.tick({ feed, audio: 1, nowTs: 1000 }); const rm = many.tick({ feed, audio: 1, nowTs: 1000 });
+  assert.deepEqual(rf.gains, ra.gains); assert.deepEqual(rf.sway, NEUTRAL_VIEW, '7 keeps + a hot room: untouched');
+  assert.equal(rm.intensity, ra.intensity); assert.equal(rm.directorPhase, ra.directorPhase);
+  assert.ok(rm.gains.temperature >= ra.gains.temperature - 1e-12 && rm.gains.temperature <= TEMP_CAP + 1e-12, `temperature ${ra.gains.temperature} -> ${rm.gains.temperature}`);
+  assert.deepEqual({ ...rm.gains, temperature: 0 }, { ...ra.gains, temperature: 0 }, 'only the temperature moves');
   assert.deepEqual(a.tick({ nowTs: 2000 }).sway, NEUTRAL_VIEW, 'silence: neutral');
 });
 
-ok('the live swayBiases is neutral while the gate is closed even if the allowance were not (belt and braces)', () => {
-  for (const allowance of [0, 0.4, 0.9, 1]) assert.deepEqual(deriveSway({ keeps: keepsOf(12), richness: 1, allowance }, swayBiases), NEUTRAL_VIEW);
+ok('the live swayBiases is the open computation (above the minimum) and neutral below it', () => {
+  const sig = { richness: 1 };
+  assert.deepEqual(swayBiases(keepsOf(MIN_KEEPS), sig), swayOpen(keepsOf(MIN_KEEPS), sig));
+  assert.deepEqual(swayBiases(keepsOf(MIN_KEEPS - 1), sig), NEUTRAL_SWAY);
 });
 
-ok('open path, test harness only: within MIN_KEEPS it is zero; above it, the temperature delta stays inside [0, 0.15 x allowance]', () => {
+ok('open path (mechanics injected): within MIN_KEEPS it is zero; above it, the temperature delta stays inside [0, 0.15 x allowance]', () => {
   for (const a of [0.1, 0.4, 0.9]) {
     assert.deepEqual(deriveSway({ keeps: keepsOf(MIN_KEEPS - 1), richness: 1, allowance: a }, swayOpen), NEUTRAL_VIEW, '7 keeps + a hot room: provably zero');
     let prev = -1;

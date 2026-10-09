@@ -36,10 +36,10 @@ import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBia
 import { GATE_OPEN } from './queenChannel.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
-// #762's proof is not done: the Queen's taste-derived columns (sway_allowance,
-// tilt_limit) are wired through the table but held neutral here. Flip only
-// when the proof clears — the selfcheck tripwires both constants.
-export const SWAY_GATE_OPEN = false;
+// The room table's two taste-derived columns. #762's proof cleared on 2026-10-08 and Matt opened SWAY (rank and
+// temperature: the room's sway_allowance now scales the pull). TILT stays shut: it needs #1144's explore/refine phases,
+// which nothing supplies yet. Constants, flipped by PR only; the selfcheck tripwires both.
+export const SWAY_GATE_OPEN = true;
 export const TILT_GATE_OPEN = false;
 
 // ─── the pull's inputs (#1139 wiring, PR 2) ────────────────────────────────

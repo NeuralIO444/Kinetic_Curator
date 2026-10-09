@@ -94,8 +94,8 @@ ok('bad lois still refuses with a valid queen section', () => {
 });
 
 // ─── gate tripwire ───
-ok('GATE_OPEN is false: the channel stays dark until #762 clears', () => {
-  assert.equal(GATE_OPEN, false);
+ok('GATE_OPEN is true: opened deliberately on 2026-10-08 (#762 proof cleared, Matt: open rank + temperature); a flip either way is a decision', () => {
+  assert.equal(GATE_OPEN, true);
 });
 
 // ─── inertness: flipped inputs → identical output ───
@@ -111,7 +111,7 @@ ok('inert: inputs change, output does not', () => {
   assert.deepEqual(a, b, 'queen section present or not: same output');
   assert.ok(Object.isFrozen(NEUTRAL_BIAS), 'neutral bias is frozen');
   assert.deepEqual([...BIAS_KEYS].sort(), ['palette', 'phrase', 'rank', 'reactivity', 'temperature']);
-  assert.equal(isLive(withQ), false, 'a valid head is still not live with the gate closed');
+  assert.equal(isLive(withQ), withQ.queen.head.fidelity >= 0.3, 'with the gate open a head is live exactly when it clears the 0.3 bar');
   assert.equal(isLive(null), false);
 });
 

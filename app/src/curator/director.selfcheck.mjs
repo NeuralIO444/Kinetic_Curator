@@ -15,6 +15,7 @@ import {
   getDirector,
 } from './director.js';
 import { TEMP_DEFAULT } from './effectiveTemp.js';
+import { DIRECTOR_TABLE } from './directorTable.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(here, '..');
@@ -55,12 +56,12 @@ ok('AWAY forces LOIS weight to 0 no matter what the table says', () => {
   }
 });
 
-ok('the gates hold: sway and tilt stay neutral until #762 clears', () => {
-  assert.equal(SWAY_GATE_OPEN, false);
-  assert.equal(TILT_GATE_OPEN, false);
+ok('the gates: sway is open (2026-10-08), tilt is shut until #1144 supplies a phase', () => {
+  assert.equal(SWAY_GATE_OPEN, true, 'sway opened deliberately on 2026-10-08');
+  assert.equal(TILT_GATE_OPEN, false, 'tilt stays shut until #1144 supplies a phase');
   for (const lois of ['NOD', 'VIBE', 'BURN', 'AWAY']) {
     const g = directorGains({ loisCode: lois, davisCode: 'FLOW', phase: 'explore' });
-    assert.equal(g.swayAllowance, 0, `${lois}: sway gated`);
+    assert.equal(g.swayAllowance, DIRECTOR_TABLE[`${lois}×FLOW`].sway_allowance, `${lois}: the room's allowance is live`);
     assert.equal(g.tiltLimit, 0, `${lois}: tilt gated`);
   }
 });
