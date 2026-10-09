@@ -15,6 +15,7 @@ import { PERSONA_TASTES, getPersonaTaste } from './personaTastes.js';
 import { getRenderProfile, applyRenderProfile } from './renderProfiles.js';
 import { rankLois } from './loisRank.js';
 import { getDirector, blendPick } from './director.js';
+import { getPhase } from './phase.js';
 import { loisActivity } from './loisActivity.js';
 
 // Re-exported so UI code has a single import site for persona data.
@@ -195,7 +196,7 @@ export function personaCurator() {
       // temperature from the single source; LOIS's rank blended against
       // Davis's pick by the room's lois_weight. Silence → neutral gains →
       // yesterday's pick, exactly.
-      const { gains } = getDirector().tick({ feed: loisActivity.snapshot() });
+      const { gains } = getDirector().tick({ feed: loisActivity.snapshot(), phase: getPhase() }); // #1144: refine cools the room, explore warms it
       const davisIndex = pickPersona(candidates, persona.id, rng, gains.temperature);
       if (gains.loisWeight <= 0 || gains.room == null) return davisIndex;
       const loisIndex = rankLois(candidates, getDirector().rankChooser()).index;
