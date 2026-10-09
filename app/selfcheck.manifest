@@ -7,6 +7,7 @@ node src/data/bodies/demoLadder.selfcheck.mjs
 node src/engine/buildPlacements.selfcheck.mjs
 node src/engine/glassSort.selfcheck.mjs
 node src/gl/glassBevel.selfcheck.mjs
+node src/gl/glassCaustic.selfcheck.mjs
 node src/engine/kineme.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
