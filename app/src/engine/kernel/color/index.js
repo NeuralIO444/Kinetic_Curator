@@ -11,8 +11,8 @@
 import { colorForPlacement } from '../../color.js';
 import { colorRngForIndex } from '../rng.js';
 
-/** Accent offset, in swatch slots, from the chosen colour. */
-const ACCENT_OFFSET = 3;
+/** Accent offset, in swatch slots, from the chosen colour. Exported for the palette-breath applier (#1151), which re-derives accents from shifted slots. */
+export const ACCENT_OFFSET = 3;
 
 /**
  * Assign the fill and accent for one placement.

@@ -17,6 +17,7 @@
 // reused, not re-derived: rate 1 IS the loop time exactly, rate 0 freezes
 // where it is, and a rate change re-anchors instead of jumping.
 import { kinemePhase as hashPhase, createKinemeClock } from '../data/kinemes.js';
+import { ACCENT_OFFSET } from './kernel/color/index.js';
 
 /** Boil default: the classic hand-drawn rate (Matt decision 2). */
 /**
@@ -164,6 +165,15 @@ export const KINEME_DRIVERS = Object.freeze([
     clock: 'boil',
     costTier: 'cpu-cheap',
   },
+  {
+    id: 'palette-breath', // #1151 — per-instance palette sweep (Davis colorOsc, homage)
+    targets: ['paletteShift'],
+    amountMeaning: 'palette sweep reach, fraction of palette length',
+    amountRange: [0, 1],
+    phaseMode: 'per-instance',
+    clock: 'smooth',
+    costTier: 'cpu-cheap',
+  },
 ].map(Object.freeze));
 
 const DRIVER_IDS = new Set(KINEME_DRIVERS.map((d) => d.id));
@@ -188,6 +198,7 @@ const DRIFT_HZ_X = 0.07;
 const DRIFT_HZ_Y = 0.083; // decorrelated axis rate
 const PULSE_DEPTH = 0.16; // 16% thump at the beat
 const PULSE_HZ = 0.5; // 2s period
+const PALETTE_HZ = 0.04; // #1151 — ~25s color breath; Davis's freq-5 cycling is the FULL BURN setting, not the default
 
 function num01(v) {
   const n = Number(v);
@@ -201,8 +212,9 @@ function num01(v) {
  *   seed,            // project seed — per-instance phase source
  *   driverSec,       // smooth-driver time (anchored clock seconds)
  *   boilStep,        // boil-driver frame (held by the caller on shed tier 1+)
- *   amounts,         // { breath, drift, pulse, brushWobble } 0..1
+ *   amounts,         // { breath, drift, pulse, brushWobble, paletteBreath } 0..1
  *   canvasW, canvasH // drift units
+ *   palette,         // #1151 — { swatches }; palette-breath reach scales in slots of its length
  *   anchored,        // #1128: every driver is measured FROM its rest pose: at driver time 0 each delta is exactly 0,
  *                    // so a still (time 0) is byte-identical to a scene with no drivers, and a living canvas leaves
  *                    // its placed position instead of starting off it
@@ -210,7 +222,9 @@ function num01(v) {
  *
  * soa: the stage-C SoA ({ n, index } read; channels written by the applier).
  *
- * Returns { active, dScale, dx, dy, dWobble } — Float64Arrays over slots.
+ * Returns { active, dScale, dx, dy, dWobble, dPalette } — Float64Arrays over
+ * slots. dPalette is the palette-slot offset (signed, in slots); the applier
+ * rounds and wraps it modulo palette length.
  * active is false when no driver has amount > 0: the applier then skips the
  * SoA entirely, so amount 0 is bit-identical to no kineme (hard gate — the
  * noise math is skipped, not multiplied by zero).
@@ -226,6 +240,7 @@ export function evaluateKineme(soa, ctx) {
     dx: new Float64Array(n),
     dy: new Float64Array(n),
     dWobble: new Float64Array(n),
+    dPalette: new Float64Array(n),
   };
   if (!n || !ctx) return out;
   const t = Number(ctx.driverSec);
@@ -284,6 +299,28 @@ export function evaluateKineme(soa, ctx) {
     }
   }
 
+  // #1151 — palette-breath: per-instance oscillator sweeping the palette
+  // sampling position (Davis colorOsc, homage — the principle, not his
+  // code). Traveling color waves via the same index-phase trick as breath:
+  // copies never move in lockstep. Reach is in slots: amount 1 sweeps the
+  // whole palette, the default (~0.12) shimmers ±a few slots. The applier
+  // rounds and wraps modulo palette length, so a palette switch never pops —
+  // the offset is relative and the phase is continuous.
+  const paletteBreath = num01(amounts.paletteBreath);
+  if (paletteBreath > 0) {
+    const swatches = ctx.palette?.swatches;
+    const len = Array.isArray(swatches) ? swatches.length : 0;
+    const reach = paletteBreath * len;
+    if (reach > 0) {
+      out.active = true;
+      for (let k = 0; k < n; k++) {
+        const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
+        const s = Math.sin(TAU * (PALETTE_HZ * t + uN));
+        out.dPalette[k] += reach * (anchored ? s - Math.sin(TAU * uN) : s);
+      }
+    }
+  }
+
   return out;
 }
 
@@ -294,6 +331,13 @@ export function evaluateKineme(soa, ctx) {
  *
  * ctx.shedTier >= 3 (pin-to-rest / zero-amounts) → identity, channels
  * untouched. !active → identity, channels untouched (the hard gate).
+ *
+ * #1151 — palette-breath additionally shifts the per-instance palette slot.
+ * It needs ctx.palette = { swatches }, ctx.colorArrays = { colors, accents }
+ * (the bind-cache arrays, mutated in place and restored by the undo) and
+ * soa.palSlot[k] = the base slot assignColor chose. The new slot wraps
+ * modulo palette length; accents re-derive from the shifted slot exactly
+ * like assignColor. Still-marked instances keep their placed color.
  */
 // #1128 — x and y live in the CACHED geometry SoA (stage C rewrites scale, rotation and alpha every frame, but never
 // the positions). A driver that nudged them in place nudged the cache: every frame stacked on the last, and the
@@ -318,7 +362,43 @@ export function applyKinemeDrivers(soa, ctx, still = null) {
     soa.x[k] += d.dx[k];
     soa.y[k] += d.dy[k];
   }
-  return () => { for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; } };
+
+  // #1151 — palette-breath: shift the palette sampling slot, wrapped modulo
+  // palette length. Amount 0 / no palette / shed tier ≥ 3 never reach here
+  // (hard gate above). The undo re-derives base colors from the base slots,
+  // so the bind-cached arrays are always base-valued on entry — the shift
+  // never accumulates across frames, and a palette switch never pops (the
+  // offset is relative, the phase continuous).
+  let palUndo = null;
+  const swatches = ctx.palette?.swatches;
+  const colorArrays = ctx.colorArrays;
+  if (num01(ctx.amounts?.paletteBreath) > 0 && Array.isArray(swatches) && swatches.length > 0
+      && colorArrays?.colors && colorArrays?.accents && soa.palSlot) {
+    const len = swatches.length;
+    const { colors, accents } = colorArrays;
+    const palSlot = soa.palSlot;
+    for (let k = 0; k < n; k++) {
+      if (still && still[k]) continue;
+      const b = palSlot[k] | 0;
+      if (b < 0 || b >= len) continue;
+      const s = (((b + Math.round(d.dPalette[k])) % len) + len) % len;
+      colors[k] = swatches[s];
+      accents[k] = swatches[(s + ACCENT_OFFSET) % len] || swatches[0];
+    }
+    palUndo = () => {
+      for (let k = 0; k < n; k++) {
+        const b = palSlot[k] | 0;
+        if (b < 0 || b >= len) continue;
+        colors[k] = swatches[b];
+        accents[k] = swatches[(b + ACCENT_OFFSET) % len] || swatches[0];
+      }
+    };
+  }
+
+  return () => {
+    for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+    if (palUndo) palUndo();
+  };
   // dWobble: no consumer on main — brush mode (#894/#897) applies it when
   // it lands. Evaluated and tested here, wired defensively (no-op absent).
 }

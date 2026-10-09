@@ -119,13 +119,16 @@ export function nodePhase(base, it) {
  * #1128 — the living-motion floor for one layer: breath and drift (and pulse, which is off until a Director pattern
  * asks) from the layer's own layout, evaluated FROM rest so the first frame is the placed picture. null when every
  * amount is 0 (the hard gate: nothing is computed), and null under shed tier 3 (the governor froze motion: identity).
+ * #1151 — palette-breath joins the floor: a per-instance palette sweep in the color domain, orthogonal to the motion
+ * drivers (patterns don't re-weight it). Reduced motion damps it to zero (DS rule 7).
  */
-function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive, assetStill) {
+function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive, assetStill, reducedMotion) {
   if (slowRender) return null;
   const amounts = patternAmounts(
     { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
     layoutParams.kinemePattern, beatDrive);
-  if (!(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0)) return null;
+  amounts.paletteBreath = reducedMotion ? 0 : layoutParams.kinemePaletteBreath;
+  if (!(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0)) return null;
   const pinned = assetStill && typeof assetStill === 'object' ? Object.keys(assetStill) : null;
   return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
 }
@@ -541,7 +544,7 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
-          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill),
+          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).

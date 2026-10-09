@@ -46,6 +46,7 @@ const LABELS = {
   damping: 'DAMPING', flap: 'FLAP', squash: 'SQUASH', crooked: 'CROOKED',
   kinemeRate: 'KINEME RATE', kinemeBreath: 'KINEME BREATH',
   kinemeDrift: 'KINEME DRIFT', kinemePulse: 'KINEME PULSE',
+  kinemePaletteBreath: 'PALETTE BREATH',
   kinemeBrushWobble: 'BRUSH WOBBLE', kinemeBoilFps: 'BOIL FPS', tight: 'TIGHT',
   wind: 'WIND', behaveSep: 'SEP', behaveAli: 'ALI', behaveCoh: 'COH',
   behaveSepR: 'SEP R', behaveAliR: 'ALI R', behaveCohR: 'COH R',

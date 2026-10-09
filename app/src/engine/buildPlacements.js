@@ -107,8 +107,10 @@ export function buildPlacements({
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
   //   driverSec, boilStep, seed,
-  //   amounts: { breath, drift, pulse, brushWobble },
+  //   amounts: { breath, drift, pulse, brushWobble, paletteBreath },
   //   canvasW, canvasH, shedTier }
+  // #1151 — buildPlacements attaches palette ({ swatches }) and colorArrays
+  // ({ colors, accents }) to the ctx before the applier runs.
 }) {
   const caps = capsIn || getQualityCaps('balanced');
   const preset = getPreset(layoutParams.composition);
@@ -195,6 +197,7 @@ export function buildPlacements({
   let colors;
   let accents;
   let keys;
+  let palSlots;
   if (bindHit) {
     ({ assetIds, colors, accents, keys } = cache);
   } else {
@@ -206,20 +209,23 @@ export function buildPlacements({
     colors = new Array(soa.n);
     accents = new Array(soa.n);
     keys = new Array(soa.n);
+    palSlots = new Array(soa.n);
     for (let k = 0; k < soa.n; k++) {
       const index = soa.index[k];
       const asset = pickWeightedIndexStable(
         activeAssets, weights, totalWeight, seed, index, seedOffsets,
       );
       // K5 (#64): colour comes from the kernel's colour channel only.
-      const { color, accent } = assignColor(
+      const { color, accent, slot } = assignColor(
         { seed, index, t: soa.t[k], seedOffsets }, palette, strategy,
       );
       assetIds[k] = asset.id;
       colors[k] = color;
       accents[k] = accent;
       keys[k] = `p${index}-${asset.id}`;
+      palSlots[k] = slot; // #1151 — base palette slot; the breath applier shifts around it
     }
+    soa.palSlot = palSlots;
   }
 
   if (cache) {
@@ -240,6 +246,13 @@ export function buildPlacements({
   if (kineme && kineme.stillAssets && kineme.stillAssets.size) {
     stillMarks = new Uint8Array(soa.n);
     for (let k = 0; k < soa.n; k++) if (kineme.stillAssets.has(assetIds[k])) stillMarks[k] = 1;
+  }
+  if (kineme) {
+    // #1151 — palette-breath resources: the resolved palette for the wrap
+    // modulus and the bind-cache color arrays the applier shifts in place
+    // (its undo restores base values, so the cache stays clean).
+    kineme.palette = palette;
+    kineme.colorArrays = { colors, accents };
   }
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
 
