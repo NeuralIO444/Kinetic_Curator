@@ -89,16 +89,27 @@ function centroidOf(kept) {
  * allows none, fewer than MIN_KEEPS keeps count, or there is nothing to lean toward: rankLois(candidates, null) IS
  * today's argmax. `open` defaults to the gate; a selfcheck passes true to exercise the open path (no live override).
  * The chooser only ever promotes inside the top 3 by one adjacent swap (applyRankBias), scaled by the room's allowance.
+ *
+ * TILT (#1144, Matt 2026-10-08): during EXPLORE the same instrument runs in reverse. `tilt` (0.01..0.05, the room's
+ * tilt_limit, and 0 unless the tilt gate is open AND the phase is explore) gives candidates that are NOT near the keeps a
+ * small boost instead, so exploring leans a little away from what the artist already has. No randomness, still at most one
+ * adjacent swap inside the top 3. When tilt is on it REPLACES the pull toward the keeps (refine is "demonstrated taste
+ * only", explore is "bounded exploration"); with tilt 0 this is exactly M1.
  */
-export function makeRankChooser({ keeps = [], allowance = 0, open = GATE_OPEN } = {}) {
+export function makeRankChooser({ keeps = [], allowance = 0, tilt = 0, open = GATE_OPEN } = {}) {
   try {
     const a = clamp01(allowance);
-    if (!open || !(a > 0)) return null;
+    const t = Number.isFinite(tilt) ? Math.max(0, Math.min(0.05, tilt)) : 0;
+    if (!open || !(a > 0 || t > 0)) return null;
     const kept = pullKeeps(keeps);
     if (kept.length < MIN_KEEPS) return null;
     const centroid = centroidOf(kept);
     if (!centroid) return null;
-    return (scores, candidates) => applyRankBias(scores, rankBiases(candidates, centroid).map((b) => b * a))[0];
+    return (scores, candidates) => {
+      const near = rankBiases(candidates, centroid); // > 0 exactly for candidates near the keeps
+      const biases = t > 0 ? near.map((b) => (b > 0 ? 0 : t)) : near.map((b) => b * a);
+      return applyRankBias(scores, biases)[0];
+    };
   } catch {
     return null;
   }
@@ -225,6 +236,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
   let lastCoolAt = now();
   let pull = { keeps: [], bands: null, enabled: false, sourceType: null }; // fed by setPullInputs (store subscription)
   let lastAllowance = 0; // the room's allowance as of the last tick (a pick reads it; it never recomputes the room)
+  let lastTilt = 0; // the room's tilt as of the last tick: 0 unless the tilt gate is open and the phase is explore
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
@@ -242,6 +254,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
       phase,
     });
     lastAllowance = base.swayAllowance;
+    lastTilt = base.tiltLimit;
     const sway = deriveSway({ keeps: pull.keeps, richness: richnessFrom(pull), allowance: base.swayAllowance });
     const gains = applySway(base, sway);
     // Strong user action ends relax early (L4D: relax ends early on movement).
@@ -285,7 +298,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
     tick,
     /** The chooser for rankLois, or null (today's argmax). */
     rankChooser() {
-      return makeRankChooser({ keeps: pull.keeps, allowance: lastAllowance });
+      return makeRankChooser({ keeps: pull.keeps, allowance: lastAllowance, tilt: lastTilt });
     },
     /** The store's view for the pull (keeps, bands, source): cheap references only, read at pick time. */
     setPullInputs(next) {
