@@ -1,5 +1,16 @@
 import { lumaToFlow as encodeLuma } from './feedOps.js';
-import { buildPointHash, forNeighbors, FIELD_RADIUS, FIELD_SOFT } from './fieldHash.js';
+
+// FIELD_RADIUS is INTENTIONALLY near-global (#1234, #350). 0.35 of the
+// unit square was the explicit design choice (docs/archive/SESSION_2026-09-18.md:37:
+// "FIELD: short-range FIELD_RADIUS = 0.35 (unit square)") — every point feels
+// every other point within ~1/3 of the canvas. At this scale a spatial index
+// is pointless: a 3×3 ring of 0.35-cells covers essentially the whole canvas,
+// so the old counting-sort hash paid per-frame build cost for near-all-pairs
+// work anyway. Direct O(n·m) loop below: behavior-identical, marginally cheaper.
+// Do NOT shrink this without Matt's sign-off — it changes output and must ship
+// as a versioned behavior change (#1234).
+export const FIELD_RADIUS = 0.35;
+const FIELD_SOFT = 1e-4;
 
 export const MAX_TRACKS = 4;
 export const PATCH_MODES = Object.freeze(['off', 'mod', 'field', 'feed']);
@@ -165,21 +176,21 @@ export function applyField(targetPts, sourcePts, patch) {
   if (!src.length) return targetPts.map((q) => ({ ...q }));
   const gain = 0.002 * p.strength * p.polarity;
   const r2 = FIELD_RADIUS * FIELD_RADIUS;
-  const hash = buildPointHash(src);
   return targetPts.map((q) => {
     const qx = Number(q.x) || 0;
     const qy = Number(q.y) || 0;
     let ax = 0;
     let ay = 0;
-    forNeighbors(hash, qx, qy, FIELD_RADIUS, (s) => {
+    for (let i = 0; i < src.length; i++) {
+      const s = src[i];
       const dx = (Number(s.x) || 0) - qx;
       const dy = (Number(s.y) || 0) - qy;
       const d2 = dx * dx + dy * dy;
-      if (d2 > r2) return;
+      if (d2 > r2) continue;
       const den = d2 + FIELD_SOFT;
       ax += dx / den;
       ay += dy / den;
-    });
+    }
     return { ...q, x: qx + ax * gain, y: qy + ay * gain };
   });
 }
