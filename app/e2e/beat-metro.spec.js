@@ -40,12 +40,19 @@ test('off by default: no attacks and a still dot; the pulse switch starts real a
   expect(await beats(page) - stopped).toBeLessThanOrEqual(1); // at most one attack already in flight
 });
 
-test('the pulse follows the dialed tempo: attacks at 240 BPM come at least twice as fast as at 60', async ({ page }) => {
+test('the pulse follows the dialed tempo: the timer it asks for is 60000 / BPM (read from the request, not from wall time, which a starved runner cannot keep)', async ({ page }) => {
   test.setTimeout(180_000);
+  // record every interval the page asks for, before the app boots
+  await page.addInitScript(() => {
+    window.__kcIntervals = []; const real = window.setInterval.bind(window);
+    window.setInterval = (fn, ms, ...rest) => { window.__kcIntervals.push(ms); return real(fn, ms, ...rest); };
+  });
   await boot(page);
+  const asked = () => page.evaluate(() => window.__kcIntervals.slice());
   await page.evaluate(() => { const s = window.__kcStore.getState(); s.setBeatMetro(true); s.setBeatBpm(240); });
-  const fast = (await waitForBeats(page, 6)) / 6; // ms per attack, ideally 250
+  await expect.poll(asked, { timeout: 30_000 }).toContain(250);
   await page.evaluate(() => window.__kcStore.getState().setBeatBpm(60));
-  const slow = (await waitForBeats(page, 3)) / 3; // ideally 1000
-  expect(slow).toBeGreaterThan(fast * 2);
+  await expect.poll(asked, { timeout: 30_000 }).toContain(1000);
+  await page.evaluate(() => window.__kcStore.getState().setBeatBpm(120));
+  await expect.poll(asked, { timeout: 30_000 }).toContain(500);
 });
