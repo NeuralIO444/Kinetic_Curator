@@ -9,6 +9,7 @@ import { CH, hashU01, hashU32, rngForIndex } from '../rng.js';
 import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
 import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { createNoise } from '../../noise.js';
+import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
 
@@ -198,7 +199,8 @@ function rails(ctx) {
 //
 // WeakMap (not a single module slot) so concurrent evaluate() / Worker
 // callers with different grids cannot stomp each other. GC drops entries
-// when a grid is no longer referenced.
+// when a grid is no longer referenced. NOT covered by the #1243 cache
+// helper on purpose: a size-capped Map would pin grid keys and leak.
 const _caFieldByGrid = new WeakMap();
 function caFieldFor(caGrid) {
   if (!caGrid) return null;
@@ -248,9 +250,10 @@ const VORONOI_VEIN = 0.04;   // unit-space half-width of the empty seam
 const VORONOI_ATTEMPTS = 24; // hard cap — see below
 
 // Centres are pure in (seed, spatial offset), so they are cached rather than
-// rebuilt per point. A small Map, not one slot: concurrent evaluate()/Worker
+// rebuilt per point. A small cache, not one slot: concurrent evaluate()/Worker
 // callers with different seeds would otherwise evict each other every call.
-const _voronoiCentres = new Map();
+// #1243: shared cap + evict-oldest discipline (see kernel/cache.js).
+const _voronoiCentres = makeSmallCache(8);
 function voronoiCentres(seed, seedOffsets) {
   const key = `${seed >>> 0}:${(seedOffsets && seedOffsets.spatial) || 0}`;
   let pts = _voronoiCentres.get(key);
@@ -260,7 +263,6 @@ function voronoiCentres(seed, seedOffsets) {
       pts[k * 2] = hashU01(seed, 'voronoi', k * 2, seedOffsets);
       pts[k * 2 + 1] = hashU01(seed, 'voronoi', k * 2 + 1, seedOffsets);
     }
-    if (_voronoiCentres.size > 8) _voronoiCentres.clear();
     _voronoiCentres.set(key, pts);
   }
   return pts;
@@ -381,9 +383,9 @@ function lsystemWalk(str, angleDeg) {
 }
 
 // Cached per (seed, depth, angle): the walk is a one-time cost, not per point.
-// A small Map rather than one slot, for the same reentrancy reason as the CA
-// field cache and the Voronoi centres.
-const _lsysCache = new Map();
+// A small cache rather than one slot, for the same reentrancy reason as the CA
+// field cache and the Voronoi centres. #1243: cap + evict-oldest (see kernel/cache.js).
+const _lsysCache = makeSmallCache(8);
 function lsystemPlant(seed, seedOffsets, depth, angleDeg) {
   const off = (seedOffsets && seedOffsets.spatial) || 0;
   const key = `${seed >>> 0}:${off}:${depth}:${angleDeg}`;
@@ -412,7 +414,6 @@ function lsystemPlant(seed, seedOffsets, depth, angleDeg) {
       ut[k] = walk.maxDepth > 0 ? walk.ds[k] / walk.maxDepth : 0;
     }
     plant = { ux, uy, ut, rule: pick.name, n: ux.length };
-    if (_lsysCache.size > 8) _lsysCache.clear();
     _lsysCache.set(key, plant);
   }
   return plant;
