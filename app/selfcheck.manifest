@@ -36,6 +36,7 @@ node src/biology/biology.selfcheck.mjs
 node src/engine/kernel/field/field.selfcheck.mjs
 node src/engine/kernel/field/scent.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.field.selfcheck.mjs
+node src/engine/kernel/tracks/trackGraph.noop.selfcheck.mjs
 node src/engine/kernel/tracks/patchDiag.selfcheck.mjs
 node src/engine/kernel/tracks/patchLinearity.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.mod.selfcheck.mjs

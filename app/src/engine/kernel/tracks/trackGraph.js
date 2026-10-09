@@ -171,9 +171,14 @@ export function applyMod(knobs, metrics, patch) {
 
 export function applyField(targetPts, sourcePts, patch) {
   const p = normalizePatch(patch);
-  if (p.mode !== 'field') return targetPts.map((q) => ({ ...q }));
+  // #1236 — no-op path returns the input array UNCHANGED (same reference,
+  // no allocation): the patch is off, its strength is zero, or the source
+  // list is empty. Nothing on this path mutates targetPts or its points,
+  // so callers that only read the result are safe holding the same array.
+  if (p.mode !== 'field') return targetPts;
+  if (!p.strength) return targetPts;
   const src = Array.isArray(sourcePts) ? sourcePts : [];
-  if (!src.length) return targetPts.map((q) => ({ ...q }));
+  if (!src.length) return targetPts;
   const gain = 0.002 * p.strength * p.polarity;
   const r2 = FIELD_RADIUS * FIELD_RADIUS;
   return targetPts.map((q) => {
@@ -216,7 +221,11 @@ export function sampleFlow(field, u, v) {
 
 export function applyFeed(targetPts, field, patch) {
   const p = normalizePatch(patch);
-  if (p.mode !== 'feed') return targetPts.map((q) => ({ ...q }));
+  // #1236 — no-op path returns the input array UNCHANGED (same reference,
+  // no allocation): the patch is off or its strength is zero. Same
+  // read-only contract as applyField's no-op path.
+  if (p.mode !== 'feed') return targetPts;
+  if (!p.strength) return targetPts;
   const amt = p.strength * p.polarity;
   return targetPts.map((q) => {
     const f = sampleFlow(field, Number(q.x) || 0, Number(q.y) || 0);
