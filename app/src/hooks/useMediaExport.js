@@ -122,7 +122,7 @@ export async function captureStill({ loopRef, resolution = 1, seedStr = '', onTh
   const width = Math.round(1000 * resolution);
   const height = Math.round(700 * resolution);
   // #270: refuse the export before any GPU allocation on iOS if it would
-  // exceed the mobile texture budget. PrintDeskModal surfaces e.message.
+  // exceed the mobile texture budget. Callers surface e.message.
   guardExportMemory(width, height, resolution);
   // #267: captureFrame discloses when an ACCUM still was upscaled from the
   // live render size instead of rendered true-size — surfaced in the print

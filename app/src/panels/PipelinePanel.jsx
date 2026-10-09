@@ -17,7 +17,6 @@ import { PanelHeader } from '../components/PanelHeader.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { invoke } from '@tauri-apps/api/tauri';
 import { RenderFinalBlock } from './pipeline/RenderFinalBlock.jsx';
-import { PrintDeskBlock } from './pipeline/PrintDeskBlock.jsx';
 import { DisplayBlock } from './pipeline/DisplayBlock.jsx';
 import { SetupBlock } from './pipeline/SetupBlock.jsx';
 import { StageBlock } from './pipeline/StageBlock.jsx';
@@ -74,16 +73,6 @@ export function PipelinePanel() {
   const [batchProgress, setBatchProgress] = useState(null);
   const cancelBatchRef = useRef(false);
   const watchdogGenRef = useRef(watchdogTripGen);
-  // #172: print desk modal, lazy-loaded like Asset Studio (AssetPoolPanel).
-  const [PrintDesk, setPrintDesk] = useState(null);
-  const openPrintDesk = async () => {
-    try {
-      const mod = await import('./PrintDeskModal.jsx');
-      setPrintDesk(() => mod.PrintDeskModal);
-    } catch (e) {
-      setMessage(`Print Desk failed to load — reload the page to retry. (${e && e.message ? e.message : String(e)})`);
-    }
-  };
 
   const accumOn = !!layoutParams.accumulation;
 
@@ -290,8 +279,6 @@ export function PipelinePanel() {
           rendering={rendering} setRendering={setRendering}
           batchActive={!!batchProgress}
         />
-
-        <PrintDeskBlock rendering={rendering} onOpen={openPrintDesk} />
 
         <div style={{ marginTop: '6px', marginBottom: '6px' }}>
           <button
@@ -559,7 +546,6 @@ export function PipelinePanel() {
 
         <SnapshotGallery snapshots={snapshots} />
       </div>
-      {PrintDesk && <PrintDesk onClose={() => setPrintDesk(null)} />}
     </div>
   );
 }
