@@ -8,7 +8,11 @@ export function useMetroPulse({ beatMetro, audioEnabled, running, beatBpm, onBea
   const on = metroRunning({ beatMetro, audioEnabled, running });
   useEffect(() => {
     if (!on) return undefined;
-    const id = setInterval(onBeat, metroIntervalMs(beatBpm));
+    const id = setInterval(() => {
+      // test hook (same shape as __KC_EXPOSE_STORE): count the attacks, which a starved CI page cannot read back from a decaying value
+      if (typeof window !== 'undefined' && window.__KC_EXPOSE_STORE === true) window.__kcMetroBeats = (window.__kcMetroBeats || 0) + 1;
+      onBeat();
+    }, metroIntervalMs(beatBpm));
     return () => clearInterval(id);
   }, [on, beatBpm, onBeat]);
 }

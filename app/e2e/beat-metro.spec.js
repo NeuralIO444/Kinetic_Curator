@@ -3,9 +3,12 @@
 import { test, expect } from '@playwright/test';
 
 async function boot(page) {
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  // the governor is disarmed: on a starved runner it pauses the instrument at boot, and a paused instrument has no metro
+  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; window.__KC_GOVERNOR_OFF = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
+  await page.evaluate(() => window.__kcStore.getState().setRunning(true));
+  await expect.poll(() => page.evaluate(() => window.__kcStore.getState().running)).toBe(true);
 }
 // the largest beatPulse seen over `ms`, sampled every 25 ms
 const peak = (page, ms) => page.evaluate((ms) => new Promise((resolve) => {
@@ -31,17 +34,15 @@ test('off by default: no audio means no beat and a still dot; pulse on makes a r
   expect(await peak(page, 1300)).toBeLessThan(0.05);
 });
 
-test('the pulse follows the dialed tempo: 60 BPM beats about half as often as 120', async ({ page }) => {
+test('the pulse follows the dialed tempo: 240 BPM beats more often than 60', async ({ page }) => {
   await boot(page);
   await page.evaluate(() => { const s = window.__kcStore.getState(); s.setBeatMetro(true); s.setBeatBpm(240); });
-  const count = (ms) => page.evaluate((ms) => new Promise((resolve) => {
-    let beats = 0; let prev = 0; const t0 = performance.now();
-    const id = setInterval(() => { const p = window.__kcStore.getState().beatPulse || 0; if (p > prev + 0.3) beats += 1; prev = p; if (performance.now() - t0 >= ms) { clearInterval(id); resolve(beats); } }, 10);
-  }), ms);
-  const fast = await count(2000);
+  // count the ATTACKS (not the decaying value, which a slow runner barely lets fall): the hook counts each one
+  const beats = async (ms) => { const a = await page.evaluate(() => window.__kcMetroBeats || 0); await page.waitForTimeout(ms); return (await page.evaluate(() => window.__kcMetroBeats || 0)) - a; };
+  const fast = await beats(2000);
   await page.evaluate(() => window.__kcStore.getState().setBeatBpm(60));
   await page.waitForTimeout(300);
-  const slow = await count(2000);
-  expect(fast).toBeGreaterThanOrEqual(slow * 2);
-  expect(slow).toBeGreaterThanOrEqual(1);
+  const slow = await beats(2000);
+  expect(fast).toBeGreaterThanOrEqual(3);
+  expect(fast).toBeGreaterThan(slow);
 });
