@@ -100,6 +100,7 @@ node src/state/queueTransport.selfcheck.mjs
 node src/curator/recipeFeatures.selfcheck.mjs
 node src/curator/tasteHead.selfcheck.mjs
 node src/curator/queenChannel.selfcheck.mjs
+node src/curator/queenDeniability.selfcheck.mjs
 node src/curator/queenLean.selfcheck.mjs
 node src/curator/whisper.selfcheck.mjs
 node src/engine/mothBodies.selfcheck.mjs

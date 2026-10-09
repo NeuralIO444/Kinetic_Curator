@@ -131,6 +131,7 @@ ok('no UI-surface file references the channel', () => {
     // PR-2's sway module reads the channel (GATE_OPEN) — added deliberately.
     'curator/queenLean.mjs',
     'curator/queenLean.selfcheck.mjs',
+    'curator/queenDeniability.selfcheck.mjs', // the import-graph guard names the modules it guards
   ]);
   const hits = [];
   const walk = (dir) => {
