@@ -1,0 +1,16 @@
+# rust/rust-toolchain.toml — pins the Rust toolchain for the wasm workspace (#1317).
+#
+# rustup (and CI) auto-selects this toolchain for any cargo/rustc invocation
+# under rust/. The pin is part of the reproducible-build contract: same rustc
+# + same sources + --locked == bit-identical .wasm, verified by CI's rebuild
+# step. Bump deliberately: every artifact must be rebuilt and re-committed.
+#
+# 1.98.1 is pinned (not just "recent") because it is the toolchain that built
+# the checked-in swarm_bake.wasm — the pipeline reproduces that artifact
+# bit-for-bit, so the pin change is pipeline-only with zero perf/behavior
+# delta (an older pin, e.g. 1.90.0, codegens this loop ~2x slower and trips
+# the selfcheck's wasm-vs-JS perf gate).
+[toolchain]
+channel = "1.98.1"
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

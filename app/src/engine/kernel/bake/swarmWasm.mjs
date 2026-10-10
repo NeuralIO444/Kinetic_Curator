@@ -1,7 +1,7 @@
 // swarmWasm.mjs — optional Rust/wasm fast path for the cloud-swarm bake (#175).
 //
 // The wasm module (kernel/wasm/swarm_bake.wasm, built by
-// scripts/build-swarm-wasm.sh) ports the swarm bake hot loop — noise,
+// scripts/build-wasm.sh, #1317) ports the swarm bake hot loop — noise,
 // spatial-hash neighbour pass, and cloud integration — from particles.js.
 // It is a pure accelerator: identical inputs produce equivalent bakes, and
 // every unsupported configuration stays on the JS engine.

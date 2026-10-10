@@ -14,8 +14,6 @@ crate-type = ["cdylib"]
 # the last ulp — see the crate docs and swarmWasm.selfcheck.mjs.
 libm = "0.2"
 
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
+# Release profile lives in the workspace root (rust/Cargo.toml, #1317): in a
+# workspace the root [profile.*] wins, so a per-crate copy would be silently
+# ignored — the old one was moved, not changed.
