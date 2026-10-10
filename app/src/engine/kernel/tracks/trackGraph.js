@@ -10,7 +10,10 @@ import { lumaToFlow as encodeLuma } from './feedOps.js';
 // Do NOT shrink this without Matt's sign-off — it changes output and must ship
 // as a versioned behavior change (#1234).
 export const FIELD_RADIUS = 0.35;
-const FIELD_SOFT = 1e-4;
+// #1307 — exported for the SoA slice-2 column loop (gl/fieldFeedColumns.mjs),
+// which must reproduce applyField's neighbor math bit-for-bit. Do not change
+// this value without a versioned behavior flag (same rule as FIELD_RADIUS).
+export const FIELD_SOFT = 1e-4;
 
 export const MAX_TRACKS = 4;
 export const PATCH_MODES = Object.freeze(['off', 'mod', 'field', 'feed']);
