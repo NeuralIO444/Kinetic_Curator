@@ -1,0 +1,22 @@
+# rust/Cargo.toml — Cargo workspace for KC-1's Rust/wasm kernel crates (#1317).
+#
+# Every member crate compiles to wasm32-unknown-unknown via scripts/build-wasm.sh
+# and lands as a checked-in artifact under app/src/engine/kernel/wasm/ with a
+# MANIFEST.json provenance record. Builds are reproducible: the rustc version is
+# pinned by rust/rust-toolchain.toml, `cargo build --locked` is mandatory, and
+# CI rebuilds from source and compares artifact hashes bit-for-bit.
+[workspace]
+members = ["swarm-bake"]
+resolver = "2"
+
+# Shared release profile for ALL wasm crates — moved here from the individual
+# crate manifests (#1317): in a workspace the root profile wins, so per-crate
+# copies would silently diverge. These settings are part of the byte-identical
+# contract: max optimization, single-codegen-unit LTO, abort on panic (no
+# unwinding tables in the wasm), scalar codegen — SIMD128 stays opt-in per
+# crate (see scripts/build-wasm.sh) with scalar as the reference.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

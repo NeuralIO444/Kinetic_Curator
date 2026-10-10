@@ -6,10 +6,12 @@
 // configs fall back to JS exactly, and the 400x120 workload is faster than
 // the JS engine it replaces.
 //
-// #1235 — the checked-in wasm must match the checked-in Rust source: the
-// gate in section 0 recomputes the source hash of rust/swarm-bake and fails
-// unless it equals the swarm_bake.wasm.sha256 sidecar recorded by
-// scripts/build-swarm-wasm.sh. A stale or hand-rebuilt wasm fails CI.
+// #1235/#1317 — the checked-in wasm must match the checked-in Rust sources:
+// the gate in section 0 recomputes the source hash of every crate in
+// app/src/engine/kernel/wasm/MANIFEST.json and fails unless it equals the
+// recorded hash. Section 1 rebuilds every crate from source with
+// scripts/build-wasm.sh --verify (self-installing the pinned toolchain) and
+// fails CI on a bit-level artifact mismatch, naming the stale crate.
 //
 // On fidelity: the swarm is chaotic, and the wasm module evaluates sin/cos/
 // atan2 with libm while JS uses V8's implementations (~1 ulp apart — the same
@@ -19,6 +21,7 @@
 // the same macroscopic distribution. The gates below assert exactly that:
 // bit-exact noise, near-exact short bakes, distribution-level long bakes.
 import assert from 'node:assert';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -46,52 +49,110 @@ const base = {
   steps: 120,
 };
 
-// --- 0. #1235: checked-in wasm matches the checked-in Rust source --------
-// Source-hash spec — MUST match scripts/build-swarm-wasm.sh (keep in sync):
-//   files  = Cargo.toml, Cargo.lock, every *.rs under src/ (recursive),
-//            paths relative to rust/swarm-bake/, sorted byte-wise;
+// --- 0. #1317: checked-in wasm matches the checked-in Rust sources -------
+// Manifest spec — MUST match scripts/build-wasm.sh (keep in sync):
+//   per crate, files = rust-toolchain.toml, Cargo.toml, Cargo.lock
+//   (workspace-level: a toolchain/lock bump invalidates every crate),
+//   plus <crate>/Cargo.toml and every *.rs under <crate>/src/ (recursive),
+//   paths relative to rust/, sorted byte-wise;
 //   digest input per file = "<relpath>\n" + raw file bytes + "\n".
+// A source change without a manifest rebuild fails here, NAMING the stale
+// crate; the recorded rustcVersion must equal the rust/rust-toolchain.toml
+// pin, or the manifest was written by the wrong toolchain.
 const SELFCHECK_DIR = dirname(fileURLToPath(import.meta.url));
-const SWARM_BAKE_DIR = join(SELFCHECK_DIR, '..', '..', '..', '..', '..', 'rust', 'swarm-bake');
-const SOURCE_HASH_SIDECAR = join(SELFCHECK_DIR, '..', 'wasm', 'swarm_bake.wasm.sha256');
+const RUST_DIR = join(SELFCHECK_DIR, '..', '..', '..', '..', '..', 'rust');
+const WASM_DIR = join(SELFCHECK_DIR, '..', 'wasm');
 
-function swarmBakeSourceHash(srcDir) {
-  const files = ['Cargo.toml', 'Cargo.lock'];
+function parseToolchainChannel(tomlPath) {
+  const m = readFileSync(tomlPath, 'utf8').match(/^channel\s*=\s*"([^"]+)"/m);
+  assert.ok(m, `cannot parse channel from ${tomlPath}`);
+  return m[1];
+}
+
+function crateSourceHash(crate) {
+  const files = [
+    'rust-toolchain.toml',
+    'Cargo.toml',
+    'Cargo.lock',
+    `${crate}/Cargo.toml`,
+  ];
   const walkRs = (dir) => {
     for (const name of readdirSync(dir).sort()) {
       const p = join(dir, name);
       if (statSync(p).isDirectory()) walkRs(p);
-      else if (name.endsWith('.rs')) files.push(relative(srcDir, p));
+      else if (name.endsWith('.rs')) files.push(relative(RUST_DIR, p));
     }
   };
-  walkRs(join(srcDir, 'src'));
+  walkRs(join(RUST_DIR, crate, 'src'));
   files.sort();
   const h = createHash('sha256');
   for (const rel of files) {
     h.update(`${rel}\n`);
-    h.update(readFileSync(join(srcDir, rel)));
+    h.update(readFileSync(join(RUST_DIR, rel)));
     h.update('\n');
   }
   return h.digest('hex');
 }
 
 {
-  let recorded;
+  const manifestPath = join(WASM_DIR, 'MANIFEST.json');
+  let manifest;
   try {
-    recorded = readFileSync(SOURCE_HASH_SIDECAR, 'utf8').trim();
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   } catch (e) {
     assert.fail(
-      `swarm_bake.wasm.sha256 sidecar is missing — run ./scripts/build-swarm-wasm.sh: ${e.message}`,
+      `kernel wasm MANIFEST.json is missing or invalid — run ./scripts/build-wasm.sh: ${e.message}`,
     );
   }
-  const current = swarmBakeSourceHash(SWARM_BAKE_DIR);
-  assert.strictEqual(
-    current,
-    recorded,
-    `checked-in swarm_bake.wasm does not match the Rust source (run ./scripts/build-swarm-wasm.sh):\n` +
-      `  recorded: ${recorded}\n  current:  ${current}`,
-  );
-  console.log(`[ok] checked-in wasm matches Rust source (source hash ${current.slice(0, 12)}…)`);
+  const pinned = parseToolchainChannel(join(RUST_DIR, 'rust-toolchain.toml'));
+  const crates = manifest.crates || {};
+  assert.ok(Object.keys(crates).length > 0, 'MANIFEST.json lists no crates');
+  for (const [crate, entry] of Object.entries(crates)) {
+    assert.strictEqual(
+      entry.rustcVersion,
+      pinned,
+      `crate "${crate}": manifest rustcVersion ${entry.rustcVersion} != pinned toolchain ${pinned} ` +
+        `(rebuild with ./scripts/build-wasm.sh)`,
+    );
+    const current = crateSourceHash(crate);
+    assert.strictEqual(
+      current,
+      entry.sourceHash,
+      `stale kernel wasm: crate "${crate}" sources changed without a rebuild ` +
+        `(run ./scripts/build-wasm.sh):\n` +
+        `  recorded: ${entry.sourceHash}\n  current:  ${current}`,
+    );
+    console.log(
+      `[ok] crate "${crate}" manifest matches Rust sources ` +
+        `(source hash ${current.slice(0, 12)}…, rustc ${entry.rustcVersion})`,
+    );
+  }
+}
+
+// --- 1. #1317: checked-in wasm rebuilds bit-for-bit from the rust/** sources
+// Rebuild gate, no workflow change needed: scripts/build-wasm.sh --verify
+// self-installs the pinned toolchain via rustup (ubuntu-latest lint runners
+// carry rustup), rebuilds every crate to a temp dir with cargo --locked, and
+// fails NAMING the crate on any artifact mismatch — changes nothing on disk.
+// No skip-if-no-cargo fallback: a missing toolchain is a loud failure.
+{
+  const REPO_ROOT = join(RUST_DIR, '..');
+  try {
+    execFileSync('bash', [join(REPO_ROOT, 'scripts', 'build-wasm.sh'), '--verify'], {
+      cwd: REPO_ROOT,
+      stdio: 'inherit',
+      timeout: 600_000,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } catch (e) {
+    assert.fail(
+      `build-wasm.sh --verify failed — the checked-in kernel wasm does not ` +
+        `reproduce bit-for-bit from the rust/** sources (the script names the ` +
+        `stale crate in the output above; rebuild with ./scripts/build-wasm.sh): ` +
+        `${e.message}`,
+    );
+  }
+  console.log('[ok] build-wasm.sh --verify: checked-in wasm reproduces bit-for-bit from source');
 }
 
 const wasm = await ensureSwarmWasm();

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "generatedBy": "scripts/build-wasm.sh",
+  "crates": {
+    "swarm-bake": {
+      "crate": "swarm-bake",
+      "artifact": "swarm_bake.wasm",
+      "rustcVersion": "1.98.1",
+      "sourceHash": "202c33500939d016af4cf942aefbc5768cf40f2c7c003258663c557f1f4c9f01",
+      "artifactHash": "28e6024d65e93b599dbdb153fd2eb1e5f05e61f36386f185a57880822eb3a207",
+      "simd128": false,
+      "builtAt": "2026-10-10T08:00:09Z"
+    }
+  }
+}
