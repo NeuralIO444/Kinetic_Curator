@@ -2,14 +2,23 @@
   "schema": 1,
   "generatedBy": "scripts/build-wasm.sh",
   "crates": {
+    "kc-neighbor": {
+      "crate": "kc-neighbor",
+      "artifact": "kc_neighbor.wasm",
+      "rustcVersion": "1.98.1",
+      "sourceHash": "7c66200fa1ec9204cbf1cceb9fd2f462ef3c574a675619332944b0468faaf2ce",
+      "artifactHash": "a4e9db866c6539e602f925411de1562cc40f789eb11e928eaa242c65549103ad",
+      "simd128": false,
+      "builtAt": "2026-10-10T09:32:11Z"
+    },
     "swarm-bake": {
       "crate": "swarm-bake",
       "artifact": "swarm_bake.wasm",
       "rustcVersion": "1.98.1",
-      "sourceHash": "202c33500939d016af4cf942aefbc5768cf40f2c7c003258663c557f1f4c9f01",
+      "sourceHash": "dfbd65aea66bb96558181ce485fd9fa9753938f2e3b8b2ed16f838f947f55b64",
       "artifactHash": "28e6024d65e93b599dbdb153fd2eb1e5f05e61f36386f185a57880822eb3a207",
       "simd128": false,
-      "builtAt": "2026-10-10T08:00:09Z"
+      "builtAt": "2026-10-10T09:32:11Z"
     }
   }
 }
