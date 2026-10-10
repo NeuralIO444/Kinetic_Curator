@@ -40,15 +40,12 @@ export function mixEase(t) {
 
 /**
  * Always Alive Protocol: smooth ease-in / ease-out for item morph (chip clicks).
- * Replaces aggressive expoOut (which halted at 97% mid-flight and popped at landing)
- * with continuous smootherstep: zero jerk at endpoints, organic acceleration out of
- * the source pose, and soft deceleration into the destination pose.
- * Input clamped; output monotone inside [0,1], f(0)=0 and f(1)=1 exact (I1 invariant).
+ * Kernel-owned (#1239): lives in app/src/engine/kernel/easing.mjs and is
+ * re-exported here so the live loop's import path is unchanged while the
+ * dependency arrow points gl→kernel.
  */
-export function morphEase(t) {
-  const x = Math.min(1, Math.max(0, t));
-  return x * x * x * (x * (x * 6 - 15) + 10);
-}
+import { morphEase } from '../engine/kernel/easing.mjs';
+export { morphEase };
 
 /**
  * Create the crossfade state machine.

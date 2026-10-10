@@ -18,12 +18,11 @@
  * Cost: ~2.3k cells, one diffuse+decay pass per update. Declared tier 0
  * (structural substrate, never shed) beside the field definition, following
  * the measured-cost-tier pattern: the cost lives with the definition, not
- * in a separate list. costTiers.mjs is import-safe here (zero imports, no
- * cycle) — this is an engine→gl import by directory only; the module itself
- * has no browser dependencies.
+ * in a separate list. The registry is kernel-local (#1239 — kernel owns it,
+ * gl reads it), so this import never leaves the kernel.
  */
 
-import { registerCostTier } from '../../../gl/costTiers.mjs';
+import { registerCostTier } from '../costRegistry.mjs';
 
 export const SCENT_COLS = 64;
 export const SCENT_ROWS = 36;

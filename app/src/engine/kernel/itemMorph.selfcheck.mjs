@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { matchItems, blendItems, planMorph, nodeWindow, moveFor,
   MOVE_SMEAR, MOVE_BREATH, MOVE_FADE, SMEAR_VEL, SMEAR_TRAVEL, DENSE_COUNT,
   joinMoveFor, leaveMoveFor, JOIN_POP, JOIN_WAVE, LEAVE_FADE, LEAVE_SHRINK } from './itemMorph.mjs';
-// The live loop's own easing — liveResolve feeds blendItems morphEase(raw),
+// The kernel's own easing — liveResolve feeds blendItems morphEase(raw),
 // so the #564 contract sweeps below must drive it the same way.
-import { morphEase } from '../../gl/paletteMix.mjs';
+// (#1239: kernel-owned in ./easing.mjs; gl/paletteMix.mjs re-exports it,
+// so this selfcheck no longer imports from gl/.)
+import { morphEase } from './easing.mjs';
 // #951: the blends below play the plan's hero-first slot schedule, so the
 // tests read each node's window from the plan's choreo — the same window
 // blendItems actually plays — instead of the seeded nodeWindow.
