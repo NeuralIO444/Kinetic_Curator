@@ -3,6 +3,9 @@
 import { strict as assert } from 'node:assert';
 import {
   recordPatchSample,
+  removePatchSample,
+  patchDiagSampleCount,
+  PATCH_DIAG_MAX_SAMPLES,
   getPatchSample,
   patchSampleAgeMs,
   isSourceStill,
@@ -87,4 +90,57 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
     formatMatrixRow({ srcId: 'x', dstId: 'a', mode: 'feed', strength: 0 }, new Map()),
     'KC-? → KC-? · FEED · 0.00', 'unknown ordinals read ?');
   console.log('[selfcheck] patchDiag matrix pairs + rows');
+}
+
+// #1246 — bound holds under add/remove cycles. Delete-on-remove is the
+// primary bound; the cap is the backstop for id churn that never hits the
+// remove hook (undo/project-load restore the layer list wholesale).
+{
+  const base = patchDiagSampleCount();
+  // Small cycle: below the cap, the map tracks live layers exactly.
+  const M = 20;
+  const live = new Set();
+  for (let i = 0; i < M; i++) {
+    const id = `torture-${i}`;
+    recordPatchSample(id, { mode: 'feed', strength: 0.2, pullPx: i });
+    live.add(id);
+    if (i % 2 === 0) { removePatchSample(id); live.delete(id); } // churn the hook path
+  }
+  assert.strictEqual(patchDiagSampleCount(), base + live.size,
+    `map size tracks live layers exactly (got ${patchDiagSampleCount()}, want ${base + live.size})`);
+  assert.strictEqual(getPatchSample('torture-0'), null, 'removed id is absent');
+  assert.ok(getPatchSample('torture-1'), 'live id survives');
+  // Large cycle: map size stays ≤ live layers even when churn overflows the cap.
+  for (let i = 0; i < PATCH_DIAG_MAX_SAMPLES * 4; i++) {
+    const id = `big-${i}`;
+    recordPatchSample(id, { mode: 'feed', strength: 0.2, pullPx: i });
+    live.add(id);
+    if (i % 2 === 0) { removePatchSample(id); live.delete(id); }
+  }
+  assert.ok(patchDiagSampleCount() <= base + live.size,
+    `map size stays ≤ live layers (got ${patchDiagSampleCount()}, live ${base + live.size})`);
+  console.log('[selfcheck] patchDiag #1246 delete-on-remove bound');
+
+  // Cap backstop: churn that never hits the remove hook stays bounded.
+  const C = PATCH_DIAG_MAX_SAMPLES * 2;
+  for (let i = 0; i < C; i++) recordPatchSample(`churn-${i}`, { mode: 'field', strength: 0.1, pullPx: i });
+  assert.ok(patchDiagSampleCount() <= PATCH_DIAG_MAX_SAMPLES,
+    `cap backstop holds (${patchDiagSampleCount()} ≤ ${PATCH_DIAG_MAX_SAMPLES})`);
+  // A live patched layer records every tick, so recency refresh keeps the
+  // artist's watched diagnostic out of the eviction path.
+  recordPatchSample('watched', { mode: 'mod', strength: 0.5, pullPx: 1 });
+  for (let i = 0; i < C; i++) {
+    recordPatchSample(`churn2-${i}`, { mode: 'field', strength: 0.1, pullPx: i });
+    recordPatchSample('watched', { mode: 'mod', strength: 0.5, pullPx: 1 });
+  }
+  assert.ok(getPatchSample('watched'), 'refreshed live layer survives churn eviction');
+  assert.ok(patchDiagSampleCount() <= PATCH_DIAG_MAX_SAMPLES, 'cap still holds after refreshed churn');
+  // Cleanup so later suites see the baseline map.
+  for (let i = 0; i < M; i++) removePatchSample(`torture-${i}`);
+  for (let i = 0; i < PATCH_DIAG_MAX_SAMPLES * 4; i++) removePatchSample(`big-${i}`);
+  removePatchSample('watched');
+  for (let i = 0; i < C; i++) { removePatchSample(`churn-${i}`); removePatchSample(`churn2-${i}`); }
+  assert.ok(patchDiagSampleCount() <= base,
+    `cleanup restores at most the baseline (got ${patchDiagSampleCount()}, base ${base})`);
+  console.log('[selfcheck] patchDiag #1246 cap backstop + recency refresh');
 }

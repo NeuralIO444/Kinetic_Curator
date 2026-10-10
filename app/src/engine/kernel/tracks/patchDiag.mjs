@@ -8,10 +8,22 @@
 // Pure + browser-safe (no imports — node-testable). No store traffic:
 // per-frame values must never ride the store (rerender storm). Samples are
 // keyed by layer id; the UI only reads layers it renders, so entries for
-// removed layers are never read (bounded at content-track count — no prune
-// path needed).
+// removed layers are never read.
+//
+// Boundedness (#1246): the primary bound is delete-on-layer-remove —
+// `removePatchSample` is called from the store's `removeLayer` action, so a
+// removed layer's sample dies with it. `PATCH_DIAG_MAX_SAMPLES` is the
+// backstop for id churn that never hits the remove hook (undo/project-load
+// restore the layer list wholesale); hitting the cap evicts the
+// least-recently-recorded entry. Diagnostics only — eviction never touches
+// simulation state.
 
 const samples = new Map(); // layerId -> sample
+
+/** Hard backstop on live samples entries (#1246). Live layer count is
+ * capped (4 content + 4 fx + 4 math + pattern ≈ 13); 32 leaves headroom so
+ * eviction only ever fires on hook-bypassing id churn, never on live ids. */
+export const PATCH_DIAG_MAX_SAMPLES = 32;
 
 /** Still boundary, px/tick on raw item-velocity units (see isSourceStill). */
 export const SOURCE_STILL_SPEED = 0.05;
@@ -20,7 +32,28 @@ export const SOURCE_STILL_AGITATION = 0.05;
 export const PATCH_DIAG_STALE_MS = 2000;
 
 export function recordPatchSample(layerId, sample) {
+  // Refresh recency: a live patched layer records every tick, so the
+  // eviction victim below is always an entry nobody is refreshing — a live
+  // layer the artist is watching is never evicted.
+  if (samples.has(layerId)) samples.delete(layerId);
+  else if (samples.size >= PATCH_DIAG_MAX_SAMPLES) {
+    // Map preserves insertion order: the first key is the least-recently-recorded.
+    samples.delete(samples.keys().next().value);
+  }
   samples.set(layerId, { at: Date.now(), ...sample });
+}
+
+/**
+ * Layer-lifecycle hook (#1246): drop the sample when its layer is removed.
+ * Called from the store's `removeLayer` action — the single removal funnel.
+ */
+export function removePatchSample(layerId) {
+  samples.delete(layerId);
+}
+
+/** Live entry count — exposed for the #1246 bound torture test. */
+export function patchDiagSampleCount() {
+  return samples.size;
 }
 
 export function getPatchSample(layerId) {

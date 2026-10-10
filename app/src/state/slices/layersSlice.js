@@ -5,6 +5,7 @@ import { kindsForFxOrdinal } from '../../fx/fxTrack.js';
 import { isMathLayer, defaultMathEffects, defaultMathParams, MATH_EFFECT_DEFS, MATH_MOD_SOURCES } from '../../fx/mathFilters.js';
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { removePatchSample } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { isTapeFull } from '../tapeBudget.js';
 import { fxBeforeMath, canTrade } from '../layerOrder.js';
 import { PATTERN_DEFAULT_DENSITY, PATTERN_PARAM_KEYS, defaultPattern, sanitizePattern } from '../patternTrack.js';
@@ -271,6 +272,7 @@ export const createLayersSlice = (set) => ({
     const target = state.layers.find((l) => l.id === id);
     if (!target) return {};
     if (isKcLayer(target) && state.layers.filter(isKcLayer).length <= 1) return {}; // the last KC track stays (it owns the seed and the BUILD sliders)
+    removePatchSample(id); // #1246 — the patch-diagnostic sample dies with its layer
     // Clear patch.to pointing at the removed track (same rule as projectNormalize on load).
     const layers = state.layers.filter((l) => l.id !== id)
       .map((l) => (l.patch?.to === id ? { ...l, patch: { ...l.patch, to: null } } : l));
