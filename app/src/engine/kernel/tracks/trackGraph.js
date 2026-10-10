@@ -169,16 +169,41 @@ export function applyMod(knobs, metrics, patch) {
   return k;
 }
 
+// SoA 2/5 (#1306) — live-point count with zero per-point work. Legacy
+// callers pass arrays (`.length`); a point set reports its live column
+// prefix as `count` (the column-count check). Anything else counts as
+// empty, exactly like the old `Array.isArray(...) ? ... : []` fallback.
+function livePointCount(pts) {
+  if (Array.isArray(pts)) return pts.length;
+  if (pts !== null && typeof pts === 'object' && typeof pts.count === 'number') {
+    const n = pts.count | 0;
+    return n > 0 ? n : 0;
+  }
+  return 0;
+}
+
 export function applyField(targetPts, sourcePts, patch) {
   const p = normalizePatch(patch);
-  // #1236 — no-op path returns the input array UNCHANGED (same reference,
-  // no allocation): the patch is off, its strength is zero, or the source
-  // list is empty. Nothing on this path mutates targetPts or its points,
-  // so callers that only read the result are safe holding the same array.
+  // #1236 — no-op path returns the input UNCHANGED (same reference, no
+  // allocation): the patch is off, its strength is zero, or there are no
+  // live sources. #1306 (SoA 2/5): "no live sources" is a column-count
+  // check — a point set's `count`, never a per-point object walk — and the
+  // input set comes back untouched (no toObjects() on this path; see the
+  // adapters kill list). Nothing here mutates the input or its columns,
+  // so readers holding the same set stay safe.
   if (p.mode !== 'field') return targetPts;
   if (!p.strength) return targetPts;
-  const src = Array.isArray(sourcePts) ? sourcePts : [];
-  if (!src.length) return targetPts;
+  if (livePointCount(sourcePts) <= 0) return targetPts;
+  if (!Array.isArray(targetPts) || !Array.isArray(sourcePts)) {
+    // Point sets on the ACTIVE field path arrive with slice 2/5 (column
+    // loops). Fail loudly instead of silently computing against a coerced
+    // empty source list — the byte-identical law wants noise, not drift.
+    throw new Error(
+      '[trackGraph.applyField] point-set input on the ACTIVE field path ' +
+        'is not migrated yet (slice 2/5); the no-op path above already accepts sets.',
+    );
+  }
+  const src = sourcePts;
   const gain = 0.002 * p.strength * p.polarity;
   const r2 = FIELD_RADIUS * FIELD_RADIUS;
   return targetPts.map((q) => {

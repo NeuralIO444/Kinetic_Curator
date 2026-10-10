@@ -7,6 +7,7 @@
 // (direct O(n·m) loop, #1254); they pin the loop's output, not its shape.
 import assert from 'node:assert';
 import { applyField, applyFeed, normalizePatch } from './trackGraph.js';
+import { createPointSet, POINT_COLUMN_NAMES } from '../soa/pointSet.js';
 
 const fieldPatch = (over = {}) =>
   normalizePatch({ from: 0, to: 1, mode: 'field', strength: 1, polarity: 1, ...over });
@@ -127,4 +128,66 @@ const feedPatch = (over = {}) =>
   out[0].x = -999;
   assert.strictEqual(pts[0].x, 0.25, 'FEED active: mutating output does not alias input');
   console.log('[selfcheck] trackGraph.noop applyFeed active path unchanged');
+}
+
+// --- #1306 (SoA 2/5): no-op path is a column-count check ----------------------
+// The no-op path accepts point sets: emptiness is read from `count` (the
+// column-count check), the input set is returned untouched (same reference,
+// zero per-point allocation, zero per-point walk — no toObjects() to
+// discover there's nothing to do), and no column is mutated.
+{
+  const snap = (s) => {
+    const o = { count: s.count };
+    for (const c of POINT_COLUMN_NAMES) o[c] = Array.from(s[c].slice(0, s.count));
+    return JSON.stringify(o);
+  };
+  const mkSet = (n, count) => {
+    const s = createPointSet(Math.max(1, n));
+    for (let i = 0; i < n; i++) {
+      s.x[i] = 0.1 * (i + 1); s.y[i] = 0.2 * (i + 1);
+      s.vx[i] = 0.01 * i; s.vy[i] = -0.01 * i;
+      s.slot[i] = i; s.energy[i] = 1 + i;
+      s.id[i] = 100 + i; s.family[i] = 7; s.source[i] = 3;
+    }
+    s.count = count;
+    return s;
+  };
+
+  // count — not capacity — decides: count 0 in a capacity-8 set is empty.
+  const emptySet = mkSet(8, 0);
+  const tgt = mkSet(2, 2);
+  const tgtBefore = snap(tgt);
+  const r1 = applyField(tgt, emptySet, fieldPatch());
+  assert.strictEqual(r1, tgt, 'FIELD set no-op (count 0): same set reference');
+  assert.strictEqual(snap(tgt), tgtBefore, 'FIELD set no-op: target columns unmutated');
+  assert.strictEqual(snap(emptySet), snap(mkSet(8, 0)), 'FIELD set no-op: source columns unmutated');
+
+  // Non-empty set sources with an off / zero-strength patch: same ref.
+  const liveSet = mkSet(3, 3);
+  assert.strictEqual(applyField(tgt, liveSet, fieldPatch({ mode: 'off' })), tgt,
+    'FIELD set no-op (off): same set reference');
+  assert.strictEqual(applyField(tgt, liveSet, fieldPatch({ strength: 0 })), tgt,
+    'FIELD set no-op (strength 0): same set reference');
+  assert.strictEqual(snap(tgt), tgtBefore, 'FIELD set no-op: still zero column writes');
+
+  // Mixed shapes on the no-op path: set target + array sources, off patch.
+  assert.strictEqual(
+    applyField(tgt, [{ x: 0.9, y: 0.1 }], fieldPatch({ mode: 'off' })), tgt,
+    'FIELD set target + array sources, off: same set reference');
+
+  // The snapshot comparisons above are the column equivalent of #1236's
+  // frozen-input test (typed arrays cannot be Object.freeze()d when
+  // non-empty): the no-op path performs zero column writes.
+
+  // Sets on the ACTIVE path are slice 2/5 territory: loud error, never a
+  // silent coercion to an empty source list (byte-identical law).
+  assert.throws(
+    () => applyField([{ x: 0.5, y: 0.5 }], liveSet, fieldPatch()),
+    /slice 2\/5/,
+    'FIELD active + set sources: loud migration error, not a silent no-op');
+  assert.throws(
+    () => applyField(tgt, [{ x: 0.9, y: 0.1 }], fieldPatch()),
+    /slice 2\/5/,
+    'FIELD active + set target: loud migration error');
+  console.log('[selfcheck] trackGraph.noop #1306 set no-op is a column-count check');
 }
