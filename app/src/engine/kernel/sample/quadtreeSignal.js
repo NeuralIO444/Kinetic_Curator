@@ -180,8 +180,19 @@ export function quantizeBands(bands) {
   return QUAD_BAND_ORDER.map((k) => Math.round(bandLevel(bands, k) * 50)).join('.');
 }
 
-export function resetQuadtreeSignal() {
-  _liveSmoother.reset();
-  _liveLastMs = -1;
-  _liveCached = null;
-}
+// NOTE (#1253): resetQuadtreeSignal was removed. The band smoother + 100ms
+// cache are intentional live state of the GLOBAL audio bus — not per-project
+// state (the bus is global, not spatial; the research note exempts this
+// module from the seed law). Every plausible session boundary legitimately
+// carries the tail across:
+//   - project load: the audio keeps playing, so the tail still describes the
+//     live mix. Resetting would dip the audio term to ~0 for the 0.15s
+//     attack on every load — a visible stutter for no benefit.
+//   - audio-off: the ~1.5s release toward zero IS the spec'd dropout
+//     behavior ("release toward zero rather than snapping", above). A reset
+//     would snap subdivisions to field-only — a pop the ballistics exist to
+//     prevent.
+//   - audio-source change: the 0.15s fast attack absorbs the new geography;
+//     a reset would be visually indistinguishable.
+// If a future session-scoped consumer ever needs a hard reset, re-add it
+// then. Per-instance reset stays available via createBandSmoother().reset().
