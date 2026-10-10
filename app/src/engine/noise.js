@@ -151,6 +151,20 @@ function curl2With(p, x, y, z, eps = 0.5, out = null) {
 }
 
 /**
+ * The raw 512-byte permutation table for a seed (buildPerm, doubled).
+ *
+ * Exported for the GPU field twin (gl/fields): the runner uploads these
+ * bytes verbatim as an R8UI texture, so the shader hashes exactly like JS.
+ * Pure accessor — no behavior change.
+ *
+ * @param {number} seedValue
+ * @returns {Uint8Array} 512 bytes, values 0..255
+ */
+export function permTableFor(seedValue) {
+  return buildPerm(seedValue);
+}
+
+/**
  * Create an isolated noise field from a numeric seed.
  * @param {number} seedValue
  * @returns {{ seed, noise3D, fBm3D, curl2 }}
