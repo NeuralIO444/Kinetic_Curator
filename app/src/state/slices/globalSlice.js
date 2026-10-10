@@ -480,7 +480,7 @@ export const createGlobalSlice = (set) => ({
     const src = findAsset(id, sanitizeOverlay(state.customAssets));
     if (!src) return {};
     const result = duplicateIntoOverlay(src, state.customAssets);
-    if (!result.ok) return { ingestError: result.error };
+    if (!result.ok) return { ingestError: result.hint || result.error };
     return {
       customAssets: result.overlay,
       enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
@@ -490,7 +490,7 @@ export const createGlobalSlice = (set) => ({
 
   ingestAsset: (svg, hint, opts = {}) => set((state) => {
     const result = ingestIntoOverlay(svg, state.customAssets, hint, opts);
-    if (!result.ok) return { ingestError: result.error || 'ingest failed' };
+    if (!result.ok) return { ingestError: result.hint || result.error || 'ingest failed' };
     // #725: region detection needs a rasterize (async) — the asset lands
     // now, its regions follow. Stale-guarded: a replace in between wins.
     queueRegionDetect(result.asset.id, result.asset.svg, (id, regions) => {
@@ -511,7 +511,7 @@ export const createGlobalSlice = (set) => ({
 
   removeCustomAsset: (id) => set((state) => {
     const result = removeFromOverlay(id, state.customAssets);
-    if (!result.ok) return { ingestError: result.error };
+    if (!result.ok) return { ingestError: result.hint || result.error };
     const enabled = { ...state.enabledAssets };
     const overrides = { ...(state.assetWeightOverrides || {}) };
     delete enabled[id];
@@ -521,7 +521,7 @@ export const createGlobalSlice = (set) => ({
 
   renameCustomAsset: (id, name) => set((state) => {
     const result = renameOverlayAsset(id, name, state.customAssets);
-    if (!result.ok) return { ingestError: result.error };
+    if (!result.ok) return { ingestError: result.hint || result.error };
     const enabled = { ...state.enabledAssets };
     const overrides = { ...(state.assetWeightOverrides || {}) };
     if (result.from !== result.to) {
@@ -543,7 +543,7 @@ export const createGlobalSlice = (set) => ({
 
   replaceCustomAsset: (id, svg) => set((state) => {
     const result = replaceOverlayAsset(id, svg, state.customAssets);
-    if (!result.ok) return { ingestError: result.error };
+    if (!result.ok) return { ingestError: result.hint || result.error };
     // #725: re-detect regions for the new artwork; stale-guard as above.
     const nextSvg = result.overlay.find((a) => a.id === id)?.svg;
     if (nextSvg) {
