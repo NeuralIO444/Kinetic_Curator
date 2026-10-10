@@ -9,7 +9,7 @@
 // deliberately so: it scans the full grid and has no place on the hottest
 // FEED path (#1253: do not wire into live diagnostics).
 import assert from 'node:assert';
-import { lumaToGrad, lumaToCurl, lumaToFlow, fieldInvariants } from './feedOps.js';
+import { lumaToGrad, lumaToCurl, lumaToFlow, lumaToGradInto, lumaToCurlInto, lumaToFlowInto, fieldInvariants } from './feedOps.js';
 
 const W = 4;
 const H = 4;
@@ -89,6 +89,61 @@ assert.deepStrictEqual(
   Array.from(curl.flow),
   "'curl' dispatches to lumaToCurl",
 );
+
+// --- lumaToFlowInto: column-writing mode pins (#1308) ------------------------
+// The SoA successor to the allocating encode: writes (u, v) columns into
+// caller-owned arrays, bit-identical to the interleaved lumaToFlow output.
+for (const [op, into, ref] of [
+  ['grad', lumaToGradInto, grad],
+  ['curl', lumaToCurlInto, curl],
+]) {
+  const u = new Float32Array(W * H).fill(123); // sentinel: every lane must be overwritten
+  const v = new Float32Array(W * H).fill(123);
+  const out = into(ramp, W, H, u, v);
+  assert.strictEqual(out.u, u, `${op}Into returns the caller's u array (no alias swap)`);
+  assert.strictEqual(out.v, v, `${op}Into returns the caller's v array`);
+  assert.strictEqual(out.op, op, `${op}Into op rides along`);
+  assert.strictEqual(out.w, W, `${op}Into width rides along`);
+  assert.strictEqual(out.h, H, `${op}Into height rides along`);
+  for (let i = 0; i < W * H; i++) {
+    assert.strictEqual(u[i], ref.flow[i * 2], `${op}Into u[${i}] bit-identical to lumaTo${op === 'grad' ? 'Grad' : 'Curl'}`);
+    assert.strictEqual(v[i], ref.flow[i * 2 + 1], `${op}Into v[${i}] bit-identical to lumaTo${op === 'grad' ? 'Grad' : 'Curl'}`);
+  }
+  assert.ok(!Array.from(u).includes(123) && !Array.from(v).includes(123), `${op}Into overwrote every lane (no sentinel left)`);
+}
+// lumaToFlowInto dispatch mirrors lumaToFlow (default curl; 'grad' → grad).
+{
+  const u = new Float32Array(W * H);
+  const v = new Float32Array(W * H);
+  const viaDefault = lumaToFlowInto(ramp, W, H, u, v);
+  assert.deepStrictEqual(Array.from(u), Array.from(curl.flow.filter((_, i) => i % 2 === 0)), 'default op is curl');
+  assert.strictEqual(viaDefault.op, 'curl', 'dispatched op rides along');
+  const ug = new Float32Array(W * H);
+  const vg = new Float32Array(W * H);
+  lumaToFlowInto(ramp, W, H, ug, vg, 'grad');
+  assert.deepStrictEqual(Array.from(ug), Array.from(grad.flow.filter((_, i) => i % 2 === 0)), "'grad' dispatches to lumaToGradInto");
+}
+// Zero allocation inside the encode (the #1308 guarantee): counting
+// Float32Array construction across encodes must see none.
+{
+  const u = new Float32Array(W * H);
+  const v = new Float32Array(W * H);
+  const RealF32 = globalThis.Float32Array;
+  let allocs = 0;
+  class CountingF32 extends RealF32 {
+    constructor(...args) {
+      allocs++;
+      super(...args);
+    }
+  }
+  globalThis.Float32Array = CountingF32;
+  try {
+    for (let k = 0; k < 20; k++) lumaToFlowInto(ramp, W, H, u, v);
+    assert.strictEqual(allocs, 0, '20 lumaToFlowInto encodes: zero Float32Array allocations');
+  } finally {
+    globalThis.Float32Array = RealF32;
+  }
+}
 
 // --- fieldInvariants pins (#1253) -------------------------------------------
 // The grad/curl duality as invariants: a curl field ((dx,dy) → (dy,-dx)) is

@@ -20,6 +20,26 @@ function makeLuma(w, h, seed) {
 }
 
 // --- 1. slot-level: tracks are independent delay slots -----------------------
+// #1308: fields are SoA column pairs now — compare columns against the
+// deinterleaved lumaToFlow() reference.
+function columnsOf(field) {
+  const n = field.w * field.h;
+  const u = new Array(n);
+  const v = new Array(n);
+  for (let i = 0; i < n; i++) {
+    u[i] = field.flow[i * 2];
+    v[i] = field.flow[i * 2 + 1];
+  }
+  return { u, v };
+}
+function expectColumns(luma) {
+  return columnsOf(lumaToFlow(luma, W, H));
+}
+function assertColumns(field, luma, label) {
+  const e = expectColumns(luma);
+  assert.deepStrictEqual(Array.from(field.u), e.u, `${label} u`);
+  assert.deepStrictEqual(Array.from(field.v), e.v, `${label} v`);
+}
 const W = 8;
 const H = 8;
 const slots = createFeedDelay(W, H);
@@ -30,16 +50,12 @@ slots.push(0, lumaA);
 slots.push(1, lumaB);
 const f0 = slots.field(0);
 const f1 = slots.field(1);
-assert.deepStrictEqual(Array.from(f0.flow), Array.from(lumaToFlow(lumaA, W, H).flow), 'slot 0 holds A');
-assert.deepStrictEqual(Array.from(f1.flow), Array.from(lumaToFlow(lumaB, W, H).flow), 'slot 1 holds B');
+assertColumns(f0, lumaA, 'slot 0 holds A');
+assertColumns(f1, lumaB, 'slot 1 holds B');
 // Pushing to slot 1 must not invalidate slot 0's cached field object.
 slots.push(1, lumaC);
 assert.strictEqual(slots.field(0), f0, 'push to slot 1 leaves slot 0 cache untouched');
-assert.deepStrictEqual(
-  Array.from(slots.field(1).flow),
-  Array.from(lumaToFlow(lumaC, W, H).flow),
-  'slot 1 recomputes to C',
-);
+assertColumns(slots.field(1), lumaC, 'slot 1 recomputes to C');
 assert.strictEqual(slots.hasHistory(0), true, 'pushed slot has history');
 assert.strictEqual(slots.hasHistory(2), false, 'never-pushed slot has no history');
 
@@ -55,7 +71,19 @@ const rasterA = new Float32Array(64);
 rasterA[27] = 1;
 const rasterB = new Float32Array(64);
 rasterB[28] = 1;
-const expectWith = (raster) => applyFeed(dst, lumaToFlow(raster, 8, 8), feed);
+// sampleFlow reads SoA columns now — deinterleave the reference encode.
+// #1308: no dual data model; the reference is converted at the test boundary.
+const toColumns = (field) => {
+  const n = field.w * field.h;
+  const u = new Float32Array(n);
+  const v = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    u[i] = field.flow[i * 2];
+    v[i] = field.flow[i * 2 + 1];
+  }
+  return { u, v, w: field.w, h: field.h, op: field.op };
+};
+const expectWith = (raster) => applyFeed(dst, toColumns(lumaToFlow(raster, 8, 8)), feed);
 
 // Frame 1: push stages A, but nothing committed → identity (no bleed of A yet).
 live.pushSource(0, pointsA);
@@ -89,11 +117,12 @@ live.reset();
 live.pushSource(0, pointsA);
 live.pushSource(0, pointsB);
 live.commit();
-assert.deepStrictEqual(
-  Array.from(live.delay.field(0).flow),
-  Array.from(lumaToFlow(rasterB, 8, 8).flow),
-  'staged B overwrites staged A — the last push wins',
-);
+{
+  const got = live.delay.field(0);
+  const exp = columnsOf(lumaToFlow(rasterB, 8, 8));
+  assert.deepStrictEqual(Array.from(got.u), exp.u, 'staged B overwrites staged A — the last push wins (u)');
+  assert.deepStrictEqual(Array.from(got.v), exp.v, 'staged B overwrites staged A — the last push wins (v)');
+}
 
 // --- 4. reset restores delay-1 start state ------------------------------------
 live.reset();
