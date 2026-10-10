@@ -2,14 +2,23 @@
   "schema": 1,
   "generatedBy": "scripts/build-wasm.sh",
   "crates": {
+    "kc-fields": {
+      "crate": "kc-fields",
+      "artifact": "kc_fields.wasm",
+      "rustcVersion": "1.98.1",
+      "sourceHash": "daf16e1c177186748955b64b36c682bab8649e4db02ca700bc8ebb1ae15be488",
+      "artifactHash": "d54e779960ce805dd7b792b18304ccba258af20ca2e3641b45e689ec7b7df813",
+      "simd128": false,
+      "builtAt": "2026-10-10T09:28:48Z"
+    },
     "swarm-bake": {
       "crate": "swarm-bake",
       "artifact": "swarm_bake.wasm",
       "rustcVersion": "1.98.1",
-      "sourceHash": "202c33500939d016af4cf942aefbc5768cf40f2c7c003258663c557f1f4c9f01",
+      "sourceHash": "471aebd0f1ee1055769a7844c74c7b1eeb12c10be901a46e389b262d8e6cd12e",
       "artifactHash": "28e6024d65e93b599dbdb153fd2eb1e5f05e61f36386f185a57880822eb3a207",
       "simd128": false,
-      "builtAt": "2026-10-10T08:00:09Z"
+      "builtAt": "2026-10-10T09:28:48Z"
     }
   }
 }
