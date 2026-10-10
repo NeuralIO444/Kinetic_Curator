@@ -97,11 +97,9 @@ test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals 
   // #1128: spin is chosen — ON starts at the offered 0.05 rev/s, not 0
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.05, 5);
 
-  // The dock renders the editor captured at open time, so it is reopened to
-  // see the speed slider the ON state unlocks.
-  await page.keyboard.press('Escape');
-  await expect(dock(page, 'ROTATE')).toHaveCount(0);
-  await valueButton(page, 'ROTATE').click();
+  // #1272 — the dock stays live while open: the speed slider the ON state
+  // unlocks appears WITHOUT reopening (the old captured-at-open render
+  // needed an Escape + re-tap to see it).
   const d = dock(page, 'ROTATE');
   const speed = d.getByLabel('Spin speed');
   await expect(speed).toBeVisible();
@@ -114,8 +112,21 @@ test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals 
 
   await d.locator('.te-matrix[aria-label="Spin"]').getByRole('button', { name: 'OFF' }).click();
   await expect.poll(() => spinOf(page)).toBe(0);
-  // OFF drops the slider on the next open
-  await page.keyboard.press('Escape');
-  await valueButton(page, 'ROTATE').click();
+  // OFF drops the slider without reopening.
   await expect(dock(page, 'ROTATE').getByLabel('Spin speed')).toHaveCount(0);
+});
+
+test('dock stays live while open: dock drag updates store and panel with no snap-back (#1272)', async ({ page }) => {
+  await boot(page);
+  await valueButton(page, 'ROTATE').click();
+  const d = dock(page, 'ROTATE');
+  const minInput = d.getByLabel('Rotate minimum');
+  // Matt's live repro: drag the dock slider...
+  await setRange(page, minInput, -400);
+  // ...the drag lands in the store...
+  await expect.poll(() => rangeOf(page, 'rotate').then((r) => r[0])).toBe(-400);
+  // ...the dock does NOT snap back to the stale open-time value...
+  await expect(minInput).toHaveValue('-400');
+  // ...and the panel's value button readout follows without reopening.
+  await expect(valueButton(page, 'ROTATE')).toContainText('-400');
 });
