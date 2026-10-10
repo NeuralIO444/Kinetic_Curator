@@ -15,6 +15,7 @@
 import assert from 'node:assert';
 import { createGlobalSlice } from './slices/globalSlice.js';
 import { OVERLAY_CAP } from '../assets/overlay.js';
+import { errorHint } from '../assets/ingest.js';
 
 function makeStore() {
   let state = {};
@@ -42,12 +43,12 @@ const ids = (s) => s.customAssets.map((a) => a.id);
   const before = ids(s());
 
   s().ingestAsset(SVG_A, 'one_too_many');
-  assert.strictEqual(s().ingestError, 'overlay full');
+  assert.strictEqual(s().ingestError, errorHint('overlay full'));
   assert.strictEqual(s().customAssets.length, OVERLAY_CAP);
   assert.deepStrictEqual(ids(s()), before, 'refused ingest must not evict anything');
 
   s().duplicateAsset(s().customAssets[0].id);
-  assert.strictEqual(s().ingestError, 'overlay full');
+  assert.strictEqual(s().ingestError, errorHint('overlay full'));
   assert.strictEqual(s().customAssets.length, OVERLAY_CAP);
   assert.deepStrictEqual(ids(s()), before, 'refused duplicate must not evict anything');
 }
@@ -88,7 +89,7 @@ const ids = (s) => s.customAssets.map((a) => a.id);
   // Rename to a taken id is refused and changes nothing.
   s().ingestAsset(SVG_A, 'other');
   s().renameCustomAsset('user:renamed', 'other');
-  assert.strictEqual(s().ingestError, 'id taken');
+  assert.strictEqual(s().ingestError, errorHint('id taken'));
   assert.ok(ids(s()).includes('user:renamed'));
 }
 
