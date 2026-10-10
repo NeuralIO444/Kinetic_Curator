@@ -4,8 +4,10 @@
 // lumaToFlow correctness on fixed fixtures: grad vs an independent central-
 // difference reference, the exact grad/curl duality, exact zeros on constant
 // luma, and the op field. No RNG anywhere — same bytes every run.
-// NOTE (#1253): the natural home for the fieldInvariants assert is here;
-// invariants are computed and logged below so that issue can pin them.
+// NOTE (#1253): fieldInvariants is pinned here and ONLY here — its sole
+// caller is this selfcheck's invariant asserts below. No live consumers, and
+// deliberately so: it scans the full grid and has no place on the hottest
+// FEED path (#1253: do not wire into live diagnostics).
 import assert from 'node:assert';
 import { lumaToGrad, lumaToCurl, lumaToFlow, fieldInvariants } from './feedOps.js';
 
@@ -88,13 +90,21 @@ assert.deepStrictEqual(
   "'curl' dispatches to lumaToCurl",
 );
 
-// --- fieldInvariants scaffold for #1253 --------------------------------------
-// Computed on the pinned fixtures so #1253 can turn these into asserts.
-// On a linear ramp: grad is nearly divergence-free? No — grad of a ramp has
-// dv/dy=du/dx structure; curl of a ramp is nearly divergence-free (dy=0,
-// v=-dx constant along y). Log the numbers; do NOT assert here (#1253's lane).
+// --- fieldInvariants pins (#1253) -------------------------------------------
+// The grad/curl duality as invariants: a curl field ((dx,dy) → (dy,-dx)) is
+// divergence-free, and a grad field is curl-free. On the pinned ramp both
+// read float-exact zero; the asserts pin "near zero" (1e-9) so the invariant
+// reads as the spec, not the fixture.
 const invGrad = fieldInvariants(grad);
 const invCurl = fieldInvariants(curl);
+assert.ok(
+  invCurl.meanAbsDiv < 1e-9,
+  `curl field must be divergence-free (meanAbsDiv ${invCurl.meanAbsDiv})`,
+);
+assert.ok(
+  invGrad.meanAbsCurl < 1e-9,
+  `grad field must be curl-free (meanAbsCurl ${invGrad.meanAbsCurl})`,
+);
 
 // --- determinism --------------------------------------------------------------
 const again = lumaToFlow(ramp, W, H);

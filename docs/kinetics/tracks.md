@@ -54,7 +54,7 @@ draw order, flips in one frame — `itemMorph.mjs:139-159` asset-group order vs
 | FEED hop cap `HOP_MAX_PX=4` + `clampHop` | `liveResolve.mjs:19-28`, applied `:361,366` | **NONE** (cap lives in one-writer file, untested) |
 | `feedLive` delay-1 (rasterize → push → commit) | `tracks/feedLive.js:5-44`; alloc `:12` | `feedLive.selfcheck.mjs` — **NOT wired into `npm run selfcheck`** (`app/package.json:11` has field+mod only, grep `feedLive` = 0) |
 | `feedDelay` buffers | `tracks/feedDelay.js:3-39` | via feedLive selfcheck `:8-16` |
-| `feedOps` grad/curl + `fieldInvariants` | `tracks/feedOps.js:16-71` | `fieldInvariants` has **no consumers** |
+| `feedOps` grad/curl + `fieldInvariants` | `tracks/feedOps.js:16-71` | `fieldInvariants` pinned by `feedOps.selfcheck.mjs` (#1253: curl-div / grad-curl asserts); no live consumers — deliberate, hot path |
 | UI entry: PATCH row → `setLayerPatch` | `LayersPanel.jsx:52,133-153`; state `layersSlice.js:79-90`; init `:53,:72`; dup `:108` | `undoLayers` covers undo, not semantics |
 | 4-content-track cap (#340) | `layersSlice.js:8,61,96` — **NOT enforced on doc load** (`projectNormalize.js:16,117` caps 16 total) | `projectDocument.selfcheck` (MAX_LAYERS only) |
 | Patch dropped on save/load | `projectNormalize.js:122-131` builds layers **without `patch`** | **NONE — round-trip loss untested** |
