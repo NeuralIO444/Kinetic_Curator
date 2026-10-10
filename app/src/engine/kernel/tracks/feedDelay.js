@@ -54,6 +54,7 @@ export function createFeedDelay(w, h) {
       prev[id] = stage[id];
       stage[id] = tmp;
       ready[id] = 1;
+      dirty[id] = 1;
     },
     field(trackId) {
       const id = trackId | 0;
