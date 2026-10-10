@@ -10,7 +10,7 @@
 //     behind import.meta.env.DEV (prod never registers it);
 //  B. no stale 'shaderlab' / 'xray' / 'govtune' registrations remain;
 //  C. devTabs exposes exactly four tabs, in order (X-Ray / Gov Tune /
-//     Shader Lab per #691, then Biology per #793), each a React.lazy component — i.e. one lazy
+//     Shader Lab per #691, then Biology per #793, Units, Kernel per #1233), each a React.lazy component — i.e. one lazy
 //     chunk per tab, loaded only when its tab opens.
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
@@ -35,12 +35,13 @@ for (const dead of ['shaderlab', 'xray', 'govtune']) {
     `stale '${dead}' registration must not remain in the registry`);
 }
 
-// C. four tabs in order — #691's three plus Biology (#793) — each a React.lazy component.
-assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units'],
-  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units, got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
+// C. six tabs in order — #691's three plus Biology (#793), Units, then
+// Kernel (#1233) — each a React.lazy component.
+assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units', 'kernel'],
+  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units / Kernel, got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
 for (const t of DEV_TABS) {
   assert.ok(t.component?.$$typeof === Symbol.for('react.lazy'),
     `tab '${t.id}' must be a React.lazy component (one chunk per tab)`);
 }
 
-console.log('[selfcheck] dev panel OK — one DEV registry entry (DEV-gated); five lazy tabs; no stale dev ids');
+console.log('[selfcheck] dev panel OK — one DEV registry entry (DEV-gated); six lazy tabs; no stale dev ids');
