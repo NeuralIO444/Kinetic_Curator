@@ -140,7 +140,7 @@ export function AssetPoolPanel() {
         </div>
         <div className="pool-search">
           <span className="prompt">⟩</span>
-          <input placeholder="filter · drop or paste SVG" value={search} onChange={e => emit(Events.ASSETS_SEARCH, e.target.value)} />
+          <input placeholder="filter · drop SVG · paste code from Illustrator or any vector app" value={search} onChange={e => emit(Events.ASSETS_SEARCH, e.target.value)} />
         </div>
       </div>
       <div className={`pool-body ${poolView}`}>
