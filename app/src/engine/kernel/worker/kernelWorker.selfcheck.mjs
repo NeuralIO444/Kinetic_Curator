@@ -200,16 +200,29 @@ async function startRealWorkerThread() {
   const tmp = mkdtempSync(join(tmpdir(), 'kc-worker-1311-'));
   const entryUrl = pathToFileURL(join(DIR, 'kernel.worker.js')).href;
   const bootstrap = join(tmp, 'bootstrap.mjs');
+  // The shim emulates browser Worker queueing: messages that arrive before
+  // the entry assigns self.onmessage are queued and flushed on assignment —
+  // without this, an INIT posted during worker boot is silently dropped
+  // (node 20 delivers it before the entry's import resolves; node 24 won
+  // the race the other way — either order must work).
   writeFileSync(
     bootstrap,
     `import { parentPort } from 'node:worker_threads';
 const box = {};
+const early = [];
 globalThis.self = {
   postMessage(msg, transfers) { parentPort.postMessage(msg, transfers); },
-  set onmessage(h) { box.h = h; },
+  set onmessage(h) {
+    box.h = h;
+    let m;
+    while ((m = early.shift()) !== undefined) h({ data: m });
+  },
   get onmessage() { return box.h; },
 };
-parentPort.on('message', (m) => { if (box.h) box.h({ data: m }); });
+parentPort.on('message', (m) => {
+  if (box.h) box.h({ data: m });
+  else early.push(m);
+});
 await import(${JSON.stringify(entryUrl)});
 `,
   );
@@ -242,9 +255,30 @@ await import(${JSON.stringify(entryUrl)});
   const N = 64;
   const DT = 1 / 60;
 
-  async function runDrive(client) {
+  async function initWithTimeout(client, host, label) {
+    // Belt-and-braces: if the worker thread fails to boot, INIT would wait
+    // forever and hang the suite (and CI). Fail loudly instead, carrying the
+    // thread's error when there is one.
+    const ms = 15000;
+    let timer;
+    try {
+      await Promise.race([
+        client.init({ seed: SEED, params: PARAMS }),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            const werr = host && host.threadError ? ` worker thread error: ${host.threadError.message}` : '';
+            reject(new Error(`${label}: INIT timed out after ${ms}ms.${werr}`));
+          }, ms);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function runDrive(client, host, label) {
     const hashes = [];
-    await client.init({ seed: SEED, params: PARAMS });
+    await initWithTimeout(client, host, label);
     assert.strictEqual(client.readyInfo.kernelVersion, KERNEL_VERSION, 'READY kernel version matches');
     for (let f = 0; f < N; f++) {
       if (f === 32) client.setParam('damping', 0.995, 32);
@@ -263,12 +297,17 @@ await import(${JSON.stringify(entryUrl)});
   }
 
   const inlineClient = createKernelClient({ runInline: true });
-  const inlineRes = await runDrive(inlineClient);
+  const inlineRes = await runDrive(inlineClient, null, 'inline');
   inlineClient.terminate();
 
   const threadHost = await startRealWorkerThread();
   const workerClient = createKernelClient({ runInline: false, host: threadHost });
-  const workerRes = await runDrive(workerClient);
+  let workerRes;
+  try {
+    workerRes = await runDrive(workerClient, threadHost, 'worker');
+  } finally {
+    workerClient.terminate();
+  }
   assert.strictEqual(threadHost.threadError, null, 'worker thread raised no errors');
 
   assert.strictEqual(workerRes.hashes.length, N, 'worker ran all frames');
@@ -321,7 +360,6 @@ await import(${JSON.stringify(entryUrl)});
     assert.strictEqual(s.reallocs, 1, 'detached set without RETURN reallocates exactly once');
   }
 
-  workerClient.terminate();
   console.log(`kernelWorker.selfcheck: gate topHash=${topHash}`);
 }
 
