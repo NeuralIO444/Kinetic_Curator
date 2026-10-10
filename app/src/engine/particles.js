@@ -29,6 +29,10 @@
 import { createNoise } from './noise.js';
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
+// #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
+// through init/update/getItems: NATIVE_TRIG by default (the exact Math.*
+// references — byte-identical to today), DET_TRIG when the bake opts in.
+import { resolveTrig, NATIVE_TRIG } from './kernel/trig.mjs';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode, symmetryParts } from '../data/layout-modes.js';
 import {
@@ -106,6 +110,10 @@ export class ParticleSystem {
     // Monotonic update counter (#287): drives the pigment write-back
     // cadence and the curiosity hash. Never reset by init().
     this._step = 0;
+    // #1240 — trig source for this system. NATIVE_TRIG until init() resolves
+    // the trig opt; always the exact Math.* references unless the bake
+    // explicitly opts into deterministic trig.
+    this._trig = NATIVE_TRIG;
     // Cold columns — never touched by the physics inner loops.
     this.color = [];
     // #1237 — palette slot per particle, riding with color[]. Accent
@@ -275,6 +283,10 @@ export class ParticleSystem {
   }
 
   init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets = null, opts = {}) {
+    // #1240 — resolve the trig source first: every trig call below (and in
+    // _spawnRange) reads this._trig, so the bake's opt-in covers init too.
+    // Throws on an unknown mode — never a silent fallback.
+    this._trig = resolveTrig(opts.trig);
     this._behaveEase = null;
     this.canvasW = canvasW;
     this.canvasH = canvasH;
@@ -344,6 +356,7 @@ export class ParticleSystem {
   _spawnRange(start, end, activeAssets, palette, seed, seedOffsets, opts = {}) {
     const swatches = palette?.swatches || ['#ffffff'];
     const grazeFrac = Math.min(1, Math.max(0, Number(opts.graze) || 0));
+    const T = this._trig; // #1240 — trig source (native Math.* by default)
     for (let i = start; i < end; i++) {
       // Draw order here is load-bearing: r() is a sequential stream, so the
       // six draws below must stay in this order to reproduce a given seed.
@@ -358,8 +371,8 @@ export class ParticleSystem {
 
       this.x[i] = x;
       this.y[i] = y;
-      this.vx[i] = Math.cos(angle) * speed;
-      this.vy[i] = Math.sin(angle) * speed;
+      this.vx[i] = T.cos(angle) * speed;
+      this.vy[i] = T.sin(angle) * speed;
       this.ax[i] = 0;
       this.ay[i] = 0;
       this.mass[i] = mass;
@@ -510,6 +523,7 @@ export class ParticleSystem {
       radius, restitution, repel, mode, umask, breedCap, seed, organism,
       minScale, maxScale, minAlpha, maxAlpha, seedOffsets,
     } = ctx;
+    const T = this._trig; // #1240 — trig source (native Math.* by default)
     const n0 = this.n;
     if (n0 < 2 || !(radius > 0)) return;
     // 3x3 cells of 2r cover every pair with dist < 2r. A second grid — the
@@ -568,7 +582,7 @@ export class ParticleSystem {
               // Exactly coincident discs: deterministic golden-angle normal
               // from the index pair — never NaN, never random.
               const ang = (i * 2.399963229728653 + j * 1.2) % TAU;
-              nx = Math.cos(ang); ny = Math.sin(ang);
+              nx = T.cos(ang); ny = T.sin(ang);
               dist = 0;
             }
             const overlap = rr - dist;
@@ -643,6 +657,7 @@ export class ParticleSystem {
    */
   _breed(i, j, seed, breedCap, minScale, maxScale, minAlpha, maxAlpha, seedOffsets = null) {
     let cs;
+    const T = this._trig; // #1240 — trig source (native Math.* by default)
     if (this._dead.length > 0) {
       cs = this._dead.pop();
     } else {
@@ -673,7 +688,7 @@ export class ParticleSystem {
     this.mass[cs] = cm;
     this.scale[cs] = minScale + cm * (maxScale - minScale);
     this.baseScale[cs] = this.scale[cs];
-    this.rotation[cs] = Math.atan2(cvy, cvx) * (180 / Math.PI);
+    this.rotation[cs] = T.atan2(cvy, cvx) * (180 / Math.PI);
     this.alpha[cs] = minAlpha + cm * (maxAlpha - minAlpha);
     this.phase[cs] = 0;
     this.u[cs] = 0;
@@ -723,6 +738,7 @@ export class ParticleSystem {
    */
   update(layoutParams, activeAssets, palette, seed, time, attractor, seedOffsets = null, dtSec = 1 / 60) {
     if (this.n === 0) return;
+    const T = this._trig; // #1240 — trig source (native Math.* by default)
     this._step += 1;
     this._layout = layoutParams;
     // #710 — restart-from-seed: entering the lorenz behave re-seeds every
@@ -962,8 +978,8 @@ export class ParticleSystem {
           pyi * noiseFreq + 200 + domainOffsetY,
           nt,
         ) + 1.0) * 0.4 * windMul;
-        fax += (Math.cos(windAngle) * windMag) / m;
-        fay += (Math.sin(windAngle) * windMag) / m;
+        fax += (T.cos(windAngle) * windMag) / m;
+        fay += (T.sin(windAngle) * windMag) / m;
       }
 
       if (organism && profile.orbit) {
@@ -1100,8 +1116,8 @@ export class ParticleSystem {
           const wob = noise.noise3D(pxi * noiseFreq + 500, pyi * noiseFreq + 500, nt + this.seedOffset[i] * 0.0001 + 7.3);
           const wa = wob * TAU;
           const wmag = DRIVE[i] * meta * 0.6;
-          fax += (Math.cos(wa) * wmag) / m;
-          fay += (Math.sin(wa) * wmag) / m;
+          fax += (T.cos(wa) * wmag) / m;
+          fay += (T.sin(wa) * wmag) / m;
         }
       }
       // #582 LEVY — forage: hold, then stride. The magnitude is heavy-tailed,
@@ -1125,8 +1141,8 @@ export class ParticleSystem {
         const ua = hashU01(seedU, CH.dyn, epoch * 7919 + 224753 + i);
         const stride = levyStep(ul, levyAlpha) * levyGain;
         const ang = ua * TAU;
-        fax += (Math.cos(ang) * stride) / m;
-        fay += (Math.sin(ang) * stride) / m;
+        fax += (T.cos(ang) * stride) / m;
+        fay += (T.sin(ang) * stride) / m;
       }
       // #583 LORENZ — ride the flow. The agent's own Lorenz state advances one
       // RK2 step per frame and its VELOCITY is the steering direction, so the
@@ -1219,7 +1235,7 @@ export class ParticleSystem {
       AX[i] = 0;
       AY[i] = 0;
       if (speed > 0.04) {
-        const next = Math.atan2(vyi, vxi) * (180 / Math.PI);
+        const next = T.atan2(vyi, vxi) * (180 / Math.PI);
         if (organism) {
           let dlt = next - this.rotation[i];
           while (dlt > 180) dlt -= 360;
@@ -1257,13 +1273,13 @@ export class ParticleSystem {
       // never breathes in lockstep. breath = 0 keeps the legacy
       // assignment bit-identical.
       if (breath > 0) {
-        sc *= 1 + breath * 0.5 * ENERGY[i] * Math.sin(ph * TAU + this.seedOffset[i]);
+        sc *= 1 + breath * 0.5 * ENERGY[i] * T.sin(ph * TAU + this.seedOffset[i]);
       }
       this.scale[i] = sc;
       this.alpha[i] = minAlpha + (mi * (maxAlpha - minAlpha));
       const spdU = Math.max(0, Math.min(1, speed / maxSpeed));
       if (organism) {
-        const flapU = 0.5 + 0.5 * Math.sin(ph * TAU + this.seedOffset[i]);
+        const flapU = 0.5 + 0.5 * T.sin(ph * TAU + this.seedOffset[i]);
         this.u[i] = Math.max(0, Math.min(1, 0.5 * flapU + 0.5 * spdU));
       } else {
         this.u[i] = spdU;
@@ -1377,6 +1393,7 @@ export class ParticleSystem {
   }
 
   _organismItems(activeAssets, lp, frac = 0) {
+    const T = this._trig; // #1240 — trig source (native Math.* by default)
     const bodyLen = Math.max(1, Math.min(7, Math.round(lp.body || 1)));
     const flap = Number.isFinite(lp.flap) ? lp.flap : 0.35;
     const symmetry = lp.symmetry || 'none';
@@ -1416,9 +1433,9 @@ export class ParticleSystem {
       }
       if (symmetry === 'bilateral') {
         const heading = protation * (Math.PI / 180);
-        const pxh = Math.cos(heading);
-        const pyh = Math.sin(heading);
-        const amp = flap * Math.sin(this.phase[i] * TAU + this.seedOffset[i]);
+        const pxh = T.cos(heading);
+        const pyh = T.sin(heading);
+        const amp = flap * T.sin(this.phase[i] * TAU + this.seedOffset[i]);
         const reach = 16 + Math.abs(amp) * 20;
         // #109A — one blend ladder per moth, round-robin over the shipped set.
         const ladderId = MOTH_LADDERS[i % MOTH_LADDERS.length].id;
@@ -1447,7 +1464,7 @@ export class ParticleSystem {
         const { kind: symKind, folds } = symmetryParts(symmetry);
         if ((symKind === 'radial' || symKind === 'kaleido') && folds >= 3) {
           const heading = protation * (Math.PI / 180);
-          const amp = flap * Math.sin(this.phase[i] * TAU + this.seedOffset[i]);
+          const amp = flap * T.sin(this.phase[i] * TAU + this.seedOffset[i]);
           const reach = 16 + Math.abs(amp) * 20;
           for (let k = 0; k < folds; k++) {
             const a = heading - Math.PI / 2 + (TAU * k) / folds;
@@ -1457,7 +1474,7 @@ export class ParticleSystem {
             const evenRot = protation + amp * 18;
             const ladderId = MOTH_LADDERS[(i + k) % MOTH_LADDERS.length].id;
             items.push({
-              x: px + Math.cos(a) * reach, y: py + Math.sin(a) * reach,
+              x: px + T.cos(a) * reach, y: py + T.sin(a) * reach,
               scale: pscale * 0.7, baseScale: pbaseScale * 0.7,
               rotation: mirrored ? 2 * foldDeg - evenRot : evenRot,
               alpha: palpha, asset, color: pcolor, u: pu,

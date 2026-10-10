@@ -54,6 +54,7 @@ node src/engine/kernel/color/color.selfcheck.mjs
 node src/engine/kernel/bake/bake.selfcheck.mjs
 node src/engine/kernel/bake/bake.accent.selfcheck.mjs
 node src/engine/kernel/bake/bake.parity.selfcheck.mjs
+node src/engine/kernel/bake/bake.detTrig.selfcheck.mjs
 node src/engine/kernel/bake/swarm.inventory.selfcheck.mjs
 node src/engine/kernel/bake/bake.contacts.selfcheck.mjs
 node src/engine/kernel/bake/bake.contacts.stills.selfcheck.mjs

@@ -19,6 +19,11 @@
 // not byte-identical across architectures, which matters if studio/ ever
 // distributes renders over mixed hardware. See docs/KERNEL_V1_PLAN.md §16.
 //
+// #1240 — opt-in deterministic trig: bakeParticles({ trig: 'det' }) swaps
+// the engine's trig source to the polynomial implementation in
+// kernel/trig.mjs (same bits on x64 and arm64). Default trig: 'native'
+// keeps the exact Math.* calls — byte-identical to today, provably.
+//
 // AC3 — dual path, stated plainly: the live canvas keeps its RAF loop for
 // interactivity (it needs to respond to the pointer attractor). Both paths
 // now run identical, seeded physics, so a bake at step N matches what the
@@ -27,6 +32,7 @@
 import { ParticleSystem } from '../../particles.js';
 import { ensureSwarmWasm, getSwarmWasm, runSwarmWasm, resolveWasmParams, wasmBakeEligible, wasmForcedOff, contactsActive } from './swarmWasm.mjs';
 import { noiseSeedFor } from '../rng.js';
+import { TRIG_NATIVE, TRIG_DET } from '../trig.mjs'; // #1240 — opt-in deterministic trig
 import { ACCENT_OFFSET } from '../color/index.js';
 // #1237 — the accent offset is kernel-local (kernel/color); bake reuses it so
 // bake and the live path derive accents from the same slot arithmetic. No
@@ -80,6 +86,13 @@ export const BAKE_DT_MS = 1000 / 60;
  *   — and any load failure — falls back to the JS engine. 'wasm' throws if
  *   the module is unavailable; 'js' forces the JS engine. KC_SWARM_WASM=0
  *   also forces the JS engine.
+ * @param {'native'|'det'} [opts.trig='native'] #1240 — trig source for the
+ *   bake. 'native' (default) is the exact Math.sin/cos/atan2 calls the engine
+ *   has always used — byte-identical to today, on this machine. 'det' opts
+ *   into the deterministic polynomial trig (kernel/trig.mjs): same bits on
+ *   x64 and arm64, at the cost of ~1e-11 absolute deviation from Math.*.
+ *   The opt-in forces the JS engine — the wasm module has its own trig, out
+ *   of scope — and throws honestly if combined with engine:'wasm'.
  * @returns {Array<{x,y,rotation,scale,alpha,color,assetIndex}>}
  */
 export function bakeParticles({
@@ -96,11 +109,14 @@ export function bakeParticles({
   attractor = null,
   maxParticles,
   engine = 'auto',
+  trig = TRIG_NATIVE,
 }) {
   const sys = new ParticleSystem();
   // #287 — the voice-level grazer fraction rides into init (and into the
   // update() re-init path via params below).
-  sys.init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0 });
+  // #1240 — the trig opt-in rides into init the same way, so init-time trig
+  // (spawn angles) uses the deterministic source too.
+  sys.init(count, canvasW, canvasH, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0, trig });
 
   // #167 — the quality cap rides on the params so contact breed() can gate
   // population growth; the bake stays a pure function of its inputs.
@@ -117,11 +133,18 @@ export function bakeParticles({
   // path refuses it rather than rendering a contact-less flock. Forcing
   // engine:'wasm' on such a config throws honestly — no silent fallback.
   const policy = contactsBakePolicy(params);
-  if (engine === 'wasm' && policy.engine === 'js') {
-    throw new Error(`bakeParticles: engine "wasm" cannot bake this config (${policy.reason})`);
+  // #1240 — deterministic trig is a JS-engine-only opt-in (the wasm module
+  // has its own trig, out of scope). Same honest-throw pattern as the
+  // contacts policy: forcing engine:'wasm' with trig:'det' throws rather
+  // than silently rendering on a different trig source.
+  const detForced = trig === TRIG_DET;
+  if (engine === 'wasm' && (policy.engine === 'js' || detForced)) {
+    throw new Error(
+      `bakeParticles: engine "wasm" cannot bake this config (${detForced && policy.engine !== 'js' ? 'det-trig' : policy.reason})`,
+    );
   }
   let ranWasm = false;
-  if (!wasmForcedOff() && engine !== 'js' && policy.engine !== 'js') {
+  if (!wasmForcedOff() && engine !== 'js' && policy.engine !== 'js' && !detForced) {
     const gate = wasmBakeEligible({ layoutParams: params, attractor, count: sys.n });
     if (engine === 'wasm' && !gate.ok) {
       throw new Error(`bakeParticles: engine "wasm" cannot bake this config (${gate.reason})`);
