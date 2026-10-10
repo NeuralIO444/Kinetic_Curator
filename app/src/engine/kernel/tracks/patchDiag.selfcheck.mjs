@@ -12,10 +12,13 @@ import {
   formatPatchLine,
   activePatchPairs,
   formatMatrixRow,
+  recordSamplerFallback,
+  getSamplerFallback,
   SOURCE_STILL_SPEED,
   SOURCE_STILL_AGITATION,
   PATCH_DIAG_STALE_MS,
 } from './patchDiag.mjs';
+import { getSampler } from '../sample/registry.js';
 
 const at = (agoMs) => Date.now() - agoMs;
 const sample = (over = {}) => ({ at: Date.now(), ...over });
@@ -143,4 +146,48 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
   assert.ok(patchDiagSampleCount() <= base,
     `cleanup restores at most the baseline (got ${patchDiagSampleCount()}, base ${base})`);
   console.log('[selfcheck] patchDiag #1246 cap backstop + recency refresh');
+}
+
+// #1245 — unknown sampler mode fallback diagnostic.
+{
+  const randomFn = getSampler('random');
+  // The fallback behaviour itself is unchanged: the miss returns the
+  // byte-identical `random` function it always did.
+  assert.strictEqual(getSampler('not-a-real-mode', 'L-fb-a'), randomFn,
+    'unknown mode still falls back to the same random function');
+  assert.strictEqual(getSampler('__proto__', 'L-fb-poison'), randomFn,
+    'poisoned mode falls back to random, not Object.prototype');
+
+  // The diagnostic names the missing id in the patch-diagnostic channel.
+  const fb = getSamplerFallback('L-fb-a');
+  assert.ok(fb && fb.mode === 'not-a-real-mode', `fallback names the missing id (got ${fb && fb.mode})`);
+  assert.ok(Number.isFinite(fb.at), 'fallback records a timestamp');
+
+  // Known modes fire nothing.
+  assert.strictEqual(getSamplerFallback('L-fb-known'), null, 'no entry before any miss');
+  for (const id of ['random', 'grid', 'stratified', 'brush']) getSampler(id, 'L-fb-known');
+  assert.strictEqual(getSamplerFallback('L-fb-known'), null, 'known modes record no fallback');
+
+  // Once per (layer, mode) per session: count console.warns.
+  let warns = 0;
+  const origWarn = console.warn;
+  console.warn = () => { warns++; };
+  try {
+    getSampler('nope-1', 'L-fb-once');
+    getSampler('nope-1', 'L-fb-once');   // same pair: silent
+    getSampler('nope-1', 'L-fb-once-2'); // new layer: fires again
+    getSampler('nope-2', 'L-fb-once');   // new mode: fires again
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.strictEqual(warns, 3, `diagnostic fires once per (layer, mode) (got ${warns})`);
+
+  // The channel entry never clobbers the layer's live patch sample.
+  recordPatchSample('L-fb-clobber', { mode: 'feed', strength: 0.2, pullPx: 7 });
+  recordSamplerFallback('L-fb-clobber', 'ghost-mode');
+  assert.strictEqual(getPatchSample('L-fb-clobber').pullPx, 7, 'fallback does not clobber the patch sample');
+  assert.strictEqual(getSamplerFallback('L-fb-clobber').mode, 'ghost-mode', 'fallback reads back by layer id');
+  assert.strictEqual(getSamplerFallback('L-fb-never'), null, 'unknown layer id is null');
+
+  console.log('[selfcheck] patchDiag sampler fallback diagnostic');
 }

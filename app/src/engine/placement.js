@@ -115,6 +115,10 @@ export function computeGeometrySoA({
   // Slice 2 — the crooked: perpendicular trail wobble in px (0 = the trail
   // exactly) and its frequency per stamp.
   wobbleAmp = 0, wobbleFreq = 0.5,
+  // #1245 — optional layer id for the unknown-sampler diagnostic; rides the
+  // params so getSampler can key the once-per-(layer,mode) report. Not part
+  // of geometrySignature: the layer id is not geometry.
+  layerId = null,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -125,7 +129,7 @@ export function computeGeometrySoA({
   const effectiveW = canvasW + bx * 2;
   const effectiveH = canvasH + by * 2;
   const tiers = Math.max(1, zTiers || 1);
-  const sample = getSampler(mode);
+  const sample = getSampler(mode, layerId);
 
   const noise = displacement > 0
     ? createNoise(hashU32(seed, CH.noise, 0, seedOffsets))

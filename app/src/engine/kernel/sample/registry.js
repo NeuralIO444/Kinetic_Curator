@@ -27,6 +27,7 @@ import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { createNoise } from '../../noise.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
 import { writeSampleColumns } from './columns.js'; // #1309 — column-writing protocol
+import { recordSamplerFallback } from '../tracks/patchDiag.mjs'; // #1245 — fallback diagnostic channel
 
 /** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown, out?: { x: Float64Array, y: Float64Array, t: Float64Array, rot01: Float64Array } | null, row?: number }} SampleCtx */
 
@@ -44,13 +45,29 @@ export function registerSampler(idOrDecl, fn) {
   return _reg.register(idOrDecl);
 }
 
-export function getSampler(mode) {
+// #1245 — once per (layer, mode) per session. getSampler runs once per
+// computeGeometrySoA (not per point), but without this a live canvas would
+// still report the same miss on every geometry rebuild of that layer.
+const _fallbackReported = new Set();
+
+export function getSampler(mode, layerId) {
   // Map-backed: `get('__proto__')` is simply undefined, so the poisoned-mode
   // vector the old Object.hasOwn guard defended against (#106) is gone
   // structurally. Unknown modes still fall back to `random` — the second
   // line of defence for callers that assemble layoutParams themselves.
   const decl = _reg.get(mode);
   if (decl && typeof decl.fn === 'function') return decl.fn;
+  // #1245 — the fallback itself is KEPT (old projects must not break, and the
+  // function returned here is byte-identical), but the miss is now visible:
+  // it is recorded once per (layer, mode) into the patch-diagnostic channel
+  // (#1246) so the instrument can show it, plus a single console.warn for
+  // studio/batch runs with no panel attached.
+  const key = `${String(layerId ?? '?')}::${String(mode)}`;
+  if (!_fallbackReported.has(key)) {
+    _fallbackReported.add(key);
+    recordSamplerFallback(layerId, mode);
+    console.warn(`[kernel] unknown sampler mode "${String(mode)}" — falling back to 'random'`);
+  }
   return _reg.get('random').fn;
 }
 
