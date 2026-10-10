@@ -64,6 +64,7 @@ node src/engine/kernel/evalContext.selfcheck.mjs
 node src/engine/kernel/itemMorph.selfcheck.mjs
 node src/engine/kernel/costRegistry.selfcheck.mjs
 node src/engine/kernel/glBoundary.selfcheck.mjs
+node src/engine/kernel/purity.selfcheck.mjs
 node src/engine/kernel/beatChoreo.selfcheck.mjs
 node src/state/projectDocument.selfcheck.mjs
 node src/state/allEraGolden.selfcheck.mjs
