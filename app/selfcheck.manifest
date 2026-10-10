@@ -317,3 +317,4 @@ node src/engine/kernel/tracks/feedDelay.delay1.selfcheck.mjs
 node src/engine/kernel/tracks/feedColumns.selfcheck.mjs
 node src/gl/fieldFeedColumns.selfcheck.mjs
 node src/engine/kernel/replay/replay.selfcheck.mjs
+node src/engine/kernel/tracks/pooledPatch.selfcheck.mjs

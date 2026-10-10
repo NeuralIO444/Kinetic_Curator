@@ -17,6 +17,10 @@ import { applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/tra
 // #1307 — SoA slice 2/5: FIELD/FEED column loops (zero per-point allocation,
 // bit-identical to the map-based path they replace — see the module header).
 import { resolveFieldItems, resolveFeedItems } from './fieldFeedColumns.mjs';
+// #1251 — pooled numeric FIELD/FEED path (opt-in via input.pooledPatch):
+// same math over reused Float64Array scratch. Bit-identical to the SoA
+// column loops — pinned by pooledPatch.selfcheck.mjs.
+import { createPooledPatch } from '../engine/kernel/tracks/pooledPatch.mjs';
 // #507 — inline PATCH diagnostic: record-only bulletin calls (no logic change).
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
@@ -131,6 +135,10 @@ export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
   const feedLive = createFeedLive(CANVAS_W, CANVAS_H);
+  // #1251 — pooled numeric FIELD/FEED scratch, owned by the resolver for its
+  // lifetime. Zero per-frame cost to create; used only when
+  // input.pooledPatch === true (default off — the object path below).
+  const pooledPatch = createPooledPatch();
   // #606: scene units follow the authored canvas (set per resolveLayers).
   let W = CANVAS_W;
   let H = CANVAS_H;
@@ -701,6 +709,11 @@ export function createLiveResolver() {
     }
     const content = out.filter((e) => !e.isFx);
     const toNorm = (it) => ({ x: (Number(it.x) || 0) / W, y: (Number(it.y) || 0) / H });
+    // #1251 — pooled numeric FIELD/FEED path. Off by default: the SoA column
+    // loops below run unchanged (byte-identical defaults). The orchestrator
+    // flips input.pooledPatch to take the pooled variant; output is
+    // bit-identical either way (pooledPatch.selfcheck.mjs).
+    const usePooledPatch = input.pooledPatch === true;
     // #343 / Spine F: MOD reads the source's motion (position + velocity).
     // Both cloud and organism tracks provide real vx/vy for motionMetrics.
     const toNormVel = (it) => ({ ...toNorm(it), vx: Number(it.vx) || 0, vy: Number(it.vy) || 0 });
@@ -733,28 +746,50 @@ export function createLiveResolver() {
       }
       if (patch.mode === 'field') {
         const src = content.find((c) => c.id === patch.to);
-        // #1307 — column loop (was: toNorm maps ×2 + applyField map + item
-        // map). Mutates e.items in place; e.items is reassigned to itself to
-        // keep the old postcondition (always an array after this branch).
-        const items = e.items || [];
-        // #507 — mean presented hop (post-clamp px); the diagnostic line.
-        const pullPx = resolveFieldItems(items, src?.items || [],
-          { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) }, W, H);
-        e.items = items;
-        recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx });
+        if (usePooledPatch) {
+          // #1251 — pooled numeric FIELD: same math over reused scratch, no
+          // per-frame point objects. Bit-identical to the SoA column loop
+          // below (pooledPatch.selfcheck.mjs).
+          const r = pooledPatch.applyFieldItems(e.items, src?.items,
+            { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) }, W, H);
+          e.items = r.items;
+          // #507 — mean presented hop (post-clamp px); the diagnostic line.
+          recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx: r.pullPx });
+        } else {
+          // #1307 — column loop (was: toNorm maps ×2 + applyField map + item
+          // map). Mutates e.items in place; e.items is reassigned to itself to
+          // keep the old postcondition (always an array after this branch).
+          const items = e.items || [];
+          // #507 — mean presented hop (post-clamp px); the diagnostic line.
+          const pullPx = resolveFieldItems(items, src?.items || [],
+            { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) }, W, H);
+          e.items = items;
+          recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx });
+        }
       } else if (patch.mode === 'feed') {
         const src = content.find((c) => c.id === patch.to);
-        // #1307 — column loop (was: pts toNorm map + applyFeed map + item
-        // map). Null field = no delay history, the old applyTo short-circuit.
-        const items = e.items || [];
-        const amt = patchStrength(patch) * 0.05;
-        const from = slotFor(src.id);
-        const field = feedLive.delay.hasHistory(from) ? feedLive.delay.field(from) : null;
-        // #507 — same accumulation shape as FIELD (mean post-clamp hop px).
-        const pullPx = resolveFeedItems(items, field,
-          { mode: 'feed', from, to: slotFor(e.id), strength: amt }, W, H);
-        e.items = items;
-        recordPatchSample(e.id, { mode: 'feed', strength: patchStrength(patch), pullPx });
+        if (usePooledPatch) {
+          // #1251 — pooled numeric FEED: same math over reused scratch.
+          // Bit-identical to the SoA column loop below (pooledPatch.selfcheck.mjs).
+          const amt = patchStrength(patch) * 0.05;
+          const r = pooledPatch.applyFeedItems(e.items, feedLive,
+            { mode: 'feed', from: slotFor(src.id), to: slotFor(e.id), strength: amt }, W, H);
+          e.items = r.items;
+          // #507 — same accumulation shape as FIELD (mean post-clamp hop px).
+          recordPatchSample(e.id, { mode: 'feed', strength: patchStrength(patch), pullPx: r.pullPx });
+        } else {
+          // #1307 — column loop (was: pts toNorm map + applyFeed map + item
+          // map). Null field = no delay history, the old applyTo short-circuit.
+          const items = e.items || [];
+          const amt = patchStrength(patch) * 0.05;
+          const from = slotFor(src.id);
+          const field = feedLive.delay.hasHistory(from) ? feedLive.delay.field(from) : null;
+          // #507 — same accumulation shape as FIELD (mean post-clamp hop px).
+          const pullPx = resolveFeedItems(items, field,
+            { mode: 'feed', from, to: slotFor(e.id), strength: amt }, W, H);
+          e.items = items;
+          recordPatchSample(e.id, { mode: 'feed', strength: patchStrength(patch), pullPx });
+        }
       } else if (patch.mode === 'mod') {
         const src = content.find((c) => c.id === patch.to);
         const metrics = motionMetrics((src?.items || []).map(toNormVel));
@@ -778,8 +813,10 @@ export function createLiveResolver() {
         }));
       }
     });
-    // #1307 — rasterize straight from item x/y (was: a per-point toNorm map
-    // per layer per frame). Bit-identical; see feedLive.pushSourceItems.
+    // #1251/#1307 — pooled FEED write side: rasterize straight from items
+    // into the delay stage buffers, skipping the per-frame toNorm object
+    // maps. Byte-identical to pushSource(trackId, items.map(toNorm))
+    // (pooledPatch.selfcheck.mjs).
     content.forEach((e) => feedLive.pushSourceItems(slotFor(e.id), e.items || [], W, H));
     feedLive.commit();
     // #509 phase 2 — step the shared scent ONCE per tick, after every

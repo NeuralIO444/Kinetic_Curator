@@ -33,10 +33,12 @@ export function createFeedLive(frameW = 1000, frameH = 700) {
       rasterize(points, buf);
       pending.add(id);
     },
-    // #1307 — rasterize straight from item x/y in px, with zero per-point
-    // allocation. Byte-identical to pushSource(trackId, items.map(toNorm)):
-    // ((Number(it.x)||0)/W)*w reproduces toNorm→rasterize's op order exactly
-    // (Number(p.x)||0 is a no-op on toNorm's already-numeric output).
+    // #1251 — pooled FEED write: rasterize item x/y straight into the stage
+    // buffer, skipping the per-frame toNorm object map. Byte-identical to
+    // pushSource(trackId, items.map(toNorm)): ((Number(it.x)||0)/W)*w
+    // reproduces toNorm→rasterize's op order exactly (Number(p.x)||0 is a
+    // no-op on toNorm's already-numeric output). Also feeds #1307's SoA
+    // column push. Pinned by pooledPatch.selfcheck.mjs.
     pushSourceItems(trackId, items, W, H) {
       const id = trackId | 0;
       const buf = delay.stageBuffer(id);

@@ -11,7 +11,8 @@ import { lumaToFlow as encodeLuma } from './feedOps.js';
 // as a versioned behavior change (#1234).
 export const FIELD_RADIUS = 0.35;
 // #1307 — exported for the SoA slice-2 column loop (gl/fieldFeedColumns.mjs),
-// which must reproduce applyField's neighbor math bit-for-bit. Do not change
+// which must reproduce applyField's neighbor math bit-for-bit. Also feeds
+// the #1251 pooled path — keep one value, never fork it. Do not change
 // this value without a versioned behavior flag (same rule as FIELD_RADIUS).
 export const FIELD_SOFT = 1e-4;
 
