@@ -13,7 +13,10 @@ import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
-import { applyField, applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
+import { applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
+// #1307 — SoA slice 2/5: FIELD/FEED column loops (zero per-point allocation,
+// bit-identical to the map-based path they replace — see the module header).
+import { resolveFieldItems, resolveFeedItems } from './fieldFeedColumns.mjs';
 // #507 — inline PATCH diagnostic: record-only bulletin calls (no logic change).
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
@@ -37,15 +40,6 @@ function hashStr(str) {
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
   return h;
-}
-
-function clampHop(it, q, W = CANVAS_W, H = CANVAS_H) {
-  if (!q) return it;
-  let dx = q.x * W - it.x;
-  let dy = q.y * H - it.y;
-  const m = Math.hypot(dx, dy);
-  if (m > HOP_MAX_PX) { dx *= HOP_MAX_PX / m; dy *= HOP_MAX_PX / m; }
-  return { ...it, x: it.x + dx, y: it.y + dy };
 }
 
 /**
@@ -739,32 +733,28 @@ export function createLiveResolver() {
       }
       if (patch.mode === 'field') {
         const src = content.find((c) => c.id === patch.to);
-        const srcPts = (src?.items || []).map(toNorm);
-        const tgt = (e.items || []).map(toNorm);
-        const pulled = applyField(tgt, srcPts, { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) });
+        // #1307 — column loop (was: toNorm maps ×2 + applyField map + item
+        // map). Mutates e.items in place; e.items is reassigned to itself to
+        // keep the old postcondition (always an array after this branch).
+        const items = e.items || [];
         // #507 — mean presented hop (post-clamp px); the diagnostic line.
-        let pullSumPx = 0;
-        const fieldN = (e.items || []).length;
-        e.items = (e.items || []).map((it, k) => {
-          const next = clampHop(it, pulled[k], W, H);
-          pullSumPx += Math.hypot(next.x - it.x, next.y - it.y);
-          return next;
-        });
-        recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx: pullSumPx / Math.max(1, fieldN) });
+        const pullPx = resolveFieldItems(items, src?.items || [],
+          { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) }, W, H);
+        e.items = items;
+        recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx });
       } else if (patch.mode === 'feed') {
         const src = content.find((c) => c.id === patch.to);
-        const pts = (e.items || []).map(toNorm);
+        // #1307 — column loop (was: pts toNorm map + applyFeed map + item
+        // map). Null field = no delay history, the old applyTo short-circuit.
+        const items = e.items || [];
         const amt = patchStrength(patch) * 0.05;
-        const pulled = feedLive.applyTo(pts, { mode: 'feed', from: slotFor(src.id), to: slotFor(e.id), strength: amt });
+        const from = slotFor(src.id);
+        const field = feedLive.delay.hasHistory(from) ? feedLive.delay.field(from) : null;
         // #507 — same accumulation shape as FIELD (mean post-clamp hop px).
-        let feedSumPx = 0;
-        const feedN = (e.items || []).length;
-        e.items = (e.items || []).map((it, k) => {
-          const next = clampHop(it, pulled[k], W, H);
-          feedSumPx += Math.hypot(next.x - it.x, next.y - it.y);
-          return next;
-        });
-        recordPatchSample(e.id, { mode: 'feed', strength: patchStrength(patch), pullPx: feedSumPx / Math.max(1, feedN) });
+        const pullPx = resolveFeedItems(items, field,
+          { mode: 'feed', from, to: slotFor(e.id), strength: amt }, W, H);
+        e.items = items;
+        recordPatchSample(e.id, { mode: 'feed', strength: patchStrength(patch), pullPx });
       } else if (patch.mode === 'mod') {
         const src = content.find((c) => c.id === patch.to);
         const metrics = motionMetrics((src?.items || []).map(toNormVel));
@@ -788,7 +778,9 @@ export function createLiveResolver() {
         }));
       }
     });
-    content.forEach((e) => feedLive.pushSource(slotFor(e.id), (e.items || []).map(toNorm)));
+    // #1307 — rasterize straight from item x/y (was: a per-point toNorm map
+    // per layer per frame). Bit-identical; see feedLive.pushSourceItems.
+    content.forEach((e) => feedLive.pushSourceItems(slotFor(e.id), e.items || [], W, H));
     feedLive.commit();
     // #509 phase 2 — step the shared scent ONCE per tick, after every
     // layer's deposits landed. Skipped under slowRender (no updates ran, so

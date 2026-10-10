@@ -10,7 +10,10 @@ import { lumaToFlow as encodeLuma } from './feedOps.js';
 // Do NOT shrink this without Matt's sign-off — it changes output and must ship
 // as a versioned behavior change (#1234).
 export const FIELD_RADIUS = 0.35;
-const FIELD_SOFT = 1e-4;
+// #1307 — exported for the SoA slice-2 column loop (gl/fieldFeedColumns.mjs),
+// which must reproduce applyField's neighbor math bit-for-bit. Do not change
+// this value without a versioned behavior flag (same rule as FIELD_RADIUS).
+export const FIELD_SOFT = 1e-4;
 
 export const MAX_TRACKS = 4;
 export const PATCH_MODES = Object.freeze(['off', 'mod', 'field', 'feed']);
@@ -188,7 +191,7 @@ export function applyField(targetPts, sourcePts, patch) {
   // allocation): the patch is off, its strength is zero, or there are no
   // live sources. #1306 (SoA 2/5): "no live sources" is a column-count
   // check — a point set's `count`, never a per-point object walk — and the
-  // input set comes back untouched (no toObjects() on this path; see the
+  // input set comes back untouched (no object adapters on this path; see the
   // adapters kill list). Nothing here mutates the input or its columns,
   // so readers holding the same set stay safe.
   if (p.mode !== 'field') return targetPts;

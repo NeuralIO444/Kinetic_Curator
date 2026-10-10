@@ -2,12 +2,17 @@
 // #1305 kernel SoA 1/5 acceptance:
 //  - acquire/release round-trip; pool reuse hands back zeroed-or-overwritten
 //    columns (debug assertion fires on a planted dirty read)
-//  - adapters round-trip objects → columns → objects losslessly
 //  - same seed → same columns, bit-identical across runs
+// #1309 (5/5) — the boundary adapters are deleted: this selfcheck asserts
+// the kill list is empty (adapters.js gone, no toObjects/fromObjects call
+// sites in-tree) instead of testing the adapters.
 // This slice adds no behavior change: nothing in the live path uses the
 // columns yet, so there are no goldens to compare — only the contract.
 
 import assert from 'node:assert';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { mkRng } from '../../prng.js';
 import {
   createPointSet,
@@ -25,7 +30,6 @@ import {
   SoaContractError,
   soaPoolStats,
 } from './pools.js';
-import { toObjects, fromObjects } from './adapters.js';
 
 const debugWas = isSoaDebugEnabled();
 setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
@@ -151,37 +155,37 @@ setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
     'releasing null throws');
 }
 
-// ── adapters: lossless round trip ──────────────────────────────────────────
+// ── kill list (#1309): adapters.js is gone; no toObjects/fromObjects ───────
+// in-tree. The boundary adapters (toObjects/fromObjects) existed only to
+// let the migration slices straddle the object/column boundary. Slice 5/5
+// converts the last path (placement writes columns directly; sampler ctx
+// column-writing mode), so the file is deleted and this block asserts the
+// kill list stays empty: the file must not exist, and no call site may
+// remain anywhere under app/src. Plain substring search, no comment
+// stripping — a prose mention with a paren trips it too, which keeps the
+// kill list culturally clean (reword, don't paren).
 {
-  const objs = [
-    { x: 0.1, y: -2.5, vx: 3.25, vy: 0, slot: 7, energy: 1.5, id: 42, family: 3, source: 11 },
-    { x: 1000.75, y: 0, vx: -0.1, vy: 99.99, slot: 65534, energy: 0, id: 4294967294, family: 254, source: 0 },
-    { x: 1 }, // missing fields default to 0
-  ];
-  const set = fromObjects(objs);
-  assert.strictEqual(set.count, 3, 'fromObjects sets count');
-  assert.strictEqual(set.capacity, 3, 'fromObjects sizes capacity to input');
-  const back = toObjects(set);
-  assert.strictEqual(back.length, 3);
-  // Float lanes round to float32 on the way in; the expected values are the
-  // float32-rounded ones, and the second round trip is exactly stable.
-  const f32 = (v) => new Float32Array([v])[0];
-  assert.deepStrictEqual(back[0], {
-    x: f32(0.1), y: f32(-2.5), vx: f32(3.25), vy: 0, slot: 7,
-    energy: f32(1.5), id: 42, family: 3, source: 11,
-  }, 'first object survives with float32 rounding');
-  assert.deepStrictEqual(back[1], {
-    x: f32(1000.75), y: 0, vx: f32(-0.1), vy: f32(99.99), slot: 65534,
-    energy: 0, id: 4294967294, family: 254, source: 0,
-  }, 'boundary integer values survive');
-  assert.deepStrictEqual(back[2], {
-    x: 1, y: 0, vx: 0, vy: 0, slot: 0, energy: 0, id: 0, family: 0, source: 0,
-  }, 'missing fields default to 0');
-  const again = toObjects(fromObjects(back));
-  assert.deepStrictEqual(again, back, 'objects → columns → objects is lossless');
-  assert.deepStrictEqual(toObjects(fromObjects([])), [], 'empty array round-trips');
-  // Kill-list hygiene: adapters stay object-shaped, never leak pool state.
-  assert.ok(!('capacity' in back[0]), 'toObjects emits plain data, no bookkeeping');
+  const here = dirname(fileURLToPath(import.meta.url));
+  assert.ok(
+    !existsSync(join(here, 'adapters.js')),
+    'kill list: src/engine/kernel/soa/adapters.js must be deleted',
+  );
+  const hits = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) { walk(p); continue; }
+      if (!/\.(m?js)$/.test(name)) continue;
+      const code = readFileSync(p, 'utf8');
+      // Built via concatenation so this file's own source doesn't trip the
+      // scan (see the comment at the top of this block).
+      for (const fn of ['toObjects', 'fromObjects']) {
+        if (code.includes(fn + '(')) hits.push(`${p}: ${fn}(`);
+      }
+    }
+  };
+  walk(join(here, '..', '..', '..')); // app/src
+  assert.deepStrictEqual(hits, [], `kill list: toObjects/fromObjects call sites remain in-tree:\n${hits.join('\n')}`);
 }
 
 // ── determinism: same seed → same columns, bit-identical ───────────────────
@@ -246,4 +250,4 @@ function snapshot(set) {
 }
 
 setSoaDebugEnabled(debugWas);
-console.log('soa.selfcheck: ok — acquire/release contract, adapters, determinism');
+console.log('soa.selfcheck: ok — acquire/release contract, kill list empty, determinism');

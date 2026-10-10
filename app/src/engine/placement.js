@@ -135,6 +135,12 @@ export function computeGeometrySoA({
   // One reused context object instead of a fresh literal per point. Samplers
   // only ever read from it (registry.js ABI), so mutation is safe; the real
   // per-point out-param rewrite is step 5's EvalContext work.
+  //
+  // #1309 — column-writing mode (sample/columns.js): ctx.out hands the
+  // sampler the SoA lanes to write directly ({ x, y, t, rot01 } +
+  // ctx.row). Samplers that implement the mode return undefined; legacy
+  // {x, y}-returning samplers are unpacked into the lanes by the adapter
+  // in the loop below.
   const ctx = {
     i: 0, count, w: effectiveW, h: effectiveH,
     rng: null, jitter: jitter || 0, seed,
@@ -151,9 +157,24 @@ export function computeGeometrySoA({
     brushSize, brushSpacing, fieldScale, trailCount,
     // Slice 2 — the crooked; ignored by every other mode.
     wobbleAmp, wobbleFreq,
+    // #1309 — column-writing mode; assigned below once the lanes exist.
+    out: null,
+    row: -1,
   };
 
   const tDenom = count > 1 ? count - 1 : 0;
+
+  // #1309 — the sampler's optional rot01 (trail tangent for brush) lands in
+  // this per-call scratch lane; NaN means "not produced". One lane, not a
+  // PlacementSoA field: stage C never reads it (it folds into uRot below),
+  // and a module-level scratch would break the reentrancy this function
+  // guarantees (multi-layer + worker callers).
+  const rot01lane = new Float64Array(cap);
+  // The placement SoA columns ARE the sampler's column target: x/y/t are
+  // written by the sampler directly, then displacement/bleed finalize x/y
+  // in place below. No per-point {x, y} object crosses this boundary for
+  // column-mode samplers.
+  ctx.out = { x: soa.x, y: soa.y, t: soa.t, rot01: rot01lane };
 
   let n = 0;
   for (let i = 0; i < cap; i++) {
@@ -161,16 +182,36 @@ export function computeGeometrySoA({
 
     ctx.i = i;
     ctx.rng = rngForIndex(seed, CH.geo, i, seedOffsets);
+    ctx.row = n;
+    // NaN sentinels for the optional lanes: a column-mode sampler that
+    // produces t/rot01 overwrites them, anything else reads back as "not
+    // produced" — the exact analogue of the legacy `pos.t !== undefined` /
+    // `pos.rot01 !== undefined` tests below.
+    soa.t[n] = NaN;
+    rot01lane[n] = NaN;
     const pos = sample(ctx);
+    if (pos !== undefined) {
+      // Legacy sampler — the adapter: unpack the {x, y} return into the
+      // lanes. Column-mode samplers return undefined; their lanes are
+      // already written.
+      soa.x[n] = pos.x;
+      soa.y[n] = pos.y;
+      if (pos.t !== undefined) soa.t[n] = pos.t;
+      if (pos.rot01 !== undefined) rot01lane[n] = pos.rot01;
+    }
 
-    let px = pos.x;
-    let py = pos.y;
+    // The unwarped sampler position, straight from the lanes the sampler
+    // wrote (or the legacy adapter unpacked into).
+    const ux = soa.x[n];
+    const uy = soa.y[n];
+    let px = ux;
+    let py = uy;
 
     if (noise) {
-      // Both octaves sample the UNWARPED position (pos.x/pos.y), matching the
+      // Both octaves sample the UNWARPED position (ux/uy), matching the
       // AoS kernel — dy must not see dx's displacement.
-      px += noise.fBm3D(pos.x * noiseFreq, pos.y * noiseFreq, nt, 3) * displacement;
-      py += noise.fBm3D(pos.x * noiseFreq + 200, pos.y * noiseFreq + 200, nt + 100, 3) * displacement;
+      px += noise.fBm3D(ux * noiseFreq, uy * noiseFreq, nt, 3) * displacement;
+      py += noise.fBm3D(ux * noiseFreq + 200, uy * noiseFreq + 200, nt + 100, 3) * displacement;
     }
 
     if (bleed) {
@@ -182,7 +223,10 @@ export function computeGeometrySoA({
 
     soa.x[n] = px;
     soa.y[n] = py;
-    soa.t[n] = pos.t !== undefined ? pos.t : (tDenom ? i / tDenom : 0.5);
+    // NaN (sentinel) selects the legacy default ramp — the column-mode form
+    // of `pos.t !== undefined ? pos.t : …`.
+    const pt = soa.t[n];
+    soa.t[n] = Number.isNaN(pt) ? (tDenom ? i / tDenom : 0.5) : pt;
     soa.index[n] = i;
     soa.zTier[n] = zTier;
     soa.depth[n] = tiers > 1 ? 0.6 + (zTier / (tiers - 1)) * 0.8 : 1.0;
@@ -190,8 +234,10 @@ export function computeGeometrySoA({
     soa.uScaleY[n] = hashU01(seed, CH.attr, Y_SCALE_INDEX_BASE + i, seedOffsets);
     // Brush stamps aim along their trail tangent: the sampler returns the
     // tangent as a unit draw; every other mode keeps the hash draw, so this
-    // is a no-op for them.
-    soa.uRot[n] = pos.rot01 !== undefined ? pos.rot01 : hashU01(seed, CH.attr, i * 3 + 1, seedOffsets);
+    // is a no-op for them. NaN (sentinel) selects the hash draw — the
+    // column-mode form of `pos.rot01 !== undefined ? pos.rot01 : …`.
+    const r01 = rot01lane[n];
+    soa.uRot[n] = Number.isNaN(r01) ? hashU01(seed, CH.attr, i * 3 + 1, seedOffsets) : r01;
     soa.uAlpha[n] = hashU01(seed, CH.attr, i * 3 + 2, seedOffsets);
     // Slice 2 — stamp jitter, the hand on top of the trail: ±10° rotation
     // and ±15% of the scale range around its midpoint, both from the

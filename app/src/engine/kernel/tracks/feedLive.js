@@ -33,6 +33,24 @@ export function createFeedLive(frameW = 1000, frameH = 700) {
       rasterize(points, buf);
       pending.add(id);
     },
+    // #1307 — rasterize straight from item x/y in px, with zero per-point
+    // allocation. Byte-identical to pushSource(trackId, items.map(toNorm)):
+    // ((Number(it.x)||0)/W)*w reproduces toNorm→rasterize's op order exactly
+    // (Number(p.x)||0 is a no-op on toNorm's already-numeric output).
+    pushSourceItems(trackId, items, W, H) {
+      const id = trackId | 0;
+      const buf = delay.stageBuffer(id);
+      if (!buf) return; // out of range: same no-op the copy path ended in
+      buf.fill(0);
+      const arr = Array.isArray(items) ? items : [];
+      for (let k = 0; k < arr.length; k++) {
+        const it = arr[k];
+        const x = Math.max(0, Math.min(w - 1, Math.floor(((Number(it.x) || 0) / W) * w)));
+        const y = Math.max(0, Math.min(h - 1, Math.floor(((Number(it.y) || 0) / H) * h)));
+        buf[y * w + x] = 1;
+      }
+      pending.add(id);
+    },
     applyTo(targetPts, patch) {
       const p = normalizePatch(patch);
       if (p.mode !== 'feed') return targetPts;

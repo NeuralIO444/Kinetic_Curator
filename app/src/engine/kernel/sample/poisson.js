@@ -34,6 +34,7 @@
 // points repeat rather than the sampler failing.
 
 import { rngForChannel } from '../rng.js';
+import { writeSampleColumns } from './columns.js'; // #1309 — column-writing protocol
 
 /** Density constant: r = K·√(A/n). K≈0.65 lands maximal sets near 2× count. */
 export const POISSON_DENSITY_K = 0.65;
@@ -183,7 +184,11 @@ export function clearPoissonCache() {
 export function poisson(ctx) {
   const { i, count, w, h, seed, seedOffsets, poissonRadius } = ctx;
   const set = poissonPointSet(seed, count, w, h, seedOffsets, poissonRadius);
-  if (!set.length) return { x: w / 2, y: h / 2 };
+  if (!set.length) {
+    if (writeSampleColumns(ctx, w / 2, h / 2)) return; // #1309 — column mode
+    return { x: w / 2, y: h / 2 };
+  }
   const p = set[i % set.length];
+  if (writeSampleColumns(ctx, p.x, p.y)) return; // #1309 — column mode
   return { x: p.x, y: p.y };
 }
