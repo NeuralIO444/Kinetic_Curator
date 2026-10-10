@@ -517,26 +517,179 @@ function stratified(ctx) {
   };
 }
 
-registerSampler('random', random);
-registerSampler('grid', grid);
-registerSampler('fibonacci', fibonacci);
-registerSampler('phyllotaxis', phyllotaxis);
-registerSampler('truchet', truchet);
-registerSampler('radial', radial);
-registerSampler('swarm', swarm);
-registerSampler('flow', flow);
-registerSampler('layers', layers);
-registerSampler('rails', rails);
-registerSampler('ca', ca);
-registerSampler('voronoi', voronoi);
-registerSampler('lsystem', lsystem);
-registerSampler('dla', dla); // #720
-registerSampler('eden', eden); // #720
-registerSampler('orbit', orbit);
-registerSampler('abacus', abacus);
-registerSampler('noise', grid); // grid base; displacement warps in orchestrator
-registerSampler('hype', swarm);
-registerSampler('murmuration', swarm); // #280 — voice over the swarm engine
+// Cost tiers follow the kernel cost-tier contract
+// (engine/kernel/costRegistry.mjs, shared with #1239): 0 structural/never
+// shed, 1 shed first, 2 expensive-but-not-shed-first, 3 cosmetic. The
+// sampler family's reading:
+//   0 — structural placement: closed-form per-item math, no rejection
+//       loops, no precomputed builds. Init-time CPU the governor never
+//       sheds.
+//   1 — voice samplers, shed first among placement: swarm/flow (and the
+//       hype/murmuration voices over the swarm engine) are ambient voices
+//       the governor substitutes with tier-0 geometry at negligible cost.
+//   2 — expensive builds: a cached per-seed structure plus per-point reads
+//       off it — ca's blurred field, voronoi's centres, the l-system plant,
+//       the DLA/Eden aggregates, brush's traced noise-field trails,
+//       poisson's dart-thrown point set. Real CPU, shed after tier-1
+//       effects, before tier-3 cosmetics.
+//   3 — unused in this family (tier 3 is cheap color ops on the gl side).
+//
+// Every entry declares id, reads, writes, costTier, fn explicitly — the
+// registry is the single readable list, and the legacy registerSampler(id,
+// fn) shape below stays only as the third-party compatibility shim.
+//
+// reads are the ctx keys the sampler actually consumes (rng is the per-item
+// stream; seed/seedOffsets are the hashed identity streams; wobbleAmp etc.
+// are brush knobs). writes are the dish channels it produces: 'points' is
+// x/y, 'points.t' the normalised param the orchestrator maps to soa.t,
+// 'points.rot01' the trail tangent brush reports for stamp rotation.
+
+registerSampler({
+  id: 'random',
+  reads: ['w', 'h', 'rng'],
+  writes: ['points'],
+  costTier: 0,
+  fn: random,
+});
+registerSampler({
+  id: 'grid',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 0,
+  fn: grid,
+});
+registerSampler({
+  id: 'fibonacci',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 0,
+  fn: fibonacci,
+});
+registerSampler({
+  id: 'phyllotaxis',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter', 'phylloDivergence'],
+  writes: ['points'],
+  costTier: 0,
+  fn: phyllotaxis,
+});
+registerSampler({
+  id: 'truchet',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets'],
+  writes: ['points'],
+  costTier: 0,
+  fn: truchet,
+});
+registerSampler({
+  id: 'radial',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 0,
+  fn: radial,
+});
+// Tier 1 — voice samplers, shed first among placement.
+registerSampler({
+  id: 'swarm',
+  reads: ['w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 1,
+  fn: swarm,
+});
+registerSampler({
+  id: 'flow',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter'],
+  writes: ['points', 'points.t'],
+  costTier: 1,
+  fn: flow,
+});
+registerSampler({
+  id: 'layers',
+  reads: ['i', 'w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 0,
+  fn: layers,
+});
+registerSampler({
+  id: 'rails',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter'],
+  writes: ['points', 'points.t'],
+  costTier: 0,
+  fn: rails,
+});
+// Tier 2 — expensive builds: rejection sampling against a cached field.
+registerSampler({
+  id: 'ca',
+  reads: ['i', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets', 'caGrid'],
+  writes: ['points'],
+  costTier: 2,
+  fn: ca,
+});
+registerSampler({
+  id: 'voronoi',
+  reads: ['i', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets'],
+  writes: ['points'],
+  costTier: 2,
+  fn: voronoi,
+});
+registerSampler({
+  id: 'lsystem',
+  reads: ['i', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets', 'lsysDepth', 'lsysAngle'],
+  writes: ['points', 'points.t'],
+  costTier: 2,
+  fn: lsystem,
+});
+registerSampler({
+  id: 'dla', // #720
+  reads: ['i', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets', 'growthTick', 'growthRate', 'growthBranch', 'audioEnergy'],
+  writes: ['points', 'points.t'],
+  costTier: 2,
+  fn: dla,
+});
+registerSampler({
+  id: 'eden', // #720
+  reads: ['i', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets', 'growthTick', 'growthRate', 'growthBranch', 'audioEnergy'],
+  writes: ['points', 'points.t'],
+  costTier: 2,
+  fn: eden,
+});
+registerSampler({
+  id: 'orbit',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'seed'],
+  writes: ['points'],
+  costTier: 0,
+  fn: orbit,
+});
+registerSampler({
+  id: 'abacus',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'seed'],
+  writes: ['points'],
+  costTier: 0,
+  fn: abacus,
+});
+// 'noise' registers the grid fn itself (displacement warps in the
+// orchestrator) — its declaration mirrors grid's.
+registerSampler({
+  id: 'noise',
+  reads: ['i', 'count', 'w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 0,
+  fn: grid,
+});
+// 'hype' and 'murmuration' ride the swarm engine (#280) — same voice tier
+// as swarm.
+registerSampler({
+  id: 'hype',
+  reads: ['w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 1,
+  fn: swarm,
+});
+registerSampler({
+  id: 'murmuration', // #280 — voice over the swarm engine
+  reads: ['w', 'h', 'rng', 'jitter'],
+  writes: ['points'],
+  costTier: 1,
+  fn: swarm,
+});
 /**
  * brush — flow-field trail stamping for the Crooked Hand brush line.
  *
@@ -615,9 +768,32 @@ function brush(ctx) {
   return { x: p.x, y: p.y, t: per > 1 ? step / (per - 1) : 0.5, rot01: p.rot01 };
 }
 
-registerSampler('brush', brush);
-registerSampler('stratified', stratified);
-registerSampler('poisson', poisson); // #1193
+registerSampler({
+  // Tier 2 — expensive build: K noise-field trails traced and cached per
+  // call, then dealt round-robin. Deliberately does NOT read ctx.rng or
+  // jitter (the file comment explains why) — neither is declared.
+  id: 'brush',
+  reads: ['i', 'count', 'w', 'h', 'seed', 'seedOffsets', 'fieldScale', 'brushSize', 'brushSpacing', 'wobbleAmp', 'wobbleFreq', 'trailCount'],
+  writes: ['points', 'points.t', 'points.rot01'],
+  costTier: 2,
+  fn: brush,
+});
+registerSampler({
+  id: 'stratified',
+  reads: ['i', 'count', 'w', 'h', 'rng'],
+  writes: ['points'],
+  costTier: 0,
+  fn: stratified,
+});
+registerSampler({
+  // #1193 — tier 2: the blue-noise set is dart-thrown once per
+  // (seed, count, w, h) and cached; no jitter, no ctx.rng.
+  id: 'poisson',
+  reads: ['i', 'count', 'w', 'h', 'seed', 'seedOffsets', 'poissonRadius'],
+  writes: ['points'],
+  costTier: 2,
+  fn: poisson,
+});
 
 export {
   random,
