@@ -38,14 +38,18 @@ const BiologyPanel = lazy(() =>
 const UnitsPanel = lazy(() =>
   import('./UnitsPanel.jsx').then((m) => ({ default: m.UnitsPanel })),
 );
+const KernelPanel = lazy(() =>
+  import('./KernelPanel.jsx').then((m) => ({ default: m.KernelPanel })),
+);
 
-/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793). */
+/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233). */
 export const DEV_TABS = [
   { id: 'xray',      title: 'X-RAY',      icon: '◉', component: GovernorXrayPanel },
   { id: 'govtune',   title: 'GOV TUNE',   icon: '◐', component: GovernorTunePanel },
   { id: 'shaderlab', title: 'SHADER LAB', icon: '◈', component: ShaderLabPanel },
   { id: 'biology',   title: 'BIOLOGY',    icon: '❋', component: BiologyPanel },
   { id: 'units',     title: 'UNITS',      icon: '✎', component: UnitsPanel },
+  { id: 'kernel',    title: 'KERNEL',     icon: '▦', component: KernelPanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];
