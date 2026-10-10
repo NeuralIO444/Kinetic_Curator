@@ -76,6 +76,28 @@ export function createRegistry(family, { payloadKey = 'fn', defaults = {} } = {}
     if (!VALID_TIERS.has(costTier)) {
       throw new Error(`[registry:${family}] "${id}": costTier must be an integer 0–3 (got ${String(costTier)})`);
     }
+    // Optional GPU twin descriptor (docs/design/gpu-field-eval.md):
+    // { vertexShader, varyings[, fragmentShader] }. Payload-adjacent like the
+    // payload closure — carried through to the frozen entry but excluded from
+    // the conflict signature, so a gl-side module can attach it by
+    // re-registering the identical declaration without tripping the HMR
+    // conflict guard (kernel never imports from gl/, #1239).
+    const gpu = decl.gpu === undefined ? undefined : decl.gpu;
+    if (gpu !== undefined) {
+      if (typeof gpu !== 'object' || gpu === null || Array.isArray(gpu)) {
+        throw new Error(`[registry:${family}] "${id}": gpu must be an object`);
+      }
+      if (typeof gpu.vertexShader !== 'string' || !gpu.vertexShader) {
+        throw new Error(`[registry:${family}] "${id}": gpu.vertexShader must be a non-empty string`);
+      }
+      if (typeof gpu.fragmentShader !== 'undefined' && (typeof gpu.fragmentShader !== 'string' || !gpu.fragmentShader)) {
+        throw new Error(`[registry:${family}] "${id}": gpu.fragmentShader must be a non-empty string when present`);
+      }
+      if (!Array.isArray(gpu.varyings) || gpu.varyings.length === 0 ||
+          !gpu.varyings.every((v) => typeof v === 'string' && v)) {
+        throw new Error(`[registry:${family}] "${id}": gpu.varyings must be a non-empty string array`);
+      }
+    }
     const entry = Object.freeze({
       id,
       family,
@@ -83,6 +105,13 @@ export function createRegistry(family, { payloadKey = 'fn', defaults = {} } = {}
       writes: Object.freeze([...writes]),
       costTier,
       [payloadKey]: payload,
+      ...(gpu ? {
+        gpu: Object.freeze({
+          vertexShader: gpu.vertexShader,
+          varyings: Object.freeze([...gpu.varyings]),
+          ...(gpu.fragmentShader ? { fragmentShader: gpu.fragmentShader } : {}),
+        }),
+      } : {}),
     });
     const prev = entries.get(id);
     if (prev && sigOf(prev) !== sigOf(entry)) {
