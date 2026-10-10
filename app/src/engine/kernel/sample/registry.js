@@ -269,10 +269,12 @@ function caFieldFor(caGrid) {
  * Rejection sampling makes position a function of (seed, i, field) only.
  */
 function ca(ctx) {
-  const { i, w, h, rng, jitter, caGrid, seed, seedOffsets } = ctx;
+  const { i, w, h, rng, jitter, caGrid, seed, seedOffsets, scratch } = ctx;
   if (!caGrid) return random(ctx);
   const field = caFieldFor(caGrid);
-  const p = sampleFieldPoint(field, seed, i, { channel: 'ca', seedOffsets });
+  // #1250 — scratch is the placement call's reseedable stream (bit-identical
+  // to rngForIndex); undefined for direct sampler callers, which fall back.
+  const p = sampleFieldPoint(field, seed, i, { channel: 'ca', seedOffsets, scratch });
   const x = p.x * w + (rng() - 0.5) * jitter;
   const y = p.y * h + (rng() - 0.5) * jitter;
   if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
@@ -330,11 +332,16 @@ function voronoiGap(pts, x, y) {
 }
 
 function voronoi(ctx) {
-  const { i, w, h, rng, jitter, seed, seedOffsets } = ctx;
+  const { i, w, h, rng, jitter, seed, seedOffsets, scratch } = ctx;
   const pts = voronoiCentres(seed, seedOffsets);
   // Its own stream, so the mask draws do not consume ctx.rng and shift every
   // other per-item draw (the same discipline sampleFieldPoint follows).
-  const r = rngForIndex(seed, 'voronoi', i, seedOffsets);
+  // #1250 — one scratch stream per placement call, reseeded per index:
+  // bit-identical to rngForIndex, without the per-point allocation.
+  // Undefined for direct sampler callers, which fall back to rngForIndex.
+  const r = scratch
+    ? scratch.reseed(seed, 'voronoi', i, seedOffsets).draw
+    : rngForIndex(seed, 'voronoi', i, seedOffsets);
   let bestX = 0.5;
   let bestY = 0.5;
   let bestGap = -1;
