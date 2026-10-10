@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KC-1 kernel worker probe — #1312</title>
+<style>
+  body { font-family: ui-monospace, Menlo, monospace; background: #101014; color: #d8d8de; margin: 0; padding: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: #8a8a96; font-size: 12px; margin-bottom: 16px; }
+  #banner { padding: 10px 14px; border-radius: 6px; font-weight: bold; margin-bottom: 16px; }
+  #banner.run { background: #3a3a22; color: #ffe27a; }
+  #banner.pass { background: #1d3a24; color: #7dffa8; }
+  #banner.fail { background: #3a1d1d; color: #ff8a8a; }
+  table { border-collapse: collapse; width: 100%; max-width: 900px; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #2a2a32; vertical-align: top; }
+  th { color: #8a8a96; font-weight: normal; }
+  .pass { color: #7dffa8; } .fail { color: #ff8a8a; }
+  .detail { color: #a9a9b5; font-size: 12px; word-break: break-word; }
+  #env { margin-top: 16px; font-size: 12px; color: #8a8a96; max-width: 900px; word-break: break-all; }
+</style>
+</head>
+<body>
+<h1>kernel worker probe — issue #1312 (worker 3/3)</h1>
+<div class="sub">Verifies Worker + transferable ArrayBuffers + the kernel worker entry shape
+(docs/design/worker-thread-kernel.md) in this engine. No app code is loaded.</div>
+<div id="banner" class="run">RUNNING…</div>
+<table>
+  <thead><tr><th style="width:70px">result</th><th style="width:260px">check</th><th>detail</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<div id="env"></div>
+<script>
+'use strict';
+/* Self-contained probe page for #1312. Runs automatically on load.
+ * Exercises: new Worker() (file + Blob URL), the versioned kernel protocol
+ * (INIT->READY, STEP->FRAME, SET_PARAM->PARAM_ACK), postMessage with
+ * transferable ArrayBuffers in both directions, and a bit-exact round-trip
+ * of Float32Array SoA column buffers (x, y, vx, vy x 1024).
+ *
+ * The integer hash below MUST stay identical to the one in
+ * kernel-worker-probe.worker.js — it is how the page verifies every
+ * transferred float bit-for-bit.
+ */
+function hash32(a) {
+  a |= 0;
+  a = (a ^ 61) ^ (a >>> 16);
+  a = (a + (a << 3)) | 0;
+  a = (a ^ (a >>> 4)) | 0;
+  a = Math.imul(a, 0x27d4eb2d);
+  a = (a ^ (a >>> 15)) | 0;
+  return a >>> 0;
+}
+function columnValue(seed, frame, col, i) {
+  var h = (seed | 0) ^
+    Math.imul(frame | 0, 0x9e3779b1) ^
+    Math.imul(col | 0, 0x85ebca6b) ^
+    Math.imul(i | 0, 0xc2b2ae35);
+  return hash32(h) / 4294967296;
+}
+
+var SEED = 1234;
+var FRAMES = 8;
+var COLUMN_NAMES = ['x', 'y', 'vx', 'vy'];
+var COLUMN_COUNT = 1024;
+var checks = [];
+var rowsEl = document.getElementById('rows');
+var bannerEl = document.getElementById('banner');
+
+function record(id, label, pass, detail) {
+  checks.push({ id: id, label: label, pass: !!pass, detail: String(detail) });
+  var tr = document.createElement('tr');
+  var r = document.createElement('td');
+  r.textContent = pass ? 'PASS' : 'FAIL';
+  r.className = pass ? 'pass' : 'fail';
+  var l = document.createElement('td'); l.textContent = label;
+  var d = document.createElement('td'); d.textContent = String(detail); d.className = 'detail';
+  tr.appendChild(r); tr.appendChild(l); tr.appendChild(d);
+  rowsEl.appendChild(tr);
+}
+
+var finished = false;
+function finish() {
+  if (finished) return;
+  finished = true;
+  var failed = checks.filter(function (c) { return !c.pass; }).length;
+  bannerEl.textContent = failed === 0
+    ? 'ALL ' + checks.length + ' CHECKS PASSED'
+    : failed + ' OF ' + checks.length + ' CHECKS FAILED';
+  bannerEl.className = failed === 0 ? 'pass' : 'fail';
+  var m = navigator.userAgent.match(/AppleWebKit\/([\d.]+)/);
+  var wk = m ? m[1] : 'n/a';
+  document.getElementById('env').textContent =
+    'userAgent: ' + navigator.userAgent + ' | AppleWebKit: ' + wk +
+    ' | hardwareConcurrency: ' + navigator.hardwareConcurrency;
+  window.__kernelWorkerProbe = {
+    done: true,
+    passed: checks.length - failed,
+    failed: failed,
+    checks: checks,
+    ua: navigator.userAgent,
+    webkitVersion: wk,
+    protocol: 1,
+  };
+}
+
+// Sequential request/response over one worker. Messages are ordered, so one
+// in-flight waiter is enough; an ERROR reply rejects the waiter.
+function makeClient(worker) {
+  var waiter = null;
+  worker.onmessage = function (e) {
+    var w = waiter; waiter = null;
+    if (w) w(e.data);
+  };
+  worker.onerror = function (e) {
+    var w = waiter; waiter = null;
+    if (w) w({ type: 'ERROR', error: 'worker onerror: ' + (e.message || 'unknown') });
+  };
+  function next() {
+    return new Promise(function (resolve) { waiter = resolve; });
+  }
+  async function send(msg, transfer) {
+    worker.postMessage(msg, transfer || []);
+    var reply = await next();
+    if (!reply || reply.type === 'ERROR') {
+      throw new Error('worker ERROR: ' + ((reply && reply.error) || 'empty reply'));
+    }
+    return reply;
+  }
+  return { send: send, next: next };
+}
+
+async function run() {
+  // 1 — file-URL worker (the deployment shape: same-origin worker entry).
+  var worker;
+  try {
+    worker = new Worker('kernel-worker-probe.worker.js');
+    record('worker-construct-file', 'new Worker() — file URL', true, 'constructed, no exception');
+  } catch (e) {
+    record('worker-construct-file', 'new Worker() — file URL', false, String((e && e.message) || e));
+    finish(); return;
+  }
+  // 2 — Blob-URL worker (fallback shape, e.g. restrictive WebView schemes).
+  try {
+    var blobUrl = URL.createObjectURL(new Blob(['onmessage=function(e){postMessage({type:"PONG"})};'], { type: 'text/javascript' }));
+    var bw = new Worker(blobUrl);
+    await new Promise(function (resolve, reject) {
+      bw.onmessage = function () { resolve(); };
+      bw.onerror = function (e) { reject(new Error((e && e.message) || 'blob worker error')); };
+      bw.postMessage({ type: 'PING' });
+      setTimeout(function () { reject(new Error('blob worker PING timeout')); }, 5000);
+    });
+    bw.terminate(); URL.revokeObjectURL(blobUrl);
+    record('worker-construct-blob', 'new Worker() — Blob URL', true, 'PING/PONG round-trip ok');
+  } catch (e) {
+    record('worker-construct-blob', 'new Worker() — Blob URL', false, String((e && e.message) || e));
+  }
+
+  var client = makeClient(worker);
+  try {
+    // 3 — INIT -> READY handshake, protocol version + column metadata.
+    var ready = await client.send({ type: 'INIT', seed: SEED, recipe: 'probe', params: { quality: 1 } });
+    var readyOk = ready.type === 'READY' && ready.protocol === 1 &&
+      ready.bufferSets === 2 && ready.columns && ready.columns.count === COLUMN_COUNT &&
+      JSON.stringify(ready.columns.names) === JSON.stringify(COLUMN_NAMES);
+    record('init-handshake', 'INIT -> READY (protocol v1)', readyOk, JSON.stringify({
+      protocol: ready.protocol, bufferSets: ready.bufferSets, columns: ready.columns,
+    }));
+
+    // 4 — SET_PARAM -> PARAM_ACK echo.
+    var ack = await client.send({ type: 'SET_PARAM', key: 'gain', value: 0.5, frame: 0 });
+    var ackOk = ack.type === 'PARAM_ACK' && ack.key === 'gain' && ack.value === 0.5;
+    record('set-param', 'SET_PARAM -> PARAM_ACK', ackOk, JSON.stringify({ key: ack.key, value: ack.value }));
+
+    // 5 — main -> worker transferable: sender-side detachment proves the
+    // buffer was transferred, not structured-cloned.
+    var scratch = new Float32Array(256);
+    for (var s = 0; s < scratch.length; s++) scratch[s] = columnValue(SEED, 7, 0, s);
+    var head = [scratch[0], scratch[128], scratch[255]];
+    worker.postMessage({ type: 'ECHO', id: 't1', buf: scratch }, [scratch.buffer]);
+    var detached = scratch.buffer.byteLength === 0;
+    var echoAck = await client.next();
+    var echoOk = detached && echoAck.type === 'ECHO_ACK' && echoAck.length === 256 &&
+      echoAck.head[0] === head[0] && echoAck.head[1] === head[1] && echoAck.head[2] === head[2];
+    record('transfer-main-to-worker', 'postMessage transferable (main -> worker)', echoOk,
+      'sender detached=' + detached + ', worker saw len=' + echoAck.length + ', head exact=' +
+      (echoAck.head && echoAck.head[0] === head[0]));
+
+    // 6 — STEP -> FRAME round-trip x N frames: bit-exact Float32Array columns,
+    // double-buffer alternation, worker-side detachment audit.
+    // NOTE: expected values go through Math.fround — the wire carries
+    // float32, so the reference must be rounded the same way.
+    // A failure throws: the message stream would be misaligned afterwards,
+    // so later checks cannot be trusted (recorded as one clear FAIL).
+    function failRound(detail) { throw new Error('frame-roundtrip: ' + detail); }
+    var lastSet = -1;
+    for (var f = 0; f < FRAMES; f++) {
+      var frame = await client.send({ type: 'STEP', frame: f, dt: 1 / 60, events: [{ frame: f, type: 'PROBE' }] });
+      if (frame.type !== 'FRAME' || frame.frame !== f) failRound('frame ' + f + ': bad echo');
+      if (frame.set !== f % 2) failRound('frame ' + f + ': set=' + frame.set + ', expected ' + (f % 2));
+      if (lastSet === frame.set) failRound('frame ' + f + ': buffer set did not alternate');
+      lastSet = frame.set;
+      if (frame.eventsSeen !== 1) failRound('frame ' + f + ': eventsSeen=' + frame.eventsSeen);
+      for (var c = 0; c < COLUMN_NAMES.length; c++) {
+        var col = frame.columns[COLUMN_NAMES[c]];
+        if (!(col instanceof Float32Array) || col.length !== COLUMN_COUNT) {
+          failRound('frame ' + f + ' col ' + COLUMN_NAMES[c] + ': not Float32Array(1024)');
+        }
+        for (var i = 0; i < COLUMN_COUNT; i++) {
+          if (col[i] !== Math.fround(columnValue(SEED, f, c, i))) {
+            failRound('frame ' + f + ' col ' + COLUMN_NAMES[c] + '[' + i + ']: mismatch');
+          }
+        }
+      }
+      var audit = await client.next();
+      var allDetached = audit.type === 'TRANSFER_AUDIT' && audit.frame === f &&
+        COLUMN_NAMES.every(function (n) { return audit.detached && audit.detached[n] === true; });
+      if (!allDetached) failRound('frame ' + f + ': TRANSFER_AUDIT not all detached');
+    }
+    record('frame-roundtrip', 'STEP -> FRAME x' + FRAMES + ' (bit-exact columns)', true,
+      FRAMES + ' frames, 4x' + COLUMN_COUNT + ' floats each, bit-exact; sets alternated 0/1; worker detached every buffer');
+
+    // 7 — negative: an event without a matching frame index must be rejected
+    // (the design doc's determinism guard), and the worker must stay healthy.
+    var negOk = false; var negDetail = '';
+    worker.postMessage({ type: 'STEP', frame: 100, dt: 1 / 60, events: [{ frame: 999, type: 'BAD' }] });
+    var negReply = await client.next();
+    if (negReply.type === 'ERROR' && /frame index/.test(negReply.error)) {
+      var recover = await client.send({ type: 'STEP', frame: 101, dt: 1 / 60, events: [] });
+      negOk = recover.type === 'FRAME' && recover.frame === 101;
+      negDetail = 'bad event rejected ("' + negReply.error + '"), worker healthy after';
+    } else {
+      negDetail = 'expected ERROR for frame-mismatched event, got: ' + JSON.stringify(negReply);
+    }
+    record('event-frame-guard', 'frame-indexed events enforced', negOk, negDetail);
+  } catch (e) {
+    record('fatal', 'probe completed without exception', false, String((e && e.message) || e));
+  } finally {
+    worker.terminate();
+  }
+  finish();
+}
+
+var timeout = setTimeout(function () {
+  record('timeout', 'probe finished in time', false, 'global 30s timeout exceeded');
+  finish();
+}, 30000);
+
+run().then(function () { clearTimeout(timeout); }).catch(function (e) {
+  clearTimeout(timeout);
+  record('fatal', 'probe completed without exception', false, String((e && e.message) || e));
+  finish();
+});
+</script>
+</body>
+</html>
