@@ -36,30 +36,47 @@ export function makeCaField(grid, { softness = 1 } = {}) {
   const cols = grid[0].length;
 
   // Pre-blur once into a float grid; sampling stays O(1) per point.
-  let field = grid.map((row) => row.map((c) => (c ? 1 : 0)));
+  // Two preallocated Float32Array buffers ping-ponged across passes (#1249):
+  // no per-pass allocation. Edge semantics match the old array-of-arrays
+  // blur exactly — out-of-bounds neighbours are skipped (not zero-padded)
+  // and the average divides by the in-bounds neighbour count.
+  const size = rows * cols;
+  let src = new Float32Array(size);
+  let dst = new Float32Array(size);
+  for (let y = 0; y < rows; y++) {
+    const row = grid[y];
+    for (let x = 0; x < cols; x++) src[y * cols + x] = row[x] ? 1 : 0;
+  }
   const passes = Math.max(0, Math.round(softness));
   for (let p = 0; p < passes; p++) {
-    const prev = field;
-    field = prev.map((row, y) => row.map((_, x) => {
-      let sum = 0;
-      let n = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
+    for (let y = 0; y < rows; y++) {
+      const yBase = y * cols;
+      for (let x = 0; x < cols; x++) {
+        let sum = 0;
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
           const yy = y + dy;
-          const xx = x + dx;
-          if (yy < 0 || yy >= rows || xx < 0 || xx >= cols) continue;
-          sum += prev[yy][xx];
-          n++;
+          if (yy < 0 || yy >= rows) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx;
+            if (xx < 0 || xx >= cols) continue;
+            sum += src[yy * cols + xx];
+            n++;
+          }
         }
+        dst[yBase + x] = n ? sum / n : 0;
       }
-      return n ? sum / n : 0;
-    }));
+    }
+    const tmp = src;
+    src = dst;
+    dst = tmp;
   }
+  const field = src; // row-major Float32Array after `passes` ping-pongs
 
   // A grid that blurred to near-nothing would reject every candidate and
   // degenerate to uniform; normalize so the brightest region reads 1.
   let max = 0;
-  for (const row of field) for (const v of row) if (v > max) max = v;
+  for (let i = 0; i < size; i++) if (field[i] > max) max = field[i];
   const norm = max > 1e-6 ? 1 / max : 0;
 
   return {
@@ -74,8 +91,8 @@ export function makeCaField(grid, { softness = 1 } = {}) {
       const y1 = Math.min(rows - 1, y0 + 1);
       const tx = fx - x0;
       const ty = fy - y0;
-      const a = field[y0][x0] * (1 - tx) + field[y0][x1] * tx;
-      const b = field[y1][x0] * (1 - tx) + field[y1][x1] * tx;
+      const a = field[y0 * cols + x0] * (1 - tx) + field[y0 * cols + x1] * tx;
+      const b = field[y1 * cols + x0] * (1 - tx) + field[y1 * cols + x1] * tx;
       return Math.min(1, Math.max(0, (a * (1 - ty) + b * ty) * norm));
     },
   };
