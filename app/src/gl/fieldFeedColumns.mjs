@@ -19,8 +19,9 @@
  * storing normalized coords in f32 rounds them, which changes the neighbor
  * accumulation's low bits and would need a versioned behavior flag. The law
  * says flags are for paths that CANNOT be made bit-identical — this one
- * can, so it is. (Slice 4/5, placement writes columns directly, will face
- * the same f32 question through the flag process.)
+ * can, so it is. (Resolved in #1309: placement stays f64 for the same
+ * reason — see the PRECISION RULE in kernel/soa/pointSet.js. Bit-identity
+ * wins over uniformity; never a silent precision change.)
  *
  * Why the items are mutated in place instead of spread-copied: in the
  * liveResolve flow every frame's items are fresh objects — buildPlacements'

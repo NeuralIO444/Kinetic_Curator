@@ -4,6 +4,14 @@
 // Pure; no React. Jitter/bleed/displacement applied in placement orchestrator optional —
 // legacy modes still apply their own jitter for visual parity.
 //
+// #1309 — the ctx gains an OPTIONAL column-writing mode: when ctx.out is
+// set ({ x, y, t, rot01 } Float64Array lanes + ctx.row), the sampler writes
+// its lanes directly at ctx.row and returns undefined — no per-point
+// {x, y} object. t/rot01 lanes arrive NaN-filled; a sampler that produces
+// them overwrites the sentinel, others leave it. Samplers that don't
+// implement the mode keep the legacy {x, y, t?} return and the orchestrator
+// adapts them (unpacks into the lanes). See sample/columns.js.
+//
 // Every sampler declares, at registration: id, family ('sampler'), reads,
 // writes, costTier — the dish contract's module shape. Two call shapes:
 //   registerSampler(id, fn) — legacy; the declaration is filled with
@@ -18,8 +26,9 @@ import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
 import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { createNoise } from '../../noise.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
+import { writeSampleColumns } from './columns.js'; // #1309 — column-writing protocol
 
-/** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown }} SampleCtx */
+/** @typedef {{ i: number, count: number, w: number, h: number, rng: () => number, jitter: number, seed: number, caGrid?: unknown, out?: { x: Float64Array, y: Float64Array, t: Float64Array, rot01: Float64Array } | null, row?: number }} SampleCtx */
 
 const _reg = createRegistry('sampler', {
   payloadKey: 'fn',
@@ -58,7 +67,10 @@ export function listSamplers() {
 
 function random(ctx) {
   const { w, h, rng } = ctx;
-  return { x: rng() * w, y: rng() * h };
+  const x = rng() * w;
+  const y = rng() * h;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 function grid(ctx) {
@@ -67,7 +79,10 @@ function grid(ctx) {
   const rows = Math.ceil(count / cols);
   const cx = ((i % cols) + 0.5) / cols * w;
   const cy = (Math.floor(i / cols) + 0.5) / rows * h;
-  return { x: cx + (rng() - 0.5) * jitter, y: cy + (rng() - 0.5) * jitter };
+  const x = cx + (rng() - 0.5) * jitter;
+  const y = cy + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 function fibonacci(ctx) {
@@ -77,7 +92,10 @@ function fibonacci(ctx) {
   const radius = Math.sqrt(i / count) * Math.min(w, h) * 0.48;
   const cx = w / 2 + Math.cos(angle) * radius;
   const cy = h / 2 + Math.sin(angle) * radius;
-  return { x: cx + (rng() - 0.5) * jitter, y: cy + (rng() - 0.5) * jitter };
+  const x = cx + (rng() - 0.5) * jitter;
+  const y = cy + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 /**
@@ -108,7 +126,10 @@ function phyllotaxis(ctx) {
   const radius = Math.sqrt(i / count) * Math.min(w, h) * 0.48;
   const cx = w / 2 + Math.cos(angle) * radius;
   const cy = h / 2 + Math.sin(angle) * radius;
-  return { x: cx + (rng() - 0.5) * jitter, y: cy + (rng() - 0.5) * jitter };
+  const x = cx + (rng() - 0.5) * jitter;
+  const y = cy + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 /**
@@ -156,10 +177,10 @@ function truchet(ctx) {
   const ay = second ? 1 : 0;
   const ux = ax + (ax === 0 ? 0.5 * Math.cos(ang) : -0.5 * Math.cos(ang));
   const uy = ay + (ay === 0 ? 0.5 * Math.sin(ang) : -0.5 * Math.sin(ang));
-  return {
-    x: (col + ux) * cw + (rng() - 0.5) * jitter,
-    y: (row + uy) * ch + (rng() - 0.5) * jitter,
-  };
+  const x = (col + ux) * cw + (rng() - 0.5) * jitter;
+  const y = (row + uy) * ch + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 function radial(ctx) {
@@ -169,10 +190,10 @@ function radial(ctx) {
   const seg = i % rings;
   const angle = (seg / rings) * Math.PI * 2 + ring * 0.3;
   const radius = ((ring + 1) / rings) * Math.min(w, h) * 0.44;
-  return {
-    x: w / 2 + Math.cos(angle) * radius + (rng() - 0.5) * jitter,
-    y: h / 2 + Math.sin(angle) * radius + (rng() - 0.5) * jitter,
-  };
+  const x = w / 2 + Math.cos(angle) * radius + (rng() - 0.5) * jitter;
+  const y = h / 2 + Math.sin(angle) * radius + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 function swarm(ctx) {
@@ -180,18 +201,21 @@ function swarm(ctx) {
   const cx = w * (0.3 + rng() * 0.4);
   const cy = h * (0.3 + rng() * 0.4);
   const spread = Math.min(w, h) * 0.35;
-  return {
-    x: cx + (rng() - 0.5) * spread + (rng() - 0.5) * jitter,
-    y: cy + (rng() - 0.5) * spread + (rng() - 0.5) * jitter,
-  };
+  const x = cx + (rng() - 0.5) * spread + (rng() - 0.5) * jitter;
+  const y = cy + (rng() - 0.5) * spread + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 function flow(ctx) {
   const { i, count, w, h, rng, jitter } = ctx;
   const t = count > 1 ? i / (count - 1) : 0.5;
-  const x = t * w;
+  const bx = t * w;
   const wave = Math.sin(t * Math.PI * 3 + rng() * 2) * h * 0.3;
-  return { x: x + (rng() - 0.5) * jitter, y: h / 2 + wave + (rng() - 0.5) * jitter, t };
+  const x = bx + (rng() - 0.5) * jitter;
+  const y = h / 2 + wave + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y, t)) return; // #1309 — column mode
+  return { x, y, t };
 }
 
 function layers(ctx) {
@@ -199,7 +223,10 @@ function layers(ctx) {
   const n = 5;
   const layer = i % n;
   const y = ((layer + 0.5) / n) * h;
-  return { x: rng() * w, y: y + (rng() - 0.5) * jitter };
+  const x = rng() * w;
+  const yy = y + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, yy)) return; // #1309 — column mode
+  return { x, y: yy };
 }
 
 function rails(ctx) {
@@ -208,7 +235,10 @@ function rails(ctx) {
   const rail = i % n;
   const x = ((rail + 0.5) / n) * w;
   const t = count > 1 ? i / (count - 1) : 0.5;
-  return { x: x + (rng() - 0.5) * jitter, y: t * h + (rng() - 0.5) * jitter, t };
+  const xx = x + (rng() - 0.5) * jitter;
+  const y = t * h + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, xx, y, t)) return; // #1309 — column mode
+  return { x: xx, y, t };
 }
 
 // Field cache keyed by grid identity: stepGrid() returns a new array each
@@ -243,10 +273,10 @@ function ca(ctx) {
   if (!caGrid) return random(ctx);
   const field = caFieldFor(caGrid);
   const p = sampleFieldPoint(field, seed, i, { channel: 'ca', seedOffsets });
-  return {
-    x: p.x * w + (rng() - 0.5) * jitter,
-    y: p.y * h + (rng() - 0.5) * jitter,
-  };
+  const x = p.x * w + (rng() - 0.5) * jitter;
+  const y = p.y * h + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 /**
@@ -313,7 +343,10 @@ function voronoi(ctx) {
     const y = r();
     const gap = voronoiGap(pts, x, y);
     if (gap >= VORONOI_VEIN) {
-      return { x: x * w + (rng() - 0.5) * jitter, y: y * h + (rng() - 0.5) * jitter };
+      const px = x * w + (rng() - 0.5) * jitter;
+      const py = y * h + (rng() - 0.5) * jitter;
+      if (writeSampleColumns(ctx, px, py)) return; // #1309 — column mode
+      return { x: px, y: py };
     }
     if (gap > bestGap) { bestGap = gap; bestX = x; bestY = y; }
   }
@@ -321,7 +354,10 @@ function voronoi(ctx) {
   // keep the least-bad candidate (furthest from a seam) rather than looping or
   // returning nothing. The sampler ABI has to return a point, so "fewer
   // points" is not available here — this is the honest equivalent.
-  return { x: bestX * w + (rng() - 0.5) * jitter, y: bestY * h + (rng() - 0.5) * jitter };
+  const fx = bestX * w + (rng() - 0.5) * jitter;
+  const fy = bestY * h + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, fx, fy)) return; // #1309 — column mode
+  return { x: fx, y: fy };
 }
 
 /**
@@ -445,11 +481,11 @@ function lsystem(ctx) {
   if (!plant.n) return random(ctx);
   const k = i % plant.n;
   const fit = Math.min(w, h) * 0.92;
-  return {
-    x: w / 2 + (plant.ux[k] - 0.5) * fit + (rng() - 0.5) * jitter,
-    y: h / 2 + (plant.uy[k] - 0.5) * fit + (rng() - 0.5) * jitter,
-    t: plant.ut[k],
-  };
+  const t = plant.ut[k];
+  const x = w / 2 + (plant.ux[k] - 0.5) * fit + (rng() - 0.5) * jitter;
+  const y = h / 2 + (plant.uy[k] - 0.5) * fit + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y, t)) return; // #1309 — column mode
+  return { x, y, t };
 }
 
 // #720 — DLA / Eden growth. Two organisms, one engine (growth.js): the
@@ -475,10 +511,10 @@ function orbit(ctx) {
   const p = planets[i % 3];
   const angle = (i / count) * Math.PI * 2 * p.speed + (seed & 0xff) * 0.01;
   const radJitter = rng() * p.r * 0.3;
-  return {
-    x: p.cx + Math.cos(angle) * (p.r + radJitter),
-    y: p.cy + Math.sin(angle) * (p.r + radJitter),
-  };
+  const x = p.cx + Math.cos(angle) * (p.r + radJitter);
+  const y = p.cy + Math.sin(angle) * (p.r + radJitter);
+  if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
+  return { x, y };
 }
 
 function abacus(ctx) {
@@ -490,7 +526,10 @@ function abacus(ctx) {
   const y = ((row + 0.5) / rows) * h;
   const x = ((beadIndex + 0.5) / beadsPerRow) * w;
   const ghostOffset = ((seed >> (row * 2)) & 3) * 6 - 9;
-  return { x: x + ghostOffset, y: y + (rng() - 0.5) * 4 };
+  const px = x + ghostOffset;
+  const py = y + (rng() - 0.5) * 4;
+  if (writeSampleColumns(ctx, px, py)) return; // #1309 — column mode
+  return { x: px, y: py };
 }
 
 /**
@@ -505,16 +544,19 @@ function stratified(ctx) {
   const row = Math.floor(i / cols);
   if (row >= rows) {
     // overflow indices: fall back to random in bounds
-    return { x: rng() * w, y: rng() * h };
+    const fx = rng() * w;
+    const fy = rng() * h;
+    if (writeSampleColumns(ctx, fx, fy)) return; // #1309 — column mode
+    return { x: fx, y: fy };
   }
   const cellW = w / cols;
   const cellH = h / rows;
   const x = (col + rng()) * cellW;
   const y = (row + rng()) * cellH;
-  return {
-    x: Math.min(w - 1e-6, Math.max(0, x)),
-    y: Math.min(h - 1e-6, Math.max(0, y)),
-  };
+  const cx = Math.min(w - 1e-6, Math.max(0, x));
+  const cy = Math.min(h - 1e-6, Math.max(0, y));
+  if (writeSampleColumns(ctx, cx, cy)) return; // #1309 — column mode
+  return { x: cx, y: cy };
 }
 
 // Cost tiers follow the kernel cost-tier contract
@@ -765,7 +807,9 @@ function brush(ctx) {
   const step = i % per;
   const pts = cache[trail];
   const p = pts[Math.min(step, pts.length - 1)];
-  return { x: p.x, y: p.y, t: per > 1 ? step / (per - 1) : 0.5, rot01: p.rot01 };
+  const t = per > 1 ? step / (per - 1) : 0.5;
+  if (writeSampleColumns(ctx, p.x, p.y, t, p.rot01)) return; // #1309 — column mode
+  return { x: p.x, y: p.y, t, rot01: p.rot01 };
 }
 
 registerSampler({

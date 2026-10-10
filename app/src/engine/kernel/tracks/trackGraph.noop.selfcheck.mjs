@@ -133,7 +133,7 @@ const feedPatch = (over = {}) =>
 // --- #1306 (SoA 2/5): no-op path is a column-count check ----------------------
 // The no-op path accepts point sets: emptiness is read from `count` (the
 // column-count check), the input set is returned untouched (same reference,
-// zero per-point allocation, zero per-point walk — no toObjects() to
+// zero per-point allocation, zero per-point walk — no object-adapter hop to
 // discover there's nothing to do), and no column is mutated.
 {
   const snap = (s) => {

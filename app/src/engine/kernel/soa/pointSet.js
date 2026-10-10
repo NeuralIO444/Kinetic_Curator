@@ -20,6 +20,26 @@
 //   family       : Uint8Array   — dish §1b family code (see below)
 //   source       : Uint16Array  — dish §1b source code
 //
+// PRECISION RULE (#1309 — reconciles the slices into one documented rule).
+// Slices chose different widths on purpose, and bit-identity wins over
+// uniformity:
+//   f64 — compute lanes whose values flow into bit-pinned output. Placement
+//     geometry (engine/placement.js: x/y/scale/rotation/alpha/t — f64
+//     deliberately, the golden fingerprints 4 decimals on values ~1000,
+//     right at float32's resolution) and the liveResolve FIELD/FEED scratch
+//     columns (gl/fieldFeedColumns.mjs: normalized coords feed the neighbor
+//     accumulation — f32 rounding moved the low bits, so the scratch stays
+//     f64 and the object path's bits are reproduced exactly).
+//   f32 — storage/transfer lanes where the narrowed value is itself pinned
+//     or the consumer re-derives: the PointSet columns above, and the feed
+//     delay (u, v) column pairs (tracks/feedOps.js — the f32 luma encode is
+//     golden-pinned by feedColumns.golden.json).
+// The rule: a lane is f64 when narrowing it would move a golden hash, f32
+// when the golden pins the narrowed value or the lane is storage/transfer
+// only. Narrowing a lane is a behavior change — it needs a golden proving
+// the new bits, or a versioned behavior flag. Never a silent precision
+// change.
+//
 // Family codes: uint8, 0 = unassigned. Codes 1–254 are the writer's
 // namespace; code 255 (0xFF) is RESERVED in debug builds — pools.js
 // poisons released columns with 0xFF-family so a read-before-write

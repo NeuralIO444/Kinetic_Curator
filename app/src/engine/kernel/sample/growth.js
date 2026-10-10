@@ -41,6 +41,7 @@
 import { hashU32 } from '../rng.js';
 import { mkRng } from '../../prng.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
+import { writeSampleColumns } from './columns.js'; // #1309 — column-writing protocol
 
 /** Lattice the aggregate lives on. 128^2 = 16k cells of address space. */
 const GROWTH_GRID = 128;
@@ -336,14 +337,17 @@ export function sampleGrowthPoint(ctx, mode) {
     seedOffsets,
   });
   const n = liveCount(agg);
-  if (!n) return { x: w / 2, y: h / 2, t: 0 };
+  if (!n) {
+    if (writeSampleColumns(ctx, w / 2, h / 2, 0)) return; // #1309 — column mode
+    return { x: w / 2, y: h / 2, t: 0 };
+  }
   const cell = liveCell(agg, i % n);
   const fit = Math.min(w, h) * 0.92;
-  return {
-    x: w / 2 + (cell.ux - 0.5) * fit + (rng() - 0.5) * jitter,
-    y: h / 2 + (cell.uy - 0.5) * fit + (rng() - 0.5) * jitter,
-    t: GrowthHooks.age01(cell.birth, agg.tick),
-  };
+  const t = GrowthHooks.age01(cell.birth, agg.tick);
+  const x = w / 2 + (cell.ux - 0.5) * fit + (rng() - 0.5) * jitter;
+  const y = h / 2 + (cell.uy - 0.5) * fit + (rng() - 0.5) * jitter;
+  if (writeSampleColumns(ctx, x, y, t)) return; // #1309 — column mode
+  return { x, y, t };
 }
 
 /**

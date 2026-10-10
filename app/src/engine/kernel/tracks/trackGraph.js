@@ -191,7 +191,7 @@ export function applyField(targetPts, sourcePts, patch) {
   // allocation): the patch is off, its strength is zero, or there are no
   // live sources. #1306 (SoA 2/5): "no live sources" is a column-count
   // check — a point set's `count`, never a per-point object walk — and the
-  // input set comes back untouched (no toObjects() on this path; see the
+  // input set comes back untouched (no object adapters on this path; see the
   // adapters kill list). Nothing here mutates the input or its columns,
   // so readers holding the same set stay safe.
   if (p.mode !== 'field') return targetPts;
