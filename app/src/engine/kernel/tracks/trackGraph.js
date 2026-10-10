@@ -202,6 +202,9 @@ export function applyField(targetPts, sourcePts, patch) {
 
 export function sampleFlow(field, u, v) {
   if (!field || !field.w || !field.h) return { x: 0, y: 0 };
+  // #1308: the field is SoA now — { u, v } Float32Array columns instead of
+  // the old interleaved { flow } array. Same float32 values, same mix ops,
+  // so the bilinear sample is bit-identical to the old shape.
   const x = Math.max(0, Math.min(field.w - 1, u * (field.w - 1)));
   const y = Math.max(0, Math.min(field.h - 1, v * (field.h - 1)));
   const x0 = Math.floor(x);
@@ -210,12 +213,12 @@ export function sampleFlow(field, u, v) {
   const y1 = Math.min(field.h - 1, y0 + 1);
   const tx = x - x0;
   const ty = y - y0;
-  const i = (xx, yy) => (yy * field.w + xx) * 2;
+  const i = (xx, yy) => yy * field.w + xx;
   const mix = (a, b, t) => a + (b - a) * t;
-  const fx0 = mix(field.flow[i(x0, y0)], field.flow[i(x1, y0)], tx);
-  const fy0 = mix(field.flow[i(x0, y0) + 1], field.flow[i(x1, y0) + 1], tx);
-  const fx1 = mix(field.flow[i(x0, y1)], field.flow[i(x1, y1)], tx);
-  const fy1 = mix(field.flow[i(x0, y1) + 1], field.flow[i(x1, y1) + 1], tx);
+  const fx0 = mix(field.u[i(x0, y0)], field.u[i(x1, y0)], tx);
+  const fy0 = mix(field.v[i(x0, y0)], field.v[i(x1, y0)], tx);
+  const fx1 = mix(field.u[i(x0, y1)], field.u[i(x1, y1)], tx);
+  const fy1 = mix(field.v[i(x0, y1)], field.v[i(x1, y1)], tx);
   return { x: mix(fx0, fx1, ty), y: mix(fy0, fy1, ty) };
 }
 

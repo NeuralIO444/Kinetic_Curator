@@ -69,14 +69,17 @@ const feedPatch = (over = {}) =>
 // --- applyFeed: no-op path returns the identical input reference -----------
 {
   const w = 4, h = 4;
-  const flow = new Float32Array(w * h * 2);
+  // #1308: sampleFlow reads SoA columns — the fixture is built as (u, v)
+  // directly, with the same values the old interleaved layout held.
+  const u = new Float32Array(w * h);
+  const v = new Float32Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 2;
-      flow[i] = 0.02 * (x + 1);
-      flow[i + 1] = -0.01 * (y + 1);
+      const i = y * w + x;
+      u[i] = 0.02 * (x + 1);
+      v[i] = -0.01 * (y + 1);
     }
-  const field = { w, h, flow };
+  const field = { w, h, u, v };
   const pts = [{ x: 0.25, y: 0.25 }, { x: 0.75, y: 0.5 }];
 
   const off = applyFeed(pts, field, feedPatch({ mode: 'off' }));
@@ -92,14 +95,17 @@ const feedPatch = (over = {}) =>
 // --- applyFeed: active path is unchanged ------------------------------------
 {
   const w = 4, h = 4;
-  const flow = new Float32Array(w * h * 2);
+  // #1308: sampleFlow reads SoA columns — the fixture is built as (u, v)
+  // directly, with the same values the old interleaved layout held.
+  const u = new Float32Array(w * h);
+  const v = new Float32Array(w * h);
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 2;
-      flow[i] = 0.02 * (x + 1);
-      flow[i + 1] = -0.01 * (y + 1);
+      const i = y * w + x;
+      u[i] = 0.02 * (x + 1);
+      v[i] = -0.01 * (y + 1);
     }
-  const field = { w, h, flow };
+  const field = { w, h, u, v };
   const pts = [{ x: 0.25, y: 0.25 }, { x: 0.75, y: 0.5 }];
   const out = applyFeed(pts, field, feedPatch());
   assert.notStrictEqual(out, pts, 'FEED active: fresh array, not the input');

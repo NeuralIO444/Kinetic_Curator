@@ -47,6 +47,48 @@ export function lumaToFlow(luma, w, h, op = FEED_OP_DEFAULT) {
   return op === 'grad' ? lumaToGrad(luma, w, h) : lumaToCurl(luma, w, h);
 }
 
+// #1308 — column-writing mode of the luma→flow encoder: the SoA successor
+// to lumaToFlow's allocate-an-interleaved-array behavior. Encodes into the
+// caller-owned u/v column pair (Struct-of-Arrays: u and v are separate
+// columns, not interleaved lanes) and never allocates — the delay path's
+// double-buffered front/back pairs are written here, then swapped.
+// Bit-identical to lumaToFlow: same central differences, same float32
+// stores, only deinterleaved. uOut/vOut must have length >= w*h; every
+// lane is written (full overwrite — the acquire-contract-safe pattern).
+export function lumaToGradInto(luma, w, h, uOut, vOut) {
+  const width = w | 0;
+  const height = h | 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const { dx, dy } = diffs(luma, width, height, x, y);
+      const i = y * width + x;
+      uOut[i] = dx;
+      vOut[i] = dy;
+    }
+  }
+  return { u: uOut, v: vOut, w: width, h: height, op: 'grad' };
+}
+
+export function lumaToCurlInto(luma, w, h, uOut, vOut) {
+  const width = w | 0;
+  const height = h | 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const { dx, dy } = diffs(luma, width, height, x, y);
+      const i = y * width + x;
+      uOut[i] = dy;
+      vOut[i] = -dx;
+    }
+  }
+  return { u: uOut, v: vOut, w: width, h: height, op: 'curl' };
+}
+
+export function lumaToFlowInto(luma, w, h, uOut, vOut, op = FEED_OP_DEFAULT) {
+  return op === 'grad'
+    ? lumaToGradInto(luma, w, h, uOut, vOut)
+    : lumaToCurlInto(luma, w, h, uOut, vOut);
+}
+
 export function fieldInvariants(field) {
   const w = field.w | 0;
   const h = field.h | 0;
