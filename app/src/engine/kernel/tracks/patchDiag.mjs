@@ -24,6 +24,23 @@ const samples = new Map(); // layerId -> sample
  * capped (4 content + 4 fx + 4 math + pattern ≈ 13); 32 leaves headroom so
  * eviction only ever fires on hook-bypassing id churn, never on live ids. */
 export const PATCH_DIAG_MAX_SAMPLES = 32;
+/**
+ * #1245 — unknown sampler-mode fallback diagnostics. Kept OUT of the patch
+ * `samples` map: a fallback is not a patch sample, and writing there would
+ * clobber the layer's live patch line. Keyed by layerId like `samples` so
+ * the delete-on-layer-remove policy (#1246) covers both maps. The instrument
+ * reads this to show which layer silently fell back to 'random' — console
+ * alone is not visible on the desk.
+ */
+const samplerFallbacks = new Map(); // layerId -> { mode, at }
+
+export function recordSamplerFallback(layerId, mode) {
+  samplerFallbacks.set(layerId ?? '?', { mode: String(mode), at: Date.now() });
+}
+
+export function getSamplerFallback(layerId) {
+  return samplerFallbacks.get(layerId ?? '?') || null;
+}
 
 /** Still boundary, px/tick on raw item-velocity units (see isSourceStill). */
 export const SOURCE_STILL_SPEED = 0.05;

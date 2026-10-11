@@ -144,6 +144,9 @@ export function buildPlacements({
   growthTick = 0,
   audioEnergy = null,
   kineme = null,
+  // #1245 — layer id for the unknown-sampler fallback diagnostic; rides into
+  // geoParams below and down to getSampler. Optional; null reads as '?'.
+  layerId = null,
   // #1183 slice 1 — the dish. The orchestrator fills it once per placement
   // call (never per frame); `lean` (0..1) mixes mark colors toward
   // dish.ground. Both are ephemeral: no dish/lean → today's path exactly.
@@ -184,6 +187,7 @@ export function buildPlacements({
   const geoParams = {
     mode: layoutParams.mode,
     count: countInt,
+    layerId, // #1245 — unknown-sampler diagnostic key; not in geometrySignature
     seed,
     seedOffsets,
     jitter: layoutParams.jitter,
