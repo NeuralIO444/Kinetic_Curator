@@ -20,3 +20,9 @@ opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
+# Drop the wasm "name" section. It carries rustc's mangled function names, and
+# those embed a crate hash that depends on the BUILD HOST (cargo mixes the host
+# triple into -C metadata), so a Mac build and a Linux build differed by ~35
+# bytes of debug names while the code and data were identical. Nothing reads
+# the names at runtime (exports are by explicit export name).
+strip = "symbols"
