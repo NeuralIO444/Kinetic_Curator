@@ -86,7 +86,10 @@ jobs:
   # ubuntu runners above. Suggested follow-up (same as selfcheck-browser's):
   # mark this check required in branch protection.
   cargo-check:
-    runs-on: [self-hosted, mac-studio]
+    # Second runner on the same Mac (label mac-studio-2) so cargo-check runs
+    # beside e2e-smoke instead of queuing behind it. cargo-check serves no port,
+    # so it is safe to run concurrently with the e2e job on :4173.
+    runs-on: [self-hosted, mac-studio-2]
     defaults:
       run:
         working-directory: src-tauri
