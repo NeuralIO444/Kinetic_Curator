@@ -51,7 +51,7 @@ ok('sanitizePattern clamps, defaults and never throws on junk', () => {
 });
 
 // ── the slice ───────────────────────────────────────────────────────────────
-ok('addPatternLayer: appended as type pattern (PT-n), a KC track stays active, no snapshot, no patch', () => {
+ok('addPatternLayer: added as GROUND below the lowest KC track (PT-n), a KC track stays active, no snapshot, no patch', () => {
   seed();
   S().addPatternLayer('GLYPH');
   const p = pt();
@@ -61,11 +61,17 @@ ok('addPatternLayer: appended as type pattern (PT-n), a KC track stays active, n
   assert.equal(p.patch, undefined);
   assert.equal(S().activeLayerId, 'kc-a', 'a pattern track never takes the active slot');
   assert.equal(S().layerSnapshots[p.id], undefined, 'and has no snapshot');
-  assert.equal(isKcLayer(p), false); assert.equal(isKcLayer(S().layers[0]), true);
+  assert.equal(isKcLayer(p), false);
+  // #1183 — ground, not overlay: the pattern sits directly below the lowest KC track (bottom -> top)
+  assert.equal(S().layers[0].id, p.id, 'the new pattern is at the bottom of the stack');
+  assert.equal(isKcLayer(S().layers[1]), true, 'with the KC track right above it');
   assert.equal(isKcLayer({ id: 'old' }), true, 'an untyped legacy layer is a KC track');
   S().addPatternLayer();
-  assert.equal(S().layers.filter(isPatternLayer)[1].name, 'PT-2');
-  assert.equal(S().layers.filter(isPatternLayer)[1].pattern.mode, 'QUILT', 'default mode');
+  const pats = S().layers.filter(isPatternLayer);
+  assert.deepEqual(pats.map((l) => l.name), ['PT-1', 'PT-2'], 'a second pattern lands ABOVE the first, still below the KC track: it is the one you see');
+  assert.equal(pats[1].pattern.mode, 'QUILT', 'default mode');
+  const kcAt = S().layers.findIndex(isKcLayer);
+  assert.equal(S().layers[kcAt - 1].name, 'PT-2', 'so the newest pattern is the nearest ground');
 });
 
 ok('the content cap counts PATTERN tracks (4 total)', () => {

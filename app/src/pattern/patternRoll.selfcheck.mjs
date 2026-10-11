@@ -38,17 +38,17 @@ ok('rollPatternLayers: nothing changes without PATTERN tracks (chaos aside); exi
   assert.deepEqual(rollPatternLayers(withP, 'nope', mkRng(1)), { layers: withP, changed: false });
 });
 
-ok('patterns on request (Matt, 2026-10-08): KIN never adds the first one, CURATOR never adds one, and a pattern that is ever born is a veil no stronger than 0.3', () => {
-  assert.strictEqual(CHAOS_ADD_CHANCE, 0, `chance ${CHAOS_ADD_CHANCE}`); assert.ok(BORN_OPACITY <= 0.3, `opacity ${BORN_OPACITY}`);
+ok('patterns on request (Matt, 2026-10-08): KIN never adds the first one, CURATOR never adds one; a pattern that is ever born is GROUND at full strength (Matt, 2026-10-11)', () => {
+  assert.strictEqual(CHAOS_ADD_CHANCE, 0, `chance ${CHAOS_ADD_CHANCE}`); assert.strictEqual(BORN_OPACITY, 1, `opacity ${BORN_OPACITY}`);
   for (let i = 1; i <= 400; i++) assert.strictEqual(rollPatternLayers([{ id: 'kc1', type: 'content' }], 'chaos', mkRng(i * 7919)).layers.length, 1, `chaos roll ${i} added nothing`);
   for (let i = 1; i <= 200; i++) assert.deepEqual(rollPatternLayers([{ id: 'kc1', type: 'content' }], 'curate', mkRng(i * 31)).layers.length, 1, 'curate adds nothing');
 });
 
-ok('the add path still works when asked for explicitly (addChance 0.3): ONE, only when none exists, never past the cap, as a translucent veil', () => {
+ok('the add path still works when asked for explicitly (addChance 0.3): ONE, only when none exists, never past the cap, as ground below the KC track', () => {
   let added = 0; const N = 400;
   for (let i = 1; i <= N; i++) {
     const r = rollPatternLayers([{ id: 'kc1', type: 'content' }], 'chaos', mkRng(i * 7919), { makeId: () => `pt-${i}`, addChance: 0.3 });
-    if (r.changed) { added += 1; assert.equal(r.layers.length, 2); const p = r.layers[1]; assert.equal(p.type, 'pattern'); assert.equal(p.layerOpacity, BORN_OPACITY); assert.equal(p.id, `pt-${i}`); assert.deepEqual(p.pattern, sanitizePattern(p.pattern)); }
+    if (r.changed) { added += 1; assert.equal(r.layers.length, 2); const p = r.layers[0]; assert.equal(p.type, 'pattern'); assert.equal(r.layers[1].id, 'kc1', 'the KC track sits above its ground'); assert.equal(p.layerOpacity, BORN_OPACITY); assert.equal(p.id, `pt-${i}`); assert.deepEqual(p.pattern, sanitizePattern(p.pattern)); }
   }
   assert.ok(Math.abs(added / N - 0.3) < 0.07, `${added}/${N} added`);
   const has = [{ id: 'kc1', type: 'content' }, PT('p1')];
