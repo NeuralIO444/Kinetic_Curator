@@ -6,7 +6,8 @@
 // Signals, per presented frame while the instrument is running:
 //   activity  real artist actions (loisActivity.beat() calls) inside the last ACTIVITY_WINDOW_FRAMES frames
 //   taste     the artist's own rolls since the last keep (loisActivity passRun; EVOLVE fires do not count)
-//   dish      0 for now: dish pressure is measured around pinned heads, and pins arrive in Phase 3. Said, not faked.
+//   dish      how crowded the dish is around the canvas pins (curator/dishPressure.js). 0 with no pins, and 0 when
+//             no reader is given: said, not faked.
 // Everything is a COUNT over frames or actions. No clock (KC-1 DS: no timers with opinions).
 import { createStressTracker, tastePressure, activityPressure } from './stress.js';
 
@@ -31,10 +32,11 @@ export function getStressState() {
 
 /**
  * Start tracking. `getCounts()` returns { activityCount, passRun } (loisActivity.pressureCounts); `isRunning()` says
- * whether the instrument is presenting frames; `raf`/`caf` default to the window's. Returns a stop function.
+ * whether the instrument is presenting frames; `getDish()` returns dish pressure 0..1 (optional); `raf`/`caf`
+ * default to the window's. Returns a stop function.
  * Injected so the module stays framework-free and testable.
  */
-export function initStress({ getCounts, isRunning, raf, caf } = {}) {
+export function initStress({ getCounts, isRunning, getDish, raf, caf } = {}) {
   const req = raf || (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : null);
   const cancel = caf || (typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : null);
   const tracker = createStressTracker();
@@ -59,7 +61,10 @@ export function initStress({ getCounts, isRunning, raf, caf } = {}) {
     head = (head + 1) % ACTIVITY_WINDOW_FRAMES;
     const activity = activityPressure(windowSum);
     const taste = tastePressure(counts && counts.passRun);
-    const dish = 0;
+    let dish = 0;
+    if (getDish) {
+      try { const d = getDish(); if (d > 0) dish = Math.min(1, d); } catch { dish = 0; } // unreadable = no pressure
+    }
     const r = tracker.update({ activity, dish, taste });
     frames += 1;
     live = { stress: r.stress, smoothed: r.smoothed, band: r.band, activity, dish, taste, frames };

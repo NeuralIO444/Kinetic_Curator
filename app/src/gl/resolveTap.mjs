@@ -48,6 +48,19 @@ export function tapResolveOutput(output) {
   }
 }
 
+let frameListener = null;
+
+/**
+ * Register the one FRAME listener (or null): fn(input, output) after every resolver call, for a reader that needs
+ * both together (dish pressure counts the marks the resolver placed around the input's pins). Separate from the
+ * two taps above, which belong to the performance recorder. Same rule: a throwing listener is dropped.
+ */
+export function setResolveFrameTap(fn) {
+  const prev = frameListener;
+  frameListener = typeof fn === 'function' ? fn : null;
+  return prev;
+}
+
 let resetRequested = false;
 
 /**
@@ -78,6 +91,14 @@ export function withResolveTap(createResolver) {
       tapResolveInput(input);
       const output = inner.resolveLayers(input);
       tapResolveOutput(output);
+      if (frameListener !== null) {
+        try {
+          frameListener(input, output);
+        } catch (e) {
+          frameListener = null;
+          console.warn('[resolveTap] frame listener threw and was removed:', e && e.message ? e.message : e);
+        }
+      }
       return output;
     },
     dispose() {

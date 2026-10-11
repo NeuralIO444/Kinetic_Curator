@@ -27,7 +27,7 @@ function rig() {
   r.frame();
   const s = getStressState();
   assert.equal(s.band, BAND_RELAX, 'no actions, no rolls: relaxed');
-  assert.equal(s.dish, 0, 'dish pressure is 0 until pins exist (Phase 3): said, not faked');
+  assert.equal(s.dish, 0, 'no dish reader given: 0, said, not faked');
   assert.equal(s.frames, 1);
   r.stop();
   assert.deepEqual(getStressState(), NEUTRAL_STRESS);
