@@ -1,5 +1,7 @@
 # Roadmap to v1
 
+> **Phase ordering moved (2026-10-11):** the current phases roadmap is [`ROADMAP_PETRI_DISH.md`](ROADMAP_PETRI_DISH.md) (the dish spine, stress and bands, wet lab and hierarchy, influences). Matt ordered it. This file is kept as the history of Stages 0 to 4.
+
 *Plan, not tickets. September 23 2026 — KC-1 v0.9.0. Matt orders every stage; nothing here is assigned. Research input: [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) (direction document feeding Stages 1–4). Track work in open issues; this doc is the map, not the ledger.*
 
 **Version answer:** we are at **0.9.0** (`app/package.json`) — pre-1.0, one selfcheck-verified engine (spines A–G merged), panel consolidation ~70% (Phase-1 reversed, DAVIS/STIMULI kept as homage), **embargo lifted 2026-09-23** (Night Migration 30/60 sign-off recorded in `EMBARGO.md`; Stage 1 unfrozen, deferred pile still waits).
