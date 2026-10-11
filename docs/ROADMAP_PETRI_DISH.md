@@ -94,6 +94,38 @@ Issues: #1145, the influences issue (new), #1173 (pass gesture: upgrades taste p
 - **#1144:** done. Matt locked the refine spread at 0.10.
 - **#1365:** in refine, keep and gently vary the palette instead of jumping to the persona's preset.
 
+## Queue: Voices, Variants, DLC (design session of 2026-10-11, nothing built)
+
+Queued by Matt on 2026-10-11 from a separate design session. Specs live in two open docs PRs that Matt merges:
+**#1372** (`docs/DLC_PRESET_TYPES.md`, `docs/VARIANTS_SWISS_JAPAN.md`) and **#1374** (`docs/VOICES.md`). These wait
+behind the phases unless Matt re-orders them.
+
+| # | Item | What it is | Spec |
+|---|---|---|---|
+| Q1 | **Layout variants** | Long-press a mode tile for a SWISS / JAPAN / NONE sheet. A variant is a data-only param overlay: one undo step, a dot indicator, no new buttons. 14 modes x 2 variants specced. | #1372 |
+| Q2 | **Selection discipline** | Deal without replacement, a variety cap, and neighbour anti-repeat. Fixes "the same assets in a yucky way" (cause: independent weighted draws per placement). New params flagged: `margin`, `rotateSnap`. | #1372 |
+| Q3 | **Slot system** | Library (unlimited, on disk) versus slots (capped, in memory). Loading past the cap replaces, never appends. Enforced in the store. **16 Look slots, 4x4** (locked). | #1372 |
+| Q4 | **DLC as preset types** | `kc-style/1` exists; add `kc-look/1`, `kc-voice/1`, `kc-variant/1`, and a `kc-pack/1` container. The loader lives in Pipeline IMPORT (kind-sniff, install to Library, quarantine). | #1372 |
+| Q5 | **Trio affect** | The pill breathes red, the face drifts amber, the Queen's mark quickens, each mapped to live conviction; still when silent; static under reduced motion. Voice marks trail live suggestions in submenus. | #1374 |
+| Q6 | **Voice slots** | 4 (the Trio plus one guest). Recommended, not yet locked. | #1374 |
+
+**Locked in that session (Matt):** 16 Look slots; Looks are new preset groups (no new buttons); voices are his casting
+call; the variant mechanic (long-press, dot, one undo); Styles scope stays strict (FX chain, blend, opacity);
+install via Pipeline, play in Build/Director, enforce in the store; the Queen's KEEP/PASS verdicts and ledger
+doctrine, never named, no tooltip.
+
+**Open questions for Matt (from that session):** lock voice slots at 4; file the Queen's M1 to M5 sway lines; are
+voice lines user-editable or canonical; when to start the code (its first phase is types and validation, no UI).
+
+**To reconcile before these are built:**
+- `VOICES.md` lists Davis's verdict as `UGLY`. On screen it now reads **SIFT** and he almost never says the word
+  (#1373). The internal code is still `UGLY`.
+- The Queen has an unnamed mark in the app today (`components/SwayMark.jsx`), and `VOICES.md` gives her KEEP/PASS
+  verdicts. `docs/characters/queen.md` says she has "no face, no pill, no meter, no state". The character file is
+  the one that is out of step and needs correcting: unnamed and never explained, yes; invisible, no.
+- Phase 4 (#1356, influences) and the taste flywheel (#1173) overlap Q5 and the Queen's keep/pass doctrine. Build
+  them as one design, not two.
+
 ## Out of scope this cycle
 
 - Live AI or model inference inside the app.

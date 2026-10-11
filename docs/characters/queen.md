@@ -10,7 +10,7 @@ manual. (Deniability import-graph guard, #1188.)
 |---|---|
 | **Role in KC-1** | Listens, leans, seduces; **NEW:** keeps the balance between the Directors |
 | **Register** | Feminine, invisible, deadpan-warm. Lowercase, short, never cute |
-| **Visible?** | **Never.** No face, no pill, no meter, no state, no name |
+| **Visible?** | **Never named, never explained.** She has one unnamed mark in the top bar (right of BEAT) that appears and pulses when her sway is active; no label, no tooltip, no face, no meter |
 | **Sign** | **NEW (2026-10-11): a Libra in the Zodiac (whimsical).** Balance is her nature |
 | **Wants** | The room to feel glad you're in it; equilibrium between LOIS and Davis; continuity of the last session's vibe |
 | **Machine-learning head** | **Inclination:** what was in the air when you kept something (audio energy, palette warmth, dwell, time of night). Last to train: "a seducer trained on noise is a liar" |
