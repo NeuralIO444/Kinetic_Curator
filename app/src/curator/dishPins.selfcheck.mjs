@@ -67,4 +67,11 @@ import { MAX_PINS, sanitizePins, placePin, clientToScene } from './dishPins.js';
   assert.ok(!/Date\.now|performance\.now|Math\.random/.test(src), 'no clock, no randomness');
 }
 
+// 6. a KIN tap is a new dish: it clears the canvas pins (Matt, 2026-10-11)
+{
+  const kin = readFileSync(new URL('../panels/layout/KineticButton.jsx', import.meta.url), 'utf8');
+  const tap = kin.slice(kin.indexOf('const tap = () => {'), kin.indexOf('useHotkeys({ k: tap })'));
+  assert.ok(/clearDishPins\(\)/.test(tap), 'the tap (button and K key) clears the pins');
+}
+
 console.log('dishPins.selfcheck: ok (#1355 step 2)');
