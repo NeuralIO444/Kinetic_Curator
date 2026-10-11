@@ -14,6 +14,7 @@ const required = [
   'brush', // flow-field trail stamping
   'poisson', // #1193 — Poisson-disc blue noise
   'gaussian', // #1194 — Gaussian cluster mixture
+  'circlepack', // #1195 — circle packing
 ];
 
 for (const id of required) {

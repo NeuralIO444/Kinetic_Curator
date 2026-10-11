@@ -25,6 +25,7 @@ import { CH, hashU01, hashU32, rngForIndex } from '../rng.js';
 import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
 import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { gaussian } from './gaussian.js'; // #1194 — Gaussian cluster mixture
+import { circlepack } from './circlepack.js'; // #1195 — circle packing
 import { createNoise } from '../../noise.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
 import { writeSampleColumns } from './columns.js'; // #1309 — column-writing protocol
@@ -871,6 +872,14 @@ registerSampler({
   costTier: 0,
   fn: gaussian,
 });
+registerSampler({
+  // #1195 — tier 2: the packing is built once per (seed, plate, count, scale range) and cached; a lookup per index.
+  id: 'circlepack',
+  reads: ['i', 'count', 'w', 'h', 'seed', 'seedOffsets', 'zTiers', 'packScale'],
+  writes: ['points'],
+  costTier: 2,
+  fn: circlepack,
+});
 
 export {
   random,
@@ -894,4 +903,5 @@ export {
   brush,
   poisson, // #1193
   gaussian, // #1194
+  circlepack, // #1195
 };
