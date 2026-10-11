@@ -153,6 +153,8 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #1193 — the Poisson-disc scatter places points, so it rides the spatial
   // stream too: re-rolling SPATIAL re-rolls the scatter, colour must not.
   poisson: 'spatial',
+  // #1206 — a creature's parts scattered on a surface (hierarchy.js) are placement: the spatial stream.
+  hierarchy: 'spatial',
   // #1194 — the Gaussian mixture places points, so it rides the spatial stream too.
   gaussian: 'spatial',
   // #1195 — circle packing places points on the spatial stream.
