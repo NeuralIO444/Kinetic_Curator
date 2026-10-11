@@ -96,6 +96,7 @@ Issues: #1145, the influences issue (new), #1173 (pass gesture: upgrades taste p
 ## Out of scope this cycle
 
 - Live AI or model inference inside the app.
+- Playing a performance file back inside the running instrument. Files are for testing and sharing this cycle.
 - The full 20-room copy matrix, new faces, and any Queen rendering.
 - **New** taste.json import work (the shipped taste artifact and the open sway gate stay as they are).
 - Stage-specific items (Syphon #608, the full MIDI-learn surface #617) unless they fall out naturally.

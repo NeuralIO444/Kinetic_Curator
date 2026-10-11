@@ -44,7 +44,7 @@ patches between layers, the kineme and pattern systems, FX layers, and a second 
 | 1 | **Determinism harness.** Turn the probe into a selfcheck and extend it to multi-layer, FIELD/FEED/MOD, kineme, pattern and FX. Any mode that diverges is fixed here. | No | None |
 | 2 | **Input tap.** One hook where `liveLoop` hands `input` to the resolver, feeding a recorder. Record changes only, with frame time quantized. | **Yes: one line in `liveLoop.mjs`** | None |
 | 3 | **Performance file v2 and a real replayer.** The file holds the starting document plus the per-frame input changes and hash checkpoints. The replayer runs the same resolver headless. Selfcheck: record, export, import, replay, hashes match. | No | None |
-| 4 | **Rename the footer export** from `log` to performance, once step 3 proves the claim. Add import. | No | Footer button label; Matt's eye |
+| 4 | **Rename the footer export** from `log` to performance, once step 3 proves the claim. No in-app import or playback this cycle (decision 3). | No | Footer button label; Matt's eye |
 | 5 | **The dish becomes the source of truth.** The resolver owns one dish per document and every layer fills it as a stratum (#1183). The dish roster (#1203) can then replace the LAYERS mixer. | **Yes: `liveResolve.mjs`** | Later, with #1203 |
 | 6 | **Retire the stand-in.** The old replayer's own cohort and goldens become kernel unit goldens (they still pin kernel pieces) and stop being described as performances. | No | None |
 
@@ -66,8 +66,9 @@ Steps 1 to 3 deliver the Phase 1 exit. Steps 4 to 6 finish the phase.
      stronger machine.
    - This is a deliberate exception to "the log wins" (roadmap decision 1): the log is the authority for what the
      artist did, and the machine is the authority for how much it can draw.
-3. **Live playback** (watching a file inside the running instrument): to be decided. Phase 1's exit is met by
-   headless replay. Recommendation: its own step after the footer rename, not inside the exit.
+3. **No live playback this cycle.** Performance files are for testing and sharing. Watching a file play inside the
+   running instrument needs a playback mode in `liveLoop`; it is out of scope until Matt re-orders it. So the footer
+   gets an honest **export**, and there is no in-app import yet: a file is verified headless, by the check.
 
 ## Risks
 
