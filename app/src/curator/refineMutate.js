@@ -3,7 +3,7 @@
 // In EXPLORE the curator rolls every unlocked numeric key from its whole dice range (wild jumps). In REFINE the
 // artist has just kept something and is settling it, so the pool is small variations of the live values instead.
 // "How far" is one number, the SPREAD: a fraction of each key's dice range, applied as triangular noise (most
-// variations are small, a few reach the edge). The spread is the tuning dial (Matt, 2026-10-11, "C").
+// variations are small, a few reach the edge). Matt tuned it live and locked 0.10 (2026-10-11); the tuning panel is gone.
 //
 // Honest by construction (KC-1 DS: no timers with opinions): phase comes from phase.js, never a clock; only keys the
 // dice already rolls are touched (modifiers and composition are never mutated, so a landing cannot leave refine by
@@ -11,6 +11,7 @@
 // definition (selfcheck: refineMutate.selfcheck.mjs).
 import { randomizeKey } from '../state/paramUtils.js';
 
+/** Locked by Matt, 2026-10-11 (#1144). */
 export const DEFAULT_SPREAD = 0.1;
 export const MIN_SPREAD = 0.01;
 export const MAX_SPREAD = 0.2;
