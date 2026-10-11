@@ -1,7 +1,7 @@
 # The dish as source of truth: architecture sketch (#1183, dish spine step 5)
 
-**Status: proposal. Not approved, nothing built.** #1183 asks for Matt's approval of this sketch before any slice
-ships, and every slice changes the look, so each one is Matt's to review.
+**Status: approved by Matt, 2026-10-11, with the answers recorded below. Nothing built yet.** Every slice changes
+the look, so each one is still Matt's to review.
 **Roadmap:** [`ROADMAP_PETRI_DISH.md`](../ROADMAP_PETRI_DISH.md) Phase 1, step 5 of [`dish-spine-plan.md`](dish-spine-plan.md).
 
 ## The idea in one paragraph
@@ -34,26 +34,20 @@ So step 5 is mostly a connection, not an invention. The honest label for the cur
 5. **Stills match live.** The still path (`studio/render.mjs`) gets the same call, so an exported still equals the
    live frame for pattern scenes (an acceptance item on #1183).
 
-## Decisions needed from Matt
+## Decisions (Matt, 2026-10-11)
 
-1. **Which pattern is "the ground" when there are several?**
-   - A. The nearest PATTERN layer *below* the marks in the stack (recommended: stack order becomes depth, which is
-     what "strata" means).
-   - B. Always the bottom-most pattern.
-   - C. All patterns below, blended.
-2. **Where does the lean knob live, and is it per layer?**
-   - A. One slider per content layer in BUILD, named for what it does (recommended; a layer can sit lightly or
-     sink in).
-   - B. One global amount for the whole dish.
-3. **A drifting pattern moves the ground under a still mark. Should the mark's colour follow?**
-   - A. Yes, re-read the ground every frame (recommended). The lookup is a pure function, about 0.05 ms at 800
-     marks, no GPU readback. The mark visibly belongs to the ground it is on.
-   - B. No, read it once when the mark is placed. Cheaper, but a drifting pattern slides out from under a colour
-     that no longer matches it.
-   - Note: the existing code fills the dish "once per placement, never per frame". Option A changes that comment
-     for the colour lookup only; positions are still placed once.
-4. **Is "lean toward the tile colour" the right first effect?** #1183's planning pass ranked four: (a) colour lean,
-   (d) palette lock, (b) a soft contact shadow, (c) a nudge from tile edges. This sketch does (a) only.
+1. **The ground is the nearest PATTERN layer below the marks in the stack.** Stack order is depth; that is what
+   "strata" means.
+2. **The lean knob is one slider per content layer, in BUILD.** A layer can sit lightly on the ground or sink in.
+3. **A mark's colour follows a drifting pattern.** The ground is re-read every frame (a pure function, about
+   0.05 ms at 800 marks, no GPU readback). The "filled once per placement, never per frame" rule in
+   `buildPlacements` relaxes for the colour lookup only; positions are still placed once.
+4. **Order of effects:**
+   1. **Colour lean, as the foundation.** It is already built and nearly free, and it proves the plumbing every
+      later effect needs (the resolver owning a dish, the pattern supplying the ground).
+   2. **Soft contact shadow and the tile-edge nudge.** The shadow costs about 3 half-resolution passes and needs a
+      governor tier. The nudge moves marks, so it sits behind its own knob.
+   3. **Palette lock.**
 
 ## After slice 1 (not designed here)
 
