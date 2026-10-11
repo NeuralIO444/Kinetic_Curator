@@ -23,8 +23,7 @@ import { isTapeFull } from '../tapeBudget.js';
 import { rollPatternLayers } from '../../pattern/patternRoll.js'; // PATTERN is part of the KIN and CURATOR systems
 import { getDirector } from '../../curator/director.js'; // #1145: the room scales the candidate count
 import { getPhase, PHASE_REFINE } from '../../curator/phase.js'; // #1144: refine mutates around what landed
-import { mutateKey } from '../../curator/refineMutate.js';
-import { getRefineSpread } from '../../curator/refineSpread.js';
+import { mutateKey, DEFAULT_SPREAD } from '../../curator/refineMutate.js';
 import { swayMagnitude, setSwayMagnitude } from '../../curator/swayView.mjs'; // #1258: publish sway for the presence mark (ephemeral, not store state)
 import { loisActivity } from '../../curator/loisActivity.js'; // #1145: the honest feed
 import { mkRng } from '../../engine/prng.js';
@@ -637,11 +636,11 @@ export const createLayoutSlice = (set) => ({
     // seeded stream and (seed, offsets, press #) still replays exactly.
     let chainFellBack = false;
     // #1144 — REFINE: the artist just kept something and is settling it, so the pool is local mutations of the
-    // live values (spread = the tuning dial), not fresh dice. Only keys the dice already rolls move; composition
+    // live values (spread 0.10, locked by Matt 2026-10-11), not fresh dice. Only keys the dice already rolls move; composition
     // and the modifiers are never touched, so a landing cannot leave refine by changing the room. Explore and no
     // phase (null) keep yesterday's whole-range roll exactly.
     const refining = getPhase() === PHASE_REFINE;
-    const refineSpread = refining ? getRefineSpread() : 0;
+    const refineSpread = refining ? DEFAULT_SPREAD : 0;
     for (let n = 0; n < candidateCount; n++) {
       const rp = { ...state.layoutParams };
       for (const key of unlocked) {

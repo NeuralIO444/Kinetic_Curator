@@ -7,7 +7,7 @@ import { PARAM_SPEC } from '../data/layout-modes.js';
 import { JUMP_FRACTION, initPhase, resetPhase, getPhase, PHASE_REFINE } from './phase.js';
 import { mkRng } from '../engine/prng.js';
 import { REFINE_RANGES, mutateKey, clampSpread, DEFAULT_SPREAD, MIN_SPREAD, MAX_SPREAD } from './refineMutate.js';
-import { getRefineSpread, setRefineSpread, resetRefineSpread } from './refineSpread.js';
+import { readFileSync, existsSync } from 'node:fs';
 
 const inRange = (v, lo, hi) => v >= lo - 1e-9 && v <= hi + 1e-9;
 const rngOf = (seed) => mkRng(seed);
@@ -60,10 +60,7 @@ for (const key of RANDOMIZABLE_KEYS) {
   assert.equal(clampSpread(0), MIN_SPREAD);
   assert.equal(clampSpread(9), MAX_SPREAD);
   assert.equal(clampSpread('x'), DEFAULT_SPREAD);
-  assert.equal(setRefineSpread(0.17), 0.17);
-  assert.equal(getRefineSpread(), 0.17);
-  resetRefineSpread();
-  assert.equal(getRefineSpread(), DEFAULT_SPREAD);
+  assert.equal(DEFAULT_SPREAD, 0.1, 'the spread Matt locked (2026-10-11)');
 }
 
 // 4. no single mutation can be a phase "jump": the worst move at MAX_SPREAD stays under JUMP_FRACTION of the
@@ -97,7 +94,6 @@ assert.equal(mutateKey('nope', 5, rngOf(3), 0.1), undefined, 'unknown key = the 
   const keep = (n) => ({ keeps: new Array(n).fill(0), favorites: [], seed: 1, activeVoiceId: null, voice: null, layoutParams: {} });
   cb(keep(1), keep(0)); // a keep lands: REFINE
   assert.equal(getPhase(), PHASE_REFINE);
-  setRefineSpread(0.1);
   const base = { ...useStore.getInitialState().layoutParams };
   let maxFrac = 0;
   for (let press = 0; press < 12; press++) {
@@ -131,7 +127,16 @@ assert.equal(mutateKey('nope', 5, rngOf(3), 0.1), undefined, 'unknown key = the 
     }
   }
   assert.ok(wild > 0, 'explore (no phase) still rolls the whole range');
-  resetRefineSpread();
+}
+
+// 7. the value is locked and the tuning panel is gone: nothing can change the spread at runtime
+{
+  assert.ok(!existsSync(new URL('./RefineDial.jsx', import.meta.url)), 'the tuning panel was removed');
+  assert.ok(!existsSync(new URL('./refineSpread.js', import.meta.url)), 'and so was the runtime dial');
+  const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
+  assert.ok(!/tune=refine|RefineDial|TUNE_REFINE/.test(app), 'no ?tune=refine hook in the app');
+  const slice = readFileSync(new URL('../state/slices/layoutSlice.js', import.meta.url), 'utf8');
+  assert.match(slice, /const refineSpread = refining \? DEFAULT_SPREAD : 0;/, 'curate reads the locked constant');
 }
 
 console.log('refineMutate.selfcheck: ok');
