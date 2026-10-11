@@ -38,7 +38,7 @@ ok('no in-tree legacy registerSampler(id, fn) calls', () => {
 
 // --- the true per-sampler tiers (the written scale lives in
 // engine/kernel/costRegistry.mjs, shared with #1239) ---
-const TIER_0 = ['random', 'grid', 'fibonacci', 'phyllotaxis', 'truchet', 'radial', 'layers', 'rails', 'orbit', 'abacus', 'stratified', 'noise'];
+const TIER_0 = ['random', 'grid', 'fibonacci', 'phyllotaxis', 'truchet', 'radial', 'layers', 'rails', 'orbit', 'abacus', 'stratified', 'noise', 'gaussian'];
 const TIER_1 = ['swarm', 'flow', 'hype', 'murmuration'];
 const TIER_2 = ['ca', 'voronoi', 'lsystem', 'dla', 'eden', 'brush', 'poisson'];
 
@@ -48,7 +48,7 @@ ok('every built-in sampler declares its true tier', () => {
     ...TIER_1.map((id) => [id, 1]),
     ...TIER_2.map((id) => [id, 2]),
   ]);
-  assert.strictEqual(expect.size, 23, 'the registry owns exactly the 23 built-ins');
+  assert.strictEqual(expect.size, 24, 'the registry owns exactly the 24 built-ins');
   for (const id of listSamplers()) {
     const d = getSamplerDecl(id);
     assert.ok(d, `missing declaration for ${id}`);
