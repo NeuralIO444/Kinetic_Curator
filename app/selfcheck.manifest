@@ -62,6 +62,7 @@ node src/engine/kernel/bake/swarm.inventory.selfcheck.mjs
 node src/engine/kernel/bake/bake.contacts.selfcheck.mjs
 node src/engine/kernel/bake/bake.contacts.stills.selfcheck.mjs
 node src/engine/kernel/bake/swarmWasm.selfcheck.mjs
+node src/engine/kernel/tracks/neighborWasm.selfcheck.mjs
 node src/engine/kernel/field/fieldsWasm.selfcheck.mjs
 node src/engine/kernel/evalContext.selfcheck.mjs
 node src/engine/kernel/itemMorph.selfcheck.mjs

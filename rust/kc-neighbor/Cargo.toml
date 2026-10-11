@@ -1,0 +1,12 @@
+[package]
+name = "kc-neighbor"
+version = "0.1.0"
+edition = "2021"
+description = "Spatial hash + neighbor loop for Kinetic_Curator (#1318) — compiled to wasm32-unknown-unknown"
+
+[lib]
+crate-type = ["cdylib"]
+
+# No dependencies: integer grid math, f64 distance tests, and the xorshift32
+# dish-RNG mirror need nothing beyond core/std. Release profile lives in the
+# workspace root (rust/Cargo.toml, #1317).

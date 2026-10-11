@@ -6,19 +6,28 @@
       "crate": "kc-fields",
       "artifact": "kc_fields.wasm",
       "rustcVersion": "1.98.1",
-      "sourceHash": "daf16e1c177186748955b64b36c682bab8649e4db02ca700bc8ebb1ae15be488",
+      "sourceHash": "46580fcca4edc6122c12c35d38a3a2b75df1d9aee1674f321b854e286419d68c",
       "artifactHash": "d54e779960ce805dd7b792b18304ccba258af20ca2e3641b45e689ec7b7df813",
       "simd128": false,
-      "builtAt": "2026-10-10T09:28:48Z"
+      "builtAt": "2026-10-11T02:46:48Z"
+    },
+    "kc-neighbor": {
+      "crate": "kc-neighbor",
+      "artifact": "kc_neighbor.wasm",
+      "rustcVersion": "1.98.1",
+      "sourceHash": "91dbdad8147084ece0d29c03482767eb6d57ae8b54a8216fc6109d92c1593bc8",
+      "artifactHash": "a4e9db866c6539e602f925411de1562cc40f789eb11e928eaa242c65549103ad",
+      "simd128": false,
+      "builtAt": "2026-10-11T02:46:48Z"
     },
     "swarm-bake": {
       "crate": "swarm-bake",
       "artifact": "swarm_bake.wasm",
       "rustcVersion": "1.98.1",
-      "sourceHash": "471aebd0f1ee1055769a7844c74c7b1eeb12c10be901a46e389b262d8e6cd12e",
+      "sourceHash": "9498bd2bba91f02695cac684f7ed390397482b6489f630ff758153c026ad39bb",
       "artifactHash": "28e6024d65e93b599dbdb153fd2eb1e5f05e61f36386f185a57880822eb3a207",
       "simd128": false,
-      "builtAt": "2026-10-10T09:28:48Z"
+      "builtAt": "2026-10-11T02:46:48Z"
     }
   }
 }
