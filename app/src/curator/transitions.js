@@ -29,7 +29,7 @@ const FAMILIES = {
     ordered: ['grid', 'rails', 'abacus', 'stratified', 'truchet', 'lsystem'],
     radial: ['fibonacci', 'phyllotaxis', 'radial', 'orbit'],
     live: ['swarm', 'hype', 'murmuration'],
-    loose: ['random', 'noise', 'layers', 'flow', 'ca', 'voronoi', 'poisson'], // #1193
+    loose: ['random', 'noise', 'layers', 'flow', 'ca', 'voronoi', 'poisson', 'circlepack'], // #1193
     // #720 — growth organisms. Without a family, a new mode's row can never
     // reach another un-familied mode (far excludes null-family values), so
     // every mode must belong to one — the "every value reachable" invariant.

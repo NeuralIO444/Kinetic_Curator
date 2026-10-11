@@ -31,6 +31,7 @@ export const LAYOUT_MODES = [
   { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
   { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
   { id: 'poisson',   name: 'poisson',    glyph: 'pois'   }, // #1193
+  { id: 'circlepack', name: 'circle pack', glyph: 'pack'  }, // #1195
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
   // swarm engine (see isLiveSwarmMode below) with its own palette + motion
   // character. Kept out of the stub list so it never falls back to a bare

@@ -119,6 +119,9 @@ export function computeGeometrySoA({
   // params so getSampler can key the once-per-(layer,mode) report. Not part
   // of geometrySignature: the layer id is not geometry.
   layerId = null,
+  // #1195 — circle packing: the BASE scale range ([lo, hi], the slider, never the audio-modulated one). Only the
+  // circlepack mode reads it; it joins geometrySignature for that mode alone.
+  packScale = null,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -167,6 +170,8 @@ export function computeGeometrySoA({
     brushSize, brushSpacing, fieldScale, trailCount,
     // Slice 2 — the crooked; ignored by every other mode.
     wobbleAmp, wobbleFreq,
+    // #1195 — circle packing needs the tier count and the base scale range; ignored by every other mode.
+    zTiers: tiers, packScale,
     // #1309 — column-writing mode; assigned below once the lanes exist.
     out: null,
     row: -1,
@@ -249,6 +254,9 @@ export function computeGeometrySoA({
     const r01 = rot01lane[n];
     soa.uRot[n] = Number.isNaN(r01) ? hashU01(seed, CH.attr, i * 3 + 1, seedOffsets) : r01;
     soa.uAlpha[n] = hashU01(seed, CH.attr, i * 3 + 2, seedOffsets);
+    // #1195 — circle packing: the sampler packed circles at specific sizes and returned each as its unit-scale draw
+    // in `t`, so stage C's `(lo + (hi - lo) * u) * depth` lands exactly on the packed radius (the brush precedent).
+    if (mode === 'circlepack' && !Number.isNaN(soa.t[n])) soa.uScale[n] = soa.t[n];
     // Slice 2 — stamp jitter, the hand on top of the trail: ±10° rotation
     // and ±15% of the scale range around its midpoint, both from the
     // per-instance seed hash, so a reseed repeats the same crookedness.
@@ -314,6 +322,12 @@ export function applyAttributes(soa, { scale, rotate, alpha }) {
  * @returns {PlacementSoA}
  */
 export function computePlacementsSoA(params, out) {
+  // #1195 — this entry owns both stages, so circle packing packs for the very scale range stage C will apply
+  // (buildPlacements, which splits the stages, passes the BASE slider range itself).
+  if (params.mode === 'circlepack' && !params.packScale && params.scale) {
+    const sx = Array.isArray(params.scale) ? params.scale : params.scale.x;
+    if (Array.isArray(sx) && sx.length === 2) params = { ...params, packScale: [sx[0], sx[1]] };
+  }
   return applyAttributes(computeGeometrySoA(params, out), params);
 }
 
@@ -341,6 +355,8 @@ export function geometrySignature(p) {
     p.brushSize, p.brushSpacing, p.fieldScale, p.trailCount,
     // Slice 2 — the crooked knobs.
     p.wobbleAmp, p.wobbleFreq,
+    // #1195 — the packing depends on the base scale range (circlepack only; 0 for every other mode).
+    p.packScale ? p.packScale[0] : 0, p.packScale ? p.packScale[1] : 0,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }
