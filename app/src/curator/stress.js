@@ -65,12 +65,14 @@ export const quantizeStress = (v) => Math.round(clamp01(v) * STRESS_STEPS) / STR
  *   { type: 'stress', value }  the quantized smoothed stress changed
  * Same signal sequence in, same sequence out: no hidden state but the smoothed value and the band.
  */
-export function createStressTracker({ smoothFrames = SMOOTH_FRAMES, hysteresis = HYSTERESIS_GAP } = {}) {
+export function createStressTracker({ smoothFrames = SMOOTH_FRAMES, hysteresis = HYSTERESIS_GAP, initial = null } = {}) {
   const alpha = 2 / (Math.max(1, smoothFrames) + 1);
   const half = Math.max(0, hysteresis) / 2;
-  let smoothed = null; // null until the first frame: the first value is taken as-is, not eased up from zero
-  let band = null;
-  let lastLogged = null;
+  // `initial` resumes a tracker mid-session ({ smoothed, band }): a recorded take starts from the live tracker's
+  // state, and its replay has to start from the same place.
+  let smoothed = initial && Number.isFinite(initial.smoothed) ? initial.smoothed : null; // null until the first frame: the first value is taken as-is
+  let band = initial && BANDS.includes(initial.band) ? initial.band : null;
+  let lastLogged = smoothed === null ? null : quantizeStress(smoothed);
   return {
     get band() { return band; },
     get smoothed() { return smoothed; },
