@@ -14,6 +14,15 @@ export const ACTIVITY_WINDOW_FRAMES = 120;
 export const NEUTRAL_STRESS = Object.freeze({ stress: 0, smoothed: 0, band: null, activity: 0, dish: 0, taste: 0, frames: 0 });
 
 let live = NEUTRAL_STRESS;
+let tap = null;
+
+/**
+ * Observe every tracker update: fn({ activity, dish, taste, band }). One listener (or null). The performance
+ * recorder uses it so a take carries its stress signals and band changes. A throwing listener is dropped.
+ */
+export function setStressTap(fn) {
+  tap = typeof fn === 'function' ? fn : null;
+}
 
 /** The latest reading: { stress, smoothed, band, activity, dish, taste, frames }. band is null before the first frame. */
 export function getStressState() {
@@ -54,6 +63,9 @@ export function initStress({ getCounts, isRunning, raf, caf } = {}) {
     const r = tracker.update({ activity, dish, taste });
     frames += 1;
     live = { stress: r.stress, smoothed: r.smoothed, band: r.band, activity, dish, taste, frames };
+    if (tap !== null) {
+      try { tap({ activity, dish, taste, band: r.band }); } catch { tap = null; }
+    }
   };
   const loop = () => {
     handle = req(loop);
