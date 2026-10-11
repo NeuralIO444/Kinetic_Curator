@@ -99,10 +99,26 @@ export function makeCaField(grid, { softness = 1 } = {}) {
 }
 
 /**
+ * Default opts for makeNoiseField. Exported so the GPU twin
+ * (gl/fields/noiseField.glsl.js + fieldRunner.js) reads the same defaults
+ * from one source of truth — the runner's uniform defaults can never drift
+ * from the JS field silently.
+ */
+export const NOISE_FIELD_DEFAULTS = Object.freeze({
+  freq: 2.5, octaves: 3, lacunarity: 2, gain: 0.5, z: 0,
+});
+
+/**
  * fBm density field. Same seed gives the same field, because the noise
  * instance is seeded (K1 removed the global perm table).
  */
-export function makeNoiseField(seed, { freq = 2.5, octaves = 3, lacunarity = 2, gain = 0.5, z = 0 } = {}) {
+export function makeNoiseField(seed, {
+  freq = NOISE_FIELD_DEFAULTS.freq,
+  octaves = NOISE_FIELD_DEFAULTS.octaves,
+  lacunarity = NOISE_FIELD_DEFAULTS.lacunarity,
+  gain = NOISE_FIELD_DEFAULTS.gain,
+  z = NOISE_FIELD_DEFAULTS.z,
+} = {}) {
   const noise = createNoise(seed >>> 0);
   return {
     kind: 'noise',
