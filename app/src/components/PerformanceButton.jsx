@@ -4,6 +4,17 @@
 // playback this cycle. The frame count in the tooltip is a measurement, read from the recorder.
 import { useEffect, useState } from 'react';
 import { isRecordingPerformance, performanceFrames, startPerformance, stopPerformance } from '../gl/performanceCapture.mjs';
+import { getStressState, setStressTap } from '../curator/stressLive.js';
+import { createStressRecorder } from '../curator/stressRecord.js';
+
+// #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
+// tracker update, and stored on the performance as `stress`.
+const stressSection = (getFrame) => {
+  const now = getStressState();
+  const rec = createStressRecorder({ initial: { smoothed: now.band === null ? null : now.smoothed, band: now.band }, getFrame });
+  setStressTap((u) => rec.update(u));
+  return { stop() { setStressTap(null); return rec.finish(); } };
+};
 
 function downloadBytes(bytes, filename) {
   const a = document.createElement('a');
@@ -28,7 +39,7 @@ export function PerformanceButton() {
 
   const onClick = async () => {
     if (!recording) {
-      if (startPerformance()) { setFrames(0); setRecording(true); }
+      if (startPerformance({ sections: { stress: stressSection } })) { setFrames(0); setRecording(true); }
       return;
     }
     setRecording(false);

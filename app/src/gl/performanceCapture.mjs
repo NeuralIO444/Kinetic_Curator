@@ -11,6 +11,7 @@ import { createPerformanceRecorder, packPerformance } from './performanceFile.mj
 
 let recorder = null;
 let seed = 0;
+let sections = null; // name -> { stop() => data }: extra tracks a caller records alongside the take
 
 export function isRecordingPerformance() {
   return recorder !== null;
@@ -21,10 +22,16 @@ export function performanceFrames() {
   return recorder ? recorder.frames : 0;
 }
 
-/** Begin a take. Returns false when one is already running. */
-export function startPerformance(opts) {
+/**
+ * Begin a take. Returns false when one is already running.
+ * `opts.sections` is an optional map name -> (getFrame) => ({ stop() => data }): each is started now with a function
+ * that returns the take's current frame, and its data is stored on the performance under that name when the take
+ * stops. This is how the stress record rides along without this module knowing what it is.
+ */
+export function startPerformance(opts = {}) {
   if (recorder) return false;
-  const r = createPerformanceRecorder(opts);
+  const { sections: makers, ...recOpts } = opts;
+  const r = createPerformanceRecorder(recOpts);
   let first = true;
   recorder = r;
   seed = 0;
@@ -35,6 +42,10 @@ export function startPerformance(opts) {
   setResolveOutputTap((output) => r.onOutput(output));
   // THE SCENE RESTARTS (Matt, 2026-10-11): the take begins on a fresh resolver, so it replays exactly.
   requestResolverReset();
+  sections = {};
+  for (const name of Object.keys(makers || {})) {
+    try { sections[name] = makers[name](() => r.frames); } catch { /* a section that cannot start is simply absent */ }
+  }
   return true;
 }
 
@@ -48,9 +59,15 @@ export async function stopPerformance() {
   recorder = null;
   setResolveTap(null);
   setResolveOutputTap(null);
+  const extra = sections || {};
+  sections = null;
+  const data = {};
+  for (const name of Object.keys(extra)) {
+    try { data[name] = extra[name].stop(); } catch { /* a section that cannot finish is left out */ }
+  }
   let perf;
   try {
-    perf = r.finish();
+    perf = { ...r.finish(), ...data };
   } catch {
     return null;
   }
