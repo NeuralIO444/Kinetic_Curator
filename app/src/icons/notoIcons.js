@@ -1,22 +1,39 @@
 /**
- * Noto Sans Symbols 2 geometric icons for KC-1 (#1262).
- * Load via <link> in index.html. Apply font-family: "Noto Sans Symbols 2", sans-serif;
- * All currentColor-driven, square-corner friendly, reduced-motion safe.
+ * Icons for KC-1 (#1262).
+ * Geometric set uses Noto Sans Symbols 2 Unicode.
+ * Queen uses chunky stepped crown SVG.
+ * Lois uses chunky empty square SVG.
  */
 export const icons = {
-  warning: '▲',      // ▲
-  check: '✓',        // ✓
-  x: '✕',            // ✕
-  star: '★',         // ★
-  plus: '+',          // +
-  circle: '●',       // ●
-  arrow: '→',        // →
-  lightning: '⚡',    // ⚡
-  square: '■',       // ■
-  crown: '♔',        // ♔ (chess king; or use custom for presence mark)
+  // Noto geometric
+  warning: '▲',
+  check: '✓',
+  x: '✕',
+  star: '★',
+  plus: '+',
+  circle: '●',
+  arrow: '→',
+  lightning: '⚡',
+  square: '■',
+
+  // Special (SVG)
+  queen: 'queen-crown',
+  lois: 'lois-square',
 };
 
 export function Icon({ name, ...props }) {
+  const special = icons[name];
+  if (special === 'queen-crown' || special === 'lois-square' || special === 'nested-target') {
+    return (
+      <img
+        src={`/src/icons/${special}.svg`}
+        alt=""
+        className="kc-icon"
+        style={{ width: '1em', height: '1em', display: 'inline-block' }}
+        {...props}
+      />
+    );
+  }
   const char = icons[name] || '?';
   return (
     <span
