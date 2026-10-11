@@ -84,11 +84,18 @@
 .tile-menu button:hover { color: var(--ink); }
 .tile-menu .del { color: var(--kc-red); grid-column: 1 / -1; }
 .tile-dup {
-  flex: 0 0 38%; min-height: 44px;
+  flex: 0 0 27%; min-height: 44px;
   background: transparent; border: none; border-left: 1px solid var(--line);
   color: var(--dim); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
 }
 .tile-dup:hover { color: var(--ink); }
+/* #1355 — EDIT opens the wet lab; the count shows when the asset has attach points */
+.tile-edit {
+  flex: 0 0 30%; min-height: 44px;
+  background: transparent; border: none; border-left: 1px solid var(--line);
+  color: var(--dim); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.tile-edit:hover, .tile-edit.on { color: var(--ink); }
 .tile-still {
   display: flex; align-items: center; justify-content: center; gap: 6px;
   flex: 1; min-height: 44px;

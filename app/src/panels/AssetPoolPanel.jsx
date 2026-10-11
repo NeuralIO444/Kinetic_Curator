@@ -65,6 +65,15 @@ export function AssetPoolPanel() {
   // out of the initial bundle). The picker looks the asset up live by id.
   const [pickerId, setPickerId] = useState(null);
   const [Picker, setPicker] = useState(null);
+  // #1355 — the wet lab window (attach points). Dynamic import, like the picker.
+  const [labId, setLabId] = useState(null);
+  const [Lab, setLab] = useState(null);
+  const attach = useStore(s => s.assetAttach);
+  const openLab = async (id) => {
+    const mod = await import('./WetLab.jsx');
+    setLab(() => mod.WetLab);
+    setLabId(id);
+  };
   const openPicker = async (id) => {
     const mod = await import('./RegionPicker.jsx');
     setPicker(() => mod.RegionPicker);
@@ -184,6 +193,9 @@ export function AssetPoolPanel() {
                         </button>
                         <button type="button" className="tile-dup" aria-label={`Duplicate ${a.id}`} title="Duplicate overlay copy"
                           onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}>dup</button>
+                        <button type="button" className={`tile-edit${attach?.[a.id]?.length ? ' on' : ''}`} aria-label={`Edit ${a.id} in the wet lab`}
+                          title="Wet lab: mark where other parts may attach to this asset" data-testid="tile-edit"
+                          onClick={(e) => { e.stopPropagation(); openLab(a.id); }}>edit{attach?.[a.id]?.length ? ` ${attach[a.id].length}` : ''}</button>
                       </>
                     )}
                     {isUser && (
@@ -222,6 +234,9 @@ export function AssetPoolPanel() {
       )}
       {Picker && pickerId && (
         <Picker assetId={pickerId} onClose={() => { setPicker(null); setPickerId(null); }} />
+      )}
+      {Lab && labId && (
+        <Lab assetId={labId} onClose={() => { setLab(null); setLabId(null); }} />
       )}
     </div>
   );
