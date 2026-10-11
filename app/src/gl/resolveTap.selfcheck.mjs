@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createLiveResolver } from './liveResolve.mjs';
-import { setResolveTap, tapResolveInput, withResolveTap } from './resolveTap.mjs';
+import { setResolveTap, tapResolveInput, withResolveTap, requestResolverReset } from './resolveTap.mjs';
 import { createInputLog, replayInputs } from '../engine/kernel/replay/inputLog.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { defaultPattern } from '../state/patternTrack.js';
@@ -30,26 +30,41 @@ import { defaultPattern } from '../state/patternTrack.js';
   assert.equal(setResolveTap(null), null, 'the broken listener was dropped');
 }
 
-// 2. the live loop is wired: its one resolver is the tapped one, and the wrapper changes nothing but observability
+// 2. the live loop is wired: its one resolver is built through the tap, which changes nothing but observability
 {
   const src = readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8');
   assert.match(src, /import \{ withResolveTap \} from '\.\/resolveTap\.mjs';/);
-  assert.match(src, /const resolver = withResolveTap\(createLiveResolver\(\)\);/, 'the loop\'s resolver is the tapped one');
-  assert.equal((src.match(/createLiveResolver\(\)/g) || []).length, 1, 'one resolver, so one tap covers every frame');
+  assert.match(src, /const resolver = withResolveTap\(createLiveResolver\);/, 'the loop\'s resolver is the tapped one');
+  assert.equal((src.match(/createLiveResolver\b/g) || []).length, 2, 'one import, one use: one resolver, so one tap covers every frame');
   assert.equal((src.match(/resolver\.resolveLayers\(/g) || []).length, 1, 'one call site');
+  assert.deepEqual((src.match(/resolver\.(\w+)/g) || []).sort(), ['resolver.dispose', 'resolver.resolveLayers'],
+    'the loop uses exactly the two members the wrapper exposes');
 
   const calls = [];
-  const inner = { resolveLayers: (i) => { calls.push(['resolve', i]); return 'out'; }, dispose: () => 'disposed', other: 7 };
-  const tapped = withResolveTap(inner);
+  let built = 0;
+  const make = () => { const id = ++built; return { resolveLayers: (i) => { calls.push([`resolve${id}`, i]); return `out${id}`; }, dispose: () => calls.push([`dispose${id}`]) }; };
+  const tapped = withResolveTap(make);
+  assert.equal(built, 1, 'the factory is called once up front');
   setResolveTap((i) => calls.push(['tap', i]));
   const input = { a: 1 };
-  assert.equal(tapped.resolveLayers(input), 'out', 'returns the resolver\'s result');
-  setResolveTap(null);
-  assert.deepEqual(calls.map((c) => c[0]), ['tap', 'resolve'], 'tap first, then the resolver');
+  assert.equal(tapped.resolveLayers(input), 'out1', 'returns the resolver\'s result');
+  assert.deepEqual(calls.map((c) => c[0]), ['tap', 'resolve1'], 'tap first, then the resolver');
   assert.ok(calls[0][1] === input && calls[1][1] === input, 'both get the same object');
-  assert.equal(tapped.dispose(), 'disposed', 'every other member is the original');
-  assert.equal(tapped.other, 7);
-  assert.equal(tapped.resolveLayers({}), 'out', 'with no listener it is just the resolver');
+
+  // a restart: the old resolver is disposed and a fresh one answers the NEXT frame, before the input is tapped
+  calls.length = 0;
+  requestResolverReset();
+  assert.equal(built, 1, 'nothing happens until the next frame');
+  assert.equal(tapped.resolveLayers(input), 'out2');
+  assert.deepEqual(calls.map((c) => c[0]), ['dispose1', 'tap', 'resolve2'], 'dispose the old, then tap, then the fresh resolver');
+  assert.equal(tapped.resolveLayers(input), 'out2', 'one request, one restart');
+  assert.equal(built, 2);
+  setResolveTap(null);
+  calls.length = 0;
+  tapped.dispose();
+  assert.deepEqual(calls.map((c) => c[0]), ['dispose2'], 'dispose reaches the current resolver');
+  assert.equal(withResolveTap(make).resolveLayers({}), 'out3', 'with no listener it is just the resolver');
+  assert.throws(() => withResolveTap({ resolveLayers() {} }), /needs the resolver factory/);
 }
 
 // ── the equivalence proof ───────────────────────────────────────────────────────────────────────────────────────

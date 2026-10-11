@@ -36,6 +36,8 @@ import { initPhase } from './curator/phase.js'; // #1144: the instrument knows t
 import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353: record a performance
 import { RefineDial } from './curator/RefineDial.jsx'; // #1144: ?tune=refine only
 import { TUNE_REFINE } from './curator/refineSpread.js';
+import { initStress, DEBUG_STRESS } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
+import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -76,6 +78,12 @@ function AppInner() {
     initWhisperTriggers(useStore.getState, useStore.subscribe);
     initDirectorBeat(useStore.subscribe); // #1145: the Director's beat input
     initPhase(useStore.subscribe); // #1144: explore / refine, from what the artist does
+    // #1354 — stress and bands from honest counts (artist actions, rolls since the last keep). Computed only: no
+    // persona reads the band yet; ?debug=stress shows it.
+    return initStress({
+      getCounts: loisActivity.pressureCounts,
+      isRunning: () => useStore.getState().running,
+    });
   }, []);
 
   const { state } = useApp(s => ({
@@ -305,6 +313,7 @@ function AppInner() {
       <MasterBar />
       <FavoritesTray />
       {TUNE_REFINE && <RefineDial />}
+      {DEBUG_STRESS && <StressReadout />}
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>

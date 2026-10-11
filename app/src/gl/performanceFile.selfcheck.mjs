@@ -49,7 +49,7 @@ function session(frames, opts = {}) {
   };
   let params = lp({ mode: 'swarm', behave: 'scatter' });
   const recorder = createPerformanceRecorder(opts);
-  const resolver = withResolveTap(createLiveResolver());
+  const resolver = withResolveTap(createLiveResolver);
   setResolveTap((i) => recorder.onInput(i));
   setResolveOutputTap((o) => recorder.onOutput(o));
   const liveChain = createHashChain(); // an independent chain over the frames the session actually produced

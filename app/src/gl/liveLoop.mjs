@@ -88,7 +88,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
   let live = createLiveRenderer(canvas);
-  const resolver = withResolveTap(createLiveResolver()); // #1353: same resolver; a listener may observe its inputs
+  const resolver = withResolveTap(createLiveResolver); // #1353: same resolver; observable, and restartable for a take
   const kinemeClock = createKinemeClock(); // #781 KINEME RATE (anchored)
   // #278 — VJ MIX: palette crossfade state machine (pure) + the last
   // presented frame's target (the outgoing deck snapshot source).

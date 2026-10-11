@@ -2,9 +2,11 @@
 //
 // Recording is OFF until the artist starts it: while it runs, every frame's inputs are diffed and its output folded
 // into the hash chain (about 0.1 to 0.3 ms a frame), and nobody should pay that for a feature they are not using.
-// Start attaches the recorder to the two resolver taps; stop detaches it and returns the finished performance.
+// Start attaches the recorder to the two resolver taps AND RESTARTS THE SCENE (a fresh resolver: a take that began
+// mid-session could not replay, because the resolver carries state from before it). Stop detaches the recorder and
+// returns the finished performance.
 // One take at a time. The take's seed is read from the first recorded frame, for the file name only.
-import { setResolveTap, setResolveOutputTap } from './resolveTap.mjs';
+import { setResolveTap, setResolveOutputTap, requestResolverReset } from './resolveTap.mjs';
 import { createPerformanceRecorder, packPerformance } from './performanceFile.mjs';
 
 let recorder = null;
@@ -31,6 +33,8 @@ export function startPerformance(opts) {
     r.onInput(input);
   });
   setResolveOutputTap((output) => r.onOutput(output));
+  // THE SCENE RESTARTS (Matt, 2026-10-11): the take begins on a fresh resolver, so it replays exactly.
+  requestResolverReset();
   return true;
 }
 

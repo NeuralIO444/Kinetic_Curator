@@ -70,6 +70,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     rollsSinceSeed: 0,
     bloomAt: null, // ts of a keep that followed a run of passes: the ugly paid off
     bloomDepth: 0, // how many rolls (passes) that run held: the number an earned voice carries (#1153)
+    activityCount: 0, // #1354: real artist actions since launch (beat() calls); a count, never a duration
     passRun: 0, // the artist's own passes (CURATOR, KIN) since the last keep; EVOLVE fires are Davis's and do not count
     muted: 0, // >0 while the machine (the dead-frame guard) is re-dealing: not the artist, not noted
     frameKept: false, // the frame on screen was kept: true from a keep until the next roll or seed change (#1126: NOD)
@@ -83,6 +84,7 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
 
   const beat = () => {
     s.lastActivityTs = t();
+    s.activityCount += 1; // #1354: every real artist action, counted (the stress signal reads the count, not a clock)
   };
 
   // Instrument 5 — dwell windows. Called on seed/composition change via the
@@ -293,7 +295,9 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
     try { return fn(); } finally { s.muted -= 1; }
   }
 
-  const api = { start, stop, beat, noteSeed, snapshot, machine };
+  /** #1354 — the two COUNTS the stress signal reads. Cheap (no window scans): safe to call every frame. */
+  const pressureCounts = () => ({ activityCount: s.activityCount, passRun: s.passRun });
+  const api = { start, stop, beat, noteSeed, snapshot, machine, pressureCounts };
   return api;
 }
 

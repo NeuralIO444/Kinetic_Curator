@@ -17,7 +17,7 @@ const stable = {
   perfClampOverride: null, perfTier1: false, assetThin: false, slowRender: false, scaleMul: 1, alphaBoost: 0,
   effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null,
 };
-const resolver = withResolveTap(createLiveResolver()); // the instrument's one resolver, as liveLoop builds it
+const resolver = withResolveTap(createLiveResolver); // the instrument's one resolver, as liveLoop builds it
 let t = 0;
 let frame = 0;
 const play = (n, seed = 0xbeef) => {
@@ -37,7 +37,7 @@ const play = (n, seed = 0xbeef) => {
   assert.equal(await stopPerformance(), null, 'stopping with no take is a no-op');
 }
 
-// 2. a take: start mid-session, play, stop → a file that replays to the same frames
+// 2. a take STARTED MID-SESSION replays, because `rec` restarts the scene (Matt's decision, 2026-10-11)
 {
   assert.equal(startPerformance(), true);
   assert.equal(startPerformance(), false, 'one take at a time');
@@ -49,24 +49,31 @@ const play = (n, seed = 0xbeef) => {
   assert.ok(take && take.bytes instanceof Uint8Array);
   assert.equal(take.perf.frames, 181, 'the take ends on its last checkpoint');
   assert.equal(take.filename, 'kc-performance-beef-181f.kcperf', 'named by seed and frames, never a time');
-  // The take began 30 frames into a running session. A replay starts from a FRESH resolver, so this only verifies
-  // if the first recorded frame carries everything the resolver needs. It does: frame 0 of a log is a full input.
+  // 30 frames of swarm motion happened before `rec`. The take still replays from a fresh resolver, because starting
+  // it restarted the scene: the first recorded frame was a fresh resolver's first frame.
   const v = verifyPerformance(await unpackPerformance(take.bytes));
-  assert.equal(v.ok, false, 'a take that starts mid-session does NOT replay from a fresh resolver: the swarm was already in motion');
+  assert.deepEqual(v, { ok: true, frames: 181, checked: 4, firstMismatchFrame: null, kernelMismatch: false },
+    'a mid-session take replays to every checkpoint');
 }
 
-// 3. so a take must start from a fresh resolver state to be a performance: prove the honest path
+// 3. and the restart is what makes that true: the same take WITHOUT it does not replay
 {
-  const fresh = withResolveTap(createLiveResolver());
-  let tt = 0;
+  const { setResolveTap, setResolveOutputTap } = await import('./resolveTap.mjs');
+  const { createPerformanceRecorder } = await import('./performanceFile.mjs');
+  play(30); // the scene is in motion again
+  const rec = createPerformanceRecorder();
+  setResolveTap((i) => rec.onInput(i)); // record with NO restart
+  setResolveOutputTap((o) => rec.onOutput(o));
+  play(200);
+  setResolveTap(null);
+  setResolveOutputTap(null);
+  assert.equal(verifyPerformance(rec.finish()).ok, false, 'without the restart, state from before the take makes the replay diverge');
+  // a second real take is independent of everything before it
   assert.equal(startPerformance(), true);
-  for (let i = 0; i < 200; i++) {
-    tt += 16.7;
-    fresh.resolveLayers({ ...stable, seed: 7, effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(i / 9)], loopTimeMs: tt, dtSec: 0.0167 });
-  }
+  play(130, 0x51);
   const take = await stopPerformance();
-  assert.equal(verifyPerformance(await unpackPerformance(take.bytes)).ok, true, 'from a fresh state, the take replays to every checkpoint');
-  fresh.dispose();
+  assert.equal(take.filename, 'kc-performance-51-121f.kcperf');
+  assert.equal(verifyPerformance(await unpackPerformance(take.bytes)).ok, true);
 }
 
 // 4. stop releases the taps; an empty take is not a performance
