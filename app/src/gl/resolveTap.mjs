@@ -1,8 +1,8 @@
 // resolveTap.mjs — #1353 step 2: the one place the live loop's frame inputs can be observed.
 //
 // liveLoop hands every frame's `input` to the resolver. A performance is exactly that input sequence (the resolver is
-// a pure function of it: liveResolve.determinism.selfcheck.mjs). This module is the tap: liveLoop wraps its resolver
-// with withResolveTap(), so every resolveLayers(input) call passes its input through tapResolveInput(input) first,
+// a pure function of it: liveResolve.determinism.selfcheck.mjs). This module is the tap: liveLoop builds its resolver
+// through withResolveTap(createLiveResolver), so every resolveLayers(input) call passes its input through tapResolveInput(input) first,
 // and whoever wants the stream registers a listener. With no listener it is a single null check and the very same
 // resolver call, so the live path is unchanged.
 //
@@ -48,18 +48,40 @@ export function tapResolveOutput(output) {
   }
 }
 
+let resetRequested = false;
+
 /**
- * The resolver, with its inputs and outputs observable. Everything else (dispose and friends) is the original, by
- * prototype: only resolveLayers is shadowed, and it hands the SAME input object to the same function and returns
- * the same result.
+ * Ask for a FRESH resolver before the next frame (#1353 step 4: `rec` restarts the scene). A performance replays
+ * from a fresh resolver, so a take has to begin on one: the swarm, the feed delay, the shared scent and the morph
+ * ledgers all carry state a file that starts mid-session could not reproduce. The swap happens at the top of the
+ * next resolveLayers call, before the input is tapped, so the first recorded frame is the fresh resolver's first.
  */
-export function withResolveTap(resolver) {
-  const tapped = Object.create(resolver);
-  tapped.resolveLayers = (input) => {
-    tapResolveInput(input);
-    const output = resolver.resolveLayers(input);
-    tapResolveOutput(output);
-    return output;
+export function requestResolverReset() {
+  resetRequested = true;
+}
+
+/**
+ * The live loop's resolver, with its inputs and outputs observable and a restart on request. Takes the FACTORY (so
+ * it can build a fresh one), and exposes exactly what the loop uses: resolveLayers and dispose. resolveLayers hands
+ * the SAME input object to the resolver and returns the same result.
+ */
+export function withResolveTap(createResolver) {
+  if (typeof createResolver !== 'function') throw new TypeError('[resolveTap] withResolveTap needs the resolver factory');
+  let inner = createResolver();
+  return {
+    resolveLayers(input) {
+      if (resetRequested) {
+        resetRequested = false;
+        if (typeof inner.dispose === 'function') inner.dispose();
+        inner = createResolver();
+      }
+      tapResolveInput(input);
+      const output = inner.resolveLayers(input);
+      tapResolveOutput(output);
+      return output;
+    },
+    dispose() {
+      if (typeof inner.dispose === 'function') inner.dispose();
+    },
   };
-  return tapped;
 }
