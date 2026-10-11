@@ -12,11 +12,15 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Self-hosted on the Mac Studio (label mac-studio): the e2e/selfcheck jobs ran for minutes-to-hours on GitHub's software-GL
+# runners and flaked on timing. Playwright uses the macOS cache path and no --with-deps (that flag is for Ubuntu).
+# One runner = jobs queue one at a time; fork PRs run code on this Mac, so keep Settings > Actions > 'Require approval
+# for all outside collaborators' on.
 # Same three job names as before — branch protection still matches.
 # No `needs` between them: lint no longer blocks browser install.
 jobs:
   lint-build-selfcheck:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mac-studio]
     defaults:
       run:
         working-directory: app
@@ -33,7 +37,7 @@ jobs:
       - run: npm run build
 
   e2e-smoke:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mac-studio]
     defaults:
       run:
         working-directory: app
@@ -46,17 +50,17 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright
+          path: ~/Library/Caches/ms-playwright
           key: playwright-1.49.1-${{ runner.os }}
       - run: npm ci --no-fund --no-audit
-      - run: npx playwright install chromium --with-deps
+      - run: npx playwright install chromium
       - run: npm run build
       - run: npm run test:e2e
         env:
           CI: true
 
   selfcheck-browser:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mac-studio]
     defaults:
       run:
         working-directory: app
@@ -69,10 +73,10 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright
+          path: ~/Library/Caches/ms-playwright
           key: playwright-1.49.1-${{ runner.os }}
       - run: npm ci --no-fund --no-audit
-      - run: npx playwright install chromium --with-deps
+      - run: npx playwright install chromium
       - run: npm run selfcheck
 
   # Added 2026-10-03 (cleanup lane C): the Rust shell had no compile gate at
@@ -82,7 +86,7 @@ jobs:
   # ubuntu runners above. Suggested follow-up (same as selfcheck-browser's):
   # mark this check required in branch protection.
   cargo-check:
-    runs-on: macos-latest
+    runs-on: [self-hosted, mac-studio]
     defaults:
       run:
         working-directory: src-tauri
