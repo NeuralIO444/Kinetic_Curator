@@ -112,6 +112,15 @@ const SCENARIOS = [
     }),
   },
   {
+    // #1183 — a layer leaning on a DRIFTING pattern below it: the colour follows the ground, deterministically
+    name: 'ground-lean',
+    at: (f) => ({
+      layers: [L('lyr-p', { type: 'pattern', pattern: { ...defaultPattern('FIELD', 9), drift: 1 } }), L('lyr-a')],
+      layoutParams: lp({ mode: 'grid', groundLean: f < 20 ? 0 : 0.7 }),
+      ...breathe(f),
+    }),
+  },
+  {
     name: 'mode-change',
     at: (f) => ({ layoutParams: lp({ mode: f < 30 ? 'grid' : f < 60 ? 'swarm' : 'poisson' }), ...breathe(f) }),
   },

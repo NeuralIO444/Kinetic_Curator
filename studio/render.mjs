@@ -23,6 +23,7 @@ import { blend, BLEND_FALLBACK } from './blendFallback.mjs';
 import { KERNEL_VERSION } from '../app/src/engine/kernel/version.js';
 import { fxFilterStringForLayer, fxFilterId, isFxLayer } from '../app/src/fx/fxFilters.js';
 import { recipeFeatures } from '../app/src/curator/recipeFeatures.js';
+import { createResolverDish, groundArgs } from '../app/src/gl/dishGround.mjs'; // #1183: the still leans on the ground exactly as the live frame does
 
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
@@ -144,6 +145,9 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
   const layers = Array.isArray(doc.layers) && doc.layers.length
     ? doc.layers
     : [{ id: '__single', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }];
+  // #1183 — one dish per still, and the same bottom -> top stack the live resolver reads its ground from.
+  const stillDish = createResolverDish();
+  const stackLayers = layers;
 
   return layers
     .filter((l) => l.visible !== false)
@@ -201,6 +205,12 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
           caps,
           canvasW: CANVAS_W,
           canvasH: CANVAS_H,
+          // #1183 — the same ground call as gl/liveResolve.mjs, so a still equals the live frame for pattern scenes.
+          ...groundArgs({
+            dish: stillDish, layers: stackLayers, layerId: layer.id, lean: layoutParams.groundLean, W: CANVAS_W, H: CANVAS_H,
+            seed: src.seed >>> 0, tSec: Number(doc.patternTime) || 0,
+            getPalette: () => resolvePalette(doc.paletteId || 'praystation', doc.paletteOverrides || null),
+          }),
         }).items;
 
       return {

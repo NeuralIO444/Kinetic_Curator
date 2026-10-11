@@ -13,6 +13,7 @@ import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
+import { createResolverDish, groundArgs } from './dishGround.mjs'; // #1183: the dish, and the ground a layer rests on
 import { applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
 // #1307 — SoA slice 2/5: FIELD/FEED column loops (zero per-point allocation,
 // bit-identical to the map-based path they replace — see the module header).
@@ -131,6 +132,7 @@ export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
   const feedLive = createFeedLive(CANVAS_W, CANVAS_H);
+  const dish = createResolverDish(); // #1183: one dish per document
   // #606: scene units follow the authored canvas (set per resolveLayers).
   let W = CANVAS_W;
   let H = CANVAS_H;
@@ -544,6 +546,12 @@ export function createLiveResolver() {
           growthTick, audioEnergy,
           layerId: layer.id, // #1245 — unknown-sampler diagnostic key
           kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
+          // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
+          ...groundArgs({
+            dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, W, H, seed,
+            getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
+            tSec: (input.loopTimeMs ?? 0) / 1000,
+          }),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).
