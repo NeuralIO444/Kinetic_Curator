@@ -28,6 +28,7 @@
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
+import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
 import { audioRoutes } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
@@ -87,7 +88,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
   let live = createLiveRenderer(canvas);
-  const resolver = createLiveResolver();
+  const resolver = withResolveTap(createLiveResolver()); // #1353: same resolver; a listener may observe its inputs
   const kinemeClock = createKinemeClock(); // #781 KINEME RATE (anchored)
   // #278 — VJ MIX: palette crossfade state machine (pure) + the last
   // presented frame's target (the outgoing deck snapshot source).
