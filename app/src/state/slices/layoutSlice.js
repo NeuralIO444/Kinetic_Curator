@@ -173,8 +173,9 @@ export const createLayoutSlice = (set) => ({
    * engine already honors as "cut".
    */
   beatBpm: BEAT_DEFAULT_BPM,
-  /** #1144 — the metro pulse: the dialed BPM as a real beatPulse when audio is off. The artist's own switch; off by default. */
-  beatMetro: false,
+  /** #1144 — the metro pulse: the dialed BPM as a real beatPulse when audio is off. On by default (Matt, 2026-10-11):
+   *  a quiet room still breathes at the dialed tempo. The artist's own switch turns it off; audio on always wins. */
+  beatMetro: true,
   setBeatMetro: (on) => set({ beatMetro: !!on }),
   /**
    * Roll scope (#964): the ModeStrip MODE/MOTION chips arm a scope for the

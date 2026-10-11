@@ -1,5 +1,6 @@
-// #1144 — beat honesty: with no audio the BEAT dial is silent by default and its dot is still; the artist's pulse switch
-// makes the dialed tempo a REAL attack the stage can feel, and the dot flashes only then.
+// #1144 — beat honesty: with no audio the dialed tempo is a REAL attack the stage can feel (the metro pulse is on by
+// default, Matt 2026-10-11), and the BEAT dot flashes only while that pulse is actually running. The artist's pulse
+// switch turns it off (dot still, no attacks) and back on.
 //
 // Written for a starved runner (software GL, ~1 fps, the watchdog pausing the instrument): clicks are dispatched (no
 // actionability waits on a busy page), the instrument is re-asserted RUNNING while we wait, and attacks are COUNTED by the
@@ -20,24 +21,25 @@ async function waitForBeats(page, n, timeout = 40_000) {
   return Date.now() - t0;
 }
 
-test('off by default: no attacks and a still dot; the pulse switch starts real attacks and a live dot; off stops them', async ({ page }) => {
+test('on by default: real attacks and a live dot with no audio; the pulse switch stops them and starts them again', async ({ page }) => {
   test.setTimeout(180_000);
   await boot(page);
   const dot = page.locator('.beat-dot');
-  await expect(dot).not.toHaveClass(/live/);
-  await keepRunning(page); await page.waitForTimeout(1500);
-  expect(await beats(page)).toBe(0); // 120 BPM would have beaten about three times: nothing does
+  await keepRunning(page);
+  await expect(dot).toHaveClass(/live/, { timeout: 30_000 });
+  await waitForBeats(page, 2); // the dialed tempo is a real attack, not a drawn readout
   await page.locator('.beat-btn').dispatchEvent('click');
   const sw = page.getByRole('button', { name: 'pulse', exact: true });
+  await expect(sw).toHaveAttribute('aria-pressed', 'true', { timeout: 30_000 });
+  await sw.dispatchEvent('click');
   await expect(sw).toHaveAttribute('aria-pressed', 'false', { timeout: 30_000 });
+  await expect(dot).not.toHaveClass(/live/, { timeout: 30_000 });
+  const stopped = await beats(page); await keepRunning(page); await page.waitForTimeout(1600);
+  expect(await beats(page) - stopped).toBeLessThanOrEqual(1); // at most one attack already in flight
   await sw.dispatchEvent('click');
   await expect(sw).toHaveAttribute('aria-pressed', 'true', { timeout: 30_000 });
   await expect(dot).toHaveClass(/live/);
   await waitForBeats(page, 2);
-  await sw.dispatchEvent('click');
-  await expect(dot).not.toHaveClass(/live/, { timeout: 30_000 });
-  const stopped = await beats(page); await keepRunning(page); await page.waitForTimeout(1600);
-  expect(await beats(page) - stopped).toBeLessThanOrEqual(1); // at most one attack already in flight
 });
 
 test('the pulse follows the dialed tempo: the timer it asks for is 60000 / BPM (read from the request, not from wall time, which a starved runner cannot keep)', async ({ page }) => {
