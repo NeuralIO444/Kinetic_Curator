@@ -23,6 +23,11 @@
  */
 
 import { registerCostTier } from '../costRegistry.mjs';
+// #1304: Rust/wasm is the default step engine when it has loaded; the JS loop
+// below stays the permanent reference and the fallback for every other case.
+import { ensureFieldsWasm, getFieldsWasm, wasmBackendFor, fieldsScentStep } from './fieldsWasm.mjs';
+
+let wasmLoadKicked = false;
 
 export const SCENT_COLS = 64;
 export const SCENT_ROWS = 36;
@@ -81,6 +86,21 @@ export function createScentField(cols = SCENT_COLS, rows = SCENT_ROWS) {
   /** One simulation step: diffuse, then decay. Deterministic. */
   function step(opts = {}) {
     const { decay = DEFAULT_STEP.decay, diffuse = DEFAULT_STEP.diffuse } = opts;
+    if (wasmBackendFor('scent')) {
+      const w = getFieldsWasm();
+      if (w) {
+        try {
+          // Bit-identical to the loop below (fieldsWasm.selfcheck): in place on `cells`.
+          fieldsScentStep(w, cells, cols, rows, { decay, diffuse });
+          return;
+        } catch {
+          // out of scope (e.g. non-finite params) or a broken module: the JS loop is the answer
+        }
+      } else if (!wasmLoadKicked) {
+        wasmLoadKicked = true;
+        ensureFieldsWasm(); // async, never rejects; JS runs until it resolves
+      }
+    }
     for (let y = 0; y < rows; y++) {
       const row = y * cols;
       for (let x = 0; x < cols; x++) {
