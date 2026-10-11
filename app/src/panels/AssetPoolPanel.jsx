@@ -1,6 +1,8 @@
 // AssetPoolPanel (P02) — pool + overlay media manager (#113) + studio (#114)
 import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
+import { useStore } from '../state/store.js';
+import { MAX_PINS } from '../curator/dishPins.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
@@ -26,6 +28,11 @@ export function AssetPoolPanel() {
   const [studioError, setStudioError] = useState(null);
   const [menu, setMenu] = useState(null); // the user overlay whose actions are open (#1128 tidy: no hover-only controls)
   const { assets } = useApp();
+  // #1355 — the wet lab's pin tool: arm it here, then click the canvas.
+  const pinArmed = useStore(s => s.pinArmed);
+  const pinCount = useStore(s => s.dishPins.length);
+  const setPinArmed = useStore(s => s.setPinArmed);
+  const clearDishPins = useStore(s => s.clearDishPins);
   const { state } = useApp(s => ({
     enabled: s.enabledAssets,
     search: s.search,
@@ -112,6 +119,10 @@ export function AssetPoolPanel() {
         }} />
       <PanelHeader tag="P02" title="ASSET POOL" subtitle={`${enabledCount}/${assets.length} active${overlayCount ? ` · ${overlayCount} user` : ''}`}>
         <div className="header-tools">
+          <button className={`chip-btn act${pinArmed ? ' active' : ''}`} aria-pressed={pinArmed} data-testid="pin-tool"
+            title={`Pin a place in the dish. Click the canvas to place or move the pin. Shift+click adds more (up to ${MAX_PINS}).`}
+            onClick={() => setPinArmed(!pinArmed)}>{pinCount ? `pin ${pinCount}/${MAX_PINS}` : 'pin'}</button>
+          {pinCount > 0 && <button className="chip-btn act" data-testid="pin-clear" title="Remove every pin" onClick={clearDishPins}>unpin</button>}
           <button className="chip-btn act" title="Motif kit — overlay only" onClick={() => openStudio(null)}>new</button>
           <button className="chip-btn act" title="Import SVG into project overlay" onClick={() => fileRef.current?.click()}>import</button>
           {/* #310: GRID/LIST is a remembered preference now (persisted across

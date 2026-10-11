@@ -181,6 +181,7 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
     audioBands: ballistics,
     beatDrive: audioBands ? ballistics.beatPulse : null, // #1128 THUMP: a real beat or nothing
     assetStill: s.assetStill, // #1128
+    dishPins: s.dishPins, // #1355
     dtSec,
     loopTimeMs: frameTimeMs,
   });

@@ -14,6 +14,7 @@ import { on, emit, Events } from '../composition/eventBus.js';
 import { createLiveLoop } from '../gl/liveLoop.mjs';
 import { createWorkerLiveLoop } from '../gl/workerLiveLoop.js';
 import { getPreset } from '../data/presets.js';
+import { clientToScene } from '../curator/dishPins.js';
 
 export function CanvasPanel() {
   const { palette: activePalette, canvasRef, glCanvasRef, glLoopRef } = useApp();
@@ -33,6 +34,15 @@ export function CanvasPanel() {
   const accumEffective = accumOn && !perfTier1;
 
   const viewport = useCanvasViewport(canvasW, canvasH);
+  // #1355 — wet-lab pins: while the pin tool is armed a click places a pin instead of starting a pan.
+  const pinArmed = useStore(s => s.pinArmed);
+  const dishPins = useStore(s => s.dishPins);
+  const placeDishPin = useStore(s => s.placeDishPin);
+  const onCanvasPointerDown = (e) => {
+    if (!pinArmed) { viewport.onPointerDown(e); return; }
+    const pt = clientToScene(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY, canvasW, canvasH, viewport.zoom, viewport.pan);
+    placeDishPin(pt, e.shiftKey);
+  };
   // Fresh-per-frame view of the viewport for the loop (the loop reads these
   // per render tick, so they live in a ref rather than a re-subscription).
   const viewRef = useRef({ zoom: 1, pan: { x: 0, y: 0 }, attractor: null });
@@ -192,9 +202,28 @@ export function CanvasPanel() {
           </div>
         ) : (
           <canvas ref={glCanvasRef} className="canvas-gl" width={canvasW} height={canvasH}
-            style={{ zIndex: 1 }}
-            onWheel={viewport.onWheel} onPointerDown={viewport.onPointerDown} onPointerMove={viewport.onPointerMoveCombined}
+            style={{ zIndex: 1, cursor: pinArmed ? 'crosshair' : undefined }}
+            onWheel={viewport.onWheel} onPointerDown={onCanvasPointerDown} onPointerMove={viewport.onPointerMoveCombined}
             onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />
+        )}
+        {dishPins.length > 0 && (
+          // The spore marks. Same box as the canvas (viewBox + meet = object-fit: contain) and the same view transform
+          // as liveLoop, so a mark sits exactly on the place it names. Pointer-transparent: the canvas keeps the click.
+          <svg viewBox={`0 0 ${canvasW} ${canvasH}`} preserveAspectRatio="xMidYMid meet" data-testid="dish-pins" aria-hidden="true"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none' }}>
+            <g transform={`translate(${canvasW / 2 + viewport.pan.x} ${canvasH / 2 + viewport.pan.y}) scale(${viewport.zoom}) translate(${-canvasW / 2} ${-canvasH / 2})`}>
+              {dishPins.map((p, i) => {
+                const r = canvasW * 0.006 / viewport.zoom; // a constant size on screen, whatever the zoom
+                return (
+                  <g key={i} transform={`translate(${p.x} ${p.y})`} fill="none" stroke="var(--ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke">
+                    <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" stroke="#000" strokeWidth="4" vectorEffect="non-scaling-stroke" />
+                    <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" vectorEffect="non-scaling-stroke" />
+                    <rect x={-r * 0.2} y={-r * 0.2} width={r * 0.4} height={r * 0.4} fill="var(--ink)" stroke="none" />
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
         )}
         {stageBlackout && (
           <div style={{ position: 'absolute', inset: 0, background: '#000', zIndex: 4 }} aria-label="Stage blackout" />
