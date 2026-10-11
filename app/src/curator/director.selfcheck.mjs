@@ -56,13 +56,16 @@ ok('AWAY forces LOIS weight to 0 no matter what the table says', () => {
   }
 });
 
-ok('the gates: sway is open (2026-10-08), tilt is shut until #1144 supplies a phase', () => {
+ok('the gates: sway is open (2026-10-08), tilt is open (2026-10-11) and only applies in explore', () => {
   assert.equal(SWAY_GATE_OPEN, true, 'sway opened deliberately on 2026-10-08');
-  assert.equal(TILT_GATE_OPEN, false, 'tilt stays shut until #1144 supplies a phase');
+  assert.equal(TILT_GATE_OPEN, true, 'tilt opened deliberately on 2026-10-11');
   for (const lois of ['NOD', 'VIBE', 'BURN', 'AWAY']) {
     const g = directorGains({ loisCode: lois, davisCode: 'FLOW', phase: 'explore' });
     assert.equal(g.swayAllowance, DIRECTOR_TABLE[`${lois}×FLOW`].sway_allowance, `${lois}: the room's allowance is live`);
-    assert.equal(g.tiltLimit, 0, `${lois}: tilt gated`);
+    assert.equal(g.tiltLimit, DIRECTOR_TABLE[`${lois}×FLOW`].tilt_limit, `${lois}: tilt is the room's limit in explore`);
+    // refine and an unknown phase never tilt: the keeps are being refined, not left
+    assert.equal(directorGains({ loisCode: lois, davisCode: 'FLOW', phase: 'refine' }).tiltLimit, 0, `${lois}: no tilt in refine`);
+    assert.equal(directorGains({ loisCode: lois, davisCode: 'FLOW', phase: null }).tiltLimit, 0, `${lois}: no tilt without a phase`);
   }
 });
 

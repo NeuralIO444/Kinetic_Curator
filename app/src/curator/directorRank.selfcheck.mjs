@@ -161,9 +161,9 @@ ok('tilt is clamped to 0.05, junk is no tilt, it needs 8 counting keeps and an o
   assert.equal(wild, 0, 'a huge tilt behaves as 0.05');
 });
 
-ok('live: the tilt gate is a shut constant, the Director feeds the room\'s tilt (and nothing else) into the chooser, and a Director that has never ticked tilts nothing', () => {
+ok('live: the tilt gate is an open constant, the Director feeds the room\'s tilt (and nothing else) into the chooser, and a Director that has never ticked tilts nothing', () => {
   const src = readFileSync(new URL('./director.js', import.meta.url), 'utf8');
-  assert.match(src, /export const TILT_GATE_OPEN = false;/);
+  assert.match(src, /export const TILT_GATE_OPEN = true;/);
   assert.match(src, /lastTilt = base\.tiltLimit;/);
   assert.match(src, /tilt: lastTilt/);
   assert.equal(createDirector({ now: () => 1000 }).rankChooser(), null);
