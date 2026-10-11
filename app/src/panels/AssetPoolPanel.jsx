@@ -193,9 +193,9 @@ export function AssetPoolPanel() {
                         </button>
                         <button type="button" className="tile-dup" aria-label={`Duplicate ${a.id}`} title="Duplicate overlay copy"
                           onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}>dup</button>
-                        <button type="button" className={`tile-edit${attach?.[a.id]?.length ? ' on' : ''}`} aria-label={`Edit ${a.id} in the wet lab`}
+                        <button type="button" className={`tile-edit${attach?.[a.id]?.length ? ' on' : ''}`} aria-label={`Edit ${a.id} in the wet lab${attach?.[a.id]?.length ? `: ${attach[a.id].length} attach points` : ''}`}
                           title="Wet lab: mark where other parts may attach to this asset" data-testid="tile-edit"
-                          onClick={(e) => { e.stopPropagation(); openLab(a.id); }}>edit{attach?.[a.id]?.length ? ` ${attach[a.id].length}` : ''}</button>
+                          onClick={(e) => { e.stopPropagation(); openLab(a.id); }}>edit</button>
                       </>
                     )}
                     {isUser && (
