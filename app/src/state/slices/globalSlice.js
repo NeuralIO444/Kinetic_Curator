@@ -25,6 +25,7 @@ import { sanitizeMidiMap } from '../../midi/map.mjs';
 import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegions, normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
+import { placePin } from '../../curator/dishPins.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -378,6 +379,12 @@ export const createGlobalSlice = (set) => ({
   }),
   setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
+  // #1355 — wet-lab pins. Session state: a pin belongs to the take, not the saved project.
+  dishPins: [],
+  pinArmed: false,
+  setPinArmed: (on) => set({ pinArmed: !!on }),
+  placeDishPin: (pt, add) => set((state) => ({ dishPins: placePin(state.dishPins, pt, { add: !!add }) })),
+  clearDishPins: () => set({ dishPins: [] }),
   setSlowRender: (slow, source) => set({
     slowRender: slow,
     slowRenderSource: slow ? (source || 'cut6') : null,

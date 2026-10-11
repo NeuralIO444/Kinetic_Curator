@@ -599,6 +599,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
       beatDrive: audioOn ? shapedAudio.beatPulse : null, // #1128 THUMP: a real beat or nothing
       assetStill: s.assetStill, // #1128: assets the artist pinned still
+      dishPins: s.dishPins, // #1355: wet-lab pins (scene coords), recorded with the take
       scaleMul,
       alphaBoost,
       effectiveScale,
