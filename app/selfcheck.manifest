@@ -39,6 +39,7 @@ node src/engine/kernel/sample/registry.tiers.selfcheck.mjs
 node src/engine/kernel/sample/growth.selfcheck.mjs
 node src/engine/kernel/sample/growth.nullaudio.selfcheck.mjs
 node src/engine/kernel/sample/poisson.selfcheck.mjs
+node src/engine/kernel/sample/circlepack.selfcheck.mjs
 node src/engine/kernel/sample/quadtree.selfcheck.mjs
 node src/engine/kernel/sample/quadtreeSignal.selfcheck.mjs
 node src/biology/biology.selfcheck.mjs

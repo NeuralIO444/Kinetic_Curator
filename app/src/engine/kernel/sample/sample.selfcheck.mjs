@@ -13,6 +13,7 @@ const required = [
   'dla', 'eden', // #720
   'brush', // flow-field trail stamping
   'poisson', // #1193 — Poisson-disc blue noise
+  'circlepack', // #1195 — circle packing
 ];
 
 for (const id of required) {

@@ -179,7 +179,8 @@ export function buildPlacements({
   // #1202 — resolve X/Y ranges. Breath overrides (arrays) win per-axis;
   // otherwise the authored {x, y} pair (a legacy array reads as linked).
   const sc = layoutParams.scale;
-  const xRange = scaleOverride ?? (Array.isArray(sc) ? sc : sc?.x) ?? [0.4, 1.6];
+  const xBase = (Array.isArray(sc) ? sc : sc?.x) ?? [0.4, 1.6];
+  const xRange = scaleOverride ?? xBase;
   const yRange = scaleYOverride ?? (Array.isArray(sc) ? sc : sc?.y) ?? xRange;
   const scale = { x: xRange, y: yRange };
   const alpha = alphaOverride ?? layoutParams.alpha;
@@ -210,6 +211,9 @@ export function buildPlacements({
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
+    // #1195 — circle packing packs for the BASE scale slider range, never the audio-modulated override (that would
+    // re-pack every frame). Other modes: null, not in their signature.
+    packScale: layoutParams.mode === 'circlepack' ? [xBase[0], xBase[1]] : null,
   };
 
   const strategy = resolveStrategy(layoutParams, preset);

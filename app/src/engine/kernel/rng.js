@@ -153,6 +153,8 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #1193 — the Poisson-disc scatter places points, so it rides the spatial
   // stream too: re-rolling SPATIAL re-rolls the scatter, colour must not.
   poisson: 'spatial',
+  // #1195 — circle packing places points on the spatial stream.
+  circlepack: 'spatial',
   // #720 — the DLA/Eden aggregate places points, so it rides the spatial
   // stream too: re-rolling SPATIAL regrows the organism, colour must not.
   growth: 'spatial',
