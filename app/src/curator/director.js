@@ -37,10 +37,11 @@ import { GATE_OPEN } from './queenChannel.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
 // The room table's two taste-derived columns. #762's proof cleared on 2026-10-08 and Matt opened SWAY (rank and
-// temperature: the room's sway_allowance now scales the pull). TILT stays shut: it needs #1144's explore/refine phases,
-// which nothing supplies yet. Constants, flipped by PR only; the selfcheck tripwires both.
+// temperature: the room's sway_allowance now scales the pull). TILT opened 2026-10-11 (Matt): #1144's explore/refine
+// phase is now supplied live at pick time (taste.js → getPhase()), and tilt only ever applies in explore. Constants,
+// flipped by PR only; the selfcheck tripwires both.
 export const SWAY_GATE_OPEN = true;
-export const TILT_GATE_OPEN = false;
+export const TILT_GATE_OPEN = true;
 
 // ─── the pull's inputs (#1139 wiring, PR 2) ────────────────────────────────
 // The Director is where the hidden pull is hosted: it already runs at pick time (never per frame) and never renders.
