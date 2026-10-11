@@ -7,13 +7,12 @@
 //                                          is bottom -> top, as everywhere else.
 //   patternGround(pattern, palette, w, h)  WHAT colour that ground is: { at(x, y, t) } in scene units, built on the
 //                                          SAME grid and the same pan the renderer rasterizes (patternSource.js), so
-//                                          the mark and the pixels beneath it can never disagree. `t` is loop time in
+//                                          the mark and the tile beneath it can never disagree. `t` is loop time in
 //                                          seconds: a drifting pattern moves the ground, and the colour follows.
-//                                          FIELD and QUILT: the tile's (or hero block's) base colour. GLYPH: its one
-//                                          ground colour.
+//                                          It is the tile's MAIN colour (see patternGround).
 //
 // No clock, no DOM, no GL. The grid is cached per (pattern, palette, size): the picture, never the time.
-import { assign, assignQuilt, assignGlyph, groundColorAt, panOffset } from './engine.js';
+import { assign, assignQuilt, assignGlyph, panOffset } from './engine.js';
 import { patternPalette } from './patternSource.js';
 import { sanitizePattern } from '../state/patternTrack.js';
 
@@ -47,29 +46,35 @@ function gridFor(p, pal, w, h) {
   return g;
 }
 
+/** A tile's MAIN colour: its first motif colour (FIELD, QUILT) or its mark colour (GLYPH); the base colour if it has no motif. */
+function mainColor(tile, grid) {
+  if (tile && Array.isArray(tile.colors)) return tile.colors[1] ?? tile.colors[0];
+  if (tile && tile.roles && typeof tile.roles.mark === 'string') return tile.roles.mark;
+  return grid.ground ?? '#000000';
+}
+
 /**
- * The ground of a pattern over a w x h scene. `at(x, y, t)` returns the hex colour of the tile under scene point
- * (x, y) at loop time t seconds: tile.colors[0], the colour the renderer paints where no motif lands.
+ * The ground of a pattern over a w x h scene. `at(x, y, t)` returns the hex of the MAIN COLOUR of the tile under
+ * scene point (x, y) at loop time t seconds (Matt, 2026-10-11: marks lean toward each tile's main colour).
+ *
+ * Why not the tile's base colour (`groundColorAt`, tile.colors[0])? Measured: it is the SAME flat background colour
+ * for every tile of every pattern, so leaning toward it only darkens the marks and the choice of pattern, and its
+ * drift, would not show. The main colour varies tile by tile, so marks on one tile share a hue and the pattern's
+ * blocks read through them. It is constant inside a tile (no flicker at motif edges as things move).
  */
 export function patternGround(pattern, palette, w, h) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   const { tileW, grid } = gridFor(p, pal, w, h);
-  // GLYPH draws marks on ONE ground colour: that colour is the ground everywhere, whatever the pan.
-  if (p.mode === 'GLYPH') return { at: () => grid.ground };
   return {
     at(x, y, t = 0) {
       const off = panOffset(p.seed, p.drift, p.drift > 0 ? Number(t) || 0 : 0);
-      const X = x / tileW + off.x;
-      const Y = y / tileW + off.y;
-      if (p.mode === 'QUILT') {
-        // a 2x2 hero block covers its four cells: the block's ground, not the hidden tile's
-        const tc = ((Math.floor(X) % grid.cols) + grid.cols) % grid.cols;
-        const tr = ((Math.floor(Y) % grid.rows) + grid.rows) % grid.rows;
-        const hero = grid.heroAt ? grid.heroAt[tr * grid.cols + tc] : -1;
-        if (hero >= 0 && grid.heroes[hero]) return grid.heroes[hero].colors[0];
-      }
-      return groundColorAt(grid, X, Y);
+      const tc = ((Math.floor(x / tileW + off.x) % grid.cols) + grid.cols) % grid.cols;
+      const tr = ((Math.floor(y / tileW + off.y) % grid.rows) + grid.rows) % grid.rows;
+      const i = tr * grid.cols + tc;
+      // a QUILT 2x2 hero block covers its four cells: the block's colour, not the hidden tile's
+      const hero = grid.heroAt ? grid.heroAt[i] : -1;
+      return mainColor(hero >= 0 && grid.heroes && grid.heroes[hero] ? grid.heroes[hero] : grid.tiles[i], grid);
     },
   };
 }

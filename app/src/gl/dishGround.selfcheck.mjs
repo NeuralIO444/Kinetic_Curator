@@ -27,8 +27,8 @@ const P = (id, mode = 'QUILT', seed = 7, extra = {}) => L(id, { type: 'pattern',
   assert.equal(nearestPatternBelow(null, 'a'), null);
 }
 
-// 2. WHAT colour: the same ground the renderer paints. Every ground colour is a colour the rasterized pattern
-//    actually contains, and a pixel's own tile ground is found in that tile's pixels.
+// 2. WHAT colour: each tile's MAIN colour, which is a colour the renderer really paints, is constant inside a tile,
+//    and VARIES from tile to tile (the flat base colour does not, which is why the lean does not use it).
 {
   const pal = resolvePalette('bone', null, []);
   for (const mode of ['QUILT', 'FIELD', 'GLYPH']) {
@@ -52,6 +52,9 @@ const P = (id, mode = 'QUILT', seed = 7, extra = {}) => L(id, { type: 'pattern',
       }
     }
     assert.ok(checked > 4, `${mode}: tiles checked`);
+    const distinct = new Set();
+    for (let ty = 0; ty < Math.floor(H / tileW); ty++) for (let tx = 0; tx < density; tx++) distinct.add(g.at((tx + 0.5) * tileW, (ty + 0.5) * tileW, 0));
+    assert.ok(distinct.size >= 3, `${mode}: the main colour varies across tiles (${distinct.size} distinct), so the pattern reads through the marks`);
     // constant inside a tile: the ground is the tile's, not a per-pixel sample of the motif
     assert.equal(g.at(0.1 * tileW, 0.1 * tileW, 0), g.at(0.9 * tileW, 0.9 * tileW, 0));
   }
@@ -155,6 +158,28 @@ const hash = (out) => createHash('sha256').update(JSON.stringify(out.map((l) => 
   const t0 = itemsOf(r.resolveLayers(input({ layers: drifting, layoutParams: lp({ groundLean: 1 }), loopTimeMs: 16 }))).map((i) => String(i.tint ?? i.color));
   const t1 = itemsOf(r.resolveLayers(input({ layers: drifting, layoutParams: lp({ groundLean: 1 }), loopTimeMs: 40000 }))).map((i) => String(i.tint ?? i.color));
   assert.ok(t0.some((c, k) => c !== t1[k]), 'the colour follows the ground as the pattern drifts');
+}
+
+// 9. a STILL equals the live frame for a pattern scene (#1183 acceptance): same marks, same leaned colours
+{
+  const { resolveLayers: resolveStill } = await import('../../../studio/render.mjs');
+  const { getRenderCaps } = await import('../data/quality.js');
+  const layers = [P('p', 'QUILT', 21), L('lyr-a')];
+  const params = lp({ groundLean: 0.8, mode: 'grid', count: 60 });
+  const live = itemsOf(createLiveResolver().resolveLayers(input({ layers, layoutParams: params, loopTimeMs: 0 })));
+  const still = resolveStill({ layers, activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 1234, paletteId: 'bone', paletteOverrides: null, layoutParams: params, patternTime: 0 },
+    { caps: getRenderCaps('balanced') }).find((l) => l.id === 'lyr-a').items;
+  assert.equal(still.length, live.length, 'the still places the same marks');
+  const col = (it) => String(it.tint ?? it.color).toLowerCase();
+  for (let k = 0; k < live.length; k++) {
+    assert.equal(still[k].x, live[k].x);
+    assert.equal(still[k].y, live[k].y);
+    assert.equal(col(still[k]), col(live[k]), `mark ${k}: the still's colour equals the live frame's`);
+  }
+  // and the still's lean is real, not both sides unleaned
+  const flat = resolveStill({ layers, activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 1234, paletteId: 'bone', paletteOverrides: null, layoutParams: lp({ mode: 'grid', count: 60 }), patternTime: 0 },
+    { caps: getRenderCaps('balanced') }).find((l) => l.id === 'lyr-a').items;
+  assert.ok(still.some((it, k) => col(it) !== col(flat[k])), 'the still leans too');
 }
 
 // 8. the one-writer file took a call site only
