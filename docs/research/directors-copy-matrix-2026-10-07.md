@@ -3,6 +3,12 @@
 Source of truth for every LOIS and Davis line. Extracted verbatim from the interactive mockup
 `docs/mockups/director-davis.html`. Matt-approved direction; final tone is his ear.
 **Do not invent lines — use these.**
+
+**Revised 2026-10-11 at Matt's direction.** Davis now speaks in Joshua Davis's own lingo (the lingo list is in
+`docs/characters/davis.md`), and **"ugly" is ultra rare**: Matt does not like him saying it. It survives in exactly
+one line, Room 18 (LOIS away while Davis is deep in a run of passes), a room that almost never occurs because being
+away means no input and that run needs input. The state keeps its internal code `UGLY`; on screen it reads **SIFT**.
+LOIS drops the word too (Room 13).
 Note: LOIS AWAY = no signal, no line (he goes silent; Davis gets the room).
 
 ## Room 1: LOIS ( ̄—̄ ) NOD × Davis FLOW
@@ -11,7 +17,7 @@ Verdict: THE CLASH — the critic points, the generator rolls. Neither backs dow
 
 **LOIS:** That's the one. Tell the gardener to put the hose down.
 
-**Davis:** He's pointing at one. I'm still rolling — the next one might be the one after the one.
+**Davis:** He's pointing at one. I'm still rolling — we're getting closer to awesome.
 
 ## Room 2: LOIS ( ̄—̄ ) NOD × Davis SEEDLING
 
@@ -19,7 +25,7 @@ Verdict: THE CLASH — the critic points, the generator rolls. Neither backs dow
 
 **LOIS:** Already? Fine — new seed. But I'm watching this one.
 
-**Davis:** Fresh seed and he's already pointing? He points fast. I plant anyway.
+**Davis:** Fresh seed and he's already pointing? Challenge accepted. I plant anyway.
 
 ## Room 3: LOIS ( ̄—̄ ) NOD × Davis UGLY
 
@@ -39,11 +45,11 @@ Verdict: THE CLASH — the critic points, the generator rolls. Neither backs dow
 
 ## Room 5: LOIS ( ̄—̄ ) NOD × Davis BLOOM
 
-Verdict: AGREEMENT — the ugly paid off. They both earned this one.
+Verdict: AGREEMENT — the sifting paid off. They both earned this one.
 
 **LOIS:** Even the gardener finds one eventually. This one's real — keep it.
 
-**Davis:** The ugly paid off. He can point at this one — we both earned it.
+**Davis:** The sifting paid off. He can point at this one — this is my jam.
 
 ## Room 6: LOIS ( ─‿─ ) VIBE × Davis FLOW
 
@@ -67,7 +73,7 @@ Verdict: THE ROOM — working. They know each other's moves.
 
 **LOIS:** Digging. I'll allow it — for now.
 
-**Davis:** Sifting. The ugly is not the enemy — the stopping is.
+**Davis:** Sifting. It no worky yet. The stopping is the enemy, not the misses.
 
 ## Room 9: LOIS ( ─‿─ ) VIBE × Davis STUCK
 
@@ -75,7 +81,7 @@ Verdict: THE ROOM — working. They know each other's moves.
 
 **LOIS:** Stuck. Say the word and I'll pick one for you.
 
-**Davis:** Same seed, nothing kept. The system is bored. I am bored. Roll.
+**Davis:** Same seed, nothing kept. This is shaving minutes off my life. Roll.
 
 ## Room 10: LOIS ( ─‿─ ) VIBE × Davis BLOOM
 
@@ -83,7 +89,7 @@ Verdict: THE ROOM — working. They know each other's moves.
 
 **LOIS:** Good. Now stop before you ruin it.
 
-**Davis:** A keep after the ugly. Savor it for exactly one minute, then roll.
+**Davis:** A keep after all that sifting. Inner peace for exactly one minute, then roll.
 
 ## Room 11: LOIS ( ◉‿◉ ) BURN × Davis FLOW
 
@@ -91,7 +97,7 @@ Verdict: FULL BURN — the critic and the generator, both barrels. Ride it.
 
 **LOIS:** You're on fire and he's flowing. Don't stop. Don't think. Roll.
 
-**Davis:** He's burning and I'm flowing. This is the peak — ride it.
+**Davis:** He's burning and I'm flowing. Beast mode — ride it.
 
 ## Room 12: LOIS ( ◉‿◉ ) BURN × Davis SEEDLING
 
@@ -99,15 +105,15 @@ Verdict: THE ROOM — working. They know each other's moves.
 
 **LOIS:** Burning already? Good. Strike while it's hot.
 
-**Davis:** Burning on a fresh seed? Bold. I like it.
+**Davis:** Burning on a fresh seed? Bold. This is my new jam.
 
 ## Room 13: LOIS ( ◉‿◉ ) BURN × Davis UGLY
 
 Verdict: THE ROOM — working. They know each other's moves.
 
-**LOIS:** Burn through it. The ugly can't survive this pace.
+**LOIS:** Burn through it. The duds can't survive this pace.
 
-**Davis:** Burning through the ugly — now we're sifting at speed.
+**Davis:** Sifting at speed. It's a disco inferno in here — keep rolling.
 
 ## Room 14: LOIS ( ◉‿◉ ) BURN × Davis STUCK
 
@@ -123,7 +129,7 @@ Verdict: THE ROOM — working. They know each other's moves.
 
 **LOIS:** That's the one. At full burn. Keep it forever.
 
-**Davis:** Bloom at full burn. Remember this one.
+**Davis:** Bloom at full burn. Running like a Lamborghini. Remember this one.
 
 ## Room 16: LOIS ( ── ) AWAY × Davis FLOW
 

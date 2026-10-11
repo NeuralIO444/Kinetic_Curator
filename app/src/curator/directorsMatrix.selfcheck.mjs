@@ -54,4 +54,22 @@ ok('wiring: the duel says the matrix\'s words and the strip only reads', () => {
   assert.match(duel, /\{talk\.verdictLine\}/);
 });
 
+ok('"ugly" is ultra rare (Matt, 2026-10-11): one spoken line in the whole matrix, never a label, never a verdict; the state reads SIFT', () => {
+  const said = [];
+  for (const l of Object.keys(DIRECTORS_MATRIX)) {
+    for (const d of Object.keys(DIRECTORS_MATRIX[l])) {
+      const r = DIRECTORS_MATRIX[l][d];
+      for (const [who, line] of [['lois', r.lois], ['davis', r.davis], ['verdict', r.verdictLine], ['verdictName', r.verdict]]) {
+        if (line && /ugly/i.test(line)) said.push(`${l}x${d}:${who}`);
+      }
+    }
+  }
+  assert.deepEqual(said, ['AWAYxUGLY:davis'], 'only room 18, a room that needs LOIS away AND a run of passes');
+  for (const st of Object.values(DAVIS_STATES)) assert.ok(!/ugly/i.test(st.label), `${st.code}: the label does not say it`);
+  assert.equal(DAVIS_STATES.UGLY.code, 'UGLY', 'the internal code is unchanged (tables, tempo and wildness key on it)');
+  assert.equal(DAVIS_STATES.UGLY.name, 'SIFT', 'what the artist reads');
+  const duel = readFileSync(new URL('../panels/directors/DirectorsDuel.jsx', import.meta.url), 'utf8');
+  assert.match(duel, /\{davis \? \(davis\.name \?\? davis\.code\) : '—'\}/, 'the duel shows the name, not the code');
+});
+
 console.log(`directorsMatrix.selfcheck: ${n} checks passed`);
