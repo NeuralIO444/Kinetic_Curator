@@ -23,7 +23,7 @@
 
 import { createNoise } from './noise.js';
 import { getSampler } from './kernel/sample/registry.js';
-import { CH, hashU01, hashU32, rngForIndex } from './kernel/rng.js';
+import { CH, hashU01, hashU32, rngForIndex, makeScratchStream } from './kernel/rng.js';
 
 /**
  * @typedef {object} PlacementSoA
@@ -115,6 +115,10 @@ export function computeGeometrySoA({
   // Slice 2 — the crooked: perpendicular trail wobble in px (0 = the trail
   // exactly) and its frequency per stamp.
   wobbleAmp = 0, wobbleFreq = 0.5,
+  // #1245 — optional layer id for the unknown-sampler diagnostic; rides the
+  // params so getSampler can key the once-per-(layer,mode) report. Not part
+  // of geometrySignature: the layer id is not geometry.
+  layerId = null,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -125,7 +129,7 @@ export function computeGeometrySoA({
   const effectiveW = canvasW + bx * 2;
   const effectiveH = canvasH + by * 2;
   const tiers = Math.max(1, zTiers || 1);
-  const sample = getSampler(mode);
+  const sample = getSampler(mode, layerId);
 
   const noise = displacement > 0
     ? createNoise(hashU32(seed, CH.noise, 0, seedOffsets))
@@ -141,11 +145,17 @@ export function computeGeometrySoA({
   // ctx.row). Samplers that implement the mode return undefined; legacy
   // {x, y}-returning samplers are unpacked into the lanes by the adapter
   // in the loop below.
+  //
+  // #1250 — one scratch RNG stream per placement call (not per point):
+  // `ca` / `voronoi` / `sampleFieldPoint` reseed it per index, which is
+  // bit-identical to their old per-point `rngForIndex` allocation.
+  const scratch = makeScratchStream();
   const ctx = {
     i: 0, count, w: effectiveW, h: effectiveH,
     rng: null, jitter: jitter || 0, seed,
     caGrid: mode === 'ca' ? caGrid : null,
     seedOffsets,
+    scratch,
     // #585 — sampler scalar; undefined for every other mode, and the sampler
     // treats a non-finite value as the golden angle.
     phylloDivergence,

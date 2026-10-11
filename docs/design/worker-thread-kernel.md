@@ -86,6 +86,20 @@ selfchecks are the work; the sim code itself mostly moves.
   deployment mode, not the dev loop.
 - **iPad WebView workers.** Verify Worker + transferables in the
   target WebView before committing — no surprises late.
+  - Probe status (2026-10-10, #1312): PASS on the closest available
+    WebKit target — Playwright WebKit (≈ Safari 18.2) with iPad Pro 11
+    device emulation. Probe: `app/public/probes/kernel-worker-probe.html`
+    (+ `.worker.js`, the protocol entry shape) and
+    `app/e2e/kernel-webview-probe.spec.js` (opt-in via `E2E_WEBKIT=1`;
+    skips in CI by design). 7/7 checks: `new Worker()` (file + Blob URL),
+    INIT→READY (protocol v1), SET_PARAM→PARAM_ACK, transferable
+    postMessage both directions (sender-side detachment observed),
+    8× STEP→FRAME round-trips of 4×1024 Float32Array columns bit-exact,
+    frame-indexed event guard enforced. NOT run: a physical iPad /
+    real WKWebView — re-run the probe page there before calling the
+    platform fully cleared. Rollout rule: the worker may become a
+    deployment default only where this probe passes; `runInline` stays
+    the fallback elsewhere.
 
 ## Unlocked after it
 

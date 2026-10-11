@@ -6,7 +6,7 @@
 # pinned by rust/rust-toolchain.toml, `cargo build --locked` is mandatory, and
 # CI rebuilds from source and compares artifact hashes bit-for-bit.
 [workspace]
-members = ["swarm-bake", "kc-neighbor"]
+members = ["swarm-bake", "kc-fields", "kc-neighbor"]
 resolver = "2"
 
 # Shared release profile for ALL wasm crates — moved here from the individual

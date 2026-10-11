@@ -142,10 +142,17 @@ export function combineFields(a, b) {
  * Falls back to the best candidate seen rather than looping forever, so a
  * nearly-empty field still yields a point (in its densest region).
  *
+ * @param {object} [opts.scratch] #1250 — per-call scratch stream from
+ *   `makeScratchStream()` (placement.js owns it). When present it is
+ *   reseeded per index, so the draws are bit-identical to a fresh
+ *   `rngForIndex` but the allocation happens once per placement call.
+ *   Falls back to `rngForIndex` when absent (direct sampler callers).
  * @returns {{x:number,y:number,accepted:boolean}} normalized 0..1
  */
-export function sampleFieldPoint(field, seed, index, { attempts = 24, channel = 'field', seedOffsets = null } = {}) {
-  const rng = rngForIndex(seed, channel, index, seedOffsets);
+export function sampleFieldPoint(field, seed, index, { attempts = 24, channel = 'field', seedOffsets = null, scratch = null } = {}) {
+  const rng = scratch
+    ? scratch.reseed(seed, channel, index, seedOffsets).draw
+    : rngForIndex(seed, channel, index, seedOffsets);
   let bestX = 0.5;
   let bestY = 0.5;
   let bestV = -1;

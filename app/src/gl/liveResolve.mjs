@@ -542,6 +542,7 @@ export function createLiveResolver() {
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, scaleY: input.effectiveScaleY, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
+          layerId: layer.id, // #1245 — unknown-sampler diagnostic key
           kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
         }).items;
 

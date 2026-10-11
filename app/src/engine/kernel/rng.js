@@ -204,6 +204,48 @@ export function rngForIndex(seed, channel, index, offsets = null) {
   return mkRng(hashU32(seed, channel, index, offsets));
 }
 
+/**
+ * #1250 — scratch stream: one reseedable RNG object for a whole placement
+ * call, replacing the per-point `rngForIndex` allocation in hot samplers
+ * (`ca` / `voronoi` / `sampleFieldPoint`).
+ *
+ * `reseed(seed, channel, index, offsets)` reseeds the internal state with
+ * exactly the hash `rngForIndex` uses, so the `draw` sequence after
+ * reseeding is bit-identical to a fresh
+ * `rngForIndex(seed, channel, index, offsets)`. The hoist only saves
+ * allocation — the sequence math is unchanged.
+ *
+ * HARD RULE: reseed per index before drawing. Consuming one stream across
+ * indices without reseeding draws in a different order and breaks
+ * index-stable placement (the `rngForIndex` contract is "pure hash to a
+ * fresh stream" — never a shared sequential stream).
+ *
+ * The stream is NOT shared across placement calls: `computeGeometrySoA`
+ * creates one per call and it is never stored, so concurrent callers
+ * cannot stomp each other.
+ */
+export function makeScratchStream() {
+  let s = 1;
+  const stream = {
+    /** One unit draw — the mkRng xorshift32 step, verbatim. */
+    draw() {
+      s ^= s << 13;
+      s ^= s >>> 17;
+      s ^= s << 5;
+      const v = (s >>> 0) / 0xffffffff;
+      // Same 1.0 clamp as mkRng (see prng.js): Math.floor(rng() * len) would
+      // otherwise index one past the end.
+      return v === 1 ? 1 - Number.EPSILON : v;
+    },
+    /** Reseed to (seed, channel, index): same state as rngForIndex. */
+    reseed(seed, channel, index, offsets = null) {
+      s = (hashU32(seed, channel, index, offsets) | 0) || 1;
+      return stream;
+    },
+  };
+  return stream;
+}
+
 /** Sequential stream for a whole channel (no index) — rare; prefer index-stable. */
 export function rngForChannel(seed, channel, offsets = null) {
   return mkRng(hashU32(seed, channel, 0, offsets));
