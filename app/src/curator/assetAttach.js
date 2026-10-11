@@ -21,15 +21,20 @@ export function sanitizeAttachPoints(points) {
   return points.filter((p) => p && inBox(p.x) && inBox(p.y)).slice(0, MAX_ATTACH).map((p) => ({ x: snap(p.x), y: snap(p.y) }));
 }
 
-/** The whole map { assetId: points }. Returns null when nothing is set, so an untouched project saves as before. */
+/**
+ * The whole map { assetId: points }: only the assets the artist edited by hand. An entry may be an EMPTY list: that
+ * is the artist saying "no points on this one", which is different from an asset with no entry (it uses the points
+ * worked out from its shape, curator/autoAttach.js). Returns null when nothing is set, so an untouched project
+ * saves as before.
+ */
 export function sanitizeAssetAttach(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const out = {};
   let n = 0;
   for (const [assetId, pts] of Object.entries(raw)) {
     if (typeof assetId !== 'string' || !assetId || assetId.length > 120 || n >= 400) continue;
-    const clean = sanitizeAttachPoints(pts);
-    if (clean.length) { out[assetId] = clean; n++; }
+    if (!Array.isArray(pts)) continue;
+    out[assetId] = sanitizeAttachPoints(pts); n++;
   }
   return n ? out : null;
 }

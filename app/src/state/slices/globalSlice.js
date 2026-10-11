@@ -26,7 +26,7 @@ import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegions, normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { placePin } from '../../curator/dishPins.js';
-import { clickAttach, sanitizeAssetAttach } from '../../curator/assetAttach.js';
+import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../curator/assetAttach.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -618,19 +618,26 @@ export const createGlobalSlice = (set) => ({
     if (cur[assetId]) { const next = { ...cur }; delete next[assetId]; return { assetStill: next }; }
     return { assetStill: { ...cur, [assetId]: true } };
   }),
-  /** #1355 — a wet-lab click on an asset: add an attach point, or remove the one clicked. Rides the document. */
-  clickAssetAttach: (assetId, pt) => set((state) => {
+  /**
+   * #1355 — a wet-lab click on an asset: add an attach point, or remove the one clicked. `shown` is what the lab is
+   * showing (the asset's own points, or the ones worked out from its shape): the first hand edit starts from those
+   * and from then on the asset uses the artist's. Rides the document.
+   */
+  clickAssetAttach: (assetId, pt, shown) => set((state) => {
     if (!assetId || typeof assetId !== 'string') return {};
     const cur = state.assetAttach || {};
-    const before = cur[assetId] || [];
+    const before = Array.isArray(cur[assetId]) ? cur[assetId] : sanitizeAttachPoints(shown);
     const after = clickAttach(before, pt);
     if (after === before) return {};
-    const next = { ...cur };
-    if (after.length) next[assetId] = after; else delete next[assetId];
-    return { assetAttach: next };
+    return { assetAttach: { ...cur, [assetId]: after } };
   }),
-  clearAssetAttach: (assetId) => set((state) => {
-    if (!state.assetAttach?.[assetId]) return {};
+  /** No points on this asset: an explicit empty list, the artist's choice (not the same as "auto"). */
+  clearAssetAttach: (assetId) => set((state) => (
+    assetId && typeof assetId === 'string' ? { assetAttach: { ...(state.assetAttach || {}), [assetId]: [] } } : {}
+  )),
+  /** Back to the points worked out from the shape: the hand edit is dropped. */
+  autoAssetAttach: (assetId) => set((state) => {
+    if (!state.assetAttach || !(assetId in state.assetAttach)) return {};
     const next = { ...state.assetAttach };
     delete next[assetId];
     return { assetAttach: next };

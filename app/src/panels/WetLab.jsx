@@ -1,20 +1,23 @@
 /**
  * WetLab.jsx — #1355 Phase 3: the wet lab window for one asset. First tool: ATTACH points, the places on the shape
- * where another part may join. Click the shape to add a point (up to MAX_ATTACH); click a point to remove it.
+ * where another part may join. Every asset starts with points worked out from its shape (AUTO); click the shape to
+ * add a point (up to MAX_ATTACH), click a point to remove it, and the asset uses yours from then on.
  * Same popup shell as RegionPicker. The window is where the asset's creature settings will grow.
  */
 import { useEffect, useRef } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { MAX_ATTACH, ATTACH_BOX } from '../curator/assetAttach.js';
+import { autoAttachPoints } from '../curator/autoAttach.js';
 
 const PREVIEW_PX = 320;
-const NONE = [];
 
 export function WetLab({ assetId, onClose }) {
   const { assets } = useApp();
   const asset = assets.find((a) => a.id === assetId) || null;
-  const points = useStore((s) => s.assetAttach?.[assetId]) || NONE;
+  const own = useStore((s) => s.assetAttach?.[assetId]);
+  const isOwn = Array.isArray(own); // the artist edited this asset by hand; otherwise the points come from its shape
+  const autoAssetAttach = useStore((s) => s.autoAssetAttach);
   const clickAssetAttach = useStore((s) => s.clickAssetAttach);
   const clearAssetAttach = useStore((s) => s.clearAssetAttach);
   const wrapRef = useRef(null);
@@ -31,6 +34,7 @@ export function WetLab({ assetId, onClose }) {
   }, []);
 
   if (!asset) return null;
+  const points = isOwn ? own : autoAttachPoints(asset.svg);
 
   const click = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();
@@ -38,7 +42,7 @@ export function WetLab({ assetId, onClose }) {
     clickAssetAttach(asset.id, {
       x: ((e.clientX - rect.left) / rect.width) * ATTACH_BOX,
       y: ((e.clientY - rect.top) / rect.height) * ATTACH_BOX,
-    });
+    }, points);
   };
   const full = points.length >= MAX_ATTACH;
 
@@ -60,26 +64,33 @@ export function WetLab({ assetId, onClose }) {
               style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
               {points.map((p, i) => (
                 <g key={i} transform={`translate(${p.x} ${p.y})`} data-testid="attach-point">
-                  <rect x="-3" y="-3" width="6" height="6" fill="#000" stroke="var(--kc-red)" strokeWidth="0.8" />
+                  <rect x="-3" y="-3" width="6" height="6" fill="#000" stroke="var(--kc-red)" strokeWidth="0.8" strokeDasharray={isOwn ? undefined : '1.5 1'} />
                   <text y="1.6" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="var(--kc-red)">{i + 1}</text>
                 </g>
               ))}
             </svg>
           </div>
           <div style={{ flex: '1 1 auto', minWidth: 160, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={secTitle}>ATTACH · {points.length}/{MAX_ATTACH}</div>
+            <div style={secTitle} data-testid="attach-source">ATTACH · {points.length}/{MAX_ATTACH} · {isOwn ? 'YOURS' : 'AUTO'}</div>
             <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.5 }}>
-              {full ? 'All four points are placed. Click a point to remove it.' : 'Click the shape to mark where another part may join. Click a point to remove it.'}
+              {isOwn ? 'These are your points.' : 'These points were worked out from the shape.'}{' '}
+              {full ? 'All four are placed: click a point to remove it.' : 'Click the shape to add a point where another part may join. Click a point to remove it.'}
             </div>
-            {points.length > 0 && (
-              <button type="button" className="chip-btn act" style={{ alignSelf: 'flex-start' }} data-testid="attach-clear"
-                onClick={() => clearAssetAttach(asset.id)}>clear points</button>
-            )}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {isOwn && (
+                <button type="button" className="chip-btn act" data-testid="attach-auto" title="Drop your edits and use the points worked out from the shape"
+                  onClick={() => autoAssetAttach(asset.id)}>auto</button>
+              )}
+              {points.length > 0 && (
+                <button type="button" className="chip-btn act" data-testid="attach-clear" title="No attach points on this asset"
+                  onClick={() => clearAssetAttach(asset.id)}>clear points</button>
+              )}
+            </div>
           </div>
         </div>
         <footer style={foot}>
           <span style={{ fontSize: 10, color: 'var(--dim)' }}>
-            attach points belong to the asset: every copy in the dish carries them, and they are saved with the project.
+            every asset has attach points from its shape. your edits replace them for this asset and are saved with the project.
           </span>
         </footer>
       </div>
