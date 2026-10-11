@@ -1,8 +1,9 @@
 /**
  * Icons for KC-1 (#1262).
  * Geometric set uses Noto Sans Symbols 2 Unicode.
- * Queen uses chunky stepped crown SVG.
- * Lois uses chunky empty square SVG.
+ * Queen → chunky stepped crown SVG
+ * Lois → chunky empty square SVG
+ * Davis → nested square target SVG
  */
 export const icons = {
   // Noto geometric
@@ -19,11 +20,12 @@ export const icons = {
   // Special (SVG)
   queen: 'queen-crown',
   lois: 'lois-square',
+  davis: 'davis-target',
 };
 
 export function Icon({ name, ...props }) {
   const special = icons[name];
-  if (special === 'queen-crown' || special === 'lois-square' || special === 'nested-target') {
+  if (special === 'queen-crown' || special === 'lois-square' || special === 'davis-target') {
     return (
       <img
         src={`/src/icons/${special}.svg`}
