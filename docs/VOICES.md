@@ -117,6 +117,16 @@ Constraints (locked): one icon (👸🏽) next to BEATS; appears/pulses when swa
 
 Davis and Lois are influences, not impersonations. Public techniques, principles, and short idioms are fair game; their artwork, code, and assets never ship. The voices are Matt's instrument wearing their influence — directed by him, arguing with each other. If it ever reads as impersonation, that's a design bug.
 
+## The Honesty Contract (anti-Clippy codification)
+
+Clippy's sins, inverted into five enforceable rules. Every rule is selfcheck-testable.
+
+1. **No verdict, no UI.** A mark, breath, or line renders if and only if a voice holds a live suggestion produced by the sway machinery. There is no idle animation, no "engagement" shimmer. Freeze the state → the UI must freeze.
+2. **Conviction is computed, never performed.** Affect intensity = f(ledger depth, verdict strength, recency). Never a timer, never random, never decorative. (LOIS rule: no timers with opinions.)
+3. **Silence is default; dismissal is data.** No suggestions → full rest. Passing on a suggestion appends to the pass ledger — the voice updates its sway, not just hides the row.
+4. **Shame mechanic.** A voice whose suggestions are passed 3× in a row goes quiet for the rest of the session. Burned means burned.
+5. **Kill switch.** One "quiet directors" toggle kills all affect instantly and persists. Clippy couldn't be turned off; the Trio can. `prefers-reduced-motion` collapses to static marks independently.
+
 ## Open questions
 
 1. Should voice `lines` be user-editable, or canonical?
