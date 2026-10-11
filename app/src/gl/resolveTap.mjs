@@ -28,15 +28,38 @@ export function tapResolveInput(input) {
   }
 }
 
+let outputListener = null;
+
+/** Register the one OUTPUT listener (or null). It sees what the resolver returned for the input just tapped. */
+export function setResolveOutputTap(fn) {
+  const prev = outputListener;
+  outputListener = typeof fn === 'function' ? fn : null;
+  return prev;
+}
+
+/** Called after every resolver call with its result. Same rule: a throwing listener is dropped, never fatal. */
+export function tapResolveOutput(output) {
+  if (outputListener === null) return;
+  try {
+    outputListener(output);
+  } catch (e) {
+    outputListener = null;
+    console.warn('[resolveTap] output listener threw and was removed:', e && e.message ? e.message : e);
+  }
+}
+
 /**
- * The resolver, with its inputs observable. Everything else (dispose and friends) is the original, by prototype:
- * only resolveLayers is shadowed, and it hands the SAME input object to the same function.
+ * The resolver, with its inputs and outputs observable. Everything else (dispose and friends) is the original, by
+ * prototype: only resolveLayers is shadowed, and it hands the SAME input object to the same function and returns
+ * the same result.
  */
 export function withResolveTap(resolver) {
   const tapped = Object.create(resolver);
   tapped.resolveLayers = (input) => {
     tapResolveInput(input);
-    return resolver.resolveLayers(input);
+    const output = resolver.resolveLayers(input);
+    tapResolveOutput(output);
+    return output;
   };
   return tapped;
 }

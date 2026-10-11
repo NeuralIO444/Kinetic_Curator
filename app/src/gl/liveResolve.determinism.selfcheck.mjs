@@ -118,8 +118,9 @@ const SCENARIOS = [
   {
     name: 'governor-inputs',
     at: (f) => ({
-      layoutParams: lp({ mode: 'flow', count: 120 }),
-      quality: f < 30 ? 'balanced' : 'fast', perfTier1: f > 45, slowRender: f > 70 && f < 80, assetThin: f > 60,
+      // 300 nodes is over the 'performance' tier's cap (180), so the tier change really sheds
+      layoutParams: lp({ mode: 'flow', count: 300 }),
+      quality: f < 30 ? 'balanced' : 'performance', perfTier1: f > 45, slowRender: f > 70 && f < 80, assetThin: f > 60,
       ...breathe(f),
     }),
   },
@@ -158,6 +159,13 @@ for (const s of SCENARIOS) {
   checked += 1;
 }
 console.log(`liveResolve.determinism: ${checked} scenarios x ${FRAMES} frames identical on two fresh resolvers`);
+
+// the governor scenario really sheds: the same scene held at one tier is a different run
+{
+  const held = run({ name: 'governor-held', at: (f) => ({ layoutParams: lp({ mode: 'flow', count: 300 }), ...breathe(f) }) });
+  assert.notEqual(createHash('sha256').update(held.join('')).digest('hex').slice(0, 16), mine['governor-inputs'],
+    'changing the quality tier changes the frames (a tier name that does not exist would silently do nothing)');
+}
 
 // the patch scenarios really exercise the patches: each one differs from the unpatched pair
 for (const p of ['patch:field', 'patch:feed', 'patch:mod']) {
