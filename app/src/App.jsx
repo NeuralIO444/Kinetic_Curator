@@ -36,6 +36,8 @@ import { initPhase } from './curator/phase.js'; // #1144: the instrument knows t
 import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353: record a performance
 import { initStress, DEBUG_STRESS } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
+import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
+import { setResolveFrameTap } from './gl/resolveTap.mjs';
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -78,10 +80,14 @@ function AppInner() {
     initPhase(useStore.subscribe); // #1144: explore / refine, from what the artist does
     // #1354 — stress and bands from honest counts (artist actions, rolls since the last keep). Computed only: no
     // persona reads the band yet; ?debug=stress shows it.
-    return initStress({
+    // #1355 — dish pressure: the marks the resolver placed around the canvas pins, read from each resolved frame.
+    setResolveFrameTap(observeDish);
+    const stop = initStress({
       getCounts: loisActivity.pressureCounts,
       isRunning: () => useStore.getState().running,
+      getDish: getDishPressure,
     });
+    return () => { setResolveFrameTap(null); stop(); };
   }, []);
 
   const { state } = useApp(s => ({
