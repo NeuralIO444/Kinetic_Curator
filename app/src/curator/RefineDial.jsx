@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { getRefineSpread, setRefineSpread } from './refineSpread.js';
 import { MIN_SPREAD, MAX_SPREAD, DEFAULT_SPREAD } from './refineMutate.js';
 import { getPhase } from './phase.js';
+import { RangeRow } from '../components/RangeRow.jsx';
 
 export function RefineDial() {
   const [value, setValue] = useState(getRefineSpread());
@@ -30,25 +31,20 @@ export function RefineDial() {
         <span>REFINE SPREAD {value.toFixed(2)}</span>
         <span style={{ color: refining ? '#ffb347' : '#8a8a90' }}>{refining ? 'refine: active' : `phase: ${phase || 'none'}`}</span>
       </div>
-      <input
-        type="range"
+      <RangeRow
+        label="spread"
+        value={value}
         min={MIN_SPREAD}
         max={MAX_SPREAD}
         step={0.01}
-        value={value}
-        aria-label="How far a refine variation may wander from the keep"
-        onChange={(e) => setValue(setRefineSpread(Number(e.target.value)))}
-        style={{ width: '100%' }}
+        defaultValue={DEFAULT_SPREAD}
+        readout={value.toFixed(2)}
+        hint="How far a refine variation may wander from the keep. Double-click resets."
+        ariaLabel="Refine spread"
+        onChange={(v) => setValue(setRefineSpread(v))}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8a8a90', marginTop: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8a8a90', marginTop: 2 }}>
         <span>tight</span>
-        <button
-          type="button"
-          onClick={() => setValue(setRefineSpread(DEFAULT_SPREAD))}
-          style={{ background: 'none', border: 0, color: '#8a8a90', cursor: 'pointer', font: 'inherit' }}
-        >
-          reset {DEFAULT_SPREAD.toFixed(2)}
-        </button>
         <span>wide</span>
       </div>
     </div>
