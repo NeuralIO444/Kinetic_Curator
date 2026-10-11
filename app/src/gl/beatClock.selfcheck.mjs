@@ -83,7 +83,7 @@ ok('metro: the interval is the dialed tempo (120 BPM = 500 ms), always inside th
 
 ok('metro: it fires only when the artist turned it on, the instrument runs, and audio is NOT the beat (audio always wins)', () => {
   assert.equal(metroRunning({ beatMetro: true, audioEnabled: false, running: true }), true);
-  assert.equal(metroRunning({ beatMetro: false, audioEnabled: false, running: true }), false, 'off by default');
+  assert.equal(metroRunning({ beatMetro: false, audioEnabled: false, running: true }), false, 'off when the switch is off');
   assert.equal(metroRunning({ beatMetro: true, audioEnabled: true, running: true }), false, 'audio wins');
   assert.equal(metroRunning({ beatMetro: true, audioEnabled: false, running: false }), false, 'paused');
   assert.equal(metroRunning(), false); assert.equal(metroRunning({}), false);
@@ -97,3 +97,12 @@ ok('the dot may flash only while a real beat drives the stage: the metro or live
 });
 
 console.log(`beatClock.selfcheck: OK (${n} checks)`);
+
+// #1144: the metro pulse is ON by default (Matt, 2026-10-11): a quiet room still breathes at the dialed tempo.
+// The store default is the one place that says so; audio on always wins (metroRunning, above).
+{
+  const { useStore } = await import('../state/store.js');
+  assert.equal(useStore.getInitialState().beatMetro, true, 'beatMetro defaults on');
+  console.log('beatClock.selfcheck: metro pulse defaults on');
+}
+
