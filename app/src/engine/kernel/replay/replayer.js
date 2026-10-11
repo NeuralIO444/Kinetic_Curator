@@ -1,5 +1,11 @@
 // kernel/replay/replayer.js — headless deterministic replayer (#1313).
 //
+// WHAT THIS IS, AND IS NOT (#1353, 2026-10-11). This is the KERNEL GOLDEN HARNESS: a small headless cohort that steps
+// kernel pieces (placement, fields, the audio drive) deterministically, so a kernel change that drifts by one bit
+// fails CI against goldens/. It is NOT a replay of the instrument: the live pipeline never ran on this cohort.
+// A PERFORMANCE of the instrument is the live resolver's recorded input sequence, replayed through the same
+// resolver: gl/performanceFile.mjs (plan: docs/design/dish-spine-plan.md).
+//
 // Per docs/design/deterministic-replay.md: `replay(seed, eventLog, frameCount,
 // { snapshotEvery })` runs the kernel with no renderer and no DOM and returns
 // per-frame hashes plus optional snapshots. Same seed + same event log →

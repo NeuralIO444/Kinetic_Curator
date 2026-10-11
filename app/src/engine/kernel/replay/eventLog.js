@@ -16,8 +16,10 @@
 //   dish-module-toggle { module, enabled }             — toggle a replay module
 //
 // The log is JSON-safe by construction: payloads are plain data only
-// (finite numbers, strings, booleans, null, arrays, plain objects). The
-// export/import UI (#1314) serializes this log verbatim.
+// (finite numbers, strings, booleans, null, arrays, plain objects).
+//
+// Scope (#1353): this log feeds the kernel golden harness (replayer.js). The instrument's performances are recorded
+// as resolver inputs instead (kernel/replay/inputLog.js + gl/performanceFile.mjs).
 
 /** Event types the replayer understands. Kebab-case, matching #1334. */
 export const EVENT_TYPES = Object.freeze([
@@ -223,7 +225,7 @@ export function maxEventFrame(log) {
   return max;
 }
 
-/** JSON-safe serialization (what #1314's export writes to disk). */
+/** JSON-safe serialization (the golden fixtures' on-disk form). */
 export function serializeEventLog(log) {
   if (!log || !Array.isArray(log.events)) {
     throw new EventLogError('log must be created by createEventLog()/parseEventLog()');
@@ -235,7 +237,7 @@ export function serializeEventLog(log) {
 }
 
 /**
- * Parse + re-validate a serialized log (golden fixtures, #1314 import path).
+ * Parse + re-validate a serialized log (golden fixtures).
  * Accepts the serialized shape; extra fields (like `seq`) are ignored.
  */
 export function parseEventLog(data) {
