@@ -63,10 +63,13 @@ export function getActiveCurator() {
  * must be the ones in this array. A profile bug never breaks the button —
  * shaping failure falls back to the unshaped candidates.
  */
-export function pickCurated(candidates, curator, rng = Math.random) {
+export function pickCurated(candidates, curator, rng = Math.random, { refine = false } = {}) {
   const n = candidates.length;
   if (n === 0) return { index: -1, curated: false };
-  if (curator && typeof curator.shapeCandidates === 'function') {
+  // #1144: in REFINE the candidates are local mutations of what landed. The persona's render profile re-rolls the
+  // biased keys from its own ranges and would undo that, so refine is not re-dreamed (the live values already carry
+  // the persona's earlier look); the pick itself is still taste-weighted.
+  if (!refine && curator && typeof curator.shapeCandidates === 'function') {
     try {
       curator.shapeCandidates(candidates, rng);
     } catch {
