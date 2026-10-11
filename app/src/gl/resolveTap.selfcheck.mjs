@@ -90,7 +90,7 @@ const SCENES = {
   'mod patch': (f) => ({ layers: [L('lyr-a'), L('lyr-b', { patch: { mode: 'mod', to: 'lyr-a', strength: 1 } })], layoutParams: lp({ mode: 'swarm', behave: 'scatter' }), layerSnapshots: { 'lyr-b': snap(999, { mode: 'random', count: 24 }) }, ...breathe(f) }),
   'mold, shared scent': (f) => ({ layers: [L('m1'), L('m2')], activeLayerId: 'm1', layoutParams: lp({ mode: 'hype', behave: 'mold', count: 14, particleCount: 14 }), layerSnapshots: { m1: snap(101, { mode: 'hype', behave: 'mold', count: 14, particleCount: 14 }), m2: snap(202, { mode: 'hype', behave: 'mold', count: 14, particleCount: 14 }) }, ...breathe(f) }),
   'fx + pattern': (f) => ({ layers: [L('lyr-a'), L('fx', { type: 'fx' }), L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) })], layoutParams: lp({ mode: 'gaussian' }), ...breathe(f) }),
-  'governor + mode change': (f) => ({ layoutParams: lp({ mode: f < 30 ? 'flow' : 'circlepack', count: 90 }), quality: f < 30 ? 'balanced' : 'fast', perfTier1: f > 45, slowRender: f > 65 && f < 72, assetThin: f > 55, ...breathe(f) }),
+  'governor + mode change': (f) => ({ layoutParams: lp({ mode: f < 30 ? 'flow' : 'circlepack', count: 300 }), quality: f < 30 ? 'balanced' : 'performance', perfTier1: f > 45, slowRender: f > 65 && f < 72, assetThin: f > 55, ...breathe(f) }),
 };
 // the real store keeps objects stable between edits: build such a stream too
 function stableScene() {
