@@ -2,7 +2,7 @@
 
 **Status:** proposal for Matt's approval. No engine code changes until approved.
 **Roadmap:** [`ROADMAP_PETRI_DISH.md`](../ROADMAP_PETRI_DISH.md), Phase 1.
-**Exit:** export a live session, import it, replay it, and the frame hashes match the live run.
+**Exit:** export a live session, import it, replay it with the recorded governor note applied, and the frame hashes match the live run. Normal playback is per machine (decision 2).
 
 ## The short version
 
@@ -50,17 +50,24 @@ patches between layers, the kineme and pattern systems, FX layers, and a second 
 
 Steps 1 to 3 deliver the Phase 1 exit. Steps 4 to 6 finish the phase.
 
-## Decisions I need from Matt
+## Decisions (Matt, 2026-10-11)
 
-1. **Frame time in the file.** The live loop uses the real frame time, clamped to 8 to 50 ms. To replay exactly, the
-   file records it per frame (about 25 KB for 2.5 minutes). The alternative is a fixed 1/60 step, which makes files
-   smaller but changes how motion feels on slow frames. Recommendation: record it.
-2. **The governor's state is recorded as an input.** When a slow machine sheds detail, that is part of what happened.
-   On replay the log wins (decision 1 in the roadmap), so a fast machine reproduces the slow machine's shed frames.
-   Recommendation: yes, record it.
-3. **Live playback.** Phase 1's exit is met by headless replay. Playing a file back inside the running instrument
-   (so you watch your performance again) needs a playback mode in `liveLoop`. Recommendation: do it as its own step
-   after step 4, not inside Phase 1's exit.
+1. **Frame time is recorded in the file.** The live loop uses the real frame time, clamped to 8 to 50 ms, and that is
+   what keeps motion smooth under load. The file records it per frame (about 25 KB for 2.5 minutes), so nothing about
+   the feel changes. A fixed 1/60 step was rejected: it would stutter on slow frames.
+2. **Detail is per machine. The performance is the artist's intent, not the weaker machine's limit.** "If you sketch
+   on a laptop and perform on a bigger machine, we want to see an improvement." So playback never applies the
+   original machine's shedding: each machine's own governor decides how much detail it can show.
+   - The governor's state (`quality`, `perfTier`, `slowRender`, asset thinning) is still written to the file, as a
+     **note, never an instruction**. Normal playback ignores it.
+   - The automated check uses the note: it replays once with the recorded shedding applied, to prove the replay is
+     exact frame for frame. That keeps the Phase 1 exit provable.
+   - The file can therefore say where the original shed detail, which explains why a performance looks richer on a
+     stronger machine.
+   - This is a deliberate exception to "the log wins" (roadmap decision 1): the log is the authority for what the
+     artist did, and the machine is the authority for how much it can draw.
+3. **Live playback** (watching a file inside the running instrument): to be decided. Phase 1's exit is met by
+   headless replay. Recommendation: its own step after the footer rename, not inside the exit.
 
 ## Risks
 
