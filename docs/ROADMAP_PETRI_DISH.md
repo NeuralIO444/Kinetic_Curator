@@ -18,7 +18,7 @@ One phase is open at a time. Phase 1 is open.
 - **Stress drives behaviour through threshold bands.** Full telemetry is recorded so the boundaries can be tuned later.
 - **No timers with opinions, honest signals only, the Queen is never rendered.** Unchanged house law.
 
-## The six decisions (2026-10-11)
+## The decisions (2026-10-11)
 
 | # | Question | Decision |
 |---|---|---|
@@ -28,6 +28,7 @@ One phase is open at a time. Phase 1 is open.
 | 4 | A second way to derive rooms | **Keep the existing rooms.** Dish pressure and taste pressure are extra inputs to the existing LOIS/Davis states; definitions stay (BURN = hot keep streak, AWAY = gone 5 minutes). |
 | 5 | Taste pressure signal | **Rolls since the last keep, now.** The keeps-vs-passes ratio joins when the pass gesture (#1173) lands. No clock. |
 | 6 | What comes first | **The dish spine.** The live instrument runs on the dish before the affective slice is built on it. |
+| 7 | Does a replay copy the original machine's shed detail | **No: detail is per machine.** The file is the artist's intent. Sketch on a laptop, perform on a bigger machine, and it looks better. The governor's state is recorded as a note for testing only. This is the one exception to decision 1. |
 
 ---
 
@@ -39,7 +40,7 @@ The live instrument runs on the same dish the replayer steps. Today the log can 
 - The live loop steps the dish; the replayer and the instrument share one step path.
 - A recorded session replays to matching frame hashes; the footer export can then honestly be called a performance.
 - Layers become strata of one dish (#1183); the dish roster replaces the LAYERS mixer (#1203) once the dish is the source of truth.
-- **Exit:** export a live session, import it, replay: the frame hashes match the live run.
+- **Exit:** export a live session, import it, replay with the recorded governor note applied: the frame hashes match the live run. Normal playback is per machine (decision 7). Plan: [`design/dish-spine-plan.md`](design/dish-spine-plan.md).
 
 Issues: the dish-spine issue (new), #1183, #1203, #1314.
 
@@ -95,6 +96,7 @@ Issues: #1145, the influences issue (new), #1173 (pass gesture: upgrades taste p
 ## Out of scope this cycle
 
 - Live AI or model inference inside the app.
+- Playing a performance file back inside the running instrument. Files are for testing and sharing this cycle.
 - The full 20-room copy matrix, new faces, and any Queen rendering.
 - **New** taste.json import work (the shipped taste artifact and the open sway gate stay as they are).
 - Stage-specific items (Syphon #608, the full MIDI-learn surface #617) unless they fall out naturally.
