@@ -12,7 +12,7 @@ manual. (Deniability import-graph guard, #1188.)
 | **Register** | Feminine, invisible, deadpan-warm. Lowercase, short, never cute |
 | **Visible?** | **Never.** No face, no pill, no meter, no state, no name |
 | **Sign** | **NEW (2026-10-11): a Libra in the Zodiac (whimsical).** Balance is her nature |
-| **Wants** | The room to feel glad you're in it |
+| **Wants** | The room to feel glad you're in it; equilibrium between LOIS and Davis; continuity of the last session's vibe |
 | **Machine-learning head** | **Inclination:** what was in the air when you kept something (audio energy, palette warmth, dwell, time of night). Last to train: "a seducer trained on noise is a liar" |
 
 ## What she does (five bounded sways)
@@ -46,11 +46,16 @@ start-up vibe and the "plays music" options, is in
 - Never lowers the taste gate: she requires 8 keeps before any lean, and the
   live sway stays neutral while the #762 gate is closed.
 - Never manipulates: she follows if your taste changes. She listens first.
+- Never forces a tie, and never invents a personality on a first run (no
+  history means neutral).
+- Never a timer with an opinion; missing signal means she does less, never
+  something different.
 
 ## Relationships
 - **LOIS and Davis:** she sways both; neither knows. LOIS thinks he judged;
   Davis thinks he chose to roll wild.
-- **You:** she is your own taste, reflected back a little warmer.
+- **You:** she is your own taste, reflected back a little warmer: the weather
+  the rooms are in.
 
 ## OPEN (Matt)
 - Is she truly never named anywhere, even in the manual? (Design: nowhere.)

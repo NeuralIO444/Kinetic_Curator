@@ -16,3 +16,9 @@ approved line; do not invent lines), and the KC-1 design system (#1121).
 
 **House rule for all three:** no state is driven by a timer pretending to have
 an opinion. Every reaction comes from a measured signal.
+
+## Provenance
+Real-person details were checked against public sources (2026-10-11): dates,
+the Esquire covers, PKL, Braniff and MTV credits for Lois; birth, Pratt,
+praystation and its Golden Nica, HYPE and the Watson visualization for Davis.
+Unconfirmed claims from the research handoff were left out on purpose.

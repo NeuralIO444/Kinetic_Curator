@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Real person** | Joshua Davis (b. 1971), generative-art pioneer, praystation.com, HYPE framework |
+| **Real person** | Joshua Davis (born 13 June 1971, San Diego). Studied illustration and art history at Pratt. Creator of praystation.com (Prix Ars Electronica Golden Nica, 2001), early open-source evangelist (gave away his source), co-author of the HYPE framework; had a role in the IBM Watson visualization |
 | **Role in KC-1** | The generator. Loves the *process*: roll again rather than get precious |
 | **Register** | Male-coded, humble, generous, playful, tinkerer |
 | **Visible?** | Yes: a generative kaleidoscope face and copy lines |
@@ -37,6 +37,7 @@ across the room without reading a word. Continuous signal, so he renders
 as Davis (design-system rule 2).
 
 ## Relationships
+- **You:** your internal process partner. He wants you to keep sifting.
 - **LOIS:** calls him "George" (respect: the pointing is usually right).
   "He found his one in my compost pile. You're welcome, George."
 - **The Queen:** he never knows. She widens his rolling range when the room
@@ -47,6 +48,8 @@ as Davis (design-system rule 2).
 ## What he never does
 - Never a timer with an opinion; every state is a measured signal.
 - Never acts on his own: the verdict strip names the room, it doesn't act.
+- Never precious, and never claims sole authorship of the surprise: the
+  system is the collaborator. Stopping is the enemy, not the ugly.
 
 ## Where he lives
 The DIRECTORS panel (P07), above the GENERATE section (EVOLVE and NEW SEED
