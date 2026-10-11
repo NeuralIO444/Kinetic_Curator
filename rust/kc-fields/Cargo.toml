@@ -1,0 +1,17 @@
+[package]
+name = "kc-fields"
+version = "0.1.0"
+edition = "2021"
+description = "Noise/scent field evaluation on flat buffers for Kinetic_Curator (#1319) — compiled to wasm32-unknown-unknown"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# No dependencies: the noise port is pure f64 arithmetic (same as the JS
+# reference — no trig, so no libm needed) and the scent grid is a plain
+# diffuse/decay loop. Fewer deps, fewer ways the build can drift.
+
+# Release profile lives in the workspace root (rust/Cargo.toml, #1317): in a
+# workspace the root [profile.*] wins, so a per-crate copy would be silently
+# ignored.
