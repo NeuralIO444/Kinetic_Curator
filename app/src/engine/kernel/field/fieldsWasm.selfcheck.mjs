@@ -43,6 +43,7 @@ import {
   fieldsScentStep,
   fieldsWasmLoadError,
   WASM_BACKEND,
+  wasmStats,
 } from './fieldsWasm.mjs';
 
 const SELFCHECK_DIR = dirname(fileURLToPath(import.meta.url));
@@ -360,15 +361,61 @@ function gridViaCellCenters(field, wasmCells, cols, rows, label) {
   console.log('[ok] scope gate refuses out-of-scope configs with named reasons');
 }
 
-// --- 7. default stays JS ----------------------------------------------------------
+// --- 7. default is Rust-when-loaded (#1304, Matt 2026-10-11) ----------------------
 {
-  assert.strictEqual(WASM_BACKEND.noise, false, 'WASM_BACKEND.noise must default to false');
-  assert.strictEqual(WASM_BACKEND.scent, false, 'WASM_BACKEND.scent must default to false');
-  assert.strictEqual(wasmBackendFor('noise'), false);
-  assert.strictEqual(wasmBackendFor('scent'), false);
+  assert.strictEqual(WASM_BACKEND.noise, true, 'WASM_BACKEND.noise defaults on');
+  assert.strictEqual(WASM_BACKEND.scent, true, 'WASM_BACKEND.scent defaults on');
+  assert.strictEqual(wasmBackendFor('noise'), true);
+  assert.strictEqual(wasmBackendFor('scent'), true);
   assert.strictEqual(wasmBackendFor('quadtree'), false, 'unknown field ids stay JS');
   assert.strictEqual(wasmForcedOff(), false, 'KC_FIELDS_WASM unset must not force off');
-  console.log('[ok] WASM_BACKEND defaults to JS for every field (default stays JS, #1319)');
+  process.env.KC_FIELDS_WASM = '0';
+  assert.strictEqual(wasmBackendFor('scent'), false, 'KC_FIELDS_WASM=0 forces JS');
+  delete process.env.KC_FIELDS_WASM;
+  console.log('[ok] WASM_BACKEND defaults on; KC_FIELDS_WASM=0 forces JS (#1304)');
+}
+
+// --- 7b. the live consumer: createScentField().step() runs wasm by default ---------
+{
+  const { createScentField } = await import('./scent.js');
+  assert.ok(getFieldsWasm(), 'module is loaded for this check');
+  const build = () => {
+    const f = createScentField();
+    for (let i = 0; i < 200; i++) f.deposit(((i * 37) % 64) / 64, ((i * 53) % 36) / 36, 0.5 + (i % 5) * 0.25);
+    return f;
+  };
+  const drive = (f) => {
+    for (let k = 0; k < 40; k++) {
+      f.deposit(((k * 11) % 64) / 64, ((k * 7) % 36) / 36, 1);
+      f.step(k % 3 === 0 ? { decay: 0.9, diffuse: 0.4 } : {});
+    }
+  };
+  const ref = build();
+  process.env.KC_FIELDS_WASM = '0'; // the JS reference run
+  const beforeRef = wasmStats.scentSteps;
+  drive(ref);
+  delete process.env.KC_FIELDS_WASM;
+  assert.strictEqual(wasmStats.scentSteps, beforeRef, 'forced-off run never touches wasm');
+  const live = build();
+  const before = wasmStats.scentSteps;
+  drive(live);
+  assert.strictEqual(wasmStats.scentSteps - before, 40, 'default run took the wasm path for every step');
+  for (let y = 0; y < 90; y++) {
+    for (let x = 0; x < 160; x++) {
+      const nx = x / 160;
+      const ny = y / 90;
+      assert.ok(Object.is(live.sample(nx, ny), ref.sample(nx, ny)), `scent grid differs at ${nx},${ny}`);
+    }
+  }
+  // non-finite params are out of scope: falls back to JS, same answer, no throw
+  const f1 = build();
+  const f2 = build();
+  f1.step({ decay: NaN });
+  process.env.KC_FIELDS_WASM = '0';
+  f2.step({ decay: NaN });
+  delete process.env.KC_FIELDS_WASM;
+  assert.ok(Object.is(f1.sample(0.5, 0.5), f2.sample(0.5, 0.5)), 'out-of-scope params use the JS loop');
+  console.log('[ok] scent step: wasm by default, bit-identical to the JS reference over 40 mixed steps');
 }
 
 // --- 8. performance: HARD = not slower than JS -----------------------------------
@@ -408,7 +455,11 @@ function timeMs(fn, { warmup, trials }) {
   const jsField = createScentField(SCENT_COLS_FIX, SCENT_ROWS_FIX);
   for (let i = 0; i < cells.length; i++) jsField.deposit(((i * 37) % SCENT_COLS_FIX) / SCENT_COLS_FIX, ((i * 53) % SCENT_ROWS_FIX) / SCENT_ROWS_FIX, 1);
   const wasmCells = Float64Array.from(cells);
+  // jsField.step() now dispatches to wasm by default (#1304): force the JS
+  // reference for the timing baseline or this would compare wasm to wasm.
+  process.env.KC_FIELDS_WASM = '0';
   const jsStepMs = timeMs(() => jsField.step(), { warmup: 1, trials: 5 });
+  delete process.env.KC_FIELDS_WASM;
   const wasmStepMs = timeMs(() => fieldsScentStep(wasm, wasmCells, SCENT_COLS_FIX, SCENT_ROWS_FIX, {}), { warmup: 2, trials: 7 });
   const stepRatio = jsStepMs / Math.max(wasmStepMs, 1e-9);
   console.log(`  [info] scent step 64x36: JS ${jsStepMs.toFixed(2)}ms, wasm ${wasmStepMs.toFixed(2)}ms (${stepRatio.toFixed(2)}x)`);

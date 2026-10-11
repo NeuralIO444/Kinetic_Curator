@@ -22,9 +22,11 @@
 //     module's linear memory) — the Rust side owns no heap state.
 //   - If the module cannot load, is absent, or the config is out of scope,
 //     callers stay on the JS engine. KC_FIELDS_WASM=0 forces the JS path.
-//   - WASM_BACKEND is the per-field flag (noise, scent). Default stays JS
-//     in this PR, period — retiring the default is a separate, Matt-approved
-//     step after parity is proven in CI.
+//   - WASM_BACKEND is the per-field flag (noise, scent). Default is ON
+//     (Matt, 2026-10-11: "Rust by default and when possible", #1304): the
+//     wasm path runs whenever the module is loaded and the call is in scope,
+//     and anything else silently uses the JS reference, which is never
+//     deleted. Parity is bit-identical and gated in CI.
 
 const REQUIRED_EXPORTS = [
   'memory',
@@ -36,9 +38,13 @@ const REQUIRED_EXPORTS = [
 /**
  * Per-field WASM_BACKEND flags. The JS implementations are the permanent
  * references; the wasm paths are parity-checked accelerators. Both default
- * to false — default stays JS until parity is proven in CI (#1319).
+ * to true (#1304): "use wasm when it is loaded and in scope". KC_FIELDS_WASM=0
+ * forces JS. A saved recipe can never change these (runtime-only).
  */
-export const WASM_BACKEND = { noise: false, scent: false };
+export const WASM_BACKEND = { noise: true, scent: true };
+
+/** Debug counters: lets selfchecks prove the wasm path actually ran. */
+export const wasmStats = { noiseBatches: 0, scentSamples: 0, scentSteps: 0 };
 
 let cached = null;      // { instance } | null
 let loadAttempted = false;
@@ -211,6 +217,7 @@ export function fieldsNoiseBatch(wasm, seed, opts = {}, xs, ys, out, count = len
   new Float32Array(mem(), px, count).set(xs);
   new Float32Array(mem(), py, count).set(ys);
   exports.fields_noise_batch(seed, freq, octaves, lacunarity, gain, z, px, py, po, count);
+  wasmStats.noiseBatches += 1;
   out.set(new Float32Array(mem(), po, count).subarray(0, count));
   return out;
 }
@@ -237,6 +244,7 @@ export function fieldsScentSample(wasm, cells, cols, rows, xs, ys, out, count = 
   new Float32Array(mem(), px, count).set(xs);
   new Float32Array(mem(), py, count).set(ys);
   exports.fields_scent_sample(pc, cols, rows, px, py, po, count);
+  wasmStats.scentSamples += 1;
   out.set(new Float32Array(mem(), po, count).subarray(0, count));
   return out;
 }
@@ -256,6 +264,7 @@ export function fieldsScentStep(wasm, cells, cols, rows, { decay = 0.97, diffuse
   const mem = () => exports.memory.buffer;
   new Float64Array(mem(), pc, cells.length).set(cells);
   exports.fields_scent_step(pc, ps, cols, rows, decay, diffuse);
+  wasmStats.scentSteps += 1;
   cells.set(new Float64Array(mem(), pc, cells.length));
   return cells;
 }

@@ -16,7 +16,7 @@
 //   D. Neighbor parity: bit-identical neighbor output (counts + per-target
 //      index sequences) JS vs WASM on fixture scenes — mixed, boundary,
 //      empty, degenerate, seeded stress, NaN.
-//   E. WASM_BACKEND flag: default stays 'js' (this PR does NOT flip it);
+//   E. WASM_BACKEND flag: default 'wasm' (#1304), KC_NEIGHBOR_WASM=0 forces js;
 //      explicit 'wasm' dispatches to the identical wasm path; the JS
 //      implementation is the permanent reference and is never deleted.
 //   F. The crate's neighbor sets drive the real FIELD path: wasm indices +
@@ -315,8 +315,11 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
 
 // --- E. WASM_BACKEND flag -------------------------------------------------------
 {
-  assert.strictEqual(getNeighborBackend(), 'js', 'default backend must be js');
-  assert.strictEqual(effectiveNeighborBackend(), 'js', 'effective backend must be js without opt-in');
+  assert.strictEqual(getNeighborBackend(), 'wasm', 'default backend is wasm (#1304)');
+  assert.strictEqual(effectiveNeighborBackend(), 'wasm', 'effective backend is wasm by default');
+  process.env.KC_NEIGHBOR_WASM = '0';
+  assert.strictEqual(effectiveNeighborBackend(), 'js', 'KC_NEIGHBOR_WASM=0 forces the JS reference');
+  delete process.env.KC_NEIGHBOR_WASM;
   assert.throws(() => setNeighborBackend('cuda'), RangeError, 'unknown backend throws');
 
   // Explicit wasm dispatch == JS reference, bit-for-bit.
@@ -346,7 +349,9 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
   setNeighborBackend('js');
   assert.strictEqual(getNeighborBackend(), 'js', 'backend restored to js');
   assert.strictEqual(effectiveNeighborBackend(), 'js');
-  console.log("[ok] E. WASM_BACKEND flag: default 'js', explicit 'wasm' dispatches bit-identical, env opt-in works");
+  setNeighborBackend('wasm'); // restore the shipped default for later sections
+  assert.strictEqual(getNeighborBackend(), 'wasm');
+  console.log("[ok] E. WASM_BACKEND flag: default 'wasm', explicit dispatch bit-identical, env force-off works");
 }
 
 // --- F. the crate drives the real FIELD path ------------------------------------

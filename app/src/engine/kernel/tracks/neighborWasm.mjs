@@ -16,9 +16,9 @@
 //     consumes the artifact as-is (provenance: kernel/wasm/MANIFEST.json,
 //     gated by bake/swarmWasm.selfcheck.mjs).
 //   - The WASM_BACKEND flag selects the neighbor path backend. Default is
-//     'js' — ALWAYS, until parity is proven in CI. KC_NEIGHBOR_WASM=1 opts
-//     in per-process (debugging / proving runs). The JS implementation is
-//     never deleted.
+//     'wasm' (Matt, 2026-10-11, #1304): used when the module is loaded, with
+//     a silent fall back to the JS reference otherwise. KC_NEIGHBOR_WASM=0
+//     forces JS per-process. The JS implementation is never deleted.
 //   - If the module cannot load, is absent, or the wasm backend is selected
 //     without a loaded module, the path silently falls back to the JS
 //     reference. A broken accelerator must never break the app.
@@ -114,10 +114,10 @@ export async function ensureNeighborWasm() {
 }
 
 // ── WASM_BACKEND flag ─────────────────────────────────────────────────
-// Default stays 'js' until parity is proven in CI (per #1318 — this PR
-// does NOT flip it). KC_NEIGHBOR_WASM=1 opts the process into 'wasm'.
+// Default is 'wasm' (#1304, Matt-approved 2026-10-11); parity is bit-identical
+// and gated in CI. KC_NEIGHBOR_WASM=0 forces the JS reference.
 
-let wasmBackend = 'js';
+let wasmBackend = 'wasm';
 
 /** Current WASM_BACKEND selection for the neighbor path: 'js' | 'wasm'. */
 export function getNeighborBackend() {
@@ -132,14 +132,21 @@ export function setNeighborBackend(name) {
   wasmBackend = name;
 }
 
-/** KC_NEIGHBOR_WASM=1 opts the neighbor path into the wasm backend. */
+/** KC_NEIGHBOR_WASM=1 explicitly opts the neighbor path into the wasm backend. */
 export function neighborWasmEnvOptIn() {
   const p = globalThis.process;
   return !!p && !!p.env && p.env.KC_NEIGHBOR_WASM === '1';
 }
 
-/** Effective backend: the env opt-in wins over setNeighborBackend(). */
+/** KC_NEIGHBOR_WASM=0 forces the JS reference (debugging escape hatch). */
+export function neighborWasmForcedOff() {
+  const p = globalThis.process;
+  return !!p && !!p.env && p.env.KC_NEIGHBOR_WASM === '0';
+}
+
+/** Effective backend: forced-off wins, then the explicit env opt-in, then the flag. */
 export function effectiveNeighborBackend() {
+  if (neighborWasmForcedOff()) return 'js';
   return neighborWasmEnvOptIn() ? 'wasm' : wasmBackend;
 }
 
@@ -261,8 +268,8 @@ export function findNeighborsWasm(wasm, tx, ty, sx, sy, radius, maxNeighbors) {
 
 /**
  * Neighbor search on SoA columns, dispatched on the WASM_BACKEND flag.
- * Default (and CI-proven) backend is the JS reference; pass
- * { backend: 'wasm' } or set KC_NEIGHBOR_WASM=1 to take the wasm path.
+ * Default backend is wasm when loaded, else the JS reference; pass
+ * { backend: 'js' } or set KC_NEIGHBOR_WASM=0 to force the reference.
  * The wasm path requires a preloaded module (ensureNeighborWasm()); when
  * it isn't available the call falls back to the JS reference with a
  * warning — the accelerator never breaks the app.
@@ -272,7 +279,11 @@ export function findNeighbors(tx, ty, sx, sy, radius, { maxNeighbors = 64, backe
   if (be === 'wasm') {
     const w = getNeighborWasm();
     if (w) return findNeighborsWasm(w, tx, ty, sx, sy, radius, maxNeighbors);
-    console.warn('[neighborWasm] backend=wasm selected but module not loaded — falling back to JS reference');
+    // Default-on means "not loaded yet" is normal: fall back quietly. Only an
+    // explicit request (the call's backend option or the env opt-in) is a warning.
+    if (backend === 'wasm' || neighborWasmEnvOptIn()) {
+      console.warn('[neighborWasm] backend=wasm requested but module not loaded — falling back to JS reference');
+    }
   }
   return findNeighborsJS(tx, ty, sx, sy, radius, maxNeighbors);
 }
