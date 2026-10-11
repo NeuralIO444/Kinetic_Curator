@@ -60,8 +60,8 @@ export function WetLab({ assetId, onClose }) {
               style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
               {points.map((p, i) => (
                 <g key={i} transform={`translate(${p.x} ${p.y})`} data-testid="attach-point">
-                  <rect x="-3" y="-3" width="6" height="6" fill="#000" stroke="var(--kc-davis)" strokeWidth="0.8" />
-                  <text y="1.6" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="var(--kc-davis)">{i + 1}</text>
+                  <rect x="-3" y="-3" width="6" height="6" fill="#000" stroke="var(--kc-red)" strokeWidth="0.8" />
+                  <text y="1.6" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="var(--kc-red)">{i + 1}</text>
                 </g>
               ))}
             </svg>
