@@ -12,6 +12,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# e2e-smoke and cargo-check run on the self-hosted mac-studio runner (real GPU,
+# hosted software-GL starves the timing specs). The two selfcheck jobs stay on
+# ubuntu: the wasm --verify reproducible-build gate is only bit-identical there
+# (a Mac-built artifact hashes differently from the checked-in one).
 # Same three job names as before — branch protection still matches.
 # No `needs` between them: lint no longer blocks browser install.
 jobs:
@@ -33,7 +37,7 @@ jobs:
       - run: npm run build
 
   e2e-smoke:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, mac-studio]
     defaults:
       run:
         working-directory: app
@@ -46,10 +50,10 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright
+          path: ~/Library/Caches/ms-playwright
           key: playwright-1.49.1-${{ runner.os }}
       - run: npm ci --no-fund --no-audit
-      - run: npx playwright install chromium --with-deps
+      - run: npx playwright install chromium
       - run: npm run build
       - run: npm run test:e2e
         env:
@@ -82,7 +86,7 @@ jobs:
   # ubuntu runners above. Suggested follow-up (same as selfcheck-browser's):
   # mark this check required in branch protection.
   cargo-check:
-    runs-on: macos-latest
+    runs-on: [self-hosted, mac-studio]
     defaults:
       run:
         working-directory: src-tauri

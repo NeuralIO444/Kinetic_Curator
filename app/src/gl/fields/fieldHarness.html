@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC field parity harness (#1315)</title></head>
+<body>
+<canvas id="c" width="4" height="4"></canvas>
+<script type="module">
+// Browser probe for fieldParity.selfcheck.mjs. Served over the shared
+// glStaticServer (src/gl, falling back to src/), driven via page.evaluate.
+// The page owns the WebGL2 context; Node owns the CPU reference.
+import {
+  FIELDS,
+} from '../../engine/kernel/field/registry.js';
+import {
+  createFieldRunner,
+  evaluateFieldColumns,
+  getFieldBackend,
+  setFieldBackend,
+} from './fieldRunner.js';
+
+const b64ToBytes = (b64) => {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+};
+const bytesToB64 = (u8) => {
+  let s = '';
+  const CH = 0x8000;
+  for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+  return btoa(s);
+};
+
+const canvas = document.getElementById('c');
+let gl = null;
+try {
+  gl = canvas.getContext('webgl2', { antialias: false, depth: false, stencil: false });
+} catch { /* stays null -> reported */ }
+let runner = null;
+const getRunner = () => {
+  if (!gl) throw new Error('no-webgl2');
+  if (!runner) runner = createFieldRunner(gl);
+  return runner;
+};
+
+/**
+ * payload: { fieldId, seed, opts, xB64, yB64, plantShift }
+ * plantShift: added to every x lane before GPU eval (parity-harness
+ * self-test: the CPU reference stays unshifted, so a nonzero shift MUST
+ * fail the tolerance comparison).
+ * returns { ok, valuesB64, count, backend } or { ok: false, error }
+ */
+window.__kcFieldRun = async (payload) => {
+  try {
+    const r = getRunner();
+    const xb = b64ToBytes(payload.xB64);
+    const yb = b64ToBytes(payload.yB64);
+    const x = new Float32Array(xb.buffer, xb.byteOffset, xb.byteLength / 4);
+    const y = new Float32Array(yb.buffer, yb.byteOffset, yb.byteLength / 4);
+    const shift = payload.plantShift || 0;
+    const xs = shift ? Float32Array.from(x, (v) => v + shift) : x;
+    const values = evaluateFieldColumns(
+      payload.fieldId, payload.seed >>> 0, payload.opts,
+      { x: xs, y }, { runner: r },
+    );
+    return {
+      ok: true,
+      valuesB64: bytesToB64(new Uint8Array(values.buffer, values.byteOffset, values.byteLength)),
+      count: values.length,
+      backend: getFieldBackend(),
+    };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+};
+
+/** Registry/backend introspection for the selfcheck (no GL needed). */
+window.__kcFieldMeta = () => {
+  const out = {};
+  for (const id of FIELDS.list()) {
+    const d = FIELDS.get(id);
+    out[id] = d.gpu
+      ? { hasGpu: true, varyings: [...d.gpu.varyings], vertBytes: d.gpu.vertexShader.length }
+      : { hasGpu: false };
+  }
+  return { fields: out, backend: getFieldBackend() };
+};
+
+window.__kcSetBackend = (b) => setFieldBackend(b);
+
+window.__kcReady = true;
+</script>
+</body>
+</html>
