@@ -39,7 +39,7 @@ The live instrument runs on the same dish the replayer steps. Today the log can 
 
 - The live loop steps the dish; the replayer and the instrument share one step path.
 - A recorded session replays to matching frame hashes; the footer export can then honestly be called a performance.
-- Layers become strata of one dish (#1183); the dish roster replaces the LAYERS mixer (#1203) once the dish is the source of truth.
+- Layers become strata of one dish (#1183, sketch approved: [`design/dish-strata-sketch.md`](design/dish-strata-sketch.md)): colour lean first, then contact shadow and tile-edge nudge, then palette lock. The dish roster replaces the LAYERS mixer (#1203) once the dish is the source of truth.
 - **Exit:** export a live session, import it, replay with the recorded governor note applied: the frame hashes match the live run. Normal playback is per machine (decision 7). Plan: [`design/dish-spine-plan.md`](design/dish-spine-plan.md).
 
 Issues: the dish-spine issue (new), #1183, #1203, #1314.
@@ -91,7 +91,8 @@ Issues: #1145, the influences issue (new), #1173 (pass gesture: upgrades taste p
 
 - **iPad worker probe (#1312):** needs the real device.
 - **Living motion samplers (#1194 to #1200):** layout modes, one PR each, in flight.
-- **#1144 close-out:** lock the refine spread value once Matt has tuned it.
+- **#1144:** done. Matt locked the refine spread at 0.10.
+- **#1365:** in refine, keep and gently vary the palette instead of jumping to the persona's preset.
 
 ## Out of scope this cycle
 
@@ -101,6 +102,7 @@ Issues: #1145, the influences issue (new), #1173 (pass gesture: upgrades taste p
 - **New** taste.json import work (the shipped taste artifact and the open sway gate stay as they are).
 - Stage-specific items (Syphon #608, the full MIDI-learn surface #617) unless they fall out naturally.
 - WebGPU (#1298).
+- Retroactive capture, "save the last few minutes" (#1367): needs state snapshots and in-app playback first.
 - Numeric fine-tuning of the hysteresis gap, range multipliers, dish-pressure radius or limb-change rules. Telemetry sets them later.
 - The design-system and UI items not named above (#1121, #1124, #1127, #1204, #1262) keep their existing order and wait for this cycle.
 
