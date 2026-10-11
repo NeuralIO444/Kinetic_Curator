@@ -244,6 +244,7 @@ node src/assets/primitives.selfcheck.mjs
 node src/assets/silhouette.selfcheck.mjs
 node src/shimmer/shimmer.selfcheck.mjs
 node src/curator/curate.selfcheck.mjs
+node src/curator/stress.selfcheck.mjs
 node src/curator/sessionLog.selfcheck.mjs
 node src/curator/refineMutate.selfcheck.mjs
 node src/curator/transitions.selfcheck.mjs
