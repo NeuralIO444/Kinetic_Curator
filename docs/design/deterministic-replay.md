@@ -1,5 +1,12 @@
 # DESIGN (deferred) — Deterministic replay
 
+> **Status, 2026-10-11: superseded for the instrument by [`dish-spine-plan.md`](dish-spine-plan.md).** Measuring the
+> live pipeline showed it was already deterministic, so a performance is the live resolver's recorded inputs replayed
+> through the same resolver (`app/src/gl/performanceFile.mjs`), not a separate headless pipeline. What this document
+> describes survives as the **kernel golden harness** (`kernel/replay/replayer.js` + `goldens/`), which still pins
+> kernel pieces bit for bit. Two things below turned out differently: files are about 100 KiB per minute compressed,
+> not kilobytes, and there is no in-app import or playback this cycle.
+
 ## Goal
 
 Seed + input event log → byte-identical session replay. Three
