@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { MAX_PINS } from '../curator/dishPins.js';
+import { attachPointsFor } from '../curator/autoAttach.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
@@ -14,6 +15,11 @@ function ingestMarkup(svg, hint) {
   if (!svg || !String(svg).includes('<')) return;
   emit(Events.ASSETS_INGEST, { svg: String(svg), hint: hint || 'ingest' });
 }
+
+// #1355 — the asset's attach points, drawn on its preview as small structure-red squares: filled when the artist
+// placed them, hollow when they come from the shape. Built from sanitized numbers only.
+const attachMarks = (points, own) => (points || []).map((p) =>
+  `<rect data-attach="${own ? 'own' : 'auto'}" x="${p.x - 5}" y="${p.y - 5}" width="10" height="10" fill="${own ? 'var(--kc-red)' : '#000'}" stroke="${own ? '#000' : 'var(--kc-red)'}" stroke-width="2"/>`).join('');
 
 export function AssetPoolPanel() {
   const fileRef = useRef(null);
@@ -65,6 +71,15 @@ export function AssetPoolPanel() {
   // out of the initial bundle). The picker looks the asset up live by id.
   const [pickerId, setPickerId] = useState(null);
   const [Picker, setPicker] = useState(null);
+  // #1355 — the wet lab window (attach points). Dynamic import, like the picker.
+  const [labId, setLabId] = useState(null);
+  const [Lab, setLab] = useState(null);
+  const attach = useStore(s => s.assetAttach);
+  const openLab = async (id) => {
+    const mod = await import('./WetLab.jsx');
+    setLab(() => mod.WetLab);
+    setLabId(id);
+  };
   const openPicker = async (id) => {
     const mod = await import('./RegionPicker.jsx');
     setPicker(() => mod.RegionPicker);
@@ -162,7 +177,7 @@ export function AssetPoolPanel() {
             return (
               <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}${enabled[a.id] && still[a.id] ? ' pinned' : ''}`} style={isUser ? { outline: '1px dashed var(--accent)' } : undefined}>
                 <button className="tile-toggle" onClick={(e) => e.altKey ? emit(Events.ASSETS_SOLO, { id: a.id }) : emit(Events.ASSETS_TOGGLE, { id: a.id })}>
-                  <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40" dangerouslySetInnerHTML={{ __html: a.svg }} />
+                  <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40" dangerouslySetInnerHTML={{ __html: a.svg + (enabled[a.id] ? attachMarks(attachPointsFor(a, attach), Array.isArray(attach?.[a.id])) : '') }} />
                 </button>
                 <button className="tile-weight" title={WEIGHT_TITLE[w]} aria-label={`weight ${w}: ${WEIGHT_TITLE[w]}. Tap to change`}
                   onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_WEIGHT_CYCLE, { id: a.id }); }}>
@@ -184,6 +199,9 @@ export function AssetPoolPanel() {
                         </button>
                         <button type="button" className="tile-dup" aria-label={`Duplicate ${a.id}`} title="Duplicate overlay copy"
                           onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}>dup</button>
+                        <button type="button" className={`tile-edit${Array.isArray(attach?.[a.id]) ? ' on' : ''}`} aria-label={`Edit ${a.id} in the wet lab${Array.isArray(attach?.[a.id]) ? ': attach points edited by hand' : ''}`}
+                          title="Wet lab: mark where other parts may attach to this asset" data-testid="tile-edit"
+                          onClick={(e) => { e.stopPropagation(); openLab(a.id); }}>edit</button>
                       </>
                     )}
                     {isUser && (
@@ -222,6 +240,9 @@ export function AssetPoolPanel() {
       )}
       {Picker && pickerId && (
         <Picker assetId={pickerId} onClose={() => { setPicker(null); setPickerId(null); }} />
+      )}
+      {Lab && labId && (
+        <Lab assetId={labId} onClose={() => { setLab(null); setLabId(null); }} />
       )}
     </div>
   );

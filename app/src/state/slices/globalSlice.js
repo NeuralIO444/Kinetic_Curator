@@ -26,6 +26,7 @@ import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegions, normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { placePin } from '../../curator/dishPins.js';
+import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../curator/assetAttach.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -273,6 +274,7 @@ export const createGlobalSlice = (set) => ({
   assetKineme: { ...DEFAULT_ASSET_KINEME }, // #705 — micro-HUD ornaments move out of the box
   /** #1128 — { assetId: true }: assets pinned still. The living-motion floor (breath, drift) leaves their marks where they were placed. */
   assetStill: {},
+  assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
   customAssets: [],
   ingestError: null,
   /**
@@ -616,6 +618,30 @@ export const createGlobalSlice = (set) => ({
     if (cur[assetId]) { const next = { ...cur }; delete next[assetId]; return { assetStill: next }; }
     return { assetStill: { ...cur, [assetId]: true } };
   }),
+  /**
+   * #1355 — a wet-lab click on an asset: add an attach point, or remove the one clicked. `shown` is what the lab is
+   * showing (the asset's own points, or the ones worked out from its shape): the first hand edit starts from those
+   * and from then on the asset uses the artist's. Rides the document.
+   */
+  clickAssetAttach: (assetId, pt, shown) => set((state) => {
+    if (!assetId || typeof assetId !== 'string') return {};
+    const cur = state.assetAttach || {};
+    const before = Array.isArray(cur[assetId]) ? cur[assetId] : sanitizeAttachPoints(shown);
+    const after = clickAttach(before, pt);
+    if (after === before) return {};
+    return { assetAttach: { ...cur, [assetId]: after } };
+  }),
+  /** No points on this asset: an explicit empty list, the artist's choice (not the same as "auto"). */
+  clearAssetAttach: (assetId) => set((state) => (
+    assetId && typeof assetId === 'string' ? { assetAttach: { ...(state.assetAttach || {}), [assetId]: [] } } : {}
+  )),
+  /** Back to the points worked out from the shape: the hand edit is dropped. */
+  autoAssetAttach: (assetId) => set((state) => {
+    if (!state.assetAttach || !(assetId in state.assetAttach)) return {};
+    const next = { ...state.assetAttach };
+    delete next[assetId];
+    return { assetAttach: next };
+  }),
   setAssetKineme: (assetId, kinemeId) => set((state) => {
     const cur = state.assetKineme || {};
     if (!assetId) return {};
@@ -712,6 +738,7 @@ export const createGlobalSlice = (set) => ({
     next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
     next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
+    next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
     next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
     next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
     {
