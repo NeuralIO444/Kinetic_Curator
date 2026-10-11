@@ -33,6 +33,9 @@ import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { initDirectorBeat } from './curator/director.js'; // #1145
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
+import { initSessionLog, snapshotSessionLog, sessionLogFilename } from './curator/sessionLog.js'; // #1314: the session log
+import { audioEnergyNow } from './curator/keepContext.js';
+import { downloadJsonFile } from './panels/pipeline/bundleFile.js';
 import { RefineDial } from './curator/RefineDial.jsx'; // #1144: ?tune=refine only
 import { TUNE_REFINE } from './curator/refineSpread.js';
 import { captureFavorite } from './state/slices/davisSlice.js';
@@ -75,6 +78,13 @@ function AppInner() {
     initWhisperTriggers(useStore.getState, useStore.subscribe);
     initDirectorBeat(useStore.subscribe); // #1145: the Director's beat input
     initPhase(useStore.subscribe); // #1144: explore / refine, from what the artist does
+    // #1314 (B): record the session's INPUTS (seed, layout changes, quantized audio) as frame-indexed data. It never
+    // reproduces the picture, and the exported file says so. No wall-clock; one rAF counter while running.
+    return initSessionLog({
+      subscribe: useStore.subscribe,
+      getState: useStore.getState,
+      getAudio: audioEnergyNow,
+    });
   }, []);
 
   const { state } = useApp(s => ({
@@ -308,6 +318,10 @@ function AppInner() {
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {state.layoutParams.mode} · seed:{state.seed.toString(16)}
+          <button type="button" className="micro-btn"
+            title="Export session log — your inputs (seed, changes, audio level) as a small file. It does not reproduce the picture."
+            style={{ opacity: 0.45 }}
+            onClick={() => { const log = snapshotSessionLog(); if (log) downloadJsonFile(log, sessionLogFilename(log)); }}>log ↓</button>
           <button type="button" className="micro-btn" title="Settings — no second prefs store"
             style={{ opacity: 0.45 }} onClick={() => { setHelpTab('settings'); setShowHotkeys(true); }}>≡</button>
           <button type="button" className="micro-btn" title="Help"
