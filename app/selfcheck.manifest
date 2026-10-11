@@ -284,6 +284,7 @@ node src/data/light.pool.selfcheck.mjs
 node src/gl/shapeDither.selfcheck.mjs
 node src/gl/trailMode.selfcheck.mjs
 node src/gl/flowField.selfcheck.mjs
+node src/gl/fields/fieldParity.selfcheck.mjs
 node src/engine/organisms/behaveEase.selfcheck.mjs
 node src/panels/pipeline/thumbnail.selfcheck.mjs
 node src/data/canvasPresets.led.selfcheck.mjs
@@ -317,3 +318,4 @@ node src/engine/kernel/tracks/applyField.neighbors.selfcheck.mjs
 node src/engine/kernel/tracks/feedDelay.delay1.selfcheck.mjs
 node src/engine/kernel/tracks/feedColumns.selfcheck.mjs
 node src/gl/fieldFeedColumns.selfcheck.mjs
+node src/engine/kernel/replay/replay.selfcheck.mjs
