@@ -12,15 +12,15 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-# Self-hosted on the Mac Studio (label mac-studio): the e2e/selfcheck jobs ran for minutes-to-hours on GitHub's software-GL
-# runners and flaked on timing. Playwright uses the macOS cache path and no --with-deps (that flag is for Ubuntu).
-# One runner = jobs queue one at a time; fork PRs run code on this Mac, so keep Settings > Actions > 'Require approval
-# for all outside collaborators' on.
+# e2e-smoke and cargo-check run on the self-hosted mac-studio runner (real GPU,
+# hosted software-GL starves the timing specs). The two selfcheck jobs stay on
+# ubuntu: the wasm --verify reproducible-build gate is only bit-identical there
+# (a Mac-built artifact hashes differently from the checked-in one).
 # Same three job names as before — branch protection still matches.
 # No `needs` between them: lint no longer blocks browser install.
 jobs:
   lint-build-selfcheck:
-    runs-on: [self-hosted, mac-studio]
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: app
@@ -31,12 +31,6 @@ jobs:
           node-version: '20'
           cache: npm
           cache-dependency-path: app/package-lock.json
-      # npm run selfcheck runs swarmWasm.selfcheck -> scripts/build-wasm.sh --verify,
-      # which needs the pinned toolchain (rust/rust-toolchain.toml) on PATH. The
-      # runner service PATH has no cargo; install the pin explicitly.
-      - uses: dtolnay/rust-toolchain@1.98.1
-        with:
-          targets: wasm32-unknown-unknown
       - run: npm ci --no-fund --no-audit
       - run: npm run lint
       - run: npm run selfcheck
@@ -66,7 +60,7 @@ jobs:
           CI: true
 
   selfcheck-browser:
-    runs-on: [self-hosted, mac-studio]
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: app
@@ -79,16 +73,10 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - uses: actions/cache@v4
         with:
-          path: ~/Library/Caches/ms-playwright
+          path: ~/.cache/ms-playwright
           key: playwright-1.49.1-${{ runner.os }}
-      # npm run selfcheck runs swarmWasm.selfcheck -> scripts/build-wasm.sh --verify,
-      # which needs the pinned toolchain (rust/rust-toolchain.toml) on PATH. The
-      # runner service PATH has no cargo; install the pin explicitly.
-      - uses: dtolnay/rust-toolchain@1.98.1
-        with:
-          targets: wasm32-unknown-unknown
       - run: npm ci --no-fund --no-audit
-      - run: npx playwright install chromium
+      - run: npx playwright install chromium --with-deps
       - run: npm run selfcheck
 
   # Added 2026-10-03 (cleanup lane C): the Rust shell had no compile gate at
