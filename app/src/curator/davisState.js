@@ -26,8 +26,10 @@ export const DAVIS_STUCK_ROLLS = 6; // ...rolled on at least this many times, no
 export const DAVIS_BLOOM_MS = 60 * 1000; // the payoff holds this long
 
 export const DAVIS_STATES = {
-  BLOOM: { code: 'BLOOM', label: 'The ugly paid off.' },
-  UGLY: { code: 'UGLY', label: 'Sifting through the ugly.' },
+  BLOOM: { code: 'BLOOM', label: 'The sifting paid off.' },
+  // Matt, 2026-10-11: Davis saying "ugly" should be ultra rare. The code stays UGLY (tables, tempo and wildness key on
+  // it); what the artist READS is `name`.
+  UGLY: { code: 'UGLY', name: 'SIFT', label: 'Sifting.' },
   STUCK: { code: 'STUCK', label: 'Same seed, nothing kept.' },
   SEEDLING: { code: 'SEEDLING', label: 'A fresh seed.' },
   FLOW: { code: 'FLOW', label: 'Rolling at a good clip.' },

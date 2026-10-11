@@ -39,7 +39,7 @@ export function DirectorsDuel() {
       <div className="duel-side duel-davis" data-code={davis ? davis.code : 'none'}>
         <span className="duel-who lbl">davis</span>
         <DavisSigil seed={seed} code={davis?.code} />
-        <span className="duel-state act">{davis ? davis.code : '—'}</span>
+        <span className="duel-state act">{davis ? (davis.name ?? davis.code) : '—'}</span>
         <span className="duel-desc name">{talk ? talk.davis : (davis ? davis.label : '')}</span>
       </div>
       {talk && (
