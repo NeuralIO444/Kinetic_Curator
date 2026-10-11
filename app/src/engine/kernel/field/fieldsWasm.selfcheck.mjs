@@ -199,6 +199,32 @@ function checkNoiseParity(seed, opts, xs, ys, n, raw) {
   console.log(`[ok] noise batch bit-identical to JS across ${checked} seed/param/point lanes (incl. NaN/Inf coords + edge seeds)`);
 }
 
+// --- 2b. large batch: staging must not touch the module's own memory ----------
+// 150k points = 1.8 MB of staged columns. A bump allocator starting at
+// address 0 walks into the Rust shadow stack (low 1 MiB) around ~87k points;
+// the wrapper pins its region past the module's initial memory instead.
+{
+  const n = 150_000;
+  const xs = new Float32Array(n);
+  const ys = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    xs[i] = ((i * 2654435761) >>> 0) / 4294967296;
+    ys[i] = ((i * 40503 + 17) >>> 0) % 65536 / 65536;
+  }
+  const opts = { freq: 3, octaves: 4, lacunarity: 2, gain: 0.5, z: 0.5 };
+  const field = makeNoiseField(444, opts);
+  const out = new Float32Array(n);
+  fieldsNoiseBatch(wasm, 444, opts, xs, ys, out, n);
+  for (let i = 0; i < n; i++) {
+    const ref = field.sample(xs[i], ys[i]);
+    if (!Object.is(Math.fround(ref), out[i])) assert.fail(`large batch lane ${i}: ${out[i]} != ${ref}`);
+  }
+  // module still sound after the big call: a small batch is still exact
+  const { xs: sx, ys: sy, n: sn } = toF32Columns(FIXTURE_POINTS);
+  checkNoiseParity(7, {}, sx, sy, sn, false);
+  console.log(`[ok] ${n}-point noise batch bit-identical; module memory intact afterwards`);
+}
+
 // --- 3. scent sample: bit-identical to scent.js --------------------------------
 // The JS field keeps its grid private, so the fixture grid is built with the
 // exact deposit sequence on both sides: the JS field via field.deposit, the

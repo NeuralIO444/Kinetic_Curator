@@ -128,10 +128,16 @@ export function wasmBackendFor(id) {
 // The bump resets per call; memory grows on demand. The crate itself never
 // allocates — the no-allocation contract holds on the Rust side.
 
+// Region base: the module's linear memory below its initial end holds the
+// Rust shadow stack and statics, and the module exports no __heap_base. The
+// crate never allocates, so everything past the initial memory end is ours:
+// pin the base there on first use and grow upward from it.
+let bumpBase = -1;
 let bumpPtr = 0;
 
-function bumpReset() {
-  bumpPtr = 0;
+function bumpReset(exports) {
+  if (bumpBase < 0) bumpBase = (exports.memory.buffer.byteLength + 15) & ~15;
+  bumpPtr = bumpBase;
 }
 
 function bumpAlloc(exports, bytes, align) {
@@ -197,7 +203,7 @@ export function fieldsNoiseBatch(wasm, seed, opts = {}, xs, ys, out, count = len
   });
   if (!gate.ok) throw new Error(`fields wasm: noise call ineligible (${gate.reason})`);
   const { exports } = wasm.instance;
-  bumpReset();
+  bumpReset(exports);
   const px = bumpAlloc(exports, count * 4, 4);
   const py = bumpAlloc(exports, count * 4, 4);
   const po = bumpAlloc(exports, count * 4, 4);
@@ -221,7 +227,7 @@ export function fieldsScentSample(wasm, cells, cols, rows, xs, ys, out, count = 
   });
   if (!gate.ok) throw new Error(`fields wasm: scent-sample call ineligible (${gate.reason})`);
   const { exports } = wasm.instance;
-  bumpReset();
+  bumpReset(exports);
   const pc = bumpAlloc(exports, cells.length * 8, 8);
   const px = bumpAlloc(exports, count * 4, 4);
   const py = bumpAlloc(exports, count * 4, 4);
@@ -244,7 +250,7 @@ export function fieldsScentStep(wasm, cells, cols, rows, { decay = 0.97, diffuse
   const gate = wasmFieldsEligible('scent-step', { cols, rows, cellsLen: lenOf(cells), decay, diffuse });
   if (!gate.ok) throw new Error(`fields wasm: scent-step call ineligible (${gate.reason})`);
   const { exports } = wasm.instance;
-  bumpReset();
+  bumpReset(exports);
   const pc = bumpAlloc(exports, cells.length * 8, 8);
   const ps = bumpAlloc(exports, cells.length * 8, 8);
   const mem = () => exports.memory.buffer;
