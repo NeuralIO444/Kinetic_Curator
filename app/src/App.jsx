@@ -33,6 +33,8 @@ import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { initDirectorBeat } from './curator/director.js'; // #1145
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
+import { RefineDial } from './curator/RefineDial.jsx'; // #1144: ?tune=refine only
+import { TUNE_REFINE } from './curator/refineSpread.js';
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -301,6 +303,7 @@ function AppInner() {
       </ErrorBoundary>
       <MasterBar />
       <FavoritesTray />
+      {TUNE_REFINE && <RefineDial />}
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
