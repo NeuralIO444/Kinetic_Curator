@@ -1,0 +1,53 @@
+// PerformanceButton.jsx — #1353 step 4: the footer control for recording a performance.
+// Two states, one button: `rec` starts a take; while recording it reads `● stop ↓` and a click ends the take and
+// downloads the .kcperf file. The file replays to the same frames (performanceFile.selfcheck); there is no in-app
+// playback this cycle. The frame count in the tooltip is a measurement, read from the recorder.
+import { useEffect, useState } from 'react';
+import { isRecordingPerformance, performanceFrames, startPerformance, stopPerformance } from '../gl/performanceCapture.mjs';
+
+function downloadBytes(bytes, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/gzip' }));
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
+export function PerformanceButton() {
+  const [recording, setRecording] = useState(isRecordingPerformance());
+  const [frames, setFrames] = useState(0);
+  // The recorder is a module singleton with no subscription API: while a take runs, poll its frame count.
+  useEffect(() => {
+    if (!recording) return undefined;
+    const id = setInterval(() => setFrames(performanceFrames()), 500);
+    return () => clearInterval(id);
+  }, [recording]);
+
+  const onClick = async () => {
+    if (!recording) {
+      if (startPerformance()) { setFrames(0); setRecording(true); }
+      return;
+    }
+    setRecording(false);
+    const take = await stopPerformance();
+    if (take) downloadBytes(take.bytes, take.filename);
+  };
+
+  return (
+    <button
+      type="button"
+      className={`micro-btn${recording ? ' active' : ''}`}
+      aria-pressed={recording}
+      style={recording ? undefined : { opacity: 0.45 }}
+      title={recording
+        ? `Recording a performance: ${frames} frames. Click to stop and download it.`
+        : 'Record a performance: your session as a small file that replays to the same frames.'}
+      onClick={onClick}
+    >
+      {recording ? '● stop ↓' : 'rec'}
+    </button>
+  );
+}

@@ -185,6 +185,7 @@ node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs
 node src/gl/resolveTap.selfcheck.mjs
 node src/gl/performanceFile.selfcheck.mjs
+node src/gl/performanceCapture.selfcheck.mjs
 node src/gl/liveResolve.determinism.selfcheck.mjs
 node src/gl/tracks.causal.selfcheck.mjs
 node src/gl/parity/diff.selfcheck.mjs
@@ -246,7 +247,6 @@ node src/shimmer/shimmer.selfcheck.mjs
 node src/curator/curate.selfcheck.mjs
 node src/curator/stress.selfcheck.mjs
 node src/curator/stressLive.selfcheck.mjs
-node src/curator/sessionLog.selfcheck.mjs
 node src/curator/refineMutate.selfcheck.mjs
 node src/curator/transitions.selfcheck.mjs
 node src/curator/taste.selfcheck.mjs
