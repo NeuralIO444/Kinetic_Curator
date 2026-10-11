@@ -183,6 +183,7 @@ node src/gl/sceneContract.selfcheck.mjs
 node src/gl/resolve.selfcheck.mjs
 node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs
+node src/gl/resolveTap.selfcheck.mjs
 node src/gl/tracks.causal.selfcheck.mjs
 node src/gl/parity/diff.selfcheck.mjs
 node src/gl/parity/parity.selfcheck.mjs
@@ -326,4 +327,5 @@ node src/engine/kernel/tracks/feedDelay.delay1.selfcheck.mjs
 node src/engine/kernel/tracks/feedColumns.selfcheck.mjs
 node src/gl/fieldFeedColumns.selfcheck.mjs
 node src/engine/kernel/replay/replay.selfcheck.mjs
+node src/engine/kernel/replay/inputLog.selfcheck.mjs
 node src/engine/kernel/replay/performance.selfcheck.mjs
