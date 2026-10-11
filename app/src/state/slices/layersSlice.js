@@ -121,7 +121,7 @@ export const createLayersSlice = (set) => ({
   }),
 
   // #1097 — PATTERN tracks. They share the content cap and the tape pre-flight with KC tracks, never
-  // become the active layer, and keep their parameters on the layer. Seed is a stored integer; SHUFFLE
+  // become the active layer, and keep their parameters on the layer. A new one is added as ground (#1183). Seed is a stored integer; SHUFFLE
   // writes a new one (the DROP gate that decides WHEN is #1100). Every write goes through sanitizePattern.
   addPatternLayer: (mode) => set((state) => {
     if (state.layers.filter((l) => !isAdjustmentLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
@@ -129,9 +129,15 @@ export const createLayersSlice = (set) => ({
     const id = makeLayerId();
     const n = state.layers.filter(isPatternLayer).length + 1;
     const pattern = defaultPattern(mode, (Math.random() * 0xffffffff) >>> 0);
+    // #1183 — a pattern is GROUND, not an overlay: it lands directly BELOW the lowest KC track (bottom -> top), so
+    // the marks rest on it straight away and it is their nearest ground. Above any pattern already down there, so the
+    // new one is the one you see. (It used to be appended on top, which read as "a 2D overlay".)
+    const layer = { id, name: `PT-${n}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern };
+    const firstKc = state.layers.findIndex(isKcLayer);
+    const at = firstKc < 0 ? 0 : firstKc;
     return {
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
-      layers: [...state.layers, { id, name: `PT-${n}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, pattern }],
+      layers: [...state.layers.slice(0, at), layer, ...state.layers.slice(at)],
       selectedPatternLayerId: id,
     };
   }),
