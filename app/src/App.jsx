@@ -38,6 +38,8 @@ import { audioEnergyNow } from './curator/keepContext.js';
 import { downloadJsonFile } from './panels/pipeline/bundleFile.js';
 import { RefineDial } from './curator/RefineDial.jsx'; // #1144: ?tune=refine only
 import { TUNE_REFINE } from './curator/refineSpread.js';
+import { initStress, DEBUG_STRESS } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
+import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -80,11 +82,18 @@ function AppInner() {
     initPhase(useStore.subscribe); // #1144: explore / refine, from what the artist does
     // #1314 (B): record the session's INPUTS (seed, layout changes, quantized audio) as frame-indexed data. It never
     // reproduces the picture, and the exported file says so. No wall-clock; one rAF counter while running.
-    return initSessionLog({
+    const stopLog = initSessionLog({
       subscribe: useStore.subscribe,
       getState: useStore.getState,
       getAudio: audioEnergyNow,
     });
+    // #1354 — stress and bands from honest counts (artist actions, rolls since the last keep). Computed only: no
+    // persona reads the band yet; ?debug=stress shows it.
+    const stopStress = initStress({
+      getCounts: loisActivity.pressureCounts,
+      isRunning: () => useStore.getState().running,
+    });
+    return () => { stopLog(); stopStress(); };
   }, []);
 
   const { state } = useApp(s => ({
@@ -314,6 +323,7 @@ function AppInner() {
       <MasterBar />
       <FavoritesTray />
       {TUNE_REFINE && <RefineDial />}
+      {DEBUG_STRESS && <StressReadout />}
       <footer className="footer-bar">
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
