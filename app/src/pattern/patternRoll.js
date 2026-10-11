@@ -19,8 +19,12 @@ import { MAX_CONTENT_TRACKS } from '../state/projectNormalize.js';
 // dealing one 30% of the time on a hammered tap. It is rare now (8%), and a quiet veil when it does come. CURATOR never
 // adds one (only chaos does). Making patterns and marks interact instead of mix is its own piece of work.
 export const CHAOS_ADD_CHANCE = 0; // Matt, 2026-10-08: patterns on request. KIN never adds one; once the artist has added one, KIN and CURATOR work with it
-/** A pattern a roll adds is a whisper, not a wall: it must never carry the picture. */
-export const BORN_OPACITY = 0.3;
+/**
+ * A pattern a roll adds is GROUND (Matt, 2026-10-11, #1183): it goes in below the lowest KC track at full strength,
+ * where the marks rest on it. (It used to be laid over the marks as a 0.3 veil, because an overlay at full strength
+ * carried the picture; as ground it is behind them.)
+ */
+export const BORN_OPACITY = 1;
 
 const isPattern = (l) => !!l && l.type === 'pattern';
 const u32 = (rng) => (Math.floor(rng() * 0xffffffff) >>> 0) || 1;
@@ -79,7 +83,11 @@ export function rollPatternLayers(layers, kind, rng, { canAdd = true, makeId = (
     // draw the dice unconditionally, so the rest of the stream does not depend on the cap
     const roll = rng(); const born = dealPattern(undefined, rng); const id = makeId();
     if (roll < addChance && content < MAX_CONTENT_TRACKS) {
-      out = [...out, { id, name: `PT-${out.filter(isPattern).length + 1}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: BORN_OPACITY, pattern: born }];
+      // one rule everywhere: a pattern is ground, directly below the lowest KC track (bottom -> top)
+      const layer = { id, name: `PT-${out.filter(isPattern).length + 1}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: BORN_OPACITY, pattern: born };
+      const firstKc = out.findIndex((l) => l && !isPattern(l) && !isFxLayer(l) && !isMathLayer(l));
+      const at = firstKc < 0 ? 0 : firstKc;
+      out = [...out.slice(0, at), layer, ...out.slice(at)];
       changed = true;
     }
   }
