@@ -23,7 +23,7 @@ export function RefineDial() {
       aria-label="Refine spread (tuning)"
       style={{
         position: 'fixed', left: 12, bottom: 44, zIndex: 9999, padding: '8px 10px',
-        background: 'rgba(12,12,14,0.92)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 6,
+        background: 'rgba(12,12,14,0.92)', border: '1px solid rgba(255,255,255,0.18)',
         font: '11px ui-monospace, Menlo, monospace', color: '#e8e8ea', minWidth: 220,
       }}
     >
