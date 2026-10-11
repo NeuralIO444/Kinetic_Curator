@@ -51,4 +51,12 @@ import { serializeProject, parseProject } from '../state/projectDocument.js';
   assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: [{ x: 20, y: 30 }, { x: 70, y: 60 }] }, 'reloaded');
 }
 
+// 4. the tile preview shows where the points are, in structure red (never Davis amber: DS rule 5)
+{
+  const { readFileSync } = await import('node:fs');
+  const panel = readFileSync(new URL('../panels/AssetPoolPanel.jsx', import.meta.url), 'utf8');
+  assert.ok(/a\.svg \+ attachMarks\(attach\?\.\[a\.id\]\)/.test(panel), 'the tile preview draws the asset\'s attach points');
+  assert.ok(/data-attach[^`]*var\(--kc-red\)/.test(panel) && !/kc-davis/.test(readFileSync(new URL('../panels/WetLab.jsx', import.meta.url), 'utf8')));
+}
+
 console.log('assetAttach.selfcheck: ok (#1355 attach points)');

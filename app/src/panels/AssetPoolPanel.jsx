@@ -15,6 +15,11 @@ function ingestMarkup(svg, hint) {
   emit(Events.ASSETS_INGEST, { svg: String(svg), hint: hint || 'ingest' });
 }
 
+// #1355 — the asset's attach points, drawn on its preview as small structure-red squares. The points are numbers
+// the store already sanitized, so the markup is built from numbers only.
+const attachMarks = (points) => (points || []).map((p) =>
+  `<rect data-attach="1" x="${p.x - 5}" y="${p.y - 5}" width="10" height="10" fill="var(--kc-red)" stroke="#000" stroke-width="2"/>`).join('');
+
 export function AssetPoolPanel() {
   const fileRef = useRef(null);
   const swapRef = useRef(null);
@@ -171,7 +176,7 @@ export function AssetPoolPanel() {
             return (
               <div key={a.id} className={`tile ${enabled[a.id] ? 'tile-on' : ''}${enabled[a.id] && still[a.id] ? ' pinned' : ''}`} style={isUser ? { outline: '1px dashed var(--accent)' } : undefined}>
                 <button className="tile-toggle" onClick={(e) => e.altKey ? emit(Events.ASSETS_SOLO, { id: a.id }) : emit(Events.ASSETS_TOGGLE, { id: a.id })}>
-                  <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40" dangerouslySetInnerHTML={{ __html: a.svg }} />
+                  <svg className="tile-svg" viewBox="0 0 100 100" width="40" height="40" dangerouslySetInnerHTML={{ __html: a.svg + attachMarks(attach?.[a.id]) }} />
                 </button>
                 <button className="tile-weight" title={WEIGHT_TITLE[w]} aria-label={`weight ${w}: ${WEIGHT_TITLE[w]}. Tap to change`}
                   onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_WEIGHT_CYCLE, { id: a.id }); }}>
