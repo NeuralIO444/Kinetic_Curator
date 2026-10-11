@@ -38,6 +38,7 @@ import {
 import {
   DEFAULT_STEP_PARAMS,
   dispatchKernelMessage,
+  dispatchToReply,
   columnTransferList,
 } from './stepKernel.js';
 import { createKernelClient } from './kernelClient.js';
@@ -172,6 +173,74 @@ function throwsProtocol(fn, label) {
   handler({ type: MSG.ERROR, protocol: PROTOCOL_VERSION, message: 'boom', forFrame: 1 });
   await assert.rejects(p1, (e) => e instanceof ProtocolError, 'worker ERROR rejects the pending STEP');
   client.terminate();
+}
+
+// ── review fixes: fatal worker error, SNAPSHOT error routing, shed sequencing ──
+{
+  const mk = () => {
+    let handler = null;
+    const posted = [];
+    const host = {
+      post(msg, transfers) { posted.push({ msg, transfers }); },
+      onMessage(h) { handler = h; },
+      terminate() {},
+    };
+    return { host, posted, reply: (r) => handler(r) };
+  };
+  const ready = async (t, client) => {
+    const ip = client.init({ seed: 1 });
+    t.reply(readyMessage({ seed: 1, params: {}, kernelVersion: KERNEL_VERSION }));
+    await ip;
+  };
+
+  // 1. worker crash: pending STEP + SNAPSHOT settle, client marked failed.
+  {
+    const t = mk();
+    const seen = [];
+    const client = createKernelClient({ host: t.host, onProtocolError: (e) => seen.push(e) });
+    await ready(t, client);
+    const step = client.stepFrame(0, 1 / 60, []);
+    const snap = client.snapshot(0);
+    t.reply({ type: MSG.ERROR, protocol: PROTOCOL_VERSION, message: 'worker error: boom', fatal: true });
+    await assert.rejects(step, ProtocolError, 'fatal worker error rejects the pending STEP');
+    await assert.rejects(snap, ProtocolError, 'fatal worker error rejects the pending SNAPSHOT');
+    assert.strictEqual(client.failed, true, 'client reports failed so the caller can fall back inline');
+    assert.throws(() => client.stepFrame(1, 1 / 60, []), ProtocolError, 'a failed client refuses new work');
+    assert.strictEqual(seen.length, 1, 'onProtocolError told once');
+  }
+
+  // 2. a SNAPSHOT error is routed by atFrame, not left unmatched.
+  {
+    const t = mk();
+    const client = createKernelClient({ host: t.host, onProtocolError: () => assert.fail('SNAPSHOT error must match its request') });
+    await ready(t, client);
+    const snap = client.snapshot(5);
+    const out = dispatchToReply(null, snapshotMessage({ atFrame: 5 })); // SNAPSHOT before INIT → ERROR reply
+    assert.strictEqual(out.reply.forFrame, 5, 'error carries atFrame as forFrame');
+    assert.strictEqual(out.reply.forType, MSG.SNAPSHOT, 'error names the request type');
+    t.reply(out.reply);
+    await assert.rejects(snap, ProtocolError, 'failed SNAPSHOT rejects (does not hang)');
+  }
+
+  // 3. shed frame is retried with the same number; skipping fails fast.
+  {
+    const t = mk();
+    const client = createKernelClient({ host: t.host });
+    await ready(t, client);
+    const s0 = client.stepFrame(0, 1 / 60, []);
+    const shed = await client.stepFrame(1, 1 / 60, []);
+    assert.strictEqual(shed.shed, true);
+    assert.strictEqual(shed.retryFrame, 1, 'shed result names the frame to retry');
+    t.reply(frameMessage({ frame: 0, columns: createPointSet(2), count: 2 }));
+    await s0;
+    assert.throws(() => client.stepFrame(2, 1 / 60, []), /expected frame 1/, 'skipping the shed frame fails fast');
+    assert.strictEqual(t.posted.filter((p) => p.msg.type === MSG.STEP).length, 1, 'nothing out of sequence reached the worker');
+    const s1 = client.stepFrame(1, 1 / 60, []);
+    assert.strictEqual(t.posted.filter((p) => p.msg.type === MSG.STEP).length, 2, 'the retried frame is posted');
+    t.reply(frameMessage({ frame: 1, columns: createPointSet(2), count: 2 }));
+    await s1;
+  }
+  console.log('kernel/worker.selfcheck: OK (fatal error, snapshot routing, shed sequencing)');
 }
 
 // ── THE GATE: worker vs runInline, bit-identical over a real thread ──────────

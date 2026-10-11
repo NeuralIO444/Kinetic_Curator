@@ -311,7 +311,13 @@ export function dispatchToReply(session, msg) {
     const message = err instanceof ProtocolError ? err.message : String((err && err.message) || err);
     return {
       session,
-      reply: errorMessage({ message, forFrame: msg && msg.frame }),
+      reply: errorMessage({
+        message,
+        // SNAPSHOT carries atFrame, not frame; forType keeps a SET_PARAM error
+        // at frame N from being mistaken for the pending STEP N.
+        forFrame: msg && (msg.frame !== undefined ? msg.frame : msg.atFrame),
+        forType: msg && msg.type,
+      }),
       transfers: [],
     };
   }

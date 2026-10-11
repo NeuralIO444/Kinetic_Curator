@@ -111,6 +111,10 @@ export function stepMessage({ frame, dt, events } = {}) {
   return { type: MSG.STEP, protocol: PROTOCOL_VERSION, frame, dt, events: events || [] };
 }
 
+// SET_PARAM order, not time: the worker applies it at its position in the
+// message stream (always between two STEPs); `frame` is validated and echoed
+// in PARAM_ACK so the replay log (#1314) can record which STEP it preceded.
+// Use the STEP `param-set` event when a change must land at an exact frame.
 export function setParamMessage({ key, value, frame }) {
   return { type: MSG.SET_PARAM, protocol: PROTOCOL_VERSION, key, value, frame };
 }
@@ -250,8 +254,8 @@ export function snapshotResultMessage({ frame, columns, count }) {
   return { type: MSG.SNAPSHOT_RESULT, protocol: PROTOCOL_VERSION, frame, columns, count };
 }
 
-export function errorMessage({ message, forFrame }) {
-  return { type: MSG.ERROR, protocol: PROTOCOL_VERSION, message: String(message), forFrame };
+export function errorMessage({ message, forFrame, forType }) {
+  return { type: MSG.ERROR, protocol: PROTOCOL_VERSION, message: String(message), forFrame, forType };
 }
 
 // ---------------------------------------------------------------------------

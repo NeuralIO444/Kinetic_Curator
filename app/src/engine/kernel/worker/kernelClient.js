@@ -61,6 +61,7 @@ function createWorkerHost(url) {
         type: MSG.ERROR,
         protocol: PROTOCOL_VERSION,
         message: `worker error: ${(event && event.message) || 'unknown'}`,
+        fatal: true,
       });
     }
   };
@@ -98,6 +99,8 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
   let lastFrame = null; // { frame, columns } — last FRAME received
   let unansweredMisses = 0;
   let terminated = false;
+  let failed = false; // fatal worker error: worker is dead, fall back to inline
+  let nextFrame = 0; // the one frame number the worker will accept next
 
   const reportError = (err) => {
     if (onProtocolError) onProtocolError(err);
@@ -152,11 +155,23 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
         break; // fire-and-forget; ordering with STEP is guaranteed by the channel
       case MSG.ERROR: {
         const err = new ProtocolError(`worker: ${reply.message}`);
-        if (pendingStep && reply.forFrame === pendingStep.frame) {
+        if (reply.fatal) {
+          // The worker is gone (crash / load failure): nothing will answer.
+          // Settle everything in flight and mark the client failed so the
+          // caller can build an inline client instead of shedding forever.
+          failed = true;
+          const waiters = [pendingStep, pendingSnapshot, initWaiter].filter(Boolean);
+          pendingStep = pendingSnapshot = initWaiter = null;
+          for (const w of waiters) w.reject(err);
+          if (onProtocolError) onProtocolError(reply);
+          break;
+        }
+        if (pendingStep && reply.forFrame === pendingStep.frame && (!reply.forType || reply.forType === MSG.STEP)) {
           const p = pendingStep;
           pendingStep = null;
+          nextFrame = p.frame; // the worker did not advance: retry this number
           p.reject(err);
-        } else if (pendingSnapshot && reply.forFrame === pendingSnapshot.atFrame) {
+        } else if (pendingSnapshot && reply.forFrame === pendingSnapshot.atFrame && (!reply.forType || reply.forType === MSG.SNAPSHOT)) {
           const s = pendingSnapshot;
           pendingSnapshot = null;
           s.reject(err);
@@ -178,12 +193,17 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
 
   function ensureLive() {
     if (terminated) throw new ProtocolError('client is terminated');
+    if (failed) throw new ProtocolError('worker failed — rebuild the client with runInline: true');
   }
 
   const client = {
     /** Host mode: 'inline' | 'worker' | 'injected'. */
     mode,
     /** True once READY has arrived. */
+    /** True after a fatal worker error; every call throws until rebuilt inline. */
+    get failed() {
+      return failed;
+    },
     get isReady() {
       return readyInfo !== null;
     },
@@ -196,6 +216,7 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
     init({ seed, recipe, params } = {}) {
       ensureLive();
       if (initWaiter) throw new ProtocolError('init already in flight');
+      nextFrame = 0; // INIT is a deterministic restart: frames begin again at 0
       return new Promise((resolve, reject) => {
         initWaiter = { resolve, reject };
         activeHost.post(initMessage({ seed, recipe, params }), []);
@@ -211,6 +232,13 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
      */
     stepFrame(frame, dt, events) {
       ensureLive();
+      // Frame numbers are the clock and the worker accepts exactly lastFrame+1.
+      // A shed or re-presented frame was never posted, so the caller retries
+      // the SAME number (see `retryFrame` on those results). Fail fast here
+      // rather than poisoning the worker session with an out-of-sequence STEP.
+      if (!pendingStep && frame !== nextFrame) {
+        throw new ProtocolError(`stepFrame(${frame}): expected frame ${nextFrame} (retry the shed frame, do not skip)`);
+      }
       if (pendingStep) {
         unansweredMisses += 1;
         if (lastFrame && unansweredMisses === 1) {
@@ -219,12 +247,14 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
             rePresented: true,
             frame: lastFrame.frame,
             columns: lastFrame.columns,
+            retryFrame: nextFrame,
           });
         }
-        return Promise.resolve({ ok: false, shed: true, frame });
+        return Promise.resolve({ ok: false, shed: true, frame, retryFrame: nextFrame });
       }
       return new Promise((resolve, reject) => {
         pendingStep = { frame, resolve, reject };
+        nextFrame = frame + 1;
         unansweredMisses = 0;
         activeHost.post(stepMessage({ frame, dt, events }), []);
       });
