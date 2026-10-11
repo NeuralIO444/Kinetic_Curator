@@ -88,14 +88,24 @@ Doctrine (compressed): the big idea communicates in a nanosecond or it is nothin
   "name": null,
   "mark": "queen",
   "archetype": "The Unseen Hand",
-  "verdicts": [],
-  "lines": {},
-  "sway": { "toward": "kept-taste", "visibility": "effect-only" },
+  "verdicts": ["KEEP", "PASS"],
+  "lines": { "keep": "Kept.", "pass": "Not kept." },
+  "sway": {
+    "toward": "kept-taste",
+    "ledger": "two-ledger-rule",
+    "keepGate": 8,
+    "warmsDefaults": "recent-keeps-ring-buffer",
+    "visibility": "effect-only",
+    "favors": ["aliveness", "breath", "room-response"],
+    "refuses": ["clicks-as-taste", "stage-presence"]
+  },
   "affect": { "color": "ink", "motion": "pulse", "rest": "still" }
 }
 ```
 
-Constraints (locked): one icon next to BEATS; appears/pulses when sway is active; never named in UI, no tooltip. Silence is the default; influence is the product. The least defined of the Trio by design — she is shaped by Matt's kept taste, not by a public figure.
+Doctrine (compressed): the keep ledger is the law — taste learns from kept renders only, never clicks. She is the ledger with a pulse, and the only voice whose doctrine is Matt's own history (Davis brings craft, Lois brings provocation). Stimuli-side: she governs aliveness — breath, reactivity, whether the piece is awake to the room. Silence is the default; influence is the product.
+
+Constraints (locked): one icon (👸🏽) next to BEATS; appears/pulses when sway is active; never named in UI, no tooltip. Never renders (DS rule 10 holds by construction). In Tighten, her restraint is carried by the Directors, never shown.
 
 ## How voices show up
 
