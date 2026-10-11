@@ -13,6 +13,7 @@ const required = [
   'dla', 'eden', // #720
   'brush', // flow-field trail stamping
   'poisson', // #1193 — Poisson-disc blue noise
+  'gaussian', // #1194 — Gaussian cluster mixture
 ];
 
 for (const id of required) {

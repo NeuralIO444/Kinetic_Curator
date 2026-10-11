@@ -24,6 +24,7 @@ import { makeCaField, sampleFieldPoint } from '../field/index.js';
 import { CH, hashU01, hashU32, rngForIndex } from '../rng.js';
 import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
 import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
+import { gaussian } from './gaussian.js'; // #1194 — Gaussian cluster mixture
 import { createNoise } from '../../noise.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
 import { writeSampleColumns } from './columns.js'; // #1309 — column-writing protocol
@@ -862,6 +863,14 @@ registerSampler({
   costTier: 2,
   fn: poisson,
 });
+registerSampler({
+  // #1194 — tier 0: a handful of cached lobe centres, then a closed-form draw per index.
+  id: 'gaussian',
+  reads: ['i', 'w', 'h', 'seed', 'seedOffsets', 'rng', 'jitter', 'gaussianSigma'],
+  writes: ['points'],
+  costTier: 0,
+  fn: gaussian,
+});
 
 export {
   random,
@@ -884,4 +893,5 @@ export {
   stratified,
   brush,
   poisson, // #1193
+  gaussian, // #1194
 };
