@@ -105,6 +105,21 @@ Silhouette/SDF collision · rigid-body stacks or a physics library · soft-body 
 2. Coalescence scope: same-family only (recommended for v1), or any-body?
 3. Population ecology: a MODE on the dish, or always-on gentle? (Recommendation: mode — ecology is a performance decision, not a default behaviour.)
 
+## Visual targets (Matt, 2026-10-12)
+
+Eight goal reference images, saved at `~/workspace/your_files/petri-goal-refs/` (kept local per the visual-targets precedent; this section is their design read):
+
+1. **01-pastel-colonies** — soft pastel colonies (pink, peach, cream) crowding in a blue medium, dotted daughter colonies beside parents. The §5 target: distinct identities that touch, lean, and trade pigment without losing themselves; breed made visible.
+2. **02-dendritic-agar** — a branching orange colony invading blue-green medium, radial spore-burst colonies at the edges, territories that stop at each other's borders. The §6 target: frontier growth, stigmergy trails, competition for space.
+3. **03-foam-cells** — interlocking translucent cells with dark membranes, teal-to-red gradient across the raft. The §3 target: pressure made visible — cells deform into polygons under crowding; the membrane between two cells is the body-level analogue of the mix seam.
+4. **04-fluoro-mesh-organisms** — wireframe tube and sphere organisms, green-red fluorescence on black. The §2 target: bodies with *structure* — lattice skins, bendable tubes (compound bodies, #1206), glow as medium.
+5. **05-diatom-arrangement** — a Victorian diatom slide: ornate circles, triangles, and star shells packed gapless on black. The asset vocabulary's north star — Haeckel-grade micro-geometry as marks; repetition with organic variation.
+6. **06-sem-fans-dotfields** — false-colour SEM: radial fan discs (teal, magenta) over tissue studded with ordered dot colonies. Hero marks + density pooling: a few large structured bodies, fields of small ones in formation.
+7. **07-stem-cross-section** — honeycomb cellular tissue in a ring, chambers inside chambers, spiked defensive edges. The hierarchy target: bodies with interiors, structure you can read at two scales.
+8. **08-iridescent-foam** — macro bubble raft, oil-slick iridescence on dark. The §6 medium target: surface tension you can *see*; iridescence as weather (FX), not decoration.
+
+Read together: the dish should look grown, not rendered — soft bodies under real pressure, structured at two scales, colour earned by neighbourhood. If a stage's output could be mistaken for clip-art circles, it has missed the target regardless of test results.
+
 ## Lois pass
 
 - The dish is not a metaphor upgrade; it is a **physics contract**. If marks can't push each other, it's still Photoshop with better PR.
