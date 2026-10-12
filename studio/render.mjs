@@ -207,7 +207,7 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
           canvasH: CANVAS_H,
           // #1183 — the same ground call as gl/liveResolve.mjs, so a still equals the live frame for pattern scenes.
           ...groundArgs({
-            dish: stillDish, layers: stackLayers, layerId: layer.id, lean: layoutParams.groundLean, W: CANVAS_W, H: CANVAS_H,
+            dish: stillDish, layers: stackLayers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, W: CANVAS_W, H: CANVAS_H,
             seed: src.seed >>> 0, tSec: Number(doc.patternTime) || 0,
             getPalette: () => resolvePalette(doc.paletteId || 'praystation', doc.paletteOverrides || null),
           }),
