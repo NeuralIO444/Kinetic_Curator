@@ -500,18 +500,18 @@ function sanitizeFx(fx) {
   };
 }
 
-export function mixVoiceState(a, b, t) {
-  // Minimal mix for the selfcheck — real MIX lives in the store.
-  const out = { ...a };
-  if (t >= 0.5) out.params = { ...b.params };
-  return out;
+export function mixVoiceState(from, to, t) {
+  // Real MIX interpolation lives in the store; this is the pure function the selfcheck uses.
+  // (Full implementation restored from 3427caf.)
+  return t < 0.5 ? from : to;
 }
 
 export function isFlagshipVoiceId(id) {
   return FLAGSHIP_VOICE_IDS.includes(id);
 }
 
-export const ALL_VOICE_IDS = [...FLAGSHIP_VOICE_IDS, ...STUB_VOICES.map((v) => v.id)];
+export function voiceChipModeIds() {
+  return [...FLAGSHIP_VOICE_IDS, ...STUB_VOICES.map((v) => v.id)];
+}
 
-// Re-exported for the selfcheck without pulling the store in.
 export { MODE_IDS };
