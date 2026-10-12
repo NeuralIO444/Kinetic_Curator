@@ -327,4 +327,177 @@ import { buildPlacements } from './buildPlacements.js';
   assert.ok(colorMoved > 0, 'palette-breath moves some marks');
 }
 
+// ── #1198: the rhythm family ─────────────────────────────────────────────
+import {
+  KINEME_PATTERNS, isRhythmPattern, rhythmTypeForPattern, patternAmounts,
+  RHYTHM_SCALE, RHYTHM_ROT, RHYTHM_DX, RHYTHM_DY,
+  evaluateRhythm, applyRhythm,
+} from './kineme.js';
+
+// the strip reads KINEME_PATTERNS: the new patterns appear automatically
+assert.deepStrictEqual([...KINEME_PATTERNS], ['DRIFT', 'SWELL', 'THUMP', 'ORGANIC', 'CADENCE']);
+assert.ok(isRhythmPattern('ORGANIC') && isRhythmPattern('CADENCE'));
+assert.ok(!isRhythmPattern('DRIFT') && !isRhythmPattern('SWELL') && !isRhythmPattern('THUMP') && !isRhythmPattern('nope'));
+assert.strictEqual(rhythmTypeForPattern('ORGANIC'), 'perlin', 'ORGANIC = Perlin via createNoise');
+assert.strictEqual(rhythmTypeForPattern('CADENCE'), 'sine', 'CADENCE = sine');
+assert.strictEqual(rhythmTypeForPattern('DRIFT'), null);
+assert.strictEqual(rhythmTypeForPattern('nope'), null);
+
+// amplitudes: small by design — organic rhythm, never jitter
+assert.ok(RHYTHM_SCALE > 0 && RHYTHM_SCALE <= 0.1, 'scale: small');
+assert.ok(RHYTHM_ROT > 0 && RHYTHM_ROT <= 10, 'rotation: small (degrees, SVG convention)');
+assert.ok(RHYTHM_DX > 0 && RHYTHM_DX <= 0.02 && RHYTHM_DY > 0 && RHYTHM_DY <= 0.02, 'spacing: small');
+
+// patternAmounts: rhythm patterns don't re-weight the amounts — the pattern is the gate
+{
+  const b = { breath: 0.3, drift: 0.5, pulse: 0.7 };
+  assert.deepStrictEqual(patternAmounts(b, 'ORGANIC'), b, 'ORGANIC leaves amounts alone');
+  assert.deepStrictEqual(patternAmounts(b, 'CADENCE'), b, 'CADENCE leaves amounts alone');
+}
+
+const mkRhythmSoa = (n, W = 1000, H = 700) => {
+  const soa = {
+    n,
+    index: Array.from({ length: n }, (_, k) => k * 7 + 1),
+    scale: new Float64Array(n).fill(1),
+    scaleY: new Float64Array(n).fill(1), // #1202 — linked: bit-equal to scale
+    rotation: new Float64Array(n),
+    x: new Float64Array(n),
+    y: new Float64Array(n),
+  };
+  for (let k = 0; k < n; k++) {
+    soa.x[k] = (k / Math.max(1, n - 1)) * W; // spread across the canvas
+    soa.y[k] = ((k * 0.61803) % 1) * H; // golden-ratio scatter
+  }
+  return soa;
+};
+const rctx = (type, extra = {}) => ({
+  seed: 42, canvasW: 1000, canvasH: 700, shedTier: 0,
+  rhythm: type ? { type } : null, ...extra,
+});
+
+// the gate: no rhythm type → inactive, zeros, applier is identity
+{
+  for (const ctx of [rctx(null), rctx('wobble'), { seed: 42, canvasW: 1000, canvasH: 700 }]) {
+    const soa = mkRhythmSoa(12);
+    const before = { x: [...soa.x], y: [...soa.y], scale: [...soa.scale], rotation: [...soa.rotation] };
+    const r = evaluateRhythm(soa, ctx);
+    assert.strictEqual(r.active, false, 'no rhythm type → inactive');
+    assert.ok(r.dRot.every((v) => v === 0) && r.dScale.every((v) => v === 0) && r.dx.every((v) => v === 0));
+    assert.strictEqual(applyRhythm(soa, ctx), null, 'inactive → applier returns null');
+    assert.deepStrictEqual([...soa.x], before.x, 'channels untouched');
+    assert.deepStrictEqual([...soa.scale], before.scale);
+    assert.deepStrictEqual([...soa.rotation], before.rotation);
+  }
+  assert.strictEqual(evaluateRhythm({ n: 0 }, rctx('perlin')).active, false, 'n=0 → inactive');
+  assert.strictEqual(evaluateRhythm(mkRhythmSoa(4), { ...rctx('perlin'), canvasW: 0 }).active, false, 'no canvas → inactive');
+}
+
+// perlin + sine: bounded, deterministic per seed, not one slab, seed matters
+for (const type of ['perlin', 'sine']) {
+  const a = evaluateRhythm(mkRhythmSoa(24), rctx(type));
+  const b = evaluateRhythm(mkRhythmSoa(24), rctx(type));
+  assert.ok(a.active, `${type}: active`);
+  assert.deepStrictEqual([...a.dScale], [...b.dScale], `${type}: deterministic per seed`);
+  assert.deepStrictEqual([...a.dRot], [...b.dRot], `${type}: deterministic per seed`);
+  assert.deepStrictEqual([...a.dx], [...b.dx], `${type}: deterministic per seed`);
+  assert.deepStrictEqual([...a.dy], [...b.dy], `${type}: deterministic per seed`);
+  assert.ok(a.dScale.every((v) => Math.abs(v) <= RHYTHM_SCALE + 1e-12), `${type}: scale bound`);
+  assert.ok(a.dRot.every((v) => Math.abs(v) <= RHYTHM_ROT + 1e-12), `${type}: rotation bound`);
+  assert.ok(a.dx.every((v) => Math.abs(v) <= RHYTHM_DX * 700 + 1e-9), `${type}: dx bound`);
+  assert.ok(a.dy.every((v) => Math.abs(v) <= RHYTHM_DY * 700 + 1e-9), `${type}: dy bound`);
+  assert.ok(new Set([...a.dScale].map((v) => v.toFixed(5))).size > 12, `${type}: not one slab`);
+  const c = evaluateRhythm(mkRhythmSoa(24), rctx(type, { seed: 43 }));
+  assert.ok(!a.dScale.every((v, k) => v === c.dScale[k]), `${type}: seed matters`);
+}
+{
+  const p = evaluateRhythm(mkRhythmSoa(24), rctx('perlin'));
+  const s = evaluateRhythm(mkRhythmSoa(24), rctx('sine'));
+  assert.ok(!p.dScale.every((v, k) => v === s.dScale[k]), 'ORGANIC and CADENCE are different fields');
+}
+
+// applier: folds all four channels; the undo restores the cached x/y only
+{
+  const soa = mkRhythmSoa(8);
+  const ctx = rctx('perlin');
+  const r = evaluateRhythm(soa, ctx);
+  const bx = [...soa.x], by = [...soa.y];
+  const undo = applyRhythm(soa, ctx);
+  assert.ok(typeof undo === 'function', 'applier ran');
+  for (let k = 0; k < 8; k++) {
+    assert.strictEqual(soa.x[k], bx[k] + r.dx[k], `k=${k}: dx folded`);
+    assert.strictEqual(soa.y[k], by[k] + r.dy[k], `k=${k}: dy folded`);
+    assert.strictEqual(soa.rotation[k], r.dRot[k], `k=${k}: dRot folded`);
+    assert.strictEqual(soa.scale[k], 1 + r.dScale[k], `k=${k}: dScale folds scale`);
+    assert.strictEqual(soa.scaleY[k], 1 + r.dScale[k], `k=${k}: dScale folds scaleY (uniform, not sheared)`);
+  }
+  undo();
+  assert.deepStrictEqual([...soa.x], bx, 'undo: x bit-identical (no cache stacking)');
+  assert.deepStrictEqual([...soa.y], by, 'undo: y bit-identical');
+}
+
+// still-marked instances keep their placed everything; shed tier 3 is identity
+{
+  const soa = mkRhythmSoa(4);
+  const bx = [...soa.x], brot = [...soa.rotation];
+  const undo = applyRhythm(soa, rctx('sine'), new Uint8Array([1, 0, 0, 0]));
+  assert.strictEqual(soa.x[0], bx[0], 'still mark keeps its placed x');
+  assert.strictEqual(soa.rotation[0], brot[0], 'still mark keeps its placed rotation');
+  let moved = 0;
+  for (let k = 1; k < 4; k++) if (soa.x[k] !== bx[k] || soa.rotation[k] !== 0) moved++;
+  assert.ok(moved > 0, 'free marks still move');
+  if (undo) undo();
+  assert.deepStrictEqual([...soa.x], bx, 'undo restores all x');
+}
+{
+  const soa = mkRhythmSoa(4);
+  const bx = [...soa.x];
+  assert.strictEqual(applyRhythm(soa, rctx('perlin', { shedTier: 3 })), null, 'shed tier 3: applier returns null');
+  assert.deepStrictEqual([...soa.x], bx, 'shed tier 3: channels untouched');
+}
+
+// buildPlacements integration: the pattern is the gate — zero amounts still switch the layer on
+{
+  const assets = [
+    { id: 'a', weight: 'heavy' },
+    { id: 'b', weight: 'medium' },
+  ];
+  const palette = { swatches: ['#111', '#222', '#333'] };
+  const layoutParams = {
+    mode: 'grid', composition: 'default', count: 40,
+    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
+    jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false,
+    displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+  };
+  const cache = {};
+  const mkBase = (kineme) => ({
+    layoutParams, seed: 0x1a4f, activeAssets: assets, palette,
+    caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
+    canvasW: 1000, canvasH: 700, cache, kineme,
+  });
+  const zero = { breath: 0, drift: 0, pulse: 0, brushWobble: 0, paletteBreath: 0 };
+  const rkin = (type) => ({
+    driverSec: 3.25, boilStep: 26, seed: 0x1a4f, amounts: zero,
+    canvasW: 1000, canvasH: 700, shedTier: 0, anchored: true, rhythm: { type },
+  });
+  const snap = (items) => items
+    .map((it) => [it.key, it.x, it.y, it.scale, it.rotation])
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); // key order: the overlap sort shuffles slot order
+  const plain = snap(buildPlacements(mkBase(null)).items);
+  const organic = snap(buildPlacements(mkBase(rkin('perlin'))).items);
+  let moved = 0;
+  for (let i = 0; i < plain.length; i++) {
+    if (organic[i][1] !== plain[i][1] || organic[i][3] !== plain[i][3] || organic[i][4] !== plain[i][4]) moved++;
+  }
+  assert.ok(moved > plain.length / 2, 'rhythm moves marks with every amount at 0');
+  const cadence = snap(buildPlacements(mkBase(rkin('sine'))).items);
+  let differs = 0;
+  for (let i = 0; i < plain.length; i++) if (cadence[i][1] !== organic[i][1]) differs++;
+  assert.ok(differs > 0, 'ORGANIC and CADENCE are different fields');
+  const back = snap(buildPlacements(mkBase(null)).items);
+  assert.deepStrictEqual(back, plain, 'no stacking: the undos restored the cached picture');
+}
+
+console.log('kineme.selfcheck: OK (rhythm)');
+
 console.log('kineme.selfcheck: OK (placements integration)');
