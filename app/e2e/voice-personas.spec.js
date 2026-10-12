@@ -37,8 +37,8 @@ test.describe('Mode personas', () => {
   });
 
   test('BUILD keeps the stub tiles, the header ROLL button, and the + cell', async ({ page }) => {
-    // 14 stub tiles keep the Layout mode matrix (12 + DLA growth + Eden growth); ROLL lives in the panel header now
-    await expect(page.locator('.te-matrix[aria-label="Layout mode"] .te-cell')).toHaveCount(14);
+    // 15 stub tiles keep the Layout mode matrix (12 + DLA growth + Eden growth + voronoi cells); ROLL lives in the panel header now
+    await expect(page.locator('.te-matrix[aria-label="Layout mode"] .te-cell')).toHaveCount(15);
     await expect(page.locator('.te-cell[aria-label="Roll the dice"]')).toBeVisible();
     await expect(page.locator('.te-cell[aria-label="Capture current state as a voice"]')).toBeVisible();
   });

@@ -17,7 +17,7 @@
 // exactly as before. Selfchecks and studio/render.mjs take that path.
 
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
-import { applyKinemeDrivers } from './kineme.js';
+import { applyKinemeDrivers, applyRhythm } from './kineme.js';
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { mkRng } from './prng.js';
@@ -27,6 +27,7 @@ import { mirrorMultiplier } from '../data/layout-modes.js';
 import { getBiologyPolicy } from '../biology/policy.js';
 import { fadeForAge } from '../biology/lifecycle.js';
 import { sortGlassInstances } from './glassSort.mjs';
+import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import {
   pickWeightedIndexStable,
 } from './kernel/rng.js';
@@ -157,7 +158,8 @@ export function buildPlacements({
   // must not bust the geometry cache. kineme = {
   //   driverSec, boilStep, seed,
   //   amounts: { breath, drift, pulse, brushWobble, paletteBreath },
-  //   canvasW, canvasH, shedTier }
+  //   canvasW, canvasH, shedTier,
+  //   rhythm: { type: 'perlin'|'sine' } | null }  // #1198 — the rhythm layer
   // #1151 — buildPlacements attaches palette ({ swatches }) and colorArrays
   // ({ colors, accents }) to the ctx before the applier runs.
 }) {
@@ -344,6 +346,11 @@ export function buildPlacements({
     kineme.palette = palette;
     kineme.colorArrays = { colors, accents };
   }
+  // #1198 — the rhythm layer runs first: it IS the placement layer (a static
+  // field over the placed positions), and the time drivers compose on top.
+  // Each applier undoes its own cached-x/y writes; undos run in reverse of
+  // application below.
+  const undoRhythm = kineme ? applyRhythm(soa, kineme, stillMarks) : null;
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
@@ -392,6 +399,29 @@ export function buildPlacements({
     }
   }
 
+  // #1199 — field→channel MAP (MATH stratum): sample the field at each
+  // mark's position and remap the selected visual channel. Runs on the
+  // built items, before the overlap sort, so the small-first order sees
+  // final scales. The hard gate inside applyFieldMap makes the all-off
+  // config a strict no-op (no field built, no math). On the pool path the
+  // colors are refreshed from the bind arrays first: the saturation
+  // channel must always start from the placed color, never last frame's
+  // remapped one (the same no-accumulation rule palette-breath's undo
+  // enforces on the bind cache).
+  if (poolHit) {
+    for (let k = 0; k < soa.n; k++) {
+      const item = mapped[k];
+      item.color = colors[k];
+      item.accent = accents[k];
+    }
+  }
+  applyFieldMap(mapped, sanitizeFieldMap({
+    field: layoutParams.fieldMapField,
+    channel: layoutParams.fieldMapChannel,
+    amount: layoutParams.fieldMapAmount,
+    curve: layoutParams.fieldMapCurve,
+  }), { seed, canvasW, canvasH });
+
   if (!layoutParams.overlap) {
     // `mapped` is already a fresh array we own — no defensive copy needed.
     // Never stash a sorted array into cache.itemPool: the pool is indexed by
@@ -422,6 +452,7 @@ export function buildPlacements({
   if (glassOn) mapped = sortGlassInstances(mapped);
 
   if (undoKineme) undoKineme();
+  if (undoRhythm) undoRhythm(); // #1198 — reverse of application
   return { preset, items: mapped, safeCount };
 }
 

@@ -16,7 +16,7 @@ import { validateLayoutParams, BEHAVE_MODES } from '../data/layout-modes.js';
 const S = () => useStore.getState();
 
 // ── layout tiles carry no motion; motion chips are valid + separate ──────
-assert.strictEqual(STUB_VOICES.length, 14); // #834: +dla, +eden growth tiles
+assert.strictEqual(STUB_VOICES.length, 15); // #1196: +voronoi-cells
 for (const v of STUB_VOICES) assert.ok(!('motion' in v), `${v.id}: layout tile carries no motion block`);
 assert.ok(MOTION_MODES.length >= 5);
 for (const m of MOTION_MODES) {
@@ -100,7 +100,7 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
 // ── loadShapeSet: the assets axis — swaps the pool at the press, nothing else ──
 {
   const known = new Set(ASSETS.map((a) => a.id));
-  assert.strictEqual(SHAPE_SETS.length, 18, '4 flagship (#704 dark glass) + 14 layout-tile shape sets'); // #834: +dla, +eden
+  assert.strictEqual(SHAPE_SETS.length, 19, '4 flagship (#704 dark glass) + 15 layout-tile shape sets'); // #1196: +voronoi-cells
   for (const x of SHAPE_SETS) {
     assert.strictEqual(x.ids.length, 4, `${x.id}: exactly 4 shapes`);
     assert.ok(x.ids.every((i) => known.has(i)), `${x.id}: all ids are real assets`);

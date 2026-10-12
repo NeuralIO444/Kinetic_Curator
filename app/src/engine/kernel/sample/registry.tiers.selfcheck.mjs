@@ -40,7 +40,7 @@ ok('no in-tree legacy registerSampler(id, fn) calls', () => {
 // engine/kernel/costRegistry.mjs, shared with #1239) ---
 const TIER_0 = ['random', 'grid', 'fibonacci', 'phyllotaxis', 'truchet', 'radial', 'layers', 'rails', 'orbit', 'abacus', 'stratified', 'noise', 'gaussian'];
 const TIER_1 = ['swarm', 'flow', 'hype', 'murmuration'];
-const TIER_2 = ['ca', 'voronoi', 'lsystem', 'dla', 'eden', 'brush', 'poisson', 'circlepack', 'colonize']; // #1197
+const TIER_2 = ['ca', 'voronoi', 'lsystem', 'dla', 'eden', 'brush', 'poisson', 'circlepack', 'voronoi-cells', 'colonize']; // #1196, #1197
 
 ok('every built-in sampler declares its true tier', () => {
   const expect = new Map([
@@ -48,7 +48,7 @@ ok('every built-in sampler declares its true tier', () => {
     ...TIER_1.map((id) => [id, 1]),
     ...TIER_2.map((id) => [id, 2]),
   ]);
-  assert.strictEqual(expect.size, 26, 'the registry owns exactly the 26 built-ins'); // #1197 — colonize joins
+  assert.strictEqual(expect.size, 27, 'the registry owns exactly the 27 built-ins'); // #1196 voronoi-cells + #1197 colonize
   for (const id of listSamplers()) {
     const d = getSamplerDecl(id);
     assert.ok(d, `missing declaration for ${id}`);

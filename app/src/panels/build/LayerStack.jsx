@@ -1,8 +1,21 @@
-// Layer stack — #248 Phase 3: BuildPanel's second section, extracted
-// verbatim from the old LayersPanel.jsx. #1014 (mockup C rebuild): ghost
-// slots are gone — each section (CONTENT / FX / MATH) gets a "+" in its
-// header (tap = add with last-used defaults, long-press = family chooser).
-import { useState, useEffect, useRef } from 'react';
+// Layer stack — #1203 block-stacking strata roster rebuild.
+//
+// The dish's strata render as chunky vertical blocks, FRONT at the top,
+// GROUND at the bottom: "stack order is depth". Each block carries a left
+// type stripe (MATH red / CONTENT teal / FX purple), a positional number
+// chip, ▲▼●S, a type tag, the name, DUP/×, and a one-line amber param
+// summary when collapsed. Tap a block to expand it inline — the expanded
+// block shows the same editors the old rows showed (wet, blend, PATCH,
+// the FX/MATH/PATTERN editors). Between two blocks the edge stripe splits
+// into a mix seam: a double line, one line per adjacent stratum's type
+// color, crossfading vertically (same-type seams continue unbroken) — the
+// visual statement of #1183's one-dish doctrine.
+//
+// Pure UI restructure: the roster data model is untouched. Reorder still
+// trades within a type (canTrade: content never crosses the adjustment
+// line, FX never crosses MATH), so ▲▼ move a stratum past its nearest
+// same-type neighbor toward FRONT/GROUND.
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
 import { useStore } from '../../state/store.js';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
@@ -17,24 +30,32 @@ import { displayLayerName, isPatternLayer, isKcLayer, MAX_CONTENT_TRACKS, MAX_FX
 import { PatternEditor } from './PatternEditor.jsx';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
-import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 import { rowsTopFirst, moveNeighbor, canMoveUp, canMoveDown } from './layerRows.mjs';
+import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
+import { strataSummary } from './strataSummary.mjs';
 import { RangeRow } from '../../components/RangeRow.jsx';
 
-// #716 Part 2 — black block + white numeral heads every row. The edited
-// track inverts (white block, black numeral).
-function TrackNumeral({ n, kind, edited = false }) {
+// #716 Part 2 — black block + white numeral heads every block. The edited
+// block inverts (white block, black numeral). #1203: the numeral is the
+// stratum's stack position (FRONT = 1), per the mockup's 1..n chips.
+function TrackNumeral({ n, kind, edited = false, title }) {
   const glyph = trackNumeral(n, kind);
   if (!glyph) return null;
   return (
     <span
       className={`track-numeral${edited ? ' track-numeral-edited' : ''}`}
-      title={trackNumeralTitle(n, kind, { edited })}
+      title={title ?? trackNumeralTitle(n, kind, { edited })}
       aria-hidden="true"
     >{glyph}</span>
   );
 }
+
+// #1203 — the block stack's type language. MATH red, CONTENT teal, FX
+// purple. Pattern tracks are CONTENT-family strata (teal stripe, CONTENT
+// tag) — they are ground in the dish, not a fourth type.
+const STRATA_COLORS = Object.freeze({ math: '#E5486F', content: '#4FD1C5', fx: '#8B7CF6' });
+const STRATA_LABEL = Object.freeze({ math: 'MATH', content: 'CONTENT', fx: 'FX' });
 
 // #509 phase 3 — matrix overview: every live cross-layer link in one
 // glance. Config render of store state (re-renders with layers naturally);
@@ -43,7 +64,7 @@ function PatchMatrix({ layers, ordinals }) {
   const pairs = activePatchPairs(layers);
   if (!pairs.length) return null;
   return (
-    <div className="patch-matrix" title="Patch matrix — every live cross-layer link. Edit in the rows below.">
+    <div className="patch-matrix" title="Patch matrix — every live cross-layer link. Edit in the blocks below.">
       <span className="fx-param-readout lbl" style={{ width: 'auto' }}>matrix</span>
       {pairs.map((p) => (
         <div key={p.dstId} className="patch-diag">{formatMatrixRow(p, ordinals)}</div>
@@ -52,7 +73,7 @@ function PatchMatrix({ layers, ordinals }) {
   );
 }
 
-// #507 — inline PATCH diagnostic: one live line under each patched row
+// #507 — inline PATCH diagnostic: one live line under each patched block
 // (TapeCounter 1Hz-poll shape). Module buffer, never the store.
 function PatchDiagLine({ layerId, patch, srcN, dstN }) {
   // All impure reads (module buffer, clock, formatter) live in the effect —
@@ -166,12 +187,36 @@ function FxEffectEditor({ layer, fxOrdinal }) {
   );
 }
 
-// #1014 (mockup C rebuild) — per-section "+": one tap arms a track with
-// last-used defaults, long-press opens the family chooser. Long-press shape
-// follows VoicesShelf (650ms, pointer down/up/leave + click guard).
-const LONG_PRESS_MS = 650;
+// #1203 — the mix seam: in the gap between two blocks the edge stripe splits
+// into a DOUBLE LINE, one line per adjacent stratum's type color, the two
+// lines crossfading into each other vertically. Same-type seams (teal→teal)
+// continue unbroken as a single line.
+function MixSeam({ upperFine, lowerFine }) {
+  const cA = STRATA_COLORS[upperFine];
+  const cB = STRATA_COLORS[lowerFine];
+  if (cA === cB) {
+    return (
+      <div className="mix-seam" title="Same-type seam — the stripe continues unbroken">
+        <span className="mix-line mix-line-single" style={{ background: cA }} />
+      </div>
+    );
+  }
+  return (
+    <div className="mix-seam" title={`Mix seam — ${STRATA_LABEL[upperFine]} bleeds into ${STRATA_LABEL[lowerFine]}`}>
+      <span className="mix-line" style={{ background: `linear-gradient(to bottom, ${cA}, ${cB})` }} />
+      <span className="mix-line mix-line-b" style={{ background: `linear-gradient(to bottom, ${cB}, ${cA})` }} />
+    </div>
+  );
+}
 
-function SectionAddButton({ title, chooserLabel, disabled, onAdd, onOpenChooser }) {
+// #1203 — one-tap add · long-press chooser. Long-press shape follows the old
+// per-section "+" (650ms, pointer down/up/leave + click guard).
+const LONG_PRESS_MS = 650;
+const LAST_ADD_KEY = 'kc:strata-last-add';
+const ADD_TYPES = Object.freeze(['content', 'fx', 'math', 'pattern']);
+const ADD_TYPE_LABEL = Object.freeze({ content: 'CONTENT', fx: 'FX', math: 'MATH', pattern: 'PATTERN' });
+
+function StrataAddSlot({ title, hint, disabled, onAdd, onOpenChooser }) {
   const timer = useRef(null);
   const longFired = useRef(false);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -179,7 +224,6 @@ function SectionAddButton({ title, chooserLabel, disabled, onAdd, onOpenChooser 
     if (disabled) return;
     longFired.current = false;
     clearTimeout(timer.current);
-    if (!onOpenChooser) return; // MATH: tap-only — a hold still adds
     timer.current = setTimeout(() => {
       longFired.current = true;
       onOpenChooser();
@@ -193,15 +237,45 @@ function SectionAddButton({ title, chooserLabel, disabled, onAdd, onOpenChooser 
   return (
     <button
       type="button"
-      className="layer-add-btn"
+      className="strata-add"
       disabled={disabled}
-      title={disabled ? 'Track cap reached' : (chooserLabel ? `${title} — tap: add · long-press: ${chooserLabel}` : title)}
-      aria-label={title}
+      title={title}
+      aria-label="Add stratum — tap: add · long-press: choose type"
       onPointerDown={startPress}
       onPointerUp={cancelPress}
       onPointerLeave={cancelPress}
       onClick={handleClick}
-    >+</button>
+    >
+      <span className="strata-add-label">+ ADD STRATUM</span>
+      <span className="strata-add-hint">{hint}</span>
+    </button>
+  );
+}
+
+// #1203 — long-press chooser, first the stratum type, then (for FX and
+// CONTENT) the existing family pickers. MATH and PATTERN add immediately —
+// MATH is tap-only by design, a PATTERN always arms as QUILT ground.
+// Capped types disable with the reason instead of swallowing the tap.
+function TypeChooser({ onPick, onClose, hasRoom }) {
+  return (
+    <>
+      <button type="button" className="layer-chooser-backdrop" aria-label="Close chooser" tabIndex={-1} onClick={onClose} />
+      <div className="layer-chooser" role="dialog" aria-label="Choose stratum type">
+        <div className="layer-chooser-title">Choose stratum type</div>
+        <div className="layer-chooser-group">
+          {ADD_TYPES.map((t) => {
+            const room = hasRoom(t);
+            return (
+              <button key={t} type="button" className="layer-chooser-item" disabled={!room}
+                title={room ? `Add ${ADD_TYPE_LABEL[t]} stratum` : 'Track cap reached'}
+                onClick={() => onPick(t)}>
+                {ADD_TYPE_LABEL[t]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -209,7 +283,7 @@ function SectionAddButton({ title, chooserLabel, disabled, onAdd, onOpenChooser 
 // CONTENT picks a blend mode. FX picks an effect kind for the NEXT track's
 // family — each FX ordinal is bound to one rack family (#520/#732), so the
 // chooser only offers that family's add-menu kinds (a cross-family pick
-// would arm a phantom effect the row editor can't show).
+// would arm a phantom effect the block editor can't show).
 function FamilyChooser({ section, fxOrdinal, fxSlotKinds, fxSlotLabel, onPick, onClose }) {
   const label = section === 'content' ? 'Choose blend for the new KC track' : `Choose effect for FX ${fxOrdinal}`;
   return (
@@ -255,7 +329,7 @@ export function LayerStack() {
   const fxCount = layers.filter(isFxLayer).length;
   const mathCount = layers.filter(isMathLayer).length;
   const kcCount = layers.filter(isKcLayer).length; // #1099 — a PATTERN track is content for the cap, but not a KC track
-  const singleTrack = kcCount < 2; // PATCH has nothing to point at (a patched row can still be set back to OFF)
+  const singleTrack = kcCount < 2; // PATCH has nothing to point at (a patched block can still be set back to OFF)
   // #1019 — PATCH one-liner for newcomers ("route one track's motion into
   // another"): visible the first time a second KC track exists, then it gets
   // out of the way. `seen` persists via localStorage (never nags on repeat
@@ -264,19 +338,38 @@ export function LayerStack() {
   // until the user taps ×, but a reload never brings it back.
   const [onelinerSeen] = useState(() => readPatchOneLinerSeen());
   const [onelinerDismissed, setOnelinerDismissed] = useState(false);
-  const onelinerVisible = shouldShowPatchOneLiner({ seen: onelinerSeen, dismissed: onelinerDismissed, contentCount });
-  useEffect(() => {
-    if (onelinerVisible) writePatchOneLinerSeen();
-  }, [onelinerVisible]);
-  // #1014 (mockup C rebuild) — no ghost rows: each section gets a "+".
-  // `chooser` is the open family picker: 'content' | 'fx' | null.
+  const onelinerArmed = shouldShowPatchOneLiner({ seen: onelinerSeen, dismissed: onelinerDismissed, contentCount });
+  // #1203 — the dashed ADD STRATUM slot. `chooser` is the open picker:
+  // 'type' (stratum type) → 'fx' | 'content' (family). Tap replays the last
+  // added type (localStorage, default CONTENT); MATH and PATTERN add
+  // immediately from the type chooser.
   const [chooser, setChooser] = useState(null);
+  const [lastAddType, setLastAddType] = useState(() => {
+    try {
+      const v = localStorage.getItem(LAST_ADD_KEY);
+      return ADD_TYPES.includes(v) ? v : 'content';
+    } catch { return 'content'; }
+  });
+  const recordAddType = (t) => {
+    setLastAddType(t);
+    try { localStorage.setItem(LAST_ADD_KEY, t); } catch { /* private mode */ }
+  };
   // The next FX track's family is fixed by its ordinal (#520/#732) — the
   // chooser only offers that family's add-menu kinds.
   const nextFxOrdinal = fxCount + 1;
   const nextFxSlot = rackSlotForFxOrdinal(nextFxOrdinal);
   const nextFxKinds = (nextFxSlot?.kinds ?? []).filter((k) => FX_MENU_KINDS.includes(k));
   const nextFxSlotLabel = nextFxSlot ? `${nextFxSlot.slot} · ${nextFxSlot.label}` : 'No family';
+
+  const doAdd = (t) => {
+    recordAddType(t);
+    if (t === 'math') emit(Events.LAYER_ADD_MATH);
+    else if (t === 'fx') emit(Events.LAYER_ADD_FX);
+    else if (t === 'pattern') addPatternLayer('QUILT');
+    else emit(Events.LAYER_ADD);
+  };
+  const typeHasRoom = (t) => (t === 'fx' ? fxCount < MAX_FX_TRACKS : t === 'math' ? mathCount < MAX_MATH_TRACKS : contentCount < MAX_CONTENT_TRACKS);
+  const addTarget = typeHasRoom(lastAddType) ? lastAddType : ADD_TYPES.find(typeHasRoom) || null;
 
   let contentOrdinal = 0;
   let fxOrdinal = 0;
@@ -309,17 +402,18 @@ export function LayerStack() {
     return hit ? hit.id : null;
   }
 
-  // #1015 — reorder feedback, reworked for the sectioned stack (#1014
-  // mockup C): rows move within their section, so ▲▼ swap the layer with
-  // its section-neighbor (same fine class) directly. The swap trades
-  // ordinals, so the "now KC-2" badge reads the neighbor's old ordinal.
-  // MATH rows stay flash-free, as before.
+  // #1015 — reorder feedback: ▲▼ trade the block with its nearest same-type
+  // neighbor toward FRONT (higher array index) or GROUND. Same-class rule
+  // as before (#732/#1048): content never crosses the adjustment line, FX
+  // never crosses MATH — the stack renders one list but the dish's fold
+  // order invariants hold.
   const [moveFlash, setMoveFlash] = useState(null); // { id, label } | null
   const flashTimer = useRef(null);
   useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
+  useEffect(() => {
+    if (onelinerArmed) writePatchOneLinerSeen();
+  }, [onelinerArmed]);
 
-  // #1037 — rows are listed frontmost first, so ▲ means "later in the chain":
-  // it trades with the neighbor at the next-HIGHER array index (layerRows.mjs).
   function handleMove(layer, dir) {
     const cls = fineClass(layer);
     const group = layers.filter((l) => fineClass(l) === cls); // array order, bottom→top
@@ -333,22 +427,24 @@ export function LayerStack() {
     flashTimer.current = setTimeout(() => setMoveFlash(null), 1600);
   }
 
-  // #1014 (mockup C rebuild) — one row renderer shared by the three
-  // sections. Rows sit under their section header in ascending ordinal;
-  // ▲▼ move the row within its section.
-  function renderRow(layer) {
+  // #1203 — one block renderer for the whole stack. Blocks read frontmost
+  // first (the array's end is the dish's front). Collapsed: header + the
+  // amber one-liner. Expanded (tap): the block's real controls — wet,
+  // blend, PATCH, the FX/MATH/PATTERN editors.
+  function renderBlock(layer, position, stackSize) {
     const fx = isFxLayer(layer);
     const math = isMathLayer(layer);
+    const pat = isPatternLayer(layer);
     const adj = fx || math;
+    const fine = fineClass(layer); // pattern → 'content'
     const wet = wetDisplay(layer); // #1023: what the renderer will honor
-    const cls = fineClass(layer);
-    const group = layers.filter((l) => fineClass(l) === cls);
-    const gi = group.findIndex((l) => l.id === layer.id);
+    const wetPct = Math.round(wet.wet * 100);
+    const group = layers.filter((l) => fineClass(l) === fine);
     const isActive = layer.id === activeLayerId;
     const isFxSelected = layer.id === selectedFxLayerId;
     const isMathSelected = layer.id === selectedMathLayerId;
-    const pat = isPatternLayer(layer); // #1099
     const isPatSelected = layer.id === selectedPatternLayerId;
+    const expanded = math ? isMathSelected : fx ? isFxSelected : pat ? isPatSelected : isActive;
     const soloed = !adj && layer.visible && layers.every((l) => l.id === layer.id || isAdj(l) || !l.visible);
     const mathSoloed = math && layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
     const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
@@ -357,217 +453,209 @@ export function LayerStack() {
     const hitsHard = math && mathTrackHitsHard(layer);
     // #1015 — DUP at cap used to click through silently. Cap the button
     // instead: disabled + tooltip so the cap reads instead of swallowing
-    // the click. MATH rows are out of scope — their DUP is untouched.
+    // the click. MATH blocks are out of scope — their DUP is untouched.
     const dupCapped = math ? false : fx ? fxCount >= MAX_FX_TRACKS : contentCount >= MAX_CONTENT_TRACKS;
+    const summary = expanded ? '' : strataSummary(layer, fine, wetPct);
+    const selectIt = () => (pat ? selectPatternLayer(layer.id) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }));
+    const color = STRATA_COLORS[fine];
+    // #1019 — the PATCH one-liner lives under the first KC block's PATCH
+    // section, and only once that block is open (the flag is consumed on
+    // display, never on arm).
+    const isFirstKc = !adj && !pat && layers.filter(isKcLayer)[0]?.id === layer.id;
+    const showOneliner = isFirstKc && expanded && onelinerArmed;
     return (
       <div
         key={layer.id}
-        className={`layer-row${cls === 'content' ? ' layer-row-kc' : ''} ${isActive ? 'layer-row-active' : ''} ${fx ? 'layer-row-fx' : ''} ${isFxSelected ? 'layer-row-fx-selected' : ''} ${math ? 'layer-row-math' : ''} ${isMathSelected ? 'layer-row-math-selected' : ''} ${pat ? 'layer-row-pattern' : ''} ${isPatSelected ? 'layer-row-pattern-selected' : ''} ${hitsHard ? 'layer-row-math-hard' : ''}${moveFlash?.id === layer.id ? ' layer-row-moved' : ''}`}
-        // #1018 (F8) — the whole FX row arms the effect editor. The name
-        // used to be the only affordance and it reads as a label, so the
-        // editor was undiscoverable. Row-body taps anywhere on an FX row
-        // emit the same FX_SELECT the name button emits; icon buttons,
-        // the opacity slider, and the editor's own controls keep their
-        // own handlers (the closest() bail-out). KC rows are unchanged;
-        // MATH rows are out of scope (#1010).
+        className={`strata-block strata-${fine}${pat ? ' strata-pattern' : ''}${expanded ? ' strata-expanded' : ''}${hitsHard ? ' strata-math-hard' : ''}${moveFlash?.id === layer.id ? ' strata-moved' : ''}`}
+        style={{ '--strata-flash': color }}
+        // #1018 (F8) — the whole block header opens the editor, so the
+        // block reads as tappable. Icon buttons and the name keep their
+        // own handlers (the closest() bail-out); the body's sliders and
+        // selects are outside the header and never arm anything.
         onClick={(e) => {
-          if (!fx && !pat) return;
+          if (!e.target.closest('.strata-head')) return;
           if (e.target.closest('button, input, select, label, a')) return;
-          if (pat) { selectPatternLayer(layer.id); return; } // #1099 — the whole PATTERN row opens its editor
-          emit(Events.FX_SELECT, { id: layer.id });
+          selectIt();
         }}
-        title={fx ? `Tap to open the ${label} effect editor` : pat ? `Tap to open the ${label} pattern editor` : undefined}
+        title={expanded ? `${label} — editing` : `Tap to edit ${label}`}
       >
-        <div className="layer-row-main">
-          <TrackNumeral n={ordinals.get(layer.id) || 1} kind={math ? 'math' : fx ? 'fx' : pat ? 'pattern' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : pat ? isPatSelected : isActive} />
-          <div className="layer-reorder">
-            <button className="micro-btn" disabled={!canMoveUp(group, layer.id)} title="Move up" onClick={() => handleMove(layer, 'up')}>▲</button>
-            <button className="micro-btn" disabled={!canMoveDown(group, layer.id)} title="Move down" onClick={() => handleMove(layer, 'down')}>▼</button>
+        <span className="strata-stripe" style={{ background: color }} aria-hidden="true" />
+        <div className="strata-head">
+          <TrackNumeral n={position} kind={math ? 'math' : fx ? 'fx' : pat ? 'pattern' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : pat ? isPatSelected : isActive} title={`Stratum ${position} of ${stackSize} — ${label}${expanded ? ' — editing' : ''}`} />
+          <div className="strata-move">
+            <button className="micro-btn" disabled={!canMoveUp(group, layer.id)} title="Move toward FRONT" onClick={() => handleMove(layer, 'up')}>▲</button>
+            <button className="micro-btn" disabled={!canMoveDown(group, layer.id)} title="Move toward GROUND" onClick={() => handleMove(layer, 'down')}>▼</button>
           </div>
-          {/* #1015 — transient position badge on the moved row */}
+          {/* #1015 — transient position badge on the moved block */}
           {moveFlash?.id === layer.id && (
             <span className={`reorder-badge${fx ? ' reorder-badge-fx' : ''}`} role="status">now {moveFlash.label}</span>
           )}
           <button className="micro-btn" title="Toggle visibility" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
           <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks (FX never solos)' : math ? 'Solo the grade: this track alone over neutral mid-grey' : 'Solo'} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{(soloed || mathSoloed) ? 'S·' : 'S'}</button>
-          {fx && <span className="fx-badge">FX</span>}
-          {math && <span className="math-badge" title={hitsHard ? 'M — this track is changing the picture hard' : 'M — MATH track'}>M</span>}
+          <span className="strata-type" style={{ background: color }}>{STRATA_LABEL[fine]}</span>
           <button
-            className="layer-name"
-            title={(isActive && !adj && !pat) || (isFxSelected && fx) || (isMathSelected && math) || (isPatSelected && pat) ? `${label} — editing` : label}
-            onClick={() => (pat ? selectPatternLayer(layer.id) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }))}
+            className="strata-name"
+            title={expanded ? `${label} — editing` : label}
+            onClick={selectIt}
           >
             {label}
           </button>
           <button className={`act micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : 'Duplicate'} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>dup</button>
           <button className="micro-btn" title="Remove track (undoable)" disabled={isKcLayer(layer) && kcCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
         </div>
-        <div className="layer-row-composite">
-          {/* #1016 — blend modes only exist on CONTENT tracks. FX/MATH
-              composite via wet/dry, so the old "Blend —" cell could
-              never show anything but a dash — it read as a broken
-              control holding layout alignment. Replaced with the
-              compact WET label (mockup C) so the slider keeps its
-              address in the row. */}
-          {!adj && (
-            <select className="blend-mode-select" value={layer.layerBlendMode} title={helpText('layers-blend')}
-              onChange={(e) => emit(Events.LAYER_SET_BLEND_MODE, { id: layer.id, mode: e.target.value })}>
-              {BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode.toUpperCase()}</option>)}
-            </select>
-          )}
-          {adj && <span className="wet-label lbl">wet</span>}
-          <RangeRow layout="bare" tone="build" min={0} max={wet.cap} step={0.01} value={wet.wet}
-            hint={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
-            onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })} />
-          <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>{Math.round(wet.wet * 100)}%{wet.capped ? ' max' : ''}</span>
-        </div>
-        {!adj && !pat && (
-          <>
-          <div className="layer-row-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
-            <span className="fx-param-readout lbl" style={{ width: 'auto' }}>patch</span>
-            <select className="blend-mode-select" value={patch.mode} disabled={singleTrack && patch.mode === 'off'}
-              onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to, strength: patch.strength })}>
-              <option value="off">OFF</option>
-              {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
-                  dither characters (▨▒▤), approximating the TE dot-matrix/LCD
-                  pixel-icon texture with plain Unicode text — no new asset
-                  pipeline, still the app's existing single-character convention
-                  (◆■◇▸◎⬇◈◉◐), just a chunkier sub-family for these three. */}
-              <option value="mod">⊗ MOD</option>
-              <option value="field">✦ FIELD</option>
-              <option value="feed">↻ FEED</option>
-            </select>
-            <select className="blend-mode-select" value={to || ''} disabled={singleTrack}
-              onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: e.target.value, strength: patch.strength })}>
-              {contentTargets.map((t) => (
-                <option key={t.id} value={t.id} disabled={t.id === layer.id}>KC-{t.n}</option>
-              ))}
-            </select>
-            {patch.mode === 'feed' && (
-              <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                hint={helpText('layers-patch-feed')}
-                onChange={(v) => setLayerPatch(layer.id, { mode: 'feed', to, strength: v })} />
-            )}
-            {patch.mode === 'mod' && (
-              <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                hint={helpText('layers-patch-mod')}
-                onChange={(v) => setLayerPatch(layer.id, { mode: 'mod', to, strength: v })} />
-            )}
-            {patch.mode === 'field' && (
-              <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                hint={helpText('layers-patch-field')}
-                onChange={(v) => setLayerPatch(layer.id, { mode: 'field', to, strength: v })} />
-            )}
-          </div>
-          {/* #1019 — one plain-language PATCH line for newcomers, shown once
-              (first time a second KC track exists), under the first row's
-              PATCH row. × dismisses this session; localStorage keeps it
-              from nagging on repeat visits. */}
-          {!adj && gi === 0 && onelinerVisible && (
-            <div className="patch-oneliner" role="note" title={PATCH_ONELINER_COPY}>
-              <span className="patch-oneliner-text">{PATCH_ONELINER_COPY}</span>
-              <button type="button" className="patch-oneliner-x" title="Got it — don't show again"
-                aria-label="Dismiss PATCH hint"
-                onClick={() => setOnelinerDismissed(true)}>×</button>
-            </div>
-          )}
-          <PatchDiagLine layerId={layer.id} patch={patch} srcN={ordinals.get(patch.to) ?? '?'} dstN={ordinals.get(layer.id) ?? '?'} />
-          </>
+        {!expanded && summary && (
+          <div className="strata-summary" title="Tap the block to edit">{summary}</div>
         )}
-        {fx && isFxSelected && <FxEffectEditor layer={layer} fxOrdinal={ordinals.get(layer.id) || 1} />}
-        {math && isMathSelected && <MathEffectEditor layer={layer} mathOrdinal={ordinals.get(layer.id) || 1} />}
-        {pat && isPatSelected && <PatternEditor layer={layer} ordinal={ordinals.get(layer.id) || 1} />}
+        {expanded && (
+          <div className="strata-body">
+            <div className="strata-composite">
+              {/* #1016 — blend modes only exist on CONTENT tracks. FX/MATH
+                  composite via wet/dry, so the old "Blend —" cell could
+                  never show anything but a dash — it read as a broken
+                  control holding layout alignment. Replaced with the
+                  compact WET label so the slider keeps its address. */}
+              {!adj && (
+                <select className="blend-mode-select" value={layer.layerBlendMode} title={helpText('layers-blend')}
+                  onChange={(e) => emit(Events.LAYER_SET_BLEND_MODE, { id: layer.id, mode: e.target.value })}>
+                  {BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode.toUpperCase()}</option>)}
+                </select>
+              )}
+              {adj && <span className="wet-label lbl">wet</span>}
+              <RangeRow layout="bare" tone="build" min={0} max={wet.cap} step={0.01} value={wet.wet}
+                hint={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
+                onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })} />
+              <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>{wetPct}%{wet.capped ? ' max' : ''}</span>
+            </div>
+            {!adj && !pat && (
+              <>
+              <div className="strata-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
+                <span className="fx-param-readout lbl" style={{ width: 'auto' }}>patch</span>
+                <select className="blend-mode-select" value={patch.mode} disabled={singleTrack && patch.mode === 'off'}
+                  onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to, strength: patch.strength })}>
+                  <option value="off">OFF</option>
+                  {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
+                      dither characters (▨▒▤), approximating the TE dot-matrix/LCD
+                      pixel-icon texture with plain Unicode text — no new asset
+                      pipeline, still the app's existing single-character convention
+                      (◆■◇▸◎⬇◈◉◐), just a chunkier sub-family for these three. */}
+                  <option value="mod">⊗ MOD</option>
+                  <option value="field">✦ FIELD</option>
+                  <option value="feed">↻ FEED</option>
+                </select>
+                <select className="blend-mode-select" value={to || ''} disabled={singleTrack}
+                  onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: e.target.value, strength: patch.strength })}>
+                  {contentTargets.map((t) => (
+                    <option key={t.id} value={t.id} disabled={t.id === layer.id}>KC-{t.n}</option>
+                  ))}
+                </select>
+                {patch.mode === 'feed' && (
+                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                    hint={helpText('layers-patch-feed')}
+                    onChange={(v) => setLayerPatch(layer.id, { mode: 'feed', to, strength: v })} />
+                )}
+                {patch.mode === 'mod' && (
+                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                    hint={helpText('layers-patch-mod')}
+                    onChange={(v) => setLayerPatch(layer.id, { mode: 'mod', to, strength: v })} />
+                )}
+                {patch.mode === 'field' && (
+                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
+                    hint={helpText('layers-patch-field')}
+                    onChange={(v) => setLayerPatch(layer.id, { mode: 'field', to, strength: v })} />
+                )}
+              </div>
+              {/* #1019 — one plain-language PATCH line for newcomers, shown once
+                  (first time a second KC track exists), under the first KC
+                  block's PATCH section. × dismisses this session; localStorage
+                  keeps it from nagging on repeat visits. */}
+              {showOneliner && (
+                <div className="patch-oneliner" role="note" title={PATCH_ONELINER_COPY}>
+                  <span className="patch-oneliner-text">{PATCH_ONELINER_COPY}</span>
+                  <button type="button" className="patch-oneliner-x" title="Got it — don't show again"
+                    aria-label="Dismiss PATCH hint"
+                    onClick={() => setOnelinerDismissed(true)}>×</button>
+                </div>
+              )}
+              <PatchDiagLine layerId={layer.id} patch={patch} srcN={ordinals.get(patch.to) ?? '?'} dstN={ordinals.get(layer.id) ?? '?'} />
+              </>
+            )}
+            {fx && isFxSelected && <FxEffectEditor layer={layer} fxOrdinal={ordinals.get(layer.id) || 1} />}
+            {math && isMathSelected && <MathEffectEditor layer={layer} mathOrdinal={ordinals.get(layer.id) || 1} />}
+            {pat && isPatSelected && <PatternEditor layer={layer} ordinal={ordinals.get(layer.id) || 1} />}
+          </div>
+        )}
       </div>
     );
   }
 
-  // #1014 (mockup C) — section header: title, n/4 count, "+" (tap = add
-  // with last-used defaults, long-press = family chooser), hint line.
-  function renderSectionHead({ title, count, max, hint, addTitle, addChooserLabel, addDisabled, onAdd, onOpenChooser, extra }) {
-    return (
-      <div className="layer-section-head">
-        <span className="layer-section-title">{title}</span>
-        <span className="layer-section-count">{count}/{max}</span>
-        <SectionAddButton
-          title={addTitle}
-          chooserLabel={addChooserLabel}
-          disabled={addDisabled}
-          onAdd={onAdd}
-          onOpenChooser={onOpenChooser}
-        />
-        {extra}
-        {hint && <span className="layer-section-hint">{hint}</span>}
-      </div>
-    );
-  }
+  // #1203 — the stack reads FRONT → GROUND: the array's end is the dish's
+  // front, so the whole list renders frontmost-first as one continuous
+  // stack (the old MATH/FX/CONTENT sections were a grouping of this same
+  // order — the fold invariants in state/layerOrder.js hold it).
+  const stack = rowsTopFirst(layers);
+  const stackSize = stack.length;
+  const strataCap = MAX_CONTENT_TRACKS + MAX_FX_TRACKS + MAX_MATH_TRACKS;
+  const addTitle = addTarget
+    ? `Add ${ADD_TYPE_LABEL[addTarget]} stratum — tap · long-press: choose type`
+    : 'All strata caps reached';
 
   return (
     <div className="build-layer-stack">
-      <PanelHeader tag="P08" title="LAYERS" subtitle={`${contentCount} / ${MAX_CONTENT_TRACKS} tracks`}>
-        {/* Gate: header ADD buttons retired — per-section "+" buttons below
-            are the add affordance (mockup C, #1014 rebuild). */}
+      <PanelHeader tag="P08" title="LAYERS" subtitle={`${stackSize} / ${strataCap} strata`}>
+        {/* Gate: header ADD buttons retired — the dashed ADD STRATUM slot
+            below is the add affordance (#1203 block stack). */}
       </PanelHeader>
+      <div className="strata-depth-head" title="The stack order is the dish's depth: the top block is the frontmost stratum.">▲ FRONT — stack order is depth — GROUND ▼</div>
       <PatchMatrix layers={layers} ordinals={ordinals} />
-      {/* #1037 — sections read MATH / FX / CONTENT top to bottom: the frontmost, last-applied track is on top. */}
-      <div className="layer-section">
-        {renderSectionHead({
-          title: 'Math', count: mathCount, max: MAX_MATH_TRACKS,
-          addTitle: 'Add MATH track',
-          addDisabled: mathCount >= MAX_MATH_TRACKS,
-          onAdd: () => emit(Events.LAYER_ADD_MATH),
-          onOpenChooser: null, // MATH: tap-only, unchanged add behavior
-        })}
-        <div className="layer-list">
-          {rowsTopFirst(layers.filter(isMathLayer)).map((layer) => renderRow(layer))}
-        </div>
+      <div className="strata-list">
+        {stack.map((layer, i) => (
+          <Fragment key={layer.id}>
+            {i > 0 && <MixSeam upperFine={fineClass(stack[i - 1])} lowerFine={fineClass(layer)} />}
+            {renderBlock(layer, i + 1, stackSize)}
+          </Fragment>
+        ))}
       </div>
-      <div className="layer-section">
-        {renderSectionHead({
-          title: 'FX', count: fxCount, max: MAX_FX_TRACKS,
-          addTitle: 'Add FX track', addChooserLabel: 'choose effect',
-          addDisabled: fxCount >= MAX_FX_TRACKS,
-          onAdd: () => emit(Events.LAYER_ADD_FX),
-          onOpenChooser: () => setChooser('fx'),
-        })}
-        {chooser === 'fx' && (
-          <FamilyChooser
-            section="fx"
-            fxOrdinal={nextFxOrdinal}
-            fxSlotKinds={nextFxKinds}
-            fxSlotLabel={nextFxSlotLabel}
-            onClose={() => setChooser(null)}
-            onPick={(family) => { setChooser(null); emit(Events.LAYER_ADD_FX, { family }); }}
-          />
-        )}
-        <div className="layer-list">
-          {rowsTopFirst(layers.filter(isFxLayer)).map((layer) => renderRow(layer))}
-        </div>
+      <div className="strata-add-wrap">
+        <StrataAddSlot
+          title={addTitle}
+          hint="one-tap add · long-press chooser"
+          disabled={!addTarget}
+          onAdd={() => addTarget && doAdd(addTarget)}
+          onOpenChooser={() => setChooser('type')}
+        />
       </div>
-      <div className="layer-section">
-        {renderSectionHead({
-          title: 'Content', count: contentCount, max: MAX_CONTENT_TRACKS,
-          hint: 'one-tap add · long-press chooser',
-          addTitle: 'Add KC track', addChooserLabel: 'choose blend',
-          addDisabled: contentCount >= MAX_CONTENT_TRACKS,
-          onAdd: () => emit(Events.LAYER_ADD),
-          onOpenChooser: () => setChooser('content'),
-          // #1099 — a PATTERN track is added beside the KC one, and opens its editor.
-          extra: (
-            <button type="button" className="micro-btn act layer-add-pattern" disabled={contentCount >= MAX_CONTENT_TRACKS}
-              title={contentCount >= MAX_CONTENT_TRACKS ? 'Track cap reached' : 'Add PATTERN track — a generated tessellation, glyph poster or field'}
-              onClick={() => addPatternLayer('QUILT')}>+ pattern</button>
-          ),
-        })}
-        {chooser === 'content' && (
-          <FamilyChooser
-            section="content"
-            onClose={() => setChooser(null)}
-            onPick={(family) => { setChooser(null); emit(Events.LAYER_ADD, { family }); }}
-          />
-        )}
-        <div className="layer-list">
-          {rowsTopFirst(layers.filter((l) => !isAdj(l))).map((layer) => renderRow(layer))}
-        </div>
+      {chooser === 'type' && (
+        <TypeChooser
+          onClose={() => setChooser(null)}
+          hasRoom={typeHasRoom}
+          onPick={(t) => {
+            if (t === 'fx') { setChooser('fx'); return; }
+            if (t === 'content') { setChooser('content'); return; }
+            setChooser(null);
+            doAdd(t);
+          }}
+        />
+      )}
+      {chooser === 'fx' && (
+        <FamilyChooser
+          section="fx"
+          fxOrdinal={nextFxOrdinal}
+          fxSlotKinds={nextFxKinds}
+          fxSlotLabel={nextFxSlotLabel}
+          onClose={() => setChooser(null)}
+          onPick={(family) => { setChooser(null); recordAddType('fx'); emit(Events.LAYER_ADD_FX, { family }); }}
+        />
+      )}
+      {chooser === 'content' && (
+        <FamilyChooser
+          section="content"
+          onClose={() => setChooser(null)}
+          onPick={(family) => { setChooser(null); recordAddType('content'); emit(Events.LAYER_ADD, { family }); }}
+        />
+      )}
+      <div className="strata-foot">
+        <span>TAP = EDIT · HOLD = 2ND FN</span>
+        <span>#1203 ROSTER</span>
       </div>
     </div>
   );

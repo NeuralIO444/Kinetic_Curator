@@ -124,7 +124,7 @@ ok('cost: 800 marks, floor on, per frame', () => {
 // ── #1128 PR2: the DIRECTOR's patterns re-weight the Curator's amounts; they never invent motion ──
 ok('patterns: DRIFT is the amounts as set; SWELL leans breath-forward; THUMP follows a real beat or is DRIFT; unknown is DRIFT', () => {
   const b = { breath: 0.3, drift: 0.5, pulse: 0 };
-  assert.deepEqual([...KINEME_PATTERNS], ['DRIFT', 'SWELL', 'THUMP']);
+  assert.deepEqual([...KINEME_PATTERNS], ['DRIFT', 'SWELL', 'THUMP', 'ORGANIC', 'CADENCE']);
   assert.deepEqual(patternAmounts(b, 'DRIFT', 0.9), b);
   const sw = patternAmounts(b, 'SWELL'); assert.ok(Math.abs(sw.breath - 0.9) < 1e-9 && Math.abs(sw.drift - 0.1) < 1e-9 && sw.pulse === 0);
   assert.equal(patternAmounts({ ...b, breath: 0.9 }, 'SWELL').breath, 1, 'breath is capped at 1');
@@ -187,6 +187,23 @@ ok('live: a pinned asset\'s marks stay exactly where they were placed while ever
   }
   assert.ok(still > 0 && moved > 0, `${still} pinned marks, ${moved} others`);
   assert.deepEqual(items(createLiveResolver(), { loopTimeMs: 6500, assetStill: {} }), moving, 'an empty pin set changes nothing');
+});
+
+// ── #1198: the rhythm family — ORGANIC/CADENCE switch on a placement layer over any sampler ──
+ok('rhythm: selecting ORGANIC/CADENCE activates the placement layer even with every motion amount at 0', () => {
+  const at = (pattern) => frame(createLiveResolver(), { loopTimeMs: 0, layoutParams: { ...OFF, kinemePattern: pattern } });
+  const still = at('DRIFT');
+  const organic = at('ORGANIC');
+  const cadence = at('CADENCE');
+  assert.notDeepEqual(organic, still, 'ORGANIC breaks the rigidity in the still itself');
+  assert.notDeepEqual(cadence, still, 'CADENCE breaks the rigidity in the still itself');
+  assert.notDeepEqual(organic, cadence, 'the two fields differ');
+  assert.deepEqual(at('ORGANIC'), organic, 'same seed → same field, frame after frame');
+  assert.deepEqual(at('DRIFT'), still, 'the pattern is the gate: DRIFT with zero amounts stays the placed picture');
+  assert.equal(normalizeLayoutParams({ kinemePattern: 'ORGANIC' }).kinemePattern, 'ORGANIC', 'the choice survives normalization');
+  const fields = { seed: 7, seedOffsets: {}, paletteId: 'bone', layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', kinemePattern: 'CADENCE' } };
+  const link = decodeRecipeUrl(encodeRecipeUrl(fields)); assert.ok(link.ok);
+  assert.equal(link.recipe.layoutParams.kinemePattern, 'CADENCE', 'a link carries a rhythm choice');
 });
 
 console.log(`livingMotion.selfcheck: ${n} checks passed`);

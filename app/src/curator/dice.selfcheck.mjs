@@ -35,7 +35,7 @@ function mulberry32(seed) {
 const byId = new Map(ASSETS.map((a) => [a.id, a]));
 const scorer = createPersonaScorer({ assetsById: byId });
 const layoutIds = new Set(STUB_VOICES.map((v) => v.id));
-assert.strictEqual(layoutIds.size, 14, 'the dice rolls across all 14 layout modes');
+assert.strictEqual(layoutIds.size, 15, 'the dice rolls across all 15 layout modes');
 
 // 1. Wildness: UGLY sifts wide, FLOW stays close; silence is an honest middle.
 assert.strictEqual(wildnessForDavis('UGLY'), 1.0);
@@ -85,7 +85,7 @@ const seen = new Set();
 for (let i = 0; i < 40; i++) {
   for (const c of rollDice({ assets: ASSETS, rng: mulberry32(1000 + i), davisCode: null, scorer, crowns: [] }).candidates) seen.add(c.layoutId);
 }
-assert.strictEqual(seen.size, 14, `all 14 modes proposed, saw ${seen.size}`);
+assert.strictEqual(seen.size, 15, `all 15 modes proposed, saw ${seen.size}`);
 
 // 7. Scorer interface: a fake MLX head swaps in without touching the dice.
 const mlxHead = { id: 'mlx-head-v1', score: (c) => c.assetIds.length / 5 };
@@ -128,4 +128,4 @@ const ev = [];
 for (let i = 0; i < 60; i++) ev.push({ ts: i, layoutId: 'grid', assetIds: ['k1', 'f1'], davisCode: null });
 assert.ok(affinity(kinA, farB, ev) > affinity(kinA, kinB, []), 'sustained crowned pairings outvote the empty prior');
 
-console.log('[dice] selfcheck OK — 14 layouts, casts 2–5, 3 finalists, crowns persist');
+console.log('[dice] selfcheck OK — 15 layouts, casts 2–5, 3 finalists, crowns persist');

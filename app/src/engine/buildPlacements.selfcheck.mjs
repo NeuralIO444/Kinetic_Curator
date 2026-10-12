@@ -120,6 +120,57 @@ const empty = buildPlacements({ ...opts, activeAssets: [] });
 assert.deepStrictEqual(empty.items, []);
 assert.strictEqual(empty.safeCount, 0);
 
+// --- #1199 field→channel MAP: wired through the real pipeline ---
+{
+  const offItems = buildPlacements(opts).items;
+  const onItems = buildPlacements({
+    ...opts,
+    layoutParams: {
+      ...layoutParams, fieldMapField: 'noise', fieldMapChannel: 'scale',
+      fieldMapAmount: 1, fieldMapCurve: 'linear',
+    },
+  }).items;
+  assert.strictEqual(onItems.length, offItems.length, 'map never changes the item count');
+  assert.ok(onItems.some((it, i) => Math.abs(it.scale - offItems[i].scale) > 1e-9),
+    'noise→scale moves marks');
+  assert.deepStrictEqual(onItems.map((it) => it.x), offItems.map((it) => it.x), 'x untouched by the map');
+  assert.deepStrictEqual(onItems.map((it) => it.y), offItems.map((it) => it.y), 'y untouched by the map');
+  // off after on: no residue — the no-op gate is real through the pipeline
+  const offAfter = buildPlacements(opts).items;
+  assert.deepStrictEqual(offAfter.map((it) => it.scale), offItems.map((it) => it.scale), 'no scale residue');
+  assert.deepStrictEqual(offAfter.map((it) => it.color), offItems.map((it) => it.color), 'no color residue');
+  // saturation channel: colors move, stay valid hex (saturated palette —
+  // the fixture palette is all greys, and greys are achromatic by design)
+  const satItems = buildPlacements({
+    ...opts,
+    palette: { swatches: ['#cc3322', '#22aa88', '#3344cc', '#ddaa33'] },
+    layoutParams: {
+      ...layoutParams, fieldMapField: 'density', fieldMapChannel: 'saturation',
+      fieldMapAmount: 1,
+    },
+  }).items;
+  assert.ok(satItems.some((it, i) => it.color !== offItems[i].color), 'density→saturation moves colors');
+  assert.ok(satItems.every((it) => /^#[0-9a-f]{6}$/.test(it.color)), 'mapped colors are valid hex');
+  // cached pool path: saturation must not compound across frames
+  const cache = {};
+  const f1 = buildPlacements({
+    ...opts, cache,
+    layoutParams: {
+      ...layoutParams, fieldMapField: 'noise', fieldMapChannel: 'saturation',
+      fieldMapAmount: 1,
+    },
+  }).items;
+  const f2 = buildPlacements({
+    ...opts, cache,
+    layoutParams: {
+      ...layoutParams, fieldMapField: 'noise', fieldMapChannel: 'saturation',
+      fieldMapAmount: 1,
+    },
+  }).items;
+  assert.deepStrictEqual(f1.map((it) => it.color), f2.map((it) => it.color),
+    'pool path: saturation never compounds');
+}
+
 console.log('buildPlacements.selfcheck: OK', {
   balanced: a.items.length,
   perfClamped: live.items.length,

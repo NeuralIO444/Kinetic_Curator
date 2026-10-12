@@ -14,7 +14,7 @@ import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
 /** #589 — the three phrase clock sources. */
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
-import { captureKeepContext, sanitizeKeepContext } from '../../curator/keepContext.js'; // #1140: per-keep session context
+import { captureKeepContext, sanitizeKeepContext, seedAgeMsNow } from '../../curator/keepContext.js'; // #1140: per-keep session context
 import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #1124
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 
@@ -63,6 +63,9 @@ export function captureFavorite(state, paletteId) {
     // #948 — full epoch ISO; legacy HH:MM:SS keeps still parse via
     // loisActivity.parseFavoriteTimestamp (date unknown -> null, honestly).
     timestamp: new Date().toISOString(),
+    // #1391 G2 — ms between this seed landing and the keep, on the record
+    // itself (additive; legacy keeps carry no field and none is invented).
+    msSinceSeed: seedAgeMsNow(),
     context: captureKeepContext(paletteId),
     config: {
       layout: { ...state.layoutParams },
@@ -109,6 +112,10 @@ export function sanitizeFavorite(raw) {
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'
       ? { seedOffsets: normalizeSeedOffsets(raw.seedOffsets) } : {}),
     timestamp: typeof raw.timestamp === 'string' ? raw.timestamp.slice(0, 32) : '',
+    // #1391 G2 — ms-since-seed rides along when it is a real measurement;
+    // absent or malformed stays absent.
+    ...(Number.isFinite(Number(raw.msSinceSeed)) && Number(raw.msSinceSeed) >= 0 && raw.msSinceSeed != null
+      ? { msSinceSeed: Math.floor(Number(raw.msSinceSeed)) } : {}),
     // #1140 — session context rides along when present; legacy keeps (no
     // context key) stay without it — never invented.
     ...(context ? { context } : {}),

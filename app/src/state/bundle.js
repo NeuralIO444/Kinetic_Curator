@@ -144,6 +144,8 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1139: developer trace flag for the sway module (off by default), never project content",
   "kc:director:trace":
     "#1145: developer trace flag for the Director scheduler (off by default), never project content",
+  "kc:strata-last-add":
+    "#1203: per-machine UI preference — the stratum type the ADD STRATUM one-tap replays",
 });
 
 /**

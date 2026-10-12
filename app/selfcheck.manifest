@@ -10,6 +10,7 @@ node src/gl/glassBevel.selfcheck.mjs
 node src/gl/glassCaustic.selfcheck.mjs
 node src/gl/glassStriation.selfcheck.mjs
 node src/engine/kineme.selfcheck.mjs
+node src/engine/fieldMap.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
 node src/hooks/batchGate.selfcheck.mjs
@@ -38,6 +39,7 @@ node src/engine/kernel/sample/sample.selfcheck.mjs
 node src/engine/kernel/sample/registry.selfcheck.mjs
 node src/engine/kernel/sample/registry.tiers.selfcheck.mjs
 node src/engine/kernel/sample/growth.selfcheck.mjs
+node src/engine/kernel/sample/voronoiCells.selfcheck.mjs
 node src/engine/kernel/sample/growth.nullaudio.selfcheck.mjs
 node src/engine/kernel/sample/poisson.selfcheck.mjs
 node src/engine/kernel/sample/circlepack.selfcheck.mjs
@@ -313,6 +315,7 @@ node src/gl/hands.selfcheck.mjs
 node src/fx/efRackTile.selfcheck.mjs
 node src/components/motionGlyph.selfcheck.mjs
 node src/panels/build/trackNumeral.selfcheck.mjs
+node src/panels/build/strataSummary.selfcheck.mjs
 node src/deferredStubs.selfcheck.mjs
 node src/panels/pipeline/stageMapping.selfcheck.mjs
 node src/panels/pipeline/stageDisplays.selfcheck.mjs
