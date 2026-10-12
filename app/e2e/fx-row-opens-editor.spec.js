@@ -28,7 +28,7 @@ test('FX block header tap opens the effect editor; controls stay independent', a
 
   // (1) Tap the FX 1 block header — not the name button (use the number
   // chip, which is pure header) — the editor opens on FX 1.
-  await fx1.locator('.strata-chip').click();
+  await fx1.locator('.track-numeral').click();
   await expect(fx1.locator('.fx-editor')).toBeVisible();
   await expect(fx1).toHaveClass(/strata-expanded/);
   await expect(fx2).not.toHaveClass(/strata-expanded/);
@@ -46,9 +46,11 @@ test('FX block header tap opens the effect editor; controls stay independent', a
   await expect(fx2.locator('.fx-editor')).toBeVisible();
   await fx1.getByTitle('Toggle visibility').click();
 
-  // Wet slider on FX 1: readout moves, editor does not open there.
-  const slider = fx1.locator('.strata-composite input[type=range]');
-  const readout = fx1.locator('.layer-opacity-readout');
+  // Wet slider inside the expanded block (FX 2): the readout moves and the
+  // slider's own handler runs — the editor stays open on FX 2 and nothing
+  // collapses or re-arms. (#1203: collapsed blocks render no sliders.)
+  const slider = fx2.locator('.strata-composite input[type=range]');
+  const readout = fx2.locator('.layer-opacity-readout');
   // Native value setter: React's controlled input ignores a direct
   // el.value assignment, so go through the prototype setter.
   await slider.evaluate((el) => {
@@ -57,8 +59,8 @@ test('FX block header tap opens the effect editor; controls stay independent', a
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await expect(readout).toHaveText('50%');
-  await expect(fx1.locator('.fx-editor')).toHaveCount(0);
   await expect(fx2.locator('.fx-editor')).toBeVisible();
+  await expect(fx1.locator('.fx-editor')).toHaveCount(0);
 
   // DUP on FX 1: a third FX block appears (DUP selects the new duplicate by
   // design — pre-existing behavior). FX 1's own editor was not opened by
@@ -88,7 +90,7 @@ test('FX block header tap opens the effect editor; controls stay independent', a
   await expect(kcBlocks).toHaveCount(2);
   // The newest track (KC-2) is active and expanded; tap KC-1's chip to edit it.
   await expect(kcBlocks.nth(0)).toHaveClass(/strata-expanded/);
-  await kcBlocks.nth(1).locator('.strata-chip').click();
+  await kcBlocks.nth(1).locator('.track-numeral').click();
   await expect(kcBlocks.nth(1)).toHaveClass(/strata-expanded/);
   await expect(kcBlocks.nth(0)).not.toHaveClass(/strata-expanded/);
 });

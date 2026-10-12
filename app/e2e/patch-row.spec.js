@@ -20,7 +20,7 @@ test('PATCH target is pickable while OFF and survives a mode change', async ({ p
   const blocks = page.locator('.strata-block.strata-content:not(.strata-pattern)');
   await expect(blocks).toHaveCount(3);
   const kc1 = blocks.nth(2);
-  await kc1.locator('.strata-chip').click();
+  await kc1.locator('.track-numeral').click();
   const patchRow = kc1.locator('.strata-composite[title^="PATCH"]');
   await expect(patchRow).toBeVisible();
   const [mode, target] = await patchRow.locator('select').all();

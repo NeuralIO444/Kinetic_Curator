@@ -31,9 +31,25 @@ import { PatternEditor } from './PatternEditor.jsx';
 import { helpText } from '../../data/helpCopy.js';
 import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { rowsTopFirst, moveNeighbor, canMoveUp, canMoveDown } from './layerRows.mjs';
+import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
 import { strataSummary } from './strataSummary.mjs';
 import { RangeRow } from '../../components/RangeRow.jsx';
+
+// #716 Part 2 — black block + white numeral heads every block. The edited
+// block inverts (white block, black numeral). #1203: the numeral is the
+// stratum's stack position (FRONT = 1), per the mockup's 1..n chips.
+function TrackNumeral({ n, kind, edited = false, title }) {
+  const glyph = trackNumeral(n, kind);
+  if (!glyph) return null;
+  return (
+    <span
+      className={`track-numeral${edited ? ' track-numeral-edited' : ''}`}
+      title={title ?? trackNumeralTitle(n, kind, { edited })}
+      aria-hidden="true"
+    >{glyph}</span>
+  );
+}
 
 // #1203 — the block stack's type language. MATH red, CONTENT teal, FX
 // purple. Pattern tracks are CONTENT-family strata (teal stripe, CONTENT
@@ -465,11 +481,7 @@ export function LayerStack() {
       >
         <span className="strata-stripe" style={{ background: color }} aria-hidden="true" />
         <div className="strata-head">
-          <span
-            className={`strata-chip${expanded ? ' strata-chip-edited' : ''}`}
-            title={`Stratum ${position} of ${stackSize} — ${label}${expanded ? ' — editing' : ''}`}
-            aria-hidden="true"
-          >{position}</span>
+          <TrackNumeral n={position} kind={math ? 'math' : fx ? 'fx' : pat ? 'pattern' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : pat ? isPatSelected : isActive} title={`Stratum ${position} of ${stackSize} — ${label}${expanded ? ' — editing' : ''}`} />
           <div className="strata-move">
             <button className="micro-btn" disabled={!canMoveUp(group, layer.id)} title="Move toward FRONT" onClick={() => handleMove(layer, 'up')}>▲</button>
             <button className="micro-btn" disabled={!canMoveDown(group, layer.id)} title="Move toward GROUND" onClick={() => handleMove(layer, 'down')}>▼</button>

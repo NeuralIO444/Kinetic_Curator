@@ -625,13 +625,9 @@
   min-height: 44px; min-width: 40px;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.strata-chip {
-  flex: 0 0 auto; min-width: 24px; height: 24px; padding: 0 4px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: #0a0a0a; color: #f4f4f4; border: 1px solid #2a2a30;
-  font-size: 12px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
-}
-.strata-chip-edited { background: #f4f4f4; color: #0a0a0a; border-color: #f4f4f4; }
+/* The number chip is the #716 .track-numeral tile (rules above) — the block
+   header keeps it centered like the old rows did. */
+.build-layer-stack .strata-head .track-numeral { align-self: center; }
 .strata-move { display: flex; gap: 2px; }
 .strata-type {
   font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
