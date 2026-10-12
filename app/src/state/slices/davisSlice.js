@@ -63,6 +63,12 @@ export function captureFavorite(state, paletteId) {
     // #948 — full epoch ISO; legacy HH:MM:SS keeps still parse via
     // loisActivity.parseFavoriteTimestamp (date unknown -> null, honestly).
     timestamp: new Date().toISOString(),
+    // #1390 (G1) — the same moment as epoch milliseconds, a number: the
+    // cross-day signals (ECHO, WANE, recency) read this, never a string
+    // parse. Additive — keeps written before it simply have no keptAt.
+    // (new Date(), not Date.now(): #806/#808 keep davisSlice free of
+    // Date.now reads; the clock inventory allow-lists this metadata read.)
+    keptAt: new Date().getTime(),
     // #1391 G2 — ms between this seed landing and the keep, on the record
     // itself (additive; legacy keeps carry no field and none is invented).
     msSinceSeed: seedAgeMsNow(),
@@ -112,6 +118,9 @@ export function sanitizeFavorite(raw) {
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'
       ? { seedOffsets: normalizeSeedOffsets(raw.seedOffsets) } : {}),
     timestamp: typeof raw.timestamp === 'string' ? raw.timestamp.slice(0, 32) : '',
+    // #1390 (G1) — a real epoch stamp rides along; absent or junk (legacy
+    // files, foreign bundles) stays absent — never invented, never repaired.
+    ...(Number.isFinite(raw.keptAt) && raw.keptAt > 0 ? { keptAt: Math.floor(raw.keptAt) } : {}),
     // #1391 G2 — ms-since-seed rides along when it is a real measurement;
     // absent or malformed stays absent.
     ...(Number.isFinite(Number(raw.msSinceSeed)) && Number(raw.msSinceSeed) >= 0 && raw.msSinceSeed != null

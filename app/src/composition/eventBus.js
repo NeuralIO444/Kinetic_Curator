@@ -115,4 +115,5 @@ export const Events = {
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
+  ACTIVITY_HEARTBEAT: 'activity:heartbeat', // #1390 (G8): { ts, idleMs } — loisActivity publishes while the artist is active
 };
