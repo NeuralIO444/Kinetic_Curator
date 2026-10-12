@@ -143,6 +143,12 @@ export const createLayoutSlice = (set) => ({
   paletteOverrides: null,
   /** Swatch slots the operator pinned; harmony/shuffle leave these alone (#56). */
   paletteLocks: {},
+  /**
+   * #1365 — has the ARTIST picked or edited the palette (strip/wing chip, swatch, bg/ink, harmony, reset)? Set only on
+   * the artist's dispatch path, never by CURATOR or a voice. While true, a CURATOR press leaves the palette alone even
+   * in explore. Cleared when a KINETIC roll or a project load replaces the palette. Session state: not saved, not undone.
+   */
+  paletteChosen: false,
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
   /**
@@ -242,6 +248,8 @@ export const createLayoutSlice = (set) => ({
     if (SEED_OFFSET_GROUPS.every((g) => cur[g] === 0)) return {};
     return { ...pushToUndo(state, true), seedOffsets: defaultSeedOffsets() };
   }),
+  /** #1365 — the artist picked or edited the palette (called on the artist's dispatch path only). */
+  markPaletteChosen: () => set((state) => (state.paletteChosen ? {} : { paletteChosen: true })),
   // Switching catalog id clears overrides (AC6)
   setPaletteId: (id) => set((state) => ({
     ...pushToUndo(state, true),
@@ -774,6 +782,7 @@ export const createLayoutSlice = (set) => ({
       paletteId,
       paletteOverrides: null,
       paletteLocks: {},
+      paletteChosen: false, // #1365 — the roll picked this palette, not the artist
       layoutParams: merged,
       enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
       layers,
@@ -851,6 +860,7 @@ export const createLayoutSlice = (set) => ({
       paletteId,
       paletteOverrides: null,
       paletteLocks: {},
+      paletteChosen: false, // #1365 — the roll picked this palette, not the artist
       layoutParams: merged,
       voiceMix: null,
       activeVoiceId: null,
@@ -912,6 +922,7 @@ export const createLayoutSlice = (set) => ({
       paletteId,
       paletteOverrides: null,
       paletteLocks: {},
+      paletteChosen: false, // #1365 — the roll picked this palette, not the artist
       light,
       layoutParams: merged,
       voiceMix: null,

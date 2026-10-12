@@ -143,7 +143,7 @@ export function CuratorBar() {
     // presses don't wipe swatch overrides or stack undo entries. "off" never
     // touches the palette.
     const st = useStore.getState();
-    const target = curatePaletteTarget({ phase, profile: getRenderProfile(getActivePersonaId()), paletteId: st.paletteId });
+    const target = curatePaletteTarget({ phase, profile: getRenderProfile(getActivePersonaId()), paletteId: st.paletteId, artistChose: !!st.paletteChosen });
     if (target) st.setPaletteId(target);
   };
 
