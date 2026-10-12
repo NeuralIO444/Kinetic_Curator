@@ -552,7 +552,7 @@ export function createLiveResolver() {
           kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
           // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
           ...groundArgs({
-            dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, W, H, seed,
+            dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, W, H, seed,
             getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
             tSec: (input.loopTimeMs ?? 0) / 1000,
           }),

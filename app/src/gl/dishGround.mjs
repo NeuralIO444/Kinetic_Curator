@@ -26,13 +26,16 @@ export function createResolverDish() {
  * layer has no ground or does not lean. `getPalette()` returns the ACTIVE palette (the one the pattern itself is
  * drawn with); it is a thunk so a layer that does not lean never pays for resolving it.
  */
-export function groundArgs({ dish, layers, layerId, lean, getPalette, W, H, tSec, seed }) {
+export function groundArgs({ dish, layers, layerId, lean, nudge = 0, getPalette, W, H, tSec, seed }) {
   const amount = clamp01(lean);
-  if (!(amount > 0) || !dish) return NONE;
+  const edge = clamp01(nudge); // #1183 tile-edge nudge: its own knob
+  if (!(amount > 0) && !(edge > 0)) return NONE;
+  if (!dish) return NONE;
   const below = nearestPatternBelow(layers, layerId);
   if (!below) return NONE;
   const ground = patternGround(below.pattern, getPalette(), W, H);
   dish.seed = (seed >>> 0) || 0;
   dish.ground = (x, y) => ground.at(x, y, tSec);
-  return { dish, lean: amount };
+  dish.groundCell = (x, y) => ground.cell(x, y, tSec);
+  return { dish, lean: amount, nudge: edge };
 }

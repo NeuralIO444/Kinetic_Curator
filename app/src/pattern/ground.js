@@ -76,5 +76,25 @@ export function patternGround(pattern, palette, w, h) {
       const hero = grid.heroAt ? grid.heroAt[i] : -1;
       return mainColor(hero >= 0 && grid.heroes && grid.heroes[hero] ? grid.heroes[hero] : grid.tiles[i], grid);
     },
+    /**
+     * #1183 tile-edge nudge — WHERE inside its tile scene point (x, y) sits at loop time t: `{ u, v, size }`, with
+     * u, v in [0, 1) across the tile and `size` its side in scene units. A QUILT 2x2 hero block is one tile here (the
+     * marks feel the block's edges, not the hidden cells'). Same grid, same pan as `at`, so the two never disagree.
+     */
+    cell(x, y, t = 0) {
+      const off = panOffset(p.seed, p.drift, p.drift > 0 ? Number(t) || 0 : 0);
+      const gx = x / tileW + off.x;
+      const gy = y / tileW + off.y;
+      const fx = gx - Math.floor(gx);
+      const fy = gy - Math.floor(gy);
+      const tc = ((Math.floor(gx) % grid.cols) + grid.cols) % grid.cols;
+      const tr = ((Math.floor(gy) % grid.rows) + grid.rows) % grid.rows;
+      const hero = grid.heroAt ? grid.heroAt[tr * grid.cols + tc] : -1;
+      const h = hero >= 0 && grid.heroes ? grid.heroes[hero] : null;
+      if (h && Number.isFinite(h.c) && Number.isFinite(h.r)) {
+        return { u: (tc - h.c + fx) / 2, v: (tr - h.r + fy) / 2, size: tileW * 2 };
+      }
+      return { u: fx, v: fy, size: tileW };
+    },
   };
 }

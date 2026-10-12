@@ -211,6 +211,26 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
           )}
         />
 
+        {/* #1183 tile-edge nudge: marks ease off the edges of the pattern tile beneath them, so the grid reads
+            through the layout. Per layer; 0 is today's frame exactly. Inert without a pattern below (#272). */}
+        <ValueButton
+          label="EDGE"
+          display={`${Math.round((layoutParams.groundNudge ?? 0) * 100)}%`}
+          locked={lockedParams.groundNudge}
+          onToggleLock={() => lock('groundNudge')}
+          disabled={!hasGround}
+          disabledReason="Needs a PATTERN layer below this one"
+          onOpen={() => (
+            <SliderEditor
+              ariaLabel="Edge: how strongly marks ease off the edges of the pattern tile beneath them"
+              value={Math.round((layoutParams.groundNudge ?? 0) * 100)}
+              min={0} max={100} step={1}
+              unit="%"
+              onChange={(v) => set('groundNudge', Math.round(v) / 100)}
+            />
+          )}
+        />
+
         {/* #1183 contact shadow: this layer's marks cast a soft shadow onto what lies beneath them, toward the sun
             when it is on, straight under them when it is off, in the palette's darkest colour. Per layer; 0 is
             today's frame exactly. Inert without a pattern below (#272). */}
