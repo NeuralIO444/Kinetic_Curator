@@ -58,6 +58,7 @@ import { injectCommon } from '../effects/chunks.mjs';
 import { buildProgramChecked, auditProgramChecked } from './diagnostics.mjs';
 import { UNIFORMS as BUILTIN_UNIFORMS } from '../bridge/builtinEffects.mjs';
 import { ACCUM_PROGRAMS } from '../accum.mjs';
+import { CONTACT_SHADOW_PROGRAMS, SHADOW_LIFT, SHADOW_MAX_OFFSET, SHADOW_SOFT } from '../contactShadow.mjs';
 import { FX_SHADER_EFFECTS } from '../effects/fxShaders.mjs';
 import { MATH_SHADER_EFFECTS } from '../effects/mathShaders.mjs';
 import { createSweepLab, runEffectSweep, locMap } from './sweep.mjs';
@@ -280,6 +281,52 @@ function resolveDef(id, fxaa) {
           });
         },
         dispose: () => gl.deleteProgram(program),
+      };
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* #1183 contact shadow: silhouette -> blur x -> blur y -> lay down     */
+/* ------------------------------------------------------------------ */
+
+const SHADOW_DECLS = {
+  silhouette: { u_src: S(0), u_mask: S(1), u_maskOn: F, u_maskMode: { kind: 'int' }, u_maskInvert: F, u_scene: { kind: 'vec2' }, u_sun: { kind: 'vec4' }, u_throw: { kind: 'vec3' } },
+  blur: { u_src: S(0), u_step: { kind: 'vec2' } },
+  lay: { u_shadow: S(0), u_dst: S(1), u_color: { kind: 'vec3' }, u_strength: F },
+};
+
+/**
+ * All four passes of one shadowed layer, run in production order (the lab is full size, so the three half-size
+ * passes are measured at full size: the number errs expensive). The lab input stands in for both the layer's marks
+ * (its alpha) and the composite below. Final image in targets.out.
+ */
+function contactShadowDef() {
+  return {
+    id: 'gl/contact-shadow',
+    build(gl) {
+      const built = {};
+      for (const def of CONTACT_SHADOW_PROGRAMS) {
+        built[def.key] = buildChecked(gl, {
+          vs: FULL_VS, fs: def.fs, name: `sweep-${def.name}`, vsFile: 'shaders.mjs:FULL_VS', fsFile: def.fsFile, decls: SHADOW_DECLS[def.key],
+        });
+      }
+      return {
+        program: built.lay.program,
+        locs: built.lay.locs,
+        apply: (glA, _locs, c, lab, targets) => {
+          const sun = c.params.sun ? [-200, 350, 120, 1] : [0, 0, 1, 0];
+          lab.render(built.silhouette.program, targets.tmp, built.silhouette.locs, SHADOW_DECLS.silhouette, {
+            u_src: lab.input.tex, u_mask: lab.input.tex, u_maskOn: c.params.matte ? 1 : 0, u_maskMode: 0, u_maskInvert: 0,
+            u_scene: [1000, 700], u_sun: sun, u_throw: [SHADOW_LIFT, SHADOW_MAX_OFFSET, 0],
+          });
+          lab.render(built.blur.program, targets.out, built.blur.locs, SHADOW_DECLS.blur, { u_src: targets.tmp.tex, u_step: [SHADOW_SOFT / 1000 / 2, 0] });
+          lab.render(built.blur.program, targets.tmp, built.blur.locs, SHADOW_DECLS.blur, { u_src: targets.out.tex, u_step: [0, SHADOW_SOFT / 700 / 2] });
+          lab.render(built.lay.program, targets.out, built.lay.locs, SHADOW_DECLS.lay, {
+            u_shadow: targets.tmp.tex, u_dst: lab.input.tex, u_color: [0.1, 0.16, 0.29], u_strength: c.params.strength,
+          });
+        },
+        dispose: () => { for (const b of Object.values(built)) gl.deleteProgram(b.program); },
       };
     },
   };
@@ -602,6 +649,19 @@ export const SWEEP_EFFECTS = [
       C('exposure 4', { exposure: 4 }),
       C('gate weave max', { exposure: 1, weave: [0.6, -0.6] }),
       H('hostile negative exposure', { exposure: -2 }),
+    ],
+  },
+  // ---- #1183 contact shadow (all four passes of one shadowed layer) ----
+  {
+    ...contactShadowDef(),
+    cases: [
+      // strength 0 lays nothing: the composite below comes back byte-for-byte
+      C('zero → no-op', { strength: 0 }, { noop: true }),
+      C('no sun', { strength: 0.8 }),
+      C('sun', { strength: 0.8, sun: true }),
+      C('sun + matte, max', { strength: 0.8, sun: true, matte: true }, { costly: true }),
+      H('hostile over-max strength', { strength: 5 }),
+      H('hostile negative strength', { strength: -3 }),
     ],
   },
   {

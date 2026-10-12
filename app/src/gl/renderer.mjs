@@ -51,6 +51,7 @@ import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/p
 const GRAIN_FAMILY_KINDS = ['grain'];
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { registerCostTier } from './costTiers.mjs';
+import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
 import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
 
 // #533 PR1 — upload-byte meter (measure-only). renderer.mjs is the only file
@@ -256,6 +257,10 @@ for (const def of RENDERER_PROGRAMS) {
 // #594 — the one CHIAROSCURO sun: a per-instance diffuse term in the existing
 // quad shader (a few ALU ops at the instance centre, one multiply per fragment),
 // no pass, no texture; off is byte-identical. Tier 0, like the #309 smear.
+// #1183 — the soft contact shadow: 3 half-size passes + 1 full-size lay-down per SHADOWED layer only (a layer
+// carries `shadow` in the contract only when its knob is up, a pattern is below, and it is not shed). Tier 2 per
+// Matt (2026-10-12): shed after the tier-1 extras, as one piece — sceneContract.js applies the shed.
+registerCostTier('gl/contact-shadow', CONTACT_SHADOW_COST);
 registerCostTier('gl/sun', {
   tier: 0, memoryBytes: 0, timeMs: 0.02,
   notes: '#594 PR1 sun: per-instance diffuse in QUAD_VS/FS; zero passes; live + GL stills',
@@ -451,6 +456,17 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     u_maskMode: U(compProg, 'u_maskMode'), u_maskInvert: U(compProg, 'u_maskInvert'),
     u_hueOn: U(compProg, 'u_hueOn'), u_hueMat: U(compProg, 'u_hueMat'),
   };
+
+  // #1183 — the contact shadow's programs go through the same checked build + uniform audit as the renderer's.
+  const contactShadow = createContactShadow(gl, {
+    buildProgram: (def) => {
+      const p = buildProgramChecked(gl, FULL_VS, def.fs, { name: def.name, vsFile: 'shaders.mjs:FULL_VS', fsFile: def.fsFile });
+      auditProgramChecked(gl, p, def.uniforms, { name: def.name, file: 'contactShadow.mjs' });
+      return p;
+    },
+    drawFullscreen,
+    bindTex,
+  });
 
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
   /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
@@ -712,9 +728,21 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       // #1098 — a PATTERN track is one generated texture, not instances: it skips the layer target
       // and composites straight from its own texture, with the same blend / opacity / matte.
       const srcTex = layer.type === 'pattern' ? patternTexture(layer, w, h) : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
+      // #1183 — the contact shadow is laid over what is below BEFORE the marks land on top. It writes the shadowed
+      // backdrop into blendT (free once the layer's marks are drawn), and the layer composites from there into
+      // dWrite, so every caller's single ping-pong swap stays correct. No `shadow` key: nothing runs.
+      const mask = maskFor(layer.id); // once: it re-renders the matte source into maskT
+      let base = dRead;
+      if (layer.type === 'content' && layer.shadow) {
+        contactShadow.apply({
+          srcTex, mask, dstRead: dRead, dstWrite: blendT, shadow: layer.shadow, sun,
+          opacity: layer.opacity, sceneW, sceneH, w: blendT.w, h: blendT.h,
+        });
+        base = blendT;
+      }
       composite(
-        compProg, compU, srcTex, dRead, dWrite,
-        blendIdFor(layer.blend), layer.opacity, null, maskFor(layer.id), hueRotate
+        compProg, compU, srcTex, base, dWrite,
+        blendIdFor(layer.blend), layer.opacity, null, mask, hueRotate
       );
     };
 
@@ -835,6 +863,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
 
   function disposeBase() {
+    contactShadow.dispose(); // #1183
     bridge.dispose();
     for (const e of patternTex.values()) gl.deleteTexture(e.tex);
     patternTex.clear();

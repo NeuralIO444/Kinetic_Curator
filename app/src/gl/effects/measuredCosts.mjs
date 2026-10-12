@@ -64,4 +64,10 @@ export const MEASURED_COSTS = {
   'math/channelMix': { ms: 0.3, method: 'wall', draws: 90 },
   'math/hueRotate': { ms: 0.3, method: 'wall', draws: 90 },
   'math/levelsFixed': { ms: 0.3, method: 'wall', draws: 90 },
+  // #1183 — added by hand, following the #740/#1010 precedent (a full re-bless on software GL in a loaded VM
+  // replaces every committed number with noise). Derived, not invented: on 2026-10-12 a full `measure-costs` run
+  // (SwiftShader, wall clock, worst case "sun + matte") put all four shadow passes at 12.0x that run's median; 12.0
+  // x this file's median (0.3 ms) = 3.6 ms. Conservative: the three half-size passes run at full lab size here.
+  // Tier 2 carries no cost band, so the number is informational. Re-bless on hardware (gpu timer).
+  'gl/contact-shadow': { ms: 3.6, method: 'wall', draws: 90 },
 };

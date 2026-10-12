@@ -344,3 +344,4 @@ node src/gl/fieldFeedColumns.selfcheck.mjs
 node src/engine/kernel/replay/replay.selfcheck.mjs
 node src/engine/kernel/replay/inputLog.selfcheck.mjs
 node src/curator/curatePalette.selfcheck.mjs
+node src/gl/contactShadow.selfcheck.mjs

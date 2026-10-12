@@ -28,6 +28,7 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
 import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, spinKineme, spinVariant } from '../data/kinemes.js';
 import { resolvePalette } from '../data/palettes.js';
+import { darkestSwatch } from './contactShadow.mjs'; // #1183 contact shadow colour
 import { sanitizePattern } from '../state/patternTrack.js';
 import { patternPalette } from '../pattern/patternSource.js';
 
@@ -221,6 +222,25 @@ export function warnUnsupportedMaterials(resolvedLayers) {
 /** #1127 — a layer's ROTATE spin in rev/s: finite, 0..1, anything else is still. */
 const spinOf = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0; };
 
+/**
+ * #1183 contact shadow — is it shed? Tier 2 (Matt, 2026-10-12): it goes only after the tier-1 extras are already
+ * gone (perfTier1) AND the quality has stepped down to PERF, as one piece. Exports and stills never shed it.
+ */
+export function contactShadowShed(doc) {
+  return !!(doc && doc.perfTier1) && String(doc.quality || '') === 'performance';
+}
+
+/**
+ * #1183 — a content layer's contact shadow for the contract, or null (the key is then omitted, so every contract
+ * without a shadow, and its hash, is exactly what it was). Needs the knob above 0 and a PATTERN below (decision 4).
+ */
+export function contractShadow(rl, groundBelow, shed) {
+  if (shed || !groundBelow) return null;
+  const a = Number(rl?.layoutParams?.groundShadow);
+  if (!Number.isFinite(a) || !(a > 0)) return null;
+  return { amount: Math.round(Math.min(1, a) * 1000) / 1000, color: darkestSwatch(rl.palette) };
+}
+
 export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = null }) {
   if (!doc || typeof doc !== 'object') throw new TypeError('buildSceneContract: doc required');
   if (!Array.isArray(resolvedLayers)) throw new TypeError('buildSceneContract: resolvedLayers required');
@@ -235,6 +255,8 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     (doc.layers || []).filter((l) => l && l.id != null).map((l) => [String(l.id), l])
   );
 
+  const shadowShed = contactShadowShed(doc); // #1183
+  let groundBelow = false; // #1183: a visible PATTERN layer has been laid down below the current one
   for (const rl of resolvedLayers) {
     if (rl.isFx && !rl.isMath) {
       layers.push({
@@ -270,6 +292,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       // track (blend, opacity, matte, the FX fold above it). `t` rides the block ONLY while it
       // drifts, so a static pattern's contract and hash do not change from frame to frame.
       const pattern = sanitizePattern(rl.pattern);
+      groundBelow = true; // #1183: resolved layers are pre-filtered for visibility, bottom -> top
       layers.push({
         id: String(rl.id),
         name: String(rl.layer?.name ?? rl.id),
@@ -297,6 +320,8 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         blendMode: KNOWN_BLENDS.has(itemBlend) ? itemBlend : 'normal',
         hueRotate: Number(rl.layoutParams?.hueRotate) || 0,
       },
+      // #1183 — the contact shadow; key absent unless it casts (knob > 0, ground below, not shed)
+      ...((sh) => (sh ? { shadow: sh } : {}))(contractShadow(rl, groundBelow, shadowShed)),
     });
     const layerSpin = spinOf(rl.layoutParams?.rotateSpin);
     for (const item of rl.items || []) {
@@ -428,6 +453,14 @@ export function assertSceneContract(scene) {
     if (l.type === 'pattern') {
       if (!l.pattern || typeof l.pattern !== 'object') fail(`pattern layer ${l.id}: pattern block required`);
       if (!l.palette || !Array.isArray(l.palette.swatches)) fail(`pattern layer ${l.id}: palette required`);
+    }
+    if (l.shadow !== undefined) { // #1183 contact shadow
+      const sh = l.shadow;
+      if (l.type !== 'content') fail(`layer ${l.id}: only content layers cast a shadow`);
+      if (!sh || typeof sh !== 'object' || !Number.isFinite(sh.amount) || sh.amount <= 0 || sh.amount > 1) {
+        fail(`layer ${l.id}: shadow.amount must be in (0, 1]`);
+      }
+      if (typeof sh.color !== 'string' || !/^#[0-9a-f]{6}$/.test(sh.color)) fail(`layer ${l.id}: shadow.color must be #rrggbb`);
     }
     if (l.matte !== null && l.matte !== undefined) {
       const m = l.matte;

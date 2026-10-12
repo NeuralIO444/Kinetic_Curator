@@ -652,7 +652,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // amount, u_smear.z). 0 on the default table (routes.squash undefined)
     // → the contract is exactly as built, today's render bit-identical.
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, perfTier1: !!s.perfTier1, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
