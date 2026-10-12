@@ -24,6 +24,12 @@
 import { createNoise } from './noise.js';
 import { getSampler } from './kernel/sample/registry.js';
 import { CH, hashU01, hashU32, rngForIndex, makeScratchStream } from './kernel/rng.js';
+import {
+  ATTRACTOR_RADIUS_DEFAULT,
+  createAttractorField,
+  sampleDensity,
+  applyHeroes,
+} from './kernel/field/attractors.js';
 
 /**
  * @typedef {object} PlacementSoA
@@ -122,6 +128,12 @@ export function computeGeometrySoA({
   // #1195 — circle packing: the BASE scale range ([lo, hi], the slider, never the audio-modulated one). Only the
   // circlepack mode reads it; it joins geometrySignature for that mode alone.
   packScale = null,
+  // #1200 — attractor density pooling. attractorCount/attractorRadius ride
+  // stage A and join geometrySignature. Heroes ride stage C only
+  // (applyAttributes) and never touch geometry. All default off:
+  // attractorCount=0 is byte-identical to current behavior.
+  attractorCount = 0,
+  attractorRadius = ATTRACTOR_RADIUS_DEFAULT,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -153,6 +165,12 @@ export function computeGeometrySoA({
   // `ca` / `voronoi` / `sampleFieldPoint` reseed it per index, which is
   // bit-identical to their old per-point `rngForIndex` allocation.
   const scratch = makeScratchStream();
+  // #1200 — dish-level attractor field, built once per placement call
+  // (init-time CPU, O(attractorCount) hashes). Null when unused: the pooling
+  // block in the loop below never runs, so output is byte-identical.
+  const attractorField = attractorCount > 0
+    ? createAttractorField(seed, null, attractorCount, { radius: attractorRadius, seedOffsets })
+    : null;
   const ctx = {
     i: 0, count, w: effectiveW, h: effectiveH,
     rng: null, jitter: jitter || 0, seed,
@@ -219,6 +237,17 @@ export function computeGeometrySoA({
     // wrote (or the legacy adapter unpacked into).
     const ux = soa.x[n];
     const uy = soa.y[n];
+
+    // #1200 — attractor density pooling. Reject the point where the
+    // attractor field reads low, so marks pool at attractor points. One draw
+    // from the per-index geo stream: deterministic per (seed, i, field) and
+    // index-stable, with exactly the same continue/drop semantics as the
+    // density rejection above (a rejected index simply leaves no row).
+    if (attractorField) {
+      const keep = sampleDensity(attractorField, ux / effectiveW, uy / effectiveH);
+      if (ctx.rng() > keep) continue;
+    }
+
     let px = ux;
     let py = uy;
 
@@ -281,7 +310,7 @@ export function computeGeometrySoA({
  *
  * @param {PlacementSoA} soa mutated in place
  */
-export function applyAttributes(soa, { scale, rotate, alpha }) {
+export function applyAttributes(soa, { scale, rotate, alpha, heroes = null }) {
   // #1202 — scale is { x:[lo,hi], y:[lo,hi] }; a legacy [lo,hi] array reads
   // as linked. Linked (the default): Y is bit-identical to X — the provable
   // no-op. Unlinked: Y samples its own independent draw (uScaleY).
@@ -310,6 +339,10 @@ export function applyAttributes(soa, { scale, rotate, alpha }) {
     soa.rotation[k] = rot0 + rotD * uRot[k];
     soa.alpha[k] = alpha0 + alphaD * uAlpha[k];
   }
+  // #1200 — heroes break the rules after the ranges land: larger scale,
+  // rotated against the field. heroes=null (the off state) leaves every
+  // lane untouched — applyHeroes is the provable no-op.
+  applyHeroes(soa, heroes);
   return soa;
 }
 
@@ -357,6 +390,10 @@ export function geometrySignature(p) {
     p.wobbleAmp, p.wobbleFreq,
     // #1195 — the packing depends on the base scale range (circlepack only; 0 for every other mode).
     p.packScale ? p.packScale[0] : 0, p.packScale ? p.packScale[1] : 0,
+    // #1200 — attractor density is read in stage A; a missing entry here
+    // would silently serve stale pools after a param edit. heroes is stage-C
+    // only (always re-run), like scale/rotate/alpha, so it stays out.
+    p.attractorCount || 0, p.attractorRadius || 0,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }
