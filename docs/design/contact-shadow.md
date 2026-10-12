@@ -1,6 +1,6 @@
 # Contact shadow: design (#1183, effect 2)
 
-**Status: proposal, for Matt. Nothing is built.** Every choice below changes the look, so each is Matt's.
+**Status: approved by Matt, 2026-10-12, with the answers recorded below. Not built yet.** Every choice changes the look, so the build is still Matt's to review.
 **Roadmap:** [`ROADMAP_PETRI_DISH.md`](../ROADMAP_PETRI_DISH.md), #1183's order of effects (Matt, 2026-10-11): colour lean
 (#1370, shipped), then **the soft contact shadow** and the tile-edge nudge (#1395), then palette lock.
 **Builds on:** [`dish-strata-sketch.md`](dish-strata-sketch.md).
@@ -17,7 +17,7 @@ Colour lean and EDGE are maths on each mark. A shadow has to be **drawn**, so th
 1. Draw the layer's marks as a silhouette, at half size, nudged a little in the light's direction.
 2. Blur it sideways, then up and down. These are the "about 3 passes" from the sketch: two cheap half-size passes, then
    the last one also lays the shadow down.
-3. Darken what is already on the canvas under that soft silhouette, **then** draw the marks on top as usual.
+3. Lay the soft silhouette over what is already on the canvas in the palette's darkest colour, **then** draw the marks on top as usual.
 
 It goes in one place: `renderer.mjs` `compositeLayerTo`, the step that puts a content layer onto the frame. It works
 inside FX/MATH wraps too, because they use the same step. No change to placement, the dish, or the one-writer files
@@ -31,7 +31,17 @@ beyond passing the knob through.
 - **Replay.** The knob is a layer parameter like GROUND and EDGE, so it is already in the performance file and the
   determinism harness.
 
-## Decisions for Matt (a recommendation on each)
+## Decisions (Matt, 2026-10-12)
+
+1. **Direction:** follow the CHIAROSCURO sun when it is on; with no sun, straight down, centred under the mark.
+2. **Control:** one SHADOW knob per content layer, default 0, next to GROUND and EDGE. Softness and offset tuned once by eye.
+3. **Falls on:** everything below the layer in the stack.
+4. **Needs ground:** yes, inert with its reason when there is no PATTERN below.
+5. **Colour: the active palette's darkest swatch** (lowest luminance). The shadow is that colour, laid over what is
+   beneath at the strength the knob sets. *(Changed from the recommendation, which was a multiply-darken.)*
+6. **Governor:** cost tier 2, shed after the tier-1 extras, as one piece.
+
+## The questions as proposed (kept for the record)
 
 | # | Question | Recommendation | Why |
 |---|---|---|---|
@@ -67,8 +77,8 @@ beyond passing the knob through.
 - The three passes in the renderer, behind the knob, and the cost-tier declaration.
 - `shadow` added to the layer's layout params (`groundShadow: 0`, spec 0..1) and to the scene contract.
 - The SHADOW knob in BUILD next to GROUND and EDGE, inert with its reason when there is no ground.
-- Selfchecks: 0 is pixel-identical; no ground means no passes; the shadow darkens only below the mark's footprint and
-  never lightens; still equals live; ACCUM does not compound it; the cost tier is declared.
+- Selfchecks: 0 is pixel-identical; no ground means no passes; the shadow is the palette's darkest swatch and lands
+  only under the mark's footprint; still equals live; ACCUM does not compound it; the cost tier is declared.
 - One PR, `Refs #1183`. Palette lock is the next, separate step.
 
 ## Not in this design
