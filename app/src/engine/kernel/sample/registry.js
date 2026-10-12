@@ -26,6 +26,7 @@ import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
 import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { gaussian } from './gaussian.js'; // #1194 — Gaussian cluster mixture
 import { circlepack } from './circlepack.js'; // #1195 — circle packing
+import { voronoiCells } from './voronoiCells.js'; // #1196 — true Voronoi cells
 import { createNoise } from '../../noise.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
 import { writeSampleColumns } from './columns.js'; // #1309 — column-writing protocol
@@ -880,6 +881,14 @@ registerSampler({
   costTier: 2,
   fn: circlepack,
 });
+registerSampler({
+  // #1196 — tier 2: Poisson seeds + nearest-cell rejection, cached seeds.
+  id: 'voronoi-cells',
+  reads: ['i', 'w', 'h', 'seed', 'seedOffsets', 'rng', 'jitter'],
+  writes: ['points', 'points.t'],
+  costTier: 2,
+  fn: voronoiCells,
+});
 
 export {
   random,
@@ -894,6 +903,7 @@ export {
   rails,
   ca,
   voronoi,
+  voronoiCells, // #1196
   lsystem,
   dla, // #720
   eden, // #720

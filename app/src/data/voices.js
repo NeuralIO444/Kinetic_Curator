@@ -372,6 +372,9 @@ export const STUB_VOICES = [
   { id: 'eden',       name: 'Eden growth', glyph: 'bloom', vibe: 'Eden Garden: cells divide outward from a seed — a compact blob breathes into being. Soft biology.', // #834
     assets: ['org_blob_01', 'org_blob_02', 'hae_sponge_01', 'dot_field_01'],
   },
+  { id: 'voronoi-cells', name: 'voronoi cells', glyph: 'cell', vibe: 'True Voronoi: gapless cellular fill. Each mark belongs to one cell.', // #1196
+    assets: ['geo_hex_01', 'geo_hex_02', 'dot_field_01', 'org_blob_01'],
+  },
 ];
 
 /**
