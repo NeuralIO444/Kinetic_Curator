@@ -223,6 +223,10 @@ mem.delete(KEEPS_KEY);
   assert.strictEqual(sanitizeFavorite({ seed: 1, keptAt: 1_700_000_000_123, config: {} }).keptAt, 1_700_000_000_123);
   assert.strictEqual(sanitizeFavorite({ seed: 1, keptAt: 1_700_000_000_123.9, config: {} }).keptAt, 1_700_000_000_123);
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, timestamp: '12:34:56', config: {} })), 'legacy favorite: no keptAt, loads unchanged');
+  // post-#948 legacy records carry a full ISO timestamp string but no
+  // keptAt — the sanitizer must NOT backfill keptAt by parsing it (the
+  // HH:MM:SS fixture above cannot catch that: Date.parse gives NaN there)
+  assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, timestamp: '2026-10-04T18:00:00.000Z', config: {} })), 'ISO-stamped legacy favorite: keptAt stays absent, never backfilled');
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: 'yesterday', config: {} })), 'string keptAt dropped');
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: -5, config: {} })), 'negative keptAt dropped');
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: NaN, config: {} })), 'NaN keptAt dropped');
