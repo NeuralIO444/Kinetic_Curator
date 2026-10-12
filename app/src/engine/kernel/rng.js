@@ -164,6 +164,11 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #720 — the DLA/Eden aggregate places points, so it rides the spatial
   // stream too: re-rolling SPATIAL regrows the organism, colour must not.
   growth: 'spatial',
+  // #1200 — attractor points and hero selection place/break placement, so
+  // both ride the spatial stream: re-rolling spatial moves the pools and
+  // the heroes; re-rolling colour must not.
+  attractor: 'spatial',
+  hero: 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

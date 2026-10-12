@@ -17,6 +17,7 @@
 // exactly as before. Selfchecks and studio/render.mjs take that path.
 
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
+import { makeHeroInfo } from './kernel/field/attractors.js';
 import { applyKinemeDrivers, applyRhythm } from './kineme.js';
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
@@ -216,6 +217,13 @@ export function buildPlacements({
     // #1195 — circle packing packs for the BASE scale slider range, never the audio-modulated override (that would
     // re-pack every frame). Other modes: null, not in their signature.
     packScale: layoutParams.mode === 'circlepack' ? [xBase[0], xBase[1]] : null,
+    // #1200 — attractor density pooling. attractorCount/attractorRadius ride
+    // stage A (density pooling) and join geometrySignature. Defaults off:
+    // no attractors is byte-identical to current behavior. UI homes are
+    // #1204's shift layer (attractors = shift of WILD) — that panel work
+    // lands separately.
+    attractorCount: layoutParams.attractorCount ?? 0,
+    attractorRadius: layoutParams.attractorRadius,
   };
 
   const strategy = resolveStrategy(layoutParams, preset);
@@ -228,7 +236,11 @@ export function buildPlacements({
 
   // ── Stage C: attributes. Always runs; this is what the audio/life
   // modulation actually moves, and it is pure arithmetic over cached units.
-  applyAttributes(soa, { scale, rotate: layoutParams.rotate, alpha });
+  // #1200 — heroes ride stage C (HEROES is #1204's shift function of a
+  // MOTION control; the panel work lands separately). makeHeroInfo is the
+  // off-state no-op: 0 heroes -> null -> applyAttributes untouched.
+  const heroInfo = makeHeroInfo(seed, countInt, layoutParams.heroes ?? 0, seedOffsets);
+  applyAttributes(soa, { scale, rotate: layoutParams.rotate, alpha, heroes: heroInfo });
   // Spine E: float count fades the spawning/dying point's alpha
   if (countFrac > 0.001 && soa.n > 0) {
     soa.alpha[soa.n - 1] *= countFrac;

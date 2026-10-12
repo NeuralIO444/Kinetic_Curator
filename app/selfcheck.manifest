@@ -51,6 +51,7 @@ node src/biology/biology.selfcheck.mjs
 node src/engine/kernel/field/field.selfcheck.mjs
 node src/engine/kernel/field/caBlur.selfcheck.mjs
 node src/engine/kernel/field/registry.selfcheck.mjs
+node src/engine/kernel/field/attractors.selfcheck.mjs
 node src/engine/kernel/field/scent.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.field.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.noop.selfcheck.mjs

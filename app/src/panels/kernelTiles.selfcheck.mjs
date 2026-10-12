@@ -19,13 +19,13 @@ import {
   probeField,
 } from './kernelTiles.mjs';
 
-// --- the live roster: five fields, one row ---
+// --- the live roster: six fields, one row ---
 {
   const rows = registryTileRows();
   assert.strictEqual(rows.length, 1, `expected only the field row, got ${rows.map((r) => r.family)}`);
   const [row] = rows;
   assert.strictEqual(row.family, 'field');
-  assert.deepStrictEqual(row.tiles.map((t) => t.id), ['constant', 'ca', 'noise', 'scent', 'quadtree']);
+  assert.deepStrictEqual(row.tiles.map((t) => t.id), ['constant', 'ca', 'noise', 'scent', 'quadtree', 'attractor']);
   for (const t of row.tiles) {
     assert.ok(t.face.length > 0 && t.face.length <= 4, `${t.id}: face "${t.face}" must be 1–4 chars`);
     assert.strictEqual(t.face, tileFace(t.id));
@@ -44,7 +44,7 @@ import {
   assert.deepStrictEqual(FEATURES.list(), [], 'feature registry starts empty');
   const counts = registryCounts();
   assert.deepStrictEqual(counts, [
-    { family: 'field', n: 5 },
+    { family: 'field', n: 6 },
     { family: 'weather', n: 0 },
     { family: 'feature', n: 0 },
   ]);
