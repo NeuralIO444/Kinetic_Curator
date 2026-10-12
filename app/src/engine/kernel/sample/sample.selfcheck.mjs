@@ -48,7 +48,9 @@ assert.ok(listed.includes('stratified'));
 {
   const s1 = geometrySignature({ mode: 'grid', count: 40, seed: 7, canvasW: 800, canvasH: 600 });
   const s2 = geometrySignature({ mode: 'grid', count: 40, seed: 7, canvasW: 800, canvasH: 600 });
-  assert.strictEqual(s1, s2);
+  // deep: two calls build two array instances; stability means equal
+  // CONTENTS, not the same reference (strictEqual can never pass here).
+  assert.deepStrictEqual(s1, s2);
 }
 
 console.log('sample.selfcheck: ok');
