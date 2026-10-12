@@ -1,5 +1,10 @@
 // #1099 — the PATTERN track's controls in BUILD, driven through the real UI.
 import { test, expect } from '@playwright/test';
+import { addStratum } from './strata-add.mjs';
+
+// #1203 — PATTERN tracks arm through the ADD STRATUM slot: long-press →
+// type chooser → PATTERN (always QUILT ground).
+const addPattern = (page) => addStratum(page, 'PATTERN');
 
 async function boot(page) {
   await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
@@ -17,10 +22,10 @@ const patternOf = async (page) => (await state(page)).layers.find((l) => l.type 
 test('+ pattern adds a PT-1 track, opens its editor, and leaves the KC track active', async ({ page }) => {
   await boot(page);
   const before = await state(page);
-  await page.getByRole('button', { name: '+ pattern' }).click();
-  const row = page.locator('.layer-row-pattern');
+  await addPattern(page);
+  const row = page.locator('.strata-block.strata-pattern');
   await expect(row).toHaveCount(1);
-  await expect(row.locator('.layer-name')).toHaveText(/PT-1/i);
+  await expect(row.locator('.strata-name')).toHaveText(/PT-1/i);
   await expect(page.locator('.pattern-editor')).toBeVisible();
   const after = await state(page);
   expect(after.active, 'a pattern track never takes the active slot').toBe(before.active);
@@ -31,7 +36,7 @@ test('+ pattern adds a PT-1 track, opens its editor, and leaves the KC track act
 
 test('mode tiles, density, mix, drift and SHUFFLE write through to the track', async ({ page }) => {
   await boot(page);
-  await page.getByRole('button', { name: '+ pattern' }).click();
+  await addPattern(page);
   const ed = page.locator('.pattern-editor');
   expect((await patternOf(page)).mode).toBe('QUILT');
   await ed.getByRole('tab', { name: /glyph/i }).click();
@@ -54,7 +59,7 @@ test('mode tiles, density, mix, drift and SHUFFLE write through to the track', a
 
 test('honest UI: grout and hero are disabled outside QUILT, with the reason, and a disabled slider cannot move the value', async ({ page }) => {
   await boot(page);
-  await page.getByRole('button', { name: '+ pattern' }).click();
+  await addPattern(page);
   const ed = page.locator('.pattern-editor');
   await expect(ed.getByRole('slider', { name: 'Pattern grout' })).toBeEnabled();
   await ed.getByRole('tab', { name: /field/i }).click();
@@ -73,14 +78,14 @@ test('honest UI: grout and hero are disabled outside QUILT, with the reason, and
 
 test('44px rows, tabs, buttons and sliders; removing the track closes the editor and keeps the KC track', async ({ page }) => {
   await boot(page);
-  await page.getByRole('button', { name: '+ pattern' }).click();
+  await addPattern(page);
   const ed = page.locator('.pattern-editor');
   const heights = await ed.locator('.chip-btn, .big-btn, input[type=range]').evaluateAll((els) => els.map((e) => ({ t: e.className || e.type, h: Math.round(e.getBoundingClientRect().height) })));
   expect(heights.length).toBeGreaterThanOrEqual(9);
   for (const h of heights) expect(h.h, `${h.t} is a 44px target`).toBeGreaterThanOrEqual(43);
   const kcCount = (await state(page)).layers.filter((l) => l.type !== 'pattern' && l.type !== 'fx' && l.type !== 'math').length;
-  await page.locator('.layer-row-pattern').getByTitle('Remove track (undoable)').click();
-  await expect(page.locator('.layer-row-pattern')).toHaveCount(0);
+  await page.locator('.strata-block.strata-pattern').getByTitle('Remove track (undoable)').click();
+  await expect(page.locator('.strata-block.strata-pattern')).toHaveCount(0);
   await expect(page.locator('.pattern-editor')).toHaveCount(0);
   expect((await state(page)).layers.filter((l) => l.type !== 'pattern' && l.type !== 'fx' && l.type !== 'math').length).toBe(kcCount);
 });
@@ -90,18 +95,28 @@ test('the last KC track cannot be removed even with a pattern track present, and
   const s0 = await state(page);
   const kc = s0.layers.filter((l) => l.type !== 'fx' && l.type !== 'math');
   if (kc.length === 1) {
-    await page.getByRole('button', { name: '+ pattern' }).click();
-    const kcRow = page.locator('.layer-row-kc:not(.layer-row-pattern)').first();
+    await addPattern(page);
+    const kcRow = page.locator('.strata-block.strata-content:not(.strata-pattern)').first();
     await expect(kcRow.getByTitle('Remove track (undoable)')).toBeDisabled();
   }
-  for (let i = 0; i < 4; i++) { const b = page.getByRole('button', { name: '+ pattern' }); if (await b.isEnabled()) await b.click(); }
-  await expect(page.getByRole('button', { name: '+ pattern' })).toBeDisabled();
+  // Fill the content cap with patterns; the unified slot still offers FX/MATH
+  // room, but the PATTERN type itself disables at the cap.
+  for (let i = 0; i < 4; i++) {
+    const n = (await state(page)).layers.filter((l) => l.type !== 'fx' && l.type !== 'math').length;
+    if (n >= 4) break;
+    await addPattern(page);
+  }
   expect((await state(page)).layers.filter((l) => l.type !== 'fx' && l.type !== 'math').length).toBe(4);
+  const slot = page.locator('.build-layer-stack .strata-add');
+  await slot.dispatchEvent('pointerdown');
+  await expect(page.locator('.layer-chooser')).toBeVisible({ timeout: 10000 });
+  await slot.dispatchEvent('pointerup');
+  await expect(page.locator('.layer-chooser').getByRole('button', { name: 'PATTERN', exact: true })).toBeDisabled();
 });
 
 test('DROP: the toggle writes through, an armed SHUFFLE shows it and lands later; with DROP off it lands at once', async ({ page }) => {
   await boot(page);
-  await page.getByRole('button', { name: '+ pattern' }).click();
+  await addPattern(page);
   const ed = page.locator('.pattern-editor');
   const drop = ed.getByRole('button', { name: /^drop$/i });
   const shuffle = ed.getByRole('button', { name: /^shuffle$/i });
