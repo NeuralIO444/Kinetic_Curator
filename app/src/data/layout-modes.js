@@ -536,3 +536,59 @@ export function normalizeLayoutParams(raw) {
 
   return next;
 }
+
+/**
+ * #107 — structural validation for project JSON / autosave.
+ * Returns the normalized params plus a list of keys that were rejected
+ * (structurally wrong, not merely out of range). Callers can keep the
+ * previous state for rejected keys.
+ *
+ * @returns {{ params: object, rejected: string[] }}
+ */
+export function validateLayoutParams(partial) {
+  const src = partial && typeof partial === 'object' && !Array.isArray(partial) ? partial : {};
+  const rejected = [];
+
+  for (const key of Object.keys(src)) {
+    if (UNSAFE_KEYS.has(key)) { rejected.push(key); continue; }
+    const value = src[key];
+    if (PARAM_SPEC[key]) {
+      // #479 Option B — a field whose OWN default is null (the 9 BEHAVE
+      // overrides) treats null as a legitimate value ("no override"), not
+      // garbage: a RESET action writes null to clear an override, and that
+      // write must not be silently rejected back to whatever the override
+      // last was. Every other numeric field's default is a real number, so
+      // this doesn't loosen validation for count/jitter/etc. — null there
+      // still rejects exactly as before.
+      const nullable = DEFAULT_LAYOUT_PARAMS[key] === null;
+      if (!(nullable && value === null) && !isNumericish(value)) rejected.push(key);
+    } else if (RANGE_SPEC[key]) {
+      // #1202 — scale validates as {x:[lo,hi], y:[lo,hi]}; a legacy array
+      // still validates (normalize migrates it to a linked pair).
+      const isPair = (p) => Array.isArray(p) && p.length >= 2 && isNumericish(p[0]) && isNumericish(p[1]);
+      const usable = key === 'scale'
+        ? (isPair(value) || (value && typeof value === 'object' && isPair(value.x) && isPair(value.y ?? value.x)))
+        : (Array.isArray(value) && value.length >= 2 && isNumericish(value[0]) && isNumericish(value[1]));
+      if (!usable) rejected.push(key);
+    } else if (ENUM_SPEC[key]) {
+      // #1202 — mirror accepts legacy booleans; normalize migrates them
+      // (true→'x', false→'off'), so they are not rejections.
+      const ok = key === 'mirror' && typeof value === 'boolean'
+        ? true
+        : pickEnumOk(value, ENUM_SPEC[key]);
+      if (!ok) rejected.push(key);
+    }
+    // Booleans coerce rather than reject; unknown keys are passed through
+    // untouched, same as normalizeLayoutParams.
+  }
+
+  return { params: normalizeLayoutParams(src), rejected };
+}
+
+function pickEnumOk(value, allowed) {
+  if (typeof value !== 'string') return false;
+  if (allowed.includes(value)) return true;
+  // Look aliases: composition:'murmuration' is a valid Look address, not a new enum.
+  if (allowed === COMPOSITION_IDS && allowed.includes(resolveLookId(value))) return true;
+  return false;
+}
