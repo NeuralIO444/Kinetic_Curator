@@ -13,6 +13,7 @@
 
 import { createRegistry } from '../registry.js';
 import { makeConstantField, makeCaField, makeNoiseField } from './index.js';
+import { createAttractorField } from './attractors.js';
 import { createScentField, SCENT_COLS, SCENT_ROWS } from './scent.js';
 import { makeQuadtreeField } from '../sample/quadtreeSignal.js';
 
@@ -60,4 +61,21 @@ FIELDS.register({
   id: 'quadtree',
   reads: ['seed', 'audio'],
   create: (seed, opts) => makeQuadtreeField(seed, opts?.seedOffsets ?? null, opts?.z ?? 0),
+});
+
+/**
+ * Dish-level attractor field (#1200) — the candidate shared implementation
+ * for the proposed attractor unification with #1197 (space-colonization).
+ * Standalone module: kernel/field/attractors.js. create(seed, { bounds,
+ * count, radius, falloff, minSpacing, seedOffsets }).
+ */
+FIELDS.register({
+  id: 'attractor',
+  reads: ['seed'],
+  create: (seed, opts) => createAttractorField(
+    seed,
+    opts?.bounds ?? null,
+    opts?.count ?? 0,
+    { radius: opts?.radius, falloff: opts?.falloff, minSpacing: opts?.minSpacing, seedOffsets: opts?.seedOffsets ?? null },
+  ),
 });
