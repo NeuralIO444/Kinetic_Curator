@@ -510,3 +510,8 @@ export function mixVoiceState(a, b, t) {
 export function isFlagshipVoiceId(id) {
   return FLAGSHIP_VOICE_IDS.includes(id);
 }
+
+export const ALL_VOICE_IDS = [...FLAGSHIP_VOICE_IDS, ...STUB_VOICES.map((v) => v.id)];
+
+// Re-exported for the selfcheck without pulling the store in.
+export { MODE_IDS };
