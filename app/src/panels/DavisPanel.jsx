@@ -184,7 +184,9 @@ export function DavisPanel() {
           </div>
 
           {/* #1128 — the DIRECTOR's motion pattern: which way the always-on breath and drift lean. A discrete choice, so it
-              renders TE (rule 2). THUMP needs a real beat; without audio it plays DRIFT, and says so. */}
+              renders TE (rule 2). THUMP needs a real beat; without audio it plays DRIFT, and says so.
+              #1198 — ORGANIC/CADENCE switch on the rhythm placement layer (Perlin/sine over spacing, scale, rotation),
+              even with every motion amount at 0. */}
           <div className="davis-actions davis-actions-motion" role="group" aria-label="motion pattern">
             <i className="lbl" title="THUMP follows a live audio beat; with none it plays DRIFT">{(layoutParams.kinemePattern === 'THUMP' && !audioEnabled) ? 'no beat' : 'motion'}</i>
             {KINEME_PATTERNS.map((p) => {
@@ -193,6 +195,8 @@ export function DavisPanel() {
                 <button key={p} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${p} pattern`}
                   title={p === 'DRIFT' ? 'DRIFT: the floor — marks breathe and drift as set'
                     : p === 'SWELL' ? 'SWELL: breath leads, drift steps back'
+                    : p === 'ORGANIC' ? 'ORGANIC: Perlin-field rhythm over spacing, scale and rotation'
+                    : p === 'CADENCE' ? 'CADENCE: sine-wave rhythm over spacing, scale and rotation'
                     : `THUMP: marks pulse on the beat${audioEnabled ? '' : ' — needs audio on; plays DRIFT until then'}`}
                   onClick={() => emit(Events.LAYOUT_PARAM, { key: 'kinemePattern', value: p })}>
                   {p}

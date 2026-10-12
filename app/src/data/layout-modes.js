@@ -168,7 +168,7 @@ export const DEFAULT_LAYOUT_PARAMS = {
   kinemeDrift: 0.5,
   kinemePulse: 0,
   kinemePaletteBreath: 0.12,
-  kinemePattern: 'DRIFT', // #1128 DIRECTOR pattern: DRIFT | SWELL | THUMP (re-weights the amounts; an unknown name is DRIFT)
+  kinemePattern: 'DRIFT', // #1128 DIRECTOR pattern: DRIFT | SWELL | THUMP (re-weight the amounts) | ORGANIC | CADENCE (#1198: switch on the rhythm placement layer; an unknown name is DRIFT)
   kinemeBrushWobble: 0,
   kinemeBoilFps: 8,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical

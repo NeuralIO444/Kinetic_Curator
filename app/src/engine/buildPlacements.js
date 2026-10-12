@@ -17,7 +17,7 @@
 // exactly as before. Selfchecks and studio/render.mjs take that path.
 
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
-import { applyKinemeDrivers } from './kineme.js';
+import { applyKinemeDrivers, applyRhythm } from './kineme.js';
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { mkRng } from './prng.js';
@@ -158,7 +158,8 @@ export function buildPlacements({
   // must not bust the geometry cache. kineme = {
   //   driverSec, boilStep, seed,
   //   amounts: { breath, drift, pulse, brushWobble, paletteBreath },
-  //   canvasW, canvasH, shedTier }
+  //   canvasW, canvasH, shedTier,
+  //   rhythm: { type: 'perlin'|'sine' } | null }  // #1198 — the rhythm layer
   // #1151 — buildPlacements attaches palette ({ swatches }) and colorArrays
   // ({ colors, accents }) to the ctx before the applier runs.
 }) {
@@ -345,6 +346,11 @@ export function buildPlacements({
     kineme.palette = palette;
     kineme.colorArrays = { colors, accents };
   }
+  // #1198 — the rhythm layer runs first: it IS the placement layer (a static
+  // field over the placed positions), and the time drivers compose on top.
+  // Each applier undoes its own cached-x/y writes; undos run in reverse of
+  // application below.
+  const undoRhythm = kineme ? applyRhythm(soa, kineme, stillMarks) : null;
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
@@ -446,6 +452,7 @@ export function buildPlacements({
   if (glassOn) mapped = sortGlassInstances(mapped);
 
   if (undoKineme) undoKineme();
+  if (undoRhythm) undoRhythm(); // #1198 — reverse of application
   return { preset, items: mapped, safeCount };
 }
 
