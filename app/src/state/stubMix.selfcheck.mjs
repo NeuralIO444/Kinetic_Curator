@@ -29,7 +29,7 @@ assert.ok(mm('still').lifeDrift <= 0.1 && mm('still').noiseSpeed <= 0.15, 'still
 assert.ok(mm('flow').noiseSpeed >= 0.5 && mm('flow').wind > mm('still').wind, 'flow has flow');
 assert.strictEqual(mm('orbit').behave, 'orbit');
 
-// ── loadStubMode: opens a MIX, touches nothing until commit ────────────
+// ── loadStubMode: opens a MIX, touches nothing until commit ──────────────
 const id = S().layoutParams.mode === 'grid' ? 'rails' : 'grid';
 const before = { params: { ...S().layoutParams }, paletteId: S().paletteId, overrides: S().paletteOverrides, assets: { ...S().enabledAssets } };
 
@@ -55,7 +55,7 @@ assert.strictEqual(S().voiceMix, null);
 S().loadStubMode(id);
 assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op');
 
-// ── loadMotion: the animation axis ─────────────────────────────────
+// ── loadMotion: the animation axis ───────────────────────────────────────
 {
   const pick = MOTION_MODES.find((m) => !isMotionActive(S().layoutParams, m));
   const b = { mode: S().layoutParams.mode, composition: S().layoutParams.composition, paletteId: S().paletteId, assets: { ...S().enabledAssets } };

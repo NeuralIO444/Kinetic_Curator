@@ -425,123 +425,9 @@ function isNumericish(value) {
  * not a value at the edge of a range; it is a caller that has gone wrong, and
  * silently substituting a default would hide the bug while changing the
  * operator's composition underneath them.
- */
-export function structuralErrors(params) {
-  const errs = [];
-  if (!params || typeof params !== 'object') return errs;
-  for (const [key, value] of Object.entries(params)) {
-    if (UNSAFE_KEYS.has(key)) continue;
-    if (key in PARAM_SPEC && !isNumericish(value) && value !== null) {
-      errs.push(`${key}: expected number, got ${typeof value}`);
-    }
-    if (key in ENUM_SPEC && typeof value !== 'string') {
-      errs.push(`${key}: expected string, got ${typeof value}`);
-    }
-  }
-  return errs;
-}
-
-/**
- * #1127 — the dual-slider ranges. The engine accepts the hard ceiling (RANGE_HARD): a performer can stretch a
- * slider past its rest span in the tap-name dialog. Macros, defaults and the randomizer keep using RANGE_SPEC.
- */
-function clampRange(value, fallback) {
-  if (!value || typeof value !== 'object') return fallback;
-  const out = {};
-  for (const key of RANGE_KEYS) {
-    const spec = RANGE_HARD[key];
-    const fb = fallback[key];
-    const v = value[key];
-    if (!Array.isArray(v) || v.length < 2) {
-      out[key] = [...fb];
-      continue;
-    }
-    const a = clampNum(v[0], spec, fb[0]);
-    const b = clampNum(v[1], spec, fb[1]);
-    out[key] = [Math.min(a, b), Math.max(a, b)];
-  }
-  return out;
-}
-
-/**
- * Normalize a raw layout-params object (project file, autosave, or a
- * hand-edited JSON) into one the engine can render. Unknown keys are dropped,
- * missing keys take the defaults, out-of-range numbers clamp, and bad enums
- * fall back. The returned object is always complete and safe.
  *
- * #1128 — a document that predates the living-motion floor loads with breath
- * and drift at 0: it opens as it was saved. A fresh scene gets the floor.
- */
-export function normalizeLayoutParams(raw) {
-  const src = raw && typeof raw === 'object' ? raw : {};
-  const next = { ...DEFAULT_LAYOUT_PARAMS };
-
-  // Copy known keys, skipping anything that would shadow the prototype.
-  for (const key of Object.keys(src)) {
-    if (UNSAFE_KEYS.has(key)) continue;
-    if (key in DEFAULT_LAYOUT_PARAMS || key in PARAM_SPEC || key in ENUM_SPEC || RANGE_KEYS.includes(key)) {
-      next[key] = src[key];
-    }
-  }
-
-  // #274 — old projects stored accumulationFade as a keep-fraction (0..1).
-  // Map it to a half-life in frames. The conversion is one-way and only
-  // fires when the value is in the old domain; a value >= 1 is already a
-  // half-life and is left alone. This is the only place the migration lives.
-  // Worth a version bump. Runs before the
-  // PARAM_SPEC clamp.
-  {
-    const v = next.accumulationFade;
-    const n = typeof v === 'number' ? v
-      : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
-    if (Number.isFinite(n) && n > 0 && n < 1) {
-      const hl = -1 / Math.log2(n);
-      next.accumulationFade = Math.min(40, Math.max(1, hl));
-    }
-  }
-
-  // #1127 — a document that predates ROTATE spin keeps its static rotation: absent means 0, not the new default.
-  // #1128 — the same rule for the living-motion floor: a document that predates it opens exactly as it was saved.
-  // #1151 — palette-breath likewise: absent means 0, not the new default.
-  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
-
-  for (const [key, spec] of Object.entries(PARAM_SPEC)) {
-    next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);
-  }
-
-  for (const key of BOOL_KEYS) next[key] = !!next[key];
-
-  // #1202 — legacy 'stamp' symmetry was organism-path X-mirroring. It becomes
-  // the unified X mirror (the placement pipeline never had it; unification
-  // is the point of the bilateral/mirror reconciliation). Runs before the
-  // symmetry enum clamp below, which would otherwise swallow it to 'none'.
-  if (next.symmetry === 'stamp') {
-    next.symmetry = 'none';
-    if (next.mirror === 'off') next.mirror = 'x';
-  }
-
-  // Enums. `mode` is the one with teeth: getSampler indexed SAMPLERS
-  // directly, so {"mode": "__proto__"} resolved to Object.prototype — truthy,
-  // not callable — and threw "sample is not a function" mid-render, taking
-  // down a studio batch or the live canvas.
-  next.mode = pickEnum(next.mode, MODE_IDS, DEFAULT_LAYOUT_PARAMS.mode);
-  next.composition = pickEnum(resolveLookId(next.composition), COMPOSITION_IDS, DEFAULT_LAYOUT_PARAMS.composition);
-  next.blendMode = pickEnum(next.blendMode, BLEND_MODES, 'normal');
-  next.paletteShift = pickEnum(next.paletteShift, PALETTE_SHIFTS, 'auto');
-  next.symmetry = pickEnum(next.symmetry, SYMMETRY_MODES, 'none');
-  next.behave = pickEnum(next.behave, BEHAVE_MODES, 'cruise');
-  next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
-  next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
-  next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
-
-  return next;
-}
-
-/**
- * #107 — structural validation for project JSON / autosave.
- * Returns the normalized params plus a list of keys that were rejected
- * (structurally wrong, not merely out of range). Callers can keep the
- * previous state for rejected keys.
+ * So: clamp what can be clamped, reject what cannot, and let the caller keep
+ * the previous state for the rejected keys.
  *
  * @returns {{ params: object, rejected: string[] }}
  */
@@ -591,4 +477,118 @@ function pickEnumOk(value, allowed) {
   // Look aliases: composition:'murmuration' is a valid Look address, not a new enum.
   if (allowed === COMPOSITION_IDS && allowed.includes(resolveLookId(value))) return true;
   return false;
+}
+
+export function normalizeLayoutParams(partial) {
+  const src = partial && typeof partial === 'object' && !Array.isArray(partial) ? partial : {};
+  const next = { ...DEFAULT_LAYOUT_PARAMS };
+  // Copy own enumerable keys, skipping prototype-shadowing names that
+  // JSON.parse hands back as ordinary own properties.
+  for (const k of Object.keys(src)) {
+    if (!UNSAFE_KEYS.has(k)) next[k] = src[k];
+  }
+
+  for (const key of RANGE_KEYS) {
+    if (key === 'scale') continue; // #1202 — scale is {x,y} now, normalized below
+    const v = next[key];
+    const spec = RANGE_HARD[key];
+    // QA (2026-09-16): length was checked but entries were not, so
+    // {scale:['a','b']} from a hand-edited or corrupted project JSON
+    // passed through unchanged and fed NaN/strings into transform math
+    // downstream instead of falling back to a safe default.
+    const usable = Array.isArray(v) && v.length >= 2
+      && Number.isFinite(Number(v[0])) && Number.isFinite(Number(v[1]));
+    next[key] = usable
+      // Ends are clamped but deliberately NOT reordered: a reversed range
+      // (hi < lo) runs the lerp backwards, which is a legitimate thing to
+      // author, so "fixing" the order would change existing compositions.
+      ? [clampNum(v[0], spec, DEFAULT_LAYOUT_PARAMS[key][0]),
+        clampNum(v[1], spec, DEFAULT_LAYOUT_PARAMS[key][1])]
+      : DEFAULT_LAYOUT_PARAMS[key].slice();
+  }
+
+  // #1202 — SCALE is { x:[lo,hi], y:[lo,hi] }. A legacy array migrates to a
+  // linked {x, y} pair (identical values) — the linked default is
+  // behavior-identical to the old pair, provable no-op.
+  {
+    const v = next.scale;
+    const dx = DEFAULT_LAYOUT_PARAMS.scale.x, dy = DEFAULT_LAYOUT_PARAMS.scale.y;
+    const pair = (p, fb) => {
+      const usable = Array.isArray(p) && p.length >= 2
+        && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1]));
+      return usable
+        ? [clampNum(p[0], RANGE_HARD.scale, fb[0]), clampNum(p[1], RANGE_HARD.scale, fb[1])]
+        : fb.slice();
+    };
+    if (Array.isArray(v)) {
+      const p = pair(v, dx);
+      next.scale = { x: p, y: p.slice() };
+    } else if (v && typeof v === 'object') {
+      const x = pair(v.x, dx);
+      next.scale = { x, y: pair(v.y ?? v.x, dy) };
+    } else {
+      next.scale = { x: dx.slice(), y: dy.slice() };
+    }
+  }
+
+  // #1202 — MIRROR is a 4-state enum. Legacy boolean: true → 'x' (the old
+  // X-only mirror), false → 'off'.
+  {
+    const v = next.mirror;
+    next.mirror = typeof v === 'boolean' ? (v ? 'x' : 'off') : pickEnum(v, MIRROR_STATES, 'off');
+  }
+
+  // #274: legacy fade migration — accumulationFade was stored as a keep
+  // multiplier (0..1) before the half-life change. Any value in (0, 1) in a
+  // saved project is a legacy keep (the new slider minimum is 1, so the
+  // ranges don't overlap); convert to half-life frames so old projects keep
+  // their look: halfLife = -1 / log2(keep). Exactly 1 is left alone — it's
+  // the new half-life minimum, and a legacy keep of exactly 1 ("never
+  // fade") is a degenerate edge not worth a version bump. Runs before the
+  // PARAM_SPEC clamp.
+  {
+    const v = next.accumulationFade;
+    const n = typeof v === 'number' ? v
+      : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+    if (Number.isFinite(n) && n > 0 && n < 1) {
+      const hl = -1 / Math.log2(n);
+      next.accumulationFade = Math.min(40, Math.max(1, hl));
+    }
+  }
+
+  // #1127 — a document that predates ROTATE spin keeps its static rotation: absent means 0, not the new default.
+  // #1128 — the same rule for the living-motion floor: a document that predates it opens exactly as it was saved.
+  // #1151 — palette-breath likewise: absent means 0, not the new default.
+  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
+
+  for (const [key, spec] of Object.entries(PARAM_SPEC)) {
+    next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);
+  }
+
+  for (const key of BOOL_KEYS) next[key] = !!next[key];
+
+  // #1202 — legacy 'stamp' symmetry was organism-path X-mirroring. It becomes
+  // the unified X mirror (the placement pipeline never had it; unification
+  // is the point of the bilateral/mirror reconciliation). Runs before the
+  // symmetry enum clamp below, which would otherwise swallow it to 'none'.
+  if (next.symmetry === 'stamp') {
+    next.symmetry = 'none';
+    if (next.mirror === 'off') next.mirror = 'x';
+  }
+
+  // Enums. `mode` is the one with teeth: getSampler indexed SAMPLERS
+  // directly, so {"mode": "__proto__"} resolved to Object.prototype — truthy,
+  // not callable — and threw "sample is not a function" mid-render, taking
+  // down a studio batch or the live canvas.
+  next.mode = pickEnum(next.mode, MODE_IDS, DEFAULT_LAYOUT_PARAMS.mode);
+  next.composition = pickEnum(resolveLookId(next.composition), COMPOSITION_IDS, DEFAULT_LAYOUT_PARAMS.composition);
+  next.blendMode = pickEnum(next.blendMode, BLEND_MODES, 'normal');
+  next.paletteShift = pickEnum(next.paletteShift, PALETTE_SHIFTS, 'auto');
+  next.symmetry = pickEnum(next.symmetry, SYMMETRY_MODES, 'none');
+  next.behave = pickEnum(next.behave, BEHAVE_MODES, 'cruise');
+  next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
+  next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
+  next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
+
+  return next;
 }

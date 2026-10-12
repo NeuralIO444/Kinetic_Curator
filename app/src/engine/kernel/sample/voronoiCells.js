@@ -18,7 +18,7 @@
 // base point; small jitter stays inside the cell in practice.
 
 import { poissonPointSet } from './poisson.js';
-import { rngForChannel, rngForIndex } from '../rng.js';
+import { rngForIndex } from '../rng.js';
 import { writeSampleColumns } from './columns.js';
 
 /** Target seed count: enough for even cells, not so many that cells vanish. */
@@ -75,7 +75,7 @@ export function nearestSeed(seeds, px, py) {
  * t is the normalized cell index (0..1) so paletteShift / modulation can key per cell.
  */
 export function voronoiCells(ctx) {
-  const { i, count, w, h, rng, jitter, seed, seedOffsets, scratch } = ctx;
+  const { i, w, h, rng, jitter, seed, seedOffsets, scratch } = ctx;
   const seeds = voronoiCellSeeds(seed, w, h, seedOffsets);
   const cell = i % seeds.n;
   const t = seeds.n > 1 ? cell / (seeds.n - 1) : 0.5;
