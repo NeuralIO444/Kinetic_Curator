@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { isRecordingPerformance, performanceFrames, startPerformance, stopPerformance } from '../gl/performanceCapture.mjs';
 import { getStressState, setStressTap } from '../curator/stressLive.js';
 import { createStressRecorder } from '../curator/stressRecord.js';
+import { createFormationRecorder } from '../curator/formation.js';
+import { resetFormation, setFormationTap } from '../curator/formationLive.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
 // tracker update, and stored on the performance as `stress`.
@@ -14,6 +16,15 @@ const stressSection = (getFrame) => {
   const rec = createStressRecorder({ initial: { smoothed: now.band === null ? null : now.smoothed, band: now.band }, getFrame });
   setStressTap((u) => rec.update(u));
   return { stop() { setStressTap(null); return rec.finish(); } };
+};
+
+// #1355 step 3 — the take carries the formation rule's signals and every `hierarchy-form` event, stored as
+// `formation`. It starts from fresh formation state, as the take starts from a fresh resolver (`rec` restarts the scene).
+const formationSection = (getFrame) => {
+  resetFormation();
+  const rec = createFormationRecorder({ getFrame });
+  setFormationTap((u, events) => rec.update(u, events));
+  return { stop() { setFormationTap(null); return rec.finish(); } };
 };
 
 function downloadBytes(bytes, filename) {
@@ -39,7 +50,7 @@ export function PerformanceButton() {
 
   const onClick = async () => {
     if (!recording) {
-      if (startPerformance({ sections: { stress: stressSection } })) { setFrames(0); setRecording(true); }
+      if (startPerformance({ sections: { stress: stressSection, formation: formationSection } })) { setFrames(0); setRecording(true); }
       return;
     }
     setRecording(false);

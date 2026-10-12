@@ -43,6 +43,18 @@ testable, and the recording spine already exists.
 6. **Attraction is a field value at the pin** (noise or scent). The dish decides: a pin in a fertile patch forms, a
    pin in a barren patch waits. Nothing is needed from the pointer, and it replays exactly.
 
+## Decisions on the formation rule (Matt, 2026-10-12, step 3)
+
+7. **A formed creature stays formed** until its pin moves or is removed. It never flickers back to a spore; step 5
+   (limb count over a life) is where a creature changes.
+8. **Both conditions must hold for 30 consecutive frames** before a spore forms, so a mark brushing past does not
+   trigger it. Counted in frames, never a clock.
+
+Built as `curator/formation.js` (the rule, the tracker, the take's record) and `curator/formationLive.js` (fed by the
+resolver frame tap). Attraction is a seeded fertility field on the noise stream; thresholds start at about the top
+60 / 40 / 25% of the dish for RELAX / NORMAL / TIGHTEN and are tunables. A take records the quantized signals and
+every `hierarchy-form` with the update it happened on, and replay verifies them.
+
 ## Risks
 
 - **Asset anchors are authoring, not code.** The creature only looks right if each part declares where it joins. A

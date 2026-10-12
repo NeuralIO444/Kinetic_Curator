@@ -15,18 +15,19 @@ export const DISH_RADIUS = 0.12;
 export const DISH_SATURATE = 24;
 
 /**
+ * #1355 step 3 — each pin's own pressure, in pin order (the formation rule reads every pin, not just the most crowded).
+ * Same count, radius and saturation as dishPressure. A malformed pin reads 0.
  * @param pins     [{x, y}] scene coordinates (curator/dishPins.js)
  * @param entries  the resolver's output: layers with `items` [{x, y}] (pattern and FX layers have none)
- * @returns 0..1
+ * @returns number[] 0..1 per pin
  */
-export function dishPressure(pins, entries, canvasW, canvasH) {
-  if (!Array.isArray(pins) || pins.length === 0 || !Array.isArray(entries)) return 0;
+export function pinPressures(pins, entries, canvasW, canvasH) {
+  if (!Array.isArray(pins) || pins.length === 0) return [];
   const r = DISH_RADIUS * Math.min(canvasW, canvasH);
-  if (!(r > 0)) return 0;
+  if (!(r > 0) || !Array.isArray(entries)) return pins.map(() => 0);
   const r2 = r * r;
-  let most = 0;
-  for (const pin of pins) {
-    if (!pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
+  return pins.map((pin) => {
+    if (!pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) return 0;
     let n = 0;
     for (const e of entries) {
       const items = e && e.items;
@@ -37,9 +38,18 @@ export function dishPressure(pins, entries, canvasW, canvasH) {
         if (dx * dx + dy * dy <= r2) n++; // NaN compares false: a broken mark is not a neighbour
       }
     }
-    if (n > most) most = n;
-  }
-  return Math.min(1, most / DISH_SATURATE);
+    return Math.min(1, n / DISH_SATURATE);
+  });
+}
+
+/**
+ * The dish's pressure: the MOST crowded pin's.
+ * @returns 0..1
+ */
+export function dishPressure(pins, entries, canvasW, canvasH) {
+  if (!Array.isArray(pins) || pins.length === 0 || !Array.isArray(entries)) return 0;
+  const each = pinPressures(pins, entries, canvasW, canvasH);
+  return each.length ? Math.max(...each) : 0;
 }
 
 let latest = 0;
