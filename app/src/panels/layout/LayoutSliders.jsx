@@ -231,6 +231,27 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
           )}
         />
 
+        {/* #1183 contact shadow: this layer's marks cast a soft shadow onto what lies beneath them, toward the sun
+            when it is on, straight under them when it is off, in the palette's darkest colour. Per layer; 0 is
+            today's frame exactly. Inert without a pattern below (#272). */}
+        <ValueButton
+          label="SHADOW"
+          display={`${Math.round((layoutParams.groundShadow ?? 0) * 100)}%`}
+          locked={lockedParams.groundShadow}
+          onToggleLock={() => lock('groundShadow')}
+          disabled={!hasGround}
+          disabledReason="Needs a PATTERN layer below this one"
+          onOpen={() => (
+            <SliderEditor
+              ariaLabel="Shadow: how dark a shadow the marks cast onto what lies beneath them"
+              value={Math.round((layoutParams.groundShadow ?? 0) * 100)}
+              min={0} max={100} step={1}
+              unit="%"
+              onChange={(v) => set('groundShadow', Math.round(v) / 100)}
+            />
+          )}
+        />
+
         {/* #585: phyllotaxis divergence — mode-gated per #272: visible but
             inert outside phyllotaxis, with the reason. */}
         <ValueButton

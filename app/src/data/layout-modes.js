@@ -173,6 +173,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   groundLean: 0,
   // #1183 — tile-edge nudge: marks ease off the edges of the PATTERN tile beneath them. 0 = today's frame exactly.
   groundNudge: 0,
+  // #1183 — contact shadow: marks cast a soft shadow onto what lies beneath them (needs a PATTERN below). 0 = off.
+  groundShadow: 0,
   kinemeBreath: 0.3,
   kinemeDrift: 0.5,
   kinemePulse: 0,
@@ -312,6 +314,7 @@ export const PARAM_SPEC = {
   rotateSpin: { min: 0, max: 1 }, // #1127 ROTATE spin, rev/s
   groundLean: { min: 0, max: 1 },
   groundNudge: { min: 0, max: 1 },
+  groundShadow: { min: 0, max: 1 },
   kinemeBreath: { min: 0, max: 1 },
   kinemeDrift: { min: 0, max: 1 },
   kinemePulse: { min: 0, max: 1 },

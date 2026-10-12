@@ -15,8 +15,7 @@ over it.
 Colour lean and EDGE are maths on each mark. A shadow has to be **drawn**, so this one lives in the renderer:
 
 1. Draw the layer's marks as a silhouette, at half size, nudged a little in the light's direction.
-2. Blur it sideways, then up and down. These are the "about 3 passes" from the sketch: two cheap half-size passes, then
-   the last one also lays the shadow down.
+2. Blur it sideways, then up and down. With step 1 these are three cheap half-size passes (the sketch's "about 3").
 3. Lay the soft silhouette over what is already on the canvas in the palette's darkest colour, **then** draw the marks on top as usual.
 
 It goes in one place: `renderer.mjs` `compositeLayerTo`, the step that puts a content layer onto the frame. It works
@@ -54,9 +53,10 @@ beyond passing the knob through.
 
 ## Cost
 
-- Two half-resolution passes plus one full-resolution composite per **shadowed** layer. Estimate: about 0.3 ms at 1080p
-  on desktop. To be measured with `npm run measure-costs` and declared as `gl/contact-shadow` (tier 2) in the cost
-  registry, so the CI gate checks the claim.
+- Three half-resolution passes plus one full-resolution lay-down per **shadowed** layer. Declared as
+  `gl/contact-shadow` (tier 2). Measured on software GL (2026-10-12, worst case sun + matte, half-size passes run at
+  full size): 12x the median effect, recorded as 3.6 ms against the committed median. Heavier than the first guess
+  (0.3 ms); a hardware re-bless will give the real number.
 - Memory: one extra half-size buffer pair (≈ 8 MB at 1080p, RGBA16F).
 - Zero cost at 0, and zero cost on layers with no ground.
 

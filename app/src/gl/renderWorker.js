@@ -233,7 +233,7 @@ function buildFrame(dtSecOverride, loopTimeMsOverride) {
 
   // Scene contract
   const contract = buildSceneContract({
-    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(frameTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: tintTargetPalette },
+    doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, perfTier1: !!s.perfTier1, layers: s.layers, light: s.light, squash: layoutParams.squash, assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(frameTimeMs / 1000, layoutParams.kinemeRate ?? 1), palette: tintTargetPalette },
     resolvedLayers: resolved,
     caps: null,
     accum: null,
