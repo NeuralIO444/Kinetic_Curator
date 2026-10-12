@@ -10,6 +10,7 @@ node src/gl/glassBevel.selfcheck.mjs
 node src/gl/glassCaustic.selfcheck.mjs
 node src/gl/glassStriation.selfcheck.mjs
 node src/engine/kineme.selfcheck.mjs
+node src/engine/fieldMap.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
 node src/hooks/batchGate.selfcheck.mjs
