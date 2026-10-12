@@ -19,6 +19,7 @@ import { AccumFamily } from './layout/AccumFamily.jsx';
 import { SwarmSliders } from './layout/SwarmSliders.jsx';
 import { CreatureSliders } from './layout/CreatureSliders.jsx';
 import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
+import { MapRow } from './layout/MapRow.jsx';
 import { SunRow } from './layout/SunRow.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
@@ -107,9 +108,10 @@ export function BuildPanel() {
           <AccumFamily layoutParams={layoutParams} />
         </BuildSection>
 
-        {/* ④ APPEARANCE — the finish: hue, mark shape, growth, sun light */}
+        {/* ④ APPEARANCE — the finish: hue, mark shape, growth, field→channel map, sun light */}
         <BuildSection num="4" title="Appearance">
           <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+          <MapRow layoutParams={layoutParams} lockedParams={lockedParams} />
           <SunRow />
         </BuildSection>
 

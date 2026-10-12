@@ -3,6 +3,7 @@
 // controls: the panel may not be taller than its content plus padding, and no
 // panel may be more than half empty. Empty slots get an action, never a void.
 import { test, expect } from '@playwright/test';
+import { seedAddType } from './strata-add.mjs';
 
 // The chrome around the controls, which is not dead space: the .fx-editor's own
 // 6px top padding + 1px dashed top border, plus the tile's 1px top and bottom
@@ -27,20 +28,19 @@ async function measure(editor) {
 }
 
 test('every FX editor is as tall as its controls, and empty slots offer an action', async ({ page }) => {
-  await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await seedAddType(page, 'fx'); // one-tap ADD STRATUM arms FX tracks with an empty rack
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   const stack = page.locator('.build-layer-stack');
-  // FX section = the one that owns the "Add FX track" button (robust to section order).
-  const fxPlus = stack.locator('.layer-section').filter({ has: page.getByRole('button', { name: 'Add FX track' }) }).locator('.layer-add-btn');
+  const addSlot = stack.locator('.strata-add');
 
   const seen = [];
   for (let track = 1; track <= 4; track++) {
-    await fxPlus.click(); // adds FX n and selects it, so its editor is open
-    const row = stack.locator('.layer-row-fx').nth(track - 1);
-    // newest-first or oldest-first: find the row that has the editor open
-    const editor = stack.locator('.layer-row-fx .fx-editor');
+    await addSlot.click(); // adds FX n and selects it, so its editor is open
+    const block = stack.locator('.strata-block.strata-fx').nth(0);
+    // newest-first: the block with the editor open is the top one
+    const editor = stack.locator('.strata-block.strata-fx .fx-editor');
     await expect(editor).toHaveCount(1);
 
     // The empty state: a call to action, a header, and no bare "empty".
@@ -58,10 +58,10 @@ test('every FX editor is as tall as its controls, and empty slots offer an actio
     const select = empty.locator('select');
     const kinds = (await select.count()) ? await select.locator('option').evaluateAll((os) => os.map((o) => o.value)) : [null];
     for (const kind of kinds) {
-      const ed = stack.locator('.layer-row-fx .fx-editor').first();
+      const ed = stack.locator(".strata-block.strata-fx .fx-editor").first();
       if (kind) await ed.locator('select').selectOption(kind);
       await ed.locator('.chip-btn').click();
-      const filled = stack.locator('.layer-row-fx .fx-editor').first();
+      const filled = stack.locator(".strata-block.strata-fx .fx-editor").first();
       await expect(filled.locator('.ef-bypass')).toBeVisible();
       const m = await measure(filled);
       const name = kind || `FX ${track} default`;
@@ -69,9 +69,9 @@ test('every FX editor is as tall as its controls, and empty slots offer an actio
       expect(m.panelH, `${name}: panel ${m.panelH}px vs content ${m.contentH}px`).toBeLessThanOrEqual(m.contentH + PAD);
       expect(m.filled, `${name}: panel is ${(100 - m.filled * 100).toFixed(0)}% empty`).toBeGreaterThanOrEqual(0.5);
       await filled.locator('.ef-bypass').click(); // back to the empty slot for the next kind
-      await expect(stack.locator('.layer-row-fx .fx-editor').first().locator('.chip-btn')).toHaveCount(1);
+      await expect(stack.locator(".strata-block.strata-fx .fx-editor").first().locator('.chip-btn')).toHaveCount(1);
     }
-    expect(row).toBeTruthy();
+    expect(block).toBeTruthy();
   }
   // Four tracks, and every effect in the rack was measured.
   expect(seen.length).toBeGreaterThanOrEqual(10);

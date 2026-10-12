@@ -17,6 +17,7 @@
 // reused, not re-derived: rate 1 IS the loop time exactly, rate 0 freezes
 // where it is, and a rate change re-anchors instead of jumping.
 import { kinemePhase as hashPhase, createKinemeClock } from '../data/kinemes.js';
+import { createNoise } from './noise.js'; // #1198 — ORGANIC rhythm samples this Perlin field
 import { ACCENT_OFFSET } from './kernel/color/index.js';
 
 /** Boil default: the classic hand-drawn rate (Matt decision 2). */
@@ -27,9 +28,12 @@ import { ACCENT_OFFSET } from './kernel/color/index.js';
  *   SWELL  breath-forward: breath x3 (capped at 1), drift x0.2: the marks visibly breathe and hardly wander.
  *   THUMP  pulse-forward and driven by a REAL beat (audio on): the pulse amount is THUMP_PULSE x the live beat
  *          envelope, so it thumps when the room does and rests between. With no audio it IS DRIFT (a reduction).
+ * #1198 — the rhythm family (ORGANIC, CADENCE): these do NOT re-weight the amounts — they switch on the
+ * rhythm placement layer (evaluateRhythm/applyRhythm below), a Perlin/sine field over spacing, scale and rotation
+ * that breaks grid rigidity. Selecting one activates the layer even when every motion amount is 0.
  * An unknown name is DRIFT. beatDrive is the shaped beat pulse 0..1, or null/undefined when nothing is listening.
  */
-export const KINEME_PATTERNS = Object.freeze(['DRIFT', 'SWELL', 'THUMP']);
+export const KINEME_PATTERNS = Object.freeze(['DRIFT', 'SWELL', 'THUMP', 'ORGANIC', 'CADENCE']);
 export const THUMP_PULSE = 0.6;
 export function patternAmounts(base, pattern, beatDrive) {
   const { breath, drift, pulse } = base;
@@ -38,6 +42,169 @@ export function patternAmounts(base, pattern, beatDrive) {
     return { breath, drift, pulse: THUMP_PULSE * Math.min(1, Math.max(0, beatDrive)) };
   }
   return { breath, drift, pulse };
+}
+
+// ── Rhythm family (#1198) ────────────────────────────────────────────────
+// ORGANIC and CADENCE are placement-layer modulations, not driver
+// re-weightings: mathematical functions over each mark's placed position
+// modulate spacing (small dx/dy offsets), scale and rotation, breaking grid
+// rigidity — repetition you can feel, not a grid you can see. A pattern is
+// a routing + a function; the three channels ride one field in v1.
+//
+// Unlike the drivers, rhythm is STATIC per (seed, placement): the field is
+// a function of where the mark landed, not of driver time. The still shows
+// the rhythm (the rigidity break must survive printing); the time-based
+// drivers compose on top. Deterministic per seed — no Math.random anywhere.
+
+/** True for the rhythm patterns (the placement layer), false for driver patterns. */
+export function isRhythmPattern(pattern) {
+  return pattern === 'ORGANIC' || pattern === 'CADENCE';
+}
+
+/**
+ * The rhythm function a pattern selects: 'perlin' for ORGANIC (via the
+ * existing createNoise — no new deps), 'sine' for CADENCE, null for every
+ * other pattern. livingMotion passes this through as ctx.rhythm.
+ */
+export function rhythmTypeForPattern(pattern) {
+  if (pattern === 'ORGANIC') return 'perlin';
+  if (pattern === 'CADENCE') return 'sine';
+  return null;
+}
+
+// Rhythm real-unit scales. There is no amount knob in v1: the pattern is
+// the switch, and the field is small by design — organic rhythm, never
+// jitter. Compare: breath ±9% scale, drift ±2% of the small dimension.
+export const RHYTHM_SCALE = 0.06; // ±6% uniform scale
+export const RHYTHM_ROT = 6; // ±6° rotation (soa.rotation is degrees, SVG convention)
+export const RHYTHM_DX = 0.008; // ±0.8% of the smaller canvas dimension
+export const RHYTHM_DY = 0.008;
+export const RHYTHM_FIELD_FREQ = 2.5; // ORGANIC: noise cycles across the canvas
+export const CADENCE_CYCLES = 3; // CADENCE: sine wavefronts across the canvas (diagonal)
+
+// Perlin channel offsets in the noise field's z: one field, four
+// decorrelated slices — spacing X, spacing Y, scale and rotation never
+// march together.
+const RHYTHM_Z = [0, 11.7, 23.4, 35.1];
+// CADENCE channel phases (radians): the wave runs diagonally across the
+// canvas; each channel rides it at its own phase.
+const CADENCE_PHASES = [0, 1.7, 3.4, 5.1];
+
+// One noise instance per seed, bounded like PHASE_CACHE below: the field
+// is pure per seed, and rebuilding the permutation table per frame per
+// layer is wasted allocation.
+const NOISE_CACHE = new Map();
+const NOISE_CACHE_MAX = 8;
+function noiseFor(seed) {
+  let n = NOISE_CACHE.get(seed);
+  if (!n) {
+    if (NOISE_CACHE.size >= NOISE_CACHE_MAX) NOISE_CACHE.delete(NOISE_CACHE.keys().next().value);
+    n = createNoise(seed);
+    NOISE_CACHE.set(seed, n);
+  }
+  return n;
+}
+
+/**
+ * Evaluate the rhythm field for every instance. Pure.
+ *
+ * ctx: {
+ *   seed,            // the field's seed — deterministic per seed
+ *   rhythm,          // { type: 'perlin'|'sine' } — the pattern's function
+ *   canvasW, canvasH // spacing offsets scale with the smaller dimension
+ * }
+ *
+ * soa: the stage-C SoA. x/y are READ (the field is sampled at the placed
+ * position, so it composes with every sampler); the written channels are
+ * the returned deltas.
+ *
+ * Returns { active, dRot, dx, dy, dScale } — Float64Arrays over slots.
+ * active is false unless a rhythm pattern is selected: the pattern is the
+ * gate, and motion amounts are irrelevant — selecting ORGANIC with every
+ * amount at 0 still turns the layer on.
+ */
+export function evaluateRhythm(soa, ctx) {
+  const n = soa?.n | 0;
+  const out = {
+    active: false,
+    dRot: new Float64Array(n),
+    dx: new Float64Array(n),
+    dy: new Float64Array(n),
+    dScale: new Float64Array(n),
+  };
+  if (!n || !ctx) return out;
+  const type = ctx.rhythm?.type;
+  if (type !== 'perlin' && type !== 'sine') return out;
+  const W = Number(ctx.canvasW), H = Number(ctx.canvasH);
+  const m = Math.min(W, H);
+  if (!(m > 0)) return out;
+  const seed = ctx.seed | 0;
+  out.active = true;
+
+  if (type === 'perlin') {
+    const noise = noiseFor(seed);
+    const F = RHYTHM_FIELD_FREQ;
+    for (let k = 0; k < n; k++) {
+      const X = (soa.x[k] / W) * F, Y = (soa.y[k] / H) * F;
+      out.dScale[k] = RHYTHM_SCALE * noise.noise3D(X, Y, RHYTHM_Z[0]);
+      out.dRot[k] = RHYTHM_ROT * noise.noise3D(X, Y, RHYTHM_Z[1]);
+      out.dx[k] = RHYTHM_DX * m * noise.noise3D(X, Y, RHYTHM_Z[2]);
+      out.dy[k] = RHYTHM_DY * m * noise.noise3D(X, Y, RHYTHM_Z[3]);
+    }
+  } else {
+    const phase = hashPhase(seed, 'rhythm:cadence'); // [0,1): the wave's seed offset
+    for (let k = 0; k < n; k++) {
+      const w = TAU * (((soa.x[k] / W) + (soa.y[k] / H)) * 0.5 * CADENCE_CYCLES + phase);
+      out.dScale[k] = RHYTHM_SCALE * Math.sin(w + CADENCE_PHASES[0]);
+      out.dRot[k] = RHYTHM_ROT * Math.sin(w + CADENCE_PHASES[1]);
+      out.dx[k] = RHYTHM_DX * m * Math.sin(w + CADENCE_PHASES[2]);
+      out.dy[k] = RHYTHM_DY * m * Math.sin(w + CADENCE_PHASES[3]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Stage-C applier for the rhythm layer: fold dRot/dScale/dx/dy into the
+ * SoA channels. Called after applyAttributes in buildPlacements, BEFORE
+ * applyKinemeDrivers — rhythm is the placement layer, the time drivers
+ * compose on top. Ephemeral: never enters geometrySignature (same deal as
+ * audioEnergy).
+ *
+ * dRot/dScale ride stage-C channels (rewritten every frame by
+ * applyAttributes: no undo). dx/dy touch the CACHED x/y, so the applier
+ * hands back an UNDO like the driver applier; buildPlacements undoes the
+ * rhythm AFTER the drivers (reverse of application). shedTier >= 3 →
+ * identity. !active → identity. still[k] (artist-pinned): the mark keeps
+ * its placed everything.
+ */
+const RHYTHM_BASE_XY = new WeakMap();
+
+/** Applies the rhythm layer; returns a function that restores the cached positions, or null when nothing moved. */
+export function applyRhythm(soa, ctx, still = null) {
+  if (!soa || !ctx) return null;
+  if ((ctx.shedTier | 0) >= 3) return null;
+  const r = evaluateRhythm(soa, ctx);
+  if (!r.active) return null;
+  const n = soa.n | 0;
+  let base = RHYTHM_BASE_XY.get(soa);
+  if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; RHYTHM_BASE_XY.set(soa, base); }
+  for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
+  for (let k = 0; k < n; k++) {
+    if (still && still[k]) continue;
+    // #1202 — scale AND scaleY: rhythm dScale is uniform scale modulation;
+    // touching only soa.scale would shear linked marks (scaleY is bit-equal
+    // to scale when X/Y are linked).
+    const sMul = 1 + r.dScale[k];
+    soa.scale[k] *= sMul;
+    soa.scaleY[k] *= sMul;
+    soa.rotation[k] += r.dRot[k];
+    soa.x[k] += r.dx[k];
+    soa.y[k] += r.dy[k];
+  }
+  return () => {
+    for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+  };
 }
 
 export const BOIL_FPS_DEFAULT = 8;

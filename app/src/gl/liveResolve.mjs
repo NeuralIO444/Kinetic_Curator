@@ -1,6 +1,6 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
-import { createDriverClock, driverTimeSec, patternAmounts } from '../engine/kineme.js'; // #1128: the living-motion floor
+import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern } from '../engine/kineme.js'; // #1128: the living-motion floor
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -116,6 +116,8 @@ export function nodePhase(base, it) {
  * amount is 0 (the hard gate: nothing is computed), and null under shed tier 3 (the governor froze motion: identity).
  * #1151 — palette-breath joins the floor: a per-instance palette sweep in the color domain, orthogonal to the motion
  * drivers (patterns don't re-weight it). Reduced motion damps it to zero (DS rule 7).
+ * #1198 — the rhythm layer: ORGANIC/CADENCE select a placement-layer modulation (Perlin/sine over spacing, scale,
+ * rotation) that switches on even when every motion amount is 0 — the pattern is the gate, not the amounts.
  */
 function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive, assetStill, reducedMotion) {
   if (slowRender) return null;
@@ -123,9 +125,11 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
     { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
     layoutParams.kinemePattern, beatDrive);
   amounts.paletteBreath = reducedMotion ? 0 : layoutParams.kinemePaletteBreath;
-  if (!(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0)) return null;
+  const rhythmType = rhythmTypeForPattern(layoutParams.kinemePattern);
+  const rhythm = rhythmType ? { type: rhythmType } : null;
+  if (!rhythm && !(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0)) return null;
   const pinned = assetStill && typeof assetStill === 'object' ? Object.keys(assetStill) : null;
-  return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
+  return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, rhythm, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
 }
 
 export function createLiveResolver() {

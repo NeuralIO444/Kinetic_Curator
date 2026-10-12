@@ -159,6 +159,8 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   gaussian: 'spatial',
   // #1195 — circle packing places points on the spatial stream.
   circlepack: 'spatial',
+  // #1196 — true Voronoi cells place points, so they ride the spatial stream.
+  'voronoi-cells': 'spatial',
   // #720 — the DLA/Eden aggregate places points, so it rides the spatial
   // stream too: re-rolling SPATIAL regrows the organism, colour must not.
   growth: 'spatial',

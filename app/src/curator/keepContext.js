@@ -110,6 +110,20 @@ export function dwellMsNow() {
 }
 
 /**
+ * #1391 G2 — ms since the current seed was set, read off the honest feed;
+ * 0 when no seed is live. Stamped onto the favorite record itself as
+ * `msSinceSeed` (the feed's in-session copy alone doesn't survive a reload).
+ */
+export function seedAgeMsNow() {
+  try {
+    const ms = loisActivity.snapshot().seedAgeMs;
+    return Number.isFinite(ms) && ms >= 0 ? Math.floor(ms) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * The keep's session context. Never throws; every field degrades honestly.
  * Shape: { audio: 0..1|null, paletteWarmth: 0..1|null, dwellMs: int>=0 }.
  */

@@ -14,7 +14,7 @@ import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
 /** #589 — the three phrase clock sources. */
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
-import { captureKeepContext, sanitizeKeepContext } from '../../curator/keepContext.js'; // #1140: per-keep session context
+import { captureKeepContext, sanitizeKeepContext, seedAgeMsNow } from '../../curator/keepContext.js'; // #1140: per-keep session context
 import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #1124
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 
@@ -69,6 +69,9 @@ export function captureFavorite(state, paletteId) {
     // (new Date(), not Date.now(): #806/#808 keep davisSlice free of
     // Date.now reads; the clock inventory allow-lists this metadata read.)
     keptAt: new Date().getTime(),
+    // #1391 G2 — ms between this seed landing and the keep, on the record
+    // itself (additive; legacy keeps carry no field and none is invented).
+    msSinceSeed: seedAgeMsNow(),
     context: captureKeepContext(paletteId),
     config: {
       layout: { ...state.layoutParams },
@@ -118,6 +121,10 @@ export function sanitizeFavorite(raw) {
     // #1390 (G1) — a real epoch stamp rides along; absent or junk (legacy
     // files, foreign bundles) stays absent — never invented, never repaired.
     ...(Number.isFinite(raw.keptAt) && raw.keptAt > 0 ? { keptAt: Math.floor(raw.keptAt) } : {}),
+    // #1391 G2 — ms-since-seed rides along when it is a real measurement;
+    // absent or malformed stays absent.
+    ...(Number.isFinite(Number(raw.msSinceSeed)) && Number(raw.msSinceSeed) >= 0 && raw.msSinceSeed != null
+      ? { msSinceSeed: Math.floor(Number(raw.msSinceSeed)) } : {}),
     // #1140 — session context rides along when present; legacy keeps (no
     // context key) stay without it — never invented.
     ...(context ? { context } : {}),
