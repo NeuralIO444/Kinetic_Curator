@@ -728,6 +728,7 @@ export const createGlobalSlice = (set) => ({
       next.assetWeightOverrides = {};
     }
     next.paletteOverrides = doc.paletteOverrides ?? null;
+    next.paletteChosen = false; // #1365 — a loaded document's palette is the document's, not a pick made this session
     // #639 — an import is a new document: undo must never resurrect the
     // pre-import composition. This runs for every import, not just ones with
     // layers (a layerless doc used to leave stale undo history behind).

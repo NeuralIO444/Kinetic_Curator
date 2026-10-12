@@ -88,11 +88,11 @@ export function useApp(selector) {
       case A.BUMP_SEED: return store.bumpSeed();
       case A.MUTATE_SEED_OFFSET: return store.mutateSeedOffset(action.group);
       case A.RESET_SEED_OFFSETS: return store.resetSeedOffsets();
-      case A.SET_PALETTE_ID: return store.setPaletteId(payload);
-      case A.SET_PALETTE_SWATCH: return store.setPaletteSwatch(action.index, action.hex);
-      case A.SET_PALETTE_BG: return store.setPaletteBg(payload);
-      case A.SET_PALETTE_INK: return store.setPaletteInk(payload);
-      case A.CLEAR_PALETTE_OVERRIDES: return store.clearPaletteOverrides();
+      case A.SET_PALETTE_ID: store.markPaletteChosen(); return store.setPaletteId(payload); // #1365: the artist chose
+      case A.SET_PALETTE_SWATCH: store.markPaletteChosen(); return store.setPaletteSwatch(action.index, action.hex); // #1365: the artist chose
+      case A.SET_PALETTE_BG: store.markPaletteChosen(); return store.setPaletteBg(payload); // #1365: the artist chose
+      case A.SET_PALETTE_INK: store.markPaletteChosen(); return store.setPaletteInk(payload); // #1365: the artist chose
+      case A.CLEAR_PALETTE_OVERRIDES: store.markPaletteChosen(); return store.clearPaletteOverrides(); // #1365: the artist chose
       case A.SET_PALETTE_MIX: return store.setPaletteMixSeconds(payload);
       case A.SET_COLOR_MODE: return store.setColorMode(payload);
       case A.SET_LAYOUT_PARAM: {
@@ -206,7 +206,7 @@ export function useApp(selector) {
       case A.CLEAR_USER_PALETTES: return store.clearUserPalettes();
       case A.TOGGLE_PALETTE_LOCK: return store.togglePaletteLock(action.index);
       case A.CLEAR_PALETTE_LOCKS: return store.clearPaletteLocks();
-      case A.APPLY_HARMONY: return store.applyHarmony(action.scheme);
+      case A.APPLY_HARMONY: store.markPaletteChosen(); return store.applyHarmony(action.scheme); // #1365: the artist chose
       default: console.warn('Unhandled action:', type);
     }
   }, []);
