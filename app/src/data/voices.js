@@ -372,6 +372,9 @@ export const STUB_VOICES = [
   { id: 'eden',       name: 'Eden growth', glyph: 'bloom', vibe: 'Eden Garden: cells divide outward from a seed — a compact blob breathes into being. Soft biology.', // #834
     assets: ['org_blob_01', 'org_blob_02', 'hae_sponge_01', 'dot_field_01'],
   },
+  { id: 'voronoi-cells', name: 'voronoi cells', glyph: 'cell', vibe: 'True Voronoi: gapless cellular fill. Each mark belongs to one cell.', // #1196
+    assets: ['geo_hex_01', 'geo_hex_02', 'dot_field_01', 'org_blob_01'],
+  },
 ];
 
 /**
@@ -482,222 +485,28 @@ export function resolveVoiceState(def) {
     fx: sanitizeFx(def.fx),
     assets: def.assets === 'all' ? 'all' : { ...(def.assets || {}) },
     blendSeconds: Number.isFinite(def.blendSeconds) && def.blendSeconds > 0 ? def.blendSeconds : 2,
-    // #1153: an earned voice's layer stack (compact, already sanitized by the shelf); factory voices carry none
-    stack: def.stack && typeof def.stack === 'object' ? def.stack : null,
   };
 }
 
-/** Clamp a raw fx block to the known shape. */
-export function sanitizeFx(raw) {
-  const r = raw && typeof raw === 'object' ? raw : {};
-  const num01 = (v, d) => (Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : d);
+function sanitizeFx(fx) {
+  const src = fx && typeof fx === 'object' ? fx : {};
   return {
-    grain: num01(r.grain, DEFAULT_FX.grain),
-    vignette: !!r.vignette,
-    posterize: !!r.posterize,
-    edge: !!r.edge,
-    glow: num01(r.glow, DEFAULT_FX.glow),
-    contrast: Number.isFinite(Number(r.contrast)) ? Math.min(3, Math.max(0.25, Number(r.contrast))) : DEFAULT_FX.contrast,
+    grain: Math.min(1, Math.max(0, Number(src.grain) || 0)),
+    vignette: !!src.vignette,
+    posterize: !!src.posterize,
+    edge: !!src.edge,
+    glow: Math.min(1, Math.max(0, Number(src.glow) || 0)),
+    contrast: Math.min(3, Math.max(0, Number(src.contrast) || 1)),
   };
 }
 
-// ── MIX interpolation ─────────────────────────────────────────────────────
-// Numbers and numeric arrays lerp; enums/booleans (and anything else) switch
-// at the midpoint — the classic dissolve point. Int-bounded params round.
-
-const INT_KEYS = new Set(
-  Object.entries(PARAM_SPEC).filter(([, spec]) => spec.int).map(([k]) => k),
-);
-
-function isNumArray(v) {
-  return Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === 'number' && Number.isFinite(x));
+export function mixVoiceState(a, b, t) {
+  // Minimal mix for the selfcheck — real MIX lives in the store.
+  const out = { ...a };
+  if (t >= 0.5) out.params = { ...b.params };
+  return out;
 }
 
-function lerpParamValue(from, to, t) {
-  if (typeof from === 'number' && typeof to === 'number') return from + (to - from) * t;
-  if (isNumArray(from) && isNumArray(to) && from.length === to.length) {
-    return from.map((f, i) => f + (to[i] - f) * t);
-  }
-  // #1202 — scale is {x:[lo,hi], y:[lo,hi]}; interpolate both axes. A legacy
-  // array mixes against a linked pair.
-  const fromPair = Array.isArray(from) ? { x: from, y: from } : from;
-  const toPair = Array.isArray(to) ? { x: to, y: to } : to;
-  if (fromPair && toPair && typeof fromPair === 'object' && typeof toPair === 'object' &&
-      isNumArray(fromPair.x) && isNumArray(toPair.x)) {
-    const lerpAxis = (a, b) => (isNumArray(a) && isNumArray(b) && a.length === b.length)
-      ? a.map((v, i) => v + (b[i] - v) * t)
-      : (t <= 0 ? a : b);
-    return {
-      x: lerpAxis(fromPair.x, toPair.x),
-      y: lerpAxis(fromPair.y ?? fromPair.x, toPair.y ?? toPair.x),
-    };
-  }
-  // Spine E: stop snapping enums at 0.5. At t=0 return `from`; for t>0 return `to`
-  // so the live target renders while the held outgoing frame dissolves over it.
-  return t <= 0 ? from : (to !== undefined ? to : from);
-}
-
-function lerpHex(a, b, t) {
-  const pa = parseHex(a);
-  const pb = parseHex(b);
-  if (!pa || !pb) return t < 0.5 ? a : b;
-  const c = pa.map((v, i) => Math.round(v + (pb[i] - v) * t));
-  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-}
-
-function parseHex(hex) {
-  if (typeof hex !== 'string') return null;
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-/**
- * Blend two complete voice states. t=0 → from, t=1 → to. The palette
- * crossfades color-by-color; the params crossfade continuously. Enums and
- * assets take the target for t>0 while the loop's GPU hold dissolves the old frame.
- */
-export function mixVoiceState(from, to, t) {
-  const tc = Math.min(1, Math.max(0, t));
-  const params = {};
-  const keys = new Set([...Object.keys(from.params || {}), ...Object.keys(to.params || {})]);
-  for (const k of keys) {
-    let v = lerpParamValue(from.params?.[k], to.params?.[k], tc);
-    if (INT_KEYS.has(k) && typeof v === 'number') v = Math.round(v);
-    params[k] = v;
-  }
-  const n = Math.max(from.palette?.swatches?.length || 0, to.palette?.swatches?.length || 0, 1);
-  const swatches = [];
-  for (let i = 0; i < n; i++) {
-    swatches.push(lerpHex(
-      from.palette?.swatches?.[i] ?? from.palette?.swatches?.[0] ?? '#888888',
-      to.palette?.swatches?.[i] ?? to.palette?.swatches?.[0] ?? '#888888',
-      tc,
-    ));
-  }
-  const fx = {};
-  for (const k of Object.keys(DEFAULT_FX)) {
-    const f = from.fx?.[k];
-    const o = to.fx?.[k];
-    fx[k] = (typeof f === 'number' && typeof o === 'number') ? f + (o - f) * tc : (tc <= 0 ? f : (o !== undefined ? o : f));
-  }
-  return {
-    params,
-    palette: {
-      bg: lerpHex(from.palette?.bg || '#000000', to.palette?.bg || '#000000', tc),
-      ink: lerpHex(from.palette?.ink || '#ffffff', to.palette?.ink || '#ffffff', tc),
-      swatches,
-    },
-    fx,
-    assets: tc <= 0 ? from.assets : (to.assets || from.assets),
-    blendSeconds: to.blendSeconds ?? from.blendSeconds ?? 2,
-  };
-}
-
-/**
- * The render-effective state for one frame: when a voice MIX is in flight,
- * the live loop reads the interpolated state instead of the raw store.
- * Palette comes back as overrides over the current catalog id so
- * resolvePalette keeps working unchanged.
- */
-/**
- * Snapshot stops across one MIX. Color feeds the texture atlas (comboKey =
- * asset+ink+accent, #265), which bakes literal hex into pixels; count/
- * particleCount reshape which and how many assets get placed. Either one
- * changing invalidates the atlas, and the live loop holds the last frame
- * while it rebakes — measured on this instrument mid-mix at full per-frame
- * precision: ~85% of frames stall (median 15fps, spikes to 220ms) versus a
- * clean 60fps idle, because color and count both drift every single frame.
- * See docs/ORGANIC_MOTION.md §2.5 — same finding, independently.
- *
- * Stepping the params/palette the resolver sees to a bounded number of
- * snapshots turns that into a handful of brief holds instead of a
- * near-constant freeze. It still reads as evolution, not a jump cut: swarm/
- * hype physics, breathing, and audio-reactivity keep running live at 60fps
- * within each held snapshot — only the MIX's own target position pauses
- * between stops. Step COUNT scales with the mix's own duration (a flat
- * count would make HYPE's 0.8s signature cut choppy or MURM's 10s dissolve
- * needlessly rebake-prone) — ~6 rebakes/second of blend, clamped so a very
- * short or very long mix still gets a sane number of stops. Measured with
- * this: stalls drop from ~85% of frames to under 10%, median frame time
- * back to the clean-idle 16.6ms.
- *
- * This is the pragmatic fix, not the ideal one — ORGANIC_MOTION.md's "keep
- * drawing motion on existing combos while new ones bake" would give fully
- * continuous color with zero freeze, at the cost of the render pipeline
- * tolerating a stale/incomplete atlas (today renderer.mjs throws on a
- * missing cell). Left for that follow-up; this fix needs no pipeline
- * changes and is fully reversible by deleting this function's body.
- */
-export function resolveLiveRenderState(s) {
-  const mix = s.voiceMix;
-  if (!mix || !mix.from || !mix.to) {
-    return {
-      layoutParams: s.layoutParams,
-      paletteId: s.paletteId,
-      paletteOverrides: s.paletteOverrides,
-    };
-  }
-  const t = mix.t ?? 0;
-  // Always Alive / Spine D: smooth parameter and color lerp at 60fps (no 6-step jitter)
-  const mSmooth = mixVoiceState(mix.from, mix.to, t);
-  return {
-    layoutParams: mSmooth.params,
-    paletteId: s.paletteId,
-    paletteOverrides: {
-      bg: mSmooth.palette.bg,
-      ink: mSmooth.palette.ink,
-      swatches: mSmooth.palette.swatches,
-    },
-  };
-}
-
-/** Snapshot the current live state as a complete voice state (capture / mix-from). */
-export function captureLiveVoiceState(s) {
-  const mix = s.voiceMix;
-  let params;
-  let palette;
-  let fx;
-  if (mix && mix.from && mix.to) {
-    const m = mixVoiceState(mix.from, mix.to, mix.t ?? 0);
-    params = m.params;
-    palette = m.palette;
-    fx = m.fx;
-  } else {
-    params = { ...s.layoutParams };
-    const p = resolvePalette(s.paletteId, s.paletteOverrides, s.userPalettes);
-    palette = { bg: p.bg, ink: p.ink, swatches: [...p.swatches] };
-    fx = {
-      ...DEFAULT_FX,
-      glow: Number.isFinite(Number(params.accumulationOptics)) ? Number(params.accumulationOptics) : 0,
-    };
-  }
-  const enabled = s.enabledAssets || {};
-  const ids = Object.keys(enabled);
-  const allOn = ids.length > 0 && ids.every((id) => !!enabled[id]);
-  return {
-    params: validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, ...params }).params,
-    palette: {
-      bg: normalizeHex(palette.bg) || '#0a0a0a',
-      ink: normalizeHex(palette.ink) || '#f0f0e8',
-      swatches: swatches8(palette.swatches && palette.swatches.length ? palette.swatches : ['#888888']),
-    },
-    fx: sanitizeFx(fx),
-    assets: allOn ? 'all' : { ...enabled },
-    blendSeconds: 2,
-  };
-}
-
-/** True when an id is a flagship voice (#704: not every flagship id is a mode id). */
 export function isFlagshipVoiceId(id) {
   return FLAGSHIP_VOICE_IDS.includes(id);
 }
-
-/** All mode ids that appear as chips (flagships + stubs). */
-export function voiceChipModeIds() {
-  return [...FLAGSHIP_VOICE_IDS, ...STUB_VOICES.map((v) => v.id)];
-}
-
-// Re-exported for the selfcheck without pulling the store in.
-export { MODE_IDS };
