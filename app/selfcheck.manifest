@@ -312,6 +312,7 @@ node src/gl/hands.selfcheck.mjs
 node src/fx/efRackTile.selfcheck.mjs
 node src/components/motionGlyph.selfcheck.mjs
 node src/panels/build/trackNumeral.selfcheck.mjs
+node src/panels/build/strataSummary.selfcheck.mjs
 node src/deferredStubs.selfcheck.mjs
 node src/panels/pipeline/stageMapping.selfcheck.mjs
 node src/panels/pipeline/stageDisplays.selfcheck.mjs
