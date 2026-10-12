@@ -172,6 +172,8 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #1183 palette snap — which marks take the tile's colours is a COLOUR decision: re-rolling colour reshuffles
   // the snapped set, re-rolling spatial does not.
   snap: 'color',
+  // #1365 — which of a persona's three palettes explore deals: a COLOUR decision.
+  paletteFamily: 'color',
 });
 
 const OFFSET_GROUP_OF = new Map([
