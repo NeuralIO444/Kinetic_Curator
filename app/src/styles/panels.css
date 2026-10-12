@@ -997,6 +997,12 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .te-pips i { width: 8px; height: 3px; box-sizing: border-box; border: 1px solid currentColor; background: transparent; }
 .te-pips i.lit { background: currentColor; }
 
+/* MAP row (#1199): field tile → channel tile → amount, one line. */
+.map-tiles { display: flex; align-items: stretch; gap: 6px; }
+.map-tiles .te-matrix { flex: 1 1 0; }
+.map-tiles .te-value { flex: 0 0 auto; min-width: 76px; }
+.map-arrow { align-self: center; color: var(--dim); font-size: 11px; }
+
 /* Amber value button: label left, live readout right, lock pip. */
 .te-value { display: flex; gap: 2px; align-items: stretch; }
 .te-value-btn {
