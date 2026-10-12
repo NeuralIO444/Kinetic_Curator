@@ -122,6 +122,8 @@ export function computeGeometrySoA({
   // #1195 — circle packing: the BASE scale range ([lo, hi], the slider, never the audio-modulated one). Only the
   // circlepack mode reads it; it joins geometrySignature for that mode alone.
   packScale = null,
+  // #1197 — space-colonization species knobs; ignored by every other mode.
+  colonizeInfluence = 90, colonizeKill = 18, colonizeBranch = 0.25, colonizeStep = 7,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -172,6 +174,8 @@ export function computeGeometrySoA({
     wobbleAmp, wobbleFreq,
     // #1195 — circle packing needs the tier count and the base scale range; ignored by every other mode.
     zTiers: tiers, packScale,
+    // #1197 — space-colonization species knobs; ignored by every other mode.
+    colonizeInfluence, colonizeKill, colonizeBranch, colonizeStep,
     // #1309 — column-writing mode; assigned below once the lanes exist.
     out: null,
     row: -1,
@@ -357,6 +361,8 @@ export function geometrySignature(p) {
     p.wobbleAmp, p.wobbleFreq,
     // #1195 — the packing depends on the base scale range (circlepack only; 0 for every other mode).
     p.packScale ? p.packScale[0] : 0, p.packScale ? p.packScale[1] : 0,
+    // #1197 — the vein network depends on the species knobs (colonize only).
+    p.colonizeInfluence || 0, p.colonizeKill || 0, p.colonizeBranch || 0, p.colonizeStep || 0,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }
