@@ -15,6 +15,8 @@ const required = [
   'poisson', // #1193 — Poisson-disc blue noise
   'gaussian', // #1194 — Gaussian cluster mixture
   'circlepack', // #1195 — circle packing
+  'voronoi-cells', // #1196 — true Voronoi cells
+  'colonize', // #1197 — space-colonization growth
 ];
 
 for (const id of required) {
@@ -23,6 +25,7 @@ for (const id of required) {
 // getSampler falls back to `random` for unknown modes, so the required loop
 // above cannot prove registration — the list check can.
 assert.ok(listSamplers().includes('brush'), 'brush must be registered');
+assert.ok(listSamplers().includes('colonize'), 'colonize must be registered'); // #1197
 
 const listed = listSamplers();
 assert.ok(listed.includes('stratified'));
