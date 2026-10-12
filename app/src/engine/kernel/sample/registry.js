@@ -26,6 +26,7 @@ import { sampleGrowthPoint } from './growth.js'; // #720 — DLA / Eden growth
 import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { gaussian } from './gaussian.js'; // #1194 — Gaussian cluster mixture
 import { circlepack } from './circlepack.js'; // #1195 — circle packing
+import { colonize } from './colonize.js'; // #1197 — space-colonization growth
 import { voronoiCells } from './voronoiCells.js'; // #1196 — true Voronoi cells
 import { createNoise } from '../../noise.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
@@ -882,6 +883,17 @@ registerSampler({
   fn: circlepack,
 });
 registerSampler({
+  // #1197 — tier 2: the vein network is grown once per (seed, plate, count,
+  // knobs) and cached; sampling deals points off the network. No jitter —
+  // jitter would break the vein structure.
+  id: 'colonize',
+  reads: ['i', 'count', 'w', 'h', 'seed', 'seedOffsets',
+    'colonizeInfluence', 'colonizeKill', 'colonizeBranch', 'colonizeStep'],
+  writes: ['points', 'points.t'],
+  costTier: 2,
+  fn: colonize,
+});
+registerSampler({
   // #1196 — tier 2: Poisson seeds + nearest-cell rejection, cached seeds.
   id: 'voronoi-cells',
   reads: ['i', 'w', 'h', 'seed', 'seedOffsets', 'rng', 'jitter'],
@@ -914,4 +926,5 @@ export {
   poisson, // #1193
   gaussian, // #1194
   circlepack, // #1195
+  colonize, // #1197
 };

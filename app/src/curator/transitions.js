@@ -33,7 +33,7 @@ const FAMILIES = {
     // #720 — growth organisms. Without a family, a new mode's row can never
     // reach another un-familied mode (far excludes null-family values), so
     // every mode must belong to one — the "every value reachable" invariant.
-    growth: ['dla', 'eden'],
+    growth: ['dla', 'eden', 'colonize'], // #1197
   },
   behave: {
     calm: ['cruise', 'orbit'],

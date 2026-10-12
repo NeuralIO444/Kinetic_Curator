@@ -34,6 +34,7 @@ export const LAYOUT_MODES = [
   { id: 'poisson',   name: 'poisson',    glyph: 'pois'   }, // #1193
   { id: 'gaussian',  name: 'gaussian',   glyph: 'gaus'   }, // #1194
   { id: 'circlepack', name: 'circle pack', glyph: 'pack'  }, // #1195
+  { id: 'colonize',  name: 'colonize',  glyph: 'branch' }, // #1197
   { id: 'voronoi-cells', name: 'voronoi cells', glyph: 'cell'  }, // #1196
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
   // swarm engine (see isLiveSwarmMode below) with its own palette + motion
@@ -131,6 +132,12 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // engine (#762), which owns the audio→growth mapping.
   growthRate: 3,
   growthBranch: 0.8,
+  // #1197 — space-colonization species knobs: influence radius (px),
+  // kill radius (px), branch probability, step size (px).
+  colonizeInfluence: 90,
+  colonizeKill: 18,
+  colonizeBranch: 0.25,
+  colonizeStep: 7,
   noiseFreq: 0.005,  noiseSpeed: 0.5,
   displacement: 0,
   // Brush line: nominal stamp diameter px, step as fraction of it,
@@ -269,6 +276,12 @@ export const PARAM_SPEC = {
   // growthBranch maps to DLA stick probability 0.25..1.0.
   growthRate: { min: 0, max: 12 },
   growthBranch: { min: 0, max: 1 },
+  // #1197 — colonize knobs: kill must stay well under influence or the
+  // veins starve (no attractors survive within reach).
+  colonizeInfluence: { min: 20, max: 300 },
+  colonizeKill: { min: 2, max: 60 },
+  colonizeBranch: { min: 0, max: 1 },
+  colonizeStep: { min: 2, max: 24 },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   // Brush line: spacing ≤ 0.7 reads as a continuous line; wider is a

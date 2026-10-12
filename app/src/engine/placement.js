@@ -134,6 +134,8 @@ export function computeGeometrySoA({
   // attractorCount=0 is byte-identical to current behavior.
   attractorCount = 0,
   attractorRadius = ATTRACTOR_RADIUS_DEFAULT,
+  // #1197 — space-colonization species knobs; ignored by every other mode.
+  colonizeInfluence = 90, colonizeKill = 18, colonizeBranch = 0.25, colonizeStep = 7,
 }, out) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
@@ -190,6 +192,8 @@ export function computeGeometrySoA({
     wobbleAmp, wobbleFreq,
     // #1195 — circle packing needs the tier count and the base scale range; ignored by every other mode.
     zTiers: tiers, packScale,
+    // #1197 — space-colonization species knobs; ignored by every other mode.
+    colonizeInfluence, colonizeKill, colonizeBranch, colonizeStep,
     // #1309 — column-writing mode; assigned below once the lanes exist.
     out: null,
     row: -1,
@@ -394,6 +398,8 @@ export function geometrySignature(p) {
     // would silently serve stale pools after a param edit. heroes is stage-C
     // only (always re-run), like scale/rotate/alpha, so it stays out.
     p.attractorCount || 0, p.attractorRadius || 0,
+    // #1197 — the vein network depends on the species knobs (colonize only).
+    p.colonizeInfluence || 0, p.colonizeKill || 0, p.colonizeBranch || 0, p.colonizeStep || 0,
     o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
   ];
 }
