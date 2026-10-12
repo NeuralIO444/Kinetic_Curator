@@ -10,6 +10,8 @@ import { emit, on, Events } from '../../composition/eventBus.js';
 import { getActiveCurator, curatorHint } from '../../curator/curate.js';
 import { useStore } from '../../state/store.js';
 import { getRenderProfile } from '../../curator/renderProfiles.js';
+import { curatePaletteTarget } from '../../curator/curatePalette.mjs';
+import { getPhase } from '../../curator/phase.js';
 import { getPresetsByGroup } from '../../data/presets.js';
 import {
   voiceOptions,
@@ -131,17 +133,18 @@ export function CuratorBar() {
   const subdued = (key, isLit) => (isLit && !lit.has(key) ? 'true' : undefined);
 
   const onCurate = () => {
+    // #1365 — judge the press by the phase it was made in (read before the roll lands).
+    const phase = getPhase();
     emit(Events.LAYOUT_CURATE);
     emit(Events.ROLL_GUARD, { kind: 'curate' }); // #1107: look at the frame it landed
-    // The persona brings its palette: switch the global palette to the
-    // profile's catalog entry so the color jumps with the voice. Skipped
-    // when already there — repeat presses don't wipe swatch overrides or
-    // stack undo entries. "off" never touches the palette.
-    const profile = getRenderProfile(getActivePersonaId());
-    if (profile) {
-      const st = useStore.getState();
-      if (st.paletteId !== profile.paletteId) st.setPaletteId(profile.paletteId);
-    }
+    // The persona brings its palette in explore (and before any phase): switch
+    // the global palette to the profile's catalog entry. Refine keeps the
+    // palette being settled (#1365). Skipped when already there — repeat
+    // presses don't wipe swatch overrides or stack undo entries. "off" never
+    // touches the palette.
+    const st = useStore.getState();
+    const target = curatePaletteTarget({ phase, profile: getRenderProfile(getActivePersonaId()), paletteId: st.paletteId });
+    if (target) st.setPaletteId(target);
   };
 
   // #1122 — the lock pill: its own bordered pill now (mockup ■ slot; BEAT owns
