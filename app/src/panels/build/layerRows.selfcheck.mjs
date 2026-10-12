@@ -8,12 +8,11 @@ let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 const ids = (ls) => ls.map((l) => l.id);
 
-ok('sections read MATH, FX, CONTENT top to bottom', () => {
-  assert.deepEqual([...SECTION_ORDER], ['math', 'fx', 'content']);
+ok('the stack reads like the fold: one list, frontmost first (#1037; #1203 block stack)', () => {
+  assert.deepEqual([...SECTION_ORDER], ['math', 'fx', 'content'], 'the fold order the array holds: CONTENT ground, FX, MATH front');
   const src = readFileSync(new URL('./LayerStack.jsx', import.meta.url), 'utf8');
-  const at = (t) => src.indexOf(`title: '${t}', count:`);
-  assert.ok(at('Math') > 0 && at('FX') > 0 && at('Content') > 0, 'all three section heads are present');
-  assert.ok(at('Math') < at('FX') && at('FX') < at('Content'), 'MATH above FX above CONTENT in the rendered JSX');
+  assert.match(src, /const stack = rowsTopFirst\(layers\);/, 'the whole roster renders frontmost-first as one block stack');
+  assert.match(src, /<MixSeam upperFine=/, 'adjacent blocks are joined by a mix seam');
 });
 
 ok('rows are listed frontmost first: array [a,b,c] draws c,b,a', () => {

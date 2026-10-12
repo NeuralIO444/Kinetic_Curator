@@ -597,6 +597,97 @@
 /* #509 phase 3 — matrix overview block (config render, same readout style). */
 .patch-matrix { padding: 2px 0 2px 2px; }
 
+/* ─── #1203 — block-stacking strata roster ───
+   The dish's strata as chunky vertical blocks, FRONT at the top, GROUND at
+   the bottom. Type language: MATH red #E5486F, CONTENT teal #4FD1C5,
+   FX purple #8B7CF6 (left stripe + type tag). Collapsed blocks show a
+   one-line amber param summary; tap expands the block inline. */
+.strata-depth-head {
+  font-size: 9px; letter-spacing: 0.18em; color: var(--dimmer);
+  text-align: center; padding: 6px 4px 2px; white-space: nowrap;
+}
+.strata-list { display: flex; flex-direction: column; padding: 2px 4px 4px; }
+.strata-block {
+  position: relative;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,0.28);
+  padding: 4px 8px 6px 14px;
+}
+.strata-block.strata-expanded { border-color: var(--line-2); background: rgba(0,0,0,0.38); }
+/* #1033 (M8) — square corners everywhere: the stripe is square too. */
+.strata-stripe {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+}
+.strata-head { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
+/* #1013 — 44px minimum touch targets on every block control. */
+.strata-head > .micro-btn,
+.strata-move .micro-btn {
+  min-height: 44px; min-width: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* The number chip is the #716 .track-numeral tile (rules above) — the block
+   header keeps it centered like the old rows did. */
+.build-layer-stack .strata-head .track-numeral { align-self: center; }
+.strata-move { display: flex; gap: 2px; }
+.strata-type {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+  color: #0a0a0a; padding: 3px 7px; white-space: nowrap;
+}
+.strata-name {
+  flex: 1; text-align: left; background: transparent; border: none;
+  color: var(--ink); font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  padding: 2px 4px; min-height: 44px; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.strata-summary {
+  font-size: 10px; letter-spacing: 0.04em; color: var(--kc-davis);
+  padding: 0 2px 2px 30px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.strata-body {
+  border-top: 1px dashed var(--line-2); margin-top: 2px; padding-top: 4px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.strata-composite { display: flex; align-items: center; gap: 6px; min-height: 44px; }
+.strata-composite .blend-mode-select { flex: 1; min-height: 44px; }
+.strata-composite input[type=range] { flex: 1; min-width: 0; }
+.build-layer-stack .strata-composite .fx-param-readout,
+.build-layer-stack .strata-composite .fx-param label { align-self: center; }
+/* #1203 — the mix seam: the edge stripe splits into a double line in the
+   gap, one line per adjacent stratum's type color, crossfading vertically.
+   Same-type seams continue unbroken as a single line. */
+.mix-seam { position: relative; height: 12px; flex: 0 0 auto; }
+.mix-line { position: absolute; top: 1px; bottom: 1px; left: 1px; width: 2px; }
+.mix-line-b { left: 6px; }
+.mix-line-single { width: 3px; }
+/* #1203 — the dashed ADD STRATUM slot: one-tap add · long-press chooser. */
+.strata-add-wrap { padding: 2px 4px; position: relative; }
+.strata-add {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px dashed var(--line-2); background: transparent;
+  color: var(--dim); padding: 12px; min-height: 52px; cursor: pointer;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.strata-add:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+.strata-add:disabled { opacity: 0.35; cursor: not-allowed; }
+.strata-add-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; }
+.strata-add-hint { font-size: 9px; letter-spacing: 0.06em; }
+/* #1203 — block footer: TAP = EDIT · HOLD = 2ND FN … #1203 ROSTER. */
+.strata-foot {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 8px; letter-spacing: 0.14em; color: var(--dimmer);
+  padding: 8px 6px 2px; text-transform: uppercase;
+}
+/* #1015 — reorder feedback: the moved block flashes its type color. */
+.strata-moved { animation: strata-moved-flash 1.6s ease-out; }
+@keyframes strata-moved-flash {
+  0% { box-shadow: 0 0 0 2px var(--strata-flash, var(--kc-davis)); background: rgba(255,255,255,0.04); }
+  100% { box-shadow: none; }
+}
+/* #1010 — the math-hard flare, retargeted at the block's type tag. */
+.strata-math-hard .strata-type { animation: math-hard-flash 0.9s steps(2, jump-none) infinite; }
+.strata-math-hard .strata-name { color: #d3b8ff; }
+
 /* ─── Pipeline ─── */
 .panel-pipeline { min-height: 0; }
 .pipeline-body { gap: 6px; display: flex; flex-direction: column; flex: 1 1 auto; overflow-y: auto; min-height: 0; }

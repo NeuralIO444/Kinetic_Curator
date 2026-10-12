@@ -38,15 +38,20 @@ const expectHouse = (list, color, where) => {
 };
 
 test('BUILD sliders are yellow, STIMULI cyan, PLAY ink; all with a 44px hit area', async ({ page }) => {
-  await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+      localStorage.setItem('kc:strata-last-add', 'fx'); // #1203 — one-tap ADD STRATUM arms FX tracks
+    } catch { /* ignore */ }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
   // BUILD: the layer wet slider (plus an FX parameter slider once one exists)
   await page.getByRole('tab', { name: /build/i }).click();
   const stack = page.locator('.build-layer-stack');
-  const fxPlus = stack.locator('.layer-section').filter({ has: page.getByRole('button', { name: 'Add FX track' }) }).locator('.layer-add-btn');
-  await fxPlus.click(); await fxPlus.click(); await fxPlus.click();      // FX 3: the Blur / Focus family
+  const addSlot = stack.locator('.strata-add');
+  await addSlot.click(); await addSlot.click(); await addSlot.click();   // FX 3: the Blur / Focus family
   await stack.locator('.fx-editor .chip-btn').click();                   // + ADD SHARPEN (has two sliders)
   await expect(stack.locator('.fx-editor input[type=range]')).toHaveCount(2);
   const build = await thumbs(page, '.panel-layout');

@@ -16,13 +16,15 @@ test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
-  await page.locator('.build-layer-stack .layer-section').last().locator('.layer-add-btn').click();
+  // #1203 — one tap on ADD STRATUM arms KC-2; adding selects it, so its
+  // block is the expanded one carrying the PATCH section.
+  await page.locator('.build-layer-stack .strata-add').click();
 
-  // Patch KC-1 (first content row in the sectioned stack) so its diag line is live.
-  const row = page.locator('.layer-row').filter({ has: page.locator('.layer-row-composite[title^="PATCH"]') }).first();
-  await row.locator('.layer-row-composite[title^="PATCH"] select').first().selectOption('field');
+  // Patch the expanded block so its diag line is live.
+  const block = page.locator('.strata-block').filter({ has: page.locator('.strata-composite[title^="PATCH"]') }).first();
+  await block.locator('.strata-composite[title^="PATCH"] select').first().selectOption('field');
 
-  const opacity = page.locator('.layer-row input[type="range"]').first();
+  const opacity = page.locator('.strata-block input[type="range"]').first();
   await opacity.focus();
   const before = await page.evaluate(() => window.__ivl1000);
   for (let i = 0; i < 10; i++) await opacity.press('ArrowLeft'); // opacity starts at max
