@@ -21,6 +21,7 @@ import { makeHeroInfo } from './kernel/field/attractors.js';
 import { applyKinemeDrivers, applyRhythm } from './kineme.js';
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
+import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
@@ -154,6 +155,8 @@ export function buildPlacements({
   // dish.ground. Both are ephemeral: no dish/lean → today's path exactly.
   dish = null,
   lean = 0,
+  // #1183 tile-edge nudge (0..1): marks ease off the edges of the tile beneath them (dish.groundCell). 0 = off.
+  nudge = 0,
   // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
@@ -364,6 +367,9 @@ export function buildPlacements({
   // application below.
   const undoRhythm = kineme ? applyRhythm(soa, kineme, stillMarks) : null;
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
+  // #1183 tile-edge nudge — after the motion drivers, so the PRESENTED position feels the (possibly drifting)
+  // tile it is over. Per frame, undone below like the drivers; nudge 0 or no ground never calls it.
+  const undoNudge = dish && dish.groundCell && nudge > 0 ? applyGroundNudge(soa, dish.groundCell, nudge, stillMarks) : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay
@@ -463,6 +469,7 @@ export function buildPlacements({
   for (const it of mapped) it.glass = glassOn;
   if (glassOn) mapped = sortGlassInstances(mapped);
 
+  if (undoNudge) undoNudge(); // #1183 — reverse of application
   if (undoKineme) undoKineme();
   if (undoRhythm) undoRhythm(); // #1198 — reverse of application
   return { preset, items: mapped, safeCount };
