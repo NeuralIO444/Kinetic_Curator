@@ -37,6 +37,7 @@ import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353
 import { initStress, DEBUG_STRESS } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
+import { observeFormation } from './curator/formationLive.js'; // #1355 step 3: when a spore would form
 import { setResolveFrameTap } from './gl/resolveTap.mjs';
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
@@ -81,7 +82,8 @@ function AppInner() {
     // #1354 — stress and bands from honest counts (artist actions, rolls since the last keep). Computed only: no
     // persona reads the band yet; ?debug=stress shows it.
     // #1355 — dish pressure: the marks the resolver placed around the canvas pins, read from each resolved frame.
-    setResolveFrameTap(observeDish);
+    // #1355 step 3 — the formation rule reads the same frame (one tap: dish pressure first, then formation).
+    setResolveFrameTap((input, output) => { observeDish(input, output); observeFormation(input, output); });
     const stop = initStress({
       getCounts: loisActivity.pressureCounts,
       isRunning: () => useStore.getState().running,
