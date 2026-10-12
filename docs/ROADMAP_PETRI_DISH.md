@@ -4,7 +4,7 @@
 **Source:** Matt's draft of 2026-10-10 ("KC1_Roadmap_Petri_Dish_Affective"), revised with the six decisions recorded below.
 **Scope:** desktop and iPad first. Live stage use is welcome but is not the design driver. No live AI inside the app.
 
-One phase is open at a time. Phase 1 is open.
+One phase is open at a time. **Phase 3 is open** (status 2026-10-12): Phases 1 and 2 are complete.
 
 ---
 
@@ -34,7 +34,7 @@ One phase is open at a time. Phase 1 is open.
 
 ## Phases
 
-### Phase 1: the dish spine *(open)*
+### Phase 1: the dish spine *(done 2026-10-11, #1353)*
 The live instrument runs on the same dish the replayer steps. Today the log can record what happened but cannot reproduce the picture, because the live pipeline does not use the dish (the session-log finding, #1314). This is the same work "One Petri Dish" needs.
 
 - The live loop steps the dish; the replayer and the instrument share one step path.
@@ -42,9 +42,9 @@ The live instrument runs on the same dish the replayer steps. Today the log can 
 - Layers become strata of one dish (#1183, sketch approved: [`design/dish-strata-sketch.md`](design/dish-strata-sketch.md)): colour lean first, then contact shadow and tile-edge nudge, then palette lock. The dish roster replaces the LAYERS mixer (#1203) once the dish is the source of truth.
 - **Exit:** export a live session, import it, replay with the recorded governor note applied: the frame hashes match the live run. Normal playback is per machine (decision 7). Plan: [`design/dish-spine-plan.md`](design/dish-spine-plan.md).
 
-Issues: the dish-spine issue (new), #1183, #1203, #1314.
+Issues: #1353 (closed: all six steps of the plan on main, exit met), #1183 (the four ground effects GROUND / EDGE / SHADOW / SNAP shipped 2026-10-12, kept open as the one-dish umbrella), #1203 (closed), #1314.
 
-### Phase 2: stress, bands, telemetry
+### Phase 2: stress, bands, telemetry *(done 2026-10-11, #1354)*
 Stress is a weighted sum of three honest signals, re-weighted after decision 2:
 
 | Input | Weight | Measured as |
@@ -64,7 +64,7 @@ Stress is a weighted sum of three honest signals, re-weighted after decision 2:
 - A stress/band readout exists as a **dev-only** overlay (URL flag), never as shipped chrome.
 - **Exit:** bands change deterministically from a recorded log, and the telemetry is enough to retune thresholds.
 
-### Phase 3: wet lab and hierarchy
+### Phase 3: wet lab and hierarchy *(open)*
 - The asset panel is the bio wet lab.
 - A **pin** marks a privileged location only (spore-like). It does not create a hierarchy immediately.
 - A hierarchy (head + body + limbs) forms only when **both** are true: attraction strength or field value at the pin exceeds a band-modulated threshold, **and** neighbour/density pressure around the pin exceeds a band-modulated threshold.
@@ -72,7 +72,7 @@ Stress is a weighted sum of three honest signals, re-weighted after decision 2:
 - New event types: `pin`, `hierarchy-form`.
 - **Exit:** a pinned spore becomes a creature under the two conditions, replayably.
 
-Issues: #1206, the wet-lab pin issue (new).
+Issues: #1206, #1355. Plan: [`design/wet-lab-plan.md`](design/wet-lab-plan.md). Steps 1 (hierarchy core, #1377), 2 (pins + dish pressure, #1379/#1381) and 3 (the formation rule, #1400) are built; step 4 (the moth) is in progress; step 5 (limb count over a life) follows it.
 
 ### Phase 4: influences
 The three personae read the band and the room.
@@ -83,7 +83,7 @@ The three personae read the band and the room.
 - Rooms stay as built (decision 4); dish pressure and taste pressure feed the existing states. Event: `matrix-room`.
 - **Exit:** the same recorded session produces the same influences on replay.
 
-Issues: #1145, the influences issue (new), #1173 (pass gesture: upgrades taste pressure).
+Issues: #1145, #1356, #1173 (pass gesture: upgrades taste pressure).
 
 ---
 
