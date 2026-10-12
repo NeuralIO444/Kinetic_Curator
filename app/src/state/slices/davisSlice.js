@@ -63,6 +63,12 @@ export function captureFavorite(state, paletteId) {
     // #948 — full epoch ISO; legacy HH:MM:SS keeps still parse via
     // loisActivity.parseFavoriteTimestamp (date unknown -> null, honestly).
     timestamp: new Date().toISOString(),
+    // #1390 (G1) — the same moment as epoch milliseconds, a number: the
+    // cross-day signals (ECHO, WANE, recency) read this, never a string
+    // parse. Additive — keeps written before it simply have no keptAt.
+    // (new Date(), not Date.now(): #806/#808 keep davisSlice free of
+    // Date.now reads; the clock inventory allow-lists this metadata read.)
+    keptAt: new Date().getTime(),
     context: captureKeepContext(paletteId),
     config: {
       layout: { ...state.layoutParams },
@@ -109,6 +115,9 @@ export function sanitizeFavorite(raw) {
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'
       ? { seedOffsets: normalizeSeedOffsets(raw.seedOffsets) } : {}),
     timestamp: typeof raw.timestamp === 'string' ? raw.timestamp.slice(0, 32) : '',
+    // #1390 (G1) — a real epoch stamp rides along; absent or junk (legacy
+    // files, foreign bundles) stays absent — never invented, never repaired.
+    ...(Number.isFinite(raw.keptAt) && raw.keptAt > 0 ? { keptAt: Math.floor(raw.keptAt) } : {}),
     // #1140 — session context rides along when present; legacy keeps (no
     // context key) stay without it — never invented.
     ...(context ? { context } : {}),

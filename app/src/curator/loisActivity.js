@@ -23,6 +23,7 @@ import { DAVIS_UGLY_PASSES, DAVIS_UGLY_WINDOW_MS, DAVIS_FLOW_WINDOW_MS } from '.
 const KEEP_DEDUPE_MS = 250;
 export const LOIS_VIBE_DWELL_MS = 8000; // VIBE starting point: lingered this long, no action (tune by feel)
 export const LOIS_ROLL_KEEP_WINDOW_MS = 5 * 60 * 1000; // rolls-vs-keeps window
+export const ACTIVITY_HEARTBEAT_MS = 5000; // #1390 (G8): the bus heartbeat cadence while the artist is active
 export const LOIS_UNDO_BURST_WINDOW_MS = 10 * 1000; // undo-burst window
 const LOG_CAP = 100; // per-log memory bound
 
@@ -50,7 +51,11 @@ export function parseFavoriteTimestamp(ts) {
   return Number.isFinite(ms) ? ms : null;
 }
 
-export function createLoisActivity({ now = () => Date.now() } = {}) {
+export function createLoisActivity({
+  now = () => Date.now(),
+  setInterval: si = globalThis.setInterval,
+  clearInterval: ci = globalThis.clearInterval,
+} = {}) {
   const t = () => now();
   const s = {
     lastActivityTs: t(),
@@ -81,10 +86,25 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
   };
   const unsubs = [];
   let removeDomListeners = null;
+  let heartbeatTimer = null;
 
   const beat = () => {
     s.lastActivityTs = t();
     s.activityCount += 1; // #1354: every real artist action, counted (the stress signal reads the count, not a clock)
+  };
+
+  // #1390 (G8) — the activity heartbeat ON THE BUS. beat() above is the
+  // internal pulse; this publishes it at a steady cadence so session-cadence
+  // signals (G10 / TIDE) have something real to read. It publishes only while
+  // the artist is active — inside the same AWAY window that defines idle —
+  // and the timer dies with stop(), so an idle or closed instrument has no
+  // pulse to report. Payload is the moment and the honest idle reading,
+  // nothing inferred.
+  const tickHeartbeat = () => {
+    const at = t();
+    const idleMs = at - s.lastActivityTs;
+    if (idleMs >= LOIS_AWAY_MS) return;
+    emit(Events.ACTIVITY_HEARTBEAT, { ts: at, idleMs });
   };
 
   // Instrument 5 — dwell windows. Called on seed/composition change via the
@@ -170,6 +190,14 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
   }
 
   function start({ store } = {}) {
+    // #1390 (G8) — the bus heartbeat runs for the instrument's lifetime;
+    // stop() clears it. unref'd where the runtime allows (node selfchecks)
+    // so the timer alone never holds a process open.
+    if (heartbeatTimer === null && typeof si === 'function') {
+      heartbeatTimer = si(tickHeartbeat, ACTIVITY_HEARTBEAT_MS);
+      if (heartbeatTimer && typeof heartbeatTimer.unref === 'function') heartbeatTimer.unref();
+    }
+
     // Instrument 1 — activity heartbeat. DOM-only; guarded for node/selfcheck.
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       const onBeat = () => beat();
@@ -276,6 +304,10 @@ export function createLoisActivity({ now = () => Date.now() } = {}) {
   }
 
   function stop() {
+    if (heartbeatTimer !== null && typeof ci === 'function') {
+      ci(heartbeatTimer);
+      heartbeatTimer = null;
+    }
     for (const u of unsubs.splice(0)) {
       try {
         u();

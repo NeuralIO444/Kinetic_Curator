@@ -1,11 +1,12 @@
 // loisActivity.selfcheck.mjs — the LOIS honest feed: every signal recorded
 // must be real. Fake clock + real event bus + fake store; no DOM needed.
 import assert from 'node:assert';
-import { Events, emit } from '../composition/eventBus.js';
+import { Events, emit, on } from '../composition/eventBus.js';
 import { captureFavorite, sanitizeFavorite } from '../state/slices/davisSlice.js';
 import {
   createLoisActivity,
   parseFavoriteTimestamp,
+  ACTIVITY_HEARTBEAT_MS,
   LOIS_AWAY_MS,
   LOIS_BURN_KEEPS,
 } from './loisActivity.js';
@@ -252,6 +253,50 @@ import {
   emit(Events.KINETIC_TAP, { kind: 'rules' });
   const snap = act.snapshot();
   assert.strictEqual(snap.rollsLast5m, 0);
+}
+
+// --- #1390 (G8): the activity heartbeat on the bus -----------------------
+// Fake timers capture the tick; the fake clock decides who is "active".
+{
+  let now = 5_000_000;
+  let tickFn = null;
+  let tickMs = null;
+  let clearedWith = null;
+  const beats = [];
+  const un = on(Events.ACTIVITY_HEARTBEAT, (p) => beats.push(p));
+  const act = createLoisActivity({
+    now: () => now,
+    setInterval: (fn, ms) => { tickFn = fn; tickMs = ms; return 'timer-1'; },
+    clearInterval: (id) => { clearedWith = id; },
+  });
+  act.start();
+  assert.strictEqual(tickMs, ACTIVITY_HEARTBEAT_MS, 'heartbeat runs at the published cadence');
+  assert.ok(tickFn, 'start() arms the heartbeat timer');
+
+  tickFn(); // the artist just arrived (the factory stamps activity at birth)
+  assert.strictEqual(beats.length, 1, 'heartbeat publishes while active');
+  assert.deepStrictEqual(Object.keys(beats[0]).sort(), ['idleMs', 'ts'], 'heartbeat shape is { ts, idleMs }');
+  assert.strictEqual(beats[0].ts, now, 'ts is the tick moment (epoch ms)');
+  assert.strictEqual(beats[0].idleMs, 0);
+
+  now += ACTIVITY_HEARTBEAT_MS;
+  act.beat(); // a real action keeps the pulse alive
+  tickFn();
+  assert.strictEqual(beats.length, 2, 'steady cadence during activity');
+  assert.strictEqual(beats[1].ts, now);
+  assert.strictEqual(beats[1].idleMs, 0);
+
+  now += LOIS_AWAY_MS; // out of the room: publication stops, honestly silent
+  tickFn();
+  assert.strictEqual(beats.length, 2, 'no heartbeat while idle');
+
+  act.beat(); // back at the instrument: the pulse resumes
+  tickFn();
+  assert.strictEqual(beats.length, 3, 'heartbeat resumes with activity');
+
+  act.stop();
+  assert.strictEqual(clearedWith, 'timer-1', 'stop() clears the heartbeat timer');
+  un();
 }
 
 console.log('ok loisActivity: 7 instruments record real signals only');

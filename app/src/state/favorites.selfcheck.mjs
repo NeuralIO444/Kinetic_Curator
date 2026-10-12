@@ -196,4 +196,36 @@ mem.delete(KEEPS_KEY);
   assert.strictEqual(sanitizeKeepContext('junk'), undefined, 'non-object -> undefined');
 }
 
+// #1390 (G1) — a keep carries an epoch stamp; a legacy record loads
+// unchanged, with no stamp invented for it.
+{
+  const before = Date.now();
+  const captured = captureFavorite(
+    { seed: 987654, seedOffsets: {}, layoutParams: { composition: 'flow' }, enabledAssets: {} },
+    'bone',
+  );
+  const afterTs = Date.now();
+  assert.ok(Number.isFinite(captured.keptAt), 'capture stamps keptAt (epoch ms)');
+  assert.ok(captured.keptAt >= before && captured.keptAt <= afterTs, 'keptAt is the keep moment');
+
+  // the stamp rides through the store and survives a reload, keeps included
+  // (found by seed — earlier blocks share this storage)
+  const a = boot();
+  a.call('addFavorite', captured);
+  const stamped = a.get().favorites.find((f) => f.seed === 987654).keptAt;
+  assert.strictEqual(stamped, captured.keptAt, 'stored favorite carries the capture stamp');
+  const b = boot(); // reload over the same storage
+  assert.strictEqual(b.get().favorites.find((f) => f.seed === 987654).keptAt, stamped, 'keptAt survives a reload');
+  assert.strictEqual(b.get().keeps.find((k) => k.seed === 987654).keptAt, stamped, 'the implied keep carries the same stamp');
+
+  // sanitizer: a real stamp round-trips (floored to whole ms); junk is
+  // dropped whole, never repaired into a plausible time
+  assert.strictEqual(sanitizeFavorite({ seed: 1, keptAt: 1_700_000_000_123, config: {} }).keptAt, 1_700_000_000_123);
+  assert.strictEqual(sanitizeFavorite({ seed: 1, keptAt: 1_700_000_000_123.9, config: {} }).keptAt, 1_700_000_000_123);
+  assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, timestamp: '12:34:56', config: {} })), 'legacy favorite: no keptAt, loads unchanged');
+  assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: 'yesterday', config: {} })), 'string keptAt dropped');
+  assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: -5, config: {} })), 'negative keptAt dropped');
+  assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: NaN, config: {} })), 'NaN keptAt dropped');
+}
+
 console.log('favorites.selfcheck: OK');

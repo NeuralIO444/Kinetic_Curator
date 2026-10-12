@@ -121,7 +121,9 @@ const MUST_LOOP_ALLOW = {
   'src/state/slices/davisSlice.js': {
     // #719: human-readable keep timestamp (HH:MM:SS) for the favorites
     // shelf — metadata, not a performer clock. morphStart itself is loop ms.
-    allow: [/new Date\(\)\.toISOString/],
+    // #1390 (G1): keptAt is the same metadata class — an epoch-ms keep
+    // stamp the cross-day signals read; the performer never reads it.
+    allow: [/new Date\(\)\.toISOString/, /keptAt: new Date\(\)\.getTime\(\)/],
     mustContain: [/morphStart: loopClock\.ms/],
   },
   'src/gl/liveLoop.mjs': {
