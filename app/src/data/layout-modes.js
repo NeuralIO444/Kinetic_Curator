@@ -5,6 +5,7 @@ import { COMPOSITION_PRESETS } from './presets.js';
 import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
+import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
 
 export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
@@ -217,6 +218,15 @@ export const DEFAULT_LAYOUT_PARAMS = {
   audioSwell: 1,
   lifeDrift: 0.35,
   parallax: 0, // #796 diorama drift; 0 = placements bit-identical
+  // #1199 — field→channel MAP (MATH stratum): data drives visual channels.
+  // fieldMapField 'off'|'noise'|'density', fieldMapChannel
+  // 'off'|'weight'|'saturation'|'scale', fieldMapAmount 0..1 dry/wet,
+  // fieldMapCurve 'linear'|'smooth'|'stepped'. All-off is the no-op: a
+  // document that predates #1199 opens exactly as it was saved.
+  fieldMapField: 'off',
+  fieldMapChannel: 'off',
+  fieldMapAmount: 0,
+  fieldMapCurve: 'smooth',
 };
 
 /** #306 — audio envelope response-curve shapes. */
@@ -289,6 +299,7 @@ export const PARAM_SPEC = {
   kinemeDrift: { min: 0, max: 1 },
   kinemePulse: { min: 0, max: 1 },
   kinemePaletteBreath: { min: 0, max: 1 },
+  fieldMapAmount: { min: 0, max: 1 }, // #1199 — MAP row amount, dry/wet
   kinemeBrushWobble: { min: 0, max: 1 },
   kinemeBoilFps: { min: 6, max: 12 },
   tight: { min: 0.05, max: 0.95 },
@@ -588,6 +599,12 @@ export function normalizeLayoutParams(partial) {
   next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
   next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
   next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
+  // #1199 — MAP row enums. Unknown/absent is the no-op ('off'); the amount
+  // clamp rides PARAM_SPEC above. A document that predates #1199 opens with
+  // the map off exactly (defaults are already the no-op).
+  next.fieldMapField = pickEnum(next.fieldMapField, FIELDMAP_FIELDS, 'off');
+  next.fieldMapChannel = pickEnum(next.fieldMapChannel, FIELDMAP_CHANNELS, 'off');
+  next.fieldMapCurve = pickEnum(next.fieldMapCurve, FIELDMAP_CURVES, 'smooth');
 
   return next;
 }

@@ -27,6 +27,7 @@ import { mirrorMultiplier } from '../data/layout-modes.js';
 import { getBiologyPolicy } from '../biology/policy.js';
 import { fadeForAge } from '../biology/lifecycle.js';
 import { sortGlassInstances } from './glassSort.mjs';
+import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import {
   pickWeightedIndexStable,
 } from './kernel/rng.js';
@@ -391,6 +392,29 @@ export function buildPlacements({
       };
     }
   }
+
+  // #1199 — field→channel MAP (MATH stratum): sample the field at each
+  // mark's position and remap the selected visual channel. Runs on the
+  // built items, before the overlap sort, so the small-first order sees
+  // final scales. The hard gate inside applyFieldMap makes the all-off
+  // config a strict no-op (no field built, no math). On the pool path the
+  // colors are refreshed from the bind arrays first: the saturation
+  // channel must always start from the placed color, never last frame's
+  // remapped one (the same no-accumulation rule palette-breath's undo
+  // enforces on the bind cache).
+  if (poolHit) {
+    for (let k = 0; k < soa.n; k++) {
+      const item = mapped[k];
+      item.color = colors[k];
+      item.accent = accents[k];
+    }
+  }
+  applyFieldMap(mapped, sanitizeFieldMap({
+    field: layoutParams.fieldMapField,
+    channel: layoutParams.fieldMapChannel,
+    amount: layoutParams.fieldMapAmount,
+    curve: layoutParams.fieldMapCurve,
+  }), { seed, canvasW, canvasH });
 
   if (!layoutParams.overlap) {
     // `mapped` is already a fresh array we own — no defensive copy needed.
