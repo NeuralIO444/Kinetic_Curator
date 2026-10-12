@@ -169,6 +169,9 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // the heroes; re-rolling colour must not.
   attractor: 'spatial',
   hero: 'spatial',
+  // #1183 palette snap — which marks take the tile's colours is a COLOUR decision: re-rolling colour reshuffles
+  // the snapped set, re-rolling spatial does not.
+  snap: 'color',
 });
 
 const OFFSET_GROUP_OF = new Map([

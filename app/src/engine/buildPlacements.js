@@ -22,6 +22,7 @@ import { applyKinemeDrivers, applyRhythm } from './kineme.js';
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
+import { applyGroundSnap } from './groundSnap.js'; // #1183 palette snap
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
@@ -157,6 +158,9 @@ export function buildPlacements({
   lean = 0,
   // #1183 tile-edge nudge (0..1): marks ease off the edges of the tile beneath them (dish.groundCell). 0 = off.
   nudge = 0,
+  // #1183 palette snap (0..1): the SHARE of marks that take the exact colours of the tile beneath them
+  // (dish.groundRoles). Snapped marks are not leaned. 0 = off.
+  snap = 0,
   // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
@@ -340,8 +344,15 @@ export function buildPlacements({
       };
     }
     fillDishPoints(dish, 'marks', entities);
+    // #1183 palette snap — before the lean, and the snapped marks skip it (snap wins). Fresh arrays, like the
+    // lean: the bind cache keeps the base colours. Re-read per frame, so a drifting ground re-colours the marks.
+    let snapped = null;
+    if (dish.groundRoles && snap > 0) {
+      const sn = applyGroundSnap({ soa, colors, accents, rolesAt: dish.groundRoles, share: snap, seed, seedOffsets });
+      if (sn) { colors = sn.colors; accents = sn.accents; snapped = sn.snapped; }
+    }
     if (dish.ground && lean > 0) {
-      colors = colors.map((c, k) => applyLean(c, dish.ground(soa.x[k], soa.y[k]), lean));
+      colors = colors.map((c, k) => (snapped && snapped[k] ? c : applyLean(c, dish.ground(soa.x[k], soa.y[k]), lean)));
     }
   }
 

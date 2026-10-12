@@ -77,6 +77,33 @@ export function patternGround(pattern, palette, w, h) {
       return mainColor(hero >= 0 && grid.heroes && grid.heroes[hero] ? grid.heroes[hero] : grid.tiles[i], grid);
     },
     /**
+     * #1183 palette snap — the ROLE colours of the tile under scene point (x, y) at loop time t: the colours that
+     * tile is actually painted in, MAIN first (the same main colour `at` returns), its ground left out (the flat
+     * background every tile shares: a mark snapped to it would vanish), de-duplicated, lower-cased. A QUILT hero block
+     * gives the block's colours. Never empty: a tile with nothing but ground falls back to [main colour].
+     */
+    roles(x, y, t = 0) {
+      const off = panOffset(p.seed, p.drift, p.drift > 0 ? Number(t) || 0 : 0);
+      const tc = ((Math.floor(x / tileW + off.x) % grid.cols) + grid.cols) % grid.cols;
+      const tr = ((Math.floor(y / tileW + off.y) % grid.rows) + grid.rows) % grid.rows;
+      const i = tr * grid.cols + tc;
+      const hero = grid.heroAt ? grid.heroAt[i] : -1;
+      const tile = hero >= 0 && grid.heroes && grid.heroes[hero] ? grid.heroes[hero] : grid.tiles[i];
+      const main = String(mainColor(tile, grid)).toLowerCase();
+      let ground = grid.ground;
+      let all = [];
+      if (tile && Array.isArray(tile.colors)) { ground = tile.colors[0]; all = tile.colors.slice(1); }
+      else if (tile && tile.roles) { ground = tile.roles.ground; all = [tile.roles.mark, tile.roles.accent, tile.roles.cut]; }
+      const g = typeof ground === 'string' ? ground.toLowerCase() : null;
+      const out = [main];
+      for (const c of all) {
+        if (typeof c !== 'string') continue;
+        const lc = c.toLowerCase();
+        if (lc !== g && !out.includes(lc)) out.push(lc);
+      }
+      return out;
+    },
+    /**
      * #1183 tile-edge nudge — WHERE inside its tile scene point (x, y) sits at loop time t: `{ u, v, size }`, with
      * u, v in [0, 1) across the tile and `size` its side in scene units. A QUILT 2x2 hero block is one tile here (the
      * marks feel the block's edges, not the hidden cells'). Same grid, same pan as `at`, so the two never disagree.

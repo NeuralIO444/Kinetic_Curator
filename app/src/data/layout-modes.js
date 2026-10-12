@@ -175,6 +175,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   groundNudge: 0,
   // #1183 — contact shadow: marks cast a soft shadow onto what lies beneath them (needs a PATTERN below). 0 = off.
   groundShadow: 0,
+  // #1183 — palette snap: the share of marks that take the exact colours of the PATTERN tile beneath them. 0 = off.
+  groundSnap: 0,
   kinemeBreath: 0.3,
   kinemeDrift: 0.5,
   kinemePulse: 0,
@@ -315,6 +317,7 @@ export const PARAM_SPEC = {
   groundLean: { min: 0, max: 1 },
   groundNudge: { min: 0, max: 1 },
   groundShadow: { min: 0, max: 1 },
+  groundSnap: { min: 0, max: 1 },
   kinemeBreath: { min: 0, max: 1 },
   kinemeDrift: { min: 0, max: 1 },
   kinemePulse: { min: 0, max: 1 },
