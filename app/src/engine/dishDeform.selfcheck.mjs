@@ -25,7 +25,7 @@ import {
 } from './dishDeform.mjs';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
-import { buildSceneContract, dishDeformShed } from '../gl/sceneContract.js';
+import { buildSceneContract, dishDeformShed, assertSceneContract } from '../gl/sceneContract.js';
 import { packInstanceData } from '../gl/renderer.mjs';
 import { QUAD_VS } from '../gl/shaders.mjs';
 import { getCostTier, tier1ShedIds } from '../gl/costTiers.mjs';
@@ -226,6 +226,22 @@ const assertSamePhysics = (a, b, label) => {
     doc: docFor({ perfTier1: true, quality: 'balanced' }), resolvedLayers: rl, caps: null,
   });
   assert.deepEqual(half.instances[0].deform, [0.6, 0.8, 0.3], 'tier-1 shed alone does not shed deform');
+
+  // a wobble the contract's 3-place rounding would turn into 0 carries NO key (it used to throw "deform amount must
+  // be in (0, 1]" on every such frame, which stalled RENDER MOVIE: the capture never got a clean frame)
+  for (const amt of [0.00001, 0.0003, 0.00049]) {
+    const tiny = buildSceneContract({
+      doc: docFor(), caps: null,
+      resolvedLayers: [{ ...rl[0], items: [{ ...item, deformAmt: amt }] }],
+    });
+    assert.ok(!('deform' in tiny.instances[0]), `amount ${amt} rounds to rest: no deform key`);
+    assert.doesNotThrow(() => assertSceneContract(tiny), `amount ${amt} must pass the contract check`);
+  }
+  const edge = buildSceneContract({
+    doc: docFor(), caps: null, resolvedLayers: [{ ...rl[0], items: [{ ...item, deformAmt: 0.0006 }] }],
+  });
+  assert.deepEqual(edge.instances[0].deform, [0.6, 0.8, 0.001], '0.0006 rounds to 0.001 and is kept');
+  assert.doesNotThrow(() => assertSceneContract(edge));
 }
 
 // (f) — the render path: the attribute exists, gated, and the packer

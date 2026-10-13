@@ -104,7 +104,10 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     // only on a body that is actually dented or wobbling, and never when
     // shed, so an undeformed contract (and its hash) is exactly what it
     // was before B1.
-    ...(item.deformAmt > 0 && !deformShed
+    // The amount is rounded to 3 places like every contract number, so a wobble under 0.0005 would round to 0
+    // and fail the (0, 1] check below on EVERY frame it rode (the capture never got a clean frame): such a
+    // body is simply at rest and carries no key.
+    ...(!deformShed && r3(Math.min(1, item.deformAmt || 0)) > 0
       ? { deform: [r3(item.deformAxisX || 0), r3(item.deformAxisY || 0), r3(Math.min(1, item.deformAmt))] }
       : {}),
   };
