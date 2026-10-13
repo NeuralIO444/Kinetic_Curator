@@ -37,7 +37,6 @@ export function CuratorBar() {
   const lockCount = useStore((s) => Object.values(s.lockedParams || {}).filter(Boolean).length);
   const armedMode = useStore((s) => s.armedMode);
   const armedMotion = useStore((s) => s.armedMotion);
-  const clearRollScope = useStore((s) => s.clearRollScope);
   const keepsCount = useStore((s) => s.keeps?.length ?? 0);
   const favoritesCount = useStore((s) => s.favorites?.length ?? 0);
   const [voice, setVoice] = useState(getActivePersonaId() ?? 'off');
@@ -289,7 +288,7 @@ export function CuratorBar() {
             data-subdued={subdued('locks', true)}
             title={lockTitle}
             aria-label="disarm roll scope"
-            onClick={(e) => { e.stopPropagation(); clearRollScope(); }}
+            onClick={(e) => { e.stopPropagation(); emit(Events.ROLL_SCOPE_CLEAR); }}
           >
             {lockPillInner}
           </button>

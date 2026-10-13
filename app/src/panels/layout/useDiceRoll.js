@@ -14,6 +14,7 @@ import { readCrowns, recordCrown } from '../../curator/diceCrowns.js';
 import { loisActivity } from '../../curator/loisActivity.js';
 import { resolveDavisState } from '../../curator/davisState.js';
 import { captureKeepContext } from '../../curator/keepContext.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 // The scorer is an interface ({ id, score }) — the MLX head swaps in here later.
@@ -22,9 +23,6 @@ const scorer = createPersonaScorer({ assetsById });
 /** Owns the tray state. Render <DiceTile/> last in the mode grid, <DiceTray/> below it. */
 export function useDiceRoll() {
   const [tray, setTray] = useState(null);
-  const loadStubMode = useStore((s) => s.loadStubMode);
-  const loadDiceCast = useStore((s) => s.loadDiceCast);
-  const addKeep = useStore((s) => s.addKeep);
 
   const roll = () => {
     const davisCode = resolveDavisState(loisActivity.snapshot())?.code ?? null;
@@ -34,12 +32,12 @@ export function useDiceRoll() {
   const crown = (finalist) => {
     const s = useStore.getState();
     // Layout axis rides the MIX road; shapes swap once, undoable.
-    loadStubMode(finalist.layoutId);
-    loadDiceCast(finalist.assetIds);
+    emit(Events.MODE_LOAD, { id: finalist.layoutId });
+    emit(Events.DICE_CAST, { assetIds: finalist.assetIds });
     // The keep ledger: what was crowned, as crowned (not a mid-blend snapshot).
     // #1140 — same record contract as captureFavorite: stream offsets (#305)
     // plus the session context. The crown used to drop the offsets.
-    addKeep({
+    emit(Events.KEEP_ADD, { keep: {
       seed: s.seed,
       seedOffsets: { ...(s.seedOffsets || {}) },
       timestamp: new Date().toISOString(),
@@ -49,7 +47,7 @@ export function useDiceRoll() {
         palette: { id: s.paletteId },
         assets: [...finalist.assetIds],
       },
-    });
+    } });
     // The dice's own log: the learned-compatibility training data.
     recordCrown({ layoutId: finalist.layoutId, assetIds: finalist.assetIds, davisCode: tray?.davisCode ?? null });
     setTray(null);

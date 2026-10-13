@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { useStore } from '../../state/store.js';
 import { MAX_USER_VOICES } from '../../state/slices/voiceSlice.js';
 import { isEarned } from '../../state/earnedVoices.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
 const LONG_PRESS_MS = 650;
 
@@ -89,16 +90,13 @@ export function VoicesShelf() {
   // the shelf is the performer's own hands; finds the triad minted live in DIRECTORS and are frozen history (#1153)
   const userVoices = useStore((s) => s.userVoices).filter((v) => !isEarned(v));
   const activeVoiceId = useStore((s) => s.activeVoiceId);
-  const loadVoice = useStore((s) => s.loadVoice);
   const captureUserVoice = useStore((s) => s.captureUserVoice);
-  const renameUserVoice = useStore((s) => s.renameUserVoice);
   const overwriteUserVoice = useStore((s) => s.overwriteUserVoice);
-  const deleteUserVoice = useStore((s) => s.deleteUserVoice);
 
   const shelfFull = userVoices.length >= MAX_USER_VOICES;
 
   const confirmDelete = (voice) => {
-    if (window.confirm(`Delete voice "${voice.name}"?`)) deleteUserVoice(voice.id);
+    if (window.confirm(`Delete voice "${voice.name}"?`)) emit(Events.VOICE_DELETE, { id: voice.id });
   };
 
   return (
@@ -110,9 +108,9 @@ export function VoicesShelf() {
             key={v.id}
             voice={v}
             active={activeVoiceId === v.id}
-            onTap={() => loadVoice(v.id)}
+            onTap={() => emit(Events.VOICE_LOAD, { id: v.id })}
             onOverwrite={() => overwriteUserVoice(v.id)}
-            onRename={(name) => renameUserVoice(v.id, name)}
+            onRename={(name) => emit(Events.VOICE_RENAME, { id: v.id, name })}
             onDelete={() => confirmDelete(v)}
           />
         ))}

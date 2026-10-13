@@ -10,6 +10,7 @@ import { useStore } from '../../state/store.js';
 import { FLAGSHIP_VOICES } from '../../data/voices.js';
 import { earnedVoices } from '../../state/earnedVoices.js';
 import { MixBar } from '../layout/MixBar.jsx';
+import { emit, Events } from '../../composition/eventBus.js';
 
 // the one built-in left in the picker: the first flagship, as the starter
 const STARTER = FLAGSHIP_VOICES[0];
@@ -29,9 +30,10 @@ function Tile({ id, swatches, name, line, title, active, kind, onTap }) {
   );
 }
 
+const loadVoice = (id) => emit(Events.VOICE_LOAD, { id });
+
 export function VoiceTiles() {
   const activeVoiceId = useStore((s) => s.activeVoiceId);
-  const loadVoice = useStore((s) => s.loadVoice);
   const userVoices = useStore((s) => s.userVoices);
   const found = earnedVoices(userVoices);
   return (

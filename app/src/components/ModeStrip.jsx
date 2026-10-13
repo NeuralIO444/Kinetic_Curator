@@ -15,6 +15,7 @@
 import { useStore } from '../state/store.js';
 import { LAYOUT_MODES } from '../data/layout-modes.js';
 import { MOTION_MODES, isMotionActive } from '../data/voices.js';
+import { emit, Events } from '../composition/eventBus.js';
 
 const MODE_FAVORITES = LAYOUT_MODES.slice(0, 4);
 
@@ -25,7 +26,6 @@ export function ModeStrip() {
   const armedMotion = useStore((s) => s.armedMotion);
   const toggleArmMode = useStore((s) => s.toggleArmMode);
   const toggleArmMotion = useStore((s) => s.toggleArmMotion);
-  const clearRollScope = useStore((s) => s.clearRollScope);
   const anyArmed = armedMode != null || armedMotion != null;
 
   return (
@@ -76,7 +76,7 @@ export function ModeStrip() {
         <button
           type="button"
           className="scope-clear"
-          onClick={clearRollScope}
+          onClick={() => emit(Events.ROLL_SCOPE_CLEAR)}
           title="Clear roll scope — back to full-freedom rolls"
           aria-label="Clear roll scope"
         >

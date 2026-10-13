@@ -234,6 +234,16 @@ export function useApp(selector) {
       case A.SWAP_CANVAS_ORIENTATION: return store.swapCanvasOrientation();
       case A.SET_FXAA: return store.setFxaa(action.on);
       case A.SET_WEAVE: return store.setWeave(action.on);
+      case A.LOAD_VOICE: return store.loadVoice(action.id);
+      case A.DELETE_USER_VOICE: return store.deleteUserVoice(action.id);
+      case A.RENAME_USER_VOICE: return store.renameUserVoice(action.id, action.name);
+      case A.SET_VOICE_MIX_T: return store.setVoiceMixT(action.t);
+      case A.LOAD_STUB_MODE: return store.loadStubMode(action.id);
+      case A.LOAD_MOTION: return store.loadMotion(action.id);
+      case A.LOAD_SHAPE_SET: return store.loadShapeSet(action.id);
+      case A.CYCLE_SHAPE_LEVEL: return store.cycleShapeLevel(action.id);
+      case A.LOAD_DICE_CAST: return store.loadDiceCast(action.assetIds);
+      case A.CLEAR_ROLL_SCOPE: return store.clearRollScope();
       default: console.warn('Unhandled action:', type);
     }
   }, []);
