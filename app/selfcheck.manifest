@@ -369,3 +369,7 @@ node src/composition/clockBus.selfcheck.mjs
 node src/gl/audioEvents.selfcheck.mjs
 node src/composition/audioBus.selfcheck.mjs
 node src/curator/paceLive.selfcheck.mjs
+node src/curator/beatLibrary.selfcheck.mjs
+node src/curator/beatPlayer.selfcheck.mjs
+node src/curator/sourceArbiter.selfcheck.mjs
+node src/curator/setLive.selfcheck.mjs

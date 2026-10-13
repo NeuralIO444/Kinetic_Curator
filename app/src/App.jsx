@@ -41,6 +41,8 @@ import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomPro
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
+import { createSet } from './curator/setLive.js'; // #1475: her set
+import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels } from './hooks/audioMeterTap.js';
@@ -117,13 +119,24 @@ function AppInner() {
     setRoomProvider(roomNow);
     // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
     const stopPace = startPace({ getBpm: () => useStore.getState().beatBpm, context: roomNow });
+    // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
+    // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
+    const set = createSet({
+      getBpm: () => useStore.getState().beatBpm,
+      getIdleMs: () => loisActivity.snapshot().idleMs,
+      getRealLevel: () => { const b = useStore.getState().audioEnabled ? readMeterBandLevels() : null; return b ? Object.values(b).reduce((x, v) => x + v, 0) / Object.keys(b).length : 0; },
+      getRoom: () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; },
+      getBand: () => getStressState().band,
+      getSeed: () => useStore.getState().seed,
+    });
+    setSourceFeed(set.feed);
     const unKeep = loisActivity.onKeep(noteKeep); // #1356 step 5: remember the living moths' traits at a keep
     const stop = initStress({
       getCounts: loisActivity.pressureCounts,
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({
