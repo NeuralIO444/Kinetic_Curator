@@ -115,8 +115,8 @@ const ring = (cx, cy, n, r) => Array.from({ length: n }, (_, i) => ({ x: cx + r 
   const src = readFileSync(new URL('./dishPressure.js', import.meta.url), 'utf8');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/.test(src));
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  // #1355 step 3: the one frame tap feeds dish pressure first, then the formation rule
-  assert.ok(/setResolveFrameTap\(\(input, output\) => \{\s*observeDish\(input, output\);/.test(app) && /getDish: getDishPressure/.test(app), 'App feeds dish pressure to the stress tracker');
+  // #1355 step 3: the one frame tap feeds dish pressure, then the formation rule (the clock, #1458, also rides it)
+  assert.ok(/setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeDish\(input, output\);[\s\S]*?observeFormation\(input, output\);/.test(app) && /getDish: getDishPressure/.test(app), 'App feeds dish pressure to the stress tracker');
 }
 
 console.log('dishPressure.selfcheck: ok (#1355 step 2, dish pressure)');
