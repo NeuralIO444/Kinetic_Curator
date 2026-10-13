@@ -31,19 +31,22 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **Offline swarm needs a bake** | `studio/` replays swarm deterministically (#63). The live canvas keeps its RAF loop for pointer response, so the two agree only for the same seed and step count. |
 | **`plus-lighter` in finals** | The GL backend maps `plus-lighter` → `screen` and records the substitution in the sidecar (#96). The old resvg path (which couldn't do it at all) is retired. |
 
-## Found in the 2026-10-13 sweep
+## Closed in the 2026-10-13 sweep
 
-Open items. "Needs Matt" means a design or ordering decision, not just code.
+| Item | Resolution |
+|------|-----------|
+| **Worker path lacks resolver inputs** (17 live inputs never reached `renderWorker.js`) | **Retired** (#1447). The opt-in OffscreenCanvas path (`renderWorker.js`, `workerLiveLoop.js`) is removed; KC-1 runs on the single in-thread loop. The kernel worker (iPad probe) is separate and stays. |
+| **Noto icon module unwired and not valid JS** | **Deleted** (#1448). Icons stay Matt-only (#346). |
+| **Unreferenced modules** | **Partial** (#1448). Deleted `AssetSpriteSheet.jsx` and `TemplateEffectControls.mjs`. Kept `gl/shapeDither.mjs`, `data/firstLight.js`, `data/cellKinemes.js` for future wiring. |
+| **Rust advisory scanning** | **Added** (advisory-audit CI job): `npm audit --omit=dev` and `cargo audit` on the Rust crates. Informational, not a required check. |
+| **Four moths can overlap at count 4** | **Accepted as intentional.** No code change. |
 
-| Item | Where | Status |
-|------|-------|--------|
-| **Worker path lacks resolver inputs** | `renderWorker.js` vs `liveLoop.mjs` — 17 live inputs not passed (canvasW/canvasH, reducedMotion, scaleMul/alphaBoost/effective*, soloStash, creature inputs). Pinned by `gl/resolverInputParity.selfcheck.mjs`. | Needs Matt: restore parity or retire the opt-in worker path |
-| **Noto icon module is unwired and not valid JS** | `src/icons/notoIcons.js` has JSX in a `.js` file, no importer, and uses `⚡` (design system retired emoji). | Needs Matt (icons are Matt-only, #346) |
-| **Dead-by-design stubs** | `midi/learnDeferred.mjs`, `panels/pipeline/syphonDeferred.js` — seams for #617 / #608, selfchecked in `deferredStubs.selfcheck.mjs`. | Intentional; waits on the deferred pile |
-| **Unreferenced data/UI modules** | `gl/shapeDither.mjs`, `data/firstLight.js`, `data/cellKinemes.js`, `components/AssetSpriteSheet.jsx`, `gl/effects/TemplateEffectControls.mjs` — only selfchecks import them. | Needs Matt: wire or delete |
-| **Dev-dependency advisories** | `npm audit` lists @babel/core, browserslist, nanoid, brace-expansion etc.; `npm audit --omit=dev` is clean. Fixable with `npm audit fix`. | Safe; not applied (lockfile churn) |
-| **Four moths can overlap at count 4** | Auto spawn gap is 0.32 of the shorter side; wings are wider than the gap at large wing traits. | Needs Matt (feel) |
-| **`cargo-audit` not installed** | Rust crates (`kc-fields`, `kc-neighbor`) are not advisory-scanned. | Tooling gap |
+## Open
+
+| Item | Status |
+|------|--------|
+| **Dev-dependency advisories** (`@babel/core`, `browserslist`, `nanoid`, ...) | Low. `npm audit fix` when convenient; not applied to avoid lockfile churn. `npm audit --omit=dev` is clean. |
+| **Deferred seams** (`midi/learnDeferred.mjs`, `panels/pipeline/syphonDeferred.js`) | Intentional; wait on #617 / #608. |
 
 ## Fixed in 0.8.0 (reference)
 
@@ -71,4 +74,4 @@ Open items. "Needs Matt" means a design or ordering decision, not just code.
 - Chip-stutter pair: continuous life-drift phase (#431 / PR #435), integrated warp phase (#432 / PR #436)
 - Unwired selfcheck suites now in manifest: `evalContext`, `itemMorph`, `feedLive` (#438)
 
-*Last updated: 2026-10-13 — sweep added above (worker parity, unwired modules, advisories). #422 status unchanged.*
+*Last updated: 2026-10-13 — sweep closed out.*
