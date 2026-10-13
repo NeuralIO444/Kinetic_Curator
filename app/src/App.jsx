@@ -41,6 +41,8 @@ import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomPro
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
+import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
+import { readMeterBandLevels } from './hooks/audioMeterTap.js';
 import { observeClock } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
 import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider } from './gl/resolveTap.mjs';
 import { observeSpawn } from './curator/spawnLive.js'; // #1355: auto spawn finds each creature's home
@@ -91,6 +93,8 @@ function AppInner() {
     setResolveFrameTap((input, output) => {
       // #1458: musical time on the loop clock (one call a frame; bus events only on whole beats and bars)
       observeClock(input && input.loopTimeMs, useStore.getState().beatBpm);
+      // #1459: discrete audio detections (onset, tempo, energy, silence) from the meter's band levels
+      observeAudio(input && input.loopTimeMs, readMeterBandLevels(), useStore.getState().audioSource && useStore.getState().audioSource.type);
       observeDish(input, output);
       observeFormation(input, output);
       // #1355 AUTO SPAWN: each creature the artist asked for finds a home in the middle of the dish. The homes are
