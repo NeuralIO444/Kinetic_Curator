@@ -1,4 +1,5 @@
 import { useStore } from "../../state/store.js";
+import { emit, Events } from "../../composition/eventBus.js";
 import { helpText } from "../../data/helpCopy.js";
 import { DsMatrix } from "./ds.jsx";
 
@@ -6,12 +7,13 @@ import { DsMatrix } from "./ds.jsx";
 // Both are per-machine (their own localStorage keys), never project content.
 // FXAA applies to the live canvas and to exports (what you see is what you
 // export); gate weave is live-only — recordings get it, stills stay exact.
+const setFxaa = (on) => emit(Events.DISPLAY_FXAA, { on });
+const setWeave = (on) => emit(Events.DISPLAY_WEAVE, { on });
+
 export function DisplayBlock() {
   const fxaa = useStore((s) => s.fxaa);
-  const setFxaa = useStore((s) => s.setFxaa);
   const shed = useStore((s) => s.fxaaShed);
   const weave = useStore((s) => s.weave);
-  const setWeave = useStore((s) => s.setWeave);
   return (
     <>
       <div className="pipeline-row" title={helpText("output-fxaa")}>

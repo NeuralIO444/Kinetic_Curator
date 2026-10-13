@@ -131,6 +131,16 @@ export const Events = {
   QUEUE_SOURCE: 'queue:source', // { source } autoplay clock: seconds | beats
   QUEUE_SECONDS: 'queue:secondsPerHit', // { seconds }
   QUEUE_BEATS: 'queue:beatsPerHit', // { beats }
+  CANVAS_PRESET: 'canvas:preset', // { id } apply a canvas preset
+  CANVAS_PRESET_SAVE: 'canvas:presetSave', // { label } save the current raster as a user preset
+  CANVAS_PRESET_DELETE: 'canvas:presetDelete', // { id }
+  CANVAS_PRESET_RENAME: 'canvas:presetRename', // { id, label }
+  CANVAS_PRESETS_LOAD: 'canvas:presetsLoad', // read the user presets from disk
+  CANVAS_FPS: 'canvas:fps', // { fps } capture fps
+  CANVAS_ASPECT_LOCK: 'canvas:aspectLock', // { on }
+  CANVAS_SWAP: 'canvas:swap', // swap width and height
+  DISPLAY_FXAA: 'display:fxaa', // { on } per-machine FXAA
+  DISPLAY_WEAVE: 'display:weave', // { on } per-machine gate weave
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
