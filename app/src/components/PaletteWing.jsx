@@ -7,8 +7,7 @@
 // unsaved overrides; Save snapshots them into a named user: palette.
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { useStore } from '../state/store.js';
-import * as A from '../state/actions.js';
+import { emit, Events } from '../composition/eventBus.js';
 import { buildHarmony, applyWithLocks, SCHEME_IDS } from '../engine/harmony.js';
 import {
   paletteToExportJson,
@@ -31,8 +30,7 @@ function downloadJson(filename, obj) {
 }
 
 export function PaletteWing({ open, onClose }) {
-  const { dispatch, palette, userPalettes, paletteLocks } = useApp();
-  const setPaletteOverrides = useStore((s) => s.setPaletteOverrides);
+  const { palette, userPalettes, paletteLocks } = useApp();
   // The name field is the most important control in the panel (#953 Lois
   // pass): a palette without a name doesn't save. No "Palette 1" defaults.
   const [name, setName] = useState('');
@@ -56,14 +54,14 @@ export function PaletteWing({ open, onClose }) {
     const seed = randomSeedHex();
     const generated = buildHarmony(seed, scheme, swatches.length);
     const next = applyWithLocks(swatches, generated, paletteLocks);
-    setPaletteOverrides({ swatches: next });
+    emit(Events.PALETTE_OVERRIDES, { swatches: next });
     setLastGen(`${scheme.toUpperCase()} · ${seed}`);
     setMsg('');
   };
 
   const save = () => {
     if (!canSave) return;
-    dispatch({ type: A.SAVE_USER_PALETTE, name: name.trim() });
+    emit(Events.PALETTE_SAVE, { name: name.trim() });
     setName('');
     setMsg(`Saved “${name.trim()}” — it's in the strip and the KIN roll.`);
   };
@@ -86,7 +84,7 @@ export function PaletteWing({ open, onClose }) {
         setMsg('Nothing usable in that file — palettes need a colors array.');
         return;
       }
-      dispatch({ type: A.IMPORT_USER_PALETTES, payload: list });
+      emit(Events.PALETTE_IMPORT, list);
       setMsg(`Imported ${list.length} palette${list.length > 1 ? 's' : ''} — ${list.map((p) => p.name).join(', ')}`);
     };
     reader.readAsText(file);
@@ -125,17 +123,17 @@ export function PaletteWing({ open, onClose }) {
               type="color"
               className="palette-color-input"
               value={sw}
-              onChange={(e) => dispatch({ type: A.SET_PALETTE_SWATCH, index: i, hex: e.target.value })}
+              onChange={(e) => emit(Events.PALETTE_SWATCH, { index: i, hex: e.target.value })}
             />
           </label>
         ))}
         <label className="palette-wing-sw meta" style={{ background: palette.bg }} title={`BG ${palette.bg}`}>
           <span className="palette-wing-sw-tag">BG</span>
-          <input type="color" className="palette-color-input" value={palette.bg} onChange={(e) => dispatch({ type: A.SET_PALETTE_BG, payload: e.target.value })} />
+          <input type="color" className="palette-color-input" value={palette.bg} onChange={(e) => emit(Events.PALETTE_BG, { hex: e.target.value })} />
         </label>
         <label className="palette-wing-sw meta" style={{ background: palette.ink }} title={`INK ${palette.ink}`}>
           <span className="palette-wing-sw-tag">INK</span>
-          <input type="color" className="palette-color-input" value={palette.ink} onChange={(e) => dispatch({ type: A.SET_PALETTE_INK, payload: e.target.value })} />
+          <input type="color" className="palette-color-input" value={palette.ink} onChange={(e) => emit(Events.PALETTE_INK, { hex: e.target.value })} />
         </label>
       </div>
 
@@ -149,7 +147,7 @@ export function PaletteWing({ open, onClose }) {
         >
           ↓ save
         </button>
-        <button type="button" className="palette-wing-btn act" onClick={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })} title="Drop unsaved tweaks, back to the catalog">
+        <button type="button" className="palette-wing-btn act" onClick={() => emit(Events.PALETTE_CLEAR_OVERRIDES)} title="Drop unsaved tweaks, back to the catalog">
           ↻ reset
         </button>
       </div>
@@ -176,7 +174,7 @@ export function PaletteWing({ open, onClose }) {
             <button
               type="button"
               className="palette-wing-lib-load"
-              onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })}
+              onClick={() => emit(Events.PALETTE_SET_ID, { id: p.id })}
               title={`Load ${p.name}`}
             >
               <span className="palette-wing-lib-swatches">
@@ -189,7 +187,7 @@ export function PaletteWing({ open, onClose }) {
             <button
               type="button"
               className="palette-wing-lib-del"
-              onClick={() => dispatch({ type: A.DELETE_USER_PALETTE, id: p.id })}
+              onClick={() => emit(Events.PALETTE_DELETE, { id: p.id })}
               title={`Delete ${p.name}`}
             >
               ×

@@ -109,6 +109,16 @@ export function wireEventBus(rawDispatch) {
   on(Events.MATH_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.MATH_EFFECT_SET_PARAM, layerId, index, key, value }));
   on(Events.MATH_EFFECT_SET_MOD, ({ layerId, index, key, mod }) => dispatch({ type: A.MATH_EFFECT_SET_MOD, layerId, index, key, mod }));
 
+  on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
+  on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));
+  on(Events.PALETTE_SET_ID, ({ id }) => dispatch({ type: A.SET_PALETTE_ID, payload: id }));
+  on(Events.PALETTE_SWATCH, ({ index, hex }) => dispatch({ type: A.SET_PALETTE_SWATCH, index, hex }));
+  on(Events.PALETTE_BG, ({ hex }) => dispatch({ type: A.SET_PALETTE_BG, payload: hex }));
+  on(Events.PALETTE_INK, ({ hex }) => dispatch({ type: A.SET_PALETTE_INK, payload: hex }));
+  on(Events.PALETTE_OVERRIDES, (overrides) => dispatch({ type: A.SET_PALETTE_OVERRIDES, overrides }));
+  on(Events.PALETTE_CLEAR_OVERRIDES, () => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES }));
+  on(Events.PALETTE_COLOR_MODE, ({ mode }) => dispatch({ type: A.SET_COLOR_MODE, payload: mode }));
+  on(Events.RUN_SET, ({ running }) => dispatch({ type: A.SET_RUNNING, payload: !!running }));
   on(Events.PALETTE_IMPORT, (list) => dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
   on(Events.PALETTE_LOCK, ({ index, clear }) => dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }));
   on(Events.PALETTE_HARMONY, ({ scheme }) => dispatch({ type: A.APPLY_HARMONY, scheme }));

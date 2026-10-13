@@ -101,7 +101,17 @@ export const Events = {
   MATH_EFFECT_SET_KIND: 'math:effectSetKind',
   MATH_EFFECT_SET_PARAM: 'math:effectSetParam',
   MATH_EFFECT_SET_MOD: 'math:effectSetMod',
+  PALETTE_SAVE: 'palette:save',
+  PALETTE_DELETE: 'palette:delete',
   PALETTE_IMPORT: 'palette:import',
+  PALETTE_SET_ID: 'palette:setId', // { id }
+  PALETTE_SWATCH: 'palette:swatch', // { index, hex }
+  PALETTE_BG: 'palette:bg', // { hex }
+  PALETTE_INK: 'palette:ink', // { hex }
+  PALETTE_OVERRIDES: 'palette:overrides', // { swatches?, bg?, ink? } the Wing's generate
+  PALETTE_CLEAR_OVERRIDES: 'palette:clearOverrides',
+  PALETTE_COLOR_MODE: 'palette:colorMode', // { mode }
+  RUN_SET: 'run:set', // { running } the run / pause button
   PALETTE_LOCK: 'palette:lock',
   PALETTE_HARMONY: 'palette:harmony',
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted

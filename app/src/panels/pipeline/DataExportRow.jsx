@@ -290,7 +290,7 @@ export function DataExportRow({
     const given = (name) => p[name]?.given;
     if (p.userPalettes?.ok) {
       // Palettes MERGE through the palette importer (the same one ↑ IMPORT uses for palette files).
-      useStore.getState().importUserPalettes(p.userPalettes.value);
+      emit(Events.PALETTE_IMPORT, p.userPalettes.value);
       counts.userPalettes = {
         kept: paletteImportCount(p.userPalettes.value),
         given: given("userPalettes"),

@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { useHotkeys } from '../hooks/useHotkeys.js';
-import * as A from '../state/actions.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { SCHEME_IDS } from '../engine/harmony.js';
 import { chipWindowStart } from './paletteChipWindow.mjs';
@@ -91,7 +90,7 @@ function TasteDiamond() {
 }
 
 export function PaletteStrip() {
-  const { dispatch, palette, palettes, paletteLocks } = useApp();
+  const { palette, palettes, paletteLocks } = useApp();
   const [harmonyScheme, setHarmonyScheme] = useState('analogous');
   const [wingOpen, setWingOpen] = useState(false); // #953 — the palette lab wing
   // #624 + #625 — the color mode lives in the store now: the GL loop reads it to
@@ -166,7 +165,7 @@ export function PaletteStrip() {
     e.preventDefault();
     e.stopPropagation();
     const i = COLOR_MODES.indexOf(colorMode);
-    dispatch({ type: A.SET_COLOR_MODE, payload: COLOR_MODES[(i + 1) % COLOR_MODES.length] });
+    emit(Events.PALETTE_COLOR_MODE, { mode: COLOR_MODES[(i + 1) % COLOR_MODES.length] });
   };
 
   const chips = visible.map((p, i) => {
@@ -183,10 +182,10 @@ export function PaletteStrip() {
             dirty={!!palette.dirty}
             locks={paletteLocks}
             onLock={(i) => emit(Events.PALETTE_LOCK, { index: i })}
-            onSwatch={(i, hex) => dispatch({ type: A.SET_PALETTE_SWATCH, index: i, hex })}
-            onBg={(hex) => dispatch({ type: A.SET_PALETTE_BG, payload: hex })}
-            onInk={(hex) => dispatch({ type: A.SET_PALETTE_INK, payload: hex })}
-            onReset={() => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES })}
+            onSwatch={(i, hex) => emit(Events.PALETTE_SWATCH, { index: i, hex })}
+            onBg={(hex) => emit(Events.PALETTE_BG, { hex })}
+            onInk={(hex) => emit(Events.PALETTE_INK, { hex })}
+            onReset={() => emit(Events.PALETTE_CLEAR_OVERRIDES)}
           />
           <span className="palette-chip-name">{p.name}</span>
         </div>
@@ -194,7 +193,7 @@ export function PaletteStrip() {
     }
     return (
       <span key={p.id} className="palette-chip-wrap">
-        <button type="button" className="palette-chip" data-fit={fit > 0 ? fit : undefined} onClick={() => dispatch({ type: A.SET_PALETTE_ID, payload: p.id })} title={`${p.name} — key ${i + 1}`}>
+        <button type="button" className="palette-chip" data-fit={fit > 0 ? fit : undefined} onClick={() => emit(Events.PALETTE_SET_ID, { id: p.id })} title={`${p.name} — key ${i + 1}`}>
           {num}
           <CompactSwatches swatches={p.swatches || []} />
           <span className="palette-chip-name">{p.name}</span>
@@ -211,7 +210,7 @@ export function PaletteStrip() {
     if (e.target?.closest?.('.favorites-tray')) return;
     const p = visible[i];
     if (!p || p.id === palette.id) return;
-    dispatch({ type: A.SET_PALETTE_ID, payload: p.id });
+    emit(Events.PALETTE_SET_ID, { id: p.id });
   };
   useHotkeys({
     1: (e) => selectChipByIndex(e, 0),
