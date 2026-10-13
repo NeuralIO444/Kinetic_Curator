@@ -57,7 +57,7 @@ assert.strictEqual(curatePaletteTarget({ phase: PHASE_EXPLORE, profile: davis, p
   S().applyProject({ seed: 9, paletteId: 'praystation', layoutParams: {} });
   assert.strictEqual(S().paletteChosen, false, 'a loaded project\'s palette is the document\'s');
 
-  const ctx = readFileSync(new URL('../state/AppContext.jsx', import.meta.url), 'utf8');
+  const ctx = readFileSync(new URL('../state/applyAction.js', import.meta.url), 'utf8'); // the action switch (was in AppContext)
   for (const t of ['SET_PALETTE_ID', 'SET_PALETTE_SWATCH', 'SET_PALETTE_BG', 'SET_PALETTE_INK', 'CLEAR_PALETTE_OVERRIDES', 'APPLY_HARMONY']) {
     assert.match(ctx, new RegExp(`case A\\.${t}: store\\.markPaletteChosen\\(\\); return `), `the artist's ${t} marks the palette chosen`);
   }

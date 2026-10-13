@@ -68,6 +68,7 @@ export const createAudioSlice = (set) => ({
    * default, `fn` receives a copy of it, so the first edit customises the table.
    */
   editAudioRoutes: (fn, continuous = false) => set((state) => {
+    if (typeof fn !== 'function') return {}; // a bus payload (a persona, a model reply) may carry anything
     const next = sanitizeAudioRoutes(fn(editableRoutes(state.audioRoutes)));
     if (JSON.stringify(next) === JSON.stringify(state.audioRoutes ?? null)) return {};
     return { ...pushToUndo(state, !continuous), audioRoutes: next };
