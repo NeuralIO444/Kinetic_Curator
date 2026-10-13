@@ -18,13 +18,9 @@ const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 ok('every non-accum present and readback applies the finish chains', () => {
   const live = read('./liveLoop.mjs');
   const ren = read('./renderer.mjs');
-  const wk = read('./renderWorker.js');
   // the three plain-present sites in the main-thread loop
   assert.equal((live.match(/live\.present\(live\.applyFinishChains\(/g) || []).length, 3, 'liveLoop: three plain presents');
   assert.ok(!/live\.present\(target\)/.test(live), 'liveLoop: no raw present(target) is left');
-  // the worker, accum and not
-  assert.equal((wk.match(/live\.present\(live\.applyFinishChains\(/g) || []).length, 3, 'renderWorker: three plain presents');
-  assert.ok(wk.includes('presentUpscaled(live.applyFinishChains('), 'renderWorker: the accum path finishes too');
   // one-shot stills and captures
   assert.ok(/applyFinishChains\(renderFrameInto\(payload, T, uploaded\)\)/.test(ren), 'renderScene finishes');
   assert.ok(/b\.resolveTargetToBytes\(b\.applyFinishChains\(mRead\)/.test(ren), 'renderFrameOffscreen finishes');

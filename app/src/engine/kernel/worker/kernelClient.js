@@ -83,7 +83,7 @@ function createWorkerHost(url) {
  * @param {boolean} [opts.runInline=true] — default stays inline; the worker is
  *   opt-in (`runInline: false`) until parity is proven in CI.
  * @param {string|URL} [opts.workerUrl] — worker entry URL; defaults to
- *   kernel.worker.js next to this module (same pattern as gl/workerLiveLoop.js).
+ *   kernel.worker.js next to this module (resolved relative to this module).
  * @param {object} [opts.host] — injected host (tests); overrides runInline.
  * @param {(err: object) => void} [opts.onProtocolError] — worker ERROR replies
  *   that match no pending request land here; default rethrows async.

@@ -50,13 +50,3 @@ test('#810 capture orchestration uses no wall clock', () => {
     assert.doesNotMatch(src, /performance\.now\s*\(/, `${f} must not use performance.now()`);
   }
 });
-
-test('#810 worker capture delegates via CAPTURE_FRAME', () => {
-  // The opt-in worker path captures through the worker's CAPTURE_FRAME
-  // message. The no-advance resolve (current loopTimeMs + last dtSec,
-  // same as the presented frame) lives in renderWorker.js — #809's
-  // in-flight lane owns that file, so this test only pins the delegation
-  // contract, not the clock behavior.
-  const src = readFileSync(join(APP, 'src/gl/workerLiveLoop.js'), 'utf8');
-  assert.match(src, /CAPTURE_FRAME/);
-});

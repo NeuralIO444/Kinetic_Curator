@@ -14,12 +14,10 @@ import { MAX_PINS, sanitizePins } from './dishPins.js';
   assert.equal(sanitizePins(Array.from({ length: 9 }, (_, i) => ({ x: i, y: i }))).length, 4);
 }
 
-// 2. the resolver is handed the homes by the live loop AND by the worker loop (or worker mode silently drops them)
+// 2. the resolver is handed the homes by the live loop
 {
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
   assert.ok(/dishPins: s\.dishPins/.test(loop), 'liveLoop passes dishPins in the resolver input');
-  assert.ok(/dishPins: s\.dishPins/.test(readFileSync(new URL('../gl/renderWorker.js', import.meta.url), 'utf8')), 'renderWorker passes dishPins');
-  assert.ok(/dishPins:/.test(readFileSync(new URL('../gl/workerLiveLoop.js', import.meta.url), 'utf8')), 'the store snapshot sent to the worker includes dishPins');
   const src = readFileSync(new URL('./dishPins.js', import.meta.url), 'utf8');
   assert.ok(!/Date\.now|performance\.now|Math\.random/.test(src), 'no clock, no randomness');
 }

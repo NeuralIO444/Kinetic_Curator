@@ -132,7 +132,7 @@ function throwsProtocol(fn, label) {
   assert.match(src, /new Worker\(url, \{ type: 'module' \}\)/,
     'worker host constructs a module worker');
   assert.match(src, /new URL\('\.\/kernel\.worker\.js', import\.meta\.url\)/,
-    'worker entry URL resolved relative to the module (same pattern as gl/workerLiveLoop.js)');
+    'worker entry URL resolved relative to the module (resolved relative to this module)');
 }
 
 // ── client: backpressure — re-present once, then shed ────────────────────────

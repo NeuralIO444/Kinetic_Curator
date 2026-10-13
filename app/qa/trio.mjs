@@ -14,7 +14,7 @@ const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const TRIO = {
   selfcheck: [
     'src/panels/pipeline/paletteImportCopy.selfcheck.mjs',
-    'src/gl/clock.workerDt.selfcheck.mjs',
+    'src/gl/clock.freeze.selfcheck.mjs',
     'qa/units.selfcheck.mjs',
   ],
   playwright: [

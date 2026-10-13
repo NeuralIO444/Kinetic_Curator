@@ -98,8 +98,6 @@ export const DEFAULT_LAYOUT_PARAMS = {
   density: 78,
   bleed: false,
   mirror: 'off', // #1202 — 4-state reflection: off | x | y | xy
-  previewDownscale: false,
-  renderWorker: false,
   overlap: true,
   glass: false, // #1129 PR1 — glass-body material: translucent instances sort back-to-front by z-tier
   blendMode: 'normal',
@@ -417,7 +415,7 @@ export const RANGE_HARD = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker', 'glass', 'dish']; // #268: recolor removed; #1202: mirror is a 4-state enum now; #1409: dish is the per-Look cross-strata switch
+const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'glass', 'dish']; // #268: recolor removed; #1202: mirror is a 4-state enum now; #1409: dish is the per-Look cross-strata switch
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);

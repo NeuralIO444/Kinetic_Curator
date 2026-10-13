@@ -37,8 +37,8 @@
  * module stays self-contained rather than depending on it. Reconcile the two
  * copies if/when both land on main.
  *
- * Pure logic, no GL: the live loop (liveLoop.mjs) and the render worker
- * (renderWorker.js) own the clock and call update() once per frame, then
+ * Pure logic, no GL: the live loop (liveLoop.mjs)
+ * owns the clock and call update() once per frame, then
  * applyInject() while an inject runs. Unit-tested in tintInject.selfcheck.mjs.
  */
 

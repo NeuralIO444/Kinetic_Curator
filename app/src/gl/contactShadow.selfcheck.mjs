@@ -127,9 +127,7 @@ const layerOf = (c, id) => c.layers.find((l) => l.id === id);
   assert.match(r, /if \(layer\.type === 'content' && layer\.shadow\) \{\s*contactShadow\.apply\(/, 'gated on the contract key');
   assert.equal((r.match(/contactShadow\.apply\(/g) || []).length, 1, 'one call site');
   assert.equal((r.match(/maskFor\(layer\.id\)/g) || []).length, 1, 'the matte is rendered once per layer');
-  for (const f of ['./liveLoop.mjs', './renderWorker.js']) {
-    assert.match(readFileSync(new URL(f, import.meta.url), 'utf8'), /perfTier1: !!s\.perfTier1/, `${f} tells the contract about the tier-1 shed`);
-  }
+  assert.match(readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8'), /perfTier1: !!s\.perfTier1/, 'liveLoop tells the contract about the tier-1 shed');
 }
 
 console.log('contactShadow node: ok');
