@@ -103,6 +103,14 @@ function route(input, target) {
  * floor returns `routes: null`, so the panel says so and changes nothing.
  * @returns {{ routes: Array|null, heard: boolean, picked: string[] }}
  */
+/**
+ * #1477 — the guided path from an empty matrix: AUDIO ON first (that button already shimmers while audio is off), then
+ * AUTO. AUTO invites a press only when audio is on and there are no routes yet; any route, or audio off, and it is quiet.
+ */
+export function autoInvites({ audioEnabled, routeCount }) {
+  return !!audioEnabled && routeCount === 0;
+}
+
 export function autoSetupRoutes(snap) {
   const hot = rank(snap).filter((r) => r.energy >= ENERGY_FLOOR);
   if (hot.length === 0) return { routes: null, heard: false, picked: [] };

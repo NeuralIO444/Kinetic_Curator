@@ -94,7 +94,7 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
 // ── wiring: the loop reads the table; every save/restore site knows the field ──
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
-  assert.ok(/audioRoutes\(shapedAudio, \{ depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt \}, s\.audioRoutes, shapedBands\)/.test(src('../gl/liveLoop.mjs')), 'the live loop passes the scene table and the shaped bands');
+  assert.ok(/audioRoutes\(shapedAudio, \{ depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt \}, effRoutes, shapedBands\)/.test(src('../gl/liveLoop.mjs')) && /effectiveRoutes\(s\.audioRoutes, !!synth\)/.test(src('../gl/liveLoop.mjs')), 'the live loop passes the scene table (default while her set plays and there are no routes) and the shaped bands');
   const sites = {
     'state/projectDocument.js': 3,      // serialize + both parse branches
     'state/slices/globalSlice.js': 1,   // applyProject

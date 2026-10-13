@@ -215,3 +215,28 @@ export function audioMatrixRows(a, { depth, scaleMod, alphaMod }, enabled = true
     { input: 'TREBLE', target: null, depth: 0, live: 0 },
   ];
 }
+
+// ── #1477: a fresh project has no routes ([]) ───────────────────────────────────────────────────────────────
+/** The built-in metro breath at a full beat pulse (the old default table's beat -> breath depth). */
+export const METRO_BREATH = 0.035;
+
+/** An explicit empty table: the artist has no routes of their own (a fresh project, or CLEAR). */
+export const hasNoRoutes = (routes) => Array.isArray(routes) && routes.length === 0;
+
+/**
+ * The table the frame uses. While her set plays (#1475) and the artist has no routes, it uses the default routing
+ * (null) so the set is not inert; real audio never does (AUTO builds the table).
+ */
+export function effectiveRoutes(routes, setPlaying) {
+  return setPlaying && hasNoRoutes(routes) ? null : routes;
+}
+
+/**
+ * The metro's own breath: with an empty table, no audio and no set, the dialed BEAT's pulse breathes the stage a
+ * little, so an empty table is not inert. Routing the beat anywhere, or real audio, replaces it. Pure. 0..0.2.
+ */
+export function metroBreath({ routes, audioOn, metro, beatPulse }) {
+  if (!hasNoRoutes(routes) || audioOn || !metro) return 0;
+  const p = Number.isFinite(beatPulse) ? Math.min(1, Math.max(0, beatPulse)) : 0;
+  return Math.min(0.2, METRO_BREATH * p);
+}

@@ -14,10 +14,11 @@ import { useEffect, useRef, useState } from 'react';
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { audioMatrixRows, ROUTE_TARGETS, COARSE_INPUTS, BAND_INPUTS, MAX_ROUTES } from '../../gl/audioRoutes.mjs';
 import { getShapedBands } from '../../gl/bandFeed.mjs';
-import { absorbPeaks, autoSetupRoutes, deadRouteIndexes, ENERGY_FLOOR, inputEnergy, retuneRoutes, snapshotFromReads } from '../../gl/stimuliAuto.mjs';
+import { absorbPeaks, autoInvites, autoSetupRoutes, deadRouteIndexes, ENERGY_FLOOR, inputEnergy, retuneRoutes, snapshotFromReads } from '../../gl/stimuliAuto.mjs';
 import { readMeterBandLevels } from '../../hooks/audioMeterTap.js';
 import { useStore } from '../../state/store.js';
 import { editableRoutes, nextRoute, patchRoute, removeRoute, routeDepthRange, defaultDepthFor } from '../../data/audioRoutes.js';
+import { useInvite } from '../../hooks/useInvite.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { LOIS_LINES } from '../loisLines.mjs';
 
@@ -121,6 +122,9 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   // Audio off ⇒ no watch ran, so any advice on file is stale (a 1s-old
   // suggestion at worst); the interval refreshes it as soon as audio returns.
   const shownAdvice = audioEnabled ? advice : null;
+  // #1477 — the next step from an empty matrix: AUDIO ON shimmers while audio is off; once it is on, AUTO shimmers
+  const [autoShimmer, markAuto] = useInvite('auto');
+  const autoInvited = autoShimmer && autoInvites({ audioEnabled, routeCount: table.length });
 
   // Masters that would bury a starter. Raised only when a starter is actually
   // applied: with audio off or with no signal, AUTO changes nothing (#980).
@@ -175,7 +179,7 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
         <Row key={i} row={row} route={table[i]} index={i} table={table} onEdit={editAudioRoutes} />
       ))}
       <div className="stim-matrix-foot">
-        <button type="button" className="chip-btn act" onClick={autoSetup}
+        <button type="button" className={`chip-btn act${autoInvited ? ' xl-shimmer' : ''}`} onClick={() => { markAuto(); autoSetup(); }}
           title="Listen to the live input and build a starter routing from whatever has energy. No signal: it says so and changes nothing.">auto</button>
         <button type="button" className="chip-btn act" disabled={full} onClick={() => editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; }, false)}
           title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}>+ route</button>

@@ -13,7 +13,18 @@ test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) 
   const reset = page.getByRole('button', { name: 'reset', exact: true });
   const add = page.getByRole('button', { name: '+ ROUTE' });
 
-  // untouched: today's seven routes, RESET greyed, MID / TREBLE honestly not routed
+  // #1477 — a fresh project starts with every route OFF: nothing is routed until audio is on and AUTO builds a starter
+  await expect(rows).toHaveCount(0);
+  await expect(page.locator('.stim-matrix-empty')).toContainText('SILENT — sound is in the room and nothing is listening.');
+  const clear0 = page.getByRole('button', { name: 'clear', exact: true });
+  await expect(clear0).toBeDisabled();
+  await expect(add).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'auto', exact: true })).toBeVisible();
+  // RESET is the way back to today's default table (the seven routes) from an empty one
+  await expect(reset).toBeEnabled();
+  await reset.click();
+
+  // the default table: today's seven routes, RESET greyed, MID / TREBLE honestly not routed
   await expect(rows).toHaveCount(7);
   await expect(reset).toBeDisabled();
   await expect(page.locator('.stim-matrix-unrouted')).toContainText('MID · TREBLE');

@@ -30,9 +30,10 @@ import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as
 import { createLiveResolver } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
 import { getFormedPins, getLimbPairs, getPinTraits } from './resolveTap.mjs'; // #1355: which pins formed, how many wings each has, and its traits
-import { audioRoutes } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
+import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
+
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
@@ -481,12 +482,20 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // Ballistics on scaleMul / alphaBoost / glow (keep silence-is-zero contract).
     // #613: the routes live in audioRoutes.mjs, shared with the STIMULI matrix.
     // #790: the scene's route table (null = default) and, only if a route reads one, the 7 meter bands.
+    // #1477 — a fresh project has no routes ([]). Her set (#1475) would then drive nothing, so while it plays and the
+    // artist has no routes of their own it uses the default routing; real audio never does (AUTO builds the table).
+    const effRoutes = effectiveRoutes(s.audioRoutes, !!synth);
     const shapedBands = bandFeed.read({
-      routes: s.audioRoutes, enabled: audioOn, sidecar: !!(s.audioSidecar && s.audioSource?.type === 'file'),
+      routes: effRoutes, enabled: audioOn, sidecar: !!(s.audioSidecar && s.audioSource?.type === 'file'),
       readBands: synth ? () => mixLevels(audioReal ? readMeterBandLevels() : null, synth.bands, synth.mix, BAND_KEYS) : readMeterBandLevels,
       dtMs: dtSec * 1000,
     });
-    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt }, s.audioRoutes, shapedBands);
+    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt }, effRoutes, shapedBands);
+    // #1477 — the metro's own breath: an empty table is not inert. With no audio and no set, the BEAT's pulse (the
+    // dialed BPM) breathes the stage a little, exactly while the artist has no routes. Routing the beat anywhere, or
+    // real audio, replaces it. (The default routes never did this with audio off: the loop reads beatPulse only
+    // through the routes, and only while audio is on.)
+    routes.breathAudio = Math.min(0.2, (routes.breathAudio || 0) + metroBreath({ routes: s.audioRoutes, audioOn, metro: s.beatMetro, beatPulse: s.beatPulse }));
     const { scaleMul, alphaBoost } = routes;
 
     // Layered life LFO (incommensurate sines) from the GL loop
