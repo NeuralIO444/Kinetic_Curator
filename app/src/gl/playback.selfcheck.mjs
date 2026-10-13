@@ -147,6 +147,7 @@ await ok('wired: the resolver wrapper substitutes the input; the canvas overlays
   assert.match(btn, /perf-dot/);
   const css = readFileSync(new URL('../styles/layout.css', import.meta.url), 'utf8');
   assert.match(css, /\.perf-btn \.perf-dot \{ color: var\(--kc-red\); \}/);
+  assert.match(css, /\.perf-btn \{[^}]*text-transform: uppercase;/, 'caps like STOP');
 });
 
 console.log(`playback.selfcheck: ${n} checks passed`);
