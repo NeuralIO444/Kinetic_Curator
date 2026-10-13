@@ -90,4 +90,15 @@ export const EVENT_REGISTRY = {
   BLOOM: { handler: ["hooks/useEarnedVoices.js"] },
   ROLL_GUARD: { handler: ["hooks/useRollGuard.js"] },
   KINETIC_TAP: { handler: ["components/LoisPill.jsx","curator/loisActivity.js"] },
-  ACTIVITY_HEARTBEAT: { handler: null, note: "telemetry: published by loisActivity (#1390); no listener yet" },};
+  ACTIVITY_HEARTBEAT: { handler: null, note: "telemetry: published by loisActivity (#1390); no listener yet" },
+  VIEW_FULLSCREEN: { handler: 'wire' },
+  STAGE_MODE: { handler: 'wire' },
+  STAGE_BLACKOUT: { handler: 'wire' },
+  STAGE_TEST_PATTERN: { handler: 'wire' },
+  STAGE_MAPPING: { handler: 'wire' },
+  STAGE_DISPLAY: { handler: 'wire' },
+  STAGE_ERROR: { handler: 'wire' },
+  STAGE_SYPHON_ON: { handler: 'wire' },
+  STAGE_SYPHON_NAME: { handler: 'wire' },
+  CANVAS_SIZE: { handler: 'wire' },
+};

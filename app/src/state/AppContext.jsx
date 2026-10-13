@@ -208,6 +208,15 @@ export function useApp(selector) {
       case A.TOGGLE_PALETTE_LOCK: return store.togglePaletteLock(action.index);
       case A.CLEAR_PALETTE_LOCKS: return store.clearPaletteLocks();
       case A.APPLY_HARMONY: store.markPaletteChosen(); return store.applyHarmony(action.scheme); // #1365: the artist chose
+      case A.SET_STAGE_MODE: return store.setStageMode(action.mode);
+      case A.SET_STAGE_BLACKOUT: return store.setStageBlackout(action.on);
+      case A.SET_STAGE_TEST_PATTERN: return store.setStageTestPattern(action.on);
+      case A.SET_STAGE_MAPPING: return store.setStageMapping(action.mapping);
+      case A.SET_STAGE_DISPLAY: return store.setStageDisplayId(action.id);
+      case A.SET_STAGE_ERROR: return store.setStageError(action.message);
+      case A.SET_SYPHON_ON: return store.setSyphonOn(action.on);
+      case A.SET_SYPHON_NAME: return store.setSyphonName(action.name);
+      case A.SET_CANVAS_SIZE: return store.setCanvasSize(action.w, action.h, action.presetId);
       default: console.warn('Unhandled action:', type);
     }
   }, []);

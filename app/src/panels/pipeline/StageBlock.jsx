@@ -1,5 +1,6 @@
 // StageBlock.jsx — #607 STAGE Phase B: fullscreen live output window.
 import { useStore } from '../../state/store.js';
+import { emit, Events } from '../../composition/eventBus.js';
 import { isTauriRuntime } from './stageWindow.js';
 import { useStageOutput } from './useStageOutput.js';
 import { displayLabel, matchRaster, REFRESH_RATE_UNAVAILABLE } from './stageDisplays.mjs';
@@ -7,24 +8,24 @@ import { STAGE_MAPPINGS, stageMappingLabel } from './stageMapping.mjs';
 
 export function StageBlock() {
   const mode = useStore((s) => s.stageMode);
-  const setMode = useStore((s) => s.setStageMode);
+  const setMode = (mode) => emit(Events.STAGE_MODE, { mode });
   const blackout = useStore((s) => s.stageBlackout);
-  const setBlackout = useStore((s) => s.setStageBlackout);
+  const setBlackout = (on) => emit(Events.STAGE_BLACKOUT, { on });
   const testPattern = useStore((s) => s.stageTestPattern);
-  const setTestPattern = useStore((s) => s.setStageTestPattern);
+  const setTestPattern = (on) => emit(Events.STAGE_TEST_PATTERN, { on });
   const mapping = useStore((s) => s.stageMapping);
-  const setMapping = useStore((s) => s.setStageMapping);
+  const setMapping = (mapping) => emit(Events.STAGE_MAPPING, { mapping });
   const stageDisplayId = useStore((s) => s.stageDisplayId);
-  const setStageDisplayId = useStore((s) => s.setStageDisplayId);
+  const setStageDisplayId = (id) => emit(Events.STAGE_DISPLAY, { id });
   const stageError = useStore((s) => s.stageError);
-  const setStageError = useStore((s) => s.setStageError);
-  const setCanvasSize = useStore((s) => s.setCanvasSize);
+  const setStageError = (message) => emit(Events.STAGE_ERROR, { message });
+  const setCanvasSize = (w, h, presetId) => emit(Events.CANVAS_SIZE, { w, h, presetId });
   const syphonOn = useStore((s) => s.syphonOn);
-  const setSyphonOn = useStore((s) => s.setSyphonOn);
+  const setSyphonOn = (on) => emit(Events.STAGE_SYPHON_ON, { on });
   const syphonName = useStore((s) => s.syphonName);
-  const setSyphonName = useStore((s) => s.setSyphonName);
+  const setSyphonName = (name) => emit(Events.STAGE_SYPHON_NAME, { name });
   const isFs = useStore((s) => s.isFullscreen);
-  const toggleFs = useStore((s) => s.toggleFullscreen);
+  const toggleFs = () => emit(Events.VIEW_FULLSCREEN);
 
   const { begin, end, displays, displaysBusy, refreshDisplays } = useStageOutput();
   const tauri = isTauriRuntime();

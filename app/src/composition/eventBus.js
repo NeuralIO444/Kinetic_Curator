@@ -114,6 +114,16 @@ export const Events = {
   RUN_SET: 'run:set', // { running } the run / pause button
   PALETTE_LOCK: 'palette:lock',
   PALETTE_HARMONY: 'palette:harmony',
+  VIEW_FULLSCREEN: 'view:fullscreen', // toggle the page fullscreen
+  STAGE_MODE: 'stage:mode', // { mode } the STAGE output mode
+  STAGE_BLACKOUT: 'stage:blackout', // { on }
+  STAGE_TEST_PATTERN: 'stage:testPattern', // { on }
+  STAGE_MAPPING: 'stage:mapping', // { mapping }
+  STAGE_DISPLAY: 'stage:display', // { id } the chosen display, or null
+  STAGE_ERROR: 'stage:error', // { message } or null to dismiss
+  STAGE_SYPHON_ON: 'stage:syphonOn', // { on }
+  STAGE_SYPHON_NAME: 'stage:syphonName', // { name }
+  CANVAS_SIZE: 'canvas:size', // { w, h, presetId } the authored raster
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
