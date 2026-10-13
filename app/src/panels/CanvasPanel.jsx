@@ -11,6 +11,7 @@ import { useStore } from '../state/store.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { on, emit, Events } from '../composition/eventBus.js';
+import { overlayScene } from '../gl/playback.mjs';
 import { createLiveLoop } from '../gl/liveLoop.mjs';
 import { getPreset } from '../data/presets.js';
 
@@ -69,7 +70,7 @@ export function CanvasPanel() {
     let loop;
     try {
       loop = createLiveLoop(canvas, {
-        getState: useStore.getState,
+        getState: () => overlayScene(useStore.getState()), // #1461: a take being played lays its scene over the view
         viewRef,
         wrapEl: wrap,
       });
