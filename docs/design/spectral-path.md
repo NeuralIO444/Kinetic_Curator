@@ -1,6 +1,6 @@
 # The spectral path: how #1482 lands in this codebase
 
-**Written for Matt, to approve the shape before any code.** Status: design, nothing built. 2026-10-14.
+**Written for Matt, to approve the shape before any code.** Status: **approved 2026-10-14** (all five decisions below), nothing built.
 The research and the full wish-list are in issue #1482. This is the part that answers *how, in what order, and what
 it costs you*, checked against what the repo already does.
 
@@ -39,13 +39,15 @@ nothing about today's audio changes unless you switch the new thing on.
 
 P1 to P3 are the issue's "v1". P4 and P5 are separate decisions.
 
-## Decisions I need from you
+## Decisions (Matt, 2026-10-14: all five took the recommendation)
 
-1. **Additive second analyser (my recommendation) or replace the meter's analyser now?** Additive costs a little more CPU (one extra FFT) and changes nothing you have tuned. Replace gives "one core" immediately but moves every band's feel before you have heard it.
-2. **Should a take record the spectrum so playback looks the same?** Without it, a take plays back with the same layout, motion and moths, but the marks do not listen (the take has no audio). With a compact record (32 bins, 8-bit, about 115 KB for a minute, gzipped smaller) playback is faithful. My recommendation: **record it**, as a section like the BPM, so a take is a true performance.
-3. **Should the Queen's beats drive the spectrum?** She writes 7 band levels. We can smooth those into 128 bins (cheap, deterministic) so her set structures the picture too. My recommendation: **yes**, it is what makes the ladder (ambiance, her set, your audio) feel like one instrument.
-4. **Where does the readout live?** Options: a new strip under the METER (my recommendation: nothing existing changes), or upgrade the METER hero itself to show 128 bins with the 7 named bands as groups (more honest, but it changes a control you use).
-5. **Is the FX feedback warp (P4) part of this, or its own issue?** My recommendation: its own issue, after you have lived with P1 to P3.
+1. **A second analyser.** The meter's analyser, the 7 bands and every tuned feel are left alone in v1. Re-deriving the bands from the new core is P5 and needs an A/B.
+2. **A take records the spectrum**, 32 bins at 8-bit as a `spectrum` section like the BPM, so playback is a faithful performance.
+3. **The Queen's beats drive the spectrum**: her 7 band levels are smoothed into the 128 bins, so ambiance, her set and your audio structure the picture alike.
+4. **The readout is a new strip under the METER.** The METER hero is unchanged.
+5. **The FX feedback warp is its own issue** (#1490), after P1 to P3 have been lived with.
+
+Queue: replay scrub strip (#1461 step 3), Mind 1 (#1462), then P1 to P3 of this, one PR at a time with a preview where it is visible.
 
 ## What it will cost
 
