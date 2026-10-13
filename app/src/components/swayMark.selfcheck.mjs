@@ -61,7 +61,7 @@ ok('the Director never renders: the mark reads the holder, not the scheduler', (
   // the mark imports no scheduler module and reads the published magnitude.)
   const jsx = read('./SwayMark.jsx');
   assert.ok(!jsx.includes('curator/director'), 'no scheduler import');
-  assert.ok(jsx.includes('getSwayMagnitude()'), 'reads the ephemeral holder');
+  assert.ok(/useSyncExternalStore\(subscribeSway, getSwayMagnitude\)/.test(jsx), 'reads the ephemeral holder, and re-renders when the pace starts or stops (#1460)');
   assert.ok(jsx.includes('s.curatePress'), 're-renders on every pick');
 });
 

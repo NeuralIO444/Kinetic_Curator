@@ -41,6 +41,7 @@ import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomPro
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
+import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels } from './hooks/audioMeterTap.js';
 import { observeClock } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
@@ -107,19 +108,22 @@ function AppInner() {
     setLimbsProvider(getLimbPairs); // #1355 step 5: a crowded place grows its second pair of wings
     setTraitsProvider(getPinTraits); // #1356 step 2: Davis's birth shifts
     // #1145 step 3 — the room, read from the honest feed at the moment a moth is born (never per frame)
-    setRoomProvider(() => {
+    const roomNow = () => {
       const feed = loisActivity.snapshot();
       const face = resolveLoisFace(feed);
       const davis = resolveDavisState(feed);
       return { ...roomWidthFromCodes(face ? face.code : null, davis ? davis.code : null), keeps: useStore.getState().keeps };
-    });
+    };
+    setRoomProvider(roomNow);
+    // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
+    const stopPace = startPace({ getBpm: () => useStore.getState().beatBpm, context: roomNow });
     const unKeep = loisActivity.onKeep(noteKeep); // #1356 step 5: remember the living moths' traits at a keep
     const stop = initStress({
       getCounts: loisActivity.pressureCounts,
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

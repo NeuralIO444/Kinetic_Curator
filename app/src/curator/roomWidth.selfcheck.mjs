@@ -69,7 +69,7 @@ import { BAND_NORMAL, BAND_RELAX } from './stress.js';
 // 4. wired: the app reads the room from the honest feed at a birth; the module imports only the room table
 {
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  assert.ok(/setRoomProvider\(\(\) => \{[\s\S]*?loisActivity\.snapshot\(\)[\s\S]*?roomWidthFromCodes\(/.test(app));
+  assert.ok(/const roomNow = \(\) => \{[\s\S]*?loisActivity\.snapshot\(\)[\s\S]*?roomWidthFromCodes\([\s\S]*?setRoomProvider\(roomNow\)/.test(app));
   const live = readFileSync(new URL('./formationLive.js', import.meta.url), 'utf8');
   assert.ok(/room: \(\) => \{ try \{ return roomProvider \? roomProvider\(\) : null; \} catch \{ return null; \} \}/.test(live), 'a broken room is no room, never a broken frame');
 }
