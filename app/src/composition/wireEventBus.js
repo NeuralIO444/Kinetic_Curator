@@ -15,7 +15,6 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYOUT_PARAM, ({ key, value }) => dispatch({ type: A.SET_LAYOUT_PARAM, key, value }));
   on(Events.LAYOUT_PRESET, (preset) => dispatch({ type: A.APPLY_PRESET, preset }));
   on(Events.LAYOUT_LOCK, ({ key }) => dispatch({ type: A.TOGGLE_PARAM_LOCK, key }));
-  on(Events.LAYOUT_RANDOMIZE, (p) => dispatch(p.type === 'unlocked' ? { type: A.RANDOMIZE_UNLOCKED } : { type: A.RANDOMIZE_PARAM, key: p.key }));
   on(Events.LAYOUT_CURATE, () => dispatch({ type: A.CURATE_UNLOCKED }));
 
   on(Events.DAVIS_EVOLVE, (p) => {
@@ -64,7 +63,6 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_TOGGLE_ALL, (on) => dispatch({ type: A.TOGGLE_ALL_ASSETS, payload: on }));
   on(Events.ASSETS_SEARCH, (q) => dispatch({ type: A.SET_SEARCH, payload: q }));
   on(Events.ASSETS_CAT_FILTER, (cat) => dispatch({ type: A.SET_CAT_FILTER, payload: cat }));
-  on(Events.ASSETS_POOL_VIEW, (view) => dispatch({ type: A.SET_POOL_VIEW, payload: view }));
   on(Events.ASSETS_WEIGHT_CYCLE, ({ id }) => dispatch({ type: 'CYCLE_ASSET_WEIGHT', id }));
   on(Events.ASSETS_STILL_TOGGLE, ({ id }) => dispatch({ type: 'TOGGLE_ASSET_STILL', id })); // #1128
   on(Events.ASSETS_WEIGHT_SET, ({ id, weight }) => dispatch({ type: A.SET_ASSET_WEIGHT, id, weight }));
@@ -86,14 +84,11 @@ export function wireEventBus(rawDispatch) {
   on(Events.EXPORT_AUTO_QUALITY, (on) => dispatch({ type: A.SET_AUTO_QUALITY, payload: on }));
   on(Events.EXPORT_SNAPSHOT, (snapshot) => dispatch({ type: A.ADD_SNAPSHOT, snapshot }));
   on(Events.EXPORT_SEED, (seed) => dispatch({ type: A.SET_SEED, payload: seed }));
-  on(Events.EXPORT_PALETTE, (id) => dispatch({ type: A.SET_PALETTE_ID, payload: id }));
-  on(Events.EXPORT_IMPORT_LAYOUT, (preset) => dispatch({ type: A.APPLY_PRESET, preset }));
   on(Events.EXPORT_LOAD_PROJECT, (project) => dispatch({ type: A.LOAD_PROJECT, project }));
 
   on(Events.LAYER_ADD, (p) => dispatch({ type: A.ADD_LAYER, family: p?.family }));
   on(Events.LAYER_REMOVE, ({ id }) => dispatch({ type: A.REMOVE_LAYER, id }));
   on(Events.LAYER_SET_ACTIVE, ({ id }) => dispatch({ type: A.SET_ACTIVE_LAYER, id }));
-  on(Events.LAYER_REORDER, ({ id, delta }) => dispatch({ type: A.REORDER_LAYER, id, delta }));
   on(Events.LAYER_SWAP_POSITIONS, ({ idA, idB }) => dispatch({ type: A.SWAP_LAYER_POSITIONS, idA, idB }));
   on(Events.LAYER_TOGGLE_VISIBLE, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_VISIBLE, id }));
   on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
@@ -104,7 +99,6 @@ export function wireEventBus(rawDispatch) {
   on(Events.FX_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_FX_LAYER, id }));
   on(Events.FX_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.FX_EFFECT_ADD, layerId, kind }));
   on(Events.FX_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.FX_EFFECT_REMOVE, layerId, index }));
-  on(Events.FX_EFFECT_REORDER, ({ layerId, index, delta }) => dispatch({ type: A.FX_EFFECT_REORDER, layerId, index, delta }));
   on(Events.FX_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.FX_EFFECT_SET_PARAM, layerId, index, key, value }));
   on(Events.LAYER_ADD_MATH, () => dispatch({ type: A.ADD_MATH_LAYER }));
   on(Events.MATH_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_MATH_LAYER, id }));
@@ -115,8 +109,6 @@ export function wireEventBus(rawDispatch) {
   on(Events.MATH_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.MATH_EFFECT_SET_PARAM, layerId, index, key, value }));
   on(Events.MATH_EFFECT_SET_MOD, ({ layerId, index, key, mod }) => dispatch({ type: A.MATH_EFFECT_SET_MOD, layerId, index, key, mod }));
 
-  on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
-  on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));
   on(Events.PALETTE_IMPORT, (list) => dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
   on(Events.PALETTE_LOCK, ({ index, clear }) => dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }));
   on(Events.PALETTE_HARMONY, ({ scheme }) => dispatch({ type: A.APPLY_HARMONY, scheme }));
