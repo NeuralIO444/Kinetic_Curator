@@ -23,6 +23,18 @@ export const SPAWN_STEP = 0.03;
 export const SPAWN_GAP = 0.32;
 /** A spot must clear the rule's bars by this much, so it forms rather than sits on the line. */
 export const SPAWN_MARGIN = 0.02;
+/**
+ * The search, widening only as far as it has to (Matt, 2026-10-13: asked for four, got three). The middle region and the
+ * full spacing first; if that finds fewer than asked, the spacing closes up a little, then the region opens outward,
+ * then the whole dish. The two conditions a creature needs to FORM (fertility above the bar, a crowd around it) are
+ * never relaxed: a home where it could not form would only sit there.
+ */
+export const SPAWN_STAGES = Object.freeze([
+  Object.freeze({ region: SPAWN_REGION, gap: 1 }),
+  Object.freeze({ region: SPAWN_REGION, gap: 0.75 }),
+  Object.freeze({ region: Object.freeze({ x0: 0.1, y0: 0.1, x1: 0.9, y1: 0.9 }), gap: 0.75 }),
+  Object.freeze({ region: Object.freeze({ x0: 0.04, y0: 0.04, x1: 0.96, y1: 0.96 }), gap: 0.6 }),
+]);
 
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
@@ -66,26 +78,42 @@ export function chooseHomes({ count, existing = [], marks = [], field, band = nu
   const needFertility = bars.attraction + SPAWN_MARGIN;
   const needMarks = Math.ceil((bars.density + SPAWN_MARGIN) * DISH_SATURATE);
   const r2 = (DISH_RADIUS * short) ** 2;
-  const gap2 = (SPAWN_GAP * short) ** 2;
   const step = Math.max(2, SPAWN_STEP * short);
   const cx = W / 2; const cy = H / 2;
-  const cands = [];
-  for (let y = SPAWN_REGION.y0 * H; y <= SPAWN_REGION.y1 * H + 1e-9; y += step) {
-    for (let x = SPAWN_REGION.x0 * W; x <= SPAWN_REGION.x1 * W + 1e-9; x += step) {
-      if (!(clamp01(field(x, y)) > needFertility)) continue;
-      let n = 0;
-      for (let k = 0; k < marks.length; k += 2) {
-        const dx = marks[k] - x; const dy = marks[k + 1] - y;
-        if (dx * dx + dy * dy <= r2 && ++n >= needMarks) break;
+  // a spot qualifies once per call however many stages look at it
+  const memo = new Map();
+  const qualifies = (x, y) => {
+    const k = `${x}|${y}`;
+    let v = memo.get(k);
+    if (v === undefined) {
+      v = false;
+      if (clamp01(field(x, y)) > needFertility) {
+        let n = 0;
+        for (let m = 0; m < marks.length; m += 2) {
+          const dx = marks[m] - x; const dy = marks[m + 1] - y;
+          if (dx * dx + dy * dy <= r2 && ++n >= needMarks) break;
+        }
+        v = n >= needMarks;
       }
-      if (n < needMarks) continue;
-      cands.push({ x, y, d: (x - cx) ** 2 + (y - cy) ** 2 });
+      memo.set(k, v);
     }
-  }
-  cands.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x); // nearest the centre first; ties in reading order
-  for (const c of cands) {
+    return v;
+  };
+  for (const stage of SPAWN_STAGES) {
     if (homes.length >= want) break;
-    if (homes.every((h) => (h.x - c.x) ** 2 + (h.y - c.y) ** 2 >= gap2)) homes.push({ x: c.x, y: c.y });
+    const gap2 = (SPAWN_GAP * stage.gap * short) ** 2;
+    const R = stage.region;
+    const cands = [];
+    for (let y = R.y0 * H; y <= R.y1 * H + 1e-9; y += step) {
+      for (let x = R.x0 * W; x <= R.x1 * W + 1e-9; x += step) {
+        if (qualifies(x, y)) cands.push({ x, y, d: (x - cx) ** 2 + (y - cy) ** 2 });
+      }
+    }
+    cands.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x); // nearest the centre first; ties in reading order
+    for (const c of cands) {
+      if (homes.length >= want) break;
+      if (homes.every((h) => (h.x - c.x) ** 2 + (h.y - c.y) ** 2 >= gap2)) homes.push({ x: c.x, y: c.y });
+    }
   }
   return homes;
 }

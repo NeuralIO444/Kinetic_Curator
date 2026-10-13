@@ -34,8 +34,21 @@ const inRegion = (p) => p.x >= SPAWN_REGION.x0 * W - 1e-6 && p.x <= SPAWN_REGION
   // no crowd in the middle: the nearest crowded spot that is inside the region
   const off = chooseHomes({ count: 1, marks: pile(300, 300, 40), field: fertile });
   assert.ok(inRegion(off[0]) && Math.hypot(off[0].x - 300, off[0].y - 300) < 90, 'the crowded corner of the middle region');
-  // a crowd outside the middle region is never a home
-  assert.deepEqual(chooseHomes({ count: 1, marks: pile(60, 60, 60), field: fertile }), []);
+  // a crowd outside the middle region is a home only as a last resort: the middle crowd wins when there is one
+  const both = chooseHomes({ count: 1, marks: [...pile(60, 60, 60), ...pile(500, 350, 40)], field: fertile });
+  assert.ok(inRegion(both[0]), 'the middle first');
+  const outer = chooseHomes({ count: 1, marks: pile(60, 60, 60), field: fertile });
+  assert.equal(outer.length, 1, 'with nothing in the middle, the dish is searched outward rather than leaving the moth out');
+  assert.ok(outer[0].x >= 0 && outer[0].x <= W && outer[0].y >= 0 && outer[0].y <= H);
+  // Matt, 2026-10-13: asked for four, got three. Four crowds, two of them close together: the full spacing fits three, so
+  // the spacing closes up (then the region opens) until the fourth is found. The bars to FORM are never relaxed.
+  const crowds = [...pile(500, 350, 40), ...pile(330, 300, 40), ...pile(670, 300, 40), ...pile(560, 470, 40)];
+  const four = chooseHomes({ count: 4, marks: crowds, field: fertile });
+  assert.equal(four.length, 4, 'all four asked for are found');
+  const noGap = chooseHomes({ count: 4, marks: [...pile(500, 350, 40), ...pile(330, 300, 40), ...pile(100, 100, 40), ...pile(900, 600, 40)], field: fertile });
+  assert.equal(noGap.length, 4, 'crowds in the corners are found once the middle is full');
+  assert.equal(chooseHomes({ count: 4, marks: crowds, field: barren }).length, 0, 'fertility is never relaxed');
+  assert.equal(chooseHomes({ count: 4, marks: pile(500, 350, 2), field: fertile }).length, 0, 'the crowd is never relaxed');
 }
 
 // 3. it only picks places where the formation rule would let a creature form
