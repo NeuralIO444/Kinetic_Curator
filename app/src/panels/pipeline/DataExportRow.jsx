@@ -72,13 +72,11 @@ export function DataExportRow({
   const [behind, setBehind] = useState(false);
   const tasteStatus = useStore((s) => s.tasteStatus);
   const tasteExperimental = useStore((s) => s.tasteExperimental);
-  const setTasteExperimental = useStore((s) => s.setTasteExperimental);
   const loisStatus = useStore((s) => s.loisStatus);
   const importTasteToStore = useStore((s) => s.importTaste);
   const importShelf = useStore((s) => s.importShelf); // #1051
   const userVoices = useStore((s) => s.userVoices); // #1063
   const importUserVoices = useStore((s) => s.importUserVoices); // #1063
-  const clearTaste = useStore((s) => s.clearTaste);
   const [nudgeTick, setNudgeTick] = useState(0); // #925 — re-render after dismissing the retrain nudge
   // #925 — one dismissible hint line under the taste status, past ~50 new
   // keeps since the last train. Reactive on taste import (tasteStatus),
@@ -89,7 +87,6 @@ export function DataExportRow({
     [tasteStatus, keeps, nudgeTick],
   );
   const projectTitle = useStore((s) => s.projectTitle);
-  const setProjectTitle = useStore((s) => s.setProjectTitle);
 
   const projectFields = {
     seed,
@@ -347,7 +344,7 @@ export function DataExportRow({
       <div className="pipeline-row">
         <input
           value={projectTitle}
-          onChange={(e) => setProjectTitle(e.target.value)}
+          onChange={(e) => emit(Events.PROJECT_TITLE, { title: e.target.value })}
           placeholder="Project title (optional)"
           title="Project title — used in export filenames"
           style={{ flex: 2, fontSize: 11 }}
@@ -468,7 +465,7 @@ export function DataExportRow({
           type="button"
           className={`big-btn ${tasteExperimental ? "active" : ""}`}
           aria-pressed={tasteExperimental}
-          onClick={() => setTasteExperimental(!tasteExperimental)}
+          onClick={() => emit(Events.TASTE_EXPERIMENTAL, { on: !tasteExperimental })}
           style={{ flex: 3 }}
           title="Experimental taste: let a taste that scores below the 0.3 fidelity bar steer CURATOR anyway. Off by default; the bar itself does not change."
         >
@@ -476,7 +473,7 @@ export function DataExportRow({
         </button>
         <button
           className="big-btn act"
-          onClick={clearTaste}
+          onClick={() => emit(Events.TASTE_CLEAR)}
           style={{ flex: 1 }}
           title="Forget the imported taste"
         >

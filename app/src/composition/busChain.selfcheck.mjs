@@ -160,6 +160,22 @@ ok('the rest of the controls Matt exercised: canvas, creature count, MIDI, start
   assert.equal((S().mathMacros || []).length, macros);
 });
 
+ok('project title (clamped to 80), the experimental taste switch, and clear taste', () => {
+  emit(Events.PROJECT_TITLE, { title: 'Night Migration' });
+  assert.equal(S().projectTitle, 'Night Migration');
+  emit(Events.PROJECT_TITLE, { title: 'x'.repeat(500) });
+  assert.equal(S().projectTitle.length, 80, 'a pasted wall of text is cut to 80');
+  emit(Events.PROJECT_TITLE, { title: null });
+  assert.equal(S().projectTitle, '', 'null reads as empty, not the string "null"');
+  const was = !!S().tasteExperimental;
+  emit(Events.TASTE_EXPERIMENTAL, { on: !was });
+  assert.equal(!!S().tasteExperimental, !was);
+  emit(Events.TASTE_EXPERIMENTAL, { on: was });
+  const rev = S().tasteRev;
+  emit(Events.TASTE_CLEAR);
+  assert.equal(S().tasteRev, rev + 1, 'clear taste bumps the revision so the UI re-reads it');
+});
+
 // ── D ───────────────────────────────────────────────────────────────────────────────────────────────────────
 ok('hostile payloads (a persona or a model reply) cannot corrupt the stage', () => {
   const layersBefore = snap(S().layers);

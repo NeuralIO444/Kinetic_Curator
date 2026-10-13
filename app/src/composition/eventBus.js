@@ -171,6 +171,9 @@ export const Events = {
   AUDIO_SIDECAR: 'audio:sidecar', // { sidecar, note } a pre-analysed envelope file, or null with the reason
   MIDI_ENABLED: 'midi:enabled', // { on }
   STARTUP_MODE: 'startup:mode', // { mode } chaos | fixed
+  PROJECT_TITLE: 'project:title', // { title } the project name shown in exports
+  TASTE_EXPERIMENTAL: 'taste:experimental', // { on } the experimental taste switch
+  TASTE_CLEAR: 'taste:clear', // drop the loaded taste.json
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)

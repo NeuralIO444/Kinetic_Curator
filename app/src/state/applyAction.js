@@ -214,6 +214,9 @@ export function applyAction(action, store = useStore.getState()) {
     case A.SET_AUDIO_SIDECAR: return store.setAudioSidecar(action.sidecar, action.note);
     case A.SET_MIDI_ENABLED: return store.setMidiEnabled(action.on);
     case A.SET_STARTUP_MODE: return store.setStartupMode(action.mode);
+    case A.SET_PROJECT_TITLE: return store.setProjectTitle(action.title);
+    case A.SET_TASTE_EXPERIMENTAL: return store.setTasteExperimental(action.on);
+    case A.CLEAR_TASTE: return store.clearTaste();
     default: console.warn('Unhandled action:', type);
   }
 }

@@ -179,6 +179,9 @@ export function wireEventBus(rawDispatch) {
   on(Events.AUDIO_SIDECAR, (p = {}) => dispatch({ type: A.SET_AUDIO_SIDECAR, sidecar: p.sidecar, note: p.note }));
   on(Events.MIDI_ENABLED, (p = {}) => dispatch({ type: A.SET_MIDI_ENABLED, on: p.on }));
   on(Events.STARTUP_MODE, (p = {}) => dispatch({ type: A.SET_STARTUP_MODE, mode: p.mode }));
+  on(Events.PROJECT_TITLE, (p = {}) => dispatch({ type: A.SET_PROJECT_TITLE, title: p.title }));
+  on(Events.TASTE_EXPERIMENTAL, (p = {}) => dispatch({ type: A.SET_TASTE_EXPERIMENTAL, on: p.on }));
+  on(Events.TASTE_CLEAR, () => dispatch({ type: A.CLEAR_TASTE }));
 
   return dispatch;
 }
