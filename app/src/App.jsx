@@ -34,7 +34,7 @@ import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { initDirectorBeat } from './curator/director.js'; // #1145
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
 import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353: record a performance
-import { initStress, DEBUG_STRESS } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
+import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
 import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomProvider } from './curator/formationLive.js';
@@ -42,6 +42,7 @@ import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: th
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
 import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider } from './gl/resolveTap.mjs';
+import { observeSpawn } from './curator/spawnLive.js'; // #1355: auto spawn finds each creature's home
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -86,7 +87,15 @@ function AppInner() {
     // persona reads the band yet; ?debug=stress shows it.
     // #1355 — dish pressure: the marks the resolver placed around the canvas pins, read from each resolved frame.
     // #1355 step 3 — the formation rule reads the same frame (one tap: dish pressure first, then formation).
-    setResolveFrameTap((input, output) => { observeDish(input, output); observeFormation(input, output); });
+    setResolveFrameTap((input, output) => {
+      observeDish(input, output);
+      observeFormation(input, output);
+      // #1355 AUTO SPAWN: each creature the artist asked for finds a home in the middle of the dish. The homes are
+      // published as `dishPins`, which the resolver reads on the next frame (so a take records them).
+      const st = useStore.getState();
+      const homes = observeSpawn(input, output, { count: st.creatureCount, formed: getFormedPins(), band: getStressState().band });
+      if (homes) st.setDishPins(homes);
+    });
     setFormedProvider(getFormedPins); // #1355 step 4: the moth grows on pins the rule has formed
     setLimbsProvider(getLimbPairs); // #1355 step 5: a crowded place grows its second pair of wings
     setTraitsProvider(getPinTraits); // #1356 step 2: Davis's birth shifts

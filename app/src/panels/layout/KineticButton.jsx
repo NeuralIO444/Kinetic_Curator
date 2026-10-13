@@ -89,7 +89,6 @@ export function KineticButton() {
     setLastLayer(r.layer); // #1122 — the layer is discrete: RULES / WEATHER / CHAOS
     // LOIS honest feed: the single observable for a KINETIC tap (button + K).
     emit(Events.KINETIC_TAP, { kind: r.layer });
-    useStore.getState().clearDishPins(); // #1355 — a KIN tap is a new dish: canvas pins do not carry over
     if (r.layer === 'chaos') kineticRoll();
     else if (r.layer === 'weather') kineticWeatherPass();
     else kineticRulesPass();

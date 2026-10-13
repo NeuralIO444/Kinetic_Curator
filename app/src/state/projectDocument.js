@@ -9,6 +9,7 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill } from '../data/kinemes.js';
 import { sanitizeAssetAttach } from '../engine/assetAttach.js';
+import { sanitizeCount } from '../curator/spawn.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../midi/map.mjs';
@@ -116,6 +117,9 @@ export function serializeProject(state) {
   // #1355 — wet-lab attach points, per asset. Written only when set.
   const attach = sanitizeAssetAttach(state.assetAttach);
   if (attach) doc.assetAttach = attach;
+  // #1355 AUTO SPAWN — how many creatures. Written only when set: an untouched project saves as before.
+  const creatures = sanitizeCount(state.creatureCount);
+  if (creatures > 0) doc.creatureCount = creatures;
   // #790 — the scene's audio routes. Written only when customised (null = the
   // default table), so an untouched piece exports exactly as before. [] is saved.
   const audioRoutes = sanitizeAudioRoutes(state.audioRoutes);
@@ -187,6 +191,7 @@ export function parseProject(raw) {
         assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
         assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
         assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
+        creatureCount: sanitizeCount(raw.creatureCount), // #1355
         audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
         midiMap: sanitizeMidiMap(raw.midiMap), // #617
         mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
@@ -235,6 +240,7 @@ export function parseProject(raw) {
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
+      creatureCount: sanitizeCount(raw.creatureCount), // #1355
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
       midiMap: sanitizeMidiMap(raw.midiMap), // #617
       mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
