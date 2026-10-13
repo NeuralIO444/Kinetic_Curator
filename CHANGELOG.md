@@ -14,6 +14,7 @@ Everything merged to `main` since the 2026-10-07 sync (about 210 commits). Roadm
 - **Telemetry (#1390–#1393, #1349)** — epoch timestamps, activity heartbeat, keep-side and Director-side gap closure, session log export from the footer.
 - **Kernel (#1320–#1346)** — SoA columns (5/5), replay event log + headless replayer, worker entry + versioned protocol, iPad worker probe, GPU field runner, Rust/wasm crates (kc-fields, kc-neighbor) default when loaded, reproducible builds, cost tiers declared, purity lint gate.
 - **Layouts + growth (#1196, #1197, #1198, #1199, #1200, #1350, #1351)** — Voronoi cells, space colonization, ORGANIC + CADENCE rhythm patterns, field→channel mapping, dish-level attractor field + hero marks, Gaussian cluster, circle packing.
+- **Housekeeping (#1445–#1448)** — event registry + audit (73 events, 8 dead removed), palette and run controls ride the bus, the opt-in render worker retired, three dead modules deleted, advisory-audit CI job.
 - **Docs** — Petri-dish roadmap and Phase 3/4 plans, dish strata sketch, characters (LOIS, Davis, Queen), VOICES.md, DLC preset types + Pipeline loader spec, telemetry gap and DLC discovery research.
 
 ## Current — Directors, patterns, keeps (2026-10-07)
