@@ -17,6 +17,7 @@ test('F adds a pill: a name, not hex, and four bands (3 palette colours + heat)'
   await expect(p.locator('.hit-pill-name')).toHaveText(/^[A-Z]{2,6}$/);
   await expect(p.locator('.hit-band')).toHaveCount(4);
   await expect(p.locator('.hit-band.heat')).toHaveCount(1);
+  await expect(p.locator('.hit-pill-sep')).toHaveCount(1); // the actions sit behind a divider
   for (const b of await p.locator('.hit-pill-act').all()) expect((await b.boundingBox()).width).toBeGreaterThanOrEqual(28);
 });
 

@@ -204,6 +204,8 @@
 .hit-band.h1, .hit-detail-legend i.h1 { background: rgba(var(--kc-davis-rgb), .45); }
 .hit-band.h2, .hit-detail-legend i.h2 { background: var(--kc-davis); }
 .hit-band.h3, .hit-detail-legend i.h3 { background: var(--kc-red); }
+/* #1124 — the divider the identity sits in front of and the actions behind (the mockup's .sep metrics) */
+.hit-pill-sep { width: 1px; height: 18px; background: var(--line-2); flex: 0 0 auto; }
 .hit-pill-act {
   width: 32px; height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
