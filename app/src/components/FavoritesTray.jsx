@@ -72,20 +72,20 @@ export function FavoritesTray() {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
     // #966 — tap-to-jump: autoplay continues from the jumped-to hit.
     if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
-  }, [setQueueIndex, bumpQueueJump]);
+  }, []);
 
   const evolveFrom = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
     emit(Events.DAVIS_EVOLVE, { mode: true });
     // #966 — tap-to-jump applies to shift-recall too.
     if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
-  }, [setQueueIndex, bumpQueueJump]);
+  }, []);
 
   const morphTo = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'morph', favorite: fav });
     // #966 — tap-to-jump applies to alt-morph too.
     if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
-  }, [setQueueIndex, bumpQueueJump]);
+  }, []);
 
   const move = useCallback((fav, delta) => {
     if (!fav.id) return;

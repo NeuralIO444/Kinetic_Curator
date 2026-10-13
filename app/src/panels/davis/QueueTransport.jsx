@@ -98,7 +98,7 @@ export function QueueTransport() {
     // queueJumpNonce: a manual tap/keyboard jump restarts the hold even when
     // the jumped-to hit is already current (re-firing it must not get cut
     // short by the old timer).
-  }, [queuePlaying, queueIndex, queueJumpNonce, queueSource, queueSecondsPerHit, queueBeatsPerHit, beatBpm, favorites, setQueuePlaying]);
+  }, [queuePlaying, queueIndex, queueJumpNonce, queueSource, queueSecondsPerHit, queueBeatsPerHit, beatBpm, favorites]);
 
   const toggle = () => {
     if (queue.length === 0) return;
