@@ -67,13 +67,13 @@ export function ReactivityControls({ depth, scaleMod, alphaMod, life, attackMs, 
     <div style={{ padding: '6px', border: '1px solid var(--line-2)', marginBottom: '6px', background: 'rgba(255,255,255,0.02)' }}>
       <div className="ttl" style={{ fontSize: '9px', color: 'var(--dim)', letterSpacing: '0.1em', marginBottom: '6px' }} title="Live node multiply from the mic. Does not tick the Ghost Station phrase clock.">reactivity / life</div>
 
-      <AudioSlider label="DEPTH" value={depth} min={0} max={1} step={0.05}
+      <AudioSlider label="DEPTH" value={depth} min={0} max={2} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioModDepth', value: v })} hint="How hard the mic pushes scale/alpha. Not the Ghost bar."
         disabled={!audioEnabled} disabledReason={disabledReason} />
-      <AudioSlider label="SCALE" value={scaleMod} min={0} max={1} step={0.05}
+      <AudioSlider label="SCALE" value={scaleMod} min={0} max={2} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: v })} hint="Bands → node size. Phrase CLOCK is a separate counter."
         disabled={!audioEnabled} disabledReason={disabledReason} />
-      <AudioSlider label="ALPHA" value={alphaMod} min={0} max={1} step={0.05}
+      <AudioSlider label="ALPHA" value={alphaMod} min={0} max={2} step={0.05}
         onChange={v => emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: v })} hint="Bands → opacity pulse."
         disabled={!audioEnabled} disabledReason={disabledReason} />
       <MotionTile kind="life" label="life" value={life} min={0} max={1} step={0.05}

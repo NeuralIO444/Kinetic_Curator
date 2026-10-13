@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { audioMatrixRows, ROUTE_TARGETS, COARSE_INPUTS, BAND_INPUTS, MAX_ROUTES } from '../../gl/audioRoutes.mjs';
 import { getShapedBands } from '../../gl/bandFeed.mjs';
-import { absorbPeaks, autoInvites, autoSetupRoutes, deadRouteIndexes, ENERGY_FLOOR, inputEnergy, retuneRoutes, snapshotFromReads } from '../../gl/stimuliAuto.mjs';
+import { absorbPeaks, autoInvites, autoSetupRoutes, masterGainFor, deadRouteIndexes, ENERGY_FLOOR, inputEnergy, retuneRoutes, snapshotFromReads } from '../../gl/stimuliAuto.mjs';
 import { readMeterBandLevels } from '../../hooks/audioMeterTap.js';
 import { useStore } from '../../state/store.js';
 import { editableRoutes, nextRoute, patchRoute, removeRoute, routeDepthRange, defaultDepthFor } from '../../data/audioRoutes.js';
@@ -128,10 +128,12 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
 
   // Masters that would bury a starter. Raised only when a starter is actually
   // applied: with audio off or with no signal, AUTO changes nothing (#980).
-  const armMasters = () => {
-    if (depth < 0.25) emit(Events.LAYOUT_PARAM, { key: 'audioModDepth', value: 0.65 });
-    if (scaleMod < 0.2) emit(Events.LAYOUT_PARAM, { key: 'audioScaleMod', value: 0.45 });
-    if (alphaMod < 0.15) emit(Events.LAYOUT_PARAM, { key: 'audioAlphaMod', value: 0.25 });
+  const armMasters = (peaks) => {
+    // #1478 — the masters follow the signal AUTO heard: a quiet input gets more gain (up to 2x the defaults) so a normal
+    // signal fills the range; a hot one leaves them; nothing the artist set higher is lowered.
+    const lp = useStore.getState().layoutParams || {};
+    const g = masterGainFor(peaks, { audioModDepth: lp.audioModDepth, audioScaleMod: lp.audioScaleMod, audioAlphaMod: lp.audioAlphaMod });
+    if (g) for (const [key, value] of Object.entries(g.patch)) emit(Events.LAYOUT_PARAM, { key, value });
     const gain = useStore.getState().audioGain;
     if (Number.isFinite(gain) && gain < 0.4) emit(Events.AUDIO_GAIN, 1);
   };
@@ -152,7 +154,7 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       if ((autoSetupRoutes(peaks).heard && elapsed >= LISTEN_MS) || elapsed >= LISTEN_CAP_MS) {
         const built = autoSetupRoutes(peaks);
         if (!built.heard) { setStatus(NO_SIGNAL); return; } // silence: nothing to route
-        armMasters();
+        armMasters(peaks);
         setAudioRoutes(built.routes);
         setStatus(`routed ${built.picked.map(INPUT_LABEL).join(' · ')}`);
         return;
