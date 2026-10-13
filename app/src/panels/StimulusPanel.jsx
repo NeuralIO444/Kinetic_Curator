@@ -5,6 +5,7 @@ import { emit, Events } from '../composition/eventBus.js';
 import { SourceControls } from './stimulus/SourceControls.jsx';
 import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
 import { FeelPicker } from './stimulus/FeelPicker.jsx';
+import { MotionStrip } from './stimulus/MotionStrip.jsx';
 import { MeterHero } from './stimulus/MeterHero.jsx';
 import { WhisperLine } from '../components/WhisperLine.jsx';
 import { ModMatrix } from './stimulus/ModMatrix.jsx';
@@ -105,6 +106,8 @@ export function StimulusPanel() {
           {/* #613 — hierarchy inverted: the METER is the hero, the MATRIX shows
               which sound drives what, live; setup and raw knobs follow. */}
           <MeterHero />
+          {/* #1469 — the always-alive motion, beside the audio: read only. */}
+          <MotionStrip />
           {/* #1139 — the whisper line lives under the meter, speaks rarely. */}
           <WhisperLine slot="stimuli" />
           {/* UX-7 — FEEL macros lead: the three feels are the first thing you
