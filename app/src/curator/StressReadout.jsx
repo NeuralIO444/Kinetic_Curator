@@ -3,7 +3,7 @@
 // three signals, the smoothed stress and the band. Nothing reads the band yet (Phase 4).
 import { useEffect, useState } from 'react';
 import { getStressState } from './stressLive.js';
-import { getFormationState } from './formationLive.js'; // #1355 step 3
+import { getFormationState, getLimbPairs } from './formationLive.js'; // #1355 step 3
 import { FORM_HOLD_FRAMES, thresholdsFor } from './formation.js';
 
 const pct = (v) => `${Math.round((Number.isFinite(v) ? v : 0) * 100)}`.padStart(3, ' ');
@@ -32,7 +32,8 @@ export function StressReadout() {
         if (!p) return null;
         const t = thresholdsFor(f.band);
         const state = p.formed ? 'FORMED' : `spore ${String(p.hold).padStart(2, ' ')}/${FORM_HOLD_FRAMES}`;
-        return `\npin ${i + 1}  attract ${pct(p.attraction)}/${pct(t.attraction)}  crowd ${pct(p.density)}/${pct(t.density)}  ${state}`;
+        const pairs = p.formed ? `  wings x${(getLimbPairs()[i] || 1) * 2}` : '';
+        return `\npin ${i + 1}  attract ${pct(p.attraction)}/${pct(t.attraction)}  crowd ${pct(p.density)}/${pct(t.density)}  ${state}${pairs}`;
       })}
     </div>
   );

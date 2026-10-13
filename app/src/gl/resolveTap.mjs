@@ -79,6 +79,24 @@ export function getFormedPins() {
   }
 }
 
+let limbsProvider = null;
+
+/** Register where the loop reads each pin's pairs of wings (curator/formationLive.js getLimbPairs). */
+export function setLimbsProvider(fn) {
+  limbsProvider = typeof fn === 'function' ? fn : null;
+}
+
+/** [1|2] per pin from the last resolved frame's decision; [] with no provider. A bad provider reads as none. */
+export function getLimbPairs() {
+  if (limbsProvider === null) return [];
+  try {
+    const l = limbsProvider();
+    return Array.isArray(l) ? l : [];
+  } catch {
+    return [];
+  }
+}
+
 let resetRequested = false;
 
 /**

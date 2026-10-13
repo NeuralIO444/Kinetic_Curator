@@ -13,8 +13,11 @@ import { createFormationTracker, fertilityField, quantizeSignal } from './format
 import { pinPressures } from './dishPressure.js';
 import { sanitizePins } from './dishPins.js';
 import { getStressState } from './stressLive.js';
+import { createLimbTracker } from './limbs.js';
 
 let tracker = createFormationTracker();
+const limbTracker = createLimbTracker();
+let limbs = [];
 let tap = null;
 let latest = Object.freeze({ states: [], band: null });
 let field = null;
@@ -35,10 +38,17 @@ export function getFormedPins() {
   return latest.states.map((s) => !!(s && s.formed));
 }
 
+/** Pairs of wings per pin (1 or 2) as of the last resolved frame: the NEXT frame's input carries it (the moth reads it). */
+export function getLimbPairs() {
+  return limbs;
+}
+
 /** Start over (tests; and a take starts from fresh formation state, like the fresh resolver `rec` asks for). */
 export function resetFormation() {
   tracker = createFormationTracker();
   latest = Object.freeze({ states: [], band: null });
+  limbTracker.reset();
+  limbs = [];
 }
 
 /** The resolver frame tap. `getBand` is injectable for tests; live it is the stress tracker's band. */
@@ -59,6 +69,7 @@ export function observeFormation(input, output, getBand = () => getStressState()
     band,
     states: r.states.map((s, i) => (s ? { ...s, attraction: attraction[i], density: density[i] } : null)),
   });
+  limbs = limbTracker.update(latest.states);
   if (tap) tap(u, r.events);
   return r;
 }
