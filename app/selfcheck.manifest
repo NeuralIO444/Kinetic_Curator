@@ -363,3 +363,4 @@ node scripts/verifyPerformance.selfcheck.mjs
 node src/gl/performanceCreatures.selfcheck.mjs
 node src/composition/eventRegistry.selfcheck.mjs
 node src/composition/busChain.selfcheck.mjs
+node src/panels/pipeline/latestCapture.selfcheck.mjs
