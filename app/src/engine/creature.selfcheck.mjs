@@ -247,4 +247,57 @@ const full = MOTH.growFrames + 1;
   assert.notEqual(play(seq([2])), play(seq([1])), 'and the second pair really is in the picture');
 }
 
+// 13. HOVER: the moth drifts near its pin on the assets' own living-motion floor, and stops when they stop
+{
+  const { HOVER, hoverPose } = await import('./creature.js');
+  const ctx = (driverSec, amounts = { breath: 0.3, drift: 0.5 }) => ({ driverSec, amounts, canvasW: 1000, canvasH: 700 });
+  const rest = { dx: 0, dy: 0, rot: 0, scale: 1 };
+  // at rest: on the pin (anchored), and nothing moves when nothing is asked
+  assert.deepEqual(hoverPose(ctx(0), 7, 0), rest, 'driver time 0 is the placed picture');
+  assert.deepEqual(hoverPose(null, 7, 0), rest, 'a held or frozen instrument: no motion context, no hover');
+  assert.deepEqual(hoverPose(ctx(5, { breath: 0, drift: 0 }), 7, 0), rest, 'both dials at zero: still');
+  assert.deepEqual(hoverPose(ctx(NaN), 7, 0), rest);
+  // it moves, within the reach the DRIFT dial sets, and never further
+  let maxD = 0; let maxR = 0; let minS = 1; let maxS = 1; let moved = 0;
+  for (let t = 0; t < 120; t += 0.37) {
+    const p = hoverPose(ctx(t), 7, 0);
+    maxD = Math.max(maxD, Math.hypot(p.dx, p.dy)); maxR = Math.max(maxR, Math.abs(p.rot)); minS = Math.min(minS, p.scale); maxS = Math.max(maxS, p.scale);
+    if (Math.abs(p.dx) + Math.abs(p.dy) > 1) moved++;
+  }
+  const reach = 0.5 * HOVER.reach * 700;
+  assert.ok(moved > 100 && maxD > reach * 0.5, `it wanders (${maxD.toFixed(1)} px of a ${reach.toFixed(0)} px reach)`);
+  assert.ok(maxD <= reach * 2 * Math.SQRT2 + 1e-9, 'never beyond the DRIFT dial\'s reach (a wave measured from rest spans at most twice the amplitude)');
+  assert.ok(maxR <= 0.5 * HOVER.tilt * 2 + 1e-9 && maxR > 1, `a gentle tilt (${maxR.toFixed(1)} deg)`);
+  assert.ok(minS < 1 && maxS > 1 && maxS - minS <= 0.3 * HOVER.breathDepth * 2 + 1e-9, 'a slow breath, at the BREATH dial');
+  // the dials scale it, and the creatures are not in lockstep
+  const far = hoverPose(ctx(9, { breath: 0, drift: 1 }), 7, 0);
+  const near = hoverPose(ctx(9, { breath: 0, drift: 0.25 }), 7, 0);
+  assert.ok(Math.abs(far.dx) > Math.abs(near.dx) * 3.5 && Math.abs(far.dx) < Math.abs(near.dx) * 4.5, 'DRIFT scales the reach');
+  assert.notDeepEqual(hoverPose(ctx(9), 7, 0), hoverPose(ctx(9), 7, 1), 'each pin hovers on its own phase');
+  assert.deepEqual(hoverPose(ctx(9), 7, 0), hoverPose(ctx(9), 7, 0), 'a pure function of its inputs');
+
+  // in the builder: the body leaves the pin by the pose, the joints do not come apart, and no motion fn = step 5 exactly
+  const centre = (e) => {
+    const c = e[0].items.filter((i) => i._creature && !i.key.includes(':halo:'));
+    return { body: c.find((i) => i.assetId === MOTH_PARTS.body), wings: c.filter((i) => i.assetId === MOTH_PARTS.wing) };
+  };
+  const still = centre(run(createCreatureBuilder(), input(), full));
+  const mv = (driverSec) => (e) => ({ driverSec, amounts: { breath: 0, drift: 0.5 }, canvasW: 1000, canvasH: 700 });
+  const build = (motionFn) => { const b = createCreatureBuilder(); let e; for (let i = 0; i < full; i++) { e = entry(); b.append(input(), e, ASSETS, motionFn); } return e; };
+  const off = centre(build(null));
+  assert.equal(off.body.x, still.body.x); assert.equal(off.body.y, still.body.y);
+  const t0 = centre(build(mv(0)));
+  assert.equal(t0.body.x, 500); assert.equal(t0.body.y, 350);
+  const later = centre(build(mv(9)));
+  const pose = hoverPose({ driverSec: 9, amounts: { breath: 0, drift: 0.5 }, canvasW: 1000, canvasH: 700 }, 77, 0);
+  assert.ok(Math.abs(later.body.x - (500 + pose.dx)) < 1e-6 && Math.abs(later.body.y - (350 + pose.dy)) < 1e-6, 'the body sits at pin + pose');
+  assert.ok(Math.abs(pose.dx) + Math.abs(pose.dy) > 1, 'and that is a real move');
+  const gap = (c) => Math.hypot(c.wings[0].x - c.body.x, c.wings[0].y - c.body.y);
+  assert.ok(Math.abs(gap(later) - gap(still)) < 1e-6, 'the wing is still joined to the body: it moved as one creature');
+  // reduced motion and a throwing/odd context never break a frame
+  const rm = createCreatureBuilder(); const e = entry(); rm.append({ ...input(), reducedMotion: true }, e, ASSETS, mv(9));
+  assert.equal(centre(e).body.x, 500, 'reduced motion: it sits still');
+  assert.doesNotThrow(() => createCreatureBuilder().append(input(), entry(), ASSETS, () => null));
+}
+
 console.log('creature.selfcheck: ok (#1355 step 4, the moth)');

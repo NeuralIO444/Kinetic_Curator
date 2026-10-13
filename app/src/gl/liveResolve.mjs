@@ -886,7 +886,8 @@ export function createLiveResolver() {
     }
 
     prune(aliveIds, documentIds);
-    creatures.append(input, out, pool); // #1355: formed pins grow a moth (no pin formed: nothing happens)
+    // #1355: formed pins grow a moth (no pin formed: nothing happens). It hovers on the layer's own living-motion floor.
+    creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion));
     return out;
   }
 
