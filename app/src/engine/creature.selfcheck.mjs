@@ -300,4 +300,89 @@ const full = MOTH.growFrames + 1;
   assert.doesNotThrow(() => createCreatureBuilder().append(input(), entry(), ASSETS, () => null));
 }
 
+// 14. TRAITS (Phase 4 step 1): a moth's small recorded set. Defaults are today's moth; ranges are hard limits
+{
+  const { TRAIT_DEFAULTS, TRAIT_RANGES, normalizeTraits } = await import('./creature.js');
+  assert.deepEqual(normalizeTraits(undefined), TRAIT_DEFAULTS);
+  assert.deepEqual(normalizeTraits('x'), TRAIT_DEFAULTS);
+  assert.deepEqual(normalizeTraits({ spread: NaN, wing: 'big', body: null, swatch: Infinity }), TRAIT_DEFAULTS, 'junk reads as the default');
+  assert.deepEqual(normalizeTraits({ spread: 999, wing: 99, body: 0, swatch: 99 }), { spread: 18, wing: 1.25, body: 0.85, swatch: 3 }, 'clamped to the ranges');
+  assert.deepEqual(normalizeTraits({ spread: -999, wing: -1, body: 99, swatch: -4 }), { spread: -18, wing: 0.8, body: 1.2, swatch: 0 });
+  assert.equal(normalizeTraits({ swatch: 1.6 }).swatch, 2, 'the swatch is a whole rank');
+  assert.ok(Object.isFrozen(TRAIT_DEFAULTS) && Object.isFrozen(TRAIT_RANGES));
+
+  const PALETTE = { bg: '#111111', ink: '#eeeeee', swatches: ['#555555', '#cc2200', '#2266cc', '#33aa33', '#aaaa22', '#888888'] };
+  const build = (traits, n = full + MOTH.pairFrames + 2, extra = {}) => {
+    const b = createCreatureBuilder(); let e;
+    for (let i = 0; i < n; i++) { e = [{ id: 'a', items: [], palette: PALETTE }]; b.append(input({ dishLimbs: [2], dishTraits: traits === undefined ? undefined : [traits], ...extra }), e, ASSETS); }
+    return e[0].items;
+  };
+  const real = (items) => items.filter((i) => i._creature && !i.key.includes(':halo:'));
+  const body = (items) => real(items).find((i) => i.assetId === MOTH_PARTS.body);
+  const fore = (items) => real(items).filter((i) => i.assetId === MOTH_PARTS.wing).slice(0, 2);
+  const hind = (items) => real(items).filter((i) => i.assetId === MOTH_PARTS.wing).slice(2, 4);
+
+  // none given = explicit defaults = step 5's moth, byte for byte
+  assert.equal(JSON.stringify(build(undefined)), JSON.stringify(build({ ...TRAIT_DEFAULTS })));
+  assert.equal(JSON.stringify(build(undefined)), JSON.stringify(build({})));
+
+  // spread: the attachment angle moves by exactly the trait; the hind pair follows at half
+  const base = build(undefined); const wide = build({ spread: 12 });
+  assert.ok(Math.abs(fore(wide)[0].rotation - fore(base)[0].rotation - 12) < 1e-6, 'fore wings open 12 degrees more');
+  assert.ok(Math.abs(hind(wide)[0].rotation - hind(base)[0].rotation - 6) < 1e-6, 'the hind pair follows at half');
+  assert.equal(body(wide).scale, body(base).scale, 'the body is untouched');
+
+  // wing size: the wings scale, the body does not; body size: the body scales, the wings do not
+  const big = build({ wing: 1.25 }); const fat = build({ body: 1.2 });
+  assert.ok(Math.abs(fore(big)[0].scale / fore(base)[0].scale - 1.25) < 1e-9);
+  assert.equal(body(big).scale, body(base).scale);
+  assert.ok(Math.abs(body(fat).scale / body(base).scale - 1.2) < 1e-9);
+  assert.ok(Math.abs(fore(fat)[0].scale - fore(base)[0].scale) < 1e-9, 'a bigger body does not make bigger wings');
+
+  // the joints hold at any trait: each fore wing's root still lands on the body's attach point
+  for (const t of [{ spread: 18, wing: 1.25, body: 0.85 }, { spread: -18, wing: 0.8, body: 1.2 }]) {
+    const items = build(t, full, { loopTimeMs: 0 });
+    const bodyPts = autoAttachPoints(asset(MOTH_PARTS.body).svg);
+    const wingPts = autoAttachPoints(asset(MOTH_PARTS.wing).svg);
+    const root = pointToward(wingPts, 'bottom');
+    const w = fore(items)[0]; const bd = body(items);
+    const th = (w.rotation * Math.PI) / 180;
+    const rx = w.x + (root.x * Math.cos(th) - root.y * Math.sin(th)) * w.scale;
+    const ry = w.y + (root.x * Math.sin(th) + root.y * Math.cos(th)) * w.scale;
+    const p = pointToward(bodyPts, 'right');
+    // the body may be hovering/beating: compare against the body's own pose
+    const bth = (bd.rotation * Math.PI) / 180;
+    const ex = bd.x + (p.x * Math.cos(bth) - p.y * Math.sin(bth)) * bd.scale;
+    const ey = bd.y + (p.x * Math.sin(bth) + p.y * Math.cos(bth)) * bd.scale;
+    assert.ok(Math.hypot(rx - ex, ry - ey) < 1e-6, `at ${JSON.stringify(t)} the wing root still meets the body's side point`);
+  }
+
+  // swatch: the wings take the rank asked for (0 = the most vivid, as today), the hind pair the next
+  const ink = '#eeeeee';
+  assert.equal(fore(base)[0].color, '#cc2200', 'default: the most vivid swatch');
+  assert.equal(fore(build({ swatch: 1 }))[0].color, '#2266cc', 'rank 1: the next');
+  assert.equal(hind(build({ swatch: 1 }))[0].color, '#aaaa22', 'the hind pair one rank further (ranked by colourfulness: #cc2200, #2266cc, #aaaa22, #33aa33)');
+  assert.equal(fore(build({ swatch: 3 }))[0].color, '#33aa33', 'the fourth most vivid');
+  assert.notEqual(fore(build({ swatch: 2 }))[0].color, ink);
+  // a palette with few swatches never crashes and never runs off the end
+  assert.doesNotThrow(() => build({ swatch: 3 }, full, { }));
+  const tiny = createCreatureBuilder(); const te = [{ id: 'a', items: [], palette: { bg: '#000', ink: '#fff', swatches: ['#f00'] } }];
+  assert.doesNotThrow(() => tiny.append(input({ dishTraits: [{ swatch: 3 }] }), te, ASSETS));
+
+  // extreme input is held to the ranges inside the builder, and pins are independent
+  const huge = build({ spread: 9999, wing: 9999, body: 9999 });
+  assert.ok(Math.abs(fore(huge)[0].rotation - fore(base)[0].rotation - 18) < 1e-6);
+  assert.ok(Math.abs(fore(huge)[0].scale / fore(base)[0].scale - 1.25) < 1e-9);
+  const two = (() => {
+    const b = createCreatureBuilder(); let e;
+    for (let i = 0; i < full; i++) {
+      e = [{ id: 'a', items: [], palette: PALETTE }];
+      b.append({ ...input(), dishPins: [{ x: 300, y: 350 }, { x: 700, y: 350 }], dishFormed: [true, true], dishLimbs: [1, 1], dishTraits: [{ spread: 15 }, null] }, e, ASSETS);
+    }
+    return real(e[0].items).filter((i) => i.assetId === MOTH_PARTS.wing);
+  })();
+  const left = two.filter((w) => w.x < 500); const right = two.filter((w) => w.x > 500);
+  assert.ok(Math.abs(Math.abs(left[0].rotation) - Math.abs(right[0].rotation) - 15) < 1e-6, 'one moth carries its traits, the next does not');
+}
+
 console.log('creature.selfcheck: ok (#1355 step 4, the moth)');
