@@ -80,7 +80,8 @@ export function createShiftTracker() {
   let slots = []; // per pin: { x, y, traits } for a formed pin
   const ordinals = [];
   return {
-    update(states, { seed = 0, seedOffsets = null, band = null, roomWidth = 1 } = {}) {
+    // `room`: { width, room } or a function returning one (called only when a moth is born: the room is read at birth)
+    update(states, { seed = 0, seedOffsets = null, band = null, roomWidth = 1, room = null } = {}) {
       const born = [];
       const next = new Array(states.length);
       const traits = new Array(states.length);
@@ -90,11 +91,13 @@ export function createShiftTracker() {
         const prev = slots[i] && slots[i].x === s.x && slots[i].y === s.y ? slots[i] : null;
         if (prev) { next[i] = prev; traits[i] = prev.traits; continue; }
         ordinals[i] = (ordinals[i] || 0) + 1;
-        const width = shiftWidthFor(band) * (Number.isFinite(roomWidth) ? Math.min(1, Math.max(0, roomWidth)) : 1);
+        const r = typeof room === 'function' ? room() : room;
+        const rw = r && Number.isFinite(r.width) ? r.width : roomWidth;
+        const width = shiftWidthFor(band) * (Number.isFinite(rw) ? Math.min(1, Math.max(0, rw)) : 1);
         const t = shiftFor({ seed, seedOffsets, pin: s, ordinal: ordinals[i], slot: i, width });
         next[i] = { x: s.x, y: s.y, traits: t };
         traits[i] = t;
-        born.push({ pin: i, x: s.x, y: s.y, traits: t, band: band ?? null, width: +width.toFixed(4) });
+        born.push({ pin: i, x: s.x, y: s.y, traits: t, band: band ?? null, width: +width.toFixed(4), room: (r && r.room) || null });
       }
       slots = next;
       return { traits, born };
@@ -103,15 +106,20 @@ export function createShiftTracker() {
   };
 }
 
-export const SHIFT_RECORD_VERSION = 1;
+export const SHIFT_RECORD_VERSION = 2;
 
-/** A take's `davis-shift` log: [frame, pin, spread, wing, body, swatch], in order. The log is authority; the traits also ride the input. */
+/**
+ * A take's `davis-shift` log: [frame, pin, spread, wing, body, swatch, room, lois, davis], in order: the room (0 = none)
+ * and the two Directors' states that gave the shift its width (`matrix-room`, roadmap Phase 4). The log is authority;
+ * the traits also ride the input.
+ */
 export function createShiftRecorder({ getFrame = () => 0 } = {}) {
   const events = [];
   return {
     update(born) {
       for (const e of born) {
-        events.push([getFrame() | 0, e.pin, +e.traits.spread.toFixed(3), +e.traits.wing.toFixed(4), +e.traits.body.toFixed(4), e.traits.swatch]);
+        events.push([getFrame() | 0, e.pin, +e.traits.spread.toFixed(3), +e.traits.wing.toFixed(4), +e.traits.body.toFixed(4), e.traits.swatch,
+          e.room ? e.room.n : 0, e.room ? e.room.lois : null, e.room ? e.room.davis : null]);
       }
     },
     finish() { return { version: SHIFT_RECORD_VERSION, events: events.map((e) => e.slice()) }; },

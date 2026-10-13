@@ -37,7 +37,10 @@ import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353
 import { initStress, DEBUG_STRESS } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
-import { observeFormation, getFormedPins, getLimbPairs, getPinTraits } from './curator/formationLive.js'; // #1355 step 3: when a spore would form
+import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomProvider } from './curator/formationLive.js';
+import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
+import { resolveLoisFace } from './curator/loisFace.js';
+import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
 import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider } from './gl/resolveTap.mjs';
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
@@ -87,12 +90,19 @@ function AppInner() {
     setFormedProvider(getFormedPins); // #1355 step 4: the moth grows on pins the rule has formed
     setLimbsProvider(getLimbPairs); // #1355 step 5: a crowded place grows its second pair of wings
     setTraitsProvider(getPinTraits); // #1356 step 2: Davis's birth shifts
+    // #1145 step 3 — the room, read from the honest feed at the moment a moth is born (never per frame)
+    setRoomProvider(() => {
+      const feed = loisActivity.snapshot();
+      const face = resolveLoisFace(feed);
+      const davis = resolveDavisState(feed);
+      return roomWidthFromCodes(face ? face.code : null, davis ? davis.code : null);
+    });
     const stop = initStress({
       getCounts: loisActivity.pressureCounts,
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

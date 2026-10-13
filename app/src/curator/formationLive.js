@@ -22,6 +22,7 @@ let limbs = [];
 const shiftTracker = createShiftTracker();
 let traits = [];
 let shiftTap = null;
+let roomProvider = null;
 let tap = null;
 let latest = Object.freeze({ states: [], band: null });
 let field = null;
@@ -50,6 +51,14 @@ export function getLimbPairs() {
 /** Each formed pin's traits (Davis's shifts, made once at birth), as of the last resolved frame; null for an unformed pin. */
 export function getPinTraits() {
   return traits;
+}
+
+/**
+ * Where a moth's birth reads the room (Phase 4 step 3): fn() => { width, room } from the two Directors' live states.
+ * Called only at a birth. Null = no room: the band's width as it was.
+ */
+export function setRoomProvider(fn) {
+  roomProvider = typeof fn === 'function' ? fn : null;
 }
 
 /** Observe Davis's birth shifts: fn(born) for frames that made any (the `davis-shift` events). One listener (or null). */
@@ -86,7 +95,10 @@ export function observeFormation(input, output, getBand = () => getStressState()
     states: r.states.map((s, i) => (s ? { ...s, attraction: attraction[i], density: density[i] } : null)),
   });
   limbs = limbTracker.update(latest.states);
-  const shifted = shiftTracker.update(latest.states, { seed: input && input.seed, seedOffsets: input && input.seedOffsets, band });
+  const shifted = shiftTracker.update(latest.states, {
+    seed: input && input.seed, seedOffsets: input && input.seedOffsets, band,
+    room: () => { try { return roomProvider ? roomProvider() : null; } catch { return null; } },
+  });
   traits = shifted.traits;
   if (shifted.born.length && shiftTap) { try { shiftTap(shifted.born); } catch { shiftTap = null; } }
   if (tap) tap(u, r.events);
