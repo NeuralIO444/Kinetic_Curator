@@ -86,7 +86,7 @@ Two rules make this replayable:
 | where it lives | spawn: fertility (the seed's hidden field) and crowd, in the middle first |
 | whether it forms | the formation rule, per band |
 | pairs of wings | the crowd at its home, over a held run |
-| spread, wing size, body size, wing colour | Davis, once, at birth; the band sets the width, the room narrows it |
+| spread, wing size, body size, wing colour | Davis, once, at birth; the band sets the width, the room narrows it, and the Queen's hidden hand nudges the centre toward the last 3 kept moths (8-keep gate, never shown) |
 | where the wings join | the body's ATTACH points: the shape's own, or the artist's edits from the wet lab (EDIT) |
 | how it sits in the picture | the layer's GROUND / EDGE / SNAP / SHADOW dials, the same functions the marks use |
 | how it moves | the layer's living-motion floor (DRIFT, BREATH, KINEME RATE, pause, shed), plus its own wing beat |

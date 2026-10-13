@@ -74,7 +74,7 @@ Stress is a weighted sum of three honest signals, re-weighted after decision 2:
 
 Issues: #1206, #1355. Plan: [`design/wet-lab-plan.md`](design/wet-lab-plan.md). Steps 1 (hierarchy core, #1377), 2 (pins + dish pressure, #1379/#1381, the ATTACH points #1380 and the pin's state mark #1421), 3 (the formation rule, #1400) and 4 (the moth, #1418) are built and merged (2026-10-13). Step 5 (limb count over a life, #1423: the crowd grows and sheds a second pair of wings) and the moth's hover (#1424) are merged too: Phase 3 is complete. #1419 found and fixed a long-standing defect on the way: the live canvas was drawn upside-down against scene coordinates, exports and the pointer.
 
-### Phase 4: influences *(open)*
+### Phase 4: influences *(steps 1 to 5 built; step 6 waits)*
 The three personae read the band and the room.
 
 - **Davis:** parametric shifts (scale, attachment angle, material bias) inside the current base type. Range width follows the band and room. Event: `davis-shift`.
@@ -83,7 +83,7 @@ The three personae read the band and the room.
 - Rooms stay as built (decision 4); dish pressure and taste pressure feed the existing states. Event: `matrix-room`.
 - **Exit:** the same recorded session produces the same influences on replay.
 
-Status: steps 1 to 3 merged (traits #1427, Davis shifts #1428, room width #1437). Step 4 (#1356): a crowded dish reads as Davis FLOW, a sparse one as SEEDLING, only when none of his own signals is true; the LOIS side (taste pressure) waits for the pass gesture (#1173). `matrix-room` is carried by the room field of each `davis-shift` record.
+Status: steps 1 to 5 built (traits #1427, Davis shifts #1428, room width #1437, the room reads the dish #1444, the birth leans toward the last 3 keeps #1451). Step 4: a crowded dish reads as Davis FLOW, a sparse one as SEEDLING, only when none of his own signals is true; the LOIS side (taste pressure) waits for the pass gesture (#1173). `matrix-room` is carried by the room field of each `davis-shift` record. Step 5 (Matt: N = 3, 5 if 3 swings): at a keep the living moths' traits go in a session ring; a later birth is rolled around a centre nudged 0.35 x the room's allowance toward their mean, behind the 8-keep gate, never shown. Exit: `gl/performanceCreatures.selfcheck.mjs` (the traits ride the resolver input, so a take replays the moths). **Step 6 (base types 2 to 4 and the Queen's order at a pinned head) waits for Matt's designs.**
 
 Issues: #1145, #1356, #1173 (pass gesture: upgrades taste pressure). Plan (draft): [`design/influences-plan.md`](design/influences-plan.md). As built: [`design/creatures-spec.md`](design/creatures-spec.md). Audit: [`research/backend-audit-2026-10-13.md`](research/backend-audit-2026-10-13.md).
 
