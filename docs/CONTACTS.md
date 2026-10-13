@@ -160,3 +160,52 @@ stays silent, so a default Look's summary line is unchanged. Every
 control change is an artist tweak in the honest feed via the bus (G7) —
 the system's own writers never emit `LAYOUT_PARAM`, which is what keeps
 the attribution honest.
+
+## Impact deform (#1410, petri dish B1)
+
+Contacts stop being billiard balls: a body that is hit — or pressed by
+a crowd — squashes along the collision axis and springs back. The law
+lives in `app/src/engine/dishDeform.mjs`; both contact passes (the
+per-system pass and the shared dish grid) take only a feed call site.
+
+- **Feed.** A resolved pair already knows its impulse and its overlap.
+  Each body's dent target is `max(impact, pressure)`: impact is the
+  body's normal Δv from the bounce/repel impulse × 0.06, pressure is
+  the overlap fraction (overlap / rsum) × 0.5. Max, never a sum — a
+  body pressed from three sides takes its worst dent, capped at 0.45.
+  The feed writes state only; positions and velocities are already
+  final when it runs.
+- **Spring.** Recovery is the Spine C (#389) critically-damped law,
+  `amt *= exp(-λ·dt)` at Spine C's base λ = 10 — the same spring the
+  heading uses, aimed at zero. Exponential decay is monotone by
+  construction: the dent settles with no overshoot and no oscillation.
+- **Wobble.** At rest, a membrane wobble (the ORGANIC character) rides
+  on top of the spring state: ±0.05 max, amplitude scaled by the body's
+  energy (liveness), phase from the step counter and the body's #558
+  uniqueness columns — deterministic per step count, so live and bake
+  agree. Impact and wobble compose as vectors in squash space.
+- **Render attribute only.** The step writes three render columns
+  (`deformAmt`, `deformAxisX/Y`); `getItems` forwards them when
+  non-zero; the contract carries `deform: [axisX, axisY, amount]` only
+  on dented instances (an undeformed contract — and its hash — is
+  exactly what it was); `QUAD_VS` applies the squash post-rotation in
+  world space, area-preserving (bulge = 1/(1−amt) across the axis),
+  gated on `amount > 0`. It rides the instance format as floats 21–23
+  (24-float stride, attribute location 7) — the #1129 PR2 pattern.
+  Contacts scenarios 22–23 pin the consequence: deform on vs off, and
+  reduced-motion vs full motion, are bit-identical in every physics
+  column. Golden placement hashes never see any of it.
+- **Stillness.** Under reduced-motion the rendered amount is 0 at every
+  step: no wobble, and a dent resolves to rest and holds (the spring
+  state still decays underneath, so leaving reduced-motion never pops
+  a stale dent). Physics is untouched.
+- **Governor.** Deform is cost tier 2 (`engine/dish-deform`) — on the
+  spec §7 ladder it sheds after the tier-1 finishes and before radius
+  fidelity and body counts. The shed applies at contract build
+  (`dishDeformShed` in `sceneContract.js`, the contact shadow's rule:
+  `perfTier1` on AND quality stepped to performance). Stills and
+  exports never shed it.
+- **Switch.** There is no artist knob: deform follows contacts. The
+  engine takes an update-level `deform: false` (spread-only, like
+  `dishSession`) that silences feed and render — the byte-identity
+  tests drive it; the governor shed is the live off-ramp.

@@ -109,6 +109,13 @@ export function mirrorItems(items, mirrorState, W, H) {
     // _mirrored); two reflections are a 180° turn — chirality restored.
     rotation: fx !== fy ? -item.rotation : item.rotation,
     ...(fx !== fy ? { _mirrored: true } : null),
+    // #1410 — a reflected copy's deform axis reflects with it, like its
+    // rotation. Only live swarm items carry the fields; placement items
+    // never do, so their mirrored copies are exactly what they were.
+    ...(item.deformAmt > 0 ? {
+      deformAxisX: fx ? -item.deformAxisX : item.deformAxisX,
+      deformAxisY: fy ? -item.deformAxisY : item.deformAxisY,
+    } : null),
     key: item.key ? `${item.key}-m${fx ? 'x' : ''}${fy ? 'y' : ''}` : undefined,
   });
   if (st === 'x' || st === 'xy') {

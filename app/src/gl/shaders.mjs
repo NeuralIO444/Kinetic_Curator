@@ -51,6 +51,7 @@ layout(location=3) in vec4 a_inst2;
 layout(location=4) in vec4 a_inst3;
 layout(location=5) in vec4 a_inst4;
 layout(location=6) in float a_glass;   // #1129 PR2: 1 = glass voice instance, 0 = enamel path
+layout(location=7) in vec3 a_def;      // #1410 petri B1: impact deform — (axisX, axisY, amount), world space; amount 0 = round
 uniform vec2 u_canvas;
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
@@ -126,6 +127,16 @@ void main() {
   float th = radians(a_inst1.x + kDeg);
   float co = cos(th), si = sin(th);
   vec2 rr = vec2(c.x * co - c.y * si, c.x * si + c.y * co);  // SVG rotate(), y-down
+  // #1410 petri B1 — impact deform: squash the mark along its collision
+  // axis (world space, post-rotation), area-preserving — the membrane
+  // bulges across the axis by the reciprocal, so a dent reads as
+  // pressure, not shrinkage. Amount 0 (every pre-B1 producer, every body
+  // at rest) never enters, so the quad is bit-for-bit the old path.
+  if (a_def.z > 0.0) {
+    vec2 dax = a_def.xy;
+    vec2 dalong = dax * dot(rr, dax);
+    rr = dalong * (1.0 - a_def.z) + (rr - dalong) / (1.0 - a_def.z);
+  }
   // #309 velocity smear: per-frame displacement (scene units) rides in
   // a_inst2.zw. The quad stretches along its own motion direction — the
   // trail system lives on the objects, zero fullscreen passes. At rest

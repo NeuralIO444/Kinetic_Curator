@@ -73,7 +73,7 @@ function hexColor(c, fallback = '#000000') {
  * Map one placement item to a contract instance (an instanced quad).
  * Draw order = array order; the backend must not re-sort.
  */
-function toInstance(item, layerId, itemBlend) {
+function toInstance(item, layerId, itemBlend, deformShed = false) {
   const s = Number(item.scale) || 0;
   const mirrored = !!item._mirrored;
   // #1202 — non-uniform scale: item.scaleY rides the Y range when X/Y are
@@ -99,6 +99,14 @@ function toInstance(item, layerId, itemBlend) {
     zTier: Number(item.zTier) || 0,
     key: String(item.key ?? ''),
     seedOffset: Number(item.seedOffset) || 0,
+    // #1410 — petri dish B1 impact deform: [axisX, axisY, amount], the
+    // world-space squash QUAD_VS applies (area-preserving). The key rides
+    // only on a body that is actually dented or wobbling, and never when
+    // shed, so an undeformed contract (and its hash) is exactly what it
+    // was before B1.
+    ...(item.deformAmt > 0 && !deformShed
+      ? { deform: [r3(item.deformAxisX || 0), r3(item.deformAxisY || 0), r3(Math.min(1, item.deformAmt))] }
+      : {}),
   };
 }
 
@@ -231,6 +239,18 @@ export function contactShadowShed(doc) {
 }
 
 /**
+ * #1410 petri dish B1 — is impact deform shed? Same tier-2 rung as the
+ * contact shadow, by the same rule (spec §7 ladder: FX finishes first,
+ * then deform, then radius fidelity and body counts): it goes only after
+ * the tier-1 extras are already gone (perfTier1) AND quality has stepped
+ * down to performance. Exports and stills never shed it — their docs do
+ * not carry the live governor state, so the predicate is false there.
+ */
+export function dishDeformShed(doc) {
+  return !!(doc && doc.perfTier1) && String(doc.quality || '') === 'performance';
+}
+
+/**
  * #1183 — a content layer's contact shadow for the contract, or null (the key is then omitted, so every contract
  * without a shadow, and its hash, is exactly what it was). Needs the knob above 0 and a PATTERN below (decision 4).
  */
@@ -256,6 +276,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
   );
 
   const shadowShed = contactShadowShed(doc); // #1183
+  const deformShed = dishDeformShed(doc); // #1410
   let groundBelow = false; // #1183: a visible PATTERN layer has been laid down below the current one
   for (const rl of resolvedLayers) {
     if (rl.isFx && !rl.isMath) {
@@ -326,7 +347,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     const layerSpin = spinOf(rl.layoutParams?.rotateSpin);
     for (const item of rl.items || []) {
       assetIds.add(String(item.assetId));
-      const inst = toInstance(item, layerId, itemBlend);
+      const inst = toInstance(item, layerId, itemBlend, deformShed);
       if (layerSpin) spinning.set(inst, layerSpin);
       instances.push(inst);
     }
@@ -497,6 +518,14 @@ export function assertSceneContract(scene) {
       if (!Number.isFinite(it[k])) fail(`instance ${it.key}: ${k} must be finite`);
     }
     if (it.opacity < 0 || it.opacity > 1) fail(`instance ${it.key}: opacity out of range`);
+    if (it.deform !== undefined) { // #1410 impact deform
+      const d = it.deform;
+      if (!Array.isArray(d) || d.length !== 3 || !d.every(Number.isFinite)) {
+        fail(`instance ${it.key}: deform must be [axisX, axisY, amount] of finite numbers`);
+      }
+      if (Math.abs(Math.hypot(d[0], d[1]) - 1) > 0.01) fail(`instance ${it.key}: deform axis must be a unit vector`);
+      if (!(d[2] > 0 && d[2] <= 1)) fail(`instance ${it.key}: deform amount must be in (0, 1]`);
+    }
   }
   return true;
 }

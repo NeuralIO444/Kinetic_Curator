@@ -28,6 +28,7 @@
 
 import { createNoise } from './noise.js';
 import { runDishContacts, contactBodyRadius } from './dishContacts.mjs'; // #1407 — cross-strata shared grid (call site below); #1408 — the shared radius law
+import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mjs'; // #1410 — impact deform (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -146,6 +147,10 @@ export class ParticleSystem {
     // #710 — behave id seen by the last update(). update() re-seeds the
     // Lorenz phase state on entry into the lorenz behave (see below).
     this._lastBehave = null;
+    // #1410 — deform switch as last seen by update() (params carry it
+    // spread-only, like dishSession). Undefined until the first update:
+    // the dish feed reads it as ON, matching the params default.
+    this._deformOn = undefined;
     // Authored population from the last init — tracked separately from the
     // runtime population (this.n), which `breed` grows past the authored
     // count. update() re-inits only when the authored count changes, so
@@ -168,6 +173,16 @@ export class ParticleSystem {
     // #1408 — per-particle contact radius trim (from the asset record at
     // spawn; see assetRadiusTrim). 1 = the mark's disc is its live scale.
     this.contactTrim = new Float64Array(cap).fill(1);
+    // #1410 — petri dish B1 deform columns (law in dishDeform.mjs).
+    // deformMem/MemX/MemY: the spring state (dent amount + axis).
+    // deformAmt/AxisX/AxisY: the rendered squash getItems forwards.
+    // Render-only: no physics loop ever reads them.
+    this.deformMem = new Float64Array(cap);
+    this.deformMemX = new Float64Array(cap).fill(1);
+    this.deformMemY = new Float64Array(cap);
+    this.deformAmt = new Float64Array(cap);
+    this.deformAxisX = new Float64Array(cap).fill(1);
+    this.deformAxisY = new Float64Array(cap);
     this.scale = new Float64Array(cap);
     // #451 — scale before the #287 breath multiplier, so a sort key can
     // rank items by their designed size without the ±50% breath swing
@@ -241,6 +256,12 @@ export class ParticleSystem {
     this.ay = grow(this.ay);
     this.mass = grow(this.mass);
     this.contactTrim = grow(this.contactTrim);
+    this.deformMem = grow(this.deformMem);
+    this.deformMemX = grow(this.deformMemX);
+    this.deformMemY = grow(this.deformMemY);
+    this.deformAmt = grow(this.deformAmt);
+    this.deformAxisX = grow(this.deformAxisX);
+    this.deformAxisY = grow(this.deformAxisY);
     this.scale = grow(this.scale);
     this.baseScale = grow(this.baseScale);
     this.rotation = grow(this.rotation);
@@ -331,6 +352,9 @@ export class ParticleSystem {
     // breed sequence, and the freelist belong to the old population.
     this._dead = [];
     this._breedSeq = 0;
+    // #1410 — a fresh cast starts undented.
+    this.deformMem.fill(0);
+    this.deformAmt.fill(0);
     // #278 — colors were just (re)assigned from this swatch set.
     this._colorSig = (palette?.swatches || ['#ffffff']).join('|');
     // #710 — a (re)init is a fresh cast: the next update re-evaluates the
@@ -641,6 +665,9 @@ export class ParticleSystem {
             Y[j] = Y[j] + ny * corr * w2;
             // Relative normal velocity, pre-impulse.
             const vn = (VX[j] - VX[i]) * nx + (VY[j] - VY[i]) * ny;
+            // #1410 — per-body normal Δv this resolution hands out, for
+            // the deform feed below (impulse magnitude, not direction).
+            let dvI = 0; let dvJ = 0;
             // 2 — bounce / stick impulse on approach.
             if (vn < 0 && canImpulse) {
               const jimp = (-(1 + e) * vn) / wSum;
@@ -648,6 +675,7 @@ export class ParticleSystem {
               VY[i] -= ny * jimp * w1;
               VX[j] += nx * jimp * w2;
               VY[j] += ny * jimp * w2;
+              dvI += jimp * w1; dvJ += jimp * w2;
             }
             // 3 — repel: same-layer personal space, extra separating
             // velocity scaled by overlap fraction. Independent of approach:
@@ -658,7 +686,13 @@ export class ParticleSystem {
               VY[i] -= ny * jr * w1;
               VX[j] += nx * jr * w2;
               VY[j] += ny * jr * w2;
+              dvI += jr * w1; dvJ += jr * w2;
             }
+            // #1410 — the dent: this resolution's impulse + pressure feed
+            // both bodies' deform springs (law in dishDeform.mjs; this
+            // file takes the call site only). State only — positions and
+            // velocities are already final for this pair.
+            feedDishDeform(this, i, this, j, nx, ny, dvI, dvJ, overlap, rsum);
             // 4 — events fire on approach only, so a resting pair doesn't
             // strobe its response every step.
             if (vn >= 0) continue;
@@ -771,6 +805,7 @@ export class ParticleSystem {
     this.leakRgb[cs * 3] = this.leakRgb[cp3];
     this.leakRgb[cs * 3 + 1] = this.leakRgb[cp3 + 1];
     this.leakRgb[cs * 3 + 2] = this.leakRgb[cp3 + 2];
+    clearDishDeform(this, cs); // #1410 — a newborn starts undented
     return cs;
   }
 
@@ -790,6 +825,12 @@ export class ParticleSystem {
     const T = this._trig; // #1240 — trig source (native Math.* by default)
     this._step += 1;
     this._layout = layoutParams;
+    // #1410 — the deform switch and the stillness flag ride the params
+    // spread-only, like dishSession: never serialized, absent = on /
+    // motion allowed. Read here so the dish feed (which runs inside
+    // another system's update) and the end-of-step composer agree.
+    this._deformOn = layoutParams.deform !== false;
+    const deformStill = !!layoutParams.reducedMotion;
     // #710 — restart-from-seed: entering the lorenz behave re-seeds every
     // agent's Lorenz phase state from the seeded hashes, so re-tapping the
     // pill restarts the identical dance (rehearsable) — never a random one,
@@ -1416,6 +1457,12 @@ export class ParticleSystem {
         this.color[i] = rgb3ToHex(q(LEAKRGB[o3]), q(LEAKRGB[o3 + 1]), q(LEAKRGB[o3 + 2]));
       }
     }
+
+    // #1410 — petri dish B1: advance the deform springs and compose the
+    // rendered squash (law in dishDeform.mjs; this file takes the call
+    // site only). Render state only — nothing in the physics above reads
+    // it, so the step is free to run or not without moving a single body.
+    stepDishDeform(this, dtSec, { reducedMotion: deformStill });
   }
 
   getItems(activeAssets) {
@@ -1445,6 +1492,12 @@ export class ParticleSystem {
           vx: this.vx[i], vy: this.vy[i],
           // Spine C (#389): per-agent phase for layered life
           seedOffset: this.seedOffset[i],
+          // #1410 — impact deform rides the item only while the body is
+          // dented or wobbling; at rest the fields are absent, so a rest
+          // item is exactly the pre-B1 item.
+          ...(this.deformAmt[i] > 0
+            ? { deformAmt: this.deformAmt[i], deformAxisX: this.deformAxisX[i], deformAxisY: this.deformAxisY[i] }
+            : null),
           ...this._uniqueness(i),
         });
       }
@@ -1476,6 +1529,11 @@ export class ParticleSystem {
       // #287 — grazer flag rides every item of a grazer organism so the
       // instance mapping can stamp it in the palette bg (eroders).
       const gz = this.grazer[i] === 1;
+      // #1410 — the body's deform rides its spine segments (not the
+      // wings: appendages at a reach offset are not the body mass).
+      const dfm = this.deformAmt[i] > 0
+        ? { deformAmt: this.deformAmt[i], deformAxisX: this.deformAxisX[i], deformAxisY: this.deformAxisY[i] }
+        : null;
       const sp = this.spine[i] && this.spine[i].length ? this.spine[i] : [{ x: px, y: py }];
       const vx = this.vx[i];
       const vy = this.vy[i];
@@ -1489,6 +1547,7 @@ export class ParticleSystem {
           key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
           vx, vy,
           seedOffset: this.seedOffset[i],
+          ...(dfm || null), // #1410 — see above
           ...this._uniqueness(i),
         });
       }

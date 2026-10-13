@@ -7,7 +7,7 @@
  *  - the dead-zone comment/code (2 alpha steps) is preserved in the wide-tap
  *    variant — it kills quantization banding on flat faces at any tap distance;
  *  - the unlit path is byte-identical: v_glass never leaks outside the sun block;
- *  - the instance stride carries the glass flag (21 floats, flag at [20]);
+ *  - the instance stride carries the glass flag (flag at [20]; stride grew to 24 floats in #1410);
  *  - the variant declares its GPU cost tier honestly (tier 0: no new fetches).
  *
  * Run: node --test src/gl/glassBevel.selfcheck.mjs
@@ -73,20 +73,20 @@ test('vertex stage carries the glass flag: attrib 6 in, varying out', () => {
   assert.ok(QUAD_FS.includes('in float v_glass;'), 'fragment stage declares the varying');
 });
 
-test('packInstanceData: 21-float stride, glass flag at [20], old producers read 0', () => {
+test('packInstanceData: 24-float stride, glass flag at [20], old producers read 0', () => {
   const cells = { 'a|#ffffff|#000000': { u0: 0, v0: 0, u1: 0.5, v1: 0.5 } };
   const mk = (glass) => ({
     x: 1, y: 2, scaleX: 1, scaleY: 1, rotation: 0, opacity: 0.5,
     asset: 'a', tint: '#ffffff', accent: '#000000', ...(glass === undefined ? {} : { glass }),
   });
   const data = packInstanceData([mk(true), mk(false), mk(undefined)], cells);
-  assert.equal(data.length, 63, '3 instances × 21 floats');
+  assert.equal(data.length, 72, '3 instances × 24 floats (21 through #1129 PR2, +deform vec3 in #1410)');
   assert.equal(data[20], 1, 'glass:true → 1');
-  assert.equal(data[41], 0, 'glass:false → 0');
-  assert.equal(data[62], 0, 'missing flag (old producers) → 0 = enamel');
+  assert.equal(data[44], 0, 'glass:false → 0');
+  assert.equal(data[68], 0, 'missing flag (old producers) → 0 = enamel');
   // The first 20 floats of a glass item match a non-glass item bit-for-bit:
   // the flag rides after, never inside, the existing channels.
-  for (let i = 0; i < 20; i++) assert.equal(data[i], data[21 + i], `float ${i} identical`);
+  for (let i = 0; i < 20; i++) assert.equal(data[i], data[24 + i], `float ${i} identical`);
 });
 
 test('cost tier declared honestly: tier 0, no new texture fetches', () => {
