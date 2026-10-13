@@ -5,6 +5,10 @@
 //   handler: 'wire'         handled in wireEventBus.js (turned into a store action through dispatchPipe)
 //            [paths]        handled in those modules (UI or telemetry reacting to the event)
 //            null           no handler (must carry a note: reserved or telemetry)
+// REQUEST / REPLY, direct by design (not events): importTaste, importShelf and importUserVoices return a receipt the
+// UI shows ("kept 3 of 5"); an event is fire-and-forget and cannot carry it back. They move onto a reply channel with
+// the mind.* work (#1462), which needs the same shape. Per-frame and governor writes (beat pulse, audio bands, FPS,
+// shed ladder, morph) also stay direct: telemetry, not user decisions.
 // Emitters are not listed: they are derived from source by eventRegistry.selfcheck.mjs, which fails on an event
 // nobody emits unless its note says reserved/telemetry.
 export const EVENT_REGISTRY = {
@@ -148,4 +152,7 @@ export const EVENT_REGISTRY = {
   AUDIO_SIDECAR: { handler: 'wire' },
   MIDI_ENABLED: { handler: 'wire' },
   STARTUP_MODE: { handler: 'wire' },
+  PROJECT_TITLE: { handler: 'wire' },
+  TASTE_EXPERIMENTAL: { handler: 'wire' },
+  TASTE_CLEAR: { handler: 'wire' },
 };
