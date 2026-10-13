@@ -1,7 +1,7 @@
 // Dev-menu units maker and debug log. Pure. CI still runs the file you save.
 
 export const UNIT_TRIO = {
-  selfcheck: ['paletteImportCopy', 'units'],
+  selfcheck: ['paletteImportCopy', 'clock.freeze', 'units'],
   playwright: ['smoke', 'living-boot', 'director-regroup'],
   qa: ['palette-import', 'wash-mode', 'fx-finish-grain-rgb'],
 };
