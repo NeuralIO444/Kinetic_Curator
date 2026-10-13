@@ -24,9 +24,11 @@ export const createAudioSlice = (set) => ({
   // one is loaded and valid, else null. `audioSidecarNote` says why a pick was
   // refused (shown honestly in SOURCE). Session state, like the file URL itself:
   // not part of the project document.
-  // #790 — the scene's audio route table: null = today's default routes.
+  // #790 — the scene's audio route table: null = today's default routes, [] = no routes.
+  // #1477 — a FRESH project starts with [] (all off): turn audio on, press AUTO. A document saved before this carries
+  // no table and still loads as the default (null), so old sessions are untouched.
   // Scene-level (saved in the project, undoable), never carried by voices.
-  audioRoutes: null,
+  audioRoutes: [],
   audioSidecar: null,
   audioSidecarNote: '',
 
