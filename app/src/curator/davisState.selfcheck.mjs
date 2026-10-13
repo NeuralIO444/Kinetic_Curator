@@ -121,4 +121,17 @@ ok('the MACHINE is not the artist: a dead-frame re-deal is muted from every ledg
   r.act.stop();
 });
 
+ok('the dish fills the silence: crowded reads FLOW, sparse reads SEEDLING, no pins read nothing (#1356 step 4)', () => {
+  assert.equal(resolveDavisState({ dishPressure: null }), null, 'no pins, no opinion');
+  assert.equal(resolveDavisState({}), null);
+  assert.equal(resolveDavisState({ dishPressure: 0.3 }), null, 'the middle is silence too');
+  assert.equal(resolveDavisState({ dishPressure: 0.5 }).code, 'FLOW');
+  assert.equal(resolveDavisState({ dishPressure: 0.05 }).code, 'SEEDLING');
+  assert.equal(resolveDavisState({ dishPressure: 0 }).code, 'SEEDLING', 'pins placed and nothing near them');
+  // the artist's own signals always win
+  assert.equal(resolveDavisState({ dishPressure: 0.9, passesLast2m: 5 }).code, 'UGLY');
+  assert.equal(resolveDavisState({ dishPressure: 0, rollsLastMinute: 3 }).code, 'FLOW');
+  assert.equal(resolveDavisState({ dishPressure: Number.NaN }), null, 'a broken reading is silence, not a state');
+});
+
 console.log(`davisState.selfcheck: ${n} checks passed`);

@@ -10,7 +10,9 @@
 //   STUCK     one seed for a long time, rolled on repeatedly, nothing kept
 //   SEEDLING  a fresh seed just dropped
 //   FLOW      rolls at a good clip
-// Priority: BLOOM > UGLY > STUCK > SEEDLING > FLOW > (none).
+//   (the dish, #1356 step 4) when no signal above is true and pins are placed: a crowded dish reads as FLOW, a
+//   sparse one as SEEDLING. The artist's own rolling and keeping always wins; the dish only fills the silence.
+// Priority: BLOOM > UGLY > STUCK > SEEDLING > FLOW > dish crowded (FLOW) > dish sparse (SEEDLING) > (none).
 //
 // A PASS is a roll (CURATOR, a KIN tap, or an EVOLVE fire) that replaced a frame nobody kept. EVOLVE fires count:
 // with LOIS away and the generator running unattended, the room is DAVIS ALONE, and that is only honest if
@@ -24,6 +26,8 @@ export const DAVIS_SEEDLING_MS = 20 * 1000; // a seed this young is a seedling
 export const DAVIS_STUCK_MS = 2 * 60 * 1000; // one seed this long...
 export const DAVIS_STUCK_ROLLS = 6; // ...rolled on at least this many times, nothing kept
 export const DAVIS_BLOOM_MS = 60 * 1000; // the payoff holds this long
+export const DAVIS_DISH_CROWDED = 0.5; // dish pressure (0..1) at or above this reads as FLOW
+export const DAVIS_DISH_SPARSE = 0.1; // at or below this, with pins placed, reads as SEEDLING
 
 export const DAVIS_STATES = {
   BLOOM: { code: 'BLOOM', label: 'The sifting paid off.' },
@@ -43,5 +47,9 @@ export function resolveDavisState(feed = {}) {
   if ((f.seedAgeMs || 0) >= DAVIS_STUCK_MS && (f.rollsSinceSeed || 0) >= DAVIS_STUCK_ROLLS && !f.keptThisSeed) return DAVIS_STATES.STUCK;
   if (f.seedDropped && (f.seedAgeMs ?? Infinity) < DAVIS_SEEDLING_MS) return DAVIS_STATES.SEEDLING;
   if ((f.rollsLastMinute || 0) >= DAVIS_FLOW_ROLLS) return DAVIS_STATES.FLOW;
+  if (Number.isFinite(f.dishPressure)) { // null / absent: no pins, no opinion
+    if (f.dishPressure >= DAVIS_DISH_CROWDED) return DAVIS_STATES.FLOW;
+    if (f.dishPressure <= DAVIS_DISH_SPARSE) return DAVIS_STATES.SEEDLING;
+  }
   return null;
 }

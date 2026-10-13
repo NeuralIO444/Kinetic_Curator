@@ -54,13 +54,20 @@ export function dishPressure(pins, entries, canvasW, canvasH) {
 }
 
 let latest = 0;
+let pinCount = 0;
 
 /** The resolver frame tap (gl/resolveTap.mjs): keep the latest reading for the stress tracker. */
 export function observeDish(input, output) {
+  pinCount = input && Array.isArray(input.dishPins) ? input.dishPins.length : 0;
   latest = dishPressure(input && input.dishPins, output, input && input.canvasW, input && input.canvasH);
 }
 
 /** The latest dish pressure, 0..1. 0 until a frame with pins has been resolved. */
 export function getDishPressure() {
   return latest;
+}
+
+/** #1356 step 4 — the room's reading: the dish's pressure, or null while there are no pins (an empty dish has no opinion). */
+export function getDishReading() {
+  return pinCount > 0 ? latest : null;
 }
