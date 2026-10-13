@@ -83,7 +83,7 @@ The three personae read the band and the room.
 - Rooms stay as built (decision 4); dish pressure and taste pressure feed the existing states. Event: `matrix-room`.
 - **Exit:** the same recorded session produces the same influences on replay.
 
-Issues: #1145, #1356, #1173 (pass gesture: upgrades taste pressure). Plan (draft): [`design/influences-plan.md`](design/influences-plan.md).
+Issues: #1145, #1356, #1173 (pass gesture: upgrades taste pressure). Plan (draft): [`design/influences-plan.md`](design/influences-plan.md). As built: [`design/creatures-spec.md`](design/creatures-spec.md). Audit: [`research/backend-audit-2026-10-13.md`](research/backend-audit-2026-10-13.md).
 
 ---
 
