@@ -25,7 +25,8 @@ import { sanitizeMidiMap } from '../../midi/map.mjs';
 import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegions, normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
-import { placePin } from '../../curator/dishPins.js';
+import { sanitizePins } from '../../curator/dishPins.js';
+import { sanitizeCount } from '../../curator/spawn.js';
 import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
@@ -381,12 +382,12 @@ export const createGlobalSlice = (set) => ({
   }),
   setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
-  // #1355 — wet-lab pins. Session state: a pin belongs to the take, not the saved project.
+  // #1355 AUTO SPAWN: the artist sets how many creatures (0 to 4); each finds its own home in the middle of the dish and
+  // the homes are published here as `dishPins`, which the resolver reads (so a take records them). Not set by hand.
+  creatureCount: 0,
+  setCreatureCount: (n) => set({ creatureCount: sanitizeCount(n) }),
   dishPins: [],
-  pinArmed: false,
-  setPinArmed: (on) => set({ pinArmed: !!on }),
-  placeDishPin: (pt, add) => set((state) => ({ dishPins: placePin(state.dishPins, pt, { add: !!add }) })),
-  clearDishPins: () => set({ dishPins: [] }),
+  setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) => set({
     slowRender: slow,
     slowRenderSource: slow ? (source || 'cut6') : null,
@@ -740,6 +741,8 @@ export const createGlobalSlice = (set) => ({
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
     next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
     next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
+    next.creatureCount = sanitizeCount(doc.creatureCount); // #1355 AUTO SPAWN: homes are found again for the new dish
+    next.dishPins = [];
     next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
     next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
     {
