@@ -97,6 +97,24 @@ export function getLimbPairs() {
   }
 }
 
+let traitsProvider = null;
+
+/** Register where the loop reads each moth's traits (curator/formationLive.js getPinTraits). */
+export function setTraitsProvider(fn) {
+  traitsProvider = typeof fn === 'function' ? fn : null;
+}
+
+/** [traits|null] per pin from the last resolved frame; [] with no provider. A bad provider reads as none. */
+export function getPinTraits() {
+  if (traitsProvider === null) return [];
+  try {
+    const t = traitsProvider();
+    return Array.isArray(t) ? t : [];
+  } catch {
+    return [];
+  }
+}
+
 let resetRequested = false;
 
 /**

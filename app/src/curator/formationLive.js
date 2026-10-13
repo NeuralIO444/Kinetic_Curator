@@ -14,10 +14,14 @@ import { pinPressures } from './dishPressure.js';
 import { sanitizePins } from './dishPins.js';
 import { getStressState } from './stressLive.js';
 import { createLimbTracker } from './limbs.js';
+import { createShiftTracker } from './davisShift.js';
 
 let tracker = createFormationTracker();
 const limbTracker = createLimbTracker();
 let limbs = [];
+const shiftTracker = createShiftTracker();
+let traits = [];
+let shiftTap = null;
 let tap = null;
 let latest = Object.freeze({ states: [], band: null });
 let field = null;
@@ -43,12 +47,24 @@ export function getLimbPairs() {
   return limbs;
 }
 
+/** Each formed pin's traits (Davis's shifts, made once at birth), as of the last resolved frame; null for an unformed pin. */
+export function getPinTraits() {
+  return traits;
+}
+
+/** Observe Davis's birth shifts: fn(born) for frames that made any (the `davis-shift` events). One listener (or null). */
+export function setShiftTap(fn) {
+  shiftTap = typeof fn === 'function' ? fn : null;
+}
+
 /** Start over (tests; and a take starts from fresh formation state, like the fresh resolver `rec` asks for). */
 export function resetFormation() {
   tracker = createFormationTracker();
   latest = Object.freeze({ states: [], band: null });
   limbTracker.reset();
   limbs = [];
+  shiftTracker.reset();
+  traits = [];
 }
 
 /** The resolver frame tap. `getBand` is injectable for tests; live it is the stress tracker's band. */
@@ -70,6 +86,9 @@ export function observeFormation(input, output, getBand = () => getStressState()
     states: r.states.map((s, i) => (s ? { ...s, attraction: attraction[i], density: density[i] } : null)),
   });
   limbs = limbTracker.update(latest.states);
+  const shifted = shiftTracker.update(latest.states, { seed: input && input.seed, seedOffsets: input && input.seedOffsets, band });
+  traits = shifted.traits;
+  if (shifted.born.length && shiftTap) { try { shiftTap(shifted.born); } catch { shiftTap = null; } }
   if (tap) tap(u, r.events);
   return r;
 }

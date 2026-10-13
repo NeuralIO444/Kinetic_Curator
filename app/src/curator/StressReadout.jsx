@@ -3,7 +3,7 @@
 // three signals, the smoothed stress and the band. Nothing reads the band yet (Phase 4).
 import { useEffect, useState } from 'react';
 import { getStressState } from './stressLive.js';
-import { getFormationState, getLimbPairs } from './formationLive.js'; // #1355 step 3
+import { getFormationState, getLimbPairs, getPinTraits } from './formationLive.js'; // #1355 step 3
 import { FORM_HOLD_FRAMES, thresholdsFor } from './formation.js';
 
 const pct = (v) => `${Math.round((Number.isFinite(v) ? v : 0) * 100)}`.padStart(3, ' ');
@@ -33,7 +33,9 @@ export function StressReadout() {
         const t = thresholdsFor(f.band);
         const state = p.formed ? 'FORMED' : `spore ${String(p.hold).padStart(2, ' ')}/${FORM_HOLD_FRAMES}`;
         const pairs = p.formed ? `  wings x${(getLimbPairs()[i] || 1) * 2}` : '';
-        return `\npin ${i + 1}  attract ${pct(p.attraction)}/${pct(t.attraction)}  crowd ${pct(p.density)}/${pct(t.density)}  ${state}${pairs}`;
+        const tr = p.formed ? getPinTraits()[i] : null;
+        const shift = tr ? `\n       spread ${tr.spread >= 0 ? '+' : ''}${tr.spread.toFixed(0)}  wing x${tr.wing.toFixed(2)}  body x${tr.body.toFixed(2)}  swatch ${tr.swatch}` : '';
+        return `\npin ${i + 1}  attract ${pct(p.attraction)}/${pct(t.attraction)}  crowd ${pct(p.density)}/${pct(t.density)}  ${state}${pairs}${shift}`;
       })}
     </div>
   );

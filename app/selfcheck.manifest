@@ -260,6 +260,7 @@ node src/curator/dishPins.selfcheck.mjs
 node src/engine/assetAttach.selfcheck.mjs
 node src/engine/creature.selfcheck.mjs
 node src/curator/limbs.selfcheck.mjs
+node src/curator/davisShift.selfcheck.mjs
 node src/curator/dishPressure.selfcheck.mjs
 node src/curator/refineMutate.selfcheck.mjs
 node src/curator/transitions.selfcheck.mjs
