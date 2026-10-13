@@ -4,7 +4,7 @@
 **Source:** Matt's draft of 2026-10-10 ("KC1_Roadmap_Petri_Dish_Affective"), revised with the six decisions recorded below.
 **Scope:** desktop and iPad first. Live stage use is welcome but is not the design driver. No live AI inside the app.
 
-One phase is open at a time. **Phase 3 is open** (status 2026-10-12): Phases 1 and 2 are complete.
+One phase is open at a time. **Phase 4 is open** (status 2026-10-13): Phases 1, 2 and 3 are complete.
 
 ---
 
@@ -64,7 +64,7 @@ Stress is a weighted sum of three honest signals, re-weighted after decision 2:
 - A stress/band readout exists as a **dev-only** overlay (URL flag), never as shipped chrome.
 - **Exit:** bands change deterministically from a recorded log, and the telemetry is enough to retune thresholds.
 
-### Phase 3: wet lab and hierarchy *(open)*
+### Phase 3: wet lab and hierarchy *(complete, 2026-10-13)*
 - The asset panel is the bio wet lab.
 - A **pin** marks a privileged location only (spore-like). It does not create a hierarchy immediately.
 - A hierarchy (head + body + limbs) forms only when **both** are true: attraction strength or field value at the pin exceeds a band-modulated threshold, **and** neighbour/density pressure around the pin exceeds a band-modulated threshold.
@@ -72,9 +72,9 @@ Stress is a weighted sum of three honest signals, re-weighted after decision 2:
 - New event types: `pin`, `hierarchy-form`.
 - **Exit:** a pinned spore becomes a creature under the two conditions, replayably.
 
-Issues: #1206, #1355. Plan: [`design/wet-lab-plan.md`](design/wet-lab-plan.md). Steps 1 (hierarchy core, #1377), 2 (pins + dish pressure, #1379/#1381, the ATTACH points #1380 and the pin's state mark #1421), 3 (the formation rule, #1400) and 4 (the moth, #1418) are built and merged (2026-10-13). Step 5 (limb count over a life) is next and waits for Matt's decisions on how a life changes the limbs. #1419 found and fixed a long-standing defect on the way: the live canvas was drawn upside-down against scene coordinates, exports and the pointer.
+Issues: #1206, #1355. Plan: [`design/wet-lab-plan.md`](design/wet-lab-plan.md). Steps 1 (hierarchy core, #1377), 2 (pins + dish pressure, #1379/#1381, the ATTACH points #1380 and the pin's state mark #1421), 3 (the formation rule, #1400) and 4 (the moth, #1418) are built and merged (2026-10-13). Step 5 (limb count over a life, #1423: the crowd grows and sheds a second pair of wings) and the moth's hover (#1424) are merged too: Phase 3 is complete. #1419 found and fixed a long-standing defect on the way: the live canvas was drawn upside-down against scene coordinates, exports and the pointer.
 
-### Phase 4: influences
+### Phase 4: influences *(open)*
 The three personae read the band and the room.
 
 - **Davis:** parametric shifts (scale, attachment angle, material bias) inside the current base type. Range width follows the band and room. Event: `davis-shift`.
@@ -83,7 +83,7 @@ The three personae read the band and the room.
 - Rooms stay as built (decision 4); dish pressure and taste pressure feed the existing states. Event: `matrix-room`.
 - **Exit:** the same recorded session produces the same influences on replay.
 
-Issues: #1145, #1356, #1173 (pass gesture: upgrades taste pressure).
+Issues: #1145, #1356, #1173 (pass gesture: upgrades taste pressure). Plan (draft): [`design/influences-plan.md`](design/influences-plan.md).
 
 ---
 
