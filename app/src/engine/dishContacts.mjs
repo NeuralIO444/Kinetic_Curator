@@ -37,6 +37,26 @@
 const TAU = Math.PI * 2;
 
 /**
+ * The one radius law (#1408, petri dish A2), shared by this pass and the
+ * per-system pass in particles.js: a body's contact disc is
+ *   base × liveScale × assetTrim
+ * where `base` is the stratum's contactRadius (the px disc of a scale-1,
+ * trim-1 mark), `liveScale` is the body's `scale` column — the live
+ * attribute path, so growth, shrink, and the breath pulse size the disc
+ * every frame — and `assetTrim` is the per-particle trim resolved from
+ * the asset record's `radiusTrim` (default 1.0). A non-positive or
+ * non-finite scale/trim reads as its neutral value's guard: scale falls
+ * back to 1 (an unreadable size is a unit mark, not a ghost), trim to 1;
+ * a scale of exactly 0 is a zero-size mark and honestly has no disc.
+ * Pure function of state — no Math.random / Date.now.
+ */
+export function contactBodyRadius(base, scale, trim) {
+  const s = Number.isFinite(scale) ? Math.max(0, scale) : 1;
+  const t = Number.isFinite(trim) && trim > 0 ? trim : 1;
+  return base * s * t;
+}
+
+/**
  * One dish session. `entries` is enrolment order; `order` is the canonical
  * stratum order set by the most recent arm (layer ids / driver keys in
  * stack order). Entries whose key is absent from `order` sit the pass out
@@ -52,6 +72,7 @@ export function createDishSession() {
     // Grid scratch, grown on demand and reused across passes.
     _bEntry: [],
     _bIdx: null,
+    _bRad: null, // #1408 — per-body disc radius, parallel to _bIdx
     _cellOf: null,
     _cellStart: null,
     _fill: null,
@@ -130,13 +151,9 @@ export function runDishContacts(session, callerSys) {
   if (active.length < 2) return true;
 
   // Flatten bodies in canonical order (stratum order, then particle index).
-  let maxR = 0;
   let total = 0;
-  for (const e of active) {
-    if (e.radius > maxR) maxR = e.radius;
-    total += e.sys.n;
-  }
-  if (total < 2 || !(maxR > 0)) return true;
+  for (const e of active) total += e.sys.n;
+  if (total < 2) return true;
 
   const bEntry = session._bEntry;
   bEntry.length = 0;
@@ -145,17 +162,29 @@ export function runDishContacts(session, callerSys) {
     bIdx = new Int32Array(total);
     session._bIdx = bIdx;
   }
+  // #1408 — per-body disc radii (base × live scale × trim), computed once
+  // per pass into scratch; maxR over bodies sizes the shared cell.
+  let bRad = session._bRad;
+  if (!bRad || bRad.length < total) {
+    bRad = new Float64Array(total);
+    session._bRad = bRad;
+  }
+  let maxR = 0;
   let nb = 0;
   for (let s = 0; s < active.length; s++) {
-    const sys = active[s].sys;
+    const e = active[s];
+    const sys = e.sys;
     for (let i = 0; i < sys.n; i++) {
       if (!sys.alive[i]) continue;
+      const r = contactBodyRadius(e.radius, sys.scale[i], sys.contactTrim ? sys.contactTrim[i] : 1);
       bEntry.push(s);
       bIdx[nb] = i;
+      bRad[nb] = r;
+      if (r > maxR) maxR = r;
       nb++;
     }
   }
-  if (nb < 2) return true;
+  if (nb < 2 || !(maxR > 0)) return true;
 
   // One shared counting-sort hash over all bodies — the same construction
   // as _buildSpatialHash (cell extent from the bodies, never clamped to
@@ -241,7 +270,11 @@ export function runDishContacts(session, callerSys) {
           // admits both pair members.
           if (!((ea.umask >>> ga) & 1) || !((ea.umask >>> gb) & 1)) continue;
           if (!((eb.umask >>> ga) & 1) || !((eb.umask >>> gb) & 1)) continue;
-          const rr = ea.radius + eb.radius;
+          // #1408 — per-body disc sum; both discs positive, or no contact
+          // (the same edge rule as the per-system pass).
+          const ra = bRad[a]; const rb = bRad[b];
+          if (!(ra > 0) || !(rb > 0)) continue;
+          const rr = ra + rb;
           const rr2 = rr * rr;
           // Re-read: a may already have moved this pass.
           const xi = sysA.x[ia]; const yi = sysA.y[ia];

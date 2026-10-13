@@ -17,10 +17,11 @@ boids grid keeps its exact cell size and visit order, which is what the
 
 ## Properties (all on the layout params; see `PARAM_SPEC` in `data/layout-modes.js`)
 
-- `contactRadius` (0–120 px, default 0) — disc radius for overlap. **0
-  disables the pass entirely**: the swarm is then bit-identical to the
-  pre-contact engine (the behaviour lock in `particles.selfcheck.mjs`
-  proves it).
+- `contactRadius` (0–120 px, default 0) — the disc radius of a scale-1,
+  trim-1 mark; each body's actual disc is `contactRadius × live scale ×
+  asset radiusTrim` (#1408, below). **0 disables the pass entirely**: the
+  swarm is then bit-identical to the pre-contact engine (the behaviour
+  lock in `particles.selfcheck.mjs` proves it).
 - `mass` — already a per-particle column (init draws 0.4–1.2); the contact
   impulse splits mass-weighted, so mass *is* the hit response. No new knob.
 - `contactRestitution` (0–1, default 0.5) — bounce coefficient.
@@ -34,7 +35,7 @@ boids grid keeps its exact cell size and visit order, which is what the
 - `contactMode` (`none | bounce | swap | stick | die | breed`, default
   `none`) — the on-contact response.
 
-Every overlapping pair (dist < 2r) always gets positional depenetration,
+Every overlapping pair (dist < ri + rj) always gets positional depenetration,
 mass-weighted, so assets never interpenetrate regardless of mode. Then:
 
 - `bounce` — impulse with `contactRestitution`; `stick` is bounce at
@@ -92,3 +93,32 @@ other configuration is bit-identical to the per-system engine above.
 Pinned by scenario 17 in `contacts.selfcheck.mjs` and by
 `src/gl/dishContacts.selfcheck.mjs` (hidden stratum = stratum alone,
 byte-for-byte).
+
+## Radius from the mark (#1408, petri dish A2)
+
+A body's boundary is its mark. Both contact passes — the per-system pass
+above and the cross-strata dish pass — compute every disc from the one
+shared law (`contactBodyRadius` in `dishContacts.mjs`):
+
+    disc = contactRadius × live scale × asset radiusTrim
+
+- **live scale** — the particle's `scale` column, the same attribute the
+  renderer draws: growth, shrink, and the breath pulse size the disc
+  every frame, so a swelling mark starts displacing neighbours at its new
+  size with no knob change.
+- **asset radiusTrim** — a silhouette factor on the asset record
+  (`radiusTrim`, default 1.0; absent or malformed reads as 1.0). Data, not
+  UI. It is resolved per particle at spawn (`contactTrim` column),
+  inherited at breed from the costume parent, and exchanged at swap —
+  the disc follows the visible costume. True silhouette/SDF collision
+  stays out (the roadmap priced it at 10–50×).
+- A pair interacts only when both discs are positive; a zero-size mark
+  (scale 0) honestly has no disc. Radius reads are pure functions of
+  state and allocate nothing per frame (radii land in reused scratch).
+
+Scale 1 + trim 1 everywhere reproduces the pre-A2 uniform-disc physics
+exactly (scenario 19's seeded A/B against scenario 17's pinned numbers).
+One deliberate non-convergence: the circlepack *placement* sampler keeps
+its own nominal unit (`PACK_UNIT_PX × scale`) — it already follows the
+same law in placement space, and unifying the literal source would move
+golden placement hashes, which stay untouched.

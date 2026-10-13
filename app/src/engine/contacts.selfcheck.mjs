@@ -42,7 +42,9 @@ const CTX_BASE = {
   maxAlpha: 100,
 };
 
-/** Two particles head-on: i at (400,350) moving +x, j at (430,350) moving -x. */
+/** Two particles head-on: i at (400,350) moving +x, j at (430,350) moving -x.
+ *  #1408 — scale pinned to 1: these scenarios pin the uniform-disc physics,
+ *  so the fixture declares its bodies' sizes just as it declares mass. */
 function headOnPair() {
   const sys = new ParticleSystem();
   sys.init(2, 1000, 700, assets, palette, SEED);
@@ -51,6 +53,7 @@ function headOnPair() {
   sys.vx[0] = 2; sys.vy[0] = 0;
   sys.vx[1] = -2; sys.vy[1] = 0;
   sys.mass[0] = 1; sys.mass[1] = 1;
+  sys.scale[0] = 1; sys.scale[1] = 1;
   return sys;
 }
 
@@ -134,6 +137,7 @@ function headOnPair() {
   sys.x[1] = 430; sys.y[1] = 350; sys.vx[1] = -2; sys.vy[1] = 0;
   sys.x[2] = 700; sys.y[2] = 350; sys.vx[2] = 0; sys.vy[2] = 0;
   sys.mass[0] = 1; sys.mass[1] = 1; sys.mass[2] = 1;
+  sys.scale[0] = 1; sys.scale[1] = 1; sys.scale[2] = 1; // #1408 — uniform discs
   sys._contactPass({ ...CTX_BASE, mode: 'die' });
   assert.deepStrictEqual([...sys._dead], [1]);
   // Bring particle 2 into contact with 0, approaching.
@@ -363,6 +367,7 @@ function headOnPair() {
       const s = new ParticleSystem();
       s.init(1, 1000, 700, assets, palette, SEED);
       s.x[0] = x; s.y[0] = 350; s.vx[0] = vx; s.vy[0] = 0; s.mass[0] = mass;
+      s.scale[0] = 1; // #1408 — A1's pinned numbers are scale-1 physics
       return s;
     };
     const pearl = mk(400, 2, 1);
@@ -508,6 +513,90 @@ function headOnPair() {
   }
 }
 
-console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid)', {
-  scenarios: 17,
+// 18 — petri dish A2 (#1408), per-system: the disc is the mark's live
+// size. Trim comes from the asset record; a body that grows into its
+// neighbour starts displacing it at the new size, no knob change.
+{
+  const trimAssets = [{ id: 'a' }, { id: 'b', radiusTrim: 0.5 }];
+  const sys = new ParticleSystem();
+  sys.init(2, 1000, 700, trimAssets, palette, SEED);
+  assert.strictEqual(sys.contactTrim[0], 1, 'trim defaults to 1 when the record omits it');
+  assert.strictEqual(sys.contactTrim[1], 0.5, 'trim is read from the asset record at spawn');
+  sys.x[0] = 400; sys.y[0] = 350;
+  sys.x[1] = 430; sys.y[1] = 350;
+  sys.vx[0] = 2; sys.vy[0] = 0;
+  sys.vx[1] = -2; sys.vy[1] = 0;
+  sys.mass[0] = 1; sys.mass[1] = 1;
+  sys.scale[0] = 1; sys.scale[1] = 1;
+  // Discs 20 and 20*1*0.5 = 10: sum 30 == dist 30 → no contact at all.
+  sys._contactPass({ ...CTX_BASE, mode: 'bounce', restitution: 1 });
+  assert.ok(Object.is(sys.x[0], 400) && Object.is(sys.x[1], 430),
+    'trimmed discs just clear: positions untouched');
+  assert.ok(Object.is(sys.vx[0], 2) && Object.is(sys.vx[1], -2),
+    'trimmed discs just clear: no impulse');
+  // Grow body 1 threefold: disc 30, sum 50, overlap 20; equal masses
+  // split it 10/10 and the elastic velocities exchange.
+  sys.scale[1] = 3;
+  sys._contactPass({ ...CTX_BASE, mode: 'bounce', restitution: 1 });
+  assert.ok(Object.is(sys.x[0], 390), `growth displaces the neighbour: ${sys.x[0]}`);
+  assert.ok(Object.is(sys.x[1], 440), `grown body is displaced in turn: ${sys.x[1]}`);
+  assert.ok(Object.is(sys.vx[0], -2) && Object.is(sys.vx[1], 2),
+    'the grown disc bounces like a body');
+}
+
+// 19 — petri dish A2 (#1408), cross-strata: scale 1 + trim 1 reproduces
+// A1's pinned numbers exactly (the seeded A/B), and growth across the
+// seam displaces at the new size.
+{
+  const dishPair = (modeA = 'bounce', modeB = 'bounce') => {
+    const mk = (x, vx, mass) => {
+      const s = new ParticleSystem();
+      s.init(1, 1000, 700, assets, palette, SEED);
+      s.x[0] = x; s.y[0] = 350; s.vx[0] = vx; s.vy[0] = 0; s.mass[0] = mass;
+      s.scale[0] = 1;
+      return s;
+    };
+    const pearl = mk(400, 2, 1);
+    const eaves = mk(430, -2, 3);
+    const ses = createDishSession();
+    enrolDishBody(ses, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: modeA, umask: 0xffffffff, organism: false });
+    enrolDishBody(ses, { key: 'eaves', sys: eaves, radius: 20, restitution: 1, contactMode: modeB, umask: 0xffffffff, organism: false });
+    return { pearl, eaves, ses };
+  };
+
+  // (a) the A/B: identical fixtures to scenario 17(a) — identical results.
+  {
+    const { pearl, eaves, ses } = dishPair();
+    armDish(ses, ['pearl', 'eaves']);
+    runDishContacts(ses, pearl);
+    assert.ok(Object.is(pearl.x[0], 392.5) && Object.is(eaves.x[0], 432.5),
+      'scale 1 + trim 1 == A1 depenetration, exactly');
+    assert.ok(Object.is(pearl.vx[0], -4) && Object.is(eaves.vx[0], 0),
+      'scale 1 + trim 1 == A1 impulse, exactly');
+  }
+
+  // (b) growth across the seam: shrunken EAVES (disc 10, sum 30 == dist)
+  // does not touch PEARL; grown EAVES (disc 40, sum 60, overlap 30)
+  // displaces it — corr 22.5 split by inverse mass (1 : 1/3).
+  {
+    const { pearl, eaves, ses } = dishPair();
+    eaves.scale[0] = 0.5;
+    armDish(ses, ['pearl', 'eaves']);
+    runDishContacts(ses, pearl);
+    assert.ok(Object.is(pearl.x[0], 400) && Object.is(eaves.x[0], 430),
+      'shrunken neighbour does not touch');
+    assert.ok(Object.is(pearl.vx[0], 2) && Object.is(eaves.vx[0], -2),
+      'shrunken neighbour exchanges nothing');
+    eaves.scale[0] = 2;
+    armDish(ses, ['pearl', 'eaves']);
+    runDishContacts(ses, pearl);
+    assert.ok(Object.is(pearl.x[0], 377.5), `growth displaces across strata: ${pearl.x[0]}`);
+    assert.ok(Object.is(eaves.x[0], 437.5), `grown body yields by its mass share: ${eaves.x[0]}`);
+    assert.ok(Object.is(pearl.vx[0], -4) && Object.is(eaves.vx[0], 0),
+      'the grown pair bounces with the same mass weighting');
+  }
+}
+
+console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid; #1408 — radius from the mark)', {
+  scenarios: 19,
 });
