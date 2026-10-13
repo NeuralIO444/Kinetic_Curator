@@ -9,12 +9,13 @@ detail is new (2026-10-11) or undecided, it is marked **NEW** or **OPEN**.
 | [lois.md](lois.md) | LOIS (George Lois) | Yes: pill, face, copy | The critic: judges the product |
 | [davis.md](davis.md) | Davis (Joshua Davis) | Yes: kaleidoscope, copy | The generator: loves the process |
 | [queen.md](queen.md) | The Queen (STIMULI) | **Never** | Listens, leans, keeps the balance |
+| [governor.md](governor.md) | The Governor (the frame guard) | Instruments only | Holds the frame; gives things up in order, honestly |
 
 Related: [PERSONAE_TRIAD.md](../PERSONAE_TRIAD.md) (the unified report),
 [the copy matrix](../research/directors-copy-matrix-2026-10-07.md) (every
 approved line; do not invent lines), and the KC-1 design system (#1121).
 
-**House rule for all three:** no state is driven by a timer pretending to have
+**House rule for all of them:** no state is driven by a timer pretending to have
 an opinion. Every reaction comes from a measured signal.
 
 ## Provenance
