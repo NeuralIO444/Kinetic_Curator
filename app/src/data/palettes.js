@@ -494,6 +494,10 @@ export function resolvePalette(paletteId, overrides = null, extra = []) {
     // #1049 — baked weights describe the catalog swatches. An override changes a color, so
     // the weights no longer describe it: drop them and let swatchWeights() derive.
     ...(Array.isArray(base.weights) && !overrides?.swatches && !overrides?.bg ? { weights: [...base.weights] } : {}),
+    // #1365 Q2 — a refine colour drift carries the kept palette's weights (it moved the colours a little, it did not
+    // change which colour is which). Only when they match the swatches and are finite; an artist edit drops them.
+    ...(Array.isArray(overrides?.weights) && overrides.weights.length === swatches.length && overrides.weights.every(Number.isFinite)
+      ? { weights: [...overrides.weights] } : {}),
     // #287 — leak is a catalog property, not a per-swatch override.
     leak: typeof base.leak === 'number' ? base.leak : 0,
     dirty: !!(overrides && (overrides.swatches || overrides.bg || overrides.ink)),

@@ -27,6 +27,17 @@ import { mutateKey, DEFAULT_SPREAD } from '../../curator/refineMutate.js';
 import { swayMagnitude, setSwayMagnitude } from '../../curator/swayView.mjs'; // #1258: publish sway for the presence mark (ephemeral, not store state)
 import { loisActivity } from '../../curator/loisActivity.js'; // #1145: the honest feed
 import { mkRng } from '../../engine/prng.js';
+import { colorDeal, nudgeSwatches, anchorValid } from '../../curator/refineColor.js'; // #1365 Q2
+
+/**
+ * #1365 Q2 — an artist's edit builds on the live overrides minus refine's carried `weights`: the weights describe the
+ * kept palette's colours, and an edit changes a colour, so they no longer do (#1049: derive them instead).
+ */
+const editableOverrides = (ov) => {
+  if (!ov) return {};
+  const { weights, ...rest } = ov; // eslint-disable-line no-unused-vars
+  return rest;
+};
 
 /** One honest die for #942's naive roll — every result lands in serialized state. */
 const die = (n) => (Math.random() * n) | 0;
@@ -149,6 +160,11 @@ export const createLayoutSlice = (set) => ({
    * in explore. Cleared when a KINETIC roll or a project load replaces the palette. Session state: not saved, not undone.
    */
   paletteChosen: false,
+  /**
+   * #1365 Q2 — the palette refine varies colour around: { paletteId, overrides, keepCount, lastOverrides } or null.
+   * Session state: not saved. Re-anchored whenever something other than refine changed the palette, or a keep landed.
+   */
+  refinePaletteAnchor: null,
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
   /**
@@ -274,7 +290,7 @@ export const createLayoutSlice = (set) => ({
     prev[index] = n;
     // If identical to catalog, collapse that slot conceptually but keep array
     const nextOverrides = {
-      ...(state.paletteOverrides || {}),
+      ...editableOverrides(state.paletteOverrides),
       swatches: prev,
     };
     // Drop if fully matches catalog
@@ -293,7 +309,7 @@ export const createLayoutSlice = (set) => ({
     const n = normalizeHex(hex);
     if (n == null) return {};
     const base = getCatalogPalette(state.paletteId, state.userPalettes);
-    const next = { ...(state.paletteOverrides || {}), bg: n };
+    const next = { ...editableOverrides(state.paletteOverrides), bg: n };
     if (n === base.bg) delete next.bg;
     const empty = !next.swatches && !next.bg && !next.ink;
     return {
@@ -308,7 +324,7 @@ export const createLayoutSlice = (set) => ({
     const n = normalizeHex(hex);
     if (n == null) return {};
     const base = getCatalogPalette(state.paletteId, state.userPalettes);
-    const next = { ...(state.paletteOverrides || {}), ink: n };
+    const next = { ...editableOverrides(state.paletteOverrides), ink: n };
     if (n === base.ink) delete next.ink;
     const empty = !next.swatches && !next.bg && !next.ink;
     return {
@@ -352,7 +368,7 @@ export const createLayoutSlice = (set) => ({
     if (swatches.every((c, i) => c === current[i])) return {};
     return {
       ...pushToUndo(state, true),
-      paletteOverrides: { ...(state.paletteOverrides || {}), swatches },
+      paletteOverrides: { ...editableOverrides(state.paletteOverrides), swatches },
     };
   }),
 
@@ -675,9 +691,33 @@ export const createLayoutSlice = (set) => ({
     // PATTERN tracks are curated too, on their own seeded stream keyed by the same (seed, press #): the same press
     // deals the same patterns again. (The taste engine scores layout params, not patterns: this is seeded dice.)
     const pat = rollPatternLayers(state.layers, 'curate', rngForIndex(state.seed, CH.curate, press + 0x10000, state.seedOffsets));
+    // #1365 Q2 — REFINE varies colour gently around the palette that was kept: a fresh small hue + warmth deal from
+    // the ANCHOR on every press (never a walk), on the colour channel keyed by (seed, press #), locked swatches held.
+    // Same store update as the layout pick, so one press is still one undo step. Explore never touches it here.
+    let colour = {};
+    if (refining) {
+      const keepCount = (state.keeps?.length ?? 0) + (state.favorites?.length ?? 0);
+      const anchor = anchorValid(state.refinePaletteAnchor, state, keepCount)
+        ? state.refinePaletteAnchor
+        : { paletteId: state.paletteId, overrides: state.paletteOverrides, keepCount };
+      const base = resolvePalette(anchor.paletteId, anchor.overrides, state.userPalettes);
+      const deal = colorDeal(rngForIndex(state.seed, CH.color, press + 0x20000, state.seedOffsets), refineSpread);
+      // The kept palette's swatch weights ride along (#1049 would otherwise drop them for any swatch override and
+      // re-derive, which shifts WHICH colours the marks get: a bigger change than the drift itself).
+      const overrides = {
+        ...(anchor.overrides || {}),
+        swatches: nudgeSwatches(base.swatches, deal, state.paletteLocks),
+        ...(Array.isArray(base.weights) ? { weights: [...base.weights] } : {}),
+      };
+      colour = {
+        paletteOverrides: overrides,
+        refinePaletteAnchor: { paletteId: anchor.paletteId, overrides: anchor.overrides, keepCount, lastOverrides: overrides },
+      };
+    }
     return {
       ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
       ...(pat.changed ? { layers: pat.layers } : {}),
+      ...colour,
       layoutParams: candidates[index],
       curatePress: press + 1,
       // Honest flag: if any chain had no row for the current value this press
