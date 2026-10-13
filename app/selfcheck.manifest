@@ -360,3 +360,4 @@ node src/state/projectDocument.fuzz.selfcheck.mjs
 node src/gl/resolverInputParity.selfcheck.mjs
 node src/gl/resolverProbe.selfcheck.mjs
 node scripts/verifyPerformance.selfcheck.mjs
+node src/gl/performanceCreatures.selfcheck.mjs
