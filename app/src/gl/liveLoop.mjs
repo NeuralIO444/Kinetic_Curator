@@ -33,6 +33,8 @@ import { getFormedPins, getLimbPairs, getPinTraits } from './resolveTap.mjs'; //
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
+import { motionReadout } from './motionReadout.mjs'; // #1469: the always-alive motion, read once a frame
+import { publishMotion } from './motionTap.mjs';
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createKinemeClock } from '../data/kinemes.js';
@@ -113,6 +115,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // shaped rms; flux is the positive delta. Render-only, never the store.
   let lastModRms = 0;
   const bandFeed = createBandFeed(); // #790 PR3
+  const motionNow = {}; // #1469: reused every frame, no allocation
   let loopLifeT = 0;
   let breathScaleSmoothed = 1;
   let breathRotSmoothed = 0;
@@ -512,6 +515,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const dampFactor = 1 - Math.exp(-8 * dtSec);
     breathScaleSmoothed += (targetBreathScale - breathScaleSmoothed) * dampFactor;
     breathRotSmoothed += (targetBreathRot - breathRotSmoothed) * dampFactor;
+    // #1469 — publish the always-alive motion for the STIMULI readout (read-only; the numbers the engine already uses)
+    publishMotion(motionReadout({
+      layoutParams, beatDrive: audioOn ? shapedAudio.beatPulse : null, breathScale: breathScaleSmoothed,
+      reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+      slowRender: s.slowRender || !s.running,
+    }, motionNow));
 
     const glow = routes.glow;
 
