@@ -122,3 +122,41 @@ One deliberate non-convergence: the circlepack *placement* sampler keeps
 its own nominal unit (`PACK_UNIT_PX × scale`) — it already follows the
 same law in placement space, and unifying the literal source would move
 golden placement hashes, which stay untouched.
+
+## Dish controls (#1409, petri dish A3)
+
+The artist's switch for the shared grid. One boolean layout param,
+`dish` (default ON — the spec's open question 1, ratified as filed),
+gated at enrolment through `dishEnrolRadius` in `dishContacts.mjs`:
+
+- **ON** — enrolment carries each stratum's `contactRadius` as before;
+  the session arms when two or more strata enrol.
+- **OFF** — enrolment carries 0, so the session can never arm and the
+  cross-strata pass never runs: strata ghost through each other exactly
+  as they did before the dish. Each stratum's own #167 per-system pass
+  is untouched either way — the switch gates the *shared* grid only.
+  OFF is byte-identical to no session at all, including across a
+  mid-performance flip (contacts scenario 20's fork test) and through
+  the resolver (gl dishContacts selfcheck §5).
+
+The switch rides the ordinary param path: `PARAM_SPEC`/`BOOL_KEYS` at
+the trust boundary, `LAYOUT_PARAM` on the bus, persisted per Look like
+every other param (normalize selfcheck pins the round trip, including
+a saved OFF). No migration case for old saves: every shipped voice and
+preset carries `contactRadius` 0, so default-ON cannot arm on any
+existing document — a pre-A3 Look opens with the behaviour it was saved
+with.
+
+UI (BUILD panel, the strata block, KC content strata only — FX strata
+never enrol, and adjacency/pattern blocks have their own physics): the
+expanded block carries the DISH on/off switch plus **bounce**
+(`contactRestitution`, 0–1, reset 0.5) and **repel** (`contactRepel`,
+0–5, reset 0); the radius is not a knob — it is A2's law. When the dish
+is on but the Look's contact radius is 0, the block says so ("idle —
+contact radius 0") rather than implying physics that cannot happen.
+The collapsed block's amber summary confesses the state: `dish off`
+always shows; `dish on` shows only when armed (radius > 0); on + idle
+stays silent, so a default Look's summary line is unchanged. Every
+control change is an artist tweak in the honest feed via the bus (G7) —
+the system's own writers never emit `LAYOUT_PARAM`, which is what keeps
+the attribution honest.

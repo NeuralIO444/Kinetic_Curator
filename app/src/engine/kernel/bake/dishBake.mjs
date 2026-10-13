@@ -16,7 +16,7 @@
 
 import { ParticleSystem } from '../../particles.js';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './index.js';
-import { createDishSession, enrolDishBody, armDish } from '../../dishContacts.mjs';
+import { createDishSession, enrolDishBody, armDish, dishEnrolRadius } from '../../dishContacts.mjs';
 import { isOrganismMode } from '../../../data/layout-modes.js';
 
 /**
@@ -51,7 +51,10 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
     enrolDishBody(session, {
       key: layer.key,
       sys,
-      radius: layer.layoutParams.contactRadius || 0,
+      // #1409 — the per-Look DISH switch gates enrolment here exactly as
+      // it does in the live resolver (dishEnrolRadius): OFF bakes the
+      // ghost stack, bit-identical to stepping the strata alone.
+      radius: dishEnrolRadius(layer.layoutParams),
       restitution: layer.layoutParams.contactRestitution ?? 0.5,
       contactMode: layer.layoutParams.contactMode || 'none',
       umask: layer.layoutParams.collideMask ?? 0xffffffff,

@@ -23,7 +23,7 @@ import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
-import { createDishSession, enrolDishBody, releaseDishBody, armDish } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
+import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
@@ -296,9 +296,12 @@ export function createLiveResolver() {
     // #1407 — enrol this stratum in the shared dish grid, refreshed every
     // frame (contact params are live knobs). Only swarm strata reach
     // swarmItems: FX strata never enrol — they are the medium.
+    // #1409 — the per-Look DISH switch gates enrolment itself: OFF enrols
+    // radius 0, the session never arms, strata ghost (the bake driver
+    // gates through the same helper — live and bake cannot disagree).
     enrolDishBody(dishSession, {
       key: layerId, sys: st.system,
-      radius: ctx.layoutParams.contactRadius || 0,
+      radius: dishEnrolRadius(ctx.layoutParams),
       restitution: ctx.layoutParams.contactRestitution ?? 0.5,
       contactMode: ctx.layoutParams.contactMode || 'none',
       umask: ctx.layoutParams.collideMask ?? 0xffffffff,

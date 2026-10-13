@@ -101,7 +101,7 @@ Silhouette/SDF collision · rigid-body stacks or a physics library · soft-body 
 
 ## Open questions for Matt
 
-1. Dish physics default: ON for live strata, or behind a DISH toggle per Look? (Recommendation: a per-Look toggle, default ON — a Look is a world, and worlds have physics; the toggle preserves today's ghost-stack as an artistic choice.)
+1. Dish physics default: ON for live strata, or behind a DISH toggle per Look? (Recommendation: a per-Look toggle, default ON — a Look is a world, and worlds have physics; the toggle preserves today's ghost-stack as an artistic choice.) **Ratified as recommended and shipped in A3 (#1409): per-Look `dish` param, default ON, gated at enrolment; OFF is byte-identical to the pre-dish engine.**
 2. Coalescence scope: same-family only (recommended for v1), or any-body?
 3. Population ecology: a MODE on the dish, or always-on gentle? (Recommendation: mode — ecology is a performance decision, not a default behaviour.)
 

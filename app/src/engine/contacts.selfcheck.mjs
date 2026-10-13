@@ -15,7 +15,7 @@ import assert from 'node:assert';
 import { ParticleSystem } from './particles.js';
 import { buildPlacements } from './buildPlacements.js';
 import { bakeParticles, BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
-import { createDishSession, enrolDishBody, armDish, runDishContacts } from './dishContacts.mjs';
+import { createDishSession, enrolDishBody, armDish, runDishContacts, dishEnrolRadius } from './dishContacts.mjs';
 import { bakeDishParticles } from './kernel/bake/dishBake.mjs';
 import {
   DEFAULT_LAYOUT_PARAMS,
@@ -597,6 +597,127 @@ function headOnPair() {
   }
 }
 
-console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid; #1408 — radius from the mark)', {
-  scenarios: 19,
+// 20 — petri dish A3 (#1409): the per-Look DISH switch gates enrolment.
+// OFF is the pre-dish engine byte-for-byte (the session rides in the
+// params but can never arm), a mid-performance flip leaves no residue
+// (the off-phase is the no-session engine from the same state), and
+// flipping back re-arms the grid.
+{
+  const lpFor = (count, radius, e, dish) => normalizeLayoutParams({
+    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: count,
+    contactRadius: radius, contactRestitution: e, contactMode: 'bounce', dish,
+  });
+  const lpOnA = lpFor(40, 14, 0.7, true);
+  const lpOnB = lpFor(35, 18, 0.4, true);
+
+  // (a) the gate itself.
+  assert.strictEqual(dishEnrolRadius({ contactRadius: 30, dish: false }), 0, 'OFF enrols 0 whatever the radius');
+  assert.strictEqual(dishEnrolRadius({ contactRadius: 30, dish: true }), 30, 'ON enrols the radius');
+  assert.strictEqual(dishEnrolRadius({ contactRadius: 30 }), 30, 'a pre-A3 document (no key) enrols: ON is the default');
+  assert.strictEqual(dishEnrolRadius(null), 0, 'no params, no enrolment');
+  assert.strictEqual(dishEnrolRadius(lpFor(10, 20, 0.5, false)), 0, 'a normalized OFF enrols 0');
+
+  // Phase harness: 'on' enrols + arms, 'off' enrols through the gate
+  // (radius 0, session riding but unarmed — the live A3 shape), 'drop'
+  // never touches the session at all (the pre-A1 engine, the control).
+  const runPhases = (phases) => {
+    const ses = createDishSession();
+    const mk = (lp, seed) => {
+      const s = new ParticleSystem();
+      s.init(lp.particleCount, 1000, 700, assets, palette, seed, null, { graze: lp.graze || 0 });
+      return s;
+    };
+    const A = mk(lpOnA, SEED);
+    const B = mk(lpOnB, SEED + 7);
+    const armedPhases = [];
+    let step = 0;
+    for (const ph of phases) {
+      let armed = false;
+      for (let s = 0; s < ph.steps; s++) {
+        const t = BAKE_TIME_ORIGIN + step * BAKE_DT_MS;
+        step++;
+        if (ph.mode === 'drop') {
+          A.update({ ...lpOnA, particleCount: lpOnA.particleCount, maxParticles: 200 }, assets, palette, SEED, t, null);
+          B.update({ ...lpOnB, particleCount: lpOnB.particleCount, maxParticles: 200 }, assets, palette, SEED + 7, t, null);
+          continue;
+        }
+        const dish = ph.mode === 'on';
+        const a = { ...lpOnA, dish };
+        const b = { ...lpOnB, dish };
+        enrolDishBody(ses, { key: 'pearl', sys: A, radius: dishEnrolRadius(a), restitution: a.contactRestitution, contactMode: a.contactMode, umask: a.collideMask, organism: false });
+        enrolDishBody(ses, { key: 'eaves', sys: B, radius: dishEnrolRadius(b), restitution: b.contactRestitution, contactMode: b.contactMode, umask: b.collideMask, organism: false });
+        if (armDish(ses, ['pearl', 'eaves'])) armed = true;
+        A.update({ ...a, particleCount: a.particleCount, maxParticles: 200, dishSession: ses }, assets, palette, SEED, t, null);
+        B.update({ ...b, particleCount: b.particleCount, maxParticles: 200, dishSession: ses }, assets, palette, SEED + 7, t, null);
+      }
+      armedPhases.push(armed);
+    }
+    return { A, B, armedPhases };
+  };
+  const assertSameSystems = (x, y, label) => {
+    for (const [sx, sy] of [[x.A, y.A], [x.B, y.B]]) {
+      for (const f of ['x', 'y', 'vx', 'vy']) {
+        for (let i = 0; i < sx.n; i++) {
+          assert.ok(Object.is(sx[f][i], sy[f][i]), `${label}: ${f}[${i}] ${sx[f][i]} vs ${sy[f][i]}`);
+        }
+      }
+    }
+  };
+  const divergedCount = (x, y) => {
+    let n = 0;
+    for (const [sx, sy] of [[x.A, y.A], [x.B, y.B]]) {
+      for (let i = 0; i < sx.n; i++) {
+        if (!Object.is(sx.x[i], sy.x[i]) || !Object.is(sx.y[i], sy.y[i])) n++;
+      }
+    }
+    return n;
+  };
+
+  // (b) OFF from step 0 is the pre-dish engine, byte-identical — and so
+  // is a bake driven through the gated bake path.
+  const off = runPhases([{ mode: 'off', steps: 45 }]);
+  const drop = runPhases([{ mode: 'drop', steps: 45 }]);
+  assert.deepEqual(off.armedPhases, [false], 'OFF never arms the session');
+  assertSameSystems(off, drop, 'dish OFF == no dish session at all');
+  {
+    const bakedOff = bakeDishParticles({
+      layers: [
+        { key: 'pearl', seed: SEED, count: 40, layoutParams: lpFor(40, 14, 0.7, false), activeAssets: assets, palette, maxParticles: 200 },
+        { key: 'eaves', seed: SEED + 7, count: 35, layoutParams: lpFor(35, 18, 0.4, false), activeAssets: assets, palette, maxParticles: 200 },
+      ],
+      canvasW: 1000, canvasH: 700, steps: 45,
+    });
+    for (const [key, sys] of [['pearl', drop.A], ['eaves', drop.B]]) {
+      const items = bakedOff.get(key);
+      const live = sys.getItems(assets);
+      assert.strictEqual(items.length, live.length, `bake OFF ${key}: population equals the ghost run`);
+      for (let i = 0; i < live.length; i++) {
+        assert.ok(Object.is(items[i].x, live[i].x) && Object.is(items[i].y, live[i].y),
+          `bake OFF ${key}[${i}]: the gated bake is the ghost stack (${items[i].x} vs ${live[i].x})`);
+      }
+    }
+  }
+
+  // (c) ON acts (the control for every OFF claim above).
+  const on = runPhases([{ mode: 'on', steps: 45 }]);
+  assert.deepEqual(on.armedPhases, [true], 'ON arms the session');
+  assert.ok(divergedCount(on, drop) > 10, `ON displaces bodies across strata (${divergedCount(on, drop)} diverged)`);
+
+  // (d) mid-performance flip: 20 steps ON, then OFF — the off-phase is
+  // byte-identical to dropping the session at the flip from the same
+  // state. No residue: the take after the flip is the per-system engine.
+  const flipped = runPhases([{ mode: 'on', steps: 20 }, { mode: 'off', steps: 25 }]);
+  const forked = runPhases([{ mode: 'on', steps: 20 }, { mode: 'drop', steps: 25 }]);
+  assert.deepEqual(flipped.armedPhases, [true, false], 'the flip disarms from the flip step on');
+  assertSameSystems(flipped, forked, 'post-flip == session dropped at the flip');
+
+  // (e) flipping back re-arms and the dish acts again within the phase.
+  const backOn = runPhases([{ mode: 'on', steps: 20 }, { mode: 'off', steps: 10 }, { mode: 'on', steps: 15 }]);
+  const stayedOff = runPhases([{ mode: 'on', steps: 20 }, { mode: 'off', steps: 25 }]);
+  assert.deepEqual(backOn.armedPhases, [true, false, true], 'the switch re-arms when flipped back');
+  assert.ok(divergedCount(backOn, stayedOff) > 0, 'the re-armed dish displaces bodies again');
+}
+
+console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid; #1408 — radius from the mark; #1409 — the per-Look dish switch)', {
+  scenarios: 20,
 });

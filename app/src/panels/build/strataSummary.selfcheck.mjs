@@ -45,6 +45,26 @@ check('content patch',
   strataSummary({ type: 'content', layerBlendMode: 'normal', patch: { mode: 'mod', to: 'x' } }, 'content', 100),
   'patch mod · wet 100%');
 
+// #1409 — the dish state on a CONTENT block: OFF always confesses, ON
+// shows only when armed (radius > 0), ON + radius 0 stays silent so a
+// default Look's line is byte-identical to pre-A3.
+const kc = { type: 'content', layerBlendMode: 'normal', patch: { mode: 'off' } };
+check('dish off', strataSummary(kc, 'content', 100, { on: false, armed: true }), 'dish off · wet 100%');
+check('dish off, radius moot', strataSummary(kc, 'content', 100, { on: false, armed: false }), 'dish off · wet 100%');
+check('dish on armed', strataSummary(kc, 'content', 100, { on: true, armed: true }), 'dish on · wet 100%');
+check('dish on idle is silent', strataSummary(kc, 'content', 100, { on: true, armed: false }), 'wet 100%');
+check('dish state omitted is silent', strataSummary(kc, 'content', 100), 'wet 100%');
+check('dish off outranks blend',
+  strataSummary({ type: 'content', layerBlendMode: 'screen', patch: { mode: 'off' } }, 'content', 80, { on: false, armed: false }),
+  'dish off · screen');
+check('patch still wins over dish',
+  strataSummary({ type: 'content', layerBlendMode: 'normal', patch: { mode: 'mod', to: 'x' } }, 'content', 100, { on: false, armed: true }),
+  'patch mod · dish off');
+check('dish never speaks on fx', strataSummary({ type: 'fx', effects: [] }, 'fx', 75, { on: false, armed: true }), 'wet 75%');
+check('dish never speaks on pattern',
+  strataSummary({ type: 'pattern', pattern: { mode: 'QUILT', density: 9 } }, 'content', 100, { on: false, armed: true }),
+  'cells 9 · quilt');
+
 check('null layer', strataSummary(null, 'content', 100), '');
 
 if (failures) { console.error(`${failures} FAILURES`); process.exit(1); }

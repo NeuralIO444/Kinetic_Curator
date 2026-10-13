@@ -221,6 +221,16 @@ export const DEFAULT_LAYOUT_PARAMS = {
   contactRepel: 0,
   contactMode: 'none',
   collideMask: 0xffffffff,
+  // #1409 (petri dish A3) — the per-Look DISH switch: gates the shared
+  // cross-strata grid (#1407) at enrolment. Default ON (spec open
+  // question 1, ratified): a Look is a world, and worlds have physics.
+  // OFF restores the pre-dish ghost stack — strata pass through each
+  // other — while each stratum's own #167 contacts keep working exactly
+  // as before. No migration case for old saves: every shipped voice and
+  // preset carries contactRadius 0, so dish ON cannot arm on any
+  // existing document; a document that predates A3 opens with the same
+  // behaviour it was saved with, and the switch is there to choose.
+  dish: true,
 
   audioModDepth: 0.65,
   audioScaleMod: 0.45,
@@ -366,8 +376,10 @@ export const PARAM_SPEC = {
   parallax: { min: 0, max: 1 },
   // #167 — contact disc radius in px (0 = contacts off), bounce 0–1,
   // personal-space force gain, and the 32-bit layer-interaction mask.
-  // No sliders expose these yet — the spec is the trust boundary (#107),
-  // the UI half is a follow-up.
+  // The spec is the trust boundary (#107). #1409 exposes restitution and
+  // repel (plus the dish switch) on the strata block; the radius itself
+  // stays voice/layout-set — it is the px anchor of A2's radius law, not
+  // a performance knob.
   contactRadius: { min: 0, max: 120 },
   contactRestitution: { min: 0, max: 1 },
   contactRepel: { min: 0, max: 5 },
@@ -405,7 +417,7 @@ export const RANGE_HARD = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker', 'glass']; // #268: recolor removed; #1202: mirror is a 4-state enum now
+const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'previewDownscale', 'renderWorker', 'glass', 'dish']; // #268: recolor removed; #1202: mirror is a 4-state enum now; #1409: dish is the per-Look cross-strata switch
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);

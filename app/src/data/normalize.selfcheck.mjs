@@ -136,7 +136,7 @@ for (const [label, patch] of POISON) {
 
   // 4. Booleans are booleans — 'false' is truthy, and used to stay a string.
   // #1202 — mirror is a 4-state enum now (off/x/y/xy), not a boolean.
-  for (const key of ['bleed', 'overlap', 'accumulation']) { // #268: recolor removed
+  for (const key of ['bleed', 'overlap', 'accumulation', 'dish']) { // #268: recolor removed; #1409: dish
     assert.strictEqual(typeof lp[key], 'boolean', `${label}: ${key} must be boolean`);
   }
   assert.ok(['off', 'x', 'y', 'xy'].includes(lp.mirror), `${label}: mirror must be a 4-state enum`);
@@ -270,6 +270,24 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
     + '  Add them to PARAM_SPEC (matching the slider in ParamBlock.jsx), or a\n'
     + '  poisoned project can put any value at all into the render loop.',
   );
+}
+
+// #1409 (petri dish A3) — the per-Look DISH switch rides the same
+// save/load path as every other param: default ON (the ratified spec
+// decision), a saved OFF survives the JSON round trip untouched, and the
+// setter's validation never rejects the key (booleans coerce, #107).
+{
+  assert.strictEqual(normalizeLayoutParams({}).dish, true, 'A3: an absent dish key defaults ON');
+  assert.strictEqual(normalizeLayoutParams({ dish: false }).dish, false, 'A3: a saved OFF stays OFF');
+  const saved = JSON.stringify({ ...DEFAULT_LAYOUT_PARAMS, dish: false, contactRestitution: 0.8, contactRepel: 2.5 });
+  const loaded = normalizeLayoutParams(JSON.parse(saved));
+  assert.strictEqual(loaded.dish, false, 'A3: dish OFF round-trips through save/load');
+  assert.strictEqual(loaded.contactRestitution, 0.8, 'A3: restitution round-trips');
+  assert.strictEqual(loaded.contactRepel, 2.5, 'A3: repel round-trips');
+  assert.strictEqual(typeof normalizeLayoutParams({ dish: 'junk' }).dish, 'boolean', 'A3: garbage coerces to a boolean, never a string');
+  const v = validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, dish: false });
+  assert.ok(!v.rejected.includes('dish'), 'A3: the firewall never rejects the dish switch');
+  assert.strictEqual(v.params.dish, false, 'A3: the firewall keeps the artist\u2019s OFF');
 }
 
 console.log('normalize.selfcheck: OK (#106 — project sanitize)', {
