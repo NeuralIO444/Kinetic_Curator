@@ -29,6 +29,12 @@ testable, and the recording spine already exists.
 | 4 | **The first creature: the moth.** A body, two wings at its anchors, and scales scattered on the wings (Poisson-disc, in wing-local space), assembled by step 1 at the pin when step 3 says so. | Yes, the main event |
 | 5 | **Limb count over a life.** Base types stay inside the TE four. | Yes |
 
+**Status (2026-10-13).** Steps 1 to 4 are merged: `engine/hierarchy.js` (#1377), pins and dish pressure (#1379, #1381), the
+formation rule (#1400), and the moth (#1418, `engine/creature.js`). Added on the way: ATTACH points set per asset in the
+wet lab window with automatic points from the asset's shape (#1380); the pin's mark shows spore / counting / formed
+(#1421); and the live canvas now shows the scene the right way up (#1419; it had been upside-down against scene
+coordinates and exports, which made pins and creatures land on the mirror image of where you clicked). Step 5 is next.
+
 ## Decisions (Matt, 2026-10-11)
 
 1. **Placing a pin:** arm a pin tool in the asset panel (the bio wet lab), then click the canvas.

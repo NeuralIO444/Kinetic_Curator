@@ -72,7 +72,7 @@ Stress is a weighted sum of three honest signals, re-weighted after decision 2:
 - New event types: `pin`, `hierarchy-form`.
 - **Exit:** a pinned spore becomes a creature under the two conditions, replayably.
 
-Issues: #1206, #1355. Plan: [`design/wet-lab-plan.md`](design/wet-lab-plan.md). Steps 1 (hierarchy core, #1377), 2 (pins + dish pressure, #1379/#1381) and 3 (the formation rule, #1400) are built; step 4 (the moth) is in progress; step 5 (limb count over a life) follows it.
+Issues: #1206, #1355. Plan: [`design/wet-lab-plan.md`](design/wet-lab-plan.md). Steps 1 (hierarchy core, #1377), 2 (pins + dish pressure, #1379/#1381, the ATTACH points #1380 and the pin's state mark #1421), 3 (the formation rule, #1400) and 4 (the moth, #1418) are built and merged (2026-10-13). Step 5 (limb count over a life) is next and waits for Matt's decisions on how a life changes the limbs. #1419 found and fixed a long-standing defect on the way: the live canvas was drawn upside-down against scene coordinates, exports and the pointer.
 
 ### Phase 4: influences
 The three personae read the band and the room.
