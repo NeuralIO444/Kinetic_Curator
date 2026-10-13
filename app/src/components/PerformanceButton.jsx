@@ -98,10 +98,9 @@ export function PerformanceButton() {
     <>
       <button
         type="button"
-        className={`micro-btn${recording ? ' active' : ''}`}
+        className={`perf-btn rec${recording ? ' on' : ''}`}
         aria-pressed={recording}
         disabled={playing}
-        style={recording ? undefined : { opacity: 0.45 }}
         title={playing
           ? 'Playing a take: stop playback to record.'
           : recording
@@ -109,14 +108,13 @@ export function PerformanceButton() {
             : 'Record a performance: your session as a small file that replays to the same frames.'}
         onClick={onClick}
       >
-        {recording ? '● stop ↓' : 'rec'}
+        <span className="perf-dot" aria-hidden="true">●</span>{recording ? ' stop ↓' : ' rec'}
       </button>
       <button
         type="button"
-        className={`micro-btn${playing ? ' active' : ''}`}
+        className={`perf-btn take${playing ? ' on' : ''}`}
         aria-pressed={playing}
         disabled={recording}
-        style={playing ? undefined : { opacity: 0.45 }}
         title={playing ? 'Playing a take back. Click to return to the live instrument.' : (playNote || 'Play a take (.kcperf) back through the instrument.')}
         onClick={() => { if (playing) { stopPlayback(); setPlayNote(''); } else if (fileRef.current) fileRef.current.click(); }}
       >

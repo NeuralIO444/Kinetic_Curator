@@ -140,6 +140,13 @@ await ok('wired: the resolver wrapper substitutes the input; the canvas overlays
   assert.match(btn, /startPlayback\(perf\)/); assert.match(btn, /stopPlayback\(\)/);
   const loop = readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8');
   assert.ok(!/playback/i.test(loop), 'the one-writer live loop is untouched');
+  // REC and take live beside STOP, in the performing bar (not the thin status line)
+  const bar = readFileSync(new URL('../components/MasterBar.jsx', import.meta.url), 'utf8');
+  assert.match(bar, /<div className="master-right">\s*<PerformanceButton \/>\s*<button className="run-btn"/);
+  assert.ok(!/<PerformanceButton \/>/.test(readFileSync(new URL('../App.jsx', import.meta.url), 'utf8')), 'no longer in the status line');
+  assert.match(btn, /perf-dot/);
+  const css = readFileSync(new URL('../styles/layout.css', import.meta.url), 'utf8');
+  assert.match(css, /\.perf-btn \.perf-dot \{ color: var\(--kc-red\); \}/);
 });
 
 console.log(`playback.selfcheck: ${n} checks passed`);

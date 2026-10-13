@@ -89,10 +89,11 @@ const play = (n, seed = 0xbeef) => {
   setResolveTap(null);
 }
 
-// 5. the footer wiring: the button is mounted and the old session log is gone
+// 5. the wiring: the button is mounted (beside STOP in the performing bar, #1461) and the old session log is gone
 {
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  assert.match(app, /<PerformanceButton \/>/);
+  const bar = readFileSync(new URL('../components/MasterBar.jsx', import.meta.url), 'utf8');
+  assert.match(bar, /<PerformanceButton \/>/);
   assert.ok(!/sessionLog/.test(app), 'the stopgap session log is retired');
 }
 
