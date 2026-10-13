@@ -385,4 +385,86 @@ const full = MOTH.growFrames + 1;
   assert.ok(Math.abs(Math.abs(left[0].rotation) - Math.abs(right[0].rotation) - 15) < 1e-6, 'one moth carries its traits, the next does not');
 }
 
+// 15. GROUND (Matt 2026-10-13, option A): the moth obeys the dials the marks do, through the same functions
+{
+  const { groundTreatment } = await import('./creature.js');
+  const { nudgeAxis } = await import('./groundNudge.js');
+  const { applyLean } = await import('./kernel/color/index.js');
+  const { snapPair } = await import('./groundSnap.js');
+  const ROLES = ['#112233', '#445566', '#778899'];
+  const dish = (over = {}) => ({
+    ground: () => '#336699', groundRoles: () => ROLES, groundCell: () => ({ u: 0.05, v: 0.5, size: 100 }), ...over,
+  });
+  const g = (knobs, d = dish()) => ({ dish: d, lean: 0, nudge: 0, snap: 0, shadow: 0, ...knobs });
+
+  // no ground, or every dial at 0: nothing happens (the moth is exactly as before)
+  for (const gr of [null, undefined, {}, g({})]) {
+    const t = groundTreatment(gr, 10, 10, 0, 7);
+    assert.deepEqual([t.dx, t.dy, t.halo], [0, 0, null]);
+    assert.deepEqual(t.recolor('#aa0000', '#00aa00'), ['#aa0000', '#00aa00']);
+  }
+  // EDGE: the same nudge the marks get, in tile units, pointing inward
+  const n = groundTreatment(g({ nudge: 1 }), 10, 10, 0, 7);
+  assert.ok(Math.abs(n.dx - nudgeAxis(0.05, 1) * 100) < 1e-12 && n.dx > 0 && n.dy === 0, 'eased inward off the left edge');
+  // LEAN: the colour mixes toward the tile, exactly as a mark's does; the accent is left (as a mark's accent is)
+  const l = groundTreatment(g({ lean: 0.5 }), 10, 10, 0, 7);
+  assert.deepEqual(l.recolor('#aa0000', '#00aa00'), [applyLean('#aa0000', '#336699', 0.5), '#00aa00']);
+  assert.equal(l.halo, '#336699', 'the halo takes the tile\'s own colour');
+  // SNAP at full share: the whole moth takes the tile's colours exactly (both colours, like a mark)
+  const sn = groundTreatment(g({ snap: 1 }), 10, 10, 0, 7);
+  const want = snapPair('#aa0000', '#00aa00', ROLES);
+  assert.deepEqual(sn.recolor('#aa0000', '#00aa00'), [want.color, want.accent]);
+  assert.ok(ROLES.includes(sn.recolor('#aa0000', '#00aa00')[0]));
+  // a share below 1 snaps a fixed set: the same moths every call, and raising it only ever adds
+  const set = (share) => Array.from({ length: 40 }, (_, i) => groundTreatment(g({ snap: share }), 0, 0, i, 3).recolor('#aa0000', '#00aa00')[0] !== '#aa0000');
+  assert.deepEqual(set(0.5), set(0.5));
+  const half = set(0.5); const most = set(0.9);
+  assert.ok(half.some(Boolean) && half.some((v) => !v), 'about half snap');
+  assert.ok(half.every((v, i) => !v || most[i]), 'raising the share only adds moths');
+  // a ground that throws or returns junk never breaks a frame
+  assert.doesNotThrow(() => groundTreatment(g({ lean: 1, snap: 1, nudge: 1 }, { ground: () => 5, groundRoles: () => null, groundCell: () => null }), 1, 1, 0, 7));
+
+  // through the builder: the moth moves by the nudge, takes the tile's colour, and no ground = exactly step 5
+  const build = (groundFn) => { const b = createCreatureBuilder(); let e; for (let i = 0; i < full; i++) { e = entry(); b.append(input(), e, ASSETS, null, groundFn); } return e[0].items; };
+  const plain = build(null);
+  assert.equal(JSON.stringify(build(() => null)), JSON.stringify(plain), 'a layer with no ground is exactly as before');
+  assert.equal(JSON.stringify(build(() => g({}))), JSON.stringify(plain), 'every dial at 0 is exactly as before');
+  const snapped = build(() => g({ snap: 1 }));
+  const bodyOf = (items) => items.find((i) => i._creature && i.assetId === MOTH_PARTS.body && !i.key.includes(':halo:'));
+  assert.ok(ROLES.includes(bodyOf(snapped).color), 'the body takes a tile colour');
+  assert.equal(snapped.find((i) => i._creature && i.key.includes(':halo:')).color, '#336699', 'the halo is the tile');
+  const nudged = build(() => g({ nudge: 1 }));
+  assert.ok(bodyOf(nudged).x > bodyOf(plain).x && bodyOf(nudged).y === bodyOf(plain).y, 'nudged inward off the edge');
+
+  // through the real resolver, over a real pattern ground: the moth takes the dial; shadow rides the layer for free
+  const { defaultPattern } = await import('../state/patternTrack.js');
+  const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
+  const run2 = (knobs, withGround = true) => {
+    const lp = { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 40, particleCount: 40, ...knobs };
+    const layers = withGround ? [L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) }), L('a')] : [L('a')];
+    const r = createLiveResolver();
+    let out;
+    for (let n = 0; n < full; n++) {
+      out = r.resolveLayers({
+        canvasW: 1000, canvasH: 700, layers, activeLayerId: 'a', layerSnapshots: {}, seed: 1234, seedOffsets: null, paletteId: 'bone',
+        paletteOverrides: null, userPalettes: [], layoutParams: lp, caGrid: null, enabledAssets: null, assetWeightOverrides: {},
+        customAssets: [], quality: 'balanced', lockedParams: {}, batchPaused: false, focusSwap: false, loopTimeMs: n * 16.7, dtSec: 1 / 60,
+        perfClampOverride: null, perfTier1: false, assetThin: false, slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5],
+        effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null, dishPins: [{ x: 500, y: 350 }], dishFormed: [true], assetAttach: {},
+      });
+    }
+    r.dispose();
+    const items = out.filter((e) => Array.isArray(e.items) && !e.isPattern && !e.isFx).at(-1).items.filter((i) => i._creature);
+    return items;
+  };
+  const off = run2({ groundSnap: 0, groundLean: 0 });
+  const offNoPattern = run2({ groundSnap: 1 }, false);
+  assert.equal(JSON.stringify(offNoPattern), JSON.stringify(run2({ groundSnap: 0 }, false)), 'SNAP with no pattern below does nothing, like a mark');
+  const onSnap = run2({ groundSnap: 1 });
+  const colourOf = (items) => items.find((i) => i.assetId === MOTH_PARTS.body && !i.key.includes(':halo:')).color;
+  assert.notEqual(colourOf(onSnap), colourOf(off), 'with a pattern below and SNAP up, the moth takes a tile colour');
+  assert.notEqual(onSnap.find((i) => i.key.includes(':halo:')).color, off.find((i) => i.key.includes(':halo:')).color, 'and the halo is the tile');
+  assert.equal(JSON.stringify(run2({ groundSnap: 1 })), JSON.stringify(onSnap), 'deterministic');
+}
+
 console.log('creature.selfcheck: ok (#1355 step 4, the moth)');
