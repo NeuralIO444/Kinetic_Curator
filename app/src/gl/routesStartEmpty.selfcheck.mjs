@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { useStore } from '../state/store.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
+import { autoInvites } from './stimuliAuto.mjs';
 import { DEFAULT_ROUTES, METRO_BREATH, hasNoRoutes, effectiveRoutes, metroBreath, audioRoutes } from './audioRoutes.mjs';
 
 let n = 0;
@@ -69,6 +70,16 @@ ok('her set is not inert: with no routes of your own it uses the default routing
   const mine = [{ input: 'band.air', target: 'render.scale', depth: 0.2 }];
   assert.strictEqual(effectiveRoutes(mine, true), mine, 'your own routes always win');
   assert.strictEqual(effectiveRoutes(null, true), null);
+});
+
+ok('the guided path: AUDIO ON shimmers while audio is off, then AUTO once audio is on and nothing is routed', () => {
+  assert.equal(autoInvites({ audioEnabled: false, routeCount: 0 }), false, 'audio off: the AUDIO button is the invitation');
+  assert.equal(autoInvites({ audioEnabled: true, routeCount: 0 }), true, 'audio on and no routes: AUTO');
+  assert.equal(autoInvites({ audioEnabled: true, routeCount: 3 }), false, 'a route exists: quiet');
+  const m = src('../panels/stimulus/ModMatrix.jsx');
+  assert.match(m, /className=\{`chip-btn act\$\{autoInvited \? ' xl-shimmer' : ''\}`\} onClick=\{\(\) => \{ markAuto\(\); autoSetup\(\); \}\}/);
+  assert.match(m, /useInvite\('auto'\)/);
+  assert.match(src('../panels/StimulusPanel.jsx'), /\$\{audioEnabled \? 'on' : 'invite'\}/, 'the AUDIO button still invites while off');
 });
 
 ok('wiring: the loop uses these, and the slice default is []', () => {
