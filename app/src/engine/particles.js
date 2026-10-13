@@ -27,7 +27,7 @@
  */
 
 import { createNoise } from './noise.js';
-import { runDishContacts } from './dishContacts.mjs'; // #1407 — cross-strata shared grid (call site below)
+import { runDishContacts, contactBodyRadius } from './dishContacts.mjs'; // #1407 — cross-strata shared grid (call site below); #1408 — the shared radius law
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -44,6 +44,19 @@ import {
 } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { registerCostTier } from '../gl/costTiers.mjs';
+
+/**
+ * #1408 — per-asset contact radius trim: a silhouette factor carried on the
+ * asset record (`radiusTrim`, default 1.0 — data, not UI). Malformed data
+ * (absent, non-numeric, non-positive) reads as 1.0, so a bad record can
+ * never zero or NaN a body's disc. Stored per particle in `contactTrim`
+ * at spawn (like `cgroup`), inherited at breed from the costume parent,
+ * and exchanged at swap — the disc follows the visible costume.
+ */
+export function assetRadiusTrim(rec) {
+  const t = rec ? Number(rec.radiusTrim) : NaN;
+  return Number.isFinite(t) && t > 0 ? t : 1;
+}
 
 /**
  * #287 bio-drives — the grazer trait lives here (per-agent, set at init
@@ -152,6 +165,9 @@ export class ParticleSystem {
     this.ax = new Float64Array(cap);
     this.ay = new Float64Array(cap);
     this.mass = new Float64Array(cap);
+    // #1408 — per-particle contact radius trim (from the asset record at
+    // spawn; see assetRadiusTrim). 1 = the mark's disc is its live scale.
+    this.contactTrim = new Float64Array(cap).fill(1);
     this.scale = new Float64Array(cap);
     // #451 — scale before the #287 breath multiplier, so a sort key can
     // rank items by their designed size without the ±50% breath swing
@@ -224,6 +240,7 @@ export class ParticleSystem {
     this.ax = grow(this.ax);
     this.ay = grow(this.ay);
     this.mass = grow(this.mass);
+    this.contactTrim = grow(this.contactTrim);
     this.scale = grow(this.scale);
     this.baseScale = grow(this.baseScale);
     this.rotation = grow(this.rotation);
@@ -393,6 +410,7 @@ export class ParticleSystem {
       this.speedMul[i] = 0.8 + 0.4 * hashU01(seed >>> 0, CH.dyn, 32768 + i);
       this.noiseSeed[i] = hashU01(seed >>> 0, CH.dyn, 36864 + i) * 10;
       this.assetIndex[i] = i % activeAssets.length;
+      this.contactTrim[i] = assetRadiusTrim(activeAssets[this.assetIndex[i]]); // #1408
       this.alive[i] = 1;
       this.cgroup[i] = (i % activeAssets.length) % 32;
       this.color[i] = swatches[i % swatches.length];
@@ -493,8 +511,12 @@ export class ParticleSystem {
    * handling as every other force. No Matter/cannon/Rapier, no rigid
    * stacks, no CCD, no 3D: one pairwise pass per step.
    *
-   * Each particle is a disc of `radius` px. For every interacting pair with
-   * dist < 2*radius, in a fixed visit order (ascending i; per i the same
+   * Each particle is a disc whose radius is its mark's live size:
+   * `contactBodyRadius(radius, scale, trim)` — `radius` px is the disc of a
+   * scale-1, trim-1 mark (#1408), the `scale` column (growth, shrink, the
+   * breath pulse) sizes it per frame, and the asset record's `radiusTrim`
+   * trims it per costume. For every interacting pair with
+   * dist < ri + rj, in a fixed visit order (ascending i; per i the same
    * ox-outer/oy-inner grid walk as the boids loop; each unordered pair once
    * from the lower index):
    *
@@ -527,18 +549,34 @@ export class ParticleSystem {
     const T = this._trig; // #1240 — trig source (native Math.* by default)
     const n0 = this.n;
     if (n0 < 2 || !(radius > 0)) return;
-    // 3x3 cells of 2r cover every pair with dist < 2r. A second grid — the
-    // boids grid keeps its exact cell size and visit order (behaviour lock).
+    // #1408 — per-body radii into scratch (reused across passes; grows
+    // only when the population does, so the hot path allocates nothing).
+    // The grid cell must cover the largest pair sum, 2 * maxR.
+    const SCALE = this.scale;
+    const TRIM = this.contactTrim;
+    let RAD = this._contactRadii;
+    if (!RAD || RAD.length < n0) {
+      RAD = new Float64Array(n0);
+      this._contactRadii = RAD;
+    }
+    let maxR = 0;
+    for (let i = 0; i < n0; i++) {
+      const ri = this.alive[i] ? contactBodyRadius(radius, SCALE[i], TRIM[i]) : 0;
+      RAD[i] = ri;
+      if (ri > maxR) maxR = ri;
+    }
+    if (!(maxR > 0)) return;
+    // 3x3 cells of 2*maxR cover every pair with dist < ri + rj. A second
+    // grid — the boids grid keeps its exact cell size and visit order
+    // (behaviour lock).
     const { cellStart, order, cols, rows, minCx, minCy, cellSize } =
-      this._buildSpatialHash(radius * 2);
+      this._buildSpatialHash(maxR * 2);
     const X = this.x; const Y = this.y;
     const VX = this.vx; const VY = this.vy;
     const MASS = this.mass;
     const ALIVE = this.alive;
     const CG = this.cgroup;
     const AI = this.assetIndex;
-    const rr = radius * 2;
-    const rr2 = rr * rr;
     const canImpulse = mode === 'bounce' || mode === 'stick';
     // stick is bounce with restitution 0.
     const e = mode === 'bounce' ? restitution : 0;
@@ -552,6 +590,8 @@ export class ParticleSystem {
 
     for (let i = 0; i < n0; i++) {
       if (!ALIVE[i] || newborn.has(i)) continue;
+      const ri = RAD[i];
+      if (!(ri > 0)) continue; // #1408 — a zero-size mark touches nothing
       const ga = CG[i];
       if (!((umask >>> ga) & 1)) continue;
       const cx = Math.floor(X[i] / cellSize) - minCx;
@@ -569,12 +609,15 @@ export class ParticleSystem {
             if (j <= i || !ALIVE[j] || newborn.has(j)) continue;
             const gb = CG[j];
             if (!((umask >>> gb) & 1)) continue;
+            const rj = RAD[j];
+            if (!(rj > 0)) continue; // #1408 — both discs positive, or no contact
+            const rsum = ri + rj; // #1408 — per-body disc sum
             // Re-read: i may already have moved this pass.
             const xi = X[i]; const yi = Y[i];
             const dx = X[j] - xi;
             const dy = Y[j] - yi;
             const d2 = dx * dx + dy * dy;
-            if (d2 >= rr2) continue;
+            if (d2 >= rsum * rsum) continue;
             let dist = Math.sqrt(d2);
             let nx; let ny;
             if (dist > 1e-9) {
@@ -586,7 +629,7 @@ export class ParticleSystem {
               nx = T.cos(ang); ny = T.sin(ang);
               dist = 0;
             }
-            const overlap = rr - dist;
+            const overlap = rsum - dist;
             const m1 = MASS[i]; const m2 = MASS[j];
             const w1 = 1 / m1; const w2 = 1 / m2;
             const wSum = w1 + w2;
@@ -610,7 +653,7 @@ export class ParticleSystem {
             // velocity scaled by overlap fraction. Independent of approach:
             // personal space pushes even when the pair is drifting apart.
             if (repel > 0 && ga === gb) {
-              const jr = ((repel * (overlap / rr)) * 0.5) / wSum;
+              const jr = ((repel * (overlap / rsum)) * 0.5) / wSum;
               VX[i] -= nx * jr * w1;
               VY[i] -= ny * jr * w1;
               VX[j] += nx * jr * w2;
@@ -621,6 +664,10 @@ export class ParticleSystem {
             if (vn >= 0) continue;
             if (wantSwap) {
               const t = AI[i]; AI[i] = AI[j]; AI[j] = t;
+              // #1408 — the disc follows the costume: trim swaps too.
+              const tt = this.contactTrim[i];
+              this.contactTrim[i] = this.contactTrim[j];
+              this.contactTrim[j] = tt;
             } else if (wantDie) {
               ALIVE[j] = 0;
               this._dead.push(j);
@@ -696,6 +743,7 @@ export class ParticleSystem {
     this.seedOffset[cs] = (this.seedOffset[i] + this.seedOffset[j]) / 2;
     // The child inherits one parent's costume and collide layer, seeded.
     this.assetIndex[cs] = r3 < 0.5 ? this.assetIndex[i] : this.assetIndex[j];
+    this.contactTrim[cs] = r3 < 0.5 ? this.contactTrim[i] : this.contactTrim[j]; // #1408 — trim follows the costume
     this.cgroup[cs] = r4 < 0.5 ? this.cgroup[i] : this.cgroup[j];
     this.alive[cs] = 1;
     this.color[cs] = r3 < 0.5 ? this.color[i] : this.color[j];

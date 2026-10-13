@@ -195,7 +195,10 @@ const PINS = {
   // organism items: bilateral/radial trig in _organismItems (getItems)
   'detTrig.hype': 'cb19269852d16f5c21a57f567a7abb0be097a9bb001a85662eee9f054fde4300',
   // contacts: golden-angle depenetration (_contactPass) + breed rotation atan2
-  'detTrig.contacts': 'dbcc788f10e740c196257355737592563dc710ea76577fb88f895973a0fc4dd0',
+  // Re-pinned 2026-10-12 for #1408 (intentional): contact discs now size
+  // from each mark's live scale (radius-from-scale), so a contacts bake's
+  // trajectory legitimately moves. Placement goldens are unaffected.
+  'detTrig.contacts': '49eafa2b552dcd347bd09316fbb925a5d5ec3913284c3d636be99774e9d6cb2a',
 };
 {
   const fixtures = {
