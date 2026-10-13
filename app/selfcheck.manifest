@@ -356,3 +356,7 @@ node src/gl/contactShadow.selfcheck.mjs
 node src/engine/groundSnap.selfcheck.mjs
 node src/curator/formation.selfcheck.mjs
 node src/curator/refineColor.selfcheck.mjs
+node src/state/projectDocument.fuzz.selfcheck.mjs
+node src/gl/resolverInputParity.selfcheck.mjs
+node src/gl/resolverProbe.selfcheck.mjs
+node scripts/verifyPerformance.selfcheck.mjs
