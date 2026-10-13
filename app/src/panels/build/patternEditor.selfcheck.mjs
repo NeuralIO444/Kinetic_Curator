@@ -46,8 +46,8 @@ ok('no inline style, no emoji, no hardcoded case; casing is the .act / .lbl clas
 
 ok('LayerStack: PATTERN in the ADD STRATUM type chooser, the whole block opens the editor, the PATCH row is hidden, a lone KC cannot be removed', () => {
   assert.match(stack, /ADD_TYPES = Object\.freeze\(\['content', 'fx', 'math', 'pattern'\]\)/, 'the chooser offers PATTERN beside the other strata');
-  assert.match(stack, /addPatternLayer\('QUILT'\)/);
-  assert.match(stack, /pat \? selectPatternLayer\(layer\.id\) :/);
+  assert.match(stack, /Events\.PATTERN_ADD, \{ mode: 'QUILT' \}/);
+  assert.match(stack, /pat \? emit\(Events\.PATTERN_SELECT, \{ id: layer\.id \}\) :/);
   assert.match(stack, /\{!adj && !pat && \(\s*<>/, 'a pattern track has no PATCH row');
   assert.match(stack, /disabled=\{isKcLayer\(layer\) && kcCount <= 1\}/);
   assert.match(stack, /const singleTrack = kcCount < 2/, 'PATCH needs a second KC track, not a second content track');
