@@ -256,6 +256,13 @@ export function useApp(selector) {
       case A.SET_LIGHT: return store.setLight(action.patch);
       case A.SET_CREATURE_COUNT: return store.setCreatureCount(action.n);
       case A.CLEAR_ASSET_ATTACH: return store.clearAssetAttach(action.assetId);
+      case A.SET_BEAT_BPM: return store.setBeatBpm(action.bpm);
+      case A.SET_BEAT_METRO: return store.setBeatMetro(action.on);
+      case A.SET_AUDIO_ROUTES: return store.setAudioRoutes(action.routes, action.continuous);
+      case A.EDIT_AUDIO_ROUTES: return store.editAudioRoutes(action.fn, action.continuous);
+      case A.SET_AUDIO_SIDECAR: return store.setAudioSidecar(action.sidecar, action.note);
+      case A.SET_MIDI_ENABLED: return store.setMidiEnabled(action.on);
+      case A.SET_STARTUP_MODE: return store.setStartupMode(action.mode);
       default: console.warn('Unhandled action:', type);
     }
   }, []);

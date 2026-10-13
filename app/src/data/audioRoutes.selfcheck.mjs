@@ -212,6 +212,6 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   assert.ok(/disabled=\{full\}/.test(ui) && /disabled=\{!custom\}/.test(ui), '+ ROUTE stops at the cap; RESET only when customised');
   assert.ok(/disabled=\{table\.length === 0\} onClick=\{\(\) => setAudioRoutes\(\[\]\)\}/.test(ui), 'CLEAR empties the table (start from scratch), greyed when already empty');
   const meter = src('../panels/stimulus/MeterHero.jsx');
-  assert.ok(/editAudioRoutes\(\(t\) => \{ const n = nextRoute\(t, input\)/.test(meter) && /onClick=\{routeBand\}/.test(meter), 'a click on a meter band adds a route for that band');
+  assert.ok(/Events\.AUDIO_ROUTES_EDIT, \{ fn: \(t\) => \{ const n = nextRoute\(t, input\)/.test(meter) && /onClick=\{routeBand\}/.test(meter), 'a click on a meter band adds a route for that band');
 }
 console.log('audioRoutes (state) selfcheck: OK');

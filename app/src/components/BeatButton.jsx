@@ -18,6 +18,7 @@ import { useStore } from '../state/store.js';
 import { helpText } from '../data/helpCopy.js';
 import { ExpandLabel } from './ExpandLabel.jsx';
 import { useTapOpen } from '../hooks/useTapOpen.js';
+import { emit, Events } from '../composition/eventBus.js';
 import {
   BEAT_DEFAULT_BPM,
   BEAT_PRESETS,
@@ -28,9 +29,7 @@ import {
 
 export function BeatButton() {
   const beatBpm = useStore((s) => s.beatBpm) ?? BEAT_DEFAULT_BPM;
-  const setBeatBpm = useStore((s) => s.setBeatBpm);
   const beatMetro = useStore((s) => s.beatMetro);
-  const setBeatMetro = useStore((s) => s.setBeatMetro);
   const audioEnabled = useStore((s) => s.audioEnabled);
   const [open, setOpen] = useState(false);
   const tapOpen = useTapOpen(); // #1103 — touch has no hover
@@ -78,7 +77,7 @@ export function BeatButton() {
   }, [open ]);
 
   const pick = (bpm) => {
-    setBeatBpm(bpm);
+    emit(Events.BEAT_BPM, { bpm });
     setTaps([]);
     setExact('');
   };
@@ -88,7 +87,7 @@ export function BeatButton() {
     const next = [...taps, now].slice(-8);
     setTaps(next);
     const bpm = tapBpm(next);
-    if (bpm != null) setBeatBpm(bpm);
+    if (bpm != null) emit(Events.BEAT_BPM, { bpm });
   };
 
   const onExact = (e) => {
@@ -168,7 +167,7 @@ export function BeatButton() {
             type="button"
             className={`beat-metro ${beatMetro ? 'active' : ''}`}
             aria-pressed={beatMetro}
-            onClick={() => setBeatMetro(!beatMetro)}
+            onClick={() => emit(Events.BEAT_METRO, { on: !beatMetro })}
             title="Pulse: the dialed tempo becomes a real beat the stage can feel when there is no audio. Audio always wins. Off by default."
           >
             pulse

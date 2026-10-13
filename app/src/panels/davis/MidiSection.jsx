@@ -6,13 +6,13 @@ import { useStore } from '../../state/store.js';
 import { midiStatusView, describeMessage } from '../../midi/status.mjs';
 import { MIDI_TARGETS } from '../../midi/targets.mjs';
 import { describeKey } from '../../midi/message.mjs';
+import { emit, Events } from '../../composition/eventBus.js';
 
 export function MidiSection() {
   const enabled = useStore((s) => s.midiEnabled);
   const status = useStore((s) => s.midiStatus);
   const last = useStore((s) => s.midiLast);
   const map = useStore((s) => s.midiMap);
-  const setMidiEnabled = useStore((s) => s.setMidiEnabled);
   const unbindMidi = useStore((s) => s.unbindMidi);
   const view = midiStatusView(status, enabled);
   const rows = Object.entries(map).map(([key, id]) => ({ key, id, target: MIDI_TARGETS.find((t) => t.id === id) })).filter((r) => r.target);
@@ -21,7 +21,7 @@ export function MidiSection() {
       <div className="davis-midi-head">
         <i className="lbl">midi</i>
         <button type="button" className={`chip-btn ${enabled ? 'active' : ''}`} aria-pressed={enabled}
-          onClick={() => setMidiEnabled(!enabled)}
+          onClick={() => emit(Events.MIDI_ENABLED, { on: !enabled })}
           title={enabled ? 'Disconnect MIDI' : 'Connect a MIDI controller (the browser will ask for access)'}>
           {enabled ? 'ON' : 'ENABLE'}
         </button>

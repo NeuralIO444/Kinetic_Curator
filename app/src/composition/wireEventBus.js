@@ -172,6 +172,13 @@ export function wireEventBus(rawDispatch) {
   on(Events.LIGHT_SET, (patch) => dispatch({ type: A.SET_LIGHT, patch }));
   on(Events.CREATURE_COUNT, (p = {}) => dispatch({ type: A.SET_CREATURE_COUNT, n: p.n }));
   on(Events.ATTACH_CLEAR, (p = {}) => dispatch({ type: A.CLEAR_ASSET_ATTACH, assetId: p.assetId }));
+  on(Events.BEAT_BPM, (p = {}) => dispatch({ type: A.SET_BEAT_BPM, bpm: p.bpm }));
+  on(Events.BEAT_METRO, (p = {}) => dispatch({ type: A.SET_BEAT_METRO, on: p.on }));
+  on(Events.AUDIO_ROUTES_SET, (p = {}) => dispatch({ type: A.SET_AUDIO_ROUTES, routes: p.routes, continuous: !!p.continuous }));
+  on(Events.AUDIO_ROUTES_EDIT, (p = {}) => dispatch({ type: A.EDIT_AUDIO_ROUTES, fn: p.fn, continuous: !!p.continuous }));
+  on(Events.AUDIO_SIDECAR, (p = {}) => dispatch({ type: A.SET_AUDIO_SIDECAR, sidecar: p.sidecar, note: p.note }));
+  on(Events.MIDI_ENABLED, (p = {}) => dispatch({ type: A.SET_MIDI_ENABLED, on: p.on }));
+  on(Events.STARTUP_MODE, (p = {}) => dispatch({ type: A.SET_STARTUP_MODE, mode: p.mode }));
 
   return dispatch;
 }

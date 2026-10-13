@@ -1,6 +1,5 @@
 import { emit, Events } from '../../composition/eventBus.js';
 import { RangeRow } from '../../components/RangeRow.jsx';
-import { useStore } from '../../state/store.js';
 import { parseAudioEnvelope } from '../../gl/audioEnvelopeCore.mjs';
 import { sourceStatus, sidecarReason } from '../../gl/sourceStatus.mjs';
 import { lostLine, selectedInputMissing } from '../../hooks/audioLoss.mjs';
@@ -24,7 +23,7 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    const set = useStore.getState().setAudioSidecar;
+    const set = (sidecar, note) => emit(Events.AUDIO_SIDECAR, { sidecar, note });
     let raw;
     try {
       raw = JSON.parse(await file.text());
@@ -92,7 +91,7 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
           <span className="lbl">sidecar</span>
           <input type="file" accept=".json,application/json" onChange={handleSidecarChange} style={{ fontSize: '9px', color: 'var(--dim)' }} />
           {audioSidecar && (
-            <button type="button" className="micro-btn" onClick={() => useStore.getState().setAudioSidecar(null)} title="Drop the sidecar and go back to live analysis">✕</button>
+            <button type="button" className="micro-btn" onClick={() => emit(Events.AUDIO_SIDECAR, { sidecar: null, note: '' })} title="Drop the sidecar and go back to live analysis">✕</button>
           )}
         </label>
       )}
