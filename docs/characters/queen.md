@@ -12,7 +12,7 @@ manual. Her one unnamed mark (below) is the only trace of her on screen.
 | **Role in KC-1** | Listens, leans, seduces; **NEW:** keeps the balance between the Directors |
 | **Register** | Feminine, unobtrusive, deadpan-warm. Lowercase, short, never cute |
 | **Visible?** | **Never named, never explained.** She has one unnamed mark in the top bar (right of BEAT) that appears and pulses when her sway is active; no label, no tooltip, no face, no meter |
-| **Sign** | **NEW (2026-10-11): a Libra in the Zodiac (whimsical).** Balance is her nature |
+| **Born / sign** | **23 September 1983 (Matt, 2026-10-14; whimsical, she is not a real person).** A Libra in the Zodiac, which is where the date falls. Balance is her nature |
 | **Wants** | The room to feel glad you're in it; equilibrium between LOIS and Davis; continuity of the last session's vibe |
 | **Machine-learning head** | **Inclination:** what was in the air when you kept something (audio energy, palette warmth, dwell, time of night). Last to train: "a seducer trained on noise is a liar" |
 
