@@ -72,5 +72,23 @@ can't breed again before depenetration pushes it clear.
 
 - No UI sliders expose the contact params yet (`PARAM_SPEC` is the trust
   boundary; the panel half is a separate pass).
-- `collideMask` groups are asset-derived; true cross-*layer* contacts
-  (two app layers colliding) would need shared grids and are out of scope.
+- `collideMask` groups are asset-derived.
+
+## Cross-strata contacts — the shared dish grid (#1407, petri dish A1)
+
+Shipped: cross-*layer* contacts now exist. `app/src/engine/dishContacts.mjs`
+holds ONE counting-sort spatial hash spanning every enrolled stratum's
+`ParticleSystem`; the resolver enrols each live swarm layer (in stack
+order), arms the session once per frame, and the first enrolled system's
+`update()` runs the cross-strata pass over the consistent end-of-last-step
+snapshot (`particles.js` and `liveResolve.mjs` each take a call site only).
+`kernel/bake/dishBake.mjs` steps several strata in lockstep under the same
+protocol, so a multi-strata bake is the same pure function as the live
+ticks. Cross-strata pairs depenetrate (mass-weighted, always) and take a
+bounce impulse only when both strata are impulse modes (restitution
+averaged); swap/die/breed and repel stay per-system in A1. A session arms
+only when at least two enrolled strata have `contactRadius > 0` — every
+other configuration is bit-identical to the per-system engine above.
+Pinned by scenario 17 in `contacts.selfcheck.mjs` and by
+`src/gl/dishContacts.selfcheck.mjs` (hidden stratum = stratum alone,
+byte-for-byte).

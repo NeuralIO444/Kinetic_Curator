@@ -190,6 +190,7 @@ node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs
 node src/gl/resolveTap.selfcheck.mjs
 node src/gl/dishGround.selfcheck.mjs
+node src/gl/dishContacts.selfcheck.mjs
 node src/gl/performanceFile.selfcheck.mjs
 node src/gl/performanceCapture.selfcheck.mjs
 node src/gl/liveResolve.determinism.selfcheck.mjs

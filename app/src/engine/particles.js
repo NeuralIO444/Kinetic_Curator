@@ -27,6 +27,7 @@
  */
 
 import { createNoise } from './noise.js';
+import { runDishContacts } from './dishContacts.mjs'; // #1407 — cross-strata shared grid (call site below)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -1185,6 +1186,18 @@ export class ParticleSystem {
       AX[i] = fax;
       AY[i] = fay;
     }
+
+    // #1407 — the dish: one shared grid across strata. When the resolver
+    // (or the bake driver) armed the session this frame, the first enrolled
+    // system to reach this point runs the cross-strata pass over every
+    // enrolled system's current state — the others still hold their
+    // end-of-last-step snapshot, so the pass reads one consistent world.
+    // The module disarms the session, so later systems skip. No session,
+    // not armed, or not enrolled: nothing runs and this system stays
+    // bit-identical to the #167 engine alone. Logic lives in
+    // dishContacts.mjs; this file takes the call site only.
+    const dishSession = layoutParams.dishSession || null;
+    if (dishSession && dishSession.armed) runDishContacts(dishSession, this);
 
     // #167 — contact pass. Between forces and integration so impulses flow
     // through the same damping, speed clamp, and wall handling. Skipped
