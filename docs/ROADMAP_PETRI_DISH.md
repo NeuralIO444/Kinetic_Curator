@@ -117,7 +117,7 @@ doctrine, never named, no tooltip.
 **Open questions for Matt (from that session):** lock voice slots at 4; file the Queen's M1 to M5 sway lines; are
 voice lines user-editable or canonical; when to start the code (its first phase is types and validation, no UI).
 
-**To reconcile before these are built:**
+**To reconcile before these are built** *(both reconciled 2026-10-12)*:
 - `VOICES.md` lists Davis's verdict as `UGLY`. On screen it now reads **SIFT** and he almost never says the word
   (#1373). The internal code is still `UGLY`.
 - The Queen has an unnamed mark in the app today (`components/SwayMark.jsx`), and `VOICES.md` gives her KEEP/PASS
