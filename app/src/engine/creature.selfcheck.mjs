@@ -192,4 +192,59 @@ const full = MOTH.growFrames + 1;
   resetFormation();
 }
 
+// 12. the second pair (step 5): the crowd decides; two pairs is the most; it grows in and out; step 4's look is unchanged at one
+{
+  const { MOTH: M } = await import('./creature.js');
+  const real = (e) => e[0].items.filter((i) => i._creature && !i.key.includes(':halo:'));
+  const wings = (e) => real(e).filter((i) => i.assetId === MOTH_PARTS.wing);
+  const marks = (e) => real(e).filter((i) => i.assetId === MOTH_PARTS.mark);
+  const frames = full + M.pairFrames + 2;
+  // one pair (or no instruction): exactly what step 4 drew
+  assert.equal(wings(run(createCreatureBuilder(), input(), frames)).length, 2);
+  assert.equal(wings(run(createCreatureBuilder(), input({ dishLimbs: [1] }), frames)).length, 2);
+  // two pairs: four wings, the TE four, and a few scales on the hind pair
+  const two = run(createCreatureBuilder(), input({ dishLimbs: [2] }), frames);
+  assert.equal(wings(two).length, 4, 'four wings: two pairs');
+  assert.equal(marks(two).length, 2 * M.marksPerWing + 2 * M.marksPerHind);
+  assert.equal(two[0].items.filter((i) => i._creature).length, MOTH_MARKS + 4 + 2 * M.marksPerHind, 'two more halos, two more wings, their scales');
+  const dishLimbsHuge = run(createCreatureBuilder(), input({ dishLimbs: [9] }), frames);
+  assert.equal(wings(dishLimbsHuge).length, 4, 'never more than four wings, whatever it is told');
+  // the hind pair hangs from the body below and outside the fore pair, smaller, and mirrors
+  const [fr, fl, hr, hl] = wings(two);
+  assert.ok(hr.y > fr.y, 'the hind wings sit lower');
+  assert.ok(Math.abs(hr.scale) < Math.abs(fr.scale), 'and smaller');
+  assert.ok(Math.abs((hr.x - 500) + (hl.x - 500)) < 1e-6 && Math.abs(hr.rotation + hl.rotation) < 1e-6, 'a mirrored pair');
+  assert.notEqual(hr.color, fr.color, 'the two pairs read apart');
+  // it grows in over pairFrames (never pops) and goes out the same way
+  const b = createCreatureBuilder();
+  run(b, input({ dishLimbs: [1] }), full);
+  const sizes = [];
+  for (let i = 0; i < M.pairFrames + 2; i++) {
+    const e = entry(); b.append(input({ dishLimbs: [2] }), e, ASSETS);
+    sizes.push(wings(e).filter((_, k) => k >= 2).length ? Math.abs(wings(e)[2].scale) : 0);
+  }
+  assert.equal(sizes[0] > 0 && sizes[0] < sizes.at(-1), true, `it starts small and ends full: ${sizes[0].toFixed(3)} -> ${sizes.at(-1).toFixed(3)}`);
+  for (let i = 2; i < sizes.length; i++) assert.ok(sizes[i] >= sizes[i - 1] - 1e-3, `monotone growth: ${sizes.map((x) => x.toFixed(3)).join(' ')}`);
+  let gone = false;
+  for (let i = 0; i < M.pairFrames + 2; i++) { const e = entry(); b.append(input({ dishLimbs: [1] }), e, ASSETS); gone = wings(e).length === 2; }
+  assert.ok(gone, 'and it shrinks out again when the crowd thins');
+  // unformed resets the second pair
+  b.append(input({ dishFormed: [false] }), entry(), ASSETS);
+  assert.equal(wings(run(b, input({ dishLimbs: [1] }), 1)).length, 2);
+  // through the real resolver: replayable (same inputs, same four wings)
+  const lp = { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60 };
+  const base = {
+    canvasW: 1000, canvasH: 700, layers: [{ id: 'a', name: 'a', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
+    activeLayerId: 'a', layerSnapshots: {}, seed: 1234, seedOffsets: null, paletteId: 'bone', paletteOverrides: null, userPalettes: [],
+    layoutParams: lp, caGrid: null, enabledAssets: null, assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {},
+    batchPaused: false, focusSwap: false, loopTimeMs: 0, dtSec: 1 / 60, perfClampOverride: null, perfTier1: false, assetThin: false,
+    slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null,
+    dishPins: [{ x: 500, y: 350 }], dishFormed: [true], assetAttach: {},
+  };
+  const seq = (limbs) => Array.from({ length: frames }, (_, n) => ({ ...base, dishLimbs: limbs, loopTimeMs: n * 16.7 }));
+  const play = (s) => { const r = createLiveResolver(); let o; for (const x of s) o = r.resolveLayers(x); r.dispose(); return JSON.stringify(o.map((e) => (e.items || []).map((i) => [i.x, i.y, i.scale, i.assetId, i.key]))); };
+  assert.equal(play(seq([2])), play(seq([2])), 'a take replays its limbs');
+  assert.notEqual(play(seq([2])), play(seq([1])), 'and the second pair really is in the picture');
+}
+
 console.log('creature.selfcheck: ok (#1355 step 4, the moth)');

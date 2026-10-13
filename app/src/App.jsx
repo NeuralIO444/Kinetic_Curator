@@ -37,8 +37,8 @@ import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353
 import { initStress, DEBUG_STRESS } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
-import { observeFormation, getFormedPins } from './curator/formationLive.js'; // #1355 step 3: when a spore would form
-import { setResolveFrameTap, setFormedProvider } from './gl/resolveTap.mjs';
+import { observeFormation, getFormedPins, getLimbPairs } from './curator/formationLive.js'; // #1355 step 3: when a spore would form
+import { setResolveFrameTap, setFormedProvider, setLimbsProvider } from './gl/resolveTap.mjs';
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
 import { Shell } from './composition/Shell.jsx';
@@ -85,12 +85,13 @@ function AppInner() {
     // #1355 step 3 — the formation rule reads the same frame (one tap: dish pressure first, then formation).
     setResolveFrameTap((input, output) => { observeDish(input, output); observeFormation(input, output); });
     setFormedProvider(getFormedPins); // #1355 step 4: the moth grows on pins the rule has formed
+    setLimbsProvider(getLimbPairs); // #1355 step 5: a crowded place grows its second pair of wings
     const stop = initStress({
       getCounts: loisActivity.pressureCounts,
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

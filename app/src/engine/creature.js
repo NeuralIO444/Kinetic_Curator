@@ -28,6 +28,14 @@ export const MOTH = Object.freeze({
   /** Where scales may sit, in wing units from the wing's centre: inside the leaf's outline. */
   markBounds: Object.freeze({ x0: -8, y0: -26, x1: 8, y1: 26 }),
   markRadius: 9, // wing units between scales
+  // The second pair (step 5): hind wings, smaller, set lower on the body and turned further down, beating against the
+  // fore pair. They grow in and shrink out over pairFrames as the crowd (curator/limbs.js) gives and takes them.
+  hindScale: 0.78, // of a fore wing
+  hindSpread: 122, // degrees from straight up: pointing down and out
+  hindAlong: 0.45, // where on the body: this far from the side point toward the bottom point
+  hindFlap: 0.7, // of the fore pair's beat, in counterphase
+  marksPerHind: 6,
+  pairFrames: 45, // resolver frames for a pair to grow in or out
   halo: 1.14, // the bg-coloured outline under body and wings, as a multiple of their size: it lifts the moth off a busy dish
 });
 
@@ -48,7 +56,7 @@ export function pointToward(points, side) {
  * (positive opens the wings). Each wing's ROOT point lands on a body attach point: the wing's centre is found by
  * walking back from that point along the wing's own direction.
  */
-export function mothRecipe({ bodyPoints, wingPoints, beat = 0 }) {
+export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0 }) {
   const root = pointToward(wingPoints, 'bottom'); // the wing's own attach point nearest its base, from its centre
   const k = MOTH.wingScale / MOTH.bodyScale; // a wing's unit measured in body units
   const anchorFor = (side, sign) => {
@@ -59,21 +67,42 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0 }) {
     // wing centre = root point on the body - R(theta) * (wing root offset), in body units
     return { dx: p.x - (root.x * c - root.y * s) * k, dy: p.y - (root.x * s + root.y * c) * k, dRot: theta, dScaleX: k, dScaleY: k };
   };
-  return {
-    parts: {
-      body: {
-        asset: MOTH_PARTS.body,
-        anchors: { wingR: anchorFor('right', 1), wingL: anchorFor('left', -1) },
-        children: [{ part: 'wing', anchor: 'wingR' }, { part: 'wing', anchor: 'wingL' }],
-      },
-      wing: {
-        asset: MOTH_PARTS.wing,
-        localBounds: MOTH.markBounds,
-        children: [{ part: 'mark', anchor: 'surface', count: MOTH.marksPerWing, key: 'marks' }],
-      },
-      mark: { asset: MOTH_PARTS.mark },
-    },
+  // The hind pair: only in the recipe while it has any size, so one pair is exactly what step 4 drew.
+  const withHind = hind > 0.02;
+  const hindAnchor = (side, sign) => {
+    const a = pointToward(bodyPoints, side);
+    const b = pointToward(bodyPoints, 'bottom');
+    const p = { x: a.x + (b.x - a.x) * MOTH.hindAlong, y: a.y + (b.y - a.y) * MOTH.hindAlong };
+    const theta = sign * (MOTH.hindSpread - beat * MOTH.hindFlap);
+    const c = Math.cos(rad(theta));
+    const s = Math.sin(rad(theta));
+    const k2 = k * MOTH.hindScale * hind;
+    return { dx: p.x - (root.x * c - root.y * s) * k2, dy: p.y - (root.x * s + root.y * c) * k2, dRot: theta, dScaleX: k2, dScaleY: k2 };
   };
+  const parts = {
+    body: {
+      asset: MOTH_PARTS.body,
+      anchors: { wingR: anchorFor('right', 1), wingL: anchorFor('left', -1) },
+      children: [{ part: 'wing', anchor: 'wingR' }, { part: 'wing', anchor: 'wingL' }],
+    },
+    wing: {
+      asset: MOTH_PARTS.wing,
+      localBounds: MOTH.markBounds,
+      children: [{ part: 'mark', anchor: 'surface', count: MOTH.marksPerWing, key: 'marks' }],
+    },
+    mark: { asset: MOTH_PARTS.mark },
+  };
+  if (withHind) {
+    parts.body.anchors.hindR = hindAnchor('right', 1);
+    parts.body.anchors.hindL = hindAnchor('left', -1);
+    parts.body.children.push({ part: 'hind', anchor: 'hindR' }, { part: 'hind', anchor: 'hindL' });
+    parts.hind = {
+      asset: MOTH_PARTS.wing,
+      localBounds: MOTH.markBounds,
+      children: [{ part: 'mark', anchor: 'surface', count: MOTH.marksPerHind, key: 'hmarks' }],
+    };
+  }
+  return { parts };
 }
 
 /** FNV-1a: a stable 32-bit number from a string. */
@@ -92,8 +121,9 @@ function mothScatter(seed, seedOffsets, pinIndex) {
   return (key, count, b) => {
     const w = b.x1 - b.x0;
     const h = b.y1 - b.y0;
-    const set = poissonPointSet((seed ^ hash32(`moth${pinIndex}`)) >>> 0, count, w, h, seedOffsets, MOTH.markRadius);
-    const left = String(key).includes('wingL');
+    const hindSet = String(key).includes('hmarks');
+    const set = poissonPointSet((seed ^ hash32(`moth${pinIndex}${hindSet ? 'h' : ''}`)) >>> 0, count, w, h, seedOffsets, MOTH.markRadius);
+    const left = String(key).includes('wingL') || String(key).includes('hindL');
     const out = new Array(count);
     for (let i = 0; i < count; i++) {
       const p = set[i % set.length];
@@ -121,6 +151,7 @@ function chroma(hex) {
  */
 export function createCreatureBuilder() {
   const ages = []; // frames each pin's creature has been formed
+  const pair2 = []; // how far each pin's second pair has grown in: 0 (none) to 1 (full)
   const assetCache = new Map(); // assetId -> its attach points (keyed also by the svg and the artist's edit)
   const pointsOf = (pool, assetAttach, id) => {
     const asset = pool.find((a) => a && a.id === id);
@@ -132,6 +163,7 @@ export function createCreatureBuilder() {
       const formed = input && input.dishFormed;
       if (!Array.isArray(pins) || !Array.isArray(formed) || !formed.some(Boolean)) {
         if (ages.length) ages.length = 0;
+        if (pair2.length) pair2.length = 0;
         return;
       }
       let top = null;
@@ -148,7 +180,11 @@ export function createCreatureBuilder() {
       const bg = typeof pal.bg === 'string' ? pal.bg : '#000000';
       // Wings take the most vivid swatch (the dish is full of leaves: the moth must not read as more of them).
       const vivid = swatches.reduce((best, c) => (chroma(c) > chroma(best) ? c : best), swatches[0] || ink);
+      // the hind pair takes the next most vivid swatch, so the two pairs read apart
+      const others = swatches.filter((c) => c !== vivid);
+      const vivid2 = others.reduce((best, c) => (chroma(c) > chroma(best) ? c : best), others[0] || vivid);
       const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], [MOTH_PARTS.mark]: [ink, vivid] };
+      const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], [MOTH_PARTS.mark]: [ink, vivid2] };
       assetCache.clear();
       const bodyPoints = pointsOf(pool, input.assetAttach, MOTH_PARTS.body);
       const wingPoints = pointsOf(pool, input.assetAttach, MOTH_PARTS.wing);
@@ -157,10 +193,14 @@ export function createCreatureBuilder() {
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
-        if (!formed[i] || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; continue; }
+        if (!formed[i] || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; continue; }
         ages[i] = (ages[i] || 0) + 1;
+        // the second pair eases toward what the crowd decided (1 pair = none, 2 = full), a step per resolver frame
+        const want = input.dishLimbs && input.dishLimbs[i] >= 2 ? 1 : 0;
+        const have = pair2[i] || 0;
+        pair2[i] = want > have ? Math.min(1, have + 1 / MOTH.pairFrames) : Math.max(0, have - 1 / MOTH.pairFrames);
         const g = Math.max(0.02, easeOut(Math.min(1, ages[i] / MOTH.growFrames)));
-        const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g });
+        const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: easeOut(pair2[i]) });
         const { items } = expandHierarchy(
           { x: pin.x, y: pin.y, rot: 0, scaleX: MOTH.bodyScale * g, scaleY: MOTH.bodyScale * g, part: 'body', key: `m${i}` },
           recipe,
@@ -173,11 +213,15 @@ export function createCreatureBuilder() {
         });
         // halos first (under everything of this creature), then the parts in order
         for (const it of items) if (it.assetId !== MOTH_PARTS.mark) extra.push(mark(it, bg, bg, MOTH.halo, 'halo:'));
-        for (const it of items) { const [color, accent] = colours[it.assetId]; extra.push(mark(it, color, accent, 1, '')); }
+        for (const it of items) {
+          const [color, accent] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
+          extra.push(mark(it, color, accent, 1, ''));
+        }
       }
       ages.length = pins.length;
+      pair2.length = pins.length;
       if (extra.length) top.items = [...top.items, ...extra];
     },
-    dispose() { ages.length = 0; assetCache.clear(); },
+    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); },
   };
 }
