@@ -15,6 +15,9 @@ import { expandHierarchy } from './hierarchy.js';
 import { poissonPointSet } from './kernel/sample/poisson.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
+import { applyLean } from './kernel/color/index.js';
+import { snapPair, snaps } from './groundSnap.js';
+import { nudgeAxis } from './groundNudge.js';
 
 export const MOTH_PARTS = Object.freeze({ body: 'org_pod_02', wing: 'org_leaf_02', mark: 'geo_diamond_01' });
 export const MOTH = Object.freeze({
@@ -90,6 +93,36 @@ export const HOVER = Object.freeze({
 });
 
 const num01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+
+/**
+ * The dish's ground treatment for one moth (Matt, 2026-10-13, option A): the moth obeys the SAME dials the marks do
+ * (GROUND lean, EDGE nudge, SNAP; SHADOW is the layer's and reaches it for free), through the same functions, so it
+ * sits in the picture the way the marks do. `ground` is `{ dish, lean, nudge, snap, shadow }` where `dish` carries
+ * { ground, groundRoles, groundCell } for this layer, or null when the layer rests on no ground (then, like a mark, the
+ * moth gets nothing and is exactly as before).
+ *
+ * Returns { dx, dy, recolor(color, accent), halo } for a moth centred at (x, y): the EDGE nudge as an offset, the
+ * recolouring (SNAP takes a tile colour exactly, else LEAN mixes toward the tile's colour), and the halo colour, which
+ * becomes the tile's own colour so the outline stops reading as a sticker.
+ */
+export function groundTreatment(ground, x, y, slot, seed, seedOffsets = null) {
+  const out = { dx: 0, dy: 0, recolor: (c, a) => [c, a], halo: null };
+  if (!ground || !ground.dish) return out;
+  const d = ground.dish;
+  const lean = num01(ground.lean); const snap = num01(ground.snap); const nudge = num01(ground.nudge);
+  if (nudge > 0 && typeof d.groundCell === 'function') {
+    const c = d.groundCell(x, y);
+    if (c && c.size > 0) { out.dx = nudgeAxis(c.u, nudge) * c.size; out.dy = nudgeAxis(c.v, nudge) * c.size; }
+  }
+  const tile = (lean > 0 || snap > 0 || num01(ground.shadow) > 0) && typeof d.ground === 'function' ? d.ground(x, y) : null;
+  const roles = snap > 0 && typeof d.groundRoles === 'function' ? d.groundRoles(x, y) : null;
+  // the whole moth snaps or does not, by its own slot in the same fixed per-seed set the marks use (an index past them)
+  const snapped = !!(roles && roles.length) && snaps(seed >>> 0, 0x40000 + slot, snap, seedOffsets);
+  if (snapped) out.recolor = (c, a) => { const s = snapPair(c, a, roles); return [s.color, s.accent]; };
+  else if (lean > 0 && typeof tile === 'string') out.recolor = (c, a) => [applyLean(c, tile, lean), a];
+  if (typeof tile === 'string') out.halo = tile;
+  return out;
+}
 
 /**
  * One creature's hover pose from the living-motion context the resolver already builds for its layer
@@ -235,7 +268,7 @@ export function createCreatureBuilder() {
     return asset ? attachPointsFor(asset, assetAttach) : [];
   };
   return {
-    append(input, entries, pool, motionFor = null) {
+    append(input, entries, pool, motionFor = null, groundFor = null) {
       const pins = input && input.dishPins;
       const formed = input && input.dishFormed;
       if (!Array.isArray(pins) || !Array.isArray(formed) || !formed.some(Boolean)) {
@@ -267,6 +300,8 @@ export function createCreatureBuilder() {
       const beat = MOTH.flap * Math.sin((2 * Math.PI * t) / MOTH.flapMs);
       // the layer's living-motion context (null when nothing moves, when the instrument is held, or under reduced motion)
       const motion = input.reducedMotion || typeof motionFor !== 'function' ? null : motionFor(top);
+      // the dials and ground this layer rests on (null when it rests on none: the moth is exactly as before)
+      const ground = typeof groundFor === 'function' ? groundFor(top) : null;
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
@@ -285,8 +320,10 @@ export function createCreatureBuilder() {
         const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], [MOTH_PARTS.mark]: [ink, vivid] };
         const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], [MOTH_PARTS.mark]: [ink, vivid2] };
         const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: easeOut(pair2[i]), traits });
+        // the ground beneath the PIN (its home), so a hovering moth does not change colour with every wobble
+        const gt = groundTreatment(ground, pin.x, pin.y, i, input.seed, input.seedOffsets || null);
         const { items } = expandHierarchy(
-          { x: pin.x + hover.dx, y: pin.y + hover.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
+          { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,
           { seed: input.seed, scatter: mothScatter(input.seed >>> 0, input.seedOffsets || null, i) },
         );
@@ -296,9 +333,11 @@ export function createCreatureBuilder() {
           glass: false, _creature: true,
         });
         // halos first (under everything of this creature), then the parts in order
-        for (const it of items) if (it.assetId !== MOTH_PARTS.mark) extra.push(mark(it, bg, bg, MOTH.halo, 'halo:'));
+        const haloColour = gt.halo || bg;
+        for (const it of items) if (it.assetId !== MOTH_PARTS.mark) extra.push(mark(it, haloColour, haloColour, MOTH.halo, 'halo:'));
         for (const it of items) {
-          const [color, accent] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
+          const [c0, a0] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
+          const [color, accent] = gt.recolor(c0, a0);
           extra.push(mark(it, color, accent, 1, ''));
         }
       }

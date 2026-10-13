@@ -13,7 +13,7 @@ import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
-import { createResolverDish, groundArgs } from './dishGround.mjs'; // #1183: the dish, and the ground a layer rests on
+import { createResolverDish, creatureGround, groundArgs } from './dishGround.mjs'; // #1183: the dish, and the ground a layer rests on
 import { applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
 // #1307 — SoA slice 2/5: FIELD/FEED column loops (zero per-point allocation,
 // bit-identical to the map-based path they replace — see the module header).
@@ -890,7 +890,13 @@ export function createLiveResolver() {
 
     prune(aliveIds, documentIds);
     // #1355: formed pins grow a moth (no pin formed: nothing happens). It hovers on the layer's own living-motion floor.
-    creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion));
+    creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
+      // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)
+      (e) => creatureGround({
+        dish, layers: input.layers, layerId: e.id, layoutParams: e.layoutParams,
+        getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
+        W, H, tSec: (input.loopTimeMs ?? 0) / 1000, seed: e.morphSeed,
+      }));
     return out;
   }
 

@@ -185,7 +185,7 @@ const hash = (out) => createHash('sha256').update(JSON.stringify(out.map((l) => 
 // 8. the one-writer file took a call site only
 {
   const src = readFileSync(new URL('./liveResolve.mjs', import.meta.url), 'utf8');
-  assert.match(src, /import \{ createResolverDish, groundArgs \} from '\.\/dishGround\.mjs';/);
+  assert.match(src, /import \{ createResolverDish, (?:\w+, )*groundArgs \} from '\.\/dishGround\.mjs';/);
   assert.equal((src.match(/groundArgs\(/g) || []).length, 1);
   assert.equal((src.match(/createResolverDish\(/g) || []).length, 1, 'one dish per resolver');
 }

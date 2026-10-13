@@ -16,6 +16,17 @@ import { nearestPatternBelow, patternGround } from '../pattern/ground.js';
 const NONE = Object.freeze({});
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
+/**
+ * #1355 — the ground a CREATURE on this content layer rests on: the layer's own GROUND / EDGE / SNAP dials through the
+ * same groundArgs the marks use, plus its SHADOW dial (the shadow itself is the layer's, so the creature casts one for
+ * free). `{ dish, lean, nudge, snap, shadow }`, or null when the layer rests on no ground or every dial is 0.
+ */
+export function creatureGround({ dish, layers, layerId, layoutParams, getPalette, W, H, tSec, seed }) {
+  const lp = layoutParams || {};
+  const a = groundArgs({ dish, layers, layerId, lean: lp.groundLean, nudge: lp.groundNudge, snap: lp.groundSnap, getPalette, W, H, tSec, seed });
+  return a.dish ? { ...a, shadow: lp.groundShadow } : null;
+}
+
 /** The resolver's dish (one per resolver, so one per document). */
 export function createResolverDish() {
   return createDish({ seed: 0 });
