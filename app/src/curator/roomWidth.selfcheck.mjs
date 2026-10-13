@@ -9,10 +9,10 @@ import { BAND_NORMAL, BAND_RELAX } from './stress.js';
 
 // 1. no room (silence is the default) is step 2's width exactly
 {
-  assert.deepEqual(roomWidthFor(null), { width: 1, room: null });
-  assert.deepEqual(roomWidthFromCodes(null, 'FLOW'), { width: 1, room: null });
-  assert.deepEqual(roomWidthFromCodes('NOD', null), { width: 1, room: null });
-  assert.deepEqual(roomWidthFromCodes('???', '???'), { width: 1, room: null });
+  assert.deepEqual(roomWidthFor(null), { width: 1, room: null, allowance: 0 });
+  assert.deepEqual(roomWidthFromCodes(null, 'FLOW'), { width: 1, room: null, allowance: 0 });
+  assert.deepEqual(roomWidthFromCodes('NOD', null), { width: 1, room: null, allowance: 0 });
+  assert.deepEqual(roomWidthFromCodes('???', '???'), { width: 1, room: null, allowance: 0 });
 }
 
 // 2. it follows the room's own kin_weight: the rooms that roll more also shift more, never above the band's width

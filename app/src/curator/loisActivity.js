@@ -203,9 +203,11 @@ export function createLoisActivity({
     // announced AFTER the ledgers are updated and while the kept frame is still the live one (#1153 mints from it)
     if (bloomed) emit(Events.BLOOM, { rolls, at });
   }
+  const keepListeners = new Set();
   function noteFavorite(fav, at, door) {
     if (s.favNote.door !== door && at - s.favNote.at < KEEP_DEDUPE_MS) return;
     s.favNote = { at, door };
+    for (const fn of keepListeners) { try { fn(); } catch { /* a listener must not break the ledger */ } }
     s.favorites.push({ ts: at, msSinceSeed: at - s.seedSetAt, seed: fav.seed ?? null, paletteId: fav.config?.palette?.id ?? null });
     cap(s.favorites);
   }
@@ -533,7 +535,7 @@ export function createLoisActivity({
 
   /** #1354 — the two COUNTS the stress signal reads. Cheap (no window scans): safe to call every frame. */
   const pressureCounts = () => ({ activityCount: s.activityCount, passRun: s.passRun });
-  const api = { start, stop, beat, noteSeed, snapshot, machine, pressureCounts };
+  const api = { start, stop, beat, noteSeed, snapshot, machine, pressureCounts, onKeep: (fn) => { keepListeners.add(fn); return () => keepListeners.delete(fn); } };
   return api;
 }
 

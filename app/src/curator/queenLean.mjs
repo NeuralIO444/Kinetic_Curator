@@ -275,3 +275,37 @@ export function trace(...args) {
     /* storage unavailable — stay silent */
   }
 }
+
+// ─── M6: warm a moth's birth toward the recent keeps (Phase 4 step 5, #1356) ──
+// Matt (2026-10-13): she looks at the last 3 keeps (5 if 3 swings). At a keep, the traits of the moths then alive are
+// remembered in a session ring (never saved, never replayed from a file: the traits ride the resolver input like
+// Davis's own). A moth born later is rolled around a CENTRE nudged from the default toward the mean of those, by
+// M6_STRENGTH x the room's allowance. Identity below MIN_KEEPS keeps and while the gate is closed. Surfaces nothing.
+export const M6_KEEPS = 3;
+export const M6_STRENGTH = 0.35;
+
+/**
+ * Ungated: the centre for one birth, or null for "no nudge".
+ * @param ring       [ [traits, ...], ... ] oldest first (each entry: the moths alive at one keep)
+ * @param defaults   TRAIT_DEFAULTS
+ * @param allowance  the room's allowance 0..1
+ */
+export function warmCentreOpen(ring, defaults, allowance, nKeeps = Infinity) {
+  if (!(nKeeps >= MIN_KEEPS) || !Array.isArray(ring)) return null;
+  const a = clamp01(allowance) * M6_STRENGTH;
+  if (a === 0) return null;
+  const sample = ring.slice(-M6_KEEPS).flat().filter((t) => t && typeof t === 'object');
+  if (!sample.length) return null;
+  const out = {};
+  for (const k of Object.keys(defaults)) {
+    let sum = 0;
+    for (const t of sample) sum += Number.isFinite(t[k]) ? t[k] : defaults[k];
+    out[k] = defaults[k] + a * (sum / sample.length - defaults[k]);
+  }
+  return out;
+}
+
+/** The gated centre. Neutral (null) while the gate is closed (#762). */
+export function warmCentre(ring, defaults, allowance, nKeeps) {
+  return GATE_OPEN ? warmCentreOpen(ring, defaults, allowance, nKeeps) : null;
+}

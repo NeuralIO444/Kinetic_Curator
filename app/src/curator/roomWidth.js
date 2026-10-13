@@ -16,13 +16,14 @@ export const ROOM_MIN = 0.25;
 
 /**
  * @param gains directorGains() output ({ kinWeight, room })
- * @returns { width, room } width in [ROOM_MIN, 1], room = { n, lois, davis } or null
+ * @returns { width, room, allowance } width in [ROOM_MIN, 1], room = { n, lois, davis } or null, the room's allowance 0..1
  */
 export function roomWidthFor(gains) {
-  if (!gains || !gains.room) return { width: 1, room: null };
+  if (!gains || !gains.room) return { width: 1, room: null, allowance: 0 };
   const k = Number.isFinite(gains.kinWeight) ? gains.kinWeight : 1;
   const width = Math.min(1, Math.max(ROOM_MIN, k / KIN_FULL));
-  return { width, room: { n: gains.room.n, lois: gains.room.lois, davis: gains.room.davis } };
+  const allowance = Number.isFinite(gains.swayAllowance) ? gains.swayAllowance : 0;
+  return { width, room: { n: gains.room.n, lois: gains.room.lois, davis: gains.room.davis }, allowance };
 }
 
 /** The room's width from the two Directors' state codes (either null = no room = 1). */
