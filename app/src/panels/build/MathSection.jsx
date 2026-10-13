@@ -8,11 +8,11 @@ import { useEffect } from 'react';
 import { useStore } from '../../state/store.js';
 import { MATH_MAX_MACROS } from '../../curator/mathMacros.js';
 import { MacroKnob } from '../../components/MacroKnob.jsx';
+import { emit, Events } from '../../composition/eventBus.js';
 
 export function MathSection() {
   const macros = useStore((s) => s.mathMacros || []);
   const armed = useStore((s) => s.mathLearnArmed);
-  const add = useStore((s) => s.addMathMacro);
   const disarm = useStore((s) => s.mathLearnDisarm);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function MathSection() {
       <div className="math-knobs">
         {macros.map((m) => <MacroKnob key={m.id} macro={m} />)}
         {macros.length < MATH_MAX_MACROS && (
-          <button className="math-add" onClick={add} title="Add a macro knob">
+          <button className="math-add" onClick={() => emit(Events.MACRO_ADD)} title="Add a macro knob">
             + MACRO
           </button>
         )}

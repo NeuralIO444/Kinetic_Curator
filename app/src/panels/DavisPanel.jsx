@@ -52,7 +52,6 @@ export function DavisPanel() {
   const { palette } = useApp();
   // #1355 AUTO SPAWN — the artist's creature count (a store field, set directly: a count, not a reduced param)
   const creatureCount = useStore((s) => s.creatureCount);
-  const setCreatureCount = useStore((s) => s.setCreatureCount);
 
   // #719: the one keep capture — seed, offsets (#305), layout, palette, cast.
   const saveFavorite = () => emit(Events.DAVIS_FAVORITE, {
@@ -109,7 +108,7 @@ export function DavisPanel() {
           {[0, 1, 2, 3, 4].map((n) => (
             <button key={n} type="button" className={`chip-btn act${creatureCount === n ? ' active' : ''}`} aria-pressed={creatureCount === n}
               aria-label={n === 0 ? 'no creatures' : `${n} ${n === 1 ? 'creature' : 'creatures'}`} data-testid={`creatures-${n}`}
-              onClick={() => setCreatureCount(n)}>
+              onClick={() => emit(Events.CREATURE_COUNT, { n })}>
               {n}
             </button>
           ))}

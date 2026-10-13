@@ -17,7 +17,6 @@
 // same-type neighbor toward FRONT/GROUND.
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
-import { useStore } from '../../state/store.js';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES } from '../../data/layout-modes.js';
@@ -330,9 +329,6 @@ export function LayerStack() {
   const dishRadius = layoutParams?.contactRadius || 0;
   const dishRestitution = layoutParams?.contactRestitution ?? 0.5;
   const dishRepel = layoutParams?.contactRepel ?? 0;
-  const setLayerPatch = useStore((s) => s.setLayerPatch);
-  const addPatternLayer = useStore((s) => s.addPatternLayer);
-  const selectPatternLayer = useStore((s) => s.selectPatternLayer);
   const isAdj = (l) => isFxLayer(l) || isMathLayer(l);
   const fineClass = (l) => (isMathLayer(l) ? 'math' : isFxLayer(l) ? 'fx' : 'content');
   const contentCount = layers.filter((l) => !isAdj(l)).length;
@@ -375,7 +371,7 @@ export function LayerStack() {
     recordAddType(t);
     if (t === 'math') emit(Events.LAYER_ADD_MATH);
     else if (t === 'fx') emit(Events.LAYER_ADD_FX);
-    else if (t === 'pattern') addPatternLayer('QUILT');
+    else if (t === 'pattern') emit(Events.PATTERN_ADD, { mode: 'QUILT' });
     else emit(Events.LAYER_ADD);
   };
   const typeHasRoom = (t) => (t === 'fx' ? fxCount < MAX_FX_TRACKS : t === 'math' ? mathCount < MAX_MATH_TRACKS : contentCount < MAX_CONTENT_TRACKS);
@@ -470,7 +466,7 @@ export function LayerStack() {
     // dish says nothing on them.
     const summary = expanded ? '' : strataSummary(layer, fine, wetPct,
       (!adj && !pat) ? { on: dishOn, armed: dishRadius > 0 } : undefined);
-    const selectIt = () => (pat ? selectPatternLayer(layer.id) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }));
+    const selectIt = () => (pat ? emit(Events.PATTERN_SELECT, { id: layer.id }) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }));
     const color = STRATA_COLORS[fine];
     // #1019 — the PATCH one-liner lives under the first KC block's PATCH
     // section, and only once that block is open (the flag is consumed on
@@ -545,7 +541,7 @@ export function LayerStack() {
               <div className="strata-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
                 <span className="fx-param-readout lbl" style={{ width: 'auto' }}>patch</span>
                 <select className="blend-mode-select" value={patch.mode} disabled={singleTrack && patch.mode === 'off'}
-                  onChange={(e) => setLayerPatch(layer.id, { mode: e.target.value, to, strength: patch.strength })}>
+                  onChange={(e) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: e.target.value, to, strength: patch.strength } })}>
                   <option value="off">OFF</option>
                   {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
                       dither characters (▨▒▤), approximating the TE dot-matrix/LCD
@@ -557,7 +553,7 @@ export function LayerStack() {
                   <option value="feed">↻ FEED</option>
                 </select>
                 <select className="blend-mode-select" value={to || ''} disabled={singleTrack}
-                  onChange={(e) => setLayerPatch(layer.id, { mode: patch.mode, to: e.target.value, strength: patch.strength })}>
+                  onChange={(e) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: patch.mode, to: e.target.value, strength: patch.strength } })}>
                   {contentTargets.map((t) => (
                     <option key={t.id} value={t.id} disabled={t.id === layer.id}>KC-{t.n}</option>
                   ))}
@@ -565,17 +561,17 @@ export function LayerStack() {
                 {patch.mode === 'feed' && (
                   <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
                     hint={helpText('layers-patch-feed')}
-                    onChange={(v) => setLayerPatch(layer.id, { mode: 'feed', to, strength: v })} />
+                    onChange={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'feed', to, strength: v } })} />
                 )}
                 {patch.mode === 'mod' && (
                   <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
                     hint={helpText('layers-patch-mod')}
-                    onChange={(v) => setLayerPatch(layer.id, { mode: 'mod', to, strength: v })} />
+                    onChange={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'mod', to, strength: v } })} />
                 )}
                 {patch.mode === 'field' && (
                   <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
                     hint={helpText('layers-patch-field')}
-                    onChange={(v) => setLayerPatch(layer.id, { mode: 'field', to, strength: v })} />
+                    onChange={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'field', to, strength: v } })} />
                 )}
               </div>
               {/* #1019 — one plain-language PATCH line for newcomers, shown once

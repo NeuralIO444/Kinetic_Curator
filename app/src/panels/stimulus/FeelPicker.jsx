@@ -3,11 +3,10 @@
 // same ReactivityControls, unchanged). Reads CUSTOM when the live params
 // match none of the three (a tweaked slider, a voice, an import) — honest, not
 // a guess. Hover a feel to see every number it sets.
-import { useStore } from '../../state/store.js';
 import { FEEL_PRESETS, activeFeelId, feelReadout } from '../../data/feels.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
 export function FeelPicker({ layoutParams }) {
-  const applyFeel = useStore((s) => s.applyFeel);
   const active = activeFeelId(layoutParams);
   return (
     <div className="stim-feel" role="group" aria-label="Audio feel">
@@ -18,7 +17,7 @@ export function FeelPicker({ layoutParams }) {
       <div className="stim-feel-row">
         {FEEL_PRESETS.map((f) => (
           <button key={f.id} type="button" className={`chip-btn stim-feel-btn ${active === f.id ? 'active' : ''}`}
-            aria-pressed={active === f.id} onClick={() => applyFeel(f.id)}
+            aria-pressed={active === f.id} onClick={() => emit(Events.FEEL_APPLY, { id: f.id })}
             title={`${f.hint}\n${feelReadout(f)}`}>
             {f.name}
           </button>

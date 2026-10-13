@@ -13,6 +13,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { useStore } from '../state/store.js';
 import { getTargetSpec, MATH_MAX_NAME } from '../curator/mathMacros.js';
+import { emit, Events } from '../composition/eventBus.js';
 
 /** Pixels of vertical drag for one full sweep (delta 1.0). */
 const SWEEP_PX = 160;
@@ -20,8 +21,6 @@ const SWEEP_PX = 160;
 export function MacroKnob({ macro }) {
   const armed = useStore((s) => s.mathLearnArmed === macro.id);
   const arm = useStore((s) => s.mathLearnArm);
-  const remove = useStore((s) => s.removeMathMacro);
-  const rename = useStore((s) => s.renameMathMacro);
   const unassign = useStore((s) => s.mathUnassign);
   const toggleInvert = useStore((s) => s.mathToggleInvert);
   const drive = useStore((s) => s.driveMathMacro);
@@ -75,7 +74,7 @@ export function MacroKnob({ macro }) {
   const commitName = () => {
     setEditing(false);
     const clean = draft.trim().slice(0, MATH_MAX_NAME);
-    if (clean) rename(macro.id, clean);
+    if (clean) emit(Events.MACRO_RENAME, { id: macro.id, name: clean });
     else setDraft(macro.name);
   };
 
@@ -112,7 +111,7 @@ export function MacroKnob({ macro }) {
         </button>
         <button
           className="macro-delete" title="Delete this macro"
-          onClick={() => remove(macro.id)}
+          onClick={() => emit(Events.MACRO_REMOVE, { id: macro.id })}
         >
           ×
         </button>

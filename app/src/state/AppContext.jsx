@@ -244,6 +244,18 @@ export function useApp(selector) {
       case A.CYCLE_SHAPE_LEVEL: return store.cycleShapeLevel(action.id);
       case A.LOAD_DICE_CAST: return store.loadDiceCast(action.assetIds);
       case A.CLEAR_ROLL_SCOPE: return store.clearRollScope();
+      case A.SET_PATTERN_MODE: return store.setPatternMode(action.id, action.mode);
+      case A.SET_PATTERN_PARAM: return store.setPatternParam(action.id, action.key, action.value);
+      case A.ADD_PATTERN_LAYER: return store.addPatternLayer(action.mode);
+      case A.SELECT_PATTERN_LAYER: return store.selectPatternLayer(action.id);
+      case A.SET_LAYER_PATCH: return store.setLayerPatch(action.id, action.patch);
+      case A.ADD_MATH_MACRO: return store.addMathMacro();
+      case A.REMOVE_MATH_MACRO: return store.removeMathMacro(action.id);
+      case A.RENAME_MATH_MACRO: return store.renameMathMacro(action.id, action.name);
+      case A.APPLY_FEEL: return store.applyFeel(action.id);
+      case A.SET_LIGHT: return store.setLight(action.patch);
+      case A.SET_CREATURE_COUNT: return store.setCreatureCount(action.n);
+      case A.CLEAR_ASSET_ATTACH: return store.clearAssetAttach(action.assetId);
       default: console.warn('Unhandled action:', type);
     }
   }, []);

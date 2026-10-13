@@ -160,6 +160,18 @@ export function wireEventBus(rawDispatch) {
   on(Events.DICE_CAST, (p = {}) => dispatch({ type: A.LOAD_DICE_CAST, assetIds: p.assetIds }));
   on(Events.KEEP_ADD, (p = {}) => dispatch({ type: A.ADD_KEEP, keep: p.keep }));
   on(Events.ROLL_SCOPE_CLEAR, () => dispatch({ type: A.CLEAR_ROLL_SCOPE }));
+  on(Events.PATTERN_MODE, (p = {}) => dispatch({ type: A.SET_PATTERN_MODE, id: p.id, mode: p.mode }));
+  on(Events.PATTERN_PARAM, (p = {}) => dispatch({ type: A.SET_PATTERN_PARAM, id: p.id, key: p.key, value: p.value }));
+  on(Events.PATTERN_ADD, (p = {}) => dispatch({ type: A.ADD_PATTERN_LAYER, mode: p.mode }));
+  on(Events.PATTERN_SELECT, (p = {}) => dispatch({ type: A.SELECT_PATTERN_LAYER, id: p.id }));
+  on(Events.LAYER_PATCH, (p = {}) => dispatch({ type: A.SET_LAYER_PATCH, id: p.id, patch: p.patch }));
+  on(Events.MACRO_ADD, () => dispatch({ type: A.ADD_MATH_MACRO }));
+  on(Events.MACRO_REMOVE, (p = {}) => dispatch({ type: A.REMOVE_MATH_MACRO, id: p.id }));
+  on(Events.MACRO_RENAME, (p = {}) => dispatch({ type: A.RENAME_MATH_MACRO, id: p.id, name: p.name }));
+  on(Events.FEEL_APPLY, (p = {}) => dispatch({ type: A.APPLY_FEEL, id: p.id }));
+  on(Events.LIGHT_SET, (patch) => dispatch({ type: A.SET_LIGHT, patch }));
+  on(Events.CREATURE_COUNT, (p = {}) => dispatch({ type: A.SET_CREATURE_COUNT, n: p.n }));
+  on(Events.ATTACH_CLEAR, (p = {}) => dispatch({ type: A.CLEAR_ASSET_ATTACH, assetId: p.assetId }));
 
   return dispatch;
 }

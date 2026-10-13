@@ -7,6 +7,7 @@ import {
 import { QUILT_MAX_GROUT } from '../../pattern/engine.js';
 import { requestPatternShuffle, subscribePending, pendingSnapshot } from '../../state/patternShuffle.js';
 import { barMs } from '../../pattern/shuffleGate.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
 // The PATTERN track's editor (#1099). It opens under the row like the FX editor, and every control
 // writes through the slice (which sanitizes). Controls a mode ignores are DISABLED with the reason,
@@ -31,9 +32,10 @@ function Param({ label, hint, children, readout }) {
   );
 }
 
+const setMode = (id, mode) => emit(Events.PATTERN_MODE, { id, mode });
+const setParam = (id, key, value) => emit(Events.PATTERN_PARAM, { id, key, value });
+
 export function PatternEditor({ layer, ordinal }) {
-  const setMode = useStore((s) => s.setPatternMode);
-  const setParam = useStore((s) => s.setPatternParam);
   const bpm = useStore((s) => s.beatBpm);
   const pending = useSyncExternalStore(subscribePending, pendingSnapshot).has(layer.id);
   const p = sanitizePattern(layer.pattern);
