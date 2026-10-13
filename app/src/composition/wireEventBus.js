@@ -122,6 +122,16 @@ export function wireEventBus(rawDispatch) {
   on(Events.PALETTE_IMPORT, (list) => dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
   on(Events.PALETTE_LOCK, ({ index, clear }) => dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }));
   on(Events.PALETTE_HARMONY, ({ scheme }) => dispatch({ type: A.APPLY_HARMONY, scheme }));
+  on(Events.VIEW_FULLSCREEN, () => dispatch({ type: A.TOGGLE_FULLSCREEN }));
+  on(Events.STAGE_MODE, (p = {}) => dispatch({ type: A.SET_STAGE_MODE, ...{ mode: p.mode } }));
+  on(Events.STAGE_BLACKOUT, (p = {}) => dispatch({ type: A.SET_STAGE_BLACKOUT, ...{ on: p.on } }));
+  on(Events.STAGE_TEST_PATTERN, (p = {}) => dispatch({ type: A.SET_STAGE_TEST_PATTERN, ...{ on: p.on } }));
+  on(Events.STAGE_MAPPING, (p = {}) => dispatch({ type: A.SET_STAGE_MAPPING, ...{ mapping: p.mapping } }));
+  on(Events.STAGE_DISPLAY, (p = {}) => dispatch({ type: A.SET_STAGE_DISPLAY, ...{ id: p.id } }));
+  on(Events.STAGE_ERROR, (p = {}) => dispatch({ type: A.SET_STAGE_ERROR, ...{ message: p.message } }));
+  on(Events.STAGE_SYPHON_ON, (p = {}) => dispatch({ type: A.SET_SYPHON_ON, ...{ on: p.on } }));
+  on(Events.STAGE_SYPHON_NAME, (p = {}) => dispatch({ type: A.SET_SYPHON_NAME, ...{ name: p.name } }));
+  on(Events.CANVAS_SIZE, (p = {}) => dispatch({ type: A.SET_CANVAS_SIZE, ...{ w: p.w, h: p.h, presetId: p.presetId } }));
 
   return dispatch;
 }

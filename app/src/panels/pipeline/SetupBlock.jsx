@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
+import { emit, Events } from '../../composition/eventBus.js';
 import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster } from '../../data/canvasPresets.js';
 
 export function SetupBlock() {
@@ -14,7 +15,7 @@ export function SetupBlock() {
   const remove = useStore((s) => s.deleteCanvasPreset);
   const rename = useStore((s) => s.renameCanvasPreset);
   const load = useStore((s) => s.loadUserCanvasPresets);
-  const setSize = useStore((s) => s.setCanvasSize);
+  const setSize = (w, h, presetId) => emit(Events.CANVAS_SIZE, { w, h, presetId });
   const setFps = useStore((s) => s.setCanvasFps);
   const setLock = useStore((s) => s.setCanvasAspectLock);
   const swap = useStore((s) => s.swapCanvasOrientation);
