@@ -32,7 +32,10 @@
 // Dish off: a session is armed only when at least two enrolled strata have
 // contactRadius > 0. Every other configuration — no session, an unarmed
 // session, a single contact stratum — leaves each system's own #167 pass
-// exactly as it was, bit-identical.
+// exactly as it was, bit-identical. #1409 (A3) adds the artist's switch on
+// top: the per-Look `dish` param gates enrolment itself (dishEnrolRadius),
+// so OFF never enrols a radius and the session can never arm — the ghost
+// stack, chosen per Look, with #167 per-system contacts untouched.
 
 const TAU = Math.PI * 2;
 
@@ -54,6 +57,23 @@ export function contactBodyRadius(base, scale, trim) {
   const s = Number.isFinite(scale) ? Math.max(0, scale) : 1;
   const t = Number.isFinite(trim) && trim > 0 ? trim : 1;
   return base * s * t;
+}
+
+/**
+ * The enrolment radius for one stratum under the per-Look DISH switch
+ * (#1409, petri dish A3). `dish === false` enrols 0: armDish then never
+ * arms, the cross-strata pass never runs, and the stratum ghosts through
+ * its neighbours exactly as it did before the dish existed — while its
+ * own #167 per-system pass (which reads contactRadius inside
+ * particles.js, not here) is untouched. Any other value — including an
+ * absent key on a pre-A3 document — enrols the stratum's contactRadius:
+ * ON is the default, per the ratified spec decision. The resolver and
+ * the bake driver both enrol through this one gate, so live and bake
+ * can never disagree about whether the dish exists.
+ */
+export function dishEnrolRadius(layoutParams) {
+  if (!layoutParams || layoutParams.dish === false) return 0;
+  return layoutParams.contactRadius || 0;
 }
 
 /**

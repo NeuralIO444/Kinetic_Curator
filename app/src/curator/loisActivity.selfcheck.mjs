@@ -564,5 +564,26 @@ import {
   act.stop();
 }
 
+// --- #1409 (petri dish A3): dish controls are artist tweaks in the feed ---
+// The DISH switch and its knobs emit LAYOUT_PARAM like every other param
+// control, so G7 records them as the artist's hand — and nothing in the
+// engine writes them any other way (system writers never emit the bus
+// event), which is what keeps the attribution honest.
+{
+  let now = 9_000_000;
+  const act = createLoisActivity({ now: () => now });
+  act.start();
+  emit(Events.LAYOUT_PARAM, { key: 'dish', value: false });
+  let snap = act.snapshot();
+  assert.strictEqual(snap.tweakCount, 1, 'the dish toggle is a recorded artist tweak');
+  assert.strictEqual(snap.lastTweak.key, 'dish');
+  emit(Events.LAYOUT_PARAM, { key: 'contactRestitution', value: 0.8 });
+  emit(Events.LAYOUT_PARAM, { key: 'contactRepel', value: 2 });
+  snap = act.snapshot();
+  assert.strictEqual(snap.tweakCount, 3, 'bounce and repel tweaks are recorded too');
+  assert.strictEqual(snap.lastTweak.key, 'contactRepel');
+  act.stop();
+}
+
 console.log('ok loisActivity: 7 instruments record real signals only');
 console.log('ok loisActivity #1391: G2–G4, G6, G7, G9–G15 gap signals recorded (G5 dwell pinned by the instrument-5 block above)');

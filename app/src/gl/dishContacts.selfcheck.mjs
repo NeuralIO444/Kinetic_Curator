@@ -94,6 +94,52 @@ const movedCount = (xs, ys) => xs.filter((it, k) => !Object.is(it.x, ys[k].x) ||
   assert.deepEqual(off.hashes, never.hashes, 'radius 0 is bit-identical to no dish at all');
 }
 
+// 5. #1409 (petri dish A3) — the per-Look DISH switch through the real
+// resolver. OFF restores the ghost stack: each stratum resolves exactly
+// as if the other were not there. The default is ON: a document with no
+// dish key anywhere (the pre-A3 shape) resolves frame-for-frame like
+// dish:true, and differently from OFF.
+{
+  const offLp = () => swarmLp({ dish: false });
+  const combinedOff = runFrames(input({
+    layoutParams: offLp(),
+    layerSnapshots: { 'lyr-b': snap(777, offLp()) },
+  })).out;
+  const soloAOff = runFrames(input({
+    layers: [L('lyr-a')], layerSnapshots: {}, layoutParams: offLp(),
+  })).out;
+  assert.deepEqual(
+    itemsOf(combinedOff, 'lyr-a').map((i) => [i.x, i.y]),
+    itemsOf(soloAOff, 'lyr-a').map((i) => [i.x, i.y]),
+    'dish OFF: stratum A resolves exactly as if alone (ghost stack)',
+  );
+  const bAloneOff = runFrames(input({
+    layers: [L('lyr-b'), L('lyr-a', { visible: false })],
+    layoutParams: offLp(),
+    layerSnapshots: { 'lyr-b': snap(777, offLp()) },
+  })).out;
+  assert.deepEqual(
+    itemsOf(combinedOff, 'lyr-b').map((i) => [i.x, i.y]),
+    itemsOf(bAloneOff, 'lyr-b').map((i) => [i.x, i.y]),
+    'dish OFF: stratum B resolves exactly as if alone (ghost stack)',
+  );
+  const stripDish = (lp) => { const c = { ...lp }; delete c.dish; return c; };
+  const preA3 = runFrames(input({
+    layoutParams: stripDish(swarmLp()),
+    layerSnapshots: { 'lyr-b': snap(777, stripDish(swarmLp())) },
+  }));
+  const explicitOn = runFrames(input({
+    layoutParams: swarmLp({ dish: true }),
+    layerSnapshots: { 'lyr-b': snap(777, swarmLp({ dish: true })) },
+  }));
+  assert.deepEqual(preA3.hashes, explicitOn.hashes, 'a pre-A3 document (no dish key) == dish ON, frame for frame');
+  const offHashes = runFrames(input({
+    layoutParams: offLp(),
+    layerSnapshots: { 'lyr-b': snap(777, offLp()) },
+  })).hashes;
+  assert.notDeepEqual(preA3.hashes, offHashes, 'ON and OFF are different frames (the switch is real)');
+}
+
 // 4. the one-writer files took call sites only.
 {
   const lr = readFileSync(new URL('./liveResolve.mjs', import.meta.url), 'utf8');
@@ -104,4 +150,4 @@ const movedCount = (xs, ys) => xs.filter((it, k) => !Object.is(it.x, ys[k].x) ||
   assert.equal((pj.match(/runDishContacts\(/g) || []).length, 1, 'particles.js takes one call site');
 }
 
-console.log('dishContacts.selfcheck: ok (#1407 — live strata share one contact grid)');
+console.log('dishContacts.selfcheck: ok (#1407 — live strata share one contact grid; #1409 — the per-Look switch gates enrolment)');

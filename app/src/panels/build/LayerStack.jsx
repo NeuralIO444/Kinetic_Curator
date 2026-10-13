@@ -33,7 +33,7 @@ import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS,
 import { rowsTopFirst, moveNeighbor, canMoveUp, canMoveDown } from './layerRows.mjs';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
-import { strataSummary } from './strataSummary.mjs';
+import { strataSummary, trimNum } from './strataSummary.mjs';
 import { RangeRow } from '../../components/RangeRow.jsx';
 
 // #716 Part 2 — black block + white numeral heads every block. The edited
@@ -318,8 +318,18 @@ function FamilyChooser({ section, fxOrdinal, fxSlotKinds, fxSlotLabel, onPick, o
 }
 
 export function LayerStack() {
-  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId, selectedPatternLayerId: s.selectedPatternLayerId }));
-  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId } = state;
+  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId, selectedPatternLayerId: s.selectedPatternLayerId, layoutParams: s.layoutParams }));
+  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId, layoutParams } = state;
+  // #1409 (petri dish A3) — the DISH controls. The switch and the two
+  // contact knobs are layout params (scene/Look state, PARAM_SPEC is the
+  // trust boundary), edited through the same LAYOUT_PARAM bus event as
+  // every other param control — which is also what makes the honest feed
+  // record them as the artist's hand, never the system's.
+  const setParam = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
+  const dishOn = layoutParams?.dish !== false;
+  const dishRadius = layoutParams?.contactRadius || 0;
+  const dishRestitution = layoutParams?.contactRestitution ?? 0.5;
+  const dishRepel = layoutParams?.contactRepel ?? 0;
   const setLayerPatch = useStore((s) => s.setLayerPatch);
   const addPatternLayer = useStore((s) => s.addPatternLayer);
   const selectPatternLayer = useStore((s) => s.selectPatternLayer);
@@ -455,7 +465,11 @@ export function LayerStack() {
     // instead: disabled + tooltip so the cap reads instead of swallowing
     // the click. MATH blocks are out of scope — their DUP is untouched.
     const dupCapped = math ? false : fx ? fxCount >= MAX_FX_TRACKS : contentCount >= MAX_CONTENT_TRACKS;
-    const summary = expanded ? '' : strataSummary(layer, fine, wetPct);
+    // #1409 — a KC block's collapsed line carries the Look's dish state
+    // (off, or on-and-armed); FX/MATH/PATTERN blocks never enrol, so the
+    // dish says nothing on them.
+    const summary = expanded ? '' : strataSummary(layer, fine, wetPct,
+      (!adj && !pat) ? { on: dishOn, armed: dishRadius > 0 } : undefined);
     const selectIt = () => (pat ? selectPatternLayer(layer.id) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }));
     const color = STRATA_COLORS[fine];
     // #1019 — the PATCH one-liner lives under the first KC block's PATCH
@@ -577,6 +591,43 @@ export function LayerStack() {
                 </div>
               )}
               <PatchDiagLine layerId={layer.id} patch={patch} srcN={ordinals.get(patch.to) ?? '?'} dstN={ordinals.get(layer.id) ?? '?'} />
+              {/* #1409 (petri dish A3) — DISH: the per-Look switch for the
+                  shared cross-strata grid (#1407) plus its two knobs.
+                  Radius is NOT here: it is A2's law (voice-set anchor ×
+                  live scale × asset trim), not a performance knob. OFF is
+                  the old ghost stack preserved as a choice; each stratum's
+                  own #167 contacts keep working either way. */}
+              <div className="strata-composite" title="DISH — one shared contact grid across strata: bodies push each other instead of ghosting. Per-Look; OFF restores the ghost stack.">
+                <span className="fx-param-readout lbl" style={{ width: 'auto' }}>dish</span>
+                <select className="blend-mode-select" value={dishOn ? 'on' : 'off'}
+                  onChange={(e) => setParam('dish', e.target.value === 'on')}>
+                  <option value="on">ON</option>
+                  <option value="off">OFF</option>
+                </select>
+                {dishOn && (
+                  <>
+                    <span className="fx-param-readout lbl" style={{ width: 'auto' }}>bounce</span>
+                    <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={dishRestitution}
+                      hint="BOUNCE — contact restitution across strata: 0 sticks, 1 is fully elastic"
+                      onReset={() => setParam('contactRestitution', 0.5)}
+                      onChange={(v) => setParam('contactRestitution', v)} />
+                    <span className="fx-param-readout">{trimNum(dishRestitution)}</span>
+                  </>
+                )}
+              </div>
+              {dishOn && (
+                <div className="strata-composite" title="REPEL — personal-space force: same-group neighbours push apart before they touch">
+                  <span className="fx-param-readout lbl" style={{ width: 'auto' }}>repel</span>
+                  <RangeRow layout="bare" tone="build" min={0} max={5} step={0.05} value={dishRepel}
+                    hint="REPEL — personal-space force gain vs same-group neighbours"
+                    onReset={() => setParam('contactRepel', 0)}
+                    onChange={(v) => setParam('contactRepel', v)} />
+                  <span className="fx-param-readout">{trimNum(dishRepel)}</span>
+                </div>
+              )}
+              {dishOn && dishRadius === 0 && (
+                <div className="fx-note" title="The dish is on, but no stratum in this Look carries a contact radius — voices set the radius, and at radius 0 the grid never arms">idle — contact radius 0</div>
+              )}
               </>
             )}
             {fx && isFxSelected && <FxEffectEditor layer={layer} fxOrdinal={ordinals.get(layer.id) || 1} />}

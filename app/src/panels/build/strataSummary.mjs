@@ -54,10 +54,19 @@ function patternSummary(layer) {
 }
 
 /** CONTENT (KC): patch state, else blend, always wet ("screen · wet 80%"). */
-function contentSummary(layer, wetPct) {
+function contentSummary(layer, wetPct, dishState) {
   const patch = layer.patch;
   const parts = [];
   if (patch && patch.mode && patch.mode !== 'off') parts.push(`patch ${patch.mode}`);
+  // #1409 — the dish state joins the line only when it says something:
+  // OFF is an artistic choice the collapsed block must confess (this
+  // stratum ghosts through its neighbours), and ON shows only when this
+  // Look actually arms contacts (contact radius > 0). ON + radius 0 is
+  // the silent default — the line stays exactly what it was pre-A3.
+  if (dishState) {
+    if (!dishState.on) parts.push('dish off');
+    else if (dishState.armed) parts.push('dish on');
+  }
   const blend = layer.layerBlendMode;
   if (blend && blend !== 'normal') parts.push(blend);
   parts.push(`wet ${wetPct}%`);
@@ -68,9 +77,11 @@ function contentSummary(layer, wetPct) {
  * @param {object} layer the stratum's layer record
  * @param {'math'|'fx'|'content'} fine the stratum's fine class (pattern → content)
  * @param {number} wetPct rounded wet percent for the wet-bearing summaries
+ * @param {{on: boolean, armed: boolean}} [dishState] #1409 — the Look's dish
+ *   state for CONTENT strata (omitted by FX/MATH/PATTERN callers)
  * @returns {string} the collapsed one-liner, or '' when there is nothing to say
  */
-export function strataSummary(layer, fine, wetPct) {
+export function strataSummary(layer, fine, wetPct, dishState) {
   if (!layer) return '';
   if (fine === 'math') return mathSummary(layer);
   if (fine === 'fx') {
@@ -78,5 +89,5 @@ export function strataSummary(layer, fine, wetPct) {
     return s || `wet ${wetPct}%`;
   }
   if (layer.type === 'pattern') return patternSummary(layer);
-  return contentSummary(layer, wetPct);
+  return contentSummary(layer, wetPct, dishState);
 }
