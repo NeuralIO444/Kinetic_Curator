@@ -9,6 +9,8 @@ import { createStressRecorder } from '../curator/stressRecord.js';
 import { createFormationRecorder } from '../curator/formation.js';
 import { resetFormation, setFormationTap, setShiftTap } from '../curator/formationLive.js';
 import { createShiftRecorder } from '../curator/davisShift.js';
+import { createClockRecorder } from '../curator/clockRecord.js';
+import { useStore } from '../state/store.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
 // tracker update, and stored on the performance as `stress`.
@@ -35,6 +37,14 @@ const davisSection = (getFrame) => {
   return { stop() { setShiftTap(null); return rec.finish(); } };
 };
 
+// #1461 step 1 — the take carries its BEAT BPM sequence (the start and every change by frame), stored as `clock`: with
+// the loop time of each frame that is enough to rebuild every bar on playback.
+const clockSection = (getFrame) => {
+  const rec = createClockRecorder({ initialBpm: useStore.getState().beatBpm, getFrame });
+  const off = useStore.subscribe((s, prev) => { if (s.beatBpm !== prev.beatBpm) rec.set(s.beatBpm); });
+  return { stop() { off(); return rec.finish(); } };
+};
+
 function downloadBytes(bytes, filename) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/gzip' }));
@@ -58,7 +68,7 @@ export function PerformanceButton() {
 
   const onClick = async () => {
     if (!recording) {
-      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection } })) { setFrames(0); setRecording(true); }
+      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection } })) { setFrames(0); setRecording(true); }
       return;
     }
     setRecording(false);
