@@ -5,14 +5,14 @@ import { TapeCounter } from './TapeCounter.jsx';
 import { TallyLight } from './TallyLight.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
 import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
-import * as A from '../state/actions.js';
+import { emit, Events } from '../composition/eventBus.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { LoisPill } from './LoisPill.jsx';
 import { lostLine } from '../hooks/audioLoss.mjs';
 
 export function MasterBar() {
-  const { dispatch, history } = useApp();
+  const { history } = useApp();
   const { state } = useApp(s => ({
     running: s.running, fps: s.fps, stageTimings: s.stageTimings, governorShedFps: s.governorShedFps,
     seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
@@ -197,7 +197,7 @@ export function MasterBar() {
         </div>
       </div>
       <div className="master-right">
-        <button className="run-btn" onClick={() => dispatch({ type: A.SET_RUNNING, payload: !running })}>
+        <button className="run-btn" onClick={() => emit(Events.RUN_SET, { running: !running })}>
           {running ? '■ STOP' : '▶ RUN'}
         </button>
       </div>

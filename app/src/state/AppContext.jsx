@@ -203,6 +203,7 @@ export function useApp(selector) {
       case A.DELETE_USER_PALETTE: return store.deleteUserPalette(action.id);
       case A.RENAME_USER_PALETTE: return store.renameUserPalette(action.id, action.name);
       case A.IMPORT_USER_PALETTES: return store.importUserPalettes(payload);
+      case A.SET_PALETTE_OVERRIDES: return store.setPaletteOverrides(action.overrides);
       case A.CLEAR_USER_PALETTES: return store.clearUserPalettes();
       case A.TOGGLE_PALETTE_LOCK: return store.togglePaletteLock(action.index);
       case A.CLEAR_PALETTE_LOCKS: return store.clearPaletteLocks();
