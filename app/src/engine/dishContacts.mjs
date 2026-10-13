@@ -37,6 +37,8 @@
 // so OFF never enrols a radius and the session can never arm — the ghost
 // stack, chosen per Look, with #167 per-system contacts untouched.
 
+import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
+
 const TAU = Math.PI * 2;
 
 /**
@@ -329,6 +331,7 @@ export function runDishContacts(session, callerSys) {
           // impulse modes; restitution is the pair's average (a stick
           // stratum contributes 0, so any pair touching one is inelastic
           // in proportion).
+          let dvA = 0; let dvB = 0; // #1410 — per-body normal Δv, for the feed
           if (ea.impulse && eb.impulse) {
             const vn = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
             if (vn < 0) {
@@ -338,8 +341,14 @@ export function runDishContacts(session, callerSys) {
               sysA.vy[ia] -= ny * jimp * w1;
               sysB.vx[ib] += nx * jimp * w2;
               sysB.vy[ib] += ny * jimp * w2;
+              dvA = jimp * w1; dvB = jimp * w2;
             }
           }
+          // #1410 — the dent across the seam: this resolution's impulse
+          // + pressure feed both bodies' deform springs (law in
+          // dishDeform.mjs). State only — the pass's positions and
+          // velocities are already final for this pair.
+          feedDishDeform(sysA, ia, sysB, ib, nx, ny, dvA, dvB, overlap, rr);
         }
       }
     }

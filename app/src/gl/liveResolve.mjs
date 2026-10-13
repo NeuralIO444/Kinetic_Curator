@@ -330,6 +330,9 @@ export function createLiveResolver() {
           // Armed once per resolve; the pass runs inside the first
           // enrolled system's update.
           dishSession,
+          // #1410 — the stillness flag (spread-only, never stored): the
+          // deform step renders rest under reduced-motion.
+          reducedMotion: !!ctx.reducedMotion,
         },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
@@ -542,6 +545,8 @@ export function createLiveResolver() {
           loopTimeMs: input.loopTimeMs ?? 0,
           // Spine C (#389): forward motionSmoothing.
           motionSmoothing: input.motionSmoothing ?? layoutParams.motionSmoothing,
+          // #1410 — forward the stillness flag to the swarm update.
+          reducedMotion: !!input.reducedMotion,
           // Spine F (#392): shared world noise + domain offset from seedOffsets.noise
           noise: worldNoise,
           noiseDomainOffset: (seedOffsets?.noise || 0) * 100,

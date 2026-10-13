@@ -718,6 +718,105 @@ function headOnPair() {
   assert.ok(divergedCount(backOn, stayedOff) > 0, 'the re-armed dish displaces bodies again');
 }
 
-console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid; #1408 — radius from the mark; #1409 — the per-Look dish switch)', {
-  scenarios: 20,
+// 21 — petri dish B1 (#1410), cross-strata feed: the dish pass's impulse
+// dents both bodies across the seam by the deform law (dishDeform.mjs).
+// Same fixture as 19(a): masses 1 and 3, velocities ±2, e = 1, discs 20
+// at dist 30 (overlap 10). jimp = (2·4)/(1+1/3) = 6: PEARL's Δv is 6
+// (dent 6·0.06 = 0.36), EAVES' Δv is 2 (dent 0.12); pressure is
+// (10/40)·0.5 = 0.125 for both. The dent is max(impact, pressure).
+{
+  const mk = (x, vx, mass) => {
+    const s = new ParticleSystem();
+    s.init(1, 1000, 700, assets, palette, SEED);
+    s.x[0] = x; s.y[0] = 350; s.vx[0] = vx; s.vy[0] = 0; s.mass[0] = mass;
+    s.scale[0] = 1;
+    return s;
+  };
+  const pearl = mk(400, 2, 1);
+  const eaves = mk(430, -2, 3);
+  const ses = createDishSession();
+  enrolDishBody(ses, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
+  enrolDishBody(ses, { key: 'eaves', sys: eaves, radius: 20, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
+  armDish(ses, ['pearl', 'eaves']);
+  runDishContacts(ses, pearl);
+  assert.ok(Math.abs(pearl.deformMem[0] - 0.36) < 1e-12, `dish feed: light body dented by its Δv (${pearl.deformMem[0]})`);
+  assert.ok(Math.abs(eaves.deformMem[0] - 0.125) < 1e-12, `dish feed: pressure floors the heavy body's dent (${eaves.deformMem[0]})`);
+  assert.ok(Object.is(pearl.deformMemX[0], 1) && Object.is(pearl.deformMemY[0], 0), 'dish feed: axis is the pair normal');
+  assert.ok(Object.is(eaves.deformMemX[0], 1) && Object.is(eaves.deformMemY[0], 0), 'dish feed: both bodies share the line of centres');
+}
+
+// 22 + 23 — petri dish B1 (#1410): deform is a render attribute only.
+// Through the full two-strata dish harness (scenario 20's shape):
+//   22 — deform OFF is bit-identical to deform ON in every physics
+//        column, over 45 steps of cross-strata collisions;
+//   23 — reduced-motion renders rest at every step (no dent, no
+//        wobble) while the physics stays bit-identical to the moving
+//        run — the stillness law restrains the render, never the world.
+{
+  const lpFor = (count, radius, e) => normalizeLayoutParams({
+    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: count,
+    contactRadius: radius, contactRestitution: e, contactMode: 'bounce', dish: true,
+  });
+  const lpA = lpFor(40, 14, 0.7);
+  const lpB = lpFor(35, 18, 0.4);
+  const runDish = (extra = {}) => {
+    const ses = createDishSession();
+    const mk = (lp, seed) => {
+      const s = new ParticleSystem();
+      s.init(lp.particleCount, 1000, 700, assets, palette, seed, null, { graze: lp.graze || 0 });
+      // Frame 0: the dish pass runs inside A's update, before B's first
+      // update has set its switch — pre-set both so the off run is off
+      // from the very first pair (production systems persist across
+      // frames, so only this cold start needs it).
+      s._deformOn = extra.deform !== false;
+      return s;
+    };
+    const A = mk(lpA, SEED);
+    const B = mk(lpB, SEED + 7);
+    let maxAmt = 0;
+    let restEveryStep = true;
+    for (let step = 0; step < 45; step++) {
+      const t = BAKE_TIME_ORIGIN + step * BAKE_DT_MS;
+      enrolDishBody(ses, { key: 'pearl', sys: A, radius: dishEnrolRadius(lpA), restitution: lpA.contactRestitution, contactMode: lpA.contactMode, umask: lpA.collideMask, organism: false });
+      enrolDishBody(ses, { key: 'eaves', sys: B, radius: dishEnrolRadius(lpB), restitution: lpB.contactRestitution, contactMode: lpB.contactMode, umask: lpB.collideMask, organism: false });
+      armDish(ses, ['pearl', 'eaves']);
+      A.update({ ...lpA, maxParticles: 200, dishSession: ses, ...extra }, assets, palette, SEED, t, null);
+      B.update({ ...lpB, maxParticles: 200, dishSession: ses, ...extra }, assets, palette, SEED + 7, t, null);
+      for (const s of [A, B]) {
+        for (let i = 0; i < s.n; i++) {
+          if (s.deformAmt[i] > maxAmt) maxAmt = s.deformAmt[i];
+          if (!Object.is(s.deformAmt[i], 0)) restEveryStep = false;
+        }
+      }
+    }
+    return { A, B, maxAmt, restEveryStep };
+  };
+  const sameDishPhysics = (x, y, label) => {
+    for (const [sx, sy] of [[x.A, y.A], [x.B, y.B]]) {
+      for (const f of ['x', 'y', 'vx', 'vy']) {
+        for (let i = 0; i < sx.n; i++) {
+          assert.ok(Object.is(sx[f][i], sy[f][i]), `${label}: ${f}[${i}] ${sx[f][i]} vs ${sy[f][i]}`);
+        }
+      }
+    }
+  };
+
+  const on = runDish();
+  assert.ok(on.maxAmt > 0, 'the dish run actually dented bodies across strata');
+
+  const off = runDish({ deform: false });
+  assert.ok(off.restEveryStep, 'deform off: no body ever renders a dent');
+  sameDishPhysics(on, off, 'deform on == deform off across the dish');
+
+  const rm = runDish({ reducedMotion: true });
+  assert.ok(rm.restEveryStep, 'reduced-motion: rest at every step, dents and wobble held');
+  sameDishPhysics(on, rm, 'reduced-motion == full motion across the dish');
+  for (const s of [rm.A, rm.B]) {
+    assert.ok(s.getItems(assets).every((it) => !('deformAmt' in it)),
+      'reduced-motion items carry no deform fields');
+  }
+}
+
+console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid; #1408 — radius from the mark; #1409 — the per-Look dish switch; #1410 — deform feeds, physics byte-identity, reduced-motion rest)', {
+  scenarios: 23,
 });
