@@ -87,12 +87,13 @@ const roll = (n, over = {}) => Array.from({ length: n }, (_, i) => shiftFor({ se
   assert.notDeepEqual(m.traits[0], m.traits[1]); assert.equal(m.traits[2], null);
 }
 
-// 5. the log: [frame, pin, spread, wing, body, swatch], in order
+// 5. the log: [frame, pin, spread, wing, body, swatch, room, lois, davis], in order
 {
   let frame = 0;
   const rec = createShiftRecorder({ getFrame: () => frame });
   frame = 42; rec.update([{ pin: 0, traits: { spread: 7.12345, wing: 1.1, body: 0.9, swatch: 2 } }]);
-  assert.deepEqual(rec.finish(), { version: 1, events: [[42, 0, 7.123, 1.1, 0.9, 2]] });
+  frame = 60; rec.update([{ pin: 1, traits: { spread: -2, wing: 1, body: 1, swatch: 0 }, room: { n: 11, lois: 'BURN', davis: 'FLOW' } }]);
+  assert.deepEqual(rec.finish(), { version: 2, events: [[42, 0, 7.123, 1.1, 0.9, 2, 0, null, null], [60, 1, -2, 1, 1, 0, 11, 'BURN', 'FLOW']] });
 }
 
 // 6. live: a pin the formation rule forms is born with traits through the same tap, once; a fresh take starts clean
