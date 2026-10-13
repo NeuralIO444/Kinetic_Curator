@@ -77,8 +77,13 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
   // STRUCTURALLY here (same assets, same regions and ids, same slots, numbers within a pixel's tolerance), and
   // bit-for-bit only against a second bake on THIS machine (determinism). Re-bake with `npm run bake:regions`.
   assert.deepEqual(Object.keys(fresh).sort(), Object.keys(BAKED_REGIONS).sort(), 'the same assets have mattes: run `npm run bake:regions`');
+  // Assets that draw <text> use the machine's own monospace font, so their glyph regions differ per machine (a number
+  // stamp is a different shape on the Linux runner). They are checked only for having a matte; the rest exactly.
+  const drawsText = new Set(ASSETS_AUTHORED.filter((a) => /<text/i.test(String(a.svg || ''))).map((a) => a.id));
+  assert.ok(drawsText.size > 0 && drawsText.size < 40, `the machine-font set is small (${drawsText.size})`);
   for (const [id, m] of Object.entries(fresh)) {
     const c = BAKED_REGIONS[id];
+    if (drawsText.has(id)) { assert.ok(c.regions.length >= 1 && m.regions.length >= 1, `${id}: has a matte on both machines`); continue; }
     assert.equal(c.regions.length, m.regions.length, `${id}: same region count`);
     assert.deepEqual(c.regionSlots, m.regionSlots, `${id}: same slots`);
     m.regions.forEach((r, i) => {
