@@ -365,3 +365,5 @@ node src/composition/eventRegistry.selfcheck.mjs
 node src/composition/busChain.selfcheck.mjs
 node src/gl/musicalClock.selfcheck.mjs
 node src/composition/clockBus.selfcheck.mjs
+node src/gl/audioEvents.selfcheck.mjs
+node src/composition/audioBus.selfcheck.mjs

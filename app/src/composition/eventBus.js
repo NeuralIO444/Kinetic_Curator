@@ -231,6 +231,12 @@ export const Events = {
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
+  AUDIO_INPUT: 'audio:input', // #1459: { source: mic | file | none } the input changed
+  AUDIO_ONSET: 'audio:onset', // #1459: { strength, band } a hit (spectral flux)
+  AUDIO_TEMPO: 'audio:tempo', // #1459: { bpm, confidence } the estimate moved by more than 2 bpm
+  AUDIO_ENERGY: 'audio:energy', // #1459: { level: low | mid | high } with hysteresis
+  AUDIO_SILENCE_START: 'audio:silenceStart', // #1459: { ms } quiet for over 2 s
+  AUDIO_SILENCE_END: 'audio:silenceEnd', // #1459: { ms } sound is back; how long the silence lasted
   CLOCK_BEAT: 'clock:beat', // #1458: { bar, beat, bpm } every whole beat of the loop clock
   CLOCK_BAR: 'clock:bar', // #1458: { bar, bpm } every downbeat
   ACTIVITY_HEARTBEAT: 'activity:heartbeat', // #1390 (G8): { ts, idleMs } — loisActivity publishes while the artist is active
