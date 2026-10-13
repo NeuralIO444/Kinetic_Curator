@@ -21,12 +21,66 @@ export function off(event, fn) {
   }
 }
 
-export function emit(event, payload) {
+// #1457 / #1458 — the OPT-IN event envelope. emit(event, payload) is unchanged. emit(event, payload, { cause }) also
+// hands every listener a second argument, `meta`: { seq, event, cause, ...musical stamp }, so "who changed this, and
+// where in the bar" has an answer. Existing listeners (payload only) are untouched; the stamp comes from the clock.
+let seq = 0;
+let stampProvider = null;
+
+/** The clock publishes musical time for stamping: fn() => { loopMs, bar, beat, phase, bpm } | null. */
+export function setStampProvider(fn) {
+  stampProvider = typeof fn === 'function' ? fn : null;
+}
+
+/** Start the envelope's sequence over (a fresh take). */
+export function resetEnvelope() {
+  seq = 0;
+}
+
+export function emit(event, payload, opts) {
   const set = listeners.get(event);
   if (!set) return;
-  for (const fn of set) {
-    try { fn(payload); } catch (e) { console.error('[eventBus]', event, e); }
+  let meta;
+  if (opts) {
+    let stamp;
+    try { stamp = stampProvider ? stampProvider() : null; } catch { stamp = null; }
+    meta = { seq: ++seq, event, cause: (opts && opts.cause) ?? null, ...(opts && opts.quantized ? { quantized: opts.quantized } : {}), ...(stamp || {}) };
   }
+  for (const fn of set) {
+    try { fn(payload, meta); } catch (e) { console.error('[eventBus]', event, e); }
+  }
+}
+
+// #1458 — quantised emit: hold an event until the next beat or bar tick, then release it stamped with that tick.
+// "Davis's new asset lands on the downbeat, not at a random moment." The clock drives releaseTick().
+const pending = { beat: [], bar: [] };
+/** The most events a unit may hold (a stopped clock must not grow a queue without bound). */
+export const PENDING_CAP = 64;
+
+/**
+ * @param unit 'beat' | 'bar'
+ * @returns false when the unit is unknown (nothing queued)
+ */
+export function emitOn(unit, event, payload, opts = {}) {
+  const q = pending[unit];
+  if (!q) return false;
+  q.push({ event, payload, opts: { ...opts, quantized: unit } });
+  while (q.length > PENDING_CAP) q.shift();
+  return true;
+}
+
+/** Release what was waiting for this tick, in the order it was queued. Called by the clock. */
+export function releaseTick(unit) {
+  const q = pending[unit];
+  if (!q || q.length === 0) return 0;
+  const batch = q.splice(0, q.length);
+  for (const p of batch) emit(p.event, p.payload, p.opts);
+  return batch.length;
+}
+
+/** Drop everything waiting (tests, a fresh take). */
+export function clearPending() {
+  pending.beat.length = 0; pending.bar.length = 0;
 }
 
 export function once(event, fn) {
@@ -177,5 +231,13 @@ export const Events = {
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
+  AUDIO_INPUT: 'audio:input', // #1459: { source: mic | file | none } the input changed
+  AUDIO_ONSET: 'audio:onset', // #1459: { strength, band } a hit (spectral flux)
+  AUDIO_TEMPO: 'audio:tempo', // #1459: { bpm, confidence } the estimate moved by more than 2 bpm
+  AUDIO_ENERGY: 'audio:energy', // #1459: { level: low | mid | high } with hysteresis
+  AUDIO_SILENCE_START: 'audio:silenceStart', // #1459: { ms } quiet for over 2 s
+  AUDIO_SILENCE_END: 'audio:silenceEnd', // #1459: { ms } sound is back; how long the silence lasted
+  CLOCK_BEAT: 'clock:beat', // #1458: { bar, beat, bpm } every whole beat of the loop clock
+  CLOCK_BAR: 'clock:bar', // #1458: { bar, bpm } every downbeat
   ACTIVITY_HEARTBEAT: 'activity:heartbeat', // #1390 (G8): { ts, idleMs } — loisActivity publishes while the artist is active
 };
