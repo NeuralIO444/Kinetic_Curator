@@ -141,6 +141,17 @@ export const Events = {
   CANVAS_SWAP: 'canvas:swap', // swap width and height
   DISPLAY_FXAA: 'display:fxaa', // { on } per-machine FXAA
   DISPLAY_WEAVE: 'display:weave', // { on } per-machine gate weave
+  VOICE_LOAD: 'voice:load', // { id }
+  VOICE_DELETE: 'voice:delete', // { id } a performer voice
+  VOICE_RENAME: 'voice:rename', // { id, name }
+  VOICE_MIX: 'voice:mix', // { t } 0..1 the MIX road position
+  MODE_LOAD: 'mode:load', // { id } a composition mode tile
+  MOTION_LOAD: 'motion:load', // { id } a motion shelf tile
+  SHAPES_LOAD: 'shapes:load', // { id } a shape set
+  SHAPES_CYCLE: 'shapes:cycle', // { id } cycle a shape level
+  DICE_CAST: 'dice:cast', // { assetIds } the crowned cast
+  KEEP_ADD: 'keep:add', // { keep } a record in the keep ledger
+  ROLL_SCOPE_CLEAR: 'roll:scopeClear', // clear the armed mode and motion
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)

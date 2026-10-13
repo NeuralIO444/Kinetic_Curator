@@ -5,10 +5,10 @@
 // the auto-advance; ⏵ resumes it; ✕ bails out to the committed state.
 import { useStore } from '../../state/store.js';
 import { RangeRow } from '../../components/RangeRow.jsx';
+import { emit, Events } from '../../composition/eventBus.js';
 
 export function MixBar() {
   const voiceMix = useStore((s) => s.voiceMix);
-  const setVoiceMixT = useStore((s) => s.setVoiceMixT);
   const resumeVoiceMix = useStore((s) => s.resumeVoiceMix);
   const cancelVoiceMix = useStore((s) => s.cancelVoiceMix);
   if (!voiceMix) return null;
@@ -27,7 +27,7 @@ export function MixBar() {
         min={0}
         max={1000}
         value={Math.round(t * 1000)}
-        onChange={(v) => setVoiceMixT(v / 1000)}
+        onChange={(v) => emit(Events.VOICE_MIX, { t: v / 1000 })}
         ariaLabel="Mix position"
         hint="Drag to scrub the crossfade"
       />

@@ -3,10 +3,9 @@
 // the label, tap cycles off → 1 → 2 → 3 → off.
 import { useStore } from '../../state/store.js';
 import { SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isShapeSetActive, liveShapeLevels } from '../../data/voices.js';
+import { emit, Events } from '../../composition/eventBus.js';
 
 export function ShapesShelf() {
-  const loadShapeSet = useStore((s) => s.loadShapeSet);
-  const cycleShapeLevel = useStore((s) => s.cycleShapeLevel);
   const shapeLevels = liveShapeLevels(useStore((s) => s.shapeLevels), useStore((s) => s.enabledAssets));
   const enabledAssets = useStore((s) => s.enabledAssets);
 
@@ -30,7 +29,7 @@ export function ShapesShelf() {
               title={mixable
                 ? `${x.name} — level ${lv}/3. Tap: off → 1 → 2 → 3 → off. Up to ${SHAPE_MIX_MAX} on.`
                 : `${x.name} — ${x.ids.length} shapes`}
-              onClick={() => (mixable ? cycleShapeLevel(x.id) : loadShapeSet(x.id))}
+              onClick={() => emit(mixable ? Events.SHAPES_CYCLE : Events.SHAPES_LOAD, { id: x.id })}
             >
               <span className="te-cell-label">{x.name}</span>
               {mixable && (
