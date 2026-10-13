@@ -7,6 +7,7 @@ import { helpText } from '../../data/helpCopy.js';
 import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
 import { ValueButton } from '../build/te/ValueButton.jsx';
 import { SliderEditor } from '../build/te/editors.jsx';
+import { emit, Events } from '../../composition/eventBus.js';
 
 // #594 — the ONE scene sun (CHIAROSCURO). Scene-level, not per layer: it lights
 // every layer's marks. Colour is a palette slot, never a free hex.
@@ -14,7 +15,6 @@ const SLOT_LABEL = (s) => (s === 'white' ? 'WHITE' : s === 'ink' ? 'INK' : `S${N
 
 export function SunRow() {
   const light = useStore((s) => s.light);
-  const setLight = useStore((s) => s.setLight);
   const on = !!light;
 
   const btn = (label, display, key, min, max, step, hint, format) => (
@@ -28,7 +28,7 @@ export function SunRow() {
           value={light[key]}
           min={min} max={max} step={step}
           format={format}
-          onChange={(v) => setLight({ [key]: v })}
+          onChange={(v) => emit(Events.LIGHT_SET, { [key]: v })}
         />
       )}
     />
@@ -42,7 +42,7 @@ export function SunRow() {
         columns={2}
         tone="red"
         value={on ? 'on' : 'off'}
-        onChange={(id) => setLight(id === 'on')}
+        onChange={(id) => emit(Events.LIGHT_SET, id === 'on')}
         options={[
           { id: 'on', label: 'ON', title: helpText('layout-sun') },
           { id: 'off', label: 'OFF', title: helpText('layout-sun') },
@@ -79,7 +79,7 @@ export function SunRow() {
             <TeaMatrix
               ariaLabel="Sun colour"
               value={light.slot}
-              onChange={(id) => setLight({ slot: id })}
+              onChange={(id) => emit(Events.LIGHT_SET, { slot: id })}
               options={LIGHT_SLOTS.map((s) => ({ id: s, label: SLOT_LABEL(s) }))}
             />
           </div>

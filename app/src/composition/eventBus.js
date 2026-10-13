@@ -152,6 +152,18 @@ export const Events = {
   DICE_CAST: 'dice:cast', // { assetIds } the crowned cast
   KEEP_ADD: 'keep:add', // { keep } a record in the keep ledger
   ROLL_SCOPE_CLEAR: 'roll:scopeClear', // clear the armed mode and motion
+  PATTERN_MODE: 'pattern:mode', // { id, mode }
+  PATTERN_PARAM: 'pattern:param', // { id, key, value }
+  PATTERN_ADD: 'pattern:add', // { mode } add a PATTERN track
+  PATTERN_SELECT: 'pattern:select', // { id }
+  LAYER_PATCH: 'layer:patch', // { id, patch } OFF / MOD / FIELD / FEED link
+  MACRO_ADD: 'macro:add', // add a math macro knob
+  MACRO_REMOVE: 'macro:remove', // { id }
+  MACRO_RENAME: 'macro:rename', // { id, name }
+  FEEL_APPLY: 'feel:apply', // { id } a FEEL preset
+  LIGHT_SET: 'light:set', // the CHIAROSCURO sun patch itself (an object, or a boolean for on/off)
+  CREATURE_COUNT: 'creature:count', // { n } how many moths (0..4)
+  ATTACH_CLEAR: 'attach:clear', // { assetId } drop an asset's edited ATTACH points
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)

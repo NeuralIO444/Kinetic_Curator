@@ -9,6 +9,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { MAX_ATTACH, ATTACH_BOX } from '../engine/assetAttach.js';
 import { autoAttachPoints } from '../engine/autoAttach.js';
+import { emit, Events } from '../composition/eventBus.js';
 
 const PREVIEW_PX = 320;
 
@@ -19,7 +20,6 @@ export function WetLab({ assetId, onClose }) {
   const isOwn = Array.isArray(own); // the artist edited this asset by hand; otherwise the points come from its shape
   const autoAssetAttach = useStore((s) => s.autoAssetAttach);
   const clickAssetAttach = useStore((s) => s.clickAssetAttach);
-  const clearAssetAttach = useStore((s) => s.clearAssetAttach);
   const wrapRef = useRef(null);
 
   // Subscribe ONCE, and read onClose through a ref. Escape is also the app's panic key: its handler changes the store
@@ -83,7 +83,7 @@ export function WetLab({ assetId, onClose }) {
               )}
               {points.length > 0 && (
                 <button type="button" className="chip-btn act" data-testid="attach-clear" title="No attach points on this asset"
-                  onClick={() => clearAssetAttach(asset.id)}>clear points</button>
+                  onClick={() => emit(Events.ATTACH_CLEAR, { assetId: asset.id })}>clear points</button>
               )}
             </div>
           </div>

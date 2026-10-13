@@ -29,7 +29,8 @@ ok('honest UI: what a mode ignores is disabled WITH a reason, never hidden and n
 });
 
 ok('every control writes through the slice, which sanitizes; nothing calls the store with raw values', () => {
-  for (const act of ['setPatternMode', 'setPatternParam']) assert.match(ed, new RegExp(`s\\.${act}`));
+  // since the bus (#1457) the editor emits events; the slice setters sit behind them
+  for (const ev of ['PATTERN_MODE', 'PATTERN_PARAM']) assert.match(ed, new RegExp(`Events\\.${ev}`));
   assert.match(ed, /requestPatternShuffle\(id\)/, 'SHUFFLE goes through the DROP gate, never straight to the seed');
   assert.ok(!/s\.shufflePattern/.test(ed));
   assert.match(ed, /setParam\(id, 'grout', v \/ 100\)/, 'percent in the UI, fractions in the store');
