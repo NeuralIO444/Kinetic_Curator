@@ -217,6 +217,13 @@ export function useApp(selector) {
       case A.SET_SYPHON_ON: return store.setSyphonOn(action.on);
       case A.SET_SYPHON_NAME: return store.setSyphonName(action.name);
       case A.SET_CANVAS_SIZE: return store.setCanvasSize(action.w, action.h, action.presetId);
+      case A.TOGGLE_QUEUE_PLAYING: return store.toggleQueuePlaying();
+      case A.SET_QUEUE_PLAYING: return store.setQueuePlaying(action.on);
+      case A.SET_QUEUE_INDEX: return store.setQueueIndex(action.index);
+      case A.BUMP_QUEUE_JUMP: return store.bumpQueueJump();
+      case A.SET_QUEUE_SOURCE: return store.setQueueSource(action.source);
+      case A.SET_QUEUE_SECONDS_PER_HIT: return store.setQueueSecondsPerHit(action.seconds);
+      case A.SET_QUEUE_BEATS_PER_HIT: return store.setQueueBeatsPerHit(action.beats);
       default: console.warn('Unhandled action:', type);
     }
   }, []);

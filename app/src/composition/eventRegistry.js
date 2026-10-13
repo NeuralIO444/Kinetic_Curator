@@ -101,4 +101,11 @@ export const EVENT_REGISTRY = {
   STAGE_SYPHON_ON: { handler: 'wire' },
   STAGE_SYPHON_NAME: { handler: 'wire' },
   CANVAS_SIZE: { handler: 'wire' },
+  QUEUE_TOGGLE: { handler: 'wire' },
+  QUEUE_PLAYING: { handler: 'wire' },
+  QUEUE_INDEX: { handler: 'wire' },
+  QUEUE_JUMP: { handler: 'wire' },
+  QUEUE_SOURCE: { handler: 'wire' },
+  QUEUE_SECONDS: { handler: 'wire' },
+  QUEUE_BEATS: { handler: 'wire' },
 };

@@ -16,6 +16,9 @@ const MAX_VISIBLE = QUEUE_MAX_VISIBLE; // #966 — the tray window IS the queue 
  * Floating Favorites / Hits setlist (#8 / #35).
  * Ordered tray: 1–9 recall, Enter/Space = next, morph-to, reorder.
  */
+const setQueueIndex = (index) => emit(Events.QUEUE_INDEX, { index });
+const bumpQueueJump = () => emit(Events.QUEUE_JUMP);
+
 export function FavoritesTray() {
   const { state } = useApp((s) => ({
     favorites: s.favorites,
@@ -29,8 +32,6 @@ export function FavoritesTray() {
   const [cursor, setCursor] = useState(0);
   // #966 — tap-to-jump: any tray tap moves the queue transport's index, so
   // autoplay continues from the jumped-to hit without pausing.
-  const setQueueIndex = useStore((s) => s.setQueueIndex);
-  const bumpQueueJump = useStore((s) => s.bumpQueueJump);
   const queuePlaying = useStore((s) => s.queuePlaying);
   const queueIndex = useStore((s) => s.queueIndex);
   // #534 — per-hit link feedback: the chip key whose link just copied.
@@ -71,20 +72,20 @@ export function FavoritesTray() {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
     // #966 — tap-to-jump: autoplay continues from the jumped-to hit.
     if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
-  }, [setQueueIndex, bumpQueueJump]);
+  }, []);
 
   const evolveFrom = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
     emit(Events.DAVIS_EVOLVE, { mode: true });
     // #966 — tap-to-jump applies to shift-recall too.
     if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
-  }, [setQueueIndex, bumpQueueJump]);
+  }, []);
 
   const morphTo = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'morph', favorite: fav });
     // #966 — tap-to-jump applies to alt-morph too.
     if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
-  }, [setQueueIndex, bumpQueueJump]);
+  }, []);
 
   const move = useCallback((fav, delta) => {
     if (!fav.id) return;

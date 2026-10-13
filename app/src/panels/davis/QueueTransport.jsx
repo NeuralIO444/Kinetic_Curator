@@ -24,6 +24,14 @@ import {
 } from '../../state/queueTransport.js';
 import { RangeRow } from '../../components/RangeRow.jsx';
 
+// module-level so their identity is stable (effects list them as deps): every queue write rides the bus
+const toggleQueuePlaying = () => emit(Events.QUEUE_TOGGLE);
+const setQueuePlaying = (on) => emit(Events.QUEUE_PLAYING, { on });
+const setQueueIndex = (index) => emit(Events.QUEUE_INDEX, { index });
+const setQueueSource = (source) => emit(Events.QUEUE_SOURCE, { source });
+const setQueueSecondsPerHit = (seconds) => emit(Events.QUEUE_SECONDS, { seconds });
+const setQueueBeatsPerHit = (beats) => emit(Events.QUEUE_BEATS, { beats });
+
 export function QueueTransport() {
   const favorites = useStore((s) => s.favorites);
   const queuePlaying = useStore((s) => s.queuePlaying);
@@ -40,12 +48,6 @@ export function QueueTransport() {
   const beatFromButton = beatBpmRaw != null;
   const beatBpm = beatFromButton ? beatBpmRaw : QUEUE_BEAT_FALLBACK_BPM;
 
-  const toggleQueuePlaying = useStore((s) => s.toggleQueuePlaying);
-  const setQueuePlaying = useStore((s) => s.setQueuePlaying);
-  const setQueueIndex = useStore((s) => s.setQueueIndex);
-  const setQueueSource = useStore((s) => s.setQueueSource);
-  const setQueueSecondsPerHit = useStore((s) => s.setQueueSecondsPerHit);
-  const setQueueBeatsPerHit = useStore((s) => s.setQueueBeatsPerHit);
 
   const queue = visibleQueue(favorites);
   const idx = clampQueueIndex(queueIndex, queue.length);
@@ -80,12 +82,12 @@ export function QueueTransport() {
       const s = useStore.getState();
       const qq = visibleQueue(s.favorites);
       if (qq.length === 0) {
-        s.setQueuePlaying(false);
+        setQueuePlaying(false);
         return;
       }
       const now = clampQueueIndex(s.queueIndex, qq.length);
       const next = nextQueueIndex(now, qq.length);
-      s.setQueueIndex(next);
+      setQueueIndex(next);
       const fav = qq[next];
       emit(Events.DAVIS_FAVORITE, {
         action: s.morphEvolve ? 'morph' : 'recall',
@@ -96,7 +98,7 @@ export function QueueTransport() {
     // queueJumpNonce: a manual tap/keyboard jump restarts the hold even when
     // the jumped-to hit is already current (re-firing it must not get cut
     // short by the old timer).
-  }, [queuePlaying, queueIndex, queueJumpNonce, queueSource, queueSecondsPerHit, queueBeatsPerHit, beatBpm, favorites, setQueuePlaying]);
+  }, [queuePlaying, queueIndex, queueJumpNonce, queueSource, queueSecondsPerHit, queueBeatsPerHit, beatBpm, favorites]);
 
   const toggle = () => {
     if (queue.length === 0) return;
