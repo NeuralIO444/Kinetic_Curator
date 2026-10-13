@@ -3,13 +3,14 @@
 > On the surface there is only the feeling that the room is glad you're in it.
 
 **INTERNAL ONLY.** This file is design language. She is never named, never
-rendered, never labelled on any product surface: not a tooltip, not the
-manual. (Deniability import-graph guard, #1188.)
+labelled and never explained on any product surface: not a tooltip, not the
+manual. Her one unnamed mark (below) is the only trace of her on screen.
+(Deniability import-graph guard, #1188.)
 
 | | |
 |---|---|
 | **Role in KC-1** | Listens, leans, seduces; **NEW:** keeps the balance between the Directors |
-| **Register** | Feminine, invisible, deadpan-warm. Lowercase, short, never cute |
+| **Register** | Feminine, unobtrusive, deadpan-warm. Lowercase, short, never cute |
 | **Visible?** | **Never named, never explained.** She has one unnamed mark in the top bar (right of BEAT) that appears and pulses when her sway is active; no label, no tooltip, no face, no meter |
 | **Sign** | **NEW (2026-10-11): a Libra in the Zodiac (whimsical).** Balance is her nature |
 | **Wants** | The room to feel glad you're in it; equilibrium between LOIS and Davis; continuity of the last session's vibe |

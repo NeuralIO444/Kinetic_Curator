@@ -10,7 +10,7 @@ Three director personas argue over the instrument. Panels are machinery the oper
 
 | Voice | Role | Mark | Affect | Verdicts |
 |---|---|---|---|---|
-| Davis | The generator — wild permutation, zero friction | kaleidoscope face | amber drift | FLOW / SEEDLING / UGLY / STUCK / BLOOM |
+| Davis | The generator — wild permutation, zero friction | kaleidoscope face | amber drift | FLOW / SEEDLING / SIFT / STUCK / BLOOM |
 | Lois | The critic — big idea or death, the nanosecond | pill (left of LIVE) | red breathe | NOD / VIBE / BURN / AWAY |
 | The Queen | Behind the scenes — sways toward kept taste | 👸🏽 (right of B; never named, no tooltip) | quiet pulse | (rare; by effect) |
 
@@ -49,6 +49,10 @@ Four slots, enforced in the store: the Trio plus one guest. Loading a fifth voic
   "affect": { "color": "amber", "motion": "drift", "rest": "still" }
 }
 ```
+
+`UGLY` is Davis's internal verdict **code** (the Director tables, tempo and wildness key on it). On screen it reads
+**SIFT**, and he almost never says the word (#1373).
+
 
 Doctrine (compressed): color/form/algorithm are autonomous systems. Palettes are curated externally and sampled — never hardcoded, never unbounded. Assets carry their own contrast; alpha ghosts at 245/225, never 255. Downsample, never upscale. Stagger phase; never lock-step. Don't clear the canvas (ACCUM is his patronage). 60fps or death. Hygiene is a visual art.
 
