@@ -26,6 +26,7 @@ export const LOIS_AWAY_MS = 5 * 60 * 1000; // AWAY: "he's out of the room" is li
 // fifteen minutes of nothing, which contradicted the word).
 export const LOIS_BURN_KEEPS = 3;
 // Davis reads the same feed through his own windows (#1126); the thresholds live with his states, in davisState.js.
+import { getDishReading } from './dishPressure.js'; // #1356 step 4: the room reads the dish
 import { DAVIS_UGLY_PASSES, DAVIS_UGLY_WINDOW_MS, DAVIS_FLOW_WINDOW_MS } from './davisState.js';
 // A keep reaches the feed from two doors (the bus event, and the store's own list growing, which F / the star / K
 // use directly). Two notes this close together are the one keep.
@@ -253,6 +254,8 @@ export function createLoisActivity({
       rollsLast5m: countSince(s.rolls, LOIS_ROLL_KEEP_WINDOW_MS, at),
       keepsLast5m: countSince(s.keeps, LOIS_ROLL_KEEP_WINDOW_MS, at),
       undosLast10s: countSince(s.undos, LOIS_UNDO_BURST_WINDOW_MS, at),
+      // #1356 step 4: how crowded the dish is around the pins (null with no pins)
+      dishPressure: getDishReading(),
       // Davis's inputs (#1126)
       rollsLastMinute: countSince(s.rolls, DAVIS_FLOW_WINDOW_MS, at),
       passesLast2m: countSince(s.passes, DAVIS_UGLY_WINDOW_MS, at),
