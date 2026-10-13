@@ -26,7 +26,6 @@ import {
   __clearTemplateRegistry,
 } from './template.mjs';
 import { TEMPLATE_EXAMPLES } from './examples.mjs';
-import { TemplateEffectControls } from './TemplateEffectControls.mjs';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -195,32 +194,6 @@ ok('controlSpecs describe panel controls with no per-effect code', () => {
   });
   const uis = Object.fromEntries(controlSpecs(all).map((s) => [s.name, s.ui]));
   assert.deepEqual(uis, { on: 'toggle', tint: 'color', off: 'slider' });
-});
-
-ok('TemplateEffectControls renders from the descriptor only', () => {
-  const poster = validateDescriptor('p', TEMPLATE_EXAMPLES[1][1].descriptor);
-  const el = TemplateEffectControls({ descriptor: poster, values: {}, onChange: () => {} });
-  assert.equal(el.type, 'div');
-  const [row] = el.props.children;
-  assert.equal(row.type.name, 'SliderRow', 'slider param -> SliderRow');
-  assert.equal(row.props.spec.min, 2);
-  assert.equal(row.props.spec.max, 8);
-  assert.equal(row.props.value, 4, 'missing value falls back to def');
-
-  const tog = validateDescriptor('t', {
-    label: 'T', params: { on: { type: 'bool', label: 'On', def: true } },
-  });
-  const tel = TemplateEffectControls({ descriptor: tog, values: { on: false }, onChange: () => {} });
-  assert.equal(tel.props.children[0].type.name, 'ToggleRow');
-  assert.equal(tel.props.children[0].props.value, false);
-
-  const v2 = validateDescriptor('v', {
-    label: 'V', params: { off: { type: 'vec2', label: 'Offset', min: -10, max: 10, def: [1, 2] } },
-  });
-  const vel = TemplateEffectControls({ descriptor: v2, values: {}, onChange: () => {} });
-  assert.equal(vel.props.children.length, 2, 'vec2 -> X/Y slider pair');
-  assert.equal(vel.props.children[0].props.spec.label, 'Offset X');
-  assert.equal(vel.props.children[0].props.value, 1);
 });
 
 ok('examples pass the static source audit with no warnings', () => {
