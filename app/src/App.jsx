@@ -40,6 +40,7 @@ import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomPro
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
+import { startMind } from './curator/mindLive.js'; // #1462: Mind 1
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
@@ -118,13 +119,27 @@ function AppInner() {
     setRoomProvider(roomNow);
     // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
     const stopPace = startPace({ getBpm: () => useStore.getState().beatBpm, context: roomNow });
+    const roomCodes = () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; };
+    // #1462 — Mind 1: once a bar each persona thinks about the room (rules backends, neutral; telemetry only)
+    const stopMind = startMind({
+      getSeed: () => useStore.getState().seed,
+      getSnapshot: () => {
+        const st = useStore.getState();
+        return {
+          layers: st.layers, enabledAssetCount: st.enabledAssets ? Object.values(st.enabledAssets).filter(Boolean).length : 0,
+          paletteId: st.paletteId, room: roomCodes(), band: getStressState().band, keepsCount: Array.isArray(st.keeps) ? st.keeps.length : 0,
+          bpm: st.beatBpm, audio: st.audioEnabled ? (st.audioSource && st.audioSource.type === 'file' ? 'file' : 'mic') : 'none',
+          creatures: st.creatureCount,
+        };
+      },
+    });
     // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
     // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
     const set = createSet({
       getBpm: () => useStore.getState().beatBpm,
       getIdleMs: () => loisActivity.snapshot().idleMs,
       getRealLevel: () => { const b = useStore.getState().audioEnabled ? readMeterBandLevels() : null; return b ? Object.values(b).reduce((x, v) => x + v, 0) / Object.keys(b).length : 0; },
-      getRoom: () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; },
+      getRoom: roomCodes,
       getBand: () => getStressState().band,
       getSeed: () => useStore.getState().seed,
     });
@@ -135,7 +150,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({
