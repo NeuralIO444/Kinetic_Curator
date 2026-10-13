@@ -32,7 +32,7 @@ export const FEEL_PRESETS = Object.freeze([
   {
     id: 'violent', name: 'VIOLENT',
     hint: 'Everything up, hits snap to their peak: the music shoves the picture.',
-    params: { audioModDepth: 1, audioScaleMod: 0.95, audioAlphaMod: 0.65, lifeDrift: 0.6, audioAttackMs: 4, audioDecayMs: 140, audioResponse: 'peak-hold', audioSwell: 1 },
+    params: { audioModDepth: 1.4, audioScaleMod: 1.35, audioAlphaMod: 0.9, lifeDrift: 0.6, audioAttackMs: 4, audioDecayMs: 140, audioResponse: 'peak-hold', audioSwell: 1 },
   },
 ].map((p) => Object.freeze({ ...p, params: Object.freeze(p.params) })));
 

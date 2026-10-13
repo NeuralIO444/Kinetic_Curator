@@ -363,9 +363,11 @@ export const PARAM_SPEC = {
   accumulationPrism: { min: 0, max: 1 },
   accumulationFlow: { min: 0, max: 1 }, // #284: Phase B2 curl advection amount
   accumulationWetness: { min: 0, max: 1 }, // #970 live wetness; 0 is the dry path
-  audioModDepth: { min: 0, max: 1 },
-  audioScaleMod: { min: 0, max: 1 },
-  audioAlphaMod: { min: 0, max: 1 },
+  // #1478 — the master gains reach 2 (defaults unchanged at 0.65 / 0.45 / 0.25): a normal mic signal is low on the bands,
+  // so the ceiling was what limited the animation, not the route sliders (those already span the output clamp).
+  audioModDepth: { min: 0, max: 2 },
+  audioScaleMod: { min: 0, max: 2 },
+  audioAlphaMod: { min: 0, max: 2 },
   // #306: envelope follower time constants (ms), glow swell fader.
   audioAttackMs: { min: 0, max: 2000 },
   audioDecayMs: { min: 0, max: 5000 },

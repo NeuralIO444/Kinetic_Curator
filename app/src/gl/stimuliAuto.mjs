@@ -99,11 +99,6 @@ function route(input, target) {
 }
 
 /**
- * Starter table from a listen snapshot. Silence is a no-op: nothing above the
- * floor returns `routes: null`, so the panel says so and changes nothing.
- * @returns {{ routes: Array|null, heard: boolean, picked: string[] }}
- */
-/**
  * #1477 — the guided path from an empty matrix: AUDIO ON first (that button already shimmers while audio is off), then
  * AUTO. AUTO invites a press only when audio is on and there are no routes yet; any route, or audio off, and it is quiet.
  */
@@ -111,6 +106,11 @@ export function autoInvites({ audioEnabled, routeCount }) {
   return !!audioEnabled && routeCount === 0;
 }
 
+/**
+ * Starter table from a listen snapshot. Silence is a no-op: nothing above the
+ * floor returns `routes: null`, so the panel says so and changes nothing.
+ * @returns {{ routes: Array|null, heard: boolean, picked: string[] }}
+ */
 export function autoSetupRoutes(snap) {
   const hot = rank(snap).filter((r) => r.energy >= ENERGY_FLOOR);
   if (hot.length === 0) return { routes: null, heard: false, picked: [] };
@@ -188,4 +188,48 @@ export function starterMovesScale(routes, snap, master = { depth: 0.65, scaleMod
   // light, accum. glow and hue are not starter targets, so they are not read.
   return out.scaleMul > 1.02 || out.alphaBoost > 0.5
     || (out.squash ?? 0) > 0.05 || (out.accum ?? 0) > 0.5 || (out.sun ?? 0) > 0.05;
+}
+
+// ── #1478: the master gain from the signal AUTO heard ─────────────────────────────────────────────────────────
+/** The master gains' own defaults (layout-modes DEFAULT_LAYOUT_PARAMS). */
+export const MASTER_DEFAULTS = Object.freeze({ audioModDepth: 0.65, audioScaleMod: 0.45, audioAlphaMod: 0.25 });
+/** The ceiling of the three master knobs. */
+export const MASTER_MAX = 2;
+/** A signal whose loudest input peaks here fills the range at the defaults; quieter asks for more gain. */
+export const GAIN_TARGET_PEAK = 0.6;
+/** The most AUTO multiplies the defaults by (a very quiet input). */
+export const GAIN_MAX_FACTOR = 2;
+/** Below this multiplier AUTO leaves the masters alone (the old rule raises only a buried one). */
+const GAIN_EPS = 0.05;
+
+/** The loudest peak across every route input in a listen snapshot. */
+export function loudestPeak(snap) {
+  let m = 0;
+  for (const id of [...COARSE_INPUTS, ...BAND_INPUTS]) m = Math.max(m, inputEnergy(id, snap));
+  return m;
+}
+
+/**
+ * The masters AUTO should set after a listen: { factor, patch } where patch holds ONLY the knobs that rise. Quiet input
+ * gets more gain (up to GAIN_MAX_FACTOR x the defaults); a hot signal leaves the defaults; a knob the artist already
+ * set higher is never lowered. Silence: null (AUTO changes nothing).
+ * @param snap    the peak snapshot the listen built
+ * @param current { audioModDepth, audioScaleMod, audioAlphaMod } as they are now
+ */
+export function masterGainFor(snap, current = {}) {
+  const peak = loudestPeak(snap);
+  if (!(peak >= ENERGY_FLOOR)) return null;
+  const factor = Math.min(GAIN_MAX_FACTOR, Math.max(1, GAIN_TARGET_PEAK / peak));
+  const patch = {};
+  for (const [key, def] of Object.entries(MASTER_DEFAULTS)) {
+    const cur = Number(current[key]);
+    const have = Number.isFinite(cur) ? cur : def;
+    if (factor > 1 + GAIN_EPS) {
+      const want = Math.min(MASTER_MAX, Math.round(def * factor * 100) / 100);
+      if (want > have + 1e-9) patch[key] = want;
+    } else if (have < def * 0.4) {
+      patch[key] = def; // the old rule: a buried master comes back to its default, nothing more
+    }
+  }
+  return { factor: Math.round(factor * 100) / 100, patch };
 }
