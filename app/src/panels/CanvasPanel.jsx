@@ -5,7 +5,7 @@
 // reuses the app's real placement + swarm logic (gl/liveResolve.mjs); the
 // viewport zoom/pan and breath transforms are baked into the scene contract
 // so what plays is what renders.
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
@@ -16,7 +16,9 @@ import { createWorkerLiveLoop } from '../gl/workerLiveLoop.js';
 import { getPreset } from '../data/presets.js';
 import { clientToScene, pinMarkState } from '../curator/dishPins.js';
 import { getFormationState } from '../curator/formationLive.js';
-import { FORM_HOLD_FRAMES } from '../curator/formation.js';
+import { FORM_HOLD_FRAMES, fertilityField, thresholdsFor } from '../curator/formation.js';
+import { soilGrid } from '../curator/soil.js';
+import { getStressState } from '../curator/stressLive.js';
 
 export function CanvasPanel() {
   const { palette: activePalette, canvasRef, glCanvasRef, glLoopRef } = useApp();
@@ -40,6 +42,31 @@ export function CanvasPanel() {
   const pinArmed = useStore(s => s.pinArmed);
   const dishPins = useStore(s => s.dishPins);
   const placeDishPin = useStore(s => s.placeDishPin);
+  // #1355 — the soil map: while PIN is armed, shade where a moth could form (the formation rule's own fertility field
+  // against the current band's bar). The band is read from the stress tracker, which has no subscription: a light poll.
+  const dishSeed = useStore(s => s.seed);
+  const dishSeedOffsets = useStore(s => s.seedOffsets);
+  const [soilBar, setSoilBar] = useState(() => thresholdsFor(null).attraction);
+  useEffect(() => {
+    if (!pinArmed) return undefined;
+    const read = () => setSoilBar((prev) => { const t = thresholdsFor(getStressState().band).attraction; return t === prev ? prev : t; });
+    read();
+    const id = setInterval(read, 400);
+    return () => clearInterval(id);
+  }, [pinArmed]);
+  const soilUrl = useMemo(() => {
+    if (!pinArmed || typeof document === 'undefined') return null;
+    try {
+      const field = fertilityField(dishSeed, dishSeedOffsets, canvasW, canvasH);
+      const g = soilGrid(field.at, canvasW, canvasH, soilBar);
+      const cv = document.createElement('canvas');
+      cv.width = g.cols; cv.height = g.rows;
+      cv.getContext('2d').putImageData(new ImageData(g.rgba, g.cols, g.rows), 0, 0);
+      return cv.toDataURL();
+    } catch {
+      return null; // no soil map is no harm: the pin still works
+    }
+  }, [pinArmed, dishSeed, dishSeedOffsets, canvasW, canvasH, soilBar]);
   // #1355 — what each pin's mark shows: the formation rule's honest state (spore / counting / formed). The tracker is a
   // module singleton with no subscription, so a light poll, only while pins exist, and only re-rendering on a change.
   const [pinMarks, setPinMarks] = useState([]);
@@ -223,12 +250,17 @@ export function CanvasPanel() {
             onWheel={viewport.onWheel} onPointerDown={onCanvasPointerDown} onPointerMove={viewport.onPointerMoveCombined}
             onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />
         )}
-        {dishPins.length > 0 && (
+        {(dishPins.length > 0 || soilUrl) && (
           // The spore marks. Same box as the canvas (viewBox + meet = object-fit: contain) and the same view transform
           // as liveLoop, so a mark sits exactly on the place it names. Pointer-transparent: the canvas keeps the click.
           <svg viewBox={`0 0 ${canvasW} ${canvasH}`} preserveAspectRatio="xMidYMid meet" data-testid="dish-pins" aria-hidden="true"
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 2, pointerEvents: 'none' }}>
             <g transform={`translate(${canvasW / 2 + viewport.pan.x} ${canvasH / 2 + viewport.pan.y}) scale(${viewport.zoom}) translate(${-canvasW / 2} ${-canvasH / 2})`}>
+              {soilUrl && (
+                // the soil map, under the marks: clear where a moth could form, dimmed where it cannot
+                <image href={soilUrl} x="0" y="0" width={canvasW} height={canvasH} preserveAspectRatio="none" data-testid="soil-map"
+                  style={{ imageRendering: 'auto' }} />
+              )}
               {dishPins.map((p, i) => {
                 const r = canvasW * 0.006 / viewport.zoom; // a constant size on screen, whatever the zoom
                 const mark = pinMarks[i] || { kind: 'spore', progress: 0 };
@@ -253,6 +285,13 @@ export function CanvasPanel() {
               })}
             </g>
           </svg>
+        )}
+        {pinArmed && (
+          <span className="soil-note" data-testid="soil-note"
+            style={{ position: 'absolute', left: 6, bottom: 6, zIndex: 3, pointerEvents: 'none', fontSize: 9, letterSpacing: '0.1em',
+              padding: '2px 6px', background: 'rgba(0,0,0,0.6)', border: '1px solid var(--line)', color: 'var(--dim)' }}>
+            PIN · clear = fertile, dim = a moth will not form · it also needs a crowd
+          </span>
         )}
         {stageBlackout && (
           <div style={{ position: 'absolute', inset: 0, background: '#000', zIndex: 4 }} aria-label="Stage blackout" />
