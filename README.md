@@ -25,6 +25,10 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - Flagship voices, 4 content-track cap, track patch round-trip + cap on load, H/M/L asset locker, FADE on the palette bar.
 - ACCUM trails, GPU FX (chain compiler + template effects + cost tiers + measured costs), showrunner shed ladder behind one tape readout (budget knob, named stages, FX-stack weight).
 - Behave profiles + bio-drives (drives, scent, mold, graze, leak, swell) on one integrator. Seven verbs: cruise, flock, orbit, scatter, mold, levy, lorenz. Audio ballistics shape mic input and the GL loop.
+- **Petri dish** (#1183, #1417–#1425) — one world: marks lean toward, rest on and take the colours of the pattern tile beneath them; shared contact grid across strata; DISH switch with bounce/repel. Roadmap: [docs/ROADMAP_PETRI_DISH.md](docs/ROADMAP_PETRI_DISH.md).
+- **Stress + bands** (#1362, #1363) — one stress value (instrument load, performer activity, dish pressure, taste pressure) with smoothing and hysteresis; Relax / Normal / Tighten bands; recorded in every take.
+- **Wet lab + creatures** (#1377–#1381, #1400, #1418–#1429) — pin a place, and when the field and crowd allow, a moth grows there (body, wings, ATTACH points, second wing pair in a crowd). Davis gives it traits once at birth; the room tightens or loosens his range.
+- **Performance files** (#1339, #1360) — record, export, import and replay a take; checkpoints verify the replay.
 - **DIRECTORS panel** (#1126; formerly DAVIS, #830) — LOIS (NOD / VIBE / BURN / AWAY) vs Davis (FLOW / SEEDLING / UGLY / STUCK / BLOOM), both reading the honest feed; the panel hosts the argument. VOICES / GENERATE / PERFORM live here (flagship voices load-only, ✎ fork dish into MY VOICES), Evolve with live progress, phrase clock readout, ACCUM gestures.
 - **PATTERN tracks** (#1039–#1042) — FIELD / QUILT / GLYPH modes in BUILD (add / edit / shuffle), with per-mode DRIFT, DROP gate, bar-quantized shuffle, and per-element kinemes; KIN and CURATOR rolls deal element motion too.
 - **Slider dialogs** (#1127) — tap a slider's name for range expansion and mode switch; ROTATE defaults to continuous SPIN in rev/s, every mark with its own speed and direction.
@@ -135,6 +139,7 @@ Pages is already on **GitHub Actions** → [live site](https://neuralio444.githu
 - [Embargo](docs/EMBARGO.md) · [Two planes](docs/TWO_PLANES.md) · [Tempo](docs/TEMPO_AND_CHIPS.md)
 - [GL contract](docs/GL_CONTRACT.md) · [ACCUM](docs/ACCUM.md) · [Showrunner](docs/SHOWRUNNER.md)
 - [Organic motion](docs/ORGANIC_MOTION.md) · [Noise](docs/NOISE_AND_LAYERS.md) · [Tracks](docs/KC1_LAYERS.md)
+- [Petri dish roadmap](docs/ROADMAP_PETRI_DISH.md) · [Release roadmap](docs/ROADMAP_V1.md) · [DLC preset types](docs/DLC_PRESET_TYPES.md)
 - [Manifesto](docs/MANIFESTO.md) · [Changelog](CHANGELOG.md) · [Buglist](docs/BUGLIST.md)
 
 ## Hotkeys
