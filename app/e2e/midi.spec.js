@@ -93,7 +93,8 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   await page.getByText('ADVANCED').click();
   const depth = page.locator('.stim-advanced input[type=range]').first();
   await page.evaluate(() => window.__midi.send([0xb0, 7, 127]));
-  await expect(depth).toHaveValue('1', { timeout: 3_000 });
+  // #1478 — the master DEPTH now spans 0..2, so a controller's full travel reads 2 (it read 1 when the ceiling was 1)
+  await expect(depth).toHaveValue('2', { timeout: 3_000 });
   await page.evaluate(() => window.__midi.send([0xb0, 7, 0]));
   await expect(depth).toHaveValue('0', { timeout: 3_000 });
 
