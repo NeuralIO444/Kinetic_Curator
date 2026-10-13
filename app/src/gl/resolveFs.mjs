@@ -9,6 +9,7 @@ uniform sampler2D u_src;
 uniform float u_aces;      // 0 = clamp-only bypass (PR1)
 uniform float u_exposure;  // default 1.0
 uniform float u_dither;    // 0 = off; PR2 ~0.5/255
+uniform float u_present;   // 1 = writing the VISIBLE canvas (its row 0 is the bottom); 0 = a readback target (row 0 read first)
 uniform float u_shape;     // #706 cell size in px. 0 = off
 uniform float u_fxaa;      // #740 PR1 probe: 0 = bypass (pixel-identical), >=0.5 = FXAA
 uniform vec2 u_weave;      // #741 gate weave: sample-position offset in output px; (0,0) = byte-identical
@@ -79,7 +80,9 @@ vec4 fxaa(vec2 uv, vec2 px) {
 
 void main() {
   // #741: whole-frame sub-pixel drift. x + 0.0 == x, so (0,0) changes nothing.
-  vec2 suv = vec2(v_cuv.x, 1.0 - v_cuv.y) + u_weave / vec2(textureSize(u_src, 0));
+  // A readback target is read row 0 first, so it wants the frame's top row there: flip. The visible canvas shows row 0
+  // at the BOTTOM, so it must not flip, or the live view is upside-down against the scene, the exports and the pointer.
+  vec2 suv = vec2(v_cuv.x, u_present > 0.5 ? v_cuv.y : 1.0 - v_cuv.y) + u_weave / vec2(textureSize(u_src, 0));
   vec4 s = texture(u_src, suv);
   if (u_aces < 0.5 && u_dither < 1e-8 && u_fxaa < 0.5 && u_shape < 0.5) {
     o = clamp(s, 0.0, 1.0);
