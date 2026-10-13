@@ -22,7 +22,8 @@
     "test:e2e:install": "playwright install chromium",
     "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e",
     "parity": "node src/gl/parity/run.mjs",
-    "verify:take": "node scripts/verifyPerformance.mjs"
+    "verify:take": "node scripts/verifyPerformance.mjs",
+    "bake:regions": "node scripts/bakeRegionMattes.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.6.0",
