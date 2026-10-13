@@ -140,15 +140,6 @@ const MUST_LOOP_ALLOW = {
     mustContain: [/loopTimeMs \+=/, /kinemeClock\.at\(loopTimeMs/],
     noDateNow: true,
   },
-  'src/gl/renderWorker.js': {
-    allow: [
-      /swellStart/, // #268 mirror: deliberate wall-clock gesture envelope
-      /accumRetryAt/, // fault-isolation backoff
-      /lastTickMs|dtMs|loopTimeMs \+=/, // worker tick source -> loopTimeMs
-    ],
-    mustContain: [/kinemeClock\.at\(frameTimeMs/, /loopTimeMs \+=/],
-    noDateNow: true,
-  },
   'src/state/slices/voiceSlice.js': {
     // createdAt / id generation are Law-allowed wall uses; the MIX clock
     // itself (startedAt) must be loop time — asserted below.

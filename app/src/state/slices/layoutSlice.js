@@ -191,8 +191,8 @@ export const createLayoutSlice = (set) => ({
   /**
    * BEAT master clock (#950): the top-bar BEAT button's BPM. The transition
    * clock derives from it — morphs are 2 beats (120 BPM → 1s). The setter
-   * writes paletteMixSeconds too, so every existing consumer (liveLoop,
-   * renderWorker) follows the master clock through the same channel; the
+   * writes paletteMixSeconds too, so every existing consumer (liveLoop)
+   * follows the master clock through the same channel; the
    * glitch ceiling maps sub-0.75s beat times to 0 (hard cut), which the
    * engine already honors as "cut".
    */

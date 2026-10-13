@@ -162,7 +162,6 @@ node src/engine/swarm.inventory.selfcheck.mjs
 node src/gl/clock.inventory.selfcheck.mjs
 node src/gl/clock.evolve.selfcheck.mjs
 node src/gl/clock.evolve-accum.selfcheck.mjs
-node src/gl/clock.workerDt.selfcheck.mjs
 node src/gl/clock.capture.selfcheck.mjs
 node src/gl/clock.freeze.selfcheck.mjs
 node src/gl/accum.inventory.selfcheck.mjs
@@ -357,7 +356,6 @@ node src/engine/groundSnap.selfcheck.mjs
 node src/curator/formation.selfcheck.mjs
 node src/curator/refineColor.selfcheck.mjs
 node src/state/projectDocument.fuzz.selfcheck.mjs
-node src/gl/resolverInputParity.selfcheck.mjs
 node src/gl/resolverProbe.selfcheck.mjs
 node scripts/verifyPerformance.selfcheck.mjs
 node src/gl/performanceCreatures.selfcheck.mjs

@@ -104,7 +104,6 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
     'hooks/useProjectAutosave.js': 1,   // autosave trigger
     'panels/PipelinePanel.jsx': 3,      // selector + destructure + prop
     'panels/pipeline/DataExportRow.jsx': 2,
-    'gl/workerLiveLoop.js': 1,          // worker serializer whitelist
     'panels/StimulusPanel.jsx': 3,      // the matrix reads it
     'panels/stimulus/ModMatrix.jsx': 2,
   };

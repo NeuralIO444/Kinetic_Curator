@@ -1,7 +1,7 @@
 // #823 — governor freeze holds the loop clock.
 //
 // A cut6 / watchdog freeze (slowRender) must hold #806 loop time so nothing
-// lump-sums on thaw. liveLoop.mjs and renderWorker.js roll the tick's clock
+// lump-sums on thaw. liveLoop.mjs rolls the tick's clock
 // advance back on freeze frames (the same shape as the paused rollback);
 // EVOLVE (#808) tears its trigger down under slowRender and re-arms on
 // thaw; the ACCUM step is skipped while frozen. Warp's own pin is covered
@@ -29,16 +29,6 @@ test('#823 liveLoop tick rolls the clock advance back on a governor freeze', () 
     src,
     /if \(getState\(\)\.slowRender\) \{\s*\n\s*loopTimeMs -= clampedDtMs;\s*\n\s*\}/,
     'slowRender must roll back the tick\'s loopTimeMs advance like the paused path',
-  );
-});
-
-test('#823 renderWorker holds the loop clock on freeze / pause', () => {
-  const src = read('src/gl/renderWorker.js');
-  assert.match(src, /#823/, 'the freeze-hold must be marked #823');
-  assert.match(
-    src,
-    /if \(s\.running === false \|\| s\.slowRender\) loopTimeMs -= dtMs;/,
-    'the worker tick must roll back its loopTimeMs advance when frozen or paused',
   );
 });
 

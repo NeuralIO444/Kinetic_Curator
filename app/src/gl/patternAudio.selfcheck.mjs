@@ -98,15 +98,10 @@ ok('a drift route wakes a STILL pattern: the contract gains t, so the picture mo
   assert.ok(Math.abs(cm.drift - 0.6) < 1e-9 && cm.t === 4, 'a routed one drifts, on the loop clock');
 });
 
-ok('both loops evaluate the route table: the render worker no longer ignores it', () => {
-  const w = readFileSync(new URL('./renderWorker.js', import.meta.url), 'utf8');
+ok('the loop evaluates the route table before the contract is built', () => {
   const m = readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8');
-  assert.match(w, /audioRoutes\(routeAudio, \{[^}]*\}, s\.audioRoutes, null\)/, 'worker evaluates the route table');
-  assert.match(w, /applyPatternAudio\(resolved, routes\.pattern\);\s*\n\s*\n\s*\/\/ Scene contract/, 'worker: applied before the contract is built');
-  assert.match(w, /applyHueAudio\(contract\.layers, routes\.hue \?\? 0\)/); assert.match(w, /applyLightAudio\(contract, routes\.sun \?\? 0\)/);
-  assert.match(m, /applyPatternAudio\(resolved, routes\.pattern\)/, 'main loop applies it too');
+  assert.match(m, /applyPatternAudio\(resolved, routes\.pattern\)/, 'main loop applies it');
   assert.ok(m.indexOf('applyPatternAudio(resolved') < m.indexOf('const contract = buildSceneContract'), 'main loop: before the contract');
-  assert.match(w, /audioOn \? \(s\.audioBands\?\.rms/, 'audio off gates the inputs, as in liveLoop');
 });
 
 console.log(`patternAudio.selfcheck: ${n} checks passed`);
