@@ -10,6 +10,7 @@ import { QUALITY_PRESETS } from '../data/quality.js';
 import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the single map
 import { LoisPill } from './LoisPill.jsx';
 import { lostLine } from '../hooks/audioLoss.mjs';
+import { TakeStrip } from './TakeStrip.jsx'; // #1461 step 3: the scrub strip, in the gap, only while a take plays
 import { PerformanceButton } from './PerformanceButton.jsx'; // #1353 / #1461: record and play a take, beside STOP
 
 export function MasterBar() {
@@ -197,6 +198,7 @@ export function MasterBar() {
           </button>
         </div>
       </div>
+      <TakeStrip />
       <div className="master-right">
         <PerformanceButton />
         <button className="run-btn" onClick={() => emit(Events.RUN_SET, { running: !running })}>
