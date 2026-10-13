@@ -1,9 +1,11 @@
 // PerformanceButton.jsx — #1353 step 4: the footer control for recording a performance.
 // Two states, one button: `rec` starts a take; while recording it reads `● stop ↓` and a click ends the take and
-// downloads the .kcperf file. The file replays to the same frames (performanceFile.selfcheck); there is no in-app
-// playback this cycle. The frame count in the tooltip is a measurement, read from the recorder.
-import { useEffect, useState } from 'react';
+// downloads the .kcperf file. The file replays to the same frames (performanceFile.selfcheck); `▶ take` plays one back
+// through the instrument (#1461). The frame count in the tooltip is a measurement, read from the recorder.
+import { useEffect, useRef, useState } from 'react';
 import { isRecordingPerformance, performanceFrames, startPerformance, stopPerformance } from '../gl/performanceCapture.mjs';
+import { unpackPerformance } from '../gl/performanceFile.mjs';
+import { startPlayback, stopPlayback, isPlaybackActive, subscribePlayback } from '../gl/playback.mjs';
 import { getStressState, setStressTap } from '../curator/stressLive.js';
 import { createStressRecorder } from '../curator/stressRecord.js';
 import { createFormationRecorder } from '../curator/formation.js';
@@ -59,6 +61,22 @@ function downloadBytes(bytes, filename) {
 export function PerformanceButton() {
   const [recording, setRecording] = useState(isRecordingPerformance());
   const [frames, setFrames] = useState(0);
+  // #1461 step 2 — playing a take back (the scrub strip is step 3)
+  const [playing, setPlaying] = useState(isPlaybackActive());
+  const [playNote, setPlayNote] = useState('');
+  const fileRef = useRef(null);
+  useEffect(() => subscribePlayback(() => setPlaying(isPlaybackActive())), []);
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const perf = await unpackPerformance(new Uint8Array(await file.arrayBuffer()));
+      setPlayNote(startPlayback(perf) ? '' : 'that file is not a take this build can play');
+    } catch {
+      setPlayNote('that file is not a take (.kcperf)');
+    }
+  };
   // The recorder is a module singleton with no subscription API: while a take runs, poll its frame count.
   useEffect(() => {
     if (!recording) return undefined;
@@ -77,17 +95,32 @@ export function PerformanceButton() {
   };
 
   return (
-    <button
-      type="button"
-      className={`micro-btn${recording ? ' active' : ''}`}
-      aria-pressed={recording}
-      style={recording ? undefined : { opacity: 0.45 }}
-      title={recording
-        ? `Recording a performance: ${frames} frames. Click to stop and download it.`
-        : 'Record a performance: your session as a small file that replays to the same frames.'}
-      onClick={onClick}
-    >
-      {recording ? '● stop ↓' : 'rec'}
-    </button>
+    <>
+      <button
+        type="button"
+        className={`perf-btn rec${recording ? ' on' : ''}`}
+        aria-pressed={recording}
+        disabled={playing}
+        title={playing
+          ? 'Playing a take: stop playback to record.'
+          : recording
+            ? `Recording a performance: ${frames} frames. Click to stop and download it.`
+            : 'Record a performance: your session as a small file that replays to the same frames.'}
+        onClick={onClick}
+      >
+        <span className="perf-dot" aria-hidden="true">●</span>{recording ? ' stop ↓' : ' rec'}
+      </button>
+      <button
+        type="button"
+        className={`perf-btn take${playing ? ' on' : ''}`}
+        aria-pressed={playing}
+        disabled={recording}
+        title={playing ? 'Playing a take back. Click to return to the live instrument.' : (playNote || 'Play a take (.kcperf) back through the instrument.')}
+        onClick={() => { if (playing) { stopPlayback(); setPlayNote(''); } else if (fileRef.current) fileRef.current.click(); }}
+      >
+        {playing ? '■ take' : '▶ take'}
+      </button>
+      <input ref={fileRef} type="file" accept=".kcperf,application/gzip" onChange={onFile} style={{ display: 'none' }} aria-label="Load a take" />
+    </>
   );
 }

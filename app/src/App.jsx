@@ -33,7 +33,6 @@ import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { initDirectorBeat } from './curator/director.js'; // #1145
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
-import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353: record a performance
 import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
@@ -370,7 +369,6 @@ function AppInner() {
         <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {state.layoutParams.mode} · seed:{state.seed.toString(16)}
-          <PerformanceButton />
           <button type="button" className="micro-btn" title="Settings — no second prefs store"
             style={{ opacity: 0.45 }} onClick={() => { setHelpTab('settings'); setShowHotkeys(true); }}>≡</button>
           <button type="button" className="micro-btn" title="Help"

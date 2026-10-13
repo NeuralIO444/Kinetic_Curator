@@ -961,3 +961,14 @@
   .kinetic-btn[data-heat-level="warm"] .tb-circle,
   .kinetic-btn[data-heat-level="hot"] .tb-circle { animation: none; opacity: .85; }
 }
+
+/* #1353 / #1461 — REC and the take player sit beside STOP, in the performing bar. The record dot is the structure red
+   (--kc-red, the design system's action / fault hue, a different hue from live pink); recording fills the button. */
+/* caps and weight like STOP (.run-btn), as an outline so STOP stays the one filled button */
+.perf-btn { font: inherit; font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 11px; background: transparent; color: var(--ink); border: 1px solid var(--line-2); cursor: pointer; }
+.perf-btn:hover:not(:disabled) { border-color: var(--ink); }
+.perf-btn:disabled { opacity: 0.35; cursor: default; }
+.perf-btn .perf-dot { color: var(--kc-red); }
+.perf-btn.rec.on { background: var(--kc-red); border-color: var(--kc-red); color: var(--bg); }
+.perf-btn.rec.on .perf-dot { color: var(--bg); }
+.perf-btn.take.on { border-color: var(--kc-red); box-shadow: inset 0 2px 0 var(--kc-red); }

@@ -8,6 +8,8 @@
 //
 // A listener must never break the frame: it runs inside try/catch, and a throwing listener is dropped (reported
 // once) rather than taking the instrument down.
+import { playbackStep } from './playback.mjs'; // #1461 step 2
+
 let listener = null;
 
 /** Register the one listener (or null to remove it). Returns the previous listener. */
@@ -136,16 +138,29 @@ export function withResolveTap(createResolver) {
   if (typeof createResolver !== 'function') throw new TypeError('[resolveTap] withResolveTap needs the resolver factory');
   let inner = createResolver();
   return {
-    resolveLayers(input) {
+    resolveLayers(liveInput) {
+      // #1461 step 2 — playing a take: the recorded input replaces the live one, one per resolved frame. After a seek
+      // the resolver starts fresh and the frames before the target are resolved here without presenting.
+      const pb = playbackStep(liveInput);
+      let input = liveInput;
+      if (pb) {
+        input = pb.input;
+        if (pb.rewind) {
+          if (typeof inner.dispose === 'function') inner.dispose();
+          inner = createResolver();
+          resetRequested = false;
+          for (const f of pb.catchUp) inner.resolveLayers(f);
+        }
+      }
       if (resetRequested) {
         resetRequested = false;
         if (typeof inner.dispose === 'function') inner.dispose();
         inner = createResolver();
       }
-      tapResolveInput(input);
+      if (!pb) tapResolveInput(input); // a take being played is never re-recorded
       const output = inner.resolveLayers(input);
-      tapResolveOutput(output);
-      if (frameListener !== null) {
+      if (!pb) tapResolveOutput(output);
+      if (frameListener !== null && !pb) {
         try {
           frameListener(input, output);
         } catch (e) {
