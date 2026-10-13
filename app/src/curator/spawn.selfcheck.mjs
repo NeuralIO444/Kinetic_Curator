@@ -158,6 +158,8 @@ const inRegion = (p) => p.x >= SPAWN_REGION.x0 * W - 1e-6 && p.x <= SPAWN_REGION
   assert.ok(/st\.setDishPins\(homes\)/.test(app));
   const dav = readFileSync(new URL('../panels/DavisPanel.jsx', import.meta.url), 'utf8');
   assert.ok(/data-testid=\{`creatures-\$\{n\}`\}/.test(dav) && /\[0, 1, 2, 3, 4\]\.map/.test(dav), 'a 0 to 4 row in the DIRECTORS panel');
+  assert.ok(/<PanelHeader tag="P07" title="DIRECTORS" subtitle=\{subtitle\}>[\s\S]*?creatures-\$\{n\}/.test(dav), 'in the panel HEADER, so the body keeps its height and its five section labels');
+  assert.ok(!/davis-section-label ttl">creatures/.test(dav), 'no sixth section label');
   const src = readFileSync(new URL('./spawn.js', import.meta.url), 'utf8') + readFileSync(new URL('./spawnLive.js', import.meta.url), 'utf8');
   const code = src.split('\n').filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*')).join('\n');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/.test(code), 'frames, not a clock; no chance');
