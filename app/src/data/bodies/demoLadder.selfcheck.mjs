@@ -29,7 +29,7 @@ assert.strictEqual(ladderFrame(-3, 'pair-2'), 0);
 assert.strictEqual(ladderFrame(NaN, 'pair-2'), 0);
 assert.strictEqual(ladderById('nope').id, DEMO_LADDER_ID, 'unknown ladder falls back to wing-open');
 assert.strictEqual(ladderFrame(0.5, 'nope'), ladderFrame(0.5, DEMO_LADDER_ID));
-// Symbol ids match what AssetSpriteSheet registers.
+// Symbol ids of the demo ladder bodies.
 assert.strictEqual(ladderSymbolId('pair-2', 3), 'kc-blend-pair-2-3');
 assert.strictEqual(ladderSymbolId('wing-open', 0), 'kc-blend-wing-open-0');
 assert.strictEqual(ladderSymbolId('nope', 1), 'kc-blend-wing-open-1');
