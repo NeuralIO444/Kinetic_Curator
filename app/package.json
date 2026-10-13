@@ -21,7 +21,8 @@
     "diff": "node qa/diff.mjs",
     "test:e2e:install": "playwright install chromium",
     "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e",
-    "parity": "node src/gl/parity/run.mjs"
+    "parity": "node src/gl/parity/run.mjs",
+    "verify:take": "node scripts/verifyPerformance.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.6.0",
