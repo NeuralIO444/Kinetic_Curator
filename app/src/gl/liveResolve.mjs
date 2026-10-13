@@ -2,7 +2,7 @@
 import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
 import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern } from '../engine/kineme.js'; // #1128: the living-motion floor
 import { ParticleSystem } from '../engine/particles.js';
-import { isLiveSwarmMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { getQualityCaps } from '../data/quality.js';
 import { shapeMixWeights, liveShapeLevels } from '../data/voices.js';
@@ -23,6 +23,7 @@ import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
+import { createDishSession, enrolDishBody, releaseDishBody, armDish } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
@@ -162,6 +163,12 @@ export function createLiveResolver() {
   // tick after all layers update — never per-layer (N× decay + order
   // dependence). Persists across ticks; decay empties it, no prune needed.
   const sharedScent = createScentField();
+  // #1407 — ONE dish session for every swarm stratum (the shared contact
+  // grid). Enrolment is refreshed per layer in swarmItems, the session is
+  // armed once per resolve with the visible stack order, and the pass
+  // itself runs inside the first enrolled system's update — see
+  // engine/dishContacts.mjs for the protocol.
+  const dishSession = createDishSession();
   // #432 — per-layer displacement warp phase, accumulated incrementally
   // (integral of noiseSpeed over each frame's dt) rather than derived as
   // speed × absolute session time. See the warp block below for why.
@@ -205,7 +212,12 @@ export function createLiveResolver() {
 
   function prune(aliveIds, documentIds) {
     for (const k of [...placementCaches.keys()]) if (!aliveIds.has(k)) placementCaches.delete(k);
-    for (const k of [...swarmState.keys()]) if (!aliveIds.has(k)) swarmState.delete(k);
+    for (const k of [...swarmState.keys()]) {
+      if (!aliveIds.has(k)) {
+        releaseDishBody(dishSession, swarmState.get(k).system); // #1407 — a removed stratum leaves the dish
+        swarmState.delete(k);
+      }
+    }
     for (const k of [...lastShown.keys()]) if (!aliveIds.has(k)) lastShown.delete(k);
     for (const k of [...morphState.keys()]) if (!aliveIds.has(k)) morphState.delete(k);
     for (const k of [...modSteerByLayer.keys()]) if (!aliveIds.has(k)) modSteerByLayer.delete(k);
@@ -280,6 +292,17 @@ export function createLiveResolver() {
       st.system.resetPhase();
       st.phraseGen = ctx.phraseWrapGen;
     }
+    // #1407 — enrol this stratum in the shared dish grid, refreshed every
+    // frame (contact params are live knobs). Only swarm strata reach
+    // swarmItems: FX strata never enrol — they are the medium.
+    enrolDishBody(dishSession, {
+      key: layerId, sys: st.system,
+      radius: ctx.layoutParams.contactRadius || 0,
+      restitution: ctx.layoutParams.contactRestitution ?? 0.5,
+      contactMode: ctx.layoutParams.contactMode || 'none',
+      umask: ctx.layoutParams.collideMask ?? 0xffffffff,
+      organism: isOrganismMode(ctx.mode),
+    });
     if (!ctx.slowRender) {
       // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().
       // Spine C (#389): forward motionSmoothing for critically damped heading.
@@ -299,6 +322,10 @@ export function createLiveResolver() {
           // #509 phase 2 — the shared scent field (spread-only, never
           // stored). All organism layers deposit into and read one ground.
           scentField: sharedScent,
+          // #1407 — the shared dish session (spread-only, never stored).
+          // Armed once per resolve; the pass runs inside the first
+          // enrolled system's update.
+          dishSession,
         },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
@@ -398,6 +425,14 @@ export function createLiveResolver() {
       }
       if (n > 0) audioEnergy = Math.min(1, Math.max(0, sum / n));
     }
+
+    // #1407 — arm the dish for this frame with the visible stack order
+    // (the order the loop below resolves in). Arms only when at least two
+    // enrolled strata have contacts on; otherwise every update below
+    // stays bit-identical to the per-system engine.
+    armDish(dishSession, (input.layers || [])
+      .filter((l) => l && typeof l === 'object' && l.visible !== false)
+      .map((l) => l.id));
 
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);

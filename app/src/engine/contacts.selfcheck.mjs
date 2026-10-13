@@ -14,7 +14,9 @@
 import assert from 'node:assert';
 import { ParticleSystem } from './particles.js';
 import { buildPlacements } from './buildPlacements.js';
-import { bakeParticles } from './kernel/bake/index.js';
+import { bakeParticles, BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
+import { createDishSession, enrolDishBody, armDish, runDishContacts } from './dishContacts.mjs';
+import { bakeDishParticles } from './kernel/bake/dishBake.mjs';
 import {
   DEFAULT_LAYOUT_PARAMS,
   normalizeLayoutParams,
@@ -352,6 +354,160 @@ function headOnPair() {
   }
 }
 
-console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed)', {
-  scenarios: 16,
+// 17 — petri dish A1 (#1407): one shared grid across strata. A PEARL body
+// displaces an EAVES body; the pass is deterministic, equals the bake, and
+// with fewer than two contact strata armed it does not exist at all.
+{
+  const dishPair = (modeA = 'bounce', modeB = 'bounce') => {
+    const mk = (x, vx, mass) => {
+      const s = new ParticleSystem();
+      s.init(1, 1000, 700, assets, palette, SEED);
+      s.x[0] = x; s.y[0] = 350; s.vx[0] = vx; s.vy[0] = 0; s.mass[0] = mass;
+      return s;
+    };
+    const pearl = mk(400, 2, 1);
+    const eaves = mk(430, -2, 3);
+    const ses = createDishSession();
+    enrolDishBody(ses, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: modeA, umask: 0xffffffff, organism: false });
+    enrolDishBody(ses, { key: 'eaves', sys: eaves, radius: 20, restitution: 1, contactMode: modeB, umask: 0xffffffff, organism: false });
+    return { pearl, eaves, ses };
+  };
+
+  // (a) closed form, cross-strata: overlap 10 splits by inverse mass
+  // (1 : 1/3) — PEARL moves 7.5, EAVES 2.5; elastic velocities exchange by
+  // the same mass weighting as the per-system pass (scenario 4's numbers).
+  {
+    const { pearl, eaves, ses } = dishPair();
+    assert.strictEqual(armDish(ses, ['pearl', 'eaves']), true, 'two contact strata arm the dish');
+    assert.strictEqual(runDishContacts(ses, pearl), true, 'the first enrolled caller runs the pass');
+    assert.ok(Object.is(pearl.x[0], 392.5), `pearl displaced: ${pearl.x[0]}`);
+    assert.ok(Object.is(eaves.x[0], 432.5), `eaves displaced: ${eaves.x[0]}`);
+    assert.ok(Object.is(pearl.vx[0], -4), `light body rebounds harder across strata: ${pearl.vx[0]}`);
+    assert.ok(Object.is(eaves.vx[0], 0), `heavy body stops dead across strata: ${eaves.vx[0]}`);
+    assert.strictEqual(runDishContacts(ses, eaves), false, 'the arm is consumed: no second run in the step');
+  }
+
+  // (b) a heavy stratum is the static body: mass 40 barely moves.
+  {
+    const { pearl, eaves, ses } = dishPair();
+    eaves.mass[0] = 40;
+    armDish(ses, ['pearl', 'eaves']);
+    runDishContacts(ses, pearl);
+    assert.ok(Math.abs(eaves.x[0] - 430) < 0.25, `heavy stratum barely moves: ${eaves.x[0]}`);
+    assert.ok(Math.abs(pearl.x[0] - 400) > 9.7, `light stratum takes the displacement: ${pearl.x[0]}`);
+  }
+
+  // (c) one stratum in mode 'none': depenetration still applies (bodies
+  // occupy space), but there is no velocity response across the seam.
+  {
+    const { pearl, eaves, ses } = dishPair('none', 'bounce');
+    armDish(ses, ['pearl', 'eaves']);
+    runDishContacts(ses, pearl);
+    assert.ok(Object.is(pearl.x[0], 392.5) && Object.is(eaves.x[0], 432.5), 'depenetration is mode-independent');
+    assert.ok(Object.is(pearl.vx[0], 2) && Object.is(eaves.vx[0], -2), 'no impulse when either stratum opted out');
+  }
+
+  // (d) dish-off: fewer than two contact strata never arms — a lone
+  // contact stratum beside a ghost stratum behaves exactly as #167 alone.
+  {
+    const { pearl, eaves, ses } = dishPair();
+    const ses2 = createDishSession();
+    enrolDishBody(ses2, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
+    enrolDishBody(ses2, { key: 'eaves', sys: eaves, radius: 0, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
+    assert.strictEqual(armDish(ses2, ['pearl', 'eaves']), false, 'one ghost stratum: the dish does not arm');
+    assert.strictEqual(runDishContacts(ses2, pearl), false, 'unarmed session runs nothing');
+    assert.ok(Object.is(pearl.x[0], 400) && Object.is(eaves.x[0], 430), 'overlapping strangers stay ghosts');
+    void ses;
+  }
+
+  // (e) determinism + bake parity over 45 steps, and proof the dish acted.
+  {
+    const lpFor = (count, radius, e) => normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: count,
+      contactRadius: radius, contactRestitution: e, contactMode: 'bounce',
+    });
+    const lpA = lpFor(40, 14, 0.7);
+    const lpB = lpFor(35, 18, 0.4);
+    const liveRun = (withDish) => {
+      const ses = createDishSession();
+      const mk = (lp, seed, key) => {
+        const s = new ParticleSystem();
+        s.init(lp.particleCount, 1000, 700, assets, palette, seed, null, { graze: lp.graze || 0 });
+        enrolDishBody(ses, {
+          key, sys: s, radius: lp.contactRadius, restitution: lp.contactRestitution,
+          contactMode: lp.contactMode, umask: lp.collideMask, organism: false,
+        });
+        return { s, params: { ...lp, particleCount: lp.particleCount, maxParticles: 200, ...(withDish ? { dishSession: ses } : {}) }, seed };
+      };
+      const A = mk(lpA, SEED, 'pearl');
+      const B = mk(lpB, SEED + 7, 'eaves');
+      for (let s = 0; s < 45; s++) {
+        if (withDish) armDish(ses, ['pearl', 'eaves']);
+        const t = BAKE_TIME_ORIGIN + s * BAKE_DT_MS;
+        A.s.update(A.params, assets, palette, A.seed, t, null);
+        B.s.update(B.params, assets, palette, B.seed, t, null);
+      }
+      return { A: A.s, B: B.s };
+    };
+    const run1 = liveRun(true);
+    const run2 = liveRun(true);
+    for (const k of ['A', 'B']) {
+      for (const f of ['x', 'y', 'vx', 'vy', 'mass']) {
+        for (let i = 0; i < run1[k].n; i++) {
+          assert.ok(Object.is(run1[k][f][i], run2[k][f][i]), `dish run deterministic: ${k}.${f}[${i}]`);
+        }
+      }
+    }
+    const baked = bakeDishParticles({
+      layers: [
+        { key: 'pearl', seed: SEED, count: 40, layoutParams: lpA, activeAssets: assets, palette, maxParticles: 200 },
+        { key: 'eaves', seed: SEED + 7, count: 35, layoutParams: lpB, activeAssets: assets, palette, maxParticles: 200 },
+      ],
+      canvasW: 1000, canvasH: 700, steps: 45,
+    });
+    for (const [key, sys] of [['pearl', run1.A], ['eaves', run1.B]]) {
+      const items = baked.get(key);
+      const live = sys.getItems(assets);
+      assert.strictEqual(items.length, live.length, `${key}: bake population equals live`);
+      for (let i = 0; i < live.length; i++) {
+        assert.ok(Object.is(items[i].x, live[i].x) && Object.is(items[i].y, live[i].y),
+          `${key}[${i}]: bake equals live (${items[i].x} vs ${live[i].x})`);
+      }
+    }
+    // The dish acted: the no-session run (today's ghost strata) diverges.
+    const ghost = liveRun(false);
+    let diverged = 0;
+    for (const k of ['A', 'B']) {
+      for (let i = 0; i < run1[k].n; i++) {
+        if (!Object.is(run1[k].x[i], ghost[k].x[i]) || !Object.is(run1[k].y[i], ghost[k].y[i])) diverged++;
+      }
+    }
+    assert.ok(diverged > 10, `cross-strata contacts moved bodies over 45 steps (${diverged} diverged)`);
+  }
+
+  // (f) the dish never reaches placements: buildPlacements output is
+  // identical with a session riding in the params (scenario 14's law,
+  // extended to the shared grid).
+  {
+    const baseLp = normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'grid', composition: 'default', count: 40,
+      scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
+    });
+    const base = {
+      layoutParams: baseLp, seed: SEED, activeAssets: assets, palette,
+      caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
+      canvasW: 1000, canvasH: 700,
+    };
+    const plain = buildPlacements(base);
+    const withDish = buildPlacements({
+      ...base,
+      layoutParams: { ...base.layoutParams, contactRadius: 30, contactMode: 'bounce', dishSession: createDishSession() },
+    });
+    assert.deepStrictEqual(withDish.items, plain.items, 'dish state must not leak into the static placement path');
+  }
+}
+
+console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid)', {
+  scenarios: 17,
 });
