@@ -14,7 +14,9 @@ import { on, emit, Events } from '../composition/eventBus.js';
 import { createLiveLoop } from '../gl/liveLoop.mjs';
 import { createWorkerLiveLoop } from '../gl/workerLiveLoop.js';
 import { getPreset } from '../data/presets.js';
-import { clientToScene } from '../curator/dishPins.js';
+import { clientToScene, pinMarkState } from '../curator/dishPins.js';
+import { getFormationState } from '../curator/formationLive.js';
+import { FORM_HOLD_FRAMES } from '../curator/formation.js';
 
 export function CanvasPanel() {
   const { palette: activePalette, canvasRef, glCanvasRef, glLoopRef } = useApp();
@@ -38,6 +40,21 @@ export function CanvasPanel() {
   const pinArmed = useStore(s => s.pinArmed);
   const dishPins = useStore(s => s.dishPins);
   const placeDishPin = useStore(s => s.placeDishPin);
+  // #1355 — what each pin's mark shows: the formation rule's honest state (spore / counting / formed). The tracker is a
+  // module singleton with no subscription, so a light poll, only while pins exist, and only re-rendering on a change.
+  const [pinMarks, setPinMarks] = useState([]);
+  useEffect(() => {
+    if (dishPins.length === 0) return undefined;
+    const read = () => {
+      const next = getFormationState().states.slice(0, dishPins.length).map((s) => {
+        const m = pinMarkState(s, FORM_HOLD_FRAMES);
+        return { kind: m.kind, progress: Math.round(m.progress * 10) / 10 };
+      });
+      setPinMarks((prev) => (prev.length === next.length && prev.every((p, i) => p.kind === next[i].kind && p.progress === next[i].progress) ? prev : next));
+    };
+    const id = setInterval(read, 100);
+    return () => clearInterval(id);
+  }, [dishPins.length]);
   const onCanvasPointerDown = (e) => {
     if (!pinArmed) { viewport.onPointerDown(e); return; }
     const pt = clientToScene(e.currentTarget.getBoundingClientRect(), e.clientX, e.clientY, canvasW, canvasH, viewport.zoom, viewport.pan);
@@ -214,11 +231,23 @@ export function CanvasPanel() {
             <g transform={`translate(${canvasW / 2 + viewport.pan.x} ${canvasH / 2 + viewport.pan.y}) scale(${viewport.zoom}) translate(${-canvasW / 2} ${-canvasH / 2})`}>
               {dishPins.map((p, i) => {
                 const r = canvasW * 0.006 / viewport.zoom; // a constant size on screen, whatever the zoom
+                const mark = pinMarks[i] || { kind: 'spore', progress: 0 };
+                const R = r * 1.9; // the counting diamond, drawn around the pin as the half-second fills
+                const line = canvasW * 0.0016 / viewport.zoom;
                 return (
-                  <g key={i} transform={`translate(${p.x} ${p.y})`} fill="none" stroke="var(--ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke">
+                  <g key={i} transform={`translate(${p.x} ${p.y})`} fill="none" stroke="var(--ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke"
+                    data-pin-state={mark.kind}>
                     <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" stroke="#000" strokeWidth="4" vectorEffect="non-scaling-stroke" />
-                    <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" vectorEffect="non-scaling-stroke" />
-                    <rect x={-r * 0.2} y={-r * 0.2} width={r * 0.4} height={r * 0.4} fill="var(--ink)" stroke="none" />
+                    <rect x={-r} y={-r} width={r * 2} height={r * 2} transform="rotate(45)" vectorEffect="non-scaling-stroke"
+                      fill={mark.kind === 'formed' ? 'var(--ink)' : 'none'} opacity={mark.kind === 'spore' ? 0.75 : 1} />
+                    {mark.kind !== 'spore' && (
+                      <rect x={-r * 0.2} y={-r * 0.2} width={r * 0.4} height={r * 0.4} fill={mark.kind === 'formed' ? '#000' : 'var(--ink)'} stroke="none" />
+                    )}
+                    {mark.kind === 'ready' && (
+                      // the diamond's outline, drawn as far round as the count has got (frames held, never a clock)
+                      <polygon points={`0,${-R} ${R},0 0,${R} ${-R},0`} pathLength="1" strokeDasharray={`${mark.progress} 1`}
+                        strokeWidth={line} stroke="var(--ink)" data-testid="pin-progress" />
+                    )}
                   </g>
                 );
               })}

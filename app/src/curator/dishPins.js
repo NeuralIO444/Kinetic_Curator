@@ -11,6 +11,22 @@ export const MAX_PINS = 4;
 
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 
+/**
+ * How a pin's mark reads, from the formation rule's state for it ({ hold, formed } or null). Honest, counted frames only:
+ *   'spore'   the spot does not qualify (no crowd, or not fertile): a hollow diamond
+ *   'ready'   both conditions hold and the count is running: `progress` 0..1 of `holdFrames`
+ *   'formed'  a creature stands here
+ * A missing or broken state reads as 'spore'.
+ */
+export function pinMarkState(state, holdFrames = 30) {
+  if (!state || typeof state !== 'object') return { kind: 'spore', progress: 0 };
+  if (state.formed === true) return { kind: 'formed', progress: 1 };
+  const hold = finite(state.hold) ? Math.max(0, state.hold) : 0;
+  const n = finite(holdFrames) && holdFrames > 0 ? holdFrames : 30;
+  if (hold <= 0) return { kind: 'spore', progress: 0 };
+  return { kind: 'ready', progress: Math.min(1, hold / n) };
+}
+
 /** Keep only well-formed pins, at most MAX_PINS. Junk degrades by reduction. */
 export function sanitizePins(pins) {
   if (!Array.isArray(pins)) return [];
