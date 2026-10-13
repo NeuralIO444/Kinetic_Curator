@@ -7,7 +7,8 @@ import { isRecordingPerformance, performanceFrames, startPerformance, stopPerfor
 import { getStressState, setStressTap } from '../curator/stressLive.js';
 import { createStressRecorder } from '../curator/stressRecord.js';
 import { createFormationRecorder } from '../curator/formation.js';
-import { resetFormation, setFormationTap } from '../curator/formationLive.js';
+import { resetFormation, setFormationTap, setShiftTap } from '../curator/formationLive.js';
+import { createShiftRecorder } from '../curator/davisShift.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
 // tracker update, and stored on the performance as `stress`.
@@ -25,6 +26,13 @@ const formationSection = (getFrame) => {
   const rec = createFormationRecorder({ getFrame });
   setFormationTap((u, events) => rec.update(u, events));
   return { stop() { setFormationTap(null); return rec.finish(); } };
+};
+
+// #1356 step 2 — the take carries every `davis-shift` (a moth's traits, made once at birth), stored as `davis`.
+const davisSection = (getFrame) => {
+  const rec = createShiftRecorder({ getFrame });
+  setShiftTap((born) => rec.update(born));
+  return { stop() { setShiftTap(null); return rec.finish(); } };
 };
 
 function downloadBytes(bytes, filename) {
@@ -50,7 +58,7 @@ export function PerformanceButton() {
 
   const onClick = async () => {
     if (!recording) {
-      if (startPerformance({ sections: { stress: stressSection, formation: formationSection } })) { setFrames(0); setRecording(true); }
+      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection } })) { setFrames(0); setRecording(true); }
       return;
     }
     setRecording(false);

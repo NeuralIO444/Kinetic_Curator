@@ -171,7 +171,7 @@ const run = (t, frames, u) => { const ev = []; for (let i = 0; i < frames; i++) 
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.match(app, /setResolveFrameTap\(\(input, output\) => \{ observeDish\(input, output\); observeFormation\(input, output\); \}\)/);
   const btn = readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8');
-  assert.match(btn, /sections: \{ stress: stressSection, formation: formationSection \}/);
+  assert.match(btn, /sections: \{ stress: stressSection, formation: formationSection(, \w+: \w+)* \}/);
   assert.match(btn, /resetFormation\(\);/, 'a take starts from fresh formation state');
 }
 
