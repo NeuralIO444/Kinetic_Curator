@@ -2,7 +2,7 @@
 // #1355 step 2 — pins as data: one by default, Shift adds up to four, scene coordinates.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MAX_PINS, sanitizePins, placePin, clientToScene } from './dishPins.js';
+import { MAX_PINS, sanitizePins, placePin, clientToScene, pinMarkState } from './dishPins.js';
 
 // 1. one pin by default: a plain click places it, the next plain click MOVES it
 {
@@ -72,6 +72,20 @@ import { MAX_PINS, sanitizePins, placePin, clientToScene } from './dishPins.js';
   const kin = readFileSync(new URL('../panels/layout/KineticButton.jsx', import.meta.url), 'utf8');
   const tap = kin.slice(kin.indexOf('const tap = () => {'), kin.indexOf('useHotkeys({ k: tap })'));
   assert.ok(/clearDishPins\(\)/.test(tap), 'the tap (button and K key) clears the pins');
+}
+
+// 7. the mark tells the truth about the pin: a spore that does not qualify, a count running, or a creature standing
+{
+  assert.deepEqual(pinMarkState(null), { kind: 'spore', progress: 0 });
+  assert.deepEqual(pinMarkState({ hold: 0, formed: false }), { kind: 'spore', progress: 0 }, 'not qualifying: hollow');
+  assert.deepEqual(pinMarkState({ hold: 15, formed: false }, 30), { kind: 'ready', progress: 0.5 }, 'half the count');
+  assert.deepEqual(pinMarkState({ hold: 99, formed: false }, 30), { kind: 'ready', progress: 1 }, 'capped');
+  assert.deepEqual(pinMarkState({ hold: 30, formed: true }, 30), { kind: 'formed', progress: 1 });
+  assert.deepEqual(pinMarkState({ hold: NaN, formed: false }), { kind: 'spore', progress: 0 }, 'junk reads as a spore');
+  assert.deepEqual(pinMarkState({ hold: -4 }), { kind: 'spore', progress: 0 });
+  const panel = readFileSync(new URL('../panels/CanvasPanel.jsx', import.meta.url), 'utf8');
+  assert.ok(/pinMarkState\(s, FORM_HOLD_FRAMES\)/.test(panel) && /data-pin-state/.test(panel), 'the canvas draws the mark from the formation state');
+  assert.ok(!/setTimeout|Date\.now|performance\.now/.test(panel.slice(panel.indexOf('pinMarks'), panel.indexOf('pinMarks') + 900).replace(/setInterval/g, '')), 'the ring is counted frames, not a timer');
 }
 
 console.log('dishPins.selfcheck: ok (#1355 step 2)');
