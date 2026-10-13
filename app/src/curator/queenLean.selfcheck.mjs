@@ -24,6 +24,7 @@ import {
   beatConfidentFromPeaks,
   swayOpen, swayBiases,
   M6_KEEPS, M6_STRENGTH, warmCentreOpen, warmCentre,
+  M7_CONFIDENCE, M7_STEP, M7_DEADBAND, M7_RANGE, tempoEaseOpen, tempoEase,
 } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 
@@ -222,6 +223,36 @@ ok('M6: it never leaves the span between the default and the kept moths (a nudge
 ok('M6: the gate decides: open reads through, and warmCentre is exactly warmCentreOpen', () => {
   const ring = [[mk(10, 1.2, 1.1, 2)]];
   assert.deepEqual(warmCentre(ring, DEF, 1, MIN_KEEPS), GATE_OPEN ? warmCentreOpen(ring, DEF, 1, MIN_KEEPS) : null);
+});
+
+// ─── M7: ease the BEAT toward a confident audio tempo (#1460) ─────────────────────────────────────────────
+ok('M7: below MIN_KEEPS, with no hand, or with a doubtful tempo, she does not move the BPM', () => {
+  const base = { current: 100, target: 130, confidence: 0.9, nKeeps: MIN_KEEPS, allowance: 1 };
+  assert.ok(tempoEaseOpen(base) > 100, 'the open case moves');
+  assert.equal(tempoEaseOpen({ ...base, nKeeps: MIN_KEEPS - 1 }), null);
+  assert.equal(tempoEaseOpen({ ...base, allowance: 0 }), null);
+  assert.equal(tempoEaseOpen({ ...base, confidence: M7_CONFIDENCE - 0.01 }), null);
+  assert.equal(tempoEaseOpen({ ...base, target: NaN }), null);
+});
+
+ok('M7: a bounded step toward the target, never past it, never chasing a wobble', () => {
+  const at = (cur, tgt, allowance = 1) => tempoEaseOpen({ current: cur, target: tgt, confidence: 0.9, nKeeps: MIN_KEEPS, allowance });
+  assert.equal(at(100, 130), 100 + M7_STEP, 'a full hand moves M7_STEP');
+  assert.equal(at(130, 100), 130 - M7_STEP, 'and downwards');
+  assert.ok(at(100, 130, 0.25) - 100 < M7_STEP && at(100, 130, 0.25) > 100, 'a small hand moves less');
+  assert.equal(at(100, 101), null, 'inside the deadband she is done');
+  assert.equal(at(100, 100 + M7_DEADBAND), null);
+  assert.equal(at(100, 104), 103, 'a gap of 4 moves by 3, not past');
+  assert.equal(at(100, 102.5), 102.5, 'a gap just over the deadband closes exactly');
+  let v = 100; for (let i = 0; i < 40; i++) { const nx = at(v, 140); if (nx === null) break; v = nx; }
+  assert.ok(v >= 140 - M7_DEADBAND && v <= 140, `converges into the deadband (${v})`);
+  assert.equal(at(100, 400), 103, 'a target above the span is clamped to it');
+  assert.ok(M7_RANGE[0] < M7_RANGE[1]);
+});
+
+ok('M7: the gate decides: open reads through', () => {
+  const a = { current: 100, target: 130, confidence: 0.9, nKeeps: MIN_KEEPS, allowance: 1 };
+  assert.equal(tempoEase(a), GATE_OPEN ? tempoEaseOpen(a) : null);
 });
 
 console.log(`\nqueenLean: ${n} checks passed`);

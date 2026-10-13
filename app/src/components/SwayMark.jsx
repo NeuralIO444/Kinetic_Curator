@@ -13,14 +13,16 @@
 // the scheduler (director.selfcheck: "the Director never renders") — it
 // re-renders on curatePress and reads the holder. Reduced motion: static
 // mark, no pulse.
+import { useSyncExternalStore } from 'react';
 import { useStore } from '../state/store.js';
-import { SWAY_VISIBLE_THRESHOLD, getSwayMagnitude } from '../curator/swayView.mjs';
+import { SWAY_VISIBLE_THRESHOLD, getSwayMagnitude, subscribeSway } from '../curator/swayView.mjs';
 
 export function SwayMark() {
   // Re-render on every pick; the pick path wrote the holder synchronously
   // before this store commit, so the read below is fresh.
   useStore((s) => s.curatePress);
-  const mag = getSwayMagnitude();
+  // also re-render when the pace (tempo ease) starts or stops, between picks
+  const mag = useSyncExternalStore(subscribeSway, getSwayMagnitude);
   const visible = Number.isFinite(mag) && mag > SWAY_VISIBLE_THRESHOLD;
   if (!visible) return null;
   return (

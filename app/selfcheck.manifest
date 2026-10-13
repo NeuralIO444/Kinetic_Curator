@@ -367,3 +367,4 @@ node src/gl/musicalClock.selfcheck.mjs
 node src/composition/clockBus.selfcheck.mjs
 node src/gl/audioEvents.selfcheck.mjs
 node src/composition/audioBus.selfcheck.mjs
+node src/curator/paceLive.selfcheck.mjs

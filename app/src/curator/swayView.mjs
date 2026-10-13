@@ -37,13 +37,31 @@ export function swayMagnitude(view) {
 // signal is ephemeral, not data, so it lives here: the pick path publishes
 // it, the presence mark reads it. Never serialized, never in devtools.
 let currentMagnitude = 0;
+// #1460 — the pace (tempo ease) shows the same mark while it is moving the BEAT; the mark is the ONLY sign of it.
+let paceMagnitude = 0;
+const subscribers = new Set();
+const notify = () => { for (const fn of subscribers) { try { fn(); } catch { /* a listener must not break the holder */ } } };
 
 /** Called by the pick path after the Director ticks. */
 export function setSwayMagnitude(n) {
   currentMagnitude = Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
 }
 
-/** Called by the presence mark on render. */
+/** Called by the pace driver: 0 when it is not moving the tempo. Notifies the mark so it appears between picks. */
+export function setPaceMagnitude(n) {
+  const next = Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
+  if (next === paceMagnitude) return;
+  paceMagnitude = next;
+  notify();
+}
+
+/** Called by the presence mark on render: whichever hand is heavier. */
 export function getSwayMagnitude() {
-  return currentMagnitude;
+  return Math.max(currentMagnitude, paceMagnitude);
+}
+
+/** useSyncExternalStore-shaped: the mark re-renders when the pace appears or goes. */
+export function subscribeSway(fn) {
+  subscribers.add(fn);
+  return () => subscribers.delete(fn);
 }

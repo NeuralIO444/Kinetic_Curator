@@ -309,3 +309,39 @@ export function warmCentreOpen(ring, defaults, allowance, nKeeps = Infinity) {
 export function warmCentre(ring, defaults, allowance, nKeeps) {
   return GATE_OPEN ? warmCentreOpen(ring, defaults, allowance, nKeeps) : null;
 }
+
+// ─── M7: ease the BEAT BPM toward a confident audio tempo (Phase 4 / #1460) ──────────────────────────────────
+// Matt (2026-10-13): she may ease the BPM toward the music, a small bounded step per phrase, only while her mark
+// shows; a BPM the artist sets by hand always wins and silences her (the driver, curator/paceLive.js, owns that).
+// Identity below MIN_KEEPS keeps, with no allowance, with a doubtful tempo, and while the gate is closed.
+export const M7_CONFIDENCE = 0.6; // below this the tempo is not trusted
+export const M7_STEP = 3; // bpm per phrase at full allowance (half of it at the smallest hand)
+export const M7_DEADBAND = 2; // within this of the target she is done: no chasing a wobble
+export const M7_RANGE = Object.freeze([60, 180]); // never leaves the BEAT dial's useful span
+
+/**
+ * Ungated: the next BPM, or null for "no move".
+ * @param current     the BEAT BPM now
+ * @param target      audio:tempo's bpm
+ * @param confidence  audio:tempo's confidence 0..1
+ * @param nKeeps      keeps the pull may learn from
+ * @param allowance   the room's allowance 0..1
+ */
+export function tempoEaseOpen({ current, target, confidence, nKeeps = Infinity, allowance = 0 } = {}) {
+  if (!(nKeeps >= MIN_KEEPS)) return null;
+  const a = clamp01(allowance);
+  if (a === 0) return null;
+  if (!(confidence >= M7_CONFIDENCE)) return null;
+  const cur = Number(current); const want = Number(target);
+  if (!Number.isFinite(cur) || !Number.isFinite(want)) return null;
+  const goal = Math.min(M7_RANGE[1], Math.max(M7_RANGE[0], want));
+  const gap = goal - cur;
+  if (Math.abs(gap) <= M7_DEADBAND) return null;
+  const step = Math.min(Math.abs(gap), M7_STEP * (0.5 + 0.5 * a));
+  return Math.round((cur + Math.sign(gap) * step) * 10) / 10;
+}
+
+/** The gated ease. Null while the gate is closed (#762). */
+export function tempoEase(args) {
+  return GATE_OPEN ? tempoEaseOpen(args) : null;
+}

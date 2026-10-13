@@ -32,7 +32,7 @@ import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
-import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre } from './queenLean.mjs';
+import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre, tempoEase } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
@@ -359,6 +359,18 @@ export function initDirectorBeat(subscribe) {
 export function birthCentre({ ring, keeps, allowance, defaults }) {
   try {
     return warmCentre(ring, defaults, allowance, pullKeeps(keeps).length);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * #1460 — the next BPM when the pace should ease toward the music, or null. Hosted here (never a surface); the live
+ * driver (curator/paceLive.js) calls it once a phrase. A thrown error reads as "no move".
+ */
+export function paceStep({ current, target, confidence, keeps, allowance }) {
+  try {
+    return tempoEase({ current, target, confidence, nKeeps: pullKeeps(keeps).length, allowance });
   } catch {
     return null;
   }
