@@ -44,6 +44,36 @@ const CENTRE = 50;
 const TAU = Math.PI * 2;
 
 /**
+ * A moth's TRAITS: the small recorded set a persona may shift (Phase 4, #1356; Matt 2026-10-13, option B: shape and
+ * colour). The defaults ARE today's moth: a creature with no traits looks exactly as before. Every value is clamped to
+ * its range, so a hostile or drifting source can never make a moth that is not a moth (the base type never leaves).
+ *   spread  degrees added to the fore wings' spread (the attachment angle); the hind pair follows at half
+ *   wing    multiplier on the wings' size
+ *   body    multiplier on the body's size
+ *   swatch  which of the palette's swatches the wings take, most vivid first (0) to the fourth (3): "material bias"
+ */
+export const TRAIT_DEFAULTS = Object.freeze({ spread: 0, wing: 1, body: 1, swatch: 0 });
+export const TRAIT_RANGES = Object.freeze({
+  spread: Object.freeze({ min: -18, max: 18 }),
+  wing: Object.freeze({ min: 0.8, max: 1.25 }),
+  body: Object.freeze({ min: 0.85, max: 1.2 }),
+  swatch: Object.freeze({ min: 0, max: 3 }),
+});
+
+/** Clamp anything to a valid trait set. Missing or non-finite fields read as the default; swatch is a whole number. */
+export function normalizeTraits(raw) {
+  const out = { ...TRAIT_DEFAULTS };
+  if (!raw || typeof raw !== 'object') return out;
+  for (const key of Object.keys(TRAIT_DEFAULTS)) {
+    const v = raw[key];
+    if (!Number.isFinite(v)) continue;
+    const r = TRAIT_RANGES[key];
+    out[key] = Math.min(r.max, Math.max(r.min, key === 'swatch' ? Math.round(v) : v));
+  }
+  return out;
+}
+
+/**
  * HOVER (Matt, 2026-10-13, option A): the moth drifts near its pin the way every asset does. It reads the SAME dials
  * and the SAME anchored clock as the assets' living-motion floor (engine/kineme.js): DRIFT sets how far it wanders,
  * BREATH how much it swells, and KINEME RATE / pause / the governor's freeze stop it exactly when they stop the
@@ -101,12 +131,14 @@ export function pointToward(points, side) {
  * (positive opens the wings). Each wing's ROOT point lands on a body attach point: the wing's centre is found by
  * walking back from that point along the wing's own direction.
  */
-export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0 }) {
+export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0, traits = TRAIT_DEFAULTS }) {
+  const t = normalizeTraits(traits);
   const root = pointToward(wingPoints, 'bottom'); // the wing's own attach point nearest its base, from its centre
-  const k = MOTH.wingScale / MOTH.bodyScale; // a wing's unit measured in body units
+  // a wing's unit measured in body units: the wing trait sizes the wing, the body trait sizes the body, neither the other
+  const k = (MOTH.wingScale * t.wing) / (MOTH.bodyScale * t.body);
   const anchorFor = (side, sign) => {
     const p = pointToward(bodyPoints, side);
-    const theta = sign * (MOTH.spread + beat);
+    const theta = sign * (MOTH.spread + t.spread + beat);
     const c = Math.cos(rad(theta));
     const s = Math.sin(rad(theta));
     // wing centre = root point on the body - R(theta) * (wing root offset), in body units
@@ -118,7 +150,7 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0 }) {
     const a = pointToward(bodyPoints, side);
     const b = pointToward(bodyPoints, 'bottom');
     const p = { x: a.x + (b.x - a.x) * MOTH.hindAlong, y: a.y + (b.y - a.y) * MOTH.hindAlong };
-    const theta = sign * (MOTH.hindSpread - beat * MOTH.hindFlap);
+    const theta = sign * (MOTH.hindSpread + t.spread * 0.5 - beat * MOTH.hindFlap);
     const c = Math.cos(rad(theta));
     const s = Math.sin(rad(theta));
     const k2 = k * MOTH.hindScale * hind;
@@ -224,12 +256,10 @@ export function createCreatureBuilder() {
       const ink = typeof pal.ink === 'string' ? pal.ink : sw(0);
       const bg = typeof pal.bg === 'string' ? pal.bg : '#000000';
       // Wings take the most vivid swatch (the dish is full of leaves: the moth must not read as more of them).
-      const vivid = swatches.reduce((best, c) => (chroma(c) > chroma(best) ? c : best), swatches[0] || ink);
-      // the hind pair takes the next most vivid swatch, so the two pairs read apart
-      const others = swatches.filter((c) => c !== vivid);
-      const vivid2 = others.reduce((best, c) => (chroma(c) > chroma(best) ? c : best), others[0] || vivid);
-      const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], [MOTH_PARTS.mark]: [ink, vivid] };
-      const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], [MOTH_PARTS.mark]: [ink, vivid2] };
+      // The palette ranked most vivid first (stable). The wings take rank `swatch` (0 = the most vivid: today's moth);
+      // the hind pair takes the next rank, so the two pairs read apart.
+      const ranked = swatches.map((c, n) => ({ c, n })).sort((a, b) => chroma(b.c) - chroma(a.c) || a.n - b.n).map((e) => e.c);
+      const pick = (r) => ranked[Math.min(ranked.length - 1, Math.max(0, r))] || ink;
       assetCache.clear();
       const bodyPoints = pointsOf(pool, input.assetAttach, MOTH_PARTS.body);
       const wingPoints = pointsOf(pool, input.assetAttach, MOTH_PARTS.wing);
@@ -248,9 +278,15 @@ export function createCreatureBuilder() {
         pair2[i] = want > have ? Math.min(1, have + 1 / MOTH.pairFrames) : Math.max(0, have - 1 / MOTH.pairFrames);
         const g = Math.max(0.02, easeOut(Math.min(1, ages[i] / MOTH.growFrames)));
         const hover = hoverPose(motion, top.morphSeed ?? input.seed, i);
-        const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: easeOut(pair2[i]) });
+        // this moth's traits (a persona's small shifts, recorded in the input); none given = today's moth
+        const traits = normalizeTraits(input.dishTraits && input.dishTraits[i]);
+        const vivid = pick(traits.swatch);
+        const vivid2 = pick(traits.swatch + 1);
+        const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], [MOTH_PARTS.mark]: [ink, vivid] };
+        const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], [MOTH_PARTS.mark]: [ink, vivid2] };
+        const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: easeOut(pair2[i]), traits });
         const { items } = expandHierarchy(
-          { x: pin.x + hover.dx, y: pin.y + hover.dy, rot: hover.rot, scaleX: MOTH.bodyScale * g * hover.scale, scaleY: MOTH.bodyScale * g * hover.scale, part: 'body', key: `m${i}` },
+          { x: pin.x + hover.dx, y: pin.y + hover.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,
           { seed: input.seed, scatter: mothScatter(input.seed >>> 0, input.seedOffsets || null, i) },
         );
