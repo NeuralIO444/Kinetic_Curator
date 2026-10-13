@@ -30,6 +30,7 @@ import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — def
 import { ensureAggregate, GrowthHooks } from '../engine/kernel/sample/growth.js'; // #793 — biology regrow
 import { assessAggregate, decideLifecycle, recordLifecycleState } from '../biology/lifecycle.js';
 import { getBiologyPolicy } from '../biology/policy.js';
+import { createCreatureBuilder } from '../engine/creature.js'; // #1355 step 4: the moth, on formed pins
 
 const HOP_MAX_PX = 4;
 
@@ -371,6 +372,8 @@ export function createLiveResolver() {
     }
     return items;
   }
+
+  const creatures = createCreatureBuilder();
 
   function resolveLayers(input) {
     W = input.canvasW || CANVAS_W;
@@ -883,10 +886,12 @@ export function createLiveResolver() {
     }
 
     prune(aliveIds, documentIds);
+    creatures.append(input, out, pool); // #1355: formed pins grow a moth (no pin formed: nothing happens)
     return out;
   }
 
   function dispose() {
+    creatures.dispose();
     placementCaches.clear();
     swarmState.clear();
     lastShown.clear();

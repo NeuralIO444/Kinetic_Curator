@@ -1,4 +1,4 @@
-// curator/assetAttach.js — #1355 Phase 3: ATTACH points, set on an asset in the wet lab.
+// engine/assetAttach.js — #1355 Phase 3: ATTACH points, set on an asset in the wet lab.
 //
 // An attach point says WHERE ON THE SHAPE another part may join (where a wing meets the body). It belongs to the
 // asset, so every copy in the dish carries it, and it rides the project document. This is not the canvas PIN
@@ -24,7 +24,7 @@ export function sanitizeAttachPoints(points) {
 /**
  * The whole map { assetId: points }: only the assets the artist edited by hand. An entry may be an EMPTY list: that
  * is the artist saying "no points on this one", which is different from an asset with no entry (it uses the points
- * worked out from its shape, curator/autoAttach.js). Returns null when nothing is set, so an untouched project
+ * worked out from its shape, engine/autoAttach.js). Returns null when nothing is set, so an untouched project
  * saves as before.
  */
 export function sanitizeAssetAttach(raw) {

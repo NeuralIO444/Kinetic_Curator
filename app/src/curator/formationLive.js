@@ -30,6 +30,11 @@ export function getFormationState() {
   return latest;
 }
 
+/** Which pins have formed, per pin, as of the last resolved frame: the NEXT frame's input carries it (the moth reads it). */
+export function getFormedPins() {
+  return latest.states.map((s) => !!(s && s.formed));
+}
+
 /** Start over (tests; and a take starts from fresh formation state, like the fresh resolver `rec` asks for). */
 export function resetFormation() {
   tracker = createFormationTracker();

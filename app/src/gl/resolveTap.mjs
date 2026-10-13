@@ -61,6 +61,24 @@ export function setResolveFrameTap(fn) {
   return prev;
 }
 
+let formedProvider = null;
+
+/** Register where the loop reads which pins have formed (curator/formationLive.js): keeps gl/ free of curator/. */
+export function setFormedProvider(fn) {
+  formedProvider = typeof fn === 'function' ? fn : null;
+}
+
+/** [bool] per pin, from the last resolved frame's decision; [] with no provider. A bad provider reads as none. */
+export function getFormedPins() {
+  if (formedProvider === null) return [];
+  try {
+    const f = formedProvider();
+    return Array.isArray(f) ? f : [];
+  } catch {
+    return [];
+  }
+}
+
 let resetRequested = false;
 
 /**

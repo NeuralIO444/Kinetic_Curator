@@ -1,4 +1,4 @@
-// curator/autoAttach.js — #1355: attach points worked out from an asset's shape (Matt, 2026-10-11: every asset gets
+// engine/autoAttach.js — #1355: attach points worked out from an asset's shape (Matt, 2026-10-11: every asset gets
 // them without setup; a hand edit in the wet lab wins).
 //
 // Pure geometry, no DOM, no chance: the same markup always gives the same points, in the engine and in Node. The
