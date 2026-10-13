@@ -15,6 +15,8 @@ import { sanitizePins } from './dishPins.js';
 import { getStressState } from './stressLive.js';
 import { createLimbTracker } from './limbs.js';
 import { createShiftTracker } from './davisShift.js';
+import { birthCentre } from './director.js'; // #1356 step 5: the nudge toward the recent keeps (hosted there, never a surface)
+import { TRAIT_DEFAULTS } from '../engine/creature.js';
 
 let tracker = createFormationTracker();
 const limbTracker = createLimbTracker();
@@ -23,6 +25,8 @@ const shiftTracker = createShiftTracker();
 let traits = [];
 let shiftTap = null;
 let roomProvider = null;
+const keepRing = []; // session-only: the traits of the moths alive at each recent keep (never saved)
+const KEEP_RING_CAP = 8;
 let tap = null;
 let latest = Object.freeze({ states: [], band: null });
 let field = null;
@@ -61,6 +65,14 @@ export function setRoomProvider(fn) {
   roomProvider = typeof fn === 'function' ? fn : null;
 }
 
+/** A keep just landed: remember the traits of the moths alive now (a session ring; nothing without a moth). */
+export function noteKeep() {
+  const alive = traits.filter(Boolean).map((t) => ({ ...t }));
+  if (!alive.length) return;
+  keepRing.push(alive);
+  while (keepRing.length > KEEP_RING_CAP) keepRing.shift();
+}
+
 /** Observe Davis's birth shifts: fn(born) for frames that made any (the `davis-shift` events). One listener (or null). */
 export function setShiftTap(fn) {
   shiftTap = typeof fn === 'function' ? fn : null;
@@ -74,6 +86,7 @@ export function resetFormation() {
   limbs = [];
   shiftTracker.reset();
   traits = [];
+  keepRing.length = 0;
 }
 
 /** The resolver frame tap. `getBand` is injectable for tests; live it is the stress tracker's band. */
@@ -98,6 +111,7 @@ export function observeFormation(input, output, getBand = () => getStressState()
   const shifted = shiftTracker.update(latest.states, {
     seed: input && input.seed, seedOffsets: input && input.seedOffsets, band,
     room: () => { try { return roomProvider ? roomProvider() : null; } catch { return null; } },
+    centre: (r) => birthCentre({ ring: keepRing, keeps: r && r.keeps, allowance: r && r.allowance, defaults: TRAIT_DEFAULTS }),
   });
   traits = shifted.traits;
   if (shifted.born.length && shiftTap) { try { shiftTap(shifted.born); } catch { shiftTap = null; } }

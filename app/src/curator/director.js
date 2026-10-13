@@ -32,7 +32,7 @@ import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
-import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias } from './queenLean.mjs';
+import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
@@ -350,4 +350,16 @@ export function initDirectorBeat(subscribe) {
     d.pushBeat(b);
     if (s) d.setPullInputs({ keeps: s.keeps, bands: s.audioBands, enabled: !!s.audioEnabled, sourceType: s.audioSource && s.audioSource.type });
   });
+}
+
+/**
+ * #1356 step 5 — the centre a newborn moth is rolled around, nudged toward the recent keeps. Null = no nudge (gate
+ * closed, fewer than MIN_KEEPS keeps, no moths remembered, or a room that gives her no hand). Never rendered.
+ */
+export function birthCentre({ ring, keeps, allowance, defaults }) {
+  try {
+    return warmCentre(ring, defaults, allowance, pullKeeps(keeps).length);
+  } catch {
+    return null;
+  }
 }

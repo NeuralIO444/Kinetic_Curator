@@ -37,7 +37,7 @@ import { PerformanceButton } from './components/PerformanceButton.jsx'; // #1353
 import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
-import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomProvider } from './curator/formationLive.js';
+import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomProvider, noteKeep } from './curator/formationLive.js';
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
@@ -104,14 +104,15 @@ function AppInner() {
       const feed = loisActivity.snapshot();
       const face = resolveLoisFace(feed);
       const davis = resolveDavisState(feed);
-      return roomWidthFromCodes(face ? face.code : null, davis ? davis.code : null);
+      return { ...roomWidthFromCodes(face ? face.code : null, davis ? davis.code : null), keeps: useStore.getState().keeps };
     });
+    const unKeep = loisActivity.onKeep(noteKeep); // #1356 step 5: remember the living moths' traits at a keep
     const stop = initStress({
       getCounts: loisActivity.pressureCounts,
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

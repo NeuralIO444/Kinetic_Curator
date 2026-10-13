@@ -50,12 +50,14 @@ function signed(seed, offsets, key, trait) {
  * @param ordinal     how many moths this session has been born at this slot (a re-pin is a new moth)
  * @param slot        the pin's index
  * @param width       0..1: the share of each range the shift may use (shiftWidthFor(band) times the room's, later)
+ * @param centre      traits to roll AROUND instead of the defaults (a nudge toward the recent keeps, step 5); null = defaults
  */
-export function shiftFor({ seed, seedOffsets = null, pin, ordinal = 0, slot = 0, width = SHIFT_WIDTH[BAND_NORMAL] }) {
+export function shiftFor({ seed, seedOffsets = null, pin, ordinal = 0, slot = 0, width = SHIFT_WIDTH[BAND_NORMAL], centre = null }) {
   const s = (seed >>> 0);
   const w = Number.isFinite(width) ? Math.min(1, Math.max(0, width)) : SHIFT_WIDTH[BAND_NORMAL];
   const key = `davis:${slot}:${ordinal}:${Math.round((pin && pin.x) || 0)}:${Math.round((pin && pin.y) || 0)}`;
   const R = TRAIT_RANGES;
+  const C = centre && typeof centre === 'object' ? normalizeTraits(centre) : TRAIT_DEFAULTS;
   const around = (def, range, trait) => {
     const v = signed(s, seedOffsets, key, trait); // -1..1
     // use `w` of the range on each side of the default (the ranges are asymmetric for the multipliers)
@@ -63,11 +65,11 @@ export function shiftFor({ seed, seedOffsets = null, pin, ordinal = 0, slot = 0,
   };
   const u = hashU01(s, 'hierarchy', (hash32(key) + SALT.swatch) >>> 0, seedOffsets);
   return normalizeTraits({
-    spread: around(TRAIT_DEFAULTS.spread, R.spread, 'spread'),
-    wing: around(TRAIT_DEFAULTS.wing, R.wing, 'wing'),
-    body: around(TRAIT_DEFAULTS.body, R.body, 'body'),
+    spread: around(C.spread, R.spread, 'spread'),
+    wing: around(C.wing, R.wing, 'wing'),
+    body: around(C.body, R.body, 'body'),
     // rank 0 is today's moth; a wider shift may reach further down the ranking
-    swatch: Math.floor(u * (1 + (R.swatch.max - R.swatch.min) * w + 0.5)),
+    swatch: Math.min(R.swatch.max, Math.max(R.swatch.min, Math.floor(u * (1 + (R.swatch.max - R.swatch.min) * w + 0.5)) + Math.round(C.swatch))),
   });
 }
 
@@ -81,7 +83,7 @@ export function createShiftTracker() {
   const ordinals = [];
   return {
     // `room`: { width, room } or a function returning one (called only when a moth is born: the room is read at birth)
-    update(states, { seed = 0, seedOffsets = null, band = null, roomWidth = 1, room = null } = {}) {
+    update(states, { seed = 0, seedOffsets = null, band = null, roomWidth = 1, room = null, centre = null } = {}) {
       const born = [];
       const next = new Array(states.length);
       const traits = new Array(states.length);
@@ -94,7 +96,8 @@ export function createShiftTracker() {
         const r = typeof room === 'function' ? room() : room;
         const rw = r && Number.isFinite(r.width) ? r.width : roomWidth;
         const width = shiftWidthFor(band) * (Number.isFinite(rw) ? Math.min(1, Math.max(0, rw)) : 1);
-        const t = shiftFor({ seed, seedOffsets, pin: s, ordinal: ordinals[i], slot: i, width });
+        const c = typeof centre === 'function' ? centre(r) : centre;
+        const t = shiftFor({ seed, seedOffsets, pin: s, ordinal: ordinals[i], slot: i, width, centre: c });
         next[i] = { x: s.x, y: s.y, traits: t };
         traits[i] = t;
         born.push({ pin: i, x: s.x, y: s.y, traits: t, band: band ?? null, width: +width.toFixed(4), room: (r && r.room) || null });

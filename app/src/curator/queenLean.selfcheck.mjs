@@ -23,6 +23,7 @@ import {
   reactivityGain,
   beatConfidentFromPeaks,
   swayOpen, swayBiases,
+  M6_KEEPS, M6_STRENGTH, warmCentreOpen, warmCentre,
 } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 
@@ -188,6 +189,39 @@ ok('no UI-surface file references her identifiers', () => {
   };
   walk(srcRoot);
   assert.deepEqual(hits, [], `surface leaks: ${hits.join(', ')}`);
+});
+
+// ─── M6: a moth's birth warms toward the last 3 keeps (#1356 step 5) ──────
+const DEF = { spread: 0, wing: 1, body: 1, swatch: 0 };
+const mk = (spread, wing, body, swatch) => ({ spread, wing, body, swatch });
+ok('M6: below MIN_KEEPS, or with no hand (allowance 0), or with no moths remembered, she does not nudge', () => {
+  const ring = [[mk(10, 1.2, 1.1, 2)]];
+  assert.equal(warmCentreOpen(ring, DEF, 1, MIN_KEEPS - 1), null);
+  assert.equal(warmCentreOpen(ring, DEF, 0, MIN_KEEPS), null);
+  assert.equal(warmCentreOpen([], DEF, 1, MIN_KEEPS), null);
+  assert.equal(warmCentreOpen(null, DEF, 1, MIN_KEEPS), null);
+});
+
+ok('M6: the centre moves from the default toward the mean of the last M6_KEEPS keeps by M6_STRENGTH x allowance', () => {
+  const ring = [[mk(-18, 0.8, 0.85, 0)], [mk(10, 1.2, 1.0, 2)], [mk(14, 1.0, 1.2, 2)], [mk(12, 1.2, 1.1, 3)]]; // the first is older than 3
+  const c = warmCentreOpen(ring, DEF, 1, MIN_KEEPS);
+  const mean = (k) => (ring.slice(-M6_KEEPS).map((e) => e[0][k]).reduce((a, b) => a + b, 0)) / M6_KEEPS;
+  for (const k of Object.keys(DEF)) assert.ok(Math.abs(c[k] - (DEF[k] + M6_STRENGTH * (mean(k) - DEF[k]))) < 1e-9, k);
+  assert.ok(c.spread > 0, 'toward the kept moths, not away');
+  const half = warmCentreOpen(ring, DEF, 0.5, MIN_KEEPS);
+  assert.ok(Math.abs(half.spread - c.spread / 2) < 1e-9, 'a room that gives her half a hand halves the nudge');
+});
+
+ok('M6: it never leaves the span between the default and the kept moths (a nudge, not a takeover)', () => {
+  const ring = [[mk(18, 1.25, 1.2, 3)]];
+  const c = warmCentreOpen(ring, DEF, 1, MIN_KEEPS);
+  assert.ok(c.spread > 0 && c.spread < 18 && c.wing > 1 && c.wing < 1.25 && c.body > 1 && c.body < 1.2);
+  assert.ok(c.spread <= 18 * M6_STRENGTH + 1e-9);
+});
+
+ok('M6: the gate decides: open reads through, and warmCentre is exactly warmCentreOpen', () => {
+  const ring = [[mk(10, 1.2, 1.1, 2)]];
+  assert.deepEqual(warmCentre(ring, DEF, 1, MIN_KEEPS), GATE_OPEN ? warmCentreOpen(ring, DEF, 1, MIN_KEEPS) : null);
 });
 
 console.log(`\nqueenLean: ${n} checks passed`);

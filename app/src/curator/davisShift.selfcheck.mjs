@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { SHIFT_WIDTH, shiftWidthFor, shiftFor, createShiftTracker, createShiftRecorder } from './davisShift.js';
 import { TRAIT_DEFAULTS, TRAIT_RANGES } from '../engine/creature.js';
 import { BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN } from './stress.js';
-import { observeFormation, getPinTraits, setShiftTap, resetFormation } from './formationLive.js';
+import { observeFormation, getPinTraits, setShiftTap, resetFormation, noteKeep, setRoomProvider } from './formationLive.js';
 import { fertilityField, FORM_HOLD_FRAMES } from './formation.js';
 
 const inRange = (t) => Object.keys(TRAIT_RANGES).every((k) => t[k] >= TRAIT_RANGES[k].min && t[k] <= TRAIT_RANGES[k].max);
@@ -120,12 +120,72 @@ const roll = (n, over = {}) => Array.from({ length: n }, (_, i) => shiftFor({ se
   assert.deepEqual(getPinTraits(), [], 'a fresh take starts clean');
 }
 
+// 6b. step 5 live: with 8 keeps and a room that gives her a hand, a moth born AFTER a keep leans toward the moths alive at it
+{
+  const born = (keepsCount, warm) => {
+    resetFormation();
+    const f = fertilityField(5, null, 1000, 700);
+    let spot = null;
+    for (let x = 25; x < 1000 && !spot; x += 25) for (let y = 25; y < 700 && !spot; y += 25) if (f.at(x, y) > 0.7) spot = { x, y };
+    const crowd = [{ items: Array.from({ length: 30 }, (_, i) => ({ x: spot.x + (i % 4), y: spot.y + (i % 3) })) }];
+    const inp = { dishPins: [spot], canvasW: 1000, canvasH: 700, seed: 5, seedOffsets: null };
+    const keeps = Array.from({ length: keepsCount }, () => ({ stack: { l: [{ type: 'content' }] } }));
+    setRoomProvider(() => ({ width: 1, room: null, allowance: 1, keeps }));
+    if (warm) { // a first moth lives and is kept; then the pin moves (a new birth) on the same seed
+      for (let i = 0; i < FORM_HOLD_FRAMES; i++) observeFormation(inp, crowd, () => BAND_NORMAL);
+      noteKeep();
+      const moved = { x: spot.x + 1, y: spot.y };
+      const inp2 = { ...inp, dishPins: [moved] };
+      const crowd2 = [{ items: crowd[0].items.map((m) => ({ x: m.x + 1, y: m.y })) }];
+      for (let i = 0; i < FORM_HOLD_FRAMES; i++) observeFormation(inp2, crowd2, () => BAND_NORMAL);
+      return getPinTraits()[0];
+    }
+    for (let i = 0; i < FORM_HOLD_FRAMES; i++) observeFormation(inp, crowd, () => BAND_NORMAL);
+    return getPinTraits()[0];
+  };
+  const first = born(8, false);
+  assert.ok(first, 'a moth is born');
+  const warmed = born(8, true);
+  const cold = born(3, true); // fewer than 8 keeps: she is identity
+  assert.ok(warmed && cold);
+  assert.notDeepEqual(warmed, cold, 'with 8 keeps the second moth is nudged; with 3 it is not');
+  setRoomProvider(null);
+  resetFormation();
+}
+
 // 7. wiring: the loop carries the traits (so a take replays the moths), the app supplies them, the take records them
 {
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
   assert.ok(/dishTraits: getPinTraits\(\)/.test(loop));
   assert.ok(/setTraitsProvider\(getPinTraits\)/.test(readFileSync(new URL('../App.jsx', import.meta.url), 'utf8')));
   assert.ok(/davis: davisSection/.test(readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8')));
+}
+
+// step 5 (#1356): a centre nudges the roll, and null is exactly the old roll
+{
+  const base = { seed: 7, pin: { x: 100, y: 120 }, ordinal: 1, slot: 0, width: 1 };
+  assert.deepEqual(shiftFor({ ...base, centre: null }), shiftFor(base), 'no centre = step 2 exactly');
+  const warm = { spread: 9, wing: 1.1, body: 1.05, swatch: 0 };
+  let up = 0; let n = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const a = shiftFor({ ...base, seed });
+    const b = shiftFor({ ...base, seed, centre: warm });
+    if (b.spread > a.spread) up++;
+    n++;
+    for (const k of ['spread', 'wing', 'body']) {
+      assert.ok(b[k] >= TRAIT_RANGES[k].min && b[k] <= TRAIT_RANGES[k].max, `${k} stays inside its range`);
+    }
+    assert.ok(b.swatch >= 0 && b.swatch <= 3 && Number.isInteger(b.swatch));
+  }
+  assert.ok(up / n > 0.8, `a warm centre leans the spread upward (${up}/${n})`);
+  // the tracker reads the centre only at a birth
+  const t = createShiftTracker();
+  let calls = 0;
+  const states = [{ x: 5, y: 5, formed: true }];
+  const r1 = t.update(states, { seed: 3, centre: () => { calls++; return warm; } });
+  t.update(states, { seed: 3, centre: () => { calls++; return warm; } });
+  assert.equal(calls, 1, 'the centre is read once, at the birth');
+  assert.ok(r1.traits[0]);
 }
 
 console.log('davisShift.selfcheck: ok (#1356 step 2)');
