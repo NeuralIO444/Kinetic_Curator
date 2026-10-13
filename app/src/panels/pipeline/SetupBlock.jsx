@@ -3,6 +3,17 @@ import { useStore } from '../../state/store.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { CANVAS_PRESETS, CANVAS_FPS, INSTRUMENT_CANVAS, ledRaster } from '../../data/canvasPresets.js';
 
+// module-level so their identity is stable (the load effect lists `load`): canvas setup rides the bus
+const apply = (id) => emit(Events.CANVAS_PRESET, { id });
+const save = (label) => emit(Events.CANVAS_PRESET_SAVE, { label });
+const remove = (id) => emit(Events.CANVAS_PRESET_DELETE, { id });
+const rename = (id, label) => emit(Events.CANVAS_PRESET_RENAME, { id, label });
+const load = () => emit(Events.CANVAS_PRESETS_LOAD);
+const setFps = (fps) => emit(Events.CANVAS_FPS, { fps });
+const setLock = (on) => emit(Events.CANVAS_ASPECT_LOCK, { on });
+const swap = () => emit(Events.CANVAS_SWAP);
+const setSize = (w, h, presetId) => emit(Events.CANVAS_SIZE, { w, h, presetId });
+
 export function SetupBlock() {
   const w = useStore((s) => s.canvasW);
   const h = useStore((s) => s.canvasH);
@@ -10,21 +21,12 @@ export function SetupBlock() {
   const presetId = useStore((s) => s.canvasPresetId);
   const lock = useStore((s) => s.canvasAspectLock);
   const mine = useStore((s) => s.userCanvasPresets);
-  const apply = useStore((s) => s.applyCanvasPreset);
-  const save = useStore((s) => s.saveCanvasPreset);
-  const remove = useStore((s) => s.deleteCanvasPreset);
-  const rename = useStore((s) => s.renameCanvasPreset);
-  const load = useStore((s) => s.loadUserCanvasPresets);
-  const setSize = (w, h, presetId) => emit(Events.CANVAS_SIZE, { w, h, presetId });
-  const setFps = useStore((s) => s.setCanvasFps);
-  const setLock = useStore((s) => s.setCanvasAspectLock);
-  const swap = useStore((s) => s.swapCanvasOrientation);
   const actual = `${INSTRUMENT_CANVAS.w}×${INSTRUMENT_CANVAS.h}`;
   const authored = `${w}×${h}`;
   const differ = authored !== actual;
   const [cab, setCab] = useState({ w: 4, h: 3, px: 128 });
   const [name, setName] = useState('My wall');
-  useEffect(() => { load?.(); }, [load]);
+  useEffect(() => { load(); }, []);
 
   return (
     <div className="pipeline-setup">

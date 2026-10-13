@@ -224,6 +224,16 @@ export function useApp(selector) {
       case A.SET_QUEUE_SOURCE: return store.setQueueSource(action.source);
       case A.SET_QUEUE_SECONDS_PER_HIT: return store.setQueueSecondsPerHit(action.seconds);
       case A.SET_QUEUE_BEATS_PER_HIT: return store.setQueueBeatsPerHit(action.beats);
+      case A.APPLY_CANVAS_PRESET: return store.applyCanvasPreset(action.id);
+      case A.SAVE_CANVAS_PRESET: return store.saveCanvasPreset(action.label);
+      case A.DELETE_CANVAS_PRESET: return store.deleteCanvasPreset(action.id);
+      case A.RENAME_CANVAS_PRESET: return store.renameCanvasPreset(action.id, action.label);
+      case A.LOAD_USER_CANVAS_PRESETS: return store.loadUserCanvasPresets();
+      case A.SET_CANVAS_FPS: return store.setCanvasFps(action.fps);
+      case A.SET_CANVAS_ASPECT_LOCK: return store.setCanvasAspectLock(action.on);
+      case A.SWAP_CANVAS_ORIENTATION: return store.swapCanvasOrientation();
+      case A.SET_FXAA: return store.setFxaa(action.on);
+      case A.SET_WEAVE: return store.setWeave(action.on);
       default: console.warn('Unhandled action:', type);
     }
   }, []);

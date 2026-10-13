@@ -139,6 +139,16 @@ export function wireEventBus(rawDispatch) {
   on(Events.QUEUE_SOURCE, (p = {}) => dispatch({ type: A.SET_QUEUE_SOURCE, ...{ source: p.source } }));
   on(Events.QUEUE_SECONDS, (p = {}) => dispatch({ type: A.SET_QUEUE_SECONDS_PER_HIT, ...{ seconds: p.seconds } }));
   on(Events.QUEUE_BEATS, (p = {}) => dispatch({ type: A.SET_QUEUE_BEATS_PER_HIT, ...{ beats: p.beats } }));
+  on(Events.CANVAS_PRESET, (p = {}) => dispatch({ type: A.APPLY_CANVAS_PRESET, ...{ id: p.id } }));
+  on(Events.CANVAS_PRESET_SAVE, (p = {}) => dispatch({ type: A.SAVE_CANVAS_PRESET, ...{ label: p.label } }));
+  on(Events.CANVAS_PRESET_DELETE, (p = {}) => dispatch({ type: A.DELETE_CANVAS_PRESET, ...{ id: p.id } }));
+  on(Events.CANVAS_PRESET_RENAME, (p = {}) => dispatch({ type: A.RENAME_CANVAS_PRESET, ...{ id: p.id, label: p.label } }));
+  on(Events.CANVAS_PRESETS_LOAD, () => dispatch({ type: A.LOAD_USER_CANVAS_PRESETS }));
+  on(Events.CANVAS_FPS, (p = {}) => dispatch({ type: A.SET_CANVAS_FPS, ...{ fps: p.fps } }));
+  on(Events.CANVAS_ASPECT_LOCK, (p = {}) => dispatch({ type: A.SET_CANVAS_ASPECT_LOCK, ...{ on: p.on } }));
+  on(Events.CANVAS_SWAP, () => dispatch({ type: A.SWAP_CANVAS_ORIENTATION }));
+  on(Events.DISPLAY_FXAA, (p = {}) => dispatch({ type: A.SET_FXAA, ...{ on: p.on } }));
+  on(Events.DISPLAY_WEAVE, (p = {}) => dispatch({ type: A.SET_WEAVE, ...{ on: p.on } }));
 
   return dispatch;
 }
