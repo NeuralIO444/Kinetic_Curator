@@ -41,6 +41,7 @@ import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomPro
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
+import { observeClock } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
 import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider } from './gl/resolveTap.mjs';
 import { observeSpawn } from './curator/spawnLive.js'; // #1355: auto spawn finds each creature's home
 import { captureFavorite } from './state/slices/davisSlice.js';
@@ -88,6 +89,8 @@ function AppInner() {
     // #1355 — dish pressure: the marks the resolver placed around the canvas pins, read from each resolved frame.
     // #1355 step 3 — the formation rule reads the same frame (one tap: dish pressure first, then formation).
     setResolveFrameTap((input, output) => {
+      // #1458: musical time on the loop clock (one call a frame; bus events only on whole beats and bars)
+      observeClock(input && input.loopTimeMs, useStore.getState().beatBpm);
       observeDish(input, output);
       observeFormation(input, output);
       // #1355 AUTO SPAWN: each creature the artist asked for finds a home in the middle of the dish. The homes are

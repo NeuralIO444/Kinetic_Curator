@@ -94,6 +94,8 @@ export const EVENT_REGISTRY = {
   BLOOM: { handler: ["hooks/useEarnedVoices.js"] },
   ROLL_GUARD: { handler: ["hooks/useRollGuard.js"] },
   KINETIC_TAP: { handler: ["components/LoisPill.jsx","curator/loisActivity.js"] },
+  CLOCK_BEAT: { handler: null, note: 'telemetry: published by clockLive each whole beat; listeners arrive with audio events and the Queen (#1459, #1460)' },
+  CLOCK_BAR: { handler: null, note: 'telemetry: published by clockLive each downbeat; listeners arrive with replay scrub (#1461)' },
   ACTIVITY_HEARTBEAT: { handler: null, note: "telemetry: published by loisActivity (#1390); no listener yet" },
   VIEW_FULLSCREEN: { handler: 'wire' },
   STAGE_MODE: { handler: 'wire' },
