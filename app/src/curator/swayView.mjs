@@ -39,6 +39,8 @@ export function swayMagnitude(view) {
 let currentMagnitude = 0;
 // #1460 — the pace (tempo ease) shows the same mark while it is moving the BEAT; the mark is the ONLY sign of it.
 let paceMagnitude = 0;
+// #1475 — her set playing shows the same mark: the third hand, the same single sign
+let setMagnitude = 0;
 const subscribers = new Set();
 const notify = () => { for (const fn of subscribers) { try { fn(); } catch { /* a listener must not break the holder */ } } };
 
@@ -55,9 +57,17 @@ export function setPaceMagnitude(n) {
   notify();
 }
 
-/** Called by the presence mark on render: whichever hand is heavier. */
+/** Called by the set driver: 0 when her beats are not playing. */
+export function setSetMagnitude(n) {
+  const next = Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
+  if (Math.abs(next - setMagnitude) < 0.01) return;
+  setMagnitude = next;
+  notify();
+}
+
+/** Called by the presence mark on render: whichever hand is heaviest. */
 export function getSwayMagnitude() {
-  return Math.max(currentMagnitude, paceMagnitude);
+  return Math.max(currentMagnitude, paceMagnitude, setMagnitude);
 }
 
 /** useSyncExternalStore-shaped: the mark re-renders when the pace appears or goes. */

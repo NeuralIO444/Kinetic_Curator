@@ -91,7 +91,7 @@ assert.strictEqual(BAND_KEYS.length, METER_BANDS.length);
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
   const loop = src('./liveLoop.mjs');
-  assert.ok(/bandFeed\.read\(\{[^}]*routes: s\.audioRoutes[^}]*sidecar: !!\(s\.audioSidecar && s\.audioSource\?\.type === 'file'\)[^}]*readBands: readMeterBandLevels/s.test(loop), 'the loop asks the feed, gated on the sidecar');
+  assert.ok(/bandFeed\.read\(\{[^}]*routes: s\.audioRoutes[^}]*sidecar: !!\(s\.audioSidecar && s\.audioSource\?\.type === 'file'\)[^}]*readBands: synth \? \(\) => mixLevels\([^}]*readMeterBandLevels/s.test(loop), 'the loop asks the feed, gated on the sidecar');
   assert.ok(/s\.audioRoutes, shapedBands\)/.test(loop), 'and hands the shaped bands to the routes');
   const tap = src('../hooks/audioMeterTap.js');
   assert.ok(/getByteFrequencyData\(freqBytes\)/.test(tap) && !/MeterHero/.test(tap.replace(/\/\/.*$/gm, '')), 'the tap reads the analyser itself: no dependency on the meter panel being mounted');
