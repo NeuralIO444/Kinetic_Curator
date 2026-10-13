@@ -8,7 +8,7 @@ export { normalizeSnapshots, normalizeLayers };
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill } from '../data/kinemes.js';
-import { sanitizeAssetAttach } from '../curator/assetAttach.js';
+import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../midi/map.mjs';

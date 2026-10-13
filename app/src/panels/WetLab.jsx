@@ -7,8 +7,8 @@
 import { useEffect, useRef } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
-import { MAX_ATTACH, ATTACH_BOX } from '../curator/assetAttach.js';
-import { autoAttachPoints } from '../curator/autoAttach.js';
+import { MAX_ATTACH, ATTACH_BOX } from '../engine/assetAttach.js';
+import { autoAttachPoints } from '../engine/autoAttach.js';
 
 const PREVIEW_PX = 320;
 

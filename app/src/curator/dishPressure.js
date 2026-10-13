@@ -33,6 +33,7 @@ export function pinPressures(pins, entries, canvasW, canvasH) {
       const items = e && e.items;
       if (!Array.isArray(items)) continue;
       for (let i = 0; i < items.length; i++) {
+        if (items[i]._creature) continue; // a creature's own marks are not the crowd that formed it
         const dx = items[i].x - pin.x;
         const dy = items[i].y - pin.y;
         if (dx * dx + dy * dy <= r2) n++; // NaN compares false: a broken mark is not a neighbour

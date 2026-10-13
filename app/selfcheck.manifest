@@ -256,7 +256,8 @@ node src/curator/stress.selfcheck.mjs
 node src/curator/stressLive.selfcheck.mjs
 node src/curator/stressRecord.selfcheck.mjs
 node src/curator/dishPins.selfcheck.mjs
-node src/curator/assetAttach.selfcheck.mjs
+node src/engine/assetAttach.selfcheck.mjs
+node src/engine/creature.selfcheck.mjs
 node src/curator/dishPressure.selfcheck.mjs
 node src/curator/refineMutate.selfcheck.mjs
 node src/curator/transitions.selfcheck.mjs

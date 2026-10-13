@@ -1,4 +1,4 @@
-// node src/curator/assetAttach.selfcheck.mjs
+// node src/engine/assetAttach.selfcheck.mjs
 // #1355 — ATTACH points: set on the asset in the wet lab, at most four, saved with the project.
 import assert from 'node:assert/strict';
 import { MAX_ATTACH, ATTACH_HIT, clickAttach, sanitizeAttachPoints, sanitizeAssetAttach } from './assetAttach.js';

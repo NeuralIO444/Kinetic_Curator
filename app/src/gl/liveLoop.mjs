@@ -29,6 +29,7 @@ import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
+import { getFormedPins } from './resolveTap.mjs'; // #1355: which pins formed
 import { audioRoutes } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
@@ -600,6 +601,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       beatDrive: audioOn ? shapedAudio.beatPulse : null, // #1128 THUMP: a real beat or nothing
       assetStill: s.assetStill, // #1128: assets the artist pinned still
       dishPins: s.dishPins, // #1355: wet-lab pins (scene coords), recorded with the take
+      dishFormed: getFormedPins(), // #1355: which pins formed (decided from the previous frame); recorded, so a take replays its creatures
+      assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,
       effectiveScale,

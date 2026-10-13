@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { MAX_PINS } from '../curator/dishPins.js';
-import { attachPointsFor } from '../curator/autoAttach.js';
+import { attachPointsFor } from '../engine/autoAttach.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
