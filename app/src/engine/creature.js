@@ -14,6 +14,7 @@
 import { expandHierarchy } from './hierarchy.js';
 import { poissonPointSet } from './kernel/sample/poisson.js';
 import { attachPointsFor } from './autoAttach.js';
+import { kinemePhase } from '../data/kinemes.js';
 
 export const MOTH_PARTS = Object.freeze({ body: 'org_pod_02', wing: 'org_leaf_02', mark: 'geo_diamond_01' });
 export const MOTH = Object.freeze({
@@ -40,6 +41,50 @@ export const MOTH = Object.freeze({
 });
 
 const CENTRE = 50;
+const TAU = Math.PI * 2;
+
+/**
+ * HOVER (Matt, 2026-10-13, option A): the moth drifts near its pin the way every asset does. It reads the SAME dials
+ * and the SAME anchored clock as the assets' living-motion floor (engine/kineme.js): DRIFT sets how far it wanders,
+ * BREATH how much it swells, and KINEME RATE / pause / the governor's freeze stop it exactly when they stop the
+ * assets. The pin stays its home: the offset is measured from rest (anchored), so the first frame sits on the pin.
+ */
+export const HOVER = Object.freeze({
+  reach: 0.06, // wander, as a fraction of the smaller canvas side, at DRIFT = 1 (so about 21 px at the default 0.5)
+  tilt: 12, // degrees of sway of the whole body, at DRIFT = 1
+  hzX: 0.09, // a slow loop: about 11 s across,
+  hzY: 0.12, // 8 s up and down,
+  hzTilt: 0.15, // 7 s of sway; the three never line up
+  breathDepth: 0.09, // the floor's own breath: +-9% size at BREATH = 1
+  breathHz: 0.11,
+});
+
+const num01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+
+/**
+ * One creature's hover pose from the living-motion context the resolver already builds for its layer
+ * ({ driverSec, amounts: { breath, drift }, canvasW, canvasH }, or null when nothing moves).
+ * Pure. Returns { dx, dy, rot, scale }: a position offset (scene units), a tilt (degrees) and a size multiplier.
+ */
+export function hoverPose(motion, seed, pinIndex) {
+  const rest = { dx: 0, dy: 0, rot: 0, scale: 1 };
+  if (!motion || !Number.isFinite(motion.driverSec)) return rest;
+  const t = motion.driverSec;
+  const a = motion.amounts || {};
+  const drift = num01(a.drift);
+  const breath = num01(a.breath);
+  const m = Math.min(Number(motion.canvasW) || 0, Number(motion.canvasH) || 0);
+  const u = (tag) => kinemePhase(seed, `moth:${tag}${pinIndex}`);
+  // anchored: each wave is measured from where it stood at driver time 0, so the creature is on its pin at rest
+  const wave = (hz, tag) => { const p = u(tag); return Math.sin(TAU * (hz * t + p)) - Math.sin(TAU * p); };
+  if (drift > 0 && m > 0) {
+    rest.dx = drift * HOVER.reach * m * wave(HOVER.hzX, 'x');
+    rest.dy = drift * HOVER.reach * m * wave(HOVER.hzY, 'y');
+    rest.rot = drift * HOVER.tilt * wave(HOVER.hzTilt, 'r');
+  }
+  if (breath > 0) rest.scale = 1 + breath * HOVER.breathDepth * wave(HOVER.breathHz, 'b');
+  return rest;
+}
 const rad = (deg) => (deg * Math.PI) / 180;
 
 /** The point of `points` furthest toward a side, as an offset from the asset's centre. No points: the centre. */
@@ -158,7 +203,7 @@ export function createCreatureBuilder() {
     return asset ? attachPointsFor(asset, assetAttach) : [];
   };
   return {
-    append(input, entries, pool) {
+    append(input, entries, pool, motionFor = null) {
       const pins = input && input.dishPins;
       const formed = input && input.dishFormed;
       if (!Array.isArray(pins) || !Array.isArray(formed) || !formed.some(Boolean)) {
@@ -190,6 +235,8 @@ export function createCreatureBuilder() {
       const wingPoints = pointsOf(pool, input.assetAttach, MOTH_PARTS.wing);
       const t = Number.isFinite(input.loopTimeMs) ? input.loopTimeMs : 0;
       const beat = MOTH.flap * Math.sin((2 * Math.PI * t) / MOTH.flapMs);
+      // the layer's living-motion context (null when nothing moves, when the instrument is held, or under reduced motion)
+      const motion = input.reducedMotion || typeof motionFor !== 'function' ? null : motionFor(top);
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
@@ -200,9 +247,10 @@ export function createCreatureBuilder() {
         const have = pair2[i] || 0;
         pair2[i] = want > have ? Math.min(1, have + 1 / MOTH.pairFrames) : Math.max(0, have - 1 / MOTH.pairFrames);
         const g = Math.max(0.02, easeOut(Math.min(1, ages[i] / MOTH.growFrames)));
+        const hover = hoverPose(motion, top.morphSeed ?? input.seed, i);
         const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: easeOut(pair2[i]) });
         const { items } = expandHierarchy(
-          { x: pin.x, y: pin.y, rot: 0, scaleX: MOTH.bodyScale * g, scaleY: MOTH.bodyScale * g, part: 'body', key: `m${i}` },
+          { x: pin.x + hover.dx, y: pin.y + hover.dy, rot: hover.rot, scaleX: MOTH.bodyScale * g * hover.scale, scaleY: MOTH.bodyScale * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,
           { seed: input.seed, scatter: mothScatter(input.seed >>> 0, input.seedOffsets || null, i) },
         );
