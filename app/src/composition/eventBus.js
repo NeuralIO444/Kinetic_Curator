@@ -124,6 +124,13 @@ export const Events = {
   STAGE_SYPHON_ON: 'stage:syphonOn', // { on }
   STAGE_SYPHON_NAME: 'stage:syphonName', // { name }
   CANVAS_SIZE: 'canvas:size', // { w, h, presetId } the authored raster
+  QUEUE_TOGGLE: 'queue:toggle', // play / pause the HITS queue
+  QUEUE_PLAYING: 'queue:playing', // { on }
+  QUEUE_INDEX: 'queue:index', // { index } the hit now current
+  QUEUE_JUMP: 'queue:jump', // a tap-to-jump: restart the autoplay clock
+  QUEUE_SOURCE: 'queue:source', // { source } autoplay clock: seconds | beats
+  QUEUE_SECONDS: 'queue:secondsPerHit', // { seconds }
+  QUEUE_BEATS: 'queue:beatsPerHit', // { beats }
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
   ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)

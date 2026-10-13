@@ -132,6 +132,13 @@ export function wireEventBus(rawDispatch) {
   on(Events.STAGE_SYPHON_ON, (p = {}) => dispatch({ type: A.SET_SYPHON_ON, ...{ on: p.on } }));
   on(Events.STAGE_SYPHON_NAME, (p = {}) => dispatch({ type: A.SET_SYPHON_NAME, ...{ name: p.name } }));
   on(Events.CANVAS_SIZE, (p = {}) => dispatch({ type: A.SET_CANVAS_SIZE, ...{ w: p.w, h: p.h, presetId: p.presetId } }));
+  on(Events.QUEUE_TOGGLE, () => dispatch({ type: A.TOGGLE_QUEUE_PLAYING }));
+  on(Events.QUEUE_PLAYING, (p = {}) => dispatch({ type: A.SET_QUEUE_PLAYING, ...{ on: p.on } }));
+  on(Events.QUEUE_INDEX, (p = {}) => dispatch({ type: A.SET_QUEUE_INDEX, ...{ index: p.index } }));
+  on(Events.QUEUE_JUMP, () => dispatch({ type: A.BUMP_QUEUE_JUMP }));
+  on(Events.QUEUE_SOURCE, (p = {}) => dispatch({ type: A.SET_QUEUE_SOURCE, ...{ source: p.source } }));
+  on(Events.QUEUE_SECONDS, (p = {}) => dispatch({ type: A.SET_QUEUE_SECONDS_PER_HIT, ...{ seconds: p.seconds } }));
+  on(Events.QUEUE_BEATS, (p = {}) => dispatch({ type: A.SET_QUEUE_BEATS_PER_HIT, ...{ beats: p.beats } }));
 
   return dispatch;
 }
