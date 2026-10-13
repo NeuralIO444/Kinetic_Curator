@@ -63,7 +63,6 @@ export function CuratorBar() {
   // wild roll (default), or the deterministic factory opener for
   // performance situations that need a known first frame.
   const startupMode = useStore((s) => s.startupMode);
-  const setStartupMode = useStore((s) => s.setStartupMode);
 
   // #1103 — every Curator roll (the button, and anything else that emits LAYOUT_CURATE) flashes CURATOR's full
   // name, then it cools down. Subscribed to the event, not the click, so a roll from anywhere is acknowledged.
@@ -167,7 +166,7 @@ export function CuratorBar() {
           type="button"
           className="tb-pill start-mode-btn act"
           data-mode={startupMode}
-          onClick={() => setStartupMode(startupMode === 'chaos' ? 'fixed' : 'chaos')}
+          onClick={() => emit(Events.STARTUP_MODE, { mode: startupMode === 'chaos' ? 'fixed' : 'chaos' })}
           title={
             startupMode === 'chaos'
               ? 'START: K.O.Z. (Kinetic Operation Zone) — every cold launch opens on one full wild roll. Click for a fixed, deterministic opener.'

@@ -80,9 +80,11 @@ function readSnap() {
   return snapshotFromReads({ audioBands: s.audioBands, beatPulse: s.beatPulse, meter });
 }
 
+// module-level: stable identity for the effects that list them
+const editAudioRoutes = (fn, continuous = false) => emit(Events.AUDIO_ROUTES_EDIT, { fn, continuous });
+const setAudioRoutes = (routes, continuous = false) => emit(Events.AUDIO_ROUTES_SET, { routes, continuous });
+
 export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod, alphaMod, routes = null }) {
-  const editAudioRoutes = useStore((s) => s.editAudioRoutes);
-  const setAudioRoutes = useStore((s) => s.setAudioRoutes);
   const table = editableRoutes(routes); // the scene's table, or a copy of the default
   // the rows follow the table; bands: exactly what the loop fed
   const rows = audioMatrixRows({ ...audioBands, beatPulse }, { depth, scaleMod, alphaMod }, audioEnabled, table, getShapedBands());

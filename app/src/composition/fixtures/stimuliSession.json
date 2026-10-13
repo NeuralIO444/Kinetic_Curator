@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "seed": 846729,
+  "paletteId": "strata",
+  "quality": "balanced",
+  "autoQuality": true,
+  "layoutParams": { "composition": "neon-brood", "mode": "hype", "count": 240, "behave": "scatter", "dish": true, "body": 3 },
+  "enabledAssets": { "flora_flower_01": true, "flora_vine_01": true, "line_spiral_01": true, "org_petal_01": true },
+  "audioRoutes": [
+    { "input": "band.air", "target": "render.scale", "depth": 0.2 },
+    { "input": "band.sub", "target": "color.hue", "depth": 15 }
+  ],
+  "layers": [
+    { "id": "layer-mv72gdqg-4qj", "name": "PT-1", "type": "pattern", "visible": true, "layerBlendMode": "normal", "layerOpacity": 1,
+      "pattern": { "mode": "FIELD", "seed": 1165553045, "density": 6, "mix": 0.8171296739524998, "grout": 0.027340748074311007, "hero": 0.05957301823878033, "drift": 0, "drop": false, "kin": "MIX", "movers": 0.4294556787888184 } },
+    { "id": "layer-1", "name": "KC-1", "type": "content", "visible": true, "layerBlendMode": "normal", "layerOpacity": 1,
+      "patch": { "mode": "field", "to": "layer-mv72g5xe-ku", "strength": 0.16 } },
+    { "id": "fx-tsetmv", "name": "FX 1", "type": "fx", "visible": true, "layerBlendMode": "normal", "layerOpacity": 1,
+      "effects": [
+        { "kind": "sharpen", "params": { "amount": 0.6, "radius": 1 } },
+        { "kind": "haze", "params": { "amount": 0.15, "lift": 0.1 } },
+        { "kind": "tear", "params": { "bands": 18, "amount": 12 } }
+      ] },
+    { "id": "layer-mv72g5xe-ku", "name": "KC-2", "type": "content", "visible": true, "layerBlendMode": "normal", "layerOpacity": 1,
+      "patch": { "mode": "off", "to": null, "strength": 0.16 } },
+    { "id": "layer-mv72hab4-3fb", "name": "M 1", "type": "math", "visible": true, "layerBlendMode": "difference", "layerOpacity": 1,
+      "effects": [
+        { "kind": "threshold", "params": { "level": 0.45, "softness": 0.4 }, "mod": {} },
+        { "kind": "contrast", "params": { "amount": 0.89 }, "mod": {} }
+      ] }
+  ],
+  "activeLayerId": "layer-1"
+}

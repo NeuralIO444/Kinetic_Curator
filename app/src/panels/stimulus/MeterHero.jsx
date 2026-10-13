@@ -9,6 +9,7 @@ import { METER_BANDS, meterBandLevels, holdPeaks } from '../../gl/meterBands.mjs
 import { useStore } from '../../state/store.js';
 import { nextRoute } from '../../data/audioRoutes.js';
 import { createBeatTracker } from '../../curator/beatConfidence.mjs';
+import { emit, Events } from '../../composition/eventBus.js';
 
 const H = 132;
 const WAVE_H = 52;
@@ -140,7 +141,7 @@ export function MeterHero() {
     if (e.clientY - r.top < WAVE_H + 8) return; // the waveform is not a band
     const i = Math.min(METER_BANDS.length - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * METER_BANDS.length)));
     const input = `band.${METER_BANDS[i].label.toLowerCase()}`;
-    useStore.getState().editAudioRoutes((t) => { const n = nextRoute(t, input); return n ? [...t, n] : t; });
+    emit(Events.AUDIO_ROUTES_EDIT, { fn: (t) => { const n = nextRoute(t, input); return n ? [...t, n] : t; }, continuous: false });
   };
   return (
     <div className="stim-meter-hero">

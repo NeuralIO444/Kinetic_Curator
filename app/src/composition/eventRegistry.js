@@ -141,4 +141,11 @@ export const EVENT_REGISTRY = {
   LIGHT_SET: { handler: 'wire' },
   CREATURE_COUNT: { handler: 'wire' },
   ATTACH_CLEAR: { handler: 'wire' },
+  BEAT_BPM: { handler: 'wire' },
+  BEAT_METRO: { handler: 'wire' },
+  AUDIO_ROUTES_SET: { handler: 'wire' },
+  AUDIO_ROUTES_EDIT: { handler: 'wire' },
+  AUDIO_SIDECAR: { handler: 'wire' },
+  MIDI_ENABLED: { handler: 'wire' },
+  STARTUP_MODE: { handler: 'wire' },
 };
