@@ -4,7 +4,7 @@
 <body>
 <canvas id="c"></canvas>
 <script type="module">
-import { createRenderer } from '../renderer.mjs';
+import { createRenderer, createLiveRenderer } from '../renderer.mjs';
 
 const canvas = document.getElementById('c');
 let renderer = null;
@@ -41,6 +41,29 @@ function renderArgs(payload) {
     atlas: { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips },
   };
 }
+
+/**
+ * #present-orientation — what the VISIBLE canvas shows, against what the readback path returns for the same frame.
+ * Returns both as top-first RGBA: `shown` is the default framebuffer read bottom-first and put back top-first (what a
+ * viewer sees), `readback` is live.readback(). They must be the same picture.
+ */
+window.__kcPresentProbe = async (payload) => {
+  const pc = document.createElement('canvas');
+  document.body.appendChild(pc);
+  const live = createLiveRenderer(pc);
+  const a = renderArgs(payload);
+  live.setAtlas(a.atlas.pixels, a.atlas.width, a.atlas.height, a.atlas.mipmaps);
+  const target = live.renderFrame({ width: a.width, height: a.height, bg: a.bg, contract: a.contract, cells: a.cells }, { dprScale: 1 });
+  const readback = live.readback(target, a.width, a.height);
+  live.present(target);
+  const gl = live.getGL();
+  const w = pc.width; const h = pc.height;
+  const bottomFirst = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, bottomFirst);
+  const shown = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) shown.set(bottomFirst.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+  return { shownB64: u8ToB64(shown), readbackB64: u8ToB64(readback), width: w, height: h };
+};
 
 window.__kcRender = async (payload) => {
   if (!renderer) renderer = createRenderer(canvas);

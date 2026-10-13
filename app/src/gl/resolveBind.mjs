@@ -10,6 +10,7 @@ export function bindResolveProbe(gl, getLoc, {
   dither = 1,
   fxaa = 0, // #740 PR1 probe: off. PR2 flips it after Matt's eyes + re-bless.
   weave = null, // #741: [dx, dy] output px, or null = off (live present only; never stills)
+  present = false, // true when drawing into the visible canvas (see u_present in resolveFs.mjs)
   fake = null, // [contact, wrap, shoulder], 0 = off
   light = null,
 } = {}) {
@@ -28,4 +29,5 @@ export function bindResolveProbe(gl, getLoc, {
   const ly = light && Number.isFinite(light[1]) ? light[1] : 0.7;
   gl.uniform2f(getLoc('u_light'), lx, ly);
   gl.uniform1f(getLoc('u_shape'), 0);
+  gl.uniform1f(getLoc('u_present'), present ? 1 : 0);
 }

@@ -211,6 +211,16 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
  * @param {object} opts { width, height, bg }
  * @returns {Promise<{pixels: Buffer, width: number, height: number}>}
  */
+/**
+ * What the VISIBLE canvas shows for a contract, and what the readback returns for the same frame (both top-first RGBA).
+ * They must match: a viewer sees what an export contains (parity probe, presentOrientation.selfcheck).
+ */
+export async function presentProbeViaGL(contract, opts = {}) {
+  const page = await ensurePage();
+  const res = await evaluateChunked(page, '__kcPresentProbe', buildRenderPayload(contract, opts));
+  return { shown: Buffer.from(res.shownB64, 'base64'), readback: Buffer.from(res.readbackB64, 'base64'), width: res.width, height: res.height };
+}
+
 export async function renderViaGL(contract, opts = {}) {
   const page = await ensurePage();
   const res = await evaluateChunked(page, '__kcRender', buildRenderPayload(contract, opts));
