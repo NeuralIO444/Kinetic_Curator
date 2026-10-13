@@ -40,3 +40,9 @@ export function bandsFor(fav, userPalettes) {
   if (own) return own;
   return captureBands(fav?.config?.palette?.id, null, userPalettes, 0);
 }
+
+/** True only when the keep carries bands recorded at its own capture. A keep from before the bands existed has
+ *  none — bandsFor still draws it an honest fallback, but nothing about it may be labelled "at capture". */
+export function hasFrozenBands(fav) {
+  return sanitizeBands(fav?.bands) !== null;
+}

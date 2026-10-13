@@ -1,6 +1,6 @@
 // hitBands.selfcheck.mjs — the vibe bands on a HITS pill: three palette colours and one heat step, frozen at capture (#1124).
 import assert from 'node:assert';
-import { captureBands, sanitizeBands, bandsFor, dominantColors, HEAT_STEPS } from './hitBands.js';
+import { captureBands, sanitizeBands, bandsFor, hasFrozenBands, dominantColors, HEAT_STEPS } from './hitBands.js';
 import { heatStep, publishShownHeat, shownHeat, KINETIC_CHAOS_HEAT } from '../panels/layout/kineticHeat.mjs';
 import { captureFavorite, sanitizeFavorite } from '../state/slices/davisSlice.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -66,6 +66,15 @@ ok('duplicating a pill copies the recipe right after it, with its own id, and mi
   assert.equal(f[2].id, b.id, 'the rest keep their order');
   assert.equal(useStore.getState().keeps.length, keeps0, 'copying a pill is not finding anything');
   useStore.getState().duplicateFavorite('no-such-id'); assert.equal(useStore.getState().favorites.length, 3);
+});
+
+ok('a keep knows whether its bands were frozen at capture or drawn as a fallback', () => {
+  const frozen = sanitizeFavorite({ seed: 9, config: { palette: { id: 'praystation' } }, bands: { c: ['#112233', '#445566', '#778899'], h: 2 } });
+  assert.equal(hasFrozenBands(frozen), true);
+  const old = sanitizeFavorite({ seed: 9, config: { palette: { id: 'praystation' } } });
+  assert.equal(hasFrozenBands(old), false, 'no stored bands: the fallback may draw, never claim "at capture"');
+  assert.equal(hasFrozenBands({ bands: { c: [], h: 9 } }), false, 'junk bands are not frozen bands');
+  assert.equal(hasFrozenBands(null), false);
 });
 
 console.log(`hitBands.selfcheck: ${n} checks passed`);

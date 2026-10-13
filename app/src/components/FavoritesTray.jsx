@@ -7,7 +7,7 @@ import { recipeFieldsFromKept, copyTextToClipboard } from '../state/recipes.js';
 import { encodeRecipeUrl, buildShareHref } from '../state/recipeUrls.js';
 import { QUEUE_MAX_VISIBLE } from '../state/queueTransport.js';
 import { hitName, hitAge } from '../curator/hitName.js';
-import { bandsFor } from '../curator/hitBands.js';
+import { bandsFor, hasFrozenBands } from '../curator/hitBands.js';
 import { parseFavoriteTimestamp } from '../curator/loisActivity.js';
 
 const MAX_VISIBLE = QUEUE_MAX_VISIBLE; // #966 — the tray window IS the queue transport's setlist.
@@ -209,6 +209,7 @@ export function FavoritesTray() {
                   <span className={`hit-band heat h${bands.h}`} />
                 </span>
               </button>
+              <span className="hit-pill-sep" aria-hidden="true" />
               <button type="button" className="hit-pill-act" aria-label={`Duplicate hit ${i + 1}`} title="Duplicate (a setlist copy, not a new keep)"
                 disabled={!f.id} onClick={() => emit(Events.DAVIS_FAVORITE, { action: 'duplicate', id: f.id })}>⧉</button>
               <button type="button" className="hit-pill-act del" aria-label={`Delete hit ${i + 1}`} title="Remove from the setlist (the keep stays)"
@@ -232,7 +233,7 @@ export function FavoritesTray() {
             <div className="hit-detail-seed">seed {nm.hex}{age ? ` · captured ${age}` : ''}</div>
             <ul className="hit-detail-legend">
               {bands.c.map((c, k) => <li key={k}><i style={{ background: c }} />palette {k + 1}</li>)}
-              <li><i className={`heat h${bands.h}`} />heat {bands.h}/3 at capture</li>
+              <li><i className={`heat h${bands.h}`} />{hasFrozenBands(f) ? `heat ${bands.h}/3 at capture` : 'heat not recorded — kept before bands'}</li>
             </ul>
             <div className="hit-detail-more">
               <button type="button" onClick={() => copyLink(f)}>{copiedKey === key ? '✓ copied' : '⧉ share'}</button>
