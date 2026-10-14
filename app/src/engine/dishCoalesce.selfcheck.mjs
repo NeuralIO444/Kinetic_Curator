@@ -163,9 +163,13 @@ const assertSamePhysics = (a, b, label) => {
 };
 
 // (c) — physics byte-identity, coalescence on vs off.
+// #1412 note: pigment exchange (B3) rides the same harness and DOES
+// change item colours when pairs merge — isolating B2's claim here
+// ("the merge adds no item state") now takes pigment: false in both
+// runs; B3's own suite pins the colour consequence.
 {
-  const on = runSys(lpSwarm(), 90);
-  const off = runSys(lpSwarm(), 90, { coalesce: false });
+  const on = runSys(lpSwarm(), 90, { pigment: false });
+  const off = runSys(lpSwarm(), 90, { coalesce: false, pigment: false });
   assert.ok(on.maxFields > 0, 'the on run actually merged (the comparison is not vacuous)');
   assert.strictEqual(off.maxFields, 0, 'the off run never composes a field');
   assertSamePhysics(on.sys, off.sys, 'coalescence on == off');

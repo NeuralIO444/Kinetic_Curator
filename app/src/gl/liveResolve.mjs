@@ -25,6 +25,8 @@ import { createNoise } from '../engine/noise.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
 import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
+import { publishDishDensity, EMPTY_DISH_DENSITY } from '../engine/dishDensity.mjs'; // #1412: the shared grid's density field, published per frame
+import { dishPigmentShed } from './sceneContract.js'; // #1412: the tier-2 shed predicate (the governor's rule, one home)
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
@@ -171,6 +173,10 @@ export function createLiveResolver() {
   // itself runs inside the first enrolled system's update — see
   // engine/dishContacts.mjs for the protocol.
   const dishSession = createDishSession();
+  // #1412 — the density tick last published from the session (see the
+  // publish at the end of resolveLayers): a frame whose dish pass ran
+  // publishes its field; any other frame publishes the empty field.
+  let densityTickSeen = 0;
   // #432 — per-layer displacement warp phase, accumulated incrementally
   // (integral of noiseSpeed over each frame's dt) rather than derived as
   // speed × absolute session time. See the warp block below for why.
@@ -334,6 +340,10 @@ export function createLiveResolver() {
           // #1410 — the stillness flag (spread-only, never stored): the
           // deform step renders rest under reduced-motion.
           reducedMotion: !!ctx.reducedMotion,
+          // #1412 — the governor's tier-2 shed for pigment exchange
+          // (spread-only, never stored), computed per layer at the
+          // swarmItems call site from the frame's governor state.
+          pigmentShed: !!ctx.pigmentShed,
         },
         ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
         ctx.dtSec,
@@ -548,6 +558,9 @@ export function createLiveResolver() {
           motionSmoothing: input.motionSmoothing ?? layoutParams.motionSmoothing,
           // #1410 — forward the stillness flag to the swarm update.
           reducedMotion: !!input.reducedMotion,
+          // #1412 — the tier-2 pigment shed, from this frame's governor
+          // state (doc.perfTier1 + quality, sceneContract's predicate).
+          pigmentShed: dishPigmentShed({ perfTier1: !!input.perfTier1, quality: input.quality || 'balanced' }),
           // Spine F (#392): shared world noise + domain offset from seedOffsets.noise
           noise: worldNoise,
           noiseDomainOffset: (seedOffsets?.noise || 0) * 100,
@@ -901,6 +914,14 @@ export function createLiveResolver() {
     }
 
     prune(aliveIds, documentIds);
+    // #1412 — publish the frame's contact-density field (engine/
+    // dishDensity.mjs): the shared grid's per-cell body counts from
+    // this frame's pass, stamped on the session by the pass itself.
+    // A frame whose pass never ran (dish off, a single stratum, slow
+    // render) publishes the empty field — never a stale one. The
+    // shell bridges the holder to the bus (curator/dishDensityLive.js).
+    publishDishDensity(dishSession.densityTick > densityTickSeen ? dishSession.density : EMPTY_DISH_DENSITY);
+    densityTickSeen = dishSession.densityTick;
     // #1355: formed pins grow a moth (no pin formed: nothing happens). It hovers on the layer's own living-motion floor.
     creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
       // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)

@@ -241,4 +241,5 @@ export const Events = {
   CLOCK_BEAT: 'clock:beat', // #1458: { bar, beat, bpm } every whole beat of the loop clock
   CLOCK_BAR: 'clock:bar', // #1458: { bar, bpm } every downbeat
   ACTIVITY_HEARTBEAT: 'activity:heartbeat', // #1390 (G8): { ts, idleMs } — loisActivity publishes while the artist is active
+  DISH_DENSITY: 'dish:density', // #1412: { field } — the shared grid's contact-density field for the frame (engine/dishDensity.mjs; counts are that tick's, read-only)
 };

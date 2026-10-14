@@ -38,6 +38,7 @@
 // stack, chosen per Look, with #167 per-system contacts untouched.
 
 import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
+import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
 
 const TAU = Math.PI * 2;
 
@@ -81,6 +82,12 @@ export function createDishSession() {
     armed: false,
     _bySys: new Map(),
     _seq: 0,
+    // #1412 — the contact-density field from the most recent pass over
+    // this session (engine/dishDensity.mjs), stamped with a tick that
+    // advances once per consumed arm, so the resolver can publish the
+    // frame's field — or the empty one when no pass ran.
+    density: null,
+    densityTick: 0,
     // Grid scratch, grown on demand and reused across passes.
     _bEntry: [],
     _bIdx: null,
@@ -154,18 +161,36 @@ function activeEntries(session) {
  * true when this call consumed the arm. A caller that is not enrolled
  * leaves the arm for an enrolled system later in the frame.
  */
+/** #1412 — stamp the session's density field for this consumed arm. */
+function stampDensity(session, field) {
+  session.densityTick += 1;
+  field.tick = session.densityTick;
+  session.density = field;
+}
+
+const EMPTY_CELL_START = new Int32Array(1);
+
+/** #1412 — a consumed arm that built no grid still stamps a field:
+ *  the empty one, so a reader never mistakes last frame's crowd for
+ *  this frame's. */
+function stampEmptyDensity(session) {
+  stampDensity(session, buildDishDensity({
+    cellStart: EMPTY_CELL_START, cols: 0, rows: 0, cellSize: 0, minCx: 0, minCy: 0,
+  }));
+}
+
 export function runDishContacts(session, callerSys) {
   if (!session || !session.armed) return false;
   if (!session._bySys.has(callerSys)) return false;
   session.armed = false;
 
   const active = activeEntries(session);
-  if (active.length < 2) return true;
+  if (active.length < 2) { stampEmptyDensity(session); return true; }
 
   // Flatten bodies in canonical order (stratum order, then particle index).
   let total = 0;
   for (const e of active) total += e.sys.n;
-  if (total < 2) return true;
+  if (total < 2) { stampEmptyDensity(session); return true; }
 
   const bEntry = session._bEntry;
   bEntry.length = 0;
@@ -196,7 +221,7 @@ export function runDishContacts(session, callerSys) {
       nb++;
     }
   }
-  if (nb < 2 || !(maxR > 0)) return true;
+  if (nb < 2 || !(maxR > 0)) { stampEmptyDensity(session); return true; }
 
   // One shared counting-sort hash over all bodies — the same construction
   // as _buildSpatialHash (cell extent from the bodies, never clamped to
@@ -250,6 +275,12 @@ export function runDishContacts(session, callerSys) {
     session._order = order;
   }
   for (let b = 0; b < nb; b++) order[fill[cellOf[b]]++] = b;
+
+  // #1412 — the density field: the counting sort above IS a per-cell
+  // body count over this tick's snapshot (cellStart is not touched by
+  // the pair loop below; `fill` took the mutation). Measurements only
+  // — nothing in the pass reads it back.
+  stampDensity(session, buildDishDensity({ cellStart, cols, rows, cellSize, minCx, minCy }));
 
   // Pair loop: ascending canonical body order; per body the same
   // ox-outer/oy-inner 3x3 walk as the boids/contact loops; each unordered

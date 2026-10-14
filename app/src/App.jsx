@@ -37,6 +37,7 @@ import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.j
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
 import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomProvider, noteKeep } from './curator/formationLive.js';
+import { observeDishDensity } from './curator/dishDensityLive.js'; // #1412: the contact-density field, onto the bus
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
@@ -100,6 +101,7 @@ function AppInner() {
       observeAudio(input && input.loopTimeMs, readMeterBandLevels(), useStore.getState().audioSource && useStore.getState().audioSource.type);
       observeDish(input, output);
       observeFormation(input, output);
+      observeDishDensity(); // #1412: the shared grid's density field, published on the bus for formation/telemetry readers
       // #1355 AUTO SPAWN: each creature the artist asked for finds a home in the middle of the dish. The homes are
       // published as `dishPins`, which the resolver reads on the next frame (so a take records them).
       const st = useStore.getState();

@@ -30,6 +30,7 @@ import { createNoise } from './noise.js';
 import { runDishContacts, contactBodyRadius } from './dishContacts.mjs'; // #1407 — cross-strata shared grid (call site below); #1408 — the shared radius law
 import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mjs'; // #1410 — impact deform (call sites below; the law lives in the module)
 import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
+import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -157,6 +158,9 @@ export class ParticleSystem {
     this._coalesceOn = undefined;
     this._coalesce = null;
     this._coalesceFields = null;
+    // #1412 — pigment exchange switch (law in dishPigment.mjs). Same
+    // spread-only params convention as deform/coalesce.
+    this._pigmentOn = undefined;
     // Authored population from the last init — tracked separately from the
     // runtime population (this.n), which `breed` grows past the authored
     // count. update() re-inits only when the authored count changes, so
@@ -847,6 +851,7 @@ export class ParticleSystem {
     // another system's update) and the end-of-step composer agree.
     this._deformOn = layoutParams.deform !== false;
     this._coalesceOn = layoutParams.coalesce !== false; // #1411 — same spread-only switch
+    this._pigmentOn = layoutParams.pigment !== false; // #1412 — same spread-only switch
     const deformStill = !!layoutParams.reducedMotion;
     // #710 — restart-from-seed: entering the lorenz behave re-seeds every
     // agent's Lorenz phase state from the seeded hashes, so re-tapping the
@@ -906,6 +911,10 @@ export class ParticleSystem {
           cols[i] = swatches[s];
           this.colorSlot[i] = s; // #1237 — keep the slot with the re-resolved color
         }
+        // #1412 — the pigment working copy re-seeds from the new
+        // colours (law in dishPigment.mjs): earned pigment belongs to
+        // the palette that earned it; the new palette takes over.
+        syncDishPigment(this);
       }
     }
     const noise = this._noise;
@@ -1484,6 +1493,11 @@ export class ParticleSystem {
     // compose this step's merge fields (law in dishCoalesce.mjs). State
     // only, like the deform step above — physics never reads it.
     stepDishCoalesce(this, { reducedMotion: deformStill });
+    // #1412 — petri dish B3: the pairs B2's step just composed trade
+    // pigment (law in dishPigment.mjs). Colour state only — the trade
+    // writes the pigment working copy and color[], never a physics
+    // column, so it runs after the coalescence step by construction.
+    stepDishPigment(this, dtSec, { reducedMotion: deformStill, shed: !!layoutParams.pigmentShed });
   }
 
   getItems(activeAssets) {
