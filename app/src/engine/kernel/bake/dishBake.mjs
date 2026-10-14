@@ -68,6 +68,12 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
       // the live resolver enrols it: an accumulating stratum deposits
       // trails in the bake on the same terms as live.
       accum: !!layer.layoutParams.accumulation,
+      // #1416 — the stratum's ecology MODE and its cap, enrolled
+      // exactly as the live resolver enrols them (the same threaded
+      // maxParticles the params below carry): an ecology bake breeds,
+      // is gated, and thins on the same terms as the live dish.
+      ecology: !!layer.layoutParams.ecology,
+      cap: layer.maxParticles ?? layer.count,
     });
     keys.push(layer.key);
     return { layer, sys, params, steps: layer.steps ?? steps };

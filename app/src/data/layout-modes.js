@@ -4,6 +4,7 @@ import { BEHAVE_IDS } from '../engine/organisms/behave.js';
 import { COMPOSITION_PRESETS } from './presets.js';
 import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
+import { TRAIL_MODES } from '../gl/trailMode.mjs'; // #560 — the trail vocabulary (resolveTrail's list)
 import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
 import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
 
@@ -229,6 +230,15 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // existing document; a document that predates A3 opens with the same
   // behaviour it was saved with, and the switch is there to choose.
   dish: true,
+  // #1416 (petri dish C4) — the ecology MODE: dish population law
+  // (one pooled cap at the governor, density-gated breed, crowding
+  // die pressure), per the spec's open-question-3 recommendation
+  // that ecology is a performance decision, not a default behaviour.
+  // Default OFF: while off, an enrolled stratum's populations are
+  // exactly as dealt. No migration case for old saves: every shipped
+  // voice and preset carries contactRadius 0, so no existing
+  // document enrols in the dish at all (A3's record).
+  ecology: false,
 
   audioModDepth: 0.65,
   audioScaleMod: 0.45,
@@ -417,7 +427,7 @@ export const RANGE_HARD = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'glass', 'dish']; // #268: recolor removed; #1202: mirror is a 4-state enum now; #1409: dish is the per-Look cross-strata switch
+const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'glass', 'dish', 'ecology']; // #268: recolor removed; #1202: mirror is a 4-state enum now; #1409: dish is the per-Look cross-strata switch; #1416: ecology is the per-Look dish population mode
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -640,6 +650,18 @@ export function normalizeLayoutParams(partial) {
   next.fieldMapField = pickEnum(next.fieldMapField, FIELDMAP_FIELDS, 'off');
   next.fieldMapChannel = pickEnum(next.fieldMapChannel, FIELDMAP_CHANNELS, 'off');
   next.fieldMapCurve = pickEnum(next.fieldMapCurve, FIELDMAP_CURVES, 'smooth');
+  // #1416 — the two string params that rode verbatim: `trail` has a
+  // canonical vocabulary (#560, the same list resolveTrail reads), so
+  // it takes the enum clamp like every other string enum. `material`
+  // deliberately has none — #268 retired its vocabulary with the SVG
+  // renderer, and old documents carry retired values ('wash',
+  // 'stipple') that the export disclosure (gl/sceneContract) still
+  // reads by name — so its clamp is type-only: any string is a name,
+  // a non-string is the default. Both holes were the same shape: a
+  // non-string (NaN above all) survived sanitising verbatim, and NaN
+  // is not JSON-stable, so parse stopped being a fixed point.
+  next.trail = pickEnum(next.trail, TRAIL_MODES, DEFAULT_LAYOUT_PARAMS.trail);
+  next.material = typeof next.material === 'string' ? next.material : DEFAULT_LAYOUT_PARAMS.material;
 
   return next;
 }
