@@ -44,6 +44,7 @@
 import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
 import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
 import { ensureEntryTrails } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
+import { ensureEcologyEntry, removeEcologyEntry } from './dishEcology.mjs'; // #1416 — the ecology ledger's enrolment (the law lives in the module)
 import { clampWetness, dishMediumFor, mediumClingCapture } from './dishMedium.mjs'; // #1413 — the medium across the seam
 
 const TAU = Math.PI * 2;
@@ -99,6 +100,12 @@ export function createDishSession() {
     // accumulating enrolment and null until then — null is the dish's
     // "ACCUM was never up" fact, and every trail read resolves off it.
     trailTotal: null,
+    // #1416 — the ecology ledger (engine/dishEcology.mjs): the pooled
+    // population accounting of the strata that carry the ecology
+    // mode, created lazily by the first such enrolment and undefined
+    // until then — its absence is the dish's "ecology was never
+    // dealt" fact, and every ecology resolution reads off it.
+    ecology: undefined,
     // Grid scratch, grown on demand and reused across passes.
     _bEntry: [],
     _bIdx: null,
@@ -120,8 +127,13 @@ export function createDishSession() {
  *   `accum` is #1415: the stratum's ACCUMULATION switch — truthy gives
  *   the entry a trail field to deposit into (dishTrails.mjs); absent or
  *   false enrols a reader that lays nothing.
+ *   `ecology` + `cap` are #1416: the stratum's ecology MODE and the
+ *   governor's cap the driver threaded for it (its maxParticles) —
+ *   truthy ecology joins the entry to the session's population ledger
+ *   (dishEcology.mjs) at that cap; absent or false enrols a stratum
+ *   the mode does not govern.
  */
-export function enrolDishBody(session, { key, sys, radius, restitution, contactMode, umask, organism, wetness, accum }) {
+export function enrolDishBody(session, { key, sys, radius, restitution, contactMode, umask, organism, wetness, accum, ecology, cap }) {
   let e = session._bySys.get(sys);
   if (!e) {
     e = { key, sys, seq: session._seq++ };
@@ -137,6 +149,16 @@ export function enrolDishBody(session, { key, sys, radius, restitution, contactM
   e.umask = (umask ?? 0xffffffff) >>> 0;
   e.organism = !!organism;
   e.wetness = clampWetness(wetness); // absent/junk enrols dry (pre-C1)
+  // #1416 — the ecology bookkeeping: membership follows the latest
+  // dealt mode, the cap is the governor's number for this stratum
+  // (a junk cap enrols at the dealt population — the roster is the
+  // honest budget when the governor named none), and the member's
+  // living count refreshes here, before its update runs.
+  e.ecology = !!ecology;
+  e.cap = Number.isFinite(cap) && cap > 0
+    ? Math.floor(cap)
+    : Math.max(0, (sys && sys._authoredCount) || (sys ? sys.n : 0) || 0);
+  ensureEcologyEntry(session, e);
   // #1415 — an accumulating stratum deposits trails; enrolment creates
   // its field (and the session's total) here so the first tick can lay.
   if (accum) ensureEntryTrails(session, e);
@@ -147,6 +169,7 @@ export function enrolDishBody(session, { key, sys, radius, restitution, contactM
 export function releaseDishBody(session, sys) {
   const e = session._bySys.get(sys);
   if (!e) return;
+  removeEcologyEntry(session, e); // #1416 — its cap share leaves the pool with it
   session._bySys.delete(sys);
   const at = session.entries.indexOf(e);
   if (at >= 0) session.entries.splice(at, 1);

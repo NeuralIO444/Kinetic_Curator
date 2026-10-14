@@ -322,6 +322,12 @@ export function createLiveResolver() {
       // same way: up, the stratum deposits trails into the shared
       // ground (the bake driver enrols the same field).
       accum: !!ctx.layoutParams.accumulation,
+      // #1416 — the stratum's ecology MODE and the governor's cap
+      // ride enrolment the same way: in the mode, the stratum joins
+      // the dish's pooled population ledger at this cap (the bake
+      // driver enrols the same fields through the same helper).
+      ecology: !!ctx.layoutParams.ecology,
+      cap: ctx.caps?.maxParticles,
     });
     if (!ctx.slowRender) {
       // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().

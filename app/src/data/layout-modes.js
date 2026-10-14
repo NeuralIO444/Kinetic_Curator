@@ -229,6 +229,15 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // existing document; a document that predates A3 opens with the same
   // behaviour it was saved with, and the switch is there to choose.
   dish: true,
+  // #1416 (petri dish C4) — the ecology MODE: dish population law
+  // (one pooled cap at the governor, density-gated breed, crowding
+  // die pressure), per the spec's open-question-3 recommendation
+  // that ecology is a performance decision, not a default behaviour.
+  // Default OFF: while off, an enrolled stratum's populations are
+  // exactly as dealt. No migration case for old saves: every shipped
+  // voice and preset carries contactRadius 0, so no existing
+  // document enrols in the dish at all (A3's record).
+  ecology: false,
 
   audioModDepth: 0.65,
   audioScaleMod: 0.45,
@@ -417,7 +426,7 @@ export const RANGE_HARD = {
 };
 
 const RANGE_KEYS = Object.keys(RANGE_SPEC);
-const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'glass', 'dish']; // #268: recolor removed; #1202: mirror is a 4-state enum now; #1409: dish is the per-Look cross-strata switch
+const BOOL_KEYS = ['bleed', 'overlap', 'accumulation', 'glass', 'dish', 'ecology']; // #268: recolor removed; #1202: mirror is a 4-state enum now; #1409: dish is the per-Look cross-strata switch; #1416: ecology is the per-Look dish population mode
 
 /** Names that would shadow Object.prototype if copied onto a plain object. */
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
