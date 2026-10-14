@@ -430,3 +430,89 @@ integrator take call sites only.
 - **Switch.** No artist knob beyond WETNESS itself: the medium
   follows the knob wherever contacts run. There is no update-level
   off switch — dry is the off, and it is exact.
+
+## The currents — the medium moves, by mass (#1414, petri dish C2)
+
+C1 gave the dish a medium; C2 gives the medium motion. Inside the
+dish the wind stops being a force and becomes a current: a body no
+longer gets pushed by the field, it rides it — carried up to the
+field's velocity if it is slower, dragged back if it is faster,
+at a rate set by its own mass. Light strata migrate with the
+weather; heavy strata hold ground against it. The law lives in
+`app/src/engine/dishCurrents.mjs`; the force pass in
+`particles.js` takes call sites only.
+
+- **The law.** One term structure for both sources:
+  acceleration += (target velocity − body velocity) × coupling /
+  mass. A push cannot brake; advection does both, which is what
+  makes it a current rather than a stronger wind. Strength rides
+  the coupling, never the target, so strength 0 makes the term
+  exactly absent — never a drag toward rest. Coupling =
+  CURRENT_COUPLING (0.02) × strength, resolved once per update by
+  `dishCurrentsFor`, the C1 resolution shape.
+- **Wind.** The target is the field's own shape read as a
+  velocity, at CURRENT_SPEED (1.2): the curl branch's target is
+  the raw curl vector × 1.2; the point branch's is
+  (cos, sin) × (noise + 1) × 0.4 × 1.2 — the shape the legacy
+  force always used, with the strength factored out of the
+  magnitude into the coupling. The field itself is untouched (the
+  issue's words): same noise, same sample points, same weather —
+  only what a body does in it changed. Entrainment is a time
+  constant, mass / coupling: ~20 steps for a light body, ~150
+  for a heavy one.
+- **Chemotaxis.** The well attractor rides the same term: target
+  = unit direction to the well × ATTRACTOR_DRIFT_SPEED (0.9) ×
+  the group's sign, where the sign is the behave row's shipped
+  seek gain (#584/#711) — seek rows drift toward the well, flee
+  rows are driven from it, the per-group reading the instrument
+  already performs. Strength = gravityWells × attract × |seek
+  gain|. Inside the dish it replaces the legacy ATTRACTOR_GAIN
+  force under the same guards (wells > 0, attract > 0, and the
+  d > 5 dead zone, kept).
+- **The gate.** Currents exist only where the dish does
+  (contactRadius > 0), C1's gate exactly. Outside it both legacy
+  forces run byte-for-byte: the manifest's reference-engine
+  parity (particles.selfcheck, including its wind-heavy case)
+  and the seek/flee suite pin them, and the currents suite
+  re-pins both legacy closed forms at the gate's edge. The WASM
+  swarm path never sees a current — it already excludes
+  contactRadius > 0 casts.
+- **Wind off = pre-C2, exactly** (the acceptance line). At wind
+  0 the resolution is the frozen off object and no term is
+  added; `dishCurrents.selfcheck.mjs` proves a dish cast at
+  wind 0 bit-identical to the same cast with no dish at all,
+  attractor present or not, over 240 steps.
+- **Acceptance, measured.** Same seed, full 40-body casts, 480
+  steps, curl current: the STRAW stratum (m = 0.4) travels a mean
+  491px with its centroid carried 128px downstream; the PEARL
+  stratum (m = 3) travels 59px, centroid 2px. On the pre-C2
+  engine the same fixture's PEARL stratum travelled 350px — the
+  strata were separated by degree; now they are separated by
+  kind. Pure single-body casts (the current the only force):
+  the light body rides at ~4× the heavy body's speed and path —
+  the per-step damping floor compresses the 7.5× coupling
+  ratio — and the heavy body never entrains (0.05–0.07 px/step).
+- **Chemotaxis, measured.** Single bodies, well east of centre,
+  480 steps: light seekers pool (mean distance 384 → 108px);
+  heavy seekers drift but lag (384 → 278px); light fleers are
+  driven off (384 → 549px); the wells-closed control does not
+  approach (384 → 383px).
+- **Determinism & parity.** The law is stateless arithmetic on
+  params and the step's own field sample — no clock, no dice, no
+  step counter — and the bake steps the same update(), so a
+  baked dish rides the currents: the suite's bake repeats bit
+  for bit and is not the contactless legacy trajectory.
+- **Stillness.** Currents are physics, not a render attribute
+  (C1's precedent): there is no reduced-motion split to make.
+  Under reduced motion the dish resolves once and holds, so
+  nothing integrates and nothing advects; when it steps, the
+  currents apply as in any bake.
+- **Governor.** No cost tier and no shed — C1's precedent,
+  followed deliberately. A shed that rewrote physics
+  mid-performance would break bake parity, since bakes carry no
+  governor state. The cost is two axis evaluations per body per
+  step inside a force pass that already samples the field.
+- **Switch.** No new knob, and the per-Look DISH switch does not
+  gate the currents: they follow the wind and attractor knobs
+  wherever the dish runs, as C1's medium follows WETNESS. Wind 0
+  and wells 0 are the offs, and they are exact.

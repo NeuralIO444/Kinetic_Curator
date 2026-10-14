@@ -32,6 +32,7 @@ import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mj
 import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
 import { dishMediumFor, mediumClingCapture, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module)
+import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -1063,6 +1064,19 @@ export class ParticleSystem {
     const seekMul = organism
       ? resolveSeekGain(profile)
       : resolveSeekGain(resolveBehave(layoutParams.behave));
+    // #1414 — the currents, resolved once per system-step (law in
+    // dishCurrents.mjs): in the dish (contactRadius > 0 — the gate
+    // C1 set for the medium) the wind and the attractor stop pushing
+    // and start carrying — each becomes a velocity the body relaxes
+    // toward at a rate inverse to its mass. Outside the dish both
+    // hold NO_CURRENTS and the legacy force terms below run
+    // bit-identical. The attractor's strength folds its knobs and
+    // the row's seek gain together; a zero anywhere resolves off,
+    // where the legacy term computes exactly zero anyway.
+    const windCurrents = contactRadius > 0 ? dishCurrentsFor(windMul) : NO_CURRENTS;
+    const attractorCurrents = contactRadius > 0
+      ? dishCurrentsFor(gravityWells * attractMul * Math.abs(seekMul))
+      : NO_CURRENTS;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
     const sepRadius2 = sepRadius * sepRadius;
@@ -1108,8 +1122,16 @@ export class ParticleSystem {
           0.5,
           this._curlOut,
         );
-        fax += (this._curlOut.x * 0.8 * windMul) / m;
-        fay += (this._curlOut.y * 0.8 * windMul) / m;
+        if (windCurrents.on) {
+          // #1414 — the wind is the dish's current: the body relaxes
+          // toward the field's velocity (the curl vector, scaled to a
+          // speed), coupled by inverse mass. Field untouched.
+          fax += advectAxis(this._curlOut.x * CURRENT_SPEED, VX[i], windCurrents.coupling, m);
+          fay += advectAxis(this._curlOut.y * CURRENT_SPEED, VY[i], windCurrents.coupling, m);
+        } else {
+          fax += (this._curlOut.x * 0.8 * windMul) / m;
+          fay += (this._curlOut.y * 0.8 * windMul) / m;
+        }
       } else {
         const nval = noise.noise3D(
           pxi * noiseFreq + domainOffsetX,
@@ -1117,13 +1139,22 @@ export class ParticleSystem {
           nt + this.seedOffset[i] * 0.0001,
         );
         const windAngle = nval * TAU;
-        const windMag = (noise.noise3D(
+        const windShape = (noise.noise3D(
           pxi * noiseFreq + 200 + domainOffsetX,
           pyi * noiseFreq + 200 + domainOffsetY,
           nt,
-        ) + 1.0) * 0.4 * windMul;
-        fax += (T.cos(windAngle) * windMag) / m;
-        fay += (T.sin(windAngle) * windMag) / m;
+        ) + 1.0) * 0.4;
+        if (windCurrents.on) {
+          // #1414 — point wind as a current: same shape, strength
+          // factored out of the magnitude into the coupling, so the
+          // target is the field's velocity and wind 0 is absence.
+          fax += advectAxis(T.cos(windAngle) * windShape * CURRENT_SPEED, VX[i], windCurrents.coupling, m);
+          fay += advectAxis(T.sin(windAngle) * windShape * CURRENT_SPEED, VY[i], windCurrents.coupling, m);
+        } else {
+          const windMag = windShape * windMul;
+          fax += (T.cos(windAngle) * windMag) / m;
+          fay += (T.sin(windAngle) * windMag) / m;
+        }
       }
 
       if (organism && profile.orbit) {
@@ -1141,9 +1172,22 @@ export class ParticleSystem {
         const dy = attractor.y - pyi;
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d > 5) {
-          const forceMag = (gravityWells * attractMul * ATTRACTOR_GAIN * seekMul) / Math.max(20, d * 0.05);
-          fax += ((dx / d) * forceMag) / m;
-          fay += ((dy / d) * forceMag) / m;
+          if (attractorCurrents.on) {
+            // #1414 — chemotaxis rides the same term structure as the
+            // current: the body relaxes toward a drift velocity
+            // along the well's axis — toward it for a seeking group
+            // (food, light), away for a fleeing one (threat), the
+            // sign being the row's seek gain (#584). The target
+            // flips with the direction, so seekers pool at the well
+            // instead of diving through it.
+            const drift = ATTRACTOR_DRIFT_SPEED * attractorDriftSign(seekMul);
+            fax += advectAxis((dx / d) * drift, VX[i], attractorCurrents.coupling, m);
+            fay += advectAxis((dy / d) * drift, VY[i], attractorCurrents.coupling, m);
+          } else {
+            const forceMag = (gravityWells * attractMul * ATTRACTOR_GAIN * seekMul) / Math.max(20, d * 0.05);
+            fax += ((dx / d) * forceMag) / m;
+            fay += ((dy / d) * forceMag) / m;
+          }
         }
       }
 
