@@ -47,6 +47,7 @@ import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=
 import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
 import { createPresenceDriver } from './curator/mindPresenceLive.js'; // #1464: Mind 3 — engagement tiers + zodiac
 import { startGhost, resetGhost } from './curator/mindGhost.js'; // #1464: the third's presence on the Stimuli meter
+import { startMindRoom, getMindRoom } from './curator/mindRoom.js'; // #1145: the Director's room, as the minds hear it
 import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/playback.mjs'; // #1462: a take's decisions replay
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
@@ -144,6 +145,7 @@ function AppInner() {
     // #1464 — Mind 3: hidden per-persona engagement (persisted on this machine), four tiers, the zodiac character and
     // one startup calendar reading. Works the same on Apple and on the rules.
     const stopGhost = startGhost();
+    const stopRoom = startMindRoom(); // #1145: director:room → the personas' context (verdict + intensity band)
     const presence = createPresenceDriver({
       getSignals: () => {
         const f = loisActivity.snapshot();
@@ -166,7 +168,7 @@ function AppInner() {
           layers: st.layers, enabledAssetCount: st.enabledAssets ? Object.values(st.enabledAssets).filter(Boolean).length : 0,
           paletteId: st.paletteId, room: roomCodes(), band: getStressState().band, keepsCount: Array.isArray(st.keeps) ? st.keeps.length : 0,
           bpm: st.beatBpm, audio: st.audioEnabled ? (st.audioSource && st.audioSource.type === 'file' ? 'file' : 'mic') : 'none',
-          creatures: st.creatureCount,
+          creatures: st.creatureCount, director: getMindRoom(),
         };
       },
     });
@@ -190,7 +192,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopGhost(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopGhost(); stopRoom(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

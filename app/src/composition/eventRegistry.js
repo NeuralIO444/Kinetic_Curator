@@ -105,6 +105,7 @@ export const EVENT_REGISTRY = {
   MIND_STATUS: { handler: null, note: 'telemetry: which backend answers (#1462); for the dev panel, no UI announces it' },
   MIND_REQ: { handler: null, note: 'telemetry: a persona asked the on-device model (#1463)' },
   MIND_REPLY: { handler: null, note: 'telemetry: every answer with its backend and latency (#1463); the thinker decides whether it is used' },
+  DIRECTOR_ROOM: { handler: ["curator/mindRoom.js"] },
   CLOCK_BEAT: { handler: null, note: 'telemetry: published by clockLive each whole beat; listeners arrive with audio events and the Queen (#1459, #1460)' },
   CLOCK_BAR: { handler: ["curator/paceLive.js"] },
   ACTIVITY_HEARTBEAT: { handler: null, note: "telemetry: published by loisActivity (#1390); no listener yet" },

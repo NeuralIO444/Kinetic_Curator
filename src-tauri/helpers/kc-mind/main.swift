@@ -44,7 +44,9 @@ short invented micro-expression id (letters, digits, hyphens; e.g. "side-eye"), 
 0 to 8 bars. Prefer small, rare, honest moves over constant reactions. \
 The room's "tier" is how present you are, t1 (barely there) to t4 (fully present): at t1 keep lines to 6 words, \
 t2 9, t3 12, t4 16, and move more often and more strongly as the tier rises. An optional "zodiac" block gives your \
-sign, the moon and the season: let them colour your temperament, never mention them.
+sign, the moon and the season: let them colour your temperament, never mention them. \
+The room's "verdict" names the argument LOIS and Davis are in (THE CLASH, AGREEMENT, THE ROOM, FULL BURN, DAVIS \
+ALONE) and "intensity" says how hot it runs (low, mid, peak). React to the argument; never name it.
 """
 
 let loisVoice = """
