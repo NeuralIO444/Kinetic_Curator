@@ -9,7 +9,7 @@
 // (`by: 'davis'`), and handed to the take's recorder. Muted while a take plays: the take's own record speaks.
 // It never invents an edit: the proposal came from a persona decision (rules or Apple), validated by the contract.
 import { on, emit, Events } from '../composition/eventBus.js';
-import { createConductor, createFlatness, applyRouteOp, describeOp, DAVIS_TAG, PHRASE_BARS } from './mindConduct.js';
+import { createConductor, createFlatness, applyRouteOp, describeOp, flatBias, DAVIS_TAG, PHRASE_BARS } from './mindConduct.js';
 import { DEFAULT_ROUTES } from '../gl/audioRoutes.mjs';
 
 /** Which dial of the artist's belongs to which route target: moving it by hand owns the target (decision 3). */
@@ -52,11 +52,12 @@ const notify = () => { for (const f of subs) { try { f(); } catch { /* a listene
  * @param getRoutes   () => the scene's route table (null = the default table)
  * @param getTier     () => 't1'..'t4' | null   Davis's engagement tier
  * @param getBands    () => number[7] | null    the band levels now (null: audio off)
+ * @param getActivity () => { keeps, rolls } in the recent window (LOIS's keep-rate read); absent = no bias
  * @param isReplaying () => boolean
  * @param subscribe   (fn(state, prev)) => unsubscribe   the store's subscribe: the artist's route and dial edits
  * @returns { showBlock(), conductor, stop() }
  */
-export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => false, subscribe = null }) {
+export function startTrio({ getRoutes, getTier, getBands, getActivity = null, isReplaying = () => false, subscribe = null }) {
   const conductor = createConductor();
   const flatness = createFlatness();
   const audio = { on: false, energy: null, bpm: null, confidence: 0, silent: false, onsets: 0, onsetsThisBar: 0, sinceBars: 0 };
@@ -64,6 +65,7 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
   const log = []; // the last LOG_MAX outcomes, newest first
   let applying = false; // our own table write: not the artist
   let bar = 0;
+  let bias = 0; // LOIS's keep-rate read, -1..+1
   const stops = [];
 
   const publish = () => {
@@ -72,7 +74,7 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
     const table = effective(getRoutes());
     view = {
       on: audio.on, energy: audio.energy, bpm: audio.bpm, silent: audio.silent, sinceBars: audio.sinceBars,
-      flatBars: flatness.flatBars(), tier, cooling: conductor.cooling(bar), owned: conductor.owned(),
+      flatBars: flatness.flatBars(), flatBelow: flatness.threshold(), bias, tier, cooling: conductor.cooling(bar), owned: conductor.owned(),
       routes: table.length, mine: table.filter((r) => r.by === DAVIS_TAG).length,
       pending: pending ? { desc: describeOp(pending.op), landBar: pending.landBar } : null,
       log: log.slice(),
@@ -120,6 +122,10 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
     audio.onsets = audio.onsetsThisBar; audio.onsetsThisBar = 0;
     let bands;
     try { bands = audio.silent ? null : getBands(); } catch { bands = null; }
+    let act;
+    try { act = getActivity ? getActivity() : null; } catch { act = null; }
+    bias = flatBias(act || {});
+    flatness.setBias(bias);
     flatness.push(bands);
     if (pending && p.bar >= pending.landBar) land(p.bar);
     publish();

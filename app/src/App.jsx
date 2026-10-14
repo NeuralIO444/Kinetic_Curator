@@ -167,6 +167,8 @@ function AppInner() {
       getRoutes: () => useStore.getState().audioRoutes,
       getTier: () => presence.contextFor('davis').tier,
       getBands: () => { const b = readMeterBandLevels(); return b ? Object.values(b) : null; },
+      // LOIS's keep-rate read (Matt, 2026-10-14): keeping a lot lets a steady show ride; passes piling up make her call it flat sooner
+      getActivity: () => { const f = loisActivity.snapshot(); return { keeps: f.keepsLast5m, rolls: f.rollsLast5m }; },
       isReplaying: isPlaybackActive,
       subscribe: (fn) => useStore.subscribe(fn),
     });

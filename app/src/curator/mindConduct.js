@@ -194,6 +194,29 @@ export function davisRoute(show, seed = 0) {
 }
 
 // ── LOIS: is the show flat? ─────────────────────────────────────────────────────────────────────────────────────────
+/** How hard the keep-rate may move LOIS's flat-show threshold: +/- this share of it (0.5 = from half to one and a half). */
+export const FLAT_BIAS_SWING = 0.5;
+/** A keep for about one roll in seven is the rate she reads as "happy with what is happening". */
+const HAPPY_KEEP_RATE = 0.15;
+/** Fewer rolls than this is not enough to read a rate from: the bias eases in. */
+const BIAS_FULL_AT_ROLLS = 8;
+
+/**
+ * LOIS's keep-rate read, in -1..+1. Pure. Keeping a lot (a high keep rate) is -1: she loosens, and lets a steady show
+ * ride. Rolling past frame after frame without keeping (passes pile up) is +1: she tightens, and calls it flat sooner.
+ * No rolls, or only a few, is near 0: there is nothing to read yet.
+ * @param keeps keeps in the recent window
+ * @param rolls rolls in the same window (a pass is a roll nobody kept)
+ */
+export function flatBias({ keeps, rolls } = {}) {
+  const r = Number.isFinite(rolls) && rolls > 0 ? rolls : 0;
+  if (r === 0) return 0;
+  const k = Number.isFinite(keeps) && keeps > 0 ? Math.min(keeps, r) : 0;
+  const rate = k / r;
+  const lean = Math.max(-1, Math.min(1, (HAPPY_KEEP_RATE - rate) / HAPPY_KEEP_RATE)); // 0 keeps: +1; at 0.3 or more: -1
+  return lean * Math.min(1, r / BIAS_FULL_AT_ROLLS);
+}
+
 /**
  * The show is flat when the sound is on, and either every band has stopped moving over a phrase (a held tone, a pinned
  * signal) or the bands are all pinned near the top. Silence is not a failed show. Pure state machine fed one sample a bar.
@@ -201,6 +224,7 @@ export function davisRoute(show, seed = 0) {
 export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel = 0.05, pinned = 0.92 } = {}) {
   const rows = [];
   let flatBars = 0;
+  let epsNow = eps; // eps, moved by the keep-rate bias
   const unit = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
   const reading = () => {
     if (rows.length === 0) return { level: 0, spread: 0, full: false };
@@ -223,11 +247,15 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
       rows.push(bands.map(unit));
       if (rows.length > windowBars) rows.shift();
       const r = reading();
-      const flat = r.full && r.level >= minLevel && (r.spread < eps || r.level > pinned);
+      const flat = r.full && r.level >= minLevel && (r.spread < epsNow || r.level > pinned);
       flatBars = flat ? flatBars + 1 : 0;
       return flat;
     },
     flatBars: () => flatBars,
+    /** LOIS's keep-rate read (flatBias): -1 loosens (how still it must be falls), +1 tightens (a livelier show is called flat). */
+    setBias(b) { epsNow = eps * (1 + FLAT_BIAS_SWING * (Number.isFinite(b) ? Math.max(-1, Math.min(1, b)) : 0)); },
+    /** The spread under which the bands read as held, as moved by the bias. */
+    threshold: () => epsNow,
     reading,
     reset() { rows.length = 0; flatBars = 0; },
   };

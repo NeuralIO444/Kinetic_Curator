@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   validateRouteOp, applyRouteOp, opTargets, landingBar, phraseOf, PRESETS, davisRoute, createFlatness, createConductor,
-  PHRASE_BARS, TIER_OPS, BACKOFF_REVERTS, BACKOFF_BARS, ENERGY_LEVELS, DAVIS_MAX_ROUTES, describeOp,
+  PHRASE_BARS, TIER_OPS, BACKOFF_REVERTS, BACKOFF_BARS, ENERGY_LEVELS, DAVIS_MAX_ROUTES, describeOp, flatBias, FLAT_BIAS_SWING,
 } from './mindConduct.js';
 import { validateReply, wantsStage, neutralReply } from './mindContract.js';
 import { rulesReply } from './mindRules.js';
@@ -142,6 +142,29 @@ ok('LOIS: a pinned flat signal is a failed show within a phrase; music and silen
   assert.equal(pinned, true, 'pinned at the top is flat even with a little wiggle');
   f.push(null); assert.equal(f.flatBars(), 0, 'no audio clears the run');
   assert.equal(createFlatness().push([NaN, 'x', undefined]), false, 'junk is a silent sample, never a throw');
+});
+
+ok('LOIS\'s keep-rate read: keeping a lot loosens her flat-show threshold, passes piling up tighten it, little evidence is neutral', () => {
+  assert.equal(flatBias({}), 0); assert.equal(flatBias({ keeps: 3, rolls: 0 }), 0, 'no rolls: nothing to read');
+  assert.ok(flatBias({ keeps: 0, rolls: 12 }) > 0.99, 'twelve rolls and no keep: tight');
+  assert.ok(flatBias({ keeps: 5, rolls: 12 }) < -0.99, 'a keep for every two or three rolls: loose');
+  assert.ok(Math.abs(flatBias({ keeps: 2, rolls: 13 })) < 0.1, 'about her happy rate: neutral');
+  assert.ok(Math.abs(flatBias({ keeps: 0, rolls: 2 })) < 0.3, 'two rolls is not enough to lean on: it eases in');
+  assert.ok(flatBias({ keeps: 9, rolls: 3 }) <= 0 && flatBias({ keeps: 9, rolls: 3 }) >= -1, 'more keeps than rolls is clamped, not extreme');
+  for (const j of [{ keeps: NaN, rolls: 5 }, { keeps: 'x', rolls: 'y' }, { keeps: -3, rolls: 5 }, null]) assert.ok(Math.abs(flatBias(j || {})) <= 1, 'junk stays inside -1..1');
+  // it moves the threshold the flatness reads with, and nothing else
+  const wiggle = (d) => Array.from({ length: PHRASE_BARS + 2 }, (_, i) => [0.5, 0.5, 0.5, 0.45, 0.4, 0.4, 0.3].map((v) => v + (i % 2 ? d : -d))); // every band moves by d: the spread is d
+  const run = (d, b) => { const f = createFlatness(); f.setBias(b); let out = false; for (const row of wiggle(d)) out = f.push(row); return out; };
+  const base = createFlatness().threshold();
+  assert.equal(run(0.04, 0), false, 'a lively-ish show is not flat at the neutral threshold');
+  assert.equal(run(0.04, 1), true, 'but passes piling up call it flat sooner');
+  assert.equal(run(0.018, 0), true, 'a held show is flat at neutral');
+  assert.equal(run(0.018, -1), false, 'but while you are keeping she lets it ride');
+  const f = createFlatness();
+  f.setBias(1); assert.ok(Math.abs(f.threshold() - base * (1 + FLAT_BIAS_SWING)) < 1e-12);
+  f.setBias(-1); assert.ok(Math.abs(f.threshold() - base * (1 - FLAT_BIAS_SWING)) < 1e-12);
+  f.setBias(NaN); assert.equal(f.threshold(), base, 'junk is neutral');
+  f.setBias(9); assert.ok(f.threshold() <= base * (1 + FLAT_BIAS_SWING) + 1e-12, 'clamped');
 });
 
 ok('sovereignty, tier and rate: the artist\'s target is owned, tier 1 makes no edits, one edit per phrase', () => {
