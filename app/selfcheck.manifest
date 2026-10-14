@@ -383,3 +383,4 @@ node src/gl/playback.selfcheck.mjs
 node src/gl/masterGain.selfcheck.mjs
 node src/curator/mind.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs
+node src/gl/spectrumCore.selfcheck.mjs
