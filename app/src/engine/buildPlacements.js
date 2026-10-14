@@ -30,6 +30,7 @@ import { mirrorMultiplier } from '../data/layout-modes.js';
 import { getBiologyPolicy } from '../biology/policy.js';
 import { fadeForAge } from '../biology/lifecycle.js';
 import { sortGlassInstances } from './glassSort.mjs';
+import { isGlassMaterial, GLASS_BODY_ALPHA } from './glassBody.mjs'; // #1547 — material:'glass'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import {
   pickWeightedIndexStable,
@@ -507,8 +508,22 @@ export function buildPlacements({
   // order (the RULES small-first sort above, #565's z-fight fix) is
   // untouched, and the pool keeps soa-slot order because the sorted array is
   // never stashed in cache.itemPool (same guard as the overlap sort above).
-  const glassOn = !!layoutParams.glass;
-  for (const it of mapped) it.glass = glassOn;
+  //
+  // #1547 (Materials M1) — `material: 'glass'` is the second switch into
+  // this same machinery, and the one that gives the body its alpha:
+  // a glass material attenuates every instance it places
+  // (glassBody.GLASS_BODY_ALPHA), here at placement time so the census,
+  // the stills and the live contract all see the one body. The alpha is
+  // keyed to the material only — the bool path's translucency is the
+  // voice's own alpha range and stays exactly as shipped. Item alpha is
+  // re-derived from the SoA on every build (stage C, above), so the
+  // multiply never compounds across pooled frames.
+  const materialGlass = isGlassMaterial(layoutParams.material);
+  const glassOn = !!layoutParams.glass || materialGlass;
+  for (const it of mapped) {
+    it.glass = glassOn;
+    if (materialGlass) it.alpha *= GLASS_BODY_ALPHA;
+  }
   if (glassOn) mapped = sortGlassInstances(mapped);
 
   if (undoNudge) undoNudge(); // #1183 — reverse of application

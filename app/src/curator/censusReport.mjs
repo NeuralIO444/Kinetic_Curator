@@ -310,7 +310,7 @@ const STRUCT_FIXTURES = {
   kinemePattern: { driver: 'kineme', ctx: { mode: 'fibonacci' }, values: ['DRIFT', 'ORGANIC'], note: 'ORGANIC routes to the rhythm layer — a placement-layer modulation that survives into stills when the driver context is present' },
   symmetry: { driver: 'swarm', ctx: { mode: 'hype' }, values: ['none', 'bilateral'], note: 'symmetry fans live in the organism item builder (wings/fans on a hype cast); placements have no symmetry channel' },
   behave: { driver: 'swarm', ctx: { ...HYPE_CTX }, values: ['cruise', 'flock'] },
-  material: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['plate', 'glass'], note: 'the only reader in the live instrument is an export warning (sceneContract.warnUnsupportedMaterials): gradient materials existed in the retired SVG layer; the GL renderer renders flat' },
+  material: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['plate', 'glass'], note: 'glass is live in GL since #1547 (Materials M1): the material value engages the #1129 glass machinery in buildPlacements (glass flag + back-to-front sort, GLASS_BODY_ALPHA on the placed alpha; the flag rides the scene contract into the shader terms) — the delta below is plate↔glass on this fixture. Plate stays flat in GL until M2, wash/stipple until M3; those values\' only reader is still the export warning (sceneContract.warnUnsupportedMaterials)' },
   contactMode: { driver: 'dish', reason: 'measured in the dish matrix (pair fixture modes)' },
   dish: { driver: 'dish', reason: 'measured in the dish matrix (the DISH toggle row)' },
   ecology: { driver: 'dish', reason: 'measured in the dish matrix (population vs pooled cap)' },
