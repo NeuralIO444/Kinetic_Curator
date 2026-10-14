@@ -117,7 +117,8 @@ export function CandidateTray() {
           ref={fileRef}
           type="file"
           multiple
-          // @ts-expect-error webkitdirectory is the folder door; multiple is the fallback
+          // webkitdirectory = pick the run folder whole; where a browser
+          // ignores it, multi-file selection of the folder's contents works
           webkitdirectory=""
           style={{ display: 'none' }}
           onChange={(e) => { loadRun(e.target.files); e.target.value = ''; }}
