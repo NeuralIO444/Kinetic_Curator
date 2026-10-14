@@ -281,6 +281,7 @@ node src/curator/loisActivity.selfcheck.mjs
 node src/curator/davisState.selfcheck.mjs
 node src/curator/davisSigil.selfcheck.mjs
 node src/curator/dice.selfcheck.mjs
+node src/curator/coverage.selfcheck.mjs
 node src/curator/directorsMatrix.selfcheck.mjs
 node src/curator/directorSense.selfcheck.mjs
 node src/curator/directorTable.selfcheck.mjs
