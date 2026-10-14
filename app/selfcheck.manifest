@@ -174,6 +174,7 @@ node src/engine/dishDeform.selfcheck.mjs
 node src/engine/dishCoalesce.selfcheck.mjs
 node src/engine/dishPigment.selfcheck.mjs
 node src/engine/dishDensity.selfcheck.mjs
+node src/engine/dishMedium.selfcheck.mjs
 node src/engine/stagedEval.selfcheck.mjs
 node src/engine/perf.selfcheck.mjs
 node src/state/phraseTick.selfcheck.mjs
