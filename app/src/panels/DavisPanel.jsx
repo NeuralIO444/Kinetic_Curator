@@ -11,6 +11,7 @@ import { captureFavorite } from '../state/slices/davisSlice.js';
 import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
 import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
+import { CandidateTray } from './davis/CandidateTray.jsx';
 import { KINEME_PATTERNS } from '../engine/kineme.js';
 import { useStore } from '../state/store.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
@@ -163,6 +164,12 @@ export function DavisPanel() {
           </div>
 
           <EvolveProgress />
+
+          {/* #1507 — the mined candidates' curation view, beside the
+              favorite capture above: mining is morning-after curation,
+              judged by hand from a loaded run folder. */}
+          <div className="davis-section-label ttl">mined</div>
+          <CandidateTray />
 
           <div className="davis-section-label ttl">perform</div>
           <div className="davis-perform-row">

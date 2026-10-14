@@ -204,6 +204,13 @@ export function FavoritesTray() {
               >
                 <span className="hit-pill-num">{i + 1}</span>
                 <span className="hit-pill-name">{nm.short}</span>
+                {/* #1507 — a mined keep stays visibly mined everywhere it
+                    renders (spec §5 marker law): provenance is on the
+                    record, the mark is on the pill. */}
+                {f.provenance?.source === 'explorer' && (
+                  <span className="hit-mined" role="img" aria-label="mined keep"
+                    title={`mined keep — crowned from explorer run ${f.provenance.run ?? ''}`} />
+                )}
                 <span className="hit-bands" aria-hidden="true">
                   {bands.c.map((c, k) => <span key={k} className="hit-band" style={{ background: c }} />)}
                   <span className={`hit-band heat h${bands.h}`} />
