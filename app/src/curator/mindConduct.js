@@ -102,6 +102,17 @@ export function applyRouteOp(table, op, by = null) {
 /** The tag a route row carries when Davis made or changed it (the MATRIX shows it; touching the row clears it). */
 export const DAVIS_TAG = 'davis';
 
+/** One line for the persona feed: what an edit is, in the route table's own words. */
+export function describeOp(op) {
+  if (!op || typeof op !== 'object') return '';
+  const d = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : '?');
+  if (op.op === 'add') return `+ ${op.input} > ${op.target} ${d(op.depth)}`;
+  if (op.op === 'remove') return `- ${op.input} > ${op.target}`;
+  if (op.op === 'retarget') return `${op.input}: ${op.from} > ${op.to}`;
+  if (op.op === 'depth') return `${op.input} > ${op.target} depth ${d(op.depth)}`;
+  return '';
+}
+
 /** The next bar a proposal made at `bar` may land on: the phrase boundary at or after it. */
 export function landingBar(bar) {
   if (!Number.isInteger(bar)) return null;

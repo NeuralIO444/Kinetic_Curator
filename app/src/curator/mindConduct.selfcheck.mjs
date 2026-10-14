@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   validateRouteOp, applyRouteOp, opTargets, landingBar, phraseOf, PRESETS, davisRoute, createFlatness, createConductor,
-  PHRASE_BARS, TIER_OPS, BACKOFF_REVERTS, BACKOFF_BARS, ENERGY_LEVELS, DAVIS_MAX_ROUTES,
+  PHRASE_BARS, TIER_OPS, BACKOFF_REVERTS, BACKOFF_BARS, ENERGY_LEVELS, DAVIS_MAX_ROUTES, describeOp,
 } from './mindConduct.js';
 import { validateReply, wantsStage, neutralReply } from './mindContract.js';
 import { rulesReply } from './mindRules.js';
@@ -55,6 +55,14 @@ ok('edits apply inside the cap and the pairs: add, remove, retarget (to the new 
   assert.equal(applyRouteOp(t, { op: 'depth', input: 'beat', target: 'render.glow', depth: 0.5 }), null, 'a depth edit needs the route');
   assert.equal(JSON.stringify(t), frozen, 'pure');
   assert.equal(applyRouteOp(null, { op: 'add' }), null);
+});
+
+ok('describeOp says an edit in the route table\'s own words, and never throws', () => {
+  assert.equal(describeOp({ op: 'add', input: 'band.mids', target: 'render.glow', depth: 0.3 }), '+ band.mids > render.glow 0.3');
+  assert.equal(describeOp({ op: 'remove', input: 'bass', target: 'render.scale' }), '- bass > render.scale');
+  assert.equal(describeOp({ op: 'retarget', input: 'bass', from: 'render.scale', to: 'render.glow' }), 'bass: render.scale > render.glow');
+  assert.equal(describeOp({ op: 'depth', input: 'beat', target: 'render.alpha', depth: 12.34567 }), 'beat > render.alpha depth 12.346');
+  assert.equal(describeOp(null), ''); assert.equal(describeOp({ op: 'wipe' }), ''); assert.equal(describeOp('x'), '');
 });
 
 ok('phrases: edits land on the boundary, four bars', () => {

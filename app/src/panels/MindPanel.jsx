@@ -2,17 +2,50 @@
 // the session's calendar reading, plus the numbers that shape them. Dev-only; the main UI never shows any of this.
 import { useEffect, useState } from 'react';
 import { getPresenceView, subscribePresence } from '../curator/mindPresenceLive.js';
+import { getTrioView, subscribeTrio } from '../curator/trioLive.js'; // #1483: Davis's conducting
 
 const cell = { padding: '2px 6px', borderBottom: '1px solid #333', textAlign: 'left', whiteSpace: 'nowrap' };
 const fmt = (v) => (Number.isFinite(v) ? (Math.round(v * 100) / 100).toString() : '—');
 
+/** #1483 — what Davis is doing to the audio show: his tier, what he holds, what waits, what became of the last twelve. */
+function Conducting() {
+  const [t, setT] = useState(getTrioView);
+  useEffect(() => subscribeTrio(() => setT(getTrioView())), []);
+  if (!t) return <p style={{ opacity: 0.6 }}>Conducting: not running.</p>;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
+        Conducting: {t.on ? 'audio on' : 'audio off'} · tier {t.tier ?? 'none'}{t.cooling ? ' · backing off' : ''}
+        {t.on ? ` · ${t.energy ?? 'no energy yet'}${t.bpm ? ` · ${Math.round(t.bpm)} bpm` : ''}${t.silent ? ' · silent' : ''} · flat ${t.flatBars} bar${t.flatBars === 1 ? '' : 's'}` : ''}
+      </p>
+      <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
+        His routes {t.mine} of {t.routes} · owned by you: {t.owned.length ? t.owned.join(', ') : 'none'}
+        {t.pending ? ` · waiting for bar ${t.pending.landBar}: ${t.pending.desc}` : ''}
+      </p>
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <tbody>
+          {t.log.length === 0 && <tr><td style={cell}>nothing yet</td></tr>}
+          {t.log.map((e, i) => (
+            <tr key={i}>
+              <td style={cell}>bar {e.landBar ?? e.bar}</td>
+              <td style={cell}>{e.status === 'applied' ? 'applied' : `dropped: ${e.reason}`}</td>
+              <td style={cell}>{e.desc}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function MindPanel() {
   const [view, setView] = useState(getPresenceView);
   useEffect(() => subscribePresence(() => setView(getPresenceView())), []);
-  if (!view) return <div style={{ padding: 12, fontSize: 12, opacity: 0.7 }}>The personas have not thought yet. Play a bar.</div>;
+  if (!view) return <div style={{ padding: 12, fontSize: 12, opacity: 0.7 }}><Conducting />The personas have not thought yet. Play a bar.</div>;
   const r = view.reading;
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
+      <Conducting />
       <p style={{ opacity: 0.75 }}>
         Reading: {r ? `${r.moonPhase} moon (${Math.round(r.illumination * 100)}% lit), ${r.season}` : 'none this session (no modulation)'}
       </p>
