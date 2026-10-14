@@ -393,5 +393,6 @@ node src/curator/mindApple.selfcheck.mjs
 node src/curator/mindPresence.selfcheck.mjs
 node src/curator/directorRoom.selfcheck.mjs
 node src/curator/directorPresence.selfcheck.mjs
+node src/curator/directorDebt.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs
 node src/gl/spectrumCore.selfcheck.mjs
