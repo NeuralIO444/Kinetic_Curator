@@ -286,6 +286,8 @@ node src/curator/census.selfcheck.mjs
 node src/curator/miner.selfcheck.mjs
 node src/curator/candidateTray.selfcheck.mjs
 node src/curator/censusReadout.selfcheck.mjs
+node src/curator/loisJudge.selfcheck.mjs
+node src/curator/prospecting.selfcheck.mjs
 node src/curator/ra4.selfcheck.mjs
 node src/curator/directorsMatrix.selfcheck.mjs
 node src/curator/directorSense.selfcheck.mjs
