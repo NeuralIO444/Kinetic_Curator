@@ -41,7 +41,8 @@ import { observeDishDensity } from './curator/dishDensityLive.js'; // #1412: the
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
-import { startMind } from './curator/mindLive.js'; // #1462: Mind 1
+import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
+import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/playback.mjs'; // #1462: a take's decisions replay
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
@@ -122,8 +123,10 @@ function AppInner() {
     // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
     const stopPace = startPace({ getBpm: () => useStore.getState().beatBpm, context: roomNow });
     const roomCodes = () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; };
-    // #1462 — Mind 1: once a bar each persona thinks about the room (rules backends, neutral; telemetry only)
+    // #1462 — Mind 1: once a bar each persona thinks about the room. Rules alone (the Apple helper is Mind 3, #1464):
+    // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
     const stopMind = startMind({
+      isReplaying: isPlaybackActive,
       getSeed: () => useStore.getState().seed,
       getSnapshot: () => {
         const st = useStore.getState();
@@ -135,6 +138,9 @@ function AppInner() {
         };
       },
     });
+    // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
+    setPlaybackFrameTap((frame, perf, o) => replayMindFrame(frame, perf && perf.mind, o));
+    const offPlayback = subscribePlayback(() => { if (!isPlaybackActive()) endMindReplay(); });
     // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
     // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
     const set = createSet({
@@ -152,7 +158,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

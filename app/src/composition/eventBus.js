@@ -237,7 +237,9 @@ export const Events = {
   AUDIO_ENERGY: 'audio:energy', // #1459: { level: low | mid | high } with hysteresis
   AUDIO_SILENCE_START: 'audio:silenceStart', // #1459: { ms } quiet for over 2 s
   AUDIO_SILENCE_END: 'audio:silenceEnd', // #1459: { ms } sound is back; how long the silence lasted
-  MIND_DECISION: 'mind:decision', // #1462: { persona, bar, source: rules | mind, seed, reply } once a bar per persona
+  MIND_DECISION: 'mind:decision', // #1462: { persona, bar, backend: apple | rules, seed, invented, reply } once a bar per persona
+  MIND_REQUEST: 'mind:request', // #1462: { persona, bar, backend, invented, reply } on the downbeat after a decision that asks the stage
+  MIND_STATUS: 'mind:status', // #1462: { available, backend: apple | rules } when the answering backend changes (dev panel)
   CLOCK_BEAT: 'clock:beat', // #1458: { bar, beat, bpm } every whole beat of the loop clock
   CLOCK_BAR: 'clock:bar', // #1458: { bar, bpm } every downbeat
   ACTIVITY_HEARTBEAT: 'activity:heartbeat', // #1390 (G8): { ts, idleMs } — loisActivity publishes while the artist is active

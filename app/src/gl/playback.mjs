@@ -21,6 +21,15 @@ export const SCENE_KEYS = Object.freeze([
 ]);
 
 let active = null; // { perf, frames, index, ended, pendingSeek }
+let frameTap = null;
+/**
+ * #1462 — observe each PLAYED frame: fn(frame, perf, { seeked }). Called once per frame the cursor plays (not while
+ * held). The app uses it to re-publish the take's recorded persona decisions. One listener (or null); a throwing
+ * listener is dropped.
+ */
+export function setPlaybackFrameTap(fn) {
+  frameTap = typeof fn === 'function' ? fn : null;
+}
 const listeners = new Set();
 const notify = () => { for (const fn of listeners) { try { fn(); } catch { /* a listener must not break the loop */ } } };
 
@@ -83,7 +92,11 @@ export function playbackStep(liveInput) {
     a.pendingSeek = null;
   }
   const held = !!(liveInput && liveInput.slowRender); // the loop's own pause / shed: hold the cursor and the picture
-  const recorded = a.frames[Math.min(a.index, a.frames.length - 1)];
+  const playedIndex = Math.min(a.index, a.frames.length - 1);
+  const recorded = a.frames[playedIndex];
+  if (!held && frameTap !== null) {
+    try { frameTap(playedIndex, a.perf, { seeked: rewind }); } catch { frameTap = null; }
+  }
   const input = held ? { ...recorded, slowRender: true } : recorded;
   if (!held) {
     if (a.index < a.frames.length - 1) { a.index += 1; } else if (!a.ended) { a.ended = true; notify(); }

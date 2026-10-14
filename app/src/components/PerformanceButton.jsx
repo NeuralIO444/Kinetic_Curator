@@ -12,6 +12,8 @@ import { createFormationRecorder } from '../curator/formation.js';
 import { resetFormation, setFormationTap, setShiftTap } from '../curator/formationLive.js';
 import { createShiftRecorder } from '../curator/davisShift.js';
 import { createClockRecorder } from '../curator/clockRecord.js';
+import { createMindRecorder } from '../curator/mindRecord.js';
+import { setMindTap } from '../curator/mindLive.js';
 import { useStore } from '../state/store.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
@@ -45,6 +47,14 @@ const clockSection = (getFrame) => {
   const rec = createClockRecorder({ initialBpm: useStore.getState().beatBpm, getFrame });
   const off = useStore.subscribe((s, prev) => { if (s.beatBpm !== prev.beatBpm) rec.set(s.beatBpm); });
   return { stop() { off(); return rec.finish(); } };
+};
+
+// #1462 — the take carries every persona decision verbatim (backend, seed, invented, the reply, whether it asked the
+// stage), stored as `mind`: playback re-publishes these and never asks a backend.
+const mindSection = (getFrame) => {
+  const rec = createMindRecorder({ getFrame });
+  setMindTap((d, requested) => rec.update(d, requested));
+  return { stop() { setMindTap(null); return rec.finish(); } };
 };
 
 function downloadBytes(bytes, filename) {
@@ -86,7 +96,7 @@ export function PerformanceButton() {
 
   const onClick = async () => {
     if (!recording) {
-      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection } })) { setFrames(0); setRecording(true); }
+      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection, mind: mindSection } })) { setFrames(0); setRecording(true); }
       return;
     }
     setRecording(false);
