@@ -26,11 +26,38 @@ export function zodiacOf(z) {
   };
 }
 
+const SHOW_ENERGY = Object.freeze(['low', 'mid', 'high']);
+const r3 = (v) => Math.round(v * 1000) / 1000;
+
+/**
+ * #1483 — the audio show block: what the trio conducts while audio is live. Null when it is missing or the audio is off
+ * (an absent block changes nothing else in the summary). Everything is clamped and bounded: the route table is at most
+ * 16 rows, owned targets are names only.
+ */
+export function showOf(s) {
+  if (!s || typeof s !== 'object') return null;
+  const routes = (Array.isArray(s.routes) ? s.routes : []).slice(0, 16)
+    .filter((r) => r && typeof r.input === 'string' && typeof r.target === 'string' && Number.isFinite(r.depth))
+    .map((r) => ({ input: r.input, target: r.target, depth: r3(r.depth) }));
+  return {
+    energy: SHOW_ENERGY.includes(s.energy) ? s.energy : null,
+    bpm: Number.isFinite(s.bpm) ? Math.round(s.bpm) : null,
+    confidence: Number.isFinite(s.confidence) ? r3(Math.min(1, Math.max(0, s.confidence))) : 0,
+    onsets: Number.isFinite(s.onsets) ? Math.max(0, Math.round(s.onsets)) : 0,
+    silent: !!s.silent,
+    sinceBars: Number.isFinite(s.sinceBars) ? Math.max(0, Math.round(s.sinceBars)) : 0,
+    flatBars: Number.isFinite(s.flatBars) ? Math.max(0, Math.round(s.flatBars)) : 0,
+    routes,
+    owned: (Array.isArray(s.owned) ? s.owned : []).filter((t) => typeof t === 'string' && t.length <= 40).slice(0, 32),
+  };
+}
+
 const count = (arr, pred) => (Array.isArray(arr) ? arr.filter(pred).length : 0);
 
 /**
  * @param snap { layers, enabledAssetCount, paletteId, room: { lois, davis }, band, keepsCount, bpm, audio: 'mic'|'file'|'none',
- *               source: 'ambient'|'set'|'audio', creatures, tier?, zodiac?, director?: { verdict, intensity } }
+ *               source: 'ambient'|'set'|'audio', creatures, tier?, zodiac?, director?: { verdict, intensity },
+ *               show?: { energy, bpm, confidence, onsets, silent, sinceBars, flatBars, routes, owned } (#1483) }
  */
 export function buildContext(input) {
   const snap = input && typeof input === 'object' ? input : {};
@@ -57,5 +84,6 @@ export function buildContext(input) {
     intensity: snap.director && ROOM_VERDICTS.includes(snap.director.verdict) && INTENSITY_BANDS.includes(snap.director.intensity) ? snap.director.intensity : null,
     tier: typeof snap.tier === 'string' && /^[a-z0-9-]{1,16}$/.test(snap.tier) ? snap.tier : null,
     ...((z) => (z ? { zodiac: z } : {}))(zodiacOf(snap.zodiac)),
+    ...((sh) => (sh && snap.audio !== 'none' ? { show: sh } : {}))(showOf(snap.show)),
   };
 }

@@ -8,6 +8,8 @@
 // reply may propose an INVENTED state { id, intensity 0..1, decay } — the affect layer may grow its own micro-
 // expressions. The books stay honest: every decision records `invented: true|false` (isInvented below), so a take
 // never passes an invented state off as a measured verdict.
+import { validateRouteOp } from './mindConduct.js'; // #1483: Davis's route edits
+
 export const PERSONAS = Object.freeze(['davis', 'lois', 'queen']);
 export const MOODS = Object.freeze(['calm', 'drive', 'lift', 'sparse', 'shift', 'weird']);
 /** The canonical states each face already has (the honest feed's codes). Anything else well-formed is invented. */
@@ -61,7 +63,7 @@ function faceExtras(persona, r) {
   return out;
 }
 
-/** Davis: propose adding one asset to the cast, or nothing; optionally a face state and a line. */
+/** Davis: propose adding one asset to the cast, or nothing; optionally a route edit, a face state and a line. */
 function davis(r) {
   let propose;
   if (r.propose === null) propose = null;
@@ -71,8 +73,11 @@ function davis(r) {
     if (!assetId) return null;
     propose = { assetId };
   }
+  // #1483 — while audio is live he may also propose one edit to the route table (add / remove / retarget / depth)
+  const route = validateRouteOp(r.route);
+  if (route === false) return null;
   const extra = faceExtras('davis', r);
-  return extra && { propose, ...extra };
+  return extra && { propose, ...(route ? { route } : {}), ...extra };
 }
 
 /** LOIS: one critique with a target and a small signed nudge, or none; optionally a face state and a line. */
@@ -127,6 +132,7 @@ export function wantsStage(persona, reply, room = {}) {
   if (!reply || persona === 'queen') return false;
   if (reply.line) return true;
   if (persona === 'davis' && reply.propose) return true;
+  if (persona === 'davis' && reply.route) return true; // #1483: a route edit asks the stage (the conductor gates it)
   if (persona === 'lois' && reply.critique) return true;
   if (!reply.state) return false;
   const showing = room && room[persona];
