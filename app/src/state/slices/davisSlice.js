@@ -19,6 +19,7 @@ import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #112
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 import { appendToLedger } from '../../curator/tasteLedger.js'; // #1173: keep/pass ledgers for the MLX loop
 import { sanitizeProvenance } from '../../curator/provenance.mjs'; // #1507: mined ≠ rolled ≠ hand-built, on the record
+import { withLiveRig } from '../audioRig.js'; // the audio setup is the performer's, not the hit's
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
 // lived in memory only: a reload silently emptied the tray. Same pattern as the
@@ -500,13 +501,14 @@ export const createDavisSlice = (set) => ({
     seed: fav.seed,
     // #305 — a kept recipe replays its stream offsets too.
     seedOffsets: normalizeSeedOffsets(fav.seedOffsets),
-    ...(fav.config?.layout ? { layoutParams: { ...fav.config.layout } } : {}),
+    // the picture comes back; the audio setup stays as it is live (state/audioRig.js — Matt, 2026-10-14: "always live")
+    ...(fav.config?.layout ? { layoutParams: withLiveRig(fav.config.layout, state.layoutParams) } : {}),
     ...(fav.config?.palette?.id ? { paletteId: fav.config.palette.id } : {}),
     // #719 — the kept cast comes back too; legacy keeps (no cast) leave the pool alone.
     ...(fav.config?.assets?.length ? { enabledAssets: castToEnabled(fav.config.assets) } : {}),
   })),
   morphToFavorite: (fav) => set((state) => ({ ...((state) => {
-    const target = fav.config?.layout;
+    const target = fav.config?.layout ? withLiveRig(fav.config.layout, state.layoutParams) : fav.config?.layout; // audio setup stays live
     // #305 — old favorites carry no offsets → zeros, like a fresh project.
     const favOffsets = normalizeSeedOffsets(fav.seedOffsets);
     // #719 — the cast swaps at the press, like a shape chip (item-morph flies
