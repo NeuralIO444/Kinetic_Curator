@@ -67,6 +67,11 @@ uniform float u_ambient;  // light that reaches a mark facing away from the sun
 uniform vec3 u_kineme[16];
 uniform float u_kinemeTime;
 uniform vec2 u_hands;     // x crooked, y open. 0 is today's quad and today's ink.
+// #1482 P3 — the spectrum the marks listen to. u_spec is a 256x4 R8 texture (rows: smoothed, peak, waveform, flux);
+// u_specA = (map, scale, displace, colour); u_specN = instances in this draw. All amounts 0 never enters (today's quad).
+uniform sampler2D u_spec;
+uniform vec4 u_specA;
+uniform float u_specN;
 out float v_seed;
 out vec2 v_uv;
 out float v_opacity;
@@ -124,6 +129,25 @@ void main() {
     else if (kind == 4) kVis = ph < km.z ? 1.0 : 0.0;
     else if (kind == 5) kOff = vec2(0.0, km.z * wav);
   }
+  // #1482 P3 — spectrum marks. Which frequency a mark listens to (0..1 along the log axis, low to high):
+  // map 0 INDEX (its place in the draw), 1 ANGLE (its rotation), 2 POSITION (its x), 3 HASH (its seed).
+  // SCALE follows the smoothed level, DISPLACE the onsets (flux) along the mark's own seeded direction, COLOUR the peak.
+  float specColour = 0.0;
+  if (u_specA.y + u_specA.z + u_specA.w > 0.0) {
+    int sm = int(u_specA.x + 0.5);
+    float sk = sm == 0 ? float(gl_InstanceID) / max(u_specN - 1.0, 1.0)
+             : sm == 1 ? fract(a_inst1.x / 360.0)
+             : sm == 2 ? clamp(a_inst0.x / u_canvas.x, 0.0, 1.0)
+             : seed;
+    int sx = int(clamp(sk, 0.0, 1.0) * 255.0 + 0.5);
+    float lvS = texelFetch(u_spec, ivec2(sx, 0), 0).r;
+    float lvP = texelFetch(u_spec, ivec2(sx, 1), 0).r;
+    float lvF = texelFetch(u_spec, ivec2(sx, 3), 0).r;
+    c *= 1.0 + u_specA.y * lvS * 0.9;
+    float sda = seed * 6.28318530718;
+    kOff += vec2(cos(sda), sin(sda)) * (u_specA.z * lvF * 28.0);
+    specColour = u_specA.w * lvP;
+  }
   float th = radians(a_inst1.x + kDeg);
   float co = cos(th), si = sin(th);
   vec2 rr = vec2(c.x * co - c.y * si, c.x * si + c.y * co);  // SVG rotate(), y-down
@@ -161,6 +185,7 @@ void main() {
   v_opacity = a_inst1.y * kVis;
   v_ink = a_inst3.xyz;
   v_accent = vec3(a_inst3.w, a_inst4.xy);
+  if (specColour > 0.0) v_ink = mix(v_ink, v_accent, min(specColour, 1.0));   // #1482 P3: ink moves toward its accent
   v_world = world;
   // Mirror = scale sign × atlas uv direction, so a sprite-space normal maps to
   // scene space however the instance was flipped or the cell was stored.

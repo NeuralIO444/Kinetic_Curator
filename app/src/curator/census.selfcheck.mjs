@@ -98,7 +98,7 @@ const reach = renderReachability();
     'audioModDepth', 'audioResponse', 'audioScaleMod', 'audioSwell',
     'blendMode', 'crooked', 'echoes', 'flowFade', 'groundShadow', 'hueRotate',
     'kinemeBoilFps', 'kinemeRate', 'leaveFade', 'parallax', 'prismFade',
-    'rotateSpin', 'squash', 'trail', 'tunnelFade',
+    'rotateSpin', 'spectrumColour', 'spectrumDisplace', 'spectrumMap', 'spectrumScale', 'squash', 'trail', 'tunnelFade',
   ], `not-headless set changed: ${JSON.stringify(notHeadless)}`);
 
   const dishClassed = paramRows.filter((r) => r.class === 'dish-matrix').map((r) => r.key).sort();

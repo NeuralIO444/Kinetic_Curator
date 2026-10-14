@@ -185,6 +185,12 @@ export const DEFAULT_LAYOUT_PARAMS = {
   kinemeBoilFps: 8,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   crooked: 0, // Crooked Hand. 0 is today's quad.
+  // #1482 P3 — spectrum marks (STIMULI → SPECTRUM). Which frequency a mark listens to: 0 INDEX, 1 ANGLE, 2 POSITION,
+  // 3 HASH; and three amounts. All amounts 0 is today's frame, byte for byte.
+  spectrumMap: 0,
+  spectrumScale: 0,
+  spectrumDisplace: 0,
+  spectrumColour: 0,
   tight: 0.55,
   wind: 1,
   symmetry: 'none',
@@ -330,6 +336,10 @@ export const PARAM_SPEC = {
   // motion while the #309 smear stretches it along — 1 holds its area.
   squash: { min: 0, max: 1 },
   crooked: { min: 0, max: 1 },
+  spectrumMap: { min: 0, max: 3, int: true },
+  spectrumScale: { min: 0, max: 1 },
+  spectrumDisplace: { min: 0, max: 1 },
+  spectrumColour: { min: 0, max: 1 },
   kinemeRate: { min: 0, max: 4 }, // #781 KINEME RATE
   rotateSpin: { min: 0, max: 1 }, // #1127 ROTATE spin, rev/s
   groundLean: { min: 0, max: 1 },

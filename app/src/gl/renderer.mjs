@@ -214,7 +214,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands', 'u_spec', 'u_specA', 'u_specN'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -262,6 +262,14 @@ for (const def of RENDERER_PROGRAMS) {
 // carries `shadow` in the contract only when its knob is up, a pattern is below, and it is not shed). Tier 2 per
 // Matt (2026-10-12): shed after the tier-1 extras, as one piece — sceneContract.js applies the shed.
 registerCostTier('gl/contact-shadow', CONTACT_SHADOW_COST);
+// #1482 P3: spectrum marks — three texelFetch per instance and a 4 KB texture, only while a dial is up. Shed with the
+// contact shadow's rung (sceneContract.spectrumMarksShed: perfTier1 AND PERF quality), before body counts.
+registerCostTier('gl/spectrum-marks', {
+  tier: 2,
+  memoryBytes: 256 * 4,
+  timeMs: 0.05,
+  notes: '#1482 spectrum marks: vertex-shader lookup into a 256x4 R8 texture; off sends zeros and never enters the branch; shed after tier 1 (perfTier1 + PERF quality), like the contact shadow',
+});
 registerCostTier('gl/sun', {
   tier: 0, memoryBytes: 0, timeMs: 0.02,
   notes: '#594 PR1 sun: per-instance diffuse in QUAD_VS/FS; zero passes; live + GL stills',
@@ -494,6 +502,32 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let kinemeTime = 0;
   const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
+  // #1482 P3: the frame's spectrum marks ({ map, scale, displace, colour, tex } or null = off, today's frame).
+  let spec = null;
+  let specTex = null;
+  let specUploaded = false;
+  const SPEC_UNIT = 3; // the quad program uses unit 0 (atlas); 3 stays clear of the composite's 0..2
+  function uploadSpectrum() {
+    if (specUploaded || !spec || !spec.tex) return;
+    // The live loop hands a Uint8Array; a contract that was cloned or serialised (the parity harness) hands an
+    // array-like. Either way the texture is exactly 256 x 4 bytes, and anything else is not uploaded.
+    const bytes = spec.tex instanceof Uint8Array ? spec.tex : Uint8Array.from(Array.isArray(spec.tex) ? spec.tex : Object.values(spec.tex));
+    if (bytes.length !== 256 * 4) return;
+    gl.activeTexture(gl.TEXTURE0 + SPEC_UNIT); // upload on its own unit: unit 0 holds the atlas right now
+    if (!specTex) {
+      specTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, specTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 4, 0, gl.RED, gl.UNSIGNED_BYTE, bytes);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); // no mip chain: the default would be incomplete
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, specTex);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 4, gl.RED, gl.UNSIGNED_BYTE, bytes);
+    }
+    specUploaded = true;
+  }
 
   let sceneW = 1000, sceneH = 700;
   function drawInstances(data, atlasTex, w, h) {
@@ -526,6 +560,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
     gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
+    // #1482 P3: off uploads nothing and sends zeros, so the shader's branch never enters (byte-identical frame).
+    uploadSpectrum();
+    if (spec && specTex && specUploaded) {
+      gl.uniform1i(U(quadProg, 'u_spec'), bindTex(SPEC_UNIT, specTex));
+      gl.uniform4f(U(quadProg, 'u_specA'), spec.map, spec.scale, spec.displace, spec.colour);
+      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 24);
+    } else {
+      gl.uniform4f(U(quadProg, 'u_specA'), 0, 0, 0, 0);
+    }
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindBuffer(gl.ARRAY_BUFFER, cornerVbo);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
@@ -695,6 +739,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     sceneH = payload.sceneH || 700;
     sun = contract.light || null;
     hands = contract.hands || { crooked: 0, open: 0 };
+    spec = contract.spectrum || null; // #1482 P3
+    specUploaded = false;
     squash = contract.squash || 0; // #594 PR3
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;

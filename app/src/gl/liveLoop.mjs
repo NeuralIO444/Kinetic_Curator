@@ -33,6 +33,8 @@ import { getFormedPins, getLimbPairs, getPinTraits } from './resolveTap.mjs'; //
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
+import { spectrumMarksShed } from './sceneContract.js';
+import { spectrumMarksFor } from './spectrumMarks.mjs'; // #1482 P3: the dials -> the renderer's spectrum key
 import { motionReadout } from './motionReadout.mjs'; // #1469: the always-alive motion, read once a frame
 import { publishMotion } from './motionTap.mjs';
 
@@ -689,6 +691,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     });
 
     contract.hands = { crooked: Number(layoutParams.crooked) || 0, open: Number(layoutParams.open) || 0 };
+    // #1482 P3 — spectrum marks: only while a dial is up and the governor has not made its first cut. Off leaves the key
+    // absent, so the frame is exactly what it was. The texture bytes are the live spectrum (gl/spectrumLive), packed once.
+    const spectrumMarks = spectrumMarksFor(layoutParams, spectrumMarksShed({ perfTier1: s.perfTier1, quality: s.quality }));
+    if (spectrumMarks) contract.spectrum = spectrumMarks;
     // #790 (color.hue): the assignable hue-rotation route's output, in
     // degrees. Rides on top of each layer's layout hueRotate (the #262
     // uniform path — never the palette). 0 on the default table (routes.hue
