@@ -27,6 +27,7 @@ export const DB_CEIL = -36;
 export const TILT_DB_PER_OCT = 3;
 export const TILT_FROM_HZ = 1000;
 export const TILT_MAX_DB = 12;
+const SNAP = 0.002; // below this, with nothing coming in, a level is silence
 const SILENCE_DB = -100; // below this a bin is exactly silent
 
 /** Centre frequency (Hz) of log bin i. */
@@ -91,9 +92,12 @@ export function createSpectrumCore({ fftBins = 1024, sampleRate = 48000 } = {}) 
      * @param dbBins   Float32Array of dB per linear bin (as getFloatFrequencyData gives), length fftBins; may be null
      * @param dtMs     ms since the last update (clamped to 0..200 here: a stalled tab must not slam the envelopes)
      * @param waveform optional Float32Array of time-domain samples (-1..1) to decimate into the waveform row
+     * @param synth    optional Float32Array(LOG_BINS) of 0..1 levels (a synthetic source, e.g. spectrumFromBands)
+     * @param mix      0..1: how much of `synth` replaces the measured level, before the ballistics
      */
-    update(dbBins, dtMs, waveform = null) {
+    update(dbBins, dtMs, waveform = null, synth = null, mix = 0) {
       const dt = clamp(Number.isFinite(dtMs) ? dtMs : 16.7, 0, 200);
+      const m = synth && Number.isFinite(mix) ? clamp(mix, 0, 1) : 0;
       // 1. log bins: power-mean of the members, back to dB, tilt, window to 0..1
       for (let i = 0; i < LOG_BINS; i++) {
         let level = 0;
@@ -109,6 +113,7 @@ export function createSpectrumCore({ fftBins = 1024, sampleRate = 48000 } = {}) 
             level = dbToUnit(db);
           }
         }
+        if (m > 0) { const v = synth[i]; level = level * (1 - m) + (Number.isFinite(v) ? clamp(v, 0, 1) : 0) * m; }
         now[i] = level;
       }
       // 2. per-bin ballistics, peaks, the slow average, flux
@@ -118,12 +123,14 @@ export function createSpectrumCore({ fftBins = 1024, sampleRate = 48000 } = {}) 
       for (let i = 0; i < LOG_BINS; i++) {
         const x = now[i];
         const s = state.smooth[i];
-        const sNew = s + (x > s ? ka : kr) * (x - s);
+        let sNew = s + (x > s ? ka : kr) * (x - s);
+        if (x === 0 && sNew < SNAP) sNew = 0; // an exponential tail never arrives: silence is exactly zero
         state.smooth[i] = sNew;
         // peaks: jump up, hold, then fall at a fixed rate toward the smoothed value
         if (sNew >= state.peak[i]) { state.peak[i] = sNew; holdLeft[i] = PEAK_HOLD_MS; }
         else if (holdLeft[i] > 0) holdLeft[i] = Math.max(0, holdLeft[i] - dt);
         else state.peak[i] = Math.max(sNew, state.peak[i] - fall);
+        if (sNew === 0 && state.peak[i] < SNAP) state.peak[i] = 0;
         // the slow average primes at the first signal so "deviation from normal" does not start with a huge jump
         if (!primed) state.slow[i] = sNew; else state.slow[i] += ks * (sNew - state.slow[i]);
         state.rel[i] = clamp(sNew - state.slow[i], -1, 1);

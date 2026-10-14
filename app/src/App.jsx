@@ -53,7 +53,8 @@ import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
-import { readMeterBandLevels } from './hooks/audioMeterTap.js';
+import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
+import { startSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
 import { observeClock } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
 import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider } from './gl/resolveTap.mjs';
 import { observeSpawn } from './curator/spawnLive.js'; // #1355: auto spawn finds each creature's home
@@ -132,6 +133,7 @@ function AppInner() {
     // #1462 — Mind 1: once a bar each persona thinks about the room (Apple when available, rules otherwise):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
     const stopFaces = startMindFaces();
+    const stopSpectrum = startSpectrum(getAudioMeterTap); // #1482 P2: steps once a frame, STIMULI open or not
     // #1463 — Apple Intelligence through the desktop helper is the default whenever it is available; until the
     // startup check answers (and always on the web) the rules answer, silently.
     let apple = null;
@@ -193,7 +195,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

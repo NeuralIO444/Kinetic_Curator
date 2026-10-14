@@ -7,6 +7,7 @@ import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
 import { FeelPicker } from './stimulus/FeelPicker.jsx';
 import { MotionStrip } from './stimulus/MotionStrip.jsx';
 import { MeterHero } from './stimulus/MeterHero.jsx';
+import { SpectrumStrip } from './stimulus/SpectrumStrip.jsx';
 import { WhisperLine } from '../components/WhisperLine.jsx';
 import { ModMatrix } from './stimulus/ModMatrix.jsx';
 import { audioInputs } from '../hooks/audioLoss.mjs';
@@ -106,6 +107,8 @@ export function StimulusPanel() {
           {/* #613 — hierarchy inverted: the METER is the hero, the MATRIX shows
               which sound drives what, live; setup and raw knobs follow. */}
           <MeterHero />
+          {/* #1482 — the spectrum the engine hears, under the METER: read only. */}
+          <SpectrumStrip />
           {/* #1469 — the always-alive motion, beside the audio: read only. */}
           <MotionStrip />
           {/* #1139 — the whisper line lives under the meter, speaks rarely. */}
