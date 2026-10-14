@@ -165,6 +165,20 @@ ok('the compact take record: 32 bytes, close to the original, and flat stays fla
   assert.ok(quantizeSpectrum(new Float32Array(LOG_BINS)).every((v) => v === 0));
 });
 
+ok('a synthetic source mixes in before the ballistics: mix 1 is the synth alone, mix 0 ignores it, garbage is silence', () => {
+  const syn = spectrumFromBands({ sub: 0.9, bass: 0.8 });
+  const a = run(flat(-140), 1, 60); a.update(null, 16.7, null, syn, 1); run(null, 400, 60, a);
+  const full = createSpectrumCore(); for (let t = 0; t < 400; t += 16.7) full.update(null, 16.7, null, syn, 1);
+  assert.ok(Math.abs(full.state.smooth[2] - syn[2]) < 0.02, 'mix 1 settles on the synth');
+  const half = createSpectrumCore(); for (let t = 0; t < 400; t += 16.7) half.update(null, 16.7, null, syn, 0.5);
+  assert.ok(Math.abs(half.state.smooth[2] - syn[2] / 2) < 0.02, 'mix 0.5 over silence is half');
+  const none = createSpectrumCore(); for (let t = 0; t < 400; t += 16.7) none.update(null, 16.7, null, syn, 0);
+  assert.ok(none.state.smooth.every((v) => v === 0), 'mix 0 ignores it');
+  const bad = createSpectrumCore(); bad.update(null, 16.7, null, new Float32Array(LOG_BINS).fill(NaN), NaN);
+  assert.ok(bad.state.smooth.every((v) => v === 0));
+  assert.ok(full.state.peak.every((p, k) => p >= full.state.smooth[k] - 1e-6), 'and it gets peaks like real audio');
+});
+
 ok('pure: no clock, timers or DOM, and the state is reused (no per-frame allocation)', () => {
   const code = readFileSync(new URL('./spectrumCore.mjs', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
   assert.ok(!/Date\.now|performance\.now|Math\.random|setTimeout|setInterval|requestAnimationFrame|AudioContext|document|window/.test(code));

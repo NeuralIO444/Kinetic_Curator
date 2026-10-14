@@ -188,10 +188,16 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
         const meterAnalyser = ctx.createAnalyser();
         meterAnalyser.fftSize = METER_FFT_SIZE;
         meterAnalyser.smoothingTimeConstant = 0.6;
+        // #1482 — a third, for the spectrum only: float dB, no browser smoothing (gl/spectrumCore owns the ballistics).
+        // The two above are untouched, so the bands, routes and every tuned feel read the same numbers as before.
+        const spectrumAnalyser = ctx.createAnalyser();
+        spectrumAnalyser.fftSize = 2048;
+        spectrumAnalyser.smoothingTimeConstant = 0;
 
         srcNode.connect(gainNode);
         gainNode.connect(analyser);
         gainNode.connect(meterAnalyser);
+        gainNode.connect(spectrumAnalyser);
         // A file source routed only into the analyser is silent. Always monitor
         // file playback; a live mic is monitored on request (feedback risk).
         if (monitor || source.type === 'file') gainNode.connect(ctx.destination);
@@ -200,7 +206,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
         sourceRef.current = { node: srcNode, stream };
         gainNodeRef.current = gainNode;
         analyserRef.current = analyser;
-        setAudioMeterTap({ analyser: meterAnalyser, sampleRate: ctx.sampleRate, kind: source.type === 'file' ? 'FILE' : (stillOn.length ? 'MIC·PROC' : 'MIC') });
+        setAudioMeterTap({ analyser: meterAnalyser, spectrum: spectrumAnalyser, sampleRate: ctx.sampleRate, kind: source.type === 'file' ? 'FILE' : (stillOn.length ? 'MIC·PROC' : 'MIC') });
         runningRef.current = true;
         // #306: fresh session, fresh envelope — never resume from stale values.
         resetBallistics(follower);

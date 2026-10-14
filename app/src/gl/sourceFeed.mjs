@@ -2,21 +2,28 @@
 // frame; the provider (curator/setLive.js) answers null when nothing is playing, so an ordinary frame costs nothing and
 // is unchanged. Kept in gl/ so the loop never imports the curator.
 let provider = null;
+let last = null; // #1482: this frame's answer, for a second reader (the provider is stateful: ask it once a frame)
 
 /** fn(loopMs) => null | { mix, coarse: { rms, bass, mid, treble, beatPulse }, bands: { sub..air } }, or null to remove. */
 export function setSourceFeed(fn) {
   provider = typeof fn === 'function' ? fn : null;
+  last = null;
 }
 
-/** The synthetic source's levels for this frame, or null. Never throws. */
+/** The synthetic source's levels for this frame, or null. Never throws. The live loop's call, once a frame. */
 export function readSourceFeed(loopMs) {
-  if (!provider) return null;
+  if (!provider) return (last = null);
   try {
     const f = provider(loopMs);
-    return f && Number.isFinite(f.mix) && f.mix > 0 ? f : null;
+    return (last = f && Number.isFinite(f.mix) && f.mix > 0 ? f : null);
   } catch {
-    return null;
+    return (last = null);
   }
+}
+
+/** The answer the live loop got this frame, without asking the provider again. */
+export function peekSourceFeed() {
+  return last;
 }
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);

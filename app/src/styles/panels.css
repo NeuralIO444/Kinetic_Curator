@@ -1248,3 +1248,11 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .stim-motion-fill { position: absolute; top: 0; left: 0; height: 100%; width: 0; background: var(--ink); opacity: 0.85; }
 .stim-motion-label { font-size: 8px; letter-spacing: 0.08em; color: var(--dim); text-align: center; }
 @media (prefers-reduced-motion: reduce) { .stim-motion-fill { transition: none; } }
+.stim-spectrum { margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.25); border: 1px solid var(--line); }
+.stim-spectrum-canvas { display: block; width: 100%; }
+.stim-spectrum-scale { position: relative; height: 10px; font-size: 8px; letter-spacing: 0.08em; color: var(--dim); }
+.stim-spectrum-scale span { position: absolute; transform: translateX(-50%); }
+.stim-spectrum-scale span:nth-child(1) { left: 0; transform: none; }
+.stim-spectrum-scale span:nth-child(2) { left: 19.2%; }
+.stim-spectrum-scale span:nth-child(3) { left: 55.8%; }
+.stim-spectrum-scale span:nth-child(4) { right: 0; transform: none; }
