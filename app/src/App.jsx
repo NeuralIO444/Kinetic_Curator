@@ -52,6 +52,7 @@ import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/p
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
+import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
 import { startSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
@@ -160,6 +161,15 @@ function AppInner() {
       },
     });
     setPresenceProvider(presence.third); // #1145 × Mind 3: her tier (earned, honest) scales her hand in the Director
+    // #1483 — the trio's audio direction: while audio is live Davis may edit the route table, on the phrase boundary,
+    // inside the clamps, never on a target the artist touched, and only at a tier that has earned it.
+    const trio = startTrio({
+      getRoutes: () => useStore.getState().audioRoutes,
+      getTier: () => presence.contextFor('davis').tier,
+      getBands: () => { const b = readMeterBandLevels(); return b ? Object.values(b) : null; },
+      isReplaying: isPlaybackActive,
+      subscribe: (fn) => useStore.subscribe(fn),
+    });
     const stopMind = startMind({
       presence,
       isReplaying: isPlaybackActive,
@@ -171,7 +181,7 @@ function AppInner() {
           layers: st.layers, enabledAssetCount: st.enabledAssets ? Object.values(st.enabledAssets).filter(Boolean).length : 0,
           paletteId: st.paletteId, room: roomCodes(), band: getStressState().band, keepsCount: Array.isArray(st.keeps) ? st.keeps.length : 0,
           bpm: st.beatBpm, audio: st.audioEnabled ? (st.audioSource && st.audioSource.type === 'file' ? 'file' : 'mic') : 'none',
-          creatures: st.creatureCount, director: getMindRoom(),
+          creatures: st.creatureCount, director: getMindRoom(), show: trio.showBlock(),
         };
       },
     });
@@ -195,7 +205,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); trio.stop(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

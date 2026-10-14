@@ -48,14 +48,13 @@ ok('a file source and then no audio are reported as input changes; silence start
   assert.ok(end[0][1].ms >= 2000);
 });
 
-ok('the registry lists them as telemetry; the app feeds them from the meter levels in the one frame tap', () => {
-  // onset and energy have no listener yet (telemetry); input, tempo and the silences are read by the pace (#1460)
+ok('the registry names who listens; the app feeds them from the meter levels in the one frame tap', () => {
+  // onset and energy are read by the trio's conducting (#1483); input, tempo and the silences by the pace (#1460) and the trio
   for (const k of ['AUDIO_ONSET', 'AUDIO_ENERGY']) {
-    assert.equal(EVENT_REGISTRY[k].handler, null, k);
-    assert.match(EVENT_REGISTRY[k].note, /telemetry/, k);
+    assert.deepEqual(EVENT_REGISTRY[k].handler, ['curator/trioLive.js'], k);
   }
   for (const k of ['AUDIO_INPUT', 'AUDIO_TEMPO', 'AUDIO_SILENCE_START', 'AUDIO_SILENCE_END']) {
-    assert.deepEqual(EVENT_REGISTRY[k].handler, ['curator/paceLive.js'], k);
+    assert.deepEqual(EVENT_REGISTRY[k].handler, ['curator/paceLive.js', 'curator/trioLive.js'], k);
   }
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.match(app, /setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeAudio\(input && input\.loopTimeMs, readMeterBandLevels\(\)/);

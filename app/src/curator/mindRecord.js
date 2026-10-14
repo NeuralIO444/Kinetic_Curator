@@ -7,6 +7,7 @@
 import { validateReply, isInvented, PERSONAS } from './mindContract.js';
 import { BACKENDS } from './mindThinker.js';
 import { checkTraits } from './mindPresence.js';
+import { validateRouteOp } from './mindConduct.js'; // #1483: what became of Davis's route proposals
 
 // #1464 Mind 3: a row may carry a 9th column, the personality layer's traits (tier, eased level, cool-down, her own
 // move, a rest, the third's presence), so a take explains every behaviour from what it recorded. A take with traits is
@@ -15,6 +16,9 @@ export const MIND_RECORD_VERSION = 2;
 const VERSIONS = [1, 2];
 /** A take is at most 20 minutes of frames; three personas, one decision a bar, stays far below this. */
 export const MIND_RECORD_MAX = 20000;
+/** At most one route edit a phrase, so this is far above any real take. */
+export const CONDUCT_RECORD_MAX = 2000;
+const CONDUCT_STATUS = Object.freeze(['applied', 'dropped']);
 
 /**
  * Recorder. `getFrame()` returns the take's current frame index; `getSystem()` the answering model's identity
@@ -23,8 +27,17 @@ export const MIND_RECORD_MAX = 20000;
  */
 export function createMindRecorder({ getFrame = () => 0, getSystem = () => null } = {}) {
   const rows = [];
+  const conduct = [];
   const systems = {};
   return {
+    /** #1483: what became of one of Davis's route proposals (trioLive's mind:route): applied with its delta, or dropped with why. */
+    conduct(e) {
+      if (!e || conduct.length >= CONDUCT_RECORD_MAX || !CONDUCT_STATUS.includes(e.status)) return;
+      const op = validateRouteOp(e.op);
+      if (!op) return;
+      conduct.push([getFrame() | 0, e.status, typeof e.reason === 'string' ? e.reason.slice(0, 16) : null, Number.isInteger(e.bar) ? e.bar : 0,
+        Number.isInteger(e.landBar) ? e.landBar : null, op, e.delta ? JSON.parse(JSON.stringify(e.delta)) : null]);
+    },
     /** A decision as mindLive published it, and whether it asked the stage for something. */
     update(d, requested) {
       if (!d || rows.length >= MIND_RECORD_MAX) return;
@@ -39,7 +52,11 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
       }
     },
     finish() {
-      return { version: rows.some((r) => r.length === 9) ? 2 : 1, decisions: rows.map((r) => r.slice()), ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}) };
+      return {
+        version: rows.some((r) => r.length === 9) ? 2 : 1, decisions: rows.map((r) => r.slice()),
+        ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}),
+        ...(conduct.length ? { conduct: JSON.parse(JSON.stringify(conduct)) } : {}), // absent when Davis did not conduct: the file is unchanged
+      };
     },
   };
 }
@@ -53,6 +70,20 @@ export function checkMindRecord(r) {
     for (const [k, v] of Object.entries(r.systems)) {
       if (!BACKENDS.includes(k) || !v || typeof v !== 'object') return null;
       for (const f of Object.values(v)) if (typeof f !== 'string' || f.length > 64) return null;
+    }
+  }
+  if (r.conduct !== undefined) { // #1483 — optional: Davis's route proposals and what became of them
+    if (!Array.isArray(r.conduct) || r.conduct.length > CONDUCT_RECORD_MAX) return null;
+    let last = -1;
+    for (const c of r.conduct) {
+      if (!Array.isArray(c) || c.length !== 7) return null;
+      const [frame, status, reason, bar, landBar, op, delta] = c;
+      if (!Number.isInteger(frame) || frame < last || !CONDUCT_STATUS.includes(status) || !Number.isInteger(bar)) return null;
+      if (reason !== null && typeof reason !== 'string') return null;
+      if (landBar !== null && !Number.isInteger(landBar)) return null;
+      if (!validateRouteOp(op)) return null;
+      if (delta !== null && (typeof delta !== 'object' || Array.isArray(delta))) return null;
+      last = frame;
     }
   }
   let prev = -1;
@@ -83,15 +114,27 @@ export function decisionOf(row) {
  */
 export function createMindReplay(record) {
   const rows = checkMindRecord(record) ? record.decisions : [];
+  const cond = checkMindRecord(record) && Array.isArray(record.conduct) ? record.conduct : [];
   let next = 0; // the first row not yet returned
+  let cnext = 0; // the first conducting row not yet returned
   const firstAt = (frame) => { let i = 0; while (i < rows.length && rows[i][0] < frame) i++; return i; };
+  const cfirstAt = (frame) => { let i = 0; while (i < cond.length && cond[i][0] < frame) i++; return i; };
   return {
     step(frame) {
       const out = [];
       while (next < rows.length && rows[next][0] <= frame) out.push(rows[next++]);
       return out;
     },
-    seek(frame) { next = firstAt(frame); },
+    seek(frame) { next = firstAt(frame); cnext = cfirstAt(frame); },
+    /** The conducting outcomes recorded at frames the cursor has passed, as mind:route payloads. */
+    conductStep(frame) {
+      const out = [];
+      while (cnext < cond.length && cond[cnext][0] <= frame) {
+        const [, status, reason, bar, landBar, op, delta] = cond[cnext++];
+        out.push({ status, ...(reason ? { reason } : {}), op, bar, landBar, ...(delta ? { delta } : {}) });
+      }
+      return out;
+    },
     get size() { return rows.length; },
   };
 }

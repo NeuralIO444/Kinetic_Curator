@@ -38,7 +38,7 @@ export function showOf(s) {
   if (!s || typeof s !== 'object') return null;
   const routes = (Array.isArray(s.routes) ? s.routes : []).slice(0, 16)
     .filter((r) => r && typeof r.input === 'string' && typeof r.target === 'string' && Number.isFinite(r.depth))
-    .map((r) => ({ input: r.input, target: r.target, depth: r3(r.depth) }));
+    .map((r) => ({ input: r.input, target: r.target, depth: r3(r.depth), ...(r.by === 'davis' ? { by: 'davis' } : {}) }));
   return {
     energy: SHOW_ENERGY.includes(s.energy) ? s.energy : null,
     bpm: Number.isFinite(s.bpm) ? Math.round(s.bpm) : null,

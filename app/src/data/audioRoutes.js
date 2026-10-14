@@ -23,7 +23,7 @@ export function isDefaultRoutes(routes) {
   if (!Array.isArray(routes) || routes.length !== DEFAULT_ROUTES.length) return false;
   return routes.every((r) => {
     const d = DEFAULT_BY_PAIR.get(pairKey(r));
-    return d !== undefined && Math.abs(d - r.depth) < 1e-9;
+    return d !== undefined && Math.abs(d - r.depth) < 1e-9 && !r.by; // a tagged row is not the default
   });
 }
 
@@ -47,7 +47,7 @@ export function sanitizeAudioRoutes(raw) {
     if (seen.has(key)) continue; // identity is the input+target pair: first one wins
     seen.add(key);
     const max = maxDepth(r.target);
-    out.push({ input: r.input, target: r.target, depth: Math.min(max, Math.max(-max, depth)) });
+    out.push({ input: r.input, target: r.target, depth: Math.min(max, Math.max(-max, depth)), ...(r.by === 'davis' ? { by: 'davis' } : {}) }); // #1483: Davis's mark
   }
   // A non-empty array with nothing usable is garbage, not "delete every route".
   if (out.length === 0) return null;
