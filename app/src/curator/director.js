@@ -199,22 +199,52 @@ export function currentPresence() {
   try { return presenceProvider ? presenceProvider() : null; } catch { return null; }
 }
 
+// ─── pacing debt (#1145, 2026-10-09 spec; part 3) ─────────────────────────────
+// The room table maps mood to gains but did not remember what the room just did, so it could flatter or punish all
+// night. Debt is one number on the existing argument, from honest transitions only: each time LOIS's face turns BURN
+// it adds 1 (cap 4), each time it turns NOD it pays 1 back (floor 0). At DEBT_OWED the room OWES quiet, and keeps owing
+// until the debt is paid down to 0. While it owes:
+//   - the temperature is capped at DEBT_TEMP_CAP, even in FULL BURN
+//   - her allowance floors at DEBT_HOLD (she holds; she does not back off) — still × her presence
+//   - Davis's freedom is held (kin_weight ≤ 1): he is allowed ugly again once the debt is paid
+// A stall (Davis STUCK: same seed, nothing kept) still widens and stays warm: debt never overrides a stall.
+// Not a timer, not a persona, never serialized, never on a surface; it lives inside the Director's closure.
+export const DEBT_CAP = 4;
+export const DEBT_OWED = 3;
+export const DEBT_TEMP_CAP = 0.4;
+export const DEBT_HOLD = 0.6;
+
+/** One LOIS transition's effect on the debt (from → to codes). Pure. */
+export function nextDebt(debt, from, to) {
+  const d = Number.isFinite(debt) ? debt : 0;
+  if (to === from) return d;
+  if (to === 'BURN') return Math.min(DEBT_CAP, d + 1);
+  if (to === 'NOD') return Math.max(0, d - 1);
+  return d;
+}
+
+/** Owing quiet, with hysteresis: starts at DEBT_OWED, lasts until the debt is paid to 0. Pure. */
+export function nextOwed(owed, debt) {
+  return owed ? debt > 0 : debt >= DEBT_OWED;
+}
+
 /**
  * Pure: room + phase (+ her presence) → gains. No state, no signals — the scheduler's mind
  * without its eyes. Null room (either Director stateless) → NEUTRAL_GAINS.
  */
-export function directorGains({ loisCode = null, davisCode = null, phase = null, presence = null } = {}) {
+export function directorGains({ loisCode = null, davisCode = null, phase = null, presence = null, owed = false } = {}) {
   const room = roomFor(loisCode, davisCode);
   const row = rowFor(loisCode, davisCode);
   if (!room || !row) return NEUTRAL_GAINS;
+  const quiet = owed === true && davisCode !== 'STUCK'; // a stall still widens: debt never overrides it
   // AWAY freezes weights structurally: the critic is not in the room.
   // (The table already says 0; this is the backstop.)
   const loisWeight = loisCode === 'AWAY' ? 0 : clamp01(row.lois_weight);
   return {
-    temperature: effectiveTemp({ room: row, phase }),
-    kinWeight: Math.min(2, Math.max(0.25, row.kin_weight)),
+    temperature: quiet ? Math.min(DEBT_TEMP_CAP, effectiveTemp({ room: row, phase })) : effectiveTemp({ room: row, phase }),
+    kinWeight: Math.min(quiet ? 1 : 2, Math.max(0.25, row.kin_weight)),
     loisWeight,
-    swayAllowance: SWAY_GATE_OPEN ? clamp01(row.sway_allowance * presenceScale(presence)) : 0,
+    swayAllowance: SWAY_GATE_OPEN ? clamp01((quiet ? Math.max(DEBT_HOLD, row.sway_allowance) : row.sway_allowance) * presenceScale(presence)) : 0,
     tiltLimit: TILT_GATE_OPEN && phase === 'explore' ? row.tilt_limit : 0,
     intensityBudget: row.intensity_budget,
     relaxSeconds: row.relax_seconds,
@@ -267,6 +297,9 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
   let lastAllowance = 0; // the room's allowance as of the last tick (a pick reads it; it never recomputes the room)
   let lastTilt = 0; // the room's tilt as of the last tick: 0 unless the tilt gate is open and the phase is explore
   let lastSway = { temperatureDelta: 0 }; // the sway view of the last tick, for the UI presence mark (#1258). Retained here, never rendered here.
+  let debt = 0; // pacing debt (#1145 part 3): honest LOIS transitions only, never serialized
+  let owed = false;
+  let lastLois = null;
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
@@ -278,11 +311,15 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
   function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now() } = {}) {
     const face = resolveLoisFace(feed);
     const davis = resolveDavisState(feed);
+    const loisNow = face ? face.code : null;
+    if (loisNow !== lastLois) { debt = nextDebt(debt, lastLois, loisNow); lastLois = loisNow; }
+    owed = nextOwed(owed, debt);
     const base = directorGains({
-      loisCode: face ? face.code : null,
+      loisCode: loisNow,
       davisCode: davis ? davis.code : null,
       phase,
       presence: currentPresence(),
+      owed,
     });
     lastAllowance = base.swayAllowance;
     lastTilt = base.tiltLimit;
@@ -321,6 +358,8 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
       room: out.room ? `${out.room.n} ${out.room.verdict}` : 'silence',
       level: +level.toFixed(2),
       directorPhase,
+      debt,
+      owed,
       temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
     });
     const result = { gains: out, intensity: level, directorPhase, sway };
@@ -350,8 +389,13 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
     get lastSway() {
       return lastSway;
     },
+    /** Pacing debt as of the last tick, for the selfcheck: { debt, owed }. Never rendered. */
+    get pacing() {
+      return { debt, owed };
+    },
     reset() {
       intensity.reset();
+      debt = 0; owed = false; lastLois = null;
       relaxUntil = 0;
       lastCoolAt = now();
     },
