@@ -57,7 +57,7 @@ ok('a proposal is held to the phrase boundary, then applied with his mark and an
   g.done();
 });
 
-ok('one edit per phrase: one is held for the boundary, a second in the same phrase is dropped, the next phrase is free', () => {
+ok('one edit per phrase: one is held for the boundary, a second waits for the next phrase and is not dropped', () => {
   const g = rig();
   audioOn();
   const other = { op: 'add', input: 'band.air', target: 'color.hue', depth: 10 };
@@ -66,10 +66,23 @@ ok('one edit per phrase: one is held for the boundary, a second in the same phra
   assert.deepEqual(g.out.dropped, [], 'held for the boundary: the same conducting said again is not a drop');
   g.bar(8);
   assert.equal(g.out.applied.length, 1);
-  g.request(8, other);
-  assert.deepEqual(g.out.dropped.map((e) => e.reason), ['rate'], 'bar 8 lands at 8, and that phrase has its edit');
-  g.request(9, other); g.bar(12);
-  assert.equal(g.out.applied.length, 2, 'the next phrase is free');
+  g.request(8, other); // bar 8 would land at 8, whose phrase has its edit: it waits for 12
+  assert.deepEqual(g.out.dropped, [], 'nothing is dropped for the rate');
+  g.bar(9); g.bar(11);
+  assert.equal(g.out.applied.length, 1, 'not before its own phrase boundary');
+  g.bar(12);
+  assert.equal(g.out.applied.length, 2, 'the next phrase');
+  assert.equal(g.out.applied[1].landBar, 12);
+  g.done();
+});
+
+ok('tier 2 does not ask for an add: no drop rows for what it may not make', () => {
+  const g = rig({ tier: 't2' });
+  audioOn();
+  const mk = (tier) => buildContext({ layers: [], room: {}, audio: 'mic', tier, show: g.trio.showBlock() });
+  for (let b = 1; b <= 6; b++) g.bar(b);
+  assert.equal(rulesReply('davis', mk('t2'), { seed: 3 }).route, undefined, 'tier 2: no proposal the tier cannot make');
+  assert.ok(rulesReply('davis', mk('t3'), { seed: 3 }).route, 'tier 3 does ask');
   g.done();
 });
 
@@ -97,8 +110,16 @@ ok('the artist is sovereign: a route they edit owns its target; a dial they move
   g.bar(5); g.request(5);
   assert.equal(g.out.dropped[0].reason, 'owned');
   // they move a dial: its target is theirs too
-  g.set({ layoutParams: { ...g.st.layoutParams, squash: 0.4 } });
+  // a recalled hit, a morph or an evolve rewrites many dials at once: that is not the artist moving a dial
+  g.set({ layoutParams: { ...g.st.layoutParams, squash: 0.9, breath: 0.2, kinemeRate: 3, hueRotate: 40, accumulation: true } });
+  for (const t of ['render.squash', 'render.breath', 'clock.kinemeRate', 'color.hue', 'render.accum']) assert.equal(g.trio.conductor.isOwned(t), false, `a rewrite of the layout does not own ${t}`);
+  // the slider's own event does
+  emit(Events.LAYOUT_PARAM, { key: 'squash', value: 0.4 });
   assert.ok(g.trio.conductor.isOwned('render.squash'), 'squash dial -> render.squash');
+  emit(Events.FEEL_APPLY, { id: 'violent' });
+  assert.ok(g.trio.conductor.isOwned('render.scale') && g.trio.conductor.isOwned('render.alpha'), 'a FEEL pill owns the audio feel targets');
+  emit(Events.LAYOUT_PARAM, { key: 'count', value: 40 });
+  assert.equal(g.trio.conductor.isOwned('render.hue'), false, 'a dial that is no route target owns nothing');
   assert.deepEqual(DIAL_FOR_TARGET['render.squash'], ['squash']);
   for (const t of Object.keys(DIAL_FOR_TARGET)) assert.ok(Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t), `${t} is a real route target`);
   g.done();

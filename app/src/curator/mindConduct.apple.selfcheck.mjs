@@ -80,7 +80,7 @@ await ok('a conforming helper conducts: the show reaches it, its route lands on 
   assert.ok(g.routes.some((e) => e.status === 'applied'), 'and one is applied');
   const mine = (g.st.audioRoutes || []).filter((r) => r.by === 'davis');
   assert.ok(mine.length >= 1 && mine.length <= 3, `his routes are in the table (${mine.length}), never more than three`);
-  assert.ok(g.routes.every((e) => e.landBar === null || e.landBar % 4 === 0), 'every edit lands on a phrase boundary');
+  assert.ok(g.routes.every((e) => e.landBar === null || e.landBar % 4 === 0), `every edit lands on a phrase boundary ${JSON.stringify(g.routes.map((e) => [e.status, e.reason, e.bar, e.landBar]))}`);
   const ctx = g.asked.find((a) => a.persona === 'davis').context;
   assert.ok(ctx.show && Array.isArray(ctx.show.routes) && 'owned' in ctx.show && 'flatBars' in ctx.show && ctx.show.energy === 'mid', 'the helper is handed the show block');
   g.done();
@@ -149,7 +149,9 @@ await ok('Apple and the rules are the same to the stage: a route from either lan
   const r = shape(viaRules);
   viaRules.done();
   assert.ok(a.length > 0 && r.length > 0, 'both conducted');
-  assert.deepEqual(a, r, 'same landing rule, same delta shape');
+  // Apple's reply arrives a bar after the rules' would, so the two may land different NUMBERS of edits in nine bars; what
+  // must be identical is the shape of every edit: the same boundary rule and the same recorded delta.
+  for (const row of [...a, ...r]) assert.deepEqual(row, [0, 'after,before,op'], 'every edit, from either backend, lands on a boundary with the same delta shape');
 });
 
 await ok('the Swift helper: PENDING until it can say `route`; once it can, its schema and prompt are checked', async () => {
