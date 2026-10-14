@@ -26,6 +26,7 @@ import { createScentField } from '../engine/kernel/field/scent.js';
 import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
 import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
 import { publishDishDensity, EMPTY_DISH_DENSITY } from '../engine/dishDensity.mjs'; // #1412: the shared grid's density field, published per frame
+import { tickDishTrails, clearDishTrails } from '../engine/dishTrails.mjs'; // #1415: the trail substrate's tick + seed-change wipe (the law lives in the module)
 import { dishPigmentShed } from './sceneContract.js'; // #1412: the tier-2 shed predicate (the governor's rule, one home)
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
@@ -317,6 +318,10 @@ export function createLiveResolver() {
       // enrols the same field through the same helper — live and bake
       // cannot disagree about how wet the dish is).
       wetness: ctx.layoutParams.accumulationWetness,
+      // #1415 — the stratum's ACCUMULATION switch rides enrolment the
+      // same way: up, the stratum deposits trails into the shared
+      // ground (the bake driver enrols the same field).
+      accum: !!ctx.layoutParams.accumulation,
     });
     if (!ctx.slowRender) {
       // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().
@@ -430,6 +435,12 @@ export function createLiveResolver() {
       } else {
         worldNoise = createNoise(projectSeed || 444);
         worldNoiseSeed = projectSeed;
+        // #1415 — state purity rides the same genuine-reseed branch:
+        // a new seed starts with an empty trail field (the focus-swap
+        // adoption above keeps the ground, exactly as it keeps the
+        // weather). The bake never needs this — its session is born
+        // empty.
+        clearDishTrails(dishSession);
       }
     }
 
@@ -870,6 +881,12 @@ export function createLiveResolver() {
     // no deposits — stepping would decay a frozen field, same honesty as
     // the paused-tick rollback).
     if (!input.slowRender) sharedScent.step();
+    // #1415 — tick the dish's trail substrate ONCE per tick, after
+    // every layer has updated, on the same protocol as the scent step
+    // above: deposits read post-integration positions, so the next
+    // frame's force passes all read one uniform field. The bake driver
+    // ticks once per step with the same call (bake = live arithmetic).
+    if (!input.slowRender) tickDishTrails(dishSession);
 
     // Item-level morph: replaces the pixel crossfade for chip clicks (mode,
     // behave, palette, asset-set). Runs after FIELD/FEED/MOD so those patch
