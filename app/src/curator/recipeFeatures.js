@@ -21,7 +21,11 @@ import { RANDOMIZABLE_KEYS } from '../state/paramUtils.js';
 // normalized 0–1 — the buckets alone are too coarse to tell 8 candidates apart.
 // v3 (#1140): keep records carry session context (audio/palette-warmth/dwell);
 // the feature keys are unchanged, but training data is now instrumented.
-export const FEATURES_VERSION = 3;
+// v4 (#1545): num.scaleMid reads the real {x, y} scale — under v3 the
+// numerics reader still indexed the legacy array shape, so scaleMid was
+// structurally 0 for every normalized recipe. Distances are not
+// comparable across v3/v4; tasteHeads trained on v3 read as stale.
+export const FEATURES_VERSION = 4;
 
 // The three pair params have no PARAM_SPEC range; these bounds are the dice's
 // own (state/paramUtils.js randomizeKey), so 0–1 spans what CURATE can roll.
@@ -38,7 +42,12 @@ export function recipeNumerics(p) {
   for (const k of RANDOMIZABLE_KEYS) {
     const v = p[k];
     if (PAIR_NUMS[k]) {
-      const pair = Array.isArray(v) && v.length === 2 ? v.map(Number) : [0, 0];
+      // #1545 — since #1202 scale arrives as {x, y}; normalize it to the
+      // X pair before the map, the same convention the bucket path in
+      // recipeFeatures uses (a legacy array still reads as itself).
+      // rotate/alpha still arrive as plain pairs.
+      const raw = k === 'scale' && v && !Array.isArray(v) ? v.x : v;
+      const pair = Array.isArray(raw) && raw.length === 2 ? raw.map(Number) : [0, 0];
       const [name, x] = PAIR_NUMS[k](pair);
       out[name] = +clamp01(x).toFixed(4);
       continue;

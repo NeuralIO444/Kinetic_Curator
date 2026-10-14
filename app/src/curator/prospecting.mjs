@@ -68,17 +68,17 @@ export function cornerDefinition(corner) {
 // ranges are mapped through the same arithmetic so the box and the
 // centroid share one space.
 //
-// SCALE IS NOT IN THIS MAP, deliberately: since #1202 the normalized
-// params carry scale as { x, y } pairs, and recipeNumerics' scaleMid
-// still reads the legacy array shape — it is structurally 0 for
-// every normalized recipe in the shipped substrate (verified:
-// features.num.scaleMid === 0 on live samples while the features'
-// scale BUCKET reads the X pair correctly). A declared range over a
-// dead axis would prove nothing. The substrate carries scale
-// honestly as the bucket, so scale is proven at bucket granularity
-// (declaredScaleBuckets below) and the dead axis is named, not
-// papered over. Fixing scaleMid means redefining FEATURES_VERSION 3
-// — the taste substrate's call, not this stage's (staging report).
+// SCALE IS NOT IN THIS MAP, deliberately: scale is proven at bucket
+// granularity (declaredScaleBuckets below), not over num.scaleMid.
+// The bucket is the honest granularity for a corner's bias — a
+// profile declares scale as rolled { x, y } ranges, and which bucket
+// the X pair's mid lands in is what a corner can actually promise.
+// (History: under FEATURES_VERSION 3 a declared range over scaleMid
+// would have proven nothing — the numerics reader still indexed the
+// legacy array shape after #1202 made scale { x, y }, so the axis
+// was structurally 0 for every normalized recipe. #1545 fixed the
+// reader and re-baselined the substrate to v4; the bucket proof
+// stays by design, not by need.)
 const pairRange = {
   rotate: ([[a, b], [c, d]]) => ['rotateSpread', [(c - b) / 360, (d - a) / 360]],
   alpha: ([[a, b], [c, d]]) => ['alphaMid', [((a + c) / 2) / 100, ((b + d) / 2) / 100]],
