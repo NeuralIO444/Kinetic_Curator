@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { emit, on, Events } from '../composition/eventBus.js';
-import { startTrio, setConductTap, DIAL_FOR_TARGET } from './trioLive.js';
+import { startTrio, setConductTap, DIAL_FOR_TARGET, getTrioView, subscribeTrio } from './trioLive.js';
 import { createMindRecorder, checkMindRecord, createMindReplay } from './mindRecord.js';
 import { sanitizeAudioRoutes, isDefaultRoutes } from '../data/audioRoutes.js';
 import { DEFAULT_ROUTES, ROUTE_TARGETS } from '../gl/audioRoutes.mjs';
@@ -197,6 +197,33 @@ ok('the take records what he did and replays it; a take without conducting is un
   cur.seek(0); assert.equal(cur.conductStep(200).length, 2, 'a seek re-arms the cursor');
   const plain = createMindRecorder({ getFrame: () => 1 }).finish();
   assert.equal('conduct' in plain, false, 'no conducting: the section is exactly what it was');
+});
+
+ok('the dev view: tier, what he holds, what waits, the last twelve outcomes newest first; null when stopped', () => {
+  const g = rig({ tier: 't4' });
+  let pings = 0;
+  const off = subscribeTrio(() => { pings++; });
+  audioOn();
+  let v = getTrioView();
+  assert.equal(v.on, true); assert.equal(v.tier, 't4'); assert.deepEqual(v.owned, []); assert.equal(v.log.length, 0);
+  g.bar(1); g.request(1);
+  v = getTrioView();
+  assert.deepEqual(v.pending, { desc: '+ band.mids > render.glow 0.3', landBar: 4 }, 'a proposal waiting for its boundary');
+  g.bar(4);
+  v = getTrioView();
+  assert.equal(v.pending, null); assert.equal(v.mine, 1); assert.equal(v.routes, DEFAULT_ROUTES.length + 1);
+  assert.deepEqual(v.log[0], { bar: 1, landBar: 4, status: 'applied', reason: null, desc: '+ band.mids > render.glow 0.3' });
+  g.trio.conductor.touch(['render.scale']);
+  g.bar(5);
+  assert.deepEqual(getTrioView().owned, ['render.scale']);
+  for (let i = 0; i < 20; i++) { g.request(8 + i, { op: 'add', input: 'band.air', target: 'render.scale', depth: 0.1 }); }
+  v = getTrioView();
+  assert.equal(v.log.length, 12, 'capped at twelve');
+  assert.equal(v.log[0].status, 'dropped'); assert.equal(v.log[0].reason, 'owned', 'newest first');
+  assert.ok(pings > 5, 'subscribers hear about it');
+  g.done();
+  assert.equal(getTrioView(), null, 'stopped: nothing to show');
+  off();
 });
 
 ok('wired: App starts the trio and tells the personas the show; the MATRIX marks his rows; the take taps the outcomes', () => {

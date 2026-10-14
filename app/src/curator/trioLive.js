@@ -9,7 +9,7 @@
 // (`by: 'davis'`), and handed to the take's recorder. Muted while a take plays: the take's own record speaks.
 // It never invents an edit: the proposal came from a persona decision (rules or Apple), validated by the contract.
 import { on, emit, Events } from '../composition/eventBus.js';
-import { createConductor, createFlatness, applyRouteOp, DAVIS_TAG, PHRASE_BARS } from './mindConduct.js';
+import { createConductor, createFlatness, applyRouteOp, describeOp, DAVIS_TAG, PHRASE_BARS } from './mindConduct.js';
 import { DEFAULT_ROUTES } from '../gl/audioRoutes.mjs';
 
 /** Which dial of the artist's belongs to which route target: moving it by hand owns the target (decision 3). */
@@ -33,6 +33,21 @@ export function setConductTap(fn) {
   tap = typeof fn === 'function' ? fn : null;
 }
 
+// The dev readout (DEV -> MIND): what the trio is doing, for tuning. Not state: a holder, like the presence view.
+const LOG_MAX = 12;
+let view = null;
+const subs = new Set();
+/** The latest conducting view, or null when the trio is not running. */
+export function getTrioView() {
+  return view;
+}
+/** Called when the view changes; returns the unsubscribe. */
+export function subscribeTrio(fn) {
+  subs.add(fn);
+  return () => { subs.delete(fn); };
+}
+const notify = () => { for (const f of subs) { try { f(); } catch { /* a listener must not stop the trio */ } } };
+
 /**
  * @param getRoutes   () => the scene's route table (null = the default table)
  * @param getTier     () => 't1'..'t4' | null   Davis's engagement tier
@@ -46,19 +61,37 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
   const flatness = createFlatness();
   const audio = { on: false, energy: null, bpm: null, confidence: 0, silent: false, onsets: 0, onsetsThisBar: 0, sinceBars: 0 };
   let pending = null; // { op, landBar, bar }
+  const log = []; // the last LOG_MAX outcomes, newest first
   let applying = false; // our own table write: not the artist
   let bar = 0;
   const stops = [];
 
+  const publish = () => {
+    let tier;
+    try { tier = getTier(); } catch { tier = null; }
+    const table = effective(getRoutes());
+    view = {
+      on: audio.on, energy: audio.energy, bpm: audio.bpm, silent: audio.silent, sinceBars: audio.sinceBars,
+      flatBars: flatness.flatBars(), tier, cooling: conductor.cooling(bar), owned: conductor.owned(),
+      routes: table.length, mine: table.filter((r) => r.by === DAVIS_TAG).length,
+      pending: pending ? { desc: describeOp(pending.op), landBar: pending.landBar } : null,
+      log: log.slice(),
+    };
+    notify();
+  };
   const announce = (e) => {
     emit(Events.MIND_ROUTE, e, { cause: 'mind' });
     if (tap !== null) { try { tap(e); } catch { tap = null; } }
+    log.unshift({ bar: e.bar, landBar: e.landBar ?? null, status: e.status, reason: e.reason || null, desc: describeOp(e.op) });
+    if (log.length > LOG_MAX) log.length = LOG_MAX;
+    publish();
   };
   const resetShow = () => { audio.on = false; audio.energy = null; audio.bpm = null; audio.confidence = 0; audio.silent = false; audio.onsets = 0; audio.onsetsThisBar = 0; audio.sinceBars = 0; flatness.reset(); pending = null; };
 
   stops.push(on(Events.AUDIO_INPUT, (p) => {
     resetShow();
     audio.on = !!(p && p.source && p.source !== 'none');
+    publish();
   }));
   stops.push(on(Events.AUDIO_ENERGY, (p) => { if (p && ['low', 'mid', 'high'].includes(p.level)) audio.energy = p.level; }));
   stops.push(on(Events.AUDIO_TEMPO, (p) => { if (p && Number.isFinite(p.bpm)) { audio.bpm = p.bpm; audio.confidence = Number(p.confidence) || 0; } }));
@@ -89,6 +122,7 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
     try { bands = audio.silent ? null : getBands(); } catch { bands = null; }
     flatness.push(bands);
     if (pending && p.bar >= pending.landBar) land(p.bar);
+    publish();
   }));
 
   stops.push(on(Events.MIND_REQUEST, (p) => {
@@ -101,6 +135,7 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
     if (!v.ok) { announce({ status: 'dropped', reason: v.reason, op, bar: p.bar, landBar: null }); return; }
     if (pending) return; // one is already held for the boundary: the same conducting, said again on the next bar
     pending = { op, landBar: v.landBar, bar: p.bar };
+    publish();
   }));
 
   // The artist: an edit of a route row (not ours) owns the row's targets; an edit of his row clears his mark and, if it
@@ -155,7 +190,7 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
         owned: conductor.owned(),
       };
     },
-    stop() { for (const s of stops) { try { s(); } catch { /* best effort */ } } pending = null; conductor.reset(); },
+    stop() { for (const s of stops) { try { s(); } catch { /* best effort */ } } pending = null; conductor.reset(); view = null; notify(); },
   };
 }
 
