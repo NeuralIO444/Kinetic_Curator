@@ -79,12 +79,14 @@ const reach = renderReachability();
   // censusReport.mjs's fixture notes. Re-pinned 2026-10-14 with the
   // #1516 brush fix: brushSize, brushSpacing, fieldScale, trailCount
   // and wobbleAmp now measure as moving (the census re-run on the
-  // combined tree is the evidence). wobbleFreq stays: threaded, but
+  // combined tree is the evidence). Re-pinned again 2026-10-14 with
+  // the #1517 colonize fix: colonizeInfluence, colonizeKill,
+  // colonizeBranch and colonizeStep now measure as moving (delta probe
+  // 48/48 each; defaults parity bit-identical). wobbleFreq stays: threaded, but
   // gated off at this fixture's wobbleAmp 0. kinemeBrushWobble stays:
   // sourced since #1516, unapplied until #894/#897.
   const dead = paramRows.filter((r) => r.class === 'zero-in-context').map((r) => r.key).sort();
   assert.deepStrictEqual(dead, [
-    'colonizeBranch', 'colonizeInfluence', 'colonizeKill', 'colonizeStep',
     'kinemeBrushWobble', 'material', 'wobbleFreq',
   ], `dead-knob set changed: ${JSON.stringify(dead)}`);
 
