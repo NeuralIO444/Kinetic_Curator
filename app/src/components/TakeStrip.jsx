@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getPlayback, seekPlayback, subscribePlayback } from '../gl/playback.mjs';
 import { takeStripModel } from '../curator/takeStrip.mjs';
+import { RangeRow } from './RangeRow.jsx';
 
 export function TakeStrip() {
   const [pb, setPb] = useState(getPlayback());
@@ -21,16 +22,15 @@ export function TakeStrip() {
   if (!pb || !model) return null;
   const pos = model.positionOf(frame);
   return (
-    <div className="take-strip" aria-label="take scrub">
+    <div className="take-strip" aria-label="take scrub"
+      onPointerDown={() => setDragging(true)}
+      onPointerUp={() => setDragging(false)}>
       <span className="take-strip-label">{model.labelFor(frame)}</span>
-      <input
-        type="range" className="take-strip-range" min={0} max={1000} step={1}
+      <RangeRow layout="bare" className="take-strip-range" min={0} max={1000} step={1}
         value={Math.round(pos * 1000)}
-        aria-label={model.hasBars ? 'Scrub by bar' : 'Scrub by time'}
-        onPointerDown={() => setDragging(true)}
-        onPointerUp={() => setDragging(false)}
-        onChange={(e) => {
-          const f = model.frameForPosition(Number(e.target.value) / 1000);
+        ariaLabel={model.hasBars ? 'Scrub by bar' : 'Scrub by time'}
+        onChange={(v) => {
+          const f = model.frameForPosition(v / 1000);
           setFrame(f);
           seekPlayback(f);
         }}

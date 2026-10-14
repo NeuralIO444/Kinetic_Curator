@@ -976,5 +976,5 @@
 /* #1461 step 3 — the take's scrub strip fills the gap between the left group and STOP; absent when no take plays. */
 .take-strip { flex: 1 1 auto; min-width: 120px; max-width: 460px; display: flex; align-items: center; gap: 8px; margin: 0 10px; }
 .take-strip-label { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; color: var(--ink); white-space: nowrap; min-width: 92px; }
-.take-strip-range { flex: 1 1 auto; min-width: 60px; accent-color: var(--kc-red); }
+.take-strip-range { flex: 1 1 auto; min-width: 60px; }
 .take-strip-note { font-size: 9px; letter-spacing: 0.1em; color: var(--dim); min-width: 24px; }
