@@ -163,9 +163,12 @@ ok('sovereignty, tier and rate: the artist\'s target is owned, tier 1 makes no e
   const other = { op: 'add', input: 'band.air', target: 'render.hue', depth: 10 };
   const k = c.consider(other, { bar: 5, tier: 't4' }); assert.equal(k.ok, true);
   c.commit(k.landBar);
-  assert.deepEqual(c.consider({ ...other, input: 'band.pres' }, { bar: 6, tier: 't4' }), { ok: false, reason: 'rate' }, 'one edit per phrase: bar 6 lands at 8, taken');
+  assert.deepEqual(c.consider({ ...other, input: 'band.pres' }, { bar: 6, tier: 't4' }), { ok: true, landBar: 12 }, 'one edit per phrase: bar 6 would land at 8 (taken), so it waits for 12, not dropped');
   assert.deepEqual(c.consider({ ...other, input: 'band.pres' }, { bar: 9, tier: 't4' }), { ok: true, landBar: 12 }, 'the next phrase is free');
   assert.deepEqual(c.consider(null, { bar: 5, tier: 't4' }), { ok: false, reason: 'malformed' });
+  const fresh = createConductor();
+  assert.equal(fresh.consider(other, { bar: 8, tier: 't4' }).landBar, 12, 'a request ON a boundary bar lands on the next one: that bar\'s tick has already run');
+  assert.equal(fresh.consider(other, { bar: 3, tier: 't4' }).landBar, 4, 'one bar before a boundary lands on it');
 });
 
 ok('backoff: three reverts and the persona goes quiet for a while, then comes back', () => {

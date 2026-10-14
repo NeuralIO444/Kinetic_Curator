@@ -22,8 +22,9 @@ export const RULES = Object.freeze({
   // show block he is exactly as neutral as he was. The seed is the decision's, so the same dish conducts the same way.
   davis: (ctx, meta = {}) => {
     // a tier that may make no edits (tier 1, or none yet) does not propose them: the books stay honest
-    const mayEdit = !!(ctx && (TIER_OPS[ctx.tier] || []).length);
-    const route = ctx && ctx.show && mayEdit ? davisRoute(ctx.show, meta.seed) : null;
+    const allowed = (ctx && TIER_OPS[ctx.tier]) || [];
+    let route = ctx && ctx.show && allowed.length ? davisRoute(ctx.show, meta.seed) : null;
+    if (route && !allowed.includes(route.op)) route = null; // tier 2 may nudge a depth, not add: it does not ask
     return { ...neutralReply('davis'), ...(route ? { route } : {}), ...reading('davis', ctx) };
   },
   // #1483 — a show that has stayed pinned and flat for a phrase is a failed show: she burns it.

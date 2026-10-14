@@ -139,7 +139,13 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
   }));
 
   // The artist: an edit of a route row (not ours) owns the row's targets; an edit of his row clears his mark and, if it
-  // undoes what he did, counts as a revert. Moving a target's own dial owns that target too (decision 3).
+  // undoes what he did, counts as a revert.
+  // Moving a target's own dial owns that target too (decision 3). That is read from the slider's own event
+  // (layout:param), never from a diff of the layout: a recalled hit, a morph, an evolve or a preset rewrites many dials
+  // at once, and none of that is the artist moving a dial by hand.
+  const owns = (key) => { for (const [target, keys] of Object.entries(DIAL_FOR_TARGET)) if (keys.includes(key)) conductor.touch(target); };
+  stops.push(on(Events.LAYOUT_PARAM, (p) => { if (p && typeof p.key === 'string') owns(p.key); }));
+  stops.push(on(Events.FEEL_APPLY, () => { for (const k of ['audioModDepth', 'audioScaleMod', 'audioAlphaMod', 'audioSwell']) owns(k); })); // a FEEL pill sets the audio feel
   if (typeof subscribe === 'function') {
     stops.push(subscribe((state, prev) => {
       if (!state || !prev || applying) return;
@@ -168,11 +174,6 @@ export function startTrio({ getRoutes, getTier, getBands, isReplaying = () => fa
           const routes = now.map((r) => (r.by === DAVIS_TAG && changed.has(pairKey(r)) ? { input: r.input, target: r.target, depth: r.depth } : r));
           applying = true;
           try { emit(Events.AUDIO_ROUTES_SET, { routes, continuous: false }, { cause: 'ownership' }); } finally { applying = false; }
-        }
-      }
-      if (state.layoutParams !== prev.layoutParams && state.layoutParams && prev.layoutParams) {
-        for (const [target, keys] of Object.entries(DIAL_FOR_TARGET)) {
-          if (keys.some((k) => state.layoutParams[k] !== prev.layoutParams[k])) conductor.touch(target);
         }
       }
     }));

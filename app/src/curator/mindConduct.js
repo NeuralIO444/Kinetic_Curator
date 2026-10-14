@@ -237,7 +237,8 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
 /**
  * The conductor's ledger. Pure state, no clock: every call is told the bar.
  *   touch(targets)          the artist acted on these targets: they are owned for the session
- *   consider(op, {bar,tier}) -> { ok: true, landBar } | { ok: false, reason: 'tier'|'owned'|'rate'|'cooldown'|'malformed' }
+ *   consider(op, {bar,tier}) -> { ok: true, landBar } | { ok: false, reason: 'tier'|'owned'|'cooldown'|'malformed' }
+ *                            (a second edit in a phrase is not dropped: it lands on the next boundary)
  *   commit(landBar)          an edit landed in that phrase
  *   revert(bar)              the artist undid / reverted a persona edit: BACKOFF_REVERTS of them start a cool-down
  */
@@ -255,8 +256,11 @@ export function createConductor() {
       if (!(TIER_OPS[tier] || []).includes(op.op)) return { ok: false, reason: 'tier' };
       if (bar < coolUntil) return { ok: false, reason: 'cooldown' };
       if (opTargets(op).some((t) => owned.has(t))) return { ok: false, reason: 'owned' };
-      const landBar = landingBar(bar);
-      if (phrases.has(phraseOf(landBar))) return { ok: false, reason: 'rate' };
+      // one edit per phrase: a proposal that would land in a phrase that has had its edit waits for the next boundary
+      // A request is released on a bar tick, AFTER that bar's own tick has run, so the earliest it can land is the next
+      // boundary strictly after it: a request at bar 8 lands at 12, never at 8 (and never one bar late, at 9).
+      let landBar = landingBar(bar + 1);
+      while (phrases.has(phraseOf(landBar))) landBar += PHRASE_BARS;
       return { ok: true, landBar };
     },
     commit(landBar) { if (Number.isInteger(landBar)) phrases.add(phraseOf(landBar)); },
