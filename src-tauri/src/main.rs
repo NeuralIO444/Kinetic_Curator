@@ -4,6 +4,7 @@
 mod metal;
 mod curator;
 mod media;
+mod mind; // #1463: Apple Intelligence via the kc-mind sidecar
 
 use std::fs;
 use std::path::Path;
@@ -37,6 +38,7 @@ fn main() {
         .manage(metal::MetalAppState(Mutex::new(None)))
         .manage(curator::CuratorAppState(Mutex::new(curator::CoreMLCurator::new())))
         .manage(media::MediaAppState::new())
+        .manage(mind::MindAppState(std::sync::Arc::new(mind::MindHelper::new())))
         .invoke_handler(tauri::generate_handler![
             write_batch_frame,
             syphon_status,
@@ -50,6 +52,8 @@ fn main() {
             media::start_media_engine_export,
             media::dump_image_batch,
             media::media_engine_get_status,
+            mind::mind_status,
+            mind::mind_ask,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

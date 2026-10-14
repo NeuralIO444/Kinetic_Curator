@@ -2,7 +2,7 @@
 
 **Status:** the current phases roadmap. Ordered by Matt, 2026-10-11.
 **Source:** Matt's draft of 2026-10-10 ("KC1_Roadmap_Petri_Dish_Affective"), revised with the six decisions recorded below.
-**Scope:** desktop and iPad first. Live stage use is welcome but is not the design driver. No live AI inside the app.
+**Scope:** desktop and iPad first. Live stage use is welcome but is not the design driver. No cloud AI: on-device system intelligence (Apple Intelligence, #1463) is allowed, and every decision is recorded (Matt, 2026-10-13).
 
 One phase is open at a time. **Phase 4 is open** (status 2026-10-13): Phases 1, 2 and 3 are complete.
 
@@ -130,7 +130,7 @@ voice lines user-editable or canonical; when to start the code (its first phase 
 
 ## Out of scope this cycle
 
-- Live AI or model inference inside the app.
+- Cloud AI of any kind. (On-device Apple Intelligence for the personas is in: #1463, Matt 2026-10-13.)
 - Playing a performance file back inside the running instrument. Files are for testing and sharing this cycle.
 - The full 20-room copy matrix, new faces, and any Queen rendering.
 - **New** taste.json import work (the shipped taste artifact and the open sway gate stay as they are).

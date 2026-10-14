@@ -11,13 +11,29 @@
 import { on, emit, emitOn, Events } from '../composition/eventBus.js';
 import { buildContext } from './mindContext.js';
 import { createThinker } from './mindThinker.js';
-import { PERSONAS, wantsStage } from './mindContract.js';
+import { PERSONAS, wantsStage, validateReply } from './mindContract.js';
 import { createMindReplay, decisionOf } from './mindRecord.js';
 
 let tap = null;
 /** Observe every live decision: fn(decision, requested). One listener (or null); the take recorder uses it. */
 export function setMindTap(fn) {
   tap = typeof fn === 'function' ? fn : null;
+}
+
+// latency telemetry only (never a decision input): the page's monotonic clock, 0 where there is none
+const now = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : 0);
+let system = null; // the answering model's identity, for the take's record
+/** The model and system the current backend runs on, or null on the rules: { backend, model?, os? }. */
+export function getMindSystem() {
+  return system ? { ...system } : null;
+}
+
+/** A short stable hash of the context: mind:req names WHAT was asked without carrying it. */
+export function contextHash(ctx) {
+  const s = JSON.stringify(ctx);
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16).padStart(8, '0');
 }
 
 const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, invented: d.invented, reply: d.reply });
@@ -34,16 +50,32 @@ const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, 
 export function startMind({ getSnapshot, getSeed, model = null, isReplaying = () => false, log = () => {} }) {
   const name = model && model.name === 'demo' ? 'demo' : 'apple';
   const available = () => { try { return !!(model && model.available()); } catch { return false; } };
+  // #1463 — every model ask is announced (mind:req) and every answer reported (mind:reply: the validated reply or
+  // null, with its latency) whatever happens to it next; the thinker still decides whether it is used.
+  const ask = (persona) => (context, meta) => {
+    const t0 = now();
+    emit(Events.MIND_REQ, { persona, bar: meta.bar, seed: meta.seed, contextHash: contextHash(context) }, { cause: 'mind' });
+    const done = (reply, error) => {
+      emit(Events.MIND_REPLY, { persona, bar: meta.bar, backend: name, latencyMs: Math.round(now() - t0), reply, ...(error ? { error } : {}) }, { cause: 'mind' });
+    };
+    return Promise.resolve()
+      .then(() => model.ask(persona, context, meta))
+      .then((raw) => { const v = validateReply(persona, raw); done(v, v ? null : 'malformed'); return raw; },
+        (e) => { done(null, String(e && e.message ? e.message : e).slice(0, 120)); throw e; });
+  };
   const thinkers = PERSONAS.map((persona) => createThinker({
     persona, log, available, backend: name,
-    mind: model ? (context, meta) => model.ask(persona, context, meta) : null,
+    mind: model ? ask(persona) : null,
   }));
   let status = null;
   const publishStatus = () => {
     const up = available();
-    const next = { available: up, backend: up ? name : 'rules' };
+    let info;
+    try { info = model && typeof model.info === 'function' ? model.info() : null; } catch { info = null; }
+    const next = { available: up, backend: up ? name : 'rules', ...(up && info && info.model ? { model: info.model } : {}) };
     if (status && status.backend === next.backend) return;
     status = next;
+    system = up ? { backend: name, ...(info && info.model ? { model: info.model } : {}), ...(info && info.os ? { os: info.os } : {}) } : null;
     emit(Events.MIND_STATUS, next, { cause: 'mind' });
   };
   publishStatus();
@@ -61,11 +93,12 @@ export function startMind({ getSnapshot, getSeed, model = null, isReplaying = ()
       if (!d) continue;
       const requested = wantsStage(d.persona, d.reply, ctx.room);
       emit(Events.MIND_DECISION, d, { cause: 'mind' });
+      if (d.backend === 'rules') emit(Events.MIND_REPLY, { persona: d.persona, bar: d.bar, backend: 'rules', latencyMs: 0, reply: d.reply }, { cause: 'mind' });
       if (requested) emitOn('bar', Events.MIND_REQUEST, requestOf(d), { cause: 'mind' });
       if (tap !== null) { try { tap(d, requested); } catch { tap = null; } }
     }
   });
-  return () => { off(); thinkers.forEach((t) => t.reset()); status = null; };
+  return () => { off(); thinkers.forEach((t) => t.reset()); status = null; system = null; };
 }
 
 let replay = null; // { record, cursor }

@@ -13,7 +13,7 @@ import { resetFormation, setFormationTap, setShiftTap } from '../curator/formati
 import { createShiftRecorder } from '../curator/davisShift.js';
 import { createClockRecorder } from '../curator/clockRecord.js';
 import { createMindRecorder } from '../curator/mindRecord.js';
-import { setMindTap } from '../curator/mindLive.js';
+import { setMindTap, getMindSystem } from '../curator/mindLive.js';
 import { useStore } from '../state/store.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
@@ -52,7 +52,7 @@ const clockSection = (getFrame) => {
 // #1462 — the take carries every persona decision verbatim (backend, seed, invented, the reply, whether it asked the
 // stage), stored as `mind`: playback re-publishes these and never asks a backend.
 const mindSection = (getFrame) => {
-  const rec = createMindRecorder({ getFrame });
+  const rec = createMindRecorder({ getFrame, getSystem: getMindSystem });
   setMindTap((d, requested) => rec.update(d, requested));
   return { stop() { setMindTap(null); return rec.finish(); } };
 };

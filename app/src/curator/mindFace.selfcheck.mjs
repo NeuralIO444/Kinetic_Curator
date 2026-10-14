@@ -110,7 +110,7 @@ await ok('wired: the faces draw the overlay; the demo is URL-gated; pure modules
   const duel = src('../panels/directors/DirectorsDuel.jsx');
   assert.match(duel, /loisLook\(mind\.lois\.id\)/); assert.match(duel, /davisLook\(mind\.davis\.id\)/);
   const app = src('../App.jsx');
-  assert.match(app, /model: DEBUG_MIND \? demoModel : null/);
+  assert.match(app, /model: DEBUG_MIND \? demoModel : appleModel/);
   assert.match(app, /const stopFaces = startMindFaces\(\)/);
   assert.match(src('./mindDemo.js'), /get\('debug'\) === 'mind'/);
   const code = src('./mindFace.js').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
