@@ -156,6 +156,20 @@ await ok('slice: a setlist duplicate and a shelf import are NOT new keep lines (
   assert.deepStrictEqual(lines('keeps').map((l) => JSON.parse(l).seed), [44]);
 });
 
+await ok('#1507: a mined record\'s provenance rides its ledger line; forged provenance is off-schema', () => {
+  const prov = { source: 'explorer', run: 'xpl-1', corner: 'haeckel', axes: { layout: 'radial', palette: 'hydra', castSize: 3 } };
+  const row = ledgerRow(rec(71, { provenance: prov }));
+  assert.deepStrictEqual(row.provenance, prov, 'the line keeps the provenance');
+  assert.strictEqual(isLedgerRow(row), true, 'a provenance line validates');
+  const { rows, skipped } = parseLedger(`${JSON.stringify(row)}\n`);
+  assert.strictEqual(rows.length, 1); assert.strictEqual(skipped, 0);
+  assert.deepStrictEqual(rows[0].provenance, prov, 'provenance survives the JSONL round-trip');
+  assert.strictEqual(isLedgerRow({ ...row, provenance: { source: 'forged', run: 'x', corner: 'y' } }), false, 'a forged origin is not a ledger row');
+  const hand = ledgerRow(rec(72));
+  assert.ok(!('provenance' in hand), 'a hand line grows no provenance');
+  assert.strictEqual(isLedgerRow(hand), true, 'legacy lines (no provenance) still validate');
+});
+
 await ok('wiring: X is bound in App.jsx and documented on the help line', () => {
   const src = join(dirname(fileURLToPath(import.meta.url)), '..');
   const app = readFileSync(join(src, 'App.jsx'), 'utf8');

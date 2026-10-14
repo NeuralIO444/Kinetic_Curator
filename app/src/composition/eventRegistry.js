@@ -20,6 +20,7 @@ export const EVENT_REGISTRY = {
   DAVIS_MUTATE_STREAM: { handler: 'wire' },
   DAVIS_FAVORITE: { handler: 'wire' },
   DAVIS_FAVORITE_REMOVE: { handler: 'wire' },
+  EXPLORER_LOAD_RUN: { handler: ["panels/davis/CandidateTray.jsx"] },
   ACCUM_GESTURE: { handler: ["panels/CanvasPanel.jsx","panels/DavisPanel.jsx"] },
   CANVAS_BG_CYCLE: { handler: 'wire' },
   LAYOUT_PARAM: { handler: 'wire' },

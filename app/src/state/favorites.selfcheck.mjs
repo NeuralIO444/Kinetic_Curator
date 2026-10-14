@@ -232,4 +232,20 @@ mem.delete(KEEPS_KEY);
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: NaN, config: {} })), 'NaN keptAt dropped');
 }
 
+// #1507 — provenance rides the shelf: a mined keep keeps its origin
+// through sanitize + the storage round-trip; a forged origin is dropped.
+{
+  const prov = { source: 'explorer', run: 'xpl-9', corner: 'reas', axes: { layout: 'grid', palette: 'bone', castSize: 2 } };
+  const minedFav = { ...fav(909), provenance: prov };
+  const a = boot();
+  a.call('addFavorite', minedFav);
+  assert.deepStrictEqual(a.get().favorites.find((f) => f.seed === 909).provenance, prov, 'provenance survives addFavorite');
+  const b = boot(); // reload over the same storage
+  assert.deepStrictEqual(b.get().favorites.find((f) => f.seed === 909).provenance, prov, 'provenance survives the reload round-trip');
+  const forged = sanitizeFavorite({ ...fav(910), provenance: { source: 'forged', run: 'x' } });
+  assert.ok(!('provenance' in forged), 'a forged origin never reaches the shelf');
+  const plain = sanitizeFavorite(fav(911));
+  assert.ok(!('provenance' in plain), 'a hand favorite grows no provenance');
+}
+
 console.log('favorites.selfcheck: OK');

@@ -18,6 +18,7 @@ import { captureKeepContext, sanitizeKeepContext, seedAgeMsNow } from '../../cur
 import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #1124
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 import { appendToLedger } from '../../curator/tasteLedger.js'; // #1173: keep/pass ledgers for the MLX loop
+import { sanitizeProvenance } from '../../curator/provenance.mjs'; // #1507: mined ≠ rolled ≠ hand-built, on the record
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
 // lived in memory only: a reload silently emptied the tray. Same pattern as the
@@ -111,9 +112,13 @@ export function sanitizeFavorite(raw) {
   const bands = sanitizeBands(raw.bands); // #1124: kept only if it is exactly what a keep writes
   const stackOk = raw.stack && JSON.stringify(raw.stack).length < 60000 && expandStack(raw.stack).ok;
   const context = sanitizeKeepContext(raw.context);
+  // #1507 — provenance rides along when it is a real one (explorer-mined);
+  // hand-built and dice-crowned records carry none and none is invented.
+  const provenance = sanitizeProvenance(raw.provenance);
   return {
     ...(stackOk ? { stack: JSON.parse(JSON.stringify(raw.stack)) } : {}),
     ...(bands ? { bands } : {}),
+    ...(provenance ? { provenance } : {}),
     id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
     seed,
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'

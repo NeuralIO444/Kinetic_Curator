@@ -11,7 +11,9 @@ test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE p
   const panel = page.locator('.panel-davis');
 
   // five labelled sections, in order (UX-7: TRAILS surfaces the ACCUM toggle
-  // + gestures in-panel, so FREEZE/CLEAR/SWELL are reachable from DIRECTOR)
+  // + gestures in-panel, so FREEZE/CLEAR/SWELL are reachable from DIRECTOR.
+  // #1507's mined tray adds NO section: its load control rides GENERATE's
+  // label row and its body renders sectionless below Evolve when loaded)
   await expect(panel.locator('.davis-section-label')).toHaveText(['voices', 'generate', 'perform', 'trails', 'the room']); // #1126: the two Directors close the panel
 
   // nothing deleted: every existing control is findable

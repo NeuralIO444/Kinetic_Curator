@@ -11,6 +11,7 @@ import { captureFavorite } from '../state/slices/davisSlice.js';
 import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
 import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
+import { CandidateTray } from './davis/CandidateTray.jsx';
 import { KINEME_PATTERNS } from '../engine/kineme.js';
 import { useStore } from '../state/store.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
@@ -128,7 +129,18 @@ export function DavisPanel() {
           <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
 
-          <div className="davis-section-label ttl">generate</div>
+          <div className="davis-label-row">
+            <div className="davis-section-label ttl bare">generate</div>
+            {/* #1507 — the mined tray's load control rides this existing
+                label row (zero added height: the DIRECTORS panel has a
+                no-scroll fit contract). The tray itself sits below
+                Evolve and opens its picker on this event. */}
+            <button type="button" className="micro-btn"
+              title="Load a mined run folder (Look Explorer) — its finalists open below Evolve for crowning"
+              onClick={() => emit(Events.EXPLORER_LOAD_RUN)}>
+              load run
+            </button>
+          </div>
           {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
           {hitCount === 0 && <div className="lois-line name">{LOIS_LINES.director}</div>}
           <div className="davis-actions davis-actions-3">
@@ -163,6 +175,12 @@ export function DavisPanel() {
           </div>
 
           <EvolveProgress />
+
+          {/* #1507 — the mined candidates' curation view: at rest it
+              renders nothing (the panel's fit budget is spent on the
+              performance surface); once a run loads from the GENERATE
+              label row, its finalists render here for crowning. */}
+          <CandidateTray />
 
           <div className="davis-section-label ttl">perform</div>
           <div className="davis-perform-row">

@@ -205,6 +205,10 @@
 .hit-pill-main:hover { background: rgba(255,255,255,0.04); }
 .hit-pill-num { color: var(--dim); font-size: 9px; font-weight: 700; }
 .hit-pill-name { letter-spacing: 0.1em; text-transform: uppercase; }
+/* #1507 — the mined mark on a crowned explorer keep: a small amber
+   diamond (amber = taste, KC-1 DS). A mined keep reads mined wherever
+   it renders; hand keeps never carry it. */
+.hit-mined { width: 6px; height: 6px; flex-shrink: 0; margin: 0 2px; background: var(--kc-davis); transform: rotate(45deg); }
 .hit-bands { display: inline-flex; gap: 3px; }
 .hit-band { width: 7px; height: 18px; }
 .hit-band.heat, .hit-detail-legend i.heat { background: var(--line-2); }

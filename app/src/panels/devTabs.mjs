@@ -44,6 +44,9 @@ const KernelPanel = lazy(() =>
 const MindPanel = lazy(() =>
   import('./MindPanel.jsx').then((m) => ({ default: m.MindPanel })),
 );
+const CensusPanel = lazy(() =>
+  import('./CensusPanel.jsx').then((m) => ({ default: m.CensusPanel })),
+);
 
 /** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464). */
 export const DEV_TABS = [
@@ -54,6 +57,9 @@ export const DEV_TABS = [
   { id: 'units',     title: 'UNITS',      icon: '✎', component: UnitsPanel },
   { id: 'kernel',    title: 'KERNEL',     icon: '▦', component: KernelPanel },
   { id: 'mind',      title: 'MIND',       icon: '◌', component: MindPanel },
+  // #1507: the Look Explorer census readout — E1a/E1b artifacts + run
+  // yield by corner, rendered read-only from the artifacts themselves.
+  { id: 'census',    title: 'CENSUS',     icon: '▤', component: CensusPanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];

@@ -1261,3 +1261,32 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .stim-spectrum-scale span:nth-child(4) { right: 0; transform: none; }
 .stim-spectrum-marks { margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.25); border: 1px solid var(--line); }
 .stim-spectrum-maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
+
+/* #1507 — the candidate tray (DIRECTORS → mined): mined candidates are
+   NOT keeps — amber left edge + MINED tag, distinct from the hits shelf
+   everywhere. No animation: a candidate still presents identically
+   under reduced motion (PA4). */
+.cand-tray { margin-bottom: 0; }
+/* #1507 — a label row: the section label keeps its own element (and its
+   exact text) while one micro action rides the same line — the mined
+   tray's load control on GENERATE's row. The row carries the divider
+   the label would have carried; the label itself goes bare. */
+.davis-label-row { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; padding-top: 3px; border-top: 1px solid var(--line-2); }
+.davis-label-row .micro-btn { line-height: 1; padding: 1px 5px; }
+.davis-section-label.bare { margin-top: 0; padding-top: 0; border-top: 0; }
+.cand-body-label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--kc-davis); margin-top: 4px; }
+.cand-run-line { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; margin-top: 2px; }
+.cand-note { font-size: 9px; color: var(--dim); margin-top: 4px; }
+.cand-refusal { font-size: 10px; color: var(--kc-red); margin-top: 4px; }
+.cand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.cand-card { border: 1px solid var(--line-2); border-left: 2px solid var(--kc-davis); background: var(--panel-2); padding: 4px; }
+.cand-card.is-crowned { opacity: 0.75; }
+.cand-card.is-passed { opacity: 0.45; }
+.cand-still { position: relative; aspect-ratio: 4 / 3; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.cand-still img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cand-nostill { font-size: 8px; color: var(--dim); letter-spacing: 0.08em; }
+.cand-tag { position: absolute; top: 3px; left: 3px; font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: #0a0a0c; background: var(--kc-davis); padding: 1px 4px; }
+.cand-prov { font-size: 9px; color: var(--ink); margin-top: 4px; line-height: 1.35; }
+.cand-meta { font-size: 8px; color: var(--dim); margin-top: 1px; }
+.cand-actions { display: flex; gap: 4px; margin-top: 4px; }
+.cand-verdict { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--kc-davis); }
