@@ -76,12 +76,16 @@ const reach = renderReachability();
 
   // THE FINDINGS, pinned. Dead knobs: zero delta in the context that
   // honestly exercises the consumer, with the wiring evidence in
-  // censusReport.mjs's fixture notes.
+  // censusReport.mjs's fixture notes. Re-pinned 2026-10-14 with the
+  // #1516 brush fix: brushSize, brushSpacing, fieldScale, trailCount
+  // and wobbleAmp now measure as moving (the census re-run on the
+  // combined tree is the evidence). wobbleFreq stays: threaded, but
+  // gated off at this fixture's wobbleAmp 0. kinemeBrushWobble stays:
+  // sourced since #1516, unapplied until #894/#897.
   const dead = paramRows.filter((r) => r.class === 'zero-in-context').map((r) => r.key).sort();
   assert.deepStrictEqual(dead, [
-    'brushSize', 'brushSpacing', 'colonizeBranch', 'colonizeInfluence',
-    'colonizeKill', 'colonizeStep', 'fieldScale', 'kinemeBrushWobble',
-    'material', 'trailCount', 'wobbleAmp', 'wobbleFreq',
+    'colonizeBranch', 'colonizeInfluence', 'colonizeKill', 'colonizeStep',
+    'kinemeBrushWobble', 'material', 'wobbleFreq',
   ], `dead-knob set changed: ${JSON.stringify(dead)}`);
 
   // Not headless-measurable — consumers exist outside headless reach;

@@ -198,12 +198,14 @@ const FIELDMAP_CTX = { fieldMapField: 'noise', fieldMapChannel: 'scale', fieldMa
 // is only honestly exercisable there.
 const HYPE_CTX = { mode: 'hype', behave: 'cruise' };
 // buildPlacements' geoParams (buildPlacements.js) forwards growthRate
-// / growthBranch / noise / lsys / phyllo into computeGeometrySoA but
-// NOT the brush or colonize families — those kernel parameters keep
-// their hardcoded defaults (placement.js: brushSize 24, spacing 0.5,
-// fieldScale 0.004, trails 6, wobble 0/0.5; colonize 90/18/0.25/7) no
-// matter what the params carry. The fixtures below still sweep them
-// through the full pipeline: the zero IS the measurement.
+// / growthBranch / noise / lsys / phyllo into computeGeometrySoA. The
+// brush family was forwarded by #1516 (2026-10-14) — before that, it
+// and the colonize family kept their hardcoded kernel defaults
+// (placement.js: brushSize 24, spacing 0.5, fieldScale 0.004, trails 6,
+// wobble 0/0.5; colonize 90/18/0.25/7) no matter what the params
+// carried. The colonize family is still not threaded (fix: #1517).
+// The fixtures below sweep every key through the full pipeline: the
+// zero IS the measurement.
 const NOT_THREADED = 'buildPlacements never forwards this key to computeGeometrySoA — the geometry kernel runs its hardcoded default';
 const KEY_FIXTURES = {
   count: { driver: 'place', ctx: { mode: 'fibonacci' } },
@@ -222,12 +224,12 @@ const KEY_FIXTURES = {
   colonizeStep: { driver: 'place', ctx: { mode: 'colonize' }, note: NOT_THREADED },
   noiseFreq: { driver: 'place', ctx: { mode: 'noise', displacement: 120 } },
   noiseSpeed: { driver: 'place', ctx: { mode: 'noise', displacement: 120 } },
-  brushSize: { driver: 'place', ctx: { mode: 'brush' }, note: NOT_THREADED },
-  brushSpacing: { driver: 'place', ctx: { mode: 'brush' }, note: NOT_THREADED },
-  fieldScale: { driver: 'place', ctx: { mode: 'brush' }, note: NOT_THREADED },
-  trailCount: { driver: 'place', ctx: { mode: 'brush' }, note: NOT_THREADED },
-  wobbleAmp: { driver: 'place', ctx: { mode: 'brush' }, note: NOT_THREADED },
-  wobbleFreq: { driver: 'place', ctx: { mode: 'brush' }, note: NOT_THREADED },
+  brushSize: { driver: 'place', ctx: { mode: 'brush' } },
+  brushSpacing: { driver: 'place', ctx: { mode: 'brush' } },
+  fieldScale: { driver: 'place', ctx: { mode: 'brush' } },
+  trailCount: { driver: 'place', ctx: { mode: 'brush' } },
+  wobbleAmp: { driver: 'place', ctx: { mode: 'brush' } },
+  wobbleFreq: { driver: 'place', ctx: { mode: 'brush' }, note: 'threaded since #1516, but this fixture sweeps at wobbleAmp 0, where the kernel gates the wobble term off entirely — the frequency of a zero-amplitude wobble; the #1516 probe measured it moving placements at wobbleAmp 20 (43/48 fixtures). The fixture-context call stands as a recorded follow-up' },
   displacement: { driver: 'place', ctx: { mode: 'noise' } },
   particleCount: { driver: 'swarm', ctx: {} },
   swarmCohesion: { driver: 'swarm', ctx: {} },
@@ -248,7 +250,7 @@ const KEY_FIXTURES = {
   kinemePulse: { driver: 'kineme', ctx: { mode: 'fibonacci' }, note: 'measured through the livingMotion driver context, driver time frozen at 3.7 s' },
   kinemePaletteBreath: { driver: 'kineme', ctx: { mode: 'fibonacci' }, note: 'measured through the livingMotion driver context, driver time frozen at 3.7 s' },
   fieldMapAmount: { driver: 'place', ctx: { ...FIELDMAP_CTX } },
-  kinemeBrushWobble: { driver: 'kineme', ctx: { mode: 'brush' }, note: 'the driver reads amounts.brushWobble (kineme.js), but livingMotion/patternAmounts never populate that field from this param — measured through the production-shaped driver context' },
+  kinemeBrushWobble: { driver: 'kineme', ctx: { mode: 'brush' }, note: 'livingMotion populates amounts.brushWobble from this param since #1516 and the driver evaluates dWobble — but no stage-C consumer applies dWobble to placements yet (#894/#897, by design), so the measured picture delta is still zero — measured through the production-shaped driver context' },
   kinemeBoilFps: { driver: 'none', reason: 'boil is a frame-timing rate (6–12 fps re-deal cadence); no still-level consumer exists' },
   tight: { driver: 'swarm', ctx: { ...HYPE_CTX }, note: 'spine follow-through in the organism integrator — hype mode only' },
   wind: { driver: 'dish', reason: 'currents live in the dish/swarm physics — measured in the dish matrix (mass-split drift)' },
