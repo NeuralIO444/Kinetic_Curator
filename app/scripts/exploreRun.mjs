@@ -6,10 +6,15 @@
 //   node scripts/exploreRun.mjs [--seed 0x1506] [--batch 240]
 //       [--finalists 12] [--keeps <ledger-export.json>] [--out <dir>]
 //       [--corner <profileId|wilderness>] [--davis <CODE>]
+//       [--variants <0..1>]
 //
 // E4 (#1508): --corner aims the run at one named prospecting corner
 // (default: the rotation); --davis <CODE> lets Davis's state steer
 // the dealing wildness (UGLY/FLOW/… — wildnessForDavis).
+//
+// E5 (#1530): --variants <0..1> turns on the variant axis: that
+// fraction of dealt cast members are replaced by Davis variants of
+// themselves (recipes in the records' provenance; default 0 = off).
 //
 // Run folder:
 //   REPORT.md       the readable run report (yield, coverage, quota
@@ -49,9 +54,10 @@ const keepsPath = opt('keeps', null);
 const keeps = keepsPath ? JSON.parse(readFileSync(keepsPath, 'utf8')) : [];
 const corner = opt('corner', null);
 const davisCode = opt('davis', null);
+const variantFraction = Number(opt('variants', '0'));
 
 const t0 = Date.now();
-const run = runMiner({ runSeed, batchSize, finalistCount, keeps, corner, davisCode });
+const run = runMiner({ runSeed, batchSize, finalistCount, keeps, corner, davisCode, variantFraction });
 const elapsedMs = Date.now() - t0;
 
 // The Queen's evidence over this run's finalists (queenEvidence.mjs):
