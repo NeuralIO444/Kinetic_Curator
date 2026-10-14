@@ -18,7 +18,8 @@
 // Reads the room from directorsMatrix (READOUT-ONLY — never written here),
 // intensity from directorSense, gains from directorTable, temperature from
 // effectiveTemp. Runs on roll/keep/seed/evolve events (i.e. at pick time),
-// never in the live loop.
+// never in the live loop. Each tick that changes the room publishes `director:room` (directorRoom.js: a readout for
+// the personas' minds — no gains, no sway, no tilt). Nothing a mind answers ever comes back in.
 import { roomFor } from './directorsMatrix.js';
 import { rowFor, relaxSecondsFor } from './directorTable.js';
 import {
@@ -34,6 +35,8 @@ import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
 import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre, tempoEase } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
+import { createRoomPublisher } from './directorRoom.js';
+import { emit, Events } from '../composition/eventBus.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
 // The room table's two taste-derived columns. #762's proof cleared on 2026-10-08 and Matt opened SWAY (rank and
@@ -230,7 +233,7 @@ function liveAudio() {
  * The stateful scheduler: intensity tracker, beat tracker, relax machine.
  * Tick it on roll/keep/seed/evolve events — never per frame.
  */
-export function createDirector({ now = () => Date.now() } = {}) {
+export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
   const intensity = createIntensityTracker({ now });
   const beats = createBeatTracker();
   let relaxUntil = 0;
@@ -294,7 +297,10 @@ export function createDirector({ now = () => Date.now() } = {}) {
       directorPhase,
       temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
     });
-    return { gains: out, intensity: level, directorPhase, sway };
+    const result = { gains: out, intensity: level, directorPhase, sway };
+    // #1145 × Mind: tell the bus which room this is (a readout; the publisher sends only changes and no gains)
+    if (onRoom) { try { onRoom(result, phase); } catch { /* a listener must never take a pick down */ } }
+    return result;
   }
 
   return {
@@ -330,7 +336,7 @@ export function createDirector({ now = () => Date.now() } = {}) {
 let singleton = null;
 /** The live Director. */
 export function getDirector() {
-  if (!singleton) singleton = createDirector();
+  if (!singleton) singleton = createDirector({ onRoom: createRoomPublisher((p) => emit(Events.DIRECTOR_ROOM, p, { cause: 'director' })) });
   return singleton;
 }
 /** Tests only: drop the singleton. */

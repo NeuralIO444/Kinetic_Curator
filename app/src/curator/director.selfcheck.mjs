@@ -161,6 +161,7 @@ ok('no UI-surface file references the director scheduler', () => {
     'curator/directorSway.selfcheck.mjs',
     'curator/phase.selfcheck.mjs', // proves the phase reaches the pick through the scheduler
     'curator/directorRank.selfcheck.mjs',
+    'curator/directorRoom.selfcheck.mjs', // #1145 × Mind: proves the room reaches the bus and no mind moves a gain
     // deliberate wiring: the pick path and the candidate count (logic, not surface)
     'curator/taste.js',
     'curator/curate.js',

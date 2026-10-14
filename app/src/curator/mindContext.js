@@ -2,7 +2,11 @@
 //
 // A summary, never the manifest: counts and names, the room, the band, how many keeps. Small enough to put in a
 // prompt later and cheap to compare. Built from a plain snapshot object the caller assembles (so it needs no store).
-export const CONTEXT_VERSION = 2;
+// #1145 × Mind (v3): the Director's room as the minds hear it — its verdict (THE CLASH, AGREEMENT, THE ROOM, FULL BURN,
+// DAVIS ALONE) and an intensity band (low | mid | peak). Null until the Director has ticked, and null in silence.
+import { ROOM_VERDICTS, INTENSITY_BANDS } from './directorRoom.js';
+
+export const CONTEXT_VERSION = 3;
 // #1462 spec update — the persona's engagement tier and the session's zodiac block both come from Mind 3 (#1464).
 // Until a tier is supplied it is null; the zodiac block is ABSENT unless the startup reading succeeded, and an absent
 // block changes nothing else in the summary.
@@ -26,7 +30,7 @@ const count = (arr, pred) => (Array.isArray(arr) ? arr.filter(pred).length : 0);
 
 /**
  * @param snap { layers, enabledAssetCount, paletteId, room: { lois, davis }, band, keepsCount, bpm, audio: 'mic'|'file'|'none',
- *               source: 'ambient'|'set'|'audio', creatures, tier?, zodiac? }
+ *               source: 'ambient'|'set'|'audio', creatures, tier?, zodiac?, director?: { verdict, intensity } }
  */
 export function buildContext(input) {
   const snap = input && typeof input === 'object' ? input : {};
@@ -49,6 +53,8 @@ export function buildContext(input) {
     audio: snap.audio === 'mic' || snap.audio === 'file' ? snap.audio : 'none',
     source: snap.source === 'set' || snap.source === 'audio' ? snap.source : 'ambient',
     creatures: Number.isFinite(snap.creatures) ? snap.creatures : 0,
+    verdict: snap.director && ROOM_VERDICTS.includes(snap.director.verdict) ? snap.director.verdict : null,
+    intensity: snap.director && ROOM_VERDICTS.includes(snap.director.verdict) && INTENSITY_BANDS.includes(snap.director.intensity) ? snap.director.intensity : null,
     tier: typeof snap.tier === 'string' && /^[a-z0-9-]{1,16}$/.test(snap.tier) ? snap.tier : null,
     ...((z) => (z ? { zodiac: z } : {}))(zodiacOf(snap.zodiac)),
   };

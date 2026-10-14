@@ -19,8 +19,8 @@ const ctx = buildContext({ layers: [{ type: 'content' }, { type: 'pattern' }, { 
 
 await ok('the context is a compact summary, not the manifest: counts, names, the room, nothing else', () => {
   assert.deepEqual(ctx, {
-    v: 2, layers: { content: 1, pattern: 1, fx: 1, math: 0 }, assets: 4, palette: 'bone', room: { lois: 'VIBE', davis: 'FLOW' },
-    band: 'normal', keeps: 9, bpm: 121, audio: 'mic', source: 'ambient', creatures: 2, tier: null,
+    v: 3, layers: { content: 1, pattern: 1, fx: 1, math: 0 }, assets: 4, palette: 'bone', room: { lois: 'VIBE', davis: 'FLOW' },
+    band: 'normal', keeps: 9, bpm: 121, audio: 'mic', source: 'ambient', creatures: 2, verdict: null, intensity: null, tier: null,
   });
   assert.ok(!('zodiac' in ctx), 'no zodiac reading: no zodiac block');
   assert.ok(JSON.stringify(ctx).length < 400, 'small enough to put in a prompt');
