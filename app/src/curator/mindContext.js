@@ -2,13 +2,31 @@
 //
 // A summary, never the manifest: counts and names, the room, the band, how many keeps. Small enough to put in a
 // prompt later and cheap to compare. Built from a plain snapshot object the caller assembles (so it needs no store).
-export const CONTEXT_VERSION = 1;
+export const CONTEXT_VERSION = 2;
+// #1462 spec update — the persona's engagement tier and the session's zodiac block both come from Mind 3 (#1464).
+// Until a tier is supplied it is null; the zodiac block is ABSENT unless the startup reading succeeded, and an absent
+// block changes nothing else in the summary.
+export const ZODIAC_SIGNS = Object.freeze(['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio',
+  'sagittarius', 'capricorn', 'aquarius', 'pisces']);
+export const MOON_PHASES = Object.freeze(['new', 'waxing-crescent', 'first-quarter', 'waxing-gibbous', 'full',
+  'waning-gibbous', 'last-quarter', 'waning-crescent']);
+export const SEASONS = Object.freeze(['spring', 'summer', 'autumn', 'winter']);
+
+/** The zodiac block, or null when it is missing or malformed (fail closed: the personas then run unmodulated). */
+export function zodiacOf(z) {
+  if (!z || typeof z !== 'object' || !ZODIAC_SIGNS.includes(z.sign)) return null;
+  return {
+    sign: z.sign,
+    ...(MOON_PHASES.includes(z.moonPhase) ? { moonPhase: z.moonPhase } : {}),
+    ...(SEASONS.includes(z.season) ? { season: z.season } : {}),
+  };
+}
 
 const count = (arr, pred) => (Array.isArray(arr) ? arr.filter(pred).length : 0);
 
 /**
  * @param snap { layers, enabledAssetCount, paletteId, room: { lois, davis }, band, keepsCount, bpm, audio: 'mic'|'file'|'none',
- *               source: 'ambient'|'set'|'audio', creatures }
+ *               source: 'ambient'|'set'|'audio', creatures, tier?, zodiac? }
  */
 export function buildContext(input) {
   const snap = input && typeof input === 'object' ? input : {};
@@ -31,5 +49,7 @@ export function buildContext(input) {
     audio: snap.audio === 'mic' || snap.audio === 'file' ? snap.audio : 'none',
     source: snap.source === 'set' || snap.source === 'audio' ? snap.source : 'ambient',
     creatures: Number.isFinite(snap.creatures) ? snap.creatures : 0,
+    tier: typeof snap.tier === 'string' && /^[a-z0-9-]{1,16}$/.test(snap.tier) ? snap.tier : null,
+    ...((z) => (z ? { zodiac: z } : {}))(zodiacOf(snap.zodiac)),
   };
 }

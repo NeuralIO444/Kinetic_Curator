@@ -100,7 +100,7 @@ await ok('the section survives the file, the take still verifies, and a bad reco
 
 await ok('wired: REC records it beside stress, formation and davis; the module is pure', () => {
   const btn = readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8');
-  assert.match(btn, /sections: \{ stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection \}/);
+  assert.match(btn, /sections: \{ stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection[ ,]/);
   assert.match(btn, /createClockRecorder\(\{ initialBpm: useStore\.getState\(\)\.beatBpm, getFrame \}\)/);
   const src = readFileSync(new URL('./clockRecord.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
   assert.ok(!/Date\.now|performance\.now|Math\.random|setTimeout|setInterval/.test(src));
