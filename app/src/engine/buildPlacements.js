@@ -225,6 +225,19 @@ export function buildPlacements({
     growthBranch: layoutParams.growthBranch,
     growthTick,
     audioEnergy,
+    // Brush line + slice 2 (the crooked) — forwarded like growth/lsys.
+    // Until #1516 the document's stored values never reached
+    // computeGeometrySoA, which ran its hardcoded defaults (24 / 0.5 /
+    // 0.004 / 6 / 0 / 0.5 — the same values DEFAULT_LAYOUT_PARAMS
+    // carries, so forwarding the defaults is bit-identical).
+    // geometrySignature already lists all six, so the staged-eval
+    // cache stays honest: a brush edit busts the geometry stage.
+    brushSize: layoutParams.brushSize,
+    brushSpacing: layoutParams.brushSpacing,
+    fieldScale: layoutParams.fieldScale,
+    trailCount: layoutParams.trailCount,
+    wobbleAmp: layoutParams.wobbleAmp,
+    wobbleFreq: layoutParams.wobbleFreq,
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,

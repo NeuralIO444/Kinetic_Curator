@@ -131,9 +131,17 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
     { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
     layoutParams.kinemePattern, beatDrive);
   amounts.paletteBreath = reducedMotion ? 0 : layoutParams.kinemePaletteBreath;
+  // #1516 — brushWobble is assigned beside paletteBreath, for the same
+  // reason: patternAmounts carries only the three pattern-weighted
+  // amounts, and no pattern re-weights the boil channel. Until this
+  // line nothing populated the field, so the brush-wobble driver
+  // (kineme.js) read a permanent 0 and the kinemeBrushWobble param
+  // was dead. (evaluateKineme's dWobble itself stays unapplied until
+  // brush mode lands its stage-C consumer — #894/#897.)
+  amounts.brushWobble = layoutParams.kinemeBrushWobble;
   const rhythmType = rhythmTypeForPattern(layoutParams.kinemePattern);
   const rhythm = rhythmType ? { type: rhythmType } : null;
-  if (!rhythm && !(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0)) return null;
+  if (!rhythm && !(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0) && !(amounts.brushWobble > 0)) return null;
   const pinned = assetStill && typeof assetStill === 'object' ? Object.keys(assetStill) : null;
   return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, rhythm, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
 }
