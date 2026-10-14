@@ -214,7 +214,7 @@ export const RENDERER_PROGRAMS = [
   {
     key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
     vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands', 'u_spec', 'u_specA', 'u_specN'],
+    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_spinTime', 'u_hands', 'u_spec', 'u_specA', 'u_specN'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
   },
@@ -500,6 +500,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let hands = { crooked: 0, open: 0 };
   let kinemeTable = null; // #781: the frame's kineme table (null = nothing moves)
   let kinemeTime = 0;
+  let spinTime = 0; // the spin kinemes' own clock; the kineme clock when the contract does not carry one
   const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
   // #1482 P3: the frame's spectrum marks ({ map, scale, displace, colour, tex } or null = off, today's frame).
@@ -558,6 +559,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (kinemeTable) kinemeTable.slice(0, 16).forEach((k, i) => { kinemeBuf[i * 3] = k.kind; kinemeBuf[i * 3 + 1] = k.period; kinemeBuf[i * 3 + 2] = k.amp; });
     gl.uniform3fv(U(quadProg, 'u_kineme'), kinemeBuf);
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
+    gl.uniform1f(U(quadProg, 'u_spinTime'), spinTime);
     gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));
     // #1482 P3: off uploads nothing and sends zeros, so the shader's branch never enters (byte-identical frame).
@@ -744,6 +746,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     squash = contract.squash || 0; // #594 PR3
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
+    spinTime = Number.isFinite(contract.spinTime) ? contract.spinTime : kinemeTime;
     const { atlasTex } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];

@@ -53,6 +53,7 @@ import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
+import { startSpinMood } from './curator/spinMoodLive.js'; // her mood leans ROTATE SPIN's follow
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
 import { startSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
@@ -134,6 +135,7 @@ function AppInner() {
     // #1462 — Mind 1: once a bar each persona thinks about the room (Apple when available, rules otherwise):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
     const stopFaces = startMindFaces();
+    const stopSpinMood = startSpinMood();
     const stopSpectrum = startSpectrum(getAudioMeterTap); // #1482 P2: steps once a frame, STIMULI open or not
     // #1463 — Apple Intelligence through the desktop helper is the default whenever it is available; until the
     // startup check answers (and always on the web) the rules answer, silently.
@@ -207,7 +209,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); trio.stop(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); trio.stop(); stopSpinMood(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

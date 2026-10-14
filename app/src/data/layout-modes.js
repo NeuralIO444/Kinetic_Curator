@@ -4,6 +4,7 @@ import { BEHAVE_IDS } from '../engine/organisms/behave.js';
 import { COMPOSITION_PRESETS } from './presets.js';
 import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
+import { SPIN_FOLLOW_MODES } from '../gl/spinFollow.mjs'; // ROTATE SPIN keeps time with the beat
 import { TRAIL_MODES } from '../gl/trailMode.mjs'; // #560 — the trail vocabulary (resolveTrail's list)
 import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
 import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
@@ -162,6 +163,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // living-motion floor below (breath and drift) is what a fresh scene gives, and spin is CHOSEN in the ROTATE
   // dialog (Matt, 2026-10-07: spin is chosen, drift is given).
   rotateSpin: 0,
+  // ROTATE SPIN keeps time with the music: 'beat' runs the spin clock at (BEAT BPM / 120) x the room's mood lean, the dial
+  // being the rev/s at 120 BPM. 'off' = the dial is plain rev/s, exactly as before. (gl/spinFollow.mjs)
+  spinFollow: 'off',
   // Kineme living-motion drivers (#1128): the floor that makes "nothing is ever 100% frozen" (#721) architectural.
   // A NEW scene breathes (0.3) and drifts (0.5), each mark on its own phase from the seed. A project, keep or link
   // saved before these defaults existed loads with both at 0 (normalizeLayoutParams): it opens as it was saved.
@@ -471,6 +475,7 @@ const ENUM_SPEC = {
   contactMode: CONTACT_MODES,
   audioResponse: AUDIO_RESPONSE_IDS, // #306
   kinemePattern: KINEME_PATTERNS, // #1128
+  spinFollow: SPIN_FOLLOW_MODES, // ROTATE SPIN keeps time with the beat
 };
 
 /** True when `value` is a number we can meaningfully clamp. */
@@ -654,6 +659,7 @@ export function normalizeLayoutParams(partial) {
   next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
   next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
   next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
+  next.spinFollow = pickEnum(next.spinFollow, SPIN_FOLLOW_MODES, 'off'); // absent or unknown is the plain dial
   // #1199 — MAP row enums. Unknown/absent is the no-op ('off'); the amount
   // clamp rides PARAM_SPEC above. A document that predates #1199 opens with
   // the map off exactly (defaults are already the no-op).

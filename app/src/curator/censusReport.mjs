@@ -244,6 +244,7 @@ const KEY_FIXTURES = {
   spectrumColour: { driver: 'none', reason: 'GL vertex lookup (#1482): ink moves toward its accent with the peak at its frequency; a still has no spectrum' },
   kinemeRate: { driver: 'none', reason: 'driver-clock rate (kineme.js driverTimeSec): scales how fast driver time accumulates — by construction invisible in any single frozen frame, live or baked' },
   rotateSpin: { driver: 'none', reason: 'live rotation rate: sceneContract spinOf carries layoutParams.rotateSpin to the renderer; a still has no spin to show' },
+  spinFollow: { driver: 'none', reason: 'live motion clock: liveLoop runs the spin kinemes on their own clock at (BEAT BPM / 120) x the Queen\'s mood lean; a still has no spin and no tempo to follow' },
   groundLean: { driver: 'ground', ctx: { mode: 'grid' }, note: 'measured with a PATTERN ground beneath (the groundArgs context); without a pattern layer below, the resolver passes nothing and the knob is inert by design' },
   groundNudge: { driver: 'ground', ctx: { mode: 'grid' }, note: 'measured with a PATTERN ground beneath (the groundArgs context)' },
   groundShadow: { driver: 'none', reason: 'creature contact shadow (gl/contactShadow.mjs, via dishGround.creatureGround); marks/placements have no shadow channel' },

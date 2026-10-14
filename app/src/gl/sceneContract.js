@@ -462,7 +462,11 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     }
     if (!table.length) return {};
     const t = Number(doc.kinemeTime);
-    return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0 };
+    const kt = Number.isFinite(t) ? t : 0;
+    // the spin's own clock rides only when it differs from the kineme clock (ROTATE SPIN keeping time with the beat):
+    // the key is absent otherwise, so every contract that does not follow, and its hash, is exactly what it was
+    const st = Number(doc.spinTime);
+    return { kinemes: table, kinemeTime: kt, ...(Number.isFinite(st) && st !== kt ? { spinTime: st } : {}) };
   })();
 
   const scene = {

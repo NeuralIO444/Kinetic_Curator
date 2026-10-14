@@ -58,6 +58,7 @@ import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
+import { spinTarget, createSpinFollow, getSpinMood } from './spinFollow.mjs'; // ROTATE SPIN keeps time with the beat
 import { applyPatternAudio } from './patternAudio.mjs'; // #1110: pattern.* routes → pattern track params
 import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity route → sun intensity
 import { squashWithAudio } from './squashAudio.mjs'; // #790: render.squash route → scene squash
@@ -97,6 +98,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   let live = createLiveRenderer(canvas);
   const resolver = withResolveTap(createLiveResolver); // #1353: same resolver; observable, and restartable for a take
   const kinemeClock = createKinemeClock(); // #781 KINEME RATE (anchored)
+  const spinClock = createKinemeClock(); // ROTATE SPIN's own anchored clock: it keeps time with the beat (gl/spinFollow)
+  const spinGlide = createSpinFollow();
   // #278 — VJ MIX: palette crossfade state machine (pure) + the last
   // presented frame's target (the outgoing deck snapshot source).
   const paletteMix = createPaletteMix();
@@ -683,8 +686,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // rides on top of the layout squash dial (the #594 squash-and-stretch
     // amount, u_smear.z). 0 on the default table (routes.squash undefined)
     // → the contract is exactly as built, today's render bit-identical.
+    // kineme clock rate (the dial and the clock.kinemeRate route), and the spin's own multiplier on top of it:
+    // 1 unless FOLLOW is on, so the spin clock IS the kineme clock and nothing changes
+    const kinemeRateNow = applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate);
+    const spinMul = spinGlide.step(dtSec * 1000, spinTarget({ follow: layoutParams.spinFollow, bpm: s.beatBpm, mood: getSpinMood() }));
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, perfTier1: !!s.perfTier1, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, perfTier1: !!s.perfTier1, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, kinemeRateNow), spinTime: spinClock.at(loopTimeMs / 1000, kinemeRateNow * spinMul), palette: activePalette },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned

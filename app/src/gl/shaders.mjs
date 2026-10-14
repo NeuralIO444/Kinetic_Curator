@@ -66,6 +66,7 @@ uniform float u_ambient;  // light that reaches a mark facing away from the sun
 // Per instance a_inst4.z = slot + 1 (0 = still), a_inst4.w = phase [0,1).
 uniform vec3 u_kineme[16];
 uniform float u_kinemeTime;
+uniform float u_spinTime;   // ROTATE SPIN has its own anchored clock, so it can keep time with the beat without moving breath or drift; equal to u_kinemeTime when it does not
 uniform vec2 u_hands;     // x crooked, y open. 0 is today's quad and today's ink.
 // #1482 P3 — the spectrum the marks listen to. u_spec is a 256x4 R8 texture (rows: smoothed, peak, waveform, flux);
 // u_specA = (map, scale, displace, colour); u_specN = instances in this draw. All amounts 0 never enters (today's quad).
@@ -120,9 +121,9 @@ void main() {
   if (a_inst4.z > 0.5) {
     vec3 km = u_kineme[int(a_inst4.z + 0.5) - 1];
     float per = max(km.y, 1e-3);
-    float ph = fract(u_kinemeTime / per + a_inst4.w);
-    float wav = sin(ph * 6.28318530718);
     int kind = int(km.x + 0.5);
+    float ph = fract((kind == 1 ? u_spinTime : u_kinemeTime) / per + a_inst4.w);
+    float wav = sin(ph * 6.28318530718);
     if (kind == 1) kDeg = (km.z < 0.0 ? -ph : ph) * 360.0; // #1127: a negative amp turns the other way
     else if (kind == 2) kDeg = km.z * wav;
     else if (kind == 3) c *= 1.0 + km.z * wav;

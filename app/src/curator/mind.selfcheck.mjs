@@ -132,7 +132,7 @@ await ok('the live driver: each bar every persona thinks once, as telemetry, det
   emit(Events.CLOCK_BAR, { bar: 4, bpm: 120 });
   assert.deepEqual(again.slice(0, 3), seeds, 'the same seed and bar give the same decision seed');
   stop2(); off(); off2(); offBeat(); offLayout();
-  assert.deepEqual(EVENT_REGISTRY.MIND_DECISION.handler, ['curator/mindFace.js']);
+  assert.deepEqual(EVENT_REGISTRY.MIND_DECISION.handler, ['curator/mindFace.js', 'curator/spinMoodLive.js']); // the faces, and ROTATE SPIN's mood lean
 });
 
 await ok('hidden and honest: no surface lists it; no store key holds it; pure modules read no clock; the app starts it', () => {

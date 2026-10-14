@@ -101,7 +101,7 @@ export const EVENT_REGISTRY = {
   AUDIO_ENERGY: { handler: ["curator/trioLive.js"] },
   AUDIO_SILENCE_START: { handler: ["curator/paceLive.js", "curator/trioLive.js"] },
   AUDIO_SILENCE_END: { handler: ["curator/paceLive.js", "curator/trioLive.js"] },
-  MIND_DECISION: { handler: ["curator/mindFace.js"] },
+  MIND_DECISION: { handler: ["curator/mindFace.js", "curator/spinMoodLive.js"] },
   MIND_REQUEST: { handler: ["curator/mindFace.js", "curator/trioLive.js"] },
   MIND_STATUS: { handler: null, note: 'telemetry: which backend answers (#1462); for the dev panel, no UI announces it' },
   MIND_REQ: { handler: null, note: 'telemetry: a persona asked the on-device model (#1463)' },
