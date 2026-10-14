@@ -23,7 +23,10 @@ live tab is a bug, and where the renderer can't match, it says so.
   (plate/wash/stipple) exist in the live tab only — the GL backend has no
   gradient shading — so studio stills warn on stderr when a project uses
   one (`warnUnsupportedMaterials`, #168) instead of silently rendering
-  flat wings. The sidecar's `_render.normalized` keeps the authored value
+  flat wings. `glass` is not one of them: since #1547 (Materials M1) it
+  is a GL material — the #1129 glass machinery (alpha body, back-to-front
+  sort, soft-bevel lighting) — in the live tab and studio stills alike,
+  so it carries no warning. The sidecar's `_render.normalized` keeps the authored value
   on record. (The resvg path is retired for finals; its honesty tables in
   FX_LAYERS.md and BUGLIST.md cover the legacy SVG recipe only.)
 - **ACCUM is a still.** In-app RENDER ACCUM captures the trail buffer as

@@ -111,6 +111,15 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     ...(!deformShed && r3(Math.min(1, item.deformAmt || 0)) > 0
       ? { deform: [r3(item.deformAxisX || 0), r3(item.deformAxisY || 0), r3(Math.min(1, item.deformAmt))] }
       : {}),
+    // #1547 — the glass flag rides only when set (the deform precedent
+    // above): packInstanceData reads it into a_glass, selecting the
+    // #1129 soft-bevel / caustic / striation terms in the quad shader.
+    // Before M1 the flag died at this seam — buildPlacements set it on
+    // items and no contract instance carried it, so v_glass was 0 on
+    // every contract render and the #1129 lighting was unreachable.
+    // Absent (the common case) the packer reads enamel, exactly the
+    // old path, and the contract hash is unchanged.
+    ...(item.glass ? { glass: true } : {}),
   };
 }
 
@@ -201,13 +210,19 @@ const warnedMaterials = new Set();
  * Disclose — don't silently drop — gradient materials on studio stills
  * (#168, "live and studio agree or refuse").
  *
- * The GL backend renders every instance flat: gradient materials (plate /
- * wash / stipple, app/src/engine/materials.js) only ever existed in the
- * retired SVG layer — the live instrument has no gradient shading.
- * A studio export of a project using a non-flat material therefore renders
- * the wings flatter than the live tab. Real gradient shading in the shaders
- * is a Phase-6-scale job, so this issue discloses instead of refusing: warn
- * once per material per process, like studio/blendFallback.mjs.
+ * Gradient materials (plate / wash / stipple, app/src/engine/materials.js)
+ * only ever existed in the retired SVG layer — the GL backend has no
+ * gradient shading for them, so a studio export of a project using one
+ * renders the wings flatter than the live tab. This discloses instead of
+ * refusing: warn once per material per process, like
+ * studio/blendFallback.mjs. (Restoring them in GL is the M2/M3 stages
+ * of the materials lane.)
+ *
+ * 'glass' is NOT disclosed: since #1547 (Materials M1) the GL backend
+ * renders it — the material engages the #1129 glass machinery (alpha
+ * body at placement, back-to-front sort, soft-bevel/caustic/striation
+ * via the contract's glass flag) in the live tab and in studio stills
+ * alike, so there is no flatness left to warn about.
  *
  * @param {Array} resolvedLayers — resolveLayers(doc, {caps}) output
  */
@@ -215,7 +230,7 @@ export function warnUnsupportedMaterials(resolvedLayers) {
   const used = new Set();
   for (const L of resolvedLayers || []) {
     const mat = L.layoutParams?.material;
-    if (!mat || mat === 'flat') continue;
+    if (!mat || mat === 'flat' || mat === 'glass') continue;
     if (Array.isArray(L.items) && L.items.some((it) => it.role === 'wing')) {
       used.add(mat);
     }
