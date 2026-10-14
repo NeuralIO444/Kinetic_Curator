@@ -9,35 +9,20 @@
 // dice already rolls are touched (modifiers and composition are never mutated, so a landing cannot leave refine by
 // changing the room); and MAX_SPREAD is capped so a single mutation can never be a "jump" by phase.js's own
 // definition (selfcheck: refineMutate.selfcheck.mjs).
-import { randomizeKey } from '../state/paramUtils.js';
+import { randomizeKey, DICE_RANGES } from '../state/paramUtils.js';
 
 /** Locked by Matt, 2026-10-11 (#1144). */
 export const DEFAULT_SPREAD = 0.1;
 export const MIN_SPREAD = 0.01;
 export const MAX_SPREAD = 0.2;
 
-// The dice ranges, mirrored from paramUtils.randomizeKey (the selfcheck proves every roll falls inside).
-// `dec` rounds to that many decimals, `int` to whole numbers; a pair is [low element range, high element range].
-export const REFINE_RANGES = Object.freeze({
-  count: { lo: 30, hi: 600, int: true },
-  scale: { pair: [[0.1, 1.0], [1.0, 3.0]], dec: 2 },
-  rotate: { pair: [[-180, 0], [0, 180]], int: true },
-  alpha: { pair: [[15, 60], [70, 100]], int: true },
-  jitter: { lo: 0, hi: 150, int: true },
-  density: { lo: 20, hi: 120, int: true },
-  zTiers: { lo: 1, hi: 10, int: true },
-  noiseFreq: { lo: 0.002, hi: 0.015, dec: 4 },
-  noiseSpeed: { lo: 0.1, hi: 2.0, dec: 2 },
-  displacement: { lo: 0, hi: 150, int: true },
-  particleCount: { lo: 50, hi: 300, int: true },
-  swarmCohesion: { lo: 0.2, hi: 4.0, dec: 2 },
-  gravityWells: { lo: 0.1, hi: 3.0, dec: 2 },
-  damping: { lo: 0.9, hi: 0.98, dec: 2 },
-  wind: { lo: 0.2, hi: 2.0, dec: 2 },
-  flap: { lo: 0.05, hi: 0.9, dec: 2 },
-  breath: { lo: 0, hi: 0.8, dec: 2 },
-  lifeDrift: { lo: 0.1, hi: 0.9, dec: 2 },
-});
+// The dice ranges — paramUtils.DICE_RANGES, the one declared table every
+// random door reads. Until #1550 this was a hand mirror of randomizeKey's
+// ranges; it now derives from the table itself, so the mirror cannot drift
+// (writePathHonesty.selfcheck pins the identity). `dec` rounds to that many
+// decimals, `int` to whole numbers; a pair is [low element range, high
+// element range]. The selfcheck proves every roll falls inside.
+export const REFINE_RANGES = DICE_RANGES;
 
 export function clampSpread(v) {
   const n = Number(v);

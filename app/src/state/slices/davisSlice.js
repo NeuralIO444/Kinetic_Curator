@@ -13,7 +13,7 @@ import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
 
 /** #589 — the three phrase clock sources. */
 export const PHRASE_CLOCKS = ['audio', 'metro', 'euclid'];
-import { normalizeLayoutParams } from '../../data/layout-modes.js';
+import { normalizeLayoutParams, validateLayoutParams } from '../../data/layout-modes.js';
 import { captureKeepContext, sanitizeKeepContext, seedAgeMsNow } from '../../curator/keepContext.js'; // #1140: per-keep session context
 import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #1124
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
@@ -353,7 +353,21 @@ export const createDavisSlice = (set) => ({
     }
 
     if (state.evolveTarget === 'layout' || state.evolveTarget === 'all') {
-      const targets = generateLayoutTargets(state);
+      // #1550: targets land through the validating door, like every other
+      // write. generateLayoutTargets rolls the shared dice table now, whose
+      // one declared overhang (density proposes to 120, PARAM_SPEC caps at
+      // 100) must clamp at write time — the non-morph path below spreads
+      // targets into layoutParams directly, and the morph path's endpoints
+      // are what its validated per-tick writes interpolate toward. Only the
+      // target keys are taken from the validated params; a rejected key
+      // (none a roll can produce) keeps its current value, per the door's
+      // partial-accept contract.
+      const rolledTargets = generateLayoutTargets(state);
+      const { params: validatedTargets, rejected: rejectedTargets } = validateLayoutParams(rolledTargets);
+      const targets = {};
+      for (const key of Object.keys(rolledTargets)) {
+        if (!rejectedTargets.includes(key)) targets[key] = validatedTargets[key];
+      }
       const seedUpdate = state.evolveTarget === 'all'
         ? { seed: (state.seed + 1) % 1000000 }
         : {};
