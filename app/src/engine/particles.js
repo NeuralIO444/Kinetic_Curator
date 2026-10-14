@@ -29,6 +29,7 @@
 import { createNoise } from './noise.js';
 import { runDishContacts, contactBodyRadius } from './dishContacts.mjs'; // #1407 — cross-strata shared grid (call site below); #1408 — the shared radius law
 import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mjs'; // #1410 — impact deform (call sites below; the law lives in the module)
+import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -151,6 +152,11 @@ export class ParticleSystem {
     // spread-only, like dishSession). Undefined until the first update:
     // the dish feed reads it as ON, matching the params default.
     this._deformOn = undefined;
+    // #1411 — coalescence switch, tracker, and composed fields (law in
+    // dishCoalesce.mjs). Same spread-only params convention as deform.
+    this._coalesceOn = undefined;
+    this._coalesce = null;
+    this._coalesceFields = null;
     // Authored population from the last init — tracked separately from the
     // runtime population (this.n), which `breed` grows past the authored
     // count. update() re-inits only when the authored count changes, so
@@ -355,6 +361,8 @@ export class ParticleSystem {
     // #1410 — a fresh cast starts undented.
     this.deformMem.fill(0);
     this.deformAmt.fill(0);
+    // #1411 — and unmerged: no pair carries dwell across a re-seed.
+    clearDishCoalesce(this);
     // #278 — colors were just (re)assigned from this swatch set.
     this._colorSig = (palette?.swatches || ['#ffffff']).join('|');
     // #710 — a (re)init is a fresh cast: the next update re-evaluates the
@@ -641,6 +649,13 @@ export class ParticleSystem {
             const dx = X[j] - xi;
             const dy = Y[j] - yi;
             const d2 = dx * dx + dy * dy;
+            // #1411 — coalescence dwell: a pair in contact, or in a near
+            // touch (depenetration parks a resting pair exactly at rsum,
+            // on the rejected side of the test below), accrues one step
+            // of dwell. Per-system pairs only — the family gate: the
+            // cross-strata pass never feeds, so different families never
+            // merge. State only (law in dishCoalesce.mjs).
+            if (d2 < (rsum * COALESCE_TOUCH) * (rsum * COALESCE_TOUCH)) feedDishCoalesce(this, i, j);
             if (d2 >= rsum * rsum) continue;
             let dist = Math.sqrt(d2);
             let nx; let ny;
@@ -806,6 +821,7 @@ export class ParticleSystem {
     this.leakRgb[cs * 3 + 1] = this.leakRgb[cp3 + 1];
     this.leakRgb[cs * 3 + 2] = this.leakRgb[cp3 + 2];
     clearDishDeform(this, cs); // #1410 — a newborn starts undented
+    clearDishCoalesceSlot(this, cs); // #1411 — and inherits no pair's dwell
     return cs;
   }
 
@@ -830,6 +846,7 @@ export class ParticleSystem {
     // motion allowed. Read here so the dish feed (which runs inside
     // another system's update) and the end-of-step composer agree.
     this._deformOn = layoutParams.deform !== false;
+    this._coalesceOn = layoutParams.coalesce !== false; // #1411 — same spread-only switch
     const deformStill = !!layoutParams.reducedMotion;
     // #710 — restart-from-seed: entering the lorenz behave re-seeds every
     // agent's Lorenz phase state from the seeded hashes, so re-tapping the
@@ -1463,6 +1480,10 @@ export class ParticleSystem {
     // site only). Render state only — nothing in the physics above reads
     // it, so the step is free to run or not without moving a single body.
     stepDishDeform(this, dtSec, { reducedMotion: deformStill });
+    // #1411 — petri dish B2: advance the coalescence dwell clock and
+    // compose this step's merge fields (law in dishCoalesce.mjs). State
+    // only, like the deform step above — physics never reads it.
+    stepDishCoalesce(this, { reducedMotion: deformStill });
   }
 
   getItems(activeAssets) {
