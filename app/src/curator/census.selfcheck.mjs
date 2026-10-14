@@ -82,12 +82,18 @@ const reach = renderReachability();
   // combined tree is the evidence). Re-pinned again 2026-10-14 with
   // the #1517 colonize fix: colonizeInfluence, colonizeKill,
   // colonizeBranch and colonizeStep now measure as moving (delta probe
-  // 48/48 each; defaults parity bit-identical). wobbleFreq stays: threaded, but
-  // gated off at this fixture's wobbleAmp 0. kinemeBrushWobble stays:
-  // sourced since #1516, unapplied until #894/#897.
+  // 48/48 each; defaults parity bit-identical). Re-pinned a third time
+  // 2026-10-14 with the #1551 fixture fix: wobbleFreq was never dead —
+  // its fixture swept the frequency at wobbleAmp 0, where the kernel
+  // gates the wobble term off entirely; swept at a working wobbleAmp
+  // 20 through the fixture's own ctx it measures as moving. The dead
+  // set is now exactly the two keys with live reasons:
+  // kinemeBrushWobble (sourced since #1516, unapplied until #894/#897)
+  // and material (its only live reader is an export warning, until
+  // M1 #1547 lands GL material shading).
   const dead = paramRows.filter((r) => r.class === 'zero-in-context').map((r) => r.key).sort();
   assert.deepStrictEqual(dead, [
-    'kinemeBrushWobble', 'material', 'wobbleFreq',
+    'kinemeBrushWobble', 'material',
   ], `dead-knob set changed: ${JSON.stringify(dead)}`);
 
   // Not headless-measurable — consumers exist outside headless reach;
