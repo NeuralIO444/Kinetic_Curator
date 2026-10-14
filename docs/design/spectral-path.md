@@ -39,6 +39,13 @@ nothing about today's audio changes unless you switch the new thing on.
 
 P1 to P3 are the issue's "v1". P4 and P5 are separate decisions.
 
+**Status (2026-10-14).** P1 built (#1496, `gl/spectrumCore.mjs`). P2 built (#1519: the third analyser, `gl/spectrumLive.mjs`, the strip under the METER, the Queen's set mixed in before the ballistics). P3 built: the marks listen.
+
+- **Where it lives:** four layout dials, `spectrumMap` (0 INDEX, 1 ANGLE, 2 POSITION, 3 HASH) and `spectrumScale` / `spectrumDisplace` / `spectrumColour` (0..1), all default 0 = off, in STIMULI under the strip. `gl/spectrumMarks.mjs` turns them into the contract's optional `spectrum` key (absent when off, shed on the contact shadow's rung); the quad vertex shader does three `texelFetch` per mark from a 256 x 4 R8 texture.
+- **What each amount follows:** SCALE the smoothed level at the mark's frequency, DISPLACE the onsets (flux) along the mark's own seeded direction, COLOUR the peak (ink moves toward its accent). Three rows, three feels, so they can be mixed.
+- **Colour is live-path only.** The offline renderer reads colour baked into the atlas, so COLOUR shows on the live canvas and not in a baked export. SCALE and DISPLACE show in both.
+- **Not yet:** the take's `spectrum` section (decision 2). The marks read the live spectrum, so a replay does not yet replay what the marks heard. It is its own small PR.
+
 ## Decisions (Matt, 2026-10-14: all five took the recommendation)
 
 1. **A second analyser.** The meter's analyser, the 7 bands and every tuned feel are left alone in v1. Re-deriving the bands from the new core is P5 and needs an A/B.

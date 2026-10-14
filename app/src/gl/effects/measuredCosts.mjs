@@ -70,4 +70,8 @@ export const MEASURED_COSTS = {
   // x this file's median (0.3 ms) = 3.6 ms. Conservative: the three half-size passes run at full lab size here.
   // Tier 2 carries no cost band, so the number is informational. Re-bless on hardware (gpu timer).
   'gl/contact-shadow': { ms: 3.6, method: 'wall', draws: 90 },
+  // #1482 — an ESTIMATE, not a sweep: spectrum marks are three texelFetch per instance in the existing quad vertex
+  // stage (no extra pass, no extra draw), so there is no pass to sweep. 0.05 ms is that work at the lab's 90 draws,
+  // errring up. Tier 2 carries no cost band, so the number is informational. Re-bless on hardware (gpu timer).
+  'gl/spectrum-marks': { ms: 0.05, method: 'estimate', draws: 90 },
 };

@@ -243,6 +243,14 @@ export function contactShadowShed(doc) {
 }
 
 /**
+ * #1482 P3 — spectrum marks go quiet on the same rung as the contact shadow: after the tier-1 extras are gone
+ * (perfTier1) AND the quality has stepped down to PERF. Before body counts are touched.
+ */
+export function spectrumMarksShed(doc) {
+  return !!(doc && doc.perfTier1) && String(doc.quality || '') === 'performance';
+}
+
+/**
  * #1410 petri dish B1 — is impact deform shed? Same tier-2 rung as the
  * contact shadow, by the same rule (spec §7 ladder: FX finishes first,
  * then deform, then radius fidelity and body counts): it goes only after

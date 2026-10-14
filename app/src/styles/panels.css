@@ -1256,3 +1256,5 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .stim-spectrum-scale span:nth-child(2) { left: 19.2%; }
 .stim-spectrum-scale span:nth-child(3) { left: 55.8%; }
 .stim-spectrum-scale span:nth-child(4) { right: 0; transform: none; }
+.stim-spectrum-marks { margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.25); border: 1px solid var(--line); }
+.stim-spectrum-maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
