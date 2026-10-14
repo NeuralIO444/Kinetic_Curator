@@ -399,3 +399,4 @@ node src/curator/takeStrip.selfcheck.mjs
 node src/gl/spectrumCore.selfcheck.mjs
 node src/gl/spectrumLive.selfcheck.mjs
 node src/gl/spectrumMarks.selfcheck.mjs
+node src/curator/mindConduct.selfcheck.mjs

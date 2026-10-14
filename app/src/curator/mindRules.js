@@ -6,6 +6,7 @@
 // #1462 spec update: LOIS and Davis report the face the honest feed already shows (a canonical state, never invented),
 // so a rules decision is always a reading and never asks the stage for a change (mindContract.wantsStage).
 import { neutralReply, CANONICAL_STATES } from './mindContract.js';
+import { davisRoute, PHRASE_BARS, TIER_OPS } from './mindConduct.js';
 
 /** The face the room already shows, as a canonical state, or nothing. */
 const reading = (persona, ctx) => {
@@ -17,8 +18,19 @@ const reading = (persona, ctx) => {
 const MOOD_FOR_DAVIS = Object.freeze({ FLOW: 'drive', SEEDLING: 'calm', STUCK: 'shift', UGLY: 'sparse', BLOOM: 'lift' });
 
 export const RULES = Object.freeze({
-  davis: (ctx) => ({ ...neutralReply('davis'), ...reading('davis', ctx) }),
-  lois: (ctx) => ({ ...neutralReply('lois'), ...reading('lois', ctx) }),
+  // #1483 — with audio live Davis conducts: one route to add, from the preset the energy and tempo ask for. Without a
+  // show block he is exactly as neutral as he was. The seed is the decision's, so the same dish conducts the same way.
+  davis: (ctx, meta = {}) => {
+    // a tier that may make no edits (tier 1, or none yet) does not propose them: the books stay honest
+    const mayEdit = !!(ctx && (TIER_OPS[ctx.tier] || []).length);
+    const route = ctx && ctx.show && mayEdit ? davisRoute(ctx.show, meta.seed) : null;
+    return { ...neutralReply('davis'), ...(route ? { route } : {}), ...reading('davis', ctx) };
+  },
+  // #1483 — a show that has stayed pinned and flat for a phrase is a failed show: she burns it.
+  lois: (ctx) => {
+    const flat = !!(ctx && ctx.show && !ctx.show.silent && ctx.show.flatBars >= PHRASE_BARS);
+    return { ...neutralReply('lois'), ...(flat ? { state: 'BURN' } : reading('lois', ctx)) };
+  },
   queen: (ctx) => {
     if (ctx && ctx.room && ctx.room.lois === 'AWAY') return { mood: 'calm', lean: {} };
     const mood = (ctx && ctx.room && MOOD_FOR_DAVIS[ctx.room.davis]) || 'calm';
