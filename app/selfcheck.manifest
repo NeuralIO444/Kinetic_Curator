@@ -377,3 +377,4 @@ node src/gl/motionReadout.selfcheck.mjs
 node src/curator/clockRecord.selfcheck.mjs
 node src/gl/playback.selfcheck.mjs
 node src/gl/masterGain.selfcheck.mjs
+node src/curator/mind.selfcheck.mjs

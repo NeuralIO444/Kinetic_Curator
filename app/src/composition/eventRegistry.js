@@ -100,6 +100,7 @@ export const EVENT_REGISTRY = {
   AUDIO_ENERGY: { handler: null, note: "telemetry: published by audioLive (#1459); listeners arrive with the Queen's tempo ease (#1460)" },
   AUDIO_SILENCE_START: { handler: ["curator/paceLive.js"] },
   AUDIO_SILENCE_END: { handler: ["curator/paceLive.js"] },
+  MIND_DECISION: { handler: null, note: 'telemetry: published by mindLive once a bar per persona (#1462); applying a decision arrives with the behaviours Matt designs' },
   CLOCK_BEAT: { handler: null, note: 'telemetry: published by clockLive each whole beat; listeners arrive with audio events and the Queen (#1459, #1460)' },
   CLOCK_BAR: { handler: ["curator/paceLive.js"] },
   ACTIVITY_HEARTBEAT: { handler: null, note: "telemetry: published by loisActivity (#1390); no listener yet" },
