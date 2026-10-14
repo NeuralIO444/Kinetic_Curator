@@ -104,6 +104,7 @@ export const EVENT_REGISTRY = {
   CLOCK_BEAT: { handler: null, note: 'telemetry: published by clockLive each whole beat; listeners arrive with audio events and the Queen (#1459, #1460)' },
   CLOCK_BAR: { handler: ["curator/paceLive.js"] },
   ACTIVITY_HEARTBEAT: { handler: null, note: "telemetry: published by loisActivity (#1390); no listener yet" },
+  DISH_DENSITY: { handler: null, note: "telemetry: published by dishDensityLive each frame the contacts pass runs (#1412); the formation check (#1355) and telemetry read it — a pull getter (getDishDensityField) sits beside it" },
   VIEW_FULLSCREEN: { handler: 'wire' },
   STAGE_MODE: { handler: 'wire' },
   STAGE_BLACKOUT: { handler: 'wire' },

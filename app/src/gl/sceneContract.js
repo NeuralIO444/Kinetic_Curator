@@ -266,6 +266,22 @@ export function dishCoalesceShed(doc) {
 }
 
 /**
+ * #1412 petri dish B3 — is pigment exchange shed? Tier 2, deform's
+ * rung and rule (spec §7 ladder: FX finishes first, then deform +
+ * exchange, then radius fidelity and body counts): it goes only after
+ * the tier-1 extras are already gone (perfTier1) AND quality has
+ * stepped down to performance. The shed stops the trade in the engine
+ * (the resolver forwards it spread-only into update()); colour
+ * already earned is history and stays — a shed never repaints a body.
+ * Exports and stills never shed it: their docs do not carry the live
+ * governor state, so the predicate is false there and their bakes
+ * trade exactly as the live dish did.
+ */
+export function dishPigmentShed(doc) {
+  return !!(doc && doc.perfTier1) && String(doc.quality || '') === 'performance';
+}
+
+/**
  * #1411 — a content layer's coalescence fields for the contract, or
  * null (the key is then omitted, so every contract without a merge, and
  * its hash, is exactly what it was). Sanitized fail-closed like the

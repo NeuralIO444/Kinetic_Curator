@@ -199,3 +199,26 @@ const EMPTY_FIELDS = Object.freeze([]);
 export function coalescenceFields(sys) {
   return (sys && sys._coalesceFields) || EMPTY_FIELDS;
 }
+
+const EMPTY_PAIRS = Object.freeze([]);
+
+/**
+ * The tracked pairs whose merge factor is above zero — [{ i, j, f }]
+ * in canonical pair order. The read API B3's pigment exchange
+ * (dishPigment.mjs, #1412) consumes: the dwell law stays written
+ * here, once; readers never touch the tracker. Run after
+ * stepDishCoalesce, which has already purged pairs touching dead
+ * bodies and drained the ones that left contact.
+ */
+export function coalescePairs(sys) {
+  const tr = sys && sys._coalesce;
+  if (!tr || tr.pairs.size === 0) return EMPTY_PAIRS;
+  const out = [];
+  for (const e of tr.pairs.values()) {
+    const f = coalesceFactor(e.dwell);
+    if (f > 0) out.push({ i: e.i, j: e.j, f });
+  }
+  if (out.length === 0) return EMPTY_PAIRS;
+  out.sort((a, b) => (a.i - b.i) || (a.j - b.j));
+  return out;
+}
