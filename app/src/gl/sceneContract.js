@@ -29,6 +29,7 @@ import { contractLight } from '../data/light.js';
 import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, spinKineme, spinVariant } from '../data/kinemes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { darkestSwatch } from './contactShadow.mjs'; // #1183 contact shadow colour
+import { COALESCE_MAX_FIELDS } from '../engine/dishCoalesce.mjs'; // #1411 coalescence field cap
 import { sanitizePattern } from '../state/patternTrack.js';
 import { patternPalette } from '../pattern/patternSource.js';
 
@@ -254,6 +255,43 @@ export function dishDeformShed(doc) {
 }
 
 /**
+ * #1411 petri dish B2 — is coalescence shed? Tier 1 (spec §5: it "sheds
+ * with the FX finishes", first on the ladder): it goes the moment the
+ * governor's tier-1 shed is active, at any quality — one rung BEFORE
+ * the shadow and deform. Exports and stills never shed it: their docs
+ * do not carry the live governor state.
+ */
+export function dishCoalesceShed(doc) {
+  return !!(doc && doc.perfTier1);
+}
+
+/**
+ * #1411 — a content layer's coalescence fields for the contract, or
+ * null (the key is then omitted, so every contract without a merge, and
+ * its hash, is exactly what it was). Sanitized fail-closed like the
+ * shadow: finite geometry, radius above 0, factor in (0, 1] AFTER the
+ * contract's 3-place rounding (a factor that rounds to 0 is rest, not
+ * a merge), tint a #rrggbb hex; anything else drops the field.
+ */
+export function contractCoalesce(rl, shed) {
+  if (shed || !Array.isArray(rl?.coalesce) || rl.coalesce.length === 0) return null;
+  const out = [];
+  for (const f of rl.coalesce) {
+    if (!f || typeof f !== 'object') continue;
+    const x = Number(f.x); const y = Number(f.y);
+    const r = Number(f.r); const fac = r3(Number(f.f));
+    const tint = typeof f.tint === 'string' ? f.tint.toLowerCase() : '';
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (!Number.isFinite(r) || !(r > 0)) continue;
+    if (!(fac > 0) || fac > 1) continue;
+    if (!/^#[0-9a-f]{6}$/.test(tint)) continue;
+    out.push({ x: r3(x), y: r3(y), r: r3(r), f: fac, tint });
+    if (out.length >= COALESCE_MAX_FIELDS) break;
+  }
+  return out.length ? out : null;
+}
+
+/**
  * #1183 — a content layer's contact shadow for the contract, or null (the key is then omitted, so every contract
  * without a shadow, and its hash, is exactly what it was). Needs the knob above 0 and a PATTERN below (decision 4).
  */
@@ -280,6 +318,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
 
   const shadowShed = contactShadowShed(doc); // #1183
   const deformShed = dishDeformShed(doc); // #1410
+  const coalesceShed = dishCoalesceShed(doc); // #1411
   let groundBelow = false; // #1183: a visible PATTERN layer has been laid down below the current one
   for (const rl of resolvedLayers) {
     if (rl.isFx && !rl.isMath) {
@@ -346,6 +385,8 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       },
       // #1183 — the contact shadow; key absent unless it casts (knob > 0, ground below, not shed)
       ...((sh) => (sh ? { shadow: sh } : {}))(contractShadow(rl, groundBelow, shadowShed)),
+      // #1411 — the coalescence fields; key absent unless a pair is mid-merge (and not tier-1 shed)
+      ...((co) => (co ? { coalesce: co } : {}))(contractCoalesce(rl, coalesceShed)),
     });
     const layerSpin = spinOf(rl.layoutParams?.rotateSpin);
     for (const item of rl.items || []) {
@@ -485,6 +526,20 @@ export function assertSceneContract(scene) {
         fail(`layer ${l.id}: shadow.amount must be in (0, 1]`);
       }
       if (typeof sh.color !== 'string' || !/^#[0-9a-f]{6}$/.test(sh.color)) fail(`layer ${l.id}: shadow.color must be #rrggbb`);
+    }
+    if (l.coalesce !== undefined) { // #1411 coalescence fields
+      if (l.type !== 'content') fail(`layer ${l.id}: only content layers coalesce`);
+      if (!Array.isArray(l.coalesce) || l.coalesce.length === 0 || l.coalesce.length > COALESCE_MAX_FIELDS) {
+        fail(`layer ${l.id}: coalesce must be an array of 1..${COALESCE_MAX_FIELDS} fields`);
+      }
+      for (const f of l.coalesce) {
+        if (!f || typeof f !== 'object' || !Number.isFinite(f.x) || !Number.isFinite(f.y)) {
+          fail(`layer ${l.id}: coalesce field x/y must be finite`);
+        }
+        if (!Number.isFinite(f.r) || !(f.r > 0)) fail(`layer ${l.id}: coalesce field r must be > 0`);
+        if (!Number.isFinite(f.f) || !(f.f > 0) || f.f > 1) fail(`layer ${l.id}: coalesce field f must be in (0, 1]`);
+        if (typeof f.tint !== 'string' || !/^#[0-9a-f]{6}$/.test(f.tint)) fail(`layer ${l.id}: coalesce field tint must be #rrggbb`);
+      }
     }
     if (l.matte !== null && l.matte !== undefined) {
       const m = l.matte;

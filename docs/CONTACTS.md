@@ -209,3 +209,66 @@ per-system pass and the shared dish grid) take only a feed call site.
   engine takes an update-level `deform: false` (spread-only, like
   `dishSession`) that silences feed and render — the byte-identity
   tests drive it; the governor shed is the live off-ramp.
+
+## Coalescence (#1411, petri dish B2)
+
+Bodies that stay in contact stop reading as two discs that happen to
+touch: a soft membrane grows at the seam, so a colony reads as one
+thing that touches without dissolving. The law lives in
+`app/src/engine/dishCoalesce.mjs`; the per-system contact pass takes
+only a feed call site, and the step/compose call site sits beside
+B1's at the end of `update()`.
+
+- **Family.** In v1 a family is the stratum (the ParticleSystem).
+  Dwell is fed ONLY by the per-system pass, so cross-strata pairs —
+  different families by construction — can never merge, however long
+  they rest against each other (spec §5, open question 2: the
+  recommended same-family-only scope).
+- **Dwell.** A pair accrues 1 dwell per step in contact. Contact
+  includes a near touch (centre distance within 1.06 × the disc
+  sum): positional depenetration parks a resting pair exactly at
+  the disc sum, on the rejected side of the contact test, so
+  without the tolerance a resting pair would strobe in and out of
+  contact and never read as sustained.
+- **Factor.** Below 24 steps of dwell the merge factor is 0 — a
+  glancing touch never merges — then it ramps linearly over 30
+  steps to 1. Out of contact, dwell drains at 4 per step and the
+  pair is forgotten at zero: separation restores two clean discs
+  within a beat. The whole state is counted in steps, so it is a
+  pure function of (seed, params, steps): bake equals live.
+- **Fields.** Each step composes the active pairs into fields:
+  midpoint on the centre segment, radius from the pair's discs
+  (the #1408 radius law, now in the `dishRadius.mjs` leaf), tint
+  the two bodies' colours averaged. Strongest first, capped at 24
+  per layer. The resolver forwards them on the content layer and
+  the contract carries `coalesce: [{x, y, r, f, tint}]` only while
+  a merge is live — an unmerged contract (and its hash) is exactly
+  what it was.
+- **Finish.** One fullscreen pass per coalescing layer
+  (`app/src/gl/coalesceFinish.mjs`), run on the layer's own
+  texture inside the per-layer composite step, before the layer
+  lands: a metaball threshold blend. Where a field's potential
+  crosses the threshold and the marks' own alpha is lower, the
+  alpha is raised to the bridge value and the colour pulled to
+  the pair's tint — the membrane exists only in the notch between
+  two touching discs. It is a local field in the finish, never a
+  blend mode over the frame. No fields, no pass: the frame is
+  pixel-identical.
+- **Physics honesty.** The feed and the step write state only —
+  no position, velocity, or mass is ever read back by the
+  integrator. `dishCoalesce.selfcheck.mjs` pins B1's proofs:
+  coalescence on vs off (and reduced-motion vs full motion) are
+  bit-identical in every physics column; a slot recycled by
+  breed inherits no pair's dwell.
+- **Stillness.** Under reduced-motion no field renders, while the
+  dwell state tracks underneath — un-stilling resumes mid-merge
+  honestly, never pops a stale membrane.
+- **Governor.** Coalescence is cost tier 1 (`engine/dish-coalesce`)
+  — it sheds WITH the FX finishes, first on the ladder: the
+  contract omits the fields whenever `perfTier1` is active
+  (`dishCoalesceShed`, any quality), one rung before the shadow
+  and deform. Stills and exports never shed it.
+- **Switch.** Like deform, there is no artist knob: coalescence
+  follows contacts. The engine takes an update-level
+  `coalesce: false` (spread-only) that silences feed and compose;
+  the byte-identity tests drive it.

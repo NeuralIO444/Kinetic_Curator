@@ -42,24 +42,14 @@ import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across 
 const TAU = Math.PI * 2;
 
 /**
- * The one radius law (#1408, petri dish A2), shared by this pass and the
- * per-system pass in particles.js: a body's contact disc is
- *   base × liveScale × assetTrim
- * where `base` is the stratum's contactRadius (the px disc of a scale-1,
- * trim-1 mark), `liveScale` is the body's `scale` column — the live
- * attribute path, so growth, shrink, and the breath pulse size the disc
- * every frame — and `assetTrim` is the per-particle trim resolved from
- * the asset record's `radiusTrim` (default 1.0). A non-positive or
- * non-finite scale/trim reads as its neutral value's guard: scale falls
- * back to 1 (an unreadable size is a unit mark, not a ghost), trim to 1;
- * a scale of exactly 0 is a zero-size mark and honestly has no disc.
- * Pure function of state — no Math.random / Date.now.
+ * The one radius law (#1408, petri dish A2) — a body's contact disc is
+ * base × liveScale × assetTrim — lives in dishRadius.mjs, a leaf, and
+ * is re-exported here so existing importers are untouched: this pass,
+ * the per-system pass in particles.js, and the coalescence law
+ * (dishCoalesce.mjs, #1411) all share the one law.
  */
-export function contactBodyRadius(base, scale, trim) {
-  const s = Number.isFinite(scale) ? Math.max(0, scale) : 1;
-  const t = Number.isFinite(trim) && trim > 0 ? trim : 1;
-  return base * s * t;
-}
+import { contactBodyRadius } from './dishRadius.mjs';
+export { contactBodyRadius };
 
 /**
  * The enrolment radius for one stratum under the per-Look DISH switch

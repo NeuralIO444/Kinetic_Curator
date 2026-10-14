@@ -52,6 +52,7 @@ const GRAIN_FAMILY_KINDS = ['grain'];
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { registerCostTier } from './costTiers.mjs';
 import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
+import { createCoalesceFinish } from './coalesceFinish.mjs'; // #1411 coalescence finish
 import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
 
 // #533 PR1 — upload-byte meter (measure-only). renderer.mjs is the only file
@@ -473,6 +474,17 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     bindTex,
   });
 
+  // #1411 — the coalescence finish's program goes through the same checked build + audit.
+  const dishCoalesce = createCoalesceFinish(gl, {
+    buildProgram: (def) => {
+      const p = buildProgramChecked(gl, FULL_VS, def.fs, { name: def.name, vsFile: 'shaders.mjs:FULL_VS', fsFile: def.fsFile });
+      auditProgramChecked(gl, p, def.uniforms, { name: def.name, file: 'coalesceFinish.mjs' });
+      return p;
+    },
+    drawFullscreen,
+    bindTex,
+  });
+
   /** Single fullscreen effect pass: reads srcTex, writes dstFb. */
   /** Draw instance list (Float32Array, 12 floats each) into the bound FBO. */
   // #594: the frame's sun, set by renderFrameInto from the contract (null = off).
@@ -736,7 +748,13 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       const hueRotate = (layer.layout && layer.layout.hueRotate) || 0;
       // #1098 — a PATTERN track is one generated texture, not instances: it skips the layer target
       // and composites straight from its own texture, with the same blend / opacity / matte.
-      const srcTex = layer.type === 'pattern' ? patternTexture(layer, w, h) : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
+      let srcTex = layer.type === 'pattern' ? patternTexture(layer, w, h) : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
+      // #1411 — coalescence: fuse the layer's merge fields into its own marks BEFORE anything else reads
+      // them, so the membrane is part of the layer (its contact shadow silhouettes the fused shape).
+      // No `coalesce` key: nothing runs and the frame is pixel-identical.
+      if (layer.type === 'content' && layer.coalesce && layer.coalesce.length) {
+        srcTex = dishCoalesce.apply({ srcTex, fields: layer.coalesce, sceneW, sceneH, w, h }).tex;
+      }
       // #1183 — the contact shadow is laid over what is below BEFORE the marks land on top. It writes the shadowed
       // backdrop into blendT (free once the layer's marks are drawn), and the layer composites from there into
       // dWrite, so every caller's single ping-pong swap stays correct. No `shadow` key: nothing runs.
@@ -873,6 +891,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   function disposeBase() {
     contactShadow.dispose(); // #1183
+    dishCoalesce.dispose(); // #1411
     bridge.dispose();
     for (const e of patternTex.values()) gl.deleteTexture(e.tex);
     patternTex.clear();

@@ -24,6 +24,7 @@ import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 import { createNoise } from '../engine/noise.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
+import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
 import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
 import { morphEase } from './paletteMix.mjs';
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
@@ -756,7 +757,13 @@ export function createLiveResolver() {
         srcMirror === true ? 'x' : (typeof srcMirror === 'string' ? srcMirror : 'off'),
         src.layoutParams?.symmetry ?? 'none',
       ].join('|');
-      out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer });
+      // #1411 — coalescence: the swarm system's composed merge fields
+      // ride the resolved layer (key present only while pairs actually
+      // merge, so an unmerged layer's contract is exactly what it was).
+      const coalesce = isLiveSwarmMode(layoutParams.mode)
+        ? coalescenceFields(swarmState.get(layer.id)?.system)
+        : null;
+      out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer, ...(coalesce && coalesce.length ? { coalesce } : {}) });
     }
     const content = out.filter((e) => !e.isFx);
     const toNorm = (it) => ({ x: (Number(it.x) || 0) / W, y: (Number(it.y) || 0) / H });
