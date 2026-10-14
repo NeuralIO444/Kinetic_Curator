@@ -199,14 +199,13 @@ const FIELDMAP_CTX = { fieldMapField: 'noise', fieldMapChannel: 'scale', fieldMa
 const HYPE_CTX = { mode: 'hype', behave: 'cruise' };
 // buildPlacements' geoParams (buildPlacements.js) forwards growthRate
 // / growthBranch / noise / lsys / phyllo into computeGeometrySoA. The
-// brush family was forwarded by #1516 (2026-10-14) — before that, it
-// and the colonize family kept their hardcoded kernel defaults
-// (placement.js: brushSize 24, spacing 0.5, fieldScale 0.004, trails 6,
-// wobble 0/0.5; colonize 90/18/0.25/7) no matter what the params
-// carried. The colonize family is still not threaded (fix: #1517).
+// brush family was forwarded by #1516 (2026-10-14) and the colonize
+// family by #1517 (2026-10-14) — before those fixes, both families
+// kept their hardcoded kernel defaults (placement.js: brushSize 24,
+// spacing 0.5, fieldScale 0.004, trails 6, wobble 0/0.5; colonize
+// 90/18/0.25/7) no matter what the params carried.
 // The fixtures below sweep every key through the full pipeline: the
 // zero IS the measurement.
-const NOT_THREADED = 'buildPlacements never forwards this key to computeGeometrySoA — the geometry kernel runs its hardcoded default';
 const KEY_FIXTURES = {
   count: { driver: 'place', ctx: { mode: 'fibonacci' } },
   jitter: { driver: 'place', ctx: { mode: 'fibonacci' } },
@@ -218,10 +217,10 @@ const KEY_FIXTURES = {
   lsysAngle: { driver: 'place', ctx: { mode: 'lsystem' } },
   growthRate: { driver: 'growth', ctx: { mode: 'dla' }, note: 'the knob is a RATE: its observable is the aggregate\u2019s cell count at a fixed tick (what the lifecycle policy itself reads). Placement fingerprints saturate — both rates present the same oldest cells — so the census measures the count directly, growing from the zygote at each value' },
   growthBranch: { driver: 'place', ctx: { mode: 'dla' }, opts: { growthTick: 60, clearGrowth: true }, note: 'measured on an aggregate grown from the zygote to tick 60 at each value' },
-  colonizeInfluence: { driver: 'place', ctx: { mode: 'colonize' }, note: NOT_THREADED },
-  colonizeKill: { driver: 'place', ctx: { mode: 'colonize' }, note: NOT_THREADED },
-  colonizeBranch: { driver: 'place', ctx: { mode: 'colonize' }, note: NOT_THREADED },
-  colonizeStep: { driver: 'place', ctx: { mode: 'colonize' }, note: NOT_THREADED },
+  colonizeInfluence: { driver: 'place', ctx: { mode: 'colonize' } },
+  colonizeKill: { driver: 'place', ctx: { mode: 'colonize' } },
+  colonizeBranch: { driver: 'place', ctx: { mode: 'colonize' } },
+  colonizeStep: { driver: 'place', ctx: { mode: 'colonize' } },
   noiseFreq: { driver: 'place', ctx: { mode: 'noise', displacement: 120 } },
   noiseSpeed: { driver: 'place', ctx: { mode: 'noise', displacement: 120 } },
   brushSize: { driver: 'place', ctx: { mode: 'brush' } },

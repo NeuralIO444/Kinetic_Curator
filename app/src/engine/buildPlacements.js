@@ -238,6 +238,17 @@ export function buildPlacements({
     trailCount: layoutParams.trailCount,
     wobbleAmp: layoutParams.wobbleAmp,
     wobbleFreq: layoutParams.wobbleFreq,
+    // Colonize species (#1197) — forwarded like growth/lsys/brush.
+    // Until #1517 the document's stored values never reached
+    // computeGeometrySoA, which ran its hardcoded defaults (90 / 18 /
+    // 0.25 / 7 — the same values DEFAULT_LAYOUT_PARAMS carries, so
+    // forwarding the defaults is bit-identical).
+    // geometrySignature already lists all four, so the staged-eval
+    // cache stays honest: a colonize edit busts the geometry stage.
+    colonizeInfluence: layoutParams.colonizeInfluence,
+    colonizeKill: layoutParams.colonizeKill,
+    colonizeBranch: layoutParams.colonizeBranch,
+    colonizeStep: layoutParams.colonizeStep,
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,
