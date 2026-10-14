@@ -146,6 +146,9 @@ export function CandidateTray() {
                     ? <img src={still} alt={label || 'mined candidate still'} />
                     : <span className="cand-nostill">no still in folder</span>}
                   <span className="cand-tag">mined</span>
+                  {card.provenance?.variants?.length
+                    ? <span className="cand-tag cand-tag-variant">variant</span>
+                    : null}
                 </div>
                 <div className="cand-prov">{label}</div>
                 <div className="cand-meta">

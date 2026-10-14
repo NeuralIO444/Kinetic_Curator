@@ -37,6 +37,12 @@
 // LOIS judges the finalists' renders after selection (loisJudge.mjs)
 // — verdicts with provenance on the records + a verdicts ledger from
 // the run tool. The default run is byte-identical to E2's.
+//
+// E5 (#1530) extends it again, the same way: a variant axis
+// (variants.mjs) may replace a recorded fraction of dealt cast
+// members with Davis variants of themselves. Default fraction 0 —
+// no draws consumed, no sample changed, the default run is still
+// byte-identical.
 import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
 import { ASSETS } from '../data/assets/index.js';
@@ -55,6 +61,10 @@ import { judgeRender, loisVerdictRow } from './loisJudge.mjs';
 import { applyRenderProfile, getRenderProfile, RENDER_PROFILE_IDS } from './renderProfiles.js';
 import { recipeFeatures } from './recipeFeatures.js';
 import { mulberry32 } from './coverageReport.mjs';
+import {
+  COMBINE_OPS, RESTYLE_MODES, VARIANT_OPS,
+  drawVariantParams, generateVariantSvg, morphCompatible, variantIdFor, variantRecord,
+} from './variants.mjs';
 
 export { mulberry32 };
 export const MINER_SEED = 0x1506;
@@ -106,6 +116,80 @@ export const CORNERS = ['wilderness', ...RENDER_PROFILE_IDS];
 export const LIVE_MODES = new Set(['swarm', 'hype', 'murmuration']);
 const SWARM_STEPS = 240; // census swarmBake precedent
 
+// ── E5 (#1530): the variant axis ────────────────────────────────────
+// A dealt cast member may be replaced by a Davis variant of itself:
+// the member stays the variant's LEAD parent (its family, its quota
+// credit, its feature coordinates — variant-ness is provenance, not
+// an axis), and the recipe rides the sample so the bake can
+// materialize the mark. Dealing resolves the drawn op honestly
+// BEFORE a recipe is written: morph against an incompatible partner
+// becomes superpose (the pair's real relation), a restyle mode that
+// does not apply to this fragment falls through the declared modes,
+// and if every op fails the member stays a library asset and the
+// fallback is counted. Draw order per member is fixed (member draw →
+// op draw → partner draw → seed → the winning op's params), and the
+// whole pass runs only when variantFraction > 0 — the default run's
+// stream is untouched, byte for byte.
+const variantCache = new Map(); // variantId -> generated asset record (process-level, idempotent)
+
+/** Resolve any cast id — library asset or variant — to its record.
+ * A variant resolves through its sample's recipe map; generated
+ * records are cached by id (ids are content hashes of the recipe). */
+export function recordFor(id, sample) {
+  const lib = byId.get(id);
+  if (lib) return lib;
+  const recipe = sample?.variants?.[id];
+  if (!recipe) return undefined;
+  let rec = variantCache.get(id);
+  if (!rec) {
+    rec = variantRecord(recipe, byId) ?? undefined;
+    if (rec) variantCache.set(id, rec);
+  }
+  return rec;
+}
+
+function dealOneVariant(leadId, rng) {
+  const lead = byId.get(leadId);
+  if (!lead) return null;
+  const start = Math.floor(rng() * VARIANT_OPS.length);
+  const partnerIdx = Math.floor(rng() * ASSETS.length);
+  const partner = ASSETS[partnerIdx].id === leadId
+    ? ASSETS[(partnerIdx + 1) % ASSETS.length].id
+    : ASSETS[partnerIdx].id;
+  const seed = Math.floor(rng() * 0x7fffffff);
+  for (let k = 0; k < VARIANT_OPS.length; k++) {
+    let op = VARIANT_OPS[(start + k) % VARIANT_OPS.length];
+    if (op === 'morph' && !morphCompatible(lead.svg, byId.get(partner).svg)) op = 'superpose';
+    const params = drawVariantParams(op, rng);
+    if (op === 'restyle') {
+      for (const mode of [params.mode, ...RESTYLE_MODES.filter((x) => x !== params.mode)]) {
+        const recipe = { parents: [leadId], op, seed, params: { ...params, mode } };
+        if (generateVariantSvg(recipe, byId) !== null) return { id: variantIdFor(recipe), recipe };
+      }
+      continue;
+    }
+    const recipe = COMBINE_OPS.includes(op)
+      ? { parents: [leadId, partner], op, seed, params }
+      : { parents: [leadId], op, seed, params };
+    if (generateVariantSvg(recipe, byId) !== null) return { id: variantIdFor(recipe), recipe };
+  }
+  return null;
+}
+
+function dealVariants(cast, rng, fraction) {
+  const out = [...cast];
+  const variants = {};
+  let attempts = 0;
+  let fallbacks = 0;
+  for (let j = 0; j < out.length; j++) {
+    if (rng() >= fraction) continue;
+    attempts++;
+    const v = dealOneVariant(out[j], rng);
+    if (v) { out[j] = v.id; variants[v.id] = v.recipe; } else fallbacks++;
+  }
+  return { cast: out, variants, attempts, fallbacks };
+}
+
 // ── sampler ─────────────────────────────────────────────────────────
 /**
  * Draw one batch from a single seeded stream. Draw order is fixed per
@@ -124,12 +208,21 @@ const SWARM_STEPS = 240; // census swarmBake precedent
  * wildness through the dice's own wildnessForDavis (UGLY 1.0 sifts
  * wide, FLOW 0.2 stays close; null = Davis silent = the honest 0.5
  * middle this sampler always used — the default stream is unchanged).
+ *
+ * E5 (#1530): `variantFraction` (default 0) replaces that fraction
+ * of dealt cast members with Davis variants of themselves (see the
+ * variant axis above). At 0 no draws are consumed and no sample
+ * carries a variants key — the default run stays byte-identical.
  */
 export function sampleBatch({
   runSeed = MINER_SEED, batchSize = 240, corner = null, davisCode = null,
+  variantFraction = 0,
 } = {}) {
   if (corner !== null && !CORNERS.includes(corner)) {
     throw new Error(`unknown corner: ${corner} (corners: ${CORNERS.join(', ')})`);
+  }
+  if (!(variantFraction >= 0 && variantFraction <= 1)) {
+    throw new Error(`variantFraction must be within [0, 1], got ${variantFraction}`);
   }
   const wildness = wildnessForDavis(davisCode ?? null);
   const rng = mulberry32(runSeed);
@@ -159,6 +252,17 @@ export function sampleBatch({
       paletteId = getRenderProfile(sampleCorner).paletteId;
       params = applyRenderProfile(params, sampleCorner, rng);
     }
+    // E5: the variant pass runs after the cast is dealt, and only
+    // when the axis is on — at fraction 0 the stream (and therefore
+    // every E2/E4 default) is untouched.
+    let variants;
+    let variantDraws;
+    if (variantFraction > 0) {
+      const dealt = dealVariants(cast, rng, variantFraction);
+      cast = dealt.cast;
+      if (Object.keys(dealt.variants).length) variants = dealt.variants;
+      if (dealt.attempts) variantDraws = { attempts: dealt.attempts, fallbacks: dealt.fallbacks };
+    }
     samples.push({
       index: i,
       corner: sampleCorner,
@@ -169,6 +273,8 @@ export function sampleBatch({
       seed,
       seedOffsets: {},
       layoutParams: normalizeLayoutParams(params),
+      ...(variants ? { variants } : {}),
+      ...(variantDraws ? { variantDraws } : {}),
     });
   }
   return samples;
@@ -195,7 +301,7 @@ export function fingerprintItems(items) {
 export function bakeSample(sample) {
   const castRecords = [];
   for (const id of sample.cast || []) {
-    const rec = byId.get(id);
+    const rec = recordFor(id, sample);
     if (!rec) return { ok: false, reason: `unknown-asset:${id}` };
     castRecords.push(rec);
   }
@@ -250,12 +356,16 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
   if (withBg) parts.push(`<rect width="${W}" height="${H}" fill="${palette.bg}"/>`);
   const body = [];
   for (const item of items || []) {
-    if (!item.assetId || !byId.has(item.assetId)) continue;
+    // Library assets resolve from the index; variant items resolve
+    // from the run's generated records (recordFor warmed the cache
+    // at bake time — a still only ever composes what the bake drew).
+    const assetRec = item.assetId ? (byId.get(item.assetId) ?? variantCache.get(item.assetId)) : undefined;
+    if (!assetRec) continue;
     const color = item.color || palette.ink || '#000000';
     const accent = item.accent || color;
     const key = `${item.assetId}|${color}|${accent}`;
     if (!symbols.has(key)) {
-      const svg = byId.get(item.assetId).svg
+      const svg = assetRec.svg
         .replace(INK_RE, color)
         .replace(ACCENT_RE, accent);
       symbols.set(key, `<symbol id="s${symbols.size}" viewBox="0 0 100 100" overflow="visible">${svg}</symbol>`);
@@ -398,23 +508,43 @@ export function stillHash(pngBuffer) {
 
 // ── measurement + distance ──────────────────────────────────────────
 /** recipeFeatures over a miner recipe. FEATURES_VERSION is the
- * substrate's own law (recipeFeatures.js) — consumed, never changed. */
-export function featuresOf({ layoutParams, paletteId, cast }) {
-  return recipeFeatures({ layoutParams, paletteId, assets: cast });
+ * substrate's own law (recipeFeatures.js) — consumed, never changed.
+ *
+ * E5 doctrine (the issue's ruling): variant-ness is provenance, NOT
+ * a feature axis. So in feature space a variant stands at its LEAD
+ * PARENT's coordinates: when a recipes-by-id map is handed in, cast
+ * entries that are variant ids are translated to their lead parent
+ * before featurizing — cast and castCategories then read exactly as
+ * if the lead itself had been dealt, on both sides of the ledger
+ * (candidates via their sample's map, keeps via their record's
+ * provenance — featuresOfKeep below), which is what keeps the two
+ * sides agreeing (recipeFeatures' own stated purpose). */
+export function featuresOf({ layoutParams, paletteId, cast }, recipesById = null) {
+  const assets = recipesById && Array.isArray(cast)
+    ? cast.map((id) => recipesById.get(id)?.parents?.[0] ?? id)
+    : cast;
+  return recipeFeatures({ layoutParams, paletteId, assets });
 }
 
 /** Features of a keep-shaped record (#1140), read as tolerantly as
  * keepsCoverage reads the ledger: config.layout / config.palette.id /
  * config.assets, absent stays absent. Null when the record carries
- * nothing featurizable. */
+ * nothing featurizable. A crowned variant keep featurizes at its
+ * lead parents (see featuresOf) — its provenance carries the
+ * recipes that make the translation possible. */
 export function featuresOfKeep(record) {
   const cfg = record?.config;
   if (!cfg || typeof cfg !== 'object') return null;
-  return recipeFeatures({
+  let recipesById = null;
+  const variants = record?.provenance?.variants;
+  if (Array.isArray(variants) && variants.length) {
+    recipesById = new Map(variants.map((r) => [variantIdFor(r), r]));
+  }
+  return featuresOf({
     layoutParams: cfg.layout || {},
     paletteId: cfg.palette?.id ?? null,
-    assets: Array.isArray(cfg.assets) ? cfg.assets : null,
-  });
+    cast: Array.isArray(cfg.assets) ? cfg.assets : null,
+  }, recipesById);
 }
 
 const CATEGORICALS = [
@@ -491,8 +621,8 @@ export function meanPairwise(items, dist) {
 }
 
 // ── selection ───────────────────────────────────────────────────────
-const castCategoriesOf = (cast) => new Set(
-  (cast || []).map((id) => byId.get(id)?.category).filter(Boolean),
+const castCategoriesOf = (cast, sample) => new Set(
+  (cast || []).map((id) => recordFor(id, sample)?.category).filter(Boolean),
 );
 
 /**
@@ -543,7 +673,7 @@ export function selectFinalists(baked, keepsFeatures, { finalistCount = 12 } = {
 
   // quota repair
   const repairs = [];
-  const carries = (c, cat) => castCategoriesOf(c.sample.cast).has(cat);
+  const carries = (c, cat) => castCategoriesOf(c.sample.cast, c.sample).has(cat);
   for (const cat of STARVED_CATEGORIES) {
     if (picked.some((c) => carries(c, cat))) continue;
     const carriers = [...remaining].filter((c) => carries(c, cat));
@@ -574,7 +704,7 @@ export function selectFinalists(baked, keepsFeatures, { finalistCount = 12 } = {
   }
 
   const finalCats = new Set();
-  for (const c of picked) for (const cat of castCategoriesOf(c.sample.cast)) finalCats.add(cat);
+  for (const c of picked) for (const cat of castCategoriesOf(c.sample.cast, c.sample)) finalCats.add(cat);
   const quota = {
     required: [...STARVED_CATEGORIES],
     perCategory: Object.fromEntries(STARVED_CATEGORIES.map((cat) => [cat, {
@@ -626,6 +756,14 @@ export function diceTrayFeatures(k, { seed = MINER_SEED ^ 0xd1ce } = {}) {
  * (E3) from the live session, never invented by the miner, and their
  * absence is what keeps a run a pure function of its seed. */
 export function candidateRecord(sample, runId) {
+  // E5: the cast's variant recipes ride provenance (sorted by
+  // variant id, the record's own order) — a crown persists them in
+  // the keep, which is what makes a crowned variant reproducible
+  // forever and countable under its lead family. Absent when the
+  // cast is all library: absent stays absent.
+  const variantRecipes = sample.variants
+    ? Object.keys(sample.variants).sort().map((id) => sample.variants[id])
+    : [];
   return {
     seed: sample.seed,
     seedOffsets: { ...(sample.seedOffsets || {}) },
@@ -644,17 +782,21 @@ export function candidateRecord(sample, runId) {
         castSize: sample.cast.length,
         ...(sample.anchor ? { anchor: sample.anchor } : {}),
       },
+      ...(variantRecipes.length ? { variants: variantRecipes } : {}),
     },
   };
 }
 
 export function runIdFor({
   runSeed = MINER_SEED, batchSize = 240, finalistCount = 12, corner = null, davisCode = null,
+  variantFraction = 0,
 } = {}) {
   const base = `xpl-${runSeed.toString(16)}-${batchSize}-${finalistCount}`;
   // E4: an aimed run names its corner (and Davis's state) in its id —
   // the default rotation run keeps the E2 id exactly.
-  return base + (corner ? `-${corner}` : '') + (davisCode ? `-${String(davisCode).toLowerCase()}` : '');
+  // E5: a variant-axis run names its fraction the same way.
+  return base + (corner ? `-${corner}` : '') + (davisCode ? `-${String(davisCode).toLowerCase()}` : '')
+    + (variantFraction > 0 ? `-var${Math.round(variantFraction * 100)}` : '');
 }
 
 /**
@@ -665,10 +807,10 @@ export function runIdFor({
  */
 export function runMiner({
   runSeed = MINER_SEED, batchSize = 240, finalistCount = 12, keeps = [],
-  corner = null, davisCode = null,
+  corner = null, davisCode = null, variantFraction = 0,
 } = {}) {
-  const runId = runIdFor({ runSeed, batchSize, finalistCount, corner, davisCode });
-  const samples = sampleBatch({ runSeed, batchSize, corner, davisCode });
+  const runId = runIdFor({ runSeed, batchSize, finalistCount, corner, davisCode, variantFraction });
+  const samples = sampleBatch({ runSeed, batchSize, corner, davisCode, variantFraction });
   const baked = [];
   const discards = [];
   for (const sample of samples) {
@@ -685,7 +827,7 @@ export function runMiner({
       items: bake.items,
       features: featuresOf({
         layoutParams: sample.layoutParams, paletteId: sample.paletteId, cast: sample.cast,
-      }),
+      }, sample.variants ? new Map(Object.entries(sample.variants)) : null),
       stats: renderStats(bake.items, palette),
       fontContingent: sample.cast.some((id) => FONT_CONTINGENT_IDS.has(id)),
       record: candidateRecord(sample, runId),
@@ -712,17 +854,24 @@ export function runMiner({
   }
   const verdicts = finalists.map((f) => loisVerdictRow(runId, f)).filter(Boolean);
 
-  // coverage rows: library / batch (sampled casts) / baked / finalists
+  // coverage rows: library / batch (sampled casts) / baked / finalists.
+  // E5: cast ids resolve through recordFor — a variant counts under
+  // its LEAD parent's family (its record carries the lead's category),
+  // and because the variant REPLACED the lead in the cast, no member
+  // is ever counted twice.
   const catRow = (test) => ({
     inLibrary: ASSETS.filter(test).length,
-    inBatch: samples.filter((s) => s.cast.some((id) => test(byId.get(id)))).length,
-    inBaked: baked.filter((c) => c.sample.cast.some((id) => test(byId.get(id)))).length,
-    inFinalists: finalists.filter((c) => c.sample.cast.some((id) => test(byId.get(id)))).length,
+    inBatch: samples.filter((s) => s.cast.some((id) => test(recordFor(id, s)))).length,
+    inBaked: baked.filter((c) => c.sample.cast.some((id) => test(recordFor(id, c.sample)))).length,
+    inFinalists: finalists.filter((c) => c.sample.cast.some((id) => test(recordFor(id, c.sample)))).length,
   });
   const categories = [...new Set(ASSETS.map((a) => a.category))]
     .sort()
     .map((name) => ({ name, ...catRow((a) => a && a.category === name) }));
-  const packs = [{ name: 'haeckel', ...catRow((a) => a && a.id.startsWith('hae')) }];
+  const packs = [{
+    name: 'haeckel',
+    ...catRow((a) => a && (a.variant ? a.variant.parents[0] : a.id).startsWith('hae')),
+  }];
 
   // quota proof, stated over the full sampled batch (selectFinalists
   // sees only the baked pool; the anchor counts belong to the batch)
@@ -731,6 +880,30 @@ export function runMiner({
     quota.perCategory[cat].inBatch = samples.filter(
       (s) => s.cast.some((id) => byId.get(id)?.category === cat),
     ).length;
+  }
+
+  // E5: the variant axis's accounting — present only when the axis
+  // was on (a default run's report is the E2/E4 report, unchanged).
+  let variantReport = null;
+  if (variantFraction > 0) {
+    const byOp = {};
+    let dealt = 0;
+    for (const s of samples) {
+      for (const r of Object.values(s.variants || {})) {
+        dealt++;
+        byOp[r.op] = (byOp[r.op] || 0) + 1;
+      }
+    }
+    variantReport = {
+      fraction: variantFraction,
+      attempts: samples.reduce((n, s) => n + (s.variantDraws?.attempts || 0), 0),
+      dealt,
+      fallbacks: samples.reduce((n, s) => n + (s.variantDraws?.fallbacks || 0), 0),
+      byOp,
+      inFinalists: finalists.reduce(
+        (n, f) => n + f.sample.cast.filter((id) => f.sample.variants?.[id]).length, 0,
+      ),
+    };
   }
 
   const tray = diceTrayFeatures(finalists.length, { seed: runSeed ^ 0xd1ce });
@@ -766,6 +939,7 @@ export function runMiner({
       corner: corner ?? 'rotation',
       davisCode: davisCode ?? null,
       wildness: wildnessForDavis(davisCode ?? null),
+      variantFraction,
     },
     samples,
     baked,
@@ -799,6 +973,7 @@ export function runMiner({
         keeps: finalists.filter((f) => f.loisVerdict?.verdict === 'keep').length,
         passes: finalists.filter((f) => f.loisVerdict?.verdict === 'pass').length,
       },
+      ...(variantReport ? { variants: variantReport } : {}),
       yieldByCorner,
     },
   };
@@ -848,6 +1023,14 @@ export function formatMinerReport(run) {
     L.push('  verdicts are recorded in verdicts.jsonl with provenance + the measured stats they rest on; they steer nothing — selection above ran on distance alone.');
     L.push('');
   }
+  if (r.variants) {
+    const v = r.variants;
+    const ops = Object.entries(v.byOp).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ×${n}`).join(' · ');
+    L.push(`VARIANTS (Davis variants, #1530): fraction ${v.fraction} · dealt ${v.dealt} of ${v.attempts} drawn members · fallbacks ${v.fallbacks} (member stayed a library asset)`);
+    L.push(`  ops dealt: ${ops}`);
+    L.push(`  variant members among finalists: ${v.inFinalists} — each is a recipe in its record's provenance; in coverage and feature space it stands at its lead parent's coordinates (variant-ness is provenance, not an axis).`);
+    L.push('');
+  }
   if (r.yieldByCorner) {
     L.push('YIELD BY CORNER (this run):');
     for (const row of r.yieldByCorner) {
@@ -863,7 +1046,8 @@ export function formatMinerReport(run) {
         ? ` (failed: ${f.loisVerdict.checks.filter((c) => !c.ok).map((c) => c.key).join(', ')})`
         : ''}`
       : '';
-    L.push(`  sample ${String(s.index).padStart(3)} · ${s.corner}${s.anchor ? ` (anchor ${s.anchor})` : ''} · ${s.layoutId} · ${s.paletteId} · cast ${s.cast.length} · ink ${f.stats.inkCoverage}${f.fontContingent ? ' · font-contingent cast' : ''} · bake ${f.fingerprint.slice(0, 12)}…${lois}`);
+    const variantMembers = s.variants ? s.cast.filter((id) => s.variants[id]).length : 0;
+    L.push(`  sample ${String(s.index).padStart(3)} · ${s.corner}${s.anchor ? ` (anchor ${s.anchor})` : ''} · ${s.layoutId} · ${s.paletteId} · cast ${s.cast.length}${variantMembers ? ` (variants ${variantMembers})` : ''} · ink ${f.stats.inkCoverage}${f.fontContingent ? ' · font-contingent cast' : ''} · bake ${f.fingerprint.slice(0, 12)}…${lois}`);
   }
   return L.join('\n');
 }
