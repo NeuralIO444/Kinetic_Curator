@@ -228,7 +228,7 @@ const KEY_FIXTURES = {
   fieldScale: { driver: 'place', ctx: { mode: 'brush' } },
   trailCount: { driver: 'place', ctx: { mode: 'brush' } },
   wobbleAmp: { driver: 'place', ctx: { mode: 'brush' } },
-  wobbleFreq: { driver: 'place', ctx: { mode: 'brush' }, note: 'threaded since #1516, but this fixture sweeps at wobbleAmp 0, where the kernel gates the wobble term off entirely — the frequency of a zero-amplitude wobble; the #1516 probe measured it moving placements at wobbleAmp 20 (43/48 fixtures). The fixture-context call stands as a recorded follow-up' },
+  wobbleFreq: { driver: 'place', ctx: { mode: 'brush', wobbleAmp: 20 }, note: 'swept at a working wobbleAmp 20 (this fixture\u2019s ctx): at the layout default amp 0 the kernel gates the wobble term off entirely, so the frequency has nothing to modulate \u2014 the honest context for this consumer is a live amplitude (#1551; the #1516 delta probe first measured it moving at amp 20, 43/48 fixtures)' },
   displacement: { driver: 'place', ctx: { mode: 'noise' } },
   particleCount: { driver: 'swarm', ctx: {} },
   swarmCohesion: { driver: 'swarm', ctx: {} },
