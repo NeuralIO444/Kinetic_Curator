@@ -612,12 +612,22 @@ export const createLayoutSlice = (set) => ({
     lockedParams: { ...state.lockedParams, [key]: !state.lockedParams[key] },
   })),
 
-  randomizeParam: (key) => set((state) => ({
-    ...pushToUndo(state, true),
-    layoutParams: { ...state.layoutParams, [key]: randomizeKey(key) },
-    voiceMix: null,
-    activeVoiceId: null,
-  })),
+  randomizeParam: (key) => set((state) => {
+    const rolled = randomizeKey(key);
+    if (rolled === undefined) return {}; // not a randomizable key: refuse, like every other door
+    // #1550: the roll lands through the same validating door as every
+    // other write — clamped to the document spec and pair-migrated by
+    // validateLayoutParams, never written raw. (Before this, a density
+    // of 101–120 — legal dice output, illegal document value — sat in
+    // layoutParams until some later validated write happened to heal it.)
+    const { params } = validateLayoutParams({ [key]: rolled });
+    return {
+      ...pushToUndo(state, true),
+      layoutParams: { ...state.layoutParams, [key]: params[key] },
+      voiceMix: null,
+      activeVoiceId: null,
+    };
+  }),
 
   randomizeUnlocked: () => set((state) => {
     const rp = { ...state.layoutParams };
@@ -629,7 +639,9 @@ export const createLayoutSlice = (set) => ({
       }
     }
     if (!changed) return {};
-    return { ...pushToUndo(state, true), layoutParams: rp, voiceMix: null, activeVoiceId: null };
+    // #1550: same law as randomizeParam — the batch lands normalized.
+    const { params } = validateLayoutParams(rp);
+    return { ...pushToUndo(state, true), layoutParams: params, voiceMix: null, activeVoiceId: null };
   }),
 
   curateUnlocked: () => set((state) => {
@@ -714,11 +726,15 @@ export const createLayoutSlice = (set) => ({
         refinePaletteAnchor: { paletteId: anchor.paletteId, overrides: anchor.overrides, keepCount, lastOverrides: overrides },
       };
     }
+    // #1550: the pick lands through the validating door, like every other
+    // write of rolled values — candidates are scored as rolled, but what
+    // lands is clamped to the document spec and pair-migrated.
+    const { params: landedParams } = validateLayoutParams(candidates[index]);
     return {
       ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
       ...(pat.changed ? { layers: pat.layers } : {}),
       ...colour,
-      layoutParams: candidates[index],
+      layoutParams: landedParams,
       curatePress: press + 1,
       // Honest flag: if any chain had no row for the current value this press
       // had no memory behind it, and the bar says so.
