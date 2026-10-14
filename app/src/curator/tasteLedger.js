@@ -15,6 +15,7 @@
 //   $APPDATA/ledgers/<kind>.jsonl. No cloud, no account.
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeKeepContext } from './keepContext.js';
+import { sanitizeProvenance, isProvenance } from './provenance.mjs';
 
 export const LEDGER_KINDS = Object.freeze(['keeps', 'passes']);
 export const LEDGER_STORAGE_KEYS = Object.freeze({
@@ -30,7 +31,7 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
  * One ledger line from a captured record (captureFavorite's shape, already
  * sanitized). Shape, keeps and passes alike:
  *   { seed, recipe: { layoutParams, paletteId, seedOffsets?, assets? },
- *     timestamp, keepContext, projectRef }
+ *     timestamp, keepContext, projectRef, provenance? (#1507) }
  * Absent stays absent: no offsets/cast are invented for legacy shapes;
  * keepContext and projectRef are null when unknown. Null on a record with no
  * usable seed or no timestamp — a line that can't be rendered is not a label.
@@ -45,6 +46,10 @@ export function ledgerRow(rec, projectRef) {
   const ref = typeof projectRef === 'string' ? projectRef.trim().slice(0, 80) : '';
   // Every keep door stamps the moment; a record without one is not invented a time.
   if (typeof rec.timestamp !== 'string' || !rec.timestamp) return null;
+  // #1507 — a mined record's provenance rides into the ledger line too: a
+  // pass on a mined render is a judgment WITH its origin, or it is a
+  // weaker label than the ledger promises. Absent stays absent.
+  const provenance = sanitizeProvenance(rec.provenance);
   return {
     seed: seed >>> 0,
     recipe: {
@@ -56,6 +61,7 @@ export function ledgerRow(rec, projectRef) {
     timestamp: rec.timestamp,
     keepContext: sanitizeKeepContext(rec.context) ?? null,
     projectRef: ref || null,
+    ...(provenance ? { provenance } : {}),
   };
 }
 
@@ -70,6 +76,9 @@ export function isLedgerRow(o) {
   if (typeof o.timestamp !== 'string' || !o.timestamp) return false;
   if (!('keepContext' in o) || (o.keepContext !== null && !isPlainObject(o.keepContext))) return false;
   if (!('projectRef' in o) || (o.projectRef !== null && typeof o.projectRef !== 'string')) return false;
+  // #1507 — provenance is optional (legacy lines carry none) but, when a
+  // line claims one, it must be a real one.
+  if ('provenance' in o && !isProvenance(o.provenance)) return false;
   return true;
 }
 
