@@ -15,15 +15,16 @@
 //    a corner run's finalist centroid can be PROVEN inside the box
 //    its profile declares (acceptance, #1508).
 //
-// 2. THE QUEEN'S EVIDENCE. Her sway mechanics (queenLean.js) are
-//    untouched and unmodified: keptCentroid over the keeps stays her
-//    anchor (taste still learns from kept renders only, spec §7),
-//    and her M1 rank bias is now also computed over the mined pool —
-//    finalists are candidates she may lean toward, in the open,
-//    reported as telemetry. The biases steer nothing in the explorer
-//    (selection stays farthest-point; spec §3.4 attaches no scores)
-//    and write nothing to taste. Below MIN_KEEPS keeps she is silent,
-//    exactly as ever.
+// 2. THE QUEEN'S EVIDENCE — deliberately NOT here. Her mechanics
+//    have exactly one host in the app graph (director.js) and the
+//    deniability suite enforces that import graph (DS rule 10), so
+//    no explorer module imports queenLean. Her evidence over a run's
+//    finalists is computed by the run tool's operator module
+//    (scripts/queenEvidence.mjs) from this stage's artifacts — her
+//    own functions, her own bounds, reported as run telemetry. The
+//    biases steer nothing in the explorer (selection stays
+//    farthest-point; spec §3.4 attaches no scores) and write nothing
+//    to taste (keeps remain her only anchor, spec §7).
 //
 // 3. YIELD ACCRUAL (spec §6). Per corner, over any set of runs plus
 //    the taste ledgers: candidates mined, finalists, LOIS keeps /
@@ -38,8 +39,6 @@ import { getRenderProfile } from './renderProfiles.js';
 import { PARAM_SPEC } from '../data/layout-modes.js';
 import { CORNERS } from './miner.mjs';
 import { cornerWord } from './provenance.mjs';
-import { keptCentroid, rankBiases, proximity, MIN_KEEPS, M1_BIAS } from './queenLean.mjs';
-import { extractFeatures } from './taste.js';
 
 export { CORNERS };
 
@@ -188,71 +187,6 @@ export function centroidViolations(centroid, ranges, eps = 0.01) {
     }
   }
   return out;
-}
-
-// ── the Queen's evidence ────────────────────────────────────────────
-/**
- * Her leanings over a mined pool. pool: [{ layoutParams, corner,
- * index }]. The anchor is keptCentroid(keeps) — keeps only, as ever.
- * Returns per-candidate { index, corner, proximity, bias } using
- * queenLean's own M1 constants, plus leaning counts by corner.
- * Silent (all-zero, `silent: true`) below MIN_KEEPS keeps or with
- * no kept centroid — she is identity there, and says so.
- */
-export function queenEvidence(keeps, pool) {
-  const list = Array.isArray(keeps) ? keeps : [];
-  const candidates = (pool || []).map((p) => p.layoutParams);
-  const centroid = keptCentroid(list);
-  if (list.length < MIN_KEEPS || !centroid) {
-    return {
-      keeps: list.length,
-      silent: true,
-      reason: list.length < MIN_KEEPS
-        ? `fewer than ${MIN_KEEPS} keeps — she is identity, as ever`
-        : 'no keep carries a layout — nothing to lean toward',
-      leaning: (pool || []).map((p) => ({
-        index: p.index ?? null, corner: p.corner ?? 'wilderness', proximity: null, bias: 0,
-      })),
-      leaningByCorner: {},
-      anchor: null,
-    };
-  }
-  const biases = rankBiases(candidates, centroid);
-  const leaning = (pool || []).map((p, i) => ({
-    index: p.index ?? null,
-    corner: p.corner ?? 'wilderness',
-    proximity: +proximity(extractFeatures(p.layoutParams), centroid).toFixed(4),
-    bias: biases[i],
-  }));
-  const leaningByCorner = {};
-  for (const l of leaning) {
-    if (l.bias > 0) leaningByCorner[l.corner] = (leaningByCorner[l.corner] || 0) + 1;
-  }
-  return {
-    keeps: list.length,
-    silent: false,
-    reason: null,
-    leaning,
-    leaningByCorner,
-    anchor: 'kept centroid (keeps only — mined candidates are weighed, never learned from)',
-    bias: M1_BIAS,
-  };
-}
-
-export function formatQueenSection(ev) {
-  const L = [];
-  L.push('THE QUEEN’S EVIDENCE (her anchor is kept taste; the mined pool is what she weighs):');
-  if (ev.silent) {
-    L.push(`  silent — ${ev.reason} (${ev.keeps} keeps handed to the run)`);
-    return L.join('\n');
-  }
-  const leaning = ev.leaning.filter((l) => l.bias > 0);
-  L.push(`  anchor: ${ev.anchor} · ${ev.keeps} keeps`);
-  L.push(`  she leans toward ${leaning.length} of ${ev.leaning.length} finalists (M1 proximity, bias +${ev.bias})`);
-  for (const [corner, n] of Object.entries(ev.leaningByCorner)) {
-    L.push(`    ${cornerWord(corner)} corner: ${n} leaned`);
-  }
-  return L.join('\n');
 }
 
 // ── yield accrual (spec §6) ─────────────────────────────────────────

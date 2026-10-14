@@ -28,8 +28,13 @@ import {
 import { getRenderProfile, RENDER_PROFILE_IDS } from './renderProfiles.js';
 import {
   cornerDefinition, declaredNumRanges, declaredScaleBuckets, featureCentroid, centroidViolations,
-  queenEvidence, yieldAccrual, formatYieldReport,
+  yieldAccrual, formatYieldReport,
 } from './prospecting.mjs';
+// The Queen's evidence is operator tooling (scripts/queenEvidence.mjs):
+// rule 10 confines her mechanics to one host in the app graph, so no
+// src module computes it. Suites are outside that graph; this one
+// proves the tool's math against her own constants.
+import { queenEvidence } from '../../scripts/queenEvidence.mjs';
 import { M1_BIAS, MIN_KEEPS } from './queenLean.mjs';
 import { ledgerRow } from './tasteLedger.js';
 

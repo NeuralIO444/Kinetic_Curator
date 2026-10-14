@@ -35,7 +35,7 @@ import { resolvePalette } from '../src/data/palettes.js';
 import {
   runMiner, formatMinerReport, renderStillPng, composeStillSvg, stillHash,
 } from '../src/curator/miner.mjs';
-import { queenEvidence, formatQueenSection } from '../src/curator/prospecting.mjs';
+import { queenEvidence, formatQueenSection } from './queenEvidence.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -54,7 +54,7 @@ const t0 = Date.now();
 const run = runMiner({ runSeed, batchSize, finalistCount, keeps, corner, davisCode });
 const elapsedMs = Date.now() - t0;
 
-// The Queen's evidence over this run's finalists (prospecting.mjs):
+// The Queen's evidence over this run's finalists (queenEvidence.mjs):
 // her anchor is the keeps corpus handed to the run; the mined pool
 // is what she weighs. Telemetry only — it steers nothing here.
 const queen = queenEvidence(keeps, run.finalists.map((f) => ({
