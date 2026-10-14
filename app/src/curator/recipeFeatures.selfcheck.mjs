@@ -52,13 +52,43 @@ assert.deepStrictEqual(h.castCategories, ['unknown', 'user']);
   assert.strictEqual(Object.keys(n).length, 18, 'one number per RANDOMIZABLE_KEY');
   assert.strictEqual(n.count, 0, 'min → 0');
   assert.strictEqual(n.density, 1, 'max → 1');
-  assert.strictEqual(n.scaleMid, 0);
+  assert.strictEqual(n.scaleMid, 0, 'scale pair at the 0.1 floor → 0 (the floor, not a dead axis)');
   assert.strictEqual(n.rotateSpread, 1);
   for (const v of Object.values(recipeFeatures({ layoutParams: { count: 'x', scale: 'big' } }).num)) {
     assert.ok(Number.isFinite(v) && v >= 0 && v <= 1, 'hostile input stays in 0–1');
   }
   assert.deepStrictEqual(Object.keys(n), Object.keys(recipeFeatures().num), 'stable key order');
-  assert.strictEqual(FEATURES_VERSION, 3);
+  assert.strictEqual(FEATURES_VERSION, 4);
+}
+
+// v4 (#1545): scaleMid reads the real {x, y} scale — the X pair, the
+// bucket path's convention — normalized on 0.1–3.0 like its siblings.
+// Under v3 this axis was structurally 0 for every normalized recipe
+// (the reader indexed the legacy array shape after #1202); the pins
+// below are the measured values from the fixed code, not the formula.
+{
+  const mid = (lp) => recipeFeatures({ layoutParams: lp }).num.scaleMid;
+  assert.strictEqual(mid({ scale: [1.55, 1.55] }), 0.5, 'a mid-scale recipe reads a mid scaleMid');
+  assert.strictEqual(mid({ scale: [3.0, 3.0] }), 1, 'the top pair pins to 1');
+  assert.strictEqual(mid({ scale: [0.1, 3.0] }), 0.5, 'the pair MID is read, not an end');
+  assert.strictEqual(mid({ scale: { x: [0.2, 2.9], y: [0.1, 0.1] } }), 0.5,
+    'object scale reads the X pair — y does not leak in');
+  assert.strictEqual(recipeFeatures().num.scaleMid, 0.3103, 'the default recipe reads its real mid');
+  // corpus ladder: 40 X pairs [v, v] spanning the full 0.1–3.0 range —
+  // the histogram is pinned to the measured run on the fixed code; the
+  // mid-band must be populated (under v3 every rung read 0).
+  const bands = [0, 0, 0, 0, 0];
+  for (let i = 0; i < 40; i++) {
+    const m = mid({ scale: [0.1 + (i * 2.9) / 39, 0.1 + (i * 2.9) / 39] });
+    if (m === 0) bands[0]++;
+    else if (m <= 0.25) bands[1]++;
+    else if (m <= 0.5) bands[2]++;
+    else if (m <= 0.75) bands[3]++;
+    else bands[4]++;
+  }
+  assert.deepStrictEqual(bands, [1, 9, 10, 10, 10],
+    'ladder histogram: only the floor rung reads 0; every band above it is populated');
+  assert.ok(bands[2] + bands[3] > 0, 'the scale mid-band is non-zero across the corpus ladder');
 }
 
 console.log('recipeFeatures.selfcheck: OK');
