@@ -5,14 +5,22 @@
 //
 //   node scripts/exploreRun.mjs [--seed 0x1506] [--batch 240]
 //       [--finalists 12] [--keeps <ledger-export.json>] [--out <dir>]
+//       [--corner <profileId|wilderness>] [--davis <CODE>]
+//
+// E4 (#1508): --corner aims the run at one named prospecting corner
+// (default: the rotation); --davis <CODE> lets Davis's state steer
+// the dealing wildness (UGLY/FLOW/… — wildnessForDavis).
 //
 // Run folder:
 //   REPORT.md       the readable run report (yield, coverage, quota
-//                   proof, spread vs the dice tray)
+//                   proof, spread vs the dice tray, LOIS verdicts,
+//                   the Queen's evidence)
 //   run.json        config + the report object (machine-readable)
 //   candidates.json every baked candidate: record + features + stats
 //   finalists.json  the finalist records alone (#1140 shape +
 //                   provenance — what E3's tray will read)
+//   verdicts.jsonl  LOIS's keep/pass ledger for the run: one line per
+//                   judged finalist, judge-marked, with provenance
 //   stills/         one PNG per finalist (the composed bake, full
 //                   size) + its SVG source
 //
@@ -27,6 +35,7 @@ import { resolvePalette } from '../src/data/palettes.js';
 import {
   runMiner, formatMinerReport, renderStillPng, composeStillSvg, stillHash,
 } from '../src/curator/miner.mjs';
+import { queenEvidence, formatQueenSection } from './queenEvidence.mjs';
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -38,10 +47,19 @@ const batchSize = Number(opt('batch', '240'));
 const finalistCount = Number(opt('finalists', '12'));
 const keepsPath = opt('keeps', null);
 const keeps = keepsPath ? JSON.parse(readFileSync(keepsPath, 'utf8')) : [];
+const corner = opt('corner', null);
+const davisCode = opt('davis', null);
 
 const t0 = Date.now();
-const run = runMiner({ runSeed, batchSize, finalistCount, keeps });
+const run = runMiner({ runSeed, batchSize, finalistCount, keeps, corner, davisCode });
 const elapsedMs = Date.now() - t0;
+
+// The Queen's evidence over this run's finalists (queenEvidence.mjs):
+// her anchor is the keeps corpus handed to the run; the mined pool
+// is what she weighs. Telemetry only — it steers nothing here.
+const queen = queenEvidence(keeps, run.finalists.map((f) => ({
+  layoutParams: f.sample.layoutParams, corner: f.sample.corner, index: f.sample.index,
+})));
 
 const outDir = opt('out', join('explorer-runs', run.runId));
 mkdirSync(join(outDir, 'stills'), { recursive: true });
@@ -62,12 +80,14 @@ const strip = ({ sample, features, stats, bakePath, fingerprint, fontContingent,
 });
 writeFileSync(join(outDir, 'candidates.json'), JSON.stringify(run.baked.map(strip), null, 2));
 writeFileSync(join(outDir, 'finalists.json'), JSON.stringify(run.finalists.map((f) => f.record), null, 2));
+writeFileSync(join(outDir, 'verdicts.jsonl'), run.verdicts.map((v) => JSON.stringify(v)).join('\n') + '\n');
 writeFileSync(join(outDir, 'run.json'), JSON.stringify({
   runId: run.runId,
   config: run.config,
   elapsedMs,
   bakesPerSecond: +(run.report.yield.baked / (elapsedMs / 1000)).toFixed(2),
   report: run.report,
+  queen,
   discards: run.discards,
   stills: stillIndex,
 }, null, 2));
@@ -76,6 +96,8 @@ writeFileSync(join(outDir, 'REPORT.md'), [
   '',
   '```',
   formatMinerReport(run),
+  '',
+  formatQueenSection(queen),
   '```',
   '',
   `Elapsed: ${(elapsedMs / 1000).toFixed(1)}s for ${run.report.yield.baked} bakes (${(run.report.yield.baked / (elapsedMs / 1000)).toFixed(2)} bakes/s, sampler + bake + measure + select, this machine).`,
