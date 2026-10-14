@@ -50,6 +50,7 @@ export function wireEventBus(rawDispatch) {
     if (fav.action === 'morph' && fav.favorite) return dispatch({ type: A.MORPH_TO_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'duplicate' && fav.id) return dispatch({ type: A.DUPLICATE_FAVORITE, id: fav.id });
     if (fav.action === 'reorder' && fav.id) return dispatch({ type: A.REORDER_FAVORITE, id: fav.id, delta: fav.delta || 0 });
+    if (fav.action === 'clear') return dispatch({ type: A.CLEAR_FAVORITES });
   });
   on(Events.DAVIS_FAVORITE_REMOVE, ({ id }) => dispatch({ type: A.REMOVE_FAVORITE, id }));
 

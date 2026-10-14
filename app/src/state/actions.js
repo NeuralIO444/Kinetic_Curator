@@ -60,6 +60,7 @@ export const SET_IS_RECORDING    = 'SET_IS_RECORDING';
 export const SET_IS_RENDERING    = 'SET_IS_RENDERING';
 export const ADD_FAVORITE      = 'ADD_FAVORITE';
 export const REMOVE_FAVORITE   = 'REMOVE_FAVORITE';
+export const CLEAR_FAVORITES  = 'CLEAR_FAVORITES'; // the HITS row: every pill at once (the keeps shelf stays)
 export const ADD_KEEP          = 'ADD_KEEP';
 export const ADD_PASS          = 'ADD_PASS'; // #1173
 export const RECALL_FAVORITE   = 'RECALL_FAVORITE';

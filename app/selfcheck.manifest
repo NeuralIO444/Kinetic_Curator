@@ -401,3 +401,4 @@ node src/gl/spectrumLive.selfcheck.mjs
 node src/gl/spectrumMarks.selfcheck.mjs
 node src/curator/mindConduct.selfcheck.mjs
 node src/curator/trioLive.selfcheck.mjs
+node src/state/hitsClear.selfcheck.mjs

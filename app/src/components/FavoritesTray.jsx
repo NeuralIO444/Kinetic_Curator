@@ -9,6 +9,7 @@ import { QUEUE_MAX_VISIBLE } from '../state/queueTransport.js';
 import { hitName, hitAge } from '../curator/hitName.js';
 import { bandsFor, hasFrozenBands } from '../curator/hitBands.js';
 import { parseFavoriteTimestamp } from '../curator/loisActivity.js';
+import { confirmClearHitsMessage } from './hitsCopy.mjs';
 
 const MAX_VISIBLE = QUEUE_MAX_VISIBLE; // #966 — the tray window IS the queue transport's setlist.
 
@@ -219,6 +220,12 @@ export function FavoritesTray() {
           );
         })}
       </div>
+      {/* every pill at once: the confirm states the count and that the keeps stay (components/hitsCopy.mjs) */}
+      <button type="button" className="favorites-tray-clear micro-btn" aria-label={`Clear all ${favorites.length} hits`}
+        title="Clear every hit from the setlist (your keeps stay)"
+        onClick={() => { if (window.confirm(confirmClearHitsMessage(favorites.length))) emit(Events.DAVIS_FAVORITE, { action: 'clear' }); }}>
+        clear
+      </button>
       {card && visible[card.i] && (() => {
         const f = visible[card.i];
         const key = f.id ?? `${f.seed}-${f.timestamp || ''}`;

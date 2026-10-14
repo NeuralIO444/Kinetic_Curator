@@ -118,6 +118,7 @@ export function applyAction(action, store = useStore.getState()) {
     case A.ADD_KEEP: return store.addKeep(action.keep);
     case A.ADD_PASS: return store.addPass(action.pass);
     case A.REMOVE_FAVORITE: return store.removeFavorite(action.id);
+    case A.CLEAR_FAVORITES: return store.clearFavorites();
     case A.RECALL_FAVORITE: return store.recallFavorite(action.favorite);
     case A.REORDER_FAVORITE: return store.reorderFavorite(action.id, action.delta);
     case A.DUPLICATE_FAVORITE: return store.duplicateFavorite(action.id);

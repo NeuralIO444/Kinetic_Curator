@@ -418,6 +418,15 @@ export const createDavisSlice = (set) => ({
     return { favorites };
   }),
   /**
+   * Every pill in the HITS row at once. The keeps ledger is the artist's own finds and stays (two-ledger rule): a
+   * pill is a place in the setlist, not a find. The queue goes back to the top.
+   */
+  clearFavorites: () => set((state) => {
+    if (!Array.isArray(state.favorites) || state.favorites.length === 0) return {};
+    persistFavorites([]);
+    return { favorites: [], queueIndex: 0 };
+  }),
+  /**
    * #1124 — a setlist copy: the same recipe right after the original, its own id. It is NOT a new keep: the keeps
    * ledger is the artist's own finds (two-ledger rule), and copying a pill is not finding anything.
    */
