@@ -10,6 +10,7 @@ import { useStore } from '../../state/store.js';
 import { nextRoute } from '../../data/audioRoutes.js';
 import { createBeatTracker } from '../../curator/beatConfidence.mjs';
 import { emit, Events } from '../../composition/eventBus.js';
+import { getGhost } from '../../curator/mindGhost.js';
 
 const H = 132;
 const WAVE_H = 52;
@@ -31,6 +32,11 @@ export function MeterHero() {
     // #1139 — beat-lock detector: two confident attacks (≥ 0.62). The amber
     // wash below is beat-lock only, in the DS amber (--kc-davis), never lean.
     const beatTracker = createBeatTracker();
+    // #1464 — a presence moves through the meter now and then: it warms, drifts or leans, never labelled. The target
+    // comes from the recorded decisions (getGhost); the meter eases toward it so it arrives and leaves softly.
+    let ghostS = 0;
+    let ghostKind = null;
+    let ghostBand = 0;
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const cv = canvasRef.current;
@@ -50,12 +56,17 @@ export function MeterHero() {
       const now = performance.now();
       const dt = (now - last) / 1000;
       last = now;
+      const gt = getGhost();
+      if (gt.strength > 0) { ghostKind = gt.kind; ghostBand = gt.band; }
+      ghostS += (gt.strength - ghostS) * Math.min(1, dt / 0.8);
+      if (ghostS < 0.002) { ghostS = 0; ghostKind = null; }
       const tap = getAudioMeterTap();
       const kind = tap ? (tap.kind === 'FILE' && sidecarRef.current ? 'FILE+ENV' : tap.kind) : 'IDLE';
       if (kind !== shownSource) { shownSource = kind; setSource(kind); }
 
       // waveform
       const wh = WAVE_H * dpr;
+      const drift = (u) => (ghostKind === 'drift' ? Math.sin(now * 0.0011 + u * 5.5) * ghostS * 9 * dpr : 0);
       g.strokeStyle = tap ? ink : dim;
       g.lineWidth = 1.2 * dpr;
       g.beginPath();
@@ -65,9 +76,11 @@ export function MeterHero() {
         tap.analyser.getByteTimeDomainData(wave);
         for (let i = 0; i < n; i++) {
           const x = (i / (n - 1)) * w;
-          const y = (wave[i] / 255) * wh;
+          const y = (wave[i] / 255) * wh + drift(i / (n - 1));
           if (i) g.lineTo(x, y); else g.moveTo(x, y);
         }
+      } else if (ghostKind === 'drift') {
+        for (let i = 0; i <= 48; i++) { const x = (i / 48) * w; const y = wh / 2 + drift(i / 48); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
       } else {
         g.moveTo(0, wh / 2); g.lineTo(w, wh / 2);
       }
@@ -94,6 +107,17 @@ export function MeterHero() {
         g.fillRect(x, top, bw, barH);
         g.fillStyle = ink;
         g.fillRect(x, top + barH * (1 - levels[i]), bw, barH * levels[i]);
+        if (ghostKind === 'warm' && ghostS > 0) { // the graph warms
+          g.fillStyle = `rgba(255, 150, 110, ${(0.45 * ghostS).toFixed(3)})`;
+          g.fillRect(x, top + barH * (1 - Math.max(levels[i], 0.08)), bw, barH * Math.max(levels[i], 0.08));
+        }
+        if (ghostKind === 'lean' && ghostS > 0 && i === ghostBand) { // one meter leans
+          const lean = barH * 0.22 * ghostS;
+          g.fillStyle = ink;
+          g.globalAlpha = 0.5 * Math.min(1, ghostS * 2);
+          g.fillRect(x, top + barH * (1 - levels[i]) - lean, bw, lean);
+          g.globalAlpha = 1;
+        }
         if (peaks[i] > 0.01) {
           g.fillStyle = accent;
           g.fillRect(x, top + barH * (1 - peaks[i]) - dpr, bw, 2 * dpr);

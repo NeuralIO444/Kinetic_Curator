@@ -45,6 +45,8 @@ import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
 import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
 import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
+import { createPresenceDriver } from './curator/mindPresenceLive.js'; // #1464: Mind 3 — engagement tiers + zodiac
+import { startGhost, resetGhost } from './curator/mindGhost.js'; // #1464: the third's presence on the Stimuli meter
 import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/playback.mjs'; // #1462: a take's decisions replay
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
@@ -69,7 +71,7 @@ const COLUMN_FRACTIONS = [0.62, 0.38];
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
 import { wireEventBus } from './composition/wireEventBus.js';
 import { subscribeDispatch } from './composition/dispatchPipe.js';
-import { loisActivity } from './curator/loisActivity.js';
+import { loisActivity, LOIS_VIBE_DWELL_MS } from './curator/loisActivity.js';
 
 function AppInner() {
   const { dispatch: rawDispatch, history, palette, glLoopRef } = useApp();
@@ -139,7 +141,22 @@ function AppInner() {
       info: () => (apple ? apple.info() : null),
       ask: (...a) => (apple ? apple.ask(...a) : Promise.reject(new Error('unavailable'))),
     };
+    // #1464 — Mind 3: hidden per-persona engagement (persisted on this machine), four tiers, the zodiac character and
+    // one startup calendar reading. Works the same on Apple and on the rules.
+    const stopGhost = startGhost();
+    const presence = createPresenceDriver({
+      getSignals: () => {
+        const f = loisActivity.snapshot();
+        const st = useStore.getState();
+        return {
+          active: !f.away && !f.tabHidden, dwelling: f.dwellMs >= LOIS_VIBE_DWELL_MS, audio: !!st.audioEnabled,
+          keeps: Array.isArray(st.keeps) ? st.keeps.length : 0, exports: f.exportCount,
+          returns: (f.recallCount || 0) + (f.bloomReturnCount || 0), evolves: f.evolveCount,
+        };
+      },
+    });
     const stopMind = startMind({
+      presence,
       isReplaying: isPlaybackActive,
       model: DEBUG_MIND ? demoModel : appleModel,
       getSeed: () => useStore.getState().seed,
@@ -155,7 +172,7 @@ function AppInner() {
     });
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     setPlaybackFrameTap((frame, perf, o) => replayMindFrame(frame, perf && perf.mind, o));
-    const offPlayback = subscribePlayback(() => { endMindReplay(); resetMindFaces(); }); // a take starts or ends: fresh faces
+    const offPlayback = subscribePlayback(() => { endMindReplay(); resetMindFaces(); resetGhost(); }); // a take starts or ends: fresh faces
     // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
     // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
     const set = createSet({
@@ -173,7 +190,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopGhost(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

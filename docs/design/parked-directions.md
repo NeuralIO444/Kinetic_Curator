@@ -18,6 +18,7 @@ of the repo. This file is the reviewed version; where it differs from the origin
 2. **On-device models only, MLX first.** The "no live AI inside the app" principle is read as "no cloud AI". Models are allowed if they run on the Mac: MLX first, Apple Intelligence later behind the same interface through a Swift helper (Apple's model is not reachable from the web view). Every model decision is recorded so a replay never calls it, and a rule-based backend is the fallback forever. Matt confirmed the wording 2026-10-13 and moved the model path to Apple Intelligence first (#1463); the roadmap now reads "No cloud AI".
 3. **The Queen eases the tempo, only while her mark shows.** The mark beside BEAT (`SwayMark`) is her presence. When audio gives a confident tempo she may ease the BEAT BPM toward it by a small bounded step per phrase, and only while her mark is visible. The button shows the new BPM. A BPM the artist sets by hand always wins and silences her. She stays unnamed.
 4. **Replay is in the product:** load a take, play it back with the personas muted, scrub by bar.
+5. **Her visibility is loosened for presence, not for naming** (2026-10-13, #1464): at higher tiers she moves through the Stimuli panel (the meter warms, drifts or leans) without a label. Tier 1 is near-silent and deniable. She is still never named on any surface.
 
 ## Corrections to the original
 
@@ -37,6 +38,7 @@ of the repo. This file is the reviewed version; where it differs from the origin
 4. **Replay playback:** load a take, mute personas, scrub by bar.
 5. **Mind:** a `think(context)` interface on each persona with a rules backend first; a `kc-mind` MLX sidecar over localhost; a reply schema per persona; `mind:status`; at most one request in flight per persona and one decision per bar; a reply more than 2 bars late is dropped.
 6. Apple Intelligence backend through a Swift helper.
+7. **Mind 3, the personality layer (#1464):** hidden per-persona engagement scores (persisted on the machine, decaying over long absences, readable only in the dev panel's MIND tab), four tiers that govern how often and how strongly each persona shows herself and how long LOIS and Davis may speak, cool-down instead of demotion, the zodiac character (Davis Gemini, LOIS Cancer, the third Capricorn) modulated by one startup calendar reading, and the third's ghost on the Stimuli meter. Runs the same on the rules as on Apple; every shaping is recorded in the take (`traits`, mind record v2).
 
 ## Still open
 
