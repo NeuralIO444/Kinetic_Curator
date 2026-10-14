@@ -31,7 +31,7 @@ import { useStore } from './state/store.js';
 import { useMetroPulse } from './hooks/useMetroPulse.js';
 import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
-import { initDirectorBeat } from './curator/director.js'; // #1145
+import { initDirectorBeat, setPresenceProvider } from './curator/director.js'; // #1145
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
 import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
@@ -157,6 +157,7 @@ function AppInner() {
         };
       },
     });
+    setPresenceProvider(presence.third); // #1145 × Mind 3: her tier (earned, honest) scales her hand in the Director
     const stopMind = startMind({
       presence,
       isReplaying: isPlaybackActive,
@@ -192,7 +193,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopGhost(); stopRoom(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

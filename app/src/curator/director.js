@@ -174,11 +174,36 @@ export const NEUTRAL_GAINS = Object.freeze({
   room: null,
 });
 
+// ─── her presence (#1145 × Mind 3, 2026-10-14) ──────────────────────────────
+// The third's hand grows with her Mind 3 tier, which is earned from honest engagement (never from a model): people who
+// play KC-1 longer get more of her. The room's sway_allowance is multiplied by her presence; cool-down softens it.
+// With no presence wired (tests, or before the app starts it) the scale is 1: exactly today's allowance.
+export const PRESENCE_SCALE = Object.freeze({ 1: 0.5, 2: 0.7, 3: 0.85, 4: 1 });
+export const PRESENCE_COOL = 0.6;
+
+/** The allowance multiplier for her presence { tier 1..4, cool }, or 1 when there is none. Never throws. */
+export function presenceScale(presence) {
+  if (!presence || typeof presence !== 'object') return 1;
+  const s = PRESENCE_SCALE[presence.tier];
+  if (!Number.isFinite(s)) return 1;
+  return presence.cool === true ? s * PRESENCE_COOL : s;
+}
+
+let presenceProvider = null;
+/** The app hands the Director a reader of her presence (() => { tier, cool }). Injected: the Director imports no mind. */
+export function setPresenceProvider(fn) {
+  presenceProvider = typeof fn === 'function' ? fn : null;
+}
+/** Her presence right now, or null (unwired, or the reader threw). */
+export function currentPresence() {
+  try { return presenceProvider ? presenceProvider() : null; } catch { return null; }
+}
+
 /**
- * Pure: room + phase → gains. No state, no signals — the scheduler's mind
+ * Pure: room + phase (+ her presence) → gains. No state, no signals — the scheduler's mind
  * without its eyes. Null room (either Director stateless) → NEUTRAL_GAINS.
  */
-export function directorGains({ loisCode = null, davisCode = null, phase = null } = {}) {
+export function directorGains({ loisCode = null, davisCode = null, phase = null, presence = null } = {}) {
   const room = roomFor(loisCode, davisCode);
   const row = rowFor(loisCode, davisCode);
   if (!room || !row) return NEUTRAL_GAINS;
@@ -189,7 +214,7 @@ export function directorGains({ loisCode = null, davisCode = null, phase = null 
     temperature: effectiveTemp({ room: row, phase }),
     kinWeight: Math.min(2, Math.max(0.25, row.kin_weight)),
     loisWeight,
-    swayAllowance: SWAY_GATE_OPEN ? row.sway_allowance : 0,
+    swayAllowance: SWAY_GATE_OPEN ? clamp01(row.sway_allowance * presenceScale(presence)) : 0,
     tiltLimit: TILT_GATE_OPEN && phase === 'explore' ? row.tilt_limit : 0,
     intensityBudget: row.intensity_budget,
     relaxSeconds: row.relax_seconds,
@@ -257,6 +282,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
       loisCode: face ? face.code : null,
       davisCode: davis ? davis.code : null,
       phase,
+      presence: currentPresence(),
     });
     lastAllowance = base.swayAllowance;
     lastTilt = base.tiltLimit;
