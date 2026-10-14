@@ -8,6 +8,10 @@
 //   - `mind:status` { available, backend } says which backend is answering (for the dev panel; no UI announces it)
 //   - while a take plays back the personas are muted: nothing thinks, and the take's own decisions are re-published
 //     from its record (replayMindFrame), so a replay never calls a backend
+//   - #1464 Mind 3: an optional `presence` (mindPresenceLive.js) carries each persona's engagement tier and zodiac into
+//     her own context, and shapes every decision (frequency, strength, line length, her own moves, the third's ghost)
+//     before it is published; the shaping is written into the decision's `traits` and recorded. Without one, Mind 1/2
+//     behave exactly as before.
 import { on, emit, emitOn, Events } from '../composition/eventBus.js';
 import { buildContext } from './mindContext.js';
 import { createThinker } from './mindThinker.js';
@@ -36,7 +40,7 @@ export function contextHash(ctx) {
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
-const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, invented: d.invented, reply: d.reply });
+const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, invented: d.invented, reply: d.reply, ...(d.traits ? { traits: d.traits } : {}) });
 
 /**
  * @param getSnapshot () => the plain object buildContext takes
@@ -45,9 +49,11 @@ const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, 
  *                    the model backend: the Apple Intelligence helper (Mind 2, #1463, name 'apple'), or the ?debug=mind
  *                    demo (name 'demo'). Absent = rules only. The name is what the books record.
  * @param isReplaying () => boolean: a take is playing back (the personas are muted)
+ * @param presence    optional { beforeBar(bar), contextFor(persona) => { tier, zodiac? }, shape(decision, context) => decision }
+ *                    (#1464 Mind 3). Absent = no personality layer.
  * @returns stop()
  */
-export function startMind({ getSnapshot, getSeed, model = null, isReplaying = () => false, log = () => {} }) {
+export function startMind({ getSnapshot, getSeed, model = null, isReplaying = () => false, presence = null, log = () => {} }) {
   const name = model && model.name === 'demo' ? 'demo' : 'apple';
   const available = () => { try { return !!(model && model.available()); } catch { return false; } };
   // #1463 — every model ask is announced (mind:req) and every answer reported (mind:reply: the validated reply or
@@ -85,20 +91,24 @@ export function startMind({ getSnapshot, getSeed, model = null, isReplaying = ()
     try { replaying = !!isReplaying(); } catch { replaying = false; }
     if (replaying) return; // muted: the take's record speaks for the personas
     publishStatus();
-    let ctx;
-    try { ctx = buildContext(getSnapshot()); } catch { return; }
+    let snap; let ctx;
+    try { snap = getSnapshot(); ctx = buildContext(snap); } catch { return; }
+    if (presence) { try { presence.beforeBar(p.bar); } catch { /* the personality layer must not stop the personas */ } }
     const seed = ((Number(getSeed()) >>> 0) ^ Math.imul(p.bar + 1, 0x9e3779b1)) >>> 0; // the document seed, the bar
-    for (const t of thinkers) {
-      const d = t.onBar({ bar: p.bar, context: ctx, seed });
-      if (!d) continue;
+    thinkers.forEach((t, i) => {
+      let pctx = ctx;
+      if (presence) { try { pctx = buildContext({ ...snap, ...presence.contextFor(PERSONAS[i]) }); } catch { pctx = ctx; } }
+      let d = t.onBar({ bar: p.bar, context: pctx, seed });
+      if (!d) return;
+      if (presence) { try { d = presence.shape(d, pctx) || d; } catch { /* unshaped, never lost */ } }
       const requested = wantsStage(d.persona, d.reply, ctx.room);
       emit(Events.MIND_DECISION, d, { cause: 'mind' });
       if (d.backend === 'rules') emit(Events.MIND_REPLY, { persona: d.persona, bar: d.bar, backend: 'rules', latencyMs: 0, reply: d.reply }, { cause: 'mind' });
       if (requested) emitOn('bar', Events.MIND_REQUEST, requestOf(d), { cause: 'mind' });
       if (tap !== null) { try { tap(d, requested); } catch { tap = null; } }
-    }
+    });
   });
-  return () => { off(); thinkers.forEach((t) => t.reset()); status = null; system = null; };
+  return () => { off(); thinkers.forEach((t) => t.reset()); status = null; system = null; if (presence && typeof presence.stop === 'function') { try { presence.stop(); } catch { /* best effort */ } } };
 }
 
 let replay = null; // { record, cursor }

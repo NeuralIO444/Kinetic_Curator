@@ -150,6 +150,8 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1145: developer trace flag for the Director scheduler (off by default), never project content",
   "kc:strata-last-add":
     "#1203: per-machine UI preference — the stratum type the ADD STRATUM one-tap replays",
+  "kc:mind:presence":
+    "#1464: the personas' hidden engagement with the player on this machine; earned here, never carried in a project",
 });
 
 /**

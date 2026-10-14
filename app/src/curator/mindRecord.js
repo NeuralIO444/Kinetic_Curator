@@ -1,13 +1,18 @@
 // mindRecord.js — #1462 Mind 1: a take carries every persona decision verbatim, so a replay never calls a backend.
 //
-// Each row: [frame, persona, bar, backend, seed, invented (0|1), request (0|1), reply]. `invented` keeps the books
+// Each row: [frame, persona, bar, backend, seed, invented (0|1), request (0|1), reply, traits?]. `invented` keeps the books
 // honest (an invented state is never passed off as a measured verdict); `request` says whether the decision asked the
 // stage for something (mind:request on the next downbeat). THE LOG WINS like the other take sections: on playback
 // these rows are re-published as they were, and no backend — not even the rules — is asked again.
 import { validateReply, isInvented, PERSONAS } from './mindContract.js';
 import { BACKENDS } from './mindThinker.js';
+import { checkTraits } from './mindPresence.js';
 
-export const MIND_RECORD_VERSION = 1;
+// #1464 Mind 3: a row may carry a 9th column, the personality layer's traits (tier, eased level, cool-down, her own
+// move, a rest, the third's presence), so a take explains every behaviour from what it recorded. A take with traits is
+// version 2; version 1 takes (8 columns) still play.
+export const MIND_RECORD_VERSION = 2;
+const VERSIONS = [1, 2];
 /** A take is at most 20 minutes of frames; three personas, one decision a bar, stays far below this. */
 export const MIND_RECORD_MAX = 20000;
 
@@ -23,8 +28,10 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
     /** A decision as mindLive published it, and whether it asked the stage for something. */
     update(d, requested) {
       if (!d || rows.length >= MIND_RECORD_MAX) return;
-      rows.push([getFrame() | 0, d.persona, d.bar, d.backend, d.seed >>> 0, d.invented ? 1 : 0, requested ? 1 : 0,
-        JSON.parse(JSON.stringify(d.reply))]);
+      const row = [getFrame() | 0, d.persona, d.bar, d.backend, d.seed >>> 0, d.invented ? 1 : 0, requested ? 1 : 0,
+        JSON.parse(JSON.stringify(d.reply))];
+      if (d.traits) row.push(JSON.parse(JSON.stringify(d.traits)));
+      rows.push(row);
       if (d.backend !== 'rules' && !systems[d.backend]) {
         let s;
         try { s = getSystem(); } catch { s = null; }
@@ -32,14 +39,14 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
       }
     },
     finish() {
-      return { version: MIND_RECORD_VERSION, decisions: rows.map((r) => r.slice()), ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}) };
+      return { version: rows.some((r) => r.length === 9) ? 2 : 1, decisions: rows.map((r) => r.slice()), ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}) };
     },
   };
 }
 
 /** Fail-closed check: the record, or null. Every reply must still pass the contract; frames must not go backwards. */
 export function checkMindRecord(r) {
-  if (!r || typeof r !== 'object' || r.version !== MIND_RECORD_VERSION || !Array.isArray(r.decisions)) return null;
+  if (!r || typeof r !== 'object' || !VERSIONS.includes(r.version) || !Array.isArray(r.decisions)) return null;
   if (r.decisions.length > MIND_RECORD_MAX) return null;
   if (r.systems !== undefined) { // #1463 — optional: the model/system each non-rules backend ran on
     if (!r.systems || typeof r.systems !== 'object' || Array.isArray(r.systems)) return null;
@@ -50,8 +57,9 @@ export function checkMindRecord(r) {
   }
   let prev = -1;
   for (const d of r.decisions) {
-    if (!Array.isArray(d) || d.length !== 8) return null;
-    const [frame, persona, bar, backend, seed, invented, request, reply] = d;
+    if (!Array.isArray(d) || !(d.length === 8 || (d.length === 9 && r.version === 2))) return null;
+    const [frame, persona, bar, backend, seed, invented, request, reply, traits] = d;
+    if (d.length === 9 && !checkTraits(traits)) return null;
     if (!Number.isInteger(frame) || frame < prev || !PERSONAS.includes(persona) || !Number.isInteger(bar)) return null;
     if (!BACKENDS.includes(backend) || !Number.isInteger(seed) || (invented !== 0 && invented !== 1)) return null;
     if (request !== 0 && request !== 1) return null;
@@ -64,8 +72,8 @@ export function checkMindRecord(r) {
 
 /** A row back to the decision mindLive published. */
 export function decisionOf(row) {
-  const [, persona, bar, backend, seed, invented, , reply] = row;
-  return { persona, bar, backend, seed, invented: invented === 1, reply: JSON.parse(JSON.stringify(reply)) };
+  const [, persona, bar, backend, seed, invented, , reply, traits] = row;
+  return { persona, bar, backend, seed, invented: invented === 1, reply: JSON.parse(JSON.stringify(reply)), ...(traits ? { traits: JSON.parse(JSON.stringify(traits)) } : {}) };
 }
 
 /**
