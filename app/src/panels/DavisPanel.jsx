@@ -129,8 +129,8 @@ export function DavisPanel() {
           <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
 
-          <div className="davis-section-label ttl with-action">
-            <span>generate</span>
+          <div className="davis-label-row">
+            <div className="davis-section-label ttl bare">generate</div>
             {/* #1507 — the mined tray's load control rides this existing
                 label row (zero added height: the DIRECTORS panel has a
                 no-scroll fit contract). The tray itself sits below
