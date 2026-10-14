@@ -98,5 +98,7 @@ export function createPresenceDriver({ getSignals, storage = globalThis.localSto
     /** For the selfcheck. */
     get reading() { return reading; },
     engagement: (p) => book.get(p),
+    /** The third's presence for the Director (#1145): { tier, cool } — earned from honest engagement only. */
+    third: () => { const e = book.get(PERSONAS[2]); return { tier: e.tier, cool: e.cool }; },
   };
 }

@@ -7,7 +7,7 @@
 //
 // It can only NARROW (the width is a multiplier at most 1 on the band's width, which is what the roadmap calls the
 // band's range). No room (either Director stateless: silence is the default) is exactly step 2's width, 1.
-import { directorGains } from './director.js';
+import { directorGains, currentPresence } from './director.js';
 
 /** The kin_weight at which a room lets Davis use the band's whole width. Rooms above it are capped at 1. */
 export const KIN_FULL = 1.5;
@@ -26,7 +26,7 @@ export function roomWidthFor(gains) {
   return { width, room: { n: gains.room.n, lois: gains.room.lois, davis: gains.room.davis }, allowance };
 }
 
-/** The room's width from the two Directors' state codes (either null = no room = 1). */
-export function roomWidthFromCodes(loisCode, davisCode) {
-  return roomWidthFor(directorGains({ loisCode, davisCode }));
+/** The room's width from the two Directors' state codes (either null = no room = 1). The allowance carries her presence. */
+export function roomWidthFromCodes(loisCode, davisCode, presence = currentPresence()) {
+  return roomWidthFor(directorGains({ loisCode, davisCode, presence }));
 }
