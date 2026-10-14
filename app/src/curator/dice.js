@@ -19,6 +19,54 @@ export const DICE_CANDIDATES_WILD = 8;
 /** Finalists LOIS shortlists per roll. */
 export const DICE_FINALISTS = 3;
 
+/**
+ * #1546 (Q1 re-scope) — dealer-side stratification. The audit (E1a #1504)
+ * showed the funnel is not the scorer: the dealer deals role-first, and
+ * only categories carrying heavy/solid assets can ever take the lead pick,
+ * so whole families reach candidacy only as wild-card guests in foreign
+ * casts and starve at the finalist cut. The repair is in the DEAL, not the
+ * grade: a share of each roll's candidates are dealt as family-anchored
+ * casts — the first pick is drawn from a starved family's own pool, and
+ * the remaining members are dealt by the ordinary take sequence (lead,
+ * texture/accent, accent, texture, wild cards) around that anchor. The
+ * scorer is untouched: an anchored cast wins only on the score the
+ * persona gives it.
+ *
+ * The table is a static design input, derived from the step-0 engagement
+ * census over the audit stream (600 rolls, seed 0x1504, 2026-10-14):
+ * the families whose tray reach was under 25% of their library, weighted
+ * by never-tray asset count (the rescue weight). Order is alphabetical —
+ * the family walk below is order-sensitive, and this order is the one
+ * the census measured. A family that stops starving leaves the table
+ * only by a deliberate edit with a fresh census behind it (the coverage
+ * suite alarms on the shape either way).
+ */
+export const STRATIFIED_FAMILIES = [
+  { category: 'biosynthetic', weight: 11 },
+  { category: 'crystalline', weight: 10 },
+  { category: 'floral', weight: 13 },
+  { category: 'radial', weight: 25 },
+];
+/** Share of each roll's candidates dealt as family-anchored casts. */
+export const DICE_STRATIFIED_SHARE = 0.25;
+const STRATIFIED_WEIGHT_TOTAL = STRATIFIED_FAMILIES.reduce((s, f) => s + f.weight, 0);
+
+/**
+ * Which starved family anchors candidate `index` of a roll, as a pure
+ * function of values the roll has already drawn (layout id, cast size,
+ * candidate index) — no stream draws of its own, so an anchored candidate
+ * consumes exactly the stream a plain one does and every other candidate
+ * in the roll deals bit-identically to the unstratified dealer.
+ */
+export function stratifiedFamilyFor(layoutId, size, index) {
+  let x = ((fnv1a(`${layoutId}|${size}|${index}`) % 100000) / 100000) * STRATIFIED_WEIGHT_TOTAL;
+  for (const f of STRATIFIED_FAMILIES) {
+    x -= f.weight;
+    if (x <= 0) return f.category;
+  }
+  return STRATIFIED_FAMILIES[STRATIFIED_FAMILIES.length - 1].category;
+}
+
 /** Davis state code → wildness 0..1. UGLY sifts wide, FLOW stays close to home. */
 export function wildnessForDavis(code) {
   switch (code) {
@@ -115,19 +163,43 @@ function pickWeighted(pool, picked, crowns, rng, wildness) {
   return candidates[candidates.length - 1];
 }
 
-/** Deal one cast: roles first (lead/texture/accent), then wild cards to size. */
-export function dealCast(assets, size, rng, wildness, crowns) {
+/**
+ * Deal one cast: roles first (lead/texture/accent), then wild cards to size.
+ *
+ * #1546: when `anchorPool` is given (a starved family's assets, chosen by
+ * rollDice), the cast is family-anchored: the first pick is drawn from the
+ * anchor pool, and the ordinary take sequence fills the remaining slots
+ * around it — the lead take still deals, so the cast fields the same role
+ * grammar as any other and competes on score alone. The anchored path
+ * consumes exactly the stream the plain path does for the same size (the
+ * one displaced draw — the size-2 coin flip — is consumed explicitly), so
+ * anchoring one candidate never perturbs the dealing of any other.
+ */
+export function dealCast(assets, size, rng, wildness, crowns, anchorPool = null) {
   const picked = [];
   const take = (pred) => {
     const a = pickWeighted(poolFor(assets, pred), picked, crowns, rng, wildness);
     if (a && !picked.some((p) => p.id === a.id)) picked.push(a);
   };
-  if (size >= 2) {
-    take(isLead);
-    take(rng() < 0.5 ? isTexture : isAccent);
+  if (anchorPool && anchorPool.length) {
+    // pickWeighted draws once for any pool > 1; a 1-asset pool draws never,
+    // so consume the displaced draw to keep the stream aligned.
+    if (anchorPool.length === 1) rng();
+    const anchor = pickWeighted(anchorPool, picked, crowns, rng, wildness);
+    if (anchor && !picked.some((p) => p.id === anchor.id)) picked.push(anchor);
+    if (size >= 2 && picked.length < size) take(isLead);
+    if (size === 2) rng(); // the coin-flip draw the anchor + lead displaced
+    if (size >= 2 && picked.length < size) take(rng() < 0.5 ? isTexture : isAccent);
+    if (size >= 3 && picked.length < size) take(isAccent);
+    if (size >= 4 && picked.length < size) take(isTexture);
+  } else {
+    if (size >= 2) {
+      take(isLead);
+      take(rng() < 0.5 ? isTexture : isAccent);
+    }
+    if (size >= 3) take(isAccent);
+    if (size >= 4) take(isTexture);
   }
-  if (size >= 3) take(isAccent);
-  if (size >= 4) take(isTexture);
   while (picked.length < size) take(() => true); // wild cards: affinity does the curating
   return picked.map((a) => a.id);
 }
@@ -142,11 +214,21 @@ export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, 
   if (!scorer || typeof scorer.score !== 'function') throw new Error('[dice] scorer missing');
   const wildness = wildnessForDavis(davisCode);
   const n = DICE_CANDIDATES_BASE + Math.round(wildness * DICE_CANDIDATES_WILD);
+  // #1546: the last share of the roll's candidates are family-anchored
+  // (see STRATIFIED_FAMILIES). The choice costs no stream draws — it is a
+  // pure function of the layout, size, and candidate index already dealt.
+  const stratCount = Math.max(1, Math.round(n * DICE_STRATIFIED_SHARE));
   const candidates = [];
   for (let i = 0; i < n; i++) {
     const layout = STUB_VOICES[Math.floor(rng() * STUB_VOICES.length)];
     const size = castSizeFor(layout.id, rng, wildness);
-    const assetIds = dealCast(assets, size, rng, wildness, crowns);
+    let anchorPool = null;
+    if (i >= n - stratCount) {
+      const fam = stratifiedFamilyFor(layout.id, size, i);
+      const pool = assets.filter((a) => a.category === fam);
+      if (pool.length) anchorPool = pool;
+    }
+    const assetIds = dealCast(assets, size, rng, wildness, crowns, anchorPool);
     const candidate = { layoutId: layout.id, assetIds };
     candidates.push({ ...candidate, score: scorer.score(candidate) });
   }
