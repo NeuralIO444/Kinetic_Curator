@@ -33,6 +33,7 @@ import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesc
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
 import { dishMediumFor, mediumClingCapture, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module)
 import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
+import { dishTrailsFor, sampleTrailReadGradient, NO_TRAILS, TRAIL_GAIN } from './dishTrails.mjs'; // #1415 — trails: the stigmergy substrate (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -1077,6 +1078,14 @@ export class ParticleSystem {
     const attractorCurrents = contactRadius > 0
       ? dishCurrentsFor(gravityWells * attractMul * Math.abs(seekMul))
       : NO_CURRENTS;
+    // #1415 — the trail reading, resolved once per system-step (law in
+    // dishTrails.mjs): this stratum's own trail field and the session's
+    // total, behind the same gate C1 set (in the dish = contactRadius
+    // > 0). NO_TRAILS whenever the dish holds no substrate — ACCUM
+    // never up — and the read below then adds exactly zero.
+    const trails = contactRadius > 0
+      ? dishTrailsFor(layoutParams.dishSession || null, this)
+      : NO_TRAILS;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
     const sepRadius2 = sepRadius * sepRadius;
@@ -1359,6 +1368,19 @@ export class ParticleSystem {
         const g = SCENT.gradient(pxi / this.canvasW, pyi / this.canvasH);
         fax += (g.gx * profile.chemotaxis) / m;
         fay += (g.gy * profile.chemotaxis) / m;
+      }
+      // #1415 — stigmergy: climb this stratum's own trail gradient,
+      // descend the ground the other strata wore (the gradient algebra
+      // lives in dishTrails.mjs — 2·∇own − ∇total). A sense, like
+      // chemotaxis above: it joins the same pre-fatigue steering sum,
+      // so vigor damps it the same way, and the contact impulses in AX
+      // are never touched. Bounded by the field's saturation and
+      // TRAIL_GAIN: trails persuade, never steer. NO_TRAILS adds
+      // nothing — the branch is not even entered.
+      if (trails.on) {
+        const tg = sampleTrailReadGradient(trails, pxi / this.canvasW, pyi / this.canvasH);
+        fax += (tg.gx * TRAIL_GAIN) / m;
+        fay += (tg.gy * TRAIL_GAIN) / m;
       }
       if (drivesOn) {
         // Fatigue damps steering authority — tired creatures respond

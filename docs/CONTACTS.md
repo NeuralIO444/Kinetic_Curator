@@ -516,3 +516,109 @@ weather; heavy strata hold ground against it. The law lives in
   gate the currents: they follow the wind and attractor knobs
   wherever the dish runs, as C1's medium follows WETNESS. Wind 0
   and wells 0 are the offs, and they are exact.
+
+## Trails — ACCUM deposits, bodies read (#1415, petri dish C3)
+
+The dish remembers where bodies have been. With ACCUM up, moving
+bodies wear a fading trail into a shared ground; bodies in the
+dish read that ground — climbing their own stratum's worn paths,
+avoiding the ground other strata wore. Colonies self-organise
+along paths predecessors wore (stigmergy; the visual target is
+dendritic agar). The law lives in
+`app/src/engine/dishTrails.mjs`; `particles.js` takes the read
+call site only, the drivers take the tick.
+
+- **The substrate.** One trail field per accumulating stratum
+  (on its dish enrolment) plus one TOTAL field on the dish
+  session that receives every deposit. The grid is the #509
+  scent geometry — 64×36 over the normalized canvas, bilinear
+  sample, central-difference gradient — under its own law: no
+  diffusion (a worn path does not spread; a smell does).
+- **Deposits.** Per tick, a moving body lays TRAIL_DEPOSIT
+  (0.05) × clamp01(speed / TRAIL_SPEED_FULL 1.5 px/step) on the
+  nearest cell of its stratum's field and of the total, capped
+  at TRAIL_MAX (4) per cell. A still body lays nothing; a dead
+  slot lays nothing; a system that did not step since the last
+  tick lays nothing (the tick reads the system's own step
+  counter, so a paused live system or a finished bake layer can
+  lay no phantom trail). Deposits gate on the ACCUMULATION
+  switch — enrolment carries it, exactly as C1's enrolment
+  carries WETNESS — and on the C1 gate: an enrolment radius of
+  0 (DISH off, or no contacts) lays no trail even with ACCUM up.
+- **The read.** In the force pass, beside chemotaxis:
+  acceleration += ∇read × TRAIL_GAIN (0.004) / mass, where
+  ∇read = 2·∇own − ∇total — climb the own stratum's gradient,
+  descend everyone else's, with the others-field never
+  materialised (total − own is everyone else by construction).
+  Group is the stratum, B2's ratified family. The read is not
+  ACCUM-gated — the issue gates the deposit — so a stratum that
+  lays nothing still reads, as pure avoidance through an empty
+  own field; it resolves through the enrolment, so a DISH-off
+  stratum (enrolled radius 0) neither lays nor reads. The term joins the pre-fatigue steering sum, so the
+  bio-drives' vigor damps it exactly as it damps chemotaxis; the
+  gradient is bounded by the field's saturation, so the term
+  persuades and cannot steer. Reach is honest: a one-cell trail
+  pulls from ~2 cells away under bilinear sampling; a worn path
+  is a corridor of cells, and its pull is the corridor's.
+- **The tick.** Driver-side, once per step, on the #509 shared
+  scent protocol: the resolver ticks after every layer updated
+  (gated !slowRender, beside the scent step); the bake driver
+  ticks after each step's units. Deposits read post-integration
+  positions, so every force pass in a step reads one uniform
+  field, and the field is a pure function of (seed, params,
+  steps) — no clock, no dice. Inside a tick: fade, then deposit.
+- **The fade.** Geometric per tick, × TRAIL_FADE (0.99), with a
+  snap: below TRAIL_EPS (0.001) a cell becomes exactly 0, so
+  "fades to zero on schedule" is exact — a saturated cell
+  reaches zero at tick 826 (~14s at 60 Hz), derived from the
+  constants and asserted by the suite (alive at 825, zero at
+  826).
+- **The ground remembers.** A stratum's release does NOT
+  subtract its deposits from the total: the trail outlives the
+  stratum, which is the predecessor case the acceptance probe
+  runs. The memory ends only at the state-purity events — the
+  resolver wipes the fields on a genuine seed change (beside
+  the #425 weather reseed; a focus swap adopts and keeps the
+  ground, as it keeps the weather), and a bake's session is
+  born empty. B3's pigment belongs to bodies and dies with
+  them; a trail belongs to the ground.
+- **ACCUM off = pre-C3, exactly** (the acceptance line). If
+  ACCUM was never up, the total is never created, every read
+  resolves the frozen NO_TRAILS, and the suite proves a full
+  dish cast (contacts, medium, currents live) bit-identical
+  ticked vs unticked over 240 steps, with ACCUM on in the same
+  fixture differing.
+- **Acceptance, measured.** Successor generations, same seed:
+  a 20-body colony runs 300 steps and is released; a follower
+  colony re-seeded identically runs 240. Mean distance from
+  the follower's bodies to the predecessor's recorded path,
+  worn ground vs the trail-off control (predecessor accumulated
+  nothing): 8.9px vs 14.1px at the pinned seed; across a seed
+  sweep 29.3 vs 36.0, 6.0 vs 13.4, 11.0 vs 18.0 — the successor
+  organises along the predecessor's path at every seed, while
+  its mean speed stays in the control's family (the trails
+  persuade; they do not capture). Dose note: at twice the gain
+  the pinned-seed probe inverts — the pull starts steering and
+  the colony destabilises — which is why TRAIL_GAIN sits where
+  it does.
+- **Determinism & parity.** The bake enrols and ticks through
+  the same helpers as the resolver, so a baked dish wears and
+  reads trails: the suite's ACCUM bake repeats bit for bit and
+  is not the ACCUM-off bake; after a wipe, a live follower runs
+  bit-identical to the same follower in a virgin session.
+- **Stillness.** Trails are physics, not a render attribute
+  (the C1/C2 precedent): no reduced-motion split. Stillness
+  arrives honestly — no motion, no deposit, no gradient, no
+  pull — and under reduced motion the dish resolves once and
+  holds, so nothing is laid and nothing fades.
+- **Governor.** No cost tier and no shed — the C1/C2
+  precedent, followed deliberately: a shed that starved the
+  substrate mid-performance would desync the bake from the
+  live dish. The cost is bounded and declared: one 64×36
+  Float64 field per accumulating stratum plus the total, one
+  fade+deposit pass per tick, two gradient samples per body
+  per step inside a force pass that already samples fields.
+- **Switch.** No new knob: the ACCUMULATION switch is the
+  gate, per the issue's "with ACCUM up." ACCUM off is the off,
+  and it is exact.
+

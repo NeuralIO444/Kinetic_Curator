@@ -43,6 +43,7 @@
 
 import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
 import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
+import { ensureEntryTrails } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
 import { clampWetness, dishMediumFor, mediumClingCapture } from './dishMedium.mjs'; // #1413 — the medium across the seam
 
 const TAU = Math.PI * 2;
@@ -93,6 +94,11 @@ export function createDishSession() {
     // frame's field — or the empty one when no pass ran.
     density: null,
     densityTick: 0,
+    // #1415 — the trail substrate's TOTAL field (engine/dishTrails.mjs):
+    // the ground's memory of every deposit, created lazily by the first
+    // accumulating enrolment and null until then — null is the dish's
+    // "ACCUM was never up" fact, and every trail read resolves off it.
+    trailTotal: null,
     // Grid scratch, grown on demand and reused across passes.
     _bEntry: [],
     _bIdx: null,
@@ -111,8 +117,11 @@ export function createDishSession() {
  *   wetness } — wetness is #1413: the stratum's medium (its
  *   accumulationWetness knob, clamped here at the boundary); a pair's
  *   medium is the two strata's average, like restitution below.
+ *   `accum` is #1415: the stratum's ACCUMULATION switch — truthy gives
+ *   the entry a trail field to deposit into (dishTrails.mjs); absent or
+ *   false enrols a reader that lays nothing.
  */
-export function enrolDishBody(session, { key, sys, radius, restitution, contactMode, umask, organism, wetness }) {
+export function enrolDishBody(session, { key, sys, radius, restitution, contactMode, umask, organism, wetness, accum }) {
   let e = session._bySys.get(sys);
   if (!e) {
     e = { key, sys, seq: session._seq++ };
@@ -128,6 +137,9 @@ export function enrolDishBody(session, { key, sys, radius, restitution, contactM
   e.umask = (umask ?? 0xffffffff) >>> 0;
   e.organism = !!organism;
   e.wetness = clampWetness(wetness); // absent/junk enrols dry (pre-C1)
+  // #1415 — an accumulating stratum deposits trails; enrolment creates
+  // its field (and the session's total) here so the first tick can lay.
+  if (accum) ensureEntryTrails(session, e);
   return e;
 }
 

@@ -17,6 +17,7 @@
 import { ParticleSystem } from '../../particles.js';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './index.js';
 import { createDishSession, enrolDishBody, armDish, dishEnrolRadius } from '../../dishContacts.mjs';
+import { tickDishTrails } from '../../dishTrails.mjs'; // #1415 — the trail substrate ticks once per bake step (the law lives in the module)
 import { isOrganismMode } from '../../../data/layout-modes.js';
 
 /**
@@ -63,6 +64,10 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
       // resolver enrols it (see liveResolve.mjs): a wet bake settles
       // like the wet live dish, never a drier fiction.
       wetness: layer.layoutParams.accumulationWetness,
+      // #1415 — the stratum's ACCUMULATION switch, enrolled exactly as
+      // the live resolver enrols it: an accumulating stratum deposits
+      // trails in the bake on the same terms as live.
+      accum: !!layer.layoutParams.accumulation,
     });
     keys.push(layer.key);
     return { layer, sys, params, steps: layer.steps ?? steps };
@@ -76,6 +81,12 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
       u.sys.update(u.params, u.layer.activeAssets, u.layer.palette,
         u.layer.seed, BAKE_TIME_ORIGIN + s * dt, attractor, u.layer.seedOffsets ?? null);
     }
+    // #1415 — the trail substrate ticks once per step, after every
+    // unit's update, exactly as the live resolver ticks once per frame
+    // after its layer loop: deposits read post-integration positions,
+    // and a finished unit (skipped above) lays no phantom trail — the
+    // tick's step-counter guard sees its frozen _step.
+    tickDishTrails(session);
   }
 
   const out = new Map();
