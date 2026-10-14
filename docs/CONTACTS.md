@@ -361,3 +361,72 @@ stamps it, the resolver publishes it, the shell puts it on the bus.
 - **Parity.** The field is a pure function of the pass, so the bake
   driver computes identical fields on its own session for identical
   steps (it simply never publishes to the live holder).
+
+## The medium — WETNESS as viscosity and cling (#1413, petri dish C1)
+
+The dish has weather now: the WETNESS knob (`accumulationWetness`,
+#970 — the watercolor word) is read by the contact engine as the
+medium the bodies move through. Wet → low restitution, high cling,
+slow damping; dry → bouncy, low adhesion. One knob, already on the
+instrument, no new vocabulary. The law lives in
+`app/src/engine/dishMedium.mjs`; both contact passes and the
+integrator take call sites only.
+
+- **The curves.** All three are pure functions of the clamped
+  wetness w, resolved once per call site by `dishMediumFor`:
+  restitution × (1 − w) (at full wet a bounce-mode pair meets
+  exactly as stick would); cling strength = smoothstep(w); drag
+  retention = 1 − 0.02·w per step, multiplied into the integrator's
+  damping in its own dt-correct pow form.
+- **Cling.** Surface tension (spec §4: WETNESS = surface tension +
+  friction). A contacting pair that is separating gives up a budget
+  of its separating normal velocity — capture =
+  min(vn, clingK × 0.9 px/step) — read on the post-impulse,
+  post-repel velocities, so a wet bounce can be recaptured by the
+  tension it lands in. A slow separation is held whole; a fast one
+  tears free having paid only the budget. Capture never exceeds
+  the separation, so tension can hold a pair but never pull one
+  together — no weld, no threshold.
+- **Composition.** The medium biases, the mode decides: restitution
+  curves only scale the bounce coefficient (stick is already 0),
+  cling acts on separation for every mode, and the approach-fired
+  events (swap/die/breed) are untouched — at full wet all three
+  still fire. Cross-strata pairs average the two strata's wetness,
+  exactly as A1 averages restitution; enrolment carries the field
+  (`wetness` on `enrolDishBody`, clamped at the boundary), and the
+  drag stays per-system in each stratum's own integrator.
+- **The gate.** The medium exists only where the dish does: the
+  curves are mapped inside the contacts gate (contactRadius > 0),
+  so a contact-less swarm — including the #970 watercolor finish
+  reading the same knob — is bit-identical to pre-C1.
+- **The dry law.** WETNESS=0 is the exact dry path: every curve is
+  the identity there (restK 1, clingK 0, retention 1), the dry
+  pair resolves no medium in the dish pass, and junk wetness
+  (absent, NaN, non-numeric) reads as dry. Pinned by
+  `dishMedium.selfcheck.mjs`: wetness-0 vs absent is bit-identical
+  through full updates in bounce and breed, and all 23 pre-existing
+  contact scenarios keep their pinned numbers.
+- **Settle.** Same seed, three wetness levels, residual kinetic
+  energy after 240 steps of the bake engine: strictly ordered
+  (wettest settles hardest, mid measurably below dry), nothing
+  frozen — the probe in `dishMedium.selfcheck.mjs` §(f).
+- **Determinism & parity.** The curves are stateless arithmetic on
+  a param — no step counter, no clock, no dice — and the bake runs
+  the same update(), so a wet bake settles exactly as the live wet
+  dish does (bakeDishParticles acts, and repeats bit for bit).
+- **Stillness.** The medium is a physics parameter, like
+  restitution itself — there is no render split to restrain. Under
+  reduced-motion the dish resolves once and holds (spec §7), so
+  nothing integrates and nothing accrues; when it steps, the
+  medium applies as in any bake.
+- **Governor.** The medium declares no cost tier and never sheds:
+  it is contact law, not a finish (restitution, repel, and the
+  shared grid register no tier either — the §7 ladder sheds
+  finishes, deform, radius fidelity, body counts). A shed that
+  rewrote physics mid-performance would break bake parity, since
+  bakes carry no governor state. Its cost is three curve
+  evaluations per system-step plus, when wet, a few flops per
+  contacting pair inside passes that already run.
+- **Switch.** No artist knob beyond WETNESS itself: the medium
+  follows the knob wherever contacts run. There is no update-level
+  off switch — dry is the off, and it is exact.

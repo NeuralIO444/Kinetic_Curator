@@ -31,6 +31,7 @@ import { runDishContacts, contactBodyRadius } from './dishContacts.mjs'; // #140
 import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mjs'; // #1410 — impact deform (call sites below; the law lives in the module)
 import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
+import { dishMediumFor, mediumClingCapture, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -575,13 +576,15 @@ export class ParticleSystem {
    * the same seed + params + step count always yields the same contacts.
    *
    * @param {object} ctx radius, restitution, repel, mode, umask, breedCap,
-   *   seed, organism, minScale, maxScale, minAlpha, maxAlpha
+   *   seed, organism, minScale, maxScale, minAlpha, maxAlpha, medium
+   *   (#1413 — the resolved dishMediumFor() curves; absent = dry)
    */
   _contactPass(ctx) {
     const {
       radius, restitution, repel, mode, umask, breedCap, seed, organism,
-      minScale, maxScale, minAlpha, maxAlpha, seedOffsets,
+      minScale, maxScale, minAlpha, maxAlpha, seedOffsets, medium,
     } = ctx;
+    const med = medium || DRY_MEDIUM; // #1413 — no medium handed in: the dry path
     const T = this._trig; // #1240 — trig source (native Math.* by default)
     const n0 = this.n;
     if (n0 < 2 || !(radius > 0)) return;
@@ -614,8 +617,10 @@ export class ParticleSystem {
     const CG = this.cgroup;
     const AI = this.assetIndex;
     const canImpulse = mode === 'bounce' || mode === 'stick';
-    // stick is bounce with restitution 0.
-    const e = mode === 'bounce' ? restitution : 0;
+    // stick is bounce with restitution 0. #1413 — the medium biases
+    // the bounce toward stick as the dish gets wetter (restK is 1
+    // when dry: the pre-C1 coefficient bit for bit).
+    const e = mode === 'bounce' ? restitution * med.restK : 0;
     const wantSwap = mode === 'swap';
     const wantDie = mode === 'die';
     const wantBreed = mode === 'breed';
@@ -706,6 +711,29 @@ export class ParticleSystem {
               VX[j] += nx * jr * w2;
               VY[j] += ny * jr * w2;
               dvI += jr * w1; dvJ += jr * w2;
+            }
+            // #1413 — cling: the wet medium's surface tension (law in
+            // dishMedium.mjs). Read on the post-impulse, post-repel
+            // velocities, so a wet bounce can be recaptured by the
+            // tension it lands in; the capture removes a budget of the
+            // separating normal velocity and never reverses it. Every
+            // mode: the medium biases, the mode decides — events below
+            // still key on the approach velocity, which cling (a
+            // separation effect) never touches. Dry (clingK 0) skips
+            // the branch entirely.
+            if (med.clingK > 0) {
+              const vnNow = (VX[j] - VX[i]) * nx + (VY[j] - VY[i]) * ny;
+              if (vnNow > 0) {
+                const cap = mediumClingCapture(med.clingK, vnNow);
+                if (cap > 0) {
+                  const jc = -cap / wSum;
+                  VX[i] -= nx * jc * w1;
+                  VY[i] -= ny * jc * w1;
+                  VX[j] += nx * jc * w2;
+                  VY[j] += ny * jc * w2;
+                  dvI += Math.abs(jc) * w1; dvJ += Math.abs(jc) * w2;
+                }
+              }
             }
             // #1410 — the dent: this resolution's impulse + pressure feed
             // both bodies' deform springs (law in dishDeform.mjs; this
@@ -1318,13 +1346,24 @@ export class ParticleSystem {
     // through the same damping, speed clamp, and wall handling. Skipped
     // entirely when contactRadius is 0: the swarm is then bit-identical to
     // the pre-contact engine (behaviour lock).
+    // #1413 — the medium, mapped here at the contact pass call site (law
+    // in dishMedium.mjs): this stratum's WETNESS (accumulationWetness,
+    // the #970 knob) resolves to curves that bias the pass (restitution,
+    // cling) and ride this step's integrator damping (drag). The medium
+    // exists only where the dish does — inside this same gate — so a
+    // contact-less swarm keeps the pre-C1 path bit for bit, and dry
+    // (WETNESS 0, the default) is the identity on all three curves.
+    let mediumDampRetention = 1;
     if (contactRadius > 0 && this.n > 1) {
+      const medium = dishMediumFor(layoutParams.accumulationWetness);
+      mediumDampRetention = medium.dampRetention;
       this._contactPass({
         radius: contactRadius,
         restitution: Math.max(0, Math.min(1, contactRestitution)),
         repel: Math.max(0, contactRepel),
         mode: CONTACT_MODES.includes(contactMode) ? contactMode : 'none',
         umask: collideMask >>> 0,
+        medium,
         // #167 — breed grows the population only under the quality cap.
         // Callers thread it in (useSwarmTick: caps.maxParticles; studio
         // bake: caps.maxParticles); without it breed only recycles dead
@@ -1343,7 +1382,10 @@ export class ParticleSystem {
 
     // Spine A (#387): dt-correct damping. pow(damp, 1.0) === damp
     // exactly at 60 fps, preserving selfcheck golden hashes.
-    const dampDt = Math.pow(damp, dtFrames);
+    // #1413 — the medium's drag multiplies in the same pow form;
+    // mediumDampRetention is exactly 1 unless this step ran a wet
+    // contact pass, so the dry path's product is bit-identical.
+    const dampDt = Math.pow(damp, dtFrames) * Math.pow(mediumDampRetention, dtFrames);
 
     for (let i = 0; i < numParticles; i++) {
       // #167 — dead particles (die) hold no state and integrate nothing.
