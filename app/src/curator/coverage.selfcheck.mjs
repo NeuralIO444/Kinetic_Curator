@@ -129,15 +129,15 @@ console.log(formatCoverageReport({ dice, doors, evolve, keeps, keepsNote }));
 const cat = Object.fromEntries(dice.categories.map((c) => [c.name, c]));
 assert.ok(dice.candidates.distinct >= 285, `dealer proposes broadly: ${dice.candidates.distinct}/294 candidates (audit 282-292 by seed)`);
 assert.ok(
-  dice.tray.neverCount >= 70 && dice.tray.neverCount <= 105,
-  `never-tray total in the audit band: ${dice.tray.neverCount} (audit 86; 8-seed sweep 82-91)`,
+  dice.tray.neverCount <= 40,
+  `never-tray ceiling: ${dice.tray.neverCount} (#1546 measured 31 on this stream; the pre-stratification audit was 86 — the ceiling alarms on a slide back toward starvation)`,
 );
-assert.ok(cat.radial.inTray <= 3, `radial near-zero: ${cat.radial.inTray}/26 in tray (audit 0 at seed 99; sweep 0-2)`);
-assert.ok(cat.crystalline.inTray <= 3, `crystalline near-zero: ${cat.crystalline.inTray}/12 in tray (audit 0 at seed 99; sweep 0-2)`);
-assert.ok(cat.floral.inTray <= 5, `floral near-zero: ${cat.floral.inTray}/15 (audit 2)`);
-assert.ok(cat.biosynthetic.inTray <= 5, `biosynthetic near-zero: ${cat.biosynthetic.inTray}/12 (audit 2)`);
+assert.ok(cat.radial.inTray >= 15, `radial reaches the tray: ${cat.radial.inTray}/26 (#1546 measured 25; pre-fix audit 0-2)`);
+assert.ok(cat.crystalline.inTray >= 6, `crystalline reaches the tray: ${cat.crystalline.inTray}/12 (#1546 measured 10; pre-fix audit 0-2)`);
+assert.ok(cat.floral.inTray >= 8, `floral reaches the tray: ${cat.floral.inTray}/15 (#1546 measured 13; pre-fix audit 2)`);
+assert.ok(cat.biosynthetic.inTray >= 7, `biosynthetic reaches the tray: ${cat.biosynthetic.inTray}/12 (#1546 measured 11; pre-fix audit 2)`);
 const haeckel = dice.packs.find((p) => p.name === 'haeckel');
-assert.ok(haeckel.inTray >= 1 && haeckel.inTray <= 12, `haeckel pack partially reachable: ${haeckel.inTray}/20 — its linework half deals, its radial half does not`);
+assert.ok(haeckel.inTray >= 15, `haeckel pack reachable: ${haeckel.inTray}/20 (#1546 measured 20 — its radial half deals now)`);
 assert.strictEqual(dice.layoutsReached, dice.library.layouts, 'every layout mode reaches the tray');
 assert.ok(dice.trios.meanPairwiseJaccard <= 0.1, `PA1: finalist trios stay distinct (mean overlap ${(dice.trios.meanPairwiseJaccard * 100).toFixed(1)}%, audit 1.7%)`);
 assert.ok(dice.trios.hiOverlapPct <= 0.02, `PA1: >=50%-overlap trios stay rare (${(dice.trios.hiOverlapPct * 100).toFixed(2)}%, audit 0.3%)`);
