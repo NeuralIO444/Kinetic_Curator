@@ -97,6 +97,7 @@ export const Events = {
   DAVIS_MUTATE_STREAM: 'davis:mutateStream', // #305: { group } | { reset: true }
   DAVIS_FAVORITE: 'davis:favorite',
   DAVIS_FAVORITE_REMOVE: 'davis:favoriteRemove',
+  EXPLORER_LOAD_RUN: 'explorer:loadRun', // #1507: the GENERATE label row asks the candidate tray to open its run-folder picker
   ACCUM_GESTURE: 'accum:gesture', // Phase A: { action: 'freeze'|'clear'|'swell', value? }
   CANVAS_BG_CYCLE: 'canvas:bgCycle', // #310: BG cycle lives in OUTPUT now
   LAYOUT_PARAM: 'layout:param',

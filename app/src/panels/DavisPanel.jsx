@@ -129,7 +129,18 @@ export function DavisPanel() {
           <VoiceTiles />
           <BehaveReadout layoutParams={layoutParams} />
 
-          <div className="davis-section-label ttl">generate</div>
+          <div className="davis-section-label ttl with-action">
+            <span>generate</span>
+            {/* #1507 — the mined tray's load control rides this existing
+                label row (zero added height: the DIRECTORS panel has a
+                no-scroll fit contract). The tray itself sits below
+                Evolve and opens its picker on this event. */}
+            <button type="button" className="micro-btn"
+              title="Load a mined run folder (Look Explorer) — its finalists open below Evolve for crowning"
+              onClick={() => emit(Events.EXPLORER_LOAD_RUN)}>
+              load run
+            </button>
+          </div>
           {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
           {hitCount === 0 && <div className="lois-line name">{LOIS_LINES.director}</div>}
           <div className="davis-actions davis-actions-3">
@@ -165,12 +176,10 @@ export function DavisPanel() {
 
           <EvolveProgress />
 
-          {/* #1507 — the mined candidates' curation view, beside the
-              favorite capture above: mining is morning-after curation,
-              judged by hand from a loaded run folder. The tray renders
-              its own section label (with the load control on the label
-              row) so the panel's no-scroll fit budget is spent on the
-              label alone until a run is actually loaded. */}
+          {/* #1507 — the mined candidates' curation view: at rest it
+              renders nothing (the panel's fit budget is spent on the
+              performance surface); once a run loads from the GENERATE
+              label row, its finalists render here for crowning. */}
           <CandidateTray />
 
           <div className="davis-section-label ttl">perform</div>

@@ -18,7 +18,7 @@
 // motion shows is exactly what full motion shows.
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
-import { emit, Events } from '../../composition/eventBus.js';
+import { emit, on, Events } from '../../composition/eventBus.js';
 import * as A from '../../state/actions.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { PALETTES } from '../../data/palettes.js';
@@ -44,6 +44,11 @@ export function CandidateTray() {
   const [loadNote, setLoadNote] = useState(null);
 
   useEffect(() => () => { for (const u of urlsRef.current) URL.revokeObjectURL(u); }, []);
+
+  // The load control lives on the GENERATE section's label row in
+  // DavisPanel (zero added height at rest — the DIRECTORS no-scroll fit
+  // contract); it asks over the bus, the tray opens its picker.
+  useEffect(() => on(Events.EXPLORER_LOAD_RUN, () => fileRef.current?.click()), []);
 
   const loadRun = async (fileList) => {
     const files = new Map();
@@ -107,28 +112,24 @@ export function CandidateTray() {
     setVerdicts((v) => ({ ...v, [card.key]: 'passed' }));
   };
 
+  // At rest the tray renders only its hidden picker input — zero height.
+  // The DIRECTORS panel's no-scroll fit budget belongs to the performance
+  // surface; the tray's body appears once a run is loaded (curation state,
+  // reached from the 'load run' control on the GENERATE label row).
+  const hasBody = run || loadNote || refusal;
   return (
     <div className="cand-tray">
-      {/* The section label IS the collapsed tray: the load control rides
-          the label row, so at rest the tray costs the panel one label
-          line (the DIRECTORS no-scroll fit contract, e2e directors-duel).
-          The run line, notes and cards render only once a run loads. */}
-      <div className="davis-section-label ttl cand-head">
-        <span>mined</span>
-        <button type="button" className="micro-btn cand-load-btn" onClick={() => fileRef.current?.click()}>
-          {run ? 'load another' : 'load run'}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          // webkitdirectory = pick the run folder whole; where a browser
-          // ignores it, multi-file selection of the folder's contents works
-          webkitdirectory=""
-          style={{ display: 'none' }}
-          onChange={(e) => { loadRun(e.target.files); e.target.value = ''; }}
-        />
-      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        multiple
+        // webkitdirectory = pick the run folder whole; where a browser
+        // ignores it, multi-file selection of the folder's contents works
+        webkitdirectory=""
+        style={{ display: 'none' }}
+        onChange={(e) => { loadRun(e.target.files); e.target.value = ''; }}
+      />
+      {hasBody && <div className="cand-body-label">mined — from the explorer</div>}
       {run && <div className="cand-run-line">run {run.runId} · {run.cards.length} mined</div>}
       {loadNote && <div className="cand-note">{loadNote}</div>}
       {refusal && <div className="cand-refusal" role="alert">{refusal}</div>}

@@ -1264,9 +1264,12 @@ details.ds-dev > summary:hover { color: var(--dim); }
    everywhere. No animation: a candidate still presents identically
    under reduced motion (PA4). */
 .cand-tray { margin-bottom: 0; }
-.cand-head { display: flex; align-items: center; justify-content: space-between; }
-.cand-load-btn { line-height: 1; padding: 1px 5px; }
-.cand-run-line { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; margin-top: 4px; }
+/* #1507 — a section label row carrying one micro action on its right
+   (the mined tray's load control rides GENERATE's label: no new row). */
+.davis-section-label.with-action { display: flex; align-items: center; justify-content: space-between; }
+.davis-section-label.with-action .micro-btn { line-height: 1; padding: 1px 5px; }
+.cand-body-label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--kc-davis); margin-top: 4px; }
+.cand-run-line { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; margin-top: 2px; }
 .cand-note { font-size: 9px; color: var(--dim); margin-top: 4px; }
 .cand-refusal { font-size: 10px; color: var(--kc-red); margin-top: 4px; }
 .cand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
