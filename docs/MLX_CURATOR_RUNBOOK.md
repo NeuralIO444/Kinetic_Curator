@@ -131,6 +131,18 @@ Shortcut: your HITS exports convert directly —
 `python3 studio/hits_bridge.py build --help` turns favourited seeds into
 `labels.json`.
 
+**No-export path (#1173):** every keep (F, J, ★) and every pass (X) in the
+app appends one line to `keeps.jsonl` / `passes.jsonl`. Save them with
+Pipeline → ↓ LEDGERS into a folder (the desktop app also keeps them in
+`$APPDATA/ledgers/`), then:
+
+```bash
+python3 studio/mlx_run.py --phase 1 --ledgers path/to/ledgers
+```
+
+Keeps are positives, passes negatives; other pool renders stay passes. A bad
+line is skipped with a warning. Labels only — nothing steers the canvas live.
+
 **d) Train the taste model:**
 
 ```bash

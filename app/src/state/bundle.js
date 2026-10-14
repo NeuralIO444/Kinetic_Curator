@@ -132,6 +132,10 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
   "kc:retrain-nudge:v1": "a derived counter, rebuilt from keeps",
   "kc:taste:experimental:v1":
     "a per-machine opt-in: a bundle opened elsewhere must never switch a below-bar taste on by itself",
+  "kc:ledger:keeps:v1":
+    "#1173 training labels, append-only: saved on their own as keeps.jsonl (Pipeline ↓ LEDGERS); a restored bundle must never rewrite that history",
+  "kc:ledger:passes:v1":
+    "#1173 training labels, append-only: saved on their own as passes.jsonl (Pipeline ↓ LEDGERS); a restored bundle must never rewrite that history",
   "kc:dice-crowns:v1":
     "dice affinity index; the crowns themselves persist in the keeps ledger",
   "kc:worker": "developer flag for the render worker",
