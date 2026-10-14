@@ -4,8 +4,9 @@
 // docs/research/look-explorer-spec-2026-10-13.md §12 (RA3, RA5, RA6,
 // PA3). Sibling of E1a's coverage suite: the pure measurement lives
 // in censusReport.mjs; the store-level halves (the write-path door
-// census, the Evolve/CURATE door disagreement E1a routed here, RA6
-// round-trip, PA3 crown integrity) live here, driving the real store
+// census, the Evolve/CURATE door question E1a routed here — answered
+// by #1550, whose unified table + single door this suite now pins —
+// RA6 round-trip, PA3 crown integrity) live here, driving the real store
 // through the real bus — the deepest level that runs headlessly.
 //
 // Assertion philosophy (E1a's): the census's FINDINGS are pinned as
@@ -42,7 +43,7 @@ const { captureKeepContext } = await import('./keepContext.js');
 const { recordCrown, readCrowns } = await import('./diceCrowns.js');
 const { captureFavorite, sanitizeFavorite, KEEPS_KEY } = await import('../state/slices/davisSlice.js');
 const { normalizeSeedOffsets } = await import('../engine/kernel/rng.js');
-const { generateLayoutTargets, randomizeKey, RANDOMIZABLE_KEYS } = await import('../state/paramUtils.js');
+const { generateLayoutTargets, randomizeKey, RANDOMIZABLE_KEYS, DICE_RANGES, EVOLVE_TARGET_OVERRIDES } = await import('../state/paramUtils.js');
 
 const byId = new Map(ASSETS.map((a) => [a.id, a]));
 const storeLines = [];
@@ -265,12 +266,16 @@ const reach = renderReachability();
 }
 
 // ── E1a's routed question — the Evolve table, the dice table, and
-// the two doors ─────────────────────────────────────────────────────
+// the two doors. ANSWERED by #1550 (2026-10-14): one table
+// (DICE_RANGES in paramUtils) and one door (validateLayoutParams).
+// This section is the re-measured baseline — where it once pinned
+// the disagreement, it now pins the unification, so a second table
+// or a raw write door fails loudly if it ever returns. ─────────────
 {
   const rng = mulberry32(0xE1B);
   const realRandom = Math.random;
   const observed = new Map(); // key -> {min, max} over target draws
-  let zeroNoiseTarget = null;
+  let zeroNoiseTarget = false;
   Math.random = rng;
   try {
     // generateLayoutTargets takes the store-state shape (it reads
@@ -282,7 +287,7 @@ const reach = renderReachability();
         const v = t[k];
         if (v === undefined) continue;
         const vals = Array.isArray(v) ? v : [v];
-        if (k === 'noiseFreq' && v === 0 && !zeroNoiseTarget) zeroNoiseTarget = t;
+        if (k === 'noiseFreq' && v === 0) zeroNoiseTarget = true;
         for (const x of vals) {
           const cur = observed.get(k) || { min: Infinity, max: -Infinity };
           cur.min = Math.min(cur.min, x); cur.max = Math.max(cur.max, x);
@@ -293,11 +298,19 @@ const reach = renderReachability();
   } finally {
     Math.random = realRandom;
   }
-  assert.ok(zeroNoiseTarget, 'a 0.00 noiseFreq target must occur within 4000 seeded Evolve draws');
-  assert.strictEqual(observed.get('zTiers').max, 9, 'Evolve can never target zTiers 10 (floor of [1, 10))');
+  // The 0.00 target is gone at the source: Evolve rolls the shared
+  // table, whose noiseFreq floor is the dice floor (0.002). (E1b
+  // pinned its occurrence; #1550 re-measures its absence.)
+  assert.strictEqual(zeroNoiseTarget, false, 'no 0.00 noiseFreq target may occur — Evolve rolls the shared table since #1550');
+  // The shared randInt construction reaches both endpoints: zTiers 10
+  // is targetable now. (The old private table floored [1, 10) at 9.)
+  assert.strictEqual(observed.get('zTiers').max, 10, 'Evolve targets zTiers 10 through the shared randInt construction (#1550)');
 
   // The five disagreements E1a found, re-measured as bands from both
-  // tables (seeded draws on each side).
+  // doors (seeded draws on each side). Four are unified: both bands
+  // sit inside — and span — the one declared table range. The fifth
+  // (swarmCohesion) is #1550's declared override: the Evolve band sits
+  // inside [0.5, 3.5] while the dice band reaches past it on both ends.
   const diceBands = {};
   for (const k of ['count', 'density', 'noiseFreq', 'gravityWells', 'swarmCohesion']) {
     const r = mulberry32(0xD1CE);
@@ -314,42 +327,59 @@ const reach = renderReachability();
     const o = observed.get(k);
     bands[k] = { evolve: { min: +o.min.toFixed(4), max: +o.max.toFixed(4) }, dice: diceBands[k] };
   }
-  storeLines.push(`evolve vs dice bands (4000 seeded draws each): ${JSON.stringify(bands)}`);
+  for (const k of ['count', 'density', 'noiseFreq', 'gravityWells']) {
+    const b = bands[k];
+    const decl = DICE_RANGES[k];
+    assert.ok(b.evolve.min >= decl.lo && b.evolve.max <= decl.hi, `${k}: Evolve band must sit inside the declared table range [${decl.lo}, ${decl.hi}], got ${JSON.stringify(b.evolve)}`);
+    assert.ok(b.dice.min >= decl.lo && b.dice.max <= decl.hi, `${k}: dice band must sit inside the declared table range [${decl.lo}, ${decl.hi}], got ${JSON.stringify(b.dice)}`);
+    assert.ok(b.evolve.max - b.evolve.min >= 0.95 * (decl.hi - decl.lo), `${k}: Evolve band must span the declared range, got ${JSON.stringify(b.evolve)}`);
+  }
+  {
+    const b = bands.swarmCohesion;
+    const ov = EVOLVE_TARGET_OVERRIDES.swarmCohesion;
+    assert.ok(b.evolve.min >= ov.lo && b.evolve.max <= ov.hi, `swarmCohesion: Evolve band must sit inside the declared override [${ov.lo}, ${ov.hi}], got ${JSON.stringify(b.evolve)}`);
+    assert.ok(b.dice.min < ov.lo && b.dice.max > ov.hi, 'swarmCohesion: the dice band must reach past the declared override on both ends (a narrowing, not a copy)');
+  }
+  storeLines.push(`evolve vs dice bands (4000 seeded draws each; #1550 — one table, swarmCohesion the declared override): ${JSON.stringify(bands)}`);
 
-  // THE CLAMP ANSWER, end to end: the 0.00 noiseFreq target, fed
-  // through the store write path exactly as a finished morph feeds
-  // its targets, lands on the normalizer floor — 0.001, the
-  // PARAM_SPEC minimum (below the dice floor of 0.002).
+  // THE CLAMP ANSWER, end to end — now a pure door property, measured
+  // on a synthetic write: a noiseFreq of exactly 0.00 (which no door
+  // can roll any more) fed through the store write path still lands
+  // on the normalizer floor — 0.001, the PARAM_SPEC minimum (below
+  // the dice floor of 0.002).
   const st = useStore.getState();
-  st.setLayoutParams(zeroNoiseTarget);
+  st.setLayoutParams({ noiseFreq: 0 });
   const landed = useStore.getState().layoutParams.noiseFreq;
-  assert.strictEqual(landed, 0.001, `0.00 noiseFreq target must land on the 0.001 floor, landed ${landed}`);
-  storeLines.push(`noiseFreq clamp answer: an Evolve target of exactly 0.00 lands at ${landed} through setLayoutParams (the PARAM_SPEC floor; the dice floor is 0.002)`);
+  assert.strictEqual(landed, 0.001, `a 0.00 noiseFreq write must land on the 0.001 floor, landed ${landed}`);
+  storeLines.push(`noiseFreq clamp answer: a synthetic 0.00 write lands at ${landed} through setLayoutParams (the PARAM_SPEC floor; no door rolls 0.00 since #1550)`);
   st.setLayoutParams(normalizeLayoutParams({}));
 
-  // The second door: CURATE's randomizeParam writes WITHOUT the
-  // validating door — a density of 101..120 (legal dice output,
-  // illegal document value) lands in layoutParams raw, until any
-  // validated write re-normalizes the document and clamps it.
+  // One door now: randomizeParam lands through the same validating
+  // door as every other write. Over 400 seeded density draws the raw
+  // stream provably rolls past the document cap (101..120 — legal
+  // dice output, illegal document value) — and every such roll lands
+  // at exactly 100. Nothing sits raw; nothing waits for a later
+  // validated write to heal it. (E1b pinned the raw landing; #1550
+  // re-measures the clamp.)
   Math.random = mulberry32(0xC07E);
-  let rawDensity = null;
+  const landedDensities = [];
   try {
     for (let i = 0; i < 400; i++) {
       useStore.getState().randomizeParam('density');
-      const d = useStore.getState().layoutParams.density;
-      if (d > 100) { rawDensity = d; break; }
+      landedDensities.push(useStore.getState().layoutParams.density);
     }
   } finally {
     Math.random = realRandom;
   }
-  assert.ok(rawDensity !== null, 'randomizeParam must be able to land density > 100 within 400 seeded draws');
-  // A validated write of a different out-of-range value re-normalizes
-  // the whole document — the smuggled value is clamped along with it.
-  // (Writing the identical value back would be a no-op by design:
-  // setLayoutParam returns early when nothing would change.)
-  useStore.getState().setLayoutParam('density', rawDensity + 1);
-  assert.strictEqual(useStore.getState().layoutParams.density, 100, 'the validated door clamps an out-of-range density to 100');
-  storeLines.push(`two doors: CURATE randomizeParam landed density ${rawDensity} unvalidated; a validated write re-normalizes the document and clamps it to 100`);
+  const replay = mulberry32(0xC07E);
+  let overCap = 0;
+  for (let i = 0; i < 400; i++) {
+    const raw = randomizeKey('density', replay);
+    if (raw > 100) overCap++;
+    assert.strictEqual(landedDensities[i], Math.min(raw, 100), `draw ${i}: a roll of ${raw} must land at ${Math.min(raw, 100)}, landed ${landedDensities[i]}`);
+  }
+  assert.ok(overCap > 0, 'the seeded stream must roll past the cap at least once (else this section proves nothing)');
+  storeLines.push(`one door (#1550): randomizeParam lands through validateLayoutParams — of 400 seeded density draws, ${overCap} rolled past the document cap and every one landed at exactly 100`);
   useStore.getState().setLayoutParams(normalizeLayoutParams({}));
 }
 
