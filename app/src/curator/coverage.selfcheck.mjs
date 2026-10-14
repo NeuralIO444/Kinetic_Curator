@@ -15,6 +15,7 @@
 // bands around the funnel's SHAPE (the zeros as near-zero ceilings),
 // never tuned to one stream; a funnel repair (spec Q1) is supposed to
 // break them, loudly, and force a re-baseline.
+import { AUDIO_RIG_KEYS } from '../state/audioRig.js';
 import assert from 'node:assert';
 import { ASSETS } from '../data/assets/index.js';
 import { MORPHABLE_KEYS } from '../state/paramUtils.js';
@@ -85,7 +86,9 @@ function assertMorphSpan(keepRaw, label) {
   );
   for (const key of MORPHABLE_KEYS) {
     assert.deepStrictEqual(st.morphFrom[key], PARAMS_A[key], `${label}: morphFrom.${key} is the live value, unclamped`);
-    assert.deepStrictEqual(st.morphTo[key], keep.config.layout[key], `${label}: morphTo.${key} is the keep's value, unclamped`);
+    // the audio setup (FEEL keys) stays live across a recall (audioRig.js, "always live"); the picture keys are the keep's
+    const want = AUDIO_RIG_KEYS.includes(key) ? PARAMS_A[key] : keep.config.layout[key];
+    assert.deepStrictEqual(st.morphTo[key], want, `${label}: morphTo.${key} is ${AUDIO_RIG_KEYS.includes(key) ? 'the live audio setup' : "the keep's value"}, unclamped`);
   }
 }
 assertMorphSpan(
