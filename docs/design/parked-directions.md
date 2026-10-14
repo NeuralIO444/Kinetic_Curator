@@ -15,7 +15,7 @@ of the repo. This file is the reviewed version; where it differs from the origin
 ## Decisions (Matt, 2026-10-13)
 
 1. **Musical time runs on the loop clock.** `bar`, `beat` and `phase` are derived from loop time and the BPM. Audio only nudges the tempo. The clock never depends on audio hardware, so replay stays exact with or without audio and on any machine. (`AudioContext.currentTime` is not the clock.)
-2. **On-device models only, MLX first.** The "no live AI inside the app" principle is read as "no cloud AI". Models are allowed if they run on the Mac: MLX first, Apple Intelligence later behind the same interface through a Swift helper (Apple's model is not reachable from the web view). Every model decision is recorded so a replay never calls it, and a rule-based backend is the fallback forever. The roadmap's locked-principle wording has **not** been amended yet; that edit waits for Matt's confirmation.
+2. **On-device models only, MLX first.** The "no live AI inside the app" principle is read as "no cloud AI". Models are allowed if they run on the Mac: MLX first, Apple Intelligence later behind the same interface through a Swift helper (Apple's model is not reachable from the web view). Every model decision is recorded so a replay never calls it, and a rule-based backend is the fallback forever. Matt confirmed the wording 2026-10-13 and moved the model path to Apple Intelligence first (#1463); the roadmap now reads "No cloud AI".
 3. **The Queen eases the tempo, only while her mark shows.** The mark beside BEAT (`SwayMark`) is her presence. When audio gives a confident tempo she may ease the BEAT BPM toward it by a small bounded step per phrase, and only while her mark is visible. The button shows the new BPM. A BPM the artist sets by hand always wins and silences her. She stays unnamed.
 4. **Replay is in the product:** load a take, play it back with the personas muted, scrub by bar.
 
@@ -42,4 +42,4 @@ of the repo. This file is the reviewed version; where it differs from the origin
 
 - Which MLX model serves `mind` (the taste ranker cannot propose assets or judge a scene). Needs a model choice and an eval.
 - Whether the Tauri bundle ships the sidecar, or it installs separately.
-- Confirm the amended wording of the roadmap's "no live AI" principle.
+- ~~Confirm the amended wording of the roadmap's "no live AI" principle.~~ Done 2026-10-13: "No cloud AI".

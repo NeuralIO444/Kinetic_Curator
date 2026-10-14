@@ -11,17 +11,29 @@ export const MIND_RECORD_VERSION = 1;
 /** A take is at most 20 minutes of frames; three personas, one decision a bar, stays far below this. */
 export const MIND_RECORD_MAX = 20000;
 
-/** Recorder. `getFrame()` returns the take's current frame index. */
-export function createMindRecorder({ getFrame = () => 0 } = {}) {
+/**
+ * Recorder. `getFrame()` returns the take's current frame index; `getSystem()` the answering model's identity
+ * ({ backend, model?, os? } or null — mindLive.getMindSystem). #1463: a take keeps the model/system version of every
+ * backend that answered in it, under `systems`, so the books say what made each decision.
+ */
+export function createMindRecorder({ getFrame = () => 0, getSystem = () => null } = {}) {
   const rows = [];
+  const systems = {};
   return {
     /** A decision as mindLive published it, and whether it asked the stage for something. */
     update(d, requested) {
       if (!d || rows.length >= MIND_RECORD_MAX) return;
       rows.push([getFrame() | 0, d.persona, d.bar, d.backend, d.seed >>> 0, d.invented ? 1 : 0, requested ? 1 : 0,
         JSON.parse(JSON.stringify(d.reply))]);
+      if (d.backend !== 'rules' && !systems[d.backend]) {
+        let s;
+        try { s = getSystem(); } catch { s = null; }
+        if (s && s.backend === d.backend) systems[d.backend] = { ...(s.model ? { model: String(s.model).slice(0, 64) } : {}), ...(s.os ? { os: String(s.os).slice(0, 32) } : {}) };
+      }
     },
-    finish() { return { version: MIND_RECORD_VERSION, decisions: rows.map((r) => r.slice()) }; },
+    finish() {
+      return { version: MIND_RECORD_VERSION, decisions: rows.map((r) => r.slice()), ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}) };
+    },
   };
 }
 
@@ -29,6 +41,13 @@ export function createMindRecorder({ getFrame = () => 0 } = {}) {
 export function checkMindRecord(r) {
   if (!r || typeof r !== 'object' || r.version !== MIND_RECORD_VERSION || !Array.isArray(r.decisions)) return null;
   if (r.decisions.length > MIND_RECORD_MAX) return null;
+  if (r.systems !== undefined) { // #1463 — optional: the model/system each non-rules backend ran on
+    if (!r.systems || typeof r.systems !== 'object' || Array.isArray(r.systems)) return null;
+    for (const [k, v] of Object.entries(r.systems)) {
+      if (!BACKENDS.includes(k) || !v || typeof v !== 'object') return null;
+      for (const f of Object.values(v)) if (typeof f !== 'string' || f.length > 64) return null;
+    }
+  }
   let prev = -1;
   for (const d of r.decisions) {
     if (!Array.isArray(d) || d.length !== 8) return null;

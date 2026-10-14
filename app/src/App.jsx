@@ -44,6 +44,7 @@ import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: wh
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
 import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
+import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
 import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/playback.mjs'; // #1462: a take's decisions replay
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
@@ -125,12 +126,22 @@ function AppInner() {
     // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
     const stopPace = startPace({ getBpm: () => useStore.getState().beatBpm, context: roomNow });
     const roomCodes = () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; };
-    // #1462 — Mind 1: once a bar each persona thinks about the room. Rules alone (the Apple helper is Mind 3, #1464):
+    // #1462 — Mind 1: once a bar each persona thinks about the room (Apple when available, rules otherwise):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
     const stopFaces = startMindFaces();
+    // #1463 — Apple Intelligence through the desktop helper is the default whenever it is available; until the
+    // startup check answers (and always on the web) the rules answer, silently.
+    let apple = null;
+    desktopAppleModel().then((m) => { apple = m; }, () => { apple = null; });
+    const appleModel = {
+      name: 'apple',
+      available: () => !!(apple && apple.available()),
+      info: () => (apple ? apple.info() : null),
+      ask: (...a) => (apple ? apple.ask(...a) : Promise.reject(new Error('unavailable'))),
+    };
     const stopMind = startMind({
       isReplaying: isPlaybackActive,
-      model: DEBUG_MIND ? demoModel : null,
+      model: DEBUG_MIND ? demoModel : appleModel,
       getSeed: () => useStore.getState().seed,
       getSnapshot: () => {
         const st = useStore.getState();
