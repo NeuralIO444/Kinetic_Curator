@@ -165,6 +165,13 @@
   min-width: 0;
   padding: 2px 0;
 }
+.favorites-tray-clear {
+  flex: 0 0 auto;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
 .hit-pill {
   position: relative;
   display: inline-flex;
