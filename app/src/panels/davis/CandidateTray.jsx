@@ -109,9 +109,14 @@ export function CandidateTray() {
 
   return (
     <div className="cand-tray">
-      <div className="cand-load-row">
-        <button type="button" className="micro-btn" onClick={() => fileRef.current?.click()}>
-          load run
+      {/* The section label IS the collapsed tray: the load control rides
+          the label row, so at rest the tray costs the panel one label
+          line (the DIRECTORS no-scroll fit contract, e2e directors-duel).
+          The run line, notes and cards render only once a run loads. */}
+      <div className="davis-section-label ttl cand-head">
+        <span>mined</span>
+        <button type="button" className="micro-btn cand-load-btn" onClick={() => fileRef.current?.click()}>
+          {run ? 'load another' : 'load run'}
         </button>
         <input
           ref={fileRef}
@@ -123,10 +128,8 @@ export function CandidateTray() {
           style={{ display: 'none' }}
           onChange={(e) => { loadRun(e.target.files); e.target.value = ''; }}
         />
-        <span className="cand-run-line">
-          {run ? `run ${run.runId} · ${run.cards.length} mined` : 'no run loaded — mining is by hand, on purpose'}
-        </span>
       </div>
+      {run && <div className="cand-run-line">run {run.runId} · {run.cards.length} mined</div>}
       {loadNote && <div className="cand-note">{loadNote}</div>}
       {refusal && <div className="cand-refusal" role="alert">{refusal}</div>}
       {run && (

@@ -167,8 +167,10 @@ export function DavisPanel() {
 
           {/* #1507 — the mined candidates' curation view, beside the
               favorite capture above: mining is morning-after curation,
-              judged by hand from a loaded run folder. */}
-          <div className="davis-section-label ttl">mined</div>
+              judged by hand from a loaded run folder. The tray renders
+              its own section label (with the load control on the label
+              row) so the panel's no-scroll fit budget is spent on the
+              label alone until a run is actually loaded. */}
           <CandidateTray />
 
           <div className="davis-section-label ttl">perform</div>
