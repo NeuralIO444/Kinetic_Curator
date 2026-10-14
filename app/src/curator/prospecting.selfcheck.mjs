@@ -73,7 +73,7 @@ for (const id of RENDER_PROFILE_IDS) {
   }));
   const ranges = declaredNumRanges(id);
   assert.ok(!('scaleMid' in ranges),
-    `${id}: no declared range over scaleMid — the substrate's dead axis (see prospecting.mjs)`);
+    `${id}: no declared range over scaleMid — scale is proven at bucket granularity by design (see prospecting.mjs)`);
   assert.deepStrictEqual(centroidViolations(featureCentroid(feats), ranges), [],
     `${id}: batch centroid inside the declared ranges`);
   const buckets = declaredScaleBuckets(id);

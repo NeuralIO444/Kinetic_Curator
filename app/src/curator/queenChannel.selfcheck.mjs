@@ -7,6 +7,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateTaste, HEAD_MIN_FIDELITY } from './tasteHead.js';
+import { FEATURES_VERSION } from './recipeFeatures.js';
 import {
   GATE_OPEN, NEUTRAL_BIAS, BIAS_KEYS,
   readQueenHead, isLive, hiddenBias,
@@ -21,7 +22,11 @@ const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 const baseFile = () => ({
   kind: 'kc-taste',
   version: 1,
-  featuresVersion: 3,
+  // dynamic on purpose: this fixture models a CURRENT taste artifact —
+  // a hardcoded version would rot at every FEATURES_VERSION bump (#1545
+  // found it pinned to 3). Stale-version rejection is covered by
+  // tasteHead.selfcheck (FEATURES_VERSION - 1, dynamically).
+  featuresVersion: FEATURES_VERSION,
   model: 'siglip-so400m',
   dims: 1152,
   trainedAt: '2026-10-08',
