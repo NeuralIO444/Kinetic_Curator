@@ -21,6 +21,10 @@
 // with restitution averaged across the pair. swap/die/breed stay per-system
 // (population state is per-system; dish ecology is C4), and repel stays
 // per-system personal space. FX strata never enrol — they are the medium.
+// #1413 (C1) adds the medium itself to the pair: enrolment carries each
+// stratum's WETNESS, the pair's is averaged like its restitution, and the
+// resolved curves (dishMedium.mjs) bias the bounce and add cling across
+// the seam — a dry pair is the A1 numbers bit for bit.
 //
 // Determinism (spec §7): pair-visit order is canonical — stratum order
 // (the arming order), then particle index — via the same counting-sort
@@ -39,6 +43,7 @@
 
 import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
 import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
+import { clampWetness, dishMediumFor, mediumClingCapture } from './dishMedium.mjs'; // #1413 — the medium across the seam
 
 const TAU = Math.PI * 2;
 
@@ -102,9 +107,12 @@ export function createDishSession() {
 /**
  * Enrol (or refresh) one stratum's body set. Called by the resolver for
  * every live swarm layer each frame, and once per layer by the bake driver.
- * `entry`: { key, sys, radius, restitution, contactMode, umask, organism }.
+ * `entry`: { key, sys, radius, restitution, contactMode, umask, organism,
+ *   wetness } — wetness is #1413: the stratum's medium (its
+ *   accumulationWetness knob, clamped here at the boundary); a pair's
+ *   medium is the two strata's average, like restitution below.
  */
-export function enrolDishBody(session, { key, sys, radius, restitution, contactMode, umask, organism }) {
+export function enrolDishBody(session, { key, sys, radius, restitution, contactMode, umask, organism, wetness }) {
   let e = session._bySys.get(sys);
   if (!e) {
     e = { key, sys, seq: session._seq++ };
@@ -119,6 +127,7 @@ export function enrolDishBody(session, { key, sys, radius, restitution, contactM
   e.restitution = e.mode === 'bounce' ? r : 0;
   e.umask = (umask ?? 0xffffffff) >>> 0;
   e.organism = !!organism;
+  e.wetness = clampWetness(wetness); // absent/junk enrols dry (pre-C1)
   return e;
 }
 
@@ -353,16 +362,42 @@ export function runDishContacts(session, callerSys) {
           // stratum contributes 0, so any pair touching one is inelastic
           // in proportion).
           let dvA = 0; let dvB = 0; // #1410 — per-body normal Δv, for the feed
+          // #1413 — the pair's medium: wetness averaged across the seam
+          // (the restitution precedent above), resolved through the one
+          // law (dishMedium.mjs). A dry pair resolves no medium at all:
+          // the pre-C1 numbers below run bit for bit.
+          const pairWet = (ea.wetness + eb.wetness) / 2;
+          const pairMed = pairWet > 0 ? dishMediumFor(pairWet) : null;
           if (ea.impulse && eb.impulse) {
             const vn = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
             if (vn < 0) {
-              const e = (ea.restitution + eb.restitution) / 2;
+              const eBase = (ea.restitution + eb.restitution) / 2;
+              const e = pairMed ? eBase * pairMed.restK : eBase;
               const jimp = (-(1 + e) * vn) / wSum;
               sysA.vx[ia] -= nx * jimp * w1;
               sysA.vy[ia] -= ny * jimp * w1;
               sysB.vx[ib] += nx * jimp * w2;
               sysB.vy[ib] += ny * jimp * w2;
               dvA = jimp * w1; dvB = jimp * w2;
+            }
+          }
+          // #1413 — cling across the seam: the same capture law as the
+          // per-system pass (dishMedium.mjs), read on the post-impulse
+          // velocities, for every mode pair — the medium biases, the
+          // mode decides. A wet pair that starts to separate slowly is
+          // held by the tension; a fast one tears free minus the budget.
+          if (pairMed && pairMed.clingK > 0) {
+            const vnNow = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
+            if (vnNow > 0) {
+              const cap = mediumClingCapture(pairMed.clingK, vnNow);
+              if (cap > 0) {
+                const jc = -cap / wSum;
+                sysA.vx[ia] -= nx * jc * w1;
+                sysA.vy[ia] -= ny * jc * w1;
+                sysB.vx[ib] += nx * jc * w2;
+                sysB.vy[ib] += ny * jc * w2;
+                dvA += Math.abs(jc) * w1; dvB += Math.abs(jc) * w2;
+              }
             }
           }
           // #1410 — the dent across the seam: this resolution's impulse

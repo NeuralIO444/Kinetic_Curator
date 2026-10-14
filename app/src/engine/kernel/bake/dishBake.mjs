@@ -59,6 +59,10 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
       contactMode: layer.layoutParams.contactMode || 'none',
       umask: layer.layoutParams.collideMask ?? 0xffffffff,
       organism: isOrganismMode(layer.layoutParams.mode),
+      // #1413 — the stratum's medium, enrolled exactly as the live
+      // resolver enrols it (see liveResolve.mjs): a wet bake settles
+      // like the wet live dish, never a drier fiction.
+      wetness: layer.layoutParams.accumulationWetness,
     });
     keys.push(layer.key);
     return { layer, sys, params, steps: layer.steps ?? steps };

@@ -313,6 +313,10 @@ export function createLiveResolver() {
       contactMode: ctx.layoutParams.contactMode || 'none',
       umask: ctx.layoutParams.collideMask ?? 0xffffffff,
       organism: isOrganismMode(ctx.mode),
+      // #1413 — the stratum's medium rides enrolment (the bake driver
+      // enrols the same field through the same helper — live and bake
+      // cannot disagree about how wet the dish is).
+      wetness: ctx.layoutParams.accumulationWetness,
     });
     if (!ctx.slowRender) {
       // Spine A (#387): dtSec + loop-accumulated ms replace Date.now().
