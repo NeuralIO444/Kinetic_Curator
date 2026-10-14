@@ -30,6 +30,13 @@
 //   - Nothing auto-saves: runMiner returns data; only the run tool
 //     (scripts/exploreRun.mjs) writes a run folder, where the caller
 //     points it.
+//
+// E4 (#1508) extends the run, additively: a run may aim at one named
+// prospecting corner (default: the E2 rotation), Davis's state steers
+// the dealing wildness (default: silent = the same 0.5 stream), and
+// LOIS judges the finalists' renders after selection (loisJudge.mjs)
+// — verdicts with provenance on the records + a verdicts ledger from
+// the run tool. The default run is byte-identical to E2's.
 import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
 import { ASSETS } from '../data/assets/index.js';
@@ -42,8 +49,9 @@ import { getQualityCaps } from '../data/quality.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
 import { bakeParticles } from '../engine/kernel/bake/index.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../state/paramUtils.js';
-import { dealCast, castSizeFor, rollDice } from './dice.js';
+import { dealCast, castSizeFor, rollDice, wildnessForDavis } from './dice.js';
 import { createPersonaScorer } from './diceScorer.js';
+import { judgeRender, loisVerdictRow } from './loisJudge.mjs';
 import { applyRenderProfile, getRenderProfile, RENDER_PROFILE_IDS } from './renderProfiles.js';
 import { recipeFeatures } from './recipeFeatures.js';
 import { mulberry32 } from './coverageReport.mjs';
@@ -109,38 +117,51 @@ const SWARM_STEPS = 240; // census swarmBake precedent
  * deal two slots from the anchor category's own pool through dealCast
  * itself, then the rest from the full library — every slot of every
  * cast is dealCast output; there is no scorer anywhere in this file.
+ *
+ * E4 (#1508): a run may AIM at one named corner (`corner` — every
+ * sample is dealt in it; the default null keeps the E2 rotation), and
+ * Davis steers the run's spread: `davisCode` sets the dealing
+ * wildness through the dice's own wildnessForDavis (UGLY 1.0 sifts
+ * wide, FLOW 0.2 stays close; null = Davis silent = the honest 0.5
+ * middle this sampler always used — the default stream is unchanged).
  */
-export function sampleBatch({ runSeed = MINER_SEED, batchSize = 240 } = {}) {
+export function sampleBatch({
+  runSeed = MINER_SEED, batchSize = 240, corner = null, davisCode = null,
+} = {}) {
+  if (corner !== null && !CORNERS.includes(corner)) {
+    throw new Error(`unknown corner: ${corner} (corners: ${CORNERS.join(', ')})`);
+  }
+  const wildness = wildnessForDavis(davisCode ?? null);
   const rng = mulberry32(runSeed);
   const samples = [];
   for (let i = 0; i < batchSize; i++) {
-    const corner = CORNERS[i % CORNERS.length];
+    const sampleCorner = corner ?? CORNERS[i % CORNERS.length];
     const anchor = i % 3 === 2
       ? STARVED_CATEGORIES[Math.floor(i / 3) % STARVED_CATEGORIES.length]
       : null;
     const layoutId = STUB_VOICES[Math.floor(rng() * STUB_VOICES.length)].id;
     const seed = Math.floor(rng() * 0x7fffffff);
-    const size = castSizeFor(layoutId, rng, WILDERNESS);
+    const size = castSizeFor(layoutId, rng, wildness);
     let cast;
     if (anchor) {
-      const anchorIds = dealCast(byCategory.get(anchor) || [], Math.min(2, size), rng, WILDERNESS, []);
-      const rest = dealCast(ASSETS, size, rng, WILDERNESS, []);
+      const anchorIds = dealCast(byCategory.get(anchor) || [], Math.min(2, size), rng, wildness, []);
+      const rest = dealCast(ASSETS, size, rng, wildness, []);
       cast = [...new Set([...anchorIds, ...rest])];
     } else {
-      cast = dealCast(ASSETS, size, rng, WILDERNESS, []);
+      cast = dealCast(ASSETS, size, rng, wildness, []);
     }
     let paletteId;
     let params = { ...DEFAULT_LAYOUT_PARAMS, mode: layoutId };
-    if (corner === 'wilderness') {
+    if (sampleCorner === 'wilderness') {
       paletteId = PALETTES[Math.floor(rng() * PALETTES.length)].id;
       for (const key of RANDOMIZABLE_KEYS) params[key] = randomizeKey(key, rng);
     } else {
-      paletteId = getRenderProfile(corner).paletteId;
-      params = applyRenderProfile(params, corner, rng);
+      paletteId = getRenderProfile(sampleCorner).paletteId;
+      params = applyRenderProfile(params, sampleCorner, rng);
     }
     samples.push({
       index: i,
-      corner,
+      corner: sampleCorner,
       anchor,
       layoutId,
       paletteId,
@@ -627,8 +648,13 @@ export function candidateRecord(sample, runId) {
   };
 }
 
-export function runIdFor({ runSeed = MINER_SEED, batchSize = 240, finalistCount = 12 } = {}) {
-  return `xpl-${runSeed.toString(16)}-${batchSize}-${finalistCount}`;
+export function runIdFor({
+  runSeed = MINER_SEED, batchSize = 240, finalistCount = 12, corner = null, davisCode = null,
+} = {}) {
+  const base = `xpl-${runSeed.toString(16)}-${batchSize}-${finalistCount}`;
+  // E4: an aimed run names its corner (and Davis's state) in its id —
+  // the default rotation run keeps the E2 id exactly.
+  return base + (corner ? `-${corner}` : '') + (davisCode ? `-${String(davisCode).toLowerCase()}` : '');
 }
 
 /**
@@ -639,9 +665,10 @@ export function runIdFor({ runSeed = MINER_SEED, batchSize = 240, finalistCount 
  */
 export function runMiner({
   runSeed = MINER_SEED, batchSize = 240, finalistCount = 12, keeps = [],
+  corner = null, davisCode = null,
 } = {}) {
-  const runId = runIdFor({ runSeed, batchSize, finalistCount });
-  const samples = sampleBatch({ runSeed, batchSize });
+  const runId = runIdFor({ runSeed, batchSize, finalistCount, corner, davisCode });
+  const samples = sampleBatch({ runSeed, batchSize, corner, davisCode });
   const baked = [];
   const discards = [];
   for (const sample of samples) {
@@ -666,6 +693,24 @@ export function runMiner({
   }
   const keepsFeatures = (keeps || []).map(featuresOfKeep).filter(Boolean);
   const { finalists, quota } = selectFinalists(baked, keepsFeatures, { finalistCount });
+
+  // E4 (#1508): LOIS judges the finalists' RENDERS. The verdict is a
+  // pure function of the bake's measured stats + recipe features
+  // (loisJudge.mjs), attached to the finalist and its record — the
+  // same record object candidates.json and finalists.json serialize,
+  // so the tray's join still sees one record. Verdicts steer nothing:
+  // selection already happened, by distance alone (spec §3.4).
+  for (const f of finalists) {
+    const v = judgeRender({
+      features: f.features, stats: f.stats,
+      fingerprint: f.fingerprint, fontContingent: f.fontContingent,
+    });
+    f.loisVerdict = v;
+    f.statsProvenance = v.statsProvenance;
+    f.record.loisVerdict = v;
+    f.record.statsProvenance = v.statsProvenance;
+  }
+  const verdicts = finalists.map((f) => loisVerdictRow(runId, f)).filter(Boolean);
 
   // coverage rows: library / batch (sampled casts) / baked / finalists
   const catRow = (test) => ({
@@ -696,13 +741,37 @@ export function runMiner({
     traySize: tray.length,
   };
 
+  // E4: this run's yield by corner (spec §6 at run scale — the
+  // accrual across runs lives in prospecting.yieldAccrual).
+  const ybc = new Map();
+  const ybRow = (c) => {
+    if (!ybc.has(c)) ybc.set(c, { corner: c, candidates: 0, finalists: 0, loisKeeps: 0, loisPasses: 0 });
+    return ybc.get(c);
+  };
+  for (const c of baked) ybRow(c.sample.corner).candidates++;
+  for (const f of finalists) {
+    const r = ybRow(f.sample.corner);
+    r.finalists++;
+    if (f.loisVerdict?.verdict === 'keep') r.loisKeeps++;
+    if (f.loisVerdict?.verdict === 'pass') r.loisPasses++;
+  }
+  const yieldByCorner = [...ybc.values()].sort(
+    (a, b) => b.finalists - a.finalists || a.corner.localeCompare(b.corner),
+  );
+
   return {
     runId,
-    config: { runSeed, batchSize, finalistCount, keepsCorpus: keepsFeatures.length },
+    config: {
+      runSeed, batchSize, finalistCount, keepsCorpus: keepsFeatures.length,
+      corner: corner ?? 'rotation',
+      davisCode: davisCode ?? null,
+      wildness: wildnessForDavis(davisCode ?? null),
+    },
     samples,
     baked,
     discards,
     finalists,
+    verdicts,
     quota,
     report: {
       yield: {
@@ -724,6 +793,13 @@ export function runMiner({
         : 'keeps corpus EMPTY in this run — novelty is pairwise-only (the production '
           + 'ledger kc:keeps:v1 is browser-local and absent headlessly; hand the run '
           + 'tool a ledger export to measure against the real corpus)',
+      lois: {
+        judge: 'lois-render-v1',
+        judged: finalists.length,
+        keeps: finalists.filter((f) => f.loisVerdict?.verdict === 'keep').length,
+        passes: finalists.filter((f) => f.loisVerdict?.verdict === 'pass').length,
+      },
+      yieldByCorner,
     },
   };
 }
@@ -733,7 +809,9 @@ export function formatMinerReport(run) {
   const L = [];
   const r = run.report;
   L.push(`LOOK EXPLORER — MINER RUN ${run.runId} (#1506)`);
-  L.push(`config: seed 0x${run.config.runSeed.toString(16)} · batch ${run.config.batchSize} · finalists ${run.config.finalistCount} · keeps corpus ${run.config.keepsCorpus}`);
+  L.push(`config: seed 0x${run.config.runSeed.toString(16)} · batch ${run.config.batchSize} · finalists ${run.config.finalistCount} · keeps corpus ${run.config.keepsCorpus}`
+    + (run.config.corner && run.config.corner !== 'rotation' ? ` · corner ${run.config.corner}` : '')
+    + (run.config.davisCode ? ` · davis ${run.config.davisCode} (wildness ${run.config.wildness})` : ''));
   L.push('');
   L.push(`YIELD: sampled ${r.yield.sampled} · baked ${r.yield.baked} · discarded ${r.yield.discarded} · finalists ${r.yield.finalists}`);
   if (r.yield.discarded) {
@@ -765,10 +843,27 @@ export function formatMinerReport(run) {
   L.push('');
   L.push(`KEEPS: ${r.keepsNote}`);
   L.push('');
+  if (r.lois) {
+    L.push(`LOIS JUDGES RENDERS (${r.lois.judge}): ${r.lois.judged} finalists judged from their bakes · keeps ${r.lois.keeps} · passes ${r.lois.passes}`);
+    L.push('  verdicts are recorded in verdicts.jsonl with provenance + the measured stats they rest on; they steer nothing — selection above ran on distance alone.');
+    L.push('');
+  }
+  if (r.yieldByCorner) {
+    L.push('YIELD BY CORNER (this run):');
+    for (const row of r.yieldByCorner) {
+      L.push(`  ${row.corner.padEnd(12)} mined ${String(row.candidates).padStart(3)} · finalists ${row.finalists} · LOIS keep ${row.loisKeeps} / pass ${row.loisPasses}`);
+    }
+    L.push('');
+  }
   L.push('FINALISTS (pick order — a spread, not a ranking):');
   for (const f of run.finalists) {
     const s = f.sample;
-    L.push(`  sample ${String(s.index).padStart(3)} · ${s.corner}${s.anchor ? ` (anchor ${s.anchor})` : ''} · ${s.layoutId} · ${s.paletteId} · cast ${s.cast.length} · ink ${f.stats.inkCoverage}${f.fontContingent ? ' · font-contingent cast' : ''} · bake ${f.fingerprint.slice(0, 12)}…`);
+    const lois = f.loisVerdict
+      ? ` · LOIS ${f.loisVerdict.verdict}${f.loisVerdict.verdict === 'pass'
+        ? ` (failed: ${f.loisVerdict.checks.filter((c) => !c.ok).map((c) => c.key).join(', ')})`
+        : ''}`
+      : '';
+    L.push(`  sample ${String(s.index).padStart(3)} · ${s.corner}${s.anchor ? ` (anchor ${s.anchor})` : ''} · ${s.layoutId} · ${s.paletteId} · cast ${s.cast.length} · ink ${f.stats.inkCoverage}${f.fontContingent ? ' · font-contingent cast' : ''} · bake ${f.fingerprint.slice(0, 12)}…${lois}`);
   }
   return L.join('\n');
 }
