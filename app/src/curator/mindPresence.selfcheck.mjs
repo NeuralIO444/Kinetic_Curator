@@ -2,7 +2,7 @@
 // third's ghost, recorded with the take; and all of it the same on the rules as on a model.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { signOf, SIGNS, readCalendar, modulation, zodiacBlock, UNMODULATED, TEMPERAMENT, seasonOf } from './mindZodiac.js';
+import { signOf, SIGNS, GOVERNOR_BIRTHDAY, GOVERNOR_SIGN, readCalendar, modulation, zodiacBlock, UNMODULATED, TEMPERAMENT, seasonOf } from './mindZodiac.js';
 import { createEngagement, decodeEngagement, encodeEngagement, tierOf, TIER_FLOORS, decayed, ABSENCE_MS, coolOf, COOL_ENTER } from './mindEngage.js';
 import { createPresence, shapeAt, checkTraits, EASE_BARS, TIER_SHAPE, GHOST_KINDS } from './mindPresence.js';
 import { createPresenceDriver, STORAGE_KEY } from './mindPresenceLive.js';
@@ -21,8 +21,10 @@ const DAY = 86400000;
 const memStore = (init = {}) => { const m = { ...init }; return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, m }; };
 const dec = (persona, bar, reply, seed = bar * 7919) => ({ persona, bar, backend: 'rules', seed, invented: false, reply });
 
-await ok('zodiac canon: the signs come from the birthdays — Davis Gemini, LOIS Cancer, the third Capricorn', () => {
-  assert.deepEqual(SIGNS, { davis: 'gemini', lois: 'cancer', queen: 'capricorn' });
+await ok('zodiac canon: the signs come from the birthdays — Davis Gemini, LOIS Cancer, the third Libra; the Governor Capricorn', () => {
+  assert.deepEqual(SIGNS, { davis: 'gemini', lois: 'cancer', queen: 'libra' });
+  assert.deepEqual([...GOVERNOR_BIRTHDAY], [1977, 1, 8]); assert.equal(GOVERNOR_SIGN, 'capricorn');
+  assert.equal(signOf(9, 22), 'virgo'); assert.equal(signOf(9, 23), 'libra');
   assert.equal(signOf(12, 22), 'capricorn'); assert.equal(signOf(1, 19), 'capricorn'); assert.equal(signOf(1, 20), 'aquarius');
   assert.equal(signOf(6, 20), 'gemini'); assert.equal(signOf(6, 21), 'cancer'); assert.equal(signOf(13, 1), null);
   for (const s of Object.values(SIGNS)) assert.ok(TEMPERAMENT[s], `${s} has a temperament`);
@@ -42,11 +44,12 @@ await ok('modulation: the reading colours each persona; a failed reading skips i
   const fullSummer = { moonPhase: 'full', illumination: 1, season: 'summer' };
   const m = modulation('lois', fullSummer);
   assert.ok(m.tempo > 1.2 && m.intensity === 1.1, 'Cancer, full moon, her season: quicker and stronger');
-  assert.ok(modulation('queen', fullSummer).intensity < 1, 'Capricorn in summer is damped');
+  assert.ok(modulation('queen', { ...fullSummer, season: 'spring' }).intensity < 1, 'Libra in spring (opposite autumn) is damped');
+  assert.ok(modulation('queen', { ...fullSummer, season: 'autumn' }).intensity > 1, 'and strongest in her own season');
   assert.ok(modulation('lois', fullSummer).tempo - 1 > modulation('davis', fullSummer).tempo - 1, 'the moon pulls LOIS hardest');
   assert.equal(modulation('lois', null), UNMODULATED);
   assert.equal(zodiacBlock('lois', null), null);
-  assert.deepEqual(zodiacBlock('queen', fullSummer), { sign: 'capricorn', moonPhase: 'full', season: 'summer' });
+  assert.deepEqual(zodiacBlock('queen', fullSummer), { sign: 'libra', moonPhase: 'full', season: 'summer' });
   assert.deepEqual(buildContext({ zodiac: zodiacBlock('davis', fullSummer) }).zodiac, { sign: 'gemini', moonPhase: 'full', season: 'summer' }, 'the Mind 1 context accepts it');
 });
 
@@ -205,7 +208,7 @@ await ok('the live layer on the rules: tier and zodiac in each persona\'s own co
   assert.equal(live.length, 120);
   assert.ok(live.every((d) => d.backend === 'rules' && checkTraits(d.traits)), 'every decision carries its traits');
   const lois = asked.find(([p]) => p === 'lois')[1]; const third = asked.find(([p]) => p === 'queen')[1];
-  assert.equal(lois.tier, 't1'); assert.equal(lois.zodiac.sign, 'cancer'); assert.equal(third.zodiac.sign, 'capricorn');
+  assert.equal(lois.tier, 't1'); assert.equal(lois.zodiac.sign, 'cancer'); assert.equal(third.zodiac.sign, 'libra');
   assert.equal(lois.zodiac.moonPhase, 'full');
   assert.ok(store.m[STORAGE_KEY], 'the scores were saved');
   const record = rec.finish();

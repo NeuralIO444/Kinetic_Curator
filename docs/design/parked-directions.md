@@ -38,7 +38,7 @@ of the repo. This file is the reviewed version; where it differs from the origin
 4. **Replay playback:** load a take, mute personas, scrub by bar.
 5. **Mind:** a `think(context)` interface on each persona with a rules backend first; a `kc-mind` MLX sidecar over localhost; a reply schema per persona; `mind:status`; at most one request in flight per persona and one decision per bar; a reply more than 2 bars late is dropped.
 6. Apple Intelligence backend through a Swift helper.
-7. **Mind 3, the personality layer (#1464):** hidden per-persona engagement scores (persisted on the machine, decaying over long absences, readable only in the dev panel's MIND tab), four tiers that govern how often and how strongly each persona shows herself and how long LOIS and Davis may speak, cool-down instead of demotion, the zodiac character (Davis Gemini, LOIS Cancer, the third Capricorn) modulated by one startup calendar reading, and the third's ghost on the Stimuli meter. Runs the same on the rules as on Apple; every shaping is recorded in the take (`traits`, mind record v2).
+7. **Mind 3, the personality layer (#1464):** hidden per-persona engagement scores (persisted on the machine, decaying over long absences, readable only in the dev panel's MIND tab), four tiers that govern how often and how strongly each persona shows herself and how long LOIS and Davis may speak, cool-down instead of demotion, the zodiac character (Davis Gemini, LOIS Cancer, the third Libra; the Governor is Capricorn, Jan 8 1977, recorded but not yet read) modulated by one startup calendar reading, and the third's ghost on the Stimuli meter. Runs the same on the rules as on Apple; every shaping is recorded in the take (`traits`, mind record v2).
 
 ## Still open
 

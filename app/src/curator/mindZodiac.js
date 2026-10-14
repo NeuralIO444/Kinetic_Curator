@@ -1,7 +1,9 @@
 // mindZodiac.js — #1464 Mind 3: the personas' zodiac character. Pure: every reading takes a Date the caller supplies.
 //
-// Matt's canon (2026-10-13): Davis — Gemini, June 13, 1971. LOIS (George Lois) — Cancer, June 26, 1931. The third —
-// Capricorn, January 8, 1977. The sign is worked out from the birthday (never typed in twice), and it colours each
+// Matt's canon: Davis — Gemini, June 13, 1971. LOIS (George Lois) — Cancer, June 26, 1931. The third — Libra,
+// September 23, 1983 (2026-10-14; she was Capricorn in the first draft). The Governor — Capricorn, January 8, 1977
+// (2026-10-14): canon, but the Governor is not one of the minds, so nothing reads its sign yet. The sign is worked out
+// from the birthday (never typed in twice), and it colours each
 // persona's ONGOING behaviour: which moves they reach for, how often, how strongly, how long they rest between moves.
 // It is character, not decoration.
 //
@@ -15,8 +17,9 @@ import { MOON_PHASES, SEASONS } from './mindContext.js';
 export const BIRTHDAYS = Object.freeze({
   davis: Object.freeze([1971, 6, 13]),
   lois: Object.freeze([1931, 6, 26]),
-  queen: Object.freeze([1977, 1, 8]),
+  queen: Object.freeze([1983, 9, 23]),
 });
+
 
 // Tropical signs: the first day (month, day) each sign begins, in calendar order from Capricorn's January tail.
 const SIGN_STARTS = [
@@ -32,11 +35,15 @@ export function signOf(month, day) {
   return sign;
 }
 
+/** The Governor's birthday (canon, 2026-10-14). Not a mind persona: recorded here, read by nothing yet. */
+export const GOVERNOR_BIRTHDAY = Object.freeze([1977, 1, 8]);
+export const GOVERNOR_SIGN = signOf(GOVERNOR_BIRTHDAY[1], GOVERNOR_BIRTHDAY[2]);
+
 /** Each persona's sign, from the canon birthday. */
 export const SIGNS = Object.freeze(Object.fromEntries(Object.entries(BIRTHDAYS).map(([p, [, m, d]]) => [p, signOf(m, d)])));
 
 /**
- * The base colouring per sign (the three the personas were born under). Few, legible numbers — the dev panel shows them.
+ * The base colouring per sign (the personas' three, plus the Governor's). Few, legible numbers — the dev panel shows them.
  *   moves       the invented micro-expressions the persona reaches for (the faces); for the third, the kinds of presence
  *   tempo       how often a move comes (× the tier's frequency)
  *   intensity   how strongly it shows (× the tier's strength)
@@ -50,7 +57,9 @@ export const TEMPERAMENT = Object.freeze({
   gemini: Object.freeze({ moves: Object.freeze(['tinkering', 'double-take', 'restless', 'grin']), tempo: 1.3, intensity: 0.85, recharge: 3, hold: 1, season: 'spring', moonPull: 0.2 }),
   // Cancer, cardinal water: moody, guarded, sentimental; fewer moves, felt harder, long rests
   cancer: Object.freeze({ moves: Object.freeze(['brood', 'guarded', 'wistful', 'side-eye']), tempo: 0.8, intensity: 1.1, recharge: 8, hold: 3, season: 'summer', moonPull: 0.6 }),
-  // Capricorn, cardinal earth: patient, controlled, a slow build; rare presences that stay a while
+  // Libra, cardinal air: balance, harmony, an eye for beauty; measured presences that come when the room asks, then settle
+  libra: Object.freeze({ moves: Object.freeze(['warm', 'drift', 'lean']), tempo: 0.85, intensity: 0.95, recharge: 10, hold: 4, season: 'autumn', moonPull: 0.2 }),
+  // Capricorn, cardinal earth (the Governor's sign): patient, controlled, a slow build. Kept for the Governor; no mind reads it yet
   capricorn: Object.freeze({ moves: Object.freeze(['warm', 'drift', 'lean']), tempo: 0.7, intensity: 1, recharge: 12, hold: 4, season: 'winter', moonPull: 0.2 }),
 });
 
