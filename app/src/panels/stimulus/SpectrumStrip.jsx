@@ -21,7 +21,7 @@ export function SpectrumStrip() {
       const g = cv.getContext('2d');
       const css = getComputedStyle(cv);
       const ink = css.getPropertyValue('--ink').trim() || '#e8e8e0';
-      const accent = css.getPropertyValue('--accent').trim() || '#ff2d6f';
+      const accent = css.getPropertyValue('--accent').trim() || ink;
       g.clearRect(0, 0, w, h);
       const s = readSpectrum();
       const bw = w / LOG_BINS;
