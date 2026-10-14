@@ -198,7 +198,12 @@ const PINS = {
   // Re-pinned 2026-10-12 for #1408 (intentional): contact discs now size
   // from each mark's live scale (radius-from-scale), so a contacts bake's
   // trajectory legitimately moves. Placement goldens are unaffected.
-  'detTrig.contacts': '49eafa2b552dcd347bd09316fbb925a5d5ec3913284c3d636be99774e9d6cb2a',
+  // Re-pinned 2026-10-13 for #1414 (intentional): inside the dish the wind
+  // is a current (advection by mass, dishCurrents), so a contacts bake
+  // under wind rides it and the trajectory legitimately moves. The swarm
+  // and hype pins (gate closed) are unchanged. Placement goldens are
+  // unaffected.
+  'detTrig.contacts': 'cc58d2e48dee1ee07cf06bbac2f53ec061fa6cca4c41095a60f9f84f3295cd88',
 };
 {
   const fixtures = {
