@@ -263,7 +263,10 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
 
 // ── the doctrine: features at lead coordinates ──────────────────────
 {
-  assert.strictEqual(FEATURES_VERSION, 3, 'FEATURES_VERSION is untouched');
+  // #1545: the version literal this pin once held (3) was a proxy for the
+  // property below — variant-ness contributes nothing to the feature
+  // vector. FEATURES_VERSION legitimately moved to 4 when the scaleMid
+  // axis was fixed; the doctrine is the deep-equals, not the number.
   const run = runMiner({ ...SMOKE, batchSize: 24 });
   const vf = run.finalists.find((f) => f.sample.cast.some((id) => V.isVariantId(id)))
     || run.baked.find((c) => c.sample.cast.some((id) => V.isVariantId(id)));
@@ -272,6 +275,7 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
   const leadCast = sample.cast.map((id) => sample.variants?.[id]?.parents?.[0] ?? id);
   const direct = recipeFeatures({ layoutParams: sample.layoutParams, paletteId: sample.paletteId, assets: leadCast });
   const bakedOne = run.baked.find((c) => c.sample.index === sample.index);
+  assert.strictEqual(bakedOne.features.v, FEATURES_VERSION, 'candidate features carry the current FEATURES_VERSION — variants add no version of their own');
   assert.deepStrictEqual(bakedOne.features.cast, direct.cast, 'candidate features: the cast reads as the lead cast');
   assert.deepStrictEqual(bakedOne.features.castCategories, direct.castCategories, 'candidate features: categories are the lead families — no “unknown”, no variant axis');
   const keepFeat = featuresOfKeep(bakedOne.record);
