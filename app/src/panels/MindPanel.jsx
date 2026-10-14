@@ -17,6 +17,7 @@ function Conducting() {
       <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
         Conducting: {t.on ? 'audio on' : 'audio off'} · tier {t.tier ?? 'none'}{t.cooling ? ' · backing off' : ''}
         {t.on ? ` · ${t.energy ?? 'no energy yet'}${t.bpm ? ` · ${Math.round(t.bpm)} bpm` : ''}${t.silent ? ' · silent' : ''} · flat ${t.flatBars} bar${t.flatBars === 1 ? '' : 's'}` : ''}
+        {t.on ? ` · LOIS calls it flat under ${t.flatBelow.toFixed(3)} (${t.bias > 0.05 ? 'tight: passes piling up' : t.bias < -0.05 ? 'loose: you are keeping' : 'neutral'})` : ''}
       </p>
       <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
         His routes {t.mine} of {t.routes} · owned by you: {t.owned.length ? t.owned.join(', ') : 'none'}

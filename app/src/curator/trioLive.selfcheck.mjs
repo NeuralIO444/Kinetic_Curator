@@ -18,7 +18,7 @@ const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
 const ADD = { op: 'add', input: 'band.mids', target: 'render.glow', depth: 0.3 };
 /** A fresh trio on a fake store: state { audioRoutes, layoutParams }, a setter that mimics the bus -> store path. */
-function rig({ tier = 't3', replaying = false } = {}) {
+function rig({ tier = 't3', replaying = false, activity = null } = {}) {
   const st = { audioRoutes: null, layoutParams: { squash: 0, audioAlphaMod: 0.25 } };
   const subs = [];
   const set = (patch) => { const prev = { ...st }; Object.assign(st, patch); subs.forEach((f) => f(st, prev)); };
@@ -29,6 +29,7 @@ function rig({ tier = 't3', replaying = false } = {}) {
   const ctl = { replaying, tier };
   const trio = startTrio({
     getRoutes: () => st.audioRoutes, getTier: () => ctl.tier, getBands: () => [0.5, 0.4, 0.3, 0.3, 0.2, 0.2, 0.1],
+    getActivity: activity ? () => activity : null,
     isReplaying: () => ctl.replaying, subscribe: (f) => { subs.push(f); return () => {}; },
   });
   const bar = (b) => emit(Events.CLOCK_BAR, { bar: b });
@@ -218,6 +219,24 @@ ok('the take records what he did and replays it; a take without conducting is un
   cur.seek(0); assert.equal(cur.conductStep(200).length, 2, 'a seek re-arms the cursor');
   const plain = createMindRecorder({ getFrame: () => 1 }).finish();
   assert.equal('conduct' in plain, false, 'no conducting: the section is exactly what it was');
+});
+
+ok('LOIS\'s keep-rate moves the threshold she calls a show flat at, and the dev view says so', () => {
+  const read = (activity) => {
+    const g = rig({ activity });
+    audioOn(); g.bar(1);
+    const v = getTrioView();
+    g.done();
+    return v;
+  };
+  const neutral = read(null);
+  assert.equal(neutral.bias, 0); assert.ok(Math.abs(neutral.flatBelow - 0.03) < 1e-9, 'no activity read: the base threshold');
+  const passing = read({ keeps: 0, rolls: 12 });
+  assert.ok(passing.bias > 0.99 && passing.flatBelow > neutral.flatBelow, 'passes pile up: she calls it flat sooner');
+  const keeping = read({ keeps: 5, rolls: 12 });
+  assert.ok(keeping.bias < -0.99 && keeping.flatBelow < neutral.flatBelow, 'you are keeping: she lets it ride');
+  const broken = rig({ activity: null });
+  broken.done();
 });
 
 ok('the dev view: tier, what he holds, what waits, the last twelve outcomes newest first; null when stopped', () => {
