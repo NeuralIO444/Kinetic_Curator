@@ -52,8 +52,8 @@ const byId = new Map(ASSETS.map((a) => [a.id, a]));
 // Deliberately includes tray-invisible families (radial, crystalline)
 // from E1a: the census deals casts directly, no scorer funnel.
 export const CAST_IDS = [
-  'geo_tri_01', 'org_blob_04', 'haeckel_radiolaria_03', 'crys_shard_02',
-  'dot_grid_03', 'line_wave_02', 'stamp_burst_01', 'floral_vine_02',
+  'geo_tri_01', 'org_blob_04', 'rad_rings_01', 'xsh01',
+  'dot_field_01', 'line_squiggle_01', 'stamp_num_01', 'flora_flower_01',
 ];
 export const CAST = CAST_IDS.map((id) => byId.get(id)).filter(Boolean);
 
@@ -928,8 +928,13 @@ export function renderReachability() {
   const grid = createGrid(48, 34);
   for (let i = 0; i < 12; i++) stepGrid(grid);
   const separation = {
-    noiseVsGridAtDisplacement: fingerprintItems(place({ ...PLACE_BASE, mode: 'noise', count: 60, displacement: 120 }), PLACE_FIELDS)
-      !== fingerprintItems(place({ ...PLACE_BASE, mode: 'grid', count: 60, displacement: 120 }), PLACE_FIELDS),
+    // 'noise' registers the grid sampler itself (kernel/sample/
+    // registry.js: "noise registers the grid fn itself") — the alias
+    // is by design, and displacement (a mode-agnostic warp) does not
+    // separate them either. The mode's identity is the live warp
+    // phase, not the placed field.
+    noiseIsGridAliasAtDisplacement: fingerprintItems(place({ ...PLACE_BASE, mode: 'noise', count: 60, displacement: 120 }), PLACE_FIELDS)
+      === fingerprintItems(place({ ...PLACE_BASE, mode: 'grid', count: 60, displacement: 120 }), PLACE_FIELDS),
     caVsRandomWithGrid: fingerprintItems(place({ ...PLACE_BASE, mode: 'ca', count: 60 }, { caGrid: grid }), PLACE_FIELDS)
       !== fingerprintItems(place({ ...PLACE_BASE, mode: 'random', count: 60 }, { caGrid: grid }), PLACE_FIELDS),
     phylloVsFibonacciAtDivergence: fingerprintItems(place({ ...PLACE_BASE, mode: 'phyllotaxis', count: 60, phylloDivergence: -20 }), PLACE_FIELDS)
@@ -995,7 +1000,7 @@ export function formatCensusReport({ paramRows, dishRows, reach, store }) {
   L.push(`  palettes: ${reach.palettes.rows.length} measured, ${reach.palettes.distinct} distinct stills; still collisions: ${JSON.stringify(reach.palettes.stillCollisions)}; resolved-colour collisions: ${JSON.stringify(reach.palettes.resolvedCollisions)}`);
   L.push(`  layouts: ${reach.layouts.rows.length} modes, ${reach.layouts.distinct} distinct signatures; collisions: ${JSON.stringify(reach.layouts.collisions)}`);
   const sep = reach.layouts.separation;
-  L.push(`  separation: noise!=grid at displacement 120: ${sep.noiseVsGridAtDisplacement}; ca!=random with a CA grid: ${sep.caVsRandomWithGrid}; phyllotaxis!=fibonacci at divergence -20: ${sep.phylloVsFibonacciAtDivergence}; live-mode bakes distinct: ${sep.liveModeBakesDistinct}/3`);
+  L.push(`  separation: noise is the grid sampler's alias even at displacement 120: ${sep.noiseIsGridAliasAtDisplacement}; ca!=random with a CA grid: ${sep.caVsRandomWithGrid}; phyllotaxis!=fibonacci at divergence -20: ${sep.phylloVsFibonacciAtDivergence}; live-mode bakes distinct: ${sep.liveModeBakesDistinct}/3`);
   if (store) {
     L.push('');
     L.push('Store-level census (write path, evolve, RA6, PA3)');
