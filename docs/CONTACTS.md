@@ -272,3 +272,92 @@ B1's at the end of `update()`.
   follows contacts. The engine takes an update-level
   `coalesce: false` (spread-only) that silences feed and compose;
   the byte-identity tests drive it.
+
+## Pigment exchange + contact density (#1412, petri dish B3)
+
+Sustained contact stops being only a membrane: the two bodies trade
+colour, and the grid itself starts reporting how crowded the dish
+is. Two deliverables, one stage: the exchange (the soul of the dish —
+colour earned by neighbourhood) and the density field (the signal
+#1355's formation thresholds were promised).
+
+### Pigment exchange
+
+The law lives in `app/src/engine/dishPigment.mjs`; particles.js
+takes call sites only (the step beside B2's at the end of `update()`,
+plus a palette-sync beside #278's re-resolve).
+
+- **Pairs.** The trade runs on B2's coalescing pairs, read through
+  `coalescePairs` — the dwell law is written once, in dishCoalesce.
+  The weight is the pair's merge factor: below the dwell gate
+  nothing trades, a full merge trades at the full rate. Family is
+  B2's family (the stratum), so cross-strata pairs never trade.
+- **The trade.** Each body closes a fraction
+  `(1 − exp(−0.05 · dt)) × factor` of the remaining gap to its
+  partner per step — the exponential is the rate cap: at full merge
+  a body closes at most 5% of the gap per second, so colonies
+  measurably converge over ~60 s of contact and can never snap.
+  One delta is computed from the pre-step snapshot and applied
+  +d / −d, so the pair's mean colour is conserved exactly and the
+  gap shrinks monotonically — no overshoot, ever. The trade crosses
+  only an actual touch (the feed's near-touch test): a separated
+  pair's draining dwell fades the membrane, but no pigment crosses
+  a gap.
+- **State.** The trade moves the engine's one pigment working copy
+  (`leakRgb`, #287) — leak drifts it toward the neighbourhood
+  average, exchange trades it pairwise; one store, two honest
+  forces. Earned colour reaches `color[]` by write-back on the #287
+  discipline: quantized to 4 bits per channel, written only when
+  the hex actually changes, so the atlas bakes once per visible
+  shift. A palette re-deal re-seeds the working copy from the new
+  colours — earned pigment belongs to the palette that earned it.
+- **History.** Nothing decays the working copy back toward the
+  palette: a body removed from contact keeps its earned colour
+  exactly. Exchange is history, not a shader trick.
+- **Physics honesty.** The step writes colour state only.
+  `dishPigment.selfcheck.mjs` pins the closed form (dwell-weighted,
+  mean-conserving, monotone), the 60 s convergence probe, history,
+  and B1's byte-identity shape: exchange on vs off — and
+  reduced-motion vs full motion — are bit-identical in every
+  physics column.
+- **Stillness.** Under reduced-motion the trade does not accrue
+  (the dwell still tracks underneath). Pigment has no rest state
+  to settle into, so trading under the stillness would repaint
+  bodies the moment it lifted — the pop B1's law forbids.
+- **Governor.** Exchange is cost tier 2 (`engine/dish-pigment`),
+  deform's rung: `dishPigmentShed` (perfTier1 on AND quality at
+  performance) reaches the step spread-only via
+  `layoutParams.pigmentShed` and stops the trade; colour already
+  earned is history and stays — a shed never repaints a body.
+  Stills and exports carry no governor state, so their bakes never
+  shed and trade exactly as the live dish did.
+- **Switch.** No artist knob: exchange follows contacts. The
+  engine takes an update-level `pigment: false` (spread-only)
+  that silences the step and the palette sync.
+
+### Contact-density field
+
+The law lives in `app/src/engine/dishDensity.mjs`; the shared pass
+stamps it, the resolver publishes it, the shell puts it on the bus.
+
+- **Field.** `runDishContacts`' counting sort already counts every
+  enrolled body into a cell per tick; the pass now stamps those
+  counts onto the session as a field — `{ cellSize, originX,
+  originY, cols, rows, counts, total, max, tick }` in the grid's own
+  geometry (cell = 2 × the largest disc radius). Measurements only:
+  nothing reads the field back into physics.
+- **Ticks.** The tick advances once per consumed arm. An arm that
+  builds no grid (too few living bodies) stamps the EMPTY field,
+  and a frame whose pass never ran (dish off, one stratum, slow
+  render) publishes the empty field — never a stale crowd.
+- **Publication.** The resolver publishes the frame's field after
+  the layer loop (`publishDishDensity`); the App frame tap bridges
+  it to the typed bus as `dish:density` (`Events.DISH_DENSITY`,
+  via curator/dishDensityLive.js, with a pull getter beside it —
+  the dishPressure precedent). Formation checks and telemetry read
+  `sampleDishDensity` / `dishDensityShare` (share saturates at
+  `DISH_DENSITY_SATURATE` bodies per cell — an open tunable, like
+  dish pressure's) from the payload with no engine change.
+- **Parity.** The field is a pure function of the pass, so the bake
+  driver computes identical fields on its own session for identical
+  steps (it simply never publishes to the live holder).
