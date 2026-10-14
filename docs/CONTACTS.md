@@ -622,3 +622,125 @@ call site only, the drivers take the tick.
   gate, per the issue's "with ACCUM up." ACCUM off is the off,
   and it is exact.
 
+## Ecology — one global cap, breed/die as population (#1416, petri dish C4)
+
+The lane's final stage: population stops being a per-system toy
+and becomes a dish regime. The law lives in
+`app/src/engine/dishEcology.mjs`; `particles.js` and
+`dishContacts.mjs` take call sites only, the drivers take the
+enrolment fields.
+
+- **The mode.** Ecology is a MODE on the dish (spec open
+  question 3, the spec's recommendation): the per-Look `ecology`
+  boolean, default OFF, beside A3's `dish` switch in the layout
+  params. While the mode is off, an enrolled stratum's breed/die
+  contact events do not fire in the dish at all — its populations
+  are exactly as dealt, for the whole run (the acceptance line,
+  pinned bit-for-bit against the same dish dealt mode `none`).
+  A system updated with no session (the #167 lab path,
+  `bakeParticles`) is outside the regime entirely and runs
+  exactly as #167 shipped it, mode or no mode. No migration
+  case for old saves: every shipped voice and preset carries
+  `contactRadius` 0 (A3's record), so no existing document
+  enrols and nothing pre-C4 changes behaviour.
+- **Participation.** A stratum is governed when it is enrolled
+  at radius > 0 (the C1 gate: in the dish) and its enrolment
+  carries the mode on. Enrolment carries the mode and the
+  governor's cap — the threaded `maxParticles` — exactly as it
+  carries WETNESS (C1) and the ACCUMULATION switch (C3); the
+  resolver and the bake driver enrol through the same helper,
+  so live and bake cannot disagree about the regime. A stratum
+  the DISH switch enrols at radius 0 is not in the dish:
+  ecology does not touch it and its #167 pass runs as dealt.
+- **The global cap.** The ledger lives on the session
+  (`session.ecology`), created by the first ecology enrolment.
+  The global cap G is the **sum of the participating strata's
+  dealt caps** — the governor's own numbers, pooled; no new
+  budget number is minted. Each cap becomes a **share**: not a
+  ceiling (a stratum may breed past its share on share other
+  strata are not using — the acceptance run's 10-cap stratum
+  reaches 40), but a guarantee (while a stratum is under its
+  share, the pool has room for it). What is enforced, before
+  every birth, is the pool: the dish's living total never
+  exceeds G on any frame. The books are accounting, kept
+  exactly: enrolment refreshes each member's living count from
+  its alive column (enrolment precedes the update in both
+  drivers), and every birth and death inside the pass notes
+  itself the moment it happens, so a later stratum's gate in
+  the same step reads exact books. A released stratum leaves
+  the ledger — its share leaves the pool with it (a trail
+  belongs to the ground and outlives its stratum; a cap share
+  belongs to the living and does not).
+- **The breed gate.** A breed event fires only when the
+  parents' local density reads sparse: `dishDensityShare`
+  (B3's field) at the parents' midpoint under
+  ECOLOGY_BREED_DENSITY_SHARE (0.5 — half saturation, 4 bodies
+  in the cell, is a crowd, not free space). `update()` resolves
+  ecology after the cross-strata pass, so every stratum reads
+  the field the pass just stamped this step. No field — a
+  session that never armed — reads as empty: the density gate
+  opens and only the cap binds (the crowding signal is the
+  shared grid's; a lone stratum has no shared grid, so its
+  ecology is cap-only). Growth still requires the dealt breed
+  mode: the gate tunes births, it does not invent them.
+- **Die pressure.** Contact deaths alone cannot thin a packed
+  colony — a resting crowd has no approach events. So each
+  participating body carries an exposure column (`ecoCrowd`,
+  step-counted like B2's dwell): a step spent above
+  ECOLOGY_CROWD_SHARE (0.5 — the stage's one definition of
+  crowded, the breed gate's line) accrues exposure in
+  proportion to the excess (a saturated cell accrues a full
+  unit per step); a step at or below the line sheds
+  ECOLOGY_RELIEF (0.5). At ECOLOGY_DIE_EXPOSURE (240 — ≈4 s of
+  saturated crowding) a body is ripe, and the step kills at
+  most ECOLOGY_DIE_PER_STEP (1) per system — the ripest first,
+  ties by lowest index — through the ordinary death path. The
+  one-per-step budget makes it thinning, not a cull: each
+  death lowers the density feeding the accrual, so the
+  pressure relieves itself as the colony thins. Pressure
+  applies to every participating stratum whatever its dealt
+  mode — growth and thinning are the mode's two halves — and
+  the dealt die mode still fires on contact under the mode,
+  ledger noted. A newborn starts unexposed (its slot's previous
+  life is wiped at breed, beside the deform/coalesce resets);
+  a re-seed zeroes the column with the cast.
+- **Acceptance, measured.** Breed-heavy dish (caps 50 + 10,
+  rosters 20 + 10), 1200 steps: the living total reaches
+  exactly 60 and never exceeds it on any frame; the 10-cap
+  stratum reaches 40 on borrowed share; the ledger matches the
+  alive columns at every step. A 36-body small-mark colony
+  packed under a hero-sized grid cell (192 px) with mode
+  `none` dealt thins 36 → 31 over 1500 steps on pressure
+  alone. An isolated colony in free space multiplies 8 → 60
+  (its whole pool); the same colony packed under the hero's
+  cells does not grow at all, and grows again without the
+  hero — the gate, not the mode, is the mover.
+- **Determinism & parity.** Ledger, gate, and exposure are
+  pure functions of (seed, params, steps) — no clock, no dice;
+  pressure deaths are chosen by exposure and index only. The
+  bake enrols and steps through the same helpers, so a baked
+  dish breeds, is gated, and thins exactly as the live one
+  (the suite's bake probe: on repeats bit for bit and fills
+  the pool 48 → 60; off is the dealt roster, 48).
+- **Stillness.** Under reduced-motion the pressure step holds
+  entirely — no accrual, no deaths (B3's precedent: state that
+  produces visible change does not accrue under the stillness).
+  The breed gate is contact law, not accrual — like the medium
+  (C1) it has no reduced-motion split.
+- **Governor.** No cost tier and no shed — the C1/C2/C3
+  precedent, followed deliberately: a shed that rewrote
+  population law mid-performance would desync the bake from
+  the live dish. §7's ladder lists body counts last, and that
+  rung is the cap itself: the governor's budget IS this
+  stage's governor surface, enforced as accounting rather
+  than as a fidelity shed. The cost is bounded and declared:
+  one Float64 column per body, one density sample per body
+  per step (participating strata only), one O(total) count
+  per enrolment.
+- **Switch.** The `ecology` param is the switch, riding the
+  ordinary param path (`PARAM_SPEC` BOOL keys at the trust
+  boundary, persisted per Look like `dish`). No panel control
+  yet — the contact params' own panel half is likewise a
+  separate pass (see the #167 follow-ups); the mode rides
+  voices and presets until then.
+

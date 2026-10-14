@@ -34,6 +34,7 @@ import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 �
 import { dishMediumFor, mediumClingCapture, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module)
 import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
 import { dishTrailsFor, sampleTrailReadGradient, NO_TRAILS, TRAIL_GAIN } from './dishTrails.mjs'; // #1415 — trails: the stigmergy substrate (call sites below; the law lives in the module)
+import { dishEcologyFor, ecologyBreedAllowed, ecologyNoteBirth, ecologyNoteDeath, stepDishEcology } from './dishEcology.mjs'; // #1416 — ecology: the dish's population regime (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -196,6 +197,11 @@ export class ParticleSystem {
     this.deformAmt = new Float64Array(cap);
     this.deformAxisX = new Float64Array(cap).fill(1);
     this.deformAxisY = new Float64Array(cap);
+    // #1416 — petri dish C4 ecology: per-body crowding exposure
+    // (step-counted die-pressure state; law in dishEcology.mjs).
+    // State only — no physics loop reads it; the pressure step that
+    // consumes it can only kill through the ordinary death path.
+    this.ecoCrowd = new Float64Array(cap);
     this.scale = new Float64Array(cap);
     // #451 — scale before the #287 breath multiplier, so a sort key can
     // rank items by their designed size without the ±50% breath swing
@@ -275,6 +281,7 @@ export class ParticleSystem {
     this.deformAmt = grow(this.deformAmt);
     this.deformAxisX = grow(this.deformAxisX);
     this.deformAxisY = grow(this.deformAxisY);
+    this.ecoCrowd = grow(this.ecoCrowd); // #1416 — exposure survives population growth
     this.scale = grow(this.scale);
     this.baseScale = grow(this.baseScale);
     this.rotation = grow(this.rotation);
@@ -368,6 +375,9 @@ export class ParticleSystem {
     // #1410 — a fresh cast starts undented.
     this.deformMem.fill(0);
     this.deformAmt.fill(0);
+    // #1416 — and unexposed: no body carries crowding pressure
+    // across a re-seed.
+    this.ecoCrowd.fill(0);
     // #1411 — and unmerged: no pair carries dwell across a re-seed.
     clearDishCoalesce(this);
     // #278 — colors were just (re)assigned from this swatch set.
@@ -579,13 +589,23 @@ export class ParticleSystem {
    *
    * @param {object} ctx radius, restitution, repel, mode, umask, breedCap,
    *   seed, organism, minScale, maxScale, minAlpha, maxAlpha, medium
-   *   (#1413 — the resolved dishMediumFor() curves; absent = dry)
+   *   (#1413 — the resolved dishMediumFor() curves; absent = dry),
+   *   ecology (#1416 — the resolved dishEcologyFor() state; absent =
+   *   outside the dish, the pass exactly as #167 shipped it)
    */
   _contactPass(ctx) {
     const {
       radius, restitution, repel, mode, umask, breedCap, seed, organism,
-      minScale, maxScale, minAlpha, maxAlpha, seedOffsets, medium,
+      minScale, maxScale, minAlpha, maxAlpha, seedOffsets, medium, ecology,
     } = ctx;
+    // #1416 — ecology's governance of this pass (law in
+    // dishEcology.mjs): absent/null = not in the dish (population
+    // events exactly as dealt); { on: false } = in the dish with the
+    // mode off (breed/die events suppressed — populations exactly as
+    // dealt); { on: true } = in the mode (breed gated by density and
+    // the pooled cap, births/deaths noted on the ledger).
+    const eco = ecology || null;
+    const ecoOn = !!(eco && eco.on);
     const med = medium || DRY_MEDIUM; // #1413 — no medium handed in: the dry path
     const T = this._trig; // #1240 — trig source (native Math.* by default)
     const n0 = this.n;
@@ -752,15 +772,34 @@ export class ParticleSystem {
               this.contactTrim[i] = this.contactTrim[j];
               this.contactTrim[j] = tt;
             } else if (wantDie) {
-              ALIVE[j] = 0;
-              this._dead.push(j);
+              // #1416 — in the dish with the ecology mode off, the
+              // event is suppressed (populations exactly as dealt);
+              // in the mode, the death fires as dealt and is noted.
+              if (!eco || ecoOn) {
+                ALIVE[j] = 0;
+                this._dead.push(j);
+                if (ecoOn) ecologyNoteDeath(eco);
+              }
             } else if (wantBreed) {
-              const cs = this._breed(
-                i, j, seed, breedCap,
-                minScale, maxScale, minAlpha, maxAlpha,
-                seedOffsets,
-              );
-              if (cs >= 0) newborn.add(cs);
+              // #1416 — the breed gate (law in dishEcology.mjs): in
+              // the dish with the mode off the event is suppressed;
+              // in the mode it must read sparse at the parents'
+              // midpoint and fit the pooled cap before it fires.
+              if (eco && !ecoOn) {
+                // suppressed — the dish's populations are as dealt
+              } else if (ecoOn && !ecologyBreedAllowed(eco, (xi + X[j]) / 2, (yi + Y[j]) / 2)) {
+                // gated — crowded ground, or the pool is full
+              } else {
+                const cs = this._breed(
+                  i, j, seed, breedCap,
+                  minScale, maxScale, minAlpha, maxAlpha,
+                  seedOffsets,
+                );
+                if (cs >= 0) {
+                  newborn.add(cs);
+                  if (ecoOn) ecologyNoteBirth(eco);
+                }
+              }
             }
           }
         }
@@ -856,6 +895,7 @@ export class ParticleSystem {
     this.leakRgb[cs * 3 + 2] = this.leakRgb[cp3 + 2];
     clearDishDeform(this, cs); // #1410 — a newborn starts undented
     clearDishCoalesceSlot(this, cs); // #1411 — and inherits no pair's dwell
+    this.ecoCrowd[cs] = 0; // #1416 — and no dead body's crowding exposure
     return cs;
   }
 
@@ -1408,6 +1448,15 @@ export class ParticleSystem {
     const dishSession = layoutParams.dishSession || null;
     if (dishSession && dishSession.armed) runDishContacts(dishSession, this);
 
+    // #1416 — petri dish C4: this step's ecology resolution (law in
+    // dishEcology.mjs), taken AFTER the cross-strata pass so the
+    // breed gate and the pressure step below read the density field
+    // the pass just stamped (B3) — every stratum in the step reads
+    // the same step's field. Null outside the dish (no session, not
+    // enrolled, or enrolment radius 0): the contact pass and the
+    // population run exactly as #167 shipped them.
+    const ecology = contactRadius > 0 ? dishEcologyFor(dishSession, this) : null;
+
     // #167 — contact pass. Between forces and integration so impulses flow
     // through the same damping, speed clamp, and wall handling. Skipped
     // entirely when contactRadius is 0: the swarm is then bit-identical to
@@ -1430,11 +1479,17 @@ export class ParticleSystem {
         mode: CONTACT_MODES.includes(contactMode) ? contactMode : 'none',
         umask: collideMask >>> 0,
         medium,
+        ecology,
         // #167 — breed grows the population only under the quality cap.
         // Callers thread it in (useSwarmTick: caps.maxParticles; studio
         // bake: caps.maxParticles); without it breed only recycles dead
         // slots and never grows n.
-        breedCap: Number.isFinite(maxParticles) ? maxParticles : this.n,
+        // #1416 — in the ecology mode the pooled ledger is the cap
+        // (the pass's gate checks it before every birth), so the
+        // per-system ceiling steps aside entirely.
+        breedCap: ecology && ecology.on
+          ? Infinity
+          : (Number.isFinite(maxParticles) ? maxParticles : this.n),
         seed: seed >>> 0,
         seedOffsets,
         organism,
@@ -1606,6 +1661,14 @@ export class ParticleSystem {
     // writes the pigment working copy and color[], never a physics
     // column, so it runs after the coalescence step by construction.
     stepDishPigment(this, dtSec, { reducedMotion: deformStill, shed: !!layoutParams.pigmentShed });
+    // #1416 — petri dish C4: sustained crowding thins (law in
+    // dishEcology.mjs). Population state only — the step accrues
+    // exposure and kills through the ordinary death path; no physics
+    // column moves. Participating strata only (the resolution is
+    // null or off everywhere else).
+    if (ecology && ecology.on) {
+      stepDishEcology(this, ecology, { reducedMotion: deformStill });
+    }
   }
 
   getItems(activeAssets) {
