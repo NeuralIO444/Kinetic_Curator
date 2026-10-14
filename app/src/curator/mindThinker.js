@@ -15,7 +15,7 @@ import { rulesReply } from './mindRules.js';
 
 export const MAX_LATE_BARS = 2;
 /** The two backends, in the order they are asked. */
-export const BACKENDS = Object.freeze(['apple', 'rules']);
+export const BACKENDS = Object.freeze(['apple', 'rules', 'demo']); // 'demo': the ?debug=mind stand-in, never shipped live
 
 /**
  * @param persona   'davis' | 'lois' | 'queen'

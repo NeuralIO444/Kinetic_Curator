@@ -25,21 +25,23 @@ const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, 
 /**
  * @param getSnapshot () => the plain object buildContext takes
  * @param getSeed     () => the document seed
- * @param apple       optional { ask(persona, context, { seed, bar }) => Promise<reply>, available() => boolean } — the
- *                    Apple Intelligence helper (Mind 3, #1464). Absent = rules only.
+ * @param model       optional { name?, ask(persona, context, { seed, bar }) => Promise<reply>, available() => boolean } —
+ *                    the model backend: the Apple Intelligence helper (Mind 2, #1463, name 'apple'), or the ?debug=mind
+ *                    demo (name 'demo'). Absent = rules only. The name is what the books record.
  * @param isReplaying () => boolean: a take is playing back (the personas are muted)
  * @returns stop()
  */
-export function startMind({ getSnapshot, getSeed, apple = null, isReplaying = () => false, log = () => {} }) {
-  const available = () => { try { return !!(apple && apple.available()); } catch { return false; } };
+export function startMind({ getSnapshot, getSeed, model = null, isReplaying = () => false, log = () => {} }) {
+  const name = model && model.name === 'demo' ? 'demo' : 'apple';
+  const available = () => { try { return !!(model && model.available()); } catch { return false; } };
   const thinkers = PERSONAS.map((persona) => createThinker({
-    persona, log, available, backend: 'apple',
-    mind: apple ? (context, meta) => apple.ask(persona, context, meta) : null,
+    persona, log, available, backend: name,
+    mind: model ? (context, meta) => model.ask(persona, context, meta) : null,
   }));
   let status = null;
   const publishStatus = () => {
     const up = available();
-    const next = { available: up, backend: up ? 'apple' : 'rules' };
+    const next = { available: up, backend: up ? name : 'rules' };
     if (status && status.backend === next.backend) return;
     status = next;
     emit(Events.MIND_STATUS, next, { cause: 'mind' });
