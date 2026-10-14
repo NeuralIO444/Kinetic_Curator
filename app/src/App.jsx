@@ -42,6 +42,8 @@ import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: th
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
+import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
+import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
 import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/playback.mjs'; // #1462: a take's decisions replay
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
@@ -125,8 +127,10 @@ function AppInner() {
     const roomCodes = () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; };
     // #1462 — Mind 1: once a bar each persona thinks about the room. Rules alone (the Apple helper is Mind 3, #1464):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
+    const stopFaces = startMindFaces();
     const stopMind = startMind({
       isReplaying: isPlaybackActive,
+      model: DEBUG_MIND ? demoModel : null,
       getSeed: () => useStore.getState().seed,
       getSnapshot: () => {
         const st = useStore.getState();
@@ -140,7 +144,7 @@ function AppInner() {
     });
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     setPlaybackFrameTap((frame, perf, o) => replayMindFrame(frame, perf && perf.mind, o));
-    const offPlayback = subscribePlayback(() => { if (!isPlaybackActive()) endMindReplay(); });
+    const offPlayback = subscribePlayback(() => { endMindReplay(); resetMindFaces(); }); // a take starts or ends: fresh faces
     // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
     // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
     const set = createSet({
@@ -158,7 +162,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopMind(); stopFaces(); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

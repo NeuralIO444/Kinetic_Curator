@@ -132,7 +132,7 @@ await ok('the live driver: each bar every persona thinks once, as telemetry, det
   emit(Events.CLOCK_BAR, { bar: 4, bpm: 120 });
   assert.deepEqual(again.slice(0, 3), seeds, 'the same seed and bar give the same decision seed');
   stop2(); off(); off2(); offBeat(); offLayout();
-  assert.equal(EVENT_REGISTRY.MIND_DECISION.handler, null);
+  assert.deepEqual(EVENT_REGISTRY.MIND_DECISION.handler, ['curator/mindFace.js']);
 });
 
 await ok('hidden and honest: no surface lists it; no store key holds it; pure modules read no clock; the app starts it', () => {
@@ -193,7 +193,7 @@ await ok('backend order: Apple when available, rules otherwise; status says whic
   let up = false;
   const apple = { available: () => up, ask: (persona, c, meta) => { asked.push([persona, meta.bar]); return Promise.resolve(persona === 'lois' ? { critique: null, state: { id: 'side-eye', intensity: 0.6, decay: 2 } } : persona === 'davis' ? { propose: null } : { mood: 'lift', lean: {} }); } };
   const offs = [on(Events.MIND_STATUS, (p) => statuses.push(p)), on(Events.MIND_REQUEST, (p, m) => requests.push([p, m])), on(Events.MIND_DECISION, (p) => decisions.push(p))];
-  const stop = startMind({ apple, getSnapshot: () => ({ room: { lois: 'VIBE', davis: 'FLOW' } }), getSeed: () => 1 });
+  const stop = startMind({ model: apple, getSnapshot: () => ({ room: { lois: 'VIBE', davis: 'FLOW' } }), getSeed: () => 1 });
   assert.deepEqual(statuses, [{ available: false, backend: 'rules' }]);
   emit(Events.CLOCK_BAR, { bar: 1 }); releaseTick('bar');
   assert.equal(asked.length, 0, 'unavailable: never asked');
@@ -221,7 +221,7 @@ await ok('a take records every decision verbatim; replay re-publishes it and ask
   const apple = { available: () => true, ask: () => { asked++; return Promise.resolve({ critique: null, state: { id: 'glint', intensity: 0.3, decay: 1 } }); } };
   const live = [];
   const offLive = on(Events.MIND_DECISION, (p, m) => live.push([p, m.cause]));
-  const stop = startMind({ apple, getSnapshot: () => ({ room: { lois: 'NOD', davis: 'FLOW' } }), getSeed: () => 77 });
+  const stop = startMind({ model: apple, getSnapshot: () => ({ room: { lois: 'NOD', davis: 'FLOW' } }), getSeed: () => 77 });
   frame = 10; emit(Events.CLOCK_BAR, { bar: 1 }); await tick(); await tick();
   frame = 20; emit(Events.CLOCK_BAR, { bar: 2 }); releaseTick('bar');
   stop(); setMindTap(null); offLive(); clearPending();
@@ -241,7 +241,7 @@ await ok('a take records every decision verbatim; replay re-publishes it and ask
   const askedBefore = asked;
   const replayed = []; const reqs = [];
   const offs = [on(Events.MIND_DECISION, (p, m) => replayed.push([p, m.cause])), on(Events.MIND_REQUEST, (p, m) => reqs.push([p, m.cause]))];
-  const muted = startMind({ apple, isReplaying: () => true, getSnapshot: () => ({}), getSeed: () => 77 });
+  const muted = startMind({ model: apple, isReplaying: () => true, getSnapshot: () => ({}), getSeed: () => 77 });
   emit(Events.CLOCK_BAR, { bar: 9 }); await tick();
   assert.equal(replayed.length, 0, 'while a take plays, nothing thinks');
   for (let f = 0; f <= 25; f++) replayMindFrame(f, record);

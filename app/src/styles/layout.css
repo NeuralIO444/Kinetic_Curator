@@ -978,3 +978,12 @@
 .take-strip-label { font-size: 10px; font-weight: 800; letter-spacing: 0.1em; color: var(--ink); white-space: nowrap; min-width: 92px; }
 .take-strip-range { flex: 1 1 auto; min-width: 60px; }
 .take-strip-note { font-size: 9px; letter-spacing: 0.1em; color: var(--dim); min-width: 24px; }
+
+/* #1462 — a mind request blends a state over the honest face: two layers in one cell, cross-faded by opacity over one
+   bar (the transition is set inline from the BEAT). The honest face is always underneath; with no request it is all
+   there is. */
+.mind-blend { display: inline-grid; }
+.mind-blend > .mind-honest, .mind-blend > .mind-over { grid-area: 1 / 1; }
+@media (prefers-reduced-motion: reduce) { .mind-blend > span { transition: none !important; } }
+/* an invented state's code is longer than the four-letter ones: it ends in an ellipsis rather than spilling */
+.lois-code { overflow: hidden; text-overflow: ellipsis; }
