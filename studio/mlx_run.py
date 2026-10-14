@@ -3,6 +3,7 @@
 
 Phase 1 (prove the loop):
     python3 studio/mlx_run.py --phase 1 --pool pool --count 200 [--hits hits.json]
+    python3 studio/mlx_run.py --phase 1 --ledgers <dir>   # #1173: keeps.jsonl + passes.jsonl, no HITS export
 
 Phase 2 (taste.json -> the app, #762):
     python3 studio/mlx_run.py --phase 2 --pool pool --recipes pool-recipes \\
@@ -119,6 +120,33 @@ def phase1(p, args):
         p.report["synthetic"] = True
         if "labels-synthetic" not in p.report["steps"]:
             p.report["steps"]["labels-synthetic"] = "ok"
+    elif args.ledgers:
+        # #1173 — the app's keep/pass ledgers, read directly: keeps positive,
+        # passes negative, no HITS export. Rebuild when a ledger is newer.
+        led = Path(args.ledgers).resolve()  # steps run from the repo root
+        files = [led / "keeps.jsonl", led / "passes.jsonl"]
+        if not files[0].exists():
+            return p._fail("labels-from-ledgers",
+                           f"{files[0]} not found — in the app keep with F/J (pass with X), "
+                           "then Pipeline \u2192 \u2193 LEDGERS into that folder")
+        newest = max(f.stat().st_mtime for f in files if f.exists())
+        if not p.force and labels.exists() and newest <= labels.stat().st_mtime:
+            print(f"\n== labels ==\n   labels.json is newer than the ledgers in {led} — skipping")
+            p.report["steps"]["labels"] = "skipped"
+        else:
+            if labels.exists() and not p.dry_run:
+                bak = Path("labels.real.json.bak")
+                i = 1
+                while bak.exists():
+                    i += 1
+                    bak = Path(f"labels.real.json.bak.{i}")
+                labels.rename(bak)
+                print(f"   (backed up existing labels.json -> {bak})")
+            if p.run("labels-from-ledgers",
+                     [sys.executable, "studio/hits_bridge.py", "ledgers",
+                      "--ledgers", str(led), "--pool", str(pool), "--base", str(base),
+                      "--out", "labels.json"]) is None:
+                return
     elif args.hits and Path(args.hits).exists():
         # A fresh HITS export rebuilds labels — never silently ignore it.
         # Only skip when the existing labels are newer than the HITS file.
@@ -145,7 +173,8 @@ def phase1(p, args):
     else:
         p.need_human(
             "no labels.json and no --hits given. Either:\n"
-            "  a) keep with \u2605/F in the app, Pipeline \u2192 \u2193 HITS, then re-run with --hits hits.json, or\n"
+            "  a) keep with F/J and pass with X in the app, Pipeline \u2192 \u2193 LEDGERS, then re-run with --ledgers <dir>, or\n"
+            "  a2) keep with \u2605/F in the app, Pipeline \u2192 \u2193 HITS, then re-run with --hits hits.json, or\n"
             "  b) label by hand: python3 studio/curator.py label --index pool/curator-index.npz --out labels.json\n"
             "     (aim for 20+ likes and 20+ passes)")
         if not p.dry_run:
@@ -244,6 +273,8 @@ def main():
     ap.add_argument("--pool", default="pool")
     ap.add_argument("--count", type=int, default=200)
     ap.add_argument("--hits", default=None, help="hits.json from the app (Pipeline -> HITS)")
+    ap.add_argument("--ledgers", default=None,
+                    help="phase 1: dir with keeps.jsonl/passes.jsonl from the app (Pipeline -> LEDGERS, #1173)")
     ap.add_argument("--recipes", default="pool-recipes", help="phase 2 recipe dir")
     ap.add_argument("--base", default="base.project.json", help="starting project JSON (app -> Pipeline -> PROJECT)")
     ap.add_argument("--force", action="store_true", help="redo steps whose outputs exist")

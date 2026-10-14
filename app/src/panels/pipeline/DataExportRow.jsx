@@ -19,6 +19,7 @@ import { useStore } from "../../state/store.js";
 import { helpText } from "../../data/helpCopy.js";
 import { retrainNudge, dismissRetrainNudge } from "../../curator/tasteHead.js";
 import { getTaste } from "../../curator/tasteStore.js";
+import { downloadLedgers, ledgerCounts } from "../../curator/tasteLedger.js";
 import { importBiologyPolicy } from "../../biology/policy.js";
 import { writeUserPresets } from "../../data/canvasPresets.js";
 import {
@@ -478,6 +479,23 @@ export function DataExportRow({
           title="Forget the imported taste"
         >
           clear
+        </button>
+      </div>
+      {/* #1173 — the keep/pass ledgers the MLX loop trains on (mlx_run.py --ledgers). Plain .jsonl, one line per
+          deliberate keep (F/J/★) or pass (X). Read-only here: nothing in the app trains on them live. */}
+      <div className="pipeline-row" title={helpText("output-ledgers")}>
+        <button
+          type="button"
+          className="big-btn dl"
+          onClick={() => {
+            downloadLedgers();
+            const c = ledgerCounts();
+            onMessage?.(`ledgers saved — ${c.keeps} keeps, ${c.passes} passes`);
+          }}
+          style={{ flex: 1 }}
+          title={helpText("output-ledgers")}
+        >
+          ↓ ledgers
         </button>
       </div>
       {/* #962 (UX-2): read-only hint lines live in their own demoted zone,

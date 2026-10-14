@@ -286,6 +286,12 @@ function AppInner() {
       type: A.ADD_KEEP,
       keep: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
     }),
+    // #1173: X passes on the plate — a deliberate "not this", one line in the
+    // passes ledger the MLX loop reads as a negative. Nothing on screen changes.
+    'x': () => piped({
+      type: A.ADD_PASS,
+      pass: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
+    }),
     'g': () => piped({ type: A.TOGGLE_FULLSCREEN }),
     // #107 §7: while recording or batch/final-rendering, N/E are debounced —
     // a seed bump or evolve toggle mid-encode changes what's being captured

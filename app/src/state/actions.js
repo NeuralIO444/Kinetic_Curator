@@ -61,6 +61,7 @@ export const SET_IS_RENDERING    = 'SET_IS_RENDERING';
 export const ADD_FAVORITE      = 'ADD_FAVORITE';
 export const REMOVE_FAVORITE   = 'REMOVE_FAVORITE';
 export const ADD_KEEP          = 'ADD_KEEP';
+export const ADD_PASS          = 'ADD_PASS'; // #1173
 export const RECALL_FAVORITE   = 'RECALL_FAVORITE';
 export const REORDER_FAVORITE = 'REORDER_FAVORITE';
 export const DUPLICATE_FAVORITE = 'DUPLICATE_FAVORITE'; // #1124

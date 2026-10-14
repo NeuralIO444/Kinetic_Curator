@@ -2,6 +2,7 @@
 """studio/hits_bridge.py — favourites ("HITS" feed) -> curator.py labels.json (issue #91).
 
     app EXPORT (the bundle carries the hits feed) -> hits_bridge.py build -> labels.json -> curator.py train
+    app keeps.jsonl + passes.jsonl (#1173)       -> hits_bridge.py ledgers -> labels.json -> curator.py train
 
 Bridges the app's favourited seeds to curator.py's label format without hand-
 editing JSON. Likes = favourited seeds. Passes = every other seed already
@@ -45,6 +46,98 @@ def missing_hit_seeds(hit_seeds: set[int], pool_sidecars: dict[str, int]) -> lis
     """Favourited seeds with no PNG in the pool yet, so they can be rendered."""
     have = set(pool_sidecars.values())
     return sorted(s for s in hit_seeds if s not in have)
+
+
+# ── #1173 keep/pass ledgers (the app's keeps.jsonl / passes.jsonl) ──────────
+
+LEDGER_FILES = {"keeps": "keeps.jsonl", "passes": "passes.jsonl"}
+
+
+def is_ledger_row(o) -> bool:
+    """Same schema the app asserts (app/src/curator/tasteLedger.js isLedgerRow)."""
+    if not isinstance(o, dict):
+        return False
+    seed = o.get("seed")
+    if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed <= 0xFFFFFFFF:
+        return False
+    r = o.get("recipe")
+    if not isinstance(r, dict) or "layoutParams" not in r or "paletteId" not in r:
+        return False
+    if r["layoutParams"] is not None and not isinstance(r["layoutParams"], dict):
+        return False
+    if r["paletteId"] is not None and not isinstance(r["paletteId"], str):
+        return False
+    if not isinstance(o.get("timestamp"), str) or not o["timestamp"]:
+        return False
+    if "keepContext" not in o or (o["keepContext"] is not None and not isinstance(o["keepContext"], dict)):
+        return False
+    if "projectRef" not in o or (o["projectRef"] is not None and not isinstance(o["projectRef"], str)):
+        return False
+    return True
+
+
+def parse_ledger(text: str, name: str = "ledger", warn=None) -> list[dict]:
+    """JSONL -> rows. A corrupt or off-schema line is skipped WITH a warning
+    (file + line number), never silently dropped. Blank lines are not lines."""
+    warn = warn or (lambda m: print(m, file=sys.stderr))
+    rows = []
+    for n, line in enumerate(text.split("\n"), 1):
+        if not line.strip():
+            continue
+        try:
+            o = json.loads(line)
+        except ValueError:
+            warn(f"warning: {name} line {n}: not JSON — skipped")
+            continue
+        if not is_ledger_row(o):
+            warn(f"warning: {name} line {n}: not a ledger row — skipped")
+            continue
+        rows.append(o)
+    return rows
+
+
+def ledger_seed_labels(keeps: list[dict], passes: list[dict]) -> dict[int, int]:
+    """seed -> 1 (kept) / 0 (passed). Two-ledger rule: keeps are positives,
+    passes negatives, nothing else is a label. A seed both kept and passed
+    takes its LATEST act (ISO timestamps sort); a tie goes to the keep."""
+    latest: dict[int, tuple[str, int]] = {}
+    for label, rows in ((0, passes), (1, keeps)):
+        for r in rows:
+            s = r["seed"] & 0xFFFFFFFF
+            prev = latest.get(s)
+            if prev is None or r["timestamp"] > prev[0] or (r["timestamp"] == prev[0] and label == 1):
+                latest[s] = (r["timestamp"], label)
+    return {s: lab for s, (_, lab) in latest.items()}
+
+
+def build_labels_from_ledgers(seed_labels: dict[int, int], pool_sidecars: dict[str, int]) -> dict[str, int]:
+    """{png: 0/1}. Ledger seeds take their ledger label; every other pool render
+    stays a pass (#91's rule — the varied passes #1205 asks for)."""
+    return {name: int(seed_labels.get(seed & 0xFFFFFFFF, 0)) for name, seed in pool_sidecars.items()}
+
+
+def ledger_row_to_hit(row: dict) -> dict:
+    """A ledger row in write_hit_project's hit shape (absent stays absent)."""
+    r = row["recipe"]
+    hit = {"seed": row["seed"]}
+    if r.get("layoutParams"):
+        hit["layoutParams"] = r["layoutParams"]
+    if r.get("paletteId"):
+        hit["paletteId"] = r["paletteId"]
+    if isinstance(r.get("seedOffsets"), dict):
+        hit["seedOffsets"] = r["seedOffsets"]
+    if isinstance(r.get("assets"), list) and r["assets"]:
+        hit["assets"] = r["assets"]
+    return hit
+
+
+def read_ledgers(d: Path) -> tuple[list[dict], list[dict]]:
+    """Both ledgers from a dir; a missing file is an empty ledger."""
+    out = []
+    for kind in ("keeps", "passes"):
+        f = Path(d) / LEDGER_FILES[kind]
+        out.append(parse_ledger(f.read_text(encoding="utf-8"), f.name) if f.exists() else [])
+    return out[0], out[1]
 
 
 # ── pool / rendering ─────────────────────────────────────────────────────
@@ -231,6 +324,24 @@ def cmd_selfcheck(_a=None) -> None:
     assert missing_hit_seeds({2, 9}, sidecars) == [9]
     assert missing_hit_seeds(set(), sidecars) == []
     assert missing_hit_seeds({1, 2, 3}, sidecars) == []
+    # #1173 — the keep/pass ledgers
+    row = lambda seed, ts="2026-10-13T00:00:00Z": {"seed": seed, "recipe": {"layoutParams": None, "paletteId": None},
+                                                  "timestamp": ts, "keepContext": None, "projectRef": None}
+    warned = []
+    text = "\n".join([json.dumps(row(1)), "{bad", "", json.dumps({"seed": 2}), json.dumps(row(3)), ""])
+    assert [r["seed"] for r in parse_ledger(text, "k", warned.append)] == [1, 3]
+    assert len(warned) == 2 and "line 2" in warned[0] and "line 4" in warned[1], "corrupt lines warn, never silent"
+    assert not is_ledger_row({**row(1), "seed": True}) and not is_ledger_row({**row(1), "seed": -1})
+    assert ledger_seed_labels([row(1)], [row(2)]) == {1: 1, 2: 0}, "keeps positive, passes negative"
+    assert ledger_seed_labels([row(5, "2026-10-01")], [row(5, "2026-10-02")]) == {5: 0}, "latest act wins"
+    assert ledger_seed_labels([row(5, "2026-10-03")], [row(5, "2026-10-02")]) == {5: 1}
+    assert ledger_seed_labels([row(5)], [row(5)]) == {5: 1}, "a tie goes to the keep"
+    assert build_labels_from_ledgers({2: 1, 3: 0}, sidecars) == {"000-a.png": 0, "001-b.png": 1, "002-c.png": 0}
+    full = {"seed": 9, "recipe": {"layoutParams": {"mode": "grid"}, "paletteId": "bone",
+                                  "seedOffsets": {"spatial": 1}, "assets": ["x"]}}
+    assert ledger_row_to_hit(full) == {"seed": 9, "layoutParams": {"mode": "grid"}, "paletteId": "bone",
+                                       "seedOffsets": {"spatial": 1}, "assets": ["x"]}
+    assert ledger_row_to_hit(row(4)) == {"seed": 4}, "absent stays absent"
     import tempfile
     with tempfile.TemporaryDirectory() as d:
         out = Path(d) / "p.json"
@@ -257,6 +368,11 @@ def cmd_selfcheck(_a=None) -> None:
         assert scan_features(pool) == {"a.png": {"v": 1, "system": "grid"}}, "features read from sidecars"
         # #762 — a recipe maps to its own pool png, stable across runs (resume)
         assert recipe_png(Path("r/recipe-0007.project.json"), Path("pool")) == Path("pool/recipe-0007.png")
+        # #1173 — read_ledgers: a missing file is an empty ledger
+        led = Path(d) / "led"
+        led.mkdir()
+        (led / "keeps.jsonl").write_text(json.dumps(row(1)) + "\n")
+        assert [r["seed"] for r in read_ledgers(led)[0]] == [1] and read_ledgers(led)[1] == []
     print("hits_bridge selfcheck OK")
 
 
@@ -320,6 +436,52 @@ def cmd_bold(a) -> None:
 
 
 
+def cmd_ledgers(a) -> None:
+    """#1173 — keeps.jsonl + passes.jsonl -> labels.json (+ features.json).
+
+    No HITS export: the app appends a line per keep (F/J/★) and per pass (X).
+    Any labelled seed not in the pool is rendered from its own recipe on the
+    base project, so every keep AND every pass is in the training set.
+    """
+    keeps, passes = read_ledgers(Path(a.ledgers))
+    if not keeps:
+        sys.exit(f"{a.ledgers}: no keeps in {LEDGER_FILES['keeps']} — keep some plates (F/J) and save ↓ LEDGERS")
+    seed_labels = ledger_seed_labels(keeps, passes)
+    row_by_seed: dict[int, dict] = {}
+    for r in keeps + passes:  # keep rows win for the render recipe
+        row_by_seed.setdefault(r["seed"] & 0xFFFFFFFF, r)
+
+    pool = Path(a.pool)
+    pool.mkdir(parents=True, exist_ok=True)
+    sidecars = scan_pool(pool)
+    todo = missing_hit_seeds(set(seed_labels), sidecars)
+    if todo:
+        if not a.base or not Path(a.base).exists():
+            sys.exit(f"{len(todo)} ledger seed(s) are not in the pool and no --base project to render them on")
+        base = {"project": json.loads(Path(a.base).read_text())}
+        print(f"rendering {len(todo)} ledger seed(s) not already in the pool...")
+        tmp_project = pool / "_ledger-render.project.json"
+        for seed in todo:
+            write_hit_project(base, ledger_row_to_hit(row_by_seed[seed]), tmp_project)
+            render_hit(tmp_project, pool, seed, a.res)
+        tmp_project.unlink(missing_ok=True)
+        sidecars = scan_pool(pool)
+
+    labels = build_labels_from_ledgers(seed_labels, sidecars)
+    Path(a.out).write_text(json.dumps(labels, indent=1, sort_keys=True))
+    feats = scan_features(pool)
+    features = {name: feats[name] for name in labels if name in feats}
+    features_out = Path(a.features_out) if a.features_out else Path(a.out).with_name("features.json")
+    features_out.write_text(json.dumps(features, indent=1, sort_keys=True))
+    kept = sum(1 for v in seed_labels.values() if v == 1)
+    pos = sum(labels.values())
+    print(f"{a.out}: {len(labels)} labels ({pos} keeps / {len(labels) - pos} passes) — "
+          f"ledgers: {kept} kept, {len(seed_labels) - kept} passed, rest of pool {len(labels) - len(seed_labels)}")
+    if pos < kept:
+        print(f"warning: only {pos}/{kept} kept seeds ended up labelled (a render failed?)", file=sys.stderr)
+
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="hits_bridge", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -347,6 +509,15 @@ def main(argv=None) -> None:
     sp.add_argument("--res", default="1")
     sp.add_argument("--out", default="bold.json")
     sp.set_defaults(func=cmd_bold)
+
+    sp = sub.add_parser("ledgers", help="#1173: the app's keeps.jsonl/passes.jsonl -> labels.json")
+    sp.add_argument("--ledgers", required=True, help="dir holding keeps.jsonl and passes.jsonl (app: Pipeline -> ↓ LEDGERS)")
+    sp.add_argument("--pool", required=True, help="studio.py batch output dir (PNG + JSON sidecars)")
+    sp.add_argument("--base", default=None, help="base project JSON to render ledger seeds missing from the pool")
+    sp.add_argument("--out", default="labels.json")
+    sp.add_argument("--features-out", default=None)
+    sp.add_argument("--res", default="1")
+    sp.set_defaults(func=cmd_ledgers)
 
     sub.add_parser("selfcheck", help="pure-logic checks, no rendering, no model") \
         .set_defaults(func=cmd_selfcheck)

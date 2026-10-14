@@ -17,6 +17,7 @@ import { normalizeLayoutParams } from '../../data/layout-modes.js';
 import { captureKeepContext, sanitizeKeepContext, seedAgeMsNow } from '../../curator/keepContext.js'; // #1140: per-keep session context
 import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #1124
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
+import { appendToLedger } from '../../curator/tasteLedger.js'; // #1173: keep/pass ledgers for the MLX loop
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
 // lived in memory only: a reload silently emptied the tray. Same pattern as the
@@ -407,6 +408,8 @@ export const createDavisSlice = (set) => ({
       ? [...state.keeps, keepEntry].slice(-KEEPS_MAX)
       : state.keeps;
     persistKeeps(keeps);
+    // #1173 — the keep is a deliberate act: one line in the keeps ledger.
+    if (keepEntry) appendToLedger('keeps', keepEntry, state.projectTitle);
     return { favorites, keeps };
   }),
   removeFavorite: (id) => set((state) => {
@@ -434,7 +437,18 @@ export const createDavisSlice = (set) => ({
     if (!entry) return {};
     const keeps = [...state.keeps, entry].slice(-KEEPS_MAX);
     persistKeeps(keeps);
+    appendToLedger('keeps', entry, state.projectTitle); // #1173
     return { keeps };
+  }),
+  /**
+   * #1173 — X passes on the current plate: same capture as a keep, one line in
+   * the passes ledger, nothing else. No store state changes, so no live
+   * influence (taste pressure from passes is Phase 4, #1356 — not here).
+   */
+  addPass: (rec) => set((state) => {
+    const entry = sanitizeFavorite({ ...rec, id: genId() });
+    if (entry) appendToLedger('passes', entry, state.projectTitle);
+    return {};
   }),
   /**
    * #1051 — replace the performer's shelf from an imported bundle. Same
