@@ -6,7 +6,7 @@
 // #1462 spec update: LOIS and Davis report the face the honest feed already shows (a canonical state, never invented),
 // so a rules decision is always a reading and never asks the stage for a change (mindContract.wantsStage).
 import { neutralReply, CANONICAL_STATES } from './mindContract.js';
-import { davisRoute, PHRASE_BARS, TIER_OPS } from './mindConduct.js';
+import { davisRoute, TIER_OPS } from './mindConduct.js';
 
 /** The face the room already shows, as a canonical state, or nothing. */
 const reading = (persona, ctx) => {
@@ -28,7 +28,7 @@ export const RULES = Object.freeze({
   },
   // #1483 — a show that has stayed pinned and flat for a phrase is a failed show: she burns it.
   lois: (ctx) => {
-    const flat = !!(ctx && ctx.show && !ctx.show.silent && ctx.show.flatBars >= PHRASE_BARS);
+    const flat = !!(ctx && ctx.show && !ctx.show.silent && ctx.show.flatBars >= 1); // the window is already a phrase of it
     return { ...neutralReply('lois'), ...(flat ? { state: 'BURN' } : reading('lois', ctx)) };
   },
   queen: (ctx) => {

@@ -23,6 +23,8 @@ export const TIER_OPS = Object.freeze({
 /** A persona backs off for this many bars once the artist has reverted its edits BACKOFF_REVERTS times. */
 export const BACKOFF_REVERTS = 3;
 export const BACKOFF_BARS = 32;
+/** The rules backend keeps at most this many routes of its own in the table. */
+export const DAVIS_MAX_ROUTES = 3;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasTarget = (t) => typeof t === 'string' && Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t);
@@ -62,12 +64,14 @@ const pairIndex = (table, input, target) => table.findIndex((r) => r && r.input 
  * Apply one edit to a table. Pure. Returns { routes, delta } or null when it cannot apply (a missing or duplicate pair, a
  * full table). `delta` is what a take records: { op, before, after } where before/after are the affected route or null.
  */
-export function applyRouteOp(table, op) {
+export function applyRouteOp(table, op, by = null) {
   if (!Array.isArray(table) || !op) return null;
-  const routes = table.map((r) => ({ input: r.input, target: r.target, depth: r.depth }));
+  // a row keeps its tag (`by`) unless this edit is the one that makes it Davis's
+  const routes = table.map((r) => ({ input: r.input, target: r.target, depth: r.depth, ...(r.by ? { by: r.by } : {}) }));
+  const mark = (row) => (by ? { ...row, by } : row);
   if (op.op === 'add') {
     if (routes.length >= MAX_ROUTES || pairIndex(routes, op.input, op.target) >= 0) return null;
-    const after = { input: op.input, target: op.target, depth: op.depth };
+    const after = mark({ input: op.input, target: op.target, depth: op.depth });
     routes.push(after);
     return { routes, delta: { op: 'add', before: null, after } };
   }
@@ -82,18 +86,21 @@ export function applyRouteOp(table, op) {
     if (i < 0 || pairIndex(routes, op.input, op.to) >= 0) return null;
     const before = { ...routes[i] };
     const { min, max } = routeDepthRange(op.to);
-    routes[i] = { input: op.input, target: op.to, depth: Math.min(max, Math.max(min, routes[i].depth)) }; // the new target's own ceiling
+    routes[i] = mark({ input: op.input, target: op.to, depth: Math.min(max, Math.max(min, routes[i].depth)) }); // the new target's own ceiling
     return { routes, delta: { op: 'retarget', before, after: routes[i] } };
   }
   if (op.op === 'depth') {
     const i = pairIndex(routes, op.input, op.target);
     if (i < 0) return null;
     const before = { ...routes[i] };
-    routes[i] = { ...routes[i], depth: op.depth };
+    routes[i] = mark({ ...routes[i], depth: op.depth });
     return { routes, delta: { op: 'depth', before, after: routes[i] } };
   }
   return null;
 }
+
+/** The tag a route row carries when Davis made or changed it (the MATRIX shows it; touching the row clears it). */
+export const DAVIS_TAG = 'davis';
 
 /** The next bar a proposal made at `bar` may land on: the phrase boundary at or after it. */
 export function landingBar(bar) {
@@ -117,12 +124,12 @@ export const PRESETS = Object.freeze({
   mid: Object.freeze([
     { input: 'band.mids', target: 'render.scale', depth: 0.15 },
     { input: 'band.pres', target: 'render.glow', depth: 0.4 },
-    { input: 'band.air', target: 'render.hue', depth: 20 },
-    { input: 'band.edge', target: 'render.kineme', depth: 0.6, bpm: [100, 220] },
+    { input: 'band.air', target: 'color.hue', depth: 20 },
+    { input: 'band.edge', target: 'clock.kinemeRate', depth: 0.6, bpm: [100, 220] },
   ]),
   high: Object.freeze([
     { input: 'band.edge', target: 'render.squash', depth: 0.3 },
-    { input: 'band.air', target: 'render.kineme', depth: 1, bpm: [110, 220] },
+    { input: 'band.air', target: 'clock.kinemeRate', depth: 1, bpm: [110, 220] },
     { input: 'band.pres', target: 'render.scale', depth: 0.25 },
     { input: 'band.mids', target: 'clock.kinemeRate', depth: 1.5, bpm: [100, 220] },
     { input: 'band.air', target: 'render.glow', depth: 0.5 },
@@ -134,7 +141,8 @@ export const ENERGY_LEVELS = Object.freeze(['low', 'mid', 'high']);
  * Davis's rules-backend conducting. Pure.
  * @param show  the context's `show` block (mindContext): { energy, bpm, silent, routes:[{input,target,depth}], owned:[], flatBars, ... }
  * @param seed  the decision seed (document seed x bar), so the same dish conducts the same way
- * @returns an add op, or null (nothing worth doing: silence, a full table, every candidate already wired or owned)
+ * @returns an add op (or, on a flat show, a retarget of one of his own rows), or null (nothing worth doing: silence, a full
+ *          table, he already holds his few, every candidate already wired or owned)
  */
 export function davisRoute(show, seed = 0) {
   if (!show || show.silent) return null;
@@ -144,8 +152,9 @@ export function davisRoute(show, seed = 0) {
   const owned = new Set(Array.isArray(show.owned) ? show.owned : []);
   const bpm = Number.isFinite(show.bpm) ? show.bpm : null;
   const fits = (c) => !c.bpm || bpm === null || (bpm >= c.bpm[0] && bpm <= c.bpm[1]);
-  // a flat show re-rolls: every PHRASE_BARS flat bars moves to the next preset level, then wraps
-  const rerolls = Math.floor((Number(show.flatBars) || 0) / PHRASE_BARS);
+  // a flat show re-rolls as soon as LOIS has read it flat (the flatness window is itself a phrase), and again for every
+  // further phrase it stays flat: each moves to the next preset level, then wraps
+  const rerolls = Math.ceil(Math.max(0, Number(show.flatBars) || 0) / PHRASE_BARS);
   const order = ENERGY_LEVELS.indexOf(level);
   const pool = [];
   for (let k = 0; k < ENERGY_LEVELS.length; k++) {
@@ -153,6 +162,18 @@ export function davisRoute(show, seed = 0) {
     for (const c of PRESETS[lvl]) if (fits(c)) pool.push(c);
   }
   const start = pool.length ? (seed >>> 0) % Math.min(pool.length, PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].length) : 0;
+  const mine = table.filter((r) => r && r.by === DAVIS_TAG);
+  // a flat show with a route of his: move it somewhere else (one move, no pile-up)
+  if (rerolls > 0 && mine.length > 0) {
+    const m = mine[0];
+    for (let k = 0; k < pool.length; k++) {
+      const c = pool[(start + k) % pool.length];
+      if (c.target === m.target || owned.has(c.target) || owned.has(m.target) || pairIndex(table, m.input, c.target) >= 0) continue;
+      return { op: 'retarget', input: m.input, from: m.target, to: c.target };
+    }
+    return null;
+  }
+  if (mine.length >= DAVIS_MAX_ROUTES) return null; // he conducts with a few, he does not fill the table
   for (let k = 0; k < pool.length; k++) {
     const c = pool[(start + k) % pool.length];
     if (owned.has(c.target) || pairIndex(table, c.input, c.target) >= 0) continue;

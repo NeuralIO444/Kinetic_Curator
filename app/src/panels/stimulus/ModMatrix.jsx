@@ -40,8 +40,11 @@ function Row({ row, route, index, table, onEdit }) {
   const taken = (input, target) => table.some((r, j) => j !== index && r.input === input && r.target === target);
   const fill = row.depth !== 0 ? Math.min(100, Math.abs(row.live / row.depth) * 100) : 0;
   return (
-    <div className="stim-route" role="row">
+    <div className={`stim-route${route.by === 'davis' ? ' stim-route-davis' : ''}`} role="row">
       <span className="stim-route-pick">
+        {route.by === 'davis' && (
+          <b className="stim-route-by" title="Davis made this route. Touch it and it is yours.">D</b>
+        )}
         <select aria-label={`Route ${index + 1} input`} className="blend-mode-select" value={route.input}
           onChange={(e) => onEdit((t) => patchRoute(t, index, { input: e.target.value }), false)}>
           <optgroup label="SOUND">

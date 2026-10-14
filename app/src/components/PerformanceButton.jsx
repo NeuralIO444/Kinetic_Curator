@@ -14,6 +14,7 @@ import { createShiftRecorder } from '../curator/davisShift.js';
 import { createClockRecorder } from '../curator/clockRecord.js';
 import { createMindRecorder } from '../curator/mindRecord.js';
 import { setMindTap, getMindSystem } from '../curator/mindLive.js';
+import { setConductTap } from '../curator/trioLive.js'; // #1483: Davis's route outcomes ride in the take
 import { useStore } from '../state/store.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
@@ -54,7 +55,8 @@ const clockSection = (getFrame) => {
 const mindSection = (getFrame) => {
   const rec = createMindRecorder({ getFrame, getSystem: getMindSystem });
   setMindTap((d, requested) => rec.update(d, requested));
-  return { stop() { setMindTap(null); return rec.finish(); } };
+  setConductTap((e) => rec.conduct(e));
+  return { stop() { setMindTap(null); setConductTap(null); return rec.finish(); } };
 };
 
 function downloadBytes(bytes, filename) {

@@ -122,6 +122,7 @@ export function replayMindFrame(frame, record, { seeked = false } = {}) {
   if (!replay || replay.record !== record) replay = { record, cursor: createMindReplay(record) };
   if (seeked) { replay.cursor.seek(frame); }
   const rows = replay.cursor.step(frame);
+  for (const e of replay.cursor.conductStep(frame)) emit(Events.MIND_ROUTE, e, { cause: 'replay' }); // #1483: the take's conducting, as it happened
   for (const row of rows) {
     const d = decisionOf(row);
     emit(Events.MIND_DECISION, d, { cause: 'replay' });

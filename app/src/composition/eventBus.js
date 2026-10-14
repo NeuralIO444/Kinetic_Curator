@@ -242,6 +242,7 @@ export const Events = {
   MIND_STATUS: 'mind:status', // #1462/#1463: { available, backend: apple | rules | demo, model? } when the answering backend changes (dev panel)
   MIND_REQ: 'mind:req', // #1463: { persona, bar, seed, contextHash } a persona asks the model
   MIND_REPLY: 'mind:reply', // #1463: { persona, bar, backend, latencyMs, reply | null, error? } every answer, used or not
+  MIND_ROUTE: 'mind:route', // #1483: { status: applied | dropped, reason?, op, delta?, bar, landBar? } what became of Davis's route proposal
   DIRECTOR_ROOM: 'director:room', // #1145: { verdict, n, lois, davis, intensity: low|mid|peak, relaxing, phase } when the Director's room changes (no gains)
   CLOCK_BEAT: 'clock:beat', // #1458: { bar, beat, bpm } every whole beat of the loop clock
   CLOCK_BAR: 'clock:bar', // #1458: { bar, bpm } every downbeat

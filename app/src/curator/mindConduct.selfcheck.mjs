@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   validateRouteOp, applyRouteOp, opTargets, landingBar, phraseOf, PRESETS, davisRoute, createFlatness, createConductor,
-  PHRASE_BARS, TIER_OPS, BACKOFF_REVERTS, BACKOFF_BARS, ENERGY_LEVELS,
+  PHRASE_BARS, TIER_OPS, BACKOFF_REVERTS, BACKOFF_BARS, ENERGY_LEVELS, DAVIS_MAX_ROUTES,
 } from './mindConduct.js';
 import { validateReply, wantsStage, neutralReply } from './mindContract.js';
 import { rulesReply } from './mindRules.js';
@@ -101,6 +101,19 @@ ok('a flat show re-rolls: Davis moves to the next preset level once a phrase of 
   assert.ok(pool('mid').includes(`${rolled.input}>${rolled.target}`), 'one flat phrase later it is in the next');
   const rolled2 = davisRoute({ ...base, flatBars: PHRASE_BARS * 2 }, 0);
   assert.ok(pool('high').includes(`${rolled2.input}>${rolled2.target}`));
+});
+
+ok('he conducts with a few routes of his own, and a flat show moves one of them rather than piling on', () => {
+  const mine = (input, target, depth) => ({ input, target, depth, by: 'davis' });
+  const show = { energy: 'mid', bpm: 124, silent: false, owned: [], flatBars: 0, routes: [mine('band.mids', 'render.scale', 0.15), mine('band.pres', 'render.glow', 0.4), mine('band.air', 'color.hue', 20)] };
+  assert.equal(davisRoute(show, 3), null, 'three of his own: he holds there');
+  const flat = davisRoute({ ...show, flatBars: 2 }, 3);
+  assert.equal(flat.op, 'retarget', 'flat: one of his is moved');
+  assert.equal(flat.input, 'band.mids'); assert.equal(flat.from, 'render.scale'); assert.notEqual(flat.to, 'render.scale');
+  assert.ok(validateRouteOp(flat), 'and the move validates');
+  assert.equal(davisRoute({ ...show, flatBars: 2, owned: [flat.to] }, 3)?.to === flat.to, false, 'never onto a target the artist owns');
+  assert.equal(davisRoute({ ...show, routes: show.routes.slice(0, 2) }, 3).op, 'add', 'under three: he adds');
+  assert.equal(DAVIS_MAX_ROUTES, 3);
 });
 
 ok('LOIS: a pinned flat signal is a failed show within a phrase; music and silence are not', () => {
