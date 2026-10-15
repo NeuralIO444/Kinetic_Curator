@@ -13,7 +13,7 @@ const REPORT = join(root, '..', 'docs/research/region-mattes-bake-report.md');
 
 const baked = bakeLibrary(ASSETS);
 const text = renderModule(baked);
-const report = renderReport(baked, ASSETS.length);
+const report = renderReport(baked, ASSETS);
 if (process.argv.includes('--check')) {
   let have = '';
   try { have = readFileSync(MODULE, 'utf8'); } catch { /* missing */ }

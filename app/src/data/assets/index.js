@@ -13,5 +13,6 @@ import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes 
 export const ASSETS_AUTHORED = [...ASSETS_PART1, ...ASSETS_PART2, ...ASSETS_PART3, ...ASSETS_PART4, ...ASSETS_PART5, ...ASSETS_MICRO, ...ASSETS_LETTERS, ...ASSETS_PIXEL];
 
 // #1432 — every built-in carries `regions` + `regionSlots`, the exact shape overlay.js validates for user imports. An
-// asset with no baked entry is the very same object as before (no empty keys).
+// asset with no baked entry is the very same object as before (no empty keys). #1434 — entries for the families the
+// table names also carry `regionKinemes` (the family-default assignments; see data/regionDefaults.js).
 export const ASSETS = ASSETS_AUTHORED.map((a) => (BAKED_REGIONS[a.id] ? { ...a, ...BAKED_REGIONS[a.id] } : a));
