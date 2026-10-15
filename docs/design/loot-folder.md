@@ -96,7 +96,7 @@ Revised slices (one PR at a time):
 | # | PR | Visible |
 |---|---|---|
 | 5 | The PIPELINE row on desktop: pick, scan, log (this slice; web reads "desktop only" until 5b) | yes |
-| 5b | The web backend (File System Access): pick, create structure, scan, hash, read, permission re-allow | yes |
+| 5b | The web backend (File System Access): pick, create structure, scan, hash, read, permission re-allow (built, in review) | yes |
 | 5c | The starter-folder zip (any browser) and the session-only read | yes |
 | 5d | The first-run wizard: choose a place, create the structure, what to drop in; skippable | yes |
 | 6 to 9 | Images, palettes, audio, missing honesty | yes |
@@ -108,6 +108,14 @@ Revised slices (one PR at a time):
 - An entry with no usable path is logged ("unsafe or unreadable name"), never lost.
 - A file modified in the last 2 s is skipped this scan ("still changing") and picked up on the next.
 - "Missing" is only decided for a folder that could be listed, and only once every hash is in, so a rename is never reported as a disappearance.
+
+### Notes from building slice 5b
+
+- A picked folder that already is a loot folder (named `KC-1 Loot`, or holding any of the four subfolders) is used as it is; otherwise `KC-1 Loot/` is made inside it. Only directories are ever created: no file is written, moved, renamed or deleted.
+- The folder handle lives in IndexedDB (`kc-loot`); the index keeps only a `web:<name>` label, so nothing path-like travels in a project or share link.
+- After a restart the browser may drop permission. Rescan re-asks for **read** access (the click is the gesture); a refusal reads "allow access to the folder, then rescan", a cleared store reads "folder link lost: point at the folder again".
+- A moved or deleted folder is reported unreachable and marks nothing missing, same as the desktop side.
+- Reads and hashes refuse files over 64 MB without reading them. Safari and Firefox get an honest line; their starter zip is 5c.
 
 ## What would make this fail in practice
 

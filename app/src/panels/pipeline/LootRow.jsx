@@ -2,23 +2,25 @@
 // a status line and a log. This slice finds and indexes what is in the folder; taking the files in as assets, palettes
 // and audio is the next slices, so nothing here changes the canvas yet.
 //
-// Desktop only. The web build shows "desktop only" instead of a dead button (like Syphon, #962). The folder path is this
-// machine's: it lives in its own local key and never travels in a project, a bundle or a share link.
+// Desktop reads the folder natively; Chrome and Edge keep a folder handle (slice 5b). A browser with neither shows its reason
+// instead of a dead button (like Syphon, #962). The folder is this machine's: it lives in its own local key and never
+// travels in a project, a bundle or a share link.
 import { useMemo, useState } from 'react';
-import { createLootNative, seenLine } from '../../loot/lootNative.mjs';
+import { seenLine } from '../../loot/lootNative.mjs';
+import { createLootBackend } from '../../loot/lootBackend.mjs';
 import { runScan } from '../../loot/lootRun.mjs';
 import { takeInImages, ingestVia } from '../../loot/lootIngest.mjs';
 import { takeInPalettes } from '../../loot/lootPalettes.mjs';
 import { takeInAudio } from '../../loot/lootAudio.mjs';
 import { useStore } from '../../state/store.js';
 import { loadIndex, saveIndex, withRoot, emptyIndex, countItems } from '../../loot/lootIndex.mjs';
-import { statusLine, logLine, confirmForgetMessage, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
+import { statusLine, logLine, confirmForgetMessage, rootLabel, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
 
 const storage = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
 const LOG_SHOWN = 40;
 
 export function LootRow() {
-  const native = useMemo(() => createLootNative(), []);
+  const native = useMemo(() => createLootBackend(), []); // the desktop shell's native side, or the browser's folder handle
   const [index, setIndex] = useState(() => loadIndex(storage()));
   const [busy, setBusy] = useState(null); // null | 'scanning' | 'reading n of m'
   const [last, setLast] = useState(null); // the last scan's summary, for the status line
@@ -67,11 +69,13 @@ export function LootRow() {
     const next = withRoot(index, p.path);
     keep(next);
     await scan(next);
+    if (p.note) setNote(p.note); // a browser that would not store the folder link says so, once
   };
 
   const forget = () => {
     if (!window.confirm(confirmForgetMessage(counts.items))) return;
     keep(emptyIndex()); setLast(null); setNote(null);
+    if (native.forget) native.forget(); // a browser also drops its stored folder link (the folder and files are not touched)
   };
 
   const has = !!index.root;
@@ -90,7 +94,7 @@ export function LootRow() {
         )}
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
-        {unavailable ? LABELS.hint : (has ? index.root : LABELS.hint)}
+        {unavailable ? LABELS.hint : (has ? rootLabel(index.root) : LABELS.hint)}
       </div>
       {!unavailable && (
         <div className="pipeline-hint pipeline-loot-status" style={{ fontSize: 10 }}>
