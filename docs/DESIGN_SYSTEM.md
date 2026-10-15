@@ -13,6 +13,41 @@ that duplicates one already in this document.
 
 ---
 
+## 0.5 The ten rules (KC-1 DS)
+
+The governing visual-language contract (#1121), TE-influenced, not TE-copied. Cite
+rules by number ("per KC-1 DS rule 3") the way you'd cite a spec section. The numbers
+are stable.
+
+1. **The instrument contract.** KC-1 is a performance instrument. Everything either
+   helps you *play* (controls) or helps you *read* (gauges). Nothing decorates.
+2. **Discrete → TE, continuous → Davis.** Countable, stepped, true/false signals render
+   mechanical: detents, labels, digits, hard states, one red. Flowing, probabilistic,
+   time-based signals render organic: breath, shimmer, decay, amber. The rendering
+   follows the *nature of the signal*, not its location in the UI. (Lock count = TE,
+   it's a number. Taste confidence = Davis, it's a feeling about a number — a detent
+   would lie about its precision.)
+3. **Honest signals only** (the LOIS rule). Every state points to a real signal —
+   honest feed, heat router, lock store. No timers with opinions.
+4. **Silence is default.** The instrument is quiet until it has something true to say.
+   Dark is honest, not broken.
+5. **One signal, one meaning.** Amber never means two things. Red never means two things.
+6. **Color discipline.** Amber = taste/presence (probabilistic: Davis, taste, time-based
+   motion). Red = structure/action (discrete: LOIS, faults, FAVORITE). Ink = quiet. No
+   rainbow. Pink stays "live/executing" and is a separate hue from red (§1.1).
+7. **Stillness is a first-class encoding.** Every animated state ships with its static
+   equivalent (the reduced-motion pattern in `panels.css`). If a state can't survive
+   without motion, it wasn't a state.
+8. **Deadpan copy.** "Looks, never presets." ≤4 chars. The UI never markets at you.
+9. **Frozen history renders TE** (from #1124). Captures, keeps, and history are
+   discrete — they render TE, even inside Davis-flavored surfaces. Only present-tense
+   playheads animate.
+10. **The seducer is never caught** (from the Queen, #1139). Invisible personae act,
+    never render — and no surface value, label, or readout may expose the sway. A
+    hidden bias the user can find in the UI is a slider, not a seducer.
+
+---
+
 ## 1. Design tokens
 
 ### 1.1 Color
