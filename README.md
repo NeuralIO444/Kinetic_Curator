@@ -8,7 +8,7 @@ Live: [neuralio444.github.io/Kinetic_Curator](https://neuralio444.github.io/Kine
 
 *A terrarium, not a DAW.* You curate plates, palettes, and voices. The seed and the wind do the rest.
 
-**Release on `main` (2026-10-01):** **[0.9.0](CHANGELOG.md)** + the KC-1 review queue and what followed: pipeline SETUP/STAGE (authored canvas size), kinemes, the CHIAROSCURO sun, assignable audio routes, the Director panel, per-node uniqueness. Engine spines A–G merged, governor R1–R4 landed, Night Migration 30/60 sign-off recorded ([docs/EMBARGO.md](docs/EMBARGO.md) — Stage 1 unfrozen). Roadmap: [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md). See [Now](#now-on-main).
+**Release on `main` (2026-10-15):** **[0.9.0](CHANGELOG.md)** + everything since: the petri dish, five materials, the Look Explorer, the loot folder, a second taste head, and the spectral path. Engine spines A–G merged, governor R1–R4 landed, Night Migration 30/60 sign-off recorded ([docs/EMBARGO.md](docs/EMBARGO.md) — Stage 1 unfrozen). Roadmap: [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md). See [Now](#now-on-main).
 
 ## Now on main
 
@@ -43,7 +43,11 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - **CHIAROSCURO sun** (#594) — one scene-level light with per-instance diffuse, bevel-from-alpha normals, and squash-and-stretch (SQUASH) so moving marks keep their mass. DARK GLASS voice (#704). Gate weave (#741), FXAA (#740), ACES + Bayer resolve (#532).
 - **Kinemes** (#781) — whole-mark motion (spin / rock / pulse / blink / bob) assigned per asset, evaluated in the vertex shader; no asset or atlas changes.
 - **Per-node uniqueness** (#558) — no two nodes in lockstep: seeded per-agent phase, drift/speed multipliers and noise seed; legacy seeds stay bit-identical. Diorama parallax on zTiers (#796).
-- **Taste curator** (#762) — import a Studio `taste.json`; CURATE picks with its head; `validate-taste.mjs` checks the file honestly.
+- **Taste curator** (#762) — import a Studio `taste.json`; CURATE picks with its head; `validate-taste.mjs` checks the file honestly. The head can now be a **tree head** (#1579–#1581): an XGBoost ensemble distilled on the Studio, printed as plain trees inside the same taste.json. The dice are ordered within their family strata by score (scores never gate the deal), every pick is stamped with score + taste version + head kind, a census readout reports how far the head and the room agree, and Davis cites the splits behind a pick. The machinery is in; the first trained tree head ships from a Studio run.
+- **Materials** (#1547–#1549) — five mark bodies render in GL: flat, glass (translucent), plate (radial ink body), wash, stipple. The vocabulary is complete.
+- **Look Explorer** (E1a–E5: #1504–#1508, #1530) — the instrument mines its own unvisited territory: a coverage census and a parameter census as standing instruments, a stratified miner, the mined tray in DIRECTORS, persona prospecting corners with LOIS judging real renders, and a Davis variants offspring engine for the library. The dice feeding it were repaired too — starved families get their own casts (#1546) — and the write path has one ranges source of truth (#1550).
+- **Loot folder** (#1479) — a local folder is a library: pick or create one in the app and KC-1 scans it. SVGs join the asset pool, palette files join the palette library, audio joins the sources. Missing files are said out loud, never silently dropped.
+- **Spectral path** (#1482, #1483) — bands modulate, spectrum structures: an analysis core, a live readout in STIMULI, and marks that listen to spectral features. Trio audio direction, stage 1: LOIS's keep-rate moves how soon she calls a show flat.
 - **Samplers and verbs** — truchet, voronoi-masked scatter, l-system growth, phyllotaxis; seek/flee behave rows; Markov transition weights; euclidean phrase clock.
 - **Shell** — Curator cluster (LOOKS / VOICE / Curator) lives in the top bar; 4-state shape intensity mixer (#733); FADE is now a real per-node colour transition (#632); taxonomy LOOK / VOICE / SYSTEM / CAST ([docs/TAXONOMY.md](docs/TAXONOMY.md)).
 - **Color modes** — FADE (the default melt), WASH (soak from the middle outward), INJECT (field dyes first, agents catch up). One slider, seconds.
@@ -57,6 +61,8 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 **Not done (do not advertise as shipped)**
 
 - Evolve seed-jitter glide, editable BEHAVE weights (#471 / #479).
+- Governor cost head (#1578) — the evaluator is merged and inert: no trained model, nothing calls it yet. The reactive governor remains the only governor.
+- Mind / MegaMind and the ROOM codec exist as committed design docs (`docs/research/`) — designed and deferred, not built.
 - Syphon / NDI output (STAGE shows an honest not-linked state), colour space waits on #532 ACES.
 - Per-asset sub-animation frame strips (#699 — reverted; kinemes are the path).
 - OSC build, MIDI learn/bind remainder (#617; BLE-MIDI path needed for iPad), mobile pass, live-output path (roadmap Stages 2–3).
