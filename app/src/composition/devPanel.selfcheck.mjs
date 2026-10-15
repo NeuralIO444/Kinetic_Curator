@@ -35,13 +35,14 @@ for (const dead of ['shaderlab', 'xray', 'govtune']) {
     `stale '${dead}' registration must not remain in the registry`);
 }
 
-// C. seven tabs in order — #691's three plus Biology (#793), Units, then
-// Kernel (#1233), then Mind (#1464) — each a React.lazy component.
-assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units', 'kernel', 'mind', 'census'],
-  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units / Kernel / Mind / Census (#1507), got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
+// C. the tabs in order — #691's three plus Biology (#793), Units, then
+// Kernel (#1233), Mind (#1464), Census (#1507), and Taste Trees (XGBoost
+// T3) — each a React.lazy component.
+assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units', 'kernel', 'mind', 'census', 'taste'],
+  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units / Kernel / Mind / Census (#1507) / Taste (XGBoost T3), got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
 for (const t of DEV_TABS) {
   assert.ok(t.component?.$$typeof === Symbol.for('react.lazy'),
     `tab '${t.id}' must be a React.lazy component (one chunk per tab)`);
 }
 
-console.log('[selfcheck] dev panel OK — one DEV registry entry (DEV-gated); eight lazy tabs; no stale dev ids');
+console.log('[selfcheck] dev panel OK — one DEV registry entry (DEV-gated); nine lazy tabs; no stale dev ids');
