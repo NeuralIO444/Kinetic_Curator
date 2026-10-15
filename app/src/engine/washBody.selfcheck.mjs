@@ -195,9 +195,15 @@ ok('stills: wash paints ink through the gradient def; the raster moves; flat gai
   const a = raster(flatSvg);
   const b = raster(washSvg);
   assert.equal(a.width, b.width); assert.equal(a.height, b.height);
+  // Cache the pixel buffers ONCE before diffing: Resvg's .pixels is
+  // a getter that materializes a fresh full-image buffer per access,
+  // so indexing it inside the loop allocates one buffer per pixel
+  // and the process OOMs (the #1564 lesson; censusReport/miner cache
+  // the same way).
+  const ap = a.pixels; const bp = b.pixels;
   let sum = 0;
-  for (let i = 0; i < a.pixels.length; i++) sum += Math.abs(a.pixels[i] - b.pixels[i]);
-  const meanAbs = sum / a.pixels.length;
+  for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
+  const meanAbs = sum / ap.length;
   assert.ok(meanAbs > 0.5, `wash still raster differs measurably from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
 });
 

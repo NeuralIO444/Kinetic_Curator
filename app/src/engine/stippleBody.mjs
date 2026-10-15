@@ -39,9 +39,10 @@
  * is screened by the same dot test — a pure function of the
  * fragment's local position in the glyph box, computed identically
  * in the JS function (tests + measurement), the GLSL chunk (live
- * canvas) and the SVG pattern def (composed stills — byte-faithful
- * to the retired def). The gaps remove ink coverage by exactly the
- * amount they remove ink colour (the plate branch's bookkeeping).
+ * canvas) and the SVG pattern def (composed stills — the retired
+ * def's tile and circles at Matt's dot scale, STIPPLE_DOT_SCALE).
+ * The gaps remove ink coverage by exactly the amount they remove
+ * ink colour (the plate branch's bookkeeping).
  * Dot edges are hard, as the def's circles are hard and this
  * renderer runs antialias:false throughout.
  *
@@ -93,6 +94,19 @@ export const STIPPLE_DOTS = Object.freeze([
 ]);
 
 /**
+ * Matt's tuning (2026-10-14, chosen on rendered density strips):
+ * the def's dots cover ~9% of the tile, which read too dark at
+ * scene scale — stipple should dissolve marks into the dot field,
+ * not speckle them. STIPPLE_DOTS above stays verbatim (the
+ * recovered def, cited); every consumer scales the radii by this
+ * one constant. ×2.5 → radii 2.0 / 1.5, ~55% ink.
+ */
+export const STIPPLE_DOT_SCALE = 2.5;
+
+/** A dot's shipped radius: the def radius at Matt's scale. */
+const scaledR = (d) => d.r * STIPPLE_DOT_SCALE;
+
+/**
  * The screen at glyph-box position (lx, ly). Returns:
  *  - color: which channel paints the ink term here — 'ink', or
  *    'accent' (the small dot), or null in the gaps;
@@ -105,7 +119,8 @@ export function stippleShadeAt(lx, ly) {
   for (const d of STIPPLE_DOTS) {
     const dx = px - d.cx;
     const dy = py - d.cy;
-    if (dx * dx + dy * dy < d.r * d.r) return { color: d.color, aMul: 1 };
+    const r = scaledR(d);
+    if (dx * dx + dy * dy < r * r) return { color: d.color, aMul: 1 };
   }
   return { color: null, aMul: 0 };
 }
@@ -125,26 +140,26 @@ export function stippleShadeAt(lx, ly) {
 export const STIPPLE_GLSL = /* glsl */`
 float stippleCover(vec2 local) {
   vec2 cell = mod(local * 100.0, 6.0);
-  if (length(cell - vec2(1.5, 1.5)) < 0.8) return 1.0;
-  if (length(cell - vec2(4.5, 4.2)) < 0.6) return 1.0;
+  if (length(cell - vec2(1.5, 1.5)) < ${scaledR(STIPPLE_DOTS[0]).toFixed(2)}) return 1.0;
+  if (length(cell - vec2(4.5, 4.2)) < ${scaledR(STIPPLE_DOTS[1]).toFixed(2)}) return 1.0;
   return 0.0;
 }
 vec3 stippleShade(vec2 local, vec3 ink, vec3 accent, out float aMul) {
   vec2 cell = mod(local * 100.0, 6.0);
-  if (length(cell - vec2(1.5, 1.5)) < 0.8) { aMul = 1.0; return ink; }
-  if (length(cell - vec2(4.5, 4.2)) < 0.6) { aMul = 1.0; return accent; }
+  if (length(cell - vec2(1.5, 1.5)) < ${scaledR(STIPPLE_DOTS[0]).toFixed(2)}) { aMul = 1.0; return ink; }
+  if (length(cell - vec2(4.5, 4.2)) < ${scaledR(STIPPLE_DOTS[1]).toFixed(2)}) { aMul = 1.0; return accent; }
   aMul = 0.0;
   return ink;
 }`;
 
 /**
- * The SVG pattern def for one item's two channels — value-faithful
- * to the retired MaterialSheet def (same tile, same circles), with
- * the item's accent/ink hexes in the var(--accent)/var(--ink)
- * slots. Used by the still composer.
+ * The SVG pattern def for one item's two channels — the retired
+ * MaterialSheet def's tile and circles, radii at Matt's dot scale
+ * (STIPPLE_DOT_SCALE), with the item's accent/ink hexes in the
+ * var(--accent)/var(--ink) slots. Used by the still composer.
  */
 export function stipplePatternDef(id, accentHex, inkHex) {
-  const dot = (d) => `<circle cx="${d.cx}" cy="${d.cy}" r="${d.r}" fill="${d.color === 'accent' ? accentHex : inkHex}"/>`;
+  const dot = (d) => `<circle cx="${d.cx}" cy="${d.cy}" r="${scaledR(d)}" fill="${d.color === 'accent' ? accentHex : inkHex}"/>`;
   return `<pattern id="${id}" width="${STIPPLE_CELL}" height="${STIPPLE_CELL}" patternUnits="userSpaceOnUse">${STIPPLE_DOTS.map(dot).join('')}</pattern>`;
 }
 

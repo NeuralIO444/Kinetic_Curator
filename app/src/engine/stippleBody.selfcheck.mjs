@@ -5,7 +5,9 @@
 //    retired SVG def, verbatim: a 6-unit userSpaceOnUse tile holding
 //    an ink dot r0.8 @1.5,1.5 and an accent dot r0.6 @4.5,4.2, the
 //    rest transparent — JS screen, GLSL chunk and SVG def all read
-//    the one STIPPLE_DOTS table);
+//    the one STIPPLE_DOTS table; the radii ship at Matt's ×2.5
+//    (STIPPLE_DOT_SCALE, tuned 2026-10-14) while the table itself
+//    stays verbatim);
 //  - placements: a stipple material flags every placed item and
 //    changes NOTHING else — the body is a render-level screen, not
 //    a placement field; plate/wash/glass are untouched;
@@ -23,7 +25,7 @@ import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
 import {
   isStippleMaterial, STIPPLE_MATERIAL, STIPPLE_CELL, STIPPLE_BOX, STIPPLE_DOTS,
-  stippleShadeAt, STIPPLE_GLSL, stipplePatternDef,
+  STIPPLE_DOT_SCALE, stippleShadeAt, STIPPLE_GLSL, stipplePatternDef,
 } from './stippleBody.mjs';
 import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
@@ -79,7 +81,16 @@ ok('the screen is the retired def, dot for dot', () => {
     }
   }
   const frac = covered / (N * N);
-  const analytic = (Math.PI * 0.8 * 0.8 + Math.PI * 0.6 * 0.6) / 36;
+  // Expected coverage at Matt's dot scale: the ink dot (r 2.0 at
+  // 1.5,1.5) crosses the tile's left/top edges and the pattern
+  // clips it there — verified against the Resvg stills path, the
+  // look Matt approved — so subtract the two clipped segments
+  // (re-derive if a future scale changes the clip geometry). The
+  // accent dot (r 1.5 at 4.5,4.2) stays inside the tile.
+  const rInk = 0.8 * STIPPLE_DOT_SCALE;
+  const rAcc = 0.6 * STIPPLE_DOT_SCALE;
+  const seg = rInk * rInk * Math.acos(1.5 / rInk) - 1.5 * Math.sqrt(rInk * rInk - 1.5 * 1.5);
+  const analytic = (Math.PI * rInk * rInk - 2 * seg + Math.PI * rAcc * rAcc) / 36;
   assert.ok(Math.abs(frac - analytic) < 0.01, `dot coverage ${frac.toFixed(4)} ≈ analytic ${analytic.toFixed(4)}`);
 });
 
@@ -89,8 +100,8 @@ ok('the GLSL chunk and the SVG def read the same constants', () => {
   }
   const def = stipplePatternDef('sgX', '#abcdef', '#123456');
   assert.ok(def.includes('<pattern id="sgX" width="6" height="6" patternUnits="userSpaceOnUse">'), 'def tile is the retired def');
-  assert.ok(def.includes('<circle cx="1.5" cy="1.5" r="0.8" fill="#123456"/>'), 'ink dot: ink channel');
-  assert.ok(def.includes('<circle cx="4.5" cy="4.2" r="0.6" fill="#abcdef"/>'), 'accent dot: accent channel');
+  assert.ok(def.includes('<circle cx="1.5" cy="1.5" r="2" fill="#123456"/>'), 'ink dot: ink channel, def radius at Matt\'s ×2.5 scale');
+  assert.ok(def.includes('<circle cx="4.5" cy="4.2" r="1.5" fill="#abcdef"/>'), 'accent dot: accent channel, def radius at Matt\'s ×2.5 scale');
 });
 
 // ── placements (the census fixture, plateBody's BASE shape) ─────────
@@ -205,9 +216,15 @@ ok('stills: stipple paints ink through the pattern def; the raster moves; flat g
   const a = raster(flatSvg);
   const b = raster(stippleSvg);
   assert.equal(a.width, b.width); assert.equal(a.height, b.height);
+  // Cache the pixel buffers ONCE before diffing: Resvg's .pixels is
+  // a getter that materializes a fresh full-image buffer per access,
+  // so indexing it inside the loop allocates one buffer per pixel
+  // and the process OOMs (the #1564 lesson; censusReport/miner cache
+  // the same way).
+  const ap = a.pixels; const bp = b.pixels;
   let sum = 0;
-  for (let i = 0; i < a.pixels.length; i++) sum += Math.abs(a.pixels[i] - b.pixels[i]);
-  const meanAbs = sum / a.pixels.length;
+  for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
+  const meanAbs = sum / ap.length;
   assert.ok(meanAbs > 0.5, `stipple still raster differs measurably from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
 });
 
