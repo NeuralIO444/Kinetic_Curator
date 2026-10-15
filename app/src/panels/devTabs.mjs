@@ -47,8 +47,11 @@ const MindPanel = lazy(() =>
 const CensusPanel = lazy(() =>
   import('./CensusPanel.jsx').then((m) => ({ default: m.CensusPanel })),
 );
+const TasteTreePanel = lazy(() =>
+  import('./TasteTreePanel.jsx').then((m) => ({ default: m.TasteTreePanel })),
+);
 
-/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464). */
+/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3). */
 export const DEV_TABS = [
   { id: 'xray',      title: 'X-RAY',      icon: '◉', component: GovernorXrayPanel },
   { id: 'govtune',   title: 'GOV TUNE',   icon: '◐', component: GovernorTunePanel },
@@ -60,6 +63,9 @@ export const DEV_TABS = [
   // #1507: the Look Explorer census readout — E1a/E1b artifacts + run
   // yield by corner, rendered read-only from the artifacts themselves.
   { id: 'census',    title: 'CENSUS',     icon: '▤', component: CensusPanel },
+  // XGBoost T3: "read the model" — the active tree head, printed the
+  // way the Studio's inspect prints it (spec §7.5).
+  { id: 'taste',     title: 'TASTE',      icon: '♣', component: TasteTreePanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];

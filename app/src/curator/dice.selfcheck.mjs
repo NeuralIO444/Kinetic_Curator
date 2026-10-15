@@ -193,6 +193,17 @@ const flat = rollDice({ ...orderedArgs, rng: mulberry32(7), orderScorer: { id: '
 const flatAnchored = flat.candidates.filter((c) => c.stratum === 'anchored');
 const flatAnchoredBest = flatAnchored.reduce((a, b) => (b.score > a.score ? b : a));
 assert.ok(flat.finalists.includes(flatAnchoredBest), 'flat model: the anchored persona-best still reaches the tray');
+// T3: Davis's citable reasons ride the ordered candidates — the clause
+// from each candidate's own tree path (this fixture splits on system
+// only, so the citation names the mode in the trainer's words). A scorer
+// that cannot explain itself stamps null, and the tray stays silent.
+for (const c of oroll.candidates) {
+  assert.strictEqual(c.xgbReason, `${c.layoutId} layouts`, 'reason stamped from the candidate’s own path');
+  assert.strictEqual(c.xgbReason, xgbScorer.explain(c), 'stamp is the scorer’s explanation of the candidate');
+}
+for (const c of flat.candidates) {
+  assert.strictEqual(c.xgbReason, null, 'an unexplaining scorer stamps null reasons');
+}
 // no head: the pre-T2 surface exactly — no stamps, no orderMeta.
 assert.ok(!('orderMeta' in plain7), 'unordered roll carries no orderMeta');
 for (const c of plain7.candidates) {
