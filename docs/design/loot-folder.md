@@ -1,6 +1,6 @@
 # Loot folder (#1479): research and build plan
 
-**Status:** plan, 2026-10-14. Nothing built. Written from a read-only pass over `app/` and `src-tauri/`; the five claims the plan stands on (premises 1 to 5 below) were re-checked against the code by hand. Matt orders every slice; nothing here is assigned.
+**Status:** plan, 2026-10-14. Slice 1 (the pure scan) built; the rest not started. Written from a read-only pass over `app/` and `src-tauri/`; the five claims the plan stands on (premises 1 to 5 below) were re-checked against the code by hand. Matt orders every slice; nothing here is assigned.
 
 ## Premises in the issue that are wrong or missing
 
@@ -66,14 +66,25 @@
 | 9 | Missing honesty | delete a file, Rescan: item `missing`, asset still plays | **yes** |
 | 10 | Looks | blocked on the `kc-look/1` types PR | n/a |
 
-## Open questions for Matt (most blocking first)
+## Decisions (Matt, 2026-10-14)
 
-1. **Raster images.** Recommended: v1 is SVG-only; rasters are logged "not supported". Decides whether a raster asset type (large, and it touches the one-writer `liveLoop.mjs`) is built before or after this.
-2. **The 32-asset cap.** Recommended: leave it; loot beyond it is indexed and marked "pool full". Decides whether loot becomes an on-demand library outside the project, or the cap rises.
-3. **Looks.** Recommended: skip `looks/` in v1. Decides whether `kc-look/1` types are pulled forward.
-4. **Provenance.** Recommended: per-device index only, never in a project. Decides whether a project can re-link loot on another machine.
-5. **Distribution.** Recommended: direct download (no sandbox). Decides whether security-scoped bookmarks are needed.
-6. **Desktop detect.** Recommended: fix `isDesktop` for Tauri 1 as slice 4, after confirming on the Mac whether STAGE and MIND currently work.
+All six questions answered; recorded on #1479.
+
+1. **Raster:** SVG only for now. PNG/JPG (and GIF/WebP) are recognised and logged "raster not supported yet", never dropped silently.
+2. **The 32-asset cap:** index every loot item; the first 32 land in the pool, the rest are marked "pool full" until a slot frees. No engine change.
+3. **Looks:** **the whole DLC Look phase is pulled forward** (`kc-look/1` types, the pack loader, the Library, 16 Look slots; see `docs/DLC_PRESET_TYPES.md` phases 1 to 3). This re-orders it out of the deferred pile. Build order: loot images, audio and palettes first (slices 1 to 9); then the Look phase as its own PRs; then `looks/` in the loot folder (slice 10). Until then a Look file is recognised and logged "looks not supported yet".
+4. **Provenance:** per-device index only; path and hash never ride in a project or share link.
+5. **Distribution:** direct download, no sandbox, so no security-scoped bookmarks. The folder access stays behind one small module so a bookmark layer could slot in.
+6. **Desktop check:** Matt will confirm on the Mac whether STAGE and MIND report correctly. The `isDesktop` fix is its own PR (slice 4) with a stubbed-globals unit test, and the loot row stays disabled-with-reason until he has confirmed it once.
+
+One PR at a time, each stopped for review.
+
+### Notes from building slice 1
+
+- A name like `wing 2.svg` or `wing copy.svg` is the artist's own and is **not** skipped; a Finder duplicate carries identical bytes, so the content hash already dedupes it. Only an explicit sync-conflict marker ("conflicted copy") is skipped, and logged.
+- An entry with no usable path is logged ("unsafe or unreadable name"), never lost.
+- A file modified in the last 2 s is skipped this scan ("still changing") and picked up on the next.
+- "Missing" is only decided for a folder that could be listed, and only once every hash is in, so a rename is never reported as a disappearance.
 
 ## What would make this fail in practice
 

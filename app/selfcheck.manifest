@@ -412,3 +412,4 @@ node src/curator/trioLive.selfcheck.mjs
 node src/state/hitsClear.selfcheck.mjs
 node src/curator/mindConduct.apple.selfcheck.mjs
 node src/state/audioRig.selfcheck.mjs
+node src/loot/lootScan.selfcheck.mjs
