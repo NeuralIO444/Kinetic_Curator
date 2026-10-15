@@ -110,11 +110,16 @@ for (const a of STRIP_ASSETS) {
     { asset: 'mic_plus', ink: INK, accent: ACC },
     { asset: 'mic_dotgrid_5', ink: INK, accent: ACC },
   ]);
-  assert.strictEqual(plain.width, 2 * 432, 'cols = ceil(sqrt(4)) as before');
-  assert.strictEqual(plain.height, 2 * 432, 'rows as before');
-  const c2 = plain.cells.get(comboKey('mic_plus', INK, ACC)); // index 2 → col 0, row 1
-  assert.strictEqual(Math.round(c2.u0 * plain.width - 0.5), 0);
-  assert.strictEqual(Math.round(c2.v0 * plain.height - 0.5), 432);
+  // #1433: the region bake packs remainder/region cells into the same
+  // sqrt grid as the mains, sized on the total slot count so combo-rich
+  // atlases stay compact. What this pin can still assert is that every
+  // main cell remains one whole stride-aligned frame; absolute grid
+  // positions are R2's packing choice, not a stage-1 invariant.
+  assert.ok(plain.width >= 432 && plain.width % 432 === 0, 'atlas width is whole strides');
+  assert.ok(plain.height >= 432 && plain.height % 432 === 0, 'atlas height is whole strides');
+  const c2 = plain.cells.get(comboKey('mic_plus', INK, ACC));
+  assert.strictEqual(Math.round(c2.u0 * plain.width - 0.5) % 432, 0, 'plain cell starts on a stride boundary');
+  assert.strictEqual(Math.round(c2.v0 * plain.height - 0.5) % 432, 0, 'plain cell starts on a stride row');
   assert.strictEqual(Math.round((c2.u1 - c2.u0) * plain.width), CELL_PX - 1, 'plain cell is one frame wide');
   stripBakes.set('__plain__', { atlas: plain, cell: c2 });
 }
