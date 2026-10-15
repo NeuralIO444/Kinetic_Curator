@@ -61,7 +61,7 @@ Three measurements, in increasing strength:
 - **New suite** `src/gl/cellKinemePlayback.selfcheck.mjs`: **PASS**, all sections (selection/windows/table, bake, pack, contract, GPU) — GPU section ran, not skipped.
 - **Neighbourhood (17 suites): all PASS** — `data/cellKinemes`, `data/kinemes`, `gl/atlas.skip`, `gl/atlasKeyGuard`, `gl/liveAtlas`, `gl/sceneContract`, `gl/kineme`, `gl/kinemeRateAudio`, `gl/costTiers`, `gl/glassBevel`, `gl/exportStill`, `gl/phase6`, `engine/dishDeform`, `engine/plateBody`, `engine/washBody`, `engine/stippleBody`, `engine/glassBody`.
 - **`npm run build`: PASS** (vite, 4.77s).
-- **Full manifest sweep** (continue-past-failure runner, solo, 414 suites): **412 pass / 2 fail**. The 2 failures are the known base-identical sandbox environment failures, unrelated to this change: `src/engine/swarmWasm.selfcheck.mjs` ("cargo: not found" — no Rust toolchain in the sandbox) and `src/gl/accum.selfcheck.mjs` (V8 OOM abort, SIGABRT — the known sandbox memory limit). No other suite failed.
+- **Full manifest sweep** (continue-past-failure runner, solo, 421 suites): **419 pass / 2 fail**. The 2 failures are the known base-identical sandbox environment failures, unrelated to this change: `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` ("cargo: not found" — no Rust toolchain in the sandbox) and `src/gl/accum.selfcheck.mjs` (V8 OOM abort, SIGABRT — the known sandbox memory limit). No other suite failed.
 
 ## Judgment calls (all flagged, none hidden)
 
