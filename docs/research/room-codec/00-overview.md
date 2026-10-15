@@ -26,5 +26,6 @@ THE ROOM panel re-cut as a Metal Gear Solid codec: two persona face windows at t
 - `06-faces-generative.md` — the two dithered face systems
 - `07-megamind-tier.md` — the wilder spec (deferred)
 - `08-open-questions.md` — decisions still open for iteration
+- `09-peephole.md` — the transport-strip peephole: single tenancy, the sliding cover (added 2026-10-15)
 
 Lois pass (whole design): *Two faces, one wire, and a ghost they're not allowed to name. Ship the marriage first; the séance is a tier, not a launch feature.*
