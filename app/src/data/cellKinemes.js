@@ -1,11 +1,14 @@
 // #781 Build C — cell kinemes. Parts stay static assets; only the UV window moves.
 import { MICRO_HUD_STRIPS } from './assets/assets-micro-hud-strips.js';
+import { LINE_STRIPS } from './assets/assets-line-strips.js';
 
 export const CELL_KINEMES = Object.freeze([
   { id: 'dial-sweep', cells: 8, period: 4, costCells: 8 },
   { id: 'wave-scroll', cells: 6, period: 2.4, costCells: 6 },
   { id: 'chevron-chase', cells: 4, period: 1.6, costCells: 4 },
   { id: 'spec-chase', cells: 8, period: 2, costCells: 8 }, // #705 — 3-bar accent window slides and wraps
+  { id: 'line-boil', cells: 7, period: 2.8, costCells: 7 }, // #1435 R4 — the squiggle roll: 7 frames x 8 units = the 56-unit wave
+  { id: 'wave-roll', cells: 8, period: 3.2, costCells: 8 }, // #1435 R4 — the tight waveform roll: 8 frames x 4 units = the 32-unit wave
 ].map(Object.freeze));
 
 const BY_ID = new Map(CELL_KINEMES.map((k) => [k.id, k]));
@@ -26,7 +29,12 @@ export const ASSET_CELL_KINEME = Object.freeze({
   mic_specbar_h: 'spec-chase',
   mic_specbar_v: 'spec-chase',
   mic_wave: 'wave-scroll',
+  line_squiggle_01: 'line-boil', // #1435 R4
+  line_squiggle_02: 'wave-roll', // #1435 R4
 });
+
+/** Every strip-frame table, one lookup: the micro-HUD ornaments + the lines. */
+const STRIP_FRAMES = Object.freeze({ ...MICRO_HUD_STRIPS, ...LINE_STRIPS });
 
 /** Shed / freeze pins cell 0. */
 export function cellIndexAt(motionTime, { period = 1, cells = 4, shed = false } = {}) {
@@ -57,7 +65,7 @@ export function stripFramesFor(assetId) {
   const kinemeId = ASSET_CELL_KINEME[assetId];
   if (!kinemeId) return null;
   const kineme = getCellKineme(kinemeId);
-  const frames = MICRO_HUD_STRIPS[assetId];
+  const frames = STRIP_FRAMES[assetId];
   if (!kineme || !frames || frames.length !== kineme.cells) return null;
   return frames;
 }
