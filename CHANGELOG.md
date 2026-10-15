@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Materials, explorer, loot, taste (2026-10-15)
+
+Everything merged to `main` since the 2026-10-13 sync.
+
+- **Materials (#1547–#1549)** — the vocabulary is complete in GL: glass renders translucent (M1, #1558), plate renders its radial ink body (M2, #1564; radius and centre tuned by eye), wash and stipple render (M3, #1572). Five bodies: flat, glass, plate, wash, stipple.
+- **Look Explorer (E1a–E5: #1504–#1508, #1530)** — coverage census as a standing instrument, parameter census + render reachability (12 dead knobs found), the stratified miner, the mined tray in DIRECTORS + the CENSUS dev tab, persona prospecting corners with LOIS judging renders, the Davis variants offspring engine.
+- **Dice + write path (#1545, #1546, #1550, #1551)** — the dead `scaleMid` axis fixed (recipe features v4), the dealer deals starved families their own casts (never-tray 86 → 31 of 294), one ranges source of truth with validated writes everywhere, census fixture honesty.
+- **Loot folder (#1479, slices 1–9)** — a local folder as the library: the pure scan (classify, dedupe, rename, missing), the per-device index, native + web backends, the PIPELINE row (point at a folder, scan, log), SVGs into the asset pool, palette files into the palette library, audio checked by its bytes, missing files said out loud. `preferences.json` lives at the loot root.
+- **XGBoost taste head (T1–T3: #1579–#1581)** — taste.json can carry a tree head (`xgboost-trees`): Studio-side distillation from the probe with a held-out ship rule, a small tree walk in the app (the library never ships). Dice ordered within strata by score — scores order, never gate — with score + taste version + head kind stamped on tray and crown records; census agreement readout; Davis cites clause reasons from the splits; dev-panel TASTE tree reader.
+- **Governor cost head runtime (#1578, #1583)** — the evaluator and prime function are merged and inert: no trained model, no caller yet. The reactive ladder is untouched and remains the authority.
+- **Spectral path (#1482 P1–P3) + trio direction (#1483, stage 1)** — pure analysis core, the live feed + STIMULI readout, marks that listen to spectral features; LOIS's keep-rate moves how soon she calls a show flat.
+- **Design docs** — MegaMind local-model plan (#1531) and the ROOM codec spec set (#1561) committed under `docs/research/`; both deferred (issues #1525–#1529, #1560). Mind doctrine amended: Apple Intelligence is the default persona backend; rules are the silent fallback.
+
 ## Current — Petri dish, kernel, creatures (2026-10-13)
 
 Everything merged to `main` since the 2026-10-07 sync (about 210 commits). Roadmap: [docs/ROADMAP_PETRI_DISH.md](docs/ROADMAP_PETRI_DISH.md).
