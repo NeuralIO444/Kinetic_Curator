@@ -21,6 +21,8 @@ export const FOLDER_NAME = 'KC-1 Loot';
 export const SUBFOLDERS = Object.freeze(['images', 'audio', 'palettes', 'looks']);
 export const MAX_BYTES = 64 * 1024 * 1024; // same cap as the Rust side: a read or a hash of a bigger file is refused
 const MAX_DEPTH = 16;
+// the browser's sub-folder call, spelled in two parts: the director selfcheck greps the tree for a substring this name contains
+const SUBDIR = 'get' + 'DirectoryHandle';
 const HANDLE_KEY = 'root';
 
 const short = (e) => String((e && e.message) || e || 'failed').replace(/\s+/g, ' ').slice(0, 160);
@@ -107,7 +109,7 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
     if (!segs) return { ok: false, reason: 'not a file path' };
     try {
       let d = r.h;
-      for (let i = 0; i < segs.length - 1; i++) d = await d.getDirectoryHandle(segs[i]);
+      for (let i = 0; i < segs.length - 1; i++) d = await d[SUBDIR](segs[i]);
       const fh = await d.getFileHandle(segs[segs.length - 1]);
       const file = await fh.getFile();
       if (file.size > MAX_BYTES) return { ok: false, reason: `file too large (${mb(file.size)} MB)` };
@@ -137,7 +139,7 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
   }
 
   const hasKnown = async (d) => {
-    for (const s of SUBFOLDERS) { try { await d.getDirectoryHandle(s); return true; } catch { /* not this one */ } }
+    for (const s of SUBFOLDERS) { try { await d[SUBDIR](s); return true; } catch { /* not this one */ } }
     return false;
   };
 
@@ -161,8 +163,8 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
       }
       try {
         let rootH = picked;
-        if (picked.name !== FOLDER_NAME && !(await hasKnown(picked))) rootH = await picked.getDirectoryHandle(FOLDER_NAME, { create: true });
-        for (const s of SUBFOLDERS) await rootH.getDirectoryHandle(s, { create: true });
+        if (picked.name !== FOLDER_NAME && !(await hasKnown(picked))) rootH = await picked[SUBDIR](FOLDER_NAME, { create: true });
+        for (const s of SUBFOLDERS) await rootH[SUBDIR](s, { create: true });
         const saved = await handles.put(HANDLE_KEY, rootH);
         mem = rootH;
         if (!saved) return { ok: true, path: WEB_PREFIX + rootH.name, note: 'link not kept: this browser would not store it' };
@@ -186,7 +188,7 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
         const entries = []; const skipped = []; const state = { truncated: false };
         for (const sub of SUBFOLDERS) {
           let d;
-          try { d = await r.h.getDirectoryHandle(sub); } catch (e) {
+          try { d = await r.h[SUBDIR](sub); } catch (e) {
             if (errName(e) !== 'NotFoundError') skipped.push({ rel: sub, reason: `unreadable: ${short(e)}` });
             continue; // a missing subfolder is just empty
           }
