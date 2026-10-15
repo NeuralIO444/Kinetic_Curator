@@ -3,6 +3,18 @@
 export const DESKTOP_ONLY = 'desktop only';
 export const NOT_CONFIRMED = 'desktop check not confirmed yet';
 export const NOT_REACHABLE = 'folder not reachable';
+// the browser backend (slice 5b): plain reasons, never a dead button
+export const WEB_UNSUPPORTED = 'needs chrome or edge, or the desktop app';
+export const WEB_INSECURE = 'needs a secure page (https)';
+export const LINK_LOST = 'folder link lost: point at the folder again';
+export const ALLOW_AGAIN = 'allow access to the folder, then rescan';
+export const NOT_BROWSER_FOLDER = 'not a browser folder: point at the folder again';
+
+/** The folder as the row shows it: a desktop path as it is, a browser folder by name and where it is kept. */
+export function rootLabel(root) {
+  if (typeof root !== 'string' || !root) return '';
+  return root.startsWith('web:') ? `${root.slice(4)} (kept in this browser)` : root;
+}
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
