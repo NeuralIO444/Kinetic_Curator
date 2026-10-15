@@ -141,10 +141,11 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx'
   check('uncapped resolves FINAL_CAPS',
     getRenderCaps('high', true) === FINAL_CAPS);
 
-  // Materials honesty (#168): a gradient material with no GL shading
-  // yet (wash/stipple) on wing items warns once per material; materials
-  // the GL backend renders (glass since #1547, plate since #1548),
-  // flat, and wing-less layers stay silent.
+  // Materials honesty (#168): the colour-ramp bodies (plate/wash)
+  // render in the live tab and in composed stills, but the headless
+  // GL export renders them flat — that seam warns once per material.
+  // Flat stays silent; glass (M1) and stipple (M3, via stippleCover)
+  // survive even the export and stay silent; wing-less layers too.
   const warned = [];
   const origWarn = console.warn;
   console.warn = (m) => warned.push(String(m));
@@ -155,9 +156,11 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx'
     check('material warning fires once', warned.length === 1);
     warnUnsupportedMaterials([{ layoutParams: { material: 'flat' }, items: [{ role: 'wing' }] }]);
     warnUnsupportedMaterials([{ layoutParams: { material: 'wash' }, items: [{ role: 'body' }] }]);
-    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'wing' }] }]);
     warnUnsupportedMaterials([{ layoutParams: { material: 'glass' }, items: [{ role: 'wing' }] }]);
-    check('flat / rendered / no-wing materials stay silent', warned.length === 1);
+    warnUnsupportedMaterials([{ layoutParams: { material: 'stipple' }, items: [{ role: 'wing' }] }]);
+    check('flat / export-proof / no-wing materials stay silent', warned.length === 1);
+    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'wing' }] }]);
+    check('plate export seam warns too', warned.length === 2 && warned[1].includes('"plate"'));
   } finally {
     console.warn = origWarn;
   }
