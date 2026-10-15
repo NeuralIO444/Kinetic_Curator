@@ -364,18 +364,26 @@ export function createLoisActivity({
     // #1391 G7 — param tweaks: every LAYOUT_PARAM off the bus is a hand on a
     // control. A tweak that lands while an undo burst is hot is the EDGE
     // collision (undo burst + param tweak). Recorded, never judged here.
+    // #1434 — a per-region kineme edit in the asset tools is the same class
+    // of artist action (LAYOUT_PARAM-class, artist-attributed): it records
+    // as a tweak under the 'regionKineme' key.
+    const noteTweak = (key) => {
+      const at = t();
+      s.tweaks.push({ ts: at, key });
+      cap(s.tweaks);
+      const undos = countSince(s.undos, LOIS_UNDO_BURST_WINDOW_MS, at);
+      if (undos >= LOIS_UNDO_BURST_MIN) {
+        s.collisions.push({ ts: at, key, undos });
+        cap(s.collisions);
+      }
+    };
     unsubs.push(
       on(Events.LAYOUT_PARAM, (p) => {
-        const at = t();
-        const key = p && typeof p.key === 'string' ? p.key : null;
-        s.tweaks.push({ ts: at, key });
-        cap(s.tweaks);
-        const undos = countSince(s.undos, LOIS_UNDO_BURST_WINDOW_MS, at);
-        if (undos >= LOIS_UNDO_BURST_MIN) {
-          s.collisions.push({ ts: at, key, undos });
-          cap(s.collisions);
-        }
+        noteTweak(p && typeof p.key === 'string' ? p.key : null);
       }),
+    );
+    unsubs.push(
+      on(Events.ASSETS_REGION_KINEME, () => noteTweak('regionKineme')),
     );
 
     // Instrument 6 — rolls-per-keep: curate taps and KINETIC taps vs keeps.
