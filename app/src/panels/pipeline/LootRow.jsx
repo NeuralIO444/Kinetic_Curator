@@ -9,6 +9,7 @@ import { createLootNative, seenLine } from '../../loot/lootNative.mjs';
 import { runScan } from '../../loot/lootRun.mjs';
 import { takeInImages, ingestVia } from '../../loot/lootIngest.mjs';
 import { takeInPalettes } from '../../loot/lootPalettes.mjs';
+import { takeInAudio } from '../../loot/lootAudio.mjs';
 import { useStore } from '../../state/store.js';
 import { loadIndex, saveIndex, withRoot, emptyIndex, countItems } from '../../loot/lootIndex.mjs';
 import { statusLine, logLine, confirmForgetMessage, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
@@ -44,10 +45,12 @@ export function LootRow() {
       // palettes go into the user palette library (your library, shared by every project)
       setBusy('adding palettes...');
       const pals = await takeInPalettes({ native, index: taken.index, importPalettes: (list) => useStore.getState().importUserPalettes(list) });
-      keep(pals.index);
+      // audio is only validated here; STIMULI offers it as a pick (a scan never switches the source)
+      const aud = await takeInAudio({ native, index: pals.index });
+      keep(aud.index);
       setLast({
         added: r.summary.add, skipped: r.summary.skipped, missing: r.summary.missing,
-        taken: taken.summary.taken + pals.summary.files, held: taken.summary.poolFull + taken.summary.rejected + pals.summary.rejected + pals.summary.unreadable,
+        taken: taken.summary.taken + pals.summary.files + aud.summary.taken, held: taken.summary.poolFull + taken.summary.rejected + pals.summary.rejected + pals.summary.unreadable + aud.summary.rejected + aud.summary.unreadable,
       });
       if (r.unreachable) setNote('folder not reachable');
     } catch (e) {
