@@ -17,8 +17,8 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
   const line = bakeAsset(byId('line_solid_01').svg);
   assert.equal(line.regions.length, 1, 'a solid line is one region');
   const compound = bakeAsset(byId('geo_burst_01').svg);
-  assert.equal(compound.regions.length, REGION_CAP, 'a compound asset is held at the cap');
-  assert.equal(REGION_CAP, 8);
+  assert.equal(compound.regions.length, 9, 'a compound asset: all 9 detected regions are tagged at the 12 cap (the old 8 cap folded one in)');
+  assert.equal(REGION_CAP, 12, 'Matt\'s amended ruling on #1433 (2026-10-14): bake tags up to 12; the governor selects live');
 }
 
 // 2. the cap keeps the largest and folds the rest into the nearest kept region (area is conserved)

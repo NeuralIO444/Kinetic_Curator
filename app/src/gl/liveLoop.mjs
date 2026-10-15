@@ -46,6 +46,7 @@ import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // 
 import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
 import { bakeLiveAtlas, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
+import { regionBudgetForDevice } from '../data/quality.js'; // #1433: the device-class region budget ceiling
 import { applyParallax } from './parallax.mjs';
 import { resolvePalette } from '../data/palettes.js';
 import { resolveLiveRenderState } from '../data/voices.js';
@@ -78,9 +79,24 @@ import {
  * render-size changes must NOT rebake it. #1079: the grain LUT bake is gone
  * (grain is procedural), so there is no second bake key anymore.
  */
-function atlasKeyFor(combos, fxLayerIds) {
+function atlasKeyFor(combos, fxLayerIds, regionAssets = []) {
   const ck = combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join(';');
-  return `${[...fxLayerIds].sort().join(',')}|${ck}`;
+  // #1433: region cells are baked on demand (only for assets the
+  // contract expands), so the demand set is part of the bake key.
+  return `${[...fxLayerIds].sort().join(',')}|${[...regionAssets].sort().join(',')}|${ck}`;
+}
+
+/**
+ * #1433 — the device class the region budget reads: iPad-class hardware
+ * gets the tighter budget (data/quality.js REGION_BUDGETS). Same sniff
+ * as useMediaExport (an iPad UA, or an iPad reporting as a Mac with a
+ * touch screen). Computed per frame with the other budget inputs; the
+ * value is stable for a session in practice.
+ */
+function isIpadClassDevice() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /iPad/.test(ua) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
 }
 
 /**
@@ -274,6 +290,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   let buildToken = 0;
   let svgPool = null; // Map asset id -> svg fragment, rebuilt on customAssets change
   let gradientPool = null; // #701 — Map asset id -> TE gradient, same lifetime
+  let regionsPool = null; // #1433 — Map asset id -> region records, same lifetime
   let svgPoolRef = null;
 
   // ACCUM session state.
@@ -371,6 +388,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // here so the baker never has to reach back into the asset catalogue
       // (overlay assets come from the store, not from ASSETS).
       gradientPool = new Map(pool.filter((a) => a.gradient).map((a) => [a.id, a.gradient]));
+      // #1433 — per-asset region records for the live baker's region
+      // cells, keyed the same way (canon + overlay assets both carry
+      // `.regions`: R1's bake for built-ins, #725 for imports).
+      regionsPool = new Map(pool.filter((a) => Array.isArray(a.regions) && a.regions.length).map((a) => [a.id, a.regions]));
       svgPoolRef = customAssets;
     }
     return svgPool;
@@ -684,7 +705,15 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     // amount, u_smear.z). 0 on the default table (routes.squash undefined)
     // → the contract is exactly as built, today's render bit-identical.
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, perfTier1: !!s.perfTier1, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette },
+      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, perfTier1: !!s.perfTier1, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette,
+        // #1433 — the governor state the region shed ladder reads
+        // (sceneContract.regionKinemesFrozen / regionCollapseShed /
+        // regionAnimBudget): deeper cuts, the OS reduced-motion
+        // preference (regions hold rest), and the device-class region
+        // budget ceiling (data/quality.js REGION_BUDGETS).
+        assetThin: s.assetThin, perfClamp: !!s.perfClampOverride, slowRender: s.slowRender || !s.running,
+        reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+        regionBudget: regionBudgetForDevice(isIpadClassDevice()) },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
@@ -785,9 +814,15 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const rw = Math.max(2, Math.round(canvasW * renderScale));
     const rh = Math.max(2, Math.round(canvasH * renderScale));
 
-    const aKey = atlasKeyFor(combos, fxLayerIds);
+    // #1433: region cells only for assets this frame's contract
+    // actually expands (none under the collapse shed — the pack reads
+    // no region cells there).
+    const regionAssets = contract.regionAnim && !contract.regionAnim.shed
+      ? Object.keys(contract.regionAnim.assets || {})
+      : [];
+    const aKey = atlasKeyFor(combos, fxLayerIds, regionAssets);
     if (aKey !== atlasKey && !building && performance.now() >= bakeRetryAt) {
-      startStaticBuild(combos, aKey);
+      startStaticBuild(combos, aKey, regionAssets);
     }
     // Spine B (#388): never return null just because a bake is in flight.
     // Keep resolving + simulating + presenting last-good atlas cells.
@@ -877,7 +912,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     };
   }
 
-  async function startStaticBuild(combos, aKey) {
+  async function startStaticBuild(combos, aKey, regionAssets = []) {
     building = true;
     const token = ++buildToken;
     try {
@@ -886,7 +921,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       // independent, so a renderScale step skips the heavy sequential-SVG
       // bake entirely (#1079: the grain LUT bake is gone).
       if (aKey !== atlasKey) {
-        const atlas = await bakeLiveAtlas(combos, svgById, gradientPool);
+        // #1433: hand the live baker only the demanded assets' records.
+        const demandedRegions = regionAssets.length
+          ? new Map(regionAssets.filter((id) => regionsPool?.has(id)).map((id) => [id, regionsPool.get(id)]))
+          : null;
+        const atlas = await bakeLiveAtlas(combos, svgById, gradientPool, demandedRegions);
         if (token !== buildToken) return; // superseded
         live.setAtlas(atlas.pixels, atlas.width, atlas.height, atlas.mipmaps);
         cells = Object.fromEntries(atlas.cells);

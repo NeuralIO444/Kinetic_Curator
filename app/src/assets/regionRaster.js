@@ -26,7 +26,8 @@ function hashStr(s) {
   return (h >>> 0).toString(36);
 }
 
-function canonicalSvg(svg) {
+/** The canonical detection SVG (exported for gl/liveAtlas.mjs, #1433 — the region-cell bake runs the same detection). */
+export function canonicalSvg(svg) {
   const body = String(svg || '').replace(INK_CSS, '#000000').replace(ACCENT_CSS, '#ff2d95');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${REGION_RASTER_PX}" height="${REGION_RASTER_PX}">${body}</svg>`;
 }
