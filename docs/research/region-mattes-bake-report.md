@@ -4,300 +4,301 @@ Assets in the library: 294. With regions: 294. Without (rasterize to nothing): 0
 Region cap: 12. Regions in total: 1095.
 Count histogram (regions per asset: assets): 1: 131, 2: 37, 3: 23, 4: 13, 5: 23, 6: 7, 7: 8, 8: 5, 9: 13, 10: 4, 11: 1, 12: 29.
 Summed region bbox area (fractions of the 100-unit box): 119.362.
+Family-default region kinemes (#1434): 294 regions assigned across 74 assets (floral: 15 assets / 53 regions, linework: 33 assets / 91 regions, radial: 26 assets / 150 regions).
 
-| asset | regions | bbox area |
-|---|---:|---:|
-| org_blob_01 | 1 | 0.710 |
-| org_blob_02 | 1 | 0.660 |
-| org_blob_03 | 1 | 0.578 |
-| org_blob_04 | 2 | 0.668 |
-| org_blob_05 | 1 | 0.569 |
-| org_petal_01 | 1 | 0.238 |
-| org_petal_02 | 3 | 0.350 |
-| org_petal_03 | 1 | 0.230 |
-| org_leaf_01 | 1 | 0.518 |
-| org_leaf_02 | 7 | 0.328 |
-| org_leaf_03 | 1 | 0.180 |
-| org_pod_01 | 2 | 0.434 |
-| org_pod_02 | 2 | 0.384 |
-| org_drop_01 | 1 | 0.437 |
-| org_drop_02 | 2 | 0.498 |
-| org_blob_outline_01 | 1 | 0.761 |
-| org_blob_dotted_01 | 6 | 0.666 |
-| org_eye_blob_01 | 3 | 0.669 |
-| org_kidney_01 | 1 | 0.465 |
-| org_lobe_01 | 1 | 0.480 |
-| geo_tri_01 | 1 | 0.608 |
-| geo_tri_02 | 1 | 0.684 |
-| geo_tri_03 | 2 | 0.608 |
-| geo_tri_04 | 3 | 0.626 |
-| geo_hex_01 | 1 | 0.605 |
-| geo_hex_02 | 1 | 0.660 |
-| geo_hex_03 | 2 | 0.829 |
-| geo_diamond_01 | 1 | 0.638 |
-| geo_diamond_02 | 2 | 0.796 |
-| geo_diamond_03 | 2 | 0.718 |
-| geo_star4_01 | 1 | 0.774 |
-| geo_star5_01 | 1 | 0.756 |
-| geo_star6_01 | 1 | 0.826 |
-| geo_star8_01 | 1 | 0.828 |
-| geo_chev_01 | 1 | 0.313 |
-| geo_chev_02 | 2 | 0.461 |
-| geo_square_01 | 1 | 0.518 |
-| geo_square_02 | 2 | 0.722 |
-| geo_square_03 | 2 | 0.648 |
-| geo_pent_01 | 1 | 0.624 |
-| geo_octa_01 | 1 | 0.706 |
-| geo_circle_01 | 1 | 0.640 |
-| geo_circle_02 | 1 | 0.706 |
-| geo_circle_03 | 2 | 0.718 |
-| geo_halfcircle_01 | 1 | 0.400 |
-| geo_quartercircle_01 | 1 | 0.518 |
-| geo_arc_01 | 1 | 0.340 |
-| geo_cross_01 | 1 | 0.640 |
-| geo_cross_02 | 1 | 0.640 |
-| geo_parallelo_01 | 1 | 0.432 |
-| geo_trapezoid_01 | 1 | 0.420 |
-| geo_burst_01 | 9 | 0.349 |
-| geo_burst_02 | 6 | 0.280 |
-| geo_concentric_tri_01 | 3 | 1.040 |
-| dot_single_01 | 1 | 0.078 |
-| dot_field_01 | 12 | 0.141 |
-| dot_field_02 | 12 | 0.159 |
-| dot_field_03 | 12 | 0.056 |
-| dot_field_04 | 12 | 0.259 |
-| dot_field_05 | 6 | 0.038 |
-| dot_confetti_01 | 10 | 0.070 |
-| dot_confetti_02 | 12 | 0.066 |
-| dot_ring_01 | 12 | 0.043 |
-| dot_speckle_01 | 12 | 0.181 |
-| dot_cluster_01 | 4 | 0.128 |
-| line_squiggle_01 | 1 | 0.287 |
-| line_squiggle_02 | 1 | 0.191 |
-| line_squiggle_03 | 1 | 0.248 |
-| line_zigzag_01 | 1 | 0.398 |
-| line_dash_01 | 9 | 0.024 |
-| line_dash_02 | 9 | 0.025 |
-| line_solid_01 | 1 | 0.037 |
-| line_double_01 | 2 | 0.055 |
-| line_swoosh_01 | 1 | 0.479 |
-| line_swoosh_02 | 2 | 0.544 |
-| line_arrow_01 | 1 | 0.230 |
-| line_arrow_02 | 1 | 0.410 |
-| line_arrow_03 | 1 | 0.254 |
-| line_loop_01 | 1 | 0.302 |
-| line_spiral_01 | 1 | 0.348 |
-| line_scribble_01 | 1 | 0.333 |
-| line_cross_01 | 1 | 0.410 |
-| line_tally_01 | 7 | 0.489 |
-| line_brackets_01 | 2 | 0.285 |
-| line_hatch_01 | 10 | 0.148 |
-| line_hatch_02 | 5 | 1.313 |
-| line_target_01 | 3 | 1.012 |
-| line_curl_01 | 1 | 0.317 |
-| line_omega_01 | 1 | 0.456 |
-| line_step_01 | 1 | 0.523 |
-| flora_flower_01 | 5 | 0.360 |
-| flora_flower_02 | 7 | 0.549 |
-| flora_flower_03 | 5 | 0.270 |
-| flora_flower_04 | 5 | 0.429 |
-| flora_sprig_01 | 5 | 0.126 |
-| flora_sprig_02 | 1 | 0.490 |
-| flora_bud_01 | 1 | 0.221 |
-| flora_seed_01 | 1 | 0.578 |
-| flora_vine_01 | 2 | 0.393 |
-| flora_branch_01 | 1 | 0.563 |
-| flora_pinwheel_01 | 5 | 0.320 |
-| flora_clover_01 | 1 | 0.423 |
-| flora_starflower_01 | 3 | 0.769 |
-| flora_palm_01 | 5 | 0.822 |
-| flora_seedhead_01 | 6 | 0.350 |
-| stamp_num_01 | 3 | 0.629 |
-| stamp_num_02 | 5 | 0.604 |
-| stamp_num_03 | 2 | 0.752 |
-| stamp_num_04 | 2 | 0.262 |
-| stamp_num_05 | 3 | 0.138 |
-| stamp_glyph_01 | 1 | 0.104 |
-| stamp_glyph_02 | 1 | 0.354 |
-| stamp_glyph_03 | 1 | 0.159 |
-| stamp_glyph_04 | 3 | 0.265 |
-| stamp_glyph_05 | 1 | 0.176 |
-| stamp_glyph_06 | 1 | 0.139 |
-| stamp_arrow_01 | 1 | 0.160 |
-| stamp_letter_01 | 5 | 0.764 |
-| stamp_letter_02 | 1 | 0.289 |
-| stamp_letter_03 | 2 | 0.760 |
-| stamp_label_01 | 5 | 0.274 |
-| stamp_label_02 | 5 | 0.313 |
-| stamp_barcode_01 | 12 | 0.216 |
-| rad_rings_01 | 5 | 1.654 |
-| rad_rings_02 | 12 | 0.773 |
-| rad_rings_03 | 4 | 1.248 |
-| rad_orbit_01 | 2 | 0.298 |
-| rad_orbit_02 | 2 | 0.376 |
-| rad_radial_01 | 9 | 0.169 |
-| rad_radial_02 | 9 | 0.273 |
-| rad_orbit_dot_01 | 1 | 0.705 |
-| rad_iris_01 | 4 | 0.766 |
-| rad_pie_01 | 4 | 0.640 |
-| rad_target_01 | 4 | 1.370 |
-| rad_starburst_01 | 6 | 0.496 |
-| rad_petals_01 | 9 | 0.368 |
-| rad_split_01 | 2 | 0.954 |
-| xsh01 | 9 | 0.210 |
-| xsh02 | 1 | 0.256 |
-| xsh03 | 1 | 0.334 |
-| xsh04 | 8 | 0.314 |
-| xsh05 | 7 | 1.327 |
-| xsh06 | 12 | 0.369 |
-| xsh07 | 12 | 1.535 |
-| xsh08 | 1 | 0.111 |
-| xsh09 | 9 | 0.630 |
-| xsh10 | 5 | 0.105 |
-| xsh11 | 8 | 0.193 |
-| xsh12 | 1 | 0.221 |
-| bio01 | 4 | 0.610 |
-| bio02 | 3 | 0.283 |
-| bio03 | 4 | 0.646 |
-| bio04 | 5 | 0.532 |
-| bio05 | 3 | 0.455 |
-| bio06 | 1 | 0.722 |
-| bio07 | 12 | 0.118 |
-| bio08 | 2 | 0.497 |
-| bio09 | 7 | 0.405 |
-| bio10 | 12 | 0.301 |
-| bio11 | 1 | 0.357 |
-| bio12 | 9 | 0.664 |
-| frg01 | 1 | 0.087 |
-| frg02 | 1 | 0.052 |
-| frg03 | 1 | 0.187 |
-| frg04 | 1 | 0.294 |
-| frg05 | 1 | 0.386 |
-| frg06 | 1 | 0.381 |
-| frg07 | 1 | 0.194 |
-| frg08 | 1 | 0.372 |
-| frg09 | 3 | 0.290 |
-| frg10 | 1 | 0.562 |
-| frg11 | 7 | 0.364 |
-| frg12 | 1 | 0.337 |
-| scn01 | 12 | 0.480 |
-| scn02 | 12 | 0.325 |
-| scn03 | 1 | 0.706 |
-| scn04 | 12 | 0.563 |
-| scn05 | 12 | 0.429 |
-| scn06 | 12 | 0.173 |
-| scn07 | 12 | 0.158 |
-| scn08 | 4 | 0.090 |
-| scn09 | 5 | 0.082 |
-| scn10 | 12 | 0.252 |
-| scn11 | 12 | 0.120 |
-| scn12 | 12 | 0.340 |
-| hae_radiolarian_01 | 12 | 1.483 |
-| hae_radiolarian_02 | 12 | 0.393 |
-| hae_diatom_01 | 2 | 0.292 |
-| hae_diatom_02 | 5 | 0.754 |
-| hae_medusa_01 | 2 | 0.345 |
-| hae_ammonite_01 | 1 | 0.742 |
-| hae_starfish_01 | 11 | 0.894 |
-| hae_coral_01 | 8 | 0.537 |
-| hae_sponge_01 | 9 | 0.368 |
-| hae_siphonophore_01 | 1 | 0.191 |
-| hae_pollen_01 | 12 | 0.547 |
-| hae_ciliate_01 | 2 | 0.417 |
-| hae_flagella_01 | 6 | 1.689 |
-| hae_tendril_01 | 1 | 0.480 |
-| hae_mycelium_01 | 4 | 0.453 |
-| hae_root_01 | 9 | 0.278 |
-| hae_nerve_01 | 2 | 0.479 |
-| hae_plume_01 | 1 | 0.405 |
-| hae_kelp_01 | 2 | 0.474 |
-| hae_fern_01 | 1 | 0.306 |
-| mic_bracket_tl | 1 | 0.068 |
-| mic_bracket_tr | 1 | 0.068 |
-| mic_bracket_bl | 1 | 0.068 |
-| mic_bracket_br | 1 | 0.068 |
-| mic_dotgrid_5 | 12 | 0.225 |
-| mic_dotgrid_3 | 9 | 0.032 |
-| mic_ticks_h | 3 | 0.130 |
-| mic_ticks_ring | 12 | 0.170 |
-| mic_dial | 10 | 0.597 |
-| mic_needle | 2 | 0.017 |
-| mic_crosshair | 2 | 0.711 |
-| mic_plus | 1 | 0.160 |
-| mic_specbar_h | 8 | 0.077 |
-| mic_specbar_v | 8 | 0.077 |
-| mic_label | 4 | 0.361 |
-| mic_tag | 4 | 0.385 |
-| mic_chevrons | 3 | 0.245 |
-| mic_wave | 1 | 0.454 |
-| mic_target | 3 | 0.786 |
-| mic_arrow | 1 | 0.272 |
-| mic_cropmarks | 4 | 0.130 |
-| typ_A | 1 | 0.344 |
-| typ_B | 1 | 0.320 |
-| typ_C | 1 | 0.328 |
-| typ_D | 1 | 0.320 |
-| typ_E | 1 | 0.264 |
-| typ_F | 1 | 0.256 |
-| typ_G | 1 | 0.328 |
-| typ_H | 1 | 0.320 |
-| typ_I | 1 | 0.128 |
-| typ_J | 1 | 0.316 |
-| typ_K | 1 | 0.332 |
-| typ_L | 1 | 0.264 |
-| typ_M | 1 | 0.504 |
-| typ_N | 1 | 0.320 |
-| typ_O | 1 | 0.328 |
-| typ_P | 1 | 0.312 |
-| typ_Q | 1 | 0.376 |
-| typ_R | 1 | 0.312 |
-| typ_S | 1 | 0.328 |
-| typ_T | 1 | 0.280 |
-| typ_U | 1 | 0.316 |
-| typ_V | 1 | 0.336 |
-| typ_W | 1 | 0.512 |
-| typ_X | 1 | 0.344 |
-| typ_Y | 1 | 0.328 |
-| typ_Z | 1 | 0.288 |
-| typ_0 | 1 | 0.353 |
-| typ_1 | 1 | 0.216 |
-| typ_2 | 1 | 0.348 |
-| typ_3 | 1 | 0.340 |
-| typ_4 | 1 | 0.360 |
-| typ_5 | 1 | 0.353 |
-| typ_6 | 1 | 0.353 |
-| typ_7 | 1 | 0.328 |
-| typ_8 | 1 | 0.344 |
-| typ_9 | 1 | 0.353 |
-| pxg_cross | 5 | 0.130 |
-| pxg_plus | 2 | 0.260 |
-| pxg_diamond | 12 | 0.150 |
-| pxg_frame | 5 | 0.210 |
-| pxg_window | 5 | 0.370 |
-| pxg_gate | 5 | 0.250 |
-| pxg_totem | 3 | 0.220 |
-| pxg_chevron | 4 | 0.260 |
-| pxg_orbit | 9 | 0.170 |
-| pxg_split | 3 | 0.430 |
-| pxg_nest | 7 | 0.250 |
-| pxg_key | 3 | 0.300 |
-| pxg_stem | 3 | 0.440 |
-| pxg_bowl | 5 | 0.390 |
-| pxg_arch | 2 | 0.500 |
-| pxg_fork | 3 | 0.340 |
-| pxg_serif | 2 | 0.500 |
-| pxg_counter | 6 | 0.220 |
-| pxg_ligature | 3 | 0.430 |
-| pxg_flag | 2 | 0.430 |
-| pxg_cross_b | 3 | 0.310 |
-| pxg_plus_b | 2 | 0.260 |
-| pxg_diamond_b | 12 | 0.120 |
-| pxg_frame_b | 5 | 0.210 |
-| pxg_window_b | 5 | 0.370 |
-| pxg_totem_b | 2 | 0.220 |
-| pxg_orbit_b | 10 | 0.160 |
-| pxg_nest_b | 7 | 0.250 |
-| pxg_speck | 1 | 0.010 |
-| pxg_speck_ne | 1 | 0.010 |
-| pxg_spark | 2 | 0.020 |
-| pxg_dust | 3 | 0.030 |
+| asset | regions | bbox area | assigned |
+|---|---:|---:|---:|
+| org_blob_01 | 1 | 0.710 | 0 |
+| org_blob_02 | 1 | 0.660 | 0 |
+| org_blob_03 | 1 | 0.578 | 0 |
+| org_blob_04 | 2 | 0.668 | 0 |
+| org_blob_05 | 1 | 0.569 | 0 |
+| org_petal_01 | 1 | 0.238 | 0 |
+| org_petal_02 | 3 | 0.350 | 0 |
+| org_petal_03 | 1 | 0.230 | 0 |
+| org_leaf_01 | 1 | 0.518 | 0 |
+| org_leaf_02 | 7 | 0.328 | 0 |
+| org_leaf_03 | 1 | 0.180 | 0 |
+| org_pod_01 | 2 | 0.434 | 0 |
+| org_pod_02 | 2 | 0.384 | 0 |
+| org_drop_01 | 1 | 0.437 | 0 |
+| org_drop_02 | 2 | 0.498 | 0 |
+| org_blob_outline_01 | 1 | 0.761 | 0 |
+| org_blob_dotted_01 | 6 | 0.666 | 0 |
+| org_eye_blob_01 | 3 | 0.669 | 0 |
+| org_kidney_01 | 1 | 0.465 | 0 |
+| org_lobe_01 | 1 | 0.480 | 0 |
+| geo_tri_01 | 1 | 0.608 | 0 |
+| geo_tri_02 | 1 | 0.684 | 0 |
+| geo_tri_03 | 2 | 0.608 | 0 |
+| geo_tri_04 | 3 | 0.626 | 0 |
+| geo_hex_01 | 1 | 0.605 | 0 |
+| geo_hex_02 | 1 | 0.660 | 0 |
+| geo_hex_03 | 2 | 0.829 | 0 |
+| geo_diamond_01 | 1 | 0.638 | 0 |
+| geo_diamond_02 | 2 | 0.796 | 0 |
+| geo_diamond_03 | 2 | 0.718 | 0 |
+| geo_star4_01 | 1 | 0.774 | 0 |
+| geo_star5_01 | 1 | 0.756 | 0 |
+| geo_star6_01 | 1 | 0.826 | 0 |
+| geo_star8_01 | 1 | 0.828 | 0 |
+| geo_chev_01 | 1 | 0.313 | 0 |
+| geo_chev_02 | 2 | 0.461 | 0 |
+| geo_square_01 | 1 | 0.518 | 0 |
+| geo_square_02 | 2 | 0.722 | 0 |
+| geo_square_03 | 2 | 0.648 | 0 |
+| geo_pent_01 | 1 | 0.624 | 0 |
+| geo_octa_01 | 1 | 0.706 | 0 |
+| geo_circle_01 | 1 | 0.640 | 0 |
+| geo_circle_02 | 1 | 0.706 | 0 |
+| geo_circle_03 | 2 | 0.718 | 0 |
+| geo_halfcircle_01 | 1 | 0.400 | 0 |
+| geo_quartercircle_01 | 1 | 0.518 | 0 |
+| geo_arc_01 | 1 | 0.340 | 0 |
+| geo_cross_01 | 1 | 0.640 | 0 |
+| geo_cross_02 | 1 | 0.640 | 0 |
+| geo_parallelo_01 | 1 | 0.432 | 0 |
+| geo_trapezoid_01 | 1 | 0.420 | 0 |
+| geo_burst_01 | 9 | 0.349 | 0 |
+| geo_burst_02 | 6 | 0.280 | 0 |
+| geo_concentric_tri_01 | 3 | 1.040 | 0 |
+| dot_single_01 | 1 | 0.078 | 0 |
+| dot_field_01 | 12 | 0.141 | 0 |
+| dot_field_02 | 12 | 0.159 | 0 |
+| dot_field_03 | 12 | 0.056 | 0 |
+| dot_field_04 | 12 | 0.259 | 0 |
+| dot_field_05 | 6 | 0.038 | 0 |
+| dot_confetti_01 | 10 | 0.070 | 0 |
+| dot_confetti_02 | 12 | 0.066 | 0 |
+| dot_ring_01 | 12 | 0.043 | 0 |
+| dot_speckle_01 | 12 | 0.181 | 0 |
+| dot_cluster_01 | 4 | 0.128 | 0 |
+| line_squiggle_01 | 1 | 0.287 | 1 |
+| line_squiggle_02 | 1 | 0.191 | 1 |
+| line_squiggle_03 | 1 | 0.248 | 1 |
+| line_zigzag_01 | 1 | 0.398 | 1 |
+| line_dash_01 | 9 | 0.024 | 9 |
+| line_dash_02 | 9 | 0.025 | 9 |
+| line_solid_01 | 1 | 0.037 | 1 |
+| line_double_01 | 2 | 0.055 | 2 |
+| line_swoosh_01 | 1 | 0.479 | 1 |
+| line_swoosh_02 | 2 | 0.544 | 2 |
+| line_arrow_01 | 1 | 0.230 | 1 |
+| line_arrow_02 | 1 | 0.410 | 1 |
+| line_arrow_03 | 1 | 0.254 | 1 |
+| line_loop_01 | 1 | 0.302 | 1 |
+| line_spiral_01 | 1 | 0.348 | 1 |
+| line_scribble_01 | 1 | 0.333 | 1 |
+| line_cross_01 | 1 | 0.410 | 1 |
+| line_tally_01 | 7 | 0.489 | 7 |
+| line_brackets_01 | 2 | 0.285 | 2 |
+| line_hatch_01 | 10 | 0.148 | 10 |
+| line_hatch_02 | 5 | 1.313 | 5 |
+| line_target_01 | 3 | 1.012 | 3 |
+| line_curl_01 | 1 | 0.317 | 1 |
+| line_omega_01 | 1 | 0.456 | 1 |
+| line_step_01 | 1 | 0.523 | 1 |
+| flora_flower_01 | 5 | 0.360 | 5 |
+| flora_flower_02 | 7 | 0.549 | 7 |
+| flora_flower_03 | 5 | 0.270 | 5 |
+| flora_flower_04 | 5 | 0.429 | 5 |
+| flora_sprig_01 | 5 | 0.126 | 5 |
+| flora_sprig_02 | 1 | 0.490 | 1 |
+| flora_bud_01 | 1 | 0.221 | 1 |
+| flora_seed_01 | 1 | 0.578 | 1 |
+| flora_vine_01 | 2 | 0.393 | 2 |
+| flora_branch_01 | 1 | 0.563 | 1 |
+| flora_pinwheel_01 | 5 | 0.320 | 5 |
+| flora_clover_01 | 1 | 0.423 | 1 |
+| flora_starflower_01 | 3 | 0.769 | 3 |
+| flora_palm_01 | 5 | 0.822 | 5 |
+| flora_seedhead_01 | 6 | 0.350 | 6 |
+| stamp_num_01 | 3 | 0.629 | 0 |
+| stamp_num_02 | 5 | 0.604 | 0 |
+| stamp_num_03 | 2 | 0.752 | 0 |
+| stamp_num_04 | 2 | 0.262 | 0 |
+| stamp_num_05 | 3 | 0.138 | 0 |
+| stamp_glyph_01 | 1 | 0.104 | 0 |
+| stamp_glyph_02 | 1 | 0.354 | 0 |
+| stamp_glyph_03 | 1 | 0.159 | 0 |
+| stamp_glyph_04 | 3 | 0.265 | 0 |
+| stamp_glyph_05 | 1 | 0.176 | 0 |
+| stamp_glyph_06 | 1 | 0.139 | 0 |
+| stamp_arrow_01 | 1 | 0.160 | 0 |
+| stamp_letter_01 | 5 | 0.764 | 0 |
+| stamp_letter_02 | 1 | 0.289 | 0 |
+| stamp_letter_03 | 2 | 0.760 | 0 |
+| stamp_label_01 | 5 | 0.274 | 0 |
+| stamp_label_02 | 5 | 0.313 | 0 |
+| stamp_barcode_01 | 12 | 0.216 | 0 |
+| rad_rings_01 | 5 | 1.654 | 5 |
+| rad_rings_02 | 12 | 0.773 | 12 |
+| rad_rings_03 | 4 | 1.248 | 4 |
+| rad_orbit_01 | 2 | 0.298 | 2 |
+| rad_orbit_02 | 2 | 0.376 | 2 |
+| rad_radial_01 | 9 | 0.169 | 9 |
+| rad_radial_02 | 9 | 0.273 | 9 |
+| rad_orbit_dot_01 | 1 | 0.705 | 1 |
+| rad_iris_01 | 4 | 0.766 | 4 |
+| rad_pie_01 | 4 | 0.640 | 4 |
+| rad_target_01 | 4 | 1.370 | 4 |
+| rad_starburst_01 | 6 | 0.496 | 6 |
+| rad_petals_01 | 9 | 0.368 | 9 |
+| rad_split_01 | 2 | 0.954 | 2 |
+| xsh01 | 9 | 0.210 | 0 |
+| xsh02 | 1 | 0.256 | 0 |
+| xsh03 | 1 | 0.334 | 0 |
+| xsh04 | 8 | 0.314 | 0 |
+| xsh05 | 7 | 1.327 | 0 |
+| xsh06 | 12 | 0.369 | 0 |
+| xsh07 | 12 | 1.535 | 0 |
+| xsh08 | 1 | 0.111 | 0 |
+| xsh09 | 9 | 0.630 | 0 |
+| xsh10 | 5 | 0.105 | 0 |
+| xsh11 | 8 | 0.193 | 0 |
+| xsh12 | 1 | 0.221 | 0 |
+| bio01 | 4 | 0.610 | 0 |
+| bio02 | 3 | 0.283 | 0 |
+| bio03 | 4 | 0.646 | 0 |
+| bio04 | 5 | 0.532 | 0 |
+| bio05 | 3 | 0.455 | 0 |
+| bio06 | 1 | 0.722 | 0 |
+| bio07 | 12 | 0.118 | 0 |
+| bio08 | 2 | 0.497 | 0 |
+| bio09 | 7 | 0.405 | 0 |
+| bio10 | 12 | 0.301 | 0 |
+| bio11 | 1 | 0.357 | 0 |
+| bio12 | 9 | 0.664 | 0 |
+| frg01 | 1 | 0.087 | 0 |
+| frg02 | 1 | 0.052 | 0 |
+| frg03 | 1 | 0.187 | 0 |
+| frg04 | 1 | 0.294 | 0 |
+| frg05 | 1 | 0.386 | 0 |
+| frg06 | 1 | 0.381 | 0 |
+| frg07 | 1 | 0.194 | 0 |
+| frg08 | 1 | 0.372 | 0 |
+| frg09 | 3 | 0.290 | 0 |
+| frg10 | 1 | 0.562 | 0 |
+| frg11 | 7 | 0.364 | 0 |
+| frg12 | 1 | 0.337 | 0 |
+| scn01 | 12 | 0.480 | 0 |
+| scn02 | 12 | 0.325 | 0 |
+| scn03 | 1 | 0.706 | 0 |
+| scn04 | 12 | 0.563 | 0 |
+| scn05 | 12 | 0.429 | 0 |
+| scn06 | 12 | 0.173 | 0 |
+| scn07 | 12 | 0.158 | 0 |
+| scn08 | 4 | 0.090 | 0 |
+| scn09 | 5 | 0.082 | 0 |
+| scn10 | 12 | 0.252 | 0 |
+| scn11 | 12 | 0.120 | 0 |
+| scn12 | 12 | 0.340 | 0 |
+| hae_radiolarian_01 | 12 | 1.483 | 12 |
+| hae_radiolarian_02 | 12 | 0.393 | 12 |
+| hae_diatom_01 | 2 | 0.292 | 2 |
+| hae_diatom_02 | 5 | 0.754 | 5 |
+| hae_medusa_01 | 2 | 0.345 | 2 |
+| hae_ammonite_01 | 1 | 0.742 | 1 |
+| hae_starfish_01 | 11 | 0.894 | 11 |
+| hae_coral_01 | 8 | 0.537 | 8 |
+| hae_sponge_01 | 9 | 0.368 | 9 |
+| hae_siphonophore_01 | 1 | 0.191 | 1 |
+| hae_pollen_01 | 12 | 0.547 | 12 |
+| hae_ciliate_01 | 2 | 0.417 | 2 |
+| hae_flagella_01 | 6 | 1.689 | 6 |
+| hae_tendril_01 | 1 | 0.480 | 1 |
+| hae_mycelium_01 | 4 | 0.453 | 4 |
+| hae_root_01 | 9 | 0.278 | 9 |
+| hae_nerve_01 | 2 | 0.479 | 2 |
+| hae_plume_01 | 1 | 0.405 | 1 |
+| hae_kelp_01 | 2 | 0.474 | 2 |
+| hae_fern_01 | 1 | 0.306 | 1 |
+| mic_bracket_tl | 1 | 0.068 | 0 |
+| mic_bracket_tr | 1 | 0.068 | 0 |
+| mic_bracket_bl | 1 | 0.068 | 0 |
+| mic_bracket_br | 1 | 0.068 | 0 |
+| mic_dotgrid_5 | 12 | 0.225 | 0 |
+| mic_dotgrid_3 | 9 | 0.032 | 0 |
+| mic_ticks_h | 3 | 0.130 | 0 |
+| mic_ticks_ring | 12 | 0.170 | 0 |
+| mic_dial | 10 | 0.597 | 0 |
+| mic_needle | 2 | 0.017 | 0 |
+| mic_crosshair | 2 | 0.711 | 0 |
+| mic_plus | 1 | 0.160 | 0 |
+| mic_specbar_h | 8 | 0.077 | 0 |
+| mic_specbar_v | 8 | 0.077 | 0 |
+| mic_label | 4 | 0.361 | 0 |
+| mic_tag | 4 | 0.385 | 0 |
+| mic_chevrons | 3 | 0.245 | 0 |
+| mic_wave | 1 | 0.454 | 0 |
+| mic_target | 3 | 0.786 | 0 |
+| mic_arrow | 1 | 0.272 | 0 |
+| mic_cropmarks | 4 | 0.130 | 0 |
+| typ_A | 1 | 0.344 | 0 |
+| typ_B | 1 | 0.320 | 0 |
+| typ_C | 1 | 0.328 | 0 |
+| typ_D | 1 | 0.320 | 0 |
+| typ_E | 1 | 0.264 | 0 |
+| typ_F | 1 | 0.256 | 0 |
+| typ_G | 1 | 0.328 | 0 |
+| typ_H | 1 | 0.320 | 0 |
+| typ_I | 1 | 0.128 | 0 |
+| typ_J | 1 | 0.316 | 0 |
+| typ_K | 1 | 0.332 | 0 |
+| typ_L | 1 | 0.264 | 0 |
+| typ_M | 1 | 0.504 | 0 |
+| typ_N | 1 | 0.320 | 0 |
+| typ_O | 1 | 0.328 | 0 |
+| typ_P | 1 | 0.312 | 0 |
+| typ_Q | 1 | 0.376 | 0 |
+| typ_R | 1 | 0.312 | 0 |
+| typ_S | 1 | 0.328 | 0 |
+| typ_T | 1 | 0.280 | 0 |
+| typ_U | 1 | 0.316 | 0 |
+| typ_V | 1 | 0.336 | 0 |
+| typ_W | 1 | 0.512 | 0 |
+| typ_X | 1 | 0.344 | 0 |
+| typ_Y | 1 | 0.328 | 0 |
+| typ_Z | 1 | 0.288 | 0 |
+| typ_0 | 1 | 0.353 | 0 |
+| typ_1 | 1 | 0.216 | 0 |
+| typ_2 | 1 | 0.348 | 0 |
+| typ_3 | 1 | 0.340 | 0 |
+| typ_4 | 1 | 0.360 | 0 |
+| typ_5 | 1 | 0.353 | 0 |
+| typ_6 | 1 | 0.353 | 0 |
+| typ_7 | 1 | 0.328 | 0 |
+| typ_8 | 1 | 0.344 | 0 |
+| typ_9 | 1 | 0.353 | 0 |
+| pxg_cross | 5 | 0.130 | 0 |
+| pxg_plus | 2 | 0.260 | 0 |
+| pxg_diamond | 12 | 0.150 | 0 |
+| pxg_frame | 5 | 0.210 | 0 |
+| pxg_window | 5 | 0.370 | 0 |
+| pxg_gate | 5 | 0.250 | 0 |
+| pxg_totem | 3 | 0.220 | 0 |
+| pxg_chevron | 4 | 0.260 | 0 |
+| pxg_orbit | 9 | 0.170 | 0 |
+| pxg_split | 3 | 0.430 | 0 |
+| pxg_nest | 7 | 0.250 | 0 |
+| pxg_key | 3 | 0.300 | 0 |
+| pxg_stem | 3 | 0.440 | 0 |
+| pxg_bowl | 5 | 0.390 | 0 |
+| pxg_arch | 2 | 0.500 | 0 |
+| pxg_fork | 3 | 0.340 | 0 |
+| pxg_serif | 2 | 0.500 | 0 |
+| pxg_counter | 6 | 0.220 | 0 |
+| pxg_ligature | 3 | 0.430 | 0 |
+| pxg_flag | 2 | 0.430 | 0 |
+| pxg_cross_b | 3 | 0.310 | 0 |
+| pxg_plus_b | 2 | 0.260 | 0 |
+| pxg_diamond_b | 12 | 0.120 | 0 |
+| pxg_frame_b | 5 | 0.210 | 0 |
+| pxg_window_b | 5 | 0.370 | 0 |
+| pxg_totem_b | 2 | 0.220 | 0 |
+| pxg_orbit_b | 10 | 0.160 | 0 |
+| pxg_nest_b | 7 | 0.250 | 0 |
+| pxg_speck | 1 | 0.010 | 0 |
+| pxg_speck_ne | 1 | 0.010 | 0 |
+| pxg_spark | 2 | 0.020 | 0 |
+| pxg_dust | 3 | 0.030 | 0 |
