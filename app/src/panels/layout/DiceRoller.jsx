@@ -43,6 +43,10 @@ function FinalistCard({ finalist, onCrown }) {
           </svg>
         ))}
       </div>
+      {/* XGBoost T3 — Davis's citation: why the model ordered this one
+          here, in the model's own split words. Absent without a tree
+          head (xgbReason null) — the card is exactly as it was. */}
+      {finalist.xgbReason && <div className="dice-card-reason">{finalist.xgbReason}</div>}
     </button>
   );
 }
