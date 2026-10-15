@@ -22,6 +22,7 @@ import { resolveFieldItems, resolveFeedItems } from './fieldFeedColumns.mjs';
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
+import { applyTravelSpike } from './travelSpike.mjs'; // #1573 spike — throwaway
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
 import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
@@ -745,6 +746,8 @@ export function createLiveResolver() {
         }
       }
       items = (items || []).filter((it) => it && it.assetId);
+      // #1573 SPIKE (throwaway, inert unless globalThis.__travelSpike.on): leash + curl-FLOW on ~20 marks.
+      items = applyTravelSpike(items, { layerId: layer.id, W, H, nowMs: input.loopTimeMs ?? 0, noise: worldNoise, slowRender: input.slowRender });
       // Item-morph trigger signature: the fields that used to drive
       // the pixel crossfade (mode/behave/asset-set; palette left it, #622), scoped per
       // layer. Deliberately excludes seed — a SHUFFLE re-roll has never
