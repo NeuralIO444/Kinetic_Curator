@@ -11,11 +11,21 @@
 // applied if present. Unknown categoricals / OOR numerics fall back.
 
 import { recipeFeatures } from '../curator/recipeFeatures.js';
-import { getCostTier } from '../gl/costTiers.mjs';
 
 /** Artifact kind for the cost model (parallel to taste's xgboost-trees). */
 export const COST_HEAD_KIND = 'xgboost-cost';
 export const COST_OBJECTIVE = 'reg:quantileerror';
+
+// Artifact bounds — the same caps as the taste tree head (tasteHead.js).
+const MAX_TREES = 512;
+const MAX_TREE_DEPTH = 6;
+const MAX_TREE_NODES = 20000;
+
+/** Feature families that carry numbers and therefore split with '<':
+ * recipe numerics (num.), mechanism estimates (mech.), device probes (probe.).
+ * Everything else in the bag is a categorical and splits with '='. */
+const isNumericCostFeature = (name) =>
+  name.startsWith('num.') || name.startsWith('mech.') || name.startsWith('probe.');
 
 // Tree-walk pure functions (copied from tasteHead.js so the evaluator is shared
 // in spirit; later extract to a common module if both grow).
@@ -46,7 +56,11 @@ function walkTree(node, features, names) {
 
 /**
  * Validate a cost model artifact. Returns { ok, model } or { ok: false, error }.
- * Bounds mirror the taste tree head so a bad file is refused, never approximated.
+ * Full node validation mirroring the taste tree head (tasteHead.js): the
+ * ensemble stays inside the artifact bounds, every split binds a declared
+ * feature with the op its family requires, every number the walk will read
+ * is finite — and validation rebuilds each node, so the app keeps a clean
+ * copy and a file edited after validation cannot move predictions.
  */
 export function validateCostModel(raw) {
   if (!raw || typeof raw !== 'object') return { ok: false, error: 'not a cost model' };
@@ -55,11 +69,21 @@ export function validateCostModel(raw) {
   if (!finite(raw.baseScore)) return { ok: false, error: 'bad baseScore' };
   const features = raw.features;
   if (!Array.isArray(features) || !features.length) return { ok: false, error: 'features missing' };
+  const seen = new Set();
+  for (const name of features) {
+    if (typeof name !== 'string' || !name) return { ok: false, error: `bad feature name: ${String(name)}` };
+    if (seen.has(name)) return { ok: false, error: `feature duplicated: ${name}` };
+    seen.add(name);
+  }
   const trees = raw.trees;
   if (!Array.isArray(trees) || !trees.length) return { ok: false, error: 'trees missing' };
-  // Light structural check; full node validation can reuse taste's if extracted.
+  if (trees.length > MAX_TREES) return { ok: false, error: 'cost model too large' };
+  const counter = { nodes: 0 };
+  const clean = [];
   for (const t of trees) {
-    if (!t || typeof t !== 'object') return { ok: false, error: 'bad tree' };
+    const v = validateCostNode(t, features, 0, counter);
+    if (v.error) return { ok: false, error: v.error };
+    clean.push(v.node);
   }
   return {
     ok: true,
@@ -69,10 +93,37 @@ export function validateCostModel(raw) {
       baseScore: raw.baseScore,
       calibration: finite(raw.calibration) ? raw.calibration : 1,
       features: [...features],
-      trees,
+      trees: clean,
       tau: finite(raw.tau) ? raw.tau : 0.9,
     },
   };
+}
+
+/** One node: a leaf { leaf } or a split { f, op, v, y, n, gain }. Depth is
+ * counted in split levels from the root (root = 0); the depth cap is also
+ * what bounds this recursion. Returns { node } (a clean copy) or { error }. */
+function validateCostNode(node, features, depth, counter) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return { error: 'bad tree node' };
+  counter.nodes += 1;
+  if (counter.nodes > MAX_TREE_NODES) return { error: 'cost model too large' };
+  if (depth > MAX_TREE_DEPTH) return { error: 'cost model too deep' };
+  if ('leaf' in node) {
+    if (!finite(node.leaf)) return { error: 'bad tree leaf' };
+    return { node: { leaf: node.leaf } };
+  }
+  const { f, op, v, gain } = node;
+  if (!Number.isInteger(f) || f < 0 || f >= features.length) return { error: 'bad tree split feature index' };
+  if (isNumericCostFeature(features[f])) {
+    if (op !== '<' || !finite(v)) return { error: 'bad tree split: numeric features split with < on a finite number' };
+  } else if (op !== '=' || (typeof v !== 'string' && typeof v !== 'boolean')) {
+    return { error: 'bad tree split: categorical features split with = on a string/boolean' };
+  }
+  if (!finite(gain)) return { error: 'bad tree split gain' };
+  const y = validateCostNode(node.y, features, depth + 1, counter);
+  if (y.error) return y;
+  const n = validateCostNode(node.n, features, depth + 1, counter);
+  if (n.error) return n;
+  return { node: { f, op, v, y: y.node, n: n.node, gain } };
 }
 
 /**
