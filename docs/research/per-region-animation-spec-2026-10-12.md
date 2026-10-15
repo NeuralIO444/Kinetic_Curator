@@ -138,6 +138,24 @@ mechanisms, in order of preference:
    invents a second deformation language. Parked unless strips prove too
    slow to author.
 
+**Shipped (#1435, per Matt's 2026-10-15 ruling amending this section).**
+Both tracks landed. The strips: `line_squiggle_01` (line-boil, 7 frames)
+and `line_squiggle_02` (wave-roll, 8 frames) roll through the C-wire —
+frame 0 is the asset's own svg verbatim (bit-identical to the pre-R4
+bake), each later frame translated along the stroke by exactly one step,
+frames × step = the wavelength so the loop wraps seamlessly; shed pins
+cell 0. The bend: the ruling's simple programmatic motion shipped
+*without* the parked warp — a stroke-shaped region (bbox long axis
+≥ 28 units, ink fill ≤ 30% of its bbox) assigned the `bend` kineme
+subdivides at pack time into 3–8 slices along its length, ordinary
+region instances over sub-windows of the region's own cell with the
+kineme phase stepped 1/N per slice, so the existing osc evaluation
+articulates the stroke and the wave travels along it. Stroke-aware by
+construction: R1's partition means a region's cell holds only that
+region's ink, so only the stroke subdivides — a non-stroke sharing the
+mark renders whole. Line-family defaults: stroke regions bend, the rest
+keep R3's bob. The quad-wide shader stroke-warp stays parked.
+
 ## Budgets (iPad bar applies)
 
 - Region expansion multiplies instance count by the average regions per
