@@ -134,4 +134,13 @@ lin = {"terms": {"density=high": 2.0}, "num": {"count": -1.0}, "bias": 0.5}
 assert curator.linear_head_scores(lin, [{"density": "high", "num": {"count": 0.5}}]) == [2.0]
 assert curator.linear_head_scores(lin, [{"density": "low", "num": {}}]) == [0.5]
 
+# ── T2: structurally-null features are trimmed from the design ──────────
+# palette is always null in the app's scoreLayout context, so its terms
+# never reach the tree head's columns; everything else survives, and the
+# exported feature names carry no palette.
+_cols = curator.xgb_design_columns(
+    ["accum=true", "density=high", "palette=bone", "palette=hydra"], ["count"])
+assert _cols == ["accum=true", "density=high", "num.count"], _cols
+assert "palette" not in curator.xgb_feature_names(_cols), _cols
+
 print("xgb_head selfcheck OK")

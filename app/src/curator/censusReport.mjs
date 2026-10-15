@@ -40,6 +40,9 @@ import { createDish } from '../engine/kernel/dish.js';
 import { patternGround } from '../pattern/ground.js';
 import { defaultPattern } from '../state/patternTrack.js';
 import { mulberry32 } from './coverageReport.mjs';
+// XGBoost T2: the agreement readout scores ledger recipes with the taste
+// head — the same module the live instrument uses (tasteHead.scoreLayout).
+import { scoreLayout, headUsable, XGB_HEAD_KIND } from './tasteHead.js';
 
 export { mulberry32 };
 export const CENSUS_SEED = 0x1505;
@@ -1020,4 +1023,92 @@ export function formatCensusReport({ paramRows, dishRows, reach, store }) {
     for (const line of store) L.push(`  ${line}`);
   }
   return L.join('\n');
+}
+
+// ── XGBoost T2: taste agreement readout (spec §6) ────────────────────
+// Scores the taste ledger's keeps and passes with the active tree head
+// and reports whether the model's taste agrees with the performer's
+// recorded verdicts. READOUT ONLY — nothing here steers curation, the
+// dice, or training; it is the census's standing answer to "does the
+// head still see what Matt saw?"
+//
+// Scoring follows the live reduction exactly: each ledger row carries
+// its recipe, and the head scores the row's layoutParams through
+// tasteHead.scoreLayout (the palette rides in the recipe, but the
+// head's features read layoutParams only — so, like the live
+// instrument, this readout does not score the palette). Rows without
+// layoutParams cannot be scored; they are counted as unscored, never
+// silently dropped.
+//
+// Separation statistic: AUC by the rank-sum (Mann–Whitney) method —
+// the probability that a randomly chosen keep out-scores a randomly
+// chosen pass, ties counting half. Deterministic, no sampling, and
+// hand-computable from the two score lists. Means and AUC are rounded
+// to 4 decimals so the readout is a stable artifact.
+export function tasteAgreement({ keeps = [], passes = [] } = {}, taste) {
+  if (!taste) return { present: false, reason: 'no taste loaded' };
+  const head = taste.head;
+  if (!head || head.kind !== XGB_HEAD_KIND) {
+    return { present: false, reason: 'taste has no tree head (linear head)' };
+  }
+  if (!headUsable(head)) {
+    return { present: false, reason: 'tree head below the fidelity bar' };
+  }
+  const scoreSide = (rows) => {
+    const scores = [];
+    let unscored = 0;
+    for (const row of rows || []) {
+      const lp = row?.recipe?.layoutParams;
+      if (!lp || typeof lp !== 'object') { unscored += 1; continue; }
+      scores.push(scoreLayout(head, lp));
+    }
+    return { scores, unscored };
+  };
+  const k = scoreSide(keeps);
+  const p = scoreSide(passes);
+  const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  const r4 = (v) => (v === null ? null : +v.toFixed(4));
+  return {
+    present: true,
+    headKind: head.kind,
+    tasteVersion: taste.version,
+    fidelity: head.fidelity,
+    keeps: { n: k.scores.length, mean: r4(mean(k.scores)) },
+    passes: { n: p.scores.length, mean: r4(mean(p.scores)) },
+    unscored: k.unscored + p.unscored,
+    auc: r4(rankAuc(k.scores, p.scores)),
+  };
+}
+
+// Mann–Whitney AUC: rank the pooled scores (ties share the average
+// rank), then AUC = (Σ keep ranks − nK(nK+1)/2) / (nK · nP).
+// Null when either side is empty — no separation to speak of.
+function rankAuc(keepScores, passScores) {
+  if (!keepScores.length || !passScores.length) return null;
+  const pooled = [
+    ...keepScores.map((s) => ({ s, keep: true })),
+    ...passScores.map((s) => ({ s, keep: false })),
+  ].sort((a, b) => a.s - b.s);
+  let rankSumKeeps = 0;
+  for (let i = 0; i < pooled.length;) {
+    let j = i;
+    while (j < pooled.length && pooled[j].s === pooled[i].s) j += 1;
+    const avgRank = (i + 1 + j) / 2; // the average of ranks i+1 … j
+    for (let t = i; t < j; t += 1) if (pooled[t].keep) rankSumKeeps += avgRank;
+    i = j;
+  }
+  const nk = keepScores.length;
+  return (rankSumKeeps - (nk * (nk + 1)) / 2) / (nk * passScores.length);
+}
+
+export function formatTasteAgreement(a) {
+  if (!a || a.present !== true) {
+    return `taste agreement: ABSENT — ${a?.reason ?? 'not measured'}`;
+  }
+  const side = (label, s) => (s.mean === null ? `${label} — (n=0)` : `${label} mean ${s.mean.toFixed(3)} (n=${s.n})`);
+  return [
+    `taste agreement (${a.headKind}, taste v${a.tasteVersion}, fidelity ${a.fidelity})`,
+    `  ${side('keeps', a.keeps)} · ${side('passes', a.passes)}`,
+    `  separation AUC ${a.auc === null ? '—' : a.auc.toFixed(3)} (P(keep out-scores pass), ties half) · ${a.unscored} unscored rows`,
+  ].join('\n');
 }

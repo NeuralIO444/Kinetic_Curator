@@ -119,3 +119,28 @@ export function yieldByCornerView({ candidates, finalists } = {}) {
     totalFinalists: rows.reduce((s, r) => s + r.finalists, 0),
   };
 }
+
+/**
+ * XGBoost T2 — the taste-agreement section model: censusReport's
+ * tasteAgreement result reshaped for display, nothing recomputed
+ * (this module's law). An absent agreement stays absent, with its
+ * reason carried through — the readout never papers over a missing
+ * or unusable tree head.
+ */
+export function agreementView(agreement) {
+  if (!agreement || agreement.present !== true) {
+    return { present: false, reason: agreement?.reason ?? 'not measured' };
+  }
+  return {
+    present: true,
+    headKind: agreement.headKind,
+    tasteVersion: agreement.tasteVersion,
+    fidelity: agreement.fidelity,
+    keepsMean: agreement.keeps.mean,
+    keepsN: agreement.keeps.n,
+    passesMean: agreement.passes.mean,
+    passesN: agreement.passes.n,
+    auc: agreement.auc,
+    unscored: agreement.unscored,
+  };
+}

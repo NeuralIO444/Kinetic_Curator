@@ -26,6 +26,8 @@ import {
   keepsCoverage,
   formatCoverageReport,
 } from './coverageReport.mjs';
+import { validateTaste, makeXgbScorer, XGB_HEAD_KIND } from './tasteHead.js';
+import { FEATURES_VERSION } from './recipeFeatures.js';
 
 // ---------------------------------------------------------------- RA1 + PA1
 const dice = diceTrayCoverage({ rolls: 600, seed: 0x1504 });
@@ -161,5 +163,66 @@ assert.ok(keeps.categories.some((c) => c.name === 'radial'), 'keeps hold radial 
 assert.ok(keeps.categories.some((c) => c.name === 'crystalline'), 'keeps hold crystalline');
 assert.strictEqual(keeps.distinctPalettes, 4, 'keeps span 4 palettes');
 assert.strictEqual(keeps.distinctLayouts, 4, 'keeps span 4 layouts');
+
+// ── XGBoost T2 — the diversity guard, ordering ON ─────────────────────
+// The kill criterion's standing form (spec §8-T2): the RA1 census with
+// a tree head ordering the tray (the dice.js T2 path), same harness,
+// same 600 rolls, seeds 0x1504..0x150B. Two fixture scorers:
+// OPINIONATED — a plausible distilled head (system splits: fibonacci /
+// orbit / grid up, swarm / eden down); FLAT — a constant score, which
+// isolates the stratified finalist cut's own effect from any model
+// opinion. Measured at build (2026-10-14), never-tray of 294:
+//   seed     OFF  flat  opin    OFF jac → opin jac
+//   0x1504    31    27    20    1.65% → 1.19%
+//   0x1505    38    32    17    1.46% → 1.22%
+//   0x1506    31    25    22    1.56% → 1.15%
+//   0x1507    32    28    24    1.49% → 0.95%
+//   0x1508    35    30    19    1.58% → 1.14%
+//   0x1509    35    30    16    1.44% → 1.12%
+//   0x150a    33    28    24    1.65% → 0.89%
+//   0x150b    41    30    21    1.37% → 1.01%
+// The guard asserted here is the kill criterion's direction: ordering
+// must never push never-tray or trio overlap ABOVE the unordered run on
+// the same stream, on either fixture. (The absolute #1546 band was
+// 28–37 never-tray; with an opinionated head the counts land BELOW it —
+// reach improves rather than degrades. That band call is the staging
+// report's, flagged for the coordinator, not silently re-baselined here.)
+const chainOf = (pairs, rest) => (pairs.length === 0
+  ? { leaf: rest }
+  : { f: 0, op: '=', v: pairs[0][0], gain: 1, y: { leaf: pairs[0][1] }, n: chainOf(pairs.slice(1), rest) });
+const OPINIONATED = makeXgbScorer(validateTaste({
+  kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'coverage fixture',
+  dims: 1152, labels: { likes: 10, passes: 10 },
+  head: {
+    kind: XGB_HEAD_KIND, objective: 'binary:logistic', baseScore: 0, fidelity: 0.9,
+    features: ['system'],
+    trees: [chainOf([['fibonacci', 1.2], ['orbit', 0.9], ['grid', 0.4], ['swarm', -0.9], ['eden', -0.5]], 0)],
+  },
+}).taste);
+const FLAT = { id: 'xgb-head-v1', score: () => 0.5 };
+const SWEEP_SEEDS = [0x1504, 0x1505, 0x1506, 0x1507, 0x1508, 0x1509, 0x150a, 0x150b];
+for (const seed of SWEEP_SEEDS) {
+  const off = diceTrayCoverage({ rolls: 600, seed });
+  const flat = diceTrayCoverage({ rolls: 600, seed, ordering: { scorer: FLAT } });
+  const opin = diceTrayCoverage({ rolls: 600, seed, ordering: { scorer: OPINIONATED, meta: { tasteVersion: 1, headKind: XGB_HEAD_KIND } } });
+  assert.strictEqual(off.ordering, null, 'unordered census records no ordering');
+  assert.strictEqual(opin.ordering.scorerId, 'xgb-head-v1', 'ordered census names its scorer');
+  for (const [name, on] of [['flat', flat], ['opinionated', opin]]) {
+    assert.ok(on.tray.neverCount <= off.tray.neverCount,
+      `seed 0x${seed.toString(16)} ${name}: never-tray ${on.tray.neverCount} must not exceed unordered ${off.tray.neverCount}`);
+    assert.ok(on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard,
+      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered`);
+    assert.ok(on.tray.distinct >= off.tray.distinct,
+      `seed 0x${seed.toString(16)} ${name}: tray reach must not shrink`);
+  }
+  console.log(`  [t2 guard] seed 0x${seed.toString(16)}: never OFF ${off.tray.neverCount} · flat ${flat.tray.neverCount} · opin ${opin.tray.neverCount}; jac OFF ${(off.trios.meanPairwiseJaccard * 100).toFixed(2)}% · opin ${(opin.trios.meanPairwiseJaccard * 100).toFixed(2)}%`);
+}
+// On the headline stream the opinionated head completes the #1546
+// rescue in-tray: every stratified family reaches its full library.
+const opinHeadline = diceTrayCoverage({ rolls: 600, seed: 0x1504, ordering: { scorer: OPINIONATED } });
+for (const fam of ['biosynthetic', 'crystalline', 'floral', 'radial']) {
+  const c = opinHeadline.categories.find((x) => x.name === fam);
+  assert.strictEqual(c.inTray, c.inLibrary, `ordered headline: ${fam} fully tray-reached (${c.inTray}/${c.inLibrary})`);
+}
 
 console.log('coverage.selfcheck: OK (#1504 — RA1 tray census reproduces the audit band, RA2 doors honest, PA1 distinct, keeps cut on the real ledger path)');
