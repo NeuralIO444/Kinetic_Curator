@@ -430,7 +430,8 @@ def cmd_train(a) -> None:
                  cv_acc=stats["acc"], cv_auc=stats["auc"], baseline=stats["baseline"])
     else:
         taste = build_taste(idx, keys, y, clf, cv={k: stats[k] for k in ("acc", "auc", "baseline", "folds")},
-                            C=a.C, features_path=Path(a.features) if a.features else None, alpha=a.head_alpha)
+                            C=a.C, features_path=Path(a.features) if a.features else None, alpha=a.head_alpha,
+                            xgb=a.xgb)
         if a.bold:
             bold = json.loads(Path(a.bold).read_text())
             bkeys, by = bold_rows(labels, bold, pos)
@@ -451,8 +452,13 @@ def cmd_train(a) -> None:
         out.write_text(json.dumps(taste, indent=1, sort_keys=True))
         h = taste.get("head")
         if h:
-            print(f"  head fidelity {h['fidelity']:.3f} (Spearman vs probe on {h['fitOn']} pool renders)")
-            print(f"  {describe_head(h)}")
+            if h.get("kind") == XGB_HEAD_KIND:
+                print(f"  tree head fidelity {h['fidelity']:.3f} (held-out Spearman vs probe, "
+                      f"fit on {h['fitOn']} pool renders)")
+                print(describe_trees(h))
+            else:
+                print(f"  head fidelity {h['fidelity']:.3f} (Spearman vs probe on {h['fitOn']} pool renders)")
+                print(f"  {describe_head(h)}")
     print(f"{len(y)} labels ({int(y.sum())} likes / {int((1 - y).sum())} passes), "
           f"{stats['folds']}-fold CV")
     print(f"  held-out accuracy {stats['acc']:.3f} +/- {stats['acc_std']:.3f}")
@@ -498,7 +504,370 @@ def fit_head(feature_rows: list[dict], target, alpha: float = 1.0) -> dict:
     }
 
 
-def build_taste(idx, keys, y, clf, *, cv, C, features_path, alpha) -> dict:
+# ── taste T1: the XGBoost tree head — a second student of the same probe ──
+#
+# Spec: kc1-xgboost-taste-spec-2026-10-14 §§3–4. The probe distils twice:
+# the linear head above, and (with --xgb) a tree ensemble over the SAME
+# design (one-hot feature_terms + the num block), exported as data in the
+# same taste.json. The app walks the trees (tasteHead.js); everything in
+# this section up to fit_xgb_head is stdlib-only so the export format, the
+# walk, and the ship rule are testable with no xgboost installed
+# (studio/xgb_head_selfcheck.py).
+
+XGB_HEAD_KIND = "xgboost-trees"
+XGB_MAX_TREES = 512
+XGB_MAX_DEPTH = 6
+XGB_MAX_NODES = 20000
+XGB_MIN_POOL = 50
+
+
+def linear_head_scores(head: dict, feature_rows: list[dict]) -> list[float]:
+    """A linear head dict applied to feature dicts (the app's scoreLayout
+    linear branch, mirrored so the ship rule can judge it on held-out rows)."""
+    out = []
+    for f in feature_rows:
+        terms = set(feature_terms(f))
+        s = head["bias"] + sum(w for t, w in head["terms"].items() if t in terms)
+        s += sum(w * float((f.get("num") or {}).get(k, 0.0)) for k, w in head["num"].items())
+        out.append(s)
+    return out
+
+
+def _spec_eq(a, b) -> bool:
+    """THE equality rule for categorical tree splits — mirrors tasteHead.js
+    treeEq exactly: strict equality, with a boolean on either side compared
+    by its term-rule spelling ('true'/'false')."""
+    if a is b or (a == b and type(a) is type(b)):
+        return True
+    if isinstance(a, bool) and isinstance(b, str):
+        return ("true" if a else "false") == b
+    if isinstance(b, bool) and isinstance(a, str):
+        return a == ("true" if b else "false")
+    return False
+
+
+def spec_feature_value(features: dict, name: str):
+    """A declared feature's value in a features dict (mirrors tasteHead.js:
+    numerics read the num block, absent = 0.0; categoricals read top level)."""
+    if name.startswith("num."):
+        return float((features.get("num") or {}).get(name[4:], 0.0))
+    return features.get(name)
+
+
+def walk_spec_tree(node: dict, features: dict, names: list[str]) -> float:
+    """One spec tree walked to its leaf margin (the app's walk, mirrored)."""
+    while "leaf" not in node:
+        val = spec_feature_value(features, names[node["f"]])
+        if node["op"] == "<":
+            go = (isinstance(val, (int, float)) and not isinstance(val, bool)
+                  and val < node["v"])
+        else:
+            go = _spec_eq(val, node["v"])
+        node = node["y"] if go else node["n"]
+    return float(node["leaf"])
+
+
+def _spec_leaf_sum(trees, features, names) -> float:
+    return sum(walk_spec_tree(t, features, names) for t in trees)
+
+
+def score_spec_head(head: dict, features: dict) -> float:
+    """Spec tree head -> keep-probability: sigmoid(baseScore + Σ leaves)."""
+    import math
+
+    margin = head["baseScore"] + _spec_leaf_sum(head["trees"], features, head["features"])
+    return 1 / (1 + math.exp(-margin))
+
+
+def spec_head_stats(head: dict):
+    """(tree count, max depth, total nodes) — the app's artifact bounds."""
+    def rec(node, depth):
+        if "leaf" in node:
+            return 1, depth
+        ln, ld = rec(node["y"], depth + 1)
+        rn, rd = rec(node["n"], depth + 1)
+        return 1 + ln + rn, max(ld, rd)
+
+    nodes = depth = 0
+    for t in head["trees"]:
+        n, d = rec(t, 0)
+        nodes += n
+        depth = max(depth, d)
+    return len(head["trees"]), depth, nodes
+
+
+def xgb_feature_names(columns: list[str]) -> list[str]:
+    """Design columns -> the head's declared features (binding order):
+    categorical keys (the part before '=' in a term column), sorted, then
+    the 'num.<k>' columns, sorted. The set is the universe tasteHead.js
+    treeFeatureNames() binds; the file declares its own order."""
+    cats = sorted({c.partition("=")[0] for c in columns if not c.startswith("num.")})
+    nums = sorted(c for c in columns if c.startswith("num."))
+    return cats + nums
+
+
+def _convert_xgb_node(node, columns, names, gains):
+    """One XGBoost JSON-dump node -> one spec node. Raises ValueError on a
+    shape the spec format cannot say exactly — a bad export must stop the
+    train, never approximate the model."""
+    if "leaf" in node:
+        return {"leaf": round(float(node["leaf"]), 6)}
+    split = node["split"]
+    if split in columns:
+        col = split
+    elif split.startswith("f") and split[1:].isdigit() and int(split[1:]) < len(columns):
+        col = columns[int(split[1:])]
+    else:
+        raise ValueError(f"xgboost split names unknown feature {split!r}")
+    cond = float(node["split_condition"])
+    kids = {c["nodeid"]: c for c in node["children"]}
+    yes = _convert_xgb_node(kids[node["yes"]], columns, names, gains)
+    no = _convert_xgb_node(kids[node["no"]], columns, names, gains)
+    gain = round(float(gains.get(node["nodeid"], 0.0)), 6)
+    if col.startswith("num."):
+        return {"f": names.index(col), "op": "<", "v": round(cond, 6),
+                "y": yes, "n": no, "gain": gain}
+    key, _, value = col.partition("=")
+    if not value:
+        raise ValueError(f"design column {col!r} is not a term column")
+    if not 0.0 < cond <= 1.0:
+        raise ValueError(f"one-hot column {col!r} split at {cond} is not a membership test")
+    v = True if value == "true" else False if value == "false" else value
+    # XGBoost routes x < cond to the yes child; on a 0/1 column that is
+    # exactly 'term absent', so the spec equality node (y = feature equals
+    # value) takes the children swapped. The dump's 'missing' child is
+    # never consulted: the design has no missing values, and the app's
+    # features are always present (numerics default 0.0).
+    return {"f": names.index(key), "op": "=", "v": v,
+            "y": no, "n": yes, "gain": gain}
+
+
+def convert_xgb_dump(dump, columns, gains=None):
+    """Parsed XGBoost JSON dump trees -> (feature names, spec trees).
+    `gains` is {(tree, nodeid): gain} as _xgb_gains returns; gains annotate
+    the file for readers (the top splits are the model's public opinions) —
+    the walk never reads them, so a missing gain is 0.0, not an error."""
+    names = xgb_feature_names(columns)
+    gains = gains or {}
+    trees = [_convert_xgb_node(t, columns, names, gains.get(i, {}))
+             for i, t in enumerate(dump)]
+    return names, trees
+
+
+def calibrate_base_score(margins, leaf_sums) -> float:
+    """baseScore for the exported head: the median (booster margin − Σ
+    exported leaves) over the pool, so sigmoid(baseScore + Σ leaves)
+    reproduces the booster's probabilities whatever its own base_score
+    bookkeeping does across versions."""
+    res = sorted(m - s for m, s in zip(margins, leaf_sums))
+    if not res:
+        raise ValueError("no rows to calibrate on")
+    mid = len(res) // 2
+    return res[mid] if len(res) % 2 else (res[mid - 1] + res[mid]) / 2
+
+
+def choose_head(tree_fidelity, linear_fidelity):
+    """The ship rule (spec §4.3): the tree head ships only when its held-out
+    fidelity beats the linear head's on the same held-out rows. The model
+    has to win its job, not inherit it. Returns (kind, reason | None)."""
+    if tree_fidelity is None:
+        return "linear", "no tree head was trained"
+    if tree_fidelity > linear_fidelity:
+        return XGB_HEAD_KIND, None
+    return "linear", (f"tree fidelity {tree_fidelity:.3f} did not beat the linear head's "
+                      f"{linear_fidelity:.3f} on held-out pool rows")
+
+
+def _format_spec_tree(node, names, depth=0):
+    pad = "  " * depth
+    if "leaf" in node:
+        return [f"{pad}-> {node['leaf']:+.4f}"]
+    name = names[node["f"]]
+    if node["op"] == "<":
+        cond = f"{name} < {node['v']:g}"
+    else:
+        cond = describe_term(f"{name}={node['v'] if not isinstance(node['v'], bool) else str(node['v']).lower()}")
+        cond = f"{name} = {node['v']} ({cond})"
+    lines = [f"{pad}if {cond}  [gain {node['gain']:g}]"]
+    lines += _format_spec_tree(node["y"], names, depth + 1)
+    lines.append(f"{pad}else")
+    lines += _format_spec_tree(node["n"], names, depth + 1)
+    return lines
+
+
+def _tree_gain(node) -> float:
+    if "leaf" in node:
+        return 0.0
+    return node["gain"] + _tree_gain(node["y"]) + _tree_gain(node["n"])
+
+
+def describe_trees(head: dict, top: int = 3) -> str:
+    """describe_head's tree analog (spec §4.5: printable, or it doesn't
+    ship) — the ensemble's shape, its strongest features by total split
+    gain, and its top trees as readable text."""
+    names = head["features"]
+    n_trees, depth, nodes = spec_head_stats(head)
+    per_feature: dict = {}
+    def tally(node):
+        if "leaf" in node:
+            return
+        per_feature[names[node["f"]]] = per_feature.get(names[node["f"]], 0.0) + node["gain"]
+        tally(node["y"])
+        tally(node["n"])
+    for t in head["trees"]:
+        tally(t)
+    strong = sorted(per_feature.items(), key=lambda kv: -kv[1])[:5]
+    lines = [f"xgboost trees · {n_trees} trees, depth <= {depth}, {nodes} nodes"]
+    if strong:
+        lines.append("strongest features: " + ", ".join(f"{k} (gain {v:g})" for k, v in strong))
+    ranked = sorted(head["trees"], key=_tree_gain, reverse=True)[:top]
+    for i, t in enumerate(ranked):
+        lines.append(f"tree {i} (total gain {_tree_gain(t):g}):")
+        lines += _format_spec_tree(t, names)
+    return "\n".join(lines)
+
+
+def _xgb_gains(bst):
+    """{(tree, nodeid): gain} from trees_to_dataframe — {} when that API
+    (or pandas under it) is unavailable; gains default to 0.0 at export."""
+    try:
+        df = bst.trees_to_dataframe()
+    except Exception:
+        return {}
+    out: dict = {}
+    for _, row in df.iterrows():
+        if row.get("Feature") in (None, "Leaf"):
+            continue
+        out.setdefault(int(row["Tree"]), {})[int(row["Node"])] = float(row["Gain"])
+    return out
+
+
+def fit_xgb_head(feature_rows: list[dict], target, *, seed: int = 0,
+                 max_depth: int = 4, max_rounds: int = 300):
+    """Distil the probe into an XGBoost tree head over the same design the
+    linear head fits (one-hot feature_terms + the num block, minus the
+    live-null trim in xgb_design_columns), target = the probe's scores
+    read as probabilities. Returns (head | None, note).
+
+    The ship comparison is honest: a deterministic 80/20 split, both
+    students fit on the train slice only, fidelity = the file's spearman
+    vs the probe on held-out rows. The shipped trees are then refit on the
+    full pool (as the linear head is) at the winning round count, and the
+    reported fidelity stays the held-out estimate.
+    """
+    try:
+        import xgboost  # noqa: F401 — presence is the gate; impl re-imports
+    except ImportError:
+        return None, ("xgboost is not installed — pip install xgboost; "
+                      "the linear head ships instead")
+    try:
+        return _fit_xgb_head_impl(feature_rows, target, seed=seed,
+                                  max_depth=max_depth, max_rounds=max_rounds)
+    except Exception as e:  # a broken student must never break the train
+        return None, (f"xgboost training failed ({type(e).__name__}: {e}); "
+                      "the linear head ships instead")
+
+
+# T2: features that are structurally null at score time. The app's
+# scoreLayout derives features from layoutParams alone
+# (recipeFeatures({ layoutParams }) — no paletteId is ever passed), so
+# `palette` is the constant null bucket in every live score: a palette
+# split the trainer learns spends tree depth distinguishing pool rows
+# the live instrument can never tell apart, and credits held-out
+# fidelity to signal that cannot fire. Such features are trimmed from
+# the tree head's design columns. (The linear head predates this audit
+# and is untouched — its palette weights are equally inert live, but
+# re-baselining it is a separate decision, not this phase's.)
+XGB_LIVE_NULL_FEATURES = frozenset({"palette"})
+
+
+def xgb_design_columns(vocab: list[str], nums: list[str]) -> list[str]:
+    """Design columns for the tree head: vocab terms minus the terms of
+    live-null features (see XGB_LIVE_NULL_FEATURES), then the num block."""
+    kept = [t for t in vocab
+            if t.split("=", 1)[0] not in XGB_LIVE_NULL_FEATURES]
+    return kept + [f"num.{k}" for k in nums]
+
+
+def _fit_xgb_head_impl(feature_rows: list[dict], target, *, seed: int = 0,
+                       max_depth: int = 4, max_rounds: int = 300):
+    import numpy as np
+    import xgboost
+
+    n = len(feature_rows)
+    if n < XGB_MIN_POOL:
+        return None, f"pool too small to judge a tree head ({n} < {XGB_MIN_POOL} rows)"
+    target = np.asarray(target, dtype=float)
+    prob = 1 / (1 + np.exp(-target))
+
+    vocab = sorted({t for f in feature_rows for t in feature_terms(f)})
+    nums = sorted({k for f in feature_rows for k in (f.get("num") or {})})
+    columns = xgb_design_columns(vocab, nums)
+    col = {c: i for i, c in enumerate(columns)}
+    X = np.zeros((n, len(columns)))
+    for r, f in enumerate(feature_rows):
+        for t in feature_terms(f):
+            if t in col:  # trimmed live-null terms have no column
+                X[r, col[t]] = 1.0
+        for k in nums:
+            X[r, col[f"num.{k}"]] = float((f.get("num") or {}).get(k, 0.0))
+
+    rng = np.random.default_rng(seed)
+    perm = rng.permutation(n)
+    n_hold = max(10, n // 5)
+    hold, train_idx = perm[:n_hold], perm[n_hold:]
+    params = {"objective": "binary:logistic", "max_depth": max_depth, "eta": 0.1,
+              "subsample": 0.9, "colsample_bytree": 0.9, "min_child_weight": 5,
+              "seed": seed, "verbosity": 0}
+    dtrain = xgboost.DMatrix(X[train_idx], label=prob[train_idx], feature_names=columns)
+    dhold = xgboost.DMatrix(X[hold], label=prob[hold], feature_names=columns)
+    bst = xgboost.train(params, dtrain, num_boost_round=max_rounds,
+                        evals=[(dhold, "hold")], early_stopping_rounds=30,
+                        verbose_eval=False)
+    best = getattr(bst, "best_iteration", None)
+    rounds = int(best) + 1 if best is not None and int(best) >= 0 else max_rounds
+
+    lin_head = fit_head([feature_rows[i] for i in train_idx], target[train_idx].tolist())
+    lin_fid = spearman(linear_head_scores(lin_head, [feature_rows[i] for i in hold]),
+                       target[hold].tolist())
+    dump = [json.loads(s) for s in bst.get_dump(dump_format="json")]
+    names, trees = convert_xgb_dump(dump, columns, _xgb_gains(bst))
+    tree_fid = spearman([_spec_leaf_sum(trees, feature_rows[i], names) for i in hold],
+                        target[hold].tolist())
+    kind, reason = choose_head(tree_fid, lin_fid)
+    if kind != XGB_HEAD_KIND:
+        return None, reason
+
+    dfull = xgboost.DMatrix(X, label=prob, feature_names=columns)
+    full = xgboost.train(params, dfull, num_boost_round=rounds, verbose_eval=False)
+    dump = [json.loads(s) for s in full.get_dump(dump_format="json")]
+    names, trees = convert_xgb_dump(dump, columns, _xgb_gains(full))
+    margins = full.predict(dfull, output_margin=True)
+    leaf_sums = [_spec_leaf_sum(trees, f, names) for f in feature_rows]
+    base = calibrate_base_score([float(m) for m in margins], leaf_sums)
+    head = {"kind": XGB_HEAD_KIND, "objective": "binary:logistic",
+            "baseScore": round(float(base), 6), "fidelity": round(tree_fid, 4),
+            "fitOn": n, "features": names, "trees": trees}
+    n_trees, depth, nodes = spec_head_stats(head)
+    if n_trees > XGB_MAX_TREES or depth > XGB_MAX_DEPTH or nodes > XGB_MAX_NODES:
+        return None, (f"tree head exceeds the artifact bounds "
+                      f"({n_trees} trees, depth {depth}, {nodes} nodes)")
+    return head, (f"tree fidelity {tree_fid:.3f} beat linear {lin_fid:.3f} "
+                  f"on {n_hold} held-out pool rows")
+
+
+def distil_head(feature_rows: list[dict], target, alpha: float = 1.0) -> dict:
+    """The head build_taste ships with --xgb: the linear head, challenged by
+    the tree student under the ship rule. The outcome prints either way."""
+    tree_head, note = fit_xgb_head(feature_rows, target)
+    if tree_head is None:
+        print(f"  xgb: {note} — the linear head ships")
+        return fit_head(feature_rows, target, alpha=alpha)
+    print(f"  xgb: {note} — the tree head ships")
+    return tree_head
+
+
+def build_taste(idx, keys, y, clf, *, cv, C, features_path, alpha, xgb=False) -> dict:
     """Taste v1 (docs/DECISIONS.md): model + dims, probe, head, manifest, labels."""
     import numpy as np
 
@@ -526,7 +895,10 @@ def build_taste(idx, keys, y, clf, *, cv, C, features_path, alpha) -> dict:
             sys.exit(f"{features_path}: mixed feature versions {sorted(versions, key=str)} — re-render the pool")
         scores = idx["emb"][[pos[n] for n in names]] @ w + clf.intercept_[0]
         taste["featuresVersion"] = versions.pop()
-        taste["head"] = fit_head([feats[n] for n in names], np.asarray(scores).tolist(), alpha=alpha)
+        rows = [feats[n] for n in names]
+        target = np.asarray(scores).tolist()
+        taste["head"] = (distil_head(rows, target, alpha=alpha) if xgb
+                         else fit_head(rows, target, alpha=alpha))
     return taste
 
 
@@ -568,8 +940,13 @@ def cmd_inspect(a) -> None:
     if not h:
         print("  no head — train with --features to give the app a live curator")
         return
-    print(f"  {describe_head(h)}")
-    print(f"  head fidelity {h.get('fidelity', 0):.3f} vs the probe on {h.get('fitOn', 0)} renders")
+    if h.get("kind") == XGB_HEAD_KIND:
+        print(describe_trees(h))
+        print(f"  tree head fidelity {h.get('fidelity', 0):.3f} (held-out) vs the probe, "
+              f"fit on {h.get('fitOn', 0)} renders")
+    else:
+        print(f"  {describe_head(h)}")
+        print(f"  head fidelity {h.get('fidelity', 0):.3f} vs the probe on {h.get('fitOn', 0)} renders")
     if h.get("fidelity", 0) < HEAD_MIN_FIDELITY:
         print("  WARNING: the head can't reproduce this taste from recipe features —"
               " live curation will stay on the persona scorer")
@@ -819,6 +1196,9 @@ def main(argv=None) -> None:
     sp.add_argument("--bold", default=None,
                     help="#954 bold.json: 1=favorite, 0=kept-not-favorited, keeps only")
     sp.add_argument("--head-alpha", type=float, default=1.0, help="ridge strength for the distilled head")
+    sp.add_argument("--xgb", action="store_true",
+                    help="T1: also distil an XGBoost tree head — it ships only if it beats "
+                         "the linear head on held-out pool rows (needs the xgboost package)")
     sp.add_argument("--folds", type=int, default=5)
     sp.add_argument("-C", type=float, default=0.05, help="inverse L2 strength")
     sp.set_defaults(func=cmd_train)

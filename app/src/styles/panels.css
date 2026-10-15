@@ -131,6 +131,7 @@
 }
 .dice-card-glyph { color: var(--dim); font-size: 10px; }
 .dice-card-cast { display: flex; gap: 3px; justify-content: center; flex-wrap: wrap; }
+.dice-card-reason { color: var(--dim); font-size: 9px; letter-spacing: 0.03em; text-align: center; }
 .dice-thumb { width: 30px; height: 30px; color: var(--ink); }
 
 /* ─── Voice row (#280) ─── */

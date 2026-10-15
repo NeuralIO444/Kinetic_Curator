@@ -5,6 +5,13 @@
 // The browser can't embed, and CURATE scores recipes it never renders, so the
 // head is what runs here: score = bias + Σ weights[term] + Σ num[k]·x[k].
 //
+// XGBoost T1: the probe has a second student — a tree-ensemble head
+// (head.kind 'xgboost-trees', distilled by curator.py --xgb). Same file, same
+// trust boundary, same scorer contracts; validateTaste dispatches on the
+// kind and scoreLayout walks the trees into a keep-probability. The linear
+// head is unchanged: a file with no kind (or kind 'linear') validates and
+// scores exactly as it always has.
+//
 // The term rule MUST match studio/curator.py `feature_terms` — both sides assert
 // app/src/curator/tasteTerms.fixture.json.
 import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
@@ -15,6 +22,30 @@ export const TASTE_VERSION = 1;
 export const HEAD_MIN_FIDELITY = 0.3;
 const MAX_TERMS = 4000;
 const TERM_SKIP = new Set(['v', 'cast', 'castSize', 'num']);
+
+/** XGBoost T1 — the tree-ensemble head kind and its artifact bounds (spec §3:
+ * a taste file is an artifact, not a program bundle). */
+export const XGB_HEAD_KIND = 'xgboost-trees';
+const XGB_OBJECTIVE = 'binary:logistic';
+const MAX_TREES = 512;
+const MAX_TREE_DEPTH = 6;
+const MAX_TREE_NODES = 20000;
+/** Keys a tree never splits on: the term-rule skips, plus the array-valued
+ * castCategories (an equality node tests one scalar, not a set). */
+const TREE_FEATURE_SKIP = new Set([...TERM_SKIP, 'castCategories']);
+
+/**
+ * The feature names a tree head may declare, in binding order: the scalar
+ * recipe keys the scoring path produces (recipeFeatures({ layoutParams }) —
+ * palette/cast are constant across a CURATE press), then `num.<key>` for
+ * each numeric. The trainer binds its columns to exactly this universe;
+ * anything outside it is a file the app cannot score honestly.
+ */
+export function treeFeatureNames() {
+  const sample = recipeFeatures();
+  const cats = Object.keys(sample).filter((k) => !TREE_FEATURE_SKIP.has(k) && k !== 'num');
+  return [...cats, ...Object.keys(sample.num).map((k) => `num.${k}`)];
+}
 
 /** The ONE term rule (mirrors curator.py feature_terms). */
 export function featureTerms(features) {
@@ -45,20 +76,30 @@ export function validateTaste(raw) {
   }
   const h = raw.head;
   if (!h || typeof h !== 'object') return { ok: false, error: 'taste has no head — train with --features' };
-  const terms = h.terms && typeof h.terms === 'object' ? h.terms : null;
-  if (!terms || Object.keys(terms).length > MAX_TERMS) return { ok: false, error: 'taste head terms missing or too large' };
   const numKeys = Object.keys(recipeFeatures().num);
-  const num = h.num && typeof h.num === 'object' ? h.num : {};
-  for (const [k, w] of Object.entries(terms)) if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
-  for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
-  if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
+  let head;
+  if (h.kind === XGB_HEAD_KIND) {
+    const treeHead = validateTreeHead(h);
+    if (!treeHead.ok) return treeHead;
+    head = treeHead.head;
+  } else if (h.kind != null && h.kind !== 'linear') {
+    return { ok: false, error: `unknown taste head kind: ${String(h.kind)}` };
+  } else {
+    const terms = h.terms && typeof h.terms === 'object' ? h.terms : null;
+    if (!terms || Object.keys(terms).length > MAX_TERMS) return { ok: false, error: 'taste head terms missing or too large' };
+    const num = h.num && typeof h.num === 'object' ? h.num : {};
+    for (const [k, w] of Object.entries(terms)) if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
+    for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
+    if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
+    head = { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 };
+  }
   const labels = raw.labels && typeof raw.labels === 'object' ? raw.labels : {};
   const taste = {
     kind: TASTE_KIND, version: TASTE_VERSION, featuresVersion: FEATURES_VERSION,
     model: String(raw.model || ''), dims: Number(raw.dims) || 0,
     trainedAt: String(raw.trainedAt || ''),
     labels: { likes: Number(labels.likes) || 0, passes: Number(labels.passes) || 0 },
-    head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 },
+    head,
   };
   // #954 — optional second head. Absent until the boldness probe has trained.
   // Probe weights stay on disk in taste.json; the browser only keeps the head.
@@ -103,6 +144,74 @@ function validateHead(h, numKeys) {
 }
 
 /**
+ * XGBoost T1 — validate a tree-ensemble head (spec §3). The teeth: the
+ * featuresVersion gate already ran; here the declared features must bind to
+ * the app's own feature universe (treeFeatureNames), the ensemble stays
+ * inside the artifact bounds, and every number the walk will read is finite.
+ * Validation rebuilds each node — the app keeps a clean copy, never the
+ * file's own objects.
+ */
+function validateTreeHead(h) {
+  if (h.objective !== XGB_OBJECTIVE) return { ok: false, error: `tree head objective must be ${XGB_OBJECTIVE}` };
+  if (!finite(h.baseScore)) return { ok: false, error: 'bad tree head baseScore' };
+  if (!finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad tree head fidelity' };
+  const allowed = new Set(treeFeatureNames());
+  const features = h.features;
+  if (!Array.isArray(features) || !features.length) return { ok: false, error: 'tree head features missing' };
+  const seen = new Set();
+  for (const name of features) {
+    if (typeof name !== 'string' || !allowed.has(name)) return { ok: false, error: `tree head feature unknown: ${String(name)}` };
+    if (seen.has(name)) return { ok: false, error: `tree head feature duplicated: ${name}` };
+    seen.add(name);
+  }
+  const trees = h.trees;
+  if (!Array.isArray(trees) || !trees.length) return { ok: false, error: 'tree head trees missing' };
+  if (trees.length > MAX_TREES) return { ok: false, error: 'tree head too large' };
+  const counter = { nodes: 0 };
+  const clean = [];
+  for (const t of trees) {
+    const v = validateTreeNode(t, features, 0, counter);
+    if (v.error) return { ok: false, error: v.error };
+    clean.push(v.node);
+  }
+  return {
+    ok: true,
+    head: {
+      kind: XGB_HEAD_KIND, objective: XGB_OBJECTIVE, baseScore: h.baseScore,
+      fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0,
+      features: [...features], trees: clean,
+    },
+  };
+}
+
+/** One node: a leaf { leaf } or a split { f, op, v, y, n, gain }. Depth is
+ * counted in split levels from the root (root = 0); the depth cap is also
+ * what bounds this recursion. Returns { node } (a clean copy) or { error }. */
+function validateTreeNode(node, features, depth, counter) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return { error: 'bad tree node' };
+  counter.nodes += 1;
+  if (counter.nodes > MAX_TREE_NODES) return { error: 'tree head too large' };
+  if (depth > MAX_TREE_DEPTH) return { error: 'tree head too deep' };
+  if ('leaf' in node) {
+    if (!finite(node.leaf)) return { error: 'bad tree leaf' };
+    return { node: { leaf: node.leaf } };
+  }
+  const { f, op, v, gain } = node;
+  if (!Number.isInteger(f) || f < 0 || f >= features.length) return { error: 'bad tree split feature index' };
+  if (features[f].startsWith('num.')) {
+    if (op !== '<' || !finite(v)) return { error: 'bad tree split: numeric features split with < on a finite number' };
+  } else if (op !== '=' || (typeof v !== 'string' && typeof v !== 'boolean')) {
+    return { error: 'bad tree split: categorical features split with = on a string/boolean' };
+  }
+  if (!finite(gain)) return { error: 'bad tree split gain' };
+  const y = validateTreeNode(node.y, features, depth + 1, counter);
+  if (y.error) return y;
+  const n = validateTreeNode(node.n, features, depth + 1, counter);
+  if (n.error) return n;
+  return { node: { f, op, v, y: y.node, n: n.node, gain } };
+}
+
+/**
  * May this head steer? At or above the bar: yes. Below it: only with the artist's experimental switch on
  * (curator/tasteGate.js), and never when it is not positively correlated with the taste at all.
  * Pure: the switch is passed in.
@@ -113,13 +222,207 @@ export function headUsable(head, experimental = false) {
   return f >= HEAD_MIN_FIDELITY || (!!experimental && f > 0);
 }
 
-/** Head score for one CURATE candidate (layout params only — palette/cast are constant across a press). */
+/** Head score for one CURATE candidate (layout params only — palette/cast are constant across a press).
+ * A tree head scores a keep-probability in (0, 1); a linear head scores its raw margin, as always. */
 export function scoreLayout(head, layoutParams) {
+  if (head && head.kind === XGB_HEAD_KIND) return scoreTreeHead(head, layoutParams);
   const f = recipeFeatures({ layoutParams });
   let s = head.bias;
   for (const t of featureTerms(f)) s += head.terms[t] || 0;
   for (const [k, w] of Object.entries(head.num || {})) s += w * (f.num[k] ?? 0);
   return s;
+}
+
+const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+/** A declared feature's value in a recipeFeatures object. Numerics read the
+ * `num` block (absent = 0, the linear head's own convention); categoricals
+ * read the top level, where an absent/null value simply fails every test. */
+function treeFeatureValue(features, name) {
+  if (name.startsWith('num.')) return (features.num || {})[name.slice(4)] ?? 0;
+  return features[name];
+}
+
+/** THE equality rule for categorical splits (mirrored by curator.py's
+ * _spec_eq): strict equality, with a boolean on either side compared by its
+ * term-rule spelling ('true'/'false') so a trainer emitting either form
+ * binds the same. */
+const treeEq = (a, b) =>
+  a === b ||
+  (typeof a === 'boolean' && String(a) === b) ||
+  (typeof b === 'boolean' && String(b) === a);
+
+/** Walk one tree to its leaf margin, recording the path taken. Pure,
+ * deterministic, no state. The path is the citation material (T3): every
+ * split the walk actually turned on, with the direction it took. */
+function walkTreePath(node, features, names) {
+  const path = [];
+  let cur = node;
+  while (!('leaf' in cur)) {
+    const val = treeFeatureValue(features, names[cur.f]);
+    const go = cur.op === '<'
+      ? typeof val === 'number' && Number.isFinite(val) && val < cur.v
+      : treeEq(val, cur.v);
+    path.push({ node: cur, went: go ? 'y' : 'n', value: val });
+    cur = go ? cur.y : cur.n;
+  }
+  return { leaf: cur.leaf, path };
+}
+
+/** Walk one tree to its leaf margin. Pure, deterministic, no state. */
+function walkTree(node, features, names) {
+  return walkTreePath(node, features, names).leaf;
+}
+
+/** Tree-head score: sigmoid(baseScore + Σ leaf margins) — a keep-probability. */
+export function scoreTreeHead(head, layoutParams) {
+  const f = recipeFeatures({ layoutParams });
+  let margin = head.baseScore;
+  for (const t of head.trees) margin += walkTree(t, f, head.features);
+  return sigmoid(margin);
+}
+
+// ─── XGBoost T3 — Davis's citable reasons (spec §6/§7.5) ───────────────────
+//
+// The score is a number; the citation is the model's own words for it: the
+// splits the candidate's walks actually turned on, strongest first, stated
+// as facts OF THE LOOK (never of the person — §7.1). The wording mirrors
+// studio/curator.py's describe_term vocabulary (_WORDS / _BOOL_WORDS) so
+// the app and the Studio describe the same split the same way; numeric
+// splits cite the candidate's side of the split's own line.
+
+const FEATURE_WORDS = {
+  bodies: '{v} crowds', density: '{v} density', scale: '{v} marks', system: '{v} layouts',
+  symmetry: '{v} symmetry', behave: '{v} motion', blend: '{v} blend',
+  palette: 'the {v} palette', paletteShift: '{v} colour shift',
+};
+const BOOL_WORDS = {
+  accum: ['trails on', 'trails off'], mirror: ['mirrored', 'unmirrored'],
+  bleed: ['bleed on', 'bleed off'], overlap: ['overlap', 'no overlap'],
+};
+/** Numeric feature → the noun its citation names (mirrors curator.py _NUM_WORDS' keys). */
+const NUM_NOUNS = {
+  count: 'marks', particleCount: 'particles', scaleMid: 'scale', rotateSpread: 'rotation',
+  alphaMid: 'opacity', density: 'density', jitter: 'jitter', zTiers: 'depth tiers',
+  noiseFreq: 'noise', noiseSpeed: 'noise speed', displacement: 'displacement',
+  swarmCohesion: 'swarm cohesion', gravityWells: 'gravity', damping: 'damping',
+  wind: 'wind', flap: 'flap', breath: 'breath', lifeDrift: 'drift',
+};
+
+/** A categorical/boolean feature fact in the trainer's own words:
+ * describeFeatureValue('density', 'high') → 'high density';
+ * describeFeatureValue('accum', true) → 'trails on'. */
+export function describeFeatureValue(name, value) {
+  if (typeof value === 'boolean') {
+    const words = BOOL_WORDS[name];
+    if (words) return value ? words[0] : words[1];
+    return `${name} ${value ? 'on' : 'off'}`;
+  }
+  const tpl = FEATURE_WORDS[name];
+  if (tpl) return tpl.replace('{v}', String(value));
+  return `${name} ${String(value)}`;
+}
+
+/** Python's %g, close enough for a citation: 0.5 → '0.5', 2 → '2'. */
+const fmtG = (x) => String(Number(x.toPrecision(6)));
+
+/** One split the candidate turned on, stated as a fact of the Look. For a
+ * categorical split the fact is the candidate's OWN value (it went down the
+ * no-branch because it is something else, and that something is the fact);
+ * for a numeric split it is the candidate's side of the split's line. */
+function splitFact(step, names) {
+  const { node, went, value } = step;
+  const name = names[node.f];
+  if (node.op === '<') {
+    const key = name.startsWith('num.') ? name.slice(4) : name;
+    return `${NUM_NOUNS[key] || key} ${went === 'y' ? 'under' : 'over'} ${fmtG(node.v)}`;
+  }
+  if (value === null || value === undefined) return `${name} unset`;
+  return describeFeatureValue(name, value);
+}
+
+/** How many facts a citation carries. Three is a clause; four is a report. */
+export const CITATION_MAX_FACTS = 3;
+
+/**
+ * Explain a tree head's score for one candidate: the same walk scoreTreeHead
+ * runs, kept. Returns null when the head is not a tree head, or when the
+ * ensemble has no split to cite (pure-leaf trees — nothing to quote, and a
+ * citation is never invented). Otherwise { score, clause, facts } where
+ * facts are the taken paths' splits — one per feature, the highest-gain
+ * occurrence — ranked by gain, capped at CITATION_MAX_FACTS, and clause is
+ * them joined ' · ' in Davis's deadpan register. An ensemble has no single
+ * "winning tree", so the citation aggregates across every tree's taken
+ * path: the strongest reasons the whole ensemble had.
+ */
+export function explainTreeScore(head, layoutParams) {
+  if (!head || head.kind !== XGB_HEAD_KIND) return null;
+  const f = recipeFeatures({ layoutParams });
+  let margin = head.baseScore;
+  const best = new Map(); // feature name -> { feature, gain, fragment }
+  for (const t of head.trees) {
+    const { leaf, path } = walkTreePath(t, f, head.features);
+    margin += leaf;
+    for (const step of path) {
+      const name = head.features[step.node.f];
+      const prev = best.get(name);
+      if (!prev || step.node.gain > prev.gain) {
+        best.set(name, { feature: name, gain: step.node.gain, fragment: splitFact(step, head.features) });
+      }
+    }
+  }
+  if (!best.size) return null;
+  const facts = [...best.values()].sort((a, b) => b.gain - a.gain).slice(0, CITATION_MAX_FACTS);
+  return { score: sigmoid(margin), clause: facts.map((x) => x.fragment).join(' · '), facts };
+}
+
+// The last citation Davis's taste made — module state in the loisRank
+// idiom (the verdict behind the last pick, read by the hint). Set by the
+// MLX curator's pick; a linear head, and no pick yet, both read null:
+// a citation exists only when trees actually judged.
+let lastDavisCitation = null;
+
+/** The deadpan clause behind the MLX curator's last tree-head pick, or null. */
+export function getDavisCitation() {
+  return lastDavisCitation;
+}
+
+/**
+ * The diceScorer-shaped factory for the tree head (diceScorer.js contract:
+ * { id, score(candidate) }). Null when there is no usable tree head (the
+ * makeMlxCurator convention), so callers fall back exactly as they do today.
+ * T2 wired it into the dice as the within-strata order scorer; T3 adds the
+ * optional explain(candidate) — Davis's citable reason for a score.
+ */
+/** Candidate → layoutParams, the reduction both score() and explain() read:
+ * a candidate either carries layoutParams, IS layout params (the CURATE
+ * path), or — a dice candidate — names its layout, and the head scores
+ * recipes, so the name is read as the recipe's mode with palette/cast
+ * constant across the press, the same reduction scoreLayout already makes. */
+function candidateLayoutParams(candidate) {
+  const c = candidate && typeof candidate === 'object' ? candidate : {};
+  return c.layoutParams && typeof c.layoutParams === 'object'
+    ? c.layoutParams
+    : typeof c.layoutId === 'string' ? { mode: c.layoutId } : c;
+}
+
+export function makeXgbScorer(taste, { experimental = false } = {}) {
+  const head = taste && taste.head;
+  if (!head || head.kind !== XGB_HEAD_KIND || !headUsable(head, experimental)) return null;
+  return {
+    id: 'xgb-head-v1',
+    score(candidate) {
+      return scoreLayout(head, candidateLayoutParams(candidate));
+    },
+    /** T3: the citable reason for this candidate's score — the deadpan
+     * clause from its own tree paths (explainTreeScore), or null when the
+     * ensemble has no split to cite. Optional in the scorer contract:
+     * dice.js stamps it when present, and only then. */
+    explain(candidate) {
+      const ex = explainTreeScore(head, candidateLayoutParams(candidate));
+      return ex ? ex.clause : null;
+    },
+  };
 }
 
 /** The `mlx` curator engine, or null when there's no usable taste (→ persona / null fallback). */
@@ -136,6 +439,11 @@ export function makeMlxCurator(taste, { experimental = false } = {}) {
         const s = scoreLayout(head, c);
         if (s > bestScore) { bestScore = s; best = i; }
       });
+      // T3: a tree head's pick carries its citation (the winner's own tree
+      // paths, as a clause) for the hint to quote. A linear head cites
+      // nothing — the recorded citation clears, exactly today's silence.
+      const ex = best >= 0 ? explainTreeScore(head, candidates[best]) : null;
+      lastDavisCitation = ex ? ex.clause : null;
       return best;
     },
   };

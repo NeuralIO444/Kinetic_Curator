@@ -3,6 +3,34 @@ import { RangeRow } from '../../components/RangeRow.jsx';
 import { parseAudioEnvelope } from '../../gl/audioEnvelopeCore.mjs';
 import { sourceStatus, sidecarReason } from '../../gl/sourceStatus.mjs';
 import { lostLine, selectedInputMissing } from '../../hooks/audioLoss.mjs';
+import { useState } from 'react';
+import { loadIndex } from '../../loot/lootIndex.mjs';
+import { audioChoices, loadAudio } from '../../loot/lootAudio.mjs';
+import { createLootNative } from '../../loot/lootNative.mjs';
+
+// #1479 slice 8: audio the loot folder took in. Picking one is the only thing that loads it.
+function LootAudioPick() {
+  const [note, setNote] = useState(null);
+  let index; try { index = loadIndex(localStorage); } catch { return null; }
+  const choices = audioChoices(index);
+  if (choices.length === 0) return null;
+  const pick = async (e) => {
+    const id = e.target.value; e.target.value = '';
+    if (!id) return;
+    const r = await loadAudio({ native: createLootNative(), index, id, makeUrl: (bytes, mime) => URL.createObjectURL(new Blob([bytes], { type: mime })) });
+    if (r.ok) { setNote(null); emit(Events.AUDIO_SOURCE, { type: 'file', url: r.url, name: r.name }); } else setNote(r.reason);
+  };
+  return (
+    <label className="stim-sidecar-pick" title="Audio files from your loot folder">
+      <span className="lbl">loot</span>
+      <select defaultValue="" onChange={pick}>
+        <option value="">pick audio...</option>
+        {choices.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      {note && <span className="lbl" role="status">{note}</span>}
+    </label>
+  );
+}
 
 export function SourceControls({ audioSource, audioLastFile, audioGain, audioMonitor, devices, audioSidecar, audioSidecarNote, audioLost = null }) {
   const status = sourceStatus(audioSource, audioSidecar, audioSidecarNote);
@@ -80,6 +108,7 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
       )}
 
       <input type="file" accept="audio/*" onChange={handleFileChange} style={{ fontSize: '9px', color: 'var(--dim)', width: '100%' }} />
+      <LootAudioPick />
 
       {/* #618 — SOURCE, honestly: what is driving reactivity, and what is not. */}
       <div className="stim-source-status" role="status" title={status.driving}>

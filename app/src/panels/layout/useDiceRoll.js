@@ -10,6 +10,9 @@ import { useStore } from '../../state/store.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { rollDice } from '../../curator/dice.js';
 import { createPersonaScorer } from '../../curator/diceScorer.js';
+import { makeXgbScorer } from '../../curator/tasteHead.js';
+import { getTaste } from '../../curator/tasteStore.js';
+import { experimentalOn } from '../../curator/tasteGate.js';
 import { readCrowns, recordCrown } from '../../curator/diceCrowns.js';
 import { loisActivity } from '../../curator/loisActivity.js';
 import { resolveDavisState } from '../../curator/davisState.js';
@@ -26,7 +29,14 @@ export function useDiceRoll() {
 
   const roll = () => {
     const davisCode = resolveDavisState(loisActivity.snapshot())?.code ?? null;
-    setTray(rollDice({ assets: ASSETS, davisCode, scorer, crowns: readCrowns() }));
+    // XGBoost T2: a usable tree head orders the tray within the deal's
+    // strata (dice.js). makeXgbScorer is null without one — persona
+    // ordering, bit-identical to before, whenever taste is absent,
+    // linear, or below the bar.
+    const taste = getTaste();
+    const orderScorer = makeXgbScorer(taste, { experimental: experimentalOn() });
+    const orderMeta = orderScorer ? { tasteVersion: taste.version, headKind: taste.head.kind } : null;
+    setTray(rollDice({ assets: ASSETS, davisCode, scorer, crowns: readCrowns(), orderScorer, orderMeta }));
   };
 
   const crown = (finalist) => {
@@ -49,7 +59,13 @@ export function useDiceRoll() {
       },
     } });
     // The dice's own log: the learned-compatibility training data.
-    recordCrown({ layoutId: finalist.layoutId, assetIds: finalist.assetIds, davisCode: tray?.davisCode ?? null });
+    // T2: a crown from a model-ordered tray carries the model's stamp
+    // (score + taste version + head kind); a persona crown carries
+    // nulls — sanitize files them either way.
+    recordCrown({
+      layoutId: finalist.layoutId, assetIds: finalist.assetIds, davisCode: tray?.davisCode ?? null,
+      xgbScore: finalist.xgbScore, tasteVersion: tray?.orderMeta?.tasteVersion, headKind: tray?.orderMeta?.headKind,
+    });
     setTray(null);
   };
 

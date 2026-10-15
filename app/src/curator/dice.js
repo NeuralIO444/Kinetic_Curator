@@ -208,8 +208,25 @@ export function dealCast(assets, size, rng, wildness, crowns, anchorPool = null)
  * Roll the dice.
  * @returns {{ candidates, finalists, rolled, kept, wildness, davisCode }}
  * candidates: every proposal with its score; finalists: top 3 by score.
+ *
+ * XGBoost T2 (spec §6): when `orderScorer` is given (a usable tree head's
+ * scorer — curator/tasteHead.js makeXgbScorer, { id, score } shaped like
+ * any scorer), the model ORDERS WITHIN STRATA. The deal itself — stream,
+ * casts, shares, persona scores — is untouched, and the candidates are
+ * partitioned by the deal's own stratification: the open stratum (dealt
+ * plain) and the anchored stratum (dealt family-anchored under #1546).
+ * Finalist slots follow the deal's proportions (the anchored stratum
+ * keeps a finalist voice in proportion to its share of the roll, at
+ * least one while it dealt any), and WITHIN each stratum the model's
+ * score ranks — ties fall to the persona score, then to deal order.
+ * Scores never gate: there is no threshold anywhere; every dealt
+ * candidate keeps its stratum's road to the tray regardless of its
+ * number, and the tray itself is presented in model order. With no
+ * orderScorer the roll is bit-identical to the pre-T2 dice. `orderMeta`
+ * ({ tasteVersion, headKind }) rides along so records made from this
+ * roll (the crown log) can stamp which head ordered it (spec §5).
  */
-export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, crowns = [] }) {
+export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, crowns = [], orderScorer = null, orderMeta = null }) {
   if (!assets || !assets.length) throw new Error('[dice] no assets to deal from');
   if (!scorer || typeof scorer.score !== 'function') throw new Error('[dice] scorer missing');
   const wildness = wildnessForDavis(davisCode);
@@ -219,26 +236,75 @@ export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, 
   // pure function of the layout, size, and candidate index already dealt.
   const stratCount = Math.max(1, Math.round(n * DICE_STRATIFIED_SHARE));
   const candidates = [];
+  const anchorOf = []; // per candidate: the family it anchored, or null
   for (let i = 0; i < n; i++) {
     const layout = STUB_VOICES[Math.floor(rng() * STUB_VOICES.length)];
     const size = castSizeFor(layout.id, rng, wildness);
     let anchorPool = null;
+    let anchorFamily = null;
     if (i >= n - stratCount) {
       const fam = stratifiedFamilyFor(layout.id, size, i);
       const pool = assets.filter((a) => a.category === fam);
-      if (pool.length) anchorPool = pool;
+      if (pool.length) { anchorPool = pool; anchorFamily = fam; }
     }
     const assetIds = dealCast(assets, size, rng, wildness, crowns, anchorPool);
     const candidate = { layoutId: layout.id, assetIds };
     candidates.push({ ...candidate, score: scorer.score(candidate) });
+    anchorOf.push(anchorFamily);
   }
-  candidates.sort((a, b) => b.score - a.score);
+  if (!orderScorer) {
+    candidates.sort((a, b) => b.score - a.score);
+    return {
+      candidates,
+      finalists: candidates.slice(0, DICE_FINALISTS),
+      rolled: n,
+      kept: DICE_FINALISTS,
+      wildness,
+      davisCode,
+    };
+  }
+  // T2 ordering: stamp the model's score + the stratum the deal put each
+  // candidate in, rank inside strata, and cut the finalists by the
+  // strata's own proportions. Pure re-ranking — no stream draws, so the
+  // dealt casts above are the same casts an unordered roll deals. Ties
+  // fall to the persona score, then to deal order (the stratum arrays
+  // start in deal order and Array#sort is stable).
+  const byModel = (a, b) => (b.xgbScore - a.xgbScore) || (b.score - a.score);
+  const open = [];
+  const anchored = [];
+  candidates.forEach((c, i) => {
+    c.xgbScore = orderScorer.score(c);
+    // T3: Davis's citable reason rides beside the score when the scorer
+    // can explain itself (the tree head can; a plain { id, score } scorer
+    // stamps null — the tray just stays silent, as before).
+    c.xgbReason = typeof orderScorer.explain === 'function' ? orderScorer.explain(c) : null;
+    c.stratum = anchorOf[i] ? 'anchored' : 'open';
+    c.anchorFamily = anchorOf[i];
+    (anchorOf[i] ? anchored : open).push(c);
+  });
+  open.sort(byModel);
+  anchored.sort(byModel);
+  let anchoredSlots = anchored.length
+    ? Math.min(anchored.length, Math.max(1, Math.round((DICE_FINALISTS * anchored.length) / n)))
+    : 0;
+  const openSlots = Math.min(open.length, DICE_FINALISTS - anchoredSlots);
+  anchoredSlots = Math.min(anchored.length, DICE_FINALISTS - openSlots);
+  const finalists = [...open.slice(0, openSlots), ...anchored.slice(0, anchoredSlots)];
+  if (finalists.length < DICE_FINALISTS) {
+    const rest = [...open.slice(openSlots), ...anchored.slice(anchoredSlots)].sort(byModel);
+    for (const c of rest) {
+      if (finalists.length >= DICE_FINALISTS) break;
+      finalists.push(c);
+    }
+  }
+  finalists.sort(byModel);
   return {
-    candidates,
-    finalists: candidates.slice(0, DICE_FINALISTS),
+    candidates: [...open, ...anchored],
+    finalists,
     rolled: n,
     kept: DICE_FINALISTS,
     wildness,
     davisCode,
+    orderMeta: orderMeta ?? null,
   };
 }

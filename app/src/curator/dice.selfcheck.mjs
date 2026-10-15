@@ -16,9 +16,13 @@ import {
   DICE_FINALISTS,
   DICE_CANDIDATES_BASE,
   DICE_CANDIDATES_WILD,
+  STRATIFIED_FAMILIES,
+  DICE_STRATIFIED_SHARE,
 } from './dice.js';
 import { createPersonaScorer } from './diceScorer.js';
 import { readCrowns, recordCrown, crownPairCount, DICE_CROWNS_MAX } from './diceCrowns.js';
+import { validateTaste, makeXgbScorer, XGB_HEAD_KIND } from './tasteHead.js';
+import { FEATURES_VERSION } from './recipeFeatures.js';
 
 // Deterministic stream — a roll with the same seed deals the same dice.
 function mulberry32(seed) {
@@ -127,5 +131,99 @@ assert.ok(priorAffinity(kinA, kinB) > priorAffinity(kinA, farB), 'prior favors s
 const ev = [];
 for (let i = 0; i < 60; i++) ev.push({ ts: i, layoutId: 'grid', assetIds: ['k1', 'f1'], davisCode: null });
 assert.ok(affinity(kinA, farB, ev) > affinity(kinA, kinB, []), 'sustained crowned pairings outvote the empty prior');
+
+// 12. XGBoost T2: a tree head orders WITHIN the deal's strata. The deal
+// (stream, casts, shares) is untouched; scores never gate; the anchored
+// stratum keeps a finalist voice in the deal's own proportion; a crown
+// from an ordered tray carries the model's stamp (spec §5/§6).
+const chainOf = (pairs, rest) => (pairs.length === 0
+  ? { leaf: rest }
+  : { f: 0, op: '=', v: pairs[0][0], gain: 1, y: { leaf: pairs[0][1] }, n: chainOf(pairs.slice(1), rest) });
+const XGB_TASTE = validateTaste({
+  kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'dice fixture',
+  dims: 1152, labels: { likes: 10, passes: 10 },
+  head: {
+    kind: XGB_HEAD_KIND, objective: 'binary:logistic', baseScore: 0, fidelity: 0.9,
+    features: ['system'],
+    trees: [chainOf([['fibonacci', 1.2], ['orbit', 0.9], ['grid', 0.4], ['swarm', -0.9], ['eden', -0.5]], 0)],
+  },
+}).taste;
+const xgbScorer = makeXgbScorer(XGB_TASTE);
+assert.ok(xgbScorer && xgbScorer.id === 'xgb-head-v1', 'fixture head yields the xgb scorer');
+const META = { tasteVersion: 1, headKind: XGB_HEAD_KIND };
+const orderedArgs = { assets: ASSETS, rng: mulberry32(7), davisCode: 'FLOW', scorer, crowns: [], orderScorer: xgbScorer, orderMeta: META };
+const oroll = rollDice(orderedArgs);
+const oroll2 = rollDice({ ...orderedArgs, rng: mulberry32(7) });
+assert.deepStrictEqual(oroll2, oroll, 'ordered roll is deterministic');
+const plain7 = rollDice({ assets: ASSETS, rng: mulberry32(7), davisCode: 'FLOW', scorer, crowns: [] });
+const castKey = (c) => `${c.layoutId}|${c.assetIds.join(',')}`;
+assert.deepStrictEqual(
+  oroll.candidates.map(castKey).sort(), plain7.candidates.map(castKey).sort(),
+  'ordering deals the SAME casts — the stream is untouched, only the order changes');
+// stamps: score + stratum on every candidate; anchored = the stratified tail.
+const stratCount7 = Math.max(1, Math.round(oroll.rolled * DICE_STRATIFIED_SHARE));
+const anchored7 = oroll.candidates.filter((c) => c.stratum === 'anchored');
+const open7 = oroll.candidates.filter((c) => c.stratum === 'open');
+assert.strictEqual(anchored7.length, stratCount7, 'anchored stratum = the #1546 share of the roll');
+assert.strictEqual(open7.length + anchored7.length, oroll.rolled);
+for (const c of oroll.candidates) {
+  assert.ok(Number.isFinite(c.xgbScore) && c.xgbScore > 0 && c.xgbScore < 1, 'xgb score stamped, in (0,1)');
+  assert.strictEqual(c.xgbScore, xgbScorer.score(c), 'stamp is the scorer reading of the candidate');
+}
+for (const c of open7) assert.strictEqual(c.anchorFamily, null, 'open candidates anchor nothing');
+for (const c of anchored7) {
+  assert.ok(STRATIFIED_FAMILIES.some((f) => f.category === c.anchorFamily), 'anchored family is a stratified family');
+  assert.strictEqual(byId.get(c.assetIds[0]).category, c.anchorFamily, 'the cast leads with its anchor family');
+}
+// allocation: finalist slots follow the strata proportions — for this
+// roll (11 dealt, 3 anchored) exactly 1 anchored + 2 open — and each
+// slot goes to its stratum's model-best. Scores never gate: the
+// anchored finalist is a finalist by winning its stratum alone.
+const anchoredSlots7 = Math.min(anchored7.length, Math.max(1, Math.round((DICE_FINALISTS * anchored7.length) / oroll.rolled)));
+assert.strictEqual(oroll.finalists.filter((f) => f.stratum === 'anchored').length, anchoredSlots7, 'anchored finalist share = deal proportion');
+assert.ok(oroll.finalists.includes(anchored7[0]), 'anchored finalist is the anchored stratum’s model-best');
+assert.ok(oroll.finalists.includes(open7[0]) && oroll.finalists.includes(open7[1]), 'open slots go to the open stratum’s model-best');
+for (let i = 1; i < oroll.finalists.length; i++) {
+  assert.ok(oroll.finalists[i - 1].xgbScore >= oroll.finalists[i].xgbScore, 'the tray is presented in model order');
+}
+assert.deepStrictEqual(oroll.orderMeta, META, 'the roll echoes which head ordered it');
+// ties fall to the persona score: a constant model still orders each
+// stratum by the persona ranking — and gates nothing.
+const flat = rollDice({ ...orderedArgs, rng: mulberry32(7), orderScorer: { id: 'xgb-head-v1', score: () => 0.5 } });
+const flatAnchored = flat.candidates.filter((c) => c.stratum === 'anchored');
+const flatAnchoredBest = flatAnchored.reduce((a, b) => (b.score > a.score ? b : a));
+assert.ok(flat.finalists.includes(flatAnchoredBest), 'flat model: the anchored persona-best still reaches the tray');
+// T3: Davis's citable reasons ride the ordered candidates — the clause
+// from each candidate's own tree path (this fixture splits on system
+// only, so the citation names the mode in the trainer's words). A scorer
+// that cannot explain itself stamps null, and the tray stays silent.
+for (const c of oroll.candidates) {
+  assert.strictEqual(c.xgbReason, `${c.layoutId} layouts`, 'reason stamped from the candidate’s own path');
+  assert.strictEqual(c.xgbReason, xgbScorer.explain(c), 'stamp is the scorer’s explanation of the candidate');
+}
+for (const c of flat.candidates) {
+  assert.strictEqual(c.xgbReason, null, 'an unexplaining scorer stamps null reasons');
+}
+// no head: the pre-T2 surface exactly — no stamps, no orderMeta.
+assert.ok(!('orderMeta' in plain7), 'unordered roll carries no orderMeta');
+for (const c of plain7.candidates) {
+  assert.ok(!('xgbScore' in c) && !('stratum' in c) && !('anchorFamily' in c), 'unordered candidates carry no T2 stamps');
+}
+// crown stamps: the trio round-trips through the log; persona crowns
+// and junk both file as honest nulls.
+const mem2 = (() => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, v) }; })();
+recordCrown({ layoutId: 'grid', assetIds: ['a', 'b'], davisCode: null, xgbScore: 0.77, tasteVersion: 1, headKind: XGB_HEAD_KIND }, mem2);
+recordCrown({ layoutId: 'grid', assetIds: ['a', 'c'], davisCode: null }, mem2);
+recordCrown({ layoutId: 'grid', assetIds: ['a', 'd'], davisCode: null, xgbScore: 'high', tasteVersion: -1, headKind: 42 }, mem2);
+const logged2 = readCrowns(mem2);
+assert.strictEqual(logged2[0].xgbScore, 0.77, 'crown keeps the model score');
+assert.strictEqual(logged2[0].tasteVersion, 1, 'crown keeps the taste version');
+assert.strictEqual(logged2[0].headKind, XGB_HEAD_KIND, 'crown keeps the head kind');
+assert.deepStrictEqual(
+  [logged2[1].xgbScore, logged2[1].tasteVersion, logged2[1].headKind], [null, null, null],
+  'a persona crown files the trio as nulls');
+assert.deepStrictEqual(
+  [logged2[2].xgbScore, logged2[2].tasteVersion, logged2[2].headKind], [null, null, null],
+  'junk stamp values sanitize to nulls');
 
 console.log('[dice] selfcheck OK — 15 layouts, casts 2–5, 3 finalists, crowns persist');
