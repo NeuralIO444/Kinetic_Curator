@@ -154,7 +154,7 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
   const atlas = getAtlas(combos);
   const cells = {};
-  for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1 };
+  for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
   // #1079: grain is procedural — no LUT is baked or shipped.
   return {
     width, height, bg, contract, cells,
@@ -188,7 +188,7 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
   }
   const atlas = getAtlas(combos);
   const cells = {};
-  for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1 };
+  for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
   // #1079: grain is procedural — no LUT is baked or shipped.
   const payload = {
     width, height, bg, fade, optics, tunnel, prism, flow, echoes,
