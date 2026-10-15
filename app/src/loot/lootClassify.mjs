@@ -56,14 +56,20 @@ export function classify(rel) {
   return spec.ok ? { ...out, ok: true } : { ...out, reason: spec.reason };
 }
 
-/** A stable, readable slug for an id: lower-case a-z0-9 and underscores, at most 32 characters. */
-export function slug(stem) {
-  const s = String(stem ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32).replace(/_+$/g, '');
+/** A stable, readable slug for an id: lower-case a-z0-9 and underscores, at most `max` characters (default 32). */
+export function slug(stem, max = 32) {
+  const s = String(stem ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, max).replace(/_+$/g, '');
   return s || 'item';
 }
+
+/** The pool caps an asset id at 40 characters after `user:`: `loot_` (5) + the stem (28) + `_` + six hex = exactly 40. */
+export const LOOT_STEM_MAX = 28;
 
 /** The `user:` id of a loot item: readable stem plus the first six hex of its content hash, so a rename keeps it. */
 export function lootId(stem, hash) {
   const h = typeof hash === 'string' ? hash.toLowerCase().replace(/[^0-9a-f]/g, '').slice(0, 6) : '';
-  return `user:loot_${slug(stem)}_${h || '000000'}`;
+  return `user:loot_${slug(stem, LOOT_STEM_MAX)}_${h || '000000'}`;
 }
+
+/** The hint the pool derives its id from (the id minus `user:`): the pool's own id rule then reproduces lootId exactly. */
+export const lootHint = (id) => String(id).replace(/^user:/, '');

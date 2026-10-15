@@ -24,12 +24,12 @@ ok('a first scan folds in: items added with their hash and path, a log newest fi
   const { index, rows } = applyPlan(base, plan, { nowMs: NOW });
   assert.equal(Object.keys(index.items).length, 2);
   const a = index.items['user:loot_a_aaaa00'];
-  assert.deepEqual(a, { kind: 'image', rel: 'images/a.svg', size: 100, mtimeMs: OLD, hash: 'aaaa0000', state: 'ok', ingested: false });
+  assert.deepEqual(a, { kind: 'image', rel: 'images/a.svg', size: 100, mtimeMs: OLD, hash: 'aaaa0000', state: 'ok', ingested: false, hold: null, assetId: null });
   assert.equal(index.scannedAt, NOW);
   assert.deepEqual(rows.map((r) => r.outcome).sort(), ['added', 'added', 'skipped']);
   assert.equal(index.log.length, 3);
   assert.equal(index.root, ROOT);
-  assert.deepEqual(countItems(index), { items: 2, ok: 2, missing: 0, pending: 2 }, 'nothing is taken in yet: both are pending');
+  assert.deepEqual(countItems(index), { items: 2, ok: 2, missing: 0, pending: 2, held: 0, taken: 0 }, 'nothing is taken in yet: both are pending');
 });
 
 ok('pure: the index in is not changed by a scan', () => {
@@ -56,7 +56,7 @@ ok('a rename, a change, a duplicate and a disappearance are each one honest row;
   assert.equal(index.items['user:loot_a_aaaa00'].rel, 'images/a2.svg', 'the id is stable across the rename');
   assert.equal(index.items['user:loot_b_bbbb00'].hash, 'dddd0000');
   assert.equal(index.items['user:loot_c_cccc00'].state, 'missing');
-  assert.deepEqual(countItems(index), { items: 3, ok: 2, missing: 1, pending: 2 });
+  assert.deepEqual(countItems(index), { items: 3, ok: 2, missing: 1, pending: 2, held: 0, taken: 0 });
   // and it comes back
   const back = applyPlan(index, planScan({ entries: [f('images/a2.svg', 'aaaa0000'), f('images/b.svg', 'dddd0000'), f('images/c.svg', 'cccc0000')], prev: asPrev(index), nowMs: NOW }), { nowMs: NOW + 2 });
   assert.equal(back.index.items['user:loot_c_cccc00'].state, 'ok');
@@ -140,7 +140,8 @@ ok('the folder path can never ride in a project, a bundle or a share link', () =
 ok('the words state counts, stay lowercase and deadpan, and never name anything they should not', () => {
   assert.equal(statusLine({}), 'no folder yet');
   assert.equal(statusLine({ items: 1 }), '1 item');
-  assert.equal(statusLine({ items: 12, added: 3, skipped: 2, missing: 1, scanned: true }), '12 items · 3 added · 2 skipped · 1 missing');
+  assert.equal(statusLine({ items: 12, added: 3, skipped: 2, missing: 1, scanned: true }), '12 items · 3 found · 2 skipped · 1 missing');
+  assert.equal(statusLine({ items: 12, added: 12, taken: 10, held: 2, skipped: 1, scanned: true }), '12 items · 12 found · 10 in the pool · 2 held · 1 skipped');
   assert.equal(logLine({ rel: 'images/a.png', outcome: 'skipped', reason: 'raster not supported yet' }), 'images/a.png  skipped: raster not supported yet');
   assert.equal(logLine({ rel: 'images/a.svg', outcome: 'added' }), 'images/a.svg  added');
   assert.equal(logLine(null), '');

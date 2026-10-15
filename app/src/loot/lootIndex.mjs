@@ -11,8 +11,9 @@ export const LOG_MAX = 200;
 export const ITEMS_MAX = 5000;
 const KINDS = ['image', 'audio', 'palette', 'look'];
 const STATES = ['ok', 'missing'];
-const OUTCOMES = ['added', 'dup', 'changed', 'renamed', 'missing', 'skipped', 'pool-full', 'rejected', 'restored'];
+const OUTCOMES = ['added', 'dup', 'changed', 'renamed', 'missing', 'skipped', 'pool-full', 'rejected', 'restored', 'taken-in'];
 const ID = /^user:loot_[a-z0-9_]{1,40}$/;
+const ID_ANY = /^user:[A-Za-z0-9_-]{1,40}$/;
 const HASH = /^[0-9a-f]{8,64}$/;
 
 export const emptyIndex = () => ({ v: 1, root: null, scannedAt: null, items: {}, log: [] });
@@ -37,6 +38,8 @@ export function sanitizeIndex(raw) {
       kind: it.kind, rel: segs.join('/'), size: num(it.size) ?? 0, mtimeMs: num(it.mtimeMs) ?? 0, hash,
       state: STATES.includes(it.state) ? it.state : 'ok',
       ingested: it.ingested === true, // false until its asset/palette/audio has actually been taken in (slice 6 and on)
+      hold: str(it.hold, 120), // why it was not taken in (rejected, pool full), so a rescan does not retry the same file
+      assetId: typeof it.assetId === 'string' && ID_ANY.test(it.assetId) ? it.assetId : null, // the id it has in the pool
     };
   }
   const log = Array.isArray(raw.log) ? raw.log : [];
@@ -67,7 +70,7 @@ export function applyPlan(index, plan, { nowMs = null } = {}) {
   }
   for (const a of plan.add || []) {
     if (Object.keys(items).length >= ITEMS_MAX) { rows.push(row(a.rel, a.kind, 'skipped', 'index full')); continue; }
-    items[a.id] = { kind: a.kind, rel: a.rel, size: a.size ?? 0, mtimeMs: a.mtimeMs ?? 0, hash: a.hash, state: 'ok', ingested: false };
+    items[a.id] = { kind: a.kind, rel: a.rel, size: a.size ?? 0, mtimeMs: a.mtimeMs ?? 0, hash: a.hash, state: 'ok', ingested: false, hold: null, assetId: null };
     rows.push(row(a.rel, a.kind, 'added'));
   }
   for (const r of plan.renamed || []) {
@@ -76,7 +79,7 @@ export function applyPlan(index, plan, { nowMs = null } = {}) {
   }
   for (const c of plan.changed || []) {
     const it = items[c.id];
-    if (it) { items[c.id] = { ...it, hash: c.hash, state: 'ok', ingested: false }; rows.push(row(c.rel, c.kind, 'changed')); } // new bytes: to be taken in again
+    if (it) { items[c.id] = { ...it, hash: c.hash, state: 'ok', ingested: false, hold: null }; rows.push(row(c.rel, c.kind, 'changed')); } // new bytes: to be taken in again
   }
   for (const d of plan.dup || []) rows.push(row(d.rel, d.kind, 'dup', `same as ${d.of}`));
   for (const m of plan.missing || []) {
@@ -106,7 +109,9 @@ export function countItems(index) {
   const items = Object.values(sanitizeIndex(index).items);
   return {
     items: items.length, ok: items.filter((i) => i.state === 'ok').length, missing: items.filter((i) => i.state === 'missing').length,
-    pending: items.filter((i) => i.state === 'ok' && !i.ingested).length,
+    pending: items.filter((i) => i.state === 'ok' && !i.ingested && !i.hold).length,
+    held: items.filter((i) => i.state === 'ok' && !i.ingested && Boolean(i.hold)).length,
+    taken: items.filter((i) => i.state === 'ok' && i.ingested).length,
   };
 }
 
@@ -127,4 +132,26 @@ export function saveIndex(storage, index) {
     storage.setItem(LOOT_KEY, JSON.stringify(sanitizeIndex(index)));
     return true;
   } catch { return false; }
+}
+
+/**
+ * Record what became of one item's take-in: { id, status: 'taken'|'held', reason?, assetId? }. Pure; unknown ids are
+ * ignored. A held item (rejected, pool full) keeps its reason so a rescan does not retry the same bytes; new bytes (a
+ * `changed` row) clear it.
+ */
+export function markTaken(index, id, { status, reason = null, assetId = null } = {}) {
+  const base = sanitizeIndex(index);
+  const it = base.items[id];
+  if (!it) return base;
+  const next = status === 'taken'
+    ? { ...it, ingested: true, hold: null, assetId: typeof assetId === 'string' ? assetId : it.assetId }
+    : { ...it, ingested: false, hold: str(reason, 120) || 'not taken in' };
+  return { ...base, items: { ...base.items, [id]: next } };
+}
+
+/** Prepend log rows (newest first, capped). */
+export function addRows(index, rows) {
+  const base = sanitizeIndex(index);
+  const clean = (Array.isArray(rows) ? rows : []).filter((r) => r && OUTCOMES.includes(r.outcome) && str(r.rel, 512));
+  return { ...base, log: [...clean.map((r) => ({ rel: r.rel, kind: KINDS.includes(r.kind) ? r.kind : null, outcome: r.outcome, reason: str(r.reason, 120) })), ...base.log].slice(0, LOG_MAX) };
 }
