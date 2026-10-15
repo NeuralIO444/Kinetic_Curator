@@ -47,6 +47,7 @@ export const EVENT_REGISTRY = {
   ASSETS_RENAME: { handler: 'wire' },
   ASSETS_REPLACE: { handler: 'wire' },
   ASSETS_REGION_SLOT: { handler: 'wire' },
+  ASSETS_REGION_KINEME: { handler: 'wire' },
   EXPORT_SNAPSHOT: { handler: 'wire' },
   EXPORT_RECORD: { handler: 'wire' },
   EXPORT_RENDERING: { handler: 'wire' },
