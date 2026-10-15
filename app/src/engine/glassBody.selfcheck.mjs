@@ -10,8 +10,10 @@
 //  - the scene contract: the glass flag rides onto contract instances
 //    only when set, so a non-glass contract is byte-identical in shape
 //    to the pre-M1 contract (no key, no hash change);
-//  - the export warning: 'glass' no longer disclosed, plate/wash/stipple
-//    still disclosed exactly once per material.
+//  - the export warning: 'glass' undisclosed since M1; since M3 the
+//    warning covers exactly the two colour-ramp bodies that don't
+//    survive the GL export — plate and wash — exactly once each
+//    (stipple's screen survives the export; flat is not a body).
 import assert from 'node:assert';
 import { isGlassMaterial, GLASS_BODY_ALPHA, GLASS_MATERIAL } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
@@ -116,22 +118,24 @@ ok('contract: glass instances carry the flag; non-glass contracts gain no key', 
 });
 
 // ── the export warning ─────────────────────────────────────────────────
-ok('warnUnsupportedMaterials: glass + plate undisclosed, wash/stipple still disclosed once', () => {
+ok('warnUnsupportedMaterials: exactly plate + wash disclosed once each; glass/stipple/flat silent', () => {
   const warns = [];
   const orig = console.warn;
   console.warn = (msg) => warns.push(String(msg));
   try {
     const wing = (material) => [{ layoutParams: { material }, items: [{ role: 'wing' }] }];
     warnUnsupportedMaterials(wing('glass'));
-    assert.equal(warns.length, 0, 'glass carries no warning since M1');
+    assert.equal(warns.length, 0, 'glass carries no warning since M1 (its body survives the export)');
+    warnUnsupportedMaterials(wing('stipple'));
+    assert.equal(warns.length, 0, 'stipple carries no warning since M3 (its screen survives the export)');
+    warnUnsupportedMaterials(wing('flat'));
+    assert.equal(warns.length, 0, 'flat is not a body — nothing to disclose');
     warnUnsupportedMaterials(wing('plate'));
-    assert.equal(warns.length, 0, 'plate carries no warning since M2 (#1548)');
-    warnUnsupportedMaterials(wing('stipple'));
-    assert.equal(warns.length, 1, 'stipple still disclosed');
-    warnUnsupportedMaterials(wing('stipple'));
+    assert.equal(warns.length, 1, 'plate disclosed: its ramp does not survive the GL export (studio.py still)');
+    warnUnsupportedMaterials(wing('plate'));
     assert.equal(warns.length, 1, 'disclosed once per material per process');
     warnUnsupportedMaterials(wing('wash'));
-    assert.equal(warns.length, 2, 'wash still disclosed');
+    assert.equal(warns.length, 2, 'wash disclosed on the same ground since M3 (#1549)');
     warnUnsupportedMaterials([{ layoutParams: { material: 'wash' }, items: [{ role: 'body' }] }]);
     assert.equal(warns.length, 2, 'non-wing layers never warned');
   } finally {
