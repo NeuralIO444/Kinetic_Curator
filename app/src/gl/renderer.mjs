@@ -319,13 +319,17 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
 
   // 25 floats/instance (100-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass)
-  // (defX,defY,defAmt) (plate).
+  // (defX,defY,defAmt) (material body code).
   // #781: kineme 0 = still (exactly the old zeros).
   // #1129 PR2: glass is 1 for glass-voice instances (soft bevel), else 0.
   // #1410: deform is the impact squash (axis + amount); absent reads 0 =
   // round, exactly the old quad.
-  // #1548: plate is 1 for plate-material instances (the radial ink ramp),
-  // else 0; appended at the tail so every earlier offset is unchanged.
+  // #1548: the tail float was appended for plate (1 = plate-material
+  // instance, the radial ink ramp) so every earlier offset is unchanged.
+  // #1549: the same tail float now carries the material BODY CODE —
+  // 0 flat, 1 plate, 2 wash, 3 stipple — decoded in QUAD_VS. The stride,
+  // the attribute pointer and every earlier offset are unchanged, so
+  // plate (1) and flat (0) pack bit-identically to M2.
   const maxLen = instances.length;
   const buf = new Float32Array(maxLen * 25);
   let o = 0;
@@ -355,7 +359,7 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     buf[o + 20] = it.glass ? 1 : 0; // #1129 PR2: missing flag (old producers) reads 0 = enamel
     const df = it.deform; // #1410: [axisX, axisY, amount]; missing (old producers) reads 0 = round
     buf[o + 21] = df ? df[0] : 0; buf[o + 22] = df ? df[1] : 0; buf[o + 23] = df ? df[2] : 0;
-    buf[o + 24] = it.plate ? 1 : 0; // #1548: missing flag (old producers) reads 0 = flat ink
+    buf[o + 24] = it.plate ? 1 : it.wash ? 2 : it.stipple ? 3 : 0; // #1548/#1549: material body code; missing flags (old producers) read 0 = flat ink
     o += 25;
   }
   if (o === 0) return new Float32Array(0);
@@ -591,7 +595,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.enableVertexAttribArray(7);
     gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 100, 84);
     gl.vertexAttribDivisor(7, 1);
-    // #1548: a_plate — single float at byte 96 (the appended tail float).
+    // #1548/#1549: a_plate — the material body code, single float at byte 96 (the appended tail float).
     gl.enableVertexAttribArray(8);
     gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 100, 96);
     gl.vertexAttribDivisor(8, 1);

@@ -125,6 +125,13 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     // plate ramp on the ink channel in the quad shader. Absent (flat /
     // wash / stipple / glass strata) the contract is byte-identical.
     ...(item.plate ? { plate: true } : {}),
+    // #1549 — the wash and stipple flags ride the same way (Materials
+    // M3): packInstanceData folds them into the same a_plate tail slot
+    // as body codes 2 and 3, selecting the vertical wash ramp / the
+    // stipple dot screen on the ink channel in the quad shader.
+    // Absent (the common case) the contract is byte-identical.
+    ...(item.wash ? { wash: true } : {}),
+    ...(item.stipple ? { stipple: true } : {}),
   };
 }
 
@@ -212,34 +219,28 @@ function buildFxWraps(resolvedLayers, caps) {
 const warnedMaterials = new Set();
 
 /**
- * Disclose — don't silently drop — gradient materials on studio stills
- * (#168, "live and studio agree or refuse").
+ * Disclose — don't silently drop — the materials that don't survive
+ * studio.py still (#168, "live and studio agree or refuse").
  *
- * Gradient materials (plate / wash / stipple, app/src/engine/materials.js)
- * only ever existed in the retired SVG layer. Plate was restored in GL
- * by #1548 (M2, below); wash/stipple still have no GL shading, so a
- * studio export of a project using one renders the wings flatter than
- * the live tab. This discloses instead of refusing: warn once per
- * material per process, like studio/blendFallback.mjs. (Restoring
- * wash/stipple in GL is the M3 stage of the materials lane.)
- *
- * 'glass' is NOT disclosed: since #1547 (Materials M1) the GL backend
- * renders it — the material engages the #1129 glass machinery (alpha
- * body at placement, back-to-front sort, soft-bevel/caustic/striation
- * via the contract's glass flag) in the live tab and in studio stills
- * alike, so there is no flatness left to warn about.
- *
- * 'plate' is NOT disclosed either: since #1548 (Materials M2) the GL
- * backend renders it — the engraved-plate radial ramp (accent heart →
- * ink rim, recovered from the retired SVG def in plateBody.mjs) runs
- * on the ink channel via the contract's plate flag in the live tab,
- * and composed stills paint it with the same def as an SVG gradient.
- * One seam stays on the record: the headless GL export
- * (renderExportViaGL → createRenderer, u_liveTint = 0) has no
- * channel decomposition to ramp against, so an exported GL still
- * renders plate flat until the export atlas bake carries the
- * gradient at bake time — a follow-up, not this stage. Only
- * wash/stipple remain disclosed, until M3.
+ * The historical vocabulary is COMPLETE in GL since #1549 (Materials
+ * M3): 'glass' engages the #1129 machinery (#1547, M1), 'plate'
+ * paints its radial ramp on the ink channel (#1548, M2), and 'wash'
+ * (vertical accent→ink ramp) and 'stipple' (dot-field screen) paint
+ * theirs on the same channel via the contract's wash/stipple flags
+ * (#1549, M3) — in the live tab, and in composed (miner) stills via
+ * the retired defs themselves. This warning is not about the live
+ * tab or composed stills; it discloses the one surface where two of
+ * the four still don't survive: `studio.py still` (and the accum
+ * still), the headless GL export (renderExportViaGL →
+ * createRenderer, u_liveTint = 0). That renderer has no channel
+ * decomposition to ramp against, so the two COLOUR-RAMP bodies —
+ * plate and wash — render flat there. The other two survive the
+ * export: glass's body is placement-level (alpha + sort, and its
+ * bevel terms sit outside the tint path), and stipple's screen is
+ * applied to the atlas sample itself, which needs no channel
+ * decomposition. Plate and wash are therefore disclosed here — warn
+ * once per material per process, like studio/blendFallback.mjs —
+ * until the export atlas bake carries their ramps at bake time.
  *
  * @param {Array} resolvedLayers — resolveLayers(doc, {caps}) output
  */
@@ -247,7 +248,7 @@ export function warnUnsupportedMaterials(resolvedLayers) {
   const used = new Set();
   for (const L of resolvedLayers || []) {
     const mat = L.layoutParams?.material;
-    if (!mat || mat === 'flat' || mat === 'glass' || mat === 'plate') continue;
+    if (mat !== 'plate' && mat !== 'wash') continue;
     if (Array.isArray(L.items) && L.items.some((it) => it.role === 'wing')) {
       used.add(mat);
     }
@@ -257,8 +258,8 @@ export function warnUnsupportedMaterials(resolvedLayers) {
     warnedMaterials.add(mat);
     console.warn(
       `[export] material "${mat}" renders flat in studio stills (#168): ` +
-      'gradient materials (wash/stipple) apply to wing assets in the live tab only; ' +
-      'the GL backend has no gradient shading for them yet. See docs/QUALITY.md.',
+      'its colour-ramp body renders in the live tab and in composed stills, but the GL export ' +
+      '(studio.py still) has no channel decomposition to ramp against. See docs/QUALITY.md.',
     );
   }
 }

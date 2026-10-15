@@ -32,6 +32,8 @@ import { fadeForAge } from '../biology/lifecycle.js';
 import { sortGlassInstances } from './glassSort.mjs';
 import { isGlassMaterial, GLASS_BODY_ALPHA } from './glassBody.mjs'; // #1547 — material:'glass'
 import { isPlateMaterial } from './plateBody.mjs'; // #1548 — material:'plate'
+import { isWashMaterial } from './washBody.mjs'; // #1549 — material:'wash'
+import { isStippleMaterial } from './stippleBody.mjs'; // #1549 — material:'stipple'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import {
   pickWeightedIndexStable,
@@ -531,6 +533,19 @@ export function buildPlacements({
   // Plate is the DEFAULT material, so this flags most instances; the
   // flag costs one boolean at build time and nothing per frame.
   const materialPlate = isPlateMaterial(layoutParams.material);
+  // #1549 (Materials M3) — `material: 'wash'` and `material: 'stipple'`
+  // are the last two switches of the restoration: each flags every
+  // instance it places, and the flag is all placement does. The wash
+  // body is a vertical accent→ink ramp inside each glyph (washBody
+  // .mjs) and the stipple body a dot-field screen (stippleBody.mjs);
+  // both paint where the glyph is painted — the quad shader's
+  // live-tint branch via the scene contract, and the composed stills
+  // via SVG defs — exactly as plate does. The three material values
+  // are mutually exclusive by construction (one `material` param),
+  // and the renderer carries them in the one tail slot as a body
+  // code (packInstanceData: 1 plate, 2 wash, 3 stipple).
+  const materialWash = isWashMaterial(layoutParams.material);
+  const materialStipple = isStippleMaterial(layoutParams.material);
   for (const it of mapped) {
     it.glass = glassOn;
     if (materialGlass) it.alpha *= GLASS_BODY_ALPHA;
@@ -541,6 +556,10 @@ export function buildPlacements({
     // glass-flagged instance never takes the plate ramp — glass
     // renders stay exactly as M1 left them, on every surface.
     it.plate = materialPlate && !glassOn;
+    // #1549: same unconditional assignment, same glass precedence —
+    // a glass-flagged instance takes no wash/stipple body either.
+    it.wash = materialWash && !glassOn;
+    it.stipple = materialStipple && !glassOn;
   }
   if (glassOn) mapped = sortGlassInstances(mapped);
 

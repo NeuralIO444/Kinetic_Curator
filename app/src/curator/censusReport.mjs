@@ -66,7 +66,15 @@ export function fingerprintItems(items, fields) {
   const canon = items.map((it) => fields.map((f) => r4(it[f])));
   return createHash('sha256').update(JSON.stringify(canon)).digest('hex');
 }
-const PLACE_FIELDS = ['assetId', 'x', 'y', 'scale', 'scaleY', 'rotation', 'alpha', 'color', 'accent', 'zTier'];
+// The material body flags ride the place fingerprint too (#1549):
+// they are placement facts (buildPlacements sets them on every item),
+// uniform in every sweep except the rows that sweep them — the
+// material row below and the glass row (whose sort already moved
+// it). Without them the material row could only ever see glass's
+// alpha; with them it measures the flags each body engages, while
+// the bodies themselves are measured at render level by their leaf
+// suites (plateBody / washBody / stippleBody raster deltas).
+const PLACE_FIELDS = ['assetId', 'x', 'y', 'scale', 'scaleY', 'rotation', 'alpha', 'color', 'accent', 'zTier', 'glass', 'plate', 'wash', 'stipple'];
 const BAKE_FIELDS = ['assetId', 'x', 'y', 'rotation', 'scale', 'alpha', 'color'];
 
 /** Fingerprint delta between two item lists over the shared prefix. */
@@ -310,7 +318,7 @@ const STRUCT_FIXTURES = {
   kinemePattern: { driver: 'kineme', ctx: { mode: 'fibonacci' }, values: ['DRIFT', 'ORGANIC'], note: 'ORGANIC routes to the rhythm layer — a placement-layer modulation that survives into stills when the driver context is present' },
   symmetry: { driver: 'swarm', ctx: { mode: 'hype' }, values: ['none', 'bilateral'], note: 'symmetry fans live in the organism item builder (wings/fans on a hype cast); placements have no symmetry channel' },
   behave: { driver: 'swarm', ctx: { ...HYPE_CTX }, values: ['cruise', 'flock'] },
-  material: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['plate', 'glass'], note: 'glass is live in GL since #1547 (Materials M1): the material value engages the #1129 glass machinery in buildPlacements (glass flag + back-to-front sort, GLASS_BODY_ALPHA on the placed alpha; the flag rides the scene contract into the shader terms) — the delta below is plate↔glass on this fixture. Plate is live since #1548 (Materials M2): buildPlacements flags plate items and the ramp paints at render (quad shader + composed-still gradient def), so plate↔flat is invisible to this place fingerprint by construction — plate\'s body is measured at render level by plateBody.selfcheck (raster delta), not here. Wash/stipple stay flat until M3; their only reader is still the export warning (sceneContract.warnUnsupportedMaterials)' },
+  material: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['plate', 'wash'], note: 'the material vocabulary is complete in GL (#1547 M1 glass, #1548 M2 plate, #1549 M3 wash + stipple): every value engages a placement flag here (the flags ride the place fingerprint and the scene contract; the renderer carries them as one body code) — the delta below is plate↔wash on this fixture, the two colour-ramp bodies. The bodies themselves are render-level and measured by their leaf suites (plateBody / washBody / stippleBody raster deltas), not here; glass additionally moves the placed alpha + sort. One seam stays disclosed, not hidden: plate and wash render flat in the GL export (studio.py still — no channel decomposition there), which sceneContract.warnUnsupportedMaterials names; stipple\'s screen and glass\'s body survive the export' },
   contactMode: { driver: 'dish', reason: 'measured in the dish matrix (pair fixture modes)' },
   dish: { driver: 'dish', reason: 'measured in the dish matrix (the DISH toggle row)' },
   ecology: { driver: 'dish', reason: 'measured in the dish matrix (population vs pooled cap)' },

@@ -54,6 +54,8 @@ import { STUB_VOICES } from '../data/voices.js';
 import { getQualityCaps } from '../data/quality.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
 import { plateGradientDef } from '../engine/plateBody.mjs';
+import { washGradientDef } from '../engine/washBody.mjs'; // #1549 — material:'wash'
+import { stipplePatternDef } from '../engine/stippleBody.mjs'; // #1549 — material:'stipple'
 import { bakeParticles } from '../engine/kernel/bake/index.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../state/paramUtils.js';
 import { dealCast, castSizeFor, rollDice, wildnessForDavis } from './dice.js';
@@ -356,7 +358,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
   ];
   if (withBg) parts.push(`<rect width="${W}" height="${H}" fill="${palette.bg}"/>`);
   const body = [];
-  const plateDefs = [];
+  const matDefs = [];
   for (const item of items || []) {
     // Library assets resolve from the index; variant items resolve
     // from the run's generated records (recordFor warmed the cache
@@ -365,7 +367,8 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
     if (!assetRec) continue;
     const color = item.color || palette.ink || '#000000';
     const accent = item.accent || color;
-    const key = `${item.assetId}|${color}|${accent}|${item.plate ? 'plate' : ''}`;
+    const matTag = item.plate ? 'plate' : item.wash ? 'wash' : item.stipple ? 'stipple' : '';
+    const key = `${item.assetId}|${color}|${accent}|${matTag}`;
     if (!symbols.has(key)) {
       let svg;
       if (item.plate) {
@@ -375,8 +378,29 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
         // as the SVG layer consumed it (Layer.jsx set --ink to the
         // url; accent paint stayed flat). One def per (accent, ink)
         // pair, emitted alongside the symbols below.
-        const gid = `pg${plateDefs.length}`;
-        plateDefs.push(plateGradientDef(gid, accent, color));
+        const gid = `pg${matDefs.length}`;
+        matDefs.push(plateGradientDef(gid, accent, color));
+        svg = assetRec.svg
+          .replace(INK_RE, `url(#${gid})`)
+          .replace(ACCENT_RE, accent);
+      } else if (item.wash) {
+        // #1549 (Materials M3): a wash item's ink paint is the
+        // vertical wash gradient — the same retired-def treatment
+        // (washBody.mjs cites the def; accent paint stayed flat).
+        const gid = `wg${matDefs.length}`;
+        matDefs.push(washGradientDef(gid, accent, color));
+        svg = assetRec.svg
+          .replace(INK_RE, `url(#${gid})`)
+          .replace(ACCENT_RE, accent);
+      } else if (item.stipple) {
+        // #1549 (Materials M3): a stipple item's ink paint is the
+        // dot-field pattern — the same retired-def treatment
+        // (stippleBody.mjs cites the def; accent paint stayed flat).
+        // The pattern's user space is the symbol's own 100-unit box,
+        // so the 6-unit cell tiles the glyph exactly as the def's
+        // userSpaceOnUse semantics read in the glyph's space.
+        const gid = `sg${matDefs.length}`;
+        matDefs.push(stipplePatternDef(gid, accent, color));
         svg = assetRec.svg
           .replace(INK_RE, `url(#${gid})`)
           .replace(ACCENT_RE, accent);
@@ -393,7 +417,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
       + `scale(${num(sx)},${num(sy)}) translate(-50,-50)`;
     body.push(`<g transform="${t}" opacity="${num((item.alpha ?? 100) / 100)}"><use href="#s${[...symbols.keys()].indexOf(key)}" width="100" height="100"/></g>`);
   }
-  parts.push(`<defs>${[...symbols.values()].join('')}${plateDefs.join('')}</defs>`, ...body, '</svg>');
+  parts.push(`<defs>${[...symbols.values()].join('')}${matDefs.join('')}</defs>`, ...body, '</svg>');
   return parts.join('\n');
 }
 
