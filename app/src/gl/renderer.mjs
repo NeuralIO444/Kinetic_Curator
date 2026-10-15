@@ -300,7 +300,7 @@ registerCostTier('gl/cell-kineme', {
 // original quad (the pre-R2 code path, exact).
 registerCostTier('gl/region-instances', {
   tier: 0, memoryBytes: 0, timeMs: 0,
-  notes: '#1433 R2: region instances expand in packInstanceData inside the quad pass; zero passes; region cells ride the atlas; governor selection via regionAnim budget; freeze tier-2, collapse deeper; live + GL stills',
+  notes: '#1433 R2: region instances expand in packInstanceData inside the quad pass; zero passes; region cells ride the atlas; governor selection via regionAnim budget; freeze tier-2, collapse deeper; live + GL stills; #1435 R4: a bend region expands into slice instances along its length — same pass, the slices are instances at full price',
 });
 // #594 PR2 bevel: 4 extra atlas taps per LIT fragment (only when the sun is on
 // and bevel > 0), inside the same quad pass. Declared tier 0 like the rest of the
@@ -406,11 +406,53 @@ function expandRegionInstances(instances, cells, regionAnim) {
     // (the shader's own convention), translated to the mark's origin.
     const th = (it.rotation * Math.PI) / 180;
     const co = Math.cos(th), si = Math.sin(th);
+    const bend = regionAnim.bend?.[it.asset];
     for (const r of entry.regions) {
       const geo = r.cell.geo;
+      const slot = assignment[r.id] || 0;
+      // #1435 (R4) — the bend: a selected stroke region (the contract's
+      // bend map carries its slice count) expands into SLICES along its
+      // length instead of one instance. Each slice is an ordinary region
+      // instance — a sub-window of the region's own cell (cellUvWindow's
+      // even split, the C-wire math), its pivot on the slice centre, the
+      // region's kineme slot — with the phase stepped 1/N per slice, so
+      // the kineme's wave travels along the stroke and the stroke
+      // articulates. Only the stroke's own pixels subdivide: the region
+      // cell holds nothing else (R1's partition), and every other region
+      // of the mark takes the single-instance path below, untouched.
+      const slices = slot > 0 && bend && Number.isInteger(bend[r.id]) && bend[r.id] >= 2 ? bend[r.id] : 0;
+      if (slices) {
+        const basePhase = kinemePhase(it.asset, r.id);
+        const alongX = geo.sx >= geo.sy; // the cell rect's long axis
+        for (let j = 0; j < slices; j++) {
+          const fc = (j + 0.5) / slices - 0.5; // slice centre, -0.5..0.5 along the axis
+          const sGeo = alongX
+            ? { px: geo.px + fc * 199.5 * geo.sx, py: geo.py, sx: geo.sx / slices, sy: geo.sy }
+            : { px: geo.px, py: geo.py + fc * 199.5 * geo.sy, sx: geo.sx, sy: geo.sy / slices };
+          const sCell = alongX
+            ? { ...r.cell, ...cellUvWindow(r.cell, j, slices), geo: sGeo }
+            : {
+                ...r.cell, geo: sGeo,
+                v0: r.cell.v0 + ((r.cell.v1 - r.cell.v0) * j) / slices,
+                v1: r.cell.v0 + ((r.cell.v1 - r.cell.v0) * (j + 1)) / slices,
+              };
+          const lx = (sGeo.px - 50) * it.scaleX;
+          const ly = (sGeo.py - 50) * it.scaleY;
+          out.push({
+            ...it,
+            _cell: sCell,
+            x: it.x + lx * co - ly * si,
+            y: it.y + lx * si + ly * co,
+            scaleX: it.scaleX * sGeo.sx,
+            scaleY: it.scaleY * sGeo.sy,
+            kineme: slot,
+            kinemePhase: (basePhase + j / slices) % 1,
+          });
+        }
+        continue;
+      }
       const lx = (geo.px - 50) * it.scaleX;
       const ly = (geo.py - 50) * it.scaleY;
-      const slot = assignment[r.id] || 0;
       out.push({
         ...it,
         _cell: r.cell,

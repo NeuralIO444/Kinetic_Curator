@@ -15,8 +15,13 @@
  *             hash (#1433), so petals around a centre never share a
  *             phase — the issue's "phase by angle" by construction.
  *   radial    every region pulses (`pulse`) — "radial pulses".
- *   linework  every region bobs (`bob`) — the bob kineme rides the
- *             boil clock like every kineme.
+ *   linework  stroke-shaped regions bend (`bend`, #1435 R4 — the pack
+ *             subdivides them along their length, phase-stepped, so the
+ *             motion travels the stroke); every other region bobs
+ *             (`bob`) — the bob kineme rides the boil clock like every
+ *             kineme. The stroke test is geometry (regionKinemes.js
+ *             isStrokeRegion): a solid bar fills its bbox and keeps the
+ *             bob; a squiggle wanders its box and bends.
  *   (others)  no default: the region is still. Silence is a valid
  *             state, and a family earns a default by being named in
  *             the table, not by analogy.
@@ -32,13 +37,14 @@
 import { stripFramesFor } from './cellKinemes.js';
 import { capRegionsTracked } from '../assets/regionPartition.js';
 import { normalizeRegions } from '../assets/regionSlots.js';
-import { REGION_TAG_CAP } from './regionKinemes.js';
+import { REGION_TAG_CAP, isStrokeRegion } from './regionKinemes.js';
 
 /** The kineme each family role defaults to (ids from data/kinemes.js). */
 export const FAMILY_DEFAULT_KINEMES = Object.freeze({
   sway: 'rock', // osc kind — flora outer regions
   pulse: 'pulse', // the centre, and radial everywhere
   bob: 'bob', // linework under boil
+  bend: 'bend', // #1435 R4 — linework strokes: the travelling bend
 });
 
 /**
@@ -84,7 +90,9 @@ export function familyDefaultRegionKinemes(asset, regions) {
       for (const r of regions) out[r.id] = FAMILY_DEFAULT_KINEMES.pulse;
       break;
     case 'linework':
-      for (const r of regions) out[r.id] = FAMILY_DEFAULT_KINEMES.bob;
+      for (const r of regions) {
+        out[r.id] = isStrokeRegion(r) ? FAMILY_DEFAULT_KINEMES.bend : FAMILY_DEFAULT_KINEMES.bob;
+      }
       break;
     default:
       return null; // no default in the table: still
