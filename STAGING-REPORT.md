@@ -1,116 +1,167 @@
-# STAGING REPORT — XGBoost taste head, Phase T1 (2026-10-14)
+# XGBoost taste head — Phase T2 staging report (dice ordering + census readout)
 
-Branch `ember/xgb-t1-taste-trees` on origin/main 29c0555c. LOCAL ONLY — no push, no PR.
-Spec: `~/workspace/your_files/kc1-xgboost-taste-spec-2026-10-14.md` §§2–5, §7, §8-T1.
-Scope kept: trainer + file format + evaluator. No dice/curate behaviour change, no UI,
-no governor contact, no new features (recipeFeatures FEATURES_VERSION 4 only).
+Branch `ember/xgb-t2-dice-census`, stacked on T1 (`ember/xgb-t1-taste-trees`,
+tip `be05d9f0`). Built to spec `kc1-xgboost-taste-spec-2026-10-14.md` §5/§6/§8-T2.
+Local commits only — no push, no PR. Coordinator: this file is the staging
+record; extract it before publishing, as with T1. (It replaces T1's report at
+this path; T1's remains in history at `be05d9f0`.)
+
+## ⚠️ Kill-criterion flag for the coordinator (read first)
+
+The §8-T2 kill criterion was re-measured exactly as the brief demanded, and
+the result needs a human call — stated plainly, nothing tuned:
+
+- With a plausible opinionated fixture head ordering the tray, **never-tray
+  lands at 16–24 across the 8 seeds — BELOW the #1546 band (28–37)** — and
+  trio overlap lands at **0.9–1.2%** (headline was 1.7%). Both measures move
+  in the *improving* direction on every seed: more of the library reaches
+  the tray, and finalist trios are more distinct.
+- The spec's own kill text (§8-T2) targets diversity that "**degrades** past
+  its 8-seed band". Nothing degrades here. But the brief's letter says
+  "out of that band", and never-tray is out of it on the low side — so this
+  is flagged, not silently re-baselined. The suite pins the *direction*
+  (ordering must never exceed the unordered run's never-tray or overlap on
+  the same stream); the absolute band call is yours.
+- Why it moves: the finalist cut is stratified (below), so the anchored
+  stratum holds a guaranteed finalist voice per roll. Decomposition,
+  measured: a FLAT scorer (ordering machinery, no opinions) already lowers
+  never-tray to 25–32; the head's layout opinions do the rest when they
+  favor varied modes (an inverted-opinion head lands at 25–31). On the
+  headline stream the four #1546 families reach their FULL library in-tray
+  (biosynthetic 12/12, crystalline 12/12, floral 15/15, radial 26/26).
 
 ## What was built
 
-**App — `app/src/curator/tasteHead.js`**
-- `validateTaste` dispatches on `head.kind`: `'xgboost-trees'` → new `validateTreeHead`;
-  absent/`'linear'` → the existing linear path, byte-identical behaviour (the validated
-  linear head still carries NO `kind` field — its historical shape); anything else is
-  rejected (`unknown taste head kind`). The featuresVersion gate and its "retrain on a
-  fresh pool" error guard tree files unchanged. Lois/Queen sections untouched.
-- Tree validation teeth (spec §3): objective must be `binary:logistic`; baseScore/fidelity
-  finite (fidelity in [−1, 1]); declared features must bind to the app's own universe
-  (`treeFeatureNames()`: scalar recipe keys minus the term-rule skips and array-valued
-  `castCategories`, plus `num.<key>`), no duplicates; ≤512 trees, depth ≤6 split levels,
-  ≤20,000 total nodes; split nodes are `{f, op, v, y, n, gain}` with `f` an in-range
-  integer, numeric features splitting only with `<` on a finite number, categoricals only
-  with `=` on a string/boolean, every gain finite, every leaf finite. Validation rebuilds
-  clean node copies — the app never keeps the file's objects (selfcheck corrupts the raw
-  file post-validate and proves scores don't move).
-- `scoreLayout` branches on the kind: tree heads return
-  `sigmoid(baseScore + Σ leaf margins)` via a pure walk (`scoreTreeHead` exported);
-  `headUsable` needed no change — it reads fidelity only, so HEAD_MIN_FIDELITY and the
-  experimental switch gate trees identically (selfcheck proves both).
-- `makeXgbScorer(taste, {experimental})` — the diceScorer-shaped factory
-  `{ id: 'xgb-head-v1', score(candidate) }`, null when no usable tree head (the
-  makeMlxCurator convention, so persona fallback is intact). Deliberately NOT wired
-  into dice.js/curate.js — T1 ends at the factory. Importing a tree taste.json through
-  tasteStore drives the existing mlx curator correctly (probability argmax; sigmoid is
-  monotonic) — proven end-to-end in the selfcheck via importTaste/getActiveCurator/
-  pickCurated, then cleared back to the previous fallback.
+### 1. Dice ordering (`app/src/curator/dice.js`, `useDiceRoll.js`)
+- `rollDice` gains optional `orderScorer` + `orderMeta`. The deal itself —
+  stream, casts, stratification (#1546), persona scores — is byte-for-byte
+  the same code path; the suite proves an ordered and an unordered roll on
+  the same seed deal the identical multiset of casts.
+- With a scorer: each candidate is stamped `xgbScore`, `stratum`
+  ('open' | 'anchored'), `anchorFamily` (null for open). "Anchored" means
+  the deal actually used a family pool for that slot (a family whose pool
+  is empty anchors nothing — exactly the pre-T2 semantics).
+- Finalist slots follow the deal's own proportions:
+  `anchoredSlots = min(|anchored|, max(1, round(3 · |anchored| / n)))` —
+  1 anchored + 2 open in every live configuration (n = 10/12/16). Within a
+  stratum, ranking is model score → persona score → deal order (stable
+  sort, no new stream draws). Slot overflow fills from the other stratum's
+  next-best; a slot is never left empty while candidates remain. Finalists
+  are presented in model order. **Scores never gate**: no threshold exists
+  anywhere; a candidate reaches the tray by winning its stratum.
+- No scorer → the return is the pre-T2 object exactly (no new keys), and
+  the whole pre-T2 suite surface passes unchanged — including the miner's
+  pinned takeHashes (miner suite green; the miner deliberately keeps its
+  persona-only real tray and never passes an order scorer).
+- Wiring: `useDiceRoll.roll()` builds the scorer per roll with the
+  curate.js idiom — `makeXgbScorer(getTaste(), { experimental:
+  experimentalOn() })` — so an absent/linear/below-bar/experimental-off
+  head yields null and the roll is bit-identical to today.
 
-**Trainer — `studio/curator.py`** (`train --xgb`; default off, linear path untouched)
-- `distil_head` challenges `fit_head` under the ship rule. `fit_xgb_head` fits XGBoost
-  (`binary:logistic`, depth 4, ≤300 rounds, early stopping) on the SAME design the
-  linear head fits (one-hot `feature_terms` + the num block), targets = probe scores as
-  probabilities. `import xgboost` is guarded (absent → a clear note naming the package,
-  linear ships); the whole fit is additionally wrapped so any xgboost failure degrades
-  to linear with the reason printed — a broken student never breaks the train.
-- Ship rule in code (`choose_head`): a deterministic 80/20 split (seed 0); both students
-  fit the train slice only; fidelity = the file's `spearman` vs the probe on held-out
-  rows (linear judged via a pure mirror, `linear_head_scores`). Trees ship ONLY on a
-  held-out win; the shipped ensemble is refit on the full pool at the winning round
-  count (the linear head's full-pool convention) and reports the held-out fidelity.
-- Export (`convert_xgb_dump`, stdlib-only): XGBoost JSON dump → spec trees. Numeric
-  columns map to `<` splits directly; one-hot term columns map to `=` splits on the
-  parent feature with children SWAPPED (the booster's yes child on a 0/1 column is
-  "term absent"); boolean terms export as real JSON booleans; gains come from
-  `trees_to_dataframe` when available (0.0 fallback; the walk never reads them); the
-  dump's `missing` child is ignored — the design has no missing values. Shapes the
-  format can't say exactly raise, they never approximate.
-- `baseScore` is calibrated, not trusted: median (booster margin − Σ exported leaves)
-  over the pool (`calibrate_base_score`), so the app reproduces booster probabilities
-  across xgboost versions. Exported heads are bounds-checked against the app's caps.
-- `describe_trees` (describe_head's analog) prints tree count/depth/nodes, strongest
-  features by total gain, and the top-3 trees as readable text; `cmd_train` and
-  `cmd_inspect` both use it for tree heads. The Lois head stays linear, untouched.
+### 2. Crown stamps (`app/src/curator/diceCrowns.js`)
+- `sanitize` gains the flat trio in the file's own idiom (always-present
+  keys, null defaults, like `davisCode`): `xgbScore`, `tasteVersion`,
+  `headKind`, each validated independently. `crown()` in useDiceRoll
+  passes the finalist's `xgbScore` + the roll's `orderMeta`.
+- Field name is `xgbScore`, not the spec §5 prose's bare `score`: on the
+  tray record `score` already IS the persona's score (both live on the
+  same object), so one name — `xgbScore` — is used in both records.
+  Judgment call, flagged for the coordinator.
 
-**Tests**
-- `app/src/curator/tasteHead.selfcheck.mjs` (already manifest-registered; no manifest
-  or package.json change): a T1 section — one-tree fixture reproduced by hand exactly
-  (sigmoid(1.25) / sigmoid(0.75) / sigmoid(−0.25) from density buckets and
-  num.count = (count−10)/790), boolean splits in both spellings (true / 'true'),
-  19 malformed-file rejections (bounds, depth, node count, index, op/type mismatches,
-  non-finite leaf/gain/baseScore, unknown kind, unknown/duplicate/array features),
-  exactly-at-cap acceptances (512 trees, depth 6, 19,939 nodes), featuresVersion
-  rejection wording, fidelity gate + experimental switch, factory shape and its three
-  candidate shapes, store end-to-end, mutation isolation.
-- `studio/xgb_head_selfcheck.py` (new, stdlib-only, geom_selfcheck pattern): synthetic
-  XGBoost dump conversion incl. the child swap and f-index form, walk parity against a
-  reference booster-semantics walker on one-hot rows, the same sigmoid(1.25) the JS
-  suite pins, calibration recovery, ship-rule win/tie/absent, describe output, and the
-  guarded fit degrading to a named note without xgboost installed.
+### 3. Census agreement readout (`censusReport.mjs`, `censusReadout.mjs`)
+- `tasteAgreement({ keeps, passes }, taste)` (pure): scores each ledger
+  row's `recipe.layoutParams` via `scoreLayout` — the exact live
+  reduction (the palette rides in the row but the head scores
+  layoutParams only; documented in the code). Rows without layoutParams
+  are counted as `unscored`, never silently dropped.
+- Reports mean keep score vs mean pass score (null for an empty side)
+  plus one separation statistic: **AUC by rank-sum (Mann–Whitney,
+  tie-averaged ranks)** — P(a random keep out-scores a random pass),
+  ties half. Deterministic and hand-computable; the census suite
+  reproduces 0.875 by hand on a fixture ledger (with a designed tie).
+- Absent, honestly, when there is no usable tree head: reasons are
+  'no taste loaded' / 'taste has no tree head (linear head)' / 'tree
+  head below the fidelity bar'. Presence requires the default (non-
+  experimental) `headUsable` bar. `formatTasteAgreement` renders both
+  states; `agreementView` in censusReadout.mjs is the section-level view
+  model (reshape only, per that module's law).
+- NOT wired into the snapshot script or any panel: spec §9 Q3 (room vs
+  dev-panel) is unruled, so T2 ships the measurement + view model only.
+  The window is whatever rows the caller passes (the full ledger by
+  default) — §6's "trailing window" becomes a caller choice at wiring
+  time.
 
-## Results (this sandbox)
+### 4. Palette wart — resolved (a) TRIM (`studio/curator.py`)
+- `XGB_LIVE_NULL_FEATURES = frozenset({'palette'})` + pure helper
+  `xgb_design_columns(vocab, nums)`: palette terms are dropped from the
+  tree head's design columns (reason written at the constant: palette is
+  the constant null bucket in every live scoreLayout call, so palette
+  splits spend depth on distinctions that can never fire and credit
+  held-out fidelity to dead signal). The design-matrix fill guards
+  trimmed terms (`if t in col`).
+- The LINEAR head is NOT touched: its palette weights are equally inert
+  live, but that head predates this audit and is not re-baselined here.
+- `studio/xgb_head_selfcheck.py` asserts the trim (palette terms dropped,
+  others kept, exported feature names exclude 'palette'). Passes.
 
-- `node src/curator/tasteHead.selfcheck.mjs` — OK
-- Taste/curator neighbourhood, 22 manifest suites (topbarTaste, tasteLedger,
-  recipeFeatures, tasteHead, queenChannel, queenDeniability, queenLean, curate, taste,
-  loisRank, dice, coverage, census, miner, candidateTray, censusReadout, loisJudge,
-  prospecting, director, directorRank, phase, curatePalette, stress, davisState) — ALL OK
-- `npm run build` — OK; `npm run lint` — 0 errors (5 warnings, pre-existing on main)
-- `python3 studio/xgb_head_selfcheck.py` — OK
-- `python3 studio/curator.py selfcheck` — OK (its taste train/head sub-check skips:
-  no scikit-learn in the sandbox, as on main)
-- `curator.py inspect` on a hand-written tree taste.json — prints the trees readably
+## Diversity measurements (dice suite harness, 600 rolls/seed)
 
-## Judgment calls (where the spec left room)
+Never-tray of 294 (OFF = unordered; the T1-era #1546 8-seed band was 28–37):
 
-- Depth counts split levels from the root (root = 0); the ≤6 cap therefore allows six
-  split levels, and the cap doubles as the recursion bound in the validator.
-- `palette` is a legal tree feature (scalar, in the term universe) even though
-  scoreLayout's press-constant reduction means it is always null at CURATE time —
-  equality against null deterministically takes the n branch. The trainer's pool rows
-  may carry real palettes; those splits simply never fire live. Flagging, not fixing:
-  if that wastes ensemble capacity, T2's trainer can drop palette from the design.
-- The tree head's validated shape keeps `fitOn` (pool size) so tasteSummary and the
-  retrain nudge read tree files with no special-casing.
-- Python fidelity reported for a shipped tree head is the held-out estimate, while the
-  shipped trees are refit on the full pool — stated in the fit docstring and the train
-  output line, so the number is never mistaken for an in-sample one.
+| seed | OFF | flat scorer | opinionated head | OFF jac | ON jac |
+|------|-----|------|------|------|------|
+| 0x1504 | 31 | 27 | 20 | 1.65% | 1.19% |
+| 0x1505 | 38 | 32 | 17 | 1.46% | 1.22% |
+| 0x1506 | 31 | 25 | 22 | 1.56% | 1.15% |
+| 0x1507 | 32 | 28 | 24 | 1.49% | 0.95% |
+| 0x1508 | 35 | 30 | 19 | 1.58% | 1.14% |
+| 0x1509 | 35 | 30 | 16 | 1.44% | 1.12% |
+| 0x150a | 33 | 28 | 24 | 1.65% | 0.89% |
+| 0x150b | 41 | 30 | 21 | 1.37% | 1.01% |
 
-## NOT verified here (no xgboost / scikit-learn in sandbox or CI)
+Note: OFF on seeds 0x1505/0x150b (38, 41) already sits above the T1-era
+band's top on this seed set — the band was measured on a different seed
+set at #1546 publish; the on/off comparisons above are same-stream,
+which is the comparison that isolates the ordering's effect. Tray reach
+(distinct) rises on every seed with ordering (263 → 270–278 range).
+Inverted-opinion head (fibonacci/orbit/grid down, swarm/eden up):
+never-tray 28/30/26/29/31/28/25/30 — never above OFF either.
 
-The live XGBoost fit path itself (DMatrix, get_dump JSON shape, trees_to_dataframe,
-best_iteration) is written against the documented APIs and wrapped to degrade loudly;
-everything around it — format, conversion, walk, calibration, ship rule — is covered
-synthetically on both sides in matching semantics (the equality rule and the walk are
-mirrored line-for-line, JS `treeEq` ↔ Python `_spec_eq`). First real `--xgb` train on
-the Mac Studio is the live-fire test; if a future xgboost rejects feature names
-containing `=` (docs ban only `[`, `]`, `<`), the fit degrades to linear with the
-reason printed rather than crashing the train.
+## Tests
+
+Extended suites only; no new suite, so `app/selfcheck.manifest` is
+unchanged and the package.json selfcheck script is untouched.
+
+- `dice.selfcheck.mjs` §12: fixture-head ordered roll — same casts as
+  unordered (stream untouched), stamps on every candidate, stratum
+  counts = the #1546 share, anchored finalist = stratum's model-best,
+  allocation = deal proportions, tray presented in model order, ties
+  fall to persona (flat scorer), no-head surface has no T2 keys, crown
+  trio round-trips + junk sanitizes to nulls. PASS.
+- `coverage.selfcheck.mjs` §4: the 8-seed guard sweep above (OFF vs
+  flat vs opinionated), non-degradation asserted per seed, headline
+  stream's four families fully tray-reached when ordered. PASS (~10 s).
+- `census.selfcheck.mjs`: tasteAgreement on a fixture ledger + head —
+  means and AUC (0.875) reproduced by hand from scoreLayout, unscored
+  rows counted, three absent states honest, empty-side nulls. PASS.
+- `censusReadout.selfcheck.mjs`: agreementView present/absent/purity
+  (deep-frozen input). PASS.
+- Curator neighbourhood (tasteHead, tasteLedger, recipeFeatures, miner,
+  candidateTray, curate, dice): all PASS.
+- Full manifest sweep (417 suites, run solo): **415 pass, 1 fail,
+  1 skip** — the fail is `src/gl/accum.selfcheck.mjs` (V8 OOM abort) and
+  the skip is `swarmWasm` (cargo absent; the stock `npm run selfcheck`
+  halts there). Both are the known base-identical sandbox limitations,
+  in code this diff does not touch.
+- `npm run build`: PASS.
+- Python: `studio/xgb_head_selfcheck.py` PASS (incl. trim asserts),
+  `geom_selfcheck.py` PASS, `run_manifest_selfcheck.py` 9/9 PASS.
+
+## Not done (deliberately)
+
+- No persona text/citations, no dev-panel tree reader (T3).
+- No snapshot-script/panel wiring for the agreement readout (Q3 unruled).
+- The miner's REAL tray stays persona-only.
+- `castCategories` observation from T1 stands (array terms could reach
+  the xgb vocab from cast-carrying pool rows; the app would reject
+  them) — a Studio-run question, not chased here.
