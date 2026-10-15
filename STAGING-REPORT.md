@@ -180,3 +180,29 @@ rules fallback. Script + output in the evidence folder.
 - Nothing visual changes: features are bookkeeping. Any Look renders
   byte-identically before and after; what changes is that novelty
   distances (miner, explorer) now carry a live scale axis.
+
+## Addendum — post-staging rebase + two pins CI caught (conveyor fix 0f71a3cd)
+
+While the sweeps above were running, the publish conveyor merged E5
+(main a2f7923c), rebased this branch onto it, published the PR, and CI
+caught **two more v3-assuming pins that this staging missed** — fixed
+in commit 0f71a3cd on top of the staged commits:
+
+1. `app/e2e/taste-experimental.spec.js` — a Playwright taste fixture
+   hardcoded `featuresVersion: 3`, re-stamped to 4. My repo sweep
+   grepped `app/src` + `app/scripts` and never covered `app/e2e`;
+   the sandbox cannot run the e2e harness, so only CI could catch it.
+   The report's "nothing else" claim above is scoped accordingly —
+   it was true of the trees searched, and incomplete as a repo claim.
+2. `app/src/curator/variants.selfcheck.mjs` — E5's suite (absent from
+   my 13a7e4ff base; it arrived with the rebase) pinned
+   `FEATURES_VERSION === 3` as its "variants add no version of their
+   own" doctrine. It now asserts the property instead — candidate
+   features carry the current FEATURES_VERSION, whatever it is.
+
+Both fixes follow the patterns this staging used (dynamic read where
+the fixture models "current", explicit re-stamp where it models a
+dated artifact). The sweeps and corpus numbers in this report were
+measured on the pre-rebase staging branch (base 13a7e4ff); the feat
+delta is byte-identical after the rebase, and the published PR's CI
+is the authority for the rebased tree.
