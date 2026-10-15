@@ -28,6 +28,7 @@ const LIVE_GUTTER = 32;
 const ALPHA_CUTOFF = 4;
 
 import { applyGradient } from '../assets/gradient.js';
+import { stripFramesFor } from '../data/cellKinemes.js';
 
 export const comboKey = (asset) => asset;
 
@@ -68,23 +69,32 @@ function rasterizeSvg(svgString, w, h) {
 
 /**
  * Bake one asset as an R/G mask. Ink = red (#ff0000), Accent = green (#00ff00).
- * Returns { data: Uint8Array (premultiplied RGBA), ink: [x0,y0,x1,y1]|null }
+ * A strip asset (#1431 KINEME C) bakes all its frames into one wide raster —
+ * same composition as the offline bake in atlas.mjs: frames contiguous, no
+ * internal gutter, frame 0 on the exact texels the single-cell bake used.
+ * Returns { data: Uint8Array (premultiplied RGBA), ink, widthPx }
  */
 async function bakeCombo(assetId, svgById, gradientById) {
   const src = svgById.get(assetId);
   if (src == null) throw new Error(`[liveAtlas] unknown asset "${assetId}"`);
-  const body = withGradient(src, gradientById && gradientById.get(assetId));
+  const gradient = gradientById && gradientById.get(assetId);
   const { x0, y0, x1, y1 } = LIVE_CELL_UNITS;
+  const frames = stripFramesFor(assetId);
+  const n = frames ? frames.length : 1;
+  const widthPx = LIVE_CELL_PX * n;
+  const body = frames
+    ? frames.map((f, i) => `<g transform="translate(${(x1 - x0) * i} 0)">${subColors(withGradient(f, gradient), '#ff0000', '#00ff00')}</g>`).join('')
+    : subColors(withGradient(src, gradient), '#ff0000', '#00ff00');
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${LIVE_CELL_PX}" height="${LIVE_CELL_PX}" ` +
-    `viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}">` +
-    subColors(body, '#ff0000', '#00ff00') +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${LIVE_CELL_PX}" ` +
+    `viewBox="${x0} ${y0} ${(x1 - x0) * n} ${y1 - y0}">` +
+    body +
     `</svg>`;
-  const img = await rasterizeSvg(svg, LIVE_CELL_PX, LIVE_CELL_PX);
+  const img = await rasterizeSvg(svg, widthPx, LIVE_CELL_PX);
   const d = img.data;
-  const out = new Uint8Array(LIVE_CELL_PX * LIVE_CELL_PX * 4);
+  const out = new Uint8Array(widthPx * LIVE_CELL_PX * 4);
   let bx0 = LIVE_CELL_PX, by0 = LIVE_CELL_PX, bx1 = -1, by1 = -1;
-  for (let i = 0, n = LIVE_CELL_PX * LIVE_CELL_PX; i < n; i++) {
+  for (let i = 0, np = widthPx * LIVE_CELL_PX; i < np; i++) {
     const o = i * 4;
     const a = d[o + 3];
     if (a === 0) continue;
@@ -93,7 +103,9 @@ async function bakeCombo(assetId, svgById, gradientById) {
     out[o + 2] = Math.round((d[o + 2] * a) / 255);
     out[o + 3] = a;
     if (a > ALPHA_CUTOFF) {
-      const x = i % LIVE_CELL_PX, y = (i / LIVE_CELL_PX) | 0;
+      // Strip x folds back into the frame-local cell (ink stays in
+      // single-asset units, the union across frames — mirrors atlas.mjs).
+      const x = (i % widthPx) % LIVE_CELL_PX, y = (i / widthPx) | 0;
       if (x < bx0) bx0 = x;
       if (x > bx1) bx1 = x;
       if (y < by0) by0 = y;
@@ -104,7 +116,7 @@ async function bakeCombo(assetId, svgById, gradientById) {
   const inkBox = bx1 >= 0
     ? [x0 + bx0 * unitsPerPx, y0 + by0 * unitsPerPx, x0 + (bx1 + 1) * unitsPerPx, y0 + (by1 + 1) * unitsPerPx]
     : null;
-  return { data: out, ink: inkBox };
+  return { data: out, ink: inkBox, widthPx };
 }
 
 /** CPU box-filter mipmap chain on premultiplied bytes (mirrors atlas.mjs:
@@ -152,28 +164,44 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null) {
     if (!seen.has(k)) { seen.add(k); uniq.push({ ...c, key: k }); }
   }
   const stride = LIVE_CELL_PX + LIVE_GUTTER;
-  const cols = Math.max(1, Math.ceil(Math.sqrt(uniq.length)));
-  const rows = Math.max(1, Math.ceil(uniq.length / cols));
+  // #1431 — slot packing, mirroring atlas.mjs: a strip entry occupies
+  // `slots` consecutive grid slots (frames stay contiguous for
+  // cellUvWindow's even split); a strip that doesn't fit the row's
+  // remainder wraps whole to the next row. Non-strip entries are 1 slot,
+  // so an atlas without strips lays out exactly as before this lane.
+  const slots = uniq.map((c) => {
+    const frames = stripFramesFor(c.asset);
+    return frames ? frames.length : 1;
+  });
+  const totalSlots = slots.reduce((s, k) => s + k, 0);
+  const maxSlots = slots.reduce((m, k) => Math.max(m, k), 1);
+  const cols = Math.max(1, Math.ceil(Math.sqrt(totalSlots)), maxSlots);
+  const place = [];
+  let col = 0, row = 0;
+  for (let i = 0; i < uniq.length; i++) {
+    if (col + slots[i] > cols) { row++; col = 0; }
+    place.push({ cx: col * stride, cy: row * stride });
+    col += slots[i];
+  }
   const width = cols * stride;
-  const height = rows * stride;
+  const height = (row + 1) * stride;
   const pixels = new Uint8Array(width * height * 4); // transparent black gutters
   const cells = new Map();
   // Rasterize sequentially: parallel Image decodes thrash the raster pool
   for (let i = 0; i < uniq.length; i++) {
     const c = uniq[i];
-    const { data, ink } = await bakeCombo(c.asset, svgById, gradientById);
-    const cx = (i % cols) * stride;
-    const cy = Math.floor(i / cols) * stride;
+    const { data, ink, widthPx } = await bakeCombo(c.asset, svgById, gradientById);
+    const { cx, cy } = place[i];
     for (let y = 0; y < LIVE_CELL_PX; y++) {
       pixels.set(
-        data.subarray(y * LIVE_CELL_PX * 4, (y + 1) * LIVE_CELL_PX * 4),
+        data.subarray(y * widthPx * 4, (y + 1) * widthPx * 4),
         ((cy + y) * width + cx) * 4,
       );
     }
     cells.set(c.key, {
       // Half-texel inset: the shader quad spans texel centers.
       u0: (cx + 0.5) / width, v0: (cy + 0.5) / height,
-      u1: (cx + LIVE_CELL_PX - 0.5) / width, v1: (cy + LIVE_CELL_PX - 0.5) / height,
+      u1: (cx + widthPx - 0.5) / width, v1: (cy + LIVE_CELL_PX - 0.5) / height,
       ink,
     });
   }
