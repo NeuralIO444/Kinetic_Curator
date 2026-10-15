@@ -538,19 +538,25 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     // governor's selection resolves HERE, where the budget lives: the
     // regionAnim map names region id -> slot, with slot 0 = assigned but
     // NOT selected (over budget, or the budget tightened to 0) — that
-    // region renders merged, at rest. The data itself (family defaults,
-    // the editor) is R3 (#1434); this consumes doc.regionKinemes over
-    // the record's own field via regionAssignmentFor.
+    // region renders merged, at rest. The data itself is R3 (#1434):
+    // family defaults ride the record's own field, the artist's override
+    // rides doc.regionKinemes, and custom (user:) assets resolve their
+    // records from the doc's customAssets — regionAssignmentFor merges
+    // all three.
     const regionAssets = {};
     {
       const seenAssets = new Set();
       const budget = regionAnimBudget(doc);
+      const overlayById = Array.isArray(doc.customAssets) && doc.customAssets.length
+        ? new Map(doc.customAssets.map((a) => [a && a.id, a]))
+        : null;
       for (const inst of instances) {
         if (seenAssets.has(inst.asset)) continue;
         seenAssets.add(inst.asset);
-        const records = regionsForAsset(inst.asset);
+        const record = overlayById ? overlayById.get(inst.asset) : undefined;
+        const records = regionsForAsset(inst.asset, record);
         if (!records) continue;
-        const assignment = regionAssignmentFor(inst.asset, doc.regionKinemes);
+        const assignment = regionAssignmentFor(inst.asset, doc.regionKinemes, record);
         if (!assignment) continue;
         const animated = selectAnimatedRegions(records, assignment, budget);
         const entry = {};
