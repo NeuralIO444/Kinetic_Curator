@@ -24,7 +24,11 @@ test('#705 six micro-HUD defaults, all real library kinemes', () => {
 });
 
 test('#705 library unchanged by the defaults', () => {
-  assert.deepStrictEqual(KINEMES.map((k) => k.id), ['spin', 'rock', 'pulse', 'blink', 'bob']);
+  // #1435 R4 appended 'bend' (the line bend, osc kind) — the five #705
+  // kinemes keep their ids, order, and slots ahead of it.
+  assert.deepStrictEqual(KINEMES.map((k) => k.id), ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend']);
+  const bend = getKineme('bend');
+  assert.deepStrictEqual({ kind: bend.kind, period: bend.period, amp: bend.amp }, { kind: 'osc', period: 3.6, amp: 6 });
 });
 
 test('#705 phases decorrelate copies of one asset', () => {

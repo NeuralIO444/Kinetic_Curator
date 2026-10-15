@@ -2,8 +2,9 @@
 // assignment — family defaults + artist override + import auto-tagging.
 //
 // Pins: the family table as deterministic functions of geometry +
-// category (flora sway/pulse by centre, radial pulse, linework bob,
-// other families still, strips excluded); the baked library carrying
+// category (flora sway/pulse by centre, radial pulse, linework bend on
+// stroke-shaped regions / bob elsewhere (#1435 R4), other families
+// still, strips excluded); the baked library carrying
 // exactly those defaults; the override precedence (a doc edit wins per
 // region, a tombstone keeps a region still, and a re-bake never brings
 // an edited region back); save/load through the project document with
@@ -20,7 +21,7 @@ import {
   familyDefaultRegionKinemes, centreRegionId, tagImportedRegions, FAMILY_DEFAULT_KINEMES,
 } from './regionDefaults.js';
 import {
-  regionsForAsset, regionAssignmentFor, sanitizeRegionKinemesDoc,
+  regionsForAsset, regionAssignmentFor, sanitizeRegionKinemesDoc, isStrokeRegion,
 } from './regionKinemes.js';
 import { sanitizeOverlay } from '../assets/overlay.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
@@ -55,7 +56,17 @@ const rec = (id, cx, cy, area, color = '000000') => ({
   assert.deepEqual(
     familyDefaultRegionKinemes({ id: 'x', category: 'linework' }, [rec('a', 0.3, 0.5, 10), rec('b', 0.7, 0.5, 10)]),
     { a: 'bob', b: 'bob' },
-    'linework: every region bobs',
+    'linework: compact regions bob (the synthetic records span 20 units — too short to bend)',
+  );
+  // #1435 R4 — the linework split is geometry: a long, thin region (a
+  // stroke: 90x20-unit bbox, ink filling ~0.17 of it) bends; a long
+  // region that FILLS its bbox (a bar, fill ~0.83) keeps the bob.
+  const strokeRec = { id: 's', color: '000000', cx: 0.5, cy: 0.5, x0: 0.05, y0: 0.4, x1: 0.95, y1: 0.6, area: 1200 };
+  const barRec = { id: 't', color: '000000', cx: 0.5, cy: 0.5, x0: 0.05, y0: 0.4, x1: 0.95, y1: 0.6, area: 6000 };
+  assert.deepEqual(
+    familyDefaultRegionKinemes({ id: 'x', category: 'linework' }, [strokeRec, barRec]),
+    { s: 'bend', t: 'bob' },
+    'linework: a stroke-shaped region bends, a filled bar bobs',
   );
   for (const cat of ['organic', 'geometric', 'dots', 'stamps', 'crystalline', 'biosynthetic', 'fragments', 'scanlines']) {
     assert.strictEqual(familyDefaultRegionKinemes({ id: 'x', category: cat }, floraRegions), null, `${cat}: no default in the table — still`);
@@ -91,8 +102,11 @@ console.log('regionAssignment (family table): OK');
       assert.ok(!('regionKinemes' in a), `${a.id}: no defaults, no key`);
     }
   }
-  assert.deepEqual(perFamily, { floral: 15, radial: 26, linework: 33 }, 'the table names three families in this library');
-  assert.strictEqual(assignedRegions, 294, 'every region of a named family is assigned');
+  // #1435 R4: linework drops 33 -> 31 assets / 294 -> 292 regions —
+  // line_squiggle_01/_02 became strip assets (the authored cell track
+  // owns them, so the strip exclusion removes their defaults).
+  assert.deepEqual(perFamily, { floral: 15, radial: 26, linework: 31 }, 'the table names three families in this library');
+  assert.strictEqual(assignedRegions, 292, 'every region of a named family is assigned');
   console.log(`regionAssignment (bake): OK — ${assignedAssets} assets, ${assignedRegions} regions assigned`);
 
   const flora = ASSETS.find((a) => a.id === 'flora_flower_01');
@@ -202,8 +216,16 @@ console.log('regionAssignment (store): OK');
   const many = Array.from({ length: 15 }, (_, i) => rec(`rm-000000-${i % 5}-${Math.floor(i / 5)}`, 0.1 + (i % 5) * 0.2, 0.1 + Math.floor(i / 5) * 0.3, 100 - i));
   const tagged = tagImportedRegions({ id: 'user:lines', category: 'linework' }, many);
   assert.strictEqual(tagged.regions.length, 12, 'an import is capped at the tag cap, like the bake');
-  assert.strictEqual(Object.keys(tagged.regionKinemes).length, 12, 'every kept region of a linework import bobs');
-  assert.ok(Object.values(tagged.regionKinemes).every((k) => k === 'bob'));
+  assert.strictEqual(Object.keys(tagged.regionKinemes).length, 12, 'every kept region of a linework import is assigned');
+  // #1435 R4: the cap merge unions some of these records into long,
+  // sparse shapes (40x50, 40x20) — stroke-shaped by the geometry rule,
+  // so they bend; the ten unmerged 20x20 records bob. Measured: 10 bob
+  // + 2 bend, each value the rule's answer for its own record.
+  for (const r of tagged.regions) {
+    assert.strictEqual(tagged.regionKinemes[r.id], isStrokeRegion(r) ? 'bend' : 'bob', `${r.id}: the import default follows the geometry`);
+  }
+  assert.strictEqual(Object.values(tagged.regionKinemes).filter((k) => k === 'bend').length, 2, 'the two cap-merged strokes bend');
+  assert.strictEqual(Object.values(tagged.regionKinemes).filter((k) => k === 'bob').length, 10, 'the rest bob');
   assert.deepEqual(
     Object.keys(tagged.regionKinemes).sort(), tagged.regions.map((r) => r.id).sort(),
     'assignments name exactly the kept regions',

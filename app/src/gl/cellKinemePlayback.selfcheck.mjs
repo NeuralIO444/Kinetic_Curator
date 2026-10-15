@@ -18,6 +18,7 @@ import {
   CELL_KINEMES, ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor,
 } from '../data/cellKinemes.js';
 import { MICRO_HUD_STRIPS } from '../data/assets/assets-micro-hud-strips.js';
+import { LINE_STRIPS } from '../data/assets/assets-line-strips.js';
 import { ASSETS } from '../data/assets/index.js';
 import { applyGradient } from '../assets/gradient.js';
 import { bakeAtlas, CELL_PX, CELL_UNITS, comboKey } from './atlas.mjs';
@@ -33,7 +34,11 @@ for (const k of CELL_KINEMES) {
   assert.strictEqual(cellIndexAt(0, k), 0, `${k.id} starts on cell 0`);
   assert.strictEqual(cellIndexAt(k.period, k), 0, `${k.id} wraps at the period`);
   assert.strictEqual(cellIndexAt(k.period * 3 + 0.001, k), 0, `${k.id} is back on cell 0 just past 3 periods`);
-  assert.strictEqual(cellIndexAt(((k.cells / 2) + 0.5) / k.cells * k.period, k), k.cells / 2, `${k.id} mid-strip cell`);
+  // #1435 R4: line-boil has an odd cell count (7), where the old probe
+  // time landed exactly on a cell boundary; probe the middle cell's
+  // centre instead (== the old probe for the even-count kinemes).
+  const midCell = Math.floor(k.cells / 2);
+  assert.strictEqual(cellIndexAt(((midCell + 0.5) / k.cells) * k.period, k), midCell, `${k.id} mid-strip cell`);
   assert.strictEqual(cellIndexAt(1.5 / k.cells * k.period, k), 1, `${k.id} reaches cell 1`);
   const seen = new Set();
   for (let s = 0; s < 400; s++) seen.add(cellIndexAt((s / 400) * k.period, k));
@@ -63,7 +68,9 @@ for (const k of CELL_KINEMES) {
 for (const a of STRIP_ASSETS) {
   const frames = stripFramesFor(a);
   assert.ok(Array.isArray(frames), `${a} has a playable strip`);
-  assert.strictEqual(frames, MICRO_HUD_STRIPS[a], `${a} frames are the baked strip data`);
+  // #1435 R4: the strip tables are two files (micro-HUD + lines) behind
+  // the one stripFramesFor lookup.
+  assert.strictEqual(frames, MICRO_HUD_STRIPS[a] || LINE_STRIPS[a], `${a} frames are the baked strip data`);
   assert.strictEqual(frames.length, getCellKineme(ASSET_CELL_KINEME[a]).cells, `${a} frame count matches its kineme`);
 }
 assert.strictEqual(stripFramesFor('geo_tri_01'), null, 'non-strip asset has no strip');
