@@ -1,6 +1,7 @@
 import { ingestSvg, duplicateAsset, isHostile, overlayId, errorHint } from './ingest.js';
 import { sanitizeGradient } from './gradient.js';
 import { normalizeRegions, normalizeRegionSlots, REGION_SLOTS } from './regionSlots.js';
+import { sanitizeRegionKinemes } from '../data/regionKinemes.js';
 
 export const OVERLAY_CAP = 32;
 
@@ -34,6 +35,11 @@ export function sanitizeOverlay(list) {
     // from one that never had them.
     const regions = normalizeRegions(raw.regions);
     const regionSlots = normalizeRegionSlots(raw.regionSlots);
+    // #1434: per-region kineme assignments (the family defaults an import
+    // was auto-tagged with) — re-validated against the record's own
+    // regions with the resolver's sanitizer, never passed through raw.
+    // Written only when set, like the mattes above.
+    const regionKinemes = sanitizeRegionKinemes(raw.regionKinemes, regions);
     out.push({
       id,
       category: raw.category || 'fragments',
@@ -45,6 +51,7 @@ export function sanitizeOverlay(list) {
       ...(gradient ? { gradient } : {}),
       ...(regions.length ? { regions } : {}),
       ...(REGION_SLOTS.some((s) => regionSlots[s]) ? { regionSlots } : {}),
+      ...(regionKinemes ? { regionKinemes } : {}),
     });
   }
   return out;
