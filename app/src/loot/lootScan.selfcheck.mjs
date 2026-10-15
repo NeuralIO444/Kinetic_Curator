@@ -99,6 +99,14 @@ ok('a changed file keeps its item; a rename keeps its id and updates the path; a
   assert.equal(copy.add.length, 0);
 });
 
+ok('a changed file and a new copy of its new content, in one scan, are one item and a duplicate, whatever the names sort like', () => {
+  const prev = idx({ 'user:loot_b_bbbbbb': { rel: 'images/b.svg', size: 100, mtimeMs: OLD, hash: 'bbbbbb11', state: 'ok' } });
+  const p = planScan({ entries: [f('images/b copy.svg', 'dddd0000'), f('images/b.svg', 'dddd0000', { mtimeMs: OLD + 7 })], prev, nowMs: NOW });
+  assert.deepEqual(p.changed.map((c) => c.rel), ['images/b.svg']);
+  assert.deepEqual(p.dup.map((d) => [d.rel, d.of]), [['images/b copy.svg', 'images/b.svg']]);
+  assert.equal(p.add.length, 0, 'no second item with the same bytes');
+});
+
 ok('identical new files in one scan: one is added, deterministically, the rest are duplicates', () => {
   const entries = ['images/z.svg', 'images/a.svg', 'images/m.svg'].map((r) => f(r, 'same0000'));
   const p = planScan({ entries, prev: null, nowMs: NOW });
