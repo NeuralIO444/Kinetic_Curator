@@ -13,7 +13,10 @@
  * Sources, in winning order: a project document's `regionKinemes`
  * ({ [assetId]: { [regionId]: kinemeId } } — the artist's override, the
  * same doc-level pattern as `assetKineme`) over the asset record's own
- * `regionKinemes` field (where R3's family defaults will live).
+ * `regionKinemes` field (R3's family defaults, #1434 — baked for the
+ * library, auto-tagged onto imports on arrival). A doc entry of `null`
+ * is the artist's tombstone: that region is deliberately still, and the
+ * default does not come back until the override is cleared.
  *
  * Browser-safe, pure. No Math.random, no Date.now: phases are the house
  * seed hash over (asset id, region id), so copies and regions never
@@ -28,8 +31,15 @@ export const REGION_TAG_CAP = 12;
 
 const BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 
-/** The region records an asset carries (R1's bake / overlay imports), or null. */
-export function regionsForAsset(assetId) {
+/**
+ * The region records an asset carries (R1's bake / overlay imports), or null.
+ * An explicit `record` (an overlay asset from a document's customAssets)
+ * wins over the built-in catalogue — that is how custom `user:` assets
+ * resolve: the contract learns their regions from the document, not the
+ * catalogue (#1434 closes the gap R2 flagged).
+ */
+export function regionsForAsset(assetId, record) {
+  if (record && Array.isArray(record.regions) && record.regions.length) return record.regions;
   const r = BY_ID.get(assetId)?.regions;
   return Array.isArray(r) && r.length ? r : null;
 }
@@ -56,22 +66,61 @@ export function sanitizeRegionKinemes(raw, records) {
 
 /**
  * The effective assignment for one asset: the record's own defaults
- * (R3's field, absent until #1434) under the doc's per-region
- * overrides. Null when the asset has no regions or nothing is assigned.
+ * (R3's field — baked family defaults for the library, auto-tagged
+ * defaults for imports) under the doc's per-region overrides. A doc
+ * entry of `null` is a tombstone: the artist set that region still on
+ * purpose, so the key is REMOVED from the merged map (the default does
+ * not leak back). Null when the asset has no regions or nothing is
+ * assigned — including the all-tombstoned case, which is exactly the
+ * pre-R3 still state.
  *
  * @param {string} assetId
  * @param {object} [docRegionKinemes] — the doc's whole { assetId: {...} } map
+ * @param {object} [record] — an overlay asset record (regions + defaults)
  */
-export function regionAssignmentFor(assetId, docRegionKinemes) {
-  const records = regionsForAsset(assetId);
+export function regionAssignmentFor(assetId, docRegionKinemes, record) {
+  const records = regionsForAsset(assetId, record);
   if (!records) return null;
-  const base = sanitizeRegionKinemes(BY_ID.get(assetId)?.regionKinemes, records);
-  const over = sanitizeRegionKinemes(
-    docRegionKinemes && typeof docRegionKinemes === 'object' ? docRegionKinemes[assetId] : null,
-    records,
-  );
-  if (!base && !over) return null;
-  return { ...(base || {}), ...(over || {}) };
+  const rec = record && Array.isArray(record.regions) && record.regions.length ? record : BY_ID.get(assetId);
+  const base = sanitizeRegionKinemes(rec?.regionKinemes, records);
+  const rawOver = docRegionKinemes && typeof docRegionKinemes === 'object' ? docRegionKinemes[assetId] : null;
+  const over = sanitizeRegionKinemes(rawOver, records);
+  if (!base && !over && !rawOver) return null;
+  const merged = { ...(base || {}), ...(over || {}) };
+  if (rawOver && typeof rawOver === 'object' && !Array.isArray(rawOver)) {
+    const valid = new Set(records.map((r) => r.id));
+    for (const [regionId, v] of Object.entries(rawOver)) {
+      if (v === null && valid.has(regionId)) delete merged[regionId];
+    }
+  }
+  return Object.keys(merged).length ? merged : null;
+}
+
+/**
+ * Sanitize a project document's whole `regionKinemes` map (the trust
+ * boundary in projectDocument.js). Unlike the record-level sanitizer,
+ * `null` values SURVIVE: they are the artist's tombstones (region set
+ * deliberately still), and dropping them on load would resurrect the
+ * family default the artist killed. Unknown kineme ids, non-string
+ * keys, and anything past the per-asset tag cap are dropped. Returns
+ * null when nothing valid remains, so callers can omit the field.
+ */
+export function sanitizeRegionKinemesDoc(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out = {};
+  for (const [assetId, per] of Object.entries(raw)) {
+    if (typeof assetId !== 'string' || !assetId) continue;
+    if (!per || typeof per !== 'object' || Array.isArray(per)) continue;
+    const clean = {};
+    for (const [regionId, v] of Object.entries(per)) {
+      if (typeof regionId !== 'string' || !regionId) continue;
+      if (v === null) clean[regionId] = null;
+      else if (typeof v === 'string' && getKineme(v)) clean[regionId] = v;
+      if (Object.keys(clean).length >= REGION_TAG_CAP) break;
+    }
+    if (Object.keys(clean).length) out[assetId] = clean;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /**
