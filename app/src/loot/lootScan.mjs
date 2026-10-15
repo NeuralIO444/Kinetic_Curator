@@ -55,6 +55,10 @@ export function planScan({ entries = [], prev = null, nowMs = 0, rootReachable =
 
   // phase 2: classify the hashed files. Deterministic: sorted by rel, the first of identical bytes is the one that adds.
   const claimed = new Map(); // hash -> rel that took it this scan
+  // paths the index already knows settle first (unchanged, changed), so a brand-new copy of a file's NEW content is a
+  // duplicate of it, whatever the two names sort like
+  const knownFirst = (x) => (prevByRel.has(x.e.rel) ? 0 : 1);
+  candidates.sort((a, b) => knownFirst(a) - knownFirst(b) || byRel(a.e, b.e));
   for (const { e, c } of candidates) {
     const known = prevByRel.get(e.rel);
     if (known && known.hash === e.hash) { out.unchanged.push({ rel: e.rel, id: known.id }); claimed.set(e.hash, e.rel); continue; }
