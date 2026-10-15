@@ -26,8 +26,8 @@ import { sanitizeMathEffects, MATH_OP_KINDS, mathTrackWetCeiling } from '../fx/m
 import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
-import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, spinKineme, spinVariant } from '../data/kinemes.js';
-import { regionsForAsset, regionAssignmentFor, selectAnimatedRegions, REGION_TAG_CAP } from '../data/regionKinemes.js';
+import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, spinKineme, spinVariant, BEND_KINEME_ID } from '../data/kinemes.js';
+import { regionsForAsset, regionAssignmentFor, selectAnimatedRegions, isStrokeRegion, bendSlicesFor, REGION_TAG_CAP } from '../data/regionKinemes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { darkestSwatch } from './contactShadow.mjs'; // #1183 contact shadow colour
 import { COALESCE_MAX_FIELDS } from '../engine/dishCoalesce.mjs'; // #1411 coalescence field cap
@@ -544,6 +544,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     // records from the doc's customAssets — regionAssignmentFor merges
     // all three.
     const regionAssets = {};
+    const bendAssets = {};
     {
       const seenAssets = new Set();
       const budget = regionAnimBudget(doc);
@@ -559,6 +560,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         const assignment = regionAssignmentFor(inst.asset, doc.regionKinemes, record);
         if (!assignment) continue;
         const animated = selectAnimatedRegions(records, assignment, budget);
+        const recordById = new Map(records.map((r) => [r.id, r]));
         const entry = {};
         for (const [regionId, kid] of Object.entries(assignment)) {
           if (!animated.has(regionId)) { entry[regionId] = 0; continue; }
@@ -570,6 +572,16 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
             table.push({ kind: KINEME_KINDS[k.kind], period: k.period, amp: k.amp });
           }
           entry[regionId] = slot.get(k.id);
+          // #1435 (R4) — a SELECTED region riding the bend kineme whose
+          // geometry is a stroke subdivides at pack time: the contract
+          // carries the slice count (a pure function of the record), the
+          // pack cuts the region's cell into that many slices and steps
+          // the phase along the length. Unselected regions (slot 0) and
+          // non-stroke regions never appear here — they render merged or
+          // whole, exactly as R2/R3 left them.
+          if (kid === BEND_KINEME_ID && isStrokeRegion(recordById.get(regionId))) {
+            (bendAssets[inst.asset] ||= {})[regionId] = bendSlicesFor(recordById.get(regionId));
+          }
         }
         if (Object.keys(entry).length) regionAssets[inst.asset] = entry;
       }
@@ -580,6 +592,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
             budget: regionAnimBudget(doc),
             ...(regionCollapseShed(doc) ? { shed: true } : {}),
             assets: regionAssets,
+            ...(Object.keys(bendAssets).length ? { bend: bendAssets } : {}),
           },
         }
       : {};
@@ -771,6 +784,20 @@ export function assertSceneContract(scene) {
       for (const [regionId, s] of Object.entries(entry)) {
         if (!Number.isInteger(s) || s < 0 || s > (scene.kinemes?.length || 0)) {
           fail(`regionAnim slot for ${assetId}/${regionId} out of range`);
+        }
+      }
+    }
+    if (ra.bend !== undefined) { // #1435 R4: per-region bend slice counts
+      if (!ra.bend || typeof ra.bend !== 'object' || Array.isArray(ra.bend)) fail('regionAnim.bend must be an object');
+      for (const [assetId, entry] of Object.entries(ra.bend)) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail(`regionAnim.bend.${assetId} must be an object`);
+        for (const [regionId, n] of Object.entries(entry)) {
+          if (!Number.isInteger(n) || n < 3 || n > 8) {
+            fail(`regionAnim bend slices for ${assetId}/${regionId} out of range`);
+          }
+          if (!(regionId in (ra.assets[assetId] || {}))) {
+            fail(`regionAnim bend for ${assetId}/${regionId} names no regionAnim region`);
+          }
         }
       }
     }

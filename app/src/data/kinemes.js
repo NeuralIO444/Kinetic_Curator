@@ -25,7 +25,19 @@ export const KINEMES = Object.freeze([
   { id: 'pulse', kind: 'pulse', period: 1.6, amp: 0.12 },
   { id: 'blink', kind: 'blink', period: 1.0, amp: 0.5 },
   { id: 'bob', kind: 'bob', period: 3.0, amp: 6 },
+  // #1435 R4 — the line bend: an osc with a small amp, but the id itself is
+  // the signal. On a stroke-shaped REGION (data/regionKinemes.js
+  // isStrokeRegion) the pack subdivides the region into slices along its
+  // length and steps this kineme's phase slice to slice, so the stroke
+  // articulates and the wave travels along it — stroke-aware by
+  // construction (only the stroke's own region instances subdivide; the
+  // quad-wide shader warp stays parked). Anywhere else — a compact region,
+  // a whole mark — it is simply the gentle osc it declares.
+  { id: 'bend', kind: 'osc', period: 3.6, amp: 6 },
 ].map(Object.freeze));
+
+/** #1435 R4 — the kineme id whose region playback subdivides stroke regions. */
+export const BEND_KINEME_ID = 'bend';
 
 /**
  * #1127 — ROTATE spin gives every mark its OWN speed and direction, so a field of marks does not turn as one wheel.
