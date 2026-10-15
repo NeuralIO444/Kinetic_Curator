@@ -274,6 +274,10 @@ export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, 
   const anchored = [];
   candidates.forEach((c, i) => {
     c.xgbScore = orderScorer.score(c);
+    // T3: Davis's citable reason rides beside the score when the scorer
+    // can explain itself (the tree head can; a plain { id, score } scorer
+    // stamps null — the tray just stays silent, as before).
+    c.xgbReason = typeof orderScorer.explain === 'function' ? orderScorer.explain(c) : null;
     c.stratum = anchorOf[i] ? 'anchored' : 'open';
     c.anchorFamily = anchorOf[i];
     (anchorOf[i] ? anchored : open).push(c);

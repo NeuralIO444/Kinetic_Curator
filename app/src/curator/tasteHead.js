@@ -252,17 +252,26 @@ const treeEq = (a, b) =>
   (typeof a === 'boolean' && String(a) === b) ||
   (typeof b === 'boolean' && String(b) === a);
 
-/** Walk one tree to its leaf margin. Pure, deterministic, no state. */
-function walkTree(node, features, names) {
+/** Walk one tree to its leaf margin, recording the path taken. Pure,
+ * deterministic, no state. The path is the citation material (T3): every
+ * split the walk actually turned on, with the direction it took. */
+function walkTreePath(node, features, names) {
+  const path = [];
   let cur = node;
   while (!('leaf' in cur)) {
     const val = treeFeatureValue(features, names[cur.f]);
     const go = cur.op === '<'
       ? typeof val === 'number' && Number.isFinite(val) && val < cur.v
       : treeEq(val, cur.v);
+    path.push({ node: cur, went: go ? 'y' : 'n', value: val });
     cur = go ? cur.y : cur.n;
   }
-  return cur.leaf;
+  return { leaf: cur.leaf, path };
+}
+
+/** Walk one tree to its leaf margin. Pure, deterministic, no state. */
+function walkTree(node, features, names) {
+  return walkTreePath(node, features, names).leaf;
 }
 
 /** Tree-head score: sigmoid(baseScore + Σ leaf margins) — a keep-probability. */
@@ -273,30 +282,145 @@ export function scoreTreeHead(head, layoutParams) {
   return sigmoid(margin);
 }
 
+// ─── XGBoost T3 — Davis's citable reasons (spec §6/§7.5) ───────────────────
+//
+// The score is a number; the citation is the model's own words for it: the
+// splits the candidate's walks actually turned on, strongest first, stated
+// as facts OF THE LOOK (never of the person — §7.1). The wording mirrors
+// studio/curator.py's describe_term vocabulary (_WORDS / _BOOL_WORDS) so
+// the app and the Studio describe the same split the same way; numeric
+// splits cite the candidate's side of the split's own line.
+
+const FEATURE_WORDS = {
+  bodies: '{v} crowds', density: '{v} density', scale: '{v} marks', system: '{v} layouts',
+  symmetry: '{v} symmetry', behave: '{v} motion', blend: '{v} blend',
+  palette: 'the {v} palette', paletteShift: '{v} colour shift',
+};
+const BOOL_WORDS = {
+  accum: ['trails on', 'trails off'], mirror: ['mirrored', 'unmirrored'],
+  bleed: ['bleed on', 'bleed off'], overlap: ['overlap', 'no overlap'],
+};
+/** Numeric feature → the noun its citation names (mirrors curator.py _NUM_WORDS' keys). */
+const NUM_NOUNS = {
+  count: 'marks', particleCount: 'particles', scaleMid: 'scale', rotateSpread: 'rotation',
+  alphaMid: 'opacity', density: 'density', jitter: 'jitter', zTiers: 'depth tiers',
+  noiseFreq: 'noise', noiseSpeed: 'noise speed', displacement: 'displacement',
+  swarmCohesion: 'swarm cohesion', gravityWells: 'gravity', damping: 'damping',
+  wind: 'wind', flap: 'flap', breath: 'breath', lifeDrift: 'drift',
+};
+
+/** A categorical/boolean feature fact in the trainer's own words:
+ * describeFeatureValue('density', 'high') → 'high density';
+ * describeFeatureValue('accum', true) → 'trails on'. */
+export function describeFeatureValue(name, value) {
+  if (typeof value === 'boolean') {
+    const words = BOOL_WORDS[name];
+    if (words) return value ? words[0] : words[1];
+    return `${name} ${value ? 'on' : 'off'}`;
+  }
+  const tpl = FEATURE_WORDS[name];
+  if (tpl) return tpl.replace('{v}', String(value));
+  return `${name} ${String(value)}`;
+}
+
+/** Python's %g, close enough for a citation: 0.5 → '0.5', 2 → '2'. */
+const fmtG = (x) => String(Number(x.toPrecision(6)));
+
+/** One split the candidate turned on, stated as a fact of the Look. For a
+ * categorical split the fact is the candidate's OWN value (it went down the
+ * no-branch because it is something else, and that something is the fact);
+ * for a numeric split it is the candidate's side of the split's line. */
+function splitFact(step, names) {
+  const { node, went, value } = step;
+  const name = names[node.f];
+  if (node.op === '<') {
+    const key = name.startsWith('num.') ? name.slice(4) : name;
+    return `${NUM_NOUNS[key] || key} ${went === 'y' ? 'under' : 'over'} ${fmtG(node.v)}`;
+  }
+  if (value === null || value === undefined) return `${name} unset`;
+  return describeFeatureValue(name, value);
+}
+
+/** How many facts a citation carries. Three is a clause; four is a report. */
+export const CITATION_MAX_FACTS = 3;
+
+/**
+ * Explain a tree head's score for one candidate: the same walk scoreTreeHead
+ * runs, kept. Returns null when the head is not a tree head, or when the
+ * ensemble has no split to cite (pure-leaf trees — nothing to quote, and a
+ * citation is never invented). Otherwise { score, clause, facts } where
+ * facts are the taken paths' splits — one per feature, the highest-gain
+ * occurrence — ranked by gain, capped at CITATION_MAX_FACTS, and clause is
+ * them joined ' · ' in Davis's deadpan register. An ensemble has no single
+ * "winning tree", so the citation aggregates across every tree's taken
+ * path: the strongest reasons the whole ensemble had.
+ */
+export function explainTreeScore(head, layoutParams) {
+  if (!head || head.kind !== XGB_HEAD_KIND) return null;
+  const f = recipeFeatures({ layoutParams });
+  let margin = head.baseScore;
+  const best = new Map(); // feature name -> { feature, gain, fragment }
+  for (const t of head.trees) {
+    const { leaf, path } = walkTreePath(t, f, head.features);
+    margin += leaf;
+    for (const step of path) {
+      const name = head.features[step.node.f];
+      const prev = best.get(name);
+      if (!prev || step.node.gain > prev.gain) {
+        best.set(name, { feature: name, gain: step.node.gain, fragment: splitFact(step, head.features) });
+      }
+    }
+  }
+  if (!best.size) return null;
+  const facts = [...best.values()].sort((a, b) => b.gain - a.gain).slice(0, CITATION_MAX_FACTS);
+  return { score: sigmoid(margin), clause: facts.map((x) => x.fragment).join(' · '), facts };
+}
+
+// The last citation Davis's taste made — module state in the loisRank
+// idiom (the verdict behind the last pick, read by the hint). Set by the
+// MLX curator's pick; a linear head, and no pick yet, both read null:
+// a citation exists only when trees actually judged.
+let lastDavisCitation = null;
+
+/** The deadpan clause behind the MLX curator's last tree-head pick, or null. */
+export function getDavisCitation() {
+  return lastDavisCitation;
+}
+
 /**
  * The diceScorer-shaped factory for the tree head (diceScorer.js contract:
- * { id, score(candidate) }). T1 scope: the factory exists and is correct,
- * but is deliberately NOT wired into dice.js or curate.js — the dice keeps
- * the persona scorer until T2. Null when there is no usable tree head (the
+ * { id, score(candidate) }). Null when there is no usable tree head (the
  * makeMlxCurator convention), so callers fall back exactly as they do today.
- *
- * Candidate → layoutParams follows the existing curator code: a candidate
- * either carries layoutParams, IS layout params (the CURATE path), or — a
- * dice candidate — names its layout, and the head scores recipes, so the
- * name is read as the recipe's mode with palette/cast constant across the
- * press, the same reduction scoreLayout already makes.
+ * T2 wired it into the dice as the within-strata order scorer; T3 adds the
+ * optional explain(candidate) — Davis's citable reason for a score.
  */
+/** Candidate → layoutParams, the reduction both score() and explain() read:
+ * a candidate either carries layoutParams, IS layout params (the CURATE
+ * path), or — a dice candidate — names its layout, and the head scores
+ * recipes, so the name is read as the recipe's mode with palette/cast
+ * constant across the press, the same reduction scoreLayout already makes. */
+function candidateLayoutParams(candidate) {
+  const c = candidate && typeof candidate === 'object' ? candidate : {};
+  return c.layoutParams && typeof c.layoutParams === 'object'
+    ? c.layoutParams
+    : typeof c.layoutId === 'string' ? { mode: c.layoutId } : c;
+}
+
 export function makeXgbScorer(taste, { experimental = false } = {}) {
   const head = taste && taste.head;
   if (!head || head.kind !== XGB_HEAD_KIND || !headUsable(head, experimental)) return null;
   return {
     id: 'xgb-head-v1',
     score(candidate) {
-      const c = candidate && typeof candidate === 'object' ? candidate : {};
-      const lp = c.layoutParams && typeof c.layoutParams === 'object'
-        ? c.layoutParams
-        : typeof c.layoutId === 'string' ? { mode: c.layoutId } : c;
-      return scoreLayout(head, lp);
+      return scoreLayout(head, candidateLayoutParams(candidate));
+    },
+    /** T3: the citable reason for this candidate's score — the deadpan
+     * clause from its own tree paths (explainTreeScore), or null when the
+     * ensemble has no split to cite. Optional in the scorer contract:
+     * dice.js stamps it when present, and only then. */
+    explain(candidate) {
+      const ex = explainTreeScore(head, candidateLayoutParams(candidate));
+      return ex ? ex.clause : null;
     },
   };
 }
@@ -315,6 +439,11 @@ export function makeMlxCurator(taste, { experimental = false } = {}) {
         const s = scoreLayout(head, c);
         if (s > bestScore) { bestScore = s; best = i; }
       });
+      // T3: a tree head's pick carries its citation (the winner's own tree
+      // paths, as a clause) for the hint to quote. A linear head cites
+      // nothing — the recorded citation clears, exactly today's silence.
+      const ex = best >= 0 ? explainTreeScore(head, candidates[best]) : null;
+      lastDavisCitation = ex ? ex.clause : null;
       return best;
     },
   };

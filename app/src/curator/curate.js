@@ -18,7 +18,7 @@
 //      was tasted. Never fake curation.
 
 import { personaCurator } from './taste.js';
-import { makeMlxCurator } from './tasteHead.js';
+import { makeMlxCurator, getDavisCitation } from './tasteHead.js';
 import { getTaste } from './tasteStore.js';
 import { experimentalOn } from './tasteGate.js';
 import { getLoisVerdict } from './loisRank.js';
@@ -102,6 +102,11 @@ export function curatorHint(curator, { chainFallback = false } = {}) {
     return `heuristic pick: LOIS · ${line}${chain}`;
   }
   if (curator.personaName) return `persona pick: ${curator.personaName}${chain}`;
-  if (curator.name === 'mlx') return `curated pick · mlx${curator.experimental ? ' · experimental' : ''}${chain}`;
+  if (curator.name === 'mlx') {
+    // T3: a tree head's last pick is quoted — Davis cites the splits that
+    // won it. No citation (linear head, or no pick yet) = the line as it was.
+    const cite = getDavisCitation();
+    return `curated pick · mlx${curator.experimental ? ' · experimental' : ''}${cite ? ` — ${cite}` : ''}${chain}`;
+  }
   return `curated pick${chain}`;
 }
