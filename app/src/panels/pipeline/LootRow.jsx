@@ -14,7 +14,7 @@ import { takeInPalettes } from '../../loot/lootPalettes.mjs';
 import { takeInAudio } from '../../loot/lootAudio.mjs';
 import { useStore } from '../../state/store.js';
 import { loadIndex, saveIndex, withRoot, emptyIndex, countItems } from '../../loot/lootIndex.mjs';
-import { statusLine, logLine, confirmForgetMessage, rootLabel, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
+import { statusLine, logLine, missingLines, confirmForgetMessage, rootLabel, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
 
 const storage = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
 const LOG_SHOWN = 40;
@@ -101,6 +101,7 @@ export function LootRow() {
           {busy || note || statusLine({ ...counts, ...(last || {}), scanned: !!last })}
         </div>
       )}
+      {!unavailable && missingLines(index).map((l) => <div key={l} className="pipeline-hint" role="status" style={{ fontSize: 10 }}>{l}</div>)}
       {!unavailable && has && (
         <details className="pipeline-loot-log">
           <summary className="lbl" style={{ fontSize: 10 }}>{LABELS.logTitle} · {index.log.length}</summary>
