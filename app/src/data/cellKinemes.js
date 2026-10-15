@@ -1,4 +1,6 @@
 // #781 Build C — cell kinemes. Parts stay static assets; only the UV window moves.
+import { MICRO_HUD_STRIPS } from './assets/assets-micro-hud-strips.js';
+
 export const CELL_KINEMES = Object.freeze([
   { id: 'dial-sweep', cells: 8, period: 4, costCells: 8 },
   { id: 'wave-scroll', cells: 6, period: 2.4, costCells: 6 },
@@ -41,4 +43,21 @@ export function cellUvWindow(cell, index, count) {
   const i = Math.max(0, Math.min(n - 1, Math.floor(index)));
   const w = (cell.u1 - cell.u0) / n;
   return { u0: cell.u0 + w * i, v0: cell.v0, u1: cell.u0 + w * (i + 1), v1: cell.v1 };
+}
+
+/**
+ * #1431 — the baked frames for an asset's strip, or null when the asset has
+ * no playable strip. The one source of truth shared by both atlas bakers and
+ * the pack path: an asset plays only when its kineme assignment, its frame
+ * data, and the kineme's cell count all agree — a mismatch fails closed to
+ * the plain single-cell bake (the asset renders exactly as it did before
+ * this lane) instead of subdividing a cell that holds one frame.
+ */
+export function stripFramesFor(assetId) {
+  const kinemeId = ASSET_CELL_KINEME[assetId];
+  if (!kinemeId) return null;
+  const kineme = getCellKineme(kinemeId);
+  const frames = MICRO_HUD_STRIPS[assetId];
+  if (!kineme || !frames || frames.length !== kineme.cells) return null;
+  return frames;
 }

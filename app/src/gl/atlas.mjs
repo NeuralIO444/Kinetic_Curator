@@ -19,6 +19,7 @@
 import { Resvg } from '@resvg/resvg-js';
 import { ASSETS } from '../data/assets/index.js';
 import { applyGradient } from '../assets/gradient.js';
+import { stripFramesFor } from '../data/cellKinemes.js';
 
 const ASSET_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 
@@ -33,34 +34,52 @@ const subColors = (svg, ink, accent) =>
     .replace(/var\(--accent[^)]*\)/g, accent);
 
 /**
- * Bake one asset/color combination into a CELL_PX square.
- * Returns {pixels, ink} where ink is the bbox in asset units.
+ * Bake one asset/color combination into a CELL_PX square — or, for a
+ * strip asset (#1431 KINEME C), into one wide raster holding every frame
+ * side by side. Returns {pixels, ink, widthPx} where ink is the bbox in
+ * asset units.
  */
 function bakeCombo(assetId, ink, accent) {
   const asset = ASSET_BY_ID.get(assetId);
   if (!asset) throw new Error(`[atlas] unknown asset "${assetId}"`);
   const { x0, y0, x1, y1 } = CELL_UNITS;
+  // #1431 — a strip asset bakes ALL its frames into one contiguous raster:
+  // frame i is translated i frame-widths right, with NO internal gutter,
+  // because cellUvWindow splits the cell rect evenly and a gutter would
+  // land inside every window but the first. Frame 0 occupies exactly the
+  // texels (and the viewBox segment) the single-cell bake used, so its
+  // pixels are bit-identical to the pre-#1431 bake. Strip ink sits well
+  // inside each frame's edges (the micro-HUD art is centered), so mip
+  // box-filtering across a frame boundary never reaches ink.
+  const frames = stripFramesFor(assetId);
+  const n = frames ? frames.length : 1;
+  const widthPx = CELL_PX * n;
   // #701 — the stills path bakes the gradient with the REAL palette colours;
   // the live path bakes the same ramp into its R/G mask. Same module, same
   // stops, so a gradient asset prints what the canvas showed.
-  const body = applyGradient(asset.svg, asset.gradient, { ink, accent });
+  const body = frames
+    ? frames.map((f, i) => `<g transform="translate(${(x1 - x0) * i} 0)">${subColors(applyGradient(f, asset.gradient, { ink, accent }), ink, accent)}</g>`).join('')
+    : subColors(applyGradient(asset.svg, asset.gradient, { ink, accent }), ink, accent);
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${CELL_PX}" height="${CELL_PX}" ` +
-    `viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}">` +
-    subColors(body, ink, accent) +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${CELL_PX}" ` +
+    `viewBox="${x0} ${y0} ${(x1 - x0) * n} ${y1 - y0}">` +
+    body +
     `</svg>`;
   const img = new Resvg(svg).render();
   const pixels = Buffer.from(img.pixels);
   // Note: no alpha-bleed. Bleeding ink RGB into transparent texels breaks
   // premultiplied mipmap filtering (saturated RGB at partial alpha reads
   // as brighter/bloated). The gutter + half-texel UVs handle edge filtering.
-  // Ink bbox in asset units (for filter-region clipping).
+  // Ink bbox in asset units (for filter-region clipping). For a strip, x
+  // folds back into the frame-local cell: ink stays in single-asset units,
+  // the union across frames.
   let bx0 = CELL_PX, by0 = CELL_PX, bx1 = -1, by1 = -1;
   for (let y = 0; y < CELL_PX; y++) {
-    for (let x = 0; x < CELL_PX; x++) {
-      if (pixels[(y * CELL_PX + x) * 4 + 3] > ALPHA_CUTOFF) {
-        if (x < bx0) bx0 = x;
-        if (x > bx1) bx1 = x;
+    for (let x = 0; x < widthPx; x++) {
+      if (pixels[(y * widthPx + x) * 4 + 3] > ALPHA_CUTOFF) {
+        const lx = x % CELL_PX;
+        if (lx < bx0) bx0 = lx;
+        if (lx > bx1) bx1 = lx;
         if (y < by0) by0 = y;
         if (y > by1) by1 = y;
       }
@@ -70,7 +89,7 @@ function bakeCombo(assetId, ink, accent) {
   const inkBounds = bx1 >= 0
     ? [x0 + bx0 * unitsPerPx, y0 + by0 * unitsPerPx, x0 + (bx1 + 1) * unitsPerPx, y0 + (by1 + 1) * unitsPerPx]
     : null;
-  return { pixels, ink: inkBounds };
+  return { pixels, ink: inkBounds, widthPx };
 }
 
 export const comboKey = (assetId, ink, accent) => `${assetId}|${ink}|${accent}`;
@@ -94,27 +113,40 @@ export function bakeAtlas(combos) {
   // the half-texel UV inset, edge filtering stays correct and invisible.
   const GUTTER = 32;
   const stride = CELL_PX + GUTTER;
-  const cols = Math.max(1, Math.ceil(Math.sqrt(uniq.length)));
-  const rows = Math.max(1, Math.ceil(uniq.length / cols));
+  // #1431 — slot packing: a strip entry occupies `slots` consecutive grid
+  // slots so its frames stay contiguous for cellUvWindow's even split; a
+  // strip that doesn't fit the row's remainder wraps whole to the next
+  // row. Non-strip entries are 1 slot, so an atlas without strips lays out
+  // exactly as before this lane (same cols, same cell rects).
+  const baked = uniq.map((c) => {
+    const { pixels: cp, ink, widthPx } = bakeCombo(c.asset, c.ink, c.accent);
+    return { c, cp, ink, widthPx, slots: Math.max(1, Math.round(widthPx / CELL_PX)) };
+  });
+  const totalSlots = baked.reduce((s, b) => s + b.slots, 0);
+  const maxSlots = baked.reduce((m, b) => Math.max(m, b.slots), 1);
+  const cols = Math.max(1, Math.ceil(Math.sqrt(totalSlots)), maxSlots);
+  let col = 0, row = 0;
+  for (const b of baked) {
+    if (col + b.slots > cols) { row++; col = 0; }
+    b.cx = col * stride; b.cy = row * stride;
+    col += b.slots;
+  }
   const width = cols * stride;
-  const height = rows * stride;
+  const height = (row + 1) * stride;
   const pixels = Buffer.alloc(width * height * 4, 0);
   const cells = new Map();
-  uniq.forEach((c, i) => {
-    const { pixels: cp, ink } = bakeCombo(c.asset, c.ink, c.accent);
-    const cx = (i % cols) * stride;
-    const cy = Math.floor(i / cols) * stride;
+  for (const b of baked) {
     for (let y = 0; y < CELL_PX; y++) {
-      cp.copy(pixels, ((cy + y) * width + cx) * 4, y * CELL_PX * 4, (y + 1) * CELL_PX * 4);
+      b.cp.copy(pixels, ((b.cy + y) * width + b.cx) * 4, y * b.widthPx * 4, (y + 1) * b.widthPx * 4);
     }
-    cells.set(c.key, {
+    cells.set(b.c.key, {
       // Inset by half a texel: the shader quad spans the texel centers
       // (asset units [-49.75, 149.75]), so UVs address texel centers.
-      u0: (cx + 0.5) / width, v0: (cy + 0.5) / height,
-      u1: (cx + CELL_PX - 0.5) / width, v1: (cy + CELL_PX - 0.5) / height,
-      ink,
+      u0: (b.cx + 0.5) / width, v0: (b.cy + 0.5) / height,
+      u1: (b.cx + b.widthPx - 0.5) / width, v1: (b.cy + CELL_PX - 0.5) / height,
+      ink: b.ink,
     });
-  });
+  }
   // CPU-generated mipmap chain (box filter on premultiplied sRGB bytes).
   const mipmaps = buildMipmaps(pixels, width, height);
   return { pixels, width, height, cells, mipmaps };
