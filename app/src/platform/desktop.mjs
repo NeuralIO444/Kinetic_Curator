@@ -10,8 +10,12 @@
 // row shows which globals it sees), and only then is the flag flipped in its own PR.
 export const TAURI_GLOBALS = Object.freeze(['__TAURI_IPC__', '__TAURI_METADATA__', '__TAURI_INTERNALS__', '__TAURI__']);
 
-/** Flipped to true once Matt has confirmed on the Mac that the loot folder's native calls work. */
-export const DESKTOP_CHECK_CONFIRMED = false;
+/**
+ * The loot folder's native calls are open on desktop. Confirmed on the real Mac (2026-10-14): the window carries
+ * __TAURI_IPC__, __TAURI_METADATA__ and __TAURI__, and scan / hash / read ran end to end through it. Matt's approval of
+ * the PR that flipped this is the confirmation.
+ */
+export const DESKTOP_CHECK_CONFIRMED = true;
 
 const win = () => (typeof window !== 'undefined' ? window : undefined);
 

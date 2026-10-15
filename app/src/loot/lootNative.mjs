@@ -36,9 +36,10 @@ export function shapeScan(raw) {
 /**
  * @param invoke    (cmd, args) => Promise: Tauri's invoke, injected so a selfcheck can drive it. Absent: loaded lazily.
  * @param isDesktop () => boolean
+ * @param pick      (options) => Promise<string|string[]|null>: the folder dialog, injected for tests (absent: lazy)
  * @param confirmed whether Matt has confirmed the desktop check on the Mac
  */
-export function createLootNative({ invoke = null, isDesktop = isTauriRuntime, confirmed = DESKTOP_CHECK_CONFIRMED } = {}) {
+export function createLootNative({ invoke = null, pick = null, isDesktop = isTauriRuntime, confirmed = DESKTOP_CHECK_CONFIRMED } = {}) {
   const gate = () => {
     if (!isDesktop()) return { ok: false, reason: DESKTOP_ONLY };
     if (!confirmed) return { ok: false, reason: NOT_CONFIRMED };
@@ -58,6 +59,19 @@ export function createLootNative({ invoke = null, isDesktop = isTauriRuntime, co
   return {
     /** Why the native calls are unavailable right now, or null when they are available. */
     unavailable: () => { const g = gate(); return g ? g.reason : null; },
+    /** The native folder picker. { ok: true, path } on a pick, { ok: true, path: null } on cancel. */
+    async pickFolder() {
+      const g = gate();
+      if (g) return g;
+      try {
+        const dlg = pick || (await import('@tauri-apps/api/dialog')).open;
+        const r = await dlg({ directory: true, multiple: false, title: 'Point KC-1 at your loot folder' });
+        const path = Array.isArray(r) ? r[0] : r;
+        return { ok: true, path: typeof path === 'string' && path.length > 0 && path.length <= 1024 && !path.includes('\0') ? path : null };
+      } catch (e) {
+        return { ok: false, reason: short(e) };
+      }
+    },
     async scan(root) {
       if (!validRoot(root)) return { ok: false, reason: 'not a folder path' };
       const r = await call('loot_scan', { root });
