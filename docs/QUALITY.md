@@ -19,21 +19,25 @@ live tab is a bug, and where the renderer can't match, it says so.
   ceiling (800/650) even at print sizes, so density does not turn to mud.
 - **Materials + blend honesty.** The GL backend handles the full CSS blend
   set; `plus-lighter` → `screen` matches the SVG reference substitution
-  (#96) and is recorded, not hidden. Gradient materials
-  (wash/stipple) exist in the live tab only — the GL backend has no
-  gradient shading for them — so studio stills warn on stderr when a
-  project uses one (`warnUnsupportedMaterials`, #168) instead of
-  silently rendering flat wings. `glass` is not one of them: since
-  #1547 (Materials M1) it is a GL material — the #1129 glass machinery
-  (alpha body, back-to-front sort, soft-bevel lighting) — in the live
-  tab and studio stills alike, so it carries no warning. `plate` is
-  restored too, since #1548 (Materials M2): the engraved-plate radial
-  ramp (accent heart → ink rim, from the retired SVG def) runs on the
-  ink channel in the live tab and in composed stills. One seam stays
-  on the record: the headless GL export has no channel decomposition
-  to ramp against, so an exported GL still renders plate flat until
-  the export atlas bake carries the gradient at bake time. The
-  sidecar's `_render.normalized` keeps the authored value
+  (#96) and is recorded, not hidden. The material vocabulary is
+  complete in GL (#1547–#1549, Materials M1–M3): `glass` engages the
+  #1129 glass machinery (alpha body, back-to-front sort, soft-bevel
+  lighting); `plate` paints its engraved-plate radial ramp (accent
+  heart → ink rim), `wash` its vertical accent→ink ramp, and
+  `stipple` its dot-field screen — the three channel bodies recovered
+  from the retired SVG defs — on the ink channel in the live tab, and
+  in composed stills via those defs themselves. One seam stays on the
+  record, and it is disclosed, not hidden: the headless GL export
+  (`studio.py still`) has no channel decomposition to ramp against,
+  so the two colour-ramp bodies — `plate` and `wash` — render flat in
+  exported GL stills until the export atlas bake carries their ramps
+  at bake time; studio stills warn on stderr when a project uses one
+  (`warnUnsupportedMaterials`, #168) instead of silently rendering
+  flat wings. `stipple` and `glass` carry no warning: stipple's
+  screen is applied to the export's atlas sample itself (a screen
+  needs no channel decomposition), and glass's body is
+  placement-level, so both survive the export. The sidecar's
+  `_render.normalized` keeps the authored value
   on record. (The resvg path is retired for finals; its honesty tables in
   FX_LAYERS.md and BUGLIST.md cover the legacy SVG recipe only.)
 - **ACCUM is a still.** In-app RENDER ACCUM captures the trail buffer as
