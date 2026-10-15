@@ -241,6 +241,7 @@ node src/gl/audioSidecar.selfcheck.mjs
 node src/gl/kineme.selfcheck.mjs
 node src/gl/cellKinemePlayback.selfcheck.mjs
 node src/gl/regionPlayback.selfcheck.mjs
+node src/data/regionAssignment.selfcheck.mjs
 node src/gl/rotateSpin.selfcheck.mjs
 node src/gl/livingMotion.selfcheck.mjs
 node src/gl/audioBallistics.selfcheck.mjs
