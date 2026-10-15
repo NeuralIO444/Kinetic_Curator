@@ -5,6 +5,13 @@
 // The browser can't embed, and CURATE scores recipes it never renders, so the
 // head is what runs here: score = bias + Σ weights[term] + Σ num[k]·x[k].
 //
+// XGBoost T1: the probe has a second student — a tree-ensemble head
+// (head.kind 'xgboost-trees', distilled by curator.py --xgb). Same file, same
+// trust boundary, same scorer contracts; validateTaste dispatches on the
+// kind and scoreLayout walks the trees into a keep-probability. The linear
+// head is unchanged: a file with no kind (or kind 'linear') validates and
+// scores exactly as it always has.
+//
 // The term rule MUST match studio/curator.py `feature_terms` — both sides assert
 // app/src/curator/tasteTerms.fixture.json.
 import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
@@ -15,6 +22,30 @@ export const TASTE_VERSION = 1;
 export const HEAD_MIN_FIDELITY = 0.3;
 const MAX_TERMS = 4000;
 const TERM_SKIP = new Set(['v', 'cast', 'castSize', 'num']);
+
+/** XGBoost T1 — the tree-ensemble head kind and its artifact bounds (spec §3:
+ * a taste file is an artifact, not a program bundle). */
+export const XGB_HEAD_KIND = 'xgboost-trees';
+const XGB_OBJECTIVE = 'binary:logistic';
+const MAX_TREES = 512;
+const MAX_TREE_DEPTH = 6;
+const MAX_TREE_NODES = 20000;
+/** Keys a tree never splits on: the term-rule skips, plus the array-valued
+ * castCategories (an equality node tests one scalar, not a set). */
+const TREE_FEATURE_SKIP = new Set([...TERM_SKIP, 'castCategories']);
+
+/**
+ * The feature names a tree head may declare, in binding order: the scalar
+ * recipe keys the scoring path produces (recipeFeatures({ layoutParams }) —
+ * palette/cast are constant across a CURATE press), then `num.<key>` for
+ * each numeric. The trainer binds its columns to exactly this universe;
+ * anything outside it is a file the app cannot score honestly.
+ */
+export function treeFeatureNames() {
+  const sample = recipeFeatures();
+  const cats = Object.keys(sample).filter((k) => !TREE_FEATURE_SKIP.has(k) && k !== 'num');
+  return [...cats, ...Object.keys(sample.num).map((k) => `num.${k}`)];
+}
 
 /** The ONE term rule (mirrors curator.py feature_terms). */
 export function featureTerms(features) {
@@ -45,20 +76,30 @@ export function validateTaste(raw) {
   }
   const h = raw.head;
   if (!h || typeof h !== 'object') return { ok: false, error: 'taste has no head — train with --features' };
-  const terms = h.terms && typeof h.terms === 'object' ? h.terms : null;
-  if (!terms || Object.keys(terms).length > MAX_TERMS) return { ok: false, error: 'taste head terms missing or too large' };
   const numKeys = Object.keys(recipeFeatures().num);
-  const num = h.num && typeof h.num === 'object' ? h.num : {};
-  for (const [k, w] of Object.entries(terms)) if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
-  for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
-  if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
+  let head;
+  if (h.kind === XGB_HEAD_KIND) {
+    const treeHead = validateTreeHead(h);
+    if (!treeHead.ok) return treeHead;
+    head = treeHead.head;
+  } else if (h.kind != null && h.kind !== 'linear') {
+    return { ok: false, error: `unknown taste head kind: ${String(h.kind)}` };
+  } else {
+    const terms = h.terms && typeof h.terms === 'object' ? h.terms : null;
+    if (!terms || Object.keys(terms).length > MAX_TERMS) return { ok: false, error: 'taste head terms missing or too large' };
+    const num = h.num && typeof h.num === 'object' ? h.num : {};
+    for (const [k, w] of Object.entries(terms)) if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
+    for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
+    if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
+    head = { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 };
+  }
   const labels = raw.labels && typeof raw.labels === 'object' ? raw.labels : {};
   const taste = {
     kind: TASTE_KIND, version: TASTE_VERSION, featuresVersion: FEATURES_VERSION,
     model: String(raw.model || ''), dims: Number(raw.dims) || 0,
     trainedAt: String(raw.trainedAt || ''),
     labels: { likes: Number(labels.likes) || 0, passes: Number(labels.passes) || 0 },
-    head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 },
+    head,
   };
   // #954 — optional second head. Absent until the boldness probe has trained.
   // Probe weights stay on disk in taste.json; the browser only keeps the head.
@@ -103,6 +144,74 @@ function validateHead(h, numKeys) {
 }
 
 /**
+ * XGBoost T1 — validate a tree-ensemble head (spec §3). The teeth: the
+ * featuresVersion gate already ran; here the declared features must bind to
+ * the app's own feature universe (treeFeatureNames), the ensemble stays
+ * inside the artifact bounds, and every number the walk will read is finite.
+ * Validation rebuilds each node — the app keeps a clean copy, never the
+ * file's own objects.
+ */
+function validateTreeHead(h) {
+  if (h.objective !== XGB_OBJECTIVE) return { ok: false, error: `tree head objective must be ${XGB_OBJECTIVE}` };
+  if (!finite(h.baseScore)) return { ok: false, error: 'bad tree head baseScore' };
+  if (!finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad tree head fidelity' };
+  const allowed = new Set(treeFeatureNames());
+  const features = h.features;
+  if (!Array.isArray(features) || !features.length) return { ok: false, error: 'tree head features missing' };
+  const seen = new Set();
+  for (const name of features) {
+    if (typeof name !== 'string' || !allowed.has(name)) return { ok: false, error: `tree head feature unknown: ${String(name)}` };
+    if (seen.has(name)) return { ok: false, error: `tree head feature duplicated: ${name}` };
+    seen.add(name);
+  }
+  const trees = h.trees;
+  if (!Array.isArray(trees) || !trees.length) return { ok: false, error: 'tree head trees missing' };
+  if (trees.length > MAX_TREES) return { ok: false, error: 'tree head too large' };
+  const counter = { nodes: 0 };
+  const clean = [];
+  for (const t of trees) {
+    const v = validateTreeNode(t, features, 0, counter);
+    if (v.error) return { ok: false, error: v.error };
+    clean.push(v.node);
+  }
+  return {
+    ok: true,
+    head: {
+      kind: XGB_HEAD_KIND, objective: XGB_OBJECTIVE, baseScore: h.baseScore,
+      fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0,
+      features: [...features], trees: clean,
+    },
+  };
+}
+
+/** One node: a leaf { leaf } or a split { f, op, v, y, n, gain }. Depth is
+ * counted in split levels from the root (root = 0); the depth cap is also
+ * what bounds this recursion. Returns { node } (a clean copy) or { error }. */
+function validateTreeNode(node, features, depth, counter) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return { error: 'bad tree node' };
+  counter.nodes += 1;
+  if (counter.nodes > MAX_TREE_NODES) return { error: 'tree head too large' };
+  if (depth > MAX_TREE_DEPTH) return { error: 'tree head too deep' };
+  if ('leaf' in node) {
+    if (!finite(node.leaf)) return { error: 'bad tree leaf' };
+    return { node: { leaf: node.leaf } };
+  }
+  const { f, op, v, gain } = node;
+  if (!Number.isInteger(f) || f < 0 || f >= features.length) return { error: 'bad tree split feature index' };
+  if (features[f].startsWith('num.')) {
+    if (op !== '<' || !finite(v)) return { error: 'bad tree split: numeric features split with < on a finite number' };
+  } else if (op !== '=' || (typeof v !== 'string' && typeof v !== 'boolean')) {
+    return { error: 'bad tree split: categorical features split with = on a string/boolean' };
+  }
+  if (!finite(gain)) return { error: 'bad tree split gain' };
+  const y = validateTreeNode(node.y, features, depth + 1, counter);
+  if (y.error) return y;
+  const n = validateTreeNode(node.n, features, depth + 1, counter);
+  if (n.error) return n;
+  return { node: { f, op, v, y: y.node, n: n.node, gain } };
+}
+
+/**
  * May this head steer? At or above the bar: yes. Below it: only with the artist's experimental switch on
  * (curator/tasteGate.js), and never when it is not positively correlated with the taste at all.
  * Pure: the switch is passed in.
@@ -113,13 +222,83 @@ export function headUsable(head, experimental = false) {
   return f >= HEAD_MIN_FIDELITY || (!!experimental && f > 0);
 }
 
-/** Head score for one CURATE candidate (layout params only — palette/cast are constant across a press). */
+/** Head score for one CURATE candidate (layout params only — palette/cast are constant across a press).
+ * A tree head scores a keep-probability in (0, 1); a linear head scores its raw margin, as always. */
 export function scoreLayout(head, layoutParams) {
+  if (head && head.kind === XGB_HEAD_KIND) return scoreTreeHead(head, layoutParams);
   const f = recipeFeatures({ layoutParams });
   let s = head.bias;
   for (const t of featureTerms(f)) s += head.terms[t] || 0;
   for (const [k, w] of Object.entries(head.num || {})) s += w * (f.num[k] ?? 0);
   return s;
+}
+
+const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+/** A declared feature's value in a recipeFeatures object. Numerics read the
+ * `num` block (absent = 0, the linear head's own convention); categoricals
+ * read the top level, where an absent/null value simply fails every test. */
+function treeFeatureValue(features, name) {
+  if (name.startsWith('num.')) return (features.num || {})[name.slice(4)] ?? 0;
+  return features[name];
+}
+
+/** THE equality rule for categorical splits (mirrored by curator.py's
+ * _spec_eq): strict equality, with a boolean on either side compared by its
+ * term-rule spelling ('true'/'false') so a trainer emitting either form
+ * binds the same. */
+const treeEq = (a, b) =>
+  a === b ||
+  (typeof a === 'boolean' && String(a) === b) ||
+  (typeof b === 'boolean' && String(b) === a);
+
+/** Walk one tree to its leaf margin. Pure, deterministic, no state. */
+function walkTree(node, features, names) {
+  let cur = node;
+  while (!('leaf' in cur)) {
+    const val = treeFeatureValue(features, names[cur.f]);
+    const go = cur.op === '<'
+      ? typeof val === 'number' && Number.isFinite(val) && val < cur.v
+      : treeEq(val, cur.v);
+    cur = go ? cur.y : cur.n;
+  }
+  return cur.leaf;
+}
+
+/** Tree-head score: sigmoid(baseScore + Σ leaf margins) — a keep-probability. */
+export function scoreTreeHead(head, layoutParams) {
+  const f = recipeFeatures({ layoutParams });
+  let margin = head.baseScore;
+  for (const t of head.trees) margin += walkTree(t, f, head.features);
+  return sigmoid(margin);
+}
+
+/**
+ * The diceScorer-shaped factory for the tree head (diceScorer.js contract:
+ * { id, score(candidate) }). T1 scope: the factory exists and is correct,
+ * but is deliberately NOT wired into dice.js or curate.js — the dice keeps
+ * the persona scorer until T2. Null when there is no usable tree head (the
+ * makeMlxCurator convention), so callers fall back exactly as they do today.
+ *
+ * Candidate → layoutParams follows the existing curator code: a candidate
+ * either carries layoutParams, IS layout params (the CURATE path), or — a
+ * dice candidate — names its layout, and the head scores recipes, so the
+ * name is read as the recipe's mode with palette/cast constant across the
+ * press, the same reduction scoreLayout already makes.
+ */
+export function makeXgbScorer(taste, { experimental = false } = {}) {
+  const head = taste && taste.head;
+  if (!head || head.kind !== XGB_HEAD_KIND || !headUsable(head, experimental)) return null;
+  return {
+    id: 'xgb-head-v1',
+    score(candidate) {
+      const c = candidate && typeof candidate === 'object' ? candidate : {};
+      const lp = c.layoutParams && typeof c.layoutParams === 'object'
+        ? c.layoutParams
+        : typeof c.layoutId === 'string' ? { mode: c.layoutId } : c;
+      return scoreLayout(head, lp);
+    },
+  };
 }
 
 /** The `mlx` curator engine, or null when there's no usable taste (→ persona / null fallback). */
