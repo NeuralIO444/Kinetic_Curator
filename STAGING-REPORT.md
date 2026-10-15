@@ -1,251 +1,193 @@
-# STAGING REPORT — #1434 R3: region kineme assignment (family defaults + artist override)
+# STAGING-REPORT — #1435 R4: waveform lines (strips + stroke-aware bend)
 
-**Branch:** `ember/1434-region-assignment` (stacked on stage-2 tip `0138c70f`)
-**Base:** stage 2 (#1433 R2 playback) — coordinator-verified.
-**Status:** LOCAL COMMITS ONLY. No push, no PR. Publish on Matt's word, one PR at a time.
+Branch `ember/1435-region-lines`, stacked on stage 3 (`81be4a3a`). Local
+only — no push, no PR. Contract: issue #1435 as filed, as amended by
+Matt's 2026-10-15 ruling comment (6193457312) — lines animate along their
+length and bend, simple programmatic motion, stroke-aware, the parked
+quad-wide shader stroke-warp stays parked.
 
-## What this stage is
+## What shipped
 
-Stage 2 built the playback: the renderer animates regions named in a
-`regionKinemes` assignment map. Almost nothing fed that map — only a
-project doc's per-asset overrides. R3 fills it:
+**Track 1 — the squiggles roll (authored strips through the C-wire).**
+`line_squiggle_01` and `line_squiggle_02` are strip assets now, exactly
+like the five micro-HUD strips from stage 1: all frames bake contiguously,
+the renderer consults the strip table only when it supplies the frame
+clock, shed pins the canonical frame.
 
-1. **Family defaults at bake.** Every library asset's regions now carry a
-   `regionKinemes` assignment in the baked `regions.generated.js`,
-   computed deterministically from region geometry + category.
-2. **Artist override.** The RegionPicker (the matte sheet where slots
-   are already authored) gains a per-region MOTION editor. Edits ride the
-   project document as `doc.regionKinemes`, win per-region over the
-   defaults, survive save/load, and are never clobbered by a re-bake.
-3. **Imports auto-tagged on arrival** (Matt's ruling): loot/custom
-   imports run the same pipeline as the bake — regions capped at 12,
-   family defaults applied — in the store's ingest actions, so a custom
-   `user:` asset is first-class immediately. This closes the gap stage 2
-   flagged: the scene contract now resolves region data for custom
-   assets from the document's `customAssets`.
+- New file `app/src/data/assets/assets-line-strips.js` (`LINE_STRIPS`).
+  Frame 0 of each strip is the asset's own `svg` **verbatim**, so its bake
+  is bit-identical to the pre-R4 single-cell bake (pinned per-row in the
+  new suite, against a re-derived pre-R4 bake).
+- Frames 1..N are the same wave translated along the stroke: squiggle_01
+  rolls 7 frames × 8 units = its 56-unit wavelength (kineme `line-boil`,
+  2.8 s); squiggle_02 rolls 8 × 4 = its 32-unit wavelength (`wave-roll`,
+  3.2 s). Frames × step = exactly one wavelength, so the loop wraps
+  seamlessly — pinned on the GPU: the render at t = period is
+  byte-identical to t = 0. Each frame draws every hump intersecting the
+  coverage window, capped so ink never comes within ~6 units of a frame
+  edge (the mic_wave mip rule); consecutive frames are exact translates of
+  each other over the covered band (pinned on rasters).
+- `cellKinemes.js`: two new cell kinemes + the two assignments;
+  `stripFramesFor` now reads one merged table (micro + line strips), so
+  both atlas bakers, the pack, and R3's strip exclusion in the family
+  defaults all see the lines without special cases.
 
-## The family table, as implemented (`data/regionDefaults.js`)
+**Track 2 — lines travel along their length and BEND (procedural, per the
+ruling).** No shader change, no new subsystem: the bend is a pack-time
+extension of stage 2's own region expansion, riding the existing osc
+kineme evaluation.
 
-| family (category) | rule |
-|---|---|
-| `floral` | the centre region → `pulse`; every other region → `rock` (the osc kineme — the sway) |
-| `radial` | every region → `pulse` |
-| `linework` | every region → `bob` |
-| everything else (organic, geometric, dots, stamps, crystalline, biosynthetic, fragments, scanlines) | no default — regions render still |
+- `kinemes.js`: one new library kineme, `bend` — {kind: 'osc', period:
+  3.6, amp: 6}. Its **id is the signal**: a region assigned `bend` asks to
+  be subdivided (documented at the entry).
+- `regionKinemes.js`: the stroke rule, pure record geometry —
+  `isStrokeRegion(record)`: bbox long axis ≥ 28 asset units AND ink fill
+  (area / bbox area on the canonical raster) ≤ 0.30; `bendSlicesFor` =
+  clamp(round(long / 14), 3, 8). A solid bar measures fill ~1.0 and can
+  never qualify; a squiggle measures 0.15–0.24.
+- `regionDefaults.js`: R3's linework default becomes per-region — stroke
+  regions default to `bend`, the rest keep `bob`. Strip assets stay
+  excluded (the strip owns their motion; the two squiggles left the
+  region-assignment census for that reason, below).
+- `sceneContract.js`: for a *selected* (slot > 0) region whose assigned
+  kineme is `bend` AND whose record is a stroke, the contract emits
+  `regionAnim.bend = { [assetId]: { [regionId]: slices } }`. The key
+  exists only when some region bends, so untouched scenes' contracts (and
+  hashes) are unchanged; placements never move (pinned). The validator
+  checks the map fail-closed (integer slices in [3, 8], region present in
+  the slot table). Budget 0, tier-2 freeze, tombstones, and an artist's
+  override to another kineme all remove the bend — pinned. `bend`
+  assigned to a non-stroke (e.g. a petal) animates the region whole,
+  exactly like rock: the subdivision is gated on geometry, not on the id
+  alone.
+- `renderer.mjs` (`expandRegionInstances`): a bend region expands into N
+  slice instances instead of one — sub-windows of the region's own cell
+  (the existing `cellUvWindow` split along the long axis; a vertical
+  mirror-split for tall regions), slice geometry = the region's placement
+  rect cut N ways, each slice carrying the region's kineme slot and
+  phase = region phase + j/N. The phase stepping is what makes the wave
+  **travel**: each slice sits at a different point of the osc cycle, so
+  the stroke articulates along its length. Slot-0 regions never slice
+  (the pack's own guard, behind the contract's); the collapse shed keeps
+  the exact pre-R2 single-quad path.
+- **Stroke-aware by construction**: R1's partition means a region's cell
+  contains only that region's ink, so subdividing the stroke's cell can
+  only ever move the stroke. A non-stroke sharing the mark is packed as
+  its own ordinary instances and does not bend (GPU-pinned: the centre
+  dot of `line_target_01` is byte-still while its ring bends).
 
-- **Centre** = the region whose centroid is nearest the area-weighted
-  centroid of all the asset's regions (ties: record order). A
-  one-region flower's only region is its centre → `pulse`.
-- **Phase:** stage 2 already phases each region by its (asset, region)
-  hash (`regionKinemePhase`), so same-kineme neighbours are not in
-  lockstep; the assignment map itself stays `{regionId: kinemeId}`.
-- **Strip assets are excluded** even inside a named family — the
-  authored cell sequence owns their motion (stage 1).
-- The defaults are pure functions of the geometry: re-running the bake
-  reproduces them exactly, and the bake's geometry output is unchanged
-  from stage 2 (the regenerated file differs only in header comments +
-  the new per-record `regionKinemes` lines).
+**Re-bake.** `regions.generated.js` + the bake report regenerated. The
+diff is only `regionKinemes` values: the two squiggles' blocks are gone
+(strip exclusion), linework stroke regions flipped bob → bend, nothing
+else moved. New census: **292 regions assigned across 72 assets** (was
+294 / 74): floral 15 regions / 53 assets, radial 26 / 150, linework 89
+regions / 31 assets — of linework's 89, **35 bend + 54 bob** (measured
+scan; bend defaults exist nowhere outside the line family, pinned).
 
-## Measured bake evidence
+## Measured evidence (real WebGL2 renders, 400×280)
 
-- **294 regions assigned across 74 assets**: floral 15 assets / 53
-  regions, radial 26 / 150, linework 33 / 91. Every region of every
-  named-family asset is assigned; no other asset carries the key.
-- `flora_flower_01`: centre (`ff2d95`) → `pulse`, its 4 petals → `rock`
-  — exactly the map stage 2's playback suite used as its ASSIGN fixture.
-- `regionBake.selfcheck` passes against the regenerated artefacts
-  (294 assets, 1,095 regions), extended to pin that baked assignments
-  survive the runtime sanitizer unchanged.
-- Families with NO library assets exercising them: none of the three
-  named families is empty (15/26/33 assets). The families NOT in the
-  table have assets (e.g. geometric 40+) and deliberately get nothing.
+New suite `regionLines` (registered in `app/selfcheck.manifest`):
 
-## The override, end to end
+- Roll: squiggle_01 cell 0→1 = **1,794 px** moved; squiggle_02 = **1,668
+  px**. One period wraps byte-identically; shed (freeze doc) at mid-roll
+  = cell 0 byte-identically. (Stage 1's cellKinemePlayback, whose strip
+  loop now covers both lines, measures 1,389 px / 1,423 px in its own
+  tint combo and re-verified all five mic strips at stage-1 numbers.)
+- Bend on `line_squiggle_03` (single stroke region, 7 slices): t=0.9 vs
+  rest = **617 px**; t=1.8 vs t=0.9 = **653 px** (the pose travels, it is
+  not a static bend); rest parity of the whole bend path vs the pre-R2
+  render = **0.469 %** of pixels (bar < 10 %); same-time renders
+  byte-identical (determinism); one bend period (3.6 s) wraps exactly;
+  shed collapse byte-identical to the pre-R2 path.
+- Stroke-awareness on `line_target_01` (ring = bend, centre dot and
+  inner held still): ring bbox motion = **1,265 px**, centre-dot bbox
+  motion = **0 px**.
+- Node pins: frame 0 verbatim + raster-exact translation between frames;
+  strip frame-0 bake bit-identity per row; the stroke rule on real
+  records (incl. the boundary case `hae_flagella_01` fill exactly 0.30 →
+  stroke); the contract map for defaults / budget 0 / freeze / overrides;
+  validator rejection of bad bend maps; pack slice tiling (UV windows
+  tile the region cell exactly, phases step 1/N, pivots advance), slot-0
+  stand-down, shed = bare pack.
 
-- **Store:** `regionKinemes` state + `setRegionKineme(assetId, regionId,
-  value)` — value is a kineme id, `'still'` (stored as a tombstone
-  `null`: deliberately still, beats the default), or `'default'`
-  (clears the override). Empty maps prune themselves.
-- **Resolver** (`regionKinemes.js`, extended): the doc map merges OVER
-  the record's baked defaults per region; a tombstone deletes that
-  region from the merged map; if every region is tombstoned the asset
-  resolves to no assignment — which is exactly the pre-R3 still state,
-  now reachable only by an artist's deliberate act.
-- **Document:** `serializeProject` writes `doc.regionKinemes` (omitted
-  when empty — old exports byte-identical); both `parseProject` branches
-  sanitize it back (tombstones preserved); `projectWatch` watches the
-  field; `applyProject` restores it; the export payload threads it.
-- **Events:** `ASSETS_REGION_KINEME` (`assets:regionKineme`), registered
-  + wired like `ASSETS_REGION_SLOT` → `SET_ASSET_REGION_KINEME` →
-  `setRegionKineme`.
-- **Editor:** RegionPicker's new REGION MOTION section lists each
-  region with its effective kineme and a select: `default · <kineme>`,
-  `still`, or any kineme (rock/pulse/bob/spin/blink).
-- **Honest feed:** the edit is recorded by `loisActivity` as a tweak
-  under the key `'regionKineme'` — the LAYOUT_PARAM class (artist
-  action, undo-burst collision check included), sharing the existing
-  recorder rather than a parallel one.
+Neighbours re-verified with stage-identical numbers: regionPlayback rest
+parity 0.646 %, petal diffs 119/110/64/119 px, budget-1 motion 321 px vs
+1,216 px at full budget — the bend machinery did not disturb R2 playback.
 
-## Imports auto-tagged
+## Suite results
 
-- `tagImportedRegions(asset, detected)` = normalize → cap at 12
-  (`capRegionsTracked`, stage 2's cap) → family defaults. Wired into
-  `ingestAsset`, `replaceCustomAsset`'s detection callback,
-  `setAssetRegions` (manual re-detect re-tags; doc overrides are a
-  separate map and survive), and `duplicateAsset` (a copy inherits the
-  source's tagged record, or detects its own).
-- `sanitizeOverlay` carries `regionKinemes` across the trust boundary,
-  re-validated against the record's own regions — an auto-tagged record
-  round-trips intact; unknown regions/kinemes are dropped.
-- The contract change is small and additive: `buildSceneContract`
-  reads `doc.customAssets` once and hands the matching record to the
-  resolver; `liveLoop` passes the store's `regionKinemes` +
-  `customAssets` into the contract doc. Scenes without region data
-  build exactly as before (stage 2's parity pins hold — below).
+- New: `regionLines` — green (Node + GPU), also green inside the sweep.
+- Lane neighbours green: regionPlayback, regionAssignment,
+  cellKinemePlayback, cellKinemes, kinemes, kineme (after re-pin, below),
+  regionBake, regionMattes, regionSlots, overlay, ingest, census,
+  censusReadout, sceneContract, micro-HUD strips (after re-pin, below).
+- `npm run build` — green.
+- **Full manifest sweep, run solo: 424 suites, 420 pass.** The four
+  non-green, each explained:
+  - `swarmWasm` — known base-identical sandbox failure (no cargo; the
+    wasm verify cannot run here).
+  - `accum` — known base-identical sandbox failure (V8 OOM, SIGABRT).
+  - `rollSafety` — SIGKILL after 873.6 s: **stage 3's documented harness
+    ceiling (a)** (sandbox memory ceiling vs region-atlas weight; stage
+    3's solo run SIGKILLed identically after its assertions passed, and
+    the stage-2 tree passes solo). Cited, not re-diagnosed; nothing
+    weakened.
+  - `phase6` — `ERR_STRING_TOO_LONG` in `glDriver.buildRenderPayload`
+    (whole-library atlas as one base64 string past V8's limit): **stage
+    3's documented harness ceiling (b)**, identical signature and call
+    site; the live app never builds whole-library scenes. Cited, not
+    re-diagnosed.
 
-## Verification
+## Re-pins (each with its measured justification)
 
-**New suite** `src/data/regionAssignment.selfcheck.mjs` (registered in
-`app/selfcheck.manifest`): the family table as functions of synthetic
-geometry (centre rule, tie-breaks, strip exclusion); the baked library
-deep-equal to the table asset-by-asset; override precedence incl.
-tombstones and a simulated re-bake; the doc sanitizer + serialize/parse
-round trip; the store actions + `applyProject`; the import path (a
-15-region linework detection caps at 12, all `bob`; the overlay
-boundary keeps it, cleans a hostile variant); and the contract raising
-`regionAnim` from defaults alone for a library asset AND for a custom
-`user:` asset whose record rides the doc.
-
-**Neighbours, all green:** regionPlayback (GPU numbers IDENTICAL to
-stage 2's verified run — rest parity 0.646%, petals 119/110/64/119,
-centre 12, budget-1 321px vs full 1,216px), cellKinemePlayback,
-regionBake, overlay, regionMattes, ingest, census, censusReadout,
-projectWatch, bundleParts, projectDocument fuzz, lootIngest, lootRun,
-eventRegistry (162 events), loisActivity, kinemes.
-
-**Stage-2 pin updates (honest re-pins, in regionPlayback.selfcheck):**
-flora's no-doc resolution is now the baked defaults — which equal the
-suite's ASSIGN fixture, so every playback pin stands unchanged. The
-pre-R2 "bare" state (no regionAnim, plain atlas, single quad) is now
-the artist-cleared state, reached by tombstoning all five flora
-regions; the petals-only wrap fixture tombstones the centre so its
-baked pulse can't break the 2.4s wrap pin. No assertion was weakened;
-two pins were ADDED (defaults alone raise regionAnim; defaults never
-move placements).
-
-**`npm run build`: green** (after `npm install` completed this fresh
-worktree's `node_modules` — the same missing-`@tauri-apps/api` state
-stage 2 documented; no lockfile change).
-
-**Full manifest sweep: 419 pass / 1 fail of the 420 commands run**
-(the manifest holds 423; swarmWasm, accum, and rollSafety were run and
-are accounted separately below — so the full accounting is 419 green +
-the four suites discussed here). The one in-sweep failure and
-rollSafety share a shape — designed weight meeting sandbox/harness
-ceilings — but they are NOT the same failure, and neither is an
-assertion failure. Both get their evidence below; the coordinator
-should read them before publishing.
-
-**phase6 (in-sweep failure) — the parity driver's atlas transport.**
-The suite's hostile-doc re-test renders a scene built from a poisoned
-doc whose enabled set is effectively the whole library.
-`glDriver.buildRenderPayload` ships the atlas to the page as ONE
-base64 string; V8 refuses strings over ~512M chars
-(`ERR_STRING_TOO_LONG` at `b64(atlas.pixels)`). Stage 2's
-whole-library atlas already measured ~511M chars of base64 — about 5%
-of headroom — because region demand was doc-only and therefore zero in
-that scene. With baked defaults, the same scene demands the region
-cells too (~368 extra cells), and the string crosses the limit.
-Verified: the stage-2 tree passes phase6 solo in this VM (exit 0);
-this tree fails solo at the same line, before any assertion runs.
-The live instrument never builds a whole-library scene (rolls and the
-default scene use curated subsets), and for realistic scenes the
-region demand grows the atlas ~35% per dimension from the 6,048² the
-FX default scene measured at stage 2 — far inside the 8,192 texture
-ceiling. Fixing the harness means chunking the payload transport or
-scoping the hostile scene's enabled set: a test-harness change, not an
-R3 behaviour change, and not one this stage makes unilaterally. It is
-flagged here as a follow-up call for the coordinator.
-
-**rollSafety — read this before the sweep line.** On this branch the
-suite does not complete in the sandbox: in the full sweep it exited 1
-after its 36-roll section, and solo it was SIGKILLed (exit 137) inside
-the final guard section — in both cases AFTER every executed assertion
-passed, with numbers identical to stage 2's run (36-roll section:
-"2 of 34 unguarded rolls are dim-on-dark", all [ok]). No assertion
-failure was printed in either attempt; the process dies, it does not
-fail. Control run, same VM, same hour: the stage-2 tree's rollSafety
-passes solo end-to-end (exit 0; guard section: "40 rolls, 14 dead as
-dealt, 0 still dead after the guard"). The difference is weight, and
-it is the feature working as ruled: rolled scenes now carry region
-atlases for the 74 defaulted assets (stage 2's demand mechanism,
-unchanged), and this sandbox has 8 GB — the suite's node process alone
-peaked ~3.4 GB RSS in the sweep, before its Chromium children. CI on
-the Mac runner is the authoritative run for this suite (same class as
-the Playwright e2e the sandbox cannot run); the two standing
-base-identical sandbox failures (swarmWasm "cargo not found", accum
-V8 OOM) are unchanged. Flagging plainly: if the coordinator wants
-rollSafety green IN THIS SANDBOX before publish, that is a
-suite-harness memory question (scene-at-a-time browser recycling),
-not an R3 behaviour change — R3 does not touch the governor budgets or
-stage 2's shed ladder, per the brief. (Provenance note: the first
-sweep's log was lost when the sandbox VM restarted mid-run — it had
-reached 284+ passes with only these same failures showing. The numbers
-above are from the complete re-run, logged at
-`~/workspace/sweep-1434/sweep2.log` outside the repo; the solo control
-logs sit beside it.)
+- `kinemes.selfcheck` + `gl/kineme.selfcheck` — the library id list gains
+  'bend' (the new kineme is the change under test); bend's entry pinned
+  {osc, 3.6, 6}.
+- `cellKinemes.selfcheck` — the animated-asset set gains the two
+  squiggles; line-boil (7/2.8/7) and wave-roll (8/3.2/8) pinned.
+- `regionAssignment.selfcheck` — linework asset count 33 → 31 and total
+  assigned 294 → 292 (the two squiggles are strips now — R3's own strip
+  exclusion); synthetic stroke/bar records pin bend vs bob by the
+  geometry rule; the synthetic IMPORT case now yields 10 bob + 2 bend
+  because the 12-cap merge unions two records into long sparse shapes
+  that measure as strokes — each asserted value is computed from the
+  geometry rule itself, not copied from the output.
+- `cellKinemePlayback.selfcheck` — two honest fixes: its mid-strip probe
+  time landed exactly on a cell boundary for odd cell counts (FP floor
+  3.9999…→3); the probe is now the middle cell's centre (identical probe
+  for even counts, all mic numbers unchanged). Its strip-table identity
+  assert now reads the union of both strip files.
+- `assets-micro-hud-strips.selfcheck` — scoped to the strips its own file
+  owns (the registry outgrew the file in R4); the line strips carry the
+  same two pins in regionLines.
 
 ## Judgment calls (flagged plainly)
 
-1. **Centre rule** = nearest the centre of ink. The issue says
-   "centre region pulses" without defining centre geometrically; this
-   is the deterministic reading, and on flora_flower_01 it picks the
-   true centre. A colour-keyed rule (the odd colour out) would be
-   bake-magic; geometry is honest.
-2. **Radial = ALL pulse.** The issue's "radial pulses" read plainly.
-   An alternating pulse/rock radial is a design variant — Matt's call
-   if he wants it; the table is one function.
-3. **The override lives in the project doc, not on the asset record.**
-   The issue says "bakes never clobber artist assignments". If edits
-   were written into the record, the next bake would either clobber
-   them or need a merge; keeping them in the doc makes the precedence
-   structural (doc over record at resolve time) and keeps a re-bake a
-   pure function. Consequence: an artist's per-region edit travels
-   with the PROJECT, like region slots do — the same asset in a
-   different project starts from the family defaults. That matches how
-   slots already behave.
-4. **Tombstones for "still".** A cleared assignment must be
-   distinguishable from "never edited", or the default would silently
-   resurrect it. `null` in the doc map is that distinction, and it
-   survives save/load (pinned).
-5. **The honest-feed record** is a tweak under the shared recorder
-   (key `'regionKineme'`) rather than a new event class — the issue
-   asks for LAYOUT_PARAM-class, and a parallel recorder would fork
-   the undo-burst collision logic for nothing.
-6. **Duplicates re-tag too.** A duplicated custom asset is an arrival;
-   it inherits the source's tagged record when present, else detects.
-   One extra branch in `duplicateAsset`, pinned by the overlay path.
-7. **Assignment-change undo**: edits flow through the store action
-   like other asset edits; no dedicated undo entry was added (region
-   slot edits don't have one either — same class, same treatment).
-8. **phase6 / rollSafety were NOT "fixed" in this stage.** Both are
-   harness ceilings that the defaults' designed weight crosses (see
-   Verification). The alternatives were weakening the hostile test,
-   capping demand the governor never asked for, or redesigning the
-   parity transport — all worse than an honest flag. If the
-   coordinator rules the harness work in-scope for the lane, it is a
-   small follow-up: chunk `buildRenderPayload`'s atlas transport (or
-   scope the hostile scene), and recycle the browser per scene in
-   rollSafety's guard section.
+1. **The "waveform asset" is `line_squiggle_02`.** The library has no
+   asset literally named waveform; the acceptance's `line_squiggle` maps
+   to `line_squiggle_01`, and squiggle_02 — the library's other sine-wave
+   line — is the second strip. (`mic_wave` already ships as a strip
+   since stage 1.)
+2. **The bend is a pack-time slice subdivision**, not authored frames and
+   not a shader warp: it reuses stage 2's region expansion and the
+   existing osc evaluation — no new subsystem, no new shader pass — per
+   the ruling's "simple" guard. The alternative reading (authored frames
+   only) covers the roll but cannot bend arbitrary lines.
+3. **Stroke-gate constants** (long axis ≥ 28 units, fill ≤ 0.30, slices
+   round(long/14) clamped [3, 8], bend osc 3.6 s / ±6°): chosen from the
+   measured library scan — solids measure fill 1.0, squiggles 0.15–0.24;
+   `line_spiral_01` (fill 0.35) stays a bob, honestly on the far side of
+   the gate. One boundary case sits exactly on the line
+   (`hae_flagella_01`, fill 0.30 → bend); the rule is ≤ and it is pinned
+   as such.
+4. **`bend` is also assignable to whole marks** (assetKineme / the region
+   picker list it automatically, like every kineme). On a whole mark it
+   behaves as the gentle osc it declares; the subdivision only engages
+   for stroke *regions*. Noted, not hidden.
+5. The R4 ruling's spec amendment is recorded in
+   `docs/research/per-region-animation-spec-2026-10-12.md` §R4 (shipped
+   note) in this stage's docs commit.
 
-## What did NOT ship
-
-- **No new families.** crystalline/biosynthetic/etc. get no defaults —
-  the issue's table names three families; widening it is Matt's call.
-- **No governor changes** — budgets, shed ladder, and stage 2's demand
-  mechanism untouched, per the brief.
-- **No liveAtlas canvas-path coverage** — stage 2's flagged gap stands
-  (the Node suites cover the contract/pack/renderer path; the
-  canvas-detection path still has no Node coverage).
-- **R4 (#1435)** is untouched — strips for waveforms/lines remain the
-  next stage.
+Coordinator calls left open (as in stage 3, not decided here): the two
+sandbox harness ceilings (rollSafety memory, phase6 driver string) recur
+identically; CI on the Mac runner is the authority for both.
