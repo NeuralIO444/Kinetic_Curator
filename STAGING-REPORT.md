@@ -1,167 +1,197 @@
-# XGBoost taste head — Phase T2 staging report (dice ordering + census readout)
+# XGBoost taste head — Phase T3 staging report (persona surface)
 
-Branch `ember/xgb-t2-dice-census`, stacked on T1 (`ember/xgb-t1-taste-trees`,
-tip `be05d9f0`). Built to spec `kc1-xgboost-taste-spec-2026-10-14.md` §5/§6/§8-T2.
+Branch `ember/xgb-t3-persona-surface`, stacked on the T2 tip (`9beb4059`).
+Built to spec `kc1-xgboost-taste-spec-2026-10-14.md` §5/§6/§7/§8-T3.
 Local commits only — no push, no PR. Coordinator: this file is the staging
-record; extract it before publishing, as with T1. (It replaces T1's report at
-this path; T1's remains in history at `be05d9f0`.)
+record; extract it before publishing, as with T1/T2. (It replaces T2's
+report at this path; T2's remains in history at `9beb4059`.)
 
-## ⚠️ Kill-criterion flag for the coordinator (read first)
+## ⚠️ One T3 element NOT built — the Queen anchor (by design)
 
-The §8-T2 kill criterion was re-measured exactly as the brief demanded, and
-the result needs a human call — stated plainly, nothing tuned:
-
-- With a plausible opinionated fixture head ordering the tray, **never-tray
-  lands at 16–24 across the 8 seeds — BELOW the #1546 band (28–37)** — and
-  trio overlap lands at **0.9–1.2%** (headline was 1.7%). Both measures move
-  in the *improving* direction on every seed: more of the library reaches
-  the tray, and finalist trios are more distinct.
-- The spec's own kill text (§8-T2) targets diversity that "**degrades** past
-  its 8-seed band". Nothing degrades here. But the brief's letter says
-  "out of that band", and never-tray is out of it on the low side — so this
-  is flagged, not silently re-baselined. The suite pins the *direction*
-  (ordering must never exceed the unordered run's never-tray or overlap on
-  the same stream); the absolute band call is yours.
-- Why it moves: the finalist cut is stratified (below), so the anchored
-  stratum holds a guaranteed finalist voice per roll. Decomposition,
-  measured: a FLAT scorer (ordering machinery, no opinions) already lowers
-  never-tray to 25–32; the head's layout opinions do the rest when they
-  favor varied modes (an inverted-opinion head lands at 25–31). On the
-  headline stream the four #1546 families reach their FULL library in-tray
-  (biosynthetic 12/12, crystalline 12/12, floral 15/15, radial 26/26).
+Spec §8-T3 lists three elements: Davis's citable reasons, the Queen anchor
+via the keeps fill, and the dev-panel tree reader. **The Queen anchor is
+NOT built and nothing stands in for it.** The keeps machinery (the shelf /
+Kinetic fill it would anchor into) does not exist yet — it is specced
+(`kc1-keeps-machinery-spec-2026-10-14.md`) but unfiled and unbuilt. Building
+an anchor now would mean inventing a fill surface, which the brief forbids.
+**This element is deferred until the keeps lane lands**; when the fill
+exists, the anchor is: the fill reads the tree head's scores for its
+consensus slots (reserved slots stay unscoreable, spec §6), which needs no
+new T3 machinery — `makeXgbScorer` is already the door.
 
 ## What was built
 
-### 1. Dice ordering (`app/src/curator/dice.js`, `useDiceRoll.js`)
-- `rollDice` gains optional `orderScorer` + `orderMeta`. The deal itself —
-  stream, casts, stratification (#1546), persona scores — is byte-for-byte
-  the same code path; the suite proves an ordered and an unordered roll on
-  the same seed deal the identical multiset of casts.
-- With a scorer: each candidate is stamped `xgbScore`, `stratum`
-  ('open' | 'anchored'), `anchorFamily` (null for open). "Anchored" means
-  the deal actually used a family pool for that slot (a family whose pool
-  is empty anchors nothing — exactly the pre-T2 semantics).
-- Finalist slots follow the deal's own proportions:
-  `anchoredSlots = min(|anchored|, max(1, round(3 · |anchored| / n)))` —
-  1 anchored + 2 open in every live configuration (n = 10/12/16). Within a
-  stratum, ranking is model score → persona score → deal order (stable
-  sort, no new stream draws). Slot overflow fills from the other stratum's
-  next-best; a slot is never left empty while candidates remain. Finalists
-  are presented in model order. **Scores never gate**: no threshold exists
-  anywhere; a candidate reaches the tray by winning its stratum.
-- No scorer → the return is the pre-T2 object exactly (no new keys), and
-  the whole pre-T2 suite surface passes unchanged — including the miner's
-  pinned takeHashes (miner suite green; the miner deliberately keeps its
-  persona-only real tray and never passes an order scorer).
-- Wiring: `useDiceRoll.roll()` builds the scorer per roll with the
-  curate.js idiom — `makeXgbScorer(getTaste(), { experimental:
-  experimentalOn() })` — so an absent/linear/below-bar/experimental-off
-  head yields null and the roll is bit-identical to today.
+### 1. Davis citable reasons (`app/src/curator/tasteHead.js`, `dice.js`, `curate.js`, `DiceRoller.jsx`, `panels.css`)
 
-### 2. Crown stamps (`app/src/curator/diceCrowns.js`)
-- `sanitize` gains the flat trio in the file's own idiom (always-present
-  keys, null defaults, like `davisCode`): `xgbScore`, `tasteVersion`,
-  `headKind`, each validated independently. `crown()` in useDiceRoll
-  passes the finalist's `xgbScore` + the roll's `orderMeta`.
-- Field name is `xgbScore`, not the spec §5 prose's bare `score`: on the
-  tray record `score` already IS the persona's score (both live on the
-  same object), so one name — `xgbScore` — is used in both records.
-  Judgment call, flagged for the coordinator.
+**The explainer.** `explainTreeScore(head, layoutParams)` runs the same
+tree walk the scorer runs — `walkTree` was refactored into `walkTreePath`,
+which records every split the walk turned on — and returns
+`{ score, clause, facts }`. The score is the walked score (the suite
+asserts equality with `scoreTreeHead` on every fixture). Returns null
+for a non-tree head, and null for a pure-leaf ensemble: no split, no
+citation, never an invented one.
 
-### 3. Census agreement readout (`censusReport.mjs`, `censusReadout.mjs`)
-- `tasteAgreement({ keeps, passes }, taste)` (pure): scores each ledger
-  row's `recipe.layoutParams` via `scoreLayout` — the exact live
-  reduction (the palette rides in the row but the head scores
-  layoutParams only; documented in the code). Rows without layoutParams
-  are counted as `unscored`, never silently dropped.
-- Reports mean keep score vs mean pass score (null for an empty side)
-  plus one separation statistic: **AUC by rank-sum (Mann–Whitney,
-  tie-averaged ranks)** — P(a random keep out-scores a random pass),
-  ties half. Deterministic and hand-computable; the census suite
-  reproduces 0.875 by hand on a fixture ledger (with a designed tie).
-- Absent, honestly, when there is no usable tree head: reasons are
-  'no taste loaded' / 'taste has no tree head (linear head)' / 'tree
-  head below the fidelity bar'. Presence requires the default (non-
-  experimental) `headUsable` bar. `formatTasteAgreement` renders both
-  states; `agreementView` in censusReadout.mjs is the section-level view
-  model (reshape only, per that module's law).
-- NOT wired into the snapshot script or any panel: spec §9 Q3 (room vs
-  dev-panel) is unruled, so T2 ships the measurement + view model only.
-  The window is whatever rows the caller passes (the full ledger by
-  default) — §6's "trailing window" becomes a caller choice at wiring
-  time.
+**How the top-gain path is chosen.** An ensemble has no single "winning
+tree", so the citation aggregates across every tree's taken path: for
+each feature, the highest-gain split the candidate actually turned on;
+facts are ranked by that gain and capped at three (`CITATION_MAX_FACTS`)
+— three fragments are a clause, four would be a report. Judgment call,
+flagged: spec §6 says "the highest-gain split path on the winning tree";
+the aggregate reading was chosen because no one tree decides an ensemble
+score, and a single-tree citation would misquote the other trees'
+contributions. The per-feature dedupe also matters in practice: a real
+head splits `density` in many trees, and citing it three times would be
+exactly the noise the kill criterion names.
 
-### 4. Palette wart — resolved (a) TRIM (`studio/curator.py`)
-- `XGB_LIVE_NULL_FEATURES = frozenset({'palette'})` + pure helper
-  `xgb_design_columns(vocab, nums)`: palette terms are dropped from the
-  tree head's design columns (reason written at the constant: palette is
-  the constant null bucket in every live scoreLayout call, so palette
-  splits spend depth on distinctions that can never fire and credit
-  held-out fidelity to dead signal). The design-matrix fill guards
-  trimmed terms (`if t in col`).
-- The LINEAR head is NOT touched: its palette weights are equally inert
-  live, but that head predates this audit and is not re-baselined here.
-- `studio/xgb_head_selfcheck.py` asserts the trim (palette terms dropped,
-  others kept, exported feature names exclude 'palette'). Passes.
+**How a split becomes words.** Facts of the LOOK only (spec §7.1 — the
+features are recipe features; no person-describing feature exists in the
+universe). The wording mirrors `studio/curator.py`'s `describe_term`
+vocabulary (`_WORDS` / `_BOOL_WORDS`), ported as `describeFeatureValue`,
+so the app and the Studio describe the same split the same way:
+- categorical split → the candidate's OWN value in the trainer's words
+  (`density` went-no on 'high' because the Look IS mid → "mid density";
+  `accum` true → "trails on"; `mirror` false → "unmirrored"). Citing the
+  candidate's value, not the split's, is what keeps the clause a
+  description of the work.
+- numeric split → the candidate's side of the split's own line
+  ("marks under 0.5" / "scale over 0.45") — the threshold is the model's
+  stated reason, so the citation quotes it.
 
-## Diversity measurements (dice suite harness, 600 rolls/seed)
+**Where it surfaces — existing surfaces only, no new panel.**
+- **CURATE (the pick):** `makeMlxCurator.pick()` records the winner's
+  clause as the last Davis citation (module state in the loisRank
+  `lastVerdict` idiom; `getDavisCitation()`). `curatorHint` — the
+  existing hint line on the Curator button — quotes it:
+  `curated pick · mlx — high density · dense crowds · mirrored`.
+  A linear head's pick clears the citation and the hint is byte-for-byte
+  the pre-T3 line (asserted). Before any pick, likewise unchanged.
+- **The dice tray (the ordering):** `makeXgbScorer` gains the optional
+  `explain(candidate)` (same candidate→layoutParams reduction `score`
+  uses, now shared). `rollDice`'s ordered path stamps `xgbReason` beside
+  `xgbScore` on every candidate — from the scorer when it can explain,
+  null when it can't (a plain `{id, score}` order scorer stamps null;
+  asserted). `DiceRoller`'s finalist card renders the clause as one
+  quiet line under the cast when present; absent → the card is exactly
+  as it was. The crown record is unchanged (score + version + kind
+  already ride it since T2; the clause is presentation, not provenance).
 
-Never-tray of 294 (OFF = unordered; the T1-era #1546 8-seed band was 28–37):
+**No head / linear head = exactly today's behaviour**, everywhere: the
+explainer is null, the scorer factory is null (T1), the dice stamps
+nothing (no orderScorer), the hint never quotes.
 
-| seed | OFF | flat scorer | opinionated head | OFF jac | ON jac |
-|------|-----|------|------|------|------|
-| 0x1504 | 31 | 27 | 20 | 1.65% | 1.19% |
-| 0x1505 | 38 | 32 | 17 | 1.46% | 1.22% |
-| 0x1506 | 31 | 25 | 22 | 1.56% | 1.15% |
-| 0x1507 | 32 | 28 | 24 | 1.49% | 0.95% |
-| 0x1508 | 35 | 30 | 19 | 1.58% | 1.14% |
-| 0x1509 | 35 | 30 | 16 | 1.44% | 1.12% |
-| 0x150a | 33 | 28 | 24 | 1.65% | 0.89% |
-| 0x150b | 41 | 30 | 21 | 1.37% | 1.01% |
+### Example clauses (from real fixture paths — the kill-criterion evidence)
 
-Note: OFF on seeds 0x1505/0x150b (38, 41) already sits above the T1-era
-band's top on this seed set — the band was measured on a different seed
-set at #1546 publish; the on/off comparisons above are same-stream,
-which is the comparison that isolates the ordering's effect. Tray reach
-(distinct) rises on every seed with ordering (263 → 270–278 range).
-Inverted-opinion head (fibonacci/orbit/grid down, swarm/eden up):
-never-tray 28/30/26/29/31/28/25/30 — never above OFF either.
+From the tasteHead suite's fixtures, generated by the explainer itself:
 
-## Tests
+| Candidate (fixture) | Clause |
+|---|---|
+| density 90 (T1 tree: density='high' → leaf) | `high density` |
+| density 50, count 400 (falls through to num.count) | `mid density · marks under 0.5` |
+| density 50, count 600 | `mid density · marks over 0.5` |
+| rich ensemble: density 90, count 300, scale [1.8, 2.2], mirror on | `high density · dense crowds · mirrored` |
+| rich ensemble: density 20, count 30, scale [0.3, 0.5], mirror off | `low density · sparse crowds · unmirrored` |
+| rich ensemble: density 50, count 120, scale [1.0, 1.2] | `mid density · mid crowds · unmirrored` |
+| dice-suite fixture (system-only head), a fibonacci finalist | `fibonacci layouts` |
 
-Extended suites only; no new suite, so `app/selfcheck.manifest` is
-unchanged and the package.json selfcheck script is untouched.
+Coordinator/Matt: the §8-T3 kill criterion is "reasons read as noise in
+the room → keep the scores, drop the citations". These read as terse
+descriptions of the Look to me; the call is Matt's eye, per the criterion.
 
-- `dice.selfcheck.mjs` §12: fixture-head ordered roll — same casts as
-  unordered (stream untouched), stamps on every candidate, stratum
-  counts = the #1546 share, anchored finalist = stratum's model-best,
-  allocation = deal proportions, tray presented in model order, ties
-  fall to persona (flat scorer), no-head surface has no T2 keys, crown
-  trio round-trips + junk sanitizes to nulls. PASS.
-- `coverage.selfcheck.mjs` §4: the 8-seed guard sweep above (OFF vs
-  flat vs opinionated), non-degradation asserted per seed, headline
-  stream's four families fully tray-reached when ordered. PASS (~10 s).
-- `census.selfcheck.mjs`: tasteAgreement on a fixture ledger + head —
-  means and AUC (0.875) reproduced by hand from scoreLayout, unscored
-  rows counted, three absent states honest, empty-side nulls. PASS.
-- `censusReadout.selfcheck.mjs`: agreementView present/absent/purity
-  (deep-frozen input). PASS.
-- Curator neighbourhood (tasteHead, tasteLedger, recipeFeatures, miner,
-  candidateTray, curate, dice): all PASS.
-- Full manifest sweep (417 suites, run solo): **415 pass, 1 fail,
-  1 skip** — the fail is `src/gl/accum.selfcheck.mjs` (V8 OOM abort) and
-  the skip is `swarmWasm` (cargo absent; the stock `npm run selfcheck`
-  halts there). Both are the known base-identical sandbox limitations,
-  in code this diff does not touch.
-- `npm run build`: PASS.
-- Python: `studio/xgb_head_selfcheck.py` PASS (incl. trim asserts),
-  `geom_selfcheck.py` PASS, `run_manifest_selfcheck.py` 9/9 PASS.
+### 2. Dev-panel tree reader — "read the model" (`treeReader.mjs`, `TasteTreePanel.jsx`, `devTabs.mjs`)
 
-## Not done (deliberately)
+- `treeHeadView(taste)` (pure, `app/src/curator/treeReader.mjs`) reshapes
+  the VALIDATED head object from `getTaste()` — the raw file is never
+  re-parsed. Absent states stay absent with the reason named, in the
+  census readout's idiom: 'no taste loaded' / 'taste has no tree head
+  (linear head)'.
+- The printed text mirrors `studio/curator.py`'s `describe_trees` line
+  for line: header (`xgboost trees · N trees, depth <= D, M nodes`,
+  stats by the `spec_head_stats` walk), strongest features by TOTAL
+  split gain (top 5), then the top 3 trees by total gain formatted as
+  `_format_spec_tree` formats them (`if …  [gain g]` / `else` /
+  `-> ±0.0000` leaves, categorical splits glossed with the same words
+  the citations use). A below-bar head still reads — inspect prints any
+  head; the bar governs steering, not readability — and the view says
+  `steering: false` so the panel can show it.
+- Surface: a new **TASTE** tab in the existing DEV panel (`devTabs.mjs`
+  lazy-chunk idiom, exactly as Census landed in #1507) rendering
+  `TasteTreePanel.jsx` — summary line (counts, fidelity, fitOn, steering)
+  + the text in a `<pre>`. DEV-gated as all dev tabs are; the perform
+  surface never imports it.
 
-- No persona text/citations, no dev-panel tree reader (T3).
-- No snapshot-script/panel wiring for the agreement readout (Q3 unruled).
-- The miner's REAL tray stays persona-only.
-- `castCategories` observation from T1 stands (array terms could reach
-  the xgb vocab from cast-carrying pool rows; the app would reject
-  them) — a Studio-run question, not chased here.
+### 3. Chore (`studio/pyproject.toml`)
+
+`requires-python ">=3.11"` → `">=3.12"` (librosa 1.0 already requires
+≥3.12; `uv sync` fails resolution without this — seen live on the Studio,
+2026-10-14) and `"xgboost>=3"` added to the `curator` optional-dependencies
+extra. Nothing else in the file.
+
+## Files touched per commit
+
+1. `feat(curator): XGBoost T3 — Davis citable reasons from the tree path`
+   tasteHead.js (walkTreePath, explainTreeScore, describeFeatureValue,
+   citation state, scorer explain, curator citation), dice.js (xgbReason
+   stamp), curate.js (hint quotes the citation), DiceRoller.jsx +
+   panels.css (the card's reason line), tasteHead.selfcheck.mjs +
+   dice.selfcheck.mjs (T3 blocks).
+2. `feat(dev): XGBoost T3 — read the model (dev-panel tree reader)`
+   treeReader.mjs + treeReader.selfcheck.mjs (new), TasteTreePanel.jsx
+   (new), devTabs.mjs (TASTE tab), devPanel.selfcheck.mjs (tab list),
+   selfcheck.manifest (register treeReader suite).
+3. `chore(studio): pyproject — Python >=3.12, xgboost in the curator extra`
+   studio/pyproject.toml only.
+4. `docs: T3 staging report` — this file.
+
+## Test results (exact, this worktree, this run)
+
+- `tasteHead.selfcheck` — OK (incl. the new T3 block: clause text on 6
+  fixture candidates, explained score = walked score, dedupe/cap,
+  null cases, scorer explain reductions, citation plumbing through the
+  store + hint both directions).
+- `dice.selfcheck` — OK (incl. T3: xgbReason stamped from each
+  candidate's own path with the real scorer; null with an unexplaining
+  scorer; the pre-T2 unordered surface unchanged).
+- `curate.selfcheck` — ok.
+- `treeReader.selfcheck` — OK (hand-computed stats: 4 trees / depth 2 /
+  18 nodes; strongest features by summed gain; top-3 tree text asserted
+  line for line; absent states; below-bar steering flag).
+- `devPanel.selfcheck` — OK (nine lazy tabs incl. taste).
+- `census.selfcheck`, `censusReadout.selfcheck` — OK.
+- Neighbourhood: taste, tasteLedger, candidateTray, loisRank,
+  topbarTaste, queenLean, directorRoom — all OK.
+- `studio/xgb_head_selfcheck.py` — OK.
+- `npm run build` — OK (built in 3.17s). NOTE: the first build attempt
+  failed resolving `@tauri-apps/api` because this worktree had no
+  `node_modules` of its own (vite leaked from a sibling worktree); after
+  `npm install` in `app/` the build is green. Environment, not code.
+- ESLint on all touched JS/JSX/MJS files — 0 errors.
+- NOT run: the full manifest sweep (per the standing sandbox rule —
+  never two sweeps, and rollSafety needs a solo run; the coordinator
+  runs the full sweep at publish). The known sandbox-env failures
+  (swarmWasm "cargo not found", gl/accum V8 OOM) are untouched by this
+  stack — no T3 file is in their neighbourhood.
+
+## Judgment calls (flagged plainly)
+
+1. **Aggregation over "the winning tree"** — see §1 above. The citation
+   aggregates the top-gain taken splits across the ensemble, one per
+   feature. Spec §6's wording is singular; the ensemble reading is the
+   honest one. If Matt wants single-tree purity, the change is small
+   (rank trees by total gain, cite only its path).
+2. **The tray clause cites the dice reduction** — a dice candidate is
+   scored as `{ mode }` (T1's reduction), so its clause cites the mode
+   plus whatever the default recipe reads as. That is exactly what the
+   head judged; anything richer would explain a score that never
+   happened. With a system-splitting head the cards differentiate
+   ("fibonacci layouts"); with a density-splitting head they will read
+   alike until the dice reduction grows — a dice question, not a T3 one.
+3. **The crown record does not carry the clause** — T2 already stamps
+   score + taste version + head kind, which reproduces the judgment
+   (and therefore the clause) exactly; stamping prose too would store
+   a derived string that can drift from the trees. Presentation only.
+4. **The dev tab is titled TASTE** (icon ♣) and sits after CENSUS in
+   the tab order — appended, not inserted, so no existing tab moved.
+5. **The hint quotes with an em dash** (`curated pick · mlx — …`),
+   matching the hint's own separator habits; the pre-T3 string is a
+   strict prefix when no citation exists, so nothing that reads the
+   old line breaks.
