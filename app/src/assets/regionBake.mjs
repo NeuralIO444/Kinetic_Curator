@@ -5,8 +5,10 @@
 // var(--accent) -> #ff2d95, 200 px over the 100-unit box), run once here and committed as data. No runtime detection
 // cost, and the diff is reviewable asset by asset.
 //
-//   cap       at most REGION_CAP (8) regions per asset: the largest are kept and each of the rest is merged into the
-//             nearest kept region (area, bbox and centroid combine; the kept region's id stays)
+//   cap       at most REGION_CAP (12) regions per asset: the largest are kept and each of the rest is merged into the
+//             nearest kept region (area, bbox and centroid combine; the kept region's id stays). 12 is Matt's
+//             amended ruling (2026-10-14, on #1433): tagging is data — up to 12 on every machine — and the
+//             GOVERNOR selects which tagged regions animate live (up to 12 desktop, up to 8 iPad-class).
 //   slots     A..D take the first four kept regions in READING ORDER (top-left first). No colour is invented: a region
 //             is only ever the colour the asset already draws.
 //   nothing   an asset that rasterizes to nothing gets no entry: it stays byte-identical to today
@@ -14,8 +16,9 @@
 import { Resvg } from '@resvg/resvg-js';
 import { detectRegions } from './regionMattes.js';
 import { REGION_SLOTS, normalizeRegionSlots } from './regionSlots.js';
+import { capRegionsTracked } from './regionPartition.js';
 
-export const REGION_CAP = 8;
+export const REGION_CAP = 12;
 export const BAKE_PX = 200;
 /** Rows of reading order: regions whose centres are within this share of the height read as one line, left to right. */
 const ROW_BAND = 0.15;
@@ -29,32 +32,11 @@ export function canonicalSvg(svg) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${BAKE_PX}" height="${BAKE_PX}">${body}</svg>`;
 }
 
-/** Merge `from` into `into` (area-weighted centroid, union bbox). The kept region's id and colour stay. */
-function absorb(into, from) {
-  const total = into.area + from.area;
-  into.cx = (into.cx * into.area + from.cx * from.area) / total;
-  into.cy = (into.cy * into.area + from.cy * from.area) / total;
-  into.x0 = Math.min(into.x0, from.x0); into.y0 = Math.min(into.y0, from.y0);
-  into.x1 = Math.max(into.x1, from.x1); into.y1 = Math.max(into.y1, from.y1);
-  into.area = total;
-}
-
-/** Keep the REGION_CAP largest (ties: the earlier in the detector's order); merge the rest into the nearest kept. */
+/** Keep the REGION_CAP largest (ties: the earlier in the detector's order); merge the rest into the nearest kept.
+ *  The merge itself lives in regionPartition.js (capRegionsTracked) — one implementation, shared with the
+ *  renderer's pixel partition (#1433); this wrapper keeps the bake's record-only shape. */
 export function capRegions(regions, cap = REGION_CAP) {
-  if (regions.length <= cap) return regions.map((r) => ({ ...r }));
-  const order = regions.map((r, i) => ({ r, i })).sort((a, b) => b.r.area - a.r.area || a.i - b.i);
-  const kept = order.slice(0, cap).map((e) => ({ ...e.r }));
-  for (const e of order.slice(cap)) {
-    let best = kept[0]; let bd = Infinity;
-    for (const k of kept) {
-      const d = (k.cx - e.r.cx) ** 2 + (k.cy - e.r.cy) ** 2;
-      if (d < bd - 1e-12) { bd = d; best = k; }
-    }
-    absorb(best, e.r);
-  }
-  // back to the detector's own order, so the output reads the same however the sizes fall
-  const keptIds = new Set(kept.map((k) => k.id));
-  return regions.filter((r) => keptIds.has(r.id)).map((r) => kept.find((k) => k.id === r.id));
+  return capRegionsTracked(regions, cap).kept;
 }
 
 /** Reading order: top-left first, by line then left to right. Pure. */
