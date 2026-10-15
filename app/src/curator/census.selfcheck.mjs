@@ -28,6 +28,7 @@ globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance
 
 const {
   paramCensus, dishMatrix, renderReachability, formatCensusReport,
+  tasteAgreement, formatTasteAgreement,
   fingerprintItems, place, assetInk, mulberry32, CENSUS_SEED, CAST, CAST_IDS,
 } = await import('./censusReport.mjs');
 const { PARAM_SPEC, RANGE_SPEC, DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } = await import('../data/layout-modes.js');
@@ -41,6 +42,8 @@ const { rollDice } = await import('./dice.js');
 const { createPersonaScorer } = await import('./diceScorer.js');
 const { captureKeepContext } = await import('./keepContext.js');
 const { recordCrown, readCrowns } = await import('./diceCrowns.js');
+const { validateTaste, scoreLayout } = await import('./tasteHead.js');
+const { FEATURES_VERSION } = await import('./recipeFeatures.js');
 const { captureFavorite, sanitizeFavorite, KEEPS_KEY } = await import('../state/slices/davisSlice.js');
 const { normalizeSeedOffsets } = await import('../engine/kernel/rng.js');
 const { generateLayoutTargets, randomizeKey, RANDOMIZABLE_KEYS, DICE_RANGES, EVOLVE_TARGET_OVERRIDES } = await import('../state/paramUtils.js');
@@ -582,5 +585,67 @@ const reach = renderReachability();
 }
 
 // ── report ──────────────────────────────────────────────────────────
+// ── XGBoost T2 — taste agreement readout ─────────────────────────────
+// The census grades the tree head against the ledger's own verdicts.
+// Fixture numbers reproduce by hand: the head pays +1.0 for density
+// 'high', else +0.5 when num.count < 0.25, else −0.5, over base 0.25.
+const AGR_TASTE = validateTaste({
+  kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'census fixture',
+  dims: 1152, labels: { likes: 4, passes: 4 },
+  head: {
+    kind: 'xgboost-trees', objective: 'binary:logistic', baseScore: 0.25, fidelity: 0.9,
+    features: ['density', 'num.count'],
+    trees: [{
+      f: 0, op: '=', v: 'high', gain: 3, y: { leaf: 1.0 },
+      n: { f: 1, op: '<', v: 0.25, gain: 1, y: { leaf: 0.5 }, n: { leaf: -0.5 } },
+    }],
+  },
+}).taste;
+const rowA = { recipe: { layoutParams: { density: 90, count: 400 }, paletteId: 'hydra' } }; // sigmoid(1.25)
+const rowB = { recipe: { layoutParams: { density: 20, count: 100 }, paletteId: null } }; // sigmoid(0.75)
+const rowC = { recipe: { layoutParams: { density: 20, count: 600 }, paletteId: 'bone' } }; // sigmoid(-0.25)
+const sA = scoreLayout(AGR_TASTE.head, rowA.recipe.layoutParams);
+const sB = scoreLayout(AGR_TASTE.head, rowB.recipe.layoutParams);
+const sC = scoreLayout(AGR_TASTE.head, rowC.recipe.layoutParams);
+assert.ok(sA > sB && sB > sC, 'fixture head orders the fixture rows as designed');
+const agr = tasteAgreement({
+  keeps: [rowA, rowB, { recipe: { layoutParams: null, paletteId: null } }],
+  passes: [rowC, rowB, {}],
+}, AGR_TASTE);
+assert.strictEqual(agr.present, true);
+assert.strictEqual(agr.headKind, 'xgboost-trees');
+assert.strictEqual(agr.tasteVersion, 1);
+assert.strictEqual(agr.keeps.n, 2, 'two scorable keeps');
+assert.strictEqual(agr.passes.n, 2, 'two scorable passes');
+assert.strictEqual(agr.unscored, 2, 'null-params and recipe-less rows are counted, never dropped');
+assert.strictEqual(agr.keeps.mean, +(((sA + sB) / 2).toFixed(4)), 'keep mean reproduces by hand');
+assert.strictEqual(agr.passes.mean, +(((sC + sB) / 2).toFixed(4)), 'pass mean reproduces by hand');
+// AUC by hand: pairs (A,C) win, (A,B) win, (B,C) win, (B,B) tie = 3.5/4.
+assert.strictEqual(agr.auc, 0.875, 'rank-sum AUC reproduces by hand, ties counting half');
+const agrText = formatTasteAgreement(agr);
+assert.ok(agrText.includes('keeps mean 0.728') && agrText.includes('AUC 0.875'), `formatted readout carries the numbers:\n${agrText}`);
+// absent, honestly: no taste, a linear taste, a below-bar tree head.
+assert.deepStrictEqual(tasteAgreement({ keeps: [], passes: [] }, null), { present: false, reason: 'no taste loaded' });
+const LINEAR_TASTE = validateTaste({
+  kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'linear fixture',
+  dims: 1152, labels: { likes: 1, passes: 1 },
+  probe: { weights: new Array(1152).fill(0), bias: 0 },
+  head: { terms: {}, num: {}, bias: 0, fidelity: 0.9, fitOn: 2 },
+}).taste;
+assert.strictEqual(tasteAgreement({ keeps: [rowA], passes: [] }, LINEAR_TASTE).present, false, 'linear taste: no tree head to grade with');
+assert.ok(tasteAgreement({ keeps: [rowA], passes: [] }, LINEAR_TASTE).reason.includes('no tree head'));
+const LOWFID_TASTE = validateTaste({
+  kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'low fixture',
+  dims: 1152, labels: { likes: 1, passes: 1 },
+  head: { ...AGR_TASTE.head, fidelity: 0.1 },
+}).taste;
+assert.ok(tasteAgreement({ keeps: [rowA], passes: [] }, LOWFID_TASTE).reason.includes('fidelity bar'), 'below-bar head reports itself absent');
+assert.ok(formatTasteAgreement(tasteAgreement({ keeps: [], passes: [] }, null)).startsWith('taste agreement: ABSENT'), 'absent formats as absent');
+// an empty side is a present readout with nulls, not an absence.
+const oneSide = tasteAgreement({ keeps: [], passes: [rowC] }, AGR_TASTE);
+assert.strictEqual(oneSide.present, true);
+assert.strictEqual(oneSide.keeps.mean, null, 'no keeps: mean is null, not 0');
+assert.strictEqual(oneSide.auc, null, 'no keeps: no separation to report');
+
 console.log(formatCensusReport({ paramRows, dishRows, reach, store: storeLines }));
 console.log('census.selfcheck: OK (#1505 — RA3 census + dish matrix + write-path doors, RA5 reachability, RA6 round-trip, PA3 crown integrity)');

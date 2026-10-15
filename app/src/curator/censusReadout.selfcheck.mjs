@@ -16,7 +16,7 @@
 //     because it cannot compute a different answer.
 import assert from 'node:assert';
 
-const { coverageView, censusView, yieldByCornerView, alarmFor, COVERAGE_KIND, CENSUS_KIND } = await import('./censusReadout.mjs');
+const { coverageView, censusView, yieldByCornerView, agreementView, alarmFor, COVERAGE_KIND, CENSUS_KIND } = await import('./censusReadout.mjs');
 const { diceTrayCoverage, keepsCoverage } = await import('./coverageReport.mjs');
 
 const lines = [];
@@ -124,6 +124,27 @@ const coverageArtifact = deepFreeze({
   const radial = v.categories.find((r) => r.name === 'radial');
   assert.ok(radial && radial.inLibrary === 26, 'radial is in the readout with its library size');
   lines.push(`real artifact: E1a coverage renders (tray ${v.trayDistinct}/${v.library.assets}, radial tray ${radial.inTray}/${radial.inLibrary}); every alarm consistent`);
+}
+
+// ── XGBoost T2 — the taste-agreement section ─────────────────────────
+// Reshape only, like everything in the readout: a present agreement
+// flattens to display fields; an absent one stays absent with its
+// reason; a deep-frozen input is never mutated.
+{
+  const agr = deepFreeze({
+    present: true, headKind: 'xgboost-trees', tasteVersion: 1, fidelity: 0.9,
+    keeps: { n: 2, mean: 0.7282 }, passes: { n: 2, mean: 0.5585 }, unscored: 2, auc: 0.875,
+  });
+  assert.deepStrictEqual(agreementView(agr), {
+    present: true, headKind: 'xgboost-trees', tasteVersion: 1, fidelity: 0.9,
+    keepsMean: 0.7282, keepsN: 2, passesMean: 0.5585, passesN: 2, auc: 0.875, unscored: 2,
+  });
+  assert.deepStrictEqual(agreementView(agr), agreementView(agr), 'agreement view is pure');
+  assert.deepStrictEqual(
+    agreementView(deepFreeze({ present: false, reason: 'no taste loaded' })),
+    { present: false, reason: 'no taste loaded' }, 'absent stays absent, reason carried');
+  assert.deepStrictEqual(agreementView(null), { present: false, reason: 'not measured' });
+  lines.push('taste agreement: present reshapes flat, absent stays absent with its reason, frozen inputs unmutated');
 }
 
 console.log('censusReadout.selfcheck:');
