@@ -20,6 +20,8 @@ import { Resvg } from '@resvg/resvg-js';
 import { ASSETS } from '../data/assets/index.js';
 import { applyGradient } from '../assets/gradient.js';
 import { stripFramesFor } from '../data/cellKinemes.js';
+import { buildRegionPartition, regionCellGeometry } from '../assets/regionPartition.js';
+import { canonicalSvg } from '../assets/regionBake.mjs';
 
 const ASSET_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 
@@ -95,13 +97,87 @@ function bakeCombo(assetId, ink, accent) {
 export const comboKey = (assetId, ink, accent) => `${assetId}|${ink}|${accent}`;
 
 /**
+ * #1433 (R2) — the region cells for one baked combo: a remainder cell
+ * (the whole mark minus every region's pixels) plus one cell per tagged
+ * region (its pixels only, in the centroid-centred frame
+ * regionCellGeometry defines). Together with the whole cell they tile
+ * the mark exactly — the partition is over the whole cell's own pixels,
+ * so region + remainder bytes sum back to the whole cell's bytes.
+ *
+ * Strip assets are excluded: their frames are whole-mark animation
+ * frames (the needle moves between them), so per-region playback is
+ * incoherent there — cell kinemes own strip assets outright.
+ *
+ * @param {object} asset — the catalogue record (carries `regions`)
+ * @param {Buffer} wholePixels — bakeCombo output for a non-strip combo
+ * @param {Map} partCache — per-call partition cache keyed by asset id
+ * @returns {Array<{suffix: string, cp: Buffer, uvSub: object|null, geo: object|null}>}
+ */
+function regionCellsFor(asset, wholePixels, partCache) {
+  if (!Array.isArray(asset?.regions) || !asset.regions.length) return [];
+  if (stripFramesFor(asset.id)) return [];
+  let part = partCache.get(asset.id);
+  if (!part) {
+    const img = new Resvg(canonicalSvg(asset.svg)).render();
+    part = buildRegionPartition(new Uint8Array(img.pixels), img.width, img.height, asset.regions);
+    partCache.set(asset.id, part);
+  }
+  // Cell px -> partition owner. The 100-unit box occupies cell px
+  // [100, 300) at the same 2 px/unit as the 200px canonical raster, so
+  // canonical px = cell px - 100 inside the box; outside it, -1.
+  const ownerAt = (x, y) =>
+    x >= 100 && x < 300 && y >= 100 && y < 300 ? part.owner[(y - 100) * 200 + (x - 100)] : -1;
+  const out = [];
+  // The remainder: every whole-cell pixel no region owns.
+  {
+    const cp = Buffer.alloc(CELL_PX * CELL_PX * 4);
+    for (let y = 0; y < CELL_PX; y++) {
+      for (let x = 0; x < CELL_PX; x++) {
+        if (ownerAt(x, y) !== -1) continue;
+        const o = (y * CELL_PX + x) * 4;
+        wholePixels.copy(cp, o, o, o + 4);
+      }
+    }
+    out.push({ suffix: '#rem', cp, uvSub: null, geo: null });
+  }
+  // One cell per region: its pixels, cut from the centroid-centred rect
+  // and centred in the slot, so the cell's content rect (uvSub) and the
+  // instance geometry (geo) agree by construction.
+  asset.regions.forEach((record, rIdx) => {
+    const g = regionCellGeometry(record);
+    const cp = Buffer.alloc(CELL_PX * CELL_PX * 4);
+    const ox = Math.round((CELL_PX - g.w) / 2);
+    const oy = Math.round((CELL_PX - g.h) / 2);
+    for (let j = 0; j < g.h; j++) {
+      for (let i = 0; i < g.w; i++) {
+        if (ownerAt(g.x0 + i, g.y0 + j) !== rIdx) continue;
+        const s = ((g.y0 + j) * CELL_PX + (g.x0 + i)) * 4;
+        wholePixels.copy(cp, ((oy + j) * CELL_PX + (ox + i)) * 4, s, s + 4);
+      }
+    }
+    out.push({
+      suffix: `#r:${record.id}`,
+      cp,
+      uvSub: { ox, oy, w: g.w, h: g.h },
+      geo: { px: g.pivotX, py: g.pivotY, sx: g.scaleX, sy: g.scaleY },
+    });
+  });
+  return out;
+}
+
+/**
  * Bake an atlas for the given combos.
  * @param {Array<{asset:string, ink:string, accent:string}>} combos
+ * @param {{regionAssets?: Set<string>|null}} [opts] region-cell demand:
+ *   null/omitted bakes region cells for every regioned combo (direct
+ *   callers and tests); a Set bakes them only for the named assets —
+ *   the render paths pass the contract's regionAnim assets, so scenes
+ *   that never expand a mark never pay for its region cells.
  * @returns {{pixels: Buffer, width: number, height: number,
  *   cells: Map<string, {u0,v0,u1,v1, ink: [x0,y0,x1,y1]|null}>}}
  *   cells map key -> atlas UV rect + ink bbox in asset units.
  */
-export function bakeAtlas(combos) {
+export function bakeAtlas(combos, { regionAssets = null } = {}) {
   const uniq = [];
   const seen = new Set();
   for (const c of combos) {
@@ -124,27 +200,56 @@ export function bakeAtlas(combos) {
   });
   const totalSlots = baked.reduce((s, b) => s + b.slots, 0);
   const maxSlots = baked.reduce((m, b) => Math.max(m, b.slots), 1);
-  const cols = Math.max(1, Math.ceil(Math.sqrt(totalSlots)), maxSlots);
+  // #1433 — region cells (remainder + one per tagged region) pack into
+  // the SAME sqrt grid as the mains, flowing on after them: the grid is
+  // sized on the TOTAL slot count. Combo-rich scenes carry ~4 extra
+  // cells per main, and any looser packing overflows the 8192 texture
+  // ceiling of 8192-class GPUs — measured: the FX-test default scene at
+  // 192 cells packed 5616x8208 in zones (16px over — GL_INVALID_VALUE
+  // at upload) vs 6048x6048 joint. Cell CONTENTS are packing-invariant
+  // (the pack addresses cells by key), so nothing downstream sees the
+  // move; only the atlas' outer dimensions reflect the region cells.
+  const partCache = new Map();
+  const extras = [];
+  for (const b of baked) {
+    if (regionAssets && !regionAssets.has(b.c.asset)) continue;
+    const asset = ASSET_BY_ID.get(b.c.asset);
+    for (const e of regionCellsFor(asset, b.cp, partCache)) {
+      extras.push({ key: b.c.key + e.suffix, cp: e.cp, ink: null, widthPx: CELL_PX, slots: 1, uvSub: e.uvSub, geo: e.geo });
+    }
+  }
+  const cols = Math.max(1, Math.ceil(Math.sqrt(totalSlots + extras.length)), maxSlots);
   let col = 0, row = 0;
   for (const b of baked) {
     if (col + b.slots > cols) { row++; col = 0; }
     b.cx = col * stride; b.cy = row * stride;
     col += b.slots;
   }
+  for (const e of extras) {
+    if (col + 1 > cols) { row++; col = 0; }
+    e.cx = col * stride; e.cy = row * stride;
+    col += 1;
+  }
   const width = cols * stride;
   const height = (row + 1) * stride;
   const pixels = Buffer.alloc(width * height * 4, 0);
   const cells = new Map();
-  for (const b of baked) {
+  for (const b of [...baked, ...extras]) {
     for (let y = 0; y < CELL_PX; y++) {
       b.cp.copy(pixels, ((b.cy + y) * width + b.cx) * 4, y * b.widthPx * 4, (y + 1) * b.widthPx * 4);
     }
-    cells.set(b.c.key, {
+    // A region cell's content sits inside its slot (uvSub): the UV rect
+    // addresses the content, inset by half a texel like every cell.
+    const sub = b.uvSub || { ox: 0, oy: 0, w: b.widthPx, h: CELL_PX };
+    cells.set(b.key || b.c.key, {
       // Inset by half a texel: the shader quad spans the texel centers
       // (asset units [-49.75, 149.75]), so UVs address texel centers.
-      u0: (b.cx + 0.5) / width, v0: (b.cy + 0.5) / height,
-      u1: (b.cx + b.widthPx - 0.5) / width, v1: (b.cy + CELL_PX - 0.5) / height,
+      u0: (b.cx + sub.ox + 0.5) / width, v0: (b.cy + sub.oy + 0.5) / height,
+      u1: (b.cx + sub.ox + sub.w - 0.5) / width, v1: (b.cy + sub.oy + sub.h - 0.5) / height,
       ink: b.ink,
+      // #1433: region-instance geometry (pivot + scale vs the quad span);
+      // absent on whole/remainder cells — the pack reads it only for #r: cells.
+      ...(b.geo ? { geo: b.geo } : {}),
     });
   }
   // CPU-generated mipmap chain (box filter on premultiplied sRGB bytes).
