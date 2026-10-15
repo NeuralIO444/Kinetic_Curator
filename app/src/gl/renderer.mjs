@@ -52,6 +52,7 @@ const GRAIN_FAMILY_KINDS = ['grain'];
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { registerCostTier } from './costTiers.mjs';
 import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
+import { kinemePhase } from '../data/kinemes.js'; // #1433 R2: per-region phase = the house seed hash of (asset id, region id)
 import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
 import { createCoalesceFinish } from './coalesceFinish.mjs'; // #1411 coalescence finish
 import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
@@ -290,6 +291,17 @@ registerCostTier('gl/cell-kineme', {
   tier: 0, memoryBytes: 0, timeMs: 0,
   notes: '#1431 KINEME C: cell window picked in packInstanceData per strip instance; zero passes; frames ride the atlas (costCells in cellKinemes.js); shed pins cell 0; live + GL stills',
 });
+// #1433 R2: region expansion is pack-time instance multiplication inside
+// the existing quad pass — no pass, no texture beyond the region cells
+// the atlas carries. The extra instances ARE the cost: they pack and
+// draw at full price, and the governor selects how many regions animate
+// via contract.regionAnim (sceneContract.regionAnimBudget). Shed ladder:
+// freeze on the tier-2 rung (budget -> 0), then collapse to the single
+// original quad (the pre-R2 code path, exact).
+registerCostTier('gl/region-instances', {
+  tier: 0, memoryBytes: 0, timeMs: 0,
+  notes: '#1433 R2: region instances expand in packInstanceData inside the quad pass; zero passes; region cells ride the atlas; governor selection via regionAnim budget; freeze tier-2, collapse deeper; live + GL stills',
+});
 // #594 PR2 bevel: 4 extra atlas taps per LIT fragment (only when the sun is on
 // and bevel > 0), inside the same quad pass. Declared tier 0 like the rest of the
 // quad program because the cost gate needs a harness measurement for tiers 1–3
@@ -320,11 +332,111 @@ export const SMEAR_MAX = 1.0;
 
 export const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
 
+/**
+ * #1433 (R2) — the region-cell index over a cells map: base cell key ->
+ * { remainder, regions: [{ id, cell }] } in bake (record) order. Built
+ * once per cells object (WeakMap): the live loop swaps cells objects
+ * only on a rebake, and stills build one per render. Region cells ride
+ * the atlas under `<base>#rem` and `<base>#r:<regionId>` keys (both
+ * bakers, atlas.mjs + liveAtlas.mjs).
+ */
+const regionIndexCache = new WeakMap();
+function regionIndexFor(cells) {
+  let idx = regionIndexCache.get(cells);
+  if (idx) return idx;
+  idx = new Map();
+  const entryFor = (base) => {
+    let e = idx.get(base);
+    if (!e) { e = { remainder: null, regions: [], ids: new Set() }; idx.set(base, e); }
+    return e;
+  };
+  for (const key of Object.keys(cells)) {
+    const rPos = key.indexOf('#r:');
+    if (rPos > 0) {
+      const e = entryFor(key.slice(0, rPos));
+      const id = key.slice(rPos + 3);
+      e.regions.push({ id, cell: cells[key] });
+      e.ids.add(id);
+    } else if (key.endsWith('#rem')) {
+      entryFor(key.slice(0, -4)).remainder = cells[key];
+    }
+  }
+  regionIndexCache.set(cells, idx);
+  return idx;
+}
+
+/**
+ * #1433 (R2) — pack-time region expansion. A mark whose asset the
+ * contract's regionAnim governs expands, in place, into a remainder
+ * instance (the mark minus its regions — it keeps the mark's own
+ * kineme, transform and flags) plus one ordinary instance per region:
+ * the region's cell, the mark's transform applied first, origin (the
+ * kineme pivot) on the region centroid. A region the governor selected
+ * (slot > 0 in regionAnim.assets) carries its own kineme slot + the
+ * seed-hash phase of (asset id, region id); every other region
+ * inherits the mark's kineme, so the mark still moves as one body.
+ *
+ * Fail-closed, like Spine B: an asset whose region cells are missing
+ * or incomplete (or whose assignment names a region the bake doesn't
+ * have) keeps the single-quad path — the mark always draws complete.
+ * When nothing expands, the ORIGINAL array is returned untouched.
+ */
+function expandRegionInstances(instances, cells, regionAnim) {
+  const idx = regionIndexFor(cells);
+  if (!idx.size) return instances;
+  const assets = regionAnim.assets || {};
+  let out = null; // lazy: no expansion anywhere -> the caller's array, untouched
+  for (let i = 0; i < instances.length; i++) {
+    const it = instances[i];
+    const assignment = assets[it.asset];
+    const combo = `${it.asset}|${it.tint}|${it.accent}`;
+    const base = cells[combo] ? combo : (cells[it.asset] ? it.asset : null);
+    const entry = assignment && base ? idx.get(base) : null;
+    const complete = entry && entry.remainder && entry.regions.length
+      && entry.regions.every((r) => r.cell.geo)
+      && Object.keys(assignment).every((id) => entry.ids.has(id));
+    if (!complete) {
+      if (out) out.push(it);
+      continue;
+    }
+    if (!out) out = instances.slice(0, i);
+    out.push({ ...it, _cell: entry.remainder });
+    // The mark's affine, applied to the region centroid: local vector
+    // (pivot - box centre) * scale, rotated by the mark's rotation
+    // (the shader's own convention), translated to the mark's origin.
+    const th = (it.rotation * Math.PI) / 180;
+    const co = Math.cos(th), si = Math.sin(th);
+    for (const r of entry.regions) {
+      const geo = r.cell.geo;
+      const lx = (geo.px - 50) * it.scaleX;
+      const ly = (geo.py - 50) * it.scaleY;
+      const slot = assignment[r.id] || 0;
+      out.push({
+        ...it,
+        _cell: r.cell,
+        x: it.x + lx * co - ly * si,
+        y: it.y + lx * si + ly * co,
+        scaleX: it.scaleX * geo.sx,
+        scaleY: it.scaleY * geo.sy,
+        kineme: slot > 0 ? slot : it.kineme,
+        kinemePhase: slot > 0 ? kinemePhase(it.asset, r.id) : it.kinemePhase,
+      });
+    }
+  }
+  return out || instances;
+}
 
 export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = null) {
   // Spine B (#388): skip instances whose cells[comboKey] is missing instead
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
+  // #1433 (R2): region expansion (above). Only when the caller supplies
+  // the frame's region state and it is not the collapse shed — the shed
+  // and every pre-R2 caller take the exact single-quad path below.
+  let list = instances;
+  if (cellFrame && cellFrame.regions && !cellFrame.regions.shed) {
+    list = expandRegionInstances(instances, cells, cellFrame.regions);
+  }
 
   // 25 floats/instance (100-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass)
@@ -339,13 +451,14 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
   // 0 flat, 1 plate, 2 wash, 3 stipple — decoded in QUAD_VS. The stride,
   // the attribute pointer and every earlier offset are unchanged, so
   // plate (1) and flat (0) pack bit-identically to M2.
-  const maxLen = instances.length;
+  const maxLen = list.length;
   const buf = new Float32Array(maxLen * 25);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
-    const it = instances[i];
+    const it = list[i];
     // Spine D: fallback supports both live (R/G mask per asset) and offline (baked combos)
-    const cell = cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
+    // #1433: an expanded region/remainder instance carries its resolved cell.
+    const cell = it._cell || cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
     if (!cell) continue; // Spine B: skip missing instance, never throw
     let u0 = cell.u0, v0 = cell.v0, u1 = cell.u1, v1 = cell.v1;
     // #1431 KINEME C — a strip asset's UV window steps through its baked
@@ -532,6 +645,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let kinemeTable = null; // #781: the frame's kineme table (null = nothing moves)
   let kinemeTime = 0;
   let cellShed = false; // #1431: contract.cellShed — strip assets park on cell 0
+  let regionAnim = null; // #1433: contract.regionAnim — region playback state (null = pre-R2 path)
   const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
   // #1482 P3: the frame's spectrum marks ({ map, scale, displace, colour, tex } or null = off, today's frame).
@@ -657,7 +771,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.clear(gl.COLOR_BUFFER_BIT);
     // #1431: the frame clock every strip instance in this layer (and its
     // mask bakes, which flow through here too) packs against.
-    const cellFrame = { motionTime: kinemeTime, shed: cellShed };
+    // #1433: the same frame state carries the region playback state.
+    const cellFrame = { motionTime: kinemeTime, shed: cellShed, regions: regionAnim };
     let batch = [];
     const flushNormal = () => {
       if (batch.length) {
@@ -784,6 +899,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
     cellShed = !!contract.cellShed; // #1431
+    regionAnim = contract.regionAnim || null; // #1433
     const { atlasTex } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];

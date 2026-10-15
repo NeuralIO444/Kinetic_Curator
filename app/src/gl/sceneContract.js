@@ -27,6 +27,7 @@ import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeA
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
 import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, spinKineme, spinVariant } from '../data/kinemes.js';
+import { regionsForAsset, regionAssignmentFor, selectAnimatedRegions, REGION_TAG_CAP } from '../data/regionKinemes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { darkestSwatch } from './contactShadow.mjs'; // #1183 contact shadow colour
 import { COALESCE_MAX_FIELDS } from '../engine/dishCoalesce.mjs'; // #1411 coalescence field cap
@@ -296,6 +297,46 @@ export function cellKinemesShed(doc) {
 }
 
 /**
+ * #1433 (R2) — the region-kineme freeze: region motion sheds on the
+ * tier-2 rung, with the cell kinemes and spectrum marks (after the
+ * tier-1 extras are gone AND quality has stepped down to performance).
+ * The freeze tightens the region budget to 0: regions still draw, at
+ * rest — only their motion sheds. Exports and stills never freeze:
+ * their docs do not carry the live governor state.
+ */
+export function regionKinemesFrozen(doc) {
+  return !!(doc && doc.perfTier1) && String(doc.quality || '') === 'performance';
+}
+
+/**
+ * #1433 (R2) — the collapse, one rung deeper than the freeze: the
+ * regions themselves go and the pack draws the single original quad
+ * (the pre-R2 code path — exact, not a re-render). Needs the freeze
+ * rung PLUS any deeper governor cut: asset thinning, the count clamp,
+ * or the motion freeze (slowRender).
+ */
+export function regionCollapseShed(doc) {
+  return regionKinemesFrozen(doc) && !!(doc && (doc.assetThin || doc.perfClamp || doc.slowRender));
+}
+
+/**
+ * #1433 (R2) — how many of a mark's tagged regions may animate
+ * individually this frame. The caller's device-class budget
+ * (doc.regionBudget — 12 desktop / 8 iPad-class; data/quality.js
+ * REGION_BUDGETS) is the ceiling; reduced motion (regions hold rest)
+ * and the freeze rung tighten it to 0. Absent a caller budget the
+ * ceiling is the tag cap, so exports and stills animate every
+ * assigned region.
+ */
+export function regionAnimBudget(doc) {
+  if (doc && doc.reducedMotion) return 0;
+  if (regionKinemesFrozen(doc)) return 0;
+  const b = Number(doc?.regionBudget);
+  if (!Number.isFinite(b)) return REGION_TAG_CAP;
+  return Math.max(0, Math.min(REGION_TAG_CAP, Math.floor(b)));
+}
+
+/**
  * #1410 petri dish B1 — is impact deform shed? Same tier-2 rung as the
  * contact shadow, by the same rule (spec §7 ladder: FX finishes first,
  * then deform, then radius fidelity and body counts): it goes only after
@@ -490,6 +531,52 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       inst.kineme = slot.get(k.id);
       inst.kinemePhase = own ? kinemePhase(inst.seedOffset, inst.key) : 0;
     }
+    // #1433 (R2) — per-region kinemes join the SAME table (one animation
+    // system: region instances ride instance floats 18/19 like any
+    // instance). Slots append after the instance kinemes, so a scene
+    // without region assignments builds exactly the pre-R2 table. The
+    // governor's selection resolves HERE, where the budget lives: the
+    // regionAnim map names region id -> slot, with slot 0 = assigned but
+    // NOT selected (over budget, or the budget tightened to 0) — that
+    // region renders merged, at rest. The data itself (family defaults,
+    // the editor) is R3 (#1434); this consumes doc.regionKinemes over
+    // the record's own field via regionAssignmentFor.
+    const regionAssets = {};
+    {
+      const seenAssets = new Set();
+      const budget = regionAnimBudget(doc);
+      for (const inst of instances) {
+        if (seenAssets.has(inst.asset)) continue;
+        seenAssets.add(inst.asset);
+        const records = regionsForAsset(inst.asset);
+        if (!records) continue;
+        const assignment = regionAssignmentFor(inst.asset, doc.regionKinemes);
+        if (!assignment) continue;
+        const animated = selectAnimatedRegions(records, assignment, budget);
+        const entry = {};
+        for (const [regionId, kid] of Object.entries(assignment)) {
+          if (!animated.has(regionId)) { entry[regionId] = 0; continue; }
+          const k = getKineme(kid); // sanitizeRegionKinemes proved it exists
+          if (!k) { entry[regionId] = 0; continue; }
+          if (!slot.has(k.id)) {
+            if (table.length >= KINEME_TABLE_MAX) { entry[regionId] = 0; continue; } // 16-slot cap, shared with instance kinemes
+            slot.set(k.id, table.length + 1);
+            table.push({ kind: KINEME_KINDS[k.kind], period: k.period, amp: k.amp });
+          }
+          entry[regionId] = slot.get(k.id);
+        }
+        if (Object.keys(entry).length) regionAssets[inst.asset] = entry;
+      }
+    }
+    const regionAnim = Object.keys(regionAssets).length
+      ? {
+          regionAnim: {
+            budget: regionAnimBudget(doc),
+            ...(regionCollapseShed(doc) ? { shed: true } : {}),
+            assets: regionAssets,
+          },
+        }
+      : {};
     if (!table.length) {
       // #1431 — cell kinemes read the same clock: motion time rides the
       // contract even when no instance kineme is assigned, or a strip-only
@@ -497,10 +584,10 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       // gets no key, so motionless contracts (and their hashes) are
       // exactly what they were.
       const t = Number(doc.kinemeTime);
-      return Number.isFinite(t) ? { kinemeTime: t } : {};
+      return { ...(Number.isFinite(t) ? { kinemeTime: t } : {}), ...regionAnim };
     }
     const t = Number(doc.kinemeTime);
-    return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0 };
+    return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0, ...regionAnim };
   })();
 
   const scene = {
@@ -663,6 +750,23 @@ export function assertSceneContract(scene) {
       }
       if (Math.abs(Math.hypot(d[0], d[1]) - 1) > 0.01) fail(`instance ${it.key}: deform axis must be a unit vector`);
       if (!(d[2] > 0 && d[2] <= 1)) fail(`instance ${it.key}: deform amount must be in (0, 1]`);
+    }
+  }
+  if (scene.regionAnim !== undefined) { // #1433 region playback state
+    const ra = scene.regionAnim;
+    if (!ra || typeof ra !== 'object' || Array.isArray(ra)) fail('regionAnim must be an object');
+    if (!Number.isInteger(ra.budget) || ra.budget < 0 || ra.budget > REGION_TAG_CAP) {
+      fail(`regionAnim.budget must be an integer in [0, ${REGION_TAG_CAP}]`);
+    }
+    if (ra.shed !== undefined && ra.shed !== true) fail('regionAnim.shed must be true when present');
+    if (!ra.assets || typeof ra.assets !== 'object' || Array.isArray(ra.assets)) fail('regionAnim.assets must be an object');
+    for (const [assetId, entry] of Object.entries(ra.assets)) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail(`regionAnim.assets.${assetId} must be an object`);
+      for (const [regionId, s] of Object.entries(entry)) {
+        if (!Number.isInteger(s) || s < 0 || s > (scene.kinemes?.length || 0)) {
+          fail(`regionAnim slot for ${assetId}/${regionId} out of range`);
+        }
+      }
     }
   }
   return true;

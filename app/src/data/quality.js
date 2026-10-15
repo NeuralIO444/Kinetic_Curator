@@ -73,6 +73,23 @@ export const QUALITY_PRESETS = {
   },
 };
 
+/**
+ * #1433 (R2) — the region-animation device budgets: how many of a
+ * mark's tagged regions (bake tags up to 12, identically on every
+ * machine) the governor may animate individually per device class.
+ * Desktop gets the full tag count; iPad-class GPUs get the tighter
+ * budget. The governor tightens further under measured frame cost
+ * (sceneContract.regionAnimBudget); this table is only the ceiling,
+ * read where the other device budgets live — never hard-code the
+ * numbers at a call site.
+ */
+export const REGION_BUDGETS = Object.freeze({ desktop: 12, ipad: 8 });
+
+/** The region-animation budget for a device class (iPad-class = true). */
+export function regionBudgetForDevice(ipadClass) {
+  return ipadClass ? REGION_BUDGETS.ipad : REGION_BUDGETS.desktop;
+}
+
 /** Caps used when RENDER · UNCAPPED is on — no interactivity to protect. */
 export const FINAL_CAPS = {
   id: 'final',
