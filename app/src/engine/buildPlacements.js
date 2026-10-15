@@ -31,6 +31,7 @@ import { getBiologyPolicy } from '../biology/policy.js';
 import { fadeForAge } from '../biology/lifecycle.js';
 import { sortGlassInstances } from './glassSort.mjs';
 import { isGlassMaterial, GLASS_BODY_ALPHA } from './glassBody.mjs'; // #1547 — material:'glass'
+import { isPlateMaterial } from './plateBody.mjs'; // #1548 — material:'plate'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import {
   pickWeightedIndexStable,
@@ -520,9 +521,26 @@ export function buildPlacements({
   // multiply never compounds across pooled frames.
   const materialGlass = isGlassMaterial(layoutParams.material);
   const glassOn = !!layoutParams.glass || materialGlass;
+  // #1548 (Materials M2) — `material: 'plate'` is the second material
+  // switch: it flags every instance it places, and the flag is all
+  // placement does. The plate body is a radial ramp INSIDE each glyph
+  // (plateBody.mjs — accent heart → ink rim, from the retired SVG
+  // def), so it cannot be a placement field: it is applied where the
+  // glyph is painted — the quad shader's live-tint branch via the
+  // scene contract, and the composed stills via an SVG gradient def.
+  // Plate is the DEFAULT material, so this flags most instances; the
+  // flag costs one boolean at build time and nothing per frame.
+  const materialPlate = isPlateMaterial(layoutParams.material);
   for (const it of mapped) {
     it.glass = glassOn;
     if (materialGlass) it.alpha *= GLASS_BODY_ALPHA;
+    // Assigned unconditionally like `glass` above: pooled items are
+    // reused across builds, so a stale true must never survive a
+    // material change. Glass wins where both could claim the item:
+    // the layout glass toggle (#1129) forces the glass body, so a
+    // glass-flagged instance never takes the plate ramp — glass
+    // renders stay exactly as M1 left them, on every surface.
+    it.plate = materialPlate && !glassOn;
   }
   if (glassOn) mapped = sortGlassInstances(mapped);
 

@@ -317,15 +317,17 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
 
-  // 24 floats/instance (96-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // 25 floats/instance (100-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass)
-  // (defX,defY,defAmt).
+  // (defX,defY,defAmt) (plate).
   // #781: kineme 0 = still (exactly the old zeros).
   // #1129 PR2: glass is 1 for glass-voice instances (soft bevel), else 0.
   // #1410: deform is the impact squash (axis + amount); absent reads 0 =
   // round, exactly the old quad.
+  // #1548: plate is 1 for plate-material instances (the radial ink ramp),
+  // else 0; appended at the tail so every earlier offset is unchanged.
   const maxLen = instances.length;
-  const buf = new Float32Array(maxLen * 24);
+  const buf = new Float32Array(maxLen * 25);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = instances[i];
@@ -353,7 +355,8 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     buf[o + 20] = it.glass ? 1 : 0; // #1129 PR2: missing flag (old producers) reads 0 = enamel
     const df = it.deform; // #1410: [axisX, axisY, amount]; missing (old producers) reads 0 = round
     buf[o + 21] = df ? df[0] : 0; buf[o + 22] = df ? df[1] : 0; buf[o + 23] = df ? df[2] : 0;
-    o += 24;
+    buf[o + 24] = it.plate ? 1 : 0; // #1548: missing flag (old producers) reads 0 = flat ink
+    o += 25;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
@@ -565,7 +568,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (spec && specTex && specUploaded) {
       gl.uniform1i(U(quadProg, 'u_spec'), bindTex(SPEC_UNIT, specTex));
       gl.uniform4f(U(quadProg, 'u_specA'), spec.map, spec.scale, spec.displace, spec.colour);
-      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 24);
+      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 25);
     } else {
       gl.uniform4f(U(quadProg, 'u_specA'), 0, 0, 0, 0);
     }
@@ -577,23 +580,27 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     for (let i = 1; i <= 5; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 96, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 100, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     // #1129 PR2: a_glass — single float at byte 80.
     gl.enableVertexAttribArray(6);
-    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 96, 80);
+    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 100, 80);
     gl.vertexAttribDivisor(6, 1);
-    // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84 (24-float stride).
+    // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84 (25-float stride).
     gl.enableVertexAttribArray(7);
-    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 96, 84);
+    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 100, 84);
     gl.vertexAttribDivisor(7, 1);
+    // #1548: a_plate — single float at byte 96 (the appended tail float).
+    gl.enableVertexAttribArray(8);
+    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 100, 96);
+    gl.vertexAttribDivisor(8, 1);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 24);
-    for (let i = 0; i <= 7; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 25);
+    for (let i = 0; i <= 8; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
 

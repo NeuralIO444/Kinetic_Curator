@@ -20,13 +20,20 @@ live tab is a bug, and where the renderer can't match, it says so.
 - **Materials + blend honesty.** The GL backend handles the full CSS blend
   set; `plus-lighter` → `screen` matches the SVG reference substitution
   (#96) and is recorded, not hidden. Gradient materials
-  (plate/wash/stipple) exist in the live tab only — the GL backend has no
-  gradient shading — so studio stills warn on stderr when a project uses
-  one (`warnUnsupportedMaterials`, #168) instead of silently rendering
-  flat wings. `glass` is not one of them: since #1547 (Materials M1) it
-  is a GL material — the #1129 glass machinery (alpha body, back-to-front
-  sort, soft-bevel lighting) — in the live tab and studio stills alike,
-  so it carries no warning. The sidecar's `_render.normalized` keeps the authored value
+  (wash/stipple) exist in the live tab only — the GL backend has no
+  gradient shading for them — so studio stills warn on stderr when a
+  project uses one (`warnUnsupportedMaterials`, #168) instead of
+  silently rendering flat wings. `glass` is not one of them: since
+  #1547 (Materials M1) it is a GL material — the #1129 glass machinery
+  (alpha body, back-to-front sort, soft-bevel lighting) — in the live
+  tab and studio stills alike, so it carries no warning. `plate` is
+  restored too, since #1548 (Materials M2): the engraved-plate radial
+  ramp (accent heart → ink rim, from the retired SVG def) runs on the
+  ink channel in the live tab and in composed stills. One seam stays
+  on the record: the headless GL export has no channel decomposition
+  to ramp against, so an exported GL still renders plate flat until
+  the export atlas bake carries the gradient at bake time. The
+  sidecar's `_render.normalized` keeps the authored value
   on record. (The resvg path is retired for finals; its honesty tables in
   FX_LAYERS.md and BUGLIST.md cover the legacy SVG recipe only.)
 - **ACCUM is a still.** In-app RENDER ACCUM captures the trail buffer as
