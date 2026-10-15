@@ -1646,11 +1646,13 @@ dependencies = [
 name = "kinetic-curator"
 version = "0.9.0"
 dependencies = [
+ "base64 0.21.7",
  "libc",
  "metal",
  "objc",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
 ]
