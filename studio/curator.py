@@ -745,8 +745,9 @@ def _xgb_gains(bst):
 def fit_xgb_head(feature_rows: list[dict], target, *, seed: int = 0,
                  max_depth: int = 4, max_rounds: int = 300):
     """Distil the probe into an XGBoost tree head over the same design the
-    linear head fits (one-hot feature_terms + the num block), target = the
-    probe's scores read as probabilities. Returns (head | None, note).
+    linear head fits (one-hot feature_terms + the num block, minus the
+    live-null trim in xgb_design_columns), target = the probe's scores
+    read as probabilities. Returns (head | None, note).
 
     The ship comparison is honest: a deterministic 80/20 split, both
     students fit on the train slice only, fidelity = the file's spearman
@@ -767,6 +768,27 @@ def fit_xgb_head(feature_rows: list[dict], target, *, seed: int = 0,
                       "the linear head ships instead")
 
 
+# T2: features that are structurally null at score time. The app's
+# scoreLayout derives features from layoutParams alone
+# (recipeFeatures({ layoutParams }) — no paletteId is ever passed), so
+# `palette` is the constant null bucket in every live score: a palette
+# split the trainer learns spends tree depth distinguishing pool rows
+# the live instrument can never tell apart, and credits held-out
+# fidelity to signal that cannot fire. Such features are trimmed from
+# the tree head's design columns. (The linear head predates this audit
+# and is untouched — its palette weights are equally inert live, but
+# re-baselining it is a separate decision, not this phase's.)
+XGB_LIVE_NULL_FEATURES = frozenset({"palette"})
+
+
+def xgb_design_columns(vocab: list[str], nums: list[str]) -> list[str]:
+    """Design columns for the tree head: vocab terms minus the terms of
+    live-null features (see XGB_LIVE_NULL_FEATURES), then the num block."""
+    kept = [t for t in vocab
+            if t.split("=", 1)[0] not in XGB_LIVE_NULL_FEATURES]
+    return kept + [f"num.{k}" for k in nums]
+
+
 def _fit_xgb_head_impl(feature_rows: list[dict], target, *, seed: int = 0,
                        max_depth: int = 4, max_rounds: int = 300):
     import numpy as np
@@ -780,12 +802,13 @@ def _fit_xgb_head_impl(feature_rows: list[dict], target, *, seed: int = 0,
 
     vocab = sorted({t for f in feature_rows for t in feature_terms(f)})
     nums = sorted({k for f in feature_rows for k in (f.get("num") or {})})
-    columns = vocab + [f"num.{k}" for k in nums]
+    columns = xgb_design_columns(vocab, nums)
     col = {c: i for i, c in enumerate(columns)}
     X = np.zeros((n, len(columns)))
     for r, f in enumerate(feature_rows):
         for t in feature_terms(f):
-            X[r, col[t]] = 1.0
+            if t in col:  # trimmed live-null terms have no column
+                X[r, col[t]] = 1.0
         for k in nums:
             X[r, col[f"num.{k}"]] = float((f.get("num") or {}).get(k, 0.0))
 
