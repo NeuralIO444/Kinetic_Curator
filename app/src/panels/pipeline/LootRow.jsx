@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { createLootNative, seenLine } from '../../loot/lootNative.mjs';
 import { runScan } from '../../loot/lootRun.mjs';
 import { takeInImages, ingestVia } from '../../loot/lootIngest.mjs';
+import { takeInPalettes } from '../../loot/lootPalettes.mjs';
 import { useStore } from '../../state/store.js';
 import { loadIndex, saveIndex, withRoot, emptyIndex, countItems } from '../../loot/lootIndex.mjs';
 import { statusLine, logLine, confirmForgetMessage, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
@@ -40,8 +41,14 @@ export function LootRow() {
         native, index: r.index, ingest: ingestVia(() => useStore.getState()),
         onProgress: ({ done, total }) => setBusy(total ? `adding ${done} of ${total} to the pool...` : LABELS.scanning),
       });
-      keep(taken.index);
-      setLast({ added: r.summary.add, skipped: r.summary.skipped, missing: r.summary.missing, taken: taken.summary.taken, held: taken.summary.poolFull + taken.summary.rejected });
+      // palettes go into the user palette library (your library, shared by every project)
+      setBusy('adding palettes...');
+      const pals = await takeInPalettes({ native, index: taken.index, importPalettes: (list) => useStore.getState().importUserPalettes(list) });
+      keep(pals.index);
+      setLast({
+        added: r.summary.add, skipped: r.summary.skipped, missing: r.summary.missing,
+        taken: taken.summary.taken + pals.summary.files, held: taken.summary.poolFull + taken.summary.rejected + pals.summary.rejected + pals.summary.unreadable,
+      });
       if (r.unreachable) setNote('folder not reachable');
     } catch (e) {
       setNote(String((e && e.message) || e).slice(0, 120));
