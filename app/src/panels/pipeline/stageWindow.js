@@ -1,13 +1,13 @@
 // #607 Tauri stage window (STAGE Phase B). No-op in the browser — every
 // entry point returns an honest {ok:false, reason} instead of throwing.
+import { isTauriRuntime } from '../../platform/desktop.mjs';
 import { normalizeMonitors } from './stageDisplays.mjs';
 import { makeCloseMessage, STAGE_CONTROL_CHANNEL } from './stageChannel.mjs';
 
 const STAGE_LABEL = 'kc-stage';
 
-export function isTauriRuntime() {
-  return typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
-}
+// one answer for the whole app (platform/desktop.mjs): Tauri 1's globals as well as v2's
+export { isTauriRuntime };
 
 /**
  * Enumerate displays via Tauri. In the browser there is no honest way to

@@ -414,3 +414,4 @@ node src/curator/mindConduct.apple.selfcheck.mjs
 node src/state/audioRig.selfcheck.mjs
 node src/loot/lootScan.selfcheck.mjs
 node src/loot/lootIndex.selfcheck.mjs
+node src/loot/lootNative.selfcheck.mjs

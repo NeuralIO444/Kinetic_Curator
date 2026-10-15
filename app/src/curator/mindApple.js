@@ -5,9 +5,11 @@
 // model to pick, download or point at. The helper is on-device only (no cloud AI).
 //
 // Every reply is a proposal: the thinker validates it against the Mind 1 contract and drops anything malformed.
+import { isTauriRuntime } from '../platform/desktop.mjs'; // one desktop check for the whole app
+
 export const ASK_TIMEOUT_MS = 300; // the hard cap the app asks for (the helper bridge clamps to it too)
 
-export const isDesktop = () => typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+export const isDesktop = () => isTauriRuntime();
 
 /**
  * @param invoke (cmd, args) => Promise — Tauri's invoke (injected so selfcheck can drive it)
