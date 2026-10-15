@@ -120,6 +120,11 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     // Absent (the common case) the packer reads enamel, exactly the
     // old path, and the contract hash is unchanged.
     ...(item.glass ? { glass: true } : {}),
+    // #1548 — the plate flag rides the same way (Materials M2):
+    // packInstanceData reads it into a_plate, selecting the radial
+    // plate ramp on the ink channel in the quad shader. Absent (flat /
+    // wash / stipple / glass strata) the contract is byte-identical.
+    ...(item.plate ? { plate: true } : {}),
   };
 }
 
@@ -211,12 +216,12 @@ const warnedMaterials = new Set();
  * (#168, "live and studio agree or refuse").
  *
  * Gradient materials (plate / wash / stipple, app/src/engine/materials.js)
- * only ever existed in the retired SVG layer — the GL backend has no
- * gradient shading for them, so a studio export of a project using one
- * renders the wings flatter than the live tab. This discloses instead of
- * refusing: warn once per material per process, like
- * studio/blendFallback.mjs. (Restoring them in GL is the M2/M3 stages
- * of the materials lane.)
+ * only ever existed in the retired SVG layer. Plate was restored in GL
+ * by #1548 (M2, below); wash/stipple still have no GL shading, so a
+ * studio export of a project using one renders the wings flatter than
+ * the live tab. This discloses instead of refusing: warn once per
+ * material per process, like studio/blendFallback.mjs. (Restoring
+ * wash/stipple in GL is the M3 stage of the materials lane.)
  *
  * 'glass' is NOT disclosed: since #1547 (Materials M1) the GL backend
  * renders it — the material engages the #1129 glass machinery (alpha
@@ -224,13 +229,25 @@ const warnedMaterials = new Set();
  * via the contract's glass flag) in the live tab and in studio stills
  * alike, so there is no flatness left to warn about.
  *
+ * 'plate' is NOT disclosed either: since #1548 (Materials M2) the GL
+ * backend renders it — the engraved-plate radial ramp (accent heart →
+ * ink rim, recovered from the retired SVG def in plateBody.mjs) runs
+ * on the ink channel via the contract's plate flag in the live tab,
+ * and composed stills paint it with the same def as an SVG gradient.
+ * One seam stays on the record: the headless GL export
+ * (renderExportViaGL → createRenderer, u_liveTint = 0) has no
+ * channel decomposition to ramp against, so an exported GL still
+ * renders plate flat until the export atlas bake carries the
+ * gradient at bake time — a follow-up, not this stage. Only
+ * wash/stipple remain disclosed, until M3.
+ *
  * @param {Array} resolvedLayers — resolveLayers(doc, {caps}) output
  */
 export function warnUnsupportedMaterials(resolvedLayers) {
   const used = new Set();
   for (const L of resolvedLayers || []) {
     const mat = L.layoutParams?.material;
-    if (!mat || mat === 'flat' || mat === 'glass') continue;
+    if (!mat || mat === 'flat' || mat === 'glass' || mat === 'plate') continue;
     if (Array.isArray(L.items) && L.items.some((it) => it.role === 'wing')) {
       used.add(mat);
     }
@@ -240,8 +257,8 @@ export function warnUnsupportedMaterials(resolvedLayers) {
     warnedMaterials.add(mat);
     console.warn(
       `[export] material "${mat}" renders flat in studio stills (#168): ` +
-      'gradient materials (plate/wash/stipple) apply to wing assets in the live tab only; ' +
-      'the GL backend has no gradient shading. See docs/QUALITY.md.',
+      'gradient materials (wash/stipple) apply to wing assets in the live tab only; ' +
+      'the GL backend has no gradient shading for them yet. See docs/QUALITY.md.',
     );
   }
 }

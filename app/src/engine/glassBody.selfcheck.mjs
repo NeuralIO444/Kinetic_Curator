@@ -55,13 +55,16 @@ ok('glass material: every item flagged, alpha attenuated exactly, sorted back-to
   assert.ok(zt.every((v, k) => k === 0 || v >= zt[k - 1]), 'glass subsequence is back-to-front (z-tier ascending)');
 });
 
-ok('parity: plate and flat placements are identical and unflagged', () => {
+ok('parity: plate and flat placements are identical; plate carries only its own flag (#1548)', () => {
   const p = byIndex(plate);
   assert.equal(plate.length, flat.length);
   for (const it of flat) {
     assert.ok(!it.glass, 'flat item carries no glass flag');
     const q = p.get(it.index);
     assert.ok(q && !q.glass, 'plate item carries no glass flag');
+    // #1548 (Materials M2): plate flags its items for the shader/still
+    // ramp — geometry, alpha and colour are untouched by the flag.
+    assert.equal(q.plate, true, 'plate item carries the plate flag since M2');
     assert.equal(q.alpha, it.alpha); assert.equal(q.x, it.x); assert.equal(q.y, it.y);
   }
 });
@@ -113,7 +116,7 @@ ok('contract: glass instances carry the flag; non-glass contracts gain no key', 
 });
 
 // ── the export warning ─────────────────────────────────────────────────
-ok('warnUnsupportedMaterials: glass undisclosed, plate/wash/stipple still disclosed once', () => {
+ok('warnUnsupportedMaterials: glass + plate undisclosed, wash/stipple still disclosed once', () => {
   const warns = [];
   const orig = console.warn;
   console.warn = (msg) => warns.push(String(msg));
@@ -122,12 +125,14 @@ ok('warnUnsupportedMaterials: glass undisclosed, plate/wash/stipple still disclo
     warnUnsupportedMaterials(wing('glass'));
     assert.equal(warns.length, 0, 'glass carries no warning since M1');
     warnUnsupportedMaterials(wing('plate'));
-    assert.equal(warns.length, 1, 'plate still disclosed');
-    warnUnsupportedMaterials(wing('plate'));
-    assert.equal(warns.length, 1, 'disclosed once per material per process');
+    assert.equal(warns.length, 0, 'plate carries no warning since M2 (#1548)');
     warnUnsupportedMaterials(wing('stipple'));
-    assert.equal(warns.length, 2, 'stipple still disclosed');
-    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'body' }] }]);
+    assert.equal(warns.length, 1, 'stipple still disclosed');
+    warnUnsupportedMaterials(wing('stipple'));
+    assert.equal(warns.length, 1, 'disclosed once per material per process');
+    warnUnsupportedMaterials(wing('wash'));
+    assert.equal(warns.length, 2, 'wash still disclosed');
+    warnUnsupportedMaterials([{ layoutParams: { material: 'wash' }, items: [{ role: 'body' }] }]);
     assert.equal(warns.length, 2, 'non-wing layers never warned');
   } finally {
     console.warn = orig;

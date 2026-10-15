@@ -9,6 +9,7 @@
  */
 
 import { injectCommon } from './effects/chunks.mjs';
+import { PLATE_GLSL } from '../engine/plateBody.mjs';
 import { GLASS_BEVEL } from './glassBevel.mjs';
 import { GLASS_CAUSTIC } from './glassCaustic.mjs';
 import { GLASS_STRIATION } from './glassStriation.mjs';
@@ -52,6 +53,7 @@ layout(location=4) in vec4 a_inst3;
 layout(location=5) in vec4 a_inst4;
 layout(location=6) in float a_glass;   // #1129 PR2: 1 = glass voice instance, 0 = enamel path
 layout(location=7) in vec3 a_def;      // #1410 petri B1: impact deform — (axisX, axisY, amount), world space; amount 0 = round
+layout(location=8) in float a_plate;   // #1548: 1 = plate material instance, 0 = flat ink path
 uniform vec2 u_canvas;
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
@@ -82,6 +84,7 @@ out vec2 v_world;   // #594 PR2: fragment position (scene units) for per-texel l
 out vec4 v_rot;     // cos, sin of the instance rotation; x/y mirror signs
 out vec4 v_cell;    // the instance's atlas cell (u0, v0, u1, v1): bevel taps never leave it
 out float v_glass;    // #1129 PR2: per-instance glass flag — selects the soft-bevel variant
+out float v_plate;    // #1548: per-instance plate flag — selects the radial ink ramp
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -194,6 +197,7 @@ void main() {
   v_rot = vec4(co, si, mx, my);
   v_cell = vec4(a_inst1.zw, a_inst2.xy);
   v_glass = a_glass;   // #1129 PR2: constant across the instance — no interpolation error
+  v_plate = a_plate;   // #1548: constant across the instance, same reasoning
   // #594 PR1: per-instance diffuse from the one sun, flat normal (0,0,1), at the
   // instance centre. Off → exactly vec3(1.0), so the unlit path is byte-identical.
   if (u_sun.w > 0.5) {
@@ -226,6 +230,8 @@ in vec3 v_ink;
 in vec3 v_accent;
 in vec3 v_light;
 in float v_glass;     // #1129 PR2: 1 = soft-bevel (glass), 0 = exact existing enamel path
+in float v_plate;     // #1548: 1 = plate material (radial ink ramp), 0 = exact existing flat path
+${PLATE_GLSL}
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
@@ -274,7 +280,25 @@ void main() {
     float inkA = max(0.0, t.r - t.b);
     float accA = max(0.0, t.g - t.b);
     vec3 color = inkA * v_ink + accA * v_accent + vec3(t.b);
-    o = vec4(color * v_opacity, t.a * v_opacity);
+    float alpha = t.a;
+    // #1548 (Materials M2): the plate ramp re-paints the ink channel —
+    // the retired SVG def (plateBody.mjs) as a radial gradient inside
+    // the glyph's own box: accent at the heart, ink by 55% of the
+    // radius, coverage dissolving 0.9 → 0.85 → 0.2 toward the rim.
+    // Only the ink term changes; the accent (vein) channel and the
+    // base stay flat, exactly as the SVG layer painted them. The
+    // faded ink coverage comes out of the union alpha by the same
+    // amount it leaves the colour. v_plate = 0 never enters, so the
+    // flat path above is bit-identical.
+    if (v_plate > 0.5) {
+      vec2 pspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
+      vec2 plocal = (v_uv - v_cell.xy) / pspan;
+      float aMul;
+      vec3 inkCol = plateShade(plocal, v_ink, v_accent, aMul);
+      color = inkA * aMul * inkCol + accA * v_accent + vec3(t.b);
+      alpha = clamp(t.a - inkA * (1.0 - aMul), 0.0, t.a);
+    }
+    o = vec4(color * v_opacity, alpha * v_opacity);
   } else {
     o = vec4(t.rgb * v_opacity, t.a * v_opacity);
   }

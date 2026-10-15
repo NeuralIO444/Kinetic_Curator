@@ -53,6 +53,7 @@ import {
 import { STUB_VOICES } from '../data/voices.js';
 import { getQualityCaps } from '../data/quality.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
+import { plateGradientDef } from '../engine/plateBody.mjs';
 import { bakeParticles } from '../engine/kernel/bake/index.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../state/paramUtils.js';
 import { dealCast, castSizeFor, rollDice, wildnessForDavis } from './dice.js';
@@ -355,6 +356,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
   ];
   if (withBg) parts.push(`<rect width="${W}" height="${H}" fill="${palette.bg}"/>`);
   const body = [];
+  const plateDefs = [];
   for (const item of items || []) {
     // Library assets resolve from the index; variant items resolve
     // from the run's generated records (recordFor warmed the cache
@@ -363,11 +365,26 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
     if (!assetRec) continue;
     const color = item.color || palette.ink || '#000000';
     const accent = item.accent || color;
-    const key = `${item.assetId}|${color}|${accent}`;
+    const key = `${item.assetId}|${color}|${accent}|${item.plate ? 'plate' : ''}`;
     if (!symbols.has(key)) {
-      const svg = assetRec.svg
-        .replace(INK_RE, color)
-        .replace(ACCENT_RE, accent);
+      let svg;
+      if (item.plate) {
+        // #1548 (Materials M2): a plate item's ink paint is the
+        // engraved-plate radial gradient — the retired MaterialSheet
+        // def with this item's two channels in the var slots, exactly
+        // as the SVG layer consumed it (Layer.jsx set --ink to the
+        // url; accent paint stayed flat). One def per (accent, ink)
+        // pair, emitted alongside the symbols below.
+        const gid = `pg${plateDefs.length}`;
+        plateDefs.push(plateGradientDef(gid, accent, color));
+        svg = assetRec.svg
+          .replace(INK_RE, `url(#${gid})`)
+          .replace(ACCENT_RE, accent);
+      } else {
+        svg = assetRec.svg
+          .replace(INK_RE, color)
+          .replace(ACCENT_RE, accent);
+      }
       symbols.set(key, `<symbol id="s${symbols.size}" viewBox="0 0 100 100" overflow="visible">${svg}</symbol>`);
     }
     const sx = item._mirrored ? -item.scale : item.scale;
@@ -376,7 +393,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
       + `scale(${num(sx)},${num(sy)}) translate(-50,-50)`;
     body.push(`<g transform="${t}" opacity="${num((item.alpha ?? 100) / 100)}"><use href="#s${[...symbols.keys()].indexOf(key)}" width="100" height="100"/></g>`);
   }
-  parts.push(`<defs>${[...symbols.values()].join('')}</defs>`, ...body, '</svg>');
+  parts.push(`<defs>${[...symbols.values()].join('')}${plateDefs.join('')}</defs>`, ...body, '</svg>');
   return parts.join('\n');
 }
 

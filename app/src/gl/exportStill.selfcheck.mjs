@@ -141,19 +141,23 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx'
   check('uncapped resolves FINAL_CAPS',
     getRenderCaps('high', true) === FINAL_CAPS);
 
-  // Materials honesty (#168): non-flat material on wing items warns once;
-  // flat or no wings stays silent.
+  // Materials honesty (#168): a gradient material with no GL shading
+  // yet (wash/stipple) on wing items warns once per material; materials
+  // the GL backend renders (glass since #1547, plate since #1548),
+  // flat, and wing-less layers stay silent.
   const warned = [];
   const origWarn = console.warn;
   console.warn = (m) => warned.push(String(m));
   try {
-    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'wing' }] }]);
-    check('material warning fires', warned.length === 1 && warned[0].includes('"plate"'));
-    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'wing' }] }]);
+    warnUnsupportedMaterials([{ layoutParams: { material: 'wash' }, items: [{ role: 'wing' }] }]);
+    check('material warning fires', warned.length === 1 && warned[0].includes('"wash"'));
+    warnUnsupportedMaterials([{ layoutParams: { material: 'wash' }, items: [{ role: 'wing' }] }]);
     check('material warning fires once', warned.length === 1);
     warnUnsupportedMaterials([{ layoutParams: { material: 'flat' }, items: [{ role: 'wing' }] }]);
     warnUnsupportedMaterials([{ layoutParams: { material: 'wash' }, items: [{ role: 'body' }] }]);
-    check('flat / no-wing materials stay silent', warned.length === 1);
+    warnUnsupportedMaterials([{ layoutParams: { material: 'plate' }, items: [{ role: 'wing' }] }]);
+    warnUnsupportedMaterials([{ layoutParams: { material: 'glass' }, items: [{ role: 'wing' }] }]);
+    check('flat / rendered / no-wing materials stay silent', warned.length === 1);
   } finally {
     console.warn = origWarn;
   }
