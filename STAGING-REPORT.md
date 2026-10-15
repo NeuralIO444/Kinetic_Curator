@@ -1,78 +1,271 @@
-# STAGING REPORT — #1431 KINEME Build C playback (Stage 1, per-region animation lane)
+# STAGING REPORT — #1433 R2: per-region animation (region instances in the renderer, playback)
 
-- **Issue:** #1431 — wire the cell kinemes (`app/src/data/cellKinemes.js`, #781) into the renderer.
-- **Branch:** `ember/1431-cwire` on base main `c05c1b73`. **Local commits only — no push, no PR** (local-stack staging rule).
-- **Worktree:** `~/workspace/kc-1431-build`.
+Branch `ember/1433-region-playback`, stacked on stage 1's tip `43e84d9e` (#1431 C-wire).
+Local commits only — no push, no PR. Stage 3 (#1434) stacks on this branch.
 
-## Files touched, per commit
+## What shipped
 
-1. **feat (bake)** — `app/src/data/cellKinemes.js`, `app/src/gl/atlas.mjs`, `app/src/gl/liveAtlas.mjs`
-   - `cellKinemes.js`: new `stripFramesFor(assetId)` — the one source of truth for a playable strip (kineme assignment + frame data + cell count must agree; mismatch fails closed to the plain single-cell bake).
-   - `atlas.mjs` / `liveAtlas.mjs`: strip-aware bake + slot packing (mirrored in both bakers).
-2. **feat (wiring)** — `app/src/gl/sceneContract.js`, `app/src/gl/renderer.mjs`
-   - `sceneContract.js`: `cellKinemesShed(doc)` export; `cellShed: true` emitted only while shed; motion-time forwarding fix in `kinemeFields`.
-   - `renderer.mjs`: `packInstanceData` 4th parameter; renderer `cellShed` state; `renderLayerInstances` passes the frame clock to both pack call sites; `gl/cell-kineme` cost tier registered (tier 0).
-3. **test** — `app/src/gl/cellKinemePlayback.selfcheck.mjs` (new), `app/selfcheck.manifest` (one line).
-4. **docs** — `docs/research/per-region-animation-spec-2026-10-12.md` (verbatim copy of the lane's founding spec, per the issue).
-5. **docs** — this report.
+A mark whose asset carries R1 region mattes now CAN render as a remainder
+instance + one instance per region, each region an ordinary instance
+carrying its own kineme id + phase in the same two instance floats
+(18/19) the kineme system already uses. No new vertex attributes, no
+second animation system, no shader change. Expansion is pack-time only:
+placements and goldens never see regions (contract instances are
+byte-identical with and without region state — pinned in the suite).
 
-## How the wiring works
+The lane is wired end to end (bake → contract → governor → pack → live
+loop) and activates when assignment data exists. That data — family
+defaults + the editor — is stage 3 (#1434) by the lane's own split, so
+in production today nothing assigns region kinemes yet and every
+contract is byte-identical to pre-R2. The acceptance below is proven
+with a test-fixture assignment through the real contract builder, the
+real bakers, and real WebGL2 renders.
 
-**The bake (the precondition the issue doesn't spell out).** Before this stage, the strip frames (`MICRO_HUD_STRIPS`) had **no consumer anywhere** and both atlas bakers baked only the asset's single `svg` — so the pack wiring alone would have had nothing to sample. A strip asset now bakes **all its frames side by side into one wide raster** (frame *i* translated *i* frame-widths right, frames **contiguous with no internal gutter**, because `cellUvWindow` splits the cell rect evenly and a gutter would land inside every window but the first). Frame 0 occupies exactly the texels — and the viewBox segment — the pre-change single-cell bake used. Layout is **slot packing**, mirrored in both bakers: an entry consumes *n* consecutive stride-432 grid slots (strips), or 1 slot (everything else); a strip that doesn't fit the row's remainder wraps whole to the next row. **An atlas with no strips lays out byte-identically to before** (same cols, same cell rects) — pinned in the new suite.
+## Commits (bottom → top)
 
-**Motion time.** The live loop's doc already carries `kinemeTime` from the anchored kineme clock (rate changes re-anchor, pause/freeze stop it). `buildSceneContract` previously forwarded `kinemeTime` only alongside a non-empty instance-kineme table — a strip-only scene would have sat on cell 0 forever. It now forwards the time whenever the doc carries a finite one; a doc without `kinemeTime` still gets no key, so motionless contracts and their hashes are unchanged. The renderer reads `contract.kinemeTime` into its frame state exactly as before.
+1. `31990268` feat(assets): region cap 12 + tracked cap merge in regionPartition
+2. `58e095cc` feat(data): regionKinemes — the assignment surface R2 consumes
+3. `d21a15de` feat(gl): region cells in both atlas bakers
+4. `0b30007e` feat(gl): region playback — contract regionAnim, pack expansion, governor wiring
+5. `e2460217` test(gl): regionPlayback selfcheck + manifest; stage-1 atlas pin follows the joint bake
+6. (this report)
 
-**The pack seam.** `renderLayerInstances` builds one frame clock per layer render — `{ motionTime: kinemeTime, shed: cellShed }` — and passes it as the new optional 4th argument to both `packInstanceData` call sites (normal batches and isolated runs; layer-mask bakes flow through the same function, same frame). Inside `packInstanceData`, only when a clock is supplied **and** `stripFramesFor(it.asset)` resolves: `cellIndexAt(motionTime, { period, cells, shed })` picks the cell and `cellUvWindow(cell, idx, cells)` rewrites the instance's UVs. Everything else falls through untouched — including the legacy producer `cellIndex` branch (kept with its exact arithmetic). **Callers that pass no clock never consult the strip table: their packed output is byte-identical to before** — every existing selfcheck caller uses the 3-arg form.
+## Design
 
-**Shed.** New predicate `cellKinemesShed(doc)` mirrors `spectrumMarksShed` exactly — the tier-2 rung: `doc.perfTier1 && quality === 'performance'`. `buildSceneContract` emits `cellShed: true` only when shed (key omitted otherwise, preserving contract shape/hashes); the renderer stores it per frame; `cellIndexAt(..., shed)` returns 0. Exports/stills docs carry no governor state, so they never shed. Note the freeze nuance: a full motion freeze (governor cut 6, pause/hold) stops the kineme clock, so strips **hold their current cell**; pin-to-cell-0 engages with the tier shed. That is the honest reading of "shed/freeze pin cell 0" given the house clock design — flagged here as a judgment call.
+### Bake / pack
+- **Cap (ruling vs R1 data):** R1 baked at REGION_CAP 8 (the spec's
+  then-recommendation). Matt's amended ruling (2026-10-14, on #1433)
+  says bake tags up to 12 — so the cap is now 12 and the library was
+  re-baked with the repo's own script (`npm run bake:regions`).
+  Measured: 49 assets change region count (dot fields / rings /
+  barcodes 8→12, dashes / hatches / radials 8→9–10, geo_burst_01 8→9);
+  total 1,095 regions over 294 assets. 15 stamp (text) assets shift
+  geometry only — the per-machine font drift `regionBake.selfcheck`
+  already exempts; this bake ran on the Linux sandbox.
+- **One cap implementation:** the cap merge moved to
+  `app/src/assets/regionPartition.js` (`capRegionsTracked`, tracked so
+  pixels can be assigned through merges). `regionBake.capRegions` is a
+  wrapper on it; the suite pins tracked == bake, library-wide.
+- **Partition:** both bakers re-run detection on the canonical raster
+  and replay the tracked cap over the detector's idMap, matching kept
+  regions to the committed records by id (records stay the authority).
+  On the resvg path: every record matched, **0 drifted pixels**
+  (pinned for flora + a 12-region dot field + geo_burst). The browser
+  baker folds any canvas-vs-resvg drift into the nearest record by
+  centroid, so pixels are never lost.
+- **Region cells:** per regioned non-strip combo, the bakers emit a
+  remainder cell (`<base>#rem`: whole mark minus region pixels) and one
+  cell per region (`<base>#r:<regionId>`: its pixels only). Region +
+  remainder bytes **sum back to the whole cell byte for byte** (pinned).
+  Strip assets are excluded — their frames are whole-mark animation;
+  cell kinemes own them.
+- **Geometry (a contract reconciliation, flagged):** the issue says
+  both "its own atlas cell (region bbox)" and "pivot at the region
+  centroid". The quad shader's pivot is the instance origin and its
+  quad is a rigid frame, so a bbox-exact quad pivots on the bbox
+  centre, not the centroid. Shipped: the region cell holds the
+  smallest **centroid-centred** rect containing the bbox (content
+  masked outside the region), the instance origin sits exactly on the
+  (bake-quantized) centroid, scale = mark scale × rect/199.5 per axis.
+  Both clauses hold; the cost is the cell rect can exceed the bbox
+  (≤ ~2× area worst case, ~1× for petal-like blobs).
+- **Packing:** remainder/region cells flow into the same sqrt grid as
+  the mains, which is sized on the TOTAL slot count. This matters:
+  combo-rich scenes carry ~4 extra cells per main, and looser packing
+  overflowed the 8192 texture ceiling of 8192-class GPUs (see the
+  rollSafety note under Acceptance). Flora single-combo atlas:
+  432×432 → 1296×1296 (1 main + 6 region cells in a 3×3 grid).
+  Whole-library worst case ≈ 1,683 slots vs 294 mains — real scenes
+  bake only their own combos, but the growth is real and belongs in
+  the publish decision (see judgment calls).
+- **Atlas demand:** region cells are baked only for assets the
+  frame's contract actually expands. `bakeAtlas` takes a
+  `regionAssets` demand set (null = every regioned combo, for direct
+  callers/tests); the parity driver derives it from the contract's
+  `regionAnim` (empty without region state, empty under the collapse
+  shed — the pack reads no region cells in either case) and the live
+  loop does the same, with the demand set riding both atlas cache
+  keys. Unassigned scenes therefore keep the exact pre-R2 atlas —
+  which is also what keeps the driver's per-scene atlas cache from
+  retaining ~180 MB region atlases for scenes that never expand a
+  mark (the second rollSafety failure, below).
+- **Pack expansion** (`renderer.mjs`): when the frame carries region
+  state and it isn't the collapse shed, a governed mark expands in
+  place: remainder first (mark's transform + kineme + flags), then
+  regions in record order. Region origin = the mark's affine applied
+  to the centroid; a selected region carries its contract slot + phase
+  `kinemePhase(assetId, regionId)`; an unselected/unassigned region
+  inherits the mark's kineme + phase (parenting approximation —
+  flagged). Fail-closed throughout: missing/incomplete region cells →
+  the single quad draws.
 
-**Determinism.** Cell choice is a pure function of motion time: no `Math.random`, no wall clock anywhere in the path. Same time → same frame, byte-identical (suite-proven).
+### Contract + governor wiring
+- `contract.regionAnim` (additive; version unchanged) is emitted
+  **only when a scene has region assignments** — so every existing
+  contract and hash is untouched in production today. Shape:
+  `{ budget, shed?, assets: { [assetId]: { [regionId]: slot } } }`,
+  slot 0 = assigned but not selected (renders merged, at rest).
+  Region kinemes join the shared 16-slot table **after** instance
+  kinemes; `assertSceneContract` validates the shape.
+- **Selection is resolved in the contract builder**, where the budget
+  lives: largest regions animate first, record order breaks ties
+  (`regionKinemes.js selectAnimatedRegions`) — mechanical cost logic,
+  no curation surface.
+- **Budget:** `REGION_BUDGETS = { desktop: 12, ipad: 8 }` in
+  `data/quality.js` (where the other budgets live). The live loop
+  detects the device class (iPad UA / MacIntel+touch, the
+  useMediaExport sniff) and passes `doc.regionBudget`; stills/exports
+  pass none and get the tag cap (12), so their region playback is
+  deterministic.
+- **Shed ladder** (predicates in sceneContract.js, doc fields wired in
+  liveLoop from the store's governor state): freeze on the tier-2 rung
+  (`perfTier1 && quality === 'performance'` — the cell-kineme /
+  spectrum rung) tightens the budget to 0: regions draw, at rest.
+  Collapse needs the freeze rung PLUS a deeper cut (`assetThin` /
+  `perfClamp` / `slowRender`): the pack then takes the **exact pre-R2
+  single-quad path** — byte-identical packed output (pinned) and a
+  byte-identical render (pinned on GPU). Reduced motion
+  (`doc.reducedMotion`, read per frame in the loop) also tightens the
+  budget to 0: regions hold rest.
+- **Instance-budget honesty:** placements never see regions (the
+  parenting law), so the resolver's placement caps can't count region
+  instances pre-pack. What the governor does feel: the true GPU cost
+  (its GPU-time signal), plus the budget/freeze/collapse rungs above,
+  plus a declared cost tier (`gl/region-instances`, tier 0, in
+  renderer.mjs). Flagged as a judgment call below.
+- **Live loop:** `getPool` also builds `regionsPool` (canon + overlay
+  records) and hands it to `bakeLiveAtlas`, which mirrors the offline
+  region cells (same partition/geometry modules).
 
-## Measured evidence (new suite: `src/gl/cellKinemePlayback.selfcheck.mjs`)
+## Acceptance evidence (regionPlayback.selfcheck, in the manifest)
 
-The suite follows the house pattern of `src/gl/kineme.selfcheck.mjs` (Node pins + real WebGL2 renders through the parity driver `renderViaGL`; the Playwright browser **is** present in this sandbox, so the GPU section ran — it was not skipped).
+Fixture: `flora_flower_01` (4 petals + centre), assignment petals →
+`rock`, centre → `pulse`, via `doc.regionKinemes` through the real
+`buildSceneContract`.
 
-**Pixel motion — cell 0 → cell 1, differing pixels in a 400×280 frame, one mark at scale 2.5:**
+- **Petals move independently (GPU):** petal-rect pixel diffs at
+  t=0.6 vs rest: **119 / 110 / 64 / 119 px** (all > 0, not equal —
+  hash phases); centre pulses on its own region (12 px). One full
+  rock period wraps byte-identically; same state renders the same
+  frame byte-identically.
+- **Placements byte-identical:** contract instances deep-equal with
+  and without region state (Node pin); expansion is pack-time only.
+- **Rest parity: 0.646% of pixels** differ between the tiled rest
+  frame (budget 0, all slots 0) and the single-quad render — bar is
+  <10%. (Method: 400×280 WebGL2 render via the parity driver, flora
+  at (500, 350) scale 2.5 on black; differing-pixel fraction over the
+  whole frame.)
+- **Shed collapse exact:** shed render byte-identical to the
+  no-regionAnim render (GPU), and shed pack output byte-identical to
+  the pre-R2 pack (Node).
+- **Governor selection demonstrable:** budget 1 vs rest: **321 px**
+  move vs **1,216 px** at budget 12; motion confined to the largest
+  petal's rect, the other petals byte-still; mark alpha within 2% of
+  rest (draws complete).
+- **Bake tiling:** region + remainder cell bytes sum to the whole
+  cell exactly (Node, per channel, per pixel).
+- **rollSafety incident (found by the sweep, fixed, re-verified):**
+  the first full sweep failed `fx/rollSafety` — a suite this lane
+  doesn't touch — in two successive forms, both mine. (1) The
+  after-rolls default scene's atlas packed 5616×8208, 16px past the
+  8192 texture ceiling → GL_INVALID_VALUE at upload; fixed by the
+  joint sqrt packing (6048×6048). (2) A later rolled scene
+  (radial/persona-davis, 630 instances, 32 combos) fit the ceiling at
+  6912×6480 but the ~179 MB region atlas (vs ~27 MB pre-R2) exhausted
+  the headless GPU process after a dozen cached scenes →
+  framebuffer-incomplete; fixed by atlas demand (above) — that scene
+  has no assignments, so its atlas is the pre-R2 one. rollSafety then
+  passed solo on this tree: **7 checks, ~9 min**, matching its
+  base-tree solo pass.
+- Full manifest sweep: **420 of 420 suites pass** (solo run, ~27
+  min, exit 0) on the manifest minus the two known base-identical
+  sandbox failures — `swarmWasm` ("cargo not found", verified
+  identical on the stage-1 base tree) and `gl/accum` (V8 OOM,
+  measured base-identical at stage 1). regionPlayback runs inside
+  the sweep and passes there too.
+- `npm run build`: green (after `npm install` completed this
+  worktree's node_modules — it was missing the declared
+  `@tauri-apps/api`; the base worktree builds without it because its
+  install is complete; unrelated to this change).
 
-| asset | kineme | differing px |
-|---|---|---|
-| mic_dial | dial-sweep | **1086** |
-| mic_chevrons | chevron-chase | **894** |
-| mic_specbar_h | spec-chase | **360** |
-| mic_specbar_v | spec-chase | **307** |
-| mic_wave | wave-scroll | **1911** |
+## Judgment calls (flagged plainly)
 
-mic_dial cell 0 → cell 4 (needle opposite): **1324 px**. One full period wraps to the **byte-identical** frame; the same motion time renders byte-identically twice; a non-strip mark (geo_tri_01) is byte-identical at any motion time.
+1. **Cap 8 → 12 re-bake** follows the amended ruling's letter ("bake
+   tags up to 12"). It rewrites R1's committed data; if Matt wants
+   the cap applied only from R3 onward, reverting commit 1 restores
+   R1's data and everything else still works (partition caps
+   detection to the record count).
+2. **Centroid-centred region cells** (above) trade atlas area for an
+   exact centroid pivot. The spec's "atlas growth bounded by total
+   region bbox area" becomes "bounded by region count" under slot
+   packing — worst-case whole-library ≈ 1,683 slots (a hypothetical
+   single whole-library atlas would exceed texture limits; no code
+   path bakes one — scenes bake their own combos). If atlas memory
+   on iPad bites, the follow-up is sub-slot shelf packing for region
+   cells; not built here.
+3. **regionAnim emission is assignment-gated.** On an iPad with no
+   assignments, marks stay single-quad (identical frame — nothing is
+   assigned to animate). Expansion exists to serve motion + the shed
+   ladder; both are inert without assignments.
+4. **Unselected regions inherit the mark's kineme** with the mark's
+   phase, pivoting at their own centroid rather than the mark's
+   origin (one kineme slot per instance — nested parent motion can't
+   compose exactly in one instance). When R3 assigns a region its
+   own kineme, that region is fully local and the remainder keeps
+   the parent motion.
+5. **Freeze = budget 0; collapse = one rung deeper** is my mapping of
+   the issue's ladder onto the governor's existing cuts (there is no
+   pre-existing "instance kinemes freeze" rung to sit between —
+   instance kinemes freeze today via slowRender, which is one of the
+   collapse triggers).
+6. **Materials on regions:** region instances inherit the mark's
+   glass/deform/material flags; the plate/wash ramps read `v_cell`
+   (the region cell's frame), so a plate-bodied regioned mark ramps
+   per region, not per mark. No test scene exercises materials ×
+   regions; flagged, not hidden.
+7. **Custom (user:) assets:** the live baker bakes their region
+   cells from the pool, but the contract learns regions from the
+   built-in catalogue only — custom-asset region playback arrives
+   with R3's import auto-tagging (#1434). Built-ins are complete.
+8. **Stage-1 pin updated:** `cellKinemePlayback`'s plain-atlas
+   position assertions now pin what R2 leaves invariant — every main
+   cell is one whole stride-aligned frame (absolute grid positions
+   are R2's packing choice once region cells share the grid). Its
+   GPU numbers are identical to stage 1's verified run:
+   1086 / 894 / 360 / 307 / 1911 px, and frame 0 stays bit-identical.
+9. **liveAtlas** is verified by mirror construction + the shared
+   pure modules (partition/geometry are suite-pinned); its canvas
+   detection path has no Node coverage (no DOM) — the GPU suite
+   covers the resvg baker end to end.
+10. **Region cells are baked on demand** (see Design): a scene whose
+    contract expands no mark pays nothing for region cells, and the
+    collapse shed bakes none. The cost: when assignments first appear
+    (or the shed lifts), the atlas rebakes with the cells — the live
+    loop's fail-closed pack draws single quads until the new atlas
+    lands, so the transition is a brief single-quad frame, never a
+    missing mark. An assignment-heavy scene with very many combos
+    can still exceed texture limits; sub-slot packing (call 2) is
+    the follow-up if that ever becomes real.
 
-**Node pins:** for all 4 kinemes — `cellIndexAt` walks every cell in one period, wraps at the period, pins 0 under shed, wraps negative time; `cellUvWindow` windows tile the cell exactly with v untouched; pack-level UVs equal `cellUvWindow(cell, cellIndexAt(t))` across a time sweep for all 5 strip assets (float32 tolerance); no-clock pack = full cell; non-strip pack byte-identical with/without the clock; contract keys (`kinemeTime` forwarding, `cellShed` only on the tier-2 rung).
+## Files touched per commit
 
-## Shed pixel-identity — the honest numbers
+1. `app/src/assets/regionPartition.js` (new), `app/src/assets/regionBake.mjs`,
+   `app/src/data/assets/regions.generated.js` (re-baked),
+   `docs/research/region-mattes-bake-report.md` (regenerated),
+   `app/src/assets/regionBake.selfcheck.mjs` (cap pin + fixture)
+2. `app/src/data/regionKinemes.js` (new)
+3. `app/src/gl/atlas.mjs`, `app/src/gl/liveAtlas.mjs`,
+   `app/src/assets/regionRaster.js` (export canonicalSvg),
+   `app/src/gl/parity/glDriver.mjs` (geo passthrough)
+4. `app/src/gl/sceneContract.js`, `app/src/gl/renderer.mjs`,
+   `app/src/data/quality.js`, `app/src/gl/liveLoop.mjs`,
+   `app/src/gl/parity/glDriver.mjs` (atlas demand + cache key)
+5. `app/src/gl/regionPlayback.selfcheck.mjs` (new),
+   `app/selfcheck.manifest`, `app/src/gl/cellKinemePlayback.selfcheck.mjs` (pin)
 
-Three measurements, in increasing strength:
+## Not built (by design)
 
-1. **Within the new code (suite-pinned):** the shed render is **byte-identical** to the cell-0 render, and to a no-clock render.
-2. **At the bake (suite-pinned):** frame 0's 400×400 texels are **bit-identical** to the pre-change single-cell bake — all 400 rows compared exactly against the old `bakeCombo` recipe re-derived in the suite.
-3. **Against the true pre-change render (one-off cross-version probe, not a suite):** I rendered the same mic_dial scene with the actual base-commit code (scratch worktree at `c05c1b73`, removed after) and compared against this branch's shed render. **980 of 112,000 px differ (0.88% of frame) at 400×280; 4,389 of 700,000 (0.63%) at 1000×700; total alpha identical (178,500,000 both).** A non-strip control asset rendered byte-identically across the two trees, so the delta is solely the strip sampling.
-
-**Judgment call, flagged plainly:** the residual in (3) is the sub-texel drift inherent to the issue-prescribed `cellUvWindow` math: it splits the strip's inset rect *evenly*, so each window spans 400 − 1/n texels instead of a frame's true 399-texel inset span — a misalignment of at most (n−1)/n texel (≤0.875 texel for n=8, ≈0.44 px at 400×280), zero at the strip's left edge, which flips hard-edge pixels while conserving total ink exactly. No uniform-split layout can make every frame texel-exact; making shed strictly bit-identical to the pre-change render would require a per-frame window seam in the pack instead of `cellUvWindow` over the strip rect — a deviation from the issue's prescribed design that I did **not** take unilaterally. The measured delta is far inside the repo's <10% parity bar. If Matt wants strict bit-identity, that's the follow-up decision.
-
-## Test results (exact)
-
-- **New suite** `src/gl/cellKinemePlayback.selfcheck.mjs`: **PASS**, all sections (selection/windows/table, bake, pack, contract, GPU) — GPU section ran, not skipped.
-- **Neighbourhood (17 suites): all PASS** — `data/cellKinemes`, `data/kinemes`, `gl/atlas.skip`, `gl/atlasKeyGuard`, `gl/liveAtlas`, `gl/sceneContract`, `gl/kineme`, `gl/kinemeRateAudio`, `gl/costTiers`, `gl/glassBevel`, `gl/exportStill`, `gl/phase6`, `engine/dishDeform`, `engine/plateBody`, `engine/washBody`, `engine/stippleBody`, `engine/glassBody`.
-- **`npm run build`: PASS** (vite, 4.77s).
-- **Full manifest sweep** (continue-past-failure runner, solo, 421 suites): **419 pass / 2 fail**. The 2 failures are the known base-identical sandbox environment failures, unrelated to this change: `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` ("cargo: not found" — no Rust toolchain in the sandbox) and `src/gl/accum.selfcheck.mjs` (V8 OOM abort, SIGABRT — the known sandbox memory limit). No other suite failed.
-
-## Judgment calls (all flagged, none hidden)
-
-1. **Bake design** (above): full-size contiguous frames + slot packing in both bakers; rejected squished-slices (mushy dial at 400/n px wide; cell 0 wouldn't be today's bake) and per-frame gutters (break the even-split math). Internal gutters are safe to omit because strip ink is measured well inside frame edges (dial ink ≈ texels 124–276 of 400), so mip box-filtering across a frame boundary never reaches ink.
-2. **Shed rung = tier 2**, mirroring spectrum marks (the closest sibling: a marks-level extra on the same ladder rung). Cell strips cost no extra pass; shedding them is about visual quiet, like the marks.
-3. **`kinemeTime` forwarding change** in `kinemeFields` (above): required for strip-only scenes; live contracts that pass a time now carry the key even with no instance kinemes — the renderer already read it as 0-equivalent when absent, and motionless docs are untouched.
-4. **Freeze holds the current cell** (clock stops); only the tier shed pins cell 0. See "Shed" above.
-5. **Shed bit-identity**: shipped the prescribed `cellUvWindow` seam and reported the measured cross-version delta (above) instead of rearchitecting for bit-exactness.
-6. **`stripFramesFor` fail-closed**: assignment/frame-data/cell-count disagreement → plain bake + no pack subdivision, rather than garbage UVs.
-7. **Cost tier** `gl/cell-kineme` registered at tier 0 (work happens inside the existing quad pass at pack time; the frames' atlas cost is the kinemes' declared `costCells`).
-
-## Out of scope (later stages)
-
-R2 #1433 (region playback), R3 #1434 (assignment), R4 #1435 (waveform strips) — untouched. No changes to `liveLoop.mjs`, shaders, or the strip data files. Nothing pushed; no PR opened — this stage stages locally for the coordinator's publish step.
+- `regionKinemes` family defaults, the asset-tools editor, import
+  auto-tagging — stage 3 (#1434).
+- Waveform strips — stage 4 (#1435).
+- No shader changes, no new vertex attributes, no UI.
