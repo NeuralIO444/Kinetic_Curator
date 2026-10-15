@@ -51,6 +51,7 @@ import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/p
 const GRAIN_FAMILY_KINDS = ['grain'];
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { registerCostTier } from './costTiers.mjs';
+import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
 import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
 import { createCoalesceFinish } from './coalesceFinish.mjs'; // #1411 coalescence finish
 import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
@@ -281,6 +282,14 @@ registerCostTier('gl/kineme', {
   tier: 0, memoryBytes: 0, timeMs: 0.01,
   notes: '#781 KINEME A: per-instance motion in QUAD_VS from a 16-slot uniform table; moving instances only; zero passes/cells; live + GL stills',
 });
+// #1431 KINEME C: strip playback is a UV window chosen at pack time inside
+// the existing quad pass — no pass, no texture beyond the strip frames the
+// atlas already carries (their cell count is the kineme's costCells). Shed
+// on the tier-2 rung (sceneContract.cellKinemesShed) pins cell 0.
+registerCostTier('gl/cell-kineme', {
+  tier: 0, memoryBytes: 0, timeMs: 0,
+  notes: '#1431 KINEME C: cell window picked in packInstanceData per strip instance; zero passes; frames ride the atlas (costCells in cellKinemes.js); shed pins cell 0; live + GL stills',
+});
 // #594 PR2 bevel: 4 extra atlas taps per LIT fragment (only when the sun is on
 // and bevel > 0), inside the same quad pass. Declared tier 0 like the rest of the
 // quad program because the cost gate needs a harness measurement for tiers 1–3
@@ -312,7 +321,7 @@ export const SMEAR_MAX = 1.0;
 export const comboKey = (asset, tint, accent) => `${asset}|${tint}|${accent}`;
 
 
-export function packInstanceData(instances, cells, alphaScale = 1) {
+export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = null) {
   // Spine B (#388): skip instances whose cells[comboKey] is missing instead
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
   if (!instances || instances.length === 0 || !cells) return new Float32Array(0);
@@ -339,7 +348,22 @@ export function packInstanceData(instances, cells, alphaScale = 1) {
     const cell = cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
     if (!cell) continue; // Spine B: skip missing instance, never throw
     let u0 = cell.u0, v0 = cell.v0, u1 = cell.u1, v1 = cell.v1;
-    if (it.cellIndex != null && it.cellCount > 1) {
+    // #1431 KINEME C — a strip asset's UV window steps through its baked
+    // frames: when the caller supplies the frame clock (the renderer
+    // always does), the strip table is authoritative for strip assets —
+    // cellIndexAt picks the cell from motion time, cellUvWindow rewrites
+    // the UVs. Shed pins cell 0 (the canonical frame). Callers without a
+    // clock (every pre-#1431 caller) never consult the table, so their
+    // packed output is byte-identical to before. Non-strip assets fall
+    // through untouched.
+    const stripK = cellFrame && stripFramesFor(it.asset)
+      ? getCellKineme(ASSET_CELL_KINEME[it.asset])
+      : null;
+    if (stripK) {
+      const idx = cellIndexAt(cellFrame.motionTime, { period: stripK.period, cells: stripK.cells, shed: !!cellFrame.shed });
+      const win = cellUvWindow(cell, idx, stripK.cells);
+      u0 = win.u0; v0 = win.v0; u1 = win.u1; v1 = win.v1;
+    } else if (it.cellIndex != null && it.cellCount > 1) {
       const n = it.cellCount;
       const i = Math.max(0, Math.min(n - 1, it.cellIndex | 0));
       const w = (u1 - u0) / n;
@@ -507,6 +531,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let hands = { crooked: 0, open: 0 };
   let kinemeTable = null; // #781: the frame's kineme table (null = nothing moves)
   let kinemeTime = 0;
+  let cellShed = false; // #1431: contract.cellShed — strip assets park on cell 0
   const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
   // #1482 P3: the frame's spectrum marks ({ map, scale, displace, colour, tex } or null = off, today's frame).
@@ -630,17 +655,20 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
+    // #1431: the frame clock every strip instance in this layer (and its
+    // mask bakes, which flow through here too) packs against.
+    const cellFrame = { motionTime: kinemeTime, shed: cellShed };
     let batch = [];
     const flushNormal = () => {
       if (batch.length) {
-        const data = instanceData(batch, cells, groupOpacity);
+        const data = instanceData(batch, cells, groupOpacity, cellFrame);
         if (data.length) drawInstances(data, atlasTex, w, h);
       }
       batch = [];
     };
     const flushIsolatedRun = (items, blendMode) => {
       if (!items.length) return;
-      const data = instanceData(items, cells, groupOpacity);
+      const data = instanceData(items, cells, groupOpacity, cellFrame);
       if (!data.length) return; // Spine B (#388): nothing bakeable in this run yet
       flushNormal();
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fb);
@@ -755,6 +783,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     squash = contract.squash || 0; // #594 PR3
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
+    cellShed = !!contract.cellShed; // #1431
     const { atlasTex } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];
