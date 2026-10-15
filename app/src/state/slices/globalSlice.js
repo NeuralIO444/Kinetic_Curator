@@ -19,11 +19,13 @@ import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { experimentalOn, setExperimental } from '../../curator/tasteGate.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
+import { sanitizeRegionKinemesDoc } from '../../data/regionKinemes.js';
+import { tagImportedRegions } from '../../data/regionDefaults.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
 import { sanitizeMidiMap } from '../../midi/map.mjs';
 import { sanitizeMathMacros } from '../../curator/mathMacros.js';
-import { normalizeRegions, normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
+import { normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { sanitizePins } from '../../curator/dishPins.js';
 import { sanitizeCount } from '../../curator/spawn.js';
@@ -128,6 +130,24 @@ function persistStartupMode(mode) {
 
 function findAsset(id, overlay) {
   return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
+}
+
+/**
+ * #1434 — an import's regions land: cap at the tag cap and apply the family
+ * defaults (tagImportedRegions — the same pipeline the library gets at
+ * bake), so a newly arrived asset is first-class immediately, never
+ * raw/inert. Defaults are recomputed from the CURRENT geometry (a redraw
+ * re-tags); the artist's doc-level overrides are separate data and always
+ * win at resolve time, so recomputing defaults never clobbers an edit.
+ */
+function withTaggedRegions(asset, regions) {
+  const tagged = tagImportedRegions(asset, regions);
+  const { regionKinemes: _stale, ...rest } = asset;
+  return {
+    ...rest,
+    regions: tagged.regions,
+    ...(tagged.regionKinemes ? { regionKinemes: tagged.regionKinemes } : {}),
+  };
 }
 
 export const createGlobalSlice = (set) => ({
@@ -273,6 +293,9 @@ export const createGlobalSlice = (set) => ({
   assetWeightOverrides: {},
   /** #781 KINEME — { assetId: kinemeId }: which assets move, and how. Assets stay static sources. */
   assetKineme: { ...DEFAULT_ASSET_KINEME }, // #705 — micro-HUD ornaments move out of the box
+  /** #1434 — { assetId: { regionId: kinemeId | null } }: the artist's per-region overrides over the family
+   * defaults. null is a tombstone: that region is still on purpose. Rides the document. */
+  regionKinemes: {},
   /** #1128 — { assetId: true }: assets pinned still. The living-motion floor (breath, drift) leaves their marks where they were placed. */
   assetStill: {},
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
@@ -491,6 +514,20 @@ export const createGlobalSlice = (set) => ({
     if (!src) return {};
     const result = duplicateIntoOverlay(src, state.customAssets);
     if (!result.ok) return { ingestError: result.hint || result.error };
+    // #1434 — a duplicate is a new arrival: it inherits its source's
+    // regions + defaults through the record spread; if the source had
+    // none yet, tag it on arrival like any import.
+    if (!Array.isArray(result.asset.regions) || !result.asset.regions.length) {
+      queueRegionDetect(result.asset.id, result.asset.svg, (rid, regions) => {
+        set((st) => {
+          const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
+          if (!cur || cur.svg !== result.asset.svg) return {};
+          return {
+            customAssets: st.customAssets.map((a) => (a.id === rid ? withTaggedRegions(a, regions) : a)),
+          };
+        });
+      });
+    }
     return {
       customAssets: result.overlay,
       enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
@@ -503,12 +540,14 @@ export const createGlobalSlice = (set) => ({
     if (!result.ok) return { ingestError: result.hint || result.error || 'ingest failed' };
     // #725: region detection needs a rasterize (async) — the asset lands
     // now, its regions follow. Stale-guarded: a replace in between wins.
+    // #1434: when they land they are capped + family-defaulted
+    // (withTaggedRegions) — no raw/inert import state.
     queueRegionDetect(result.asset.id, result.asset.svg, (id, regions) => {
       set((st) => {
         const cur = findAsset(id, sanitizeOverlay(st.customAssets));
         if (!cur || cur.svg !== result.asset.svg) return {};
         return {
-          customAssets: st.customAssets.map((a) => (a.id === id ? { ...a, regions } : a)),
+          customAssets: st.customAssets.map((a) => (a.id === id ? withTaggedRegions(a, regions) : a)),
         };
       });
     });
@@ -555,6 +594,7 @@ export const createGlobalSlice = (set) => ({
     const result = replaceOverlayAsset(id, svg, state.customAssets);
     if (!result.ok) return { ingestError: result.hint || result.error };
     // #725: re-detect regions for the new artwork; stale-guard as above.
+    // #1434: the new geometry re-tags (cap + family defaults) on arrival.
     const nextSvg = result.overlay.find((a) => a.id === id)?.svg;
     if (nextSvg) {
       queueRegionDetect(id, nextSvg, (rid, regions) => {
@@ -562,7 +602,7 @@ export const createGlobalSlice = (set) => ({
           const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
           if (!cur || cur.svg !== nextSvg) return {};
           return {
-            customAssets: st.customAssets.map((a) => (a.id === rid ? { ...a, regions } : a)),
+            customAssets: st.customAssets.map((a) => (a.id === rid ? withTaggedRegions(a, regions) : a)),
           };
         });
       });
@@ -576,9 +616,12 @@ export const createGlobalSlice = (set) => ({
    * IDs: redraw-same-color survives, recolor breaks (new ID).
    */
   setAssetRegions: (id, regions) => set((state) => {
-    const clean = normalizeRegions(regions);
     const asset = findAsset(id, sanitizeOverlay(state.customAssets));
     if (!asset) return {};
+    // #1434 — regions landing through here get the import pipeline too:
+    // the tag cap + family defaults, recomputed from the new geometry.
+    const tagged = tagImportedRegions(asset, regions);
+    const clean = tagged.regions;
     // #725: prune slot assignments whose IDs died with the recolor — a slot
     // pointing at a missing region is a broken promise, not a kept one.
     const alive = new Set(clean.map((r) => r.id));
@@ -590,9 +633,16 @@ export const createGlobalSlice = (set) => ({
     const prevSlots = normalizeRegionSlots(asset.regionSlots);
     const slotsChanged = pruned || REGION_SLOTS.some((s) => slots[s] !== prevSlots[s]);
     return {
-      customAssets: state.customAssets.map((a) => (a.id === id
-        ? { ...a, regions: clean, ...(slotsChanged ? { regionSlots: slots } : {}) }
-        : a)),
+      customAssets: state.customAssets.map((a) => {
+        if (a.id !== id) return a;
+        const { regionKinemes: _stale, ...rest } = a;
+        return {
+          ...rest,
+          regions: clean,
+          ...(slotsChanged ? { regionSlots: slots } : {}),
+          ...(tagged.regionKinemes ? { regionKinemes: tagged.regionKinemes } : {}),
+        };
+      }),
     };
   }),
   setAssetRegionSlot: (id, slot, regionId) => set((state) => {
@@ -654,6 +704,33 @@ export const createGlobalSlice = (set) => ({
     }
     if (!getKineme(kinemeId) || cur[assetId] === kinemeId) return {};
     return { assetKineme: { ...cur, [assetId]: kinemeId } };
+  }),
+  /**
+   * #1434 — the artist's per-region kineme override, from the asset tools.
+   * value: a kineme id (override), 'still' (tombstone — the region rests
+   * on purpose, the default does not come back), or 'default' (clear the
+   * override; the family default rules again). Rides the document; beats
+   * the baked/auto-tagged defaults at resolve time, and a re-bake or
+   * re-tag never touches this map.
+   */
+  setRegionKineme: (assetId, regionId, value) => set((state) => {
+    if (!assetId || typeof assetId !== 'string' || !regionId || typeof regionId !== 'string') return {};
+    const cur = state.regionKinemes || {};
+    const per = { ...(cur[assetId] || {}) };
+    if (value === 'default') {
+      if (!(regionId in per)) return {};
+      delete per[regionId];
+    } else if (value === 'still') {
+      if (per[regionId] === null) return {};
+      per[regionId] = null;
+    } else if (typeof value === 'string' && getKineme(value)) {
+      if (per[regionId] === value) return {};
+      per[regionId] = value;
+    } else return {};
+    const next = { ...cur };
+    if (Object.keys(per).length) next[assetId] = per;
+    else delete next[assetId];
+    return { regionKinemes: next };
   }),
   setAssetWeight: (id, weight) => set((state) => {
     if (!WEIGHT_CYCLE.includes(weight)) return {};
@@ -744,6 +821,7 @@ export const createGlobalSlice = (set) => ({
     next.creatureCount = sanitizeCount(doc.creatureCount); // #1355 AUTO SPAWN: homes are found again for the new dish
     next.dishPins = [];
     next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
+    next.regionKinemes = sanitizeRegionKinemesDoc(doc.regionKinemes) || {}; // #1434 — a doc without region edits leaves the family defaults alone
     next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
     {
       const canvas = sanitizeCanvasSpec(doc);
