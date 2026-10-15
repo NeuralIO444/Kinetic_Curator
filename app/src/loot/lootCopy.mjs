@@ -30,6 +30,18 @@ export function statusLine({ items = 0, missing = 0, added = 0, skipped = 0, tak
   return bits.join(' · ');
 }
 
+const MISSING_SHOWN = 3;
+const KEEPS = Object.freeze({ image: 'the pool keeps its copy', palette: 'the palette stays in your library', audio: 'it leaves the STIMULI menu' });
+
+/** Honest lines for files that were taken in and are no longer in the folder: [`images/a.svg: source missing, the pool keeps its copy`]. */
+export function missingLines(index) {
+  const items = (index && index.items && typeof index.items === 'object') ? Object.values(index.items) : [];
+  const gone = items.filter((it) => it && it.state === 'missing' && typeof it.rel === 'string').sort((a, b) => (a.rel < b.rel ? -1 : 1));
+  const lines = gone.slice(0, MISSING_SHOWN).map((it) => `${it.rel}: source missing${it.ingested && KEEPS[it.kind] ? `, ${KEEPS[it.kind]}` : ''}`);
+  if (gone.length > MISSING_SHOWN) lines.push(`and ${gone.length - MISSING_SHOWN} more missing`);
+  return lines;
+}
+
 /** One log row as text: `images/a.svg  skipped: raster not supported yet`. */
 export function logLine(r) {
   if (!r || typeof r.rel !== 'string') return '';
