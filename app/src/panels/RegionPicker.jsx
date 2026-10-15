@@ -111,10 +111,9 @@ export function RegionPicker({ assetId, onClose }) {
   // pool asset are the editing surface; the raster's regions above are
   // for matte picking.
   const motionRecords = (asset.regions && asset.regions.length) ? asset.regions : regions;
-  const defaults = useMemo(
-    () => familyDefaultRegionKinemes(asset, motionRecords) || {},
-    [asset, motionRecords],
-  );
+  // Plain computation, not a hook: this sits below the early return above,
+  // and the table is a cheap pure lookup over at most 12 records.
+  const defaults = familyDefaultRegionKinemes(asset, motionRecords) || {};
   const docPer = (docRegionKinemes && asset.id in docRegionKinemes) ? docRegionKinemes[asset.id] : null;
   const overrideOf = (regionId) => {
     if (docPer && regionId in docPer) return docPer[regionId] === null ? 'still' : docPer[regionId];

@@ -142,7 +142,8 @@ function findAsset(id, overlay) {
  */
 function withTaggedRegions(asset, regions) {
   const tagged = tagImportedRegions(asset, regions);
-  const { regionKinemes: _stale, ...rest } = asset;
+  const rest = { ...asset };
+  delete rest.regionKinemes; // stale defaults off — the fresh tag below replaces them
   return {
     ...rest,
     regions: tagged.regions,
@@ -635,7 +636,8 @@ export const createGlobalSlice = (set) => ({
     return {
       customAssets: state.customAssets.map((a) => {
         if (a.id !== id) return a;
-        const { regionKinemes: _stale, ...rest } = a;
+        const rest = { ...a };
+        delete rest.regionKinemes; // stale defaults off — the fresh tag below replaces them
         return {
           ...rest,
           regions: clean,
