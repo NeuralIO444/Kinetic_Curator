@@ -136,14 +136,27 @@ export async function openHarnessPage(pagePath) {
 
 function b64(buf) { return Buffer.from(buf).toString('base64'); }
 
-function getAtlas(combos) {
-  const key = combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join('|');
+function getAtlas(combos, regionAssets = null) {
+  // #1433: the cache key carries the region-cell demand — the same
+  // combos rendered with and without region assignments need different
+  // atlases (region cells exist only for assets the contract expands).
+  const regionKey = regionAssets === null ? '*' : [...regionAssets].sort().join(',');
+  const key = `${regionKey}#${combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join('|')}`;
   let a = atlasCache.get(key);
   if (!a) {
-    a = bakeAtlas(combos);
+    a = bakeAtlas(combos, { regionAssets });
     atlasCache.set(key, a);
   }
   return a;
+}
+
+// The assets a contract actually expands: its regionAnim assets, or
+// none when there is no region state / the state is the collapse shed
+// (the pack takes the single-quad path and reads no region cells).
+function regionAssetsFor(contract) {
+  return contract.regionAnim && !contract.regionAnim.shed
+    ? new Set(Object.keys(contract.regionAnim.assets || {}))
+    : new Set();
 }
 
 /**
@@ -152,7 +165,7 @@ function getAtlas(combos) {
  */
 export function buildRenderPayload(contract, { width = 400, height = 280, bg = '#0a0a0a' } = {}) {
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
-  const atlas = getAtlas(combos);
+  const atlas = getAtlas(combos, regionAssetsFor(contract));
   const cells = {};
   for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
   // #1079: grain is procedural — no LUT is baked or shipped.
@@ -186,7 +199,9 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
       }
     }
   }
-  const atlas = getAtlas(combos);
+  const regionAssets = new Set();
+  for (const contract of frameContracts) for (const id of regionAssetsFor(contract)) regionAssets.add(id);
+  const atlas = getAtlas(combos, regionAssets);
   const cells = {};
   for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
   // #1079: grain is procedural — no LUT is baked or shipped.
