@@ -241,7 +241,7 @@ assert.strictEqual(describeMessage(M([0x80, 36, 0])), 'note 36 · ch 1 · off');
 // ── wiring ───────────────────────────────────────────────────────────────
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
-  const sites = { 'state/projectDocument.js': 3, 'state/slices/globalSlice.js': 1, 'hooks/useProjectPayload.js': 2, 'hooks/useProjectAutosave.js': 1, 'panels/PipelinePanel.jsx': 3, 'panels/pipeline/DataExportRow.jsx': 2 };
+  const sites = { 'state/projectDocument.js': 3, 'state/slices/globalSlice.js': 1, 'hooks/useProjectPayload.js': 2, 'state/projectWatch.mjs': 1, 'panels/PipelinePanel.jsx': 3, 'panels/pipeline/DataExportRow.jsx': 2 };
   for (const [file, min] of Object.entries(sites)) {
     const n = (src(`../${file}`).match(/midiMap|sanitizeMidiMap/g) || []).length;
     assert.ok(n >= min, `${file} must wire midiMap (found ${n}, expected >= ${min})`);
