@@ -8,6 +8,7 @@ import {
   readPipelineAutosave,
 } from '../state/projectDocument.js';
 import { decideBoot } from '../state/startupBoot.mjs';
+import { projectDirty } from '../state/projectWatch.mjs'; // every field the document saves
 import { recipeToProjectDoc } from '../state/recipes.js';
 import { parseBootHash, describePaletteFallback } from '../state/recipeUrls.js';
 
@@ -170,38 +171,29 @@ export function useProjectAutosave() {
   }, []);
 
   useEffect(() => {
-    const unsub = useStore.subscribe((state, prev) => {
-      if (
-        state.seed === prev.seed &&
-        state.paletteId === prev.paletteId &&
-        state.quality === prev.quality &&
-        state.layoutParams === prev.layoutParams &&
-        state.enabledAssets === prev.enabledAssets &&
-        state.assetWeightOverrides === prev.assetWeightOverrides &&
-        state.assetKineme === prev.assetKineme && // #781
-        state.audioRoutes === prev.audioRoutes && // #790
-        state.midiMap === prev.midiMap && // #617
-        state.customAssets === prev.customAssets &&
-        state.layers === prev.layers &&
-        state.paletteOverrides === prev.paletteOverrides
-      ) {
-        return;
+    // One writer, used by the debounce, the max-wait and the flush on hide/close.
+    const doWrite = () => {
+      firstChangeAt.current = null;
+      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+      const res = writePipelineAutosave(serializeProject(useStore.getState()));
+      const store = useStore.getState();
+      // Do not clear a quarantine flag on a later successful write: the
+      // operator still needs to know this session did not start from their
+      // last document.
+      if (store.persistStatus !== 'quarantined') {
+        const next = res.ok ? 'ok' : 'unsaved';
+        if (store.persistStatus !== next) store.setPersistStatus(next);
       }
+    };
+    // A pending change is written NOW when the page is hidden or closing: the debounce would otherwise never fire.
+    const flush = () => { if (firstChangeAt.current != null || timer.current) doWrite(); };
+    const onVisibility = () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flush(); };
+
+    const unsub = useStore.subscribe((state, prev) => {
+      // every field the document saves (state/projectWatch.mjs), not a hand-kept dozen
+      if (!projectDirty(state, prev)) return;
       const now = Date.now();
       if (firstChangeAt.current == null) firstChangeAt.current = now;
-      const doWrite = () => {
-        firstChangeAt.current = null;
-        const res = writePipelineAutosave(serializeProject(useStore.getState()));
-        const store = useStore.getState();
-        // Do not clear a quarantine flag on a later successful write: the
-        // operator still needs to know this session did not start from their
-        // last document.
-        if (store.persistStatus !== 'quarantined') {
-          const next = res.ok ? 'ok' : 'unsaved';
-          if (store.persistStatus !== next) store.setPersistStatus(next);
-        }
-      };
-
       if (timer.current) clearTimeout(timer.current);
       if (now - firstChangeAt.current >= MAX_WAIT_MS) {
         doWrite();
@@ -209,8 +201,16 @@ export function useProjectAutosave() {
         timer.current = setTimeout(doWrite, DEBOUNCE_MS);
       }
     });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', flush);
+    }
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
     return () => {
       unsub();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pagehide', flush);
+      }
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
       if (timer.current) clearTimeout(timer.current);
     };
   }, []);

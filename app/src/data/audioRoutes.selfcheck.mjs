@@ -101,7 +101,7 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
     'state/slices/audioSlice.js': 2,    // default + setter
     'state/history.js': 3,              // capture + signature + restore (the sun missed the signature)
     'hooks/useProjectPayload.js': 2,    // destructure + serialize call
-    'hooks/useProjectAutosave.js': 1,   // autosave trigger
+    'state/projectWatch.mjs': 1,        // autosave trigger (the one watch list the autosave hook reads)
     'panels/PipelinePanel.jsx': 3,      // selector + destructure + prop
     'panels/pipeline/DataExportRow.jsx': 2,
     'panels/StimulusPanel.jsx': 3,      // the matrix reads it
