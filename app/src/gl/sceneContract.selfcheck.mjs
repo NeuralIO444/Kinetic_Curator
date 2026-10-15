@@ -237,12 +237,12 @@ ok('Spine B (#388): packInstanceData skips missing atlas cells without throwing'
     [comboKey('ast-c', '#ff0000', '#00ff00')]: { u0: 0.5, v0: 0.5, u1: 1, v1: 1 },
   };
   const packed = packInstanceData(instances, cells);
-  // 2 valid instances * 24 floats = 48 floats (stride grew 20→21 in #1129 PR2: glass flag; 21→24 in #1410: deform vec3)
-  assert.equal(packed.length, 48);
+  // 2 valid instances * 25 floats = 50 floats (stride grew 20→21 in #1129 PR2: glass flag; 21→24 in #1410: deform vec3; 24→25 in #1548: plate flag at the tail)
+  assert.equal(packed.length, 50);
   assert.equal(packed[0], 10); // instance 0 x
   assert.equal(packed[1], 20); // instance 0 y
-  assert.equal(packed[24], 50); // instance 2 x (instance 1 was skipped)
-  assert.equal(packed[25], 60); // instance 2 y
+  assert.equal(packed[25], 50); // instance 2 x (instance 1 was skipped)
+  assert.equal(packed[26], 60); // instance 2 y
 
   // Completely missing cells returns empty Float32Array, does not throw
   const empty = packInstanceData(instances, {});
