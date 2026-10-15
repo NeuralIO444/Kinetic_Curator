@@ -16,6 +16,7 @@
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeKeepContext } from './keepContext.js';
 import { sanitizeProvenance, isProvenance } from './provenance.mjs';
+import { isTauriRuntime } from '../platform/desktop.mjs'; // one desktop check for the whole app
 
 export const LEDGER_KINDS = Object.freeze(['keeps', 'passes']);
 export const LEDGER_STORAGE_KEYS = Object.freeze({
@@ -138,7 +139,7 @@ export function ledgerCounts(storage = defaultStorage()) {
   return { keeps: count('keeps'), passes: count('passes') };
 }
 
-const isTauri = () => typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+const isTauri = () => isTauriRuntime();
 
 /** Desktop mirror: append the same line to $APPDATA/ledgers/<kind>.jsonl. */
 async function appendToAppData(kind, line) {
