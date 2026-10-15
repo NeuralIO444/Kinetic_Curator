@@ -16,6 +16,8 @@ serde_json = "1.0"
 metal = "0.31.0"
 libc = "0.2.189"
 objc = "0.2.7"
+sha2 = "0.10"   # #1479 loot folder: streamed SHA-256 of a file (already in the tree via tauri)
+base64 = "0.21" # #1479 loot folder: a file to JS as a string, not a JSON number array
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

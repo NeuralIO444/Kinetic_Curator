@@ -5,6 +5,7 @@ mod metal;
 mod curator;
 mod media;
 mod mind; // #1463: Apple Intelligence via the kc-mind sidecar
+mod loot; // #1479: the loot folder: list, hash and read, root-bound
 
 use std::fs;
 use std::path::Path;
@@ -54,6 +55,9 @@ fn main() {
             media::media_engine_get_status,
             mind::mind_status,
             mind::mind_ask,
+            loot::loot_scan,
+            loot::loot_hash,
+            loot::loot_read,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
