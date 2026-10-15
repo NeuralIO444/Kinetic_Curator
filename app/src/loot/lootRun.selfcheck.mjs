@@ -44,7 +44,7 @@ await ok('a first scan adds, logs what it cannot use, and reads every file once'
   assert.deepEqual(r.rows.map((x) => x.outcome).sort(), ['added', 'added', 'added', 'added', 'skipped']);
   assert.ok(r.rows.find((x) => x.outcome === 'skipped').reason.includes('raster'));
   assert.equal(fo.calls.hash.length, 4, 'the png is classified out before it is ever read');
-  assert.deepEqual(countItems(r.index), { items: 4, ok: 4, missing: 0, pending: 4 });
+  assert.deepEqual(countItems(r.index), { items: 4, ok: 4, missing: 0, pending: 4, held: 0, taken: 0 });
   assert.deepEqual(progress.at(-1), { done: 4, total: 4 });
 });
 
@@ -131,7 +131,8 @@ await ok('the row: mounted in SETUP under STAGE, desktop-only on the web, the pa
   assert.ok(panel.indexOf('<StageBlock />') < panel.indexOf('<LootRow />') && panel.indexOf('<LootRow />') < panel.indexOf('ds-dev'), 'SETUP, after STAGE, before the dev area');
   const row = src('../panels/pipeline/LootRow.jsx');
   assert.match(row, /native\.unavailable\(\)/); assert.match(row, /window\.confirm\(confirmForgetMessage\(counts\.items\)\)/);
-  assert.ok(!/emit\(|useStore|useApp/.test(row), 'it writes nothing to the store or the bus');
+  assert.ok(!/emit\(|setState|useApp/.test(row), 'it does not write the store or the bus directly');
+  assert.match(row, /ingest: ingestVia\(\(\) => useStore\.getState\(\)\)/, 'assets enter the pool only through the app\'s own ingest action');
   assert.ok(!/lootIndex|LootRow/.test(src('../state/projectDocument.js')), 'the project document knows nothing of it');
   const conf = JSON.parse(readFileSync(new URL('../../../src-tauri/tauri.conf.json', import.meta.url), 'utf8'));
   assert.deepEqual(conf.tauri.allowlist.dialog, { all: false, open: true }, 'only the open dialog, nothing else');

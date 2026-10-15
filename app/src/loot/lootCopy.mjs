@@ -7,10 +7,12 @@ export const NOT_REACHABLE = 'folder not reachable';
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 /** The quiet status line under the row: what the index holds and what the last scan did. */
-export function statusLine({ items = 0, missing = 0, added = 0, skipped = 0, scanned = false } = {}) {
+export function statusLine({ items = 0, missing = 0, added = 0, skipped = 0, taken = 0, held = 0, scanned = false } = {}) {
   if (!scanned && items === 0) return 'no folder yet';
   const bits = [plural(items, 'item', 'items')];
-  if (added) bits.push(`${added} added`);
+  if (added) bits.push(`${added} found`);
+  if (taken) bits.push(`${taken} in the pool`);
+  if (held) bits.push(`${held} held`);
   if (skipped) bits.push(`${skipped} skipped`);
   if (missing) bits.push(`${missing} missing`);
   return bits.join(' · ');

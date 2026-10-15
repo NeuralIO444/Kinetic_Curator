@@ -416,3 +416,4 @@ node src/loot/lootScan.selfcheck.mjs
 node src/loot/lootIndex.selfcheck.mjs
 node src/loot/lootNative.selfcheck.mjs
 node src/loot/lootRun.selfcheck.mjs
+node src/loot/lootIngest.selfcheck.mjs
