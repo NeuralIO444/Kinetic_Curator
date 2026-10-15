@@ -10,9 +10,13 @@ import { ASSET_CELL_KINEME, getCellKineme } from '../cellKinemes.js';
 const assetSvg = (id) => ASSETS_MICRO.find((a) => a.id === id).svg;
 const count = (s, sub) => s.split(sub).length - 1;
 
-test('#705 strips: every registry asset has a strip with the kineme cell count', () => {
-  assert.deepEqual(new Set(Object.keys(MICRO_HUD_STRIPS)), new Set(Object.keys(ASSET_CELL_KINEME)));
+// #1435 R4: the cell-kineme registry also carries the LINE strips
+// (assets-line-strips.js) since R4 — this suite's subject is the strips
+// THIS file owns, so it iterates MICRO_HUD_STRIPS, not the registry.
+// (The line strips get the same two pins in regionLines.)
+test('#705 strips: every strip in this file is registered with the kineme cell count', () => {
   for (const [asset, kinemeId] of Object.entries(ASSET_CELL_KINEME)) {
+    if (!(asset in MICRO_HUD_STRIPS)) continue;
     const k = getCellKineme(kinemeId);
     assert.equal(
       MICRO_HUD_STRIPS[asset].length, k.cells,
@@ -22,7 +26,7 @@ test('#705 strips: every registry asset has a strip with the kineme cell count',
 });
 
 test('#705 strips: cell 0 is pixel-identical to today\'s bake', () => {
-  for (const asset of Object.keys(ASSET_CELL_KINEME)) {
+  for (const asset of Object.keys(MICRO_HUD_STRIPS)) {
     assert.equal(MICRO_HUD_STRIPS[asset][0], assetSvg(asset), `${asset} cell 0 drifted from today's art`);
   }
 });
