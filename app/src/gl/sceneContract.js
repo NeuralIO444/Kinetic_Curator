@@ -284,6 +284,18 @@ export function spectrumMarksShed(doc) {
 }
 
 /**
+ * #1431 KINEME C — cell kinemes (strip playback inside the mark) park on
+ * cell 0 on the same tier-2 rung as the spectrum marks: after the tier-1
+ * extras are gone (perfTier1) AND quality has stepped down to performance.
+ * Shed pins the canonical frame — cell 0, the frame the pre-#1431
+ * single-cell bake carried. Exports and stills never shed: their docs do
+ * not carry the live governor state, so the predicate is false there.
+ */
+export function cellKinemesShed(doc) {
+  return !!(doc && doc.perfTier1) && String(doc.quality || '') === 'performance';
+}
+
+/**
  * #1410 petri dish B1 — is impact deform shed? Same tier-2 rung as the
  * contact shadow, by the same rule (spec §7 ladder: FX finishes first,
  * then deform, then radius fidelity and body counts): it goes only after
@@ -478,7 +490,15 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       inst.kineme = slot.get(k.id);
       inst.kinemePhase = own ? kinemePhase(inst.seedOffset, inst.key) : 0;
     }
-    if (!table.length) return {};
+    if (!table.length) {
+      // #1431 — cell kinemes read the same clock: motion time rides the
+      // contract even when no instance kineme is assigned, or a strip-only
+      // scene would sit on cell 0 forever. A doc without kinemeTime still
+      // gets no key, so motionless contracts (and their hashes) are
+      // exactly what they were.
+      const t = Number(doc.kinemeTime);
+      return Number.isFinite(t) ? { kinemeTime: t } : {};
+    }
     const t = Number(doc.kinemeTime);
     return { kinemes: table, kinemeTime: Number.isFinite(t) ? t : 0 };
   })();
@@ -524,6 +544,9 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       return Number.isFinite(q) && q > 0 ? { squash: Math.min(1, q) } : {};
     })(),
     ...kinemeFields,
+    // #1431 — cell-kineme shed state. Key present only while shed, so an
+    // unshed contract (and its hash) is exactly what it was.
+    ...(cellKinemesShed(doc) ? { cellShed: true } : {}),
     textRuns: [], // #550: CUT — no producer (glyph-atlas baker removed; text is baked into stamp assets). Kept as [] for shape/hash stability; the renderer never reads it.
     accum: accum && accum.enabled
       ? {
