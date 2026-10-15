@@ -192,22 +192,39 @@ ok('shader: a_plate / v_plate wired and plateShade inlined', () => {
   assert.ok(QUAD_FS.includes('if (v_plate > 0.5)'), 'the ramp is gated on the flag — flat path untouched');
 });
 
-// ── composed stills: the render-level measurement ────────────────────
-ok('stills: plate paints ink through the gradient def; the raster moves; flat gains nothing', () => {
+// ── composed stills ──────────────────────────────────────────────────
+ok('stills: plate paints ink through the gradient def; flat gains nothing', () => {
   const palette = resolvePalette('hydra', null, []);
   const flatSvg = composeStillSvg(flat, palette);
   const plateSvg = composeStillSvg(plate, palette);
   assert.ok(!flatSvg.includes('<radialGradient'), 'flat still has no gradient def');
   assert.ok(plateSvg.includes('<radialGradient'), 'plate still carries the gradient def');
   assert.ok(plateSvg.includes('url(#pg0)'), 'plate ink paint references the def');
+});
+
+ok('stills: the raster moves — plate pixels differ measurably from flat', () => {
+  // plate↔flat placements are identical by design, so the census
+  // place fingerprint cannot see plate; the raster can. Compose the
+  // same seeded scene both ways and the pixels must move.
+  //
+  // GOTCHA (this case's own history, 2026-10-14): Resvg's `.pixels`
+  // is a getter that materializes a FRESH full-image buffer on every
+  // access. Indexing it per pixel (`img.pixels[i]` in a loop) makes
+  // one native allocation per pixel — the process balloons to ~6 GB
+  // and dies by SIGKILL with no assertion ever failing (locally, and
+  // on CI, where it took both selfcheck jobs down at this case).
+  // Cache the buffers once, then index the copies — the same pattern
+  // censusReport and miner already use (`const px = img.pixels`).
+  const palette = resolvePalette('hydra', null, []);
   const raster = (svg) => new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
-  const a = raster(flatSvg);
-  const b = raster(plateSvg);
+  const a = raster(composeStillSvg(flat, palette));
+  const b = raster(composeStillSvg(plate, palette));
   assert.equal(a.width, b.width); assert.equal(a.height, b.height);
+  const ap = a.pixels; const bp = b.pixels;
   let sum = 0;
-  for (let i = 0; i < a.pixels.length; i++) sum += Math.abs(a.pixels[i] - b.pixels[i]);
-  const meanAbs = sum / a.pixels.length;
-  assert.ok(meanAbs > 0.5, `plate still raster differs measurably from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
+  for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
+  const meanAbs = sum / ap.length;
+  assert.ok(meanAbs > 0.5, `plate raster differs from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
 });
 
 console.log(`plateBody.selfcheck: OK (${n} cases)`);
