@@ -79,6 +79,29 @@ All six questions answered; recorded on #1479.
 
 One PR at a time, each stopped for review.
 
+### Addendum (Matt, 2026-10-14): the website gets the full system too
+
+"When I said desktop I also meant the website": a visitor at the GitHub Pages site gets the same loot folder, and the first-run tutorial screen carries a wizard that makes it, wherever the user chooses to put it. Decided: **full system everywhere it can be.**
+
+| Where | What it does |
+|---|---|
+| Desktop app | Pick or create a folder; KC-1 creates `images/ audio/ palettes/ looks/` and keeps the link. Native scan, hash, read (slices 3 to 5). |
+| Chrome, Edge (web) | The File System Access API: the user chooses a place once and approves it, KC-1 creates the folder and subfolders there and keeps the link (a handle in IndexedDB; the browser may ask for one click to re-allow after a restart). Same scan, planner and index; a web backend beside the native one, same interface. |
+| Safari, Firefox (web) | No folder-write permission exists. The page **downloads a starter folder** (a small store-only zip: the four subfolders and a note in each) that the user unzips where they like, and "choose folder" reads it **for that visit** (a one-time folder upload). A plain note says it cannot keep the link or notice renames, and that the desktop app or Chrome does. |
+
+Browsers are feature-detected at runtime, never by user-agent. A browser will never write anywhere without that one choice and approval, and KC-1 still never copies, moves or deletes the user's files.
+
+Revised slices (one PR at a time):
+
+| # | PR | Visible |
+|---|---|---|
+| 5 | The PIPELINE row on desktop: pick, scan, log (this slice; web reads "desktop only" until 5b) | yes |
+| 5b | The web backend (File System Access): pick, create structure, scan, hash, read, permission re-allow | yes |
+| 5c | The starter-folder zip (any browser) and the session-only read | yes |
+| 5d | The first-run wizard: choose a place, create the structure, what to drop in; skippable | yes |
+| 6 to 9 | Images, palettes, audio, missing honesty | yes |
+| then | The Look phase, then `looks/` | yes |
+
 ### Notes from building slice 1
 
 - A name like `wing 2.svg` or `wing copy.svg` is the artist's own and is **not** skipped; a Finder duplicate carries identical bytes, so the content hash already dedupes it. Only an explicit sync-conflict marker ("conflicted copy") is skipped, and logged.

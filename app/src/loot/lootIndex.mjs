@@ -36,6 +36,7 @@ export function sanitizeIndex(raw) {
     out.items[id] = {
       kind: it.kind, rel: segs.join('/'), size: num(it.size) ?? 0, mtimeMs: num(it.mtimeMs) ?? 0, hash,
       state: STATES.includes(it.state) ? it.state : 'ok',
+      ingested: it.ingested === true, // false until its asset/palette/audio has actually been taken in (slice 6 and on)
     };
   }
   const log = Array.isArray(raw.log) ? raw.log : [];
@@ -66,7 +67,7 @@ export function applyPlan(index, plan, { nowMs = null } = {}) {
   }
   for (const a of plan.add || []) {
     if (Object.keys(items).length >= ITEMS_MAX) { rows.push(row(a.rel, a.kind, 'skipped', 'index full')); continue; }
-    items[a.id] = { kind: a.kind, rel: a.rel, size: a.size ?? 0, mtimeMs: a.mtimeMs ?? 0, hash: a.hash, state: 'ok' };
+    items[a.id] = { kind: a.kind, rel: a.rel, size: a.size ?? 0, mtimeMs: a.mtimeMs ?? 0, hash: a.hash, state: 'ok', ingested: false };
     rows.push(row(a.rel, a.kind, 'added'));
   }
   for (const r of plan.renamed || []) {
@@ -75,7 +76,7 @@ export function applyPlan(index, plan, { nowMs = null } = {}) {
   }
   for (const c of plan.changed || []) {
     const it = items[c.id];
-    if (it) { items[c.id] = { ...it, hash: c.hash, state: 'ok' }; rows.push(row(c.rel, c.kind, 'changed')); }
+    if (it) { items[c.id] = { ...it, hash: c.hash, state: 'ok', ingested: false }; rows.push(row(c.rel, c.kind, 'changed')); } // new bytes: to be taken in again
   }
   for (const d of plan.dup || []) rows.push(row(d.rel, d.kind, 'dup', `same as ${d.of}`));
   for (const m of plan.missing || []) {
@@ -103,7 +104,10 @@ export function withRoot(index, root) {
 /** The counts a status line shows. */
 export function countItems(index) {
   const items = Object.values(sanitizeIndex(index).items);
-  return { items: items.length, ok: items.filter((i) => i.state === 'ok').length, missing: items.filter((i) => i.state === 'missing').length };
+  return {
+    items: items.length, ok: items.filter((i) => i.state === 'ok').length, missing: items.filter((i) => i.state === 'missing').length,
+    pending: items.filter((i) => i.state === 'ok' && !i.ingested).length,
+  };
 }
 
 /** The plan's `prev` argument: just what lootScan reads. */

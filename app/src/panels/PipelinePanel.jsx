@@ -27,6 +27,7 @@ import { RecipeRow } from "./pipeline/RecipeRow.jsx";
 import { SnapshotGallery } from "./pipeline/SnapshotGallery.jsx";
 import { LatestCapture } from "./pipeline/LatestCapture.jsx";
 import { NativeLabBlock } from "./pipeline/NativeLabBlock.jsx";
+import { LootRow } from "./pipeline/LootRow.jsx"; // #1479: the loot folder
 
 export function PipelinePanel() {
   const { palette, glCanvasRef, glLoopRef } = useApp();
@@ -212,6 +213,7 @@ export function PipelinePanel() {
         <SetupBlock />
         <DisplayBlock />
         <StageBlock />
+        <LootRow />
 
         <details className="ds-dev">
           <summary>DEV · NATIVE</summary>

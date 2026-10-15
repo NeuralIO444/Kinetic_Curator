@@ -23,7 +23,7 @@ await ok('the desktop check knows Tauri 1 and 2, and is a superset of what every
   assert.deepEqual(desktopGlobals(null), []);
   const trap = new Proxy({}, { get() { throw new Error('boom'); } });
   assert.deepEqual(desktopGlobals(trap), [], 'a window that throws is not desktop, and does not throw');
-  assert.equal(DESKTOP_CHECK_CONFIRMED, false, 'not confirmed on the Mac yet: flipped in its own PR once Matt has');
+  assert.equal(DESKTOP_CHECK_CONFIRMED, true, 'confirmed on the real Mac (2026-10-14); the gate itself is still tested with confirmed: false below');
 });
 
 await ok('the three old copies are gone: one shared check', () => {

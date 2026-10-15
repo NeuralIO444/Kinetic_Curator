@@ -28,3 +28,17 @@ export function confirmForgetMessage(count) {
   const n = Math.max(0, Math.floor(Number(count) || 0));
   return `Forget the loot folder and its ${plural(n, 'item', 'items')}? Your files are not touched, and assets already in the pool stay.`;
 }
+
+/** Row labels, lowercase like the rest of PIPELINE. */
+export const LABELS = Object.freeze({
+  title: 'loot folder',
+  point: 'point at folder...',
+  change: 'change folder...',
+  rescan: 'rescan',
+  forget: 'forget',
+  scanning: 'scanning...',
+  hashing: (done, total) => `reading ${done} of ${total}...`,
+  hint: 'images/ audio/ palettes/ looks/ — your files are read in place, never copied or moved',
+  logTitle: 'ingest log',
+  empty: 'nothing in the log yet',
+});
