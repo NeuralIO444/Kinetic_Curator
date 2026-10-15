@@ -53,8 +53,13 @@ const jaccard = (a, b) => {
  * persona scorer, Davis silent (wildness 0.5), no crowns — crowns are the
  * performer's history, and the census measures the instrument, not the
  * history. One seeded stream deals the whole run.
+ *
+ * XGBoost T2: `ordering` ({ scorer, meta } — a tree head's scorer, as
+ * rollDice takes them) runs the same census with model ordering switched
+ * on, so the diversity measures read OFF vs ON over identical streams.
+ * Default null: the census above, bit-identical to E1a's.
  */
-export function diceTrayCoverage({ rolls = 600, seed = 0x1504 } = {}) {
+export function diceTrayCoverage({ rolls = 600, seed = 0x1504, ordering = null } = {}) {
   const scorer = createPersonaScorer({ assetsById: byId });
   const rng = mulberry32(seed);
   const candidateSeen = new Set();
@@ -66,7 +71,10 @@ export function diceTrayCoverage({ rolls = 600, seed = 0x1504 } = {}) {
   let hiOverlapTrios = 0;
 
   for (let i = 0; i < rolls; i++) {
-    const r = rollDice({ assets: ASSETS, rng, davisCode: null, scorer, crowns: [] });
+    const r = rollDice({
+      assets: ASSETS, rng, davisCode: null, scorer, crowns: [],
+      ...(ordering ? { orderScorer: ordering.scorer, orderMeta: ordering.meta ?? null } : {}),
+    });
     for (const c of r.candidates) for (const id of c.assetIds) candidateSeen.add(id);
     const F = r.finalists;
     const trioLayouts = new Set();
@@ -112,6 +120,7 @@ export function diceTrayCoverage({ rolls = 600, seed = 0x1504 } = {}) {
   return {
     rolls,
     seed,
+    ordering: ordering ? { scorerId: ordering.scorer.id } : null,
     library: { assets: ASSETS.length, palettes: PALETTES.length, layouts: STUB_VOICES.length },
     candidates: {
       distinct: candidateSeen.size,

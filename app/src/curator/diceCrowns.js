@@ -4,6 +4,12 @@
 // the learned compatibility (curator/dice.js affinity) feeds on, and the raw
 // material for the Phase C Davis head (which seeds produce keepers).
 //
+// XGBoost T2 (spec §5): when a tree head ordered the roll the crown came
+// from, the crown also carries the model's stamp — { xgbScore,
+// tasteVersion, headKind } — so a replay (or a future training run) can
+// reproduce the judgment, not just the render. Persona-ordered crowns
+// carry nulls: the absence is the honest record that no model steered.
+//
 // Storage is localStorage (kc:dice-crowns:v1), capped — the same pattern as
 // the favorites/keeps ledger in state/slices/davisSlice.js. A storage backend
 // can be injected (the selfcheck uses memory).
@@ -39,6 +45,11 @@ function sanitize(raw) {
     layoutId,
     assetIds,
     davisCode: typeof raw.davisCode === 'string' ? raw.davisCode.slice(0, 24) : null,
+    // T2 model stamp: the trio stands or falls together in spirit, but
+    // each field validates on its own, like everything else here.
+    xgbScore: typeof raw.xgbScore === 'number' && Number.isFinite(raw.xgbScore) ? raw.xgbScore : null,
+    tasteVersion: Number.isInteger(raw.tasteVersion) && raw.tasteVersion >= 0 ? raw.tasteVersion : null,
+    headKind: typeof raw.headKind === 'string' ? raw.headKind.slice(0, 24) : null,
   };
 }
 
