@@ -10,9 +10,19 @@ const canvas = document.getElementById('c');
 let renderer = null;
 
 const b64ToU8 = (b64) => {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  // Atlas pixels arrive as an array of base64 pieces (glDriver.b64Pieces:
+  // a whole-library atlas is past V8's single-string cap on this side
+  // too) — decode piece by piece into one preallocated buffer, never
+  // joined. A plain string still works.
+  const pieces = Array.isArray(b64) ? b64 : [b64];
+  const decodedLen = (p) => (p.length / 4) * 3 - (p.endsWith('==') ? 2 : p.endsWith('=') ? 1 : 0);
+  const out = new Uint8Array(pieces.reduce((n, p) => n + decodedLen(p), 0));
+  let off = 0;
+  for (const p of pieces) {
+    const bin = atob(p); // one piece at a time — never hold every decoded string at once
+    for (let i = 0; i < bin.length; i++) out[off + i] = bin.charCodeAt(i);
+    off += bin.length;
+  }
   return out;
 };
 const u8ToB64 = (u8) => {

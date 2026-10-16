@@ -2,12 +2,19 @@
  * RegionPicker.jsx — #725 slice 2: click a color region in the asset preview,
  * assign it to a named slot (A/B/C/D). Build-time picking; slots are keyed
  * by stable region ID (redraw-same-color survives, recolor breaks).
+ *
+ * #1434: the same sheet carries the per-region MOTION editor — family
+ * defaults under the artist's override (a kineme, still, or back to the
+ * default). Edits ride the project document and beat the defaults.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { emit, Events } from '../composition/eventBus.js';
 import { useApp } from '../state/AppContext.jsx';
+import { useStore } from '../state/store.js';
 import { rasterizeRegions, regionAt, REGION_RASTER_PX } from '../assets/regionRaster.js';
 import { REGION_SLOTS, normalizeRegionSlots, slotOfRegion } from '../assets/regionSlots.js';
+import { KINEMES } from '../data/kinemes.js';
+import { familyDefaultRegionKinemes } from '../data/regionDefaults.js';
 
 const SLOT_COLORS = { A: '#ffd166', B: '#06d6a0', C: '#118ab2', D: '#ef476f' };
 const PREVIEW_PX = 240;
@@ -15,6 +22,7 @@ const PREVIEW_PX = 240;
 export function RegionPicker({ assetId, onClose }) {
   const { assets } = useApp();
   const asset = assets.find((a) => a.id === assetId) || null;
+  const docRegionKinemes = useStore((s) => s.regionKinemes);
   const [cached, setCached] = useState(null);
   const [hoverId, setHoverId] = useState(null);
   const [activeSlot, setActiveSlot] = useState('A');
@@ -98,6 +106,21 @@ export function RegionPicker({ assetId, onClose }) {
   const regions = shown?.regions || [];
   const hoverRegion = regions.find((r) => r.id === hoverId);
 
+  // #1434 — region motion: the family defaults (what the record carries)
+  // under the artist's doc-level overrides. The committed records on the
+  // pool asset are the editing surface; the raster's regions above are
+  // for matte picking.
+  const motionRecords = (asset.regions && asset.regions.length) ? asset.regions : regions;
+  // Plain computation, not a hook: this sits below the early return above,
+  // and the table is a cheap pure lookup over at most 12 records.
+  const defaults = familyDefaultRegionKinemes(asset, motionRecords) || {};
+  const docPer = (docRegionKinemes && asset.id in docRegionKinemes) ? docRegionKinemes[asset.id] : null;
+  const overrideOf = (regionId) => {
+    if (docPer && regionId in docPer) return docPer[regionId] === null ? 'still' : docPer[regionId];
+    return 'default';
+  };
+  const setMotion = (regionId, value) => emit(Events.ASSETS_REGION_KINEME, { id: asset.id, regionId, value });
+
   return (
     <div style={veil} onClick={() => onClose()} role="presentation">
       <div style={sheet} onClick={(e) => e.stopPropagation()}>
@@ -159,6 +182,34 @@ export function RegionPicker({ assetId, onClose }) {
                       <span style={{ marginLeft: 'auto', fontWeight: 700, color: SLOT_COLORS[s], flex: '0 0 auto' }}>{s}</span>
                     )}
                   </button>
+                );
+              })}
+            </div>
+            <div style={secTitle}>REGION MOTION (#1434)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto' }}>
+              {motionRecords.length === 0 && (
+                <span style={{ fontSize: 11, color: 'var(--dim)' }}>no regions yet — motion arrives with the mattes</span>
+              )}
+              {motionRecords.map((r) => {
+                const ov = overrideOf(r.id);
+                const effective = ov === 'default' ? (defaults[r.id] || 'still') : ov;
+                return (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+                    <span style={{ width: 12, height: 12, background: `#${r.color}`, display: 'inline-block', flex: '0 0 auto' }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{r.id}</span>
+                    <span style={{ color: 'var(--dim)', flex: '0 0 auto' }}>{effective}</span>
+                    <select
+                      value={ov}
+                      title="Region motion: the family default, a kineme, or still. Your pick rides the project and beats the default."
+                      onChange={(e) => setMotion(r.id, e.target.value)}
+                      style={{ flex: '0 0 auto', background: 'var(--bg, #111)', color: 'var(--ink)', border: '1px solid var(--line)', fontSize: 11 }}>
+                      <option value="default">default · {defaults[r.id] || 'still'}</option>
+                      <option value="still">still</option>
+                      {KINEMES.map((k) => (
+                        <option key={k.id} value={k.id}>{k.id}</option>
+                      ))}
+                    </select>
+                  </div>
                 );
               })}
             </div>

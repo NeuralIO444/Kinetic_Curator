@@ -46,6 +46,7 @@ export function PipelinePanel() {
     enabledAssets: s.enabledAssets,
     assetWeightOverrides: s.assetWeightOverrides,
     assetKineme: s.assetKineme, // #781
+    regionKinemes: s.regionKinemes, // #1434
     audioRoutes: s.audioRoutes, // #790
     midiMap: s.midiMap, // #617
     paletteOverrides: s.paletteOverrides,
@@ -74,6 +75,7 @@ export function PipelinePanel() {
     enabledAssets,
     assetWeightOverrides,
     assetKineme,
+    regionKinemes,
     audioRoutes,
     midiMap,
     paletteOverrides,
@@ -197,6 +199,7 @@ export function PipelinePanel() {
           autoQuality={autoQuality}
           assetWeightOverrides={assetWeightOverrides}
           assetKineme={assetKineme}
+          regionKinemes={regionKinemes}
           audioRoutes={audioRoutes}
           midiMap={midiMap}
           customAssets={customAssets}

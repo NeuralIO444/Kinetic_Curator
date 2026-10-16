@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { ASSETS, ASSETS_AUTHORED } from '../data/assets/index.js';
 import { bakeAsset, bakeLibrary, capRegions, readingOrder, renderModule, REGION_CAP } from './regionBake.mjs';
 import { normalizeRegions, normalizeRegionSlots, REGION_SLOTS } from './regionSlots.js';
+import { sanitizeRegionKinemes } from '../data/regionKinemes.js';
 import { BAKED_REGIONS } from '../data/assets/regions.generated.js';
 
 const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
@@ -57,14 +58,17 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
     assert.ok(a.regions.length >= 1 && a.regions.length <= REGION_CAP, `${a.id}: ${a.regions.length} regions`);
     assert.deepEqual(normalizeRegions(a.regions), a.regions, `${a.id}: regions survive the validator unchanged`);
     assert.deepEqual(normalizeRegionSlots(a.regionSlots), a.regionSlots, `${a.id}: slots survive the validator unchanged`);
+    if (a.regionKinemes) {
+      assert.deepEqual(sanitizeRegionKinemes(a.regionKinemes, a.regions), a.regionKinemes, `${a.id}: baked assignments survive the sanitizer unchanged`);
+    }
     for (const id of Object.values(a.regionSlots).filter(Boolean)) assert.ok(a.regions.some((r) => r.id === id), `${a.id}: a slot names a real region`);
   }
   assert.ok(withRegions >= 250, `the library has mattes (${withRegions} of ${ASSETS.length})`);
   assert.equal(Object.keys(BAKED_REGIONS).length, withRegions);
-  // nothing else about the records changed: same keys plus the two
+  // nothing else about the records changed: same keys plus the bake's three
   for (const a of ASSETS.slice(0, 40)) {
     const extra = Object.keys(a).filter((k) => !(k in byId(a.id)));
-    assert.ok(extra.every((k) => k === 'regions' || k === 'regionSlots'), `${a.id}: only regions / regionSlots added`);
+    assert.ok(extra.every((k) => k === 'regions' || k === 'regionSlots' || k === 'regionKinemes'), `${a.id}: only regions / regionSlots / regionKinemes added`);
   }
 }
 

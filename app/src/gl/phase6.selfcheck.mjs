@@ -313,7 +313,17 @@ const contractOf = (d) => {
       });
       const parsed = parseProject(JSON.parse(JSON.stringify(hostileDoc)));
       assert.ok(parsed.ok, 'browser hostile doc parses');
-      const hostileDoc2 = { ...hostileDoc, layoutParams: parsed.doc.layoutParams };
+      // #1434 — the render leg keeps the hostile VALUES (the #103 cliffs:
+      // clamped count, null scales, __proto__ mode) but scopes the enabled
+      // set to 48 assets. With region defaults baked, the all-assets doc
+      // bakes an 11,664px atlas — past the 8192 texture ceiling of
+      // 8192-class GL, where the upload fails with GL_INVALID_VALUE.
+      // Section D still runs the full all-assets doc through the whole
+      // contract path; only this browser render is scoped to an atlas
+      // inside the ceiling the bakers are built to (atlas.mjs: the sqrt
+      // packing targets 8192-class GPUs).
+      const renderEnabled = Object.fromEntries(ASSETS.slice(0, 48).map((a) => [a.id, true]));
+      const hostileDoc2 = { ...hostileDoc, layoutParams: parsed.doc.layoutParams, enabledAssets: renderEnabled };
       const scene = buildSceneContract({
         doc: hostileDoc2,
         resolvedLayers: resolveLayers(hostileDoc2, { caps }),

@@ -78,6 +78,7 @@ export function applyAction(action, store = useStore.getState()) {
     case 'RENAME_CUSTOM_ASSET': return store.renameCustomAsset(action.id, action.name);
     case 'REPLACE_CUSTOM_ASSET': return store.replaceCustomAsset(action.id, action.svg);
     case 'SET_ASSET_REGION_SLOT': return store.setAssetRegionSlot(action.id, action.slot, action.regionId);
+    case 'SET_ASSET_REGION_KINEME': return store.setRegionKineme(action.id, action.regionId, action.value); // #1434
     case A.SET_WEBCAM_ENABLED: return store.setWebcamEnabled(payload);
     case A.SET_AUDIO_ENABLED: return store.setAudioEnabled(payload);
     case A.SET_AUDIO_DENIED: return store.setAudioDenied(payload);

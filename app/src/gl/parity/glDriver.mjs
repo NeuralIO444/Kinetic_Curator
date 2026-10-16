@@ -34,7 +34,11 @@ const XFER_PIECE = 16 * 1024 * 1024;
 function splitLargeStrings(payload) {
   const chunks = new Map();
   const walk = (v) => {
-    if (typeof v === 'string' && v.length > XFER_PIECE) {
+    // >=, not >: a string of exactly one piece still rides the ferry store
+    // instead of inline — b64Pieces below cuts atlas pieces to exactly
+    // XFER_PIECE chars, and a payload of many such pieces inline would
+    // recreate the giant single evaluate this ferry exists to avoid.
+    if (typeof v === 'string' && v.length >= XFER_PIECE) {
       const key = `c${chunks.size}`;
       const pieces = [];
       for (let i = 0; i < v.length; i += XFER_PIECE) pieces.push(v.slice(i, i + XFER_PIECE));
@@ -136,6 +140,25 @@ export async function openHarnessPage(pagePath) {
 
 function b64(buf) { return Buffer.from(buf).toString('base64'); }
 
+// Atlas pixels cross to the page as an ARRAY of base64 pieces, never one
+// string: with region cells baked (#1434), a whole-library atlas base64s
+// past V8's ~512M-char string cap and Buffer#toString throws
+// ERR_STRING_TOO_LONG before the ferry can slice it. Pieces are cut on a
+// 3-byte boundary — 12MiB of bytes is exactly XFER_PIECE base64 chars with
+// no padding except on the final piece — so each piece decodes
+// independently and the page fills one preallocated buffer (b64ToU8 in
+// glHarness.html) without ever joining them.
+const B64_PIECE_BYTES = 12 * 1024 * 1024;
+function b64Pieces(buf) {
+  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  if (b.length === 0) return [''];
+  const pieces = [];
+  for (let i = 0; i < b.length; i += B64_PIECE_BYTES) {
+    pieces.push(b.subarray(i, i + B64_PIECE_BYTES).toString('base64'));
+  }
+  return pieces;
+}
+
 function getAtlas(combos, regionAssets = null) {
   // #1433: the cache key carries the region-cell demand — the same
   // combos rendered with and without region assignments need different
@@ -171,8 +194,8 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
   // #1079: grain is procedural — no LUT is baked or shipped.
   return {
     width, height, bg, contract, cells,
-    atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
-    atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
+    atlasB64: b64Pieces(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
+    atlasMips: atlas.mipmaps.map((m) => ({ b64: b64Pieces(m.pixels), w: m.width, h: m.height })),
   };
 }
 
@@ -210,8 +233,8 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
     audioFrames: audio,
     swell, // #306: audio→glow fader, forwarded to renderAccumSequence
     cells,
-    atlasB64: b64(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
-    atlasMips: atlas.mipmaps.map((m) => ({ b64: b64(m.pixels), w: m.width, h: m.height })),
+    atlasB64: b64Pieces(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
+    atlasMips: atlas.mipmaps.map((m) => ({ b64: b64Pieces(m.pixels), w: m.width, h: m.height })),
     frames: frameContracts.map((contract) => ({
       contract,
     })),
