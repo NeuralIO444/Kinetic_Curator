@@ -7,6 +7,8 @@ import { isTauriRuntime, desktopGlobals, DESKTOP_CHECK_CONFIRMED } from '../plat
 import { DESKTOP_ONLY, NOT_CONFIRMED } from './lootCopy.mjs';
 
 export const MAX_ENTRIES = 20000;
+/** The write cap, mirroring the Rust side (loot.rs MAX_WRITE_BYTES): a keep export is a JSON record plus a still. */
+export const MAX_WRITE_BYTES = 16 * 1024 * 1024;
 const MAX_B64 = 90 * 1024 * 1024; // ~64 MB of bytes
 const HEX64 = /^[0-9a-f]{64}$/;
 
@@ -96,6 +98,20 @@ export function createLootNative({ invoke = null, pick = null, isDesktop = isTau
       } catch {
         return { ok: false, reason: 'unreadable: bad encoding' };
       }
+    },
+    /**
+     * Write one of KC-1's own files (#1591: the keeps shelf's exports into looks/). Bytes travel as base64, the
+     * read side's shape. The native side writes via a temp sibling + rename and refuses anything that leaves the
+     * root or the subfolders; the artist's own files are never written through this — exports only.
+     */
+    async write(root, rel, bytes) {
+      if (!validRoot(root) || typeof rel !== 'string' || !rel) return { ok: false, reason: 'not a file path' };
+      if (!(bytes instanceof Uint8Array)) return { ok: false, reason: 'not bytes' };
+      if (bytes.length > MAX_WRITE_BYTES) return { ok: false, reason: `file too large (${Math.ceil(bytes.length / (1024 * 1024))} MB)` };
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const r = await call('loot_write', { root, rel, data: btoa(bin) });
+      return r.ok ? { ok: true } : r;
     },
   };
 }

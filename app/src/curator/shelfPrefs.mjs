@@ -177,6 +177,6 @@ export const DEFAULT_PREFERENCES_TEXT = `${JSON.stringify({
     table: { ...FULL_WEIRD_TABLE },
     recencyWindow: DEFAULT_SHELF_PREFS.recencyWindow,
     collectionSoftBound: DEFAULT_SHELF_PREFS.collectionSoftBound,
-    export: { folder: 'looks', includeStills: true, includeSeeds: true, onSoftBound: 'ask' },
+    export: { folder: 'looks', includeStills: true, includeSeeds: true, onSoftBound: 'export' },
   },
 }, null, 2)}\n`;

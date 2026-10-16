@@ -20,11 +20,13 @@
 //
 // K1 scope: tiers + migration + crown routing + hand-swap. K2 (#1590)
 // adds fill() (curator/shelfFill.mjs) + the fill history record below;
-// export()/disk is K3 (#1591), census readouts are K4 (#1592) — still
-// deliberately absent, not stubbed.
+// K3 (#1591) adds export() (curator/shelfDisk.mjs) + the export/import
+// history records + the merged disk rows; census readouts are K4
+// (#1592) — still deliberately absent, not stubbed.
 import { LOOK_SLOT_BUDGET, slotCostOf, lookSlotsUsed } from './candidateTray.mjs';
 import { provenanceLabel } from './provenance.mjs';
 import { dealFill } from './shelfFill.mjs';
+import { planExports } from './shelfDisk.mjs';
 
 /** The stage budget, in slot costs (hand 1 · mined 2 — the E3 accounting,
  * folded into the stage per the ruling note: scarcity lives on the stage). */
@@ -203,6 +205,17 @@ export function swapSlots(keeps, stageIds, outId, inId, { performingKeepId = nul
 export const crownHistoryRecord = (keepId, tier, at) => ({ kind: 'crown', keepId, tier, at });
 export const swapHistoryRecord = (outId, inId, at) => ({ kind: 'swap', outId, inId, at });
 
+/** The K3 move records (§5): a keep's record changed PLACE, never
+ * hands — export writes its file and drops the in-app copy; import
+ * (a promotion: swap, stage-it, or a fill that dealt it) brings the
+ * record back in-app. `path` is the loot-root-relative POSIX path —
+ * the only path a record may carry; absolute paths are never stored. */
+export const exportHistoryRecord = (keepId, path, at) => ({ kind: 'export', keepId, path, at });
+export const importHistoryRecord = (keepId, path, at) => ({ kind: 'import', keepId, path, at });
+
+/** A loot-relative looks/ path as the ledger may carry it. */
+const ledgerRel = (v) => (typeof v === 'string' && v.length <= 200 && /^looks\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/.test(v) ? v : null);
+
 /** The slot rules a fill record may name (K2; 'pinned' is the S1 pin). */
 export const FILL_RULES = ['consensus', 'neglected', 'wild', 'lois', 'contrarian', 'pinned'];
 
@@ -227,6 +240,9 @@ export function sanitizeHistoryRecord(raw) {
   }
   if (raw.kind === 'swap' && id(raw.inId) && (raw.outId === null || id(raw.outId))) {
     return { kind: 'swap', outId: raw.outId === null ? null : id(raw.outId), inId: id(raw.inId), at };
+  }
+  if ((raw.kind === 'export' || raw.kind === 'import') && id(raw.keepId) && ledgerRel(raw.path)) {
+    return { kind: raw.kind, keepId: id(raw.keepId), path: ledgerRel(raw.path), at };
   }
   if (raw.kind === 'fill' && Number.isFinite(raw.seed) && Array.isArray(raw.slots)) {
     const slots = raw.slots.slice(0, LOOK_SLOT_BUDGET).map((s) => (
@@ -301,11 +317,12 @@ export function shelfRow(keep, stageIds, { assetsById = new Map(), palettesById 
  * The stage is a separate strip in the view; rows here are the whole
  * collection, stage members included and marked by their tier.
  */
-export function shelfRows(keeps, stageIds, { query = '', sort = 'kept', assetsById, palettesById } = {}) {
-  const rows = (keeps || []).map((k, i) => ({ ...shelfRow(k, stageIds, { assetsById, palettesById }), _i: i }));
+/** Search + sort over built rows — the collection view's one reading
+ * order, shared by the plain rows and the K3 merged rows below. */
+function searchSortShelfRows(rows, { query = '', sort = 'kept' } = {}) {
   const q = String(query || '').trim().toLowerCase();
   const searched = q
-    ? rows.filter((r) => [r.label, r.mode, r.paletteId, r.origin, r.corner, String(r.keep.seed), ...r.families]
+    ? rows.filter((r) => [r.label, r.mode, r.paletteId, r.origin, r.corner, String(r.keep?.seed ?? ''), ...r.families]
       .join(' ').toLowerCase().includes(q))
     : rows;
   const keptKey = (r) => (r.keptAt != null ? r.keptAt : -Infinity);
@@ -318,6 +335,62 @@ export function shelfRows(keeps, stageIds, { query = '', sort = 'kept', assetsBy
   };
   return searched.sort(by[SHELF_SORTS.includes(sort) ? sort : 'kept'])
     .map(({ _i, ...r }) => r);
+}
+
+export function shelfRows(keeps, stageIds, { query = '', sort = 'kept', assetsById, palettesById } = {}) {
+  const rows = (keeps || []).map((k, i) => ({ ...shelfRow(k, stageIds, { assetsById, palettesById }), _i: i }));
+  return searchSortShelfRows(rows, { query, sort });
+}
+
+/**
+ * A collection row for a keep whose record lives in a file and is not
+ * in hand (folder away, or the file gone): built from its disk stub
+ * (curator/shelfDisk.mjs — the stub is an index card, never the
+ * record, so `keep` is null and the view's record actions disable).
+ * location: 'missing' when the scan says the file is gone,
+ * 'disk-away' when it simply hasn't been read this session.
+ */
+export function shelfStubRow(stub) {
+  return {
+    keep: null,
+    id: stub.id,
+    tier: 'collection',
+    label: stub.label || stub.id,
+    mode: stub.mode || '',
+    paletteId: stub.paletteId || '',
+    families: [...(stub.families || [])],
+    origin: stub.origin || '',
+    corner: stub.corner || '',
+    keptAt: stub.keptAt ?? null,
+    stagedCount: stub.stagedCount ?? null,
+    lastStagedAt: stub.lastStagedAt ?? null,
+    location: stub.missing ? 'missing' : 'disk-away',
+  };
+}
+
+/**
+ * The K3 collection view's rows: the in-app records, the disk records
+ * read this session (marked location 'disk'), and a stub row for
+ * every disk keep whose record is not in hand — one listing, three
+ * locations, searched and sorted by the same reading order. A keep
+ * appears exactly once: its stub never doubles a record row.
+ */
+export function shelfDiskRows(keeps, stageIds, {
+  diskRecords = [], stubs = {}, query = '', sort = 'kept', assetsById, palettesById,
+} = {}) {
+  const merged = [...(keeps || []), ...(diskRecords || [])];
+  const diskIds = new Set((diskRecords || []).map((k) => k.id));
+  const rows = merged.map((k, i) => ({
+    ...shelfRow(k, stageIds, { assetsById, palettesById }),
+    location: diskIds.has(k.id) ? 'disk' : 'app',
+    _i: i,
+  }));
+  const have = new Set(merged.map((k) => k.id));
+  for (const stub of Object.values(stubs || {})) {
+    if (!stub || have.has(stub.id)) continue;
+    rows.push({ ...shelfStubRow(stub), _i: rows.length });
+  }
+  return searchSortShelfRows(rows, { query, sort });
 }
 
 /**
@@ -338,6 +411,10 @@ export const shelf = {
   // K2 (#1590): the Kinetic fill — the pure deal (curator/shelfFill.mjs);
   // the store's fillStage action owns the write (stamps, history, undo).
   fill: (args) => dealFill(args),
+  // K3 (#1591): the disk tier's planner — which keeps export when the
+  // collection stands past its soft bound (curator/shelfDisk.mjs). The
+  // IO + the store moves live in loot/shelfDiskRun.mjs + davisSlice.
+  export: (args) => planExports(args),
   // §5's ledger read: the sanitized history, oldest first, as stored.
   history: (history) => [...(history || [])],
 };

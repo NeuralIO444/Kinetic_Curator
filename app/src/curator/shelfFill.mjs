@@ -88,6 +88,11 @@ const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 export function dealFill({
   keeps = [], stageIds = [], history = [], prefs, seed = 0,
   scoreOf = null, performingKeepId = null, assetsById = null,
+  // K3 (#1591, audit S5): how many disk keeps the anchor could NOT
+  // read (their records live in files the folder didn't give up this
+  // session). The anchor over the rest is partial, and the receipt
+  // NAMES it — never a silent partial. 0 (the default) is a full read.
+  anchorPartial = 0,
 } = {}) {
   const table = prefs.table;
   const notes = [];
@@ -126,6 +131,7 @@ export function dealFill({
   const centroid = anchorInfo.centroid;
   if (anchor === 'identity') notes.push('anchor: identity — too few keeps to lean on; consensus deals in Davis\'s novelty order');
   if (anchor === 'none') notes.push('anchor: none — no counted keep carries a layout to lean toward');
+  if (anchorPartial > 0) notes.push(`anchor: partial — ${anchorPartial} keep${anchorPartial === 1 ? '' : 's'} on disk unread; the anchor leans on the rest at full weight`);
 
   // ── features + novelty (distance from the current stage) ─────────
   const feats = new Map(keeps.map((k) => [k.id, featuresOf(k)]));
