@@ -6,7 +6,7 @@ import { genId } from '../id.js';
 import { stackOf, expandStack } from '../recipeStack.js'; // #1131: a keep carries the layer stack
 import { tickPhraseBeat } from '../phraseTick.js';
 import { sanitizeBeatRoute } from '../beatArbiter.js';
-import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
+import { pushToUndo, UNDO_KIND_LAYERS, UNDO_KIND_SHELF } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { EUCLID_MAX_STEPS } from '../euclid.js';
 import { sanitizeQueueSeconds, sanitizeQueueBeats } from '../queueTransport.js';
@@ -21,9 +21,16 @@ import { appendToLedger } from '../../curator/tasteLedger.js'; // #1173: keep/pa
 import { sanitizeProvenance } from '../../curator/provenance.mjs'; // #1507: mined ≠ rolled ≠ hand-built, on the record
 import { // #1589 (Keeps K1): the shelf's tiers — stage membership, crown routing, swaps, migration
   deriveStageIds, sanitizeStageIds, routeCrown, swapSlots, admitToStage,
-  crownHistoryRecord, swapHistoryRecord, sanitizeHistoryRecord,
+  crownHistoryRecord, swapHistoryRecord, fillHistoryRecord, sanitizeHistoryRecord,
   ON_SHELF_COPY, favoritesTrimCopy,
 } from '../../curator/shelf.mjs';
+import { dealFill } from '../../curator/shelfFill.mjs'; // #1590 (Keeps K2): the Kinetic fill
+import { DEFAULT_SHELF_PREFS, tableName } from '../../curator/shelfPrefs.mjs'; // #1590: preferences.json
+import { sanitizeGateVerdict } from '../../curator/loisJudge.mjs'; // #1590: stored E4 verdicts ride keeps
+import { getTaste } from '../../curator/tasteStore.js'; // #762: the loaded taste (the Queen's head)
+import { scoreLayout, headUsable } from '../../curator/tasteHead.js'; // the scorer interface (§7 door)
+import { experimentalOn } from '../../curator/tasteGate.js';
+import { ASSETS } from '../../data/assets/index.js';
 import { withLiveRig } from '../audioRig.js'; // the audio setup is the performer's, not the hit's
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
@@ -136,10 +143,15 @@ export function sanitizeFavorite(raw) {
   // #1507 — provenance rides along when it is a real one (explorer-mined);
   // hand-built and dice-crowned records carry none and none is invented.
   const provenance = sanitizeProvenance(raw.provenance);
+  // #1590 — a stored Lois gate verdict (E4, recorded at bake time)
+  // rides the keep when a real one is present, so the fill's gate has
+  // verdicts to read; absent stays absent (unjudged, never failed).
+  const gateVerdict = sanitizeGateVerdict(raw.gateVerdict);
   return {
     ...(stackOk ? { stack: JSON.parse(JSON.stringify(raw.stack)) } : {}),
     ...(bands ? { bands } : {}),
     ...(provenance ? { provenance } : {}),
+    ...(gateVerdict ? { gateVerdict } : {}),
     id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
     seed,
     ...(raw.seedOffsets && typeof raw.seedOffsets === 'object'
@@ -357,6 +369,24 @@ export const createDavisSlice = (set) => {
   shelfNotice: null,
   setShelfNotice: (msg) => set({ shelfNotice: typeof msg === 'string' && msg ? msg : null }),
   performingKeepId: null,
+  // #1590 — the preferences.json state (curator/shelfPrefs.mjs): the
+  // effective table + window + soft bound, where they came from, and
+  // every correction the parser named. null until the loot read path
+  // reports (a launch without a loot folder runs on shipped defaults —
+  // dealFill's caller substitutes DEFAULT_SHELF_PREFS). Applied by the
+  // loot surface on launch + rescan; a fill reads the values in force
+  // at press time, so an edit lands on the NEXT fill, never mid-fill.
+  shelfPrefs: null,
+  shelfPrefsLines: [],
+  shelfPrefsSource: null,
+  setShelfPrefs: (prefs, lines = [], source = null) => set({
+    shelfPrefs: prefs || null,
+    shelfPrefsLines: Array.isArray(lines) ? lines : [],
+    shelfPrefsSource: source || null,
+    // Law 1: a correction the artist made by hand-editing the file is
+    // spoken where the shelf acts happen, not only in the dev panel.
+    ...(Array.isArray(lines) && lines.length ? { shelfNotice: lines[0] } : {}),
+  }),
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
@@ -677,6 +707,59 @@ export const createDavisSlice = (set) => {
     persistKeeps(keeps);
     persistStage(res.stageIds);
     return { keeps, keepStage: res.stageIds, shelfHistory, shelfNotice: null };
+  }),
+  /**
+   * #1590 (Keeps K2) — the Kinetic fill: deal a new stage from the
+   * whole collection (curator/shelfFill.mjs owns the deal; this owns
+   * the write). The seed is the session seed (the current Look's)
+   * mixed with the fill counter, and the fill RECORD carries it — a
+   * fill replays bit-exactly from the same ledger state. The Queen's
+   * ranking door: a usable taste head (either kind) orders consensus
+   * through the existing scorer interface — scores order, they never
+   * gate or deal (§7); with no usable head the deal falls back to the
+   * kept centroid inside the pure fill. Dealt keeps are stamped like
+   * any staging; the fill is ONE undo step (S7); a fill that can deal
+   * nothing changes nothing and says why on the shelf's line.
+   */
+  fillStage: () => set((state) => {
+    const prefs = state.shelfPrefs || DEFAULT_SHELF_PREFS;
+    const fillsSoFar = (state.shelfHistory || []).filter((r) => r && r.kind === 'fill').length;
+    let seed = ((Number(state.seed) >>> 0) ^ Math.imul(fillsSoFar + 1, 0x9e3779b9)) >>> 0;
+    seed = Math.imul(seed ^ (seed >>> 16), 0x45d9f3b) >>> 0;
+    const taste = getTaste();
+    const head = taste?.head ?? null;
+    const scoreOf = (head && headUsable(head, experimentalOn()))
+      ? (keep) => scoreLayout(head, keep?.config?.layout ?? {})
+      : null;
+    const tableLabel = `${state.shelfPrefsSource === 'file' ? 'preferences.json' : 'shipped defaults'} · ${tableName(prefs)}`;
+    const res = dealFill({
+      keeps: state.keeps, stageIds: state.keepStage, history: state.shelfHistory,
+      prefs, seed, scoreOf, performingKeepId: state.performingKeepId,
+      assetsById: new Map(ASSETS.map((a) => [a.id, a])),
+    });
+    if (!res.stageIds) {
+      return { shelfNotice: res.receipt.notes.at(-1) || 'nothing to deal' };
+    }
+    const at = new Date().getTime();
+    const dealtIds = new Set(res.dealt.map((d) => d.keepId));
+    const keeps = state.keeps.map((k) => (dealtIds.has(k.id)
+      ? { ...k, stagedCount: (k.stagedCount || 0) + 1, lastStagedAt: at }
+      : k));
+    const shelfHistory = withShelfHistory(state, fillHistoryRecord({
+      seed: res.receipt.seed, table: tableLabel, slots: res.receipt.slots,
+      undealt: res.receipt.undealt, notes: res.receipt.notes, at,
+    }));
+    persistKeeps(keeps);
+    persistStage(res.stageIds);
+    const c = res.receipt.dealtByRule;
+    const summary = `the trio dealt a new stage — ${c.consensus} consensus · ${c.neglected} neglected · ${c.wild} wild · ${c.lois} lois · ${c.contrarian} contrarian`;
+    return {
+      ...pushToUndo(state, true, UNDO_KIND_SHELF),
+      keeps, keepStage: res.stageIds, shelfHistory,
+      shelfNotice: res.receipt.undealt.length
+        ? `${summary} — undealt: ${res.receipt.undealt.join(', ')}`
+        : summary,
+    };
   }),
   /**
    * #1173 — X passes on the current plate: same capture as a keep, one line in

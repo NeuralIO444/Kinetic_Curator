@@ -100,6 +100,10 @@ export function CandidateTray() {
     context: captureKeepContext(paletteId),
     config: card.record.config,
     provenance: card.record.provenance,
+    // #1590: the run's Lois verdict (E4, judged at bake time) rides
+    // the crown, so the fill's gate has a stored verdict to read for
+    // this keep. sanitizeFavorite bounds it on the way in.
+    ...(card.record.loisVerdict ? { gateVerdict: card.record.loisVerdict } : {}),
   });
 
   const crown = (card) => {

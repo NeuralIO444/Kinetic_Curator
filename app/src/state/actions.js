@@ -64,6 +64,7 @@ export const CLEAR_FAVORITES  = 'CLEAR_FAVORITES'; // the HITS row: every pill a
 export const ADD_KEEP          = 'ADD_KEEP';
 export const SWAP_STAGE_SLOT   = 'SWAP_STAGE_SLOT'; // #1589: hand-swap a stage slot for a collection keep
 export const STAGE_KEEP        = 'STAGE_KEEP'; // #1589: promote a collection keep into a free stage slot
+export const FILL_STAGE        = 'FILL_STAGE'; // #1590: the Kinetic fill — deal a new stage from the whole collection
 export const ADD_PASS          = 'ADD_PASS'; // #1173
 export const RECALL_FAVORITE   = 'RECALL_FAVORITE';
 export const REORDER_FAVORITE = 'REORDER_FAVORITE';

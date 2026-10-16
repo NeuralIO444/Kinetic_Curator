@@ -36,10 +36,10 @@ for (const dead of ['shaderlab', 'xray', 'govtune']) {
 }
 
 // C. the tabs in order — #691's three plus Biology (#793), Units, then
-// Kernel (#1233), Mind (#1464), Census (#1507), and Taste Trees (XGBoost
-// T3) — each a React.lazy component.
-assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units', 'kernel', 'mind', 'census', 'taste'],
-  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units / Kernel / Mind / Census (#1507) / Taste (XGBoost T3), got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
+// Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost
+// T3), and Shelf (#1590) — each a React.lazy component.
+assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units', 'kernel', 'mind', 'census', 'taste', 'shelf'],
+  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units / Kernel / Mind / Census (#1507) / Taste (XGBoost T3) / Shelf (#1590), got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
 for (const t of DEV_TABS) {
   assert.ok(t.component?.$$typeof === Symbol.for('react.lazy'),
     `tab '${t.id}' must be a React.lazy component (one chunk per tab)`);

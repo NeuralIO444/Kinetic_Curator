@@ -50,8 +50,11 @@ const CensusPanel = lazy(() =>
 const TasteTreePanel = lazy(() =>
   import('./TasteTreePanel.jsx').then((m) => ({ default: m.TasteTreePanel })),
 );
+const ShelfDevPanel = lazy(() =>
+  import('./ShelfDevPanel.jsx').then((m) => ({ default: m.ShelfDevPanel })),
+);
 
-/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3). */
+/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3), Shelf (#1590). */
 export const DEV_TABS = [
   { id: 'xray',      title: 'X-RAY',      icon: '◉', component: GovernorXrayPanel },
   { id: 'govtune',   title: 'GOV TUNE',   icon: '◐', component: GovernorTunePanel },
@@ -66,6 +69,9 @@ export const DEV_TABS = [
   // XGBoost T3: "read the model" — the active tree head, printed the
   // way the Studio's inspect prints it (spec §7.5).
   { id: 'taste',     title: 'TASTE',      icon: '♣', component: TasteTreePanel },
+  // #1590: the Keeps fill, backstage — the table in force, every named
+  // preferences correction, and the last fill's receipt from the ledger.
+  { id: 'shelf',     title: 'SHELF',      icon: '▥', component: ShelfDevPanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];

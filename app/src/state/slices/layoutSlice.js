@@ -1,6 +1,7 @@
 import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
-import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, trimUndoStack, UNDO_KIND_LAYERS } from '../history.js';
+import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, shelfRestoreFields, trimUndoStack, UNDO_KIND_LAYERS, UNDO_KIND_SHELF } from '../history.js';
+import { KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY } from './davisSlice.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
 import { hasChain, markovPick } from '../../curator/transitions.js';
@@ -134,6 +135,17 @@ function openParamsMix(state, merged, { name }) {
       targetName: name,
     },
   };
+}
+
+// #1590: a shelf undo/redo restores the shelf's three storage keys
+// alongside the state (davisSlice owns the keys; its persist helpers
+// are slice-local, so the restore writes them here, same JSON shape).
+function persistShelfRestore(shelfBack) {
+  try {
+    localStorage.setItem(KEEPS_KEY, JSON.stringify(shelfBack.keeps || []));
+    localStorage.setItem(STAGE_KEY, JSON.stringify(shelfBack.keepStage || []));
+    localStorage.setItem(SHELF_HISTORY_KEY, JSON.stringify(shelfBack.shelfHistory || []));
+  } catch { /* storage full/blocked — state still restores */ }
 }
 
 export const createLayoutSlice = (set) => ({
@@ -1000,6 +1012,17 @@ export const createLayoutSlice = (set) => ({
     const previous = state.historyUndoStack[state.historyUndoStack.length - 1];
     if (!entryApplies(previous, state.activeLayerId)) return {};
     const current = captureUndoEntry(state, previous.kind);
+    // #1590: a 'shelf' entry restores the shelf only (a fill touched
+    // nothing else) and re-persists its three storage keys.
+    if (previous.kind === UNDO_KIND_SHELF) {
+      const shelfBack = shelfRestoreFields(previous);
+      persistShelfRestore(shelfBack);
+      return {
+        ...shelfBack,
+        historyUndoStack: state.historyUndoStack.slice(0, -1),
+        historyRedoStack: trimUndoStack([...state.historyRedoStack, current]),
+      };
+    }
     const restore = previous.kind === UNDO_KIND_LAYERS
       ? { ...editRestoreFields(previous), ...layersRestoreFields(previous) }
       : editRestoreFields(previous);
@@ -1021,6 +1044,16 @@ export const createLayoutSlice = (set) => ({
     const next = state.historyRedoStack[state.historyRedoStack.length - 1];
     if (!entryApplies(next, state.activeLayerId)) return {};
     const current = captureUndoEntry(state, next.kind);
+    // #1590: the shelf half of undo, mirrored.
+    if (next.kind === UNDO_KIND_SHELF) {
+      const shelfFwd = shelfRestoreFields(next);
+      persistShelfRestore(shelfFwd);
+      return {
+        ...shelfFwd,
+        historyUndoStack: trimUndoStack([...state.historyUndoStack, current]),
+        historyRedoStack: state.historyRedoStack.slice(0, -1),
+      };
+    }
     const restore = next.kind === UNDO_KIND_LAYERS
       ? { ...editRestoreFields(next), ...layersRestoreFields(next) }
       : editRestoreFields(next);
