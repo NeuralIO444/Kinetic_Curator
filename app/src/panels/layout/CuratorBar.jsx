@@ -18,7 +18,7 @@ import {
   getActivePersonaId,
   setActivePersona,
 } from '../../curator/taste.js';
-import { getLoisVerdict, getLoisVerdictParts } from '../../curator/loisRank.js';
+import { getLoisVerdictParts } from '../../curator/loisRank.js';
 import { getPersonaTaste } from '../../curator/personaTastes.js';
 import { verdictDetent, voiceBreathS, voiceLevel, litPills } from '../../curator/topbarTaste.mjs';
 import { loisActivity } from '../../curator/loisActivity.js';
@@ -104,7 +104,8 @@ export function CuratorBar() {
     voice === 'off'
       ? 'off'
       : voices.find((p) => p.id === voice)?.alias ?? voice;
-  const loisLine = voice === 'lois' ? getLoisVerdict() : '';
+  // #1588 — LOIS's verdict line no longer renders here; it rides the footer ticker in her slot
+  // (components/LoisPill.jsx). The pick record stays in the Curator button's tooltip, via the hint.
   // #1122 — affective grammar derivations. Every one traces to a real signal:
   const lookState = !appliedLook ? 'none' : composition === appliedLook.id ? 'clean' : 'dirty';
   const lookName = appliedLook?.name ?? '';
@@ -301,9 +302,6 @@ export function CuratorBar() {
         <BeatButton />
         {/* #1258 — the presence mark sits immediately right of BEATS. Never named: no title, no tooltip, no label. */}
         <SwayMark />
-        {loisLine && (
-          <span className="lois-verdict" title={hint}>{loisLine}</span>
-        )}
     </div>
   );
 }
