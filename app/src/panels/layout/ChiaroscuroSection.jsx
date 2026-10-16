@@ -1,12 +1,15 @@
-// CHIAROSCURO section (#1587) — one home for the render engine in BUILD.
+// CHIAROSCURO (#1587; collapsed to a button by #1629) — one home for
+// the render engine in BUILD.
 //
-// In the panel the section is a compact row: a plain TE label, a live
-// one-line summary of the sun + hue, and an EDIT button. The full control
-// set lives in a large floating editor OVER the canvas (Matt's form
-// ruling, 2026-10-15): no backdrop, the canvas stays live and rendering
-// underneath, no apply/confirm — every control emits its usual event the
-// moment it moves, so a sun slider changes the light in the same gesture.
-// Esc or click-away closes it; there is no focus trap.
+// In the panel it is JUST A BUTTON (Matt's ruling, 2026-10-16): the
+// titled section row — plain TE label, live one-line summary of the
+// sun + hue, EDIT cell — is gone. The button, labelled CHIAROSCURO,
+// opens the full control set in a large floating editor OVER the
+// canvas (Matt's form ruling, 2026-10-15): no backdrop, the canvas
+// stays live and rendering underneath, no apply/confirm — every
+// control emits its usual event the moment it moves, so a sun slider
+// changes the light in the same gesture. Esc or click-away closes it;
+// there is no focus trap.
 //
 // Tenants (the explicit #1587 inventory — nothing else moved):
 //   · the sun (#594) — from the Appearance shelf's sun row (SunRow.jsx)
@@ -19,13 +22,12 @@
 // The editor follows the app's overlay grammar (portal + fixed position,
 // like the beat menu / favorites tray), anchored to the canvas wrap's
 // rect. The panel value dock is the other editor grammar and it never
-// covers the canvas by design — so the section closes the dock when it
+// covers the canvas by design — so the button closes the dock when it
 // opens: one editor at a time.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../../state/store.js';
 import { emit, Events } from '../../composition/eventBus.js';
-import { helpText } from '../../data/helpCopy.js';
 import { SunControls } from './SunControls.jsx';
 import { DialEditor } from '../build/te/editors.jsx';
 import { useDock } from '../build/te/useDock.js';
@@ -99,29 +101,19 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
     };
   }, [open, closeEditor, place]);
 
-  const summary = light
-    ? `sun ${Math.round(light.x)},${Math.round(light.y)} · int ${Math.round(light.intensity * 100)}% · hue ${Math.round(hue)}°`
-    : `sun off · hue ${Math.round(hue)}°`;
-
   return (
     <div className="chiaro-section">
-      <div className="chiaro-row">
-        <div className="chiaro-head">
-          <span className="chiaro-title" title={helpText('layout-sun')}>CHIAROSCURO</span>
-          <span className="chiaro-summary">{summary}</span>
-        </div>
-        <button
-          type="button"
-          ref={anchorRef}
-          className="te-cell chiaro-open"
-          onClick={() => (open ? closeEditor() : openEditor())}
-          aria-expanded={open}
-          aria-haspopup="dialog"
-          title="Open the render engine — the sun and the finish, over the canvas"
-        >
-          <span className="te-cell-label">EDIT</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        ref={anchorRef}
+        className="te-cell chiaro-open"
+        onClick={() => (open ? closeEditor() : openEditor())}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        title="Open the render engine — the sun and the finish, over the canvas"
+      >
+        <span className="te-cell-label">CHIAROSCURO</span>
+      </button>
       {open && pos && createPortal(
         <div
           ref={editorRef}

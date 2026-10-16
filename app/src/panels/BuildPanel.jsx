@@ -110,8 +110,8 @@ export function BuildPanel() {
         </BuildSection>
 
         {/* ④ APPEARANCE — the finish: mark shape, growth, materials, field→channel map,
-            and the CHIAROSCURO section (#1587): the render engine's home — the sun +
-            hue, edited in a floating editor over the canvas */}
+            and the CHIAROSCURO button (#1587; a button since #1629): the render
+            engine's door — the sun + hue, edited in a floating editor over the canvas */}
         <BuildSection num="4" title="Appearance">
           <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <MaterialSliders layoutParams={layoutParams} lockedParams={lockedParams} />

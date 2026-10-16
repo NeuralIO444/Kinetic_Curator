@@ -1,7 +1,10 @@
 // chiaroscuro.selfcheck.mjs — #1587: the CHIAROSCURO section is the one
 // home for the scene-level render engine in BUILD, and the move was a
-// pure relocation. Node-only source invariants (the render itself is
-// proven byte-identical by the parity corpus, not by this file):
+// pure relocation. #1629: in the panel that home is now JUST A BUTTON —
+// no title row, no live summary, no EDIT cell; the button, labelled
+// CHIAROSCURO, launches the same floating editor, unchanged. Node-only
+// source invariants (the render itself is proven byte-identical by the
+// parity corpus, not by this file):
 //   · BUILD hosts the section; the old sun row file is gone
 //   · the sun controls still speak LIGHT_SET over exactly the light keys
 //   · the section emits only the events its controls always emitted
@@ -28,7 +31,7 @@ const displayBlock = read('../pipeline/DisplayBlock.jsx');
 const { LIGHT_DEFAULT, LIGHT_SLOTS } = await import('../../data/light.js');
 const { helpText } = await import('../../data/helpCopy.js');
 
-ok('BUILD hosts the CHIAROSCURO section in Appearance; SunRow is gone', () => {
+ok('BUILD hosts the CHIAROSCURO button in Appearance; SunRow is gone', () => {
   assert.ok(buildPanel.includes('<ChiaroscuroSection'), 'BuildPanel renders the section');
   assert.ok(!buildPanel.includes('SunRow'), 'BuildPanel no longer references the sun row');
   assert.ok(!existsSync(join(here, 'SunRow.jsx')), 'SunRow.jsx was relocated, not duplicated');
@@ -58,6 +61,17 @@ ok('the editor floats over the canvas — portal, canvas anchor, Esc, no modal',
   assert.ok(!/className=\{?["'`][^"'`]*backdrop/.test(section), 'no backdrop element is rendered');
 });
 
+ok('the panel form is just a button (#1629) — no title row, no summary, no EDIT', () => {
+  assert.ok(section.includes('<span className="te-cell-label">CHIAROSCURO</span>'),
+    'the one button is labelled CHIAROSCURO');
+  assert.equal([...section.matchAll(/aria-haspopup="dialog"/g)].length, 1,
+    'exactly one editor launcher');
+  for (const gone of ['chiaro-row', 'chiaro-head', 'chiaro-title', 'chiaro-summary', 'const summary']) {
+    assert.ok(!section.includes(gone), `${gone} left with the section row`);
+  }
+  assert.ok(!/>EDIT</.test(section), 'no EDIT cell remains');
+});
+
 ok('HUE ROTATE left AppearanceSliders; FXAA never moved', () => {
   assert.ok(!appearance.includes('hueRotate'), 'hue dial is out of the appearance shelf');
   assert.ok(section.includes('hueRotate'), 'hue dial lives in the section editor');
@@ -66,8 +80,9 @@ ok('HUE ROTATE left AppearanceSliders; FXAA never moved', () => {
   assert.ok(displayBlock.includes('Events.DISPLAY_FXAA'), 'FXAA stays in Pipeline (amendment 1)');
 });
 
-ok('the help copy followed the sun to the CHIAROSCURO section', () => {
-  assert.ok(helpText('layout-sun').includes('CHIAROSCURO'), 'layout-sun names the new home');
+ok('the help copy followed the sun to the CHIAROSCURO button', () => {
+  assert.ok(helpText('layout-sun').includes('CHIAROSCURO'), 'layout-sun names the home');
+  assert.ok(helpText('layout-sun').includes('button'), 'layout-sun names the button, not the old section row');
 });
 
 console.log(`chiaroscuro.selfcheck: ${n} checks passed`);
