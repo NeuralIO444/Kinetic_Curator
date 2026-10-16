@@ -263,12 +263,14 @@ export function createCreatureBuilder() {
   const ages = []; // frames each pin's creature has been formed
   const pair2 = []; // how far each pin's second pair has grown in: 0 (none) to 1 (full)
   const assetCache = new Map(); // assetId -> its attach points (keyed also by the svg and the artist's edit)
+  let wingBeat = null; // #1469 — the last appended frame's wing beat as 0..1 openness; null when no moth was appended
   const pointsOf = (pool, assetAttach, id) => {
     const asset = pool.find((a) => a && a.id === id);
     return asset ? attachPointsFor(asset, assetAttach) : [];
   };
   return {
     append(input, entries, pool, motionFor = null, groundFor = null) {
+      wingBeat = null; // #1469 — re-earned below only if this call actually appends a moth
       const pins = input && input.dishPins;
       const formed = input && input.dishFormed;
       if (!Array.isArray(pins) || !Array.isArray(formed) || !formed.some(Boolean)) {
@@ -343,8 +345,14 @@ export function createCreatureBuilder() {
       }
       ages.length = pins.length;
       pair2.length = pins.length;
+      // #1469 — publish the wing beat this frame actually used (the global beat above, before the
+      // per-moth grow-in scaling), as 0..1 openness, for the MOTION strip's MOTH bar. No moth
+      // appended → stays null: the bar is absent, not zeroed.
+      if (extra.length) wingBeat = (beat / MOTH.flap + 1) / 2;
       if (extra.length) top.items = [...top.items, ...extra];
     },
-    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); },
+    /** #1469 — the last appended frame's wing beat (0..1 openness), or null when no moths are on stage. */
+    lastWingBeat() { return wingBeat; },
+    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); wingBeat = null; },
   };
 }

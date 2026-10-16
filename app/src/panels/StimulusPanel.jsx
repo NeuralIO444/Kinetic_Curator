@@ -6,6 +6,7 @@ import { SourceControls } from './stimulus/SourceControls.jsx';
 import { ReactivityControls } from './stimulus/ReactivityControls.jsx';
 import { FeelPicker } from './stimulus/FeelPicker.jsx';
 import { MotionStrip } from './stimulus/MotionStrip.jsx';
+import { MotionMeter } from './stimulus/MotionMeter.jsx';
 import { MeterHero } from './stimulus/MeterHero.jsx';
 import { SpectrumStrip } from './stimulus/SpectrumStrip.jsx';
 import { SpectrumMarks } from './stimulus/SpectrumMarks.jsx';
@@ -108,6 +109,8 @@ export function StimulusPanel() {
           {/* #613 — hierarchy inverted: the METER is the hero, the MATRIX shows
               which sound drives what, live; setup and raw knobs follow. */}
           <MeterHero />
+          {/* #1469 — the living-motion read, beside the METER: the resolver's own amounts via the tap. Read only. */}
+          <MotionMeter />
           {/* #1482 — the spectrum the engine hears, under the METER: read only. */}
           <SpectrumStrip />
           {/* #1482 P3 — what the marks do with it: off by default. */}
