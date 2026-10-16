@@ -918,6 +918,22 @@
   font-size: 14px; letter-spacing: 0; flex: 0 0 auto;
 }
 
+/* ─── #1630: the unlock tree — read-only nodes at the bottom of BUILD.
+   A node is a name, a state word (LIT / DARK / HIS), and the plain line
+   that says what lights it. Dark nodes dim; his nodes carry the amber
+   (Davis renders amber, KC-1 DS). Nothing here is a control. ─── */
+.unlock-tree { display: flex; flex-direction: column; gap: 10px; }
+.unlock-note { font-size: 9px; line-height: 1.5; color: var(--dim); padding: 0 2px 2px; }
+.unlock-node { padding: 3px 2px; border-top: 1px dotted var(--line); }
+.unlock-node:first-of-type { border-top: none; }
+.unlock-head { display: flex; align-items: baseline; gap: 6px; }
+.unlock-pip { font-size: 9px; color: var(--ink); flex: 0 0 auto; }
+.unlock-name { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink); }
+.unlock-state { margin-left: auto; font-size: 8px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink); }
+.unlock-line { font-size: 9px; line-height: 1.5; color: var(--dim); padding-left: 15px; }
+.unlock-node.is-dark { opacity: 0.45; }
+.unlock-node.is-his .unlock-pip, .unlock-node.is-his .unlock-state { color: var(--accent); }
+
 /* #1010 — MATH tracks: ink-violet strip color, distinct from FX violet-teal
    and content amber. Same grammar as FX rows. */
 .layer-row-math { border-color: #b78cff; background: rgba(183, 140, 255, 0.07); }
