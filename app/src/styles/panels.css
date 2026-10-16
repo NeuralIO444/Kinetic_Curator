@@ -958,7 +958,22 @@
 /* #1126 — the panel fits without a scroll: one row each for the three generate verbs, the four trail gestures, and
    phrase beside midi. */
 .davis-body { gap: 2px; }
-.panel-davis .davis-body { padding: 4px 8px; }
+.panel-davis .davis-body { padding: 2px 8px; }
+/* #1604 — the fit repair (Matt's ruling: fix the margin, not the test — the 479 allowance stays). The panel's
+   button rows sized by the font's INTRINSIC line height (buttons take line-height: normal from the UA sheet),
+   so the talking state's total followed the platform's mono metrics: +9 on the CI runner, +18 measured
+   locally under Noto Sans Mono. Pin the buttons to fixed line heights — locally height-neutral, the
+   intrinsic box already measures 11px at 10px and 10px at 9px — and trim 2px of slack padding inside the
+   bordered rows (the midi row gap 4→2 stays on the #1031 density scale). The talking content drops ~14px
+   and stops following the font. */
+.panel-davis .big-btn { line-height: 1.1; }
+.panel-davis .chip-btn { line-height: 1.1; }
+.panel-davis .davis-progress { padding: 2px 6px; }
+.panel-davis .davis-midi { padding: 2px 6px; gap: 2px; }
+.panel-davis .duel-verdict { padding: 2px 8px; }
+@media (max-height: 760px) {
+  .panel-davis .duel-side { padding-top: 2px; padding-bottom: 2px; }
+}
 .davis-actions-3 { grid-template-columns: repeat(3, 1fr); }
 .davis-actions-4 { grid-template-columns: repeat(4, 1fr); }
 /* #1128: the motion row costs 25px; the panel pays for it here, so it still fits 1280x720 with no scroll */
