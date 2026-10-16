@@ -329,6 +329,7 @@ export function LayerStack() {
   const dishRadius = layoutParams?.contactRadius || 0;
   const dishRestitution = layoutParams?.contactRestitution ?? 0.5;
   const dishRepel = layoutParams?.contactRepel ?? 0;
+  const dishTempo = layoutParams?.dishTempo ?? 0;
   const isAdj = (l) => isFxLayer(l) || isMathLayer(l);
   const fineClass = (l) => (isMathLayer(l) ? 'math' : isFxLayer(l) ? 'fx' : 'content');
   const contentCount = layers.filter((l) => !isAdj(l)).length;
@@ -619,6 +620,16 @@ export function LayerStack() {
                     onReset={() => setParam('contactRepel', 0)}
                     onChange={(v) => setParam('contactRepel', v)} />
                   <span className="fx-param-readout">{trimNum(dishRepel)}</span>
+                </div>
+              )}
+              {dishOn && (
+                <div className="strata-composite" title="TEMPO — the dish's thermal energy (petri spec §4): Brownian jitter on every body in the dish. Hot never settles; 0 is the cold dish, exactly as before. DENSITY (the Layout %) is the dish's crowding pressure on REPEL.">
+                  <span className="fx-param-readout lbl" style={{ width: 'auto' }}>tempo</span>
+                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={dishTempo}
+                    hint="TEMPO — thermal energy: Brownian jitter amplitude in the dish"
+                    onReset={() => setParam('dishTempo', 0)}
+                    onChange={(v) => setParam('dishTempo', v)} />
+                  <span className="fx-param-readout">{trimNum(dishTempo)}</span>
                 </div>
               )}
               {dishOn && dishRadius === 0 && (

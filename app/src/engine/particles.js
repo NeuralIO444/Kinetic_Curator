@@ -32,6 +32,7 @@ import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mj
 import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
 import { dishMediumFor, mediumClingCapture, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module)
+import { dishThermalFor, crowdingRepelGain, COLD_THERMAL } from './dishThermal.mjs'; // #1538 — petri §4's missing rows: TEMPO as thermal jitter, DENSITY as crowding pressure on the repel gain (call sites below; the law lives in the module)
 import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
 import { dishTrailsFor, sampleTrailReadGradient, NO_TRAILS, TRAIL_GAIN } from './dishTrails.mjs'; // #1415 — trails: the stigmergy substrate (call sites below; the law lives in the module)
 import { dishEcologyFor, ecologyBreedAllowed, ecologyNoteBirth, ecologyNoteDeath, stepDishEcology } from './dishEcology.mjs'; // #1416 — ecology: the dish's population regime (call sites below; the law lives in the module)
@@ -1469,13 +1470,25 @@ export class ParticleSystem {
     // contact-less swarm keeps the pre-C1 path bit for bit, and dry
     // (WETNESS 0, the default) is the identity on all three curves.
     let mediumDampRetention = 1;
+    // #1538 — TEMPO resolved beside the medium (law in
+    // dishThermal.mjs): the dish's thermal energy, read from the
+    // dishTempo param and the frame's stillness flag (spec §7 —
+    // thermal reads the stillness law, not the knob). Exactly the
+    // cold identity unless this step runs in a hot dish, so the
+    // pre-#1538 integrator arithmetic is untouched bit for bit.
+    let thermal = COLD_THERMAL;
     if (contactRadius > 0 && this.n > 1) {
       const medium = dishMediumFor(layoutParams.accumulationWetness);
       mediumDampRetention = medium.dampRetention;
+      thermal = dishThermalFor(layoutParams.dishTempo, deformStill);
       this._contactPass({
         radius: contactRadius,
         restitution: Math.max(0, Math.min(1, contactRestitution)),
-        repel: Math.max(0, contactRepel),
+        // #1538 — DENSITY as crowding pressure: the density param
+        // scales the repel gain around its shipped default (gain
+        // exactly 1 there — dishThermal.mjs), so a default dish
+        // presses exactly as it did before the reinterpretation.
+        repel: Math.max(0, contactRepel) * crowdingRepelGain(layoutParams.density),
         mode: CONTACT_MODES.includes(contactMode) ? contactMode : 'none',
         umask: collideMask >>> 0,
         medium,
@@ -1507,6 +1520,11 @@ export class ParticleSystem {
     // mediumDampRetention is exactly 1 unless this step ran a wet
     // contact pass, so the dry path's product is bit-identical.
     const dampDt = Math.pow(damp, dtFrames) * Math.pow(mediumDampRetention, dtFrames);
+    // #1538 — the thermal kick's dt form: a random walk's variance
+    // adds per step, so the kick scales with sqrt(dtFrames) and the
+    // DIFFUSION RATE is what stays frame-rate true. Exactly 1 at
+    // 60 fps, like every other dt form in this integrator.
+    const dtSqrt = Math.sqrt(dtFrames);
 
     for (let i = 0; i < numParticles; i++) {
       // #167 — dead particles (die) hold no state and integrate nothing.
@@ -1515,6 +1533,20 @@ export class ParticleSystem {
       // v_new = (v_old + a * dtFrames) * dampDt
       let vxi = (VX[i] + AX[i] * dtFrames) * dampDt;
       let vyi = (VY[i] + AY[i] * dtFrames) * dampDt;
+      // #1538 — TEMPO: the thermal kick (law in dishThermal.mjs).
+      // A Brownian velocity impulse, one draw per axis per body per
+      // step from the dyn channel — step-mixed keys in the curiosity
+      // walk's idiom, offset far clear of the init / breed /
+      // curiosity / levy draws on the channel. Before the speed
+      // clamp, so the clamp governs the final velocity exactly as
+      // it governs any other impulse. thermal.amp is exactly 0 in a
+      // cold or held dish: the branch never runs and the cold path's
+      // arithmetic is the pre-#1538 arithmetic bit for bit.
+      if (thermal.amp > 0) {
+        const tk = this._step * 131071 + i;
+        vxi += (hashU01(seedU, CH.dyn, tk + 1048573) * 2 - 1) * thermal.amp * dtSqrt;
+        vyi += (hashU01(seedU, CH.dyn, tk + 1048583) * 2 - 1) * thermal.amp * dtSqrt;
+      }
       const speed = Math.sqrt(vxi * vxi + vyi * vyi);
       if (speed > maxSpeed) {
         vxi = (vxi / speed) * maxSpeed;
