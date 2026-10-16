@@ -33,6 +33,7 @@ import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesc
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
 import { dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module); #1595 (D1) — its friction
 import { spinContactVt, spinInertia, spinInvMassT, spinDeltaOmega, spinStepOmega, spinWrapAngle } from './dishSpin.mjs'; // #1596 (D2) — spin: ω/θ columns, torque from D1's jt (call sites below; the law lives in the module)
+import { solveDishLinks, noteBondGrip, BOND_TOUCH, BOND_GRIP_VT } from './dishLinks.mjs'; // #1597 (D3) — constraints: declared distance/spring links, XPBD-solved on predicted positions after the integration loop, and bonds formed from sustained wet grip (call sites below; the law lives in the module)
 import { dishThermalFor, crowdingRepelGain, COLD_THERMAL } from './dishThermal.mjs'; // #1538 — petri §4's missing rows: TEMPO as thermal jitter, DENSITY as crowding pressure on the repel gain (call sites below; the law lives in the module)
 import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
 import { dishTrailsFor, sampleTrailReadGradient, NO_TRAILS, TRAIL_GAIN } from './dishTrails.mjs'; // #1415 — trails: the stigmergy substrate (call sites below; the law lives in the module)
@@ -164,6 +165,11 @@ export class ParticleSystem {
     this._coalesceOn = undefined;
     this._coalesce = null;
     this._coalesceFields = null;
+    // #1597 (D3) — bond state (law in dishLinks.mjs): grip dwell
+    // and formed bonds for this system. Allocated lazily by the
+    // first wet grip note — null in every dry scene, so no dry
+    // path ever touches it.
+    this._dishBonds = null;
     // #1412 — pigment exchange switch (law in dishPigment.mjs). Same
     // spread-only params convention as deform/coalesce.
     this._pigmentOn = undefined;
@@ -396,6 +402,8 @@ export class ParticleSystem {
     this.theta.fill(0);
     // #1411 — and unmerged: no pair carries dwell across a re-seed.
     clearDishCoalesce(this);
+    // #1597 — and unbonded: no pair carries a bond across a re-seed.
+    this._dishBonds = null;
     // #278 — colors were just (re)assigned from this swatch set.
     this._colorSig = (palette?.swatches || ['#ffffff']).join('|');
     // #710 — a (re)init is a fresh cast: the next update re-evaluates the
@@ -704,7 +712,28 @@ export class ParticleSystem {
             // cross-strata pass never feeds, so different families never
             // merge. State only (law in dishCoalesce.mjs).
             if (d2 < (rsum * COALESCE_TOUCH) * (rsum * COALESCE_TOUCH)) feedDishCoalesce(this, i, j);
-            if (d2 >= rsum * rsum) continue;
+            if (d2 >= rsum * rsum) {
+              // #1597 (D3) — bond grip at a NEAR touch: a resting pair
+              // parks exactly at rsum, on this rejected side of the
+              // test, where the friction block below can never read
+              // it (the #1411 geometry). In the BOND_TOUCH band a wet
+              // pair whose contact-point slide sits under the grip
+              // ceiling is held, not passing — one grip step, noted
+              // for the formation count (law in dishLinks.mjs). In
+              // contact, the friction block's stick verdict is the
+              // grip authority instead; a pair is never noted twice
+              // for one step.
+              if (med.fricK > 0 && d2 < (rsum * BOND_TOUCH) * (rsum * BOND_TOUCH)) {
+                const dN = Math.sqrt(d2);
+                const gtx = -dy / dN, gty = dx / dN;
+                const gvt = spinContactVt(
+                  (VX[j] - VX[i]) * gtx + (VY[j] - VY[i]) * gty,
+                  OMEGA[i], ri, OMEGA[j], rj,
+                );
+                if (Math.abs(gvt) <= BOND_GRIP_VT) noteBondGrip(this, i, j);
+              }
+              continue;
+            }
             let dist = Math.sqrt(d2);
             let nx; let ny;
             if (dist > 1e-9) {
@@ -819,6 +848,19 @@ export class ParticleSystem {
                   OMEGA[i] += spinDeltaOmega(ri, jt, iI);
                   OMEGA[j] += spinDeltaOmega(rj, jt, iJ);
                 }
+                // #1597 (D3) — bond formation (law in dishLinks.mjs):
+                // the pair GRIPPED this step iff friction's stick
+                // impulse fit its Coulomb budget — jt is then the
+                // unclamped stick value −vt/kt itself, not the
+                // clamp. A saturated jt means the pair slid: no
+                // grip. (kt recomputed for the verdict: the helper
+                // is pure arithmetic, and the impulse call above
+                // keeps its D1/D2 pinned form.)
+                if (jt === -vt / spinInvMassT(wSum, ri, iI, rj, iJ)) noteBondGrip(this, i, j);
+              } else {
+                // No slide demand at all — resting wet contact is
+                // grip by definition (the pair is held, not sliding).
+                noteBondGrip(this, i, j);
               }
             }
             // #1410 — the dent: this resolution's impulse + pressure feed
@@ -1717,6 +1759,26 @@ export class ParticleSystem {
         OMEGA[i] = w;
         THETA[i] = spinWrapAngle(THETA[i] + w * dtFrames);
       }
+    }
+
+    // #1597 (D3) — links: distance/spring constraints between this
+    // system's own bodies, declared per Look on layoutParams
+    // (spread-only, like dishSession: never stored, never
+    // serialized — absent means no DECLARED links; a dry dish is
+    // then the D2 engine bit for bit, while a wet dish may still
+    // form bonds from grip) AND bonds formed from sustained wet
+    // grip during play (ruled by Matt 2026-10-16; state on the
+    // system, law in dishLinks.mjs). Solver: XPBD inside this
+    // integrator (ruled by Matt 2026-10-16) — the integration loop
+    // above is the prediction; the solve projects the predicted
+    // positions and folds the correction back into velocity
+    // (Δx/dtFrames), here, before any state step reads positions.
+    // Inside the dish gate, like the medium: links are contact
+    // law, and a contact-less swarm has no dish to hold them.
+    const dishLinks = layoutParams.dishLinks;
+    const formedBonds = this._dishBonds && this._dishBonds.formed.size > 0;
+    if (contactRadius > 0 && this.n > 1 && ((dishLinks && dishLinks.length) || formedBonds)) {
+      solveDishLinks(this, dishLinks, dtFrames);
     }
 
     // #287 — scent deposit, then the field's own diffuse+decay step. The
