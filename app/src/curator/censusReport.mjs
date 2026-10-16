@@ -320,6 +320,7 @@ const KEY_FIXTURES = {
   washStrength: { driver: 'matstill', ctx: { material: 'wash' }, note: 'render-level: swept through the composed still' },
   washSpread: { driver: 'matstill', ctx: { material: 'wash' }, note: 'render-level: swept through the composed still' },
   stippleDotScale: { driver: 'matstill', ctx: { material: 'stipple' }, note: 'render-level: swept through the composed still' },
+  dishTempo: { driver: 'dish', reason: 'thermal energy (#1538) — measured in the dish matrix (settle energy, tempo 0 vs 1)' },
 };
 
 // The structural keys (enums + bools) — value pairs to sweep at the
@@ -883,22 +884,43 @@ export function dishMatrix() {
     });
   }
 
-  // TEMPO + DENSITY as dish knobs — the petri spec §4 reinterpretation
-  // rows. Measured honestly: there is no tempo/thermal input to the
-  // dish anywhere in PARAM_SPEC, and the density layout param never
-  // enters the dish path (two bakes differing only in density are
-  // bit-identical), while density DOES move placements (param census).
+  // TEMPO + DENSITY as dish knobs — the petri spec §4 rows, built by
+  // #1538 (law in engine/dishThermal.mjs), measured the way the gap
+  // was first measured: density through the packed colony at the
+  // knob's ends (10 vs 100 — no longer bit-identical: crowding
+  // pressure drives the repel gain), TEMPO through the same colony's
+  // settle energy cold vs hot. The parity pins ride along: TEMPO 0
+  // and density-at-default must reproduce the row-absent dish bit
+  // for bit, or existing Looks would shift at their defaults.
   {
     const dense = (density) => dishCast([{
       key: 'd', seed: SEED, count: 24, place: placePack,
       lp: packLp({ density }),
     }], 240).units[0].sys;
+    const base = dishCast([{
+      key: 'd', seed: SEED, count: 24, place: placePack, lp: packLp({}),
+    }], 240).units[0].sys;
     rows.push({
       knob: 'density (as dish knob)', formation: 'packed colony',
-      observable: 'dish fingerprint at density 10 vs 100',
+      observable: 'dish fingerprint at density 10 vs 100; at the layout default vs the row absent',
       identicalInDish: sysFingerprint(dense(10)) === sysFingerprint(dense(100)),
+      defaultIsIdentity: sysFingerprint(dense(DEFAULT_LAYOUT_PARAMS.density)) === sysFingerprint(base),
       tempoKeyExists: Object.keys(PARAM_SPEC).some((k) => /tempo|thermal/i.test(k)),
-      note: 'petri spec §4 rows (TEMPO = thermal jitter, DENSITY = crowding pressure) — see staging report',
+      note: 'petri spec §4 rows (TEMPO = thermal jitter, DENSITY = crowding pressure) — built by #1538, law in engine/dishThermal.mjs',
+    });
+
+    const settle = (tempo) => dishCast([{
+      key: 't', seed: SEED, count: 24, place: placePack,
+      lp: packLp({ dishTempo: tempo }),
+    }], 240).units[0].sys;
+    const cold = settle(0); const hot = settle(1);
+    rows.push({
+      knob: 'dishTempo (TEMPO)', formation: 'packed colony, 24 bodies',
+      observable: 'residual kinetic energy after 240 steps at tempo 0 vs 1; fingerprint at 0 vs the row absent',
+      ke: { t0: +settleKE(cold).toFixed(4), t1: +settleKE(hot).toFixed(4) },
+      hotterKeepsEnergy: settleKE(hot) > settleKE(cold),
+      movesDish: sysFingerprint(cold) !== sysFingerprint(hot),
+      tempo0IsIdentity: sysFingerprint(cold) === sysFingerprint(base),
     });
   }
 

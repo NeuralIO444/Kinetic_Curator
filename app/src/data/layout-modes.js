@@ -247,6 +247,14 @@ export const DEFAULT_LAYOUT_PARAMS = {
   contactRepel: 0,
   contactMode: 'none',
   collideMask: 0xffffffff,
+  // #1538 (petri spec §4) — TEMPO: the dish's thermal energy
+  // (Brownian jitter amplitude; law in engine/dishThermal.mjs).
+  // Default 0 = cold: the pre-#1538 dish bit for bit, so a document
+  // that predates the row opens exactly as it was saved. DENSITY's
+  // §4 meaning (crowding pressure on the repel gain, pivot = the
+  // density default 78 above) needs no new key — it reinterprets
+  // the existing density param in the dish path only.
+  dishTempo: 0,
   // #1409 (petri dish A3) — the per-Look DISH switch: gates the shared
   // cross-strata grid (#1407) at enrolment. Default ON (spec open
   // question 1, ratified): a Look is a world, and worlds have physics.
@@ -440,6 +448,10 @@ export const PARAM_SPEC = {
   washStrength: { min: 0, max: 1 },
   washSpread: { min: 0.25, max: 4 },
   stippleDotScale: { min: 0.5, max: 5 },
+  // #1538 — TEMPO, the dish's thermal knob: 0 cold (identity) to
+  // 1 full Brownian jitter. #1409-class dish law, not a performance
+  // slider range — the DISH block's RangeRow spans exactly this.
+  dishTempo: { min: 0, max: 1 },
 };
 
 /**

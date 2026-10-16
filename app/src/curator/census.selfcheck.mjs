@@ -116,7 +116,7 @@ const reach = renderReachability();
   const dishClassed = paramRows.filter((r) => r.class === 'dish-matrix').map((r) => r.key).sort();
   assert.deepStrictEqual(dishClassed, [
     'accumulation', 'accumulationWetness', 'collideMask', 'contactMode',
-    'contactRadius', 'contactRepel', 'contactRestitution', 'dish', 'ecology', 'wind',
+    'contactRadius', 'contactRepel', 'contactRestitution', 'dish', 'dishTempo', 'ecology', 'wind',
   ], `dish-matrix set changed: ${JSON.stringify(dishClassed)}`);
 }
 
@@ -167,8 +167,14 @@ const reach = renderReachability();
   assert.ok(mingle.converges, `pigment gap must converge: ${mingle.gapEarly} -> ${mingle.gapLate}`);
 
   const density = row('density (as dish knob)');
-  assert.ok(density.identicalInDish, 'the density layout param must not enter the dish path (measured bit-identical)');
-  assert.strictEqual(density.tempoKeyExists, false, 'no tempo/thermal key exists in PARAM_SPEC (the §4 TEMPO row is unbuilt)');
+  assert.strictEqual(density.identicalInDish, false, 'density must move the dish path (#1538: crowding pressure drives the repel gain — 10 vs 100 can no longer be bit-identical)');
+  assert.ok(density.defaultIsIdentity, 'density at its layout default must be the row-absent dish bit for bit (defaults parity: the crowding gain is exactly 1 at the pivot)');
+  assert.strictEqual(density.tempoKeyExists, true, 'a tempo/thermal key must exist in PARAM_SPEC (the §4 TEMPO row is built, #1538)');
+
+  const tempo = row('dishTempo (TEMPO)');
+  assert.ok(tempo.movesDish, 'TEMPO must move the dish fingerprint (a hot dish is a different dish)');
+  assert.ok(tempo.hotterKeepsEnergy, `a hot dish must keep more settle energy than a cold one: ${JSON.stringify(tempo.ke)}`);
+  assert.ok(tempo.tempo0IsIdentity, 'TEMPO 0 must be the row-absent dish bit for bit (defaults parity: cold is the pre-#1538 engine)');
 }
 
 // ── RA5 — render reachability ───────────────────────────────────────

@@ -32,6 +32,7 @@ export const MATH_MAX_NAME = 24;
 const EXCLUDED_KEYS = new Set([
   ...ATLAS_AFFECTING_PARAMS, // count, particleCount, lsysDepth, body
   'collideMask', 'contactRadius', 'contactRestitution', 'contactRepel',
+  'dishTempo', // #1538 — dish law like the contact params: a macro must not sweep the dish's temperature every frame
   // #1042 — PATTERN reseeds. A macro must never sweep the seed every frame; SHUFFLE is a trigger, not a scalar.
   'shuffle', 'seed',
 ]);
