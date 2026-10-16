@@ -1,10 +1,12 @@
 // APPEARANCE as amber TE value buttons (#1202).
-// The finish: HUE ROTATE (dial — angular), CROOKED / SQUASH (mark shape),
+// Mark shape + organism finish: CROOKED / SQUASH (mark shape),
 // GROWTH RATE / BRANCHING (DLA / Eden organisms, mode-gated per #272).
 // Locks ride on the button.
+// #1587: HUE ROTATE (the whole-canvas finish) moved into the CHIAROSCURO
+// section's floating editor — it is render-engine, not mark finish.
 import { emit, Events } from '../../composition/eventBus.js';
 import { ValueButton } from '../build/te/ValueButton.jsx';
-import { SliderEditor, DialEditor } from '../build/te/editors.jsx';
+import { SliderEditor } from '../build/te/editors.jsx';
 
 export function AppearanceSliders({ layoutParams, lockedParams }) {
   const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
@@ -31,10 +33,6 @@ export function AppearanceSliders({ layoutParams, lockedParams }) {
           stay in state and presets/voices still set them, but the live knobs
           are gone. (MATERIAL and SHADING were already voice-only via #268.) */}
       <div className="slider-stack">
-        {btn('HUE ROTATE', `${Math.round(layoutParams.hueRotate ?? 0)}°`, 'hueRotate',
-          <DialEditor ariaLabel="Hue rotate" value={layoutParams.hueRotate ?? 0}
-            min={0} max={360} onChange={(v) => set('hueRotate', Math.round(v))} />,
-          { hint: 'Global hue shift applied to the whole canvas' })}
         {/* #594 PR3 — squash-and-stretch: moving marks already stretch along
             their motion (#309); this thins them across it so they keep their
             mass. Works on anything that moves. */}
