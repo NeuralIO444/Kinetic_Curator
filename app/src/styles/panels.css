@@ -1172,6 +1172,35 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .te-dock-close:hover { color: var(--ink); border-color: var(--ink); }
 .te-dock-body { padding: 12px 10px; overflow-y: auto; flex: 1 1 auto; }
 
+/* CHIAROSCURO section (#1587): a compact row in BUILD; the full control
+   set lives in a floating editor over the canvas — portaled to the body,
+   position:fixed at the canvas wrap's rect (inline geometry), no
+   backdrop, the canvas stays live underneath. Flat per DS: border only. */
+.chiaro-section { padding: 6px 0; border-top: 1px solid var(--line); }
+.chiaro-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chiaro-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.chiaro-title { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: var(--ink); }
+.chiaro-summary { font-size: 9px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chiaro-open { flex: 0 0 auto; min-height: 24px; padding: 2px 12px; }
+.chiaro-editor {
+  position: fixed;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  z-index: 60;
+  display: flex; flex-direction: column;
+}
+.chiaro-editor-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.chiaro-editor-title { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--kc-davis); }
+.chiaro-editor-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; }
+.chiaro-group { width: auto; margin-top: 2px; }
+.chiaro-group-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.chiaro-note { font-size: 9px; color: var(--dim); }
+
 /* Dock editors. */
 .te-editor { display: flex; flex-direction: column; gap: 10px; }
 .te-editor-readout {
