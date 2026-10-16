@@ -117,6 +117,8 @@ export function applyAction(action, store = useStore.getState()) {
     case A.SET_IS_RENDERING: return store.setIsRendering(payload);
     case A.ADD_FAVORITE: return store.addFavorite(action.favorite);
     case A.ADD_KEEP: return store.addKeep(action.keep);
+    case A.SWAP_STAGE_SLOT: return store.swapStageSlot(action.outId, action.inId);
+    case A.STAGE_KEEP: return store.stageKeep(action.keepId);
     case A.ADD_PASS: return store.addPass(action.pass);
     case A.REMOVE_FAVORITE: return store.removeFavorite(action.id);
     case A.CLEAR_FAVORITES: return store.clearFavorites();

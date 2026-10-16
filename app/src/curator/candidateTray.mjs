@@ -5,9 +5,13 @@
 // 1. LOOK-SLOT ACCOUNTING. The instrument keeps 16 Looks (spec §5: the
 //    scarcity is the product). A hand-earned keep costs 1 slot; a mined
 //    keep is unearned — the explorer found it, the performer didn't —
-//    so it counts double. The gate REFUSES at the cap with the refusal
-//    copy; it never evicts anything to make room (no silent auto-evict,
-//    ever). The accounting reads the keeps shelf (kc:keeps:v1 records):
+//    so it counts double. #1589 (Keeps K1) reframed the gate: the 16
+//    slots are now the STAGE's budget (curator/shelf.mjs owns tiers),
+//    and the gate no longer refuses anything — it predicts whether a
+//    crown takes a stage slot or lands in the collection with the line
+//    ("on the shelf — swap it in"). The E3 refusal copy is dead for
+//    every crown kind (Matt, 2026-10-14); nothing is ever evicted to
+//    make room. The accounting reads keep records (kc:keeps:v1):
 //    favorites are setlist copies of keeps, not slots of their own.
 //
 // 2. RUN-FOLDER PARSING. The miner (#1506) writes run.json +
@@ -21,15 +25,12 @@ export const LOOK_SLOT_BUDGET = 16;
 export const HAND_SLOT_COST = 1;
 export const MINED_SLOT_COST = 2;
 
-/** The refusal copy, verbatim wherever the gate speaks. */
-export const SHELF_FULL_COPY = 'shelf full — 16 looks kept; free one first';
-
 const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** Slot cost of one shelf record: mined (explorer provenance) counts double. */
 export const slotCostOf = (rec) => (rec?.provenance?.source === 'explorer' ? MINED_SLOT_COST : HAND_SLOT_COST);
 
-/** Slots the shelf already holds. */
+/** Slots a list of keep records holds (the stage's records, in K1 terms). */
 export function lookSlotsUsed(keeps) {
   let n = 0;
   for (const k of keeps || []) n += slotCostOf(k);
@@ -37,15 +38,18 @@ export function lookSlotsUsed(keeps) {
 }
 
 /**
- * The crown gate. ok when the candidate fits; refused (with the copy)
- * when it would pass the budget. Pure: the caller writes nothing on a
- * refusal, and this function can make nothing fit by dropping a keep.
+ * The crown gate, K1 reading: pass the STAGE's records. ok when the
+ * candidate takes a stage slot; not-ok when it lands in the collection
+ * instead (the crown still lands — curator/shelf.mjs routeCrown is the
+ * store's routing; this is the same arithmetic as a pure predictor, so
+ * the tray's line and the store's routing can never disagree). There is
+ * no refusal and no copy: nothing about a not-ok answer stops a write.
  */
-export function crownGate(keeps, candidate) {
-  const used = lookSlotsUsed(keeps);
+export function crownGate(stageKeeps, candidate) {
+  const used = lookSlotsUsed(stageKeeps);
   const cost = slotCostOf(candidate);
   const ok = used + cost <= LOOK_SLOT_BUDGET;
-  return { ok, used, cost, budget: LOOK_SLOT_BUDGET, ...(ok ? {} : { copy: SHELF_FULL_COPY }) };
+  return { ok, used, cost, budget: LOOK_SLOT_BUDGET };
 }
 
 // ── run-folder parsing ────────────────────────────────────────────────

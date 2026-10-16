@@ -9,9 +9,11 @@
 //     when hostile — a mined record is forever distinguishable IN DATA;
 //   - the plain-word label (corner + axes) with NO real artist names
 //     (the display policy: aliases on product surfaces);
-//   - look-slot accounting: 16 slots, a mined keep counts double, the
-//     gate REFUSES at the cap with the refusal copy and writes nothing
-//     — no silent eviction on this path, ever;
+//   - look-slot accounting: 16 slots, a mined keep counts double —
+//     #1589 (Keeps K1) reframed the gate as the STAGE's predictor: at
+//     the cap the crown is not refused, it lands in the collection
+//     with the line; the refusal copy is dead, no silent eviction on
+//     any path, ever;
 //   - run-folder parsing: finalists join their candidates for the
 //     sample index (the still's name) and the anchor word;
 //   - the crown end-to-end: a mined radial/Haeckel-corner finalist
@@ -37,9 +39,10 @@ globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance
 
 const { sanitizeProvenance, isProvenance, isMined, cornerWord, provenanceLabel } = await import('./provenance.mjs');
 const {
-  LOOK_SLOT_BUDGET, HAND_SLOT_COST, MINED_SLOT_COST, SHELF_FULL_COPY,
+  LOOK_SLOT_BUDGET, HAND_SLOT_COST, MINED_SLOT_COST,
   slotCostOf, lookSlotsUsed, crownGate, parseRunFolder,
 } = await import('./candidateTray.mjs');
+const { stageRecords, stageSlotsUsed, ON_SHELF_COPY } = await import('./shelf.mjs');
 const { sanitizeFavorite, KEEPS_KEY } = await import('../state/slices/davisSlice.js');
 const { ledgerRow, isLedgerRow, parseLedger, readLedgerText } = await import('./tasteLedger.js');
 const { ASSETS } = await import('../data/assets/index.js');
@@ -125,19 +128,18 @@ const handRecord = {
   lines.push('ledger door: keeps/passes lines carry provenance; the schema admits it optionally and rejects forgeries');
 }
 
-// ── slot accounting ──────────────────────────────────────────────────
+// ── slot accounting (K1: the gate predicts the STAGE landing) ───────
 {
-  assert.strictEqual(LOOK_SLOT_BUDGET, 16, 'the shelf is 16 looks (spec §5)');
+  assert.strictEqual(LOOK_SLOT_BUDGET, 16, 'the stage is 16 looks (spec §5)');
   assert.strictEqual(slotCostOf(handRecord), HAND_SLOT_COST);
   assert.strictEqual(slotCostOf(minedRecord), MINED_SLOT_COST, 'an unearned (mined) keep counts double');
   assert.strictEqual(lookSlotsUsed([handRecord, handRecord, minedRecord]), 4);
-  assert.strictEqual(crownGate(Array(15).fill(handRecord), handRecord).ok, true, '15 hand + 1 hand = 16 fits');
-  const refused = crownGate(Array(15).fill(handRecord), minedRecord);
-  assert.strictEqual(refused.ok, false, '15 hand + 1 mined (2) = 17 refuses');
-  assert.strictEqual(refused.copy, SHELF_FULL_COPY, 'the refusal speaks the shipped copy');
-  assert.ok(SHELF_FULL_COPY.length > 0);
-  assert.strictEqual(crownGate(Array(14).fill(handRecord), minedRecord).ok, true, '14 + 2 = 16 fits exactly');
-  lines.push('slots: budget 16 · hand 1 · mined 2 · 15+mined refuses with the copy · 14+mined fits exactly');
+  assert.strictEqual(crownGate(Array(15).fill(handRecord), handRecord).ok, true, '15 hand + 1 hand = 16 takes the last stage slot');
+  const toCollection = crownGate(Array(15).fill(handRecord), minedRecord);
+  assert.strictEqual(toCollection.ok, false, '15 hand + 1 mined (2) = 17 does not take a stage slot');
+  assert.ok(!('copy' in toCollection), 'there is no refusal copy anymore — a not-ok gate is a landing prediction, not a refusal');
+  assert.strictEqual(crownGate(Array(14).fill(handRecord), minedRecord).ok, true, '14 + 2 = 16 fits the stage exactly');
+  lines.push('slots: budget 16 · hand 1 · mined 2 · 15+mined predicts the collection (no copy, no refusal) · 14+mined fits exactly');
 }
 
 // ── run-folder parsing ───────────────────────────────────────────────
@@ -161,19 +163,20 @@ const handRecord = {
   lines.push('run parsing: finalists join candidates by record (sample index + anchor ride along); orphans stay honest');
 }
 
-// ── crown end-to-end + RA6 + pass + refusal (the real store) ──────
+// ── crown end-to-end + RA6 + pass + collection landing (the store) ──
 {
   wireEventBus(applyAction);
   const st0 = useStore.getState();
-  const used0 = lookSlotsUsed(st0.keeps);
+  const used0 = stageSlotsUsed(st0.keeps, st0.keepStage);
   const keepsLines0 = parseLedger(readLedgerText('keeps')).rows.length;
 
-  // The component's crown act, verbatim in shape: gate first, then the
-  // dice crown's own door with the candidate's record + provenance.
+  // The component's crown act, verbatim in shape: gate over the STAGE's
+  // records first (it predicts the landing), then the dice crown's own
+  // door with the candidate's record + provenance — ALWAYS. A not-ok
+  // gate no longer stops the write; the crown lands in the collection.
   const crownAttempt = (record) => {
     const s = useStore.getState();
-    const gate = crownGate(s.keeps, record);
-    if (!gate.ok) return gate;
+    const gate = crownGate(stageRecords(s.keeps, s.keepStage), record);
     emit(Events.KEEP_ADD, {
       keep: {
         seed: record.seed, seedOffsets: { ...record.seedOffsets },
@@ -185,10 +188,11 @@ const handRecord = {
   };
 
   const gate = crownAttempt(minedRecord);
-  assert.strictEqual(gate.ok, true, 'the fixture crown fits the shelf');
+  assert.strictEqual(gate.ok, true, 'the fixture crown fits the stage');
   await tick(); await tick();
   let st = useStore.getState();
-  assert.strictEqual(lookSlotsUsed(st.keeps), used0 + MINED_SLOT_COST, 'the mined crown lands on the shelf at double cost');
+  assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), used0 + MINED_SLOT_COST, 'the mined crown takes a stage slot at double cost');
+  assert.ok(st.keepStage.includes(st.keeps[st.keeps.length - 1].id), 'the crowned keep is staged');
   const keep = st.keeps[st.keeps.length - 1];
   assert.deepStrictEqual(keep.provenance, minedRecord.provenance, 'the shelf record carries the provenance');
   const keepRows = parseLedger(readLedgerText('keeps')).rows;
@@ -227,7 +231,7 @@ const handRecord = {
   // Pass: a passes-ledger line WITH provenance; never a keep.
   const passRows0 = parseLedger(readLedgerText('passes')).rows.length;
   const keepsBefore = useStore.getState().keeps.length;
-  const usedBefore = lookSlotsUsed(useStore.getState().keeps);
+  const usedBefore = stageSlotsUsed(useStore.getState().keeps, useStore.getState().keepStage);
   applyAction({
     type: A.ADD_PASS,
     pass: {
@@ -240,28 +244,36 @@ const handRecord = {
   assert.strictEqual(passRows.length, passRows0 + 1, 'the pass wrote exactly one passes line');
   assert.deepStrictEqual(passRows[passRows.length - 1].provenance, minedRecord.provenance, 'the pass line carries provenance (spec Q5: passes are recorded)');
   assert.strictEqual(useStore.getState().keeps.length, keepsBefore, 'a pass adds no keep');
-  assert.strictEqual(lookSlotsUsed(useStore.getState().keeps), usedBefore, 'a pass is never counted as a keep');
-  lines.push('pass: one passes-ledger line with provenance; keeps and slot usage untouched');
+  assert.strictEqual(stageSlotsUsed(useStore.getState().keeps, useStore.getState().keepStage), usedBefore, 'a pass is never counted as a keep');
+  lines.push('pass: one passes-ledger line with provenance; keeps and stage usage untouched');
 
-  // Refusal at the cap writes NOTHING (and evicts nothing).
+  // A full stage refuses NOTHING: the crown lands in the collection,
+  // the line is spoken, the stage is untouched, nothing is evicted.
   st = useStore.getState();
-  while (lookSlotsUsed(st.keeps) < 15) {
+  while (stageSlotsUsed(st.keeps, st.keepStage) < 15) {
     applyAction({ type: A.ADD_KEEP, keep: { ...handRecord, seed: 1000 + st.keeps.length, timestamp: new Date().toISOString() } });
     st = useStore.getState();
   }
-  assert.strictEqual(lookSlotsUsed(st.keeps), 15);
+  assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), 15);
   const oldestId = st.keeps[0].id;
   const keepsCountAtCap = st.keeps.length;
   const ledgerAtCap = parseLedger(readLedgerText('keeps')).rows.length;
-  const refusedGate = crownAttempt(minedRecord);
-  assert.strictEqual(refusedGate.ok, false, 'at 15 slots a mined crown (cost 2) is refused');
-  assert.strictEqual(refusedGate.copy, SHELF_FULL_COPY);
-  await tick();
+  const stageAtCap = [...st.keepStage];
+  const landedGate = crownAttempt(minedRecord);
+  assert.strictEqual(landedGate.ok, false, 'at 15 stage slots a mined crown (cost 2) does not take a stage slot');
+  assert.ok(!('copy' in landedGate), 'the gate carries no refusal copy');
+  await tick(); await tick();
   st = useStore.getState();
-  assert.strictEqual(st.keeps.length, keepsCountAtCap, 'the refusal wrote no keep');
-  assert.strictEqual(st.keeps[0].id, oldestId, 'the refusal evicted nothing — the oldest keep still stands');
-  assert.strictEqual(parseLedger(readLedgerText('keeps')).rows.length, ledgerAtCap, 'the refusal wrote no ledger line');
-  lines.push('refusal: at the cap the gate refuses with the copy — no keep written, no ledger line, no eviction');
+  assert.strictEqual(st.keeps.length, keepsCountAtCap + 1, 'the crown still landed — in the collection');
+  const landedKeep = st.keeps[st.keeps.length - 1];
+  assert.deepStrictEqual(landedKeep.provenance, minedRecord.provenance, 'the collection landing keeps its provenance');
+  assert.ok(!st.keepStage.includes(landedKeep.id), 'the collection landing holds no stage slot');
+  assert.deepStrictEqual(st.keepStage, stageAtCap, 'the stage is untouched by a collection landing');
+  assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), 15, 'stage usage unchanged by the landing');
+  assert.strictEqual(st.keeps[0].id, oldestId, 'nothing was evicted — the oldest keep still stands');
+  assert.strictEqual(st.shelfNotice, ON_SHELF_COPY, 'the landing speaks the line: on the shelf — swap it in');
+  assert.strictEqual(parseLedger(readLedgerText('keeps')).rows.length, ledgerAtCap + 1, 'the landing wrote its keeps-ledger line like any crown');
+  lines.push('collection landing: full stage → the crown lands in the collection with the line, stage untouched, no eviction, ledger written');
 }
 
 // ── the marker contract in the shipped components ────────────────────
@@ -271,7 +283,9 @@ const handRecord = {
   assert.ok(tray.includes('cand-tag'), 'candidate cards carry the MINED tag element');
   assert.ok(tray.includes('Events.KEEP_ADD'), 'the crown rides the dice crown\'s door');
   assert.ok(tray.includes('A.ADD_PASS'), 'the pass rides the X door');
-  assert.ok(tray.includes('crownGate'), 'the crown is gated before any write');
+  assert.ok(tray.includes('crownGate'), 'the crown gate predicts the landing before the write');
+  assert.ok(tray.includes('ON_SHELF_COPY'), 'the tray speaks the shelf line when a crown lands in the collection');
+  assert.ok(!tray.includes('SHELF_FULL'), 'the refusal copy is gone from the tray');
   const hits = readFileSync(new URL('../components/FavoritesTray.jsx', import.meta.url), 'utf8');
   assert.ok(hits.includes('hit-mined') && hits.includes("provenance?.source === 'explorer'"), 'a crowned mined keep\'s hits pill carries the mined mark');
   const panelsCss = readFileSync(new URL('../styles/panels.css', import.meta.url), 'utf8');

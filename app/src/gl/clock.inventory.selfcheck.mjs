@@ -123,7 +123,10 @@ const MUST_LOOP_ALLOW = {
     // shelf — metadata, not a performer clock. morphStart itself is loop ms.
     // #1390 (G1): keptAt is the same metadata class — an epoch-ms keep
     // stamp the cross-day signals read; the performer never reads it.
-    allow: [/new Date\(\)\.toISOString/, /keptAt: new Date\(\)\.getTime\(\)/],
+    // #1589 (Keeps K1): the shelf stamps are the same class again — `at`
+    // feeds lastStagedAt and the shelf-history records (sort/readout
+    // metadata on keeps); no performer path reads them.
+    allow: [/new Date\(\)\.toISOString/, /keptAt: new Date\(\)\.getTime\(\)/, /const at = new Date\(\)\.getTime\(\)/],
     mustContain: [/morphStart: loopClock\.ms/],
   },
   'src/gl/liveLoop.mjs': {
