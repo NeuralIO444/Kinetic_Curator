@@ -111,13 +111,15 @@ ok('importShelf: a missing part leaves that list alone (a refused part never wip
   assert.deepEqual(s.get().keeps.map((f) => f.seed), [3]);
 }));
 
-ok('importShelf caps both lists at 200', () => quiet(() => {
+ok('importShelf caps favorites at 200; keeps land whole (#1589: the collection is uncapped)', () => quiet(() => {
   const s = makeShelf();
   const many = Array.from({ length: 250 }, (_, i) => fav(i + 1));
   const landed = s.get().importShelf({ favorites: many, keeps: many });
-  assert.deepEqual(landed, { favorites: 200, keeps: 200 }, '#1064: the action reports what landed after the cap');
-  assert.equal(s.get().favorites.length, 200);
-  assert.equal(s.get().keeps.length, 200);
+  assert.deepEqual(landed, { favorites: 200, keeps: 250 }, '#1064: the action reports what landed; #1589: no keep is dropped at the old cap');
+  assert.equal(s.get().favorites.length, 200, 'the favorites cap still trims (and speaks — the rider lives in the shelf suite)');
+  assert.equal(s.get().keeps.length, 250, 'every imported keep lands in the collection');
+  assert.ok(Array.isArray(s.get().keepStage) && s.get().keepStage.length > 0, 'the stage re-derives from the imported collection');
+  assert.ok(s.get().keepStage.every((id) => s.get().keeps.some((k) => k.id === id)), 'every staged id names an imported keep');
 }));
 
 // ── #1063: the performer's saved voices ─────────────────────────────────────

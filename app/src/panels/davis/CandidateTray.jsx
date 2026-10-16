@@ -9,7 +9,10 @@
 // shelf + the keeps ledger), carrying the candidate's provenance; pass
 // writes a passes-ledger line with provenance (the X door, ADD_PASS).
 // Nothing becomes a keep without the crown click (nothing-auto-saves
-// law), and the look-slot gate refuses at the cap — it never evicts.
+// law). #1589 (Keeps K1): the crown is never refused — the stage gate
+// only predicts the landing. A crown that fits the stage takes a slot;
+// one that doesn't lands in the collection and the tray speaks the
+// line ("on the shelf — swap it in"). Nothing is evicted, ever.
 //
 // Marker law: a candidate is visibly a candidate everywhere it renders —
 // the MINED tag + provenance line on the card here, and the mined mark
@@ -25,6 +28,7 @@ import { PALETTES } from '../../data/palettes.js';
 import { captureKeepContext } from '../../curator/keepContext.js';
 import { provenanceLabel } from '../../curator/provenance.mjs';
 import { parseRunFolder, crownGate } from '../../curator/candidateTray.mjs';
+import { stageRecords, ON_SHELF_COPY } from '../../curator/shelf.mjs';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
@@ -32,15 +36,16 @@ const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
 const baseName = (f) => (f.webkitRelativePath || f.name).split('/').pop();
 
 export function CandidateTray() {
-  const { state, dispatch } = useApp((s) => ({ keeps: s.keeps, paletteId: s.paletteId }));
+  const { state, dispatch } = useApp((s) => ({ keeps: s.keeps, keepStage: s.keepStage, paletteId: s.paletteId }));
   const keeps = state.keeps || [];
+  const keepStage = state.keepStage || [];
   const paletteId = state.paletteId;
   const fileRef = useRef(null);
   const urlsRef = useRef([]);
   const [run, setRun] = useState(null); // parseRunFolder model
   const [stills, setStills] = useState({}); // stillBase -> object URL
   const [verdicts, setVerdicts] = useState({}); // card key -> 'crowned' | 'passed'
-  const [refusal, setRefusal] = useState(null);
+  const [line, setLine] = useState(null); // the crown landing's line (#1589: a landing, never a refusal)
   const [loadNote, setLoadNote] = useState(null);
 
   useEffect(() => () => { for (const u of urlsRef.current) URL.revokeObjectURL(u); }, []);
@@ -81,7 +86,7 @@ export function CandidateTray() {
     setRun(model);
     setStills(stillMap);
     setVerdicts({});
-    setRefusal(null);
+    setLine(null);
     setLoadNote(finalists.length ? null : 'that run crowned no finalists — its folder holds none');
   };
 
@@ -99,10 +104,12 @@ export function CandidateTray() {
 
   const crown = (card) => {
     if (verdicts[card.key]) return;
-    const gate = crownGate(keeps, card.record);
-    if (!gate.ok) { setRefusal(gate.copy); return; }
-    setRefusal(null);
+    // #1589: the gate reads the STAGE's records and only predicts the
+    // landing — the crown always writes through the dice crown's door,
+    // and the store routes it (stage slot, or collection + this line).
+    const gate = crownGate(stageRecords(keeps, keepStage), card.record);
     emit(Events.KEEP_ADD, { keep: judgedRecord(card) });
+    setLine(gate.ok ? null : ON_SHELF_COPY);
     setVerdicts((v) => ({ ...v, [card.key]: 'crowned' }));
   };
 
@@ -116,7 +123,7 @@ export function CandidateTray() {
   // The DIRECTORS panel's no-scroll fit budget belongs to the performance
   // surface; the tray's body appears once a run is loaded (curation state,
   // reached from the 'load run' control on the GENERATE label row).
-  const hasBody = run || loadNote || refusal;
+  const hasBody = run || loadNote || line;
   return (
     <div className="cand-tray">
       <input
@@ -132,7 +139,7 @@ export function CandidateTray() {
       {hasBody && <div className="cand-body-label">mined — from the explorer</div>}
       {run && <div className="cand-run-line">run {run.runId} · {run.cards.length} mined</div>}
       {loadNote && <div className="cand-note">{loadNote}</div>}
-      {refusal && <div className="cand-refusal" role="alert">{refusal}</div>}
+      {line && <div className="cand-note" role="status">{line}</div>}
       {run && (
         <div className="cand-grid">
           {run.cards.map((card) => {

@@ -19,6 +19,11 @@ import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #112
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 import { appendToLedger } from '../../curator/tasteLedger.js'; // #1173: keep/pass ledgers for the MLX loop
 import { sanitizeProvenance } from '../../curator/provenance.mjs'; // #1507: mined ≠ rolled ≠ hand-built, on the record
+import { // #1589 (Keeps K1): the shelf's tiers — stage membership, crown routing, swaps, migration
+  deriveStageIds, sanitizeStageIds, routeCrown, swapSlots, admitToStage,
+  crownHistoryRecord, swapHistoryRecord, sanitizeHistoryRecord,
+  ON_SHELF_COPY, favoritesTrimCopy,
+} from '../../curator/shelf.mjs';
 import { withLiveRig } from '../audioRig.js'; // the audio setup is the performer's, not the hit's
 
 // #568 — favorites are the set's curation (export-hits reads them), but they
@@ -33,7 +38,22 @@ const FAVORITES_MAX = 200;
  * implies a keep, but a keep is not a favorite. Own kc: key, same record
  * shape as a favorite (seed, offsets, recipe, cast), same trust boundary. */
 export const KEEPS_KEY = 'kc:keeps:v1';
-const KEEPS_MAX = 200;
+/** #1589 (Keeps K1) — the shelf's tiers. `kc:keeps:v1` is now the
+ * COLLECTION: every keep lives there, uncapped (the old KEEPS_MAX=200
+ * tail eviction — slice(-KEEPS_MAX), the oldest keep silently vanishing
+ * and the Queen's anchor silently moving with it — is gone; the
+ * collection's 400 soft bound is an export trigger in K3, never a trim).
+ * The STAGE (16 slots, what the Looks menu shows) is a separate ordered
+ * list of keep ids: membership, not a copy, so a keep's tier is derived
+ * and its record can never fork. Absence of the stage key IS the
+ * migration signal (see readStage). */
+export const STAGE_KEY = 'kc:keeps-stage:v1';
+/** #1589 — K1's shelf-history staging area: flat crown/swap records in
+ * the §5 shape K2's ledger (#1590) will consume. Capped generously;
+ * unlike keeps, a history trim loses no work — the staging facts are
+ * cached on the records themselves (stagedCount / lastStagedAt). */
+export const SHELF_HISTORY_KEY = 'kc:keeps-history:v1';
+const SHELF_HISTORY_MAX = 1000;
 /** #719 — cap on a kept cast (ids, not the full enabled map). */
 export const FAVORITE_CAST_MAX = 256;
 
@@ -135,6 +155,13 @@ export function sanitizeFavorite(raw) {
     // #1140 — session context rides along when present; legacy keeps (no
     // context key) stay without it — never invented.
     ...(context ? { context } : {}),
+    // #1589 (K1) — the shelf's staging facts ride along when real
+    // (stagedCount a positive count, lastStagedAt an epoch stamp). They
+    // are caches of the shelf history, maintained by the crown/swap
+    // paths; absent stays absent — a legacy keep has never been staged
+    // and none is invented for it (spec §2.4/§7).
+    ...(Number.isFinite(raw.stagedCount) && raw.stagedCount >= 1 ? { stagedCount: Math.floor(raw.stagedCount) } : {}),
+    ...(Number.isFinite(raw.lastStagedAt) && raw.lastStagedAt > 0 ? { lastStagedAt: Math.floor(raw.lastStagedAt) } : {}),
     config: {
       ...(layout && typeof layout === 'object' && !Array.isArray(layout)
         ? { layout: normalizeLayoutParams(layout) } : {}),
@@ -165,14 +192,19 @@ function persistFavorites(list) {
   }
 }
 
-/** #996 — keeps persist exactly like favorites (same record shape). */
+/** #996 — keeps persist exactly like favorites (same record shape).
+ * #1589: NO length slice on the way in or out — the collection is not a
+ * cliff. A stored list longer than the old 200 cap (a foreign bundle, a
+ * pre-cap build) loads whole: migration must be lossless on the real
+ * record shapes, and a read-path trim would be the old silent eviction
+ * wearing a new coat. */
 function readKeeps() {
   try {
     const raw = localStorage.getItem(KEEPS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.map(sanitizeFavorite).filter(Boolean).slice(0, KEEPS_MAX)
+      ? parsed.map(sanitizeFavorite).filter(Boolean)
       : [];
   } catch {
     return [];
@@ -185,6 +217,97 @@ function persistKeeps(list) {
   } catch (e) {
     console.warn('[keeps] save failed', e);
   }
+}
+
+function persistStage(ids) {
+  try {
+    localStorage.setItem(STAGE_KEY, JSON.stringify(ids));
+  } catch (e) {
+    console.warn('[keeps] stage save failed', e);
+  }
+}
+
+/**
+ * #1589 — read the stage, migrating on first sight (spec §7: a
+ * sanitize-path version step, idempotent). The stage key's ABSENCE is
+ * the unmigrated state: derive the stage from the collection (the 16
+ * most recently kept the budget admits), persist it, and from then on
+ * the stored list is law — later reads sanitize it against the
+ * collection but never re-derive it. A present-but-empty list is a real
+ * state (an emptied stage), not a migration trigger.
+ */
+function readStage(keeps) {
+  try {
+    const raw = localStorage.getItem(STAGE_KEY);
+    if (raw == null) {
+      const derived = deriveStageIds(keeps);
+      persistStage(derived);
+      return derived;
+    }
+    return sanitizeStageIds(JSON.parse(raw), keeps);
+  } catch {
+    return deriveStageIds(keeps);
+  }
+}
+
+function readShelfHistory() {
+  try {
+    const raw = localStorage.getItem(SHELF_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.map(sanitizeHistoryRecord).filter(Boolean).slice(-SHELF_HISTORY_MAX)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistShelfHistory(list) {
+  try {
+    localStorage.setItem(SHELF_HISTORY_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn('[keeps] shelf history save failed', e);
+  }
+}
+
+/**
+ * #1589 — route one crowned keep into the shelf (spec §4, all crowns):
+ * the stage has room → the keep takes a slot and is stamped with its
+ * first staging; the stage is full → the keep lands in the collection
+ * and the caller speaks ON_SHELF_COPY. The collection append is
+ * unconditional — a crown is never refused and never evicts. Returns
+ * the next { keeps, keepStage, landed } for the caller's set().
+ */
+function crownIntoShelf(state, entry, at) {
+  const route = routeCrown(state.keeps, state.keepStage, entry);
+  const landed = route.lands;
+  const staged = landed === 'stage'
+    ? { ...entry, stagedCount: (entry.stagedCount || 0) + 1, lastStagedAt: at }
+    : entry;
+  return { entry: staged, keeps: [...state.keeps, staged], keepStage: route.stageIds, landed };
+}
+
+/** Append one shelf-history record, capped, persisted. Returns the list. */
+function withShelfHistory(state, record) {
+  const list = [...(state.shelfHistory || []), record].slice(-SHELF_HISTORY_MAX);
+  persistShelfHistory(list);
+  return list;
+}
+
+/**
+ * #1589 (audit S1) — which keep is on the deck? A loaded record names
+ * its keep directly when its id is a keep id; a favorite names its
+ * implied keep twin (addFavorite captures both from the same plate:
+ * same seed, same keptAt/timestamp, different ids). Anything else (a
+ * preset, a scene) resolves to undefined — the pin stays where it was.
+ */
+function performingIdFor(state, rec) {
+  if (!rec || typeof rec !== 'object') return undefined;
+  if (typeof rec.id === 'string' && state.keeps.some((k) => k.id === rec.id)) return rec.id;
+  const match = state.keeps.find((k) => k.seed === rec.seed
+    && (Number.isFinite(rec.keptAt) ? k.keptAt === rec.keptAt : k.timestamp === rec.timestamp));
+  return match ? match.id : undefined;
 }
 
 /**
@@ -202,7 +325,11 @@ function withEvolveStats(state, update) {
   };
 }
 
-export const createDavisSlice = (set) => ({
+export const createDavisSlice = (set) => {
+  // #1589 — boot the shelf once: the collection first, then the stage
+  // read against it (which migrates on first sight; see readStage).
+  const bootKeeps = readKeeps();
+  return {
   evolveMode: false,
   // #616 EVOLVE progress: live run, last finished run, candidates seen this session.
   evolveRun: null,
@@ -217,7 +344,19 @@ export const createDavisSlice = (set) => ({
   // #996 — keeps without the star. A favorite implies a keep (addFavorite
   // appends both); un-favoriting leaves the keep. Session-persisted like
   // favorites; the HITS export carries them for hits_bridge.py bold.
-  keeps: readKeeps(),
+  // #1589 — state.keeps IS the collection (every keep; consumers like
+  // the Queen's centroid read the whole of it, spec §6). keepStage is
+  // the stage's ordered id list; shelfHistory is K1's staging area for
+  // K2's ledger; shelfNotice is the shelf's visible line (Law 1: the
+  // crown landing, the swap refusal, the favorites trim all speak here
+  // and in their own surfaces); performingKeepId is the deck pin (S1),
+  // session-only — what is performing is a live fact, not shelf data.
+  keeps: bootKeeps,
+  keepStage: readStage(bootKeeps),
+  shelfHistory: readShelfHistory(),
+  shelfNotice: null,
+  setShelfNotice: (msg) => set({ shelfNotice: typeof msg === 'string' && msg ? msg : null }),
+  performingKeepId: null,
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
   // phrase first, then fires evolve on the post-phrase state.
@@ -419,18 +558,34 @@ export const createDavisSlice = (set) => ({
   addFavorite: (fav) => set((state) => {
     const entry = sanitizeFavorite({ ...fav, id: genId() });
     if (!entry) return {};
-    const favorites = [...state.favorites, entry].slice(-FAVORITES_MAX);
+    const favNext = [...state.favorites, entry];
+    const favDropped = Math.max(0, favNext.length - FAVORITES_MAX);
+    const favorites = favNext.slice(-FAVORITES_MAX);
     persistFavorites(favorites);
     // #996 — a favorite implies a keep: same plate, its own record. Removing
     // the favorite later leaves this keep in place.
+    // #1589 — the implied keep is a crown like any other: it routes into
+    // the shelf (stage slot or collection + the line), never evicts.
     const keepEntry = sanitizeFavorite({ ...fav, id: genId() });
-    const keeps = keepEntry
-      ? [...state.keeps, keepEntry].slice(-KEEPS_MAX)
-      : state.keeps;
-    persistKeeps(keeps);
-    // #1173 — the keep is a deliberate act: one line in the keeps ledger.
-    if (keepEntry) appendToLedger('keeps', keepEntry, state.projectTitle);
-    return { favorites, keeps };
+    let keeps = state.keeps;
+    let keepStage = state.keepStage;
+    let shelfHistory = state.shelfHistory;
+    let crownLine = null;
+    if (keepEntry) {
+      const at = new Date().getTime();
+      const routed = crownIntoShelf(state, keepEntry, at);
+      keeps = routed.keeps;
+      keepStage = routed.keepStage;
+      shelfHistory = withShelfHistory(state, crownHistoryRecord(keepEntry.id, routed.landed, at));
+      persistKeeps(keeps);
+      persistStage(keepStage);
+      if (routed.landed === 'collection') crownLine = ON_SHELF_COPY;
+      // #1173 — the keep is a deliberate act: one line in the keeps ledger.
+      appendToLedger('keeps', routed.entry, state.projectTitle);
+    }
+    // Audit S2 rider: a favorites-cap trim is no longer silent either.
+    const lines = [favDropped ? favoritesTrimCopy(favDropped) : null, crownLine].filter(Boolean);
+    return { favorites, keeps, keepStage, shelfHistory, ...(lines.length ? { shelfNotice: lines.join(' — ') } : {}) };
   }),
   removeFavorite: (id) => set((state) => {
     const favorites = state.favorites.filter((f) => f.id !== id);
@@ -455,19 +610,73 @@ export const createDavisSlice = (set) => ({
     if (idx < 0) return {};
     const copy = sanitizeFavorite({ ...state.favorites[idx], id: genId() });
     if (!copy) return {};
-    const next = [...state.favorites.slice(0, idx + 1), copy, ...state.favorites.slice(idx + 1)].slice(-FAVORITES_MAX);
+    const grown = [...state.favorites.slice(0, idx + 1), copy, ...state.favorites.slice(idx + 1)];
+    const dropped = Math.max(0, grown.length - FAVORITES_MAX);
+    const next = grown.slice(-FAVORITES_MAX);
     persistFavorites(next);
-    return { favorites: next };
+    // S2 rider: the duplicate's trim speaks too.
+    return { favorites: next, ...(dropped ? { shelfNotice: favoritesTrimCopy(dropped) } : {}) };
   }),
   /** #996 — K keeps the current plate without starring it. Same capture as
-   * a favorite (recipe, seed, offsets, cast); no star, no tray entry. */
+   * a favorite (recipe, seed, offsets, cast); no star, no tray entry.
+   * #1589 — a crown: routes into the shelf (stage slot, or the
+   * collection with the line). Never refused, never evicting. */
   addKeep: (keep) => set((state) => {
     const entry = sanitizeFavorite({ ...keep, id: genId() });
     if (!entry) return {};
-    const keeps = [...state.keeps, entry].slice(-KEEPS_MAX);
+    const at = new Date().getTime();
+    const routed = crownIntoShelf(state, entry, at);
+    const shelfHistory = withShelfHistory(state, crownHistoryRecord(entry.id, routed.landed, at));
+    persistKeeps(routed.keeps);
+    persistStage(routed.keepStage);
+    appendToLedger('keeps', routed.entry, state.projectTitle); // #1173
+    return {
+      keeps: routed.keeps, keepStage: routed.keepStage, shelfHistory,
+      ...(routed.landed === 'collection' ? { shelfNotice: ON_SHELF_COPY } : {}),
+    };
+  }),
+  /**
+   * #1589 — hand-swap: exchange one stage slot for a collection keep
+   * (curator/shelf swapSlots owns the law: position preserved, the
+   * performing Look's slot pinned, the budget a hard invariant). Both
+   * keeps' lastStagedAt update — being chosen against is information
+   * too (§3.6) — but only the incoming keep's stagedCount grows, and
+   * nothing here feeds taste (swaps move membership, not the Queen).
+   * A refusal lands in shelfNotice and changes nothing else.
+   */
+  swapStageSlot: (outId, inId) => set((state) => {
+    const res = swapSlots(state.keeps, state.keepStage, outId, inId, { performingKeepId: state.performingKeepId });
+    if (!res.ok) return { shelfNotice: res.copy };
+    const at = new Date().getTime();
+    const keeps = state.keeps.map((k) => {
+      if (k.id === inId) return { ...k, stagedCount: (k.stagedCount || 0) + 1, lastStagedAt: at };
+      if (k.id === outId) return { ...k, lastStagedAt: at };
+      return k;
+    });
+    const shelfHistory = withShelfHistory(state, swapHistoryRecord(outId, inId, at));
     persistKeeps(keeps);
-    appendToLedger('keeps', entry, state.projectTitle); // #1173
-    return { keeps };
+    persistStage(res.stageIds);
+    return { keeps, keepStage: res.stageIds, shelfHistory, shelfNotice: null };
+  }),
+  /**
+   * #1589 — promote a collection keep into a free stage slot (the shelf
+   * view's "stage it"; a swap with nobody when the budget has room).
+   * Recorded as a swap with an empty out side, the shape K2's ledger
+   * consumes for membership changes that exchange nothing.
+   */
+  stageKeep: (keepId) => set((state) => {
+    const keep = state.keeps.find((k) => k.id === keepId);
+    if (!keep) return {};
+    const res = admitToStage(state.keeps, state.keepStage, keep);
+    if (!res.ok) return { shelfNotice: res.copy };
+    const at = new Date().getTime();
+    const keeps = state.keeps.map((k) => (k.id === keepId
+      ? { ...k, stagedCount: (k.stagedCount || 0) + 1, lastStagedAt: at }
+      : k));
+    const shelfHistory = withShelfHistory(state, swapHistoryRecord(null, keepId, at));
+    persistKeeps(keeps);
+    persistStage(res.stageIds);
+    return { keeps, keepStage: res.stageIds, shelfHistory, shelfNotice: null };
   }),
   /**
    * #1173 — X passes on the current plate: same capture as a keep, one line in
@@ -492,8 +701,13 @@ export const createDavisSlice = (set) => ({
       persistFavorites(out.favorites);
     }
     if (Array.isArray(keeps)) {
-      out.keeps = keeps.map(sanitizeFavorite).filter(Boolean).slice(0, KEEPS_MAX);
+      // #1589 — an imported shelf replaces the collection whole (no cap
+      // slice: the collection is not a cliff) and its stage re-derives
+      // by the migration rule, exactly as a first boot would derive it.
+      out.keeps = keeps.map(sanitizeFavorite).filter(Boolean);
+      out.keepStage = deriveStageIds(out.keeps);
       persistKeeps(out.keeps);
+      persistStage(out.keepStage);
     }
     if (Object.keys(out).length) set(() => out);
     // #1064 — what actually landed, so the result line can be honest about caps.
@@ -512,6 +726,9 @@ export const createDavisSlice = (set) => ({
   }),
   recallFavorite: (fav) => set((state) => ({
     ...keepStackPatch(state, fav),
+    // #1589 (S1) — loading a keep pins it as the performing Look: its
+    // stage slot now refuses swaps until another keep is loaded.
+    ...(performingIdFor(state, fav) ? { performingKeepId: performingIdFor(state, fav) } : {}),
     seed: fav.seed,
     // #305 — a kept recipe replays its stream offsets too.
     seedOffsets: normalizeSeedOffsets(fav.seedOffsets),
@@ -572,7 +789,9 @@ export const createDavisSlice = (set) => ({
       morphPendingSeedOffsets: favOffsets,
       morphPendingPalette: fav.config?.palette.id || null,
     };
-  })(state), ...keepStackPatch(state, fav) })), // the stack's whole-document undo entry wins over the morph's edit one
+  })(state), ...keepStackPatch(state, fav),
+  // #1589 (S1) — a morph lands the keep on the deck too: same pin as recall.
+  ...(performingIdFor(state, fav) ? { performingKeepId: performingIdFor(state, fav) } : {}) })),
 
   // #966 — HITS queue transport actions.
   setQueuePlaying: (on) => set({ queuePlaying: !!on }),
@@ -582,4 +801,5 @@ export const createDavisSlice = (set) => ({
   setQueueSecondsPerHit: (s) => set({ queueSecondsPerHit: sanitizeQueueSeconds(s) }),
   setQueueBeatsPerHit: (b) => set({ queueBeatsPerHit: sanitizeQueueBeats(b) }),
   bumpQueueJump: () => set((state) => ({ queueJumpNonce: state.queueJumpNonce + 1 })),
-});
+  };
+};

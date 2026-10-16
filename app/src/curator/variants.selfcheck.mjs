@@ -291,15 +291,16 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
   const { applyAction } = await import('../state/applyAction.js');
   const { emit, Events } = await import('../composition/eventBus.js');
   const { captureKeepContext } = await import('./keepContext.js');
-  const { crownGate, lookSlotsUsed, MINED_SLOT_COST } = await import('./candidateTray.mjs');
+  const { crownGate, MINED_SLOT_COST } = await import('./candidateTray.mjs');
+  const { stageRecords, stageSlotsUsed } = await import('./shelf.mjs');
   wireEventBus(applyAction);
   const run = runMiner({ ...SMOKE, batchSize: 24 });
   const vf = run.finalists.find((f) => f.sample.cast.some((id) => V.isVariantId(id)));
   assert.ok(vf, 'a variant finalist to crown');
   const rec = vf.record;
-  const used0 = lookSlotsUsed(useStore.getState().keeps);
-  const gate = crownGate(useStore.getState().keeps, rec);
-  assert.strictEqual(gate.ok, true, 'the variant crown fits the shelf');
+  const used0 = stageSlotsUsed(useStore.getState().keeps, useStore.getState().keepStage);
+  const gate = crownGate(stageRecords(useStore.getState().keeps, useStore.getState().keepStage), rec);
+  assert.strictEqual(gate.ok, true, 'the variant crown fits the stage');
   emit(Events.KEEP_ADD, {
     keep: {
       seed: rec.seed, seedOffsets: { ...rec.seedOffsets },
@@ -309,7 +310,7 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
   });
   await tick(); await tick();
   const st = useStore.getState();
-  assert.strictEqual(lookSlotsUsed(st.keeps), used0 + MINED_SLOT_COST, 'the variant crown lands at mined cost');
+  assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), used0 + MINED_SLOT_COST, 'the variant crown takes a stage slot at mined cost');
   const keep = st.keeps[st.keeps.length - 1];
   assert.deepStrictEqual(keep.provenance, rec.provenance, 'the shelf keep carries the recipes (E3 door, E5 payload)');
   assert.doesNotThrow(() => st.recallFavorite(keep), 'recalling a variant keep does not throw at the store level');

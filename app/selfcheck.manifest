@@ -299,6 +299,7 @@ node src/curator/coverage.selfcheck.mjs
 node src/curator/census.selfcheck.mjs
 node src/curator/miner.selfcheck.mjs
 node src/curator/candidateTray.selfcheck.mjs
+node src/curator/shelf.selfcheck.mjs
 node src/curator/censusReadout.selfcheck.mjs
 node src/curator/treeReader.selfcheck.mjs
 node src/curator/loisJudge.selfcheck.mjs
