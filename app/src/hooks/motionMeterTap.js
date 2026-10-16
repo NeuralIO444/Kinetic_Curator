@@ -4,9 +4,29 @@
 // levels here once per frame; panels/stimulus/MotionMeter.jsx reads them straight from its own
 // rAF. Keeping the levels out of the React store means the readout never re-renders the app
 // 60x a second. null = nothing has published yet (the strip reads flat, never missing).
+//
+// One level does not come from the resolver: LIFE is the GL loop's own breath (|breathScale − 1|
+// over its span), applied to the frame after the resolve, so the loop is its only honest source.
+// The loop notes its finished reading here once per built frame (noteLifeBreath — its sole
+// writer); the publisher folds the note into the levels it republishes.
 let tap = null;
 
-/** @param {{drift: number, breath: number, wind: number, rhythmPhase: number, rhythmType: string|null, wobble: number, mothBeat: number|null}|null} next */
+/** The life breath's span: |breathScale − 1| at this reads full (the loop's lifeDrift 1 swings about 0.012; the audio breath adds). */
+export const LIFE_FULL = 0.06;
+
+let lifeNote = 0;
+
+/** The GL loop notes the frame's LIFE reading (0..1; 0 while the governor has motion frozen). Sole writer: the loop. */
+export function noteLifeBreath(v) {
+  lifeNote = Number.isFinite(v) ? (v < 0 ? 0 : v > 1 ? 1 : v) : 0;
+}
+
+/** The latest noted LIFE reading, 0 until the loop's first built frame. */
+export function getLifeBreath() {
+  return lifeNote;
+}
+
+/** @param {{life: number, drift: number, breath: number, pulse: number, wind: number, rhythmPhase: number, rhythmType: string|null, wobble: number, palette: number, mothBeat: number|null}|null} next */
 export function setMotionMeterTap(next) {
   tap = next;
 }
