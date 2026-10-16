@@ -89,6 +89,26 @@ function centroidOf(kept) {
 }
 
 /**
+ * The anchor a pick-time consumer leans on, hosted here like everything
+ * the pull touches (never a surface): the kept-taste centroid over the
+ * pull's keeps (pullKeeps — pattern-layer keeps do not teach it), with
+ * its state said plainly: 'identity' when too few keeps count to lean
+ * (below MIN_KEEPS — no tilt exists), 'none' when no counted keep
+ * carries a layout, else 'live' with the centroid. Keeps K2's fill
+ * (#1590) reads its consensus tilt through this door.
+ */
+export function keptAnchor(keeps) {
+  try {
+    const kept = pullKeeps(keeps);
+    if (kept.length < MIN_KEEPS) return { state: 'identity', centroid: null };
+    const centroid = centroidOf(kept);
+    return centroid ? { state: 'live', centroid } : { state: 'none', centroid: null };
+  } catch {
+    return { state: 'identity', centroid: null };
+  }
+}
+
+/**
  * M1 (rank bias): the chooser handed to rankLois, or null. Null is the answer whenever the pull is closed, the room
  * allows none, fewer than MIN_KEEPS keeps count, or there is nothing to lean toward: rankLois(candidates, null) IS
  * today's argmax. `open` defaults to the gate; a selfcheck passes true to exercise the open path (no live override).

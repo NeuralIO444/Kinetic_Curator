@@ -119,6 +119,65 @@ export function judgeRender({ features, stats, fingerprint, fontContingent = fal
  * timestamp: no artist pressed a key for this line, and none is
  * invented (absent stays absent).
  */
+/**
+ * Keeps K2 (#1590): the stored-verdict form of a gate decision — the
+ * shape a keep record may carry (`gateVerdict`) so the Kinetic fill's
+ * Lois gate can run on verdicts recorded at bake time (the E4
+ * ledger's discipline) without re-baking at fill time. Untrusted
+ * input is bounded hard: anything that is not plainly a lois-render
+ * verdict drops to null (no verdict — the candidate is unjudged, not
+ * failed). The fingerprint binds the verdict to the still it judged.
+ */
+export function sanitizeGateVerdict(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (raw.judge !== 'lois-render') return null;
+  if (raw.verdict !== 'keep' && raw.verdict !== 'pass') return null;
+  const num = (v) => (Number.isFinite(v) ? round(v) : null);
+  const sp = (raw.statsProvenance && typeof raw.statsProvenance === 'object') ? raw.statsProvenance : {};
+  const checks = Array.isArray(raw.checks)
+    ? raw.checks.slice(0, 8).map((c) => (c && typeof c === 'object' ? {
+      key: typeof c.key === 'string' ? c.key.slice(0, 24) : '',
+      measured: num(c.measured),
+      ok: c.ok === true,
+    } : null)).filter((c) => c && c.key)
+    : [];
+  return {
+    judge: 'lois-render',
+    version: 1,
+    verdict: raw.verdict,
+    checks,
+    statsProvenance: {
+      fingerprint: typeof sp.fingerprint === 'string' ? sp.fingerprint.slice(0, 80) : null,
+      inkCoverage: num(sp.inkCoverage),
+      inkCoverageWithFonts: num(sp.inkCoverageWithFonts),
+      judgedInk: sp.judgedInk === 'with-fonts' ? 'with-fonts' : 'font-less',
+      luminanceMean: num(sp.luminanceMean),
+      luminanceSpread: num(sp.luminanceSpread),
+    },
+  };
+}
+
+/**
+ * How comfortably a 'keep' verdict passed — the smallest headroom
+ * across the gates whose measurements the stored provenance carries
+ * (presence / contrast / exposure; the promise gate shares the
+ * presence measurement). Lois's-choice slots in the fill rank by
+ * this. Null when there is no passing verdict or no usable
+ * measurement: unjudged is not a margin of zero, it is no margin.
+ */
+export function gateMargin(verdict) {
+  const v = sanitizeGateVerdict(verdict);
+  if (!v || v.verdict !== 'keep') return null;
+  const sp = v.statsProvenance;
+  const ink = sp.judgedInk === 'with-fonts' ? sp.inkCoverageWithFonts : sp.inkCoverage;
+  const slacks = [];
+  if (Number.isFinite(ink)) slacks.push(ink - INK_MIN, INK_MAX - ink);
+  if (Number.isFinite(sp.luminanceSpread)) slacks.push(sp.luminanceSpread - CONTRAST_MIN);
+  if (Number.isFinite(sp.luminanceMean)) slacks.push(sp.luminanceMean - MEAN_MIN, MEAN_MAX - sp.luminanceMean);
+  if (!slacks.length) return null;
+  return round(Math.min(...slacks));
+}
+
 export function loisVerdictRow(runId, finalist) {
   const rec = finalist?.record || {};
   const v = finalist?.loisVerdict || null;

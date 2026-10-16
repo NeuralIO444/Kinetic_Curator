@@ -18,11 +18,13 @@
 // Pure: no store, no DOM, no clock. Callers pass `at` (epoch ms) in; the
 // store reads its clock the davisSlice way (new Date().getTime()).
 //
-// K1 scope: tiers + migration + crown routing + hand-swap. fill() is K2
-// (#1590), export()/disk is K3 (#1591), census readouts are K4 (#1592) —
-// they are deliberately absent here, not stubbed.
+// K1 scope: tiers + migration + crown routing + hand-swap. K2 (#1590)
+// adds fill() (curator/shelfFill.mjs) + the fill history record below;
+// export()/disk is K3 (#1591), census readouts are K4 (#1592) — still
+// deliberately absent, not stubbed.
 import { LOOK_SLOT_BUDGET, slotCostOf, lookSlotsUsed } from './candidateTray.mjs';
 import { provenanceLabel } from './provenance.mjs';
+import { dealFill } from './shelfFill.mjs';
 
 /** The stage budget, in slot costs (hand 1 · mined 2 — the E3 accounting,
  * folded into the stage per the ruling note: scarcity lives on the stage). */
@@ -201,6 +203,20 @@ export function swapSlots(keeps, stageIds, outId, inId, { performingKeepId = nul
 export const crownHistoryRecord = (keepId, tier, at) => ({ kind: 'crown', keepId, tier, at });
 export const swapHistoryRecord = (outId, inId, at) => ({ kind: 'swap', outId, inId, at });
 
+/** The slot rules a fill record may name (K2; 'pinned' is the S1 pin). */
+export const FILL_RULES = ['consensus', 'neglected', 'wild', 'lois', 'contrarian', 'pinned'];
+
+/**
+ * The K2 fill record (§5): the seed + the table in force + which rule
+ * dealt each slot — enough to replay the fill bit-exactly from the
+ * same ledger state, and enough for the dev panel to show the deal.
+ * `table` is the receipt's label (e.g. 'preferences.json · FULL
+ * WEIRD'); `notes` carries the receipt's named degradations.
+ */
+export const fillHistoryRecord = ({ seed, table, slots, undealt = [], notes = [], at }) => ({
+  kind: 'fill', seed, table, slots, undealt, notes, at,
+});
+
 /** Sanitize one stored history record; junk drops whole, never repairs. */
 export function sanitizeHistoryRecord(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -211,6 +227,27 @@ export function sanitizeHistoryRecord(raw) {
   }
   if (raw.kind === 'swap' && id(raw.inId) && (raw.outId === null || id(raw.outId))) {
     return { kind: 'swap', outId: raw.outId === null ? null : id(raw.outId), inId: id(raw.inId), at };
+  }
+  if (raw.kind === 'fill' && Number.isFinite(raw.seed) && Array.isArray(raw.slots)) {
+    const slots = raw.slots.slice(0, LOOK_SLOT_BUDGET).map((s) => (
+      s && typeof s === 'object' && id(s.keepId) && FILL_RULES.includes(s.rule)
+        ? { keepId: id(s.keepId), rule: s.rule }
+        : null
+    ));
+    if (slots.some((s) => s === null)) return null; // a torn receipt drops whole
+    return {
+      kind: 'fill',
+      seed: Math.floor(raw.seed),
+      table: typeof raw.table === 'string' ? raw.table.slice(0, 60) : '',
+      slots,
+      undealt: Array.isArray(raw.undealt)
+        ? [...new Set(raw.undealt.filter((r) => FILL_RULES.includes(r) && r !== 'pinned'))].slice(0, 5)
+        : [],
+      notes: Array.isArray(raw.notes)
+        ? raw.notes.filter((n) => typeof n === 'string').slice(0, 8).map((n) => n.slice(0, 160))
+        : [],
+      at,
+    };
   }
   return null;
 }
@@ -298,4 +335,9 @@ export const shelf = {
   stageFits,
   routeCrown,
   swap: swapSlots,
+  // K2 (#1590): the Kinetic fill — the pure deal (curator/shelfFill.mjs);
+  // the store's fillStage action owns the write (stamps, history, undo).
+  fill: (args) => dealFill(args),
+  // §5's ledger read: the sanitized history, oldest first, as stored.
+  history: (history) => [...(history || [])],
 };
