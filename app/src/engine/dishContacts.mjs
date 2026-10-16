@@ -24,7 +24,10 @@
 // #1413 (C1) adds the medium itself to the pair: enrolment carries each
 // stratum's WETNESS, the pair's is averaged like its restitution, and the
 // resolved curves (dishMedium.mjs) bias the bounce and add cling across
-// the seam — a dry pair is the A1 numbers bit for bit.
+// the seam — a dry pair is the A1 numbers bit for bit. #1595 (D1)
+// completes the medium across the seam: the same resolved curves add
+// friction, the tangential half of the impulse, budgeted by the normal
+// impulse the pair exchanged this step.
 //
 // Determinism (spec §7): pair-visit order is canonical — stratum order
 // (the arming order), then particle index — via the same counting-sort
@@ -45,7 +48,7 @@ import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across 
 import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
 import { ensureEntryTrails } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
 import { ensureEcologyEntry, removeEcologyEntry } from './dishEcology.mjs'; // #1416 — the ecology ledger's enrolment (the law lives in the module)
-import { clampWetness, dishMediumFor, mediumClingCapture } from './dishMedium.mjs'; // #1413 — the medium across the seam
+import { clampWetness, dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX } from './dishMedium.mjs'; // #1413 — the medium across the seam; #1595 (D1) — its friction
 
 const TAU = Math.PI * 2;
 
@@ -397,6 +400,7 @@ export function runDishContacts(session, callerSys) {
           // stratum contributes 0, so any pair touching one is inelastic
           // in proportion).
           let dvA = 0; let dvB = 0; // #1410 — per-body normal Δv, for the feed
+          let jnTotal = 0; // #1595 (D1) — the normal impulse this pair exchanges this step; friction's budget
           // #1413 — the pair's medium: wetness averaged across the seam
           // (the restitution precedent above), resolved through the one
           // law (dishMedium.mjs). A dry pair resolves no medium at all:
@@ -414,6 +418,7 @@ export function runDishContacts(session, callerSys) {
               sysB.vx[ib] += nx * jimp * w2;
               sysB.vy[ib] += ny * jimp * w2;
               dvA = jimp * w1; dvB = jimp * w2;
+              jnTotal = Math.abs(jimp);
             }
           }
           // #1413 — cling across the seam: the same capture law as the
@@ -432,6 +437,31 @@ export function runDishContacts(session, callerSys) {
                 sysB.vx[ib] += nx * jc * w2;
                 sysB.vy[ib] += ny * jc * w2;
                 dvA += Math.abs(jc) * w1; dvB += Math.abs(jc) * w2;
+                jnTotal += Math.abs(jc);
+              }
+            }
+          }
+          // #1595 (D1) — friction across the seam: the tangential
+          // half of the impulse (law in dishMedium.mjs). The pair's
+          // μ comes from the pair's medium; the budget is the normal
+          // impulse exchanged above, so a dry pair (pairMed null,
+          // fricK 0) never enters and a light touch barely grips.
+          // jt stays a named value in this scope — D2 (spin)
+          // consumes it as torque without recomputing the contact.
+          // The #1410 feed below still reads normal Δv only: whether
+          // tangential drag should shear the dent is a feel question
+          // for after D1 plays.
+          if (pairMed && pairMed.fricK > 0) {
+            const mu = FRIC_MAX * pairMed.fricK;
+            const tx = -ny, ty = nx;
+            const vt = (sysB.vx[ib] - sysA.vx[ia]) * tx + (sysB.vy[ib] - sysA.vy[ia]) * ty;
+            if (vt !== 0) {
+              const jt = mediumFrictionImpulse(mu, jnTotal, vt, wSum);
+              if (jt !== 0) {
+                sysA.vx[ia] -= tx * jt * w1;
+                sysA.vy[ia] -= ty * jt * w1;
+                sysB.vx[ib] += tx * jt * w2;
+                sysB.vy[ib] += ty * jt * w2;
               }
             }
           }

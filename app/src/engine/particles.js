@@ -31,7 +31,7 @@ import { runDishContacts, contactBodyRadius } from './dishContacts.mjs'; // #140
 import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mjs'; // #1410 — impact deform (call sites below; the law lives in the module)
 import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
-import { dishMediumFor, mediumClingCapture, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module)
+import { dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module); #1595 (D1) — its friction
 import { dishThermalFor, crowdingRepelGain, COLD_THERMAL } from './dishThermal.mjs'; // #1538 — petri §4's missing rows: TEMPO as thermal jitter, DENSITY as crowding pressure on the repel gain (call sites below; the law lives in the module)
 import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
 import { dishTrailsFor, sampleTrailReadGradient, NO_TRAILS, TRAIL_GAIN } from './dishTrails.mjs'; // #1415 — trails: the stigmergy substrate (call sites below; the law lives in the module)
@@ -715,6 +715,10 @@ export class ParticleSystem {
             // #1410 — per-body normal Δv this resolution hands out, for
             // the deform feed below (impulse magnitude, not direction).
             let dvI = 0; let dvJ = 0;
+            // #1595 (D1) — the normal impulse this pair exchanges this
+            // step (bounce + cling; repel is personal space, not contact
+            // load, and stays out): friction's Coulomb budget.
+            let jnTotal = 0;
             // 2 — bounce / stick impulse on approach.
             if (vn < 0 && canImpulse) {
               const jimp = (-(1 + e) * vn) / wSum;
@@ -723,6 +727,7 @@ export class ParticleSystem {
               VX[j] += nx * jimp * w2;
               VY[j] += ny * jimp * w2;
               dvI += jimp * w1; dvJ += jimp * w2;
+              jnTotal = Math.abs(jimp);
             }
             // 3 — repel: same-layer personal space, extra separating
             // velocity scaled by overlap fraction. Independent of approach:
@@ -755,6 +760,36 @@ export class ParticleSystem {
                   VX[j] += nx * jc * w2;
                   VY[j] += ny * jc * w2;
                   dvI += Math.abs(jc) * w1; dvJ += Math.abs(jc) * w2;
+                  jnTotal += Math.abs(jc);
+                }
+              }
+            }
+            // #1595 (D1) — friction: the tangential half of the
+            // impulse (law in dishMedium.mjs), the mirror of the
+            // cross-strata block in dishContacts.mjs — same-kind
+            // collisions are most of the dish, and friction that
+            // existed only across strata would be a lie you can feel.
+            // Read on the post-impulse, post-repel, post-cling
+            // velocities, for every mode, exactly as cling reads
+            // them: the medium biases, the mode decides, and the
+            // events below still key on the approach velocity, which
+            // friction never touches. jt stays a named value in this
+            // scope — D2 (spin) consumes it as torque. The #1410
+            // feed below still reads normal Δv only (dvI/dvJ are not
+            // touched): whether tangential drag should shear the
+            // dent is a feel question for after D1 plays. Dry
+            // (fricK 0) skips the block entirely.
+            if (med.fricK > 0) {
+              const mu = FRIC_MAX * med.fricK;
+              const tx = -ny, ty = nx;
+              const vt = (VX[j] - VX[i]) * tx + (VY[j] - VY[i]) * ty;
+              if (vt !== 0) {
+                const jt = mediumFrictionImpulse(mu, jnTotal, vt, wSum);
+                if (jt !== 0) {
+                  VX[i] -= tx * jt * w1;
+                  VY[i] -= ty * jt * w1;
+                  VX[j] += tx * jt * w2;
+                  VY[j] += ty * jt * w2;
                 }
               }
             }
