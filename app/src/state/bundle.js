@@ -113,7 +113,7 @@ export const BUNDLE_STORAGE_KEYS = Object.freeze({
   userPalettes: ["kc:user-palettes:v1"],
   userVoices: ["kc:user-voices:v1"],
   favorites: ["kc:favorites:v1"],
-  keeps: ["kc:keeps:v1"],
+  keeps: ["kc:keeps:v1", "kc:keeps-stage:v1"], // #1589: the collection + its stage membership — a restored shelf keeps its stage
   taste: ["kc:taste:v1"],
   biology: ["kc:biology:v1"],
   canvasPresets: ["kc:canvas-presets"],
@@ -140,6 +140,8 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1173 training labels, append-only: saved on their own as passes.jsonl (Pipeline ↓ LEDGERS); a restored bundle must never rewrite that history",
   "kc:dice-crowns:v1":
     "dice affinity index; the crowns themselves persist in the keeps ledger",
+  "kc:keeps-history:v1":
+    "#1589 K1's shelf-history staging area (crown/swap records) — a working cache whose facts are also stamped on the keep records themselves; the durable shelf ledger lands in K2 (#1590) and takes its own bundle decision then",
   "kc:worker": "developer flag for the render worker",
   "kc:pipeline:backup":
     "autosave plumbing: the previous copy of the project the bundle already carries",

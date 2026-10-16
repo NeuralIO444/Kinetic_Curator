@@ -1323,6 +1323,39 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .cand-run-line { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; margin-top: 2px; }
 .cand-note { font-size: 9px; color: var(--dim); margin-top: 4px; }
 .cand-refusal { font-size: 10px; color: var(--kc-red); margin-top: 4px; }
+/* #1589 — the keeps shelf (ShelfView, in the ASSETS drawer): the stage
+   strip over the collection rows. TE throughout — membership is discrete
+   and countable; the only colour is the deck mark (structure red) and
+   the aimed slot (amber = the artist's hand, per DS colour discipline). */
+.shelf { border-top: 1px solid var(--line-2); margin-top: 8px; padding: 6px 10px 8px; }
+.shelf-head { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
+.shelf-title { font-size: 10px; letter-spacing: 0.14em; color: var(--ink); }
+.shelf-counts { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; }
+.shelf-caret { margin-left: auto; font-size: 9px; color: var(--dim); }
+.shelf-stage { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.shelf-slot { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line-2); background: var(--panel-2); padding: 2px 6px; font-size: 9px; color: var(--ink); cursor: pointer; }
+.shelf-slot.aimed { border-color: var(--kc-amber, #e8a33d); }
+.shelf-slot.on-deck { border-left: 2px solid var(--kc-red); }
+.shelf-slot-n { color: var(--dim); }
+.shelf-mined { color: var(--kc-davis); letter-spacing: 0.06em; }
+.shelf-deck { color: var(--kc-red); letter-spacing: 0.06em; }
+.shelf-controls { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.shelf-controls .prompt { color: var(--dim); font-size: 10px; }
+.shelf-controls input { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink); font-size: 10px; padding: 3px 6px; }
+.shelf-sorts { display: inline-flex; gap: 3px; }
+.shelf-sort { background: none; border: 1px solid var(--line-2); color: var(--dim); font-size: 9px; padding: 2px 5px; cursor: pointer; }
+.shelf-sort.active { color: var(--ink); border-color: var(--dim); }
+.shelf-aim, .shelf-line { display: flex; align-items: center; gap: 8px; font-size: 9px; color: var(--dim); margin-top: 6px; }
+.shelf-line { color: var(--ink); }
+.shelf-rows { margin-top: 6px; }
+.shelf-row { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-top: 1px solid var(--line-2); font-size: 10px; }
+.shelf-row.is-stage { opacity: 0.65; }
+.shelf-row-label { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+.shelf-row-meta { color: var(--dim); font-size: 9px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shelf-row-actions { display: inline-flex; gap: 3px; align-items: center; }
+.shelf-onstage { font-size: 9px; color: var(--dim); letter-spacing: 0.06em; }
+.shelf-empty { font-size: 9px; color: var(--dim); padding: 4px 0; }
+.shelf-foot { font-size: 8px; color: var(--dim); letter-spacing: 0.04em; margin-top: 6px; }
 .cand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
 .cand-card { border: 1px solid var(--line-2); border-left: 2px solid var(--kc-davis); background: var(--panel-2); padding: 4px; }
 .cand-card.is-crowned { opacity: 0.75; }

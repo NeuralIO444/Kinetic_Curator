@@ -4,6 +4,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { attachPointsFor } from '../engine/autoAttach.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
+import { ShelfView } from './ShelfView.jsx'; // #1589: the keeps shelf lives in this drawer
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
 
@@ -221,6 +222,8 @@ export function AssetPoolPanel() {
           })}
         </div>
       </div>
+      {/* #1589 — the keeps shelf: stage + collection, explorable (spec §2.2) */}
+      <ShelfView />
       {Studio && (
         <Studio
           seedSvg={studioSeed?.svg || ''}
