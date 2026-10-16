@@ -120,3 +120,85 @@ During verification I accidentally ran `git stash` once in this worktree. I popp
 immediately in the same minute: the tree was restored in full (diff stat and a re-run of
 the new suite confirmed identical state) and the stash stack was left empty. Recorded
 here because the house rule exists and the record should be honest.
+
+---
+
+## Amendment — the two strips merge (Matt's ruling, 2026-10-15)
+
+Matt ruled on the open question above: **merge** — the new MotionMeter absorbs the #1485
+strip's unique reads and the old strip retires. Built on the commits above, same worktree.
+
+### Each folded value's traced source
+
+- **PULSE** — the kineme ctx's `amounts.pulse`: `patternAmounts`' output for the first
+  alive layer, the exact object `buildPlacements` consumed (post-pattern, post-beat-drive,
+  post-shed). The publisher reads it off the ctx it already republishes; the selfcheck
+  proves provenance twice (identity with `amounts.pulse` on a DRIFT frame; a THUMP frame
+  at beatDrive 1 raises the ctx pulse from 0 and the tap carries that same number).
+- **PALETTE** — the same ctx's `amounts.paletteBreath`, normalised by the retired strip's
+  display span (full at 0.5, kept so the bar reads as it always has). `livingMotion`
+  already zeroes it under reduced motion at the source (DS rule 7) — no reader-side gate
+  needed, and none was added.
+- **LIFE** — the one read the resolver cannot supply, and it is **not** recomputed: the
+  breath scale is the GL loop's own (`breathScaleSmoothed` — the layered life LFO plus the
+  audio routes' breath, critically damped), applied to the frame *after* the resolve as a
+  viewport transform, so it exists nowhere in the resolver's world. The loop therefore
+  notes its finished reading — `|breathScale − 1| / LIFE_FULL`, honest zero while frozen
+  or paused, at the exact site where it used to publish the old tap — into
+  `hooks/motionMeterTap.js` (`noteLifeBreath`, the loop its sole writer; `LIFE_FULL` moved
+  there from the retired readout). `composition/motionLive.js` folds the note into the
+  levels verbatim (`getLifeBreath()`). No data invented, no parallel LFO: the strip shows
+  the breath the frame was actually scaled by, with the same one-frame exposure the old
+  strip had (a rolled-back tick's note is overwritten by the next built frame).
+
+### Disposition of the old strip, its tap, its readout, its suite
+
+- `panels/stimulus/MotionStrip.jsx` — **deleted**; its import and render removed from
+  `StimulusPanel.jsx`. STIMULI now has one motion readout.
+- `gl/motionTap.mjs` — **retired with it**. Its only consumers were the strip, the loop's
+  publish call, and its own suite (verified by grep across src; `state/rollScope.mjs`'s
+  `MOTION_KEYS` is an unrelated namesake and untouched).
+- `gl/motionReadout.mjs` — **retired**. The loop was its only caller; six of its seven
+  readings duplicated what the merged publisher now takes from the resolver's ctx, and the
+  seventh (LIFE) rides the note above.
+- `gl/motionReadout.selfcheck.mjs` — **retired with its subjects**; its manifest line is
+  removed. Its honest-when-frozen and read-only assertions live on in the merged suite's
+  chain and scan blocks, against the surviving code.
+- CSS (`styles/panels.css`) — the old strip's rules (`.stim-motion`, `-bars`, `-col`,
+  `-track`, `-fill`, its reduced-motion rule) removed with their only consumer; the shared
+  `.stim-motion-head` / `.stim-motion-label` stay, and `.stim-motion-hint` stays — the
+  spectrum strips use it (caught by grep before the edit, not after a visual bug). The
+  merged strip's grid goes 6 → 9 columns.
+- `gl/spectrumLive.mjs` — one comment updated: its holder analogy now names motionMeterTap.
+- **A pre-existing red, repaired:** `gl/spectrumLive.selfcheck.mjs` had been failing since
+  the original staging build — its wiring scan asserted SpectrumStrip sits within 120
+  chars of MeterHero ("directly under the METER"), which the MotionMeter's beside-the-METER
+  placement broke; the suite simply wasn't in the original neighbour list. The scan now
+  asserts the true order (MeterHero → MotionMeter → SpectrumStrip). Noted here because it
+  was red before this amendment touched anything; it is green now.
+
+### The merged strip
+
+Nine bars, in order: **LIFE · DRIFT · BREATH · PULSE · WIND · RHYTHM · WOBBLE · PALETTE ·
+MOTH** — LIFE leads (the loop's global breath, as it led the old strip), the kineme amounts
+follow in their established relative order, PALETTE sits with WOBBLE among the floor's
+non-pattern channels, MOTH stays last and conditional (absent, not zeroed). Short names
+only, still read-only, still no numbers; the read-only source scan now covers the merged
+component and asserts the panel no longer renders MotionStrip.
+
+### Suites run for the amendment (own exit codes)
+
+- `hooks/motionMeterTap.selfcheck.mjs` — **8/8** (was 7): the chain block now asserts
+  PULSE/PALETTE provenance and the frozen-frame deep-equal over all ten fields; a new LIFE
+  block covers the note's round-trip through the publisher, clamping, junk, and a source
+  scan of the loop's note call.
+- Neighbours, all green: `gl/livingMotion` · `gl/resolveTap` · `engine/creature` ·
+  `gl/liveResolve` · `gl/liveResolve.determinism` · `curator/dishPressure` ·
+  `curator/formation` · `composition/audioBus` 3/3 · `composition/clockBus` 6/6 ·
+  `gl/resolve` · `gl/performanceCreatures` · `gl/spectrumMarks` · `panels/loisLines` 8/8 ·
+  `gl/spectrumLive` 6/6 (after the repair above).
+- `npm run build`: **green**. ESLint on all touched files: **0 errors, 0 warnings** (the 3
+  pre-existing App.jsx warnings from the original report are untouched — App.jsx is not
+  part of this amendment).
+- The full manifest sweep was not run, per the original build's reasoning; every suite
+  whose file or scanned surface this amendment touches is in the list above.
