@@ -224,7 +224,17 @@
 .lois-pill[data-tone="ink"] { color: #6b655c; }
 .lois-pill[data-tone="cream"] { color: #F2EAD8; }
 .lois-pill[data-tone="mustard"] { color: #D9A441; }
-.lois-face { flex: 0 0 78px; width: 78px; text-align: center; overflow: hidden; }
+/* #1588 — the verdict line's ticker, in the place the kaomoji face held: the chip's left segment.
+   The run travels left to right (endpoints arrive as --tk-from / --tk-to from loisTicker.mjs) only in
+   scroll mode; static mode sits still and ellipsizes. Reduced motion settles it twice over — the
+   component decides static, and this media query refuses the animation regardless. */
+.lois-ticker { position: relative; flex: 1 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; overflow: hidden; }
+.lois-ticker-run { display: block; white-space: nowrap; }
+.lois-ticker[data-mode="static"] .lois-ticker-run { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.lois-ticker[data-mode="scroll"] .lois-ticker-run { animation-name: lois-ticker-run; animation-timing-function: linear; animation-iteration-count: infinite; }
+.lois-ticker-measure { position: absolute; left: 0; top: 0; visibility: hidden; white-space: nowrap; pointer-events: none; }
+@keyframes lois-ticker-run { from { transform: translateX(var(--tk-from, 0px)); } to { transform: translateX(var(--tk-to, 0px)); } }
+@media (prefers-reduced-motion: reduce) { .lois-ticker-run { animation: none !important; } }
 .lois-word { flex: 0 0 32px; }
 .lois-dot { flex: 0 0 8px; text-align: center; }
 .lois-code { flex: 0 0 36px; }
