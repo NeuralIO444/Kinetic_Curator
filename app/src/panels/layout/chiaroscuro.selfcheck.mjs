@@ -19,6 +19,9 @@
 //     hugs its groups (no forced width/height); shelfAnchor now
 //     supplies only the placement and the bound (wrap rect minus the
 //     16px inset), past whose height cap the body scrolls internally
+//   · 2026-10-16 amendment 3: inside the editor the map keeps its
+//     one-line form — the matrices' auto-fill grid must not reflow
+//     into columns under the panel's max-content width
 import assert from 'node:assert';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -115,6 +118,21 @@ ok('the editor is content-sized, bounded by the wrap minus its inset (2026-10-16
     'the panel hugs its content (width: max-content) up to the inline bound');
   assert.ok(/\.chiaro-editor-body \{[^}]*overflow-y: auto/.test(css),
     'past the height bound the body scrolls internally, never overflowing the canvas');
+});
+
+ok('inside the editor the map keeps its one-line form — no wrap, no reflow (2026-10-16, amendment 3)', () => {
+  // .te-matrix is an auto-fill grid whose column count follows its
+  // width; under the panel's max-content width it collapsed and the
+  // map tiles reflowed into two columns. The relocation contract was
+  // "same component, same form": scoped to the editor, the map row
+  // and its matrices are pinned to a single non-wrapping row at
+  // natural width, tiles at their designed 52px measure.
+  assert.ok(/\.chiaro-editor \.map-tiles \{[^}]*flex-wrap: nowrap/.test(css),
+    'the map tile row never wraps inside the editor');
+  assert.ok(/\.chiaro-editor \.map-tiles \.te-matrix \{[^}]*display: flex[^}]*flex-wrap: nowrap[^}]*flex: 0 0 auto/.test(css),
+    'inside the editor the matrices render as one non-wrapping row at natural width, not the reflow-prone auto-fill grid');
+  assert.ok(/\.chiaro-editor \.map-tiles \.te-cell \{[^}]*flex: 0 0 auto[^}]*min-width: 52px/.test(css),
+    'inside the editor the map tiles keep their designed 52px measure');
 });
 
 console.log(`chiaroscuro.selfcheck: ${n} checks passed`);

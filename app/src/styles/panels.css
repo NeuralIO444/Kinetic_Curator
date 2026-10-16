@@ -1204,6 +1204,18 @@ details.ds-dev > summary:hover { color: var(--dim); }
    stretches past the measure it was designed at. */
 .chiaro-editor-body > * { max-width: 560px; }
 .chiaro-editor .map-row { margin-top: 4px; }
+/* Amendment 3 (2026-10-16): inside the content-sized editor the map
+   keeps its ONE-LINE form. .te-matrix is an auto-fill grid whose
+   column count follows its width, and under width:max-content it
+   collapsed — the tiles reflowed into two vertical columns beside a
+   stretched AMOUNT dock. Scoped to the editor only, the map's
+   matrices render as a single non-wrapping row at natural width,
+   tiles at their designed 52px measure: the form the row had in §④
+   and in the wide editor, so the panel's width stays the widest
+   group's natural width. §④ and every other matrix are untouched. */
+.chiaro-editor .map-tiles { flex-wrap: nowrap; }
+.chiaro-editor .map-tiles .te-matrix { display: flex; flex-wrap: nowrap; flex: 0 0 auto; }
+.chiaro-editor .map-tiles .te-cell { flex: 0 0 auto; min-width: 52px; }
 .chiaro-group { width: auto; margin-top: 2px; }
 .chiaro-group-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
 .chiaro-note { font-size: 9px; color: var(--dim); }
