@@ -160,7 +160,14 @@ export function predictMs(model, features) {
 export function mechanismFeatures(layoutParams = {}, canvas = { w: 1920, h: 1080 }) {
   const p = layoutParams || {};
   const bodies = Number(p.count || p.particleCount || 100);
-  const scale = Array.isArray(p.scale) ? (p.scale[0] + p.scale[1]) / 2 : (p.scale?.x ?? 1);
+  // #1202 — scale arrives as { x: [lo, hi], y: [lo, hi] }; read the X pair,
+  // the same convention recipeFeatures uses. (The original read took
+  // p.scale?.x itself as the number — an array — and produced NaN mech
+  // values for every current-shape recipe; found by the #1578 harness,
+  // whose dataset gate refuses non-finite features.)
+  const scalePair = Array.isArray(p.scale) ? p.scale : (p.scale?.x ?? [1, 1]);
+  const scaleAvg = (Number(scalePair[0]) + Number(scalePair[1])) / 2;
+  const scale = Number.isFinite(scaleAvg) ? scaleAvg : 1;
   const pixels = (canvas.w || 1920) * (canvas.h || 1080);
   // Rough: each body is ~1 instance; primitives ~scale²; passes from effects.
   const instances = Math.max(1, bodies);
