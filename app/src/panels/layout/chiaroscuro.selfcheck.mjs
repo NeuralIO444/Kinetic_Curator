@@ -14,8 +14,11 @@
 //   · the help copy followed the sun to its new home
 //   · 2026-10-16 amendment: the field→channel map renders inside the
 //     editor (below sun + hue), no longer in the §④ row — still #1204's
-//     Appearance-family control — and the editor takes the K5 expanded
-//     shelf's size (wrap rect minus the 16px inset, via shelfAnchor)
+//     Appearance-family control
+//   · 2026-10-16 amendment 2: the editor is content-sized — the panel
+//     hugs its groups (no forced width/height); shelfAnchor now
+//     supplies only the placement and the bound (wrap rect minus the
+//     16px inset), past whose height cap the body scrolls internally
 import assert from 'node:assert';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +36,7 @@ const sun = read('./SunControls.jsx');
 const map = read('./MapRow.jsx');
 const appearance = read('./AppearanceSliders.jsx');
 const displayBlock = read('../pipeline/DisplayBlock.jsx');
+const css = read('../../styles/panels.css');
 const { LIGHT_DEFAULT, LIGHT_SLOTS } = await import('../../data/light.js');
 const { helpText } = await import('../../data/helpCopy.js');
 
@@ -97,12 +101,20 @@ ok('the field→channel map renders inside the editor, not the §④ row (2026-1
   assert.ok(map.includes('#1204'), 'the #1204 home doctrine still rides the control');
 });
 
-ok('the editor takes the expanded shelf size — wrap rect minus inset (2026-10-16)', () => {
-  assert.ok(section.includes("from '../shelfView.mjs'"), 'geometry comes from the shelf anchor module');
-  assert.ok(section.includes('shelfAnchor('), 'the anchor is shelfAnchor, not a second mechanism');
-  assert.ok(!section.includes('EDITOR_W'), 'the old 560px width cap is gone');
-  assert.ok(!section.includes('maxHeight'), 'no height cap — the panel takes the wrap height');
-  assert.ok(section.includes('height: pos.height'), 'the portal styles an explicit height');
+ok('the editor is content-sized, bounded by the wrap minus its inset (2026-10-16, amendment 2)', () => {
+  // The law: the panel hugs its content; the wrap rect minus the 16px
+  // inset is only a bound (placement + caps), never the panel's size.
+  assert.ok(section.includes("from '../shelfView.mjs'"), 'the bound still comes from the shelf anchor module');
+  assert.ok(section.includes('shelfAnchor('), 'placement and bound computed by shelfAnchor, not a second mechanism');
+  assert.ok(section.includes('maxWidth: pos.maxWidth'), 'the portal caps the width at the wrap-minus-inset bound');
+  assert.ok(section.includes('maxHeight: pos.maxHeight'), 'the portal caps the height at the wrap-minus-inset bound');
+  assert.ok(!section.includes('width: pos.width'), 'no forced panel width — the content sizes the panel');
+  assert.ok(!section.includes('height: pos.height'), 'no forced panel height — the content sizes the panel');
+  assert.ok(!section.includes('EDITOR_W'), 'the old 560px panel-width constant stays gone');
+  assert.ok(/\.chiaro-editor \{[^}]*width: max-content/.test(css),
+    'the panel hugs its content (width: max-content) up to the inline bound');
+  assert.ok(/\.chiaro-editor-body \{[^}]*overflow-y: auto/.test(css),
+    'past the height bound the body scrolls internally, never overflowing the canvas');
 });
 
 console.log(`chiaroscuro.selfcheck: ${n} checks passed`);

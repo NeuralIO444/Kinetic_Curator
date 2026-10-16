@@ -1174,15 +1174,18 @@ details.ds-dev > summary:hover { color: var(--dim); }
 
 /* CHIAROSCURO (#1587; just a button since #1629): one button in BUILD;
    the full control set lives in a floating editor over the canvas —
-   portaled to the body, position:fixed at the canvas wrap's rect
+   portaled to the body, position:fixed from the canvas wrap's anchor
    (inline geometry), no backdrop, the canvas stays live underneath.
-   Flat per DS: border only. Since 2026-10-16 the editor takes the K5
-   expanded shelf's size (wrap rect minus a 16px inset on every side)
-   and carries the field→channel map below the sun + hue. */
+   Flat per DS: border only. The editor carries the field→channel map
+   below the sun + hue. Size (2026-10-16, amendment 2): the window is
+   content-sized — width:max-content hugs it to its groups; the inline
+   max-width/max-height (wrap rect minus the 16px inset) are only a
+   bound, and past the height bound the body scrolls internally. */
 .chiaro-section { padding: 6px 0; border-top: 1px solid var(--line); }
 .chiaro-open { min-height: 24px; padding: 2px 12px; }
 .chiaro-editor {
   position: fixed;
+  width: max-content;
   background: var(--panel-2);
   border: 1px solid var(--line);
   z-index: 60;
@@ -1195,10 +1198,10 @@ details.ds-dev > summary:hover { color: var(--dim); }
   flex: 0 0 auto;
 }
 .chiaro-editor-title { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--kc-davis); }
-.chiaro-editor-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; }
-/* The panel grew to the shelf's expanded form; the control groups did
-   not — they keep the old editor's measure so no slider or tile row
-   stretches the full canvas width. */
+.chiaro-editor-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+/* The control groups keep the old editor's measure: the widest group
+   sets the content-sized panel's width, and no slider or tile row
+   stretches past the measure it was designed at. */
 .chiaro-editor-body > * { max-width: 560px; }
 .chiaro-editor .map-row { margin-top: 4px; }
 .chiaro-group { width: auto; margin-top: 2px; }

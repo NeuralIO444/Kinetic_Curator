@@ -4,7 +4,7 @@
 // In the panel it is JUST A BUTTON (Matt's ruling, 2026-10-16): the
 // titled section row — plain TE label, live one-line summary of the
 // sun + hue, EDIT cell — is gone. The button, labelled CHIAROSCURO,
-// opens the full control set in a large floating editor OVER the
+// opens the full control set in a floating editor OVER the
 // canvas (Matt's form ruling, 2026-10-15): no backdrop, the canvas
 // stays live and rendering underneath, no apply/confirm — every
 // control emits its usual event the moment it moves, so a sun slider
@@ -24,12 +24,18 @@
 // per-stratum controls, and the governor's tuning (stays with the
 // governor).
 //
-// Size (2026-10-16): the editor takes the expanded form the K5 Keeps
-// shelf shipped (PR #1628) — the canvas wrap's rect shrunk by a 16px
-// inset on every side, computed by shelfView's shelfAnchor, the same
-// mechanism (not a second one). The panel is what grows: the control
-// groups inside keep the measure they were designed at (a width cap
-// in the CSS), so no slider stretches the full canvas width.
+// Size (2026-10-16, amendment 2): the window is RESPONSIVE — it takes
+// only the essential size, the size its content needs (Matt's words).
+// No width or height is forced: the CSS hugs the panel to its groups,
+// which keep the measure they were designed at (a width cap in the
+// CSS). The one bound is the canvas: shelfView's shelfAnchor (the K5
+// expanded shelf's mechanism, not a second one) supplies the
+// placement — top-left of the wrap rect shrunk by the 16px inset —
+// and the caps: the panel may never exceed that rect in either
+// dimension, and past the height cap the body scrolls internally
+// rather than overflowing the canvas. (Amendment 1 forced the full
+// shelf size for a few hours; the expanded panel was mostly empty,
+// so the size now follows the content, not the canvas.)
 //
 // The editor follows the app's overlay grammar (portal + fixed position,
 // like the beat menu / favorites tray), anchored to the canvas wrap's
@@ -49,9 +55,14 @@ import { useDock } from '../build/te/useDock.js';
 function canvasAnchor() {
   const wrap = document.querySelector('.canvas-wrap');
   if (!wrap) return null;
-  // The K5 expanded shelf's anchor, verbatim: wrap rect minus a 16px
-  // inset on every side (null when the wrap is too small to host it).
-  return shelfAnchor(wrap.getBoundingClientRect());
+  // The K5 expanded shelf's anchor supplies the placement and the
+  // bound: top-left of the wrap rect minus a 16px inset on every side,
+  // and that rect's size as the caps. The panel itself is
+  // content-sized by the CSS and may never exceed the bound (null
+  // when the wrap is too small to host it).
+  const bound = shelfAnchor(wrap.getBoundingClientRect());
+  if (!bound) return null;
+  return { top: bound.top, left: bound.left, maxWidth: bound.width, maxHeight: bound.height };
 }
 
 export function ChiaroscuroSection({ layoutParams, lockedParams }) {
@@ -70,7 +81,7 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
     setPos((prev) => {
       if (!next) return prev;
       if (prev && prev.top === next.top && prev.left === next.left
-        && prev.width === next.width && prev.height === next.height) return prev;
+        && prev.maxWidth === next.maxWidth && prev.maxHeight === next.maxHeight) return prev;
       return next;
     });
   }, []);
@@ -125,7 +136,7 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
           className="chiaro-editor"
           role="dialog"
           aria-label="CHIAROSCURO — render engine controls"
-          style={{ top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
+          style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
         >
           <div className="chiaro-editor-head">
             <div>
