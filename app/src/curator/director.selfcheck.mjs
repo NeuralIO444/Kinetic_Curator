@@ -175,6 +175,10 @@ ok('no UI-surface file references the director scheduler', () => {
     'engine/mathRandomGuard.selfcheck.mjs',
   ]);
   const ids = ['directorGains', 'getDirector', 'blendPick', 'directorSense', 'directorTable', 'effectiveTemp', 'initDirectorBeat', 'directorTrace'];
+  // whole-identifier match, not substring: loot/lootWrite.selfcheck.mjs mocks the
+  // File System Access API's getDirectoryHandle, which contains 'getDirector' as a
+  // substring but references no scheduler identifier (#1591).
+  const idRes = ids.map((id) => new RegExp(`(?<![\\w$])${id}(?![\\w$])`));
   const hits = [];
   const walk = (dir) => {
     for (const e of readdirSync(dir)) {
@@ -185,7 +189,7 @@ ok('no UI-surface file references the director scheduler', () => {
       const rel = relative(srcRoot, p);
       if (allowed.has(rel)) continue;
       const src = readFileSync(p, 'utf8');
-      if (ids.some((id) => src.includes(id))) hits.push(rel);
+      if (idRes.some((re) => re.test(src))) hits.push(rel);
     }
   };
   walk(srcRoot);
