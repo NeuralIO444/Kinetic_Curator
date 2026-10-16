@@ -22,7 +22,24 @@
 // swapping one in re-imports its record in the same move. A keep whose
 // record is not in hand (folder away, file gone) lists from its stub
 // with its actions disabled — it cannot be loaded from a listing card.
-import { useMemo, useState } from 'react';
+//
+// K5 (the shelf revision — UX pass 2026-10-16 + Matt's split ruling):
+// ONE shelf at two sizes, never two shelves. This component owns the
+// shelf's one copy of UI state (aim, query, sort, notice, prefs) and
+// renders it compact or expanded from the same variables:
+//   · MINI — in the ASSETS drawer: head + stage grid + the fill band.
+//     The glance surface; it renders no collection rows.
+//   · EXPANDED — a large floating panel over the canvas (portal +
+//     fixed, anchored to the canvas wrap, Esc / click-away closes, no
+//     backdrop, no focus trap — the floating-editor grammar the
+//     CHIAROSCURO editor shipped in #1587/#1621), carrying the tools
+//     and the collection. Aiming in the mini is aiming in the
+//     expanded: the same state, so the two can never disagree.
+// The pass's hierarchy lives in panels/shelfView.mjs (two-tier rows,
+// the fixed 16-cell grid, the aim sentence in the fill band, location
+// as a right-edge tag, stub reasons said in the row).
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import * as A from '../state/actions.js';
@@ -33,6 +50,10 @@ import {
   STAGE_BUDGET, COLLECTION_SOFT_BOUND, SHELF_SORTS,
 } from '../curator/shelf.mjs';
 import { DEFAULT_SHELF_PREFS, tableName } from '../curator/shelfPrefs.mjs';
+import {
+  shelfAnchor, stageCells, fillBandState, toolsStandDown,
+  rowIdentity, rowMeta, rowLocationTag, rowReason,
+} from './shelfView.mjs';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
@@ -51,9 +72,13 @@ export function ShelfView() {
   const keeps = state.keeps || [];
   const keepStage = state.keepStage || [];
   const [open, setOpen] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [pos, setPos] = useState(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('kept');
   const [aimedSlot, setAimedSlot] = useState(null); // stage index a swap targets
+  const editorRef = useRef(null);
+  const expandRef = useRef(null);
 
   const staged = useMemo(() => stageRecords(keeps, keepStage), [keeps, keepStage]);
   const used = stageSlotsUsed(keeps, keepStage);
@@ -77,6 +102,19 @@ export function ShelfView() {
   // file's; until then / without a folder, the shipped defaults).
   const effectivePrefs = state.shelfPrefs || DEFAULT_SHELF_PREFS;
   const softBound = state.shelfPrefs?.collectionSoftBound ?? COLLECTION_SOFT_BOUND;
+  const collectionCount = keeps.length + diskCount;
+  const standDown = toolsStandDown(collectionCount);
+  const cells = stageCells(staged, state.performingKeepId);
+  const band = fillBandState({
+    aimedSlot: aimedId != null ? aimedSlot : null,
+    tableLine: `table: ${tableName(effectivePrefs)} · ${state.shelfPrefsSource === 'file' ? 'preferences.json' : 'shipped defaults'}`,
+  });
+  const countsText = `stage ${used}/${STAGE_BUDGET} · collection ${collectionCount}`
+    + (diskCount ? ` · ${diskCount} on disk` : '');
+  // The pass (P2-3): the soft-bound overflow is an event, not a count —
+  // it leaves the head and stands in the notice position (the store's
+  // own line, an actual receipt, always wins the slot).
+  const overBound = keeps.length > softBound;
 
   const swapIn = (row) => {
     if (aimedId == null) return;
@@ -84,110 +122,219 @@ export function ShelfView() {
     setAimedSlot(null);
   };
 
+  // The expanded panel's anchor + dismissal — the shipped floating
+  // editor's seams (#1587): measure the canvas wrap, portal to body,
+  // Esc or a pointerdown outside (editor and its anchor button aside)
+  // closes, re-anchor on resize and after drags. No backdrop.
+  const place = useCallback(() => {
+    const wrap = document.querySelector('.canvas-wrap');
+    const next = wrap ? shelfAnchor(wrap.getBoundingClientRect()) : null;
+    setPos((prev) => {
+      if (!next) return prev;
+      if (prev && prev.top === next.top && prev.left === next.left
+        && prev.width === next.width && prev.height === next.height) return prev;
+      return next;
+    });
+  }, []);
+
+  const openExpanded = useCallback(() => {
+    place();
+    setExpanded(true);
+  }, [place]);
+
+  const closeExpanded = useCallback(() => setExpanded(false), []);
+
+  useEffect(() => {
+    if (!expanded) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') closeExpanded(); };
+    const onDown = (e) => {
+      if (editorRef.current?.contains(e.target)) return;
+      if (expandRef.current?.contains(e.target)) return;
+      closeExpanded();
+    };
+    const onResize = () => place();
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('pointerup', onResize);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('pointerup', onResize);
+    };
+  }, [expanded, closeExpanded, place]);
+
+  // — the shared bands: defined once, rendered by both sizes ————————
+
+  const stageGrid = (
+    <div className="shelf-stage" role="list" aria-label="the stage — 16 slots">
+      {cells.map((cell) => (cell.keepId == null ? (
+        <div key={cell.n} className="shelf-slot ghost" aria-hidden="true">
+          <span className="shelf-slot-n">{cell.n}</span>
+        </div>
+      ) : (
+        <button
+          type="button" role="listitem" key={cell.keepId}
+          className={`shelf-slot${aimedSlot === cell.n - 1 ? ' aimed' : ''}${cell.onDeck ? ' on-deck' : ''}`}
+          title={cell.onDeck ? 'on the deck — this slot refuses swaps' : 'aim a swap at this slot'}
+          onClick={() => setAimedSlot(aimedSlot === cell.n - 1 ? null : cell.n - 1)}
+        >
+          <span className="shelf-slot-top">
+            <span className="shelf-slot-n">{cell.n}</span>
+            <span className="shelf-slot-label" title={cell.label}>{cell.label}</span>
+          </span>
+          {cell.marks.length > 0 && <span className="shelf-slot-mark">{cell.marks.join(' · ')}</span>}
+        </button>
+      )))}
+    </div>
+  );
+
+  const motto = (
+    <div className="shelf-motto">
+      tier is membership, not a copy — a keep lives once: on the stage, in the collection, or on disk
+    </div>
+  );
+
+  const fillBand = (
+    <div className="shelf-fillrow">
+      <button type="button" className="micro-btn shelf-fill-btn" onClick={() => dispatch({ type: A.FILL_STAGE })}>
+        KINETIC — deal a new stage
+      </button>
+      {band.kind === 'aim' ? (
+        <>
+          <span className="shelf-aimline">{band.text}</span>
+          <button type="button" className="micro-btn shelf-aim-clear" onClick={() => setAimedSlot(null)}>clear</button>
+        </>
+      ) : (
+        <span className="shelf-table">{band.text}</span>
+      )}
+    </div>
+  );
+
+  const noticeBand = state.shelfNotice ? (
+    <div className="shelf-line" role="status">
+      <span className="shelf-line-text">{state.shelfNotice}</span>
+      <button type="button" className="micro-btn" onClick={() => setShelfNotice(null)}>ok</button>
+    </div>
+  ) : overBound ? (
+    <div className="shelf-line shelf-overbound" role="status">
+      <span className="shelf-line-text">collection over the {softBound} soft bound</span>
+    </div>
+  ) : null;
+
+  const emptyStageLine = staged.length === 0
+    ? <div className="shelf-empty">the stage is empty — crown something</div>
+    : null;
+
+  const controlsBand = (
+    <div className="shelf-controls">
+      <input
+        placeholder="search the collection — family, palette, origin, seed"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <span className="shelf-sorts" role="group" aria-label="sort the collection">
+        {SHELF_SORTS.map((s) => (
+          <button
+            type="button" key={s}
+            className={`shelf-sort${sort === s ? ' active' : ''}`}
+            onClick={() => setSort(s)}
+          >{SORT_LABEL[s]}</button>
+        ))}
+      </span>
+    </div>
+  );
+
+  const rowsList = (
+    <div className="shelf-rows">
+      {rows.map((row) => {
+        const reason = rowReason(row);
+        const tag = rowLocationTag(row);
+        return (
+          <div key={row.id} className={`shelf-row${row.tier === 'stage' ? ' is-stage' : ''}`}>
+            <span className="shelf-row-main">
+              <span className="shelf-row-label" title={row.label}>{rowIdentity(row)}</span>
+              <span className="shelf-row-meta">{rowMeta(row).join(' · ')}</span>
+            </span>
+            {tag && <span className="shelf-row-tag">{tag}</span>}
+            {reason ? (
+              <span className="shelf-row-reason">{reason}</span>
+            ) : (
+              <span className="shelf-row-actions">
+                {row.tier !== 'stage' && aimedId != null && (
+                  <>
+                    <button type="button" className="micro-btn" disabled={!row.keep}
+                      title="swap into the aimed slot"
+                      onClick={() => swapIn(row)}>swap in</button>
+                    <button type="button" className="micro-btn" disabled={!row.keep}
+                      title="take a free stage slot"
+                      onClick={() => dispatch({ type: A.STAGE_KEEP, keepId: row.id })}>stage it</button>
+                  </>
+                )}
+                <button type="button" className="micro-btn" disabled={!row.keep}
+                  onClick={() => dispatch({ type: A.RECALL_FAVORITE, favorite: row.keep })}>load</button>
+              </span>
+            )}
+          </div>
+        );
+      })}
+      {rows.length === 0 && <div className="shelf-empty">nothing on the shelf matches</div>}
+    </div>
+  );
+
+  // — the two sizes ————————————————————————————————————————————————
+
   return (
     <div className="shelf">
-      <button type="button" className="shelf-head" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="shelf-title">KEEPS SHELF</span>
-        <span className="shelf-counts">
-          stage {used}/{STAGE_BUDGET} · collection {keeps.length + diskCount}
-          {diskCount ? ` · ${diskCount} on disk` : ''}
-          {keeps.length > softBound ? ` · over the ${softBound} soft bound` : ''}
-        </span>
-        <span className="shelf-caret">{open ? '▾' : '▸'}</span>
-      </button>
+      <div className="shelf-head">
+        <button type="button" className="shelf-head-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <span className="shelf-title">KEEPS SHELF</span>
+          <span className="shelf-counts">{countsText}</span>
+          <span className="shelf-caret">{open ? '▾' : '▸'}</span>
+        </button>
+        <button
+          type="button" ref={expandRef} className="micro-btn shelf-expand"
+          aria-expanded={expanded} aria-haspopup="dialog"
+          title="Open the shelf over the canvas"
+          onClick={() => (expanded ? closeExpanded() : openExpanded())}
+        >expand</button>
+      </div>
       {open && (
         <>
-          <div className="shelf-stage" role="list" aria-label="the stage — 16 slots">
-            {staged.map((k, i) => (
-              <button
-                type="button" role="listitem" key={k.id}
-                className={`shelf-slot${aimedSlot === i ? ' aimed' : ''}${k.id === state.performingKeepId ? ' on-deck' : ''}`}
-                title={k.id === state.performingKeepId ? 'on the deck — this slot refuses swaps' : 'aim a swap at this slot'}
-                onClick={() => setAimedSlot(aimedSlot === i ? null : i)}
-              >
-                <span className="shelf-slot-n">{i + 1}</span>
-                <span className="shelf-slot-label">{k.config?.layout?.mode || 'look'} · {k.config?.palette?.id || ''}</span>
-                {k.provenance?.source === 'explorer' ? <span className="shelf-mined">mined ×2</span> : null}
-                {k.id === state.performingKeepId ? <span className="shelf-deck">on deck</span> : null}
-              </button>
-            ))}
-            {staged.length === 0 && <span className="shelf-empty">the stage is empty — crown something</span>}
-          </div>
-          <div className="shelf-controls">
-            <span className="prompt">⟩</span>
-            <input
-              placeholder="search the collection — family, palette, origin, seed"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <span className="shelf-sorts" role="group" aria-label="sort the collection">
-              {SHELF_SORTS.map((s) => (
-                <button
-                  type="button" key={s}
-                  className={`shelf-sort${sort === s ? ' active' : ''}`}
-                  onClick={() => setSort(s)}
-                >{SORT_LABEL[s]}</button>
-              ))}
-            </span>
-          </div>
-          <div className="shelf-fillrow">
-            <button type="button" className="micro-btn" onClick={() => dispatch({ type: A.FILL_STAGE })}>
-              KINETIC — deal a new stage
-            </button>
-            <span className="shelf-table">
-              table: {tableName(effectivePrefs)} · {state.shelfPrefsSource === 'file' ? 'preferences.json' : 'shipped defaults'}
-            </span>
-          </div>
-          {aimedId != null && (
-            <div className="shelf-aim">
-              slot {aimedSlot + 1} aimed — pick a shelf keep to swap in
-              <button type="button" className="micro-btn" onClick={() => setAimedSlot(null)}>clear</button>
-            </div>
-          )}
-          {state.shelfNotice && (
-            <div className="shelf-line" role="status">
-              {state.shelfNotice}
-              <button type="button" className="micro-btn" onClick={() => setShelfNotice(null)}>ok</button>
-            </div>
-          )}
-          <div className="shelf-rows">
-            {rows.map((row) => (
-              <div key={row.id} className={`shelf-row${row.tier === 'stage' ? ' is-stage' : ''}`}>
-                <span className="shelf-row-label" title={row.label}>{row.label}</span>
-                <span className="shelf-row-meta">
-                  {row.families.join(' ')}
-                  {row.origin ? ` · ${row.origin}` : ''}
-                  {row.keptAt ? ` · kept ${new Date(row.keptAt).toLocaleDateString()}` : ' · kept (legacy)'}
-                  {row.stagedCount ? ` · staged ×${row.stagedCount}` : ' · never staged'}
-                  {row.location === 'disk' ? ' · on disk' : ''}
-                  {row.location === 'disk-away' ? ' · on disk — folder away' : ''}
-                  {row.location === 'missing' ? ' · on disk — file gone' : ''}
-                </span>
-                <span className="shelf-row-actions">
-                  {row.tier === 'stage'
-                    ? <span className="shelf-onstage">on stage</span>
-                    : (
-                      <>
-                        <button type="button" className="micro-btn" disabled={aimedId == null || !row.keep}
-                          title={!row.keep ? 'its record is on disk, not read yet — connect the loot folder to bring it back' : (aimedId == null ? 'aim a stage slot first' : 'swap into the aimed slot')}
-                          onClick={() => swapIn(row)}>swap in</button>
-                        <button type="button" className="micro-btn" disabled={!row.keep}
-                          title={row.keep ? 'take a free stage slot' : 'its record is on disk, not read yet — connect the loot folder to bring it back'}
-                          onClick={() => dispatch({ type: A.STAGE_KEEP, keepId: row.id })}>stage it</button>
-                      </>
-                    )}
-                  <button type="button" className="micro-btn" disabled={!row.keep}
-                    title={row.keep ? undefined : 'on disk — stage it or swap it in to bring it back'}
-                    onClick={() => dispatch({ type: A.RECALL_FAVORITE, favorite: row.keep })}>load</button>
-                </span>
-              </div>
-            ))}
-            {rows.length === 0 && <div className="shelf-empty">nothing on the shelf matches</div>}
-          </div>
-          <div className="shelf-foot">
-            tier is membership, not a copy — a keep lives once: on the stage, in the collection, or on disk
-          </div>
+          {stageGrid}
+          {motto}
+          {!standDown && fillBand}
+          {noticeBand}
+          {emptyStageLine}
         </>
+      )}
+      {expanded && pos && createPortal(
+        <div
+          ref={editorRef}
+          className="shelf-overlay"
+          role="dialog"
+          aria-label="KEEPS SHELF — the collection"
+          style={{ top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
+        >
+          <div className="shelf-overlay-head">
+            <span className="shelf-title">KEEPS SHELF</span>
+            <span className="shelf-counts">{countsText}</span>
+            <button
+              type="button" className="micro-btn shelf-overlay-close"
+              onClick={closeExpanded}
+              aria-label="Close the shelf"
+            >×</button>
+          </div>
+          {stageGrid}
+          {motto}
+          {!standDown && controlsBand}
+          {!standDown && fillBand}
+          {noticeBand}
+          {emptyStageLine}
+          {rowsList}
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -1323,41 +1323,77 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .cand-run-line { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; margin-top: 2px; }
 .cand-note { font-size: 9px; color: var(--dim); margin-top: 4px; }
 .cand-refusal { font-size: 10px; color: var(--kc-red); margin-top: 4px; }
-/* #1589 — the keeps shelf (ShelfView, in the ASSETS drawer): the stage
-   strip over the collection rows. TE throughout — membership is discrete
-   and countable; the only colour is the deck mark (structure red) and
-   the aimed slot (amber = the artist's hand, per DS colour discipline). */
+/* #1589 — the keeps shelf (ShelfView). K5 (the shelf revision, UX pass
+   2026-10-16): ONE shelf at two sizes — the mini in the ASSETS drawer
+   (head + stage grid + fill band) and the expanded floating panel over
+   the canvas (.shelf-overlay: the CHIAROSCURO editor's grammar, #1587 —
+   fixed, panel-2, hairline, z 60, flex column; the rows scroll inside
+   it, so head + stage + tools pin by construction). TE throughout —
+   membership is discrete and countable. Selection (the aimed slot, the
+   active sort) is the DS §2.3 inversion everywhere; amber keeps its one
+   meaning (taste/presence) and appears nowhere on this surface; the
+   only colour is the deck slot's structure-red left bar. */
 .shelf { border-top: 1px solid var(--line-2); margin-top: 8px; padding: 6px 10px 8px; }
-.shelf-head { display: flex; align-items: baseline; gap: 8px; width: 100%; background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
+.shelf-head { display: flex; align-items: center; gap: 8px; }
+.shelf-head-toggle { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; background: none; border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
 .shelf-title { font-size: 10px; letter-spacing: 0.14em; color: var(--ink); }
-.shelf-counts { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; }
+.shelf-counts { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shelf-caret { margin-left: auto; font-size: 9px; color: var(--dim); }
-.shelf-stage { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.shelf-slot { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line-2); background: var(--panel-2); padding: 2px 6px; font-size: 9px; color: var(--ink); cursor: pointer; }
-.shelf-slot.aimed { border-color: var(--kc-amber, #e8a33d); }
+.shelf-expand { flex: none; }
+/* The stage: a fixed 16-cell grid (P0-2) — equal cells, ghosts for the
+   unfilled slots, so the budget reads at a glance (DS rule 2). */
+.shelf-stage { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 8px; }
+.shelf-slot { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; min-width: 0; min-height: 26px; border: 1px solid var(--line-2); background: var(--panel-2); padding: 4px 6px; font-size: 9px; color: var(--ink); cursor: pointer; text-align: left; }
+.shelf-slot.ghost { background: none; border-color: var(--line); cursor: default; }
+.shelf-slot.aimed { background: var(--ink); border-color: var(--ink); color: #000; }
+.shelf-slot.aimed .shelf-slot-n, .shelf-slot.aimed .shelf-slot-mark { color: rgba(0, 0, 0, 0.55); }
 .shelf-slot.on-deck { border-left: 2px solid var(--kc-red); }
-.shelf-slot-n { color: var(--dim); }
-.shelf-mined { color: var(--kc-davis); letter-spacing: 0.06em; }
-.shelf-deck { color: var(--kc-red); letter-spacing: 0.06em; }
-.shelf-controls { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
-.shelf-controls .prompt { color: var(--dim); font-size: 10px; }
-.shelf-controls input { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink); font-size: 10px; padding: 3px 6px; }
-.shelf-sorts { display: inline-flex; gap: 3px; }
-.shelf-sort { background: none; border: 1px solid var(--line-2); color: var(--dim); font-size: 9px; padding: 2px 5px; cursor: pointer; }
-.shelf-sort.active { color: var(--ink); border-color: var(--dim); }
-.shelf-fillrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.shelf-slot-top { display: flex; align-items: baseline; gap: 5px; width: 100%; min-width: 0; }
+.shelf-slot-n { color: var(--dim); font-size: 8px; flex: none; }
+.shelf-slot.ghost .shelf-slot-n { color: var(--dimmer); }
+.shelf-slot-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.shelf-slot-mark { font-size: 8px; color: var(--dimmer); letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* The motto (P2-1): under the grid it annotates, not a permanent line
+   taxed at the bottom of the list. */
+.shelf-motto { font-size: 8px; color: var(--dimmer); letter-spacing: 0.04em; margin-top: 6px; }
+/* The tools (expanded only): search gets its full line (P1-5), sorts
+   speak the one chip grammar (P1-2). */
+.shelf-controls { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+.shelf-controls input { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink); font-size: 10px; padding: 4px 8px; }
+.shelf-sorts { display: inline-flex; gap: 3px; flex: none; }
+.shelf-sort { background: none; border: 1px solid var(--line-2); color: var(--dim); font-size: 9px; padding: 3px 8px; cursor: pointer; }
+.shelf-sort.active { background: var(--ink); border-color: var(--ink); color: #000; }
+/* The fill band: KINETIC at utility height (P2-2); the aim sentence
+   replaces the table line in this same band while aiming (P1-1). */
+.shelf-fillrow { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.shelf-fill-btn { padding: 4px 10px; }
 .shelf-table { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; }
-.shelf-aim, .shelf-line { display: flex; align-items: center; gap: 8px; font-size: 9px; color: var(--dim); margin-top: 6px; }
-.shelf-line { color: var(--ink); }
-.shelf-rows { margin-top: 6px; }
-.shelf-row { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-top: 1px solid var(--line-2); font-size: 10px; }
-.shelf-row.is-stage { opacity: 0.65; }
-.shelf-row-label { color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
-.shelf-row-meta { color: var(--dim); font-size: 9px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.shelf-row-actions { display: inline-flex; gap: 3px; align-items: center; }
-.shelf-onstage { font-size: 9px; color: var(--dim); letter-spacing: 0.06em; }
+.shelf-aimline { font-size: 9px; color: var(--ink); letter-spacing: 0.04em; }
+.shelf-aim-clear { margin-left: auto; flex: none; }
+/* The notice: a receipt, two lines allowed, its ok pinned right. */
+.shelf-line { display: flex; align-items: flex-start; gap: 8px; font-size: 9px; color: var(--ink); margin-top: 6px; }
+.shelf-line-text { flex: 1; min-width: 0; }
+.shelf-line .micro-btn { margin-left: auto; flex: none; }
+.shelf-overbound { color: var(--dim); }
+/* The collection (expanded only): two-tier rows (P0-1) — identity at
+   DS body size, facts as a dimmer caption, location as a right-edge
+   tag, dead rows stating their reason in place of dead buttons. */
+.shelf-rows { margin-top: 12px; }
+.shelf-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-top: 1px solid var(--line-2); }
+.shelf-row-main { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.shelf-row-label { font-size: 11px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shelf-row-meta { font-size: 9px; color: var(--dimmer); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.shelf-row-tag { font-size: 9px; color: var(--dim); letter-spacing: 0.06em; flex: none; }
+.shelf-row-reason { font-size: 9px; color: var(--dim); flex: none; }
+.shelf-row-actions { display: inline-flex; gap: 3px; align-items: center; flex: none; }
+.shelf-row-actions .micro-btn { padding: 2px 8px; }
 .shelf-empty { font-size: 9px; color: var(--dim); padding: 4px 0; }
-.shelf-foot { font-size: 8px; color: var(--dim); letter-spacing: 0.04em; margin-top: 6px; }
+/* The expanded shelf: a large floating panel over the canvas (portal +
+   fixed, canvas live behind, no backdrop — #1587's editor grammar). */
+.shelf-overlay { position: fixed; background: var(--panel-2); border: 1px solid var(--line); z-index: 60; display: flex; flex-direction: column; padding: 10px 14px 12px; }
+.shelf-overlay-head { display: flex; align-items: baseline; gap: 8px; }
+.shelf-overlay-close { margin-left: auto; flex: none; }
+.shelf-overlay .shelf-rows { overflow-y: auto; flex: 1; min-height: 0; }
 .cand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
 .cand-card { border: 1px solid var(--line-2); border-left: 2px solid var(--kc-davis); background: var(--panel-2); padding: 4px; }
 .cand-card.is-crowned { opacity: 0.75; }
