@@ -1,9 +1,11 @@
 // node src/hooks/motionMeterTap.selfcheck.mjs
-// #1469 — the MOTION readout (expanded spec): the tap's contract, the publisher's chain from the
-// resolver's own living-motion read, the moth beat's null-vs-value, and the strip's read-only law.
+// #1469 — the MOTION readout (expanded spec, with the #1485 strip merged in): the tap's contract,
+// the publisher's chain from the resolver's own living-motion read (PULSE and PALETTE folded from
+// the same kineme ctx), the loop's LIFE note, the moth beat's null-vs-value, the strip's
+// read-only law, and the old strip's retirement.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { setMotionMeterTap, getMotionMeterTap, readMotionLevels } from './motionMeterTap.js';
+import { setMotionMeterTap, getMotionMeterTap, readMotionLevels, noteLifeBreath, getLifeBreath, LIFE_FULL } from './motionMeterTap.js';
 import { observeMotion } from '../composition/motionLive.js';
 import { createLiveResolver, getLastFrameMotion } from '../gl/liveResolve.mjs';
 import { createCreatureBuilder, MOTH, MOTH_PARTS } from '../engine/creature.js';
@@ -21,7 +23,7 @@ ok('null before first publish: the tap and the resolver read both start empty', 
 });
 
 ok('tap round-trip: what is set is what is read, and null clears it', () => {
-  const v = { drift: 0.5, breath: 0.3, wind: 0.5, rhythmPhase: 1, rhythmType: 'sine', wobble: 0.4, mothBeat: 0.25 };
+  const v = { life: 0.2, drift: 0.5, breath: 0.3, pulse: 0.1, wind: 0.5, rhythmPhase: 1, rhythmType: 'sine', wobble: 0.4, palette: 0.24, mothBeat: 0.25 };
   setMotionMeterTap(v);
   assert.equal(readMotionLevels(), v);
   assert.equal(getMotionMeterTap(), v);
@@ -30,9 +32,9 @@ ok('tap round-trip: what is set is what is read, and null clears it', () => {
 });
 
 ok('moth field is null-vs-value at the tap: absent is not zero', () => {
-  setMotionMeterTap({ drift: 0, breath: 0, wind: 0, rhythmPhase: 0, rhythmType: null, wobble: 0, mothBeat: null });
+  setMotionMeterTap({ life: 0, drift: 0, breath: 0, pulse: 0, wind: 0, rhythmPhase: 0, rhythmType: null, wobble: 0, palette: 0, mothBeat: null });
   assert.equal(readMotionLevels().mothBeat, null);
-  setMotionMeterTap({ drift: 0, breath: 0, wind: 0, rhythmPhase: 0, rhythmType: null, wobble: 0, mothBeat: 0 });
+  setMotionMeterTap({ life: 0, drift: 0, breath: 0, pulse: 0, wind: 0, rhythmPhase: 0, rhythmType: null, wobble: 0, palette: 0, mothBeat: 0 });
   assert.equal(readMotionLevels().mothBeat, 0, 'a moth at the bottom of its beat is a value, not an absence');
   setMotionMeterTap(null);
 });
@@ -80,22 +82,49 @@ ok('the chain: a resolved frame publishes the resolver\'s own amounts through ob
   assert.equal(f.mothBeat, null, 'no pins formed: no moths on stage');
   observeMotion();
   assert.deepEqual(readMotionLevels(), {
-    drift: 0.5, breath: 0.3, wind: 0.5, rhythmPhase: 0, rhythmType: null, wobble: 0.4, mothBeat: null,
+    life: 0, drift: 0.5, breath: 0.3, pulse: 0, wind: 0.5, rhythmPhase: 0, rhythmType: null, wobble: 0.4, palette: 0.24, mothBeat: null,
   });
+  assert.equal(readMotionLevels().pulse, f.kineme.amounts.pulse, 'PULSE is the ctx\'s own amount, folded in');
+  assert.equal(readMotionLevels().palette, f.kineme.amounts.paletteBreath / 0.5, 'PALETTE is the ctx\'s paletteBreath over its display span');
 
   r.resolveLayers(frameInput({ layoutParams: lp({ kinemePattern: 'ORGANIC' }), loopTimeMs: 16.7 }));
   observeMotion();
   assert.equal(readMotionLevels().rhythmType, 'perlin', 'ORGANIC names its rhythm function');
   assert.equal(readMotionLevels().rhythmPhase, 1, 'a live rhythm layer reads at full authored depth');
 
+  r.resolveLayers(frameInput({ layoutParams: lp({ kinemePattern: 'THUMP', kinemePulse: 0 }), beatDrive: 1, loopTimeMs: 25 }));
+  const thump = getLastFrameMotion();
+  observeMotion();
+  assert.ok(thump.kineme.amounts.pulse > 0, 'THUMP on a beat raises the ctx pulse from zero');
+  assert.equal(readMotionLevels().pulse, thump.kineme.amounts.pulse, 'the tap carries the beat-driven pulse the placements consumed');
+
   r.resolveLayers(frameInput({ slowRender: true, loopTimeMs: 33.4 }));
   const frozen = getLastFrameMotion();
   assert.equal(frozen.kineme, null, 'a frozen frame has no living motion (the shed flattens the read)');
   observeMotion();
   assert.deepEqual(readMotionLevels(), {
-    drift: 0, breath: 0, wind: 0, rhythmPhase: 0, rhythmType: null, wobble: 0, mothBeat: null,
+    life: 0, drift: 0, breath: 0, pulse: 0, wind: 0, rhythmPhase: 0, rhythmType: null, wobble: 0, palette: 0, mothBeat: null,
   }, 'flat bars under the freeze — never a ghost of the last live frame');
   r.dispose();
+});
+
+ok('LIFE rides the loop\'s note: the publisher folds the noted reading in verbatim, clamped, junk-proof', () => {
+  assert.equal(getLifeBreath(), 0, 'no loop has noted yet');
+  assert.ok(LIFE_FULL > 0, 'the span the loop divides by');
+  noteLifeBreath(0.7);
+  observeMotion(); // the last resolved frame is the frozen one: the note still folds in
+  assert.equal(readMotionLevels().life, 0.7, 'the noted reading, carried through the tap');
+  assert.equal(readMotionLevels().drift, 0, 'the fold invents nothing else: the frozen frame stays flat');
+  noteLifeBreath(2);
+  observeMotion();
+  assert.equal(readMotionLevels().life, 1, 'clamped to the bar');
+  noteLifeBreath(NaN);
+  observeMotion();
+  assert.equal(readMotionLevels().life, 0, 'junk notes read as stillness, never NaN');
+  noteLifeBreath(0);
+  const loop = src('../gl/liveLoop.mjs');
+  assert.match(loop, /noteLifeBreath\(\(s\.slowRender \|\| !s\.running\) \? 0 : Math\.abs\(breathScaleSmoothed - 1\) \/ LIFE_FULL\)/, 'the loop notes |breathScale − 1| over the span, zeroed while frozen');
+  assert.ok(!/publishMotion|from '\.\/motionTap|from '\.\/motionReadout/.test(loop), 'the retired tap and readout are gone from the loop');
 });
 
 ok('read-only law: the strip sends nothing out, writes no state, and names no bus machinery', () => {
@@ -105,15 +134,20 @@ ok('read-only law: the strip sends nothing out, writes no state, and names no bu
   assert.ok(!/Events\.|eventBus/.test(strip), 'no event names, no bus');
   assert.ok(!/on(Click|Pointer|Mouse|Hover)/.test(strip), 'no pointer handlers: a readout, not a control');
   assert.match(strip, /readMotionLevels/);
-  for (const label of ['DRIFT', 'BREATH', 'WIND', 'RHYTHM', 'WOBBLE', 'MOTH']) assert.ok(strip.includes(`'${label}'`), label);
+  for (const label of ['LIFE', 'DRIFT', 'BREATH', 'PULSE', 'WIND', 'RHYTHM', 'WOBBLE', 'PALETTE', 'MOTH']) assert.ok(strip.includes(`'${label}'`), label);
   assert.ok(!/title=/.test(strip), 'no explainer tooltips');
 });
 
-ok('the publisher reads the resolver, never recomputes; the panel and the frame tap are wired', () => {
+ok('the publisher reads the resolver, never recomputes; the panel and the frame tap are wired; the old strip is retired', () => {
   const pub = src('../composition/motionLive.js').replace(/\/\/.*$/gm, '');
   assert.match(pub, /getLastFrameMotion/);
+  assert.match(pub, /getLifeBreath/, 'LIFE folds in from the loop\'s note');
+  assert.match(pub, /amounts\.pulse/, 'PULSE folds in from the same ctx');
+  assert.match(pub, /amounts\.paletteBreath/, 'PALETTE folds in from the same ctx');
   assert.ok(!/patternAmounts|livingMotion\s*\(/.test(pub), 'no motion is recomputed in the publisher');
-  assert.match(src('../panels/StimulusPanel.jsx'), /<MeterHero \/>[\s\S]*?<MotionMeter \/>/, 'beside the meter, STIMULI only');
+  const panel = src('../panels/StimulusPanel.jsx');
+  assert.match(panel, /<MeterHero \/>[\s\S]*?<MotionMeter \/>/, 'beside the meter, STIMULI only');
+  assert.ok(!/MotionStrip/.test(panel), 'the #1485 strip no longer renders: one motion readout in the panel');
   assert.match(src('../App.jsx'), /observeAudio\(input && input\.loopTimeMs[\s\S]*?observeMotion\(\)/, 'published once per resolved frame, from the frame tap');
 });
 

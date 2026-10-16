@@ -1,20 +1,25 @@
-// MotionMeter (#1469) — the always-alive motion made visible, beside the METER in STIMULI: six
-// vertical bars in the meter's language (DRIFT, BREATH, WIND, RHYTHM, WOBBLE, MOTH), short names
-// only, no numbers, no units, nothing that explains the engine. Read-only in the strict sense:
-// it polls the motion tap in its own rAF — the METER's cadence — and writes bar heights straight
-// to the DOM. It sends nothing out, touches no store, and holds no per-frame React state. The
-// MOTH bar is absent (not zeroed) whenever no moths are on stage. A null read (no frame has
-// published yet, or the resolver's living-motion floor is still) shows flat bars: stillness is
-// a reading, never a missing panel.
+// MotionMeter (#1469) — the always-alive motion made visible, beside the METER in STIMULI: the
+// panel's only motion readout (the #1485 strip merged into this one, Matt's ruling 2026-10-15).
+// Nine vertical bars in the meter's language — LIFE, DRIFT, BREATH, PULSE, WIND, RHYTHM, WOBBLE,
+// PALETTE from the frame's own numbers, MOTH last — short names only, no numbers, no units,
+// nothing that explains the engine. Read-only in the strict sense: it polls the motion tap in
+// its own rAF — the METER's cadence — and writes bar heights straight to the DOM. It sends
+// nothing out, touches no store, and holds no per-frame React state. The MOTH bar is absent
+// (not zeroed) whenever no moths are on stage. A null read (no frame has published yet, or the
+// resolver's living-motion floor is still) shows flat bars: stillness is a reading, never a
+// missing panel.
 import { useEffect, useRef } from 'react';
 import { readMotionLevels } from '../../hooks/motionMeterTap.js';
 
 const BARS = [
+  ['life', 'LIFE'],
   ['drift', 'DRIFT'],
   ['breath', 'BREATH'],
+  ['pulse', 'PULSE'],
   ['wind', 'WIND'],
   ['rhythmPhase', 'RHYTHM'],
   ['wobble', 'WOBBLE'],
+  ['palette', 'PALETTE'],
   ['mothBeat', 'MOTH'],
 ];
 

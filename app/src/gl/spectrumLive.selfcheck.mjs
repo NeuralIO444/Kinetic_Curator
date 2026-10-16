@@ -73,7 +73,7 @@ ok('wired: App starts and stops the driver; STIMULI mounts the strip under the M
   const app = src('../App.jsx');
   assert.ok(/const stopSpectrum = startSpectrum\(getAudioMeterTap\)/.test(app) && /stopSpectrum\(\)/.test(app));
   const panel = src('../panels/StimulusPanel.jsx');
-  assert.ok(/<MeterHero \/>[\s\S]{0,120}<SpectrumStrip \/>/.test(panel), 'directly under the METER');
+  assert.ok(/<MeterHero \/>[\s\S]*?<MotionMeter \/>[\s\S]*?<SpectrumStrip \/>/.test(panel), 'under the METER, below the MOTION strip (#1469 takes the beside-the-METER slot)');
   const strip = src('../panels/stimulus/SpectrumStrip.jsx');
   assert.ok(/readSpectrum\(\)/.test(strip) && !/stepSpectrum|emit\(|useStore/.test(strip), 'read only');
   const live = src('./spectrumLive.mjs');
