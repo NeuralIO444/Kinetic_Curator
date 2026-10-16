@@ -14,7 +14,16 @@
 //   coverage: { kind:'kc-census-coverage', dice, keeps, keepsNote }
 //   census:   { kind:'kc-census-params',   params, reach }
 //   run:      run.json + finalists.json + candidates.json (a run folder)
+//
+// One view below breaks the artifact pattern on purpose (#1592): the
+// shelf readout's input is the LIVE shelf state (records + history
+// ledger), because the shelf's census is a telemetry read of the
+// instrument as it stands, not of a snapshot file. It keeps the same
+// discipline — a pure tally of the records handed to it.
 import { cornerWord } from './provenance.mjs';
+import { STAGE_BUDGET, FILL_RULES, stageSlotsUsed } from './shelf.mjs';
+import { RULE_ORDER, tableName, DEFAULT_SHELF_PREFS } from './shelfPrefs.mjs';
+import { anchorAccount, DEFAULT_EXPORT_PREFS } from './shelfDisk.mjs';
 
 export const COVERAGE_KIND = 'kc-census-coverage';
 export const CENSUS_KIND = 'kc-census-params';
@@ -117,6 +126,205 @@ export function yieldByCornerView({ candidates, finalists } = {}) {
     rows,
     totalCandidates: rows.reduce((s, r) => s + r.candidates, 0),
     totalFinalists: rows.reduce((s, r) => s + r.finalists, 0),
+  };
+}
+
+/**
+ * Keeps K4 (#1592) — the census shelf readout: the shelf explains
+ * itself in the census. Unlike the artifact views above, its input is
+ * the LIVE shelf state (records, stage ids, the §5 history ledger,
+ * the disk stub index, the preferences in force) handed in by the
+ * panel — but the discipline is the same as every view in this module:
+ * a tally of records, nothing measured, nothing graded. Every figure
+ * below traces to a ledger record, a record stamp, or stage
+ * membership; a keep counts as staged when the ledger dealt/swapped/
+ * crowned it onto the stage, its stagedCount stamp (the ledger's own
+ * cache, spec §5) says so, or it stands on the stage now.
+ *
+ * Honest-signals law (issue #1592): an empty shelf returns words, not
+ * zeros with confidence; a rule that dealt nothing shows its zero;
+ * the fill window is stated, never implied.
+ */
+export const SHELF_CENSUS_FILL_WINDOW = 10;
+export const SHELF_CENSUS_TAIL = 8;
+
+export function shelfCensusView({
+  keeps = [], stageIds = [], history = [],
+  stubs = {}, diskRecords = {},
+  prefs = null, exportPrefs = null, labels = {},
+} = {}) {
+  const p = prefs || DEFAULT_SHELF_PREFS;
+  const xp = exportPrefs || DEFAULT_EXPORT_PREFS;
+  const inApp = new Map((keeps || []).map((k) => [k.id, k]));
+  const stageSet = new Set(stageIds || []);
+  const acct = anchorAccount({ stubs, diskRecords, inAppIds: new Set(inApp.keys()) });
+
+  // Ledger evidence: who has ever been staged, and the move totals.
+  const ledgerStaged = new Set();
+  const moves = { crowns: 0, swaps: 0, exports: 0, imports: 0 };
+  const fills = [];
+  for (const r of history || []) {
+    if (!r || typeof r !== 'object') continue;
+    if (r.kind === 'fill') {
+      fills.push(r);
+      for (const s of r.slots || []) if (s && s.keepId) ledgerStaged.add(s.keepId);
+    } else if (r.kind === 'swap') {
+      moves.swaps++;
+      if (r.inId) ledgerStaged.add(r.inId);
+    } else if (r.kind === 'crown') {
+      moves.crowns++;
+      if (r.tier === 'stage' && r.keepId) ledgerStaged.add(r.keepId);
+    } else if (r.kind === 'export') moves.exports++;
+    else if (r.kind === 'import') moves.imports++;
+  }
+
+  // The population: every known keep exactly once. In-app records
+  // first; a disk keep reads from its record when one is in hand,
+  // else from its stub (the index card — never a second record).
+  const population = [];
+  const seen = new Set();
+  const entryFor = (id, rec, location) => ({
+    id,
+    label: labels[id] || rec?.label || id,
+    keptAt: Number.isFinite(rec?.keptAt) ? rec.keptAt : null,
+    stagedCount: Number.isFinite(rec?.stagedCount) ? rec.stagedCount : null,
+    lastStagedAt: Number.isFinite(rec?.lastStagedAt) ? rec.lastStagedAt : null,
+    location,
+    onStage: stageSet.has(id),
+    staged: stageSet.has(id) || ledgerStaged.has(id)
+      || (Number.isFinite(rec?.stagedCount) && rec.stagedCount >= 1),
+  });
+  for (const k of keeps || []) {
+    if (!k || seen.has(k.id)) continue;
+    seen.add(k.id);
+    population.push(entryFor(k.id, k, 'app'));
+  }
+  for (const [id, stub] of Object.entries(stubs || {})) {
+    if (!stub || seen.has(id)) continue;
+    seen.add(id);
+    const rec = (diskRecords || {})[id] || stub;
+    population.push(entryFor(id, rec, stub.missing ? 'missing' : 'disk'));
+  }
+
+  const total = population.length;
+  if (total === 0) {
+    return {
+      empty: true,
+      emptyLine: 'the shelf is empty — no keeps in the app, none on disk. Crown a keep and it lands here.',
+      tiers: null, fills: null, neglect: null, wiring: [], moves,
+      anchor: { partial: acct.partial, unread: acct.unread.length },
+    };
+  }
+
+  // ── tier counts (live) ──
+  const stageKeeps = population.filter((e) => e.onStage);
+  const allRecords = [...(keeps || []),
+    ...Object.values(diskRecords || {}).filter((k) => k && !inApp.has(k.id))];
+  const slotsUsed = stageSlotsUsed(allRecords, stageIds);
+  const tiers = {
+    stage: stageKeeps.length,
+    slotsUsed,
+    slotsBudget: STAGE_BUDGET,
+    collection: population.filter((e) => !e.onStage && e.location === 'app').length,
+    disk: acct.known,
+    diskRead: acct.loaded,
+    diskUnread: acct.unread.length,
+    diskMissing: population.filter((e) => e.location === 'missing').length,
+    total,
+    softBound: p.collectionSoftBound,
+    inApp: inApp.size,
+    overBy: Math.max(0, inApp.size - p.collectionSoftBound),
+  };
+
+  // ── fill-rule distribution over the last N fills ──
+  const windowFills = fills.slice(-SHELF_CENSUS_FILL_WINDOW);
+  const distinctDealt = new Set();
+  const ruleRows = FILL_RULES.map((rule) => {
+    let dealt = 0;
+    let fillsDealt = 0;
+    let undealt = 0;
+    for (const f of windowFills) {
+      const n = (f.slots || []).filter((s) => s && s.rule === rule).length;
+      dealt += n;
+      if (n > 0) fillsDealt++;
+      if ((f.undealt || []).includes(rule)) undealt++;
+    }
+    return { rule, dealt, fillsDealt, undealt };
+  });
+  for (const f of windowFills) for (const s of f.slots || []) if (s && s.keepId) distinctDealt.add(s.keepId);
+  const fillsView = {
+    window: SHELF_CENSUS_FILL_WINDOW,
+    counted: windowFills.length,
+    total: fills.length,
+    none: windowFills.length === 0,
+    rows: ruleRows,
+    slotsTotal: ruleRows.reduce((n, r) => n + r.dealt, 0),
+    distinctDealt: distinctDealt.size,
+    lastTable: windowFills.length ? (windowFills[windowFills.length - 1].table || '') : '',
+  };
+
+  // ── neglect coverage + the longest-unstaged tail ──
+  // The tail reads neglect the way the fill's neglected rule does
+  // (shelfFill's byNeglect): least-staged first, then longest since
+  // last staged, then oldest kept. On-stage keeps are not the tail.
+  const stagedEver = population.filter((e) => e.staged).length;
+  const tail = population
+    .filter((e) => !e.onStage)
+    .sort((a, b) => ((a.stagedCount ?? 0) - (b.stagedCount ?? 0))
+      || ((a.lastStagedAt ?? -Infinity) - (b.lastStagedAt ?? -Infinity))
+      || ((a.keptAt ?? -Infinity) - (b.keptAt ?? -Infinity))
+      || (a.id < b.id ? -1 : 1))
+    .slice(0, SHELF_CENSUS_TAIL)
+    .map((e) => ({
+      id: e.id, label: e.label, keptAt: e.keptAt,
+      stagedCount: e.stagedCount, lastStagedAt: e.lastStagedAt,
+      neverStaged: !e.staged, location: e.location,
+    }));
+  const neglect = {
+    population: total,
+    stagedEver,
+    neverStaged: total - stagedEver,
+    coverage: total ? stagedEver / total : null,
+    tail,
+    tailTotal: population.filter((e) => !e.onStage).length,
+  };
+
+  // ── the wiring: every setting the stack introduced, its value in
+  // force, and its footprint in the ledger (the census discipline —
+  // a knob with no footprint anywhere is a knob to name, not hide).
+  const wiring = [
+    {
+      key: 'table',
+      setting: `sway table ${tableName(p)} — ${RULE_ORDER.map((r) => `${r} ${p.table[r]}`).join(' · ')}`,
+      footprint: fillsView.none
+        ? 'no fills in the ledger yet — the table has dealt nothing'
+        : `${fillsView.slotsTotal} slots dealt across the last ${fillsView.counted} fills (${fillsView.distinctDealt} distinct keeps)`,
+    },
+    {
+      key: 'recencyWindow',
+      setting: `recency window ${p.recencyWindow} fills`,
+      footprint: fillsView.none
+        ? 'no fills yet — suppression has had nothing to rotate'
+        : `${fillsView.distinctDealt} distinct keeps reached the stage in the window — the rotation the window produces`,
+    },
+    {
+      key: 'collectionSoftBound',
+      setting: `collection soft bound ${p.collectionSoftBound}`,
+      footprint: tiers.overBy > 0
+        ? `the shelf stands at ${tiers.inApp} in-app — ${tiers.overBy} over the bound (K3's export is the release valve)`
+        : `the shelf stands at ${tiers.inApp} in-app — under the bound`,
+    },
+    {
+      key: 'export',
+      setting: `export on soft bound: ${xp.onSoftBound} · folder ${xp.folder} · stills ${xp.includeStills ? 'in' : 'out'}`,
+      footprint: `${moves.exports} exports · ${moves.imports} imports in the ledger`,
+    },
+  ];
+
+  return {
+    empty: false, emptyLine: null,
+    tiers, fills: fillsView, neglect, wiring, moves,
+    anchor: { partial: acct.partial, unread: acct.unread.length },
   };
 }
 
