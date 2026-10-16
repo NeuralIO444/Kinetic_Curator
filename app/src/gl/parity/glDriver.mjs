@@ -56,7 +56,11 @@ function splitLargeStrings(payload) {
   return { slim: walk(payload), chunks };
 }
 
-async function evaluateChunked(pg, fnName, payload) {
+/** Call a harness-page function with a payload too large for one evaluate
+ * argument, ferried in pieces and reassembled page-side. Exported for the
+ * cost bench (#1578): a recipe's atlas payload is the same shape — and the
+ * same size problem — as an export's. */
+export async function evaluateChunked(pg, fnName, payload) {
   const { slim, chunks } = splitLargeStrings(payload);
   if (chunks.size === 0) {
     return pg.evaluate(([name, arg]) => window[name](arg), [fnName, slim]);
