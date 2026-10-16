@@ -133,6 +133,14 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     // Absent (the common case) the contract is byte-identical.
     ...(item.wash ? { wash: true } : {}),
     ...(item.stipple ? { stipple: true } : {}),
+    // #1585 (Materials M4) — the body's tunables ride the same way:
+    // buildPlacements stamps `matParams` only when the stratum's
+    // knobs moved off the shipped defaults, so an unmoved Look's
+    // contract (and its hash) is exactly the pre-M4 contract, and the
+    // packer fills the param attribute from the leaves' defaults
+    // whenever the key is absent. Rounded to 3 places like every
+    // contract number.
+    ...(Array.isArray(item.matParams) ? { mat: item.matParams.map((v) => r3(v)) } : {}),
   };
 }
 

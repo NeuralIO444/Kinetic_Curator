@@ -54,6 +54,9 @@ import { registerCostTier } from './costTiers.mjs';
 import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
 import { kinemePhase } from '../data/kinemes.js'; // #1433 R2: per-region phase = the house seed hash of (asset id, region id)
 import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
+import { PLATE_GEO_DEFAULTS } from '../engine/plateBody.mjs'; // #1585 (Materials M4): packer defaults for the param attribute
+import { WASH_PARAM_DEFAULTS } from '../engine/washBody.mjs'; // #1585
+import { STIPPLE_DOT_SCALE } from '../engine/stippleBody.mjs'; // #1585
 import { createCoalesceFinish } from './coalesceFinish.mjs'; // #1411 coalescence finish
 import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
 
@@ -480,9 +483,9 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     list = expandRegionInstances(instances, cells, cellFrame.regions);
   }
 
-  // 25 floats/instance (100-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // 29 floats/instance (116-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass)
-  // (defX,defY,defAmt) (material body code).
+  // (defX,defY,defAmt) (material body code) (material params x4).
   // #781: kineme 0 = still (exactly the old zeros).
   // #1129 PR2: glass is 1 for glass-voice instances (soft bevel), else 0.
   // #1410: deform is the impact squash (axis + amount); absent reads 0 =
@@ -493,8 +496,15 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
   // 0 flat, 1 plate, 2 wash, 3 stipple — decoded in QUAD_VS. The stride,
   // the attribute pointer and every earlier offset are unchanged, so
   // plate (1) and flat (0) pack bit-identically to M2.
+  // #1585 (Materials M4): four param floats appended after the body
+  // code (the M2 append pattern — every earlier offset unchanged).
+  // The body's own reading: plate (cx, cy, radius, 0), wash
+  // (strength, spread, 0, 0), stipple (dotScale, 0, 0, 0). An
+  // instance whose contract carries no `mat` (its Look never moved
+  // the knobs) packs the leaves' shipped defaults, so the shader
+  // reads the pre-M4 constants for it, bit for bit.
   const maxLen = list.length;
-  const buf = new Float32Array(maxLen * 25);
+  const buf = new Float32Array(maxLen * 29);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = list[i];
@@ -539,7 +549,29 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     const df = it.deform; // #1410: [axisX, axisY, amount]; missing (old producers) reads 0 = round
     buf[o + 21] = df ? df[0] : 0; buf[o + 22] = df ? df[1] : 0; buf[o + 23] = df ? df[2] : 0;
     buf[o + 24] = it.plate ? 1 : it.wash ? 2 : it.stipple ? 3 : 0; // #1548/#1549: material body code; missing flags (old producers) read 0 = flat ink
-    o += 25;
+    // #1585: the body's M4 params (see the stride note above). `mat`
+    // rides the contract only when the Look moved a knob; absent, the
+    // body code selects the shipped defaults.
+    const mat = it.mat;
+    if (buf[o + 24] === 1) {
+      buf[o + 25] = mat ? mat[0] : PLATE_GEO_DEFAULTS.cx;
+      buf[o + 26] = mat ? mat[1] : PLATE_GEO_DEFAULTS.cy;
+      buf[o + 27] = mat ? mat[2] : PLATE_GEO_DEFAULTS.radius;
+      buf[o + 28] = 0;
+    } else if (buf[o + 24] === 2) {
+      buf[o + 25] = mat ? mat[0] : WASH_PARAM_DEFAULTS.strength;
+      buf[o + 26] = mat ? mat[1] : WASH_PARAM_DEFAULTS.spread;
+      buf[o + 27] = 0;
+      buf[o + 28] = 0;
+    } else if (buf[o + 24] === 3) {
+      buf[o + 25] = mat ? mat[0] : STIPPLE_DOT_SCALE;
+      buf[o + 26] = 0;
+      buf[o + 27] = 0;
+      buf[o + 28] = 0;
+    } else {
+      buf[o + 25] = 0; buf[o + 26] = 0; buf[o + 27] = 0; buf[o + 28] = 0;
+    }
+    o += 29;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
@@ -753,7 +785,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (spec && specTex && specUploaded) {
       gl.uniform1i(U(quadProg, 'u_spec'), bindTex(SPEC_UNIT, specTex));
       gl.uniform4f(U(quadProg, 'u_specA'), spec.map, spec.scale, spec.displace, spec.colour);
-      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 25);
+      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 29); // #1585: instance count at the 29-float stride
     } else {
       gl.uniform4f(U(quadProg, 'u_specA'), 0, 0, 0, 0);
     }
@@ -765,27 +797,31 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     for (let i = 1; i <= 5; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 100, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 116, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     // #1129 PR2: a_glass — single float at byte 80.
     gl.enableVertexAttribArray(6);
-    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 100, 80);
+    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 116, 80);
     gl.vertexAttribDivisor(6, 1);
-    // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84 (25-float stride).
+    // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84.
     gl.enableVertexAttribArray(7);
-    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 100, 84);
+    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 116, 84);
     gl.vertexAttribDivisor(7, 1);
     // #1548/#1549: a_plate — the material body code, single float at byte 96 (the appended tail float).
     gl.enableVertexAttribArray(8);
-    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 100, 96);
+    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 116, 96);
     gl.vertexAttribDivisor(8, 1);
+    // #1585: a_matP — the material body's M4 param vec4 at byte 100 (29-float stride).
+    gl.enableVertexAttribArray(9);
+    gl.vertexAttribPointer(9, 4, gl.FLOAT, false, 116, 100);
+    gl.vertexAttribDivisor(9, 1);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 25);
-    for (let i = 0; i <= 8; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 29);
+    for (let i = 0; i <= 9; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
 

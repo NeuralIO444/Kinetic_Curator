@@ -12,7 +12,8 @@
 //    changes NOTHING else — the body is a render-level screen, not
 //    a placement field; plate/wash/glass are untouched;
 //  - the scene contract: the stipple flag rides only when set;
-//  - the instance packer: 25-float stride, the tail float carries
+//  - the instance packer: 29-float stride (#1585 appended the M4
+//    param vec4 after the body code), the tail float carries
 //    body code 3 for stipple (1 plate / 2 wash / 0 flat unchanged);
 //  - the shader: the body code is decoded in QUAD_VS, stippleShade
 //    gated on v_stipple in the tint branch, and stippleCover screens
@@ -25,7 +26,7 @@ import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
 import {
   isStippleMaterial, STIPPLE_MATERIAL, STIPPLE_CELL, STIPPLE_BOX, STIPPLE_DOTS,
-  STIPPLE_DOT_SCALE, stippleShadeAt, STIPPLE_GLSL, stipplePatternDef,
+  STIPPLE_DOT_SCALE, stippleShadeAt, STIPPLE_GLSL, stipplePatternDef, stippleDotScaleFrom,
 } from './stippleBody.mjs';
 import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
@@ -181,18 +182,38 @@ ok('contract: stipple instances carry the flag; non-stipple contracts gain no ke
 });
 
 // ── the instance packer + shader ─────────────────────────────────────
-ok('packInstanceData: 25-float stride, stipple packs body code 3 at the tail', () => {
+ok('packInstanceData: 29-float stride, stipple packs body code 3 at the tail', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
     asset: 'a1', tint: '#000000', accent: '#000000', x: 1, y: 2, scaleX: 3, scaleY: 3,
     rotation: 0, opacity: 1, vx: 0, vy: 0, kineme: 0, kinemePhase: 0, ...extra,
   });
   const buf = packInstanceData([mk({ stipple: true }), mk({ wash: true }), mk({ plate: true }), mk({})], cells);
-  assert.equal(buf.length, 4 * 25, 'four instances at the 25-float stride');
+  assert.equal(buf.length, 4 * 29, 'four instances at the 29-float stride');
   assert.equal(buf[24], 3, 'stipple instance: tail float is body code 3');
-  assert.equal(buf[25 + 24], 2, 'wash instance: tail float is body code 2');
-  assert.equal(buf[2 * 25 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
-  assert.equal(buf[3 * 25 + 24], 0, 'unflagged instance: tail float is 0');
+  assert.equal(buf[29 + 24], 2, 'wash instance: tail float is body code 2');
+  assert.equal(buf[2 * 29 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
+  assert.equal(buf[3 * 29 + 24], 0, 'unflagged instance: tail float is 0');
+  // #1585: absent `mat` the packer writes Matt's shipped dot scale;
+  // a carried `mat` writes through.
+  assert.deepEqual([...buf.slice(25, 29)], [2.5, 0, 0, 0], 'stipple at defaults packs the shipped dot scale');
+  const moved = packInstanceData([mk({ stipple: true, mat: [4, 0, 0, 0] })], cells);
+  assert.deepEqual([...moved.slice(25, 29)], [4, 0, 0, 0], 'stipple with a moved dot scale packs it');
+});
+
+ok('#1585: the dot scale moves the screen; defaults resolve to Matt\'s scale', () => {
+  // at ×1 the ink dot is r 0.8 — a point 1.2 units from its centre is a gap;
+  // at Matt's ×2.5 (r 2.0) the same point is inside the dot.
+  const pt = { x: (1.5 + 1.2) / 100, y: 1.5 / 100 };
+  assert.equal(stippleShadeAt(pt.x, pt.y, 1).color, null, 'at ×1 the point sits in a gap');
+  assert.equal(stippleShadeAt(pt.x, pt.y).color, 'ink', 'at the shipped ×2.5 the point is inside the ink dot');
+  assert.equal(stippleDotScaleFrom({}), 2.5);
+  assert.equal(stippleDotScaleFrom({ stippleDotScale: NaN }), 2.5, 'garbage resolves to the shipped scale');
+  assert.equal(stippleDotScaleFrom({ stippleDotScale: 4 }), 4);
+  // the def at explicit defaults is byte-identical to the def at no argument
+  assert.equal(stipplePatternDef('sgD', '#abcdef', '#123456', 2.5), stipplePatternDef('sgD', '#abcdef', '#123456'));
+  const big = stipplePatternDef('sgB', '#abcdef', '#123456', 5);
+  assert.ok(big.includes('<circle cx="1.5" cy="1.5" r="4"'), 'at ×5 the ink dot radius doubles Matt\'s');
 });
 
 ok('shader: body code decoded, v_stipple wired, screen in both tint and baked paths', () => {
@@ -226,6 +247,22 @@ ok('stills: stipple paints ink through the pattern def; the raster moves; flat g
   for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
   const meanAbs = sum / ap.length;
   assert.ok(meanAbs > 0.5, `stipple still raster differs measurably from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
+});
+
+ok('#1585 stills: the dot scale moves the raster; defaults leave no matParams', () => {
+  assert.ok(stipple.every((i) => i.matParams === undefined), 'default stipple items carry no matParams field value');
+  const fine = place({ ...BASE, material: 'stipple', stippleDotScale: 1 });
+  assert.ok(fine.every((i) => Array.isArray(i.matParams)), 'moved stipple items carry matParams');
+  assert.deepEqual(fine[0].matParams, [1, 0, 0, 0], 'matParams is (dotScale, 0, 0, 0)');
+  const palette = resolvePalette('hydra', null, []);
+  const raster = (svg) => new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
+  const a = raster(composeStillSvg(stipple, palette));
+  const b = raster(composeStillSvg(fine, palette));
+  const ap = a.pixels; const bp = b.pixels;
+  let sum = 0;
+  for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
+  const meanAbs = sum / ap.length;
+  assert.ok(meanAbs > 0.5, `stipple dot scale 2.5 → 1 moves the still (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
 });
 
 console.log(`stippleBody.selfcheck: OK (${n} cases)`);

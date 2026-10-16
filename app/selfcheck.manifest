@@ -10,6 +10,7 @@ node src/engine/glassBody.selfcheck.mjs
 node src/engine/plateBody.selfcheck.mjs
 node src/engine/washBody.selfcheck.mjs
 node src/engine/stippleBody.selfcheck.mjs
+node src/engine/materialParams.selfcheck.mjs
 node src/gl/glassBevel.selfcheck.mjs
 node src/gl/glassCaustic.selfcheck.mjs
 node src/gl/glassStriation.selfcheck.mjs

@@ -273,7 +273,7 @@ console.log('regionPlayback node (atlas demand): OK');
   const inst = { ...c.instances[0], rotation: 30 }; // rotated, to prove the parenting math
   const frame = { motionTime: 0, shed: false, regions: c.regionAnim };
   const packed = packInstanceData([inst], cellsObj, 1, frame);
-  assert.strictEqual(packed.length, (flora.regions.length + 1) * 25, 'one mark expands to remainder + R region instances');
+  assert.strictEqual(packed.length, (flora.regions.length + 1) * 29, 'one mark expands to remainder + R region instances');
   // Remainder first: the mark's own transform and kineme, the remainder cell.
   const base = comboKey(FLORA, inst.tint, inst.accent);
   const remCell = atlas.cells.get(`${base}#rem`);
@@ -284,7 +284,7 @@ console.log('regionPlayback node (atlas demand): OK');
   // scale = mark scale x geometry, kineme slot + hash phase.
   const th = (inst.rotation * Math.PI) / 180, co = Math.cos(th), si = Math.sin(th);
   flora.regions.forEach((r, i) => {
-    const o = (i + 1) * 25;
+    const o = (i + 1) * 29;
     const cell = atlas.cells.get(`${base}#r:${r.id}`);
     const g = cell.geo;
     const lx = (g.px - 50) * inst.scaleX, ly = (g.py - 50) * inst.scaleY;
@@ -302,7 +302,7 @@ console.log('regionPlayback node (atlas demand): OK');
     'shed collapse packs exactly the single quad');
   assert.deepStrictEqual(packInstanceData([inst], cellsObj, 1, { motionTime: 0, shed: false, regions: null }), bare,
     'no region state packs exactly the single quad');
-  assert.strictEqual(bare.length, 25, 'the single quad is one instance');
+  assert.strictEqual(bare.length, 29, 'the single quad is one instance');
   // Fail-closed: region state but no region cells -> the single quad.
   const wholeOnly = { [base]: atlas.cells.get(base) };
   assert.deepStrictEqual(packInstanceData([inst], wholeOnly, 1, frame), packInstanceData([inst], wholeOnly),
@@ -312,11 +312,11 @@ console.log('regionPlayback node (atlas demand): OK');
   const lowInst = low.instances[0];
   const lowPacked = packInstanceData([lowInst], cellsObj, 1, { motionTime: 0, shed: false, regions: low.regionAnim });
   const centreIdx = flora.regions.findIndex((r) => r.id === CENTRE);
-  assert.strictEqual(lowPacked[(centreIdx + 1) * 25 + 18], lowInst.kineme, 'unselected region inherits the mark kineme');
-  assert.ok(Math.abs(lowPacked[(centreIdx + 1) * 25 + 19] - lowInst.kinemePhase) < 2e-3, 'unselected region inherits the mark phase');
+  assert.strictEqual(lowPacked[(centreIdx + 1) * 29 + 18], lowInst.kineme, 'unselected region inherits the mark kineme');
+  assert.ok(Math.abs(lowPacked[(centreIdx + 1) * 29 + 19] - lowInst.kinemePhase) < 2e-3, 'unselected region inherits the mark phase');
   // Two marks expand independently.
   const two = packInstanceData([inst, { ...inst, x: 100, y: 100 }], cellsObj, 1, frame);
-  assert.strictEqual(two.length, 2 * (flora.regions.length + 1) * 25, 'two marks -> two expansions');
+  assert.strictEqual(two.length, 2 * (flora.regions.length + 1) * 29, 'two marks -> two expansions');
 }
 console.log('regionPlayback node (pack): OK');
 

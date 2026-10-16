@@ -40,6 +40,7 @@ import { createDish } from '../engine/kernel/dish.js';
 import { patternGround } from '../pattern/ground.js';
 import { defaultPattern } from '../state/patternTrack.js';
 import { mulberry32 } from './coverageReport.mjs';
+import { composeStillSvg } from './miner.mjs'; // #1585 — the matstill driver's still composer
 // XGBoost T2: the agreement readout scores ledger recipes with the taste
 // head — the same module the live instrument uses (tasteHead.scoreLayout).
 import { scoreLayout, headUsable, XGB_HEAD_KIND } from './tasteHead.js';
@@ -201,6 +202,9 @@ const SWARM_BASE = {
 //   place — buildPlacements fingerprint (the still pipeline)
 //   swarm — bakeParticles end-state fingerprint (the physics bake)
 //   dish  — measured in the dish matrix below (cross-referenced)
+//   matstill — the composed still's raster, pixel-compared (#1585:
+//           the material bodies are render-level — placements carry
+//           their flags only — so the still is the honest context)
 //   none  — no headless consumer exists; reason recorded, door is in
 //           the selfcheck's write-path census.
 const FIELDMAP_CTX = { fieldMapField: 'noise', fieldMapChannel: 'scale', fieldMapAmount: 0.8 };
@@ -303,6 +307,19 @@ const KEY_FIXTURES = {
   contactRestitution: { driver: 'dish', reason: 'measured in the dish matrix (pair fixture)' },
   contactRepel: { driver: 'dish', reason: 'measured in the dish matrix (pair fixture)' },
   collideMask: { driver: 'dish', reason: 'measured in the dish matrix (masked pair isolation)' },
+  // #1585 (Materials M4) — the material bodies' tunables. glassAlpha is
+  // spent at placement time (the alpha multiply), so the place
+  // fingerprint sees it; the ramp/screen knobs are render-level —
+  // placements carry their flags only, by design — so they are swept
+  // through the composed still (matstill), the same surface their
+  // leaf suites measure.
+  glassAlpha: { driver: 'place', ctx: { mode: 'fibonacci', material: 'glass' }, note: 'the glass body spends its alpha at placement time (buildPlacements), so the fingerprint carries it' },
+  plateRadius: { driver: 'matstill', ctx: { material: 'plate' }, note: 'render-level: swept through the composed still (the plateBody leaf suite measures the same raster)' },
+  plateCenterX: { driver: 'matstill', ctx: { material: 'plate' }, note: 'render-level: swept through the composed still' },
+  plateCenterY: { driver: 'matstill', ctx: { material: 'plate' }, note: 'render-level: swept through the composed still' },
+  washStrength: { driver: 'matstill', ctx: { material: 'wash' }, note: 'render-level: swept through the composed still' },
+  washSpread: { driver: 'matstill', ctx: { material: 'wash' }, note: 'render-level: swept through the composed still' },
+  stippleDotScale: { driver: 'matstill', ctx: { material: 'stipple' }, note: 'render-level: swept through the composed still' },
 };
 
 // The structural keys (enums + bools) — value pairs to sweep at the
@@ -387,6 +404,30 @@ function baseFor(driver) {
   return { ...PLACE_BASE };
 }
 
+// ── #1585 — the matstill driver ─────────────────────────────────────
+// The material bodies paint at render level; placements carry their
+// flags and nothing else, so no placement fingerprint can see their
+// tunables. The honest headless context is the composed still (the
+// miner's SVG baker — one of the two render paths the bodies serve),
+// rasterized and compared pixel by pixel. The pixel buffer is cached
+// ONCE per raster (Resvg's .pixels getter materializes a fresh buffer
+// per access — the #1564 lesson).
+function matStillRaster(params) {
+  const items = place(params);
+  const svg = composeStillSvg(items, resolvePalette('hydra', null, []));
+  const img = new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
+  const px = img.pixels;
+  return { px, hash: createHash('sha256').update(px).digest('hex'), n: items.length };
+}
+function pxDiffCount(a, b) {
+  let d = 0;
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i += 4) {
+    if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) d++;
+  }
+  return d;
+}
+
 export function paramCensus() {
   const rows = [];
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
@@ -417,6 +458,23 @@ export function paramCensus() {
       const gMax = flagged(spec.max);
       row.delta = { n0: gMin, n1: gMax, equal: gMin === gMax, moved: Math.abs(gMax - gMin), meanPosShift: 0 };
       row.repeatIdentical = flagged(spec.min) === gMin;
+      row.class = row.delta.equal ? 'zero-in-context' : 'moves';
+      if (fx.note) row.note = fx.note;
+      rows.push(row);
+      continue;
+    }
+    if (fx.driver === 'matstill') {
+      const at = (v) => matStillRaster({ ...PLACE_BASE, ...fx.ctx, [key]: v });
+      const lo = at(spec.min);
+      const hi = at(spec.max);
+      const rep = at(spec.min);
+      row.delta = {
+        n0: lo.n, n1: hi.n,
+        equal: lo.hash === hi.hash,
+        moved: pxDiffCount(lo.px, hi.px),
+        meanPosShift: 0,
+      };
+      row.repeatIdentical = rep.hash === lo.hash;
       row.class = row.delta.equal ? 'zero-in-context' : 'moves';
       if (fx.note) row.note = fx.note;
       rows.push(row);

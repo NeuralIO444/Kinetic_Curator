@@ -12,7 +12,8 @@
 //  - the scene contract: the wash flag rides only when set, so a
 //    non-wash contract is byte-identical in shape to the pre-M3
 //    contract (no key, no hash change);
-//  - the instance packer: 25-float stride, the tail float carries
+//  - the instance packer: 29-float stride (#1585 appended the M4
+//    param vec4 after the body code), the tail float carries
 //    body code 2 for wash (1 plate / 0 flat bit-identical to M2);
 //  - the shader: the body code is decoded in QUAD_VS, washShade
 //    inlined from the leaf constants, gated on v_wash;
@@ -24,7 +25,7 @@ import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
 import {
   isWashMaterial, WASH_MATERIAL, WASH_STOPS,
-  washRampAt, WASH_GLSL, washGradientDef,
+  washRampAt, WASH_GLSL, washGradientDef, washParamsFrom,
 } from './washBody.mjs';
 import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
@@ -71,7 +72,9 @@ ok('the ramp is the retired def, stop for stop', () => {
 });
 
 ok('the GLSL chunk and the SVG def read the same constants', () => {
-  for (const frag of ['washShade', 'clamp(local.y, 0.0, 1.0)', 'mix(accent, ink']) {
+  // #1585: strength/spread arrive as the `prm` vector (the packer
+  // fills it from the one source of truth); the stops stay the table.
+  for (const frag of ['washShade', 'clamp(local.y / prm.y, 0.0, 1.0) * prm.x', 'mix(accent, ink']) {
     assert.ok(WASH_GLSL.includes(frag), `GLSL carries ${frag}`);
   }
   const def = washGradientDef('wgX', '#abcdef', '#123456');
@@ -79,6 +82,25 @@ ok('the GLSL chunk and the SVG def read the same constants', () => {
   assert.ok(def.includes('<stop offset="0%" stop-color="#abcdef"/>'), 'top stop: accent');
   assert.ok(def.includes('<stop offset="100%" stop-color="#123456"/>'), 'bottom stop: ink');
   assert.ok(!def.includes('stop-opacity'), 'the retired def declares no stop-opacity — none is emitted');
+});
+
+ok('#1585: strength + spread reshape the ramp; defaults resolve to the shipped pair', () => {
+  assert.equal(washRampAt(0.5, 1, { strength: 0.5, spread: 1 }).inkMix, 0.5, 'strength halves the travel: the bottom edge is half ink');
+  assert.equal(washRampAt(0.5, 0.5, { strength: 1, spread: 2 }).inkMix, 0.25, 'spread 2: halfway down is a quarter of the ramp');
+  assert.equal(washRampAt(0.5, 0.25, { strength: 1, spread: 0.5 }).inkMix, 0.5, 'spread 0.5: the ramp completes by halfway down');
+  assert.equal(washRampAt(0.5, 0.75, { strength: 1, spread: 0.5 }).inkMix, 1, 'past the compressed ramp the pad is the last stop');
+  assert.equal(washRampAt(0.5, 0.5, { strength: 0, spread: 1 }).inkMix, 0, 'strength 0 holds the top colour everywhere');
+  assert.equal(washRampAt(0.5, 0.5, { strength: 0.5, spread: 1 }).alpha, 1, 'alpha is the table\'s, untouched by the params');
+  assert.deepEqual(washParamsFrom({}), { strength: 1, spread: 1 });
+  assert.deepEqual(washParamsFrom({ washStrength: NaN, washSpread: 0 }), { strength: 1, spread: 1 }, 'garbage resolves to the shipped pair');
+  assert.deepEqual(washParamsFrom({ washStrength: 0.4, washSpread: 2.5 }), { strength: 0.4, spread: 2.5 });
+  // the def at explicit defaults is byte-identical to the def at no argument
+  assert.equal(washGradientDef('wgD', '#abcdef', '#123456', { strength: 1, spread: 1 }), washGradientDef('wgD', '#abcdef', '#123456'));
+  const half = washGradientDef('wgH', '#000000', '#ffffff', { strength: 0.5, spread: 1 });
+  assert.ok(half.includes('<stop offset="100%" stop-color="#808080"/>'), 'strength 0.5: the bottom stop is the channel midpoint');
+  const tight = washGradientDef('wgT', '#abcdef', '#123456', { strength: 1, spread: 0.5 });
+  assert.ok(tight.includes('y2="0.5"'), 'spread 0.5: the gradient vector halves (the ramp completes halfway down)');
+  assert.ok(tight.includes('<stop offset="100%" stop-color="#123456"/>'), 'spread leaves the authored stop offsets alone — the vector carries it');
 });
 
 // ── placements (the census fixture, plateBody's BASE shape) ─────────
@@ -159,19 +181,24 @@ ok('contract: wash instances carry the flag; non-wash contracts gain no key', ()
 });
 
 // ── the instance packer + shader ─────────────────────────────────────
-ok('packInstanceData: 25-float stride, wash packs body code 2 at the tail', () => {
+ok('packInstanceData: 29-float stride, wash packs body code 2 at the tail', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
     asset: 'a1', tint: '#000000', accent: '#000000', x: 1, y: 2, scaleX: 3, scaleY: 3,
     rotation: 0, opacity: 1, vx: 0, vy: 0, kineme: 0, kinemePhase: 0, ...extra,
   });
   const buf = packInstanceData([mk({ wash: true }), mk({ plate: true }), mk({}), mk({ glass: true })], cells);
-  assert.equal(buf.length, 4 * 25, 'four instances at the 25-float stride');
+  assert.equal(buf.length, 4 * 29, 'four instances at the 29-float stride');
   assert.equal(buf[24], 2, 'wash instance: tail float is body code 2');
-  assert.equal(buf[25 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
-  assert.equal(buf[2 * 25 + 24], 0, 'unflagged instance: tail float is 0');
-  assert.equal(buf[3 * 25 + 20], 1, 'glass float unmoved at offset 20');
-  assert.equal(buf[3 * 25 + 24], 0, 'glass instance carries no body code');
+  assert.equal(buf[29 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
+  assert.equal(buf[2 * 29 + 24], 0, 'unflagged instance: tail float is 0');
+  assert.equal(buf[3 * 29 + 20], 1, 'glass float unmoved at offset 20');
+  assert.equal(buf[3 * 29 + 24], 0, 'glass instance carries no body code');
+  // #1585: absent `mat` the packer writes the shipped wash pair; a
+  // carried `mat` writes through.
+  assert.deepEqual([...buf.slice(25, 29)], [1, 1, 0, 0], 'wash at defaults packs (strength 1, spread 1)');
+  const moved = packInstanceData([mk({ wash: true, mat: [0.4, 2.5, 0, 0] })], cells);
+  assert.deepEqual([...moved.slice(25, 29)], [0.4, 2.5, 0, 0].map(Math.fround), 'wash with moved knobs packs them');
 });
 
 ok('shader: body code decoded, v_wash wired and washShade inlined', () => {
@@ -205,6 +232,22 @@ ok('stills: wash paints ink through the gradient def; the raster moves; flat gai
   for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
   const meanAbs = sum / ap.length;
   assert.ok(meanAbs > 0.5, `wash still raster differs measurably from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
+});
+
+ok('#1585 stills: wash strength moves the raster; defaults leave no matParams', () => {
+  assert.ok(wash.every((i) => i.matParams === undefined), 'default wash items carry no matParams field value');
+  const weak = place({ ...BASE, material: 'wash', washStrength: 0.25 });
+  assert.ok(weak.every((i) => Array.isArray(i.matParams)), 'moved wash items carry matParams');
+  assert.deepEqual(weak[0].matParams, [0.25, 1, 0, 0], 'matParams is (strength, spread, 0, 0)');
+  const palette = resolvePalette('hydra', null, []);
+  const raster = (svg) => new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
+  const a = raster(composeStillSvg(wash, palette));
+  const b = raster(composeStillSvg(weak, palette));
+  const ap = a.pixels; const bp = b.pixels;
+  let sum = 0;
+  for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
+  const meanAbs = sum / ap.length;
+  assert.ok(meanAbs > 0.5, `wash strength 1 → 0.25 moves the still (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
 });
 
 console.log(`washBody.selfcheck: OK (${n} cases)`);
