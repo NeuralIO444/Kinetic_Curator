@@ -26,6 +26,16 @@
 //       dishMedium.selfcheck (h) and the bake suites).
 //   (e) wiring: in both passes the friction block sits after the
 //       cling block and before the #1410 deform feed.
+//
+// D2 amendment (#1596): the slide the block answers is now read
+// at the contact point (centres + ω×r) and spread over the
+// spin-inclusive mass, so two D1 pins that measured the CENTRES'
+// slide are re-pinned to the contact-point law — the (a) grip
+// (the surfaces grip to zero; the centres keep the rolling
+// share) and the (c) trail (slide converts to roll instead of
+// stopping). Everything D1 pinned about budgets, dry parity,
+// and energy is unchanged and still asserted below; the spin
+// probes proper live in dishSpin.selfcheck.mjs.
 
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
@@ -86,11 +96,18 @@ const vtOf = (sys) => sys.vy[1] - sys.vy[0];
     `wet slide pays the Coulomb amount: vy ${slide.vy[0]}, ${slide.vy[1]} (vt −4 → −3)`);
   assert.ok(Math.abs(vtOf(slide) - -3) < EPS, 'vt reduced by exactly μ × jn × wSum');
 
-  // Wet grip: a small slide fits inside the budget and zeroes.
+  // Wet grip: a small slide fits inside the budget and the
+  // CONTACT-POINT slide zeroes (D2 re-pin — see the header note):
+  // the centres keep vt × (1 − wSum/kt) = −0.4 × 2/3 of slide as
+  // rolling motion, and both discs carry ω = −1/150.
   const grip = pair2(1, 0.2, -1, -0.2);
   grip._contactPass({ ...CTX, medium: dishMediumFor(1) });
-  assert.ok(Object.is(grip.vy[0], 0) && Object.is(grip.vy[1], 0),
-    `small vt grips to zero: ${grip.vy[0]}, ${grip.vy[1]}`);
+  assert.ok(Math.abs(grip.vy[0] - 2 / 15) < EPS && Math.abs(grip.vy[1] - -2 / 15) < EPS,
+    `grip: the centres keep the rolling share: ${grip.vy[0]}, ${grip.vy[1]}`);
+  assert.ok(Math.abs(grip.omega[0] - -1 / 150) < EPS && Math.abs(grip.omega[1] - -1 / 150) < EPS,
+    `grip: both discs spin up by Δω = −R·jt/I: ${grip.omega[0]}, ${grip.omega[1]}`);
+  const gripCp = (grip.vy[1] - grip.omega[1] * 20) - (grip.vy[0] + grip.omega[0] * 20);
+  assert.ok(Math.abs(gripCp) < EPS, `grip: the contact point itself is at rest: ${gripCp}`);
 
   // Half wet, composed: restitution halves the bounce (jimp 1.5),
   // the tension taxes the way out (cap 0.45, jc −0.225), and
@@ -200,15 +217,23 @@ const vtOf = (sys) => sys.vy[1] - sys.vy[0];
     }
     return { sys, trail };
   };
-  // Wet: each step's stick impulse (0.5) funds a budget of 0.25;
-  // the slide pays budget × wSum = 0.5 per step, grips at zero
-  // on the eighth step, and holds there.
+  // Wet: each step's stick impulse (0.5) funds a budget of 0.25.
+  // D1's trail paid budget × wSum = 0.5 of CENTRE slide per step
+  // to zero at step 8. Since D2 the same payments also spin the
+  // discs up: the centre slide pays 0.5 for two steps, then the
+  // contact point grips (step 3) and the pair ROLLS — the centres
+  // hold −8/3 of relative slide with both discs at ω = −1/15 and
+  // the surfaces matched (the re-pin the header note describes;
+  // the full rolling probes live in dishSpin.selfcheck (d)).
   const wet = slideRun(dishMediumFor(1), 11);
-  const expect = [-3.5, -3, -2.5, -2, -1.5, -1, -0.5, 0, 0, 0, 0];
-  for (let s = 0; s < expect.length; s++) {
-    assert.ok(Object.is(wet.trail[s], expect[s]),
-      `wet slide step ${s + 1}: vt ${wet.trail[s]}, expected ${expect[s]}`);
+  assert.ok(Object.is(wet.trail[0], -3.5) && Object.is(wet.trail[1], -3),
+    `wet slide pays the budget while spin builds: ${wet.trail[0]}, ${wet.trail[1]}`);
+  for (let s = 2; s < wet.trail.length; s++) {
+    assert.ok(Math.abs(wet.trail[s] - -8 / 3) < 1e-9,
+      `wet roll step ${s + 1}: centre vt ${wet.trail[s]} holds at −8/3 (rolling, not sliding)`);
   }
+  assert.ok(Math.abs(wet.sys.omega[0] - -1 / 15) < 1e-9 && Math.abs(wet.sys.omega[1] - -1 / 15) < 1e-9,
+    `the rolled pair carries ω = −1/15 each: ${wet.sys.omega[0]}, ${wet.sys.omega[1]}`);
   assert.ok(Object.is(wet.sys.vx[0], 0) && Object.is(wet.sys.vx[1], 0), 'stick holds the normal too');
   // Dry: the same sustained contact never touches the slide.
   const dry = slideRun(dishMediumFor(0), 11);
@@ -267,8 +292,8 @@ const vtOf = (sys) => sys.vy[1] - sys.vy[0];
     const ia = src.indexOf(a); const ib = src.indexOf(b, ia); const ic = src.indexOf(c, ib);
     assert.ok(ia >= 0 && ib > ia && ic > ib, `${label}: cling < friction < deform feed`);
   };
-  order(particles, 'mediumClingCapture(med.clingK, vnNow)', 'mediumFrictionImpulse(mu, jnTotal, vt, wSum)', 'feedDishDeform', 'per-system pass');
-  order(dish, 'mediumClingCapture(pairMed.clingK, vnNow)', 'mediumFrictionImpulse(mu, jnTotal, vt, wSum)', 'feedDishDeform', 'cross-strata pass');
+  order(particles, 'mediumClingCapture(med.clingK, vnNow)', 'mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum', 'feedDishDeform', 'per-system pass');
+  order(dish, 'mediumClingCapture(pairMed.clingK, vnNow)', 'mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum', 'feedDishDeform', 'cross-strata pass');
   assert.ok(particles.includes('if (med.fricK > 0)'), 'per-system friction is guarded by the medium');
   assert.ok(dish.includes('if (pairMed && pairMed.fricK > 0)'), 'cross-strata friction is guarded by the pair medium');
 }

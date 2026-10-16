@@ -32,6 +32,7 @@ import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mj
 import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
 import { dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module); #1595 (D1) — its friction
+import { spinContactVt, spinInertia, spinInvMassT, spinDeltaOmega, spinStepOmega, spinWrapAngle } from './dishSpin.mjs'; // #1596 (D2) — spin: ω/θ columns, torque from D1's jt (call sites below; the law lives in the module)
 import { dishThermalFor, crowdingRepelGain, COLD_THERMAL } from './dishThermal.mjs'; // #1538 — petri §4's missing rows: TEMPO as thermal jitter, DENSITY as crowding pressure on the repel gain (call sites below; the law lives in the module)
 import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
 import { dishTrailsFor, sampleTrailReadGradient, NO_TRAILS, TRAIL_GAIN } from './dishTrails.mjs'; // #1415 — trails: the stigmergy substrate (call sites below; the law lives in the module)
@@ -203,6 +204,15 @@ export class ParticleSystem {
     // State only — no physics loop reads it; the pressure step that
     // consumes it can only kill through the ordinary death path.
     this.ecoCrowd = new Float64Array(cap);
+    // #1596 — petri dish D2 spin columns (law in dishSpin.mjs).
+    // omega: the body's angular velocity (rad/step), written ONLY
+    // by the two passes' friction blocks as torque from D1's jt —
+    // exactly 0 for any body friction has never touched, which is
+    // what keeps the dry engine bit-identical. theta: omega's
+    // integral (radians, wrapped), a render-only roll the item
+    // forward adds to the heading when nonzero.
+    this.omega = new Float64Array(cap);
+    this.theta = new Float64Array(cap);
     this.scale = new Float64Array(cap);
     // #451 — scale before the #287 breath multiplier, so a sort key can
     // rank items by their designed size without the ±50% breath swing
@@ -283,6 +293,8 @@ export class ParticleSystem {
     this.deformAxisX = grow(this.deformAxisX);
     this.deformAxisY = grow(this.deformAxisY);
     this.ecoCrowd = grow(this.ecoCrowd); // #1416 — exposure survives population growth
+    this.omega = grow(this.omega); // #1596 — spin survives population growth
+    this.theta = grow(this.theta);
     this.scale = grow(this.scale);
     this.baseScale = grow(this.baseScale);
     this.rotation = grow(this.rotation);
@@ -379,6 +391,9 @@ export class ParticleSystem {
     // #1416 — and unexposed: no body carries crowding pressure
     // across a re-seed.
     this.ecoCrowd.fill(0);
+    // #1596 — and unspun: a fresh cast has no spin and no roll.
+    this.omega.fill(0);
+    this.theta.fill(0);
     // #1411 — and unmerged: no pair carries dwell across a re-seed.
     clearDishCoalesce(this);
     // #278 — colors were just (re)assigned from this swatch set.
@@ -636,6 +651,7 @@ export class ParticleSystem {
     const X = this.x; const Y = this.y;
     const VX = this.vx; const VY = this.vy;
     const MASS = this.mass;
+    const OMEGA = this.omega; // #1596 (D2) — spin column (law in dishSpin.mjs)
     const ALIVE = this.alive;
     const CG = this.cgroup;
     const AI = this.assetIndex;
@@ -773,23 +789,35 @@ export class ParticleSystem {
             // velocities, for every mode, exactly as cling reads
             // them: the medium biases, the mode decides, and the
             // events below still key on the approach velocity, which
-            // friction never touches. jt stays a named value in this
-            // scope — D2 (spin) consumes it as torque. The #1410
-            // feed below still reads normal Δv only (dvI/dvJ are not
-            // touched): whether tangential drag should shear the
-            // dent is a feel question for after D1 plays. Dry
-            // (fricK 0) skips the block entirely.
+            // friction never touches. #1596 (D2) — the slide is read
+            // at the contact point (v + ω×r) and spread over the
+            // spin-inclusive tangential mass (law in dishSpin.mjs),
+            // and the same clamped jt torques both discs
+            // (Δω = −R·jt/I): no new budget, no second friction.
+            // The #1410 feed below still reads normal Δv only
+            // (dvI/dvJ are not touched): whether tangential drag —
+            // or spin — should shear the dent is a feel question
+            // for after the stage plays (D1's deliberate non-witness,
+            // carried). Dry (fricK 0) skips the block entirely —
+            // and with it every ω write in the engine.
             if (med.fricK > 0) {
               const mu = FRIC_MAX * med.fricK;
               const tx = -ny, ty = nx;
-              const vt = (VX[j] - VX[i]) * tx + (VY[j] - VY[i]) * ty;
+              const vt = spinContactVt(
+                (VX[j] - VX[i]) * tx + (VY[j] - VY[i]) * ty,
+                OMEGA[i], ri, OMEGA[j], rj,
+              );
               if (vt !== 0) {
-                const jt = mediumFrictionImpulse(mu, jnTotal, vt, wSum);
+                const iI = spinInertia(MASS[i], ri);
+                const iJ = spinInertia(MASS[j], rj);
+                const jt = mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum, ri, iI, rj, iJ));
                 if (jt !== 0) {
                   VX[i] -= tx * jt * w1;
                   VY[i] -= ty * jt * w1;
                   VX[j] += tx * jt * w2;
                   VY[j] += ty * jt * w2;
+                  OMEGA[i] += spinDeltaOmega(ri, jt, iI);
+                  OMEGA[j] += spinDeltaOmega(rj, jt, iJ);
                 }
               }
             }
@@ -915,6 +943,11 @@ export class ParticleSystem {
     // costume-inheriting parent so the drift starts from the visible color.
     this.energy[cs] = (this.energy[i] + this.energy[j]) / 2;
     this.drive[cs] = (this.drive[i] + this.drive[j]) / 2;
+    // #1596 (D2) — spin is heritable body state like the velocity
+    // above: the child starts between its parents' spins
+    // (mass-weighted, the COM idiom), with no accumulated roll.
+    this.omega[cs] = (this.omega[i] * m1 + this.omega[j] * m2) / tm;
+    this.theta[cs] = 0;
     this.grazer[cs] = r4 < 0.5 ? this.grazer[i] : this.grazer[j];
     // #583 — a child inherits one parent's ride outright rather than the
     // average: averaging two points on opposite lobes lands near the origin,
@@ -1178,6 +1211,7 @@ export class ParticleSystem {
     const VX = this.vx; const VY = this.vy;
     const AX = this.ax; const AY = this.ay;
     const MASS = this.mass;
+    const OMEGA = this.omega; const THETA = this.theta; // #1596 (D2) — spin columns
     const ALIVE = this.alive;
     // #287 — drive columns (hoisted; the force loop reads them per agent).
     const ENERGY = this.energy; const DRIVE = this.drive;
@@ -1672,6 +1706,17 @@ export class ParticleSystem {
       Y[i] = pyi;
       VX[i] = vxi;
       VY[i] = vyi;
+      // #1596 (D2) — spin integration: damp + clamp ω and advance
+      // θ by the damped rate (law in dishSpin.mjs). Only a body the
+      // friction blocks have spun ever enters — ω is exactly 0
+      // everywhere else in the engine, so an unspun population's
+      // step arithmetic is the pre-D2 arithmetic bit for bit.
+      const omI = OMEGA[i];
+      if (omI !== 0) {
+        const w = spinStepOmega(omI, dtFrames);
+        OMEGA[i] = w;
+        THETA[i] = spinWrapAngle(THETA[i] + w * dtFrames);
+      }
     }
 
     // #287 — scent deposit, then the field's own diffuse+decay step. The
@@ -1751,9 +1796,15 @@ export class ParticleSystem {
         if (i === this.n - 1 && frac > 0.001) {
           alpha *= frac;
         }
+        // #1596 (D2) — a spun body's roll (θ, radians) rides on
+        // top of its heading rotation; θ = 0 forwards the heading
+        // exactly as the pre-D2 item carried it.
+        const rotI = this.theta[i] !== 0
+          ? this.rotation[i] + this.theta[i] * (180 / Math.PI)
+          : this.rotation[i];
         items.push({
           x: this.x[i], y: this.y[i], scale: this.scale[i], baseScale: this.baseScale[i],
-          rotation: this.rotation[i], alpha,
+          rotation: rotI, alpha,
           asset: activeAssets[this.assetIndex[i] % activeAssets.length],
           color: this.color[i], u: this.u[i],
           colorSlot: this.colorSlot[i], // #1237 — palette slot for accent derivation
@@ -1792,7 +1843,11 @@ export class ParticleSystem {
       const py = this.y[i];
       const pscale = this.scale[i];
       const pbaseScale = this.baseScale[i]; // #451 — pre-breath, for sort stability
-      const protation = this.rotation[i];
+      // #1596 (D2) — the body's roll rides its heading, as in the
+      // flat path: θ = 0 forwards the heading untouched.
+      const protation = this.theta[i] !== 0
+        ? this.rotation[i] + this.theta[i] * (180 / Math.PI)
+        : this.rotation[i];
       let palpha = this.alpha[i];
       if (i === this.n - 1 && frac > 0.001) {
         palpha *= frac;
