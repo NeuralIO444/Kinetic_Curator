@@ -2,8 +2,9 @@
 //
 // The folder contract: the subfolder says the intent (images/, audio/, palettes/, looks/); anything outside those is
 // ignored; a file inside one that cannot be used is SKIPPED with a reason, never dropped silently. Matt's v1 choices
-// (2026-10-14): SVG only for images (rasters are recognised and logged "not supported yet"), looks/ lands after the Look
-// phase, so a Look file is recognised and logged until then.
+// (2026-10-14): SVG only for images (rasters are recognised and logged "not supported yet"). looks/ was recognised
+// and logged as not-yet-supported until the keeps shelf's disk tier landed (K3, #1591): a look JSON is now a real
+// file the shelf reads — its own exports live there. (.kclook stays a future format, still named, still skipped.)
 export const LOOT_SUBFOLDERS = Object.freeze({ images: 'image', audio: 'audio', palettes: 'palette', looks: 'look' });
 export const MAX_REL_LENGTH = 512;
 
@@ -12,7 +13,7 @@ const EXT = Object.freeze({
   image: { '.svg': { ok: true }, '.png': { ok: false, reason: 'raster not supported yet' }, '.jpg': { ok: false, reason: 'raster not supported yet' }, '.jpeg': { ok: false, reason: 'raster not supported yet' }, '.gif': { ok: false, reason: 'raster not supported yet' }, '.webp': { ok: false, reason: 'raster not supported yet' } },
   audio: { '.wav': { ok: true }, '.mp3': { ok: true }, '.aif': { ok: true }, '.aiff': { ok: true } },
   palette: { '.json': { ok: true } },
-  look: { '.json': { ok: false, reason: 'looks not supported yet' }, '.kclook': { ok: false, reason: 'looks not supported yet' } },
+  look: { '.json': { ok: true }, '.kclook': { ok: false, reason: 'looks not supported yet' } },
 });
 
 /** A path as POSIX segments, or null when it is unsafe or malformed. Never throws. */

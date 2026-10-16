@@ -1,14 +1,16 @@
-//! #1479 — the loot folder, native half. Three root-bound commands and nothing else:
+//! #1479 — the loot folder, native half. Four root-bound commands and nothing else:
 //!
 //!   loot_scan(root)        list the files under images/ audio/ palettes/ looks/ (path, size, mtime), sorted
 //!   loot_hash(root, rel)   the SHA-256 of one file, streamed, never loaded whole
 //!   loot_read(root, rel)   one file's bytes as base64 (a string, not a JSON array of numbers), capped
+//!   loot_write(root, rel, data)  write one of KC-1's own files (the keeps shelf's exports, #1591), capped
 //!
 //! Every path the webview names is resolved against the canonical root and refused if it leaves it: `..`, an absolute
-//! path, a symlink that points elsewhere, a name outside the four subfolders. Nothing is written, moved or deleted: KC-1
-//! references the artist's files in place. Nothing here panics on a bad folder; every failure is a returned message the
-//! ingest log can show. The classification of what a file *is* lives in JS (src/loot/lootClassify.mjs); this side only
-//! lists, hashes and reads.
+//! path, a symlink that points elsewhere, a name outside the four subfolders. The artist's files are referenced in
+//! place and never written, moved or deleted: the one write verb exists so the keeps shelf can export its own records
+//! into looks/ (#1591), it writes flat in a subfolder via a temp sibling + rename, and the JS side writes nothing else
+//! through it. Nothing here panics on a bad folder; every failure is a returned message the ingest log can show. The
+//! classification of what a file *is* lives in JS (src/loot/lootClassify.mjs); this side lists, hashes, reads, writes.
 use base64::Engine as _;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -21,6 +23,9 @@ use std::time::UNIX_EPOCH;
 pub const SUBFOLDERS: [&str; 4] = ["images", "audio", "palettes", "looks"];
 /// The most a single read or hash will take. A bigger file is reported, not loaded.
 pub const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
+/// The most a single write will take. A keep export is a JSON record (plus a baked still, when one exists): this is
+/// generous headroom, not a target.
+pub const MAX_WRITE_BYTES: u64 = 16 * 1024 * 1024;
 /// A scan stops here and says so, rather than listing a whole disk someone pointed it at.
 pub const MAX_ENTRIES: usize = 20_000;
 /// Folders nest at most this deep under a subfolder.
@@ -219,6 +224,72 @@ pub fn read_b64(path: &Path, cap: u64) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
+/// Resolve `rel` for a WRITE: the file may not exist yet, so the parent is what gets canonicalised. Same refusals as
+/// `resolve` (no `..`, no absolute paths, first segment one of the four subfolders), plus the write's own discipline:
+/// flat in the subfolder (exactly two segments — KC-1's own files are never nested), the subfolder must be a real
+/// directory inside the root (a symlink standing in for it is refused; a missing one is created), and an existing
+/// target must be a regular file, never a link to somewhere else.
+pub fn resolve_write(root: &Path, rel: &str) -> Result<PathBuf, String> {
+    if rel.is_empty() || rel.len() > 512 || rel.contains('\0') {
+        return Err("unsafe name".into());
+    }
+    let rp = Path::new(rel);
+    let mut segs: Vec<String> = Vec::new();
+    for c in rp.components() {
+        match c {
+            Component::Normal(s) => segs.push(s.to_string_lossy().to_string()),
+            _ => return Err("unsafe name".into()), // `..`, `.`, a root, a drive prefix
+        }
+    }
+    if segs.len() != 2 {
+        return Err("writes land flat in a subfolder".into());
+    }
+    if !SUBFOLDERS.contains(&segs[0].to_lowercase().as_str()) {
+        return Err("outside the loot subfolders".into());
+    }
+    let sub = root.join(&segs[0]);
+    match fs::symlink_metadata(&sub) {
+        Ok(m) if m.file_type().is_dir() => {}
+        Ok(_) => return Err("subfolder is not a folder".into()), // a file, or a symlink standing in for one
+        Err(_) => fs::create_dir_all(&sub).map_err(|e| format!("unwritable: {e}"))?,
+    }
+    let canon_sub = fs::canonicalize(&sub).map_err(|e| format!("unwritable: {e}"))?;
+    if !canon_sub.starts_with(root) {
+        return Err("outside folder".into());
+    }
+    let target = canon_sub.join(&segs[1]);
+    if let Ok(m) = fs::symlink_metadata(&target) {
+        if m.file_type().is_symlink() || !m.file_type().is_file() {
+            return Err("not a file".into());
+        }
+    }
+    Ok(target)
+}
+
+/// Write one of KC-1's own files: base64 in (the read side's shape), decoded under the cap, written to a temp sibling
+/// and renamed over the target, so a crash mid-write leaves the old file — or no file — never a torn one.
+pub fn write_b64(root: &str, rel: &str, data: &str) -> Result<(), String> {
+    if (data.len() as u64) > (MAX_WRITE_BYTES / 3 + 1) * 4 {
+        return Err(format!("file too large ({} MB)", MAX_WRITE_BYTES / (1024 * 1024)));
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data)
+        .map_err(|e| format!("bad data: {e}"))?;
+    if bytes.len() as u64 > MAX_WRITE_BYTES {
+        return Err(format!("file too large ({} MB)", MAX_WRITE_BYTES / (1024 * 1024)));
+    }
+    let root = canonical_root(root)?;
+    let target = resolve_write(&root, rel)?;
+    let name = target.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let tmp = target.with_file_name(format!(".{name}.kc-tmp-{}", std::process::id()));
+    fs::write(&tmp, &bytes).map_err(|e| format!("unwritable: {e}"))?;
+    if let Err(e) = fs::rename(&tmp, &target) {
+        let _ = fs::remove_file(&tmp);
+        return Err(format!("unwritable: {e}"));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn loot_scan(root: String) -> Result<LootScan, String> {
     tauri::async_runtime::spawn_blocking(move || scan(&root))
@@ -246,6 +317,13 @@ pub async fn loot_read(root: String, rel: String) -> Result<String, String> {
     })
     .await
     .map_err(|e| format!("read failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn loot_write(root: String, rel: String, data: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || write_b64(&root, &rel, &data))
+        .await
+        .map_err(|e| format!("write failed: {e}"))?
 }
 
 #[cfg(test)]
@@ -361,6 +439,59 @@ mod tests {
         assert!(hash_path(&p, 4096).is_ok());
         // 4096 bytes: ceil(4096 / 3) * 4 = 5464 base64 characters
         assert_eq!(read_b64(&p, 4096).unwrap().len(), 5464);
+    }
+
+    #[test]
+    fn write_round_trips_through_the_read_side_and_replaces_whole() {
+        let t = Tmp::new("write");
+        let root = t.0.to_str().unwrap();
+        let b64 = |s: &str| base64::engine::general_purpose::STANDARD.encode(s);
+        // the looks/ subfolder does not exist yet: the write creates it (it is one of the four)
+        write_b64(root, "looks/k1.json", &b64("{\"a\":1}")).unwrap();
+        assert_eq!(read_b64(&t.0.join("looks/k1.json"), MAX_FILE_BYTES).unwrap(), b64("{\"a\":1}"));
+        // a second write replaces the file whole — no append, no torn middle
+        write_b64(root, "looks/k1.json", &b64("{\"a\":2,\"b\":[1,2,3]}")).unwrap();
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD.decode(read_b64(&t.0.join("looks/k1.json"), MAX_FILE_BYTES).unwrap()).unwrap(),
+            b"{\"a\":2,\"b\":[1,2,3]}"
+        );
+        // and the scan lists it like any other file in the folder
+        let s = scan(root);
+        assert!(s.entries.iter().any(|e| e.rel == "looks/k1.json"), "the export is listed");
+        // no temp sibling is left behind
+        assert!(!t.0.join("looks").read_dir().unwrap().any(|e| e.unwrap().file_name().to_string_lossy().contains("kc-tmp")));
+    }
+
+    #[test]
+    fn writes_that_leave_the_folder_or_nest_are_refused() {
+        let t = Tmp::new("write-refuse");
+        let root = t.0.to_str().unwrap();
+        let b64 = base64::engine::general_purpose::STANDARD.encode("{}");
+        for bad in ["../x.json", "looks/../../x.json", "/etc/x.json", "notes/x.json", "x.json", "looks/sub/x.json", "looks/"] {
+            assert!(write_b64(root, bad, &b64).is_err(), "{bad:?} must be refused");
+        }
+        assert!(write_b64(root, "looks/x.json", "!!! not base64 !!!").is_err(), "undecodable data is refused");
+        assert!(!t.0.join("x.json").exists(), "nothing escaped the folder");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_subfolder_or_target_is_never_written_through() {
+        use std::os::unix::fs::symlink;
+        let outside = Tmp::new("write-outside");
+        outside.file("loot.json", b"{}");
+        let t = Tmp::new("write-link");
+        symlink(&outside.0, t.0.join("looks")).unwrap();
+        let root = t.0.to_str().unwrap();
+        let b64 = base64::engine::general_purpose::STANDARD.encode("{}");
+        assert!(write_b64(root, "looks/k.json", &b64).is_err(), "a symlink standing in for looks/ is refused");
+        assert!(!outside.0.join("k.json").exists(), "nothing was written outside");
+        // a symlink AS the target inside a real subfolder is refused too
+        let t2 = Tmp::new("write-link2");
+        t2.file("images/real.svg", b"<svg/>");
+        fs::create_dir_all(t2.0.join("looks")).unwrap();
+        symlink(t2.0.join("images/real.svg"), t2.0.join("looks/k.json")).unwrap();
+        assert!(write_b64(t2.0.to_str().unwrap(), "looks/k.json", &b64).is_err(), "a symlink target is refused");
     }
 
     #[test]

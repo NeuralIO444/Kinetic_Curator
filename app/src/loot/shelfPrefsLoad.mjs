@@ -10,17 +10,25 @@
 // a root is already indexed) and after every rescan — edits take
 // effect on the NEXT fill, never mid-fill.
 //
-// Named gaps, honestly: the loot backend has no write verb in this
-// stack, so a missing preferences.json is READ as "shipped defaults
-// in force" (the parser's line says so) — writing the defaults
-// document (curator/shelfPrefs.mjs DEFAULT_PREFERENCES_TEXT) into a
-// fresh folder awaits a write door in the loot lane; nothing here
-// invents one. The iCloud conflict copy is never read (S6); when a
-// scan sees one, its name is spoken in the lines.
+// Named gap, narrowed by K3 (#1591): the loot write verb EXISTS now
+// (the backends' write(), built for the keeps exports into looks/),
+// but writing the defaults document (curator/shelfPrefs.mjs
+// DEFAULT_PREFERENCES_TEXT) into a fresh folder is still not wired —
+// a missing preferences.json is READ as "shipped defaults in force"
+// (the parser's line says so) until a first-setup write is dispatched
+// as its own step. Nothing here invents one silently. The iCloud
+// conflict copy is never read (S6); when a scan sees one, its name
+// is spoken in the lines.
+//
+// K3: the same document's `shelf.export` namespace is parsed here too
+// (curator/shelfDisk.mjs parseShelfExportPrefs) and returned as
+// exportPrefs, its corrections folded into the lines after the main
+// parser's — one file, one set of named corrections.
 
 import {
   parseShelfPrefs, isConflictCopyName, conflictCopyLine,
 } from '../curator/shelfPrefs.mjs';
+import { parseShelfExportPrefs } from '../curator/shelfDisk.mjs';
 
 export const PREFERENCES_REL = 'preferences.json';
 
@@ -42,7 +50,8 @@ export async function loadShelfPrefs({ backend, root, rels = [] } = {}) {
     // No folder (or no readable backend): shipped defaults, and —
     // with no folder connected — nothing to say anywhere visible.
     const parsed = parseShelfPrefs(null);
-    return { prefs: parsed.prefs, source: 'default', lines };
+    const exp = parseShelfExportPrefs(null);
+    return { prefs: parsed.prefs, exportPrefs: exp.exportPrefs, source: 'default', lines };
   }
   let text = null;
   try {
@@ -50,5 +59,9 @@ export async function loadShelfPrefs({ backend, root, rels = [] } = {}) {
     if (read && read.ok && read.bytes) text = new TextDecoder().decode(read.bytes);
   } catch { /* unreadable reads as missing — the parser names it */ }
   const parsed = parseShelfPrefs(text);
-  return { prefs: parsed.prefs, source: parsed.source, lines: [...lines, ...parsed.lines] };
+  const exp = parseShelfExportPrefs(text);
+  return {
+    prefs: parsed.prefs, exportPrefs: exp.exportPrefs, source: parsed.source,
+    lines: [...lines, ...parsed.lines, ...exp.lines],
+  };
 }
