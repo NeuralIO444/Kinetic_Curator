@@ -1,5 +1,9 @@
-// MAP row — field→channel mapping (#1199), home per #1204.
-// APPEARANCE shelf: field tile → channel tile → amount.
+// MAP row — field→channel mapping (#1199), home per #1204: an
+// Appearance-family scene control, NOT a MATH op. It sat in the §④
+// Appearance row until 2026-10-16; it now renders inside the
+// CHIAROSCURO floating editor (§④'s own editor), below the sun + hue
+// — the same control, same state, same events, same stored keys.
+// Field tile → channel tile → amount.
 // A MATH-stratum modulation: data (noise/density) drives visual channels
 // (stroke weight, saturation, scale). It remaps marks; it emits none.
 // All-off is the no-op — the render is untouched until the map is set.

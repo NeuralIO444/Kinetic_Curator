@@ -20,7 +20,6 @@ import { SwarmSliders } from './layout/SwarmSliders.jsx';
 import { CreatureSliders } from './layout/CreatureSliders.jsx';
 import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
 import { MaterialSliders } from './layout/MaterialSliders.jsx'; // #1585 — material body tunables (Materials M4)
-import { MapRow } from './layout/MapRow.jsx';
 import { ChiaroscuroSection } from './layout/ChiaroscuroSection.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
@@ -109,13 +108,13 @@ export function BuildPanel() {
           <AccumFamily layoutParams={layoutParams} />
         </BuildSection>
 
-        {/* ④ APPEARANCE — the finish: mark shape, growth, materials, field→channel map,
-            and the CHIAROSCURO section (#1587): the render engine's home — the sun +
-            hue, edited in a floating editor over the canvas */}
+        {/* ④ APPEARANCE — the finish: mark shape, growth, materials, and the
+            CHIAROSCURO button (#1587; a button since #1629): the render
+            engine's door — the sun + hue + the field→channel map, edited in
+            a floating editor over the canvas */}
         <BuildSection num="4" title="Appearance">
           <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <MaterialSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <MapRow layoutParams={layoutParams} lockedParams={lockedParams} />
           <ChiaroscuroSection layoutParams={layoutParams} lockedParams={lockedParams} />
         </BuildSection>
 
