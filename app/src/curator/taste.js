@@ -89,6 +89,28 @@ export function scoreCandidate(features, weights) {
 
 
 /**
+ * Cosine proximity of two feature maps from extractFeatures — the
+ * shared feature-space geometry for pick-time consumers (Keeps K2's
+ * fill measures novelty and distance with it). A key one side lacks
+ * reads as the neutral 0.5; a map with no magnitude has no proximity.
+ */
+export function featureProximity(a, b) {
+  if (!a || !b) return 0;
+  const keys = Object.keys(a);
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (const k of keys) {
+    const x = typeof a[k] === 'number' ? a[k] : 0.5;
+    const y = typeof b[k] === 'number' ? b[k] : 0.5;
+    dot += x * y;
+    na += x * x;
+    nb += y * y;
+  }
+  return na > 0 && nb > 0 ? dot / Math.sqrt(na * nb) : 0;
+}
+
+/**
  * Pick a candidate index for a persona. Scores all candidates, takes the
  * top 3, and softmax-samples among them (temperature 0.4) so the best
  * usually wins but the pick doesn't feel robotic. rng is injectable:

@@ -15,6 +15,11 @@
 //              reorder, visibility, blend, opacity, FX stack). Always
 //              applies: the entry holds the whole pre-action document, so
 //              each layer's content is restored onto its own layer.
+//   'shelf'  — a Keeps fill (#1590, spec S7: a fill is one undo step).
+//              Always applies: the entry holds the whole shelf state
+//              (keeps, stage, history), restored and re-persisted by
+//              layoutSlice's undo/redo like the layers kind restores
+//              its document.
 //
 // Per-frame live tweaks (audio stimulus, beat pulse, fps, morph lerp
 // frames via setLayoutParams, the running loop) never call pushToUndo —
@@ -27,6 +32,7 @@ export const UNDO_DEBOUNCE_MS = 800;
 
 export const UNDO_KIND_EDIT = 'edit';
 export const UNDO_KIND_LAYERS = 'layers';
+export const UNDO_KIND_SHELF = 'shelf';
 
 let lastPushTime = 0;
 
@@ -60,6 +66,13 @@ export function captureUndoEntry(state, kind = UNDO_KIND_EDIT) {
     entry.activeLayerId = state.activeLayerId;
     entry.layerSnapshots = deep(state.layerSnapshots);
   }
+  if (kind === UNDO_KIND_SHELF) {
+    entry.shelf = {
+      keeps: deep(state.keeps || []),
+      keepStage: deep(state.keepStage || []),
+      shelfHistory: deep(state.shelfHistory || []),
+    };
+  }
   // Estimated serialized size, for the byte cap. Stored on the entry so
   // totals stay exact as entries move between the undo and redo stacks.
   entry.bytes = JSON.stringify(entry).length;
@@ -83,6 +96,7 @@ function entrySignature(entry) {
     entry.layers,
     entry.activeLayerId,
     entry.layerSnapshots,
+    entry.shelf ?? null, // #1590: a shelf-only change must not dedupe away
   ]);
 }
 
@@ -136,7 +150,7 @@ export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT) {
 
 /** A top entry applies if it is structural, or its layer is active (#92). */
 export function entryApplies(entry, activeLayerId) {
-  return !!entry && (entry.kind === UNDO_KIND_LAYERS || entry.layerId === activeLayerId);
+  return !!entry && (entry.kind === UNDO_KIND_LAYERS || entry.kind === UNDO_KIND_SHELF || entry.layerId === activeLayerId);
 }
 
 /**
@@ -165,4 +179,13 @@ export function layersRestoreFields(entry) {
     activeLayerId: entry.activeLayerId,
     layerSnapshots: entry.layerSnapshots,
   };
+}
+
+/** Shelf fields a 'shelf' undo/redo restores INSTEAD of the content. */
+export function shelfRestoreFields(entry) {
+  return entry && entry.shelf ? {
+    keeps: entry.shelf.keeps,
+    keepStage: entry.shelf.keepStage,
+    shelfHistory: entry.shelf.shelfHistory,
+  } : {};
 }
