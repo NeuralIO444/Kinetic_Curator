@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC cost bench harness (#1578)</title></head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { createRenderer } from '../renderer.mjs';
+
+// costBench page — the measurement half of the T4 cost-head harness (#1578).
+//
+// Timing law (the codebase learned this in measureCosts.mjs, and it applies
+// here unchanged): a frame time is only honest if the GPU work is forced to
+// complete inside the timed window. renderScene ends in readPixels, so a
+// performance.now() bracket around it measures real, completed work — the
+// same convention as __kcPerf in glHarness.html. Nothing here uses rAF:
+// rAF intervals are vsync-censored (every frame cheaper than the refresh
+// interval reads the same), and censored labels would poison training.
+//
+// The atlas decode helpers below are the glHarness.html ones, duplicated
+// because a harness page is standalone by design (same convention as
+// costTiers.measure.mjs duplicating its batch constants).
+
+const canvas = document.getElementById('c');
+let renderer = null;
+let loadedArgs = null;
+
+const b64ToU8 = (b64) => {
+  const pieces = Array.isArray(b64) ? b64 : [b64];
+  const decodedLen = (p) => (p.length / 4) * 3 - (p.endsWith('==') ? 2 : p.endsWith('=') ? 1 : 0);
+  const out = new Uint8Array(pieces.reduce((n, p) => n + decodedLen(p), 0));
+  let off = 0;
+  for (const p of pieces) {
+    const bin = atob(p);
+    for (let i = 0; i < bin.length; i++) out[off + i] = bin.charCodeAt(i);
+    off += bin.length;
+  }
+  return out;
+};
+
+function renderArgs(payload) {
+  const atlasPx = b64ToU8(payload.atlasB64);
+  const atlasMips = (payload.atlasMips || []).map((m) => ({
+    pixels: b64ToU8(m.b64), width: m.w, height: m.h,
+  }));
+  return {
+    width: payload.width,
+    height: payload.height,
+    bg: payload.bg,
+    contract: payload.contract,
+    cells: payload.cells,
+    atlas: { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips },
+  };
+}
+
+/** Load a recipe payload once; runs then render from the stored args so
+ * ferry/upload cost never enters a timed frame. */
+window.__kcBenchLoad = async (payload) => {
+  if (!renderer) renderer = createRenderer(canvas);
+  loadedArgs = renderArgs(payload);
+  return { width: loadedArgs.width, height: loadedArgs.height };
+};
+
+/** Render `warmup` frames (discarded — clocks ramp, programs compile),
+ * then time `frames` consecutive renders individually. */
+window.__kcBenchRun = async (frames, warmup = 2) => {
+  if (!loadedArgs) throw new Error('[costBench] no recipe loaded');
+  for (let i = 0; i < warmup; i++) renderer.renderScene(loadedArgs);
+  const timesMs = [];
+  for (let i = 0; i < frames; i++) {
+    const t0 = performance.now();
+    renderer.renderScene(loadedArgs);
+    timesMs.push(+(performance.now() - t0).toFixed(4));
+  }
+  return { timesMs, width: loadedArgs.width, height: loadedArgs.height };
+};
+
+/**
+ * Device probes — the PROBE_SPEC work in costDataset.mjs, implemented here.
+ * NOT device names: four fixed microbenchmarks whose times describe this
+ * environment as measurable numbers, so an unseen device still prices.
+ * Each probe: 1 warm-up batch, then 5 timed batches, median reported.
+ * Every batch ends in readPixels so the work cannot be elided or deferred.
+ */
+const PROBE_REPS = 5;
+const med = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
+
+function probeContext() {
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = 512;
+  const gl = cv.getContext('webgl2', { antialias: false, depth: false, stencil: false });
+  if (!gl) throw new Error('[costBench] WebGL2 unavailable for probes');
+  return gl;
+}
+
+function makeTarget(gl, size) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return fbo;
+}
+
+function shader(gl, type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error('[costBench] probe shader: ' + gl.getShaderInfoLog(sh));
+  return sh;
+}
+function program(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, shader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, shader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('[costBench] probe program link failed');
+  return p;
+}
+const VS_FULL = `#version 300 es
+void main(){ vec2 p = vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); gl_Position = vec4(p*2.0-1.0, 0.0, 1.0); }`;
+function timeBatches(fn) {
+  fn(); // warm-up, discarded
+  const times = [];
+  for (let r = 0; r < PROBE_REPS; r++) {
+    const t0 = performance.now();
+    fn();
+    times.push(performance.now() - t0);
+  }
+  return +med(times).toFixed(4);
+}
+
+window.__kcProbes = async () => {
+  const gl = probeContext();
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  const renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  const vendor = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR);
+  const px = new Uint8Array(4);
+
+  // fill: 512x512, 48-iteration fragment loop, 16 draws per batch
+  const fillProg = program(gl, VS_FULL, `#version 300 es
+    precision highp float; out vec4 o;
+    void main(){ float a = 0.0; vec2 q = gl_FragCoord.xy / 512.0;
+      for (int i = 0; i < 48; i++) { float f = float(i) * 0.013; a += sin(q.x * 40.0 + f) * cos(q.y * 40.0 - f); }
+      o = vec4(vec3(a * 0.02 + 0.5), 1.0); }`);
+  makeTarget(gl, 512);
+  gl.viewport(0, 0, 512, 512);
+  gl.useProgram(fillProg);
+  const fillMs = timeBatches(() => {
+    for (let d = 0; d < 16; d++) gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(256, 256, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  });
+
+  // instanced: 8192 instanced quads, 8 draws per batch
+  const instProg = program(gl, `#version 300 es
+    layout(location=0) in vec2 pos; layout(location=1) in vec2 off;
+    void main(){ gl_Position = vec4(pos * 0.02 + off, 0.0, 1.0); }`, `#version 300 es
+    precision highp float; out vec4 o; void main(){ o = vec4(0.8, 0.4, 0.2, 1.0); }`);
+  const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+  const offs = new Float32Array(8192 * 2);
+  for (let i = 0; i < 8192; i++) { offs[i * 2] = ((i % 91) / 91) * 1.8 - 0.9; offs[i * 2 + 1] = (((i / 91) | 0) / 91) * 1.8 - 0.9; }
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const vb0 = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb0); gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  const vb1 = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb1); gl.bufferData(gl.ARRAY_BUFFER, offs, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(1, 1);
+  gl.useProgram(instProg);
+  const instancedMs = timeBatches(() => {
+    for (let d = 0; d < 8; d++) gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, 8192);
+    gl.readPixels(256, 256, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  });
+  gl.bindVertexArray(null);
+
+  // blend: 512x512, 24 fullscreen blended quads per batch
+  const blendProg = program(gl, VS_FULL, `#version 300 es
+    precision highp float; out vec4 o; void main(){ o = vec4(0.5, 0.3, 0.7, 0.1); }`);
+  gl.useProgram(blendProg);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  const blendMs = timeBatches(() => {
+    for (let d = 0; d < 24; d++) gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(256, 256, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  });
+  gl.disable(gl.BLEND);
+
+  // js: 2,000,000 iterations of a small math loop
+  const jsMs = timeBatches(() => {
+    let a = 0.0001;
+    for (let i = 0; i < 2000000; i++) { a += Math.sin(a + i * 1e-7) * Math.cos(a * 0.5); }
+    if (!Number.isFinite(a)) throw new Error('[costBench] js probe diverged');
+  });
+
+  const gl2 = gl.getParameter(gl.VERSION);
+  return {
+    fillMs, instancedMs, blendMs, jsMs,
+    renderer: String(renderer), vendor: String(vendor), webglVersion: String(gl2),
+  };
+};
+
+window.__kcBenchReady = true;
+window.__kcReady = true; // glDriver.openHarnessPage waits on this flag
+</script>
+</body>
+</html>
