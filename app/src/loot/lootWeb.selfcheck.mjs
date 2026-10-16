@@ -201,12 +201,18 @@ await ok('a whole scan over it (runScan): add, unchanged, rename keeps the item,
   assert.equal(s5.ok, true); assert.equal(s5.unreachable, true); assert.equal(s5.summary.missing, 0, 'a folder that cannot be reached marks nothing missing');
 });
 
-await ok('the module only ever creates directories: no write, move or delete exists in it', () => {
+await ok("the module's only write is the governed write(): no move, delete, or picker exists in it", () => {
+  // Pre-K3 this module never wrote at all. #1591 added exactly one write path —
+  // write(): flat in a subfolder, our own files only, verified by read-back in the
+  // caller. The law now: that path exists exactly once, and nothing else mutates.
   const code = src('./lootWeb.mjs').replace(/\/\/.*$/gm, '');
-  assert.ok(!/removeEntry|createWritable|\.move\(|\.remove\(|FileSystemWritable|showSaveFilePicker|showOpenFilePicker/.test(code));
+  assert.ok(!/removeEntry|\.move\(|\.remove\(|showSaveFilePicker|showOpenFilePicker/.test(code), 'no move, delete, or picker');
+  const writables = code.match(/createWritable/g) || [];
+  assert.equal(writables.length, 1, 'exactly one writable stream: write()');
+  const fileCreates = code.match(/getFileHandle\([^)]*create/g) || [];
+  assert.equal(fileCreates.length, 1, 'exactly one file creation: inside write()');
   const creates = code.match(/create: true/g) || [];
-  assert.equal(creates.length, 2, 'two creation sites: the KC-1 Loot folder and its subfolders');
-  assert.ok(!/getFileHandle\([^)]*create/.test(code), 'a file is never created');
+  assert.equal(creates.length, 4, 'folder + subfolders at pick, subfolder ensure + the one file inside write()');
   assert.ok(!/localStorage|Date\.now|Math\.random/.test(code));
 });
 
