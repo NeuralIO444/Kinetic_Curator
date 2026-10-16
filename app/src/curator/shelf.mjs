@@ -21,8 +21,9 @@
 // K1 scope: tiers + migration + crown routing + hand-swap. K2 (#1590)
 // adds fill() (curator/shelfFill.mjs) + the fill history record below;
 // K3 (#1591) adds export() (curator/shelfDisk.mjs) + the export/import
-// history records + the merged disk rows; census readouts are K4
-// (#1592) — still deliberately absent, not stubbed.
+// history records + the merged disk rows; K4 (#1592) adds the census
+// readout over all of it (curator/censusReadout.mjs shelfCensusView,
+// rendered in the census panel) — a tally of this state, read-only.
 import { LOOK_SLOT_BUDGET, slotCostOf, lookSlotsUsed } from './candidateTray.mjs';
 import { provenanceLabel } from './provenance.mjs';
 import { dealFill } from './shelfFill.mjs';
