@@ -21,7 +21,7 @@ import { CreatureSliders } from './layout/CreatureSliders.jsx';
 import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
 import { MaterialSliders } from './layout/MaterialSliders.jsx'; // #1585 — material body tunables (Materials M4)
 import { MapRow } from './layout/MapRow.jsx';
-import { SunRow } from './layout/SunRow.jsx';
+import { ChiaroscuroSection } from './layout/ChiaroscuroSection.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
 import { MathSection } from './build/MathSection.jsx';
@@ -109,12 +109,14 @@ export function BuildPanel() {
           <AccumFamily layoutParams={layoutParams} />
         </BuildSection>
 
-        {/* ④ APPEARANCE — the finish: hue, mark shape, growth, field→channel map, sun light */}
+        {/* ④ APPEARANCE — the finish: mark shape, growth, materials, field→channel map,
+            and the CHIAROSCURO section (#1587): the render engine's home — the sun +
+            hue, edited in a floating editor over the canvas */}
         <BuildSection num="4" title="Appearance">
           <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <MaterialSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <MapRow layoutParams={layoutParams} lockedParams={lockedParams} />
-          <SunRow />
+          <ChiaroscuroSection layoutParams={layoutParams} lockedParams={lockedParams} />
         </BuildSection>
 
         {/* ⑤ MATH — broad strokes over the fine sliders: assignable macro knobs (#724) */}
