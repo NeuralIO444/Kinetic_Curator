@@ -8,7 +8,7 @@
 export const PROJECT_STATE_KEYS = Object.freeze([
   'seed', 'seedOffsets', 'paletteId', 'layoutParams', 'enabledAssets', 'quality', 'autoQuality',
   'assetWeightOverrides', 'projectTitle', 'paletteOverrides', 'paletteLocks', 'customAssets', 'light',
-  'assetKineme', 'regionKinemes', 'assetStill', 'assetAttach', 'creatureCount', 'audioRoutes',
+  'assetKineme', 'assetStill', 'assetAttach', 'creatureCount', 'audioRoutes',
   'canvasW', 'canvasH', 'canvasFps', 'canvasPresetId', 'stageMode',
   'midiMap', 'mathMacros', 'layers', 'activeLayerId', 'layerSnapshots',
 ]);

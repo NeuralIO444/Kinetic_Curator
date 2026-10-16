@@ -30,10 +30,10 @@ import { mirrorMultiplier } from '../data/layout-modes.js';
 import { getBiologyPolicy } from '../biology/policy.js';
 import { fadeForAge } from '../biology/lifecycle.js';
 import { sortGlassInstances } from './glassSort.mjs';
-import { isGlassMaterial, glassAlphaFrom } from './glassBody.mjs'; // #1547 — material:'glass'
-import { isPlateMaterial, plateGeoFrom, PLATE_GEO_DEFAULTS } from './plateBody.mjs'; // #1548 — material:'plate'
-import { isWashMaterial, washParamsFrom, WASH_PARAM_DEFAULTS } from './washBody.mjs'; // #1549 — material:'wash'
-import { isStippleMaterial, stippleDotScaleFrom, STIPPLE_DOT_SCALE } from './stippleBody.mjs'; // #1549 — material:'stipple'
+import { isGlassMaterial, GLASS_BODY_ALPHA } from './glassBody.mjs'; // #1547 — material:'glass'
+import { isPlateMaterial } from './plateBody.mjs'; // #1548 — material:'plate'
+import { isWashMaterial } from './washBody.mjs'; // #1549 — material:'wash'
+import { isStippleMaterial } from './stippleBody.mjs'; // #1549 — material:'stipple'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import {
   pickWeightedIndexStable,
@@ -515,8 +515,7 @@ export function buildPlacements({
   // #1547 (Materials M1) — `material: 'glass'` is the second switch into
   // this same machinery, and the one that gives the body its alpha:
   // a glass material attenuates every instance it places
-  // (glassBody's alpha — the GLASS_BODY_ALPHA constant, a live param
-  // since #1585), here at placement time so the census,
+  // (glassBody.GLASS_BODY_ALPHA), here at placement time so the census,
   // the stills and the live contract all see the one body. The alpha is
   // keyed to the material only — the bool path's translucency is the
   // voice's own alpha range and stays exactly as shipped. Item alpha is
@@ -524,18 +523,6 @@ export function buildPlacements({
   // multiply never compounds across pooled frames.
   const materialGlass = isGlassMaterial(layoutParams.material);
   const glassOn = !!layoutParams.glass || materialGlass;
-  // #1585 (Materials M4) — the bodies' tunables, resolved once per
-  // build from this stratum's params (each leaf's resolver falls back
-  // to the shipped constant, so an unmoved knob is the constant).
-  // Glass spends its param here (the alpha multiply below); the three
-  // ramp/screen bodies carry theirs on the items as `matParams`,
-  // stamped in the flag loop — present only when a knob actually
-  // moved, so default placements gain no field (the deform/flag
-  // elision discipline the scene contract's hash parity rests on).
-  const glassAlpha = glassAlphaFrom(layoutParams);
-  const plateGeo = plateGeoFrom(layoutParams);
-  const washPrm = washParamsFrom(layoutParams);
-  const stippleScale = stippleDotScaleFrom(layoutParams);
   // #1548 (Materials M2) — `material: 'plate'` is the second material
   // switch: it flags every instance it places, and the flag is all
   // placement does. The plate body is a radial ramp INSIDE each glyph
@@ -561,7 +548,7 @@ export function buildPlacements({
   const materialStipple = isStippleMaterial(layoutParams.material);
   for (const it of mapped) {
     it.glass = glassOn;
-    if (materialGlass) it.alpha *= glassAlpha;
+    if (materialGlass) it.alpha *= GLASS_BODY_ALPHA;
     // Assigned unconditionally like `glass` above: pooled items are
     // reused across builds, so a stale true must never survive a
     // material change. Glass wins where both could claim the item:
@@ -573,22 +560,6 @@ export function buildPlacements({
     // a glass-flagged instance takes no wash/stipple body either.
     it.wash = materialWash && !glassOn;
     it.stipple = materialStipple && !glassOn;
-    // #1585: the M4 param vector for the body this item carries —
-    // a 4-slot array in the body's own reading (plate: cx, cy,
-    // radius; wash: strength, spread; stipple: dot scale; the rest
-    // zero). Cleared unconditionally first (pooled items), then set
-    // only when the stratum's knobs moved off the shipped defaults,
-    // so a default build's items are field-for-field the pre-M4 items.
-    it.matParams = undefined;
-    if (it.plate
-      && (plateGeo.cx !== PLATE_GEO_DEFAULTS.cx || plateGeo.cy !== PLATE_GEO_DEFAULTS.cy || plateGeo.radius !== PLATE_GEO_DEFAULTS.radius)) {
-      it.matParams = [plateGeo.cx, plateGeo.cy, plateGeo.radius, 0];
-    } else if (it.wash
-      && (washPrm.strength !== WASH_PARAM_DEFAULTS.strength || washPrm.spread !== WASH_PARAM_DEFAULTS.spread)) {
-      it.matParams = [washPrm.strength, washPrm.spread, 0, 0];
-    } else if (it.stipple && stippleScale !== STIPPLE_DOT_SCALE) {
-      it.matParams = [stippleScale, 0, 0, 0];
-    }
   }
   if (glassOn) mapped = sortGlassInstances(mapped);
 

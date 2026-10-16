@@ -255,7 +255,7 @@ const assertSamePhysics = (a, b, label) => {
     asset: 'a', tint: '#ffffff', accent: '#000000', ...over,
   });
   const data = packInstanceData([inst({ deform: [0.6, 0.8, 0.3] }), inst()], cells);
-  assert.strictEqual(data.length, 58, 'two instances at the 29-float stride (24 through #1410, +plate float in #1548, +matP vec4 in #1585)');
+  assert.strictEqual(data.length, 50, 'two instances at the 25-float stride (24 through #1410, +plate float in #1548)');
   assert.ok(Math.abs(data[21] - 0.6) < 1e-6 && Math.abs(data[22] - 0.8) < 1e-6 && Math.abs(data[23] - 0.3) < 1e-6,
     'deform triple packed at floats 21–23');
   assert.ok(data[46] === 0 && data[47] === 0 && data[48] === 0, 'no deform (old producer) packs zeros = round');

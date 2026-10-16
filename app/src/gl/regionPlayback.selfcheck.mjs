@@ -122,13 +122,8 @@ console.log('regionPlayback node (geometry): OK');
   }
   assert.strictEqual(new Set(phases).size, records.length, 'regions never share a phase (no lockstep)');
   // regionAssignmentFor: doc wins per region; nothing assigned -> null.
-  // R3 (#1434) — flora now carries BAKED family defaults (petals sway,
-  // centre pulses), so no doc at all resolves to the defaults; a doc
-  // entry wins per region over the default it names.
-  const DEFAULTS = { ...Object.fromEntries(PETALS.map((p) => [p, 'rock'])), [CENTRE]: 'pulse' };
-  assert.deepEqual(regionAssignmentFor(FLORA, null), DEFAULTS, 'R3: baked family defaults resolve with no doc');
-  assert.deepEqual(regionAssignmentFor(FLORA, { [FLORA]: { [PETALS[0]]: 'bob' } }),
-    { ...DEFAULTS, [PETALS[0]]: 'bob' }, 'doc wins per region over the default');
+  assert.strictEqual(regionAssignmentFor(FLORA, null), null, 'no doc, no defaults (R3) -> no assignment');
+  assert.deepEqual(regionAssignmentFor(FLORA, { [FLORA]: { [PETALS[0]]: 'bob' } }), { [PETALS[0]]: 'bob' });
   assert.strictEqual(regionAssignmentFor('geo_tri_01', { geo_tri_01: { 'rm-xxxxxx-0-0': 'rock' } }), null, 'invalid entries sanitize away');
   assert.deepEqual(regionsForAsset(FLORA), flora.regions, 'records come from the catalogue');
 }
@@ -195,16 +190,9 @@ const item = (assetId, key) => ({ assetId, x: 500, y: 350, scale: 2.5, rotation:
 const layer = (items) => [{ id: 'L', isFx: false, items }];
 const contract = (doc, items) => buildSceneContract({ doc: { seed: 1, ...doc }, resolvedLayers: layer(items) });
 const ASSIGN = { [FLORA]: { ...Object.fromEntries(PETALS.map((p) => [p, 'rock'])), [CENTRE]: 'pulse' } };
-// #1434 — flora's baked defaults ARE the ASSIGN map, so the pre-R3
-// no-regionAnim state is now the artist's deliberate still: every region
-// tombstoned in the doc. The pins below use it wherever R2 said "bare".
-const STILL = { regionKinemes: { [FLORA]: Object.fromEntries(flora.regions.map((r) => [r.id, null])) } };
 {
-  const bare = contract(STILL, [item(FLORA, 'a')]);
-  assert.ok(!('regionAnim' in bare), 'all regions cleared -> no regionAnim key (hashes unchanged)');
-  const defaulted = contract({}, [item(FLORA, 'a')]);
-  assert.ok(defaulted.regionAnim, 'R3: the baked family defaults alone raise regionAnim');
-  assert.deepEqual(defaulted.instances, bare.instances, 'defaults never move placements');
+  const bare = contract({}, [item(FLORA, 'a')]);
+  assert.ok(!('regionAnim' in bare), 'no assignments -> no regionAnim key (hashes unchanged)');
   const c = contract({ regionKinemes: ASSIGN }, [item(FLORA, 'a')]);
   assert.deepEqual(c.instances, bare.instances, 'placements byte-identical to the single-quad run');
   assert.strictEqual(c.regionAnim.budget, 12, 'no caller budget -> the tag cap');
@@ -253,7 +241,7 @@ console.log('regionPlayback node (contract): OK');
 {
   const { buildRenderPayload } = await import('./parity/glDriver.mjs');
   const hasRegionCells = (payload) => Object.keys(payload.cells).some((k) => k.includes('#r:') || k.endsWith('#rem'));
-  const barePayload = buildRenderPayload(contract(STILL, [item(FLORA, 'a')]), { width: 400, height: 280 });
+  const barePayload = buildRenderPayload(contract({}, [item(FLORA, 'a')]), { width: 400, height: 280 });
   assert.ok(!hasRegionCells(barePayload), 'no region state -> the payload atlas has no region cells');
   assert.strictEqual(barePayload.atlasW, 432, 'no region state -> the pre-R2 atlas size');
   const assignedPayload = buildRenderPayload(contract({ regionKinemes: ASSIGN }, [item(FLORA, 'a')]), { width: 400, height: 280 });
@@ -273,7 +261,7 @@ console.log('regionPlayback node (atlas demand): OK');
   const inst = { ...c.instances[0], rotation: 30 }; // rotated, to prove the parenting math
   const frame = { motionTime: 0, shed: false, regions: c.regionAnim };
   const packed = packInstanceData([inst], cellsObj, 1, frame);
-  assert.strictEqual(packed.length, (flora.regions.length + 1) * 29, 'one mark expands to remainder + R region instances');
+  assert.strictEqual(packed.length, (flora.regions.length + 1) * 25, 'one mark expands to remainder + R region instances');
   // Remainder first: the mark's own transform and kineme, the remainder cell.
   const base = comboKey(FLORA, inst.tint, inst.accent);
   const remCell = atlas.cells.get(`${base}#rem`);
@@ -284,7 +272,7 @@ console.log('regionPlayback node (atlas demand): OK');
   // scale = mark scale x geometry, kineme slot + hash phase.
   const th = (inst.rotation * Math.PI) / 180, co = Math.cos(th), si = Math.sin(th);
   flora.regions.forEach((r, i) => {
-    const o = (i + 1) * 29;
+    const o = (i + 1) * 25;
     const cell = atlas.cells.get(`${base}#r:${r.id}`);
     const g = cell.geo;
     const lx = (g.px - 50) * inst.scaleX, ly = (g.py - 50) * inst.scaleY;
@@ -302,7 +290,7 @@ console.log('regionPlayback node (atlas demand): OK');
     'shed collapse packs exactly the single quad');
   assert.deepStrictEqual(packInstanceData([inst], cellsObj, 1, { motionTime: 0, shed: false, regions: null }), bare,
     'no region state packs exactly the single quad');
-  assert.strictEqual(bare.length, 29, 'the single quad is one instance');
+  assert.strictEqual(bare.length, 25, 'the single quad is one instance');
   // Fail-closed: region state but no region cells -> the single quad.
   const wholeOnly = { [base]: atlas.cells.get(base) };
   assert.deepStrictEqual(packInstanceData([inst], wholeOnly, 1, frame), packInstanceData([inst], wholeOnly),
@@ -312,11 +300,11 @@ console.log('regionPlayback node (atlas demand): OK');
   const lowInst = low.instances[0];
   const lowPacked = packInstanceData([lowInst], cellsObj, 1, { motionTime: 0, shed: false, regions: low.regionAnim });
   const centreIdx = flora.regions.findIndex((r) => r.id === CENTRE);
-  assert.strictEqual(lowPacked[(centreIdx + 1) * 29 + 18], lowInst.kineme, 'unselected region inherits the mark kineme');
-  assert.ok(Math.abs(lowPacked[(centreIdx + 1) * 29 + 19] - lowInst.kinemePhase) < 2e-3, 'unselected region inherits the mark phase');
+  assert.strictEqual(lowPacked[(centreIdx + 1) * 25 + 18], lowInst.kineme, 'unselected region inherits the mark kineme');
+  assert.ok(Math.abs(lowPacked[(centreIdx + 1) * 25 + 19] - lowInst.kinemePhase) < 2e-3, 'unselected region inherits the mark phase');
   // Two marks expand independently.
   const two = packInstanceData([inst, { ...inst, x: 100, y: 100 }], cellsObj, 1, frame);
-  assert.strictEqual(two.length, 2 * (flora.regions.length + 1) * 29, 'two marks -> two expansions');
+  assert.strictEqual(two.length, 2 * (flora.regions.length + 1) * 25, 'two marks -> two expansions');
 }
 console.log('regionPlayback node (pack): OK');
 
@@ -357,7 +345,7 @@ async function runBrowserTests() {
     // tiled (remainder + region cells) with every kineme at rest. That
     // frame must match the single-quad (pre-R2) render inside the bar.
     const restTiled = await shot({ regionKinemes: ASSIGN, regionBudget: 0, kinemeTime: 0.6 });
-    const plainShot = await shot({ ...STILL, kinemeTime: 0 });
+    const plainShot = await shot({ kinemeTime: 0 });
     const parity = diffPx(restTiled, plainShot) / (400 * 280);
     assert.ok(parity < 0.10, `rest parity inside the WebGL bar: ${(parity * 100).toFixed(3)}% of pixels differ`);
     // The shed render IS the pre-R2 render: byte-identical to no regionAnim at all.
@@ -376,9 +364,7 @@ async function runBrowserTests() {
     // One full period wraps to the identical frame (petals-only scene:
     // every animated region rides the rock, period 2.4 — the mixed
     // fixture's centre pulse, period 1.6, does not wrap at 2.4).
-    // #1434: petals-only now needs the centre TOMBSTONED — left alone it
-    // would keep its baked pulse default.
-    const PETALS_ONLY = { [FLORA]: { ...Object.fromEntries(PETALS.map((p) => [p, 'rock'])), [CENTRE]: null } };
+    const PETALS_ONLY = { [FLORA]: Object.fromEntries(PETALS.map((p) => [p, 'rock'])) };
     const restPetals = await shot({ regionKinemes: PETALS_ONLY, kinemeTime: 0 });
     assert.ok(same(restPetals, await shot({ regionKinemes: PETALS_ONLY, kinemeTime: 2.4 })), 'one full period wraps exactly');
     // Governor selection: budget 1 animates only the largest petal —

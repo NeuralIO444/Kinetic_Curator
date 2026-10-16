@@ -8,7 +8,6 @@ export { normalizeSnapshots, normalizeLayers };
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill } from '../data/kinemes.js';
-import { sanitizeRegionKinemesDoc } from '../data/regionKinemes.js';
 import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCount } from '../curator/spawn.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
@@ -112,11 +111,6 @@ export function serializeProject(state) {
   // motionless piece exports exactly as before.
   const kineme = sanitizeAssetKineme(state.assetKineme);
   if (kineme) doc.assetKineme = kineme;
-  // #1434 — per-region kineme overrides (the artist's hand over the family
-  // defaults; null entries are tombstones — a region set still on purpose).
-  // Written only when set: a piece with no region edits exports as before.
-  const regionKinemes = sanitizeRegionKinemesDoc(state.regionKinemes);
-  if (regionKinemes) doc.regionKinemes = regionKinemes;
   // #1128 — assets pinned still (the living-motion floor skips them). Written only when set.
   const still = sanitizeAssetStill(state.assetStill);
   if (still) doc.assetStill = still;
@@ -195,7 +189,6 @@ export function parseProject(raw) {
         paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
         light: sanitizeLight(raw.light), // #594 — absent → null (off)
         assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
-        regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
         assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
         assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
         creatureCount: sanitizeCount(raw.creatureCount), // #1355
@@ -245,7 +238,6 @@ export function parseProject(raw) {
       assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
       light: sanitizeLight(raw.light), // #594 — absent → null (off)
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
-      regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
       assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
       creatureCount: sanitizeCount(raw.creatureCount), // #1355

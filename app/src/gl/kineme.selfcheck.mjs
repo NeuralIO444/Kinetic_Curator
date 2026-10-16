@@ -19,11 +19,7 @@ import { QUAD_VS } from './shaders.mjs';
 import { useStore } from '../state/store.js';
 
 // ── library + sanitizer ──────────────────────────────────────────────────
-// #1435 R4: the library grows 'bend' — an osc kineme whose id doubles as
-// the region-subdivision signal (regionKinemes.js); kind osc is measured
-// below via rock, bend's own per-slice behaviour is regionLines' subject.
-assert.deepStrictEqual(KINEMES.map((k) => k.id), ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend']);
-assert.deepStrictEqual(getKineme('bend'), { id: 'bend', kind: 'osc', period: 3.6, amp: 6 });
+assert.deepStrictEqual(KINEMES.map((k) => k.id), ['spin', 'rock', 'pulse', 'blink', 'bob']);
 for (const k of KINEMES) assert.ok(KINEME_KINDS[k.kind] > 0 && k.period > 0, `${k.id} is well-formed`);
 assert.strictEqual(getKineme('nope'), undefined);
 assert.strictEqual(sanitizeAssetKineme(null), null);

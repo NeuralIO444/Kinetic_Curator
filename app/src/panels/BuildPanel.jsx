@@ -19,7 +19,6 @@ import { AccumFamily } from './layout/AccumFamily.jsx';
 import { SwarmSliders } from './layout/SwarmSliders.jsx';
 import { CreatureSliders } from './layout/CreatureSliders.jsx';
 import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
-import { MaterialSliders } from './layout/MaterialSliders.jsx'; // #1585 — material body tunables (Materials M4)
 import { MapRow } from './layout/MapRow.jsx';
 import { SunRow } from './layout/SunRow.jsx';
 import { LayerStack } from './build/LayerStack.jsx';
@@ -112,7 +111,6 @@ export function BuildPanel() {
         {/* ④ APPEARANCE — the finish: hue, mark shape, growth, field→channel map, sun light */}
         <BuildSection num="4" title="Appearance">
           <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <MaterialSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <MapRow layoutParams={layoutParams} lockedParams={lockedParams} />
           <SunRow />
         </BuildSection>

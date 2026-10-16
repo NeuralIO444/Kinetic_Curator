@@ -711,10 +711,6 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
         // regionAnimBudget): deeper cuts, the OS reduced-motion
         // preference (regions hold rest), and the device-class region
         // budget ceiling (data/quality.js REGION_BUDGETS).
-        // #1434 — the region data itself: the artist's per-region
-        // overrides (doc map) and the custom-asset records the contract
-        // resolves regions/defaults from.
-        regionKinemes: s.regionKinemes, customAssets: s.customAssets,
         assetThin: s.assetThin, perfClamp: !!s.perfClampOverride, slowRender: s.slowRender || !s.running,
         reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
         regionBudget: regionBudgetForDevice(isIpadClassDevice()) },

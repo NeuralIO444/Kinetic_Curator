@@ -2906,6 +2906,9 @@ export const BAKED_REGIONS = {
    "B": null,
    "C": null,
    "D": null
+  },
+  "regionKinemes": {
+   "rm-000000-4-4": "bob"
   }
  },
  "line_squiggle_02": {
@@ -2927,6 +2930,9 @@ export const BAKED_REGIONS = {
    "B": null,
    "C": null,
    "D": null
+  },
+  "regionKinemes": {
+   "rm-000000-4-4": "bob"
   }
  },
  "line_squiggle_03": {
@@ -2950,7 +2956,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "line_zigzag_01": {
@@ -2974,7 +2980,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "line_dash_01": {
@@ -3298,7 +3304,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "line_swoosh_02": {
@@ -3334,7 +3340,7 @@ export const BAKED_REGIONS = {
   },
   "regionKinemes": {
    "rm-ff2d95-7-2": "bob",
-   "rm-000000-3-3": "bend"
+   "rm-000000-3-3": "bob"
   }
  },
  "line_arrow_01": {
@@ -3358,7 +3364,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-5-4": "bend"
+   "rm-000000-5-4": "bob"
   }
  },
  "line_arrow_02": {
@@ -3382,7 +3388,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "line_arrow_03": {
@@ -3406,7 +3412,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-5-4": "bend"
+   "rm-000000-5-4": "bob"
   }
  },
  "line_loop_01": {
@@ -3430,7 +3436,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "line_spiral_01": {
@@ -3478,7 +3484,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-3": "bend"
+   "rm-000000-4-3": "bob"
   }
  },
  "line_cross_01": {
@@ -3502,7 +3508,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "line_tally_01": {
@@ -3595,7 +3601,7 @@ export const BAKED_REGIONS = {
    "rm-000000-4-2": "bob",
    "rm-000000-2-3": "bob",
    "rm-000000-3-3": "bob",
-   "rm-ef2b8c-4-4": "bend",
+   "rm-ef2b8c-4-4": "bob",
    "rm-000000-6-5": "bob",
    "rm-000000-3-6": "bob",
    "rm-000000-4-5": "bob"
@@ -3633,8 +3639,8 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-1-4": "bend",
-   "rm-000000-7-4": "bend"
+   "rm-000000-1-4": "bob",
+   "rm-000000-7-4": "bob"
   }
  },
  "line_hatch_01": {
@@ -3834,11 +3840,11 @@ export const BAKED_REGIONS = {
    "D": "rm-000000-4-4"
   },
   "regionKinemes": {
-   "rm-000000-6-2": "bend",
-   "rm-000000-5-3": "bend",
-   "rm-000000-3-5": "bend",
-   "rm-000000-4-4": "bend",
-   "rm-000000-2-6": "bend"
+   "rm-000000-6-2": "bob",
+   "rm-000000-5-3": "bob",
+   "rm-000000-3-5": "bob",
+   "rm-000000-4-4": "bob",
+   "rm-000000-2-6": "bob"
   }
  },
  "line_target_01": {
@@ -3884,9 +3890,9 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend",
+   "rm-000000-4-4": "bob",
    "rm-ff2d95-4-4": "bob",
-   "rm-000000-4-4-2": "bend"
+   "rm-000000-4-4-2": "bob"
   }
  },
  "line_curl_01": {
@@ -3910,7 +3916,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-3-5": "bend"
+   "rm-000000-3-5": "bob"
   }
  },
  "line_omega_01": {
@@ -3934,7 +3940,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-5": "bend"
+   "rm-000000-4-5": "bob"
   }
  },
  "line_step_01": {
@@ -3958,7 +3964,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "flora_flower_01": {
@@ -11244,12 +11250,12 @@ export const BAKED_REGIONS = {
    "D": "rm-400c26-5-4"
   },
   "regionKinemes": {
-   "rm-000000-1-1": "bend",
-   "rm-400c26-3-4": "bend",
-   "rm-400c26-4-4": "bend",
-   "rm-400c26-5-4": "bend",
-   "rm-400c26-6-4": "bend",
-   "rm-400c26-3-5": "bend"
+   "rm-000000-1-1": "bob",
+   "rm-400c26-3-4": "bob",
+   "rm-400c26-4-4": "bob",
+   "rm-400c26-5-4": "bob",
+   "rm-400c26-6-4": "bob",
+   "rm-400c26-3-5": "bob"
   }
  },
  "hae_tendril_01": {
@@ -11273,7 +11279,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-c02270-4-4": "bend"
+   "rm-c02270-4-4": "bob"
   }
  },
  "hae_mycelium_01": {
@@ -11331,7 +11337,7 @@ export const BAKED_REGIONS = {
   },
   "regionKinemes": {
    "rm-80174b-5-2": "bob",
-   "rm-901a54-4-4": "bend",
+   "rm-901a54-4-4": "bob",
    "rm-400c26-6-4": "bob",
    "rm-7f174a-7-4": "bob"
   }
@@ -11448,7 +11454,7 @@ export const BAKED_REGIONS = {
    "rm-000000-5-3": "bob",
    "rm-000000-5-3-2": "bob",
    "rm-000000-5-3-3": "bob",
-   "rm-30091c-4-4": "bend",
+   "rm-30091c-4-4": "bob",
    "rm-000000-3-5": "bob",
    "rm-000000-3-5-2": "bob",
    "rm-000000-3-6": "bob",
@@ -11489,7 +11495,7 @@ export const BAKED_REGIONS = {
   },
   "regionKinemes": {
    "rm-5f1138-4-4": "bob",
-   "rm-000000-4-4": "bend"
+   "rm-000000-4-4": "bob"
   }
  },
  "hae_plume_01": {
@@ -11513,7 +11519,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-f02b8c-4-4": "bend"
+   "rm-f02b8c-4-4": "bob"
   }
  },
  "hae_kelp_01": {
@@ -11548,7 +11554,7 @@ export const BAKED_REGIONS = {
    "D": null
   },
   "regionKinemes": {
-   "rm-000000-4-4": "bend",
+   "rm-000000-4-4": "bob",
    "rm-80174b-3-7": "bob"
   }
  },

@@ -15,7 +15,7 @@
 //    survive the GL export — plate and wash — exactly once each
 //    (stipple's screen survives the export; flat is not a body).
 import assert from 'node:assert';
-import { isGlassMaterial, GLASS_BODY_ALPHA, GLASS_MATERIAL, glassAlphaFrom } from './glassBody.mjs';
+import { isGlassMaterial, GLASS_BODY_ALPHA, GLASS_MATERIAL } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
 import { buildSceneContract, warnUnsupportedMaterials } from '../gl/sceneContract.js';
 import { resolveLayers } from '../../../studio/render.mjs';
@@ -87,20 +87,6 @@ ok('the #1129 glass bool keeps its own alpha; bool + material attenuates once', 
 ok('repeat builds are identical (the multiply never compounds)', () => {
   const again = place({ ...BASE, material: 'glass' });
   assert.deepEqual(again.map((i) => i.alpha), glass.map((i) => i.alpha));
-});
-
-ok('#1585: glassAlpha is a live param; the shipped constant is its default', () => {
-  assert.equal(glassAlphaFrom({}), GLASS_BODY_ALPHA, 'absent resolves to the shipped constant');
-  assert.equal(glassAlphaFrom({ glassAlpha: NaN }), GLASS_BODY_ALPHA, 'garbage resolves to the shipped constant');
-  assert.equal(glassAlphaFrom({ glassAlpha: 0.5 }), 0.5);
-  const f = byIndex(flat);
-  const half = place({ ...BASE, material: 'glass', glassAlpha: 0.5 });
-  assert.ok(half.length > 0);
-  for (const g of half) {
-    assert.equal(g.alpha, f.get(g.index).alpha * 0.5, 'the param, not the constant, attenuates');
-  }
-  const clear = place({ ...BASE, material: 'glass', glassAlpha: 0 });
-  assert.ok(clear.every((i) => i.alpha === 0), 'glassAlpha 0: the body keeps none of its rolled alpha');
 });
 
 // ── the scene contract ─────────────────────────────────────────────────

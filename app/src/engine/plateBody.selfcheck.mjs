@@ -12,8 +12,7 @@
 //  - the scene contract: the plate flag rides only when set, so a
 //    non-plate contract is byte-identical in shape to the pre-M2
 //    contract (no key, no hash change);
-//  - the instance packer: 29-float stride (#1585 appended the M4
-//    param vec4 after the body code), plate float at the tail
+//  - the instance packer: 25-float stride, plate float at the tail
 //    offset, missing flag reads 0;
 //  - the shader: a_plate / v_plate wired, plateShade inlined from the
 //    leaf constants;
@@ -25,7 +24,7 @@ import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
 import {
   isPlateMaterial, PLATE_MATERIAL, PLATE_CENTER, PLATE_RADIUS, PLATE_STOPS,
-  plateRampAt, PLATE_GLSL, plateGradientDef, plateGeoFrom,
+  plateRampAt, PLATE_GLSL, plateGradientDef,
 } from './plateBody.mjs';
 import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
@@ -85,11 +84,7 @@ ok('the ramp is the retired def, stop for stop', () => {
 });
 
 ok('the GLSL chunk and the SVG def read the same constants', () => {
-  // #1585: the geometry is a live param now — the GLSL takes it as
-  // the `geo` vector (the packer fills it from the one source of
-  // truth); the stops stay inlined authored data, and the def still
-  // carries the geometry at the shipped defaults.
-  for (const frag of ['0.900', '0.850', '0.200', 'plateShade', 'geo']) {
+  for (const frag of ['0.360', '0.300', '1.050', '0.900', '0.850', '0.200', 'plateShade']) {
     assert.ok(PLATE_GLSL.includes(frag), `GLSL carries ${frag}`);
   }
   const def = plateGradientDef('pgX', '#abcdef', '#123456');
@@ -97,23 +92,6 @@ ok('the GLSL chunk and the SVG def read the same constants', () => {
   assert.ok(def.includes('<stop offset="0%" stop-color="#abcdef" stop-opacity="0.9"/>'), 'core stop: accent @0.9');
   assert.ok(def.includes('<stop offset="55%" stop-color="#123456" stop-opacity="0.85"/>'), 'mid stop: ink @0.85');
   assert.ok(def.includes('<stop offset="100%" stop-color="#123456" stop-opacity="0.2"/>'), 'rim stop: ink @0.2');
-});
-
-ok('#1585: the geometry params move the ramp; defaults resolve to the shipped geometry', () => {
-  const moved = { cx: 0.5, cy: 0.5, radius: 0.5 };
-  const core = plateRampAt(0.5, 0.5, moved);
-  assert.equal(core.inkMix, 0, 'the moved core paints accent at its own centre');
-  assert.equal(core.alpha, 0.9);
-  const rim = plateRampAt(0.5 + 0.5, 0.5, moved);
-  assert.ok(Math.abs(rim.alpha - 0.2) < 1e-9, 'the moved radius reaches the rim stop at its own rim');
-  // the resolver: garbage/absent fields fall back to the shipped constants
-  assert.deepEqual(plateGeoFrom({}), { cx: 0.36, cy: 0.30, radius: 1.05 });
-  assert.deepEqual(plateGeoFrom({ plateCenterX: NaN, plateRadius: 'x' }), { cx: 0.36, cy: 0.30, radius: 1.05 });
-  assert.deepEqual(plateGeoFrom({ plateCenterX: 0.5, plateCenterY: 0.25, plateRadius: 0.6 }), { cx: 0.5, cy: 0.25, radius: 0.6 });
-  // the def at explicit defaults is byte-identical to the def at no argument
-  assert.equal(plateGradientDef('pgD', '#abcdef', '#123456', { cx: 0.36, cy: 0.30, radius: 1.05 }), plateGradientDef('pgD', '#abcdef', '#123456'));
-  const defMoved = plateGradientDef('pgM', '#abcdef', '#123456', moved);
-  assert.ok(defMoved.includes('cx="50%"') && defMoved.includes('cy="50%"') && defMoved.includes('r="50%"'), 'moved def carries the moved geometry');
 });
 
 // ── placements (the census fixture, glassBody's BASE shape) ─────────
@@ -191,39 +169,19 @@ ok('contract: plate instances carry the flag; non-plate contracts gain no key', 
   assert.ok(fInst.every((i) => !('plate' in i)), 'flat contract has no plate key anywhere (hash parity)');
 });
 
-ok('#1585 contract: `mat` rides only when a plate knob moved', () => {
-  const p = contractFor('plate');
-  const pInst = p.instances.filter((i) => i.layer === 'bg');
-  assert.ok(pInst.every((i) => !('mat' in i)), 'plate at defaults: no mat key (hash parity with pre-M4)');
-  const doc = docWith('plate');
-  doc.layoutParams = { ...doc.layoutParams, plateRadius: 0.6, plateCenterX: 0.5 };
-  const moved = buildSceneContract({ doc, resolvedLayers: resolveLayers(doc, { caps }), caps });
-  const mInst = moved.instances.filter((i) => i.layer === 'bg');
-  assert.ok(mInst.length > 0, 'moved plate doc produced instances');
-  assert.ok(mInst.every((i) => Array.isArray(i.mat)), 'moved plate instances carry mat');
-  assert.deepEqual(mInst[0].mat, [0.5, 0.3, 0.6, 0], 'mat is (cx, cy, radius, 0) at contract precision');
-});
-
 // ── the instance packer + shader ─────────────────────────────────────
-ok('packInstanceData: 29-float stride, plate at the tail, absent reads 0', () => {
+ok('packInstanceData: 25-float stride, plate at the tail, absent reads 0', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
     asset: 'a1', tint: '#000000', accent: '#000000', x: 1, y: 2, scaleX: 3, scaleY: 3,
     rotation: 0, opacity: 1, vx: 0, vy: 0, kineme: 0, kinemePhase: 0, ...extra,
   });
   const buf = packInstanceData([mk({ plate: true }), mk({}), mk({ glass: true })], cells);
-  assert.equal(buf.length, 3 * 29, 'three instances at the 29-float stride');
+  assert.equal(buf.length, 3 * 25, 'three instances at the 25-float stride');
   assert.equal(buf[24], 1, 'plate instance: tail float is 1');
-  assert.equal(buf[29 + 24], 0, 'unflagged instance: tail float is 0');
-  assert.equal(buf[2 * 29 + 20], 1, 'glass float unmoved at offset 20');
-  assert.equal(buf[2 * 29 + 24], 0, 'glass instance carries no plate');
-  // #1585: the param vec4 follows the body code. Absent `mat` (an
-  // unmoved Look) the packer writes the shipped defaults; a carried
-  // `mat` writes through. (The buffer is Float32 — expectations are
-  // the fround'd values.)
-  assert.deepEqual([...buf.slice(25, 29)], [0.36, 0.30, 1.05, 0].map(Math.fround), 'plate at defaults packs the shipped geometry');
-  const moved = packInstanceData([mk({ plate: true, mat: [0.5, 0.25, 0.6, 0] })], cells);
-  assert.deepEqual([...moved.slice(25, 29)], [0.5, 0.25, 0.6, 0].map(Math.fround), 'plate with a moved centre/radius packs them');
+  assert.equal(buf[25 + 24], 0, 'unflagged instance: tail float is 0');
+  assert.equal(buf[2 * 25 + 20], 1, 'glass float unmoved at offset 20');
+  assert.equal(buf[2 * 25 + 24], 0, 'glass instance carries no plate');
 });
 
 ok('shader: a_plate / v_plate wired and plateShade inlined', () => {
@@ -267,22 +225,6 @@ ok('stills: the raster moves — plate pixels differ measurably from flat', () =
   for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
   const meanAbs = sum / ap.length;
   assert.ok(meanAbs > 0.5, `plate raster differs from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
-});
-
-ok('#1585 stills: a moved plate radius moves the raster; defaults leave no matParams', () => {
-  assert.ok(plate.every((i) => i.matParams === undefined), 'default plate items carry no matParams field value');
-  const tight = place({ ...BASE, material: 'plate', plateRadius: 0.3 });
-  assert.ok(tight.every((i) => Array.isArray(i.matParams)), 'moved plate items carry matParams');
-  assert.deepEqual(tight[0].matParams, [0.36, 0.3, 0.3, 0], 'matParams is (cx, cy, radius, 0)');
-  const palette = resolvePalette('hydra', null, []);
-  const raster = (svg) => new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
-  const a = raster(composeStillSvg(plate, palette));
-  const b = raster(composeStillSvg(tight, palette));
-  const ap = a.pixels; const bp = b.pixels;
-  let sum = 0;
-  for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
-  const meanAbs = sum / ap.length;
-  assert.ok(meanAbs > 0.5, `plate radius 1.05 → 0.3 moves the still (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
 });
 
 console.log(`plateBody.selfcheck: OK (${n} cases)`);

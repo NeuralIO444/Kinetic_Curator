@@ -4,7 +4,7 @@ Assets in the library: 294. With regions: 294. Without (rasterize to nothing): 0
 Region cap: 12. Regions in total: 1095.
 Count histogram (regions per asset: assets): 1: 131, 2: 37, 3: 23, 4: 13, 5: 23, 6: 7, 7: 8, 8: 5, 9: 13, 10: 4, 11: 1, 12: 29.
 Summed region bbox area (fractions of the 100-unit box): 119.362.
-Family-default region kinemes (#1434): 292 regions assigned across 72 assets (floral: 15 assets / 53 regions, linework: 31 assets / 89 regions, radial: 26 assets / 150 regions).
+Family-default region kinemes (#1434): 294 regions assigned across 74 assets (floral: 15 assets / 53 regions, linework: 33 assets / 91 regions, radial: 26 assets / 150 regions).
 
 | asset | regions | bbox area | assigned |
 |---|---:|---:|---:|
@@ -73,8 +73,8 @@ Family-default region kinemes (#1434): 292 regions assigned across 72 assets (fl
 | dot_ring_01 | 12 | 0.043 | 0 |
 | dot_speckle_01 | 12 | 0.181 | 0 |
 | dot_cluster_01 | 4 | 0.128 | 0 |
-| line_squiggle_01 | 1 | 0.287 | 0 |
-| line_squiggle_02 | 1 | 0.191 | 0 |
+| line_squiggle_01 | 1 | 0.287 | 1 |
+| line_squiggle_02 | 1 | 0.191 | 1 |
 | line_squiggle_03 | 1 | 0.248 | 1 |
 | line_zigzag_01 | 1 | 0.398 | 1 |
 | line_dash_01 | 9 | 0.024 | 9 |

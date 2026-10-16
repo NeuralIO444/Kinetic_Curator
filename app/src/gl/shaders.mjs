@@ -56,7 +56,6 @@ layout(location=5) in vec4 a_inst4;
 layout(location=6) in float a_glass;   // #1129 PR2: 1 = glass voice instance, 0 = enamel path
 layout(location=7) in vec3 a_def;      // #1410 petri B1: impact deform — (axisX, axisY, amount), world space; amount 0 = round
 layout(location=8) in float a_plate;   // #1548/#1549: material body code — 0 = flat, 1 = plate, 2 = wash, 3 = stipple
-layout(location=9) in vec4 a_matP;      // #1585 (Materials M4): the body's live params, in the body's own reading (see packInstanceData)
 uniform vec2 u_canvas;
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
@@ -90,7 +89,6 @@ out float v_glass;    // #1129 PR2: per-instance glass flag — selects the soft
 out float v_plate;    // #1548: per-instance plate flag — selects the radial ink ramp
 out float v_wash;     // #1549: per-instance wash flag — selects the vertical ink ramp
 out float v_stipple;  // #1549: per-instance stipple flag — selects the dot-field ink screen
-out vec4 v_matP;      // #1585: per-instance material params — constant across the instance, like the flags
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -211,7 +209,6 @@ void main() {
   v_wash = a_plate == 2.0 ? 1.0 : 0.0;
   v_stipple = a_plate == 3.0 ? 1.0 : 0.0;
   v_plate = a_plate == 1.0 ? 1.0 : 0.0;
-  v_matP = a_matP;   // #1585: the body's params ride alongside its code
   // #594 PR1: per-instance diffuse from the one sun, flat normal (0,0,1), at the
   // instance centre. Off → exactly vec3(1.0), so the unlit path is byte-identical.
   if (u_sun.w > 0.5) {
@@ -247,7 +244,6 @@ in float v_glass;     // #1129 PR2: 1 = soft-bevel (glass), 0 = exact existing e
 in float v_plate;     // #1548: 1 = plate material (radial ink ramp), 0 = exact existing flat path
 in float v_wash;      // #1549: 1 = wash material (vertical ink ramp), 0 = not wash
 in float v_stipple;   // #1549: 1 = stipple material (dot-field ink screen), 0 = not stipple
-in vec4 v_matP;       // #1585: the body's live params (the packer resolves defaults, so these are always the effective values)
 ${PLATE_GLSL}
 ${WASH_GLSL}
 ${STIPPLE_GLSL}
@@ -313,7 +309,7 @@ void main() {
       vec2 pspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
       vec2 plocal = (v_uv - v_cell.xy) / pspan;
       float aMul;
-      vec3 inkCol = plateShade(plocal, v_ink, v_accent, v_matP.xyz, aMul);
+      vec3 inkCol = plateShade(plocal, v_ink, v_accent, aMul);
       color = inkA * aMul * inkCol + accA * v_accent + vec3(t.b);
       alpha = clamp(t.a - inkA * (1.0 - aMul), 0.0, t.a);
     }
@@ -327,7 +323,7 @@ void main() {
     else if (v_wash > 0.5) {
       vec2 wspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
       vec2 wlocal = (v_uv - v_cell.xy) / wspan;
-      color = inkA * washShade(wlocal, v_ink, v_accent, v_matP.xy) + accA * v_accent + vec3(t.b);
+      color = inkA * washShade(wlocal, v_ink, v_accent) + accA * v_accent + vec3(t.b);
     }
     // #1549 (Materials M3): the stipple screen re-paints the ink
     // channel — the retired SVG def (stippleBody.mjs) as a dot field
@@ -341,7 +337,7 @@ void main() {
       vec2 sspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
       vec2 slocal = (v_uv - v_cell.xy) / sspan;
       float saMul;
-      vec3 inkCol = stippleShade(slocal, v_ink, v_accent, v_matP.x, saMul);
+      vec3 inkCol = stippleShade(slocal, v_ink, v_accent, saMul);
       color = inkA * saMul * inkCol + accA * v_accent + vec3(t.b);
       alpha = clamp(t.a - inkA * (1.0 - saMul), 0.0, t.a);
     }
@@ -358,7 +354,7 @@ void main() {
     if (v_stipple > 0.5) {
       vec2 xspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
       vec2 xlocal = (v_uv - v_cell.xy) / xspan;
-      float cover = stippleCover(xlocal, v_matP.x);
+      float cover = stippleCover(xlocal);
       st.rgb *= cover;
       st.a *= cover;
     }

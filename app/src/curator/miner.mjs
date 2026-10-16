@@ -368,14 +368,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
     const color = item.color || palette.ink || '#000000';
     const accent = item.accent || color;
     const matTag = item.plate ? 'plate' : item.wash ? 'wash' : item.stipple ? 'stipple' : '';
-    // #1585 (Materials M4): an item whose stratum moved a material
-    // knob carries `matParams` (buildPlacements stamps it only then);
-    // it joins the symbol key so two items that differ only in a knob
-    // never share a def, and the def generators receive the params.
-    // Absent (every default Look) the key and the defs are exactly
-    // the pre-M4 ones.
-    const mp = Array.isArray(item.matParams) ? item.matParams : null;
-    const key = `${item.assetId}|${color}|${accent}|${matTag}${mp ? `|${mp.join(',')}` : ''}`;
+    const key = `${item.assetId}|${color}|${accent}|${matTag}`;
     if (!symbols.has(key)) {
       let svg;
       if (item.plate) {
@@ -386,7 +379,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
         // url; accent paint stayed flat). One def per (accent, ink)
         // pair, emitted alongside the symbols below.
         const gid = `pg${matDefs.length}`;
-        matDefs.push(plateGradientDef(gid, accent, color, mp ? { cx: mp[0], cy: mp[1], radius: mp[2] } : undefined));
+        matDefs.push(plateGradientDef(gid, accent, color));
         svg = assetRec.svg
           .replace(INK_RE, `url(#${gid})`)
           .replace(ACCENT_RE, accent);
@@ -395,7 +388,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
         // vertical wash gradient — the same retired-def treatment
         // (washBody.mjs cites the def; accent paint stayed flat).
         const gid = `wg${matDefs.length}`;
-        matDefs.push(washGradientDef(gid, accent, color, mp ? { strength: mp[0], spread: mp[1] } : undefined));
+        matDefs.push(washGradientDef(gid, accent, color));
         svg = assetRec.svg
           .replace(INK_RE, `url(#${gid})`)
           .replace(ACCENT_RE, accent);
@@ -407,7 +400,7 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
         // so the 6-unit cell tiles the glyph exactly as the def's
         // userSpaceOnUse semantics read in the glyph's space.
         const gid = `sg${matDefs.length}`;
-        matDefs.push(stipplePatternDef(gid, accent, color, mp ? mp[0] : undefined));
+        matDefs.push(stipplePatternDef(gid, accent, color));
         svg = assetRec.svg
           .replace(INK_RE, `url(#${gid})`)
           .replace(ACCENT_RE, accent);

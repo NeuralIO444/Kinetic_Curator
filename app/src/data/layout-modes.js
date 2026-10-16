@@ -7,9 +7,6 @@ import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 import { TRAIL_MODES } from '../gl/trailMode.mjs'; // #560 — the trail vocabulary (resolveTrail's list)
 import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
 import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
-import { GLASS_BODY_ALPHA } from '../engine/glassBody.mjs'; // #1585 (Materials M4) — the shipped glass tune is the param default
-import { PLATE_CENTER, PLATE_RADIUS } from '../engine/plateBody.mjs'; // #1585 — ditto, plate geometry
-import { STIPPLE_DOT_SCALE } from '../engine/stippleBody.mjs'; // #1585 — ditto, Matt's dot scale
 
 export const LAYOUT_MODES = [
   { id: 'random',    name: 'random',     glyph: 'rand'   },
@@ -214,24 +211,6 @@ export const DEFAULT_LAYOUT_PARAMS = {
   behaveOrbit: null,
   behaveAttract: null,
   material: 'plate',
-  // #1585 (Materials M4) — the material bodies' scalar tunables as live
-  // per-Look params. The defaults ARE the shipped constants (imported
-  // from the body leaves above, one source of truth): a Look that
-  // predates M4, or one that never touches these knobs, renders
-  // exactly as the constants rendered it. The STIPPLE_DOTS / WASH_STOPS
-  // / PLATE_STOPS tables stay authored data in their leaves — these
-  // knobs scale and spread them, never replace them. Plate centre is
-  // two scalars (plateCenterX / plateCenterY): PARAM_SPEC's currency
-  // is the scalar, and the one structured precedent (scale {x,y})
-  // carries ranges, not points — two clamped scalars are the honest
-  // fit, each swept and censused on its own.
-  glassAlpha: GLASS_BODY_ALPHA,
-  plateRadius: PLATE_RADIUS,
-  plateCenterX: PLATE_CENTER.x,
-  plateCenterY: PLATE_CENTER.y,
-  washStrength: 1, // the wash ramp at full travel (washBody.mjs)
-  washSpread: 1, // the wash ramp spans the full glyph height
-  stippleDotScale: STIPPLE_DOT_SCALE,
   // #287 bio-drives. metabolism 0 = drives off (legacy behaviour);
   // breath 0 = no breathing swell; graze 0 = no grazers. graze is a hidden
   // voice-level param (no slider — the spec is the trust boundary, same as
@@ -425,21 +404,6 @@ export const PARAM_SPEC = {
   contactRestitution: { min: 0, max: 1 },
   contactRepel: { min: 0, max: 5 },
   collideMask: { min: 0, max: 0xffffffff, int: true },
-  // #1585 (Materials M4) — material body tunables. glassAlpha is the
-  // fraction of rolled alpha a glass body keeps (0 = the body
-  // vanishes, 1 = no attenuation). Plate geometry is in glyph-box
-  // units like the def it came from: radius spans past the box at the
-  // top end (the shipped 1.05 already does), centre anywhere in the
-  // box. washStrength scales the ramp's travel toward ink; washSpread
-  // stretches (or compresses) the height over which it travels.
-  // stippleDotScale multiplies the authored dot radii (STIPPLE_DOTS).
-  glassAlpha: { min: 0, max: 1 },
-  plateRadius: { min: 0.2, max: 2 },
-  plateCenterX: { min: 0, max: 1 },
-  plateCenterY: { min: 0, max: 1 },
-  washStrength: { min: 0, max: 1 },
-  washSpread: { min: 0.25, max: 4 },
-  stippleDotScale: { min: 0.5, max: 5 },
 };
 
 /**

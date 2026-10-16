@@ -54,9 +54,6 @@ import { registerCostTier } from './costTiers.mjs';
 import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
 import { kinemePhase } from '../data/kinemes.js'; // #1433 R2: per-region phase = the house seed hash of (asset id, region id)
 import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
-import { PLATE_GEO_DEFAULTS } from '../engine/plateBody.mjs'; // #1585 (Materials M4): packer defaults for the param attribute
-import { WASH_PARAM_DEFAULTS } from '../engine/washBody.mjs'; // #1585
-import { STIPPLE_DOT_SCALE } from '../engine/stippleBody.mjs'; // #1585
 import { createCoalesceFinish } from './coalesceFinish.mjs'; // #1411 coalescence finish
 import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
 
@@ -303,7 +300,7 @@ registerCostTier('gl/cell-kineme', {
 // original quad (the pre-R2 code path, exact).
 registerCostTier('gl/region-instances', {
   tier: 0, memoryBytes: 0, timeMs: 0,
-  notes: '#1433 R2: region instances expand in packInstanceData inside the quad pass; zero passes; region cells ride the atlas; governor selection via regionAnim budget; freeze tier-2, collapse deeper; live + GL stills; #1435 R4: a bend region expands into slice instances along its length — same pass, the slices are instances at full price',
+  notes: '#1433 R2: region instances expand in packInstanceData inside the quad pass; zero passes; region cells ride the atlas; governor selection via regionAnim budget; freeze tier-2, collapse deeper; live + GL stills',
 });
 // #594 PR2 bevel: 4 extra atlas taps per LIT fragment (only when the sun is on
 // and bevel > 0), inside the same quad pass. Declared tier 0 like the rest of the
@@ -409,53 +406,11 @@ function expandRegionInstances(instances, cells, regionAnim) {
     // (the shader's own convention), translated to the mark's origin.
     const th = (it.rotation * Math.PI) / 180;
     const co = Math.cos(th), si = Math.sin(th);
-    const bend = regionAnim.bend?.[it.asset];
     for (const r of entry.regions) {
       const geo = r.cell.geo;
-      const slot = assignment[r.id] || 0;
-      // #1435 (R4) — the bend: a selected stroke region (the contract's
-      // bend map carries its slice count) expands into SLICES along its
-      // length instead of one instance. Each slice is an ordinary region
-      // instance — a sub-window of the region's own cell (cellUvWindow's
-      // even split, the C-wire math), its pivot on the slice centre, the
-      // region's kineme slot — with the phase stepped 1/N per slice, so
-      // the kineme's wave travels along the stroke and the stroke
-      // articulates. Only the stroke's own pixels subdivide: the region
-      // cell holds nothing else (R1's partition), and every other region
-      // of the mark takes the single-instance path below, untouched.
-      const slices = slot > 0 && bend && Number.isInteger(bend[r.id]) && bend[r.id] >= 2 ? bend[r.id] : 0;
-      if (slices) {
-        const basePhase = kinemePhase(it.asset, r.id);
-        const alongX = geo.sx >= geo.sy; // the cell rect's long axis
-        for (let j = 0; j < slices; j++) {
-          const fc = (j + 0.5) / slices - 0.5; // slice centre, -0.5..0.5 along the axis
-          const sGeo = alongX
-            ? { px: geo.px + fc * 199.5 * geo.sx, py: geo.py, sx: geo.sx / slices, sy: geo.sy }
-            : { px: geo.px, py: geo.py + fc * 199.5 * geo.sy, sx: geo.sx, sy: geo.sy / slices };
-          const sCell = alongX
-            ? { ...r.cell, ...cellUvWindow(r.cell, j, slices), geo: sGeo }
-            : {
-                ...r.cell, geo: sGeo,
-                v0: r.cell.v0 + ((r.cell.v1 - r.cell.v0) * j) / slices,
-                v1: r.cell.v0 + ((r.cell.v1 - r.cell.v0) * (j + 1)) / slices,
-              };
-          const lx = (sGeo.px - 50) * it.scaleX;
-          const ly = (sGeo.py - 50) * it.scaleY;
-          out.push({
-            ...it,
-            _cell: sCell,
-            x: it.x + lx * co - ly * si,
-            y: it.y + lx * si + ly * co,
-            scaleX: it.scaleX * sGeo.sx,
-            scaleY: it.scaleY * sGeo.sy,
-            kineme: slot,
-            kinemePhase: (basePhase + j / slices) % 1,
-          });
-        }
-        continue;
-      }
       const lx = (geo.px - 50) * it.scaleX;
       const ly = (geo.py - 50) * it.scaleY;
+      const slot = assignment[r.id] || 0;
       out.push({
         ...it,
         _cell: r.cell,
@@ -483,9 +438,9 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     list = expandRegionInstances(instances, cells, cellFrame.regions);
   }
 
-  // 29 floats/instance (116-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // 25 floats/instance (100-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass)
-  // (defX,defY,defAmt) (material body code) (material params x4).
+  // (defX,defY,defAmt) (material body code).
   // #781: kineme 0 = still (exactly the old zeros).
   // #1129 PR2: glass is 1 for glass-voice instances (soft bevel), else 0.
   // #1410: deform is the impact squash (axis + amount); absent reads 0 =
@@ -496,15 +451,8 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
   // 0 flat, 1 plate, 2 wash, 3 stipple — decoded in QUAD_VS. The stride,
   // the attribute pointer and every earlier offset are unchanged, so
   // plate (1) and flat (0) pack bit-identically to M2.
-  // #1585 (Materials M4): four param floats appended after the body
-  // code (the M2 append pattern — every earlier offset unchanged).
-  // The body's own reading: plate (cx, cy, radius, 0), wash
-  // (strength, spread, 0, 0), stipple (dotScale, 0, 0, 0). An
-  // instance whose contract carries no `mat` (its Look never moved
-  // the knobs) packs the leaves' shipped defaults, so the shader
-  // reads the pre-M4 constants for it, bit for bit.
   const maxLen = list.length;
-  const buf = new Float32Array(maxLen * 29);
+  const buf = new Float32Array(maxLen * 25);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = list[i];
@@ -549,29 +497,7 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     const df = it.deform; // #1410: [axisX, axisY, amount]; missing (old producers) reads 0 = round
     buf[o + 21] = df ? df[0] : 0; buf[o + 22] = df ? df[1] : 0; buf[o + 23] = df ? df[2] : 0;
     buf[o + 24] = it.plate ? 1 : it.wash ? 2 : it.stipple ? 3 : 0; // #1548/#1549: material body code; missing flags (old producers) read 0 = flat ink
-    // #1585: the body's M4 params (see the stride note above). `mat`
-    // rides the contract only when the Look moved a knob; absent, the
-    // body code selects the shipped defaults.
-    const mat = it.mat;
-    if (buf[o + 24] === 1) {
-      buf[o + 25] = mat ? mat[0] : PLATE_GEO_DEFAULTS.cx;
-      buf[o + 26] = mat ? mat[1] : PLATE_GEO_DEFAULTS.cy;
-      buf[o + 27] = mat ? mat[2] : PLATE_GEO_DEFAULTS.radius;
-      buf[o + 28] = 0;
-    } else if (buf[o + 24] === 2) {
-      buf[o + 25] = mat ? mat[0] : WASH_PARAM_DEFAULTS.strength;
-      buf[o + 26] = mat ? mat[1] : WASH_PARAM_DEFAULTS.spread;
-      buf[o + 27] = 0;
-      buf[o + 28] = 0;
-    } else if (buf[o + 24] === 3) {
-      buf[o + 25] = mat ? mat[0] : STIPPLE_DOT_SCALE;
-      buf[o + 26] = 0;
-      buf[o + 27] = 0;
-      buf[o + 28] = 0;
-    } else {
-      buf[o + 25] = 0; buf[o + 26] = 0; buf[o + 27] = 0; buf[o + 28] = 0;
-    }
-    o += 29;
+    o += 25;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
@@ -785,7 +711,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (spec && specTex && specUploaded) {
       gl.uniform1i(U(quadProg, 'u_spec'), bindTex(SPEC_UNIT, specTex));
       gl.uniform4f(U(quadProg, 'u_specA'), spec.map, spec.scale, spec.displace, spec.colour);
-      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 29); // #1585: instance count at the 29-float stride
+      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 25);
     } else {
       gl.uniform4f(U(quadProg, 'u_specA'), 0, 0, 0, 0);
     }
@@ -797,31 +723,27 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     for (let i = 1; i <= 5; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 116, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 100, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     // #1129 PR2: a_glass — single float at byte 80.
     gl.enableVertexAttribArray(6);
-    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 116, 80);
+    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 100, 80);
     gl.vertexAttribDivisor(6, 1);
-    // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84.
+    // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84 (25-float stride).
     gl.enableVertexAttribArray(7);
-    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 116, 84);
+    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 100, 84);
     gl.vertexAttribDivisor(7, 1);
     // #1548/#1549: a_plate — the material body code, single float at byte 96 (the appended tail float).
     gl.enableVertexAttribArray(8);
-    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 116, 96);
+    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 100, 96);
     gl.vertexAttribDivisor(8, 1);
-    // #1585: a_matP — the material body's M4 param vec4 at byte 100 (29-float stride).
-    gl.enableVertexAttribArray(9);
-    gl.vertexAttribPointer(9, 4, gl.FLOAT, false, 116, 100);
-    gl.vertexAttribDivisor(9, 1);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 29);
-    for (let i = 0; i <= 9; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 25);
+    for (let i = 0; i <= 8; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
 
