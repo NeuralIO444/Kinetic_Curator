@@ -41,6 +41,25 @@
  *   of glide that is the difference between a dish that settles and
  *   one that jitters on.
  *
+ *   FRICTION — the surface half (§4's other meaning), shipped by D1
+ *   (#1595): after the bounce impulse and the cling have run, a
+ *   contacting pair's relative TANGENTIAL velocity meets one
+ *   Coulomb clamp. The pair coefficient is μ = FRIC_MAX × fricK(w),
+ *   fricK the cling curve's smoothstep sibling; the impulse that
+ *   would zero the slide is clamped to μ × the total normal impulse
+ *   the pair actually exchanged this step (bounce + cling), so
+ *   friction creates no energy and no grip from nothing: under
+ *   budget the pair grips (static friction, emergent — no mode
+ *   switch), over budget it slides, giving up exactly the budget
+ *   (kinetic). One μ, both regimes, named as the deliberate
+ *   simplification. At w = 0 fricK is 0 and both passes skip the
+ *   block whole — a dry dish is the pre-D1 dish bit for bit. The
+ *   budget is this-step only: no persistent manifolds, no
+ *   accumulation across steps (research §1.4, accepted deliberately
+ *   — a pair resting in a V of neighbours can keep a small residual
+ *   tangential drift; resting-contact friction is a different
+ *   engine's problem). Dry is billiards; wet has skin.
+ *
  * Composition and scope, decided once here:
  *   - The medium exists only where the dish does: the call site maps
  *     the curves inside the contacts gate (contactRadius > 0), so a
@@ -64,7 +83,7 @@
  *     FX finishes, then deform, then radius fidelity, then body
  *     counts — never the parameters of the contact law), and a shed
  *     that rewrote physics mid-performance would break bake parity,
- *     since bakes carry no governor state. Its cost is three curve
+ *     since bakes carry no governor state. Its cost is four curve
  *     evaluations per system-step and, when wet, a few flops per
  *     contacting pair inside passes that already run.
  *
@@ -83,6 +102,12 @@ export const MEDIUM_CLING_TENSION = 0.9;
  *  step at 60 fps (≈ ×0.30 over a second of free glide). */
 export const MEDIUM_DAMP_DRAG = 0.02;
 
+/** The pair friction coefficient at full wet (D1, #1595): wet
+ *  paper on glass — strong enough to feel in ten seconds, far from
+ *  a lock. The pair's μ is this × fricK(pairWet); Matt's tune on
+ *  the review lane. */
+export const FRIC_MAX = 0.5;
+
 /** The knob, read honestly: a finite number clamped to [0, 1];
  *  anything else (absent, NaN, junk) is the dry path, 0. */
 export function clampWetness(v) {
@@ -98,6 +123,16 @@ export function mediumRestitutionK(w) {
 /** Cling strength: the smoothstep of w — 0 at dry, 1 at full wet,
  *  flat at both ends of the knob so small wetness stays subtle. */
 export function mediumClingK(w) {
+  const x = clampWetness(w);
+  return x * x * (3 - 2 * x);
+}
+
+/** Friction strength (D1, #1595): the smoothstep of w, the cling
+ *  curve's sibling — 0 at dry (both passes skip the tangential
+ *  block whole), 1 at full wet. One knob, three consequences:
+ *  cling holds the normal, friction holds the tangent, damping
+ *  slows the glide. */
+export function mediumFricK(w) {
   const x = clampWetness(w);
   return x * x * (3 - 2 * x);
 }
@@ -121,9 +156,37 @@ export function mediumClingCapture(clingK, vn) {
 }
 
 /**
+ * The tangential impulse a contact can transmit this step (D1,
+ * #1595): μ × the total normal impulse the pair actually exchanged
+ * (bounce + cling). A pair that barely touched barely grips — the
+ * budget is the physics, and it is why friction can create neither
+ * energy nor grip from nothing.
+ */
+export function mediumFrictionBudget(mu, jnTotal) {
+  if (!(mu > 0) || !jnTotal) return 0;
+  return mu * Math.abs(jnTotal);
+}
+
+/**
+ * The pair's tangential impulse (D1, #1595): the impulse that
+ * would zero the pair's relative slide (−vt / wSum), Coulomb-
+ * clamped to ±mediumFrictionBudget. Inside the budget the pair
+ * grips — the slide zeroes this step; outside, it slides having
+ * paid exactly the budget. One μ, both regimes.
+ */
+export function mediumFrictionImpulse(mu, jnTotal, vt, wSum) {
+  if (vt === 0 || !(wSum > 0)) return 0;
+  const budget = mediumFrictionBudget(mu, jnTotal);
+  if (!(budget > 0)) return 0;
+  const stick = -vt / wSum;
+  return stick < -budget ? -budget : stick > budget ? budget : stick;
+}
+
+/**
  * The medium at wetness `w`, resolved once per call site:
- * { wet, restK, clingK, dampRetention }. At w = 0 every field is the
- * identity (restK 1, clingK 0, dampRetention 1) — the dry path.
+ * { wet, restK, clingK, fricK, dampRetention }. At w = 0 every field
+ * is the identity (restK 1, clingK 0, fricK 0, dampRetention 1) —
+ * the dry path.
  */
 export function dishMediumFor(w) {
   const wet = clampWetness(w);
@@ -131,6 +194,7 @@ export function dishMediumFor(w) {
     wet,
     restK: 1 - wet,
     clingK: mediumClingK(wet),
+    fricK: mediumFricK(wet),
     dampRetention: 1 - MEDIUM_DAMP_DRAG * wet,
   };
 }
