@@ -1,57 +1,67 @@
-# STAGING REPORT — Keeps K1 (#1589): tiers + migration
+# K2 staging report — the fill (#1590)
 
-**Branch:** `ember/1589-keeps-tiers` on `origin/main` f6cb8a15 · **LOCAL ONLY** — no push, no PR.
-**Stack position:** stage 1 of 4 (K2 #1590 fill, K3 #1591 disk, K4 #1592 readouts build on this branch in later dispatches; none of their scope is here).
+**Branch:** `ember/1590-keeps-fill` on `ember/1589-keeps-tiers` (K1, tip 00867ba9). LOCAL ONLY — no push, no PR.
+**Stack position:** stage 2 of 4 (K1's report is the parent commit's version of this file). K3 #1591 (disk) and K4 #1592 (readouts) are not here.
+**Scope:** the Kinetic fill + preferences.json only.
 
-## What K1 delivers
+## What shipped
 
-- **Two-tier store.** The keep record lives once, in the Collection (`kc:keeps:v1`, now **uncapped**). The Stage is an ordered list of keep ids (`kc:keeps-stage:v1`) — membership, not a copy. A keep's tier is **derived** from stage membership, never stored on the record.
-- **The silent eviction is dead.** `readKeeps` no longer slices to `KEEPS_MAX` (constant removed); `importShelf` no longer caps keeps. The E3 tray refusal copy (`SHELF_FULL_COPY`, "shelf full — free one first") is removed from the tray, the gate, and the store.
-- **Crown routing for ALL crowns** (spec §4): stage has room → the keep takes a slot (appended; menu order = arrival order, stamped `stagedCount`/`lastStagedAt`). Stage full → the keep lands in the Collection and the surface speaks `on the shelf — swap it in` (store `shelfNotice`; the tray predicts the same landing via `crownGate` over the stage's records, so the line and the routing can never disagree).
-- **Migration.** First read with no `kc:keeps-stage:v1` key derives the stage once and persists it; from then on the stored list is law (sanitized on read: strings only, deduped, must name real keeps, budget repaired oldest-first). A stored `[]` is respected — migration never re-runs.
-- **Hand-swap + promote in-app.** `ShelfView` (mounted in `AssetPoolPanel`): stage strip of 16 slots with aim-a-slot, search (label/family/palette/origin/mode/seed/corner) + kept/staged/never sorts, collection rows with swap-in / stage-it / load, counts line, soft-bound note. Actions `SWAP_STAGE_SLOT` / `STAGE_KEEP` ride the bus like every store door.
-- **Shelf history staging area for K2.** `kc:keeps-history:v1` (cap 1,000) records crown + swap events in the spec §5 flat shapes. The key is deliberately **left out of project bundles** (`BUNDLE_LEFT_OUT` with a reason, per the bundleKeys suite's law): history is this machine's diary, not project data.
-- **The favorites rider speaks.** The favorites cap still trims (favorites are setlist copies, not keeps), but the trim now lands in `shelfNotice` ("favorites full — the oldest favorite was let go") instead of vanishing silently.
+- `curator/shelfFill.mjs` (new) — the pure deal. Davis drafts a pool of 48 (stratified by cast family × origin, novelty-weighted: distance from the current stage); Lois gates on stored verdicts; the anchor tilts consensus; the sway table deals in order. Seeded (mulberry32), replays bit-exactly. No store, no IO, no wall clock.
+- `curator/shelfPrefs.mjs` (new) — the preferences contract: shipped defaults (FULL WEIRD), parser with named clamps/corrections, the defaults document text (`DEFAULT_PREFERENCES_TEXT`) for first setup, conflict-copy recognition.
+- `loot/shelfPrefsLoad.mjs` (new) — the loot read path: `preferences.json` at the loot root, read on launch + after every rescan (`LootRow`), applied via `setShelfPrefs`; edits land on the NEXT fill, never mid-fill.
+- `curator/shelf.mjs` — `fill` history records (+ sanitizer: seed · table label · per-slot rule · undealt rules · notes; torn records drop whole) and the §10 API gains `shelf.fill()` / `shelf.history()`.
+- `curator/loisJudge.mjs` — `sanitizeGateVerdict` + `gateMargin` (a passing verdict's smallest gate headroom — what Lois's-choice ranks by).
+- `curator/director.js` — `keptAnchor(keeps)`: the fill's tilt reads the kept centroid through the Director, the pull's hosted door (design call 5).
+- `curator/taste.js` — `featureProximity`: the shared feature-space cosine (novelty/distance geometry).
+- `state/slices/davisSlice.js` — `fillStage` (seed = session seed mixed with the fill counter; stamps dealt keeps; one ledger record; persists all three keys) + `setShelfPrefs` + `gateVerdict` carried by `sanitizeFavorite`.
+- `state/history.js` + `state/slices/layoutSlice.js` — `UNDO_KIND_SHELF`: a fill is exactly one undo step (S7); undo/redo restore keeps/stage/history and re-persist their keys.
+- `state/actions.js` / `applyAction.js` — `FILL_STAGE`.
+- `panels/davis/CandidateTray.jsx` — a mined crown now carries its run's Lois verdict onto the keep (`gateVerdict`), so the gate has verdicts to read.
+- `panels/ShelfView.jsx` — the KINETIC control on the shelf ("deal a new stage") + the table in force; the counts line reads the soft bound from the preferences in force.
+- `panels/ShelfDevPanel.jsx` (new) + `panels/devTabs.mjs` — DEV → SHELF: table in force, every named correction, the last fill's receipt from the ledger (per-slot rule, undealt rules named, receipt notes). The `devPanel.selfcheck` pin is extended with the #1590 justification (the census/taste precedent).
+- Suites: `curator/shelfPrefs.selfcheck.mjs` + `curator/shelfFill.selfcheck.mjs` (new, registered in `app/selfcheck.manifest`).
 
-## Design decisions (the judgement calls, on the record)
+## Behaviour evidence (measured, from the suites + a probe run)
 
-1. **The stage budget is 16 slot-cost units, not 16 keeps.** Hand keep = 1, mined keep = 2 — the E3 accounting folded into the stage, per the ruling note's "folds into the stage budget." Scarcity lives on the stage; the Collection is unbounded. Migration consequence: newest-first admission under the budget; for an all-hand shelf this is exactly "the 16 most recently kept," matching the issue's acceptance wording.
-2. **Swaps may not overfill the budget** (`that swap overfills the stage`). The stage list is persisted as-is, and the read-path sanitizer trims oldest-first to validity — so a swap that broke the budget would be silently undone on the next reload. Refusing out loud at swap time is the honest version of the same law.
-3. **The performing Look is pinned** (audit S1). `performingKeepId` (session-only state) is set when a recall/morph resolves to a keep — directly by id, or via its seed+keptAt/timestamp twin for favorites. `swapSlots` refuses to swap the pinned slot out: `that look is on the deck — swap another slot`.
-4. **Swap stamps:** `lastStagedAt` on BOTH records (both changed stage relationship), `stagedCount` only on the incoming keep (spec §3.6). First staging via a crown stamps the same way.
-5. **Collection soft bound (400) is a named constant only in K1** (`COLLECTION_SOFT_BOUND`). Keeps land past it; nothing triggers. It becomes a loot `preferences.json` value in K2 and an export trigger in K3 — the issue contract puts the preference itself in K2, so K1 names it and the shelf view reports the crossing honestly.
-6. **`crownGate` is a predictor now, not a gate.** It takes the stage's records and answers whether a crown takes a slot; a not-ok answer stops nothing. The tray and the store read the same arithmetic (`stageFits`/`routeCrown` in `shelf.mjs`).
+- **FULL WEIRD distribution:** 60-keep fixture, full stage replaced → dealt exactly consensus 8 · neglected 3 · wild 2 · lois 2 · contrarian 1; stage cost exactly 16/16; pool drafted 48; no keep dealt twice; FULL WEIRD slot count = 8 rule-breaking slots of 16.
+- **Rotation across fills (probe, 5 consecutive fills, evolving ledger):** every fill dealt the full 8+3+2+2+1; **49 of 60 distinct keeps reached the stage**; only 2 keeps were staged 3+ times — recency suppression + the neglect boost visibly rotate the deal instead of re-dealing the same faces.
+- **Replay:** seed 7 twice from the same ledger state → identical stage, slot for slot and rule for rule; seed 8 → a different deal.
+- **Suppression:** keeps staged in the last fill and 2 fills ago (window 2) barred from consensus; staged 3 fills ago eligible again; a keep swapped out 3× barred from consensus *even when a rigged scorer ranks it first* — and still dealt by **neglected** in the same fill (swap history feeds suppression, never the anchor). The chronic suppression is a named receipt line.
+- **Dry pool:** with 8 of 10 keeps "recent", neglected/wild lift recency and the receipt names the lift.
+- **The gate:** a keep carrying a stored `pass` verdict — rigged to be simultaneously the most neglected and the farthest outlier — appears in **no** slot from any rule; Lois's choice orders judged keeps by margin (0.35 dealt before 0.05).
+- **Pin (S1):** the performing keep holds its exact slot (slot 6 of 16); 15 dealt around it; its cost counts toward the budget.
+- **Budget:** 30 mined keeps (cost 2 each) → exactly 8 dealt, cost 16/16, the budget stop named in the receipt.
+- **Degradation:** 5 keeps → 5 dealt, the four undealt rules NAMED; empty collection and all-gate-failed collection → stage untouched, receipt explains.
+- **§7 door (the XGBoost/persona head):** a rigged scorer's top pick takes a consensus slot (scores ORDER); the same scorer ranking the margin-richest keep dead last cannot stop Lois's choice from dealing him; the table's 8 rule-breaking slots deal by their own rules whatever the scorer says. In the store, `fillStage` builds the scorer from the loaded head via `scoreLayout` + `headUsable` (either head kind); with no usable head, consensus falls back to anchor proximity.
+- **Store end:** one `fillStage` → stage + stamps + ledger record + all three `kc:` keys persisted; undo stack grows by exactly 1; undo restores stage, stamps, and ledger; redo re-deals identically.
 
-## Migration evidence (shelf.selfcheck, real record shapes)
+## Preferences clamp cases (measured)
 
-- **200-record fixture** (hand + mined + legacy no-provenance + ISO timestamps, i.e. a store at the old cap): migration is **lossless — all 200 ids and record content intact**; stage derived once, persisted, and **swap-stable across reloads** (a post-migration swap survives a re-read; the derivation never re-runs).
-- **Crowns past 200:** with 200 keeps already stored, further crowns all land (collection), each speaks the line, the existing 200-prefix is byte-intact, and history records the landing tier. Queen centroid input only grows.
-- **Mined crown at 15/16 stage slots:** lands in the Collection with the line — the tray refusal is dead for mined crowns too, not just hand crowns.
-- **Import of 250 keeps:** lands whole (250/250); the stage re-derives against the imported collection.
-- **End-to-end in candidateTray.selfcheck:** mined crown through `KEEP_ADD` takes a stage slot at cost 2 with provenance on the record AND the ledger line; at a full stage the same crown lands in the Collection (stage list deep-equal untouched, oldest keep standing, ledger +1, `shelfNotice` = the line).
+- Missing / empty / unparseable / non-object file → shipped defaults (FULL WEIRD) + one named line ("shipped defaults in force").
+- `consensus: 99` → 16 · `lois: -2` → 0 · `recencyWindow: -1` → 0 · `collectionSoftBound: 3` → 16 — every clamp named with its key.
+- `consensus: "eight"` → that key's default, named; `recencyWindow: 2.6` → rounds to 3.
+- A table summing to 20 → tail-trimmed to 16 (contrarian 5 → 1, named; consensus untouched). Spelling only `wild: 4` (sum 18) keeps wild 4 and trims contrarian 1 → 0 and lois 2 → 1, both named.
+- Partial files: unspelled keys take the shipped defaults silently. Unknown keys (incl. K3's `shelf.export`) tolerated, never "corrected".
+- `DEFAULT_PREFERENCES_TEXT` parses back to exactly the shipped defaults with zero corrections.
+- `preferences (conflicted copy).json` is recognized by name so the loader ignores it — and names it.
 
-## Files
+## Design calls (flagged)
 
-- NEW `app/src/curator/shelf.mjs` — tiers, budget, routing, migration derivation, stage sanitizer, swap law, §5 history shapes, shelf view rows. Pure (no store/DOM/clock).
-- NEW `app/src/curator/shelf.selfcheck.mjs` — registered in `app/selfcheck.manifest`.
-- NEW `app/src/panels/ShelfView.jsx` (+ CSS in `app/src/styles/panels.css`), mounted in `AssetPoolPanel.jsx`.
-- `app/src/state/slices/davisSlice.js` — stage key + read/migrate, crown routing in `addKeep`/`addFavorite`, swap/stage actions, speaking favorites trim, performing pin, whole-collection import; `sanitizeFavorite` carries `stagedCount`/`lastStagedAt` when real.
-- `app/src/curator/candidateTray.mjs` — gate reframed as stage predictor; refusal copy deleted.
-- `app/src/panels/davis/CandidateTray.jsx` — crown always emits; predicts the landing and speaks the shelf line.
-- `app/src/state/actions.js` / `applyAction.js` — `SWAP_STAGE_SLOT`, `STAGE_KEEP`.
-- `app/src/state/bundle.js` — stage key joins the keeps bundle part; history key left out with a reason.
-- Suites updated to the K1 contract: `candidateTray.selfcheck` (refusal block → collection-landing block), `variants.selfcheck` (crown gate over stage records), `bundleParts.selfcheck` (import: favorites cap, keeps whole), `clock.inventory.selfcheck` (#1589 justification added to the davisSlice wall-clock allow-list — the shelf stamps are the keptAt metadata class; the suite's own extension point, #1390 precedent).
+1. **The Lois gate runs on stored verdicts — the issue's kill-criterion fallback, taken deliberately.** The E4 bake is Node-side machinery (the Resvg rasterizer in `miner.mjs`); keep records carry no baked stats in the browser, so no honest fill-time `judgeRender` exists in-app today, and shipping a freezing fill is explicitly forbidden. The fill therefore gates on verdicts recorded at bake time: mined keeps crowned from a run now carry theirs (`gateVerdict`, sanitized on the record). A keep with no verdict is **unjudged, not failed** — dealable, and every receipt states the gate's evidence ("no stored verdicts on file" for hand/dice keeps today). The law "a gate failure never reaches the stage from any rule" is enforced wherever verdicts exist and is suite-proven. The follow-up that lights the gate up for the whole collection is a crown-time bake for hand keeps (the spec's opportunity O1) — not absorbed into K2 silently.
+2. **preferences.json has no write door in this stack.** The loot backend exposes scan/hash/read only. K2 ships the parser, the read path, and the defaults document; a first setup *writing* the file awaits a write verb in the loot lane (K3's disk work is the natural home). Until then: no file → defaults in force, said out loud (shelf line + DEV → SHELF).
+3. **The fill's button lives on the shelf.** Spec §3 says "pressing Kinetic with the shelf in focus" — the top-bar KINETIC is the storm generator (#942), a different act; the shelf carries its own KINETIC control, present exactly when the shelf is the surface in focus.
+4. **Consensus draws from Davis's draft pool; the rule-breakers draw from the whole gate-passed collection.** The draft is Davis's proposal set (consensus is what the room agrees on); neglect is a collection property — the most-neglected keep may never be drafted, and the table's cure slots must still reach it. The receipt reports the pool size.
+5. **The anchor is read through the Director (`keptAnchor`), not by importing the pull.** The `queenDeniability` suite (DS rule 10) allows only the hosted modules to touch the pull; the fill complies — and inherits the pull's own learning set (pattern-layer keeps do not teach the anchor). Novelty/distance geometry uses `featureProximity` from `taste.js`.
+6. **The receipt speaks in the instrument's neutral voice** ("anchor: identity / none / live") — the deniability discipline holds on data surfaces too, not just in source.
+7. **K1 behaviour otherwise untouched:** crowns/swaps still push no undo (only the fill does, per S7); the soft bound (now a real preference) still deletes nothing — crossing it is named in the dev panel as K3's export trigger, and K3 remains unbuilt.
 
-## Verification
+## Suites
 
-- `npm run build` — green.
-- Suites run and green: shelf, candidateTray, variants, favorites, bundle, bundleParts, bundleKeys, bundleFile, census, censusReadout, coverage, tasteLedger, clock.inventory, plus every other store-importing suite (busChain, curate, hitBands, loisActivity, refineColor, audioRoutes, evolveProgress, feels, regionAssignment, assetAttach, mathRandomGuard, audioSidecar, clock.evolve, kineme, routesStartEmpty, midi, patternRoll, audioRig, euclid, hitsClear, recipeStack, watchdog, writePathHonesty).
-- Full manifest sweep (431 command lines, run sequentially in this sandbox, no concurrent sweeps): **428 pass, 3 fail** — and all 3 failures are the known sandbox base-identical signatures, none touching keeps/shelf code: `swarmWasm` (build-wasm.sh cannot run — no cargo in the sandbox), `accum` (V8 OOM), `rollSafety` (headless-Chromium page closed mid-render in the GL parity driver). `vortex` and `livingMotion`, the other known sandbox intermittents, passed this run.
+- New: shelfPrefs ✓ (11 blocks) · shelfFill ✓ (12 blocks).
+- Neighbours run individually: shelf ✓ · candidateTray ✓ · census ✓ · tasteLedger ✓ · loisJudge ✓ · queenLean ✓ · tasteHead ✓ · curate ✓ · dice ✓ · curatePalette ✓ · undoLayers ✓ · undoSeedOffsets ✓ · devPanel ✓.
+- `npm run build` ✓ (after `npm install` in this fresh worktree; the pre-install failure was an unresolved `@tauri-apps/api` import in untouched code resolving through a sibling worktree's modules).
+- Full manifest sweep (433 suites): **430 pass.** The 3 exceptions are sandbox-environment failures, each verified base-identical on the untouched K1 branch: swarmWasm (no cargo on PATH), accum (V8 abort, exit 134 on base too), rollSafety (known headless-Chromium non-completion — it hangs rather than fails in this sandbox; CI judges it). One real failure surfaced and was fixed during the sweep: `queenDeniability` caught the fill importing the pull directly — the anchor now reads through the Director (design call 5); the suite passes 6/6 on the final code, and every suite in its neighbourhood passed in the same sweep.
 
-## Deliberately NOT here (later stack stages)
+## Next level
 
-- **K2 #1590:** the Kinetic fill (trio + sway table, FULL WEIRD), `preferences.json` (incl. the soft bound becoming a setting), the fill's history verbs.
-- **K3 #1591:** disk export of the Collection to the loot folder, disk as a third location, export-on-bound-crossing.
-- **K4 #1592:** census readouts over the tiers (the `shelfRows` view model is the seam; no readout surfaces built here).
-
-No push, no PR, no merge — local staging per the stack rule. Publish is the coordinator's call when K1's turn comes.
+When this publishes, the fill is playable end-to-end on defaults alone. The two follow-ups that deepen it, in order: (1) the crown-time bake (O1), so hand keeps carry verdicts and Lois's gate + margins light up across the whole collection; (2) K3's export, which turns the now-real soft-bound preference into the disk release valve. The XGBoost door needs no further code — the first usable head (the #1173 retrain) starts ordering consensus the moment it loads.
