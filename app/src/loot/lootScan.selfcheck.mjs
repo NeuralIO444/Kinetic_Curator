@@ -19,6 +19,11 @@ ok('the folder contract: the subfolder is the intent; anything outside is ignore
   assert.equal(classify('IMAGES/Deep/Nest/A.SVG').ok, true, 'case-insensitive, nested');
   assert.equal(classify('audio/loop.wav').kind, 'audio');
   assert.equal(classify('palettes/dusk.json').kind, 'palette');
+  // #1591 (Keeps K3): a look JSON is a real file now — the shelf's own
+  // exports live in looks/ and the scan reads them (the pin below this
+  // one used to say 'looks not supported yet' for exactly this path).
+  assert.equal(classify('looks/pretty.json').kind, 'look');
+  assert.equal(classify('looks/pretty.json').ok, true);
   assert.equal(classify('notes/readme.txt').ignored, true);
   assert.equal(classify('readme.txt').ignored, true);
   assert.equal(classify('images').reason, 'a folder, not a file');
@@ -27,7 +32,7 @@ ok('the folder contract: the subfolder is the intent; anything outside is ignore
 ok('what is recognised but not supported yet is reported with a reason, never guessed at', () => {
   assert.equal(classify('images/photo.png').reason, 'raster not supported yet');
   assert.equal(classify('images/photo.JPEG').reason, 'raster not supported yet');
-  assert.equal(classify('looks/pretty.json').reason, 'looks not supported yet');
+  assert.equal(classify('looks/pretty.kclook').reason, 'looks not supported yet'); // the future format stays named + skipped (K3)
   assert.equal(classify('audio/song.flac').reason, 'not a audio file (.flac)');
   assert.equal(classify('palettes/noext').reason, 'no file extension');
   assert.equal(classify('images/a.svg.txt').ok, false);

@@ -1,67 +1,134 @@
-# K2 staging report — the fill (#1590)
+# K3 staging report — the disk tier (#1591)
 
-**Branch:** `ember/1590-keeps-fill` on `ember/1589-keeps-tiers` (K1, tip 00867ba9). LOCAL ONLY — no push, no PR.
-**Stack position:** stage 2 of 4 (K1's report is the parent commit's version of this file). K3 #1591 (disk) and K4 #1592 (readouts) are not here.
-**Scope:** the Kinetic fill + preferences.json only.
+**Branch:** `ember/1591-keeps-disk` on `ember/1590-keeps-fill` (K2, tip 99b41ee3). LOCAL ONLY — no push, no PR.
+**Stack position:** stage 3 of 4 (K2's report is the parent commit's version of this file). K4 #1592 (census readouts) is not here.
+**Scope:** the disk/export stage only — overflow exports to the loot folder, the write verb, re-import on promotion, disk-aware consumers. Spec: `docs/research/keeps-machinery-spec-2026-10-14.md` §2.3/§5/§6/§10 + issue #1591 + audit S5.
 
 ## What shipped
 
-- `curator/shelfFill.mjs` (new) — the pure deal. Davis drafts a pool of 48 (stratified by cast family × origin, novelty-weighted: distance from the current stage); Lois gates on stored verdicts; the anchor tilts consensus; the sway table deals in order. Seeded (mulberry32), replays bit-exactly. No store, no IO, no wall clock.
-- `curator/shelfPrefs.mjs` (new) — the preferences contract: shipped defaults (FULL WEIRD), parser with named clamps/corrections, the defaults document text (`DEFAULT_PREFERENCES_TEXT`) for first setup, conflict-copy recognition.
-- `loot/shelfPrefsLoad.mjs` (new) — the loot read path: `preferences.json` at the loot root, read on launch + after every rescan (`LootRow`), applied via `setShelfPrefs`; edits land on the NEXT fill, never mid-fill.
-- `curator/shelf.mjs` — `fill` history records (+ sanitizer: seed · table label · per-slot rule · undealt rules · notes; torn records drop whole) and the §10 API gains `shelf.fill()` / `shelf.history()`.
-- `curator/loisJudge.mjs` — `sanitizeGateVerdict` + `gateMargin` (a passing verdict's smallest gate headroom — what Lois's-choice ranks by).
-- `curator/director.js` — `keptAnchor(keeps)`: the fill's tilt reads the kept centroid through the Director, the pull's hosted door (design call 5).
-- `curator/taste.js` — `featureProximity`: the shared feature-space cosine (novelty/distance geometry).
-- `state/slices/davisSlice.js` — `fillStage` (seed = session seed mixed with the fill counter; stamps dealt keeps; one ledger record; persists all three keys) + `setShelfPrefs` + `gateVerdict` carried by `sanitizeFavorite`.
-- `state/history.js` + `state/slices/layoutSlice.js` — `UNDO_KIND_SHELF`: a fill is exactly one undo step (S7); undo/redo restore keeps/stage/history and re-persist their keys.
-- `state/actions.js` / `applyAction.js` — `FILL_STAGE`.
-- `panels/davis/CandidateTray.jsx` — a mined crown now carries its run's Lois verdict onto the keep (`gateVerdict`), so the gate has verdicts to read.
-- `panels/ShelfView.jsx` — the KINETIC control on the shelf ("deal a new stage") + the table in force; the counts line reads the soft bound from the preferences in force.
-- `panels/ShelfDevPanel.jsx` (new) + `panels/devTabs.mjs` — DEV → SHELF: table in force, every named correction, the last fill's receipt from the ledger (per-slot rule, undealt rules named, receipt notes). The `devPanel.selfcheck` pin is extended with the #1590 justification (the census/taste precedent).
-- Suites: `curator/shelfPrefs.selfcheck.mjs` + `curator/shelfFill.selfcheck.mjs` (new, registered in `app/selfcheck.manifest`).
+**Overflow exports instead of deleting.** When the in-app collection stands past its soft bound
+(the `shelf.collectionSoftBound` preference, 400 shipped), the longest-unstaged keeps export to the
+loot folder as `looks/<keep-id>.json` — the keep record verbatim, plus its baked still when one
+exists and `shelf.export.includeStills` is on. Export order: never-staged first (oldest kept
+leads), then longest since last staged. Never exported: a staged keep, the performing keep, and a
+keep staged within the current session ("never exported under the artist"). When fewer keeps are
+exportable than the overflow, the shortfall is a named line, not a quiet reach into the protected
+set. `shelf.export.onSoftBound: 'off'` disables exports (the overflow is still counted and shown).
 
-## Behaviour evidence (measured, from the suites + a probe run)
+**The write verb (K2's flagged gap, the part the issue contract puts in K3).** The loot backends
+gained `write()`: native → a new Tauri command `loot_write` (base64 in, temp sibling + rename so a
+crash never leaves a torn file; flat exactly-two-segment paths inside the four subfolders only;
+symlink subfolders and symlink targets refused; 16 MB cap; registered in `main.rs`, with Rust unit
+tests for round-trip / refusals / symlink cases); web → File System Access with a `readwrite`
+handle, the same flat rule mirrored. The JS doors validate before invoking (gates, bytes, cap).
 
-- **FULL WEIRD distribution:** 60-keep fixture, full stage replaced → dealt exactly consensus 8 · neglected 3 · wild 2 · lois 2 · contrarian 1; stage cost exactly 16/16; pool drafted 48; no keep dealt twice; FULL WEIRD slot count = 8 rule-breaking slots of 16.
-- **Rotation across fills (probe, 5 consecutive fills, evolving ledger):** every fill dealt the full 8+3+2+2+1; **49 of 60 distinct keeps reached the stage**; only 2 keeps were staged 3+ times — recency suppression + the neglect boost visibly rotate the deal instead of re-dealing the same faces.
-- **Replay:** seed 7 twice from the same ledger state → identical stage, slot for slot and rule for rule; seed 8 → a different deal.
-- **Suppression:** keeps staged in the last fill and 2 fills ago (window 2) barred from consensus; staged 3 fills ago eligible again; a keep swapped out 3× barred from consensus *even when a rigged scorer ranks it first* — and still dealt by **neglected** in the same fill (swap history feeds suppression, never the anchor). The chronic suppression is a named receipt line.
-- **Dry pool:** with 8 of 10 keeps "recent", neglected/wild lift recency and the receipt names the lift.
-- **The gate:** a keep carrying a stored `pass` verdict — rigged to be simultaneously the most neglected and the farthest outlier — appears in **no** slot from any rule; Lois's choice orders judged keeps by margin (0.35 dealt before 0.05).
-- **Pin (S1):** the performing keep holds its exact slot (slot 6 of 16); 15 dealt around it; its cost counts toward the budget.
-- **Budget:** 30 mined keeps (cost 2 each) → exactly 8 dealt, cost 16/16, the budget stop named in the receipt.
-- **Degradation:** 5 keeps → 5 dealt, the four undealt rules NAMED; empty collection and all-gate-failed collection → stage untouched, receipt explains.
-- **§7 door (the XGBoost/persona head):** a rigged scorer's top pick takes a consensus slot (scores ORDER); the same scorer ranking the margin-richest keep dead last cannot stop Lois's choice from dealing him; the table's 8 rule-breaking slots deal by their own rules whatever the scorer says. In the store, `fillStage` builds the scorer from the loaded head via `scoreLayout` + `headUsable` (either head kind); with no usable head, consensus falls back to anchor proximity.
-- **Store end:** one `fillStage` → stage + stamps + ledger record + all three `kc:` keys persisted; undo stack grows by exactly 1; undo restores stage, stamps, and ledger; redo re-deals identically.
+**The record has exactly one writable home.** An exported keep's record LEAVES the in-app store
+and lives in its file; the store keeps a slim **stub** (listing fields only) in a persisted index
+(`kc:keeps-disk:v1`, bound to the loot root; in `BUNDLE_LEFT_OUT` with its reason — machine-local
+like the loot index). Disk records actually read this session are held in memory
+(`shelfDiskRecords`) — performable, anchor-counted — rebuilt from the files on each scan.
+Promoting a disk keep (stage-it, swap-in, or a fill that deals it) re-imports its record in the
+same move; the file left behind becomes a **fossil**: the take-in marks it taken and never reads
+it into a second record (a later re-export overwrites it whole). Tier stays derived — stage
+membership from `keepStage`, location from where the record lives; no record gains a tier field.
 
-## Preferences clamp cases (measured)
+**Nothing silently moves.** Every export and import is a shelf-history record (§5) with the
+loot-relative path, plus a visible line: the shelf notice on export ("exported to the loot folder
+— …" / a batch summary), "back from disk — …" on promotion. A failed write or a read-back that
+doesn't verify stops the run with the reason on the shelf line and every un-moved keep still in
+the collection (writes are verified by reading the file back before the record moves).
 
-- Missing / empty / unparseable / non-object file → shipped defaults (FULL WEIRD) + one named line ("shipped defaults in force").
-- `consensus: 99` → 16 · `lois: -2` → 0 · `recencyWindow: -1` → 0 · `collectionSoftBound: 3` → 16 — every clamp named with its key.
-- `consensus: "eight"` → that key's default, named; `recencyWindow: 2.6` → rounds to 3.
-- A table summing to 20 → tail-trimmed to 16 (contrarian 5 → 1, named; consensus untouched). Spelling only `wild: 4` (sum 18) keeps wild 4 and trims contrarian 1 → 0 and lois 2 → 1, both named.
-- Partial files: unspelled keys take the shipped defaults silently. Unknown keys (incl. K3's `shelf.export`) tolerated, never "corrected".
-- `DEFAULT_PREFERENCES_TEXT` parses back to exactly the shipped defaults with zero corrections.
-- `preferences (conflicted copy).json` is recognized by name so the loader ignores it — and names it.
+**The anchor names its partiality (audit S5).** Queen's anchor counts disk keeps at full weight
+when their records are read. When the folder is away or a file is unread, the fill receipt and the
+DEV → SHELF readout name the anchor partial with the unread count
+("anchor: partial — N keeps on disk unread; the anchor leans on the rest at full weight"). Taste
+training is untouched: it reads the crown/pass ledgers, which span all tiers by construction —
+tier is not a training feature because the ledger never knew tiers.
 
-## Design calls (flagged)
+**Surfaces.** ShelfView's collection is one merged listing (in-app · on-disk · folder-away ·
+file-gone), searched and sorted by the same reading order; counts show "N on disk"; stub rows
+(record not in hand) show their state and disable their actions with the reason. DEV → SHELF
+gains a DISK section: tier counts, connected state, the anchor line, export prefs in force, and
+the last five moves to/from disk. The loot row reads looks in on scan, folds missing verdicts in
+(a file deleted outside the app marks its stub missing and the row says "on disk — file gone"),
+and arms an export watch: a crown that crosses the bound exports without waiting for a rescan.
 
-1. **The Lois gate runs on stored verdicts — the issue's kill-criterion fallback, taken deliberately.** The E4 bake is Node-side machinery (the Resvg rasterizer in `miner.mjs`); keep records carry no baked stats in the browser, so no honest fill-time `judgeRender` exists in-app today, and shipping a freezing fill is explicitly forbidden. The fill therefore gates on verdicts recorded at bake time: mined keeps crowned from a run now carry theirs (`gateVerdict`, sanitized on the record). A keep with no verdict is **unjudged, not failed** — dealable, and every receipt states the gate's evidence ("no stored verdicts on file" for hand/dice keeps today). The law "a gate failure never reaches the stage from any rule" is enforced wherever verdicts exist and is suite-proven. The follow-up that lights the gate up for the whole collection is a crown-time bake for hand keeps (the spec's opportunity O1) — not absorbed into K2 silently.
-2. **preferences.json has no write door in this stack.** The loot backend exposes scan/hash/read only. K2 ships the parser, the read path, and the defaults document; a first setup *writing* the file awaits a write verb in the loot lane (K3's disk work is the natural home). Until then: no file → defaults in force, said out loud (shelf line + DEV → SHELF).
-3. **The fill's button lives on the shelf.** Spec §3 says "pressing Kinetic with the shelf in focus" — the top-bar KINETIC is the storm generator (#942), a different act; the shelf carries its own KINETIC control, present exactly when the shelf is the surface in focus.
-4. **Consensus draws from Davis's draft pool; the rule-breakers draw from the whole gate-passed collection.** The draft is Davis's proposal set (consensus is what the room agrees on); neglect is a collection property — the most-neglected keep may never be drafted, and the table's cure slots must still reach it. The receipt reports the pool size.
-5. **The anchor is read through the Director (`keptAnchor`), not by importing the pull.** The `queenDeniability` suite (DS rule 10) allows only the hosted modules to touch the pull; the fill complies — and inherits the pull's own learning set (pattern-layer keeps do not teach the anchor). Novelty/distance geometry uses `featureProximity` from `taste.js`.
-6. **The receipt speaks in the instrument's neutral voice** ("anchor: identity / none / live") — the deniability discipline holds on data surfaces too, not just in source.
-7. **K1 behaviour otherwise untouched:** crowns/swaps still push no undo (only the fill does, per S7); the soft bound (now a real preference) still deletes nothing — crossing it is named in the dev panel as K3's export trigger, and K3 remains unbuilt.
+**§10 API.** `curator/shelf` gains `export()` (the pure planner). The fill/swap/stage law now
+reads the whole shelf (in-app + disk records) through one merged list.
 
-## Suites
+## Evidence (suites, all headless)
 
-- New: shelfPrefs ✓ (11 blocks) · shelfFill ✓ (12 blocks).
-- Neighbours run individually: shelf ✓ · candidateTray ✓ · census ✓ · tasteLedger ✓ · loisJudge ✓ · queenLean ✓ · tasteHead ✓ · curate ✓ · dice ✓ · curatePalette ✓ · undoLayers ✓ · undoSeedOffsets ✓ · devPanel ✓.
-- `npm run build` ✓ (after `npm install` in this fresh worktree; the pre-install failure was an unresolved `@tauri-apps/api` import in untouched code resolving through a sibling worktree's modules).
-- Full manifest sweep (433 suites): **430 pass.** The 3 exceptions are sandbox-environment failures, each verified base-identical on the untouched K1 branch: swarmWasm (no cargo on PATH), accum (V8 abort, exit 134 on base too), rollSafety (known headless-Chromium non-completion — it hangs rather than fails in this sandbox; CI judges it). One real failure surfaced and was fixed during the sweep: `queenDeniability` caught the fill importing the pull directly — the anchor now reads through the Director (design call 5); the suite passes 6/6 on the final code, and every suite in its neighbourhood passed in the same sweep.
+New suites (registered in `app/selfcheck.manifest`):
+- `curator/shelfDisk.selfcheck` — export-prefs clamps named ('ask'→'export', folder→'looks',
+  'off'), the file contract (round-trip exact for hand + mined shapes; still in/out),
+  a no-absolute-path grep over serialized exports (`/Users/`, `/home/`, `/Volumes/`, `C:\`,
+  `file://`), planner order + protections + shortfall line, the anchor account, the stub
+  sanitizer (id/rel disagreement refused), merged rows in all four locations, ledger records
+  (an absolute path in a move record is refused whole), `shelf.export()` identity, and the
+  fill receipt's partial-anchor naming.
+- `loot/shelfDiskRun.selfcheck` — the real store + glue over a fake folder, scenarios A–H:
+  overflow exports longest-unstaged first with files deep-equal to the in-app records, history +
+  notice + persisted index; protections (staged / performing / session-staged never move);
+  stage-it re-imports with no duplicate and the fossil take-in stays a non-record; a fill deals
+  the only keep from disk and imports it under the fill's ledger records (the fill's single undo
+  snapshot carries the pre-fill disk tier); folder-away fill names the anchor partial; a deleted
+  file marks missing; non-export files in looks/ are held with reasons; a failed write stops
+  spoken with nothing moved.
+- `loot/lootWrite.selfcheck` — native write (gates, validation before invoke, base64 payload
+  exact, dead-IPC refusal) and web write (subfolder creation, flat rule, cap, foreign label
+  refusal, byte-exact read-back).
 
-## Next level
+One deliberate pin update: `loot/lootScan.selfcheck` — `looks/*.json` now classifies as a real
+look file (K3 is when keeps' looks land); `.kclook` keeps the 'looks not supported yet' pin.
 
-When this publishes, the fill is playable end-to-end on defaults alone. The two follow-ups that deepen it, in order: (1) the crown-time bake (O1), so hand keeps carry verdicts and Lois's gate + margins light up across the whole collection; (2) K3's export, which turns the now-real soft-bound preference into the disk release valve. The XGBoost door needs no further code — the first usable head (the #1173 retrain) starts ordering consensus the moment it loads.
+Neighbours run individually (all PASS): shelf, shelfFill, shelfPrefs, candidateTray, bundle,
+bundleParts, bundleKeys, census, censusReadout, coverage, tasteLedger, clock.inventory,
+devPanel, queenDeniability, favorites, undoLayers, undoSeedOffsets, and the full loot family
+(lootScan, lootIndex, lootNative, lootWeb, lootCopy, lootRun, lootIngest, lootPalettes, lootAudio).
+`npm run build` PASS.
+
+Full manifest sweep (one sequential run, 436 suites): **433 pass / 3 fail** — the three known
+sandbox-only signatures, all verified base-identical in prior stages (K1's sweep: 428/431, K2's:
+430/433, same three): `swarmWasm` (the sandbox has no cargo), `clock.evolve-accum` (V8 OOM abort,
+exit 134), `rollSafety` (does not complete in the sandbox — browser closes mid-render with no
+assertion failing; CI passed it inside lint-build-selfcheck on #1617 and remains its authority).
+All three new K3 suites pass inside the sweep; no new failures.
+
+## Design calls flagged
+
+1. **Records leave the store on export** (spec §2.2's "400 records in-app" + S5's partial anchor
+   only make sense this way). The in-app collection the bound counts is `state.keeps`; disk
+   records in memory are a read cache of the files, never persisted as records.
+2. **The fossil rule.** Import never deletes the file. Deleting on import would make an undo of
+   an importing fill unrecoverable; leaving it costs nothing — the take-in recognizes an in-app
+   keep's file and never double-records it, and re-export overwrites it whole.
+3. **`onSoftBound: 'ask'`** shipped as a placeholder value in K2's defaults document; K3's enum
+   is `export | off`, and a stored `'ask'` clamps to `'export'` WITH a named line (never a silent
+   behaviour change). The shipped defaults text now writes `'export'`. K2's own parser/pins are
+   untouched (it ignores the export namespace).
+4. **`includeSeeds`** (a K2 defaults-text key) is parsed and tolerated with no effect: under the
+   verbatim law the record IS the record — its seed rides because it is part of the keep, not an
+   attachment. Named in `shelfDisk.mjs` so the tolerance is a decision.
+5. **Export prefs parse separately** (`parseShelfExportPrefs`) rather than widening K2's
+   `parseShelfPrefs`: the two parsers share the document, never each other's keys, so K2's
+   corrections and suite pins are undisturbed.
+6. **A keep file deleted outside the app** keeps its stub (marked missing) and any record
+   already read this session stays in hand — a promotion then becomes the only copy, which the
+   import line speaks. Nothing is auto-deleted anywhere.
+7. **The preferences.json write door — gap named again, narrowed.** K2 flagged that
+   preferences.json could not be written (the loot backend had scan/hash/read only). The write
+   verb now EXISTS and is used for `looks/` exports, but writing the shipped defaults document
+   into a fresh loot folder on first setup is still NOT wired: it is one call site away, and the
+   issue contract does not put it in K3. `loot/shelfPrefsLoad.mjs` says so in its header.
+8. **Rust is uncompiled in the sandbox** (no cargo here): `loot_write` + `resolve_write` +
+   `write_b64` and their unit tests are written to the existing loot.rs patterns, but their first
+   compile is CI's cargo-check. The JS side is fully suite-verified.
+9. **Stills are honestly zero today**: no keep record carries a baked still (the crown-time
+   bake is spec opportunity O1, unbuilt), so exports today are the record alone; the
+   includeStills path is forward-compatible and suite-pinned with a synthetic still field.
+
+## Not in K3 (scope discipline)
+
+No census readouts (K4 #1592). No changes to the stage budget, the fill's table, or FULL WEIRD
+scoring — disk keeps enter the deal as records, unscored slots stay unscored. No preferences
+defaults-document write (call 7). No `.kclook` support.
