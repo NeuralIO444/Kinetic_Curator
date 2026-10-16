@@ -59,6 +59,11 @@
  *   — a pair resting in a V of neighbours can keep a small residual
  *   tangential drift; resting-contact friction is a different
  *   engine's problem). Dry is billiards; wet has skin.
+ *   D2 (#1596) spends this same impulse twice: applied at the
+ *   contact point it is also torque (Δω = −R·jt/I per disc, law in
+ *   dishSpin.mjs), and the slide it answers is read at the contact
+ *   point — no new budget, no second friction, exactly as §9 of
+ *   the D1 sketch promised.
  *
  * Composition and scope, decided once here:
  *   - The medium exists only where the dish does: the call site maps
@@ -169,16 +174,25 @@ export function mediumFrictionBudget(mu, jnTotal) {
 
 /**
  * The pair's tangential impulse (D1, #1595): the impulse that
- * would zero the pair's relative slide (−vt / wSum), Coulomb-
+ * would zero the pair's relative slide (−vt / kInv), Coulomb-
  * clamped to ±mediumFrictionBudget. Inside the budget the pair
  * grips — the slide zeroes this step; outside, it slides having
  * paid exactly the budget. One μ, both regimes.
+ *
+ * `vt` is the slide the impulse must answer: D1 read the centres'
+ * relative tangential velocity; since D2 (#1596) the call sites
+ * pass the CONTACT-POINT slide (centres plus ω×r, dishSpin.mjs),
+ * so a grip now zeroes the surfaces' slide and the pair leaves
+ * rolling. `kInv` is the tangential inverse effective mass the
+ * slide spreads over: D1's wSum (centres only) before D2, the
+ * spin-inclusive wSum + Σ R²/I since. The budget and the clamp —
+ * the parts that make friction honest — are unchanged.
  */
-export function mediumFrictionImpulse(mu, jnTotal, vt, wSum) {
-  if (vt === 0 || !(wSum > 0)) return 0;
+export function mediumFrictionImpulse(mu, jnTotal, vt, kInv) {
+  if (vt === 0 || !(kInv > 0)) return 0;
   const budget = mediumFrictionBudget(mu, jnTotal);
   if (!(budget > 0)) return 0;
-  const stick = -vt / wSum;
+  const stick = -vt / kInv;
   return stick < -budget ? -budget : stick > budget ? budget : stick;
 }
 

@@ -27,7 +27,10 @@
 // the seam — a dry pair is the A1 numbers bit for bit. #1595 (D1)
 // completes the medium across the seam: the same resolved curves add
 // friction, the tangential half of the impulse, budgeted by the normal
-// impulse the pair exchanged this step.
+// impulse the pair exchanged this step. #1596 (D2) spends that impulse
+// as torque too: the slide is read at the contact point and both discs
+// take Δω = −R·jt/I (law in dishSpin.mjs), so spin crosses the seam
+// exactly as friction does.
 //
 // Determinism (spec §7): pair-visit order is canonical — stratum order
 // (the arming order), then particle index — via the same counting-sort
@@ -49,6 +52,7 @@ import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's pe
 import { ensureEntryTrails } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
 import { ensureEcologyEntry, removeEcologyEntry } from './dishEcology.mjs'; // #1416 — the ecology ledger's enrolment (the law lives in the module)
 import { clampWetness, dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX } from './dishMedium.mjs'; // #1413 — the medium across the seam; #1595 (D1) — its friction
+import { spinContactVt, spinInertia, spinInvMassT, spinDeltaOmega } from './dishSpin.mjs'; // #1596 (D2) — spin: torque from D1's jt across the seam
 
 const TAU = Math.PI * 2;
 
@@ -446,22 +450,32 @@ export function runDishContacts(session, callerSys) {
           // μ comes from the pair's medium; the budget is the normal
           // impulse exchanged above, so a dry pair (pairMed null,
           // fricK 0) never enters and a light touch barely grips.
-          // jt stays a named value in this scope — D2 (spin)
-          // consumes it as torque without recomputing the contact.
-          // The #1410 feed below still reads normal Δv only: whether
-          // tangential drag should shear the dent is a feel question
-          // for after D1 plays.
+          // #1596 (D2) — the slide is read at the contact point
+          // (v + ω×r) and spread over the spin-inclusive tangential
+          // mass (law in dishSpin.mjs), and the same clamped jt
+          // torques both discs (Δω = −R·jt/I): no new budget, no
+          // second friction. The #1410 feed below still reads normal
+          // Δv only: whether tangential drag — or spin — should shear
+          // the dent is a feel question for after the stage plays
+          // (D1's deliberate non-witness, carried).
           if (pairMed && pairMed.fricK > 0) {
             const mu = FRIC_MAX * pairMed.fricK;
             const tx = -ny, ty = nx;
-            const vt = (sysB.vx[ib] - sysA.vx[ia]) * tx + (sysB.vy[ib] - sysA.vy[ia]) * ty;
+            const vt = spinContactVt(
+              (sysB.vx[ib] - sysA.vx[ia]) * tx + (sysB.vy[ib] - sysA.vy[ia]) * ty,
+              sysA.omega[ia], ra, sysB.omega[ib], rb,
+            );
             if (vt !== 0) {
-              const jt = mediumFrictionImpulse(mu, jnTotal, vt, wSum);
+              const iA = spinInertia(m1, ra);
+              const iB = spinInertia(m2, rb);
+              const jt = mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum, ra, iA, rb, iB));
               if (jt !== 0) {
                 sysA.vx[ia] -= tx * jt * w1;
                 sysA.vy[ia] -= ty * jt * w1;
                 sysB.vx[ib] += tx * jt * w2;
                 sysB.vy[ib] += ty * jt * w2;
+                sysA.omega[ia] += spinDeltaOmega(ra, jt, iA);
+                sysB.omega[ib] += spinDeltaOmega(rb, jt, iB);
               }
             }
           }
