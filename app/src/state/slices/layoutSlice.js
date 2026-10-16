@@ -1,7 +1,7 @@
 import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, shelfRestoreFields, trimUndoStack, UNDO_KIND_LAYERS, UNDO_KIND_SHELF } from '../history.js';
-import { KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY } from './davisSlice.js';
+import { KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY, DISK_KEY } from './davisSlice.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
 import { hasChain, markovPick } from '../../curator/transitions.js';
@@ -145,6 +145,14 @@ function persistShelfRestore(shelfBack) {
     localStorage.setItem(KEEPS_KEY, JSON.stringify(shelfBack.keeps || []));
     localStorage.setItem(STAGE_KEY, JSON.stringify(shelfBack.keepStage || []));
     localStorage.setItem(SHELF_HISTORY_KEY, JSON.stringify(shelfBack.shelfHistory || []));
+    // #1591 — the disk index follows the shelf restore, so an undo
+    // that returns a record to the disk tier reads consistently
+    // after a reload too.
+    if (shelfBack.shelfDiskStubs !== undefined) {
+      localStorage.setItem(DISK_KEY, JSON.stringify({
+        v: 1, root: shelfBack.shelfDiskRoot ?? null, stubs: shelfBack.shelfDiskStubs,
+      }));
+    }
   } catch { /* storage full/blocked — state still restores */ }
 }
 

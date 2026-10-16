@@ -31,7 +31,7 @@ export function statusLine({ items = 0, missing = 0, added = 0, skipped = 0, tak
 }
 
 const MISSING_SHOWN = 3;
-const KEEPS = Object.freeze({ image: 'the pool keeps its copy', palette: 'the palette stays in your library', audio: 'it leaves the STIMULI menu' });
+const KEEPS = Object.freeze({ image: 'the pool keeps its copy', palette: 'the palette stays in your library', audio: 'it leaves the STIMULI menu', look: 'the shelf marks the keep missing' });
 
 /** Honest lines for files that were taken in and are no longer in the folder: [`images/a.svg: source missing, the pool keeps its copy`]. */
 export function missingLines(index) {
@@ -64,7 +64,7 @@ export const LABELS = Object.freeze({
   forget: 'forget',
   scanning: 'scanning...',
   hashing: (done, total) => `reading ${done} of ${total}...`,
-  hint: 'images/ audio/ palettes/ looks/ — your files are read in place, never copied or moved',
+  hint: 'images/ audio/ palettes/ looks/ — your files stay where they are; KC-1 writes only its own keep exports into looks/',
   logTitle: 'ingest log',
   empty: 'nothing in the log yet',
 });

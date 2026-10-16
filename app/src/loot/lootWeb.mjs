@@ -4,8 +4,9 @@
 //
 // What a browser will and will not do, and what this module does with it:
 //   - the user chooses a place ONCE and approves it; we create `KC-1 Loot/` there with images/ audio/ palettes/ looks/ (or,
-//     if they pick a folder that already is one, we use it as it is). That is the only thing this module ever writes, and
-//     it only ever creates directories: no file is written, moved, renamed or deleted. The files stay where they are.
+//     if they pick a folder that already is one, we use it as it is). Creating those directories was the only write until
+//     #1591: the keeps shelf's exports are KC-1's own files, written flat into looks/ through write() below — the
+//     artist's files are still never written, moved, renamed or deleted. Their files stay where they are.
 //   - the folder handle is kept in IndexedDB. After a restart the browser may want one click to allow it again, so the
 //     rescan button re-asks (a click is the user gesture the browser needs); a refusal is a plain reason, not a crash.
 //   - features are detected at runtime (never by user-agent). Safari and Firefox have no folder-write permission: they get
@@ -13,7 +14,7 @@
 //
 // Pure of the page: `win`, the handle store and the picker are injected, so a selfcheck drives it with a fake folder tree.
 import { relSegments } from './lootClassify.mjs';
-import { shapeScan, MAX_ENTRIES } from './lootNative.mjs';
+import { shapeScan, MAX_ENTRIES, MAX_WRITE_BYTES } from './lootNative.mjs';
 import { WEB_UNSUPPORTED, WEB_INSECURE, LINK_LOST, ALLOW_AGAIN, NOT_BROWSER_FOLDER } from './lootCopy.mjs';
 
 export const WEB_PREFIX = 'web:';
@@ -90,13 +91,14 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
   const unsupported = () => webFolderSupport(w);
   const sha = digest || ((b) => globalThis.crypto.subtle.digest('SHA-256', b));
 
-  // the stored handle for a root label, with read access (asks again if the browser dropped it: a click is the gesture)
-  async function rootHandle(label) {
+  // the stored handle for a root label, with the access the call needs (asks again if the browser dropped it:
+  // a click is the gesture)
+  async function rootHandle(label, mode = 'read') {
     if (typeof label !== 'string' || !label.startsWith(WEB_PREFIX)) return { ok: false, reason: NOT_BROWSER_FOLDER };
     let h = mem;
     if (!h) { try { h = await handles.get(HANDLE_KEY); } catch { h = null; } }
     if (!h || h.kind !== 'directory' || WEB_PREFIX + h.name !== label) return { ok: false, reason: LINK_LOST };
-    if (!(await allowed(h, 'read'))) return { ok: false, reason: ALLOW_AGAIN };
+    if (!(await allowed(h, mode))) return { ok: false, reason: ALLOW_AGAIN };
     mem = h;
     return { ok: true, h };
   }
@@ -219,6 +221,32 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
         return { ok: true, bytes: new Uint8Array(await f.file.arrayBuffer()) };
       } catch (e) {
         return { ok: false, reason: short(e) };
+      }
+    },
+
+    /**
+     * Write one of KC-1's own files (#1591: the keeps shelf's exports into looks/) — the native side's twin.
+     * Flat in a subfolder only, like the Rust command; the subfolder is created when missing (the picker already
+     * makes all four, a hand-made folder may lack one). The artist's files are never written through this.
+     */
+    async write(label, rel, bytes) {
+      const g = unsupported();
+      if (g) return { ok: false, reason: g };
+      if (!(bytes instanceof Uint8Array)) return { ok: false, reason: 'not bytes' };
+      if (bytes.length > MAX_WRITE_BYTES) return { ok: false, reason: `file too large (${mb(bytes.length)} MB)` };
+      const segs = relSegments(rel);
+      if (!segs || segs.length !== 2) return { ok: false, reason: 'writes land flat in a subfolder' };
+      const r = await rootHandle(label, 'readwrite');
+      if (!r.ok) return r;
+      try {
+        const d = await r.h[SUBDIR](segs[0], { create: true });
+        const fh = await d.getFileHandle(segs[1], { create: true });
+        const w = await fh.createWritable();
+        await w.write(bytes);
+        await w.close();
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, reason: errName(e) === 'NotAllowedError' ? ALLOW_AGAIN : short(e) };
       }
     },
 

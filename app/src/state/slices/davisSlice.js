@@ -22,10 +22,18 @@ import { sanitizeProvenance } from '../../curator/provenance.mjs'; // #1507: min
 import { // #1589 (Keeps K1): the shelf's tiers — stage membership, crown routing, swaps, migration
   deriveStageIds, sanitizeStageIds, routeCrown, swapSlots, admitToStage,
   crownHistoryRecord, swapHistoryRecord, fillHistoryRecord, sanitizeHistoryRecord,
+  exportHistoryRecord, importHistoryRecord, shelfRow,
   ON_SHELF_COPY, favoritesTrimCopy,
 } from '../../curator/shelf.mjs';
 import { dealFill } from '../../curator/shelfFill.mjs'; // #1590 (Keeps K2): the Kinetic fill
 import { DEFAULT_SHELF_PREFS, tableName } from '../../curator/shelfPrefs.mjs'; // #1590: preferences.json
+import { // #1591 (Keeps K3): the disk tier — stub index sanitizer, the anchor account, export paths
+  sanitizeDiskIndex, anchorAccount, exportRelFor,
+} from '../../curator/shelfDisk.mjs';
+import { PALETTES } from '../../data/palettes.js'; // #1591: shelf row labels for the disk lines
+const SHELF_ASSETS_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
+const SHELF_PALETTES_BY_ID = new Map(PALETTES.map((p) => [p.id, p]));
+const shelfLabelOf = (rec) => shelfRow(rec, [], { assetsById: SHELF_ASSETS_BY_ID, palettesById: SHELF_PALETTES_BY_ID }).label;
 import { sanitizeGateVerdict } from '../../curator/loisJudge.mjs'; // #1590: stored E4 verdicts ride keeps
 import { getTaste } from '../../curator/tasteStore.js'; // #762: the loaded taste (the Queen's head)
 import { scoreLayout, headUsable } from '../../curator/tasteHead.js'; // the scorer interface (§7 door)
@@ -283,6 +291,31 @@ function persistShelfHistory(list) {
   }
 }
 
+/** #1591 (Keeps K3) — the disk index (`kc:keeps-disk:v1`): this
+ * machine's diary of which keeps live as files in the loot folder —
+ * one slim stub per disk keep (listing fields only; the RECORD lives
+ * in the file, verbatim), bound to one loot root. Machine-local like
+ * the loot index itself: it never rides a bundle (BUNDLE_LEFT_OUT),
+ * and a different folder starts it clean. */
+export const DISK_KEY = 'kc:keeps-disk:v1';
+
+function readDiskIndex() {
+  try {
+    const raw = localStorage.getItem(DISK_KEY);
+    return raw ? sanitizeDiskIndex(JSON.parse(raw)) : { v: 1, root: null, stubs: {} };
+  } catch {
+    return { v: 1, root: null, stubs: {} };
+  }
+}
+
+function persistDiskIndex(root, stubs) {
+  try {
+    localStorage.setItem(DISK_KEY, JSON.stringify({ v: 1, root: root || null, stubs }));
+  } catch (e) {
+    console.warn('[keeps] disk index save failed', e);
+  }
+}
+
 /**
  * #1589 — route one crowned keep into the shelf (spec §4, all crowns):
  * the stage has room → the keep takes a slot and is stamped with its
@@ -305,6 +338,46 @@ function withShelfHistory(state, record) {
   const list = [...(state.shelfHistory || []), record].slice(-SHELF_HISTORY_MAX);
   persistShelfHistory(list);
   return list;
+}
+
+/** Append several shelf-history records (a fill and the imports it
+ * caused), capped, persisted once. Returns the list. */
+function withShelfHistoryMany(state, records) {
+  if (!records.length) return state.shelfHistory || [];
+  const list = [...(state.shelfHistory || []), ...records].slice(-SHELF_HISTORY_MAX);
+  persistShelfHistory(list);
+  return list;
+}
+
+/**
+ * #1591 — every keep the shelf can see: the in-app collection plus
+ * the disk records read this session. One list for the pure law
+ * (swap / stage / fill / anchor): a disk keep competes exactly like
+ * an in-app one, and dealing or promoting it is the import below.
+ * The invariant the actions maintain: a keep id lives in exactly one
+ * of the two lists — its record has exactly one writable home.
+ */
+function allKeeps(state) {
+  return [...(state.keeps || []), ...Object.values(state.shelfDiskRecords || {})];
+}
+
+/**
+ * #1591 — bring a disk keep's record back in-app (the promotion: the
+ * swap, stage-it, or fill that dealt it). The record appends to the
+ * collection; its disk record + stub drop — the file left in looks/
+ * becomes a fossil the shelf ignores (the take-in marks it as an
+ * in-app keep's disk copy; a later re-export overwrites it whole).
+ * Returns the moved state pieces, or null when the keep isn't on disk.
+ */
+function importDiskKeep(state, keepId) {
+  const rec = (state.shelfDiskRecords || {})[keepId];
+  if (!rec) return null;
+  const shelfDiskRecords = { ...state.shelfDiskRecords };
+  delete shelfDiskRecords[keepId];
+  const shelfDiskStubs = { ...state.shelfDiskStubs };
+  delete shelfDiskStubs[keepId];
+  persistDiskIndex(state.shelfDiskRoot, shelfDiskStubs);
+  return { keeps: [...(state.keeps || []), rec], shelfDiskRecords, shelfDiskStubs };
 }
 
 /**
@@ -341,6 +414,10 @@ export const createDavisSlice = (set) => {
   // #1589 — boot the shelf once: the collection first, then the stage
   // read against it (which migrates on first sight; see readStage).
   const bootKeeps = readKeeps();
+  // #1591 — the disk index boots with the shelf: the listing knows its
+  // disk keeps (as stubs) before any folder read; their records load
+  // when the loot surface scans (loot/shelfDiskRun.mjs).
+  const bootDisk = readDiskIndex();
   return {
   evolveMode: false,
   // #616 EVOLVE progress: live run, last finished run, candidates seen this session.
@@ -386,6 +463,98 @@ export const createDavisSlice = (set) => {
     // Law 1: a correction the artist made by hand-editing the file is
     // spoken where the shelf acts happen, not only in the dev panel.
     ...(Array.isArray(lines) && lines.length ? { shelfNotice: lines[0] } : {}),
+  }),
+  // #1591 — the `shelf.export` preferences (curator/shelfDisk.mjs):
+  // where exports land, whether stills ride, and whether the soft
+  // bound exports at all. Applied by the same loot read path as the
+  // table (loot/shelfPrefsLoad.mjs); null = shipped defaults.
+  shelfExportPrefs: null,
+  setShelfExportPrefs: (prefs) => set({ shelfExportPrefs: prefs || null }),
+  // #1591 — the disk tier's face in the store. shelfDiskStubs is the
+  // persisted index (kc:keeps-disk:v1); shelfDiskRecords holds the
+  // disk keeps actually READ this session (memory only — persisting
+  // them in-app would defeat the tier: their home is the file);
+  // shelfDiskConnected says whether a scan has read the folder in
+  // this session, which is what makes the anchor partial-or-full an
+  // honest statement (audit S5). The loot glue (loot/shelfDiskRun.mjs)
+  // is the only writer of scans; the shelf actions move records.
+  shelfDiskRoot: bootDisk.root,
+  shelfDiskStubs: bootDisk.stubs,
+  shelfDiskRecords: {},
+  shelfDiskConnected: false,
+  /**
+   * #1591 — fold one folder reading into the disk tier. records are
+   * the raw export docs the take-in read (sanitized at this door,
+   * like every boundary) keyed by the keep id their filename names;
+   * freshStubs are their listing cards; present / missingIds are the
+   * scan's verdict on every looks/ keep file. Laws enforced here:
+   * an in-app keep is never a disk keep (a scan that finds its file
+   * treats the file as the keep's fossil copy and drops the stub);
+   * a missing file marks its stub, never drops the listing; a
+   * different root starts the index clean.
+   */
+  setShelfDiskScan: ({ root = null, connected = false, records = {}, freshStubs = {}, present = [], missingIds = [] } = {}) => set((state) => {
+    const rootNow = root || state.shelfDiskRoot;
+    const reset = !!(root && state.shelfDiskRoot && root !== state.shelfDiskRoot);
+    const stubs = reset ? {} : { ...state.shelfDiskStubs };
+    const diskRecords = reset ? {} : { ...state.shelfDiskRecords };
+    const inApp = new Set((state.keeps || []).map((k) => k.id));
+    for (const [id, rawRec] of Object.entries(records || {})) {
+      if (inApp.has(id)) continue;
+      const rec = sanitizeFavorite(rawRec);
+      if (!rec || rec.id !== id) continue;
+      diskRecords[id] = rec;
+      if (freshStubs[id]) stubs[id] = { ...freshStubs[id], missing: false };
+    }
+    for (const p of present || []) {
+      if (!p || typeof p.keepId !== 'string') continue;
+      if (inApp.has(p.keepId)) { delete stubs[p.keepId]; delete diskRecords[p.keepId]; continue; }
+      if (stubs[p.keepId]) stubs[p.keepId] = { ...stubs[p.keepId], rel: p.rel, missing: false };
+      else if (freshStubs[p.keepId]) stubs[p.keepId] = { ...freshStubs[p.keepId] };
+    }
+    for (const id of missingIds || []) {
+      if (inApp.has(id)) { delete stubs[id]; delete diskRecords[id]; continue; }
+      // The file is gone; the stub stays and says so. A record already
+      // read this session stays in hand (performable, promotable —
+      // a promotion is now the only copy, which the import speaks).
+      if (stubs[id]) stubs[id] = { ...stubs[id], missing: true };
+    }
+    persistDiskIndex(rootNow, stubs);
+    return {
+      shelfDiskRoot: rootNow, shelfDiskStubs: stubs, shelfDiskRecords: diskRecords,
+      shelfDiskConnected: !!connected,
+    };
+  }),
+  /** #1591 — the folder was forgotten (or changed): the disk tier
+   * empties with its index. The files themselves are not touched. */
+  clearShelfDisk: () => set(() => {
+    persistDiskIndex(null, {});
+    return { shelfDiskRoot: null, shelfDiskStubs: {}, shelfDiskRecords: {}, shelfDiskConnected: false };
+  }),
+  /**
+   * #1591 — one export, completed by the runner (loot/shelfDiskRun
+   * .mjs) AFTER the file is written and read back verified: the
+   * record leaves the collection, its disk record + stub land, and
+   * the move is a history record and a line on the shelf (Law 1:
+   * nothing silently moves). A staged or performing keep can never
+   * be exported from under the artist — the planner never names one
+   * and this door refuses one all the same.
+   */
+  shelfExported: (keepId, stub) => set((state) => {
+    const keep = (state.keeps || []).find((k) => k.id === keepId);
+    if (!keep || !stub || stub.id !== keepId || typeof stub.rel !== 'string') return {};
+    if ((state.keepStage || []).includes(keepId) || state.performingKeepId === keepId) return {};
+    const keeps = state.keeps.filter((k) => k.id !== keepId);
+    persistKeeps(keeps);
+    const at = new Date().getTime();
+    const shelfHistory = withShelfHistory(state, exportHistoryRecord(keepId, stub.rel, at));
+    const shelfDiskStubs = { ...state.shelfDiskStubs, [keepId]: { ...stub, missing: false } };
+    persistDiskIndex(state.shelfDiskRoot, shelfDiskStubs);
+    const shelfDiskRecords = { ...state.shelfDiskRecords, [keepId]: keep };
+    return {
+      keeps, shelfHistory, shelfDiskStubs, shelfDiskRecords,
+      shelfNotice: `exported to the loot folder — ${stub.label || keepId}`,
+    };
   }),
   // Beat router: which consumers answer a mic attack when evolve SOURCE is
   // BEAT and the phrase CLOCK is AUDIO. 'both' (recommended) ticks the
@@ -675,18 +844,31 @@ export const createDavisSlice = (set) => {
    * A refusal lands in shelfNotice and changes nothing else.
    */
   swapStageSlot: (outId, inId) => set((state) => {
-    const res = swapSlots(state.keeps, state.keepStage, outId, inId, { performingKeepId: state.performingKeepId });
+    // #1591 — the law reads the whole shelf (in-app + disk records):
+    // swapping in a disk keep IS its re-import, in the same move.
+    const res = swapSlots(allKeeps(state), state.keepStage, outId, inId, { performingKeepId: state.performingKeepId });
     if (!res.ok) return { shelfNotice: res.copy };
     const at = new Date().getTime();
-    const keeps = state.keeps.map((k) => {
+    const inRel = state.shelfDiskStubs?.[inId]?.rel || exportRelFor(inId);
+    const imported = importDiskKeep(state, inId);
+    const base = imported || state;
+    const keeps = base.keeps.map((k) => {
       if (k.id === inId) return { ...k, stagedCount: (k.stagedCount || 0) + 1, lastStagedAt: at };
       if (k.id === outId) return { ...k, lastStagedAt: at };
       return k;
     });
-    const shelfHistory = withShelfHistory(state, swapHistoryRecord(outId, inId, at));
+    const recs = [swapHistoryRecord(outId, inId, at)];
+    if (imported) recs.push(importHistoryRecord(inId, inRel, at));
+    const shelfHistory = withShelfHistoryMany(state, recs);
     persistKeeps(keeps);
     persistStage(res.stageIds);
-    return { keeps, keepStage: res.stageIds, shelfHistory, shelfNotice: null };
+    return {
+      keeps, keepStage: res.stageIds, shelfHistory,
+      ...(imported ? { shelfDiskRecords: imported.shelfDiskRecords, shelfDiskStubs: imported.shelfDiskStubs } : {}),
+      shelfNotice: imported
+        ? `back from disk — ${shelfLabelOf(keeps.find((k) => k.id === inId))}`
+        : null,
+    };
   }),
   /**
    * #1589 — promote a collection keep into a free stage slot (the shelf
@@ -695,18 +877,33 @@ export const createDavisSlice = (set) => {
    * consumes for membership changes that exchange nothing.
    */
   stageKeep: (keepId) => set((state) => {
-    const keep = state.keeps.find((k) => k.id === keepId);
+    // #1591 — a disk keep promotes exactly like an in-app one; the
+    // promotion is its re-import (the record joins the collection in
+    // the same move, and the ledger carries both records).
+    const merged = allKeeps(state);
+    const keep = merged.find((k) => k.id === keepId);
     if (!keep) return {};
-    const res = admitToStage(state.keeps, state.keepStage, keep);
+    const res = admitToStage(merged, state.keepStage, keep);
     if (!res.ok) return { shelfNotice: res.copy };
     const at = new Date().getTime();
-    const keeps = state.keeps.map((k) => (k.id === keepId
+    const inRel = state.shelfDiskStubs?.[keepId]?.rel || exportRelFor(keepId);
+    const imported = importDiskKeep(state, keepId);
+    const base = imported || state;
+    const keeps = base.keeps.map((k) => (k.id === keepId
       ? { ...k, stagedCount: (k.stagedCount || 0) + 1, lastStagedAt: at }
       : k));
-    const shelfHistory = withShelfHistory(state, swapHistoryRecord(null, keepId, at));
+    const recs = [swapHistoryRecord(null, keepId, at)];
+    if (imported) recs.push(importHistoryRecord(keepId, inRel, at));
+    const shelfHistory = withShelfHistoryMany(state, recs);
     persistKeeps(keeps);
     persistStage(res.stageIds);
-    return { keeps, keepStage: res.stageIds, shelfHistory, shelfNotice: null };
+    return {
+      keeps, keepStage: res.stageIds, shelfHistory,
+      ...(imported ? { shelfDiskRecords: imported.shelfDiskRecords, shelfDiskStubs: imported.shelfDiskStubs } : {}),
+      shelfNotice: imported
+        ? `back from disk — ${shelfLabelOf(keeps.find((k) => k.id === keepId))}`
+        : null,
+    };
   }),
   /**
    * #1590 (Keeps K2) — the Kinetic fill: deal a new stage from the
@@ -732,30 +929,55 @@ export const createDavisSlice = (set) => {
       ? (keep) => scoreLayout(head, keep?.config?.layout ?? {})
       : null;
     const tableLabel = `${state.shelfPrefsSource === 'file' ? 'preferences.json' : 'shipped defaults'} · ${tableName(prefs)}`;
+    // #1591 — the deal reads the whole shelf: disk keeps compete at
+    // full weight (their records in hand), and the anchor's partiality
+    // — the disk keeps whose records are NOT in hand — is named in
+    // the receipt by the pure fill itself (audit S5).
+    const acct = anchorAccount({
+      stubs: state.shelfDiskStubs || {}, diskRecords: state.shelfDiskRecords || {},
+      inAppIds: new Set((state.keeps || []).map((k) => k.id)),
+    });
     const res = dealFill({
-      keeps: state.keeps, stageIds: state.keepStage, history: state.shelfHistory,
+      keeps: allKeeps(state), stageIds: state.keepStage, history: state.shelfHistory,
       prefs, seed, scoreOf, performingKeepId: state.performingKeepId,
       assetsById: new Map(ASSETS.map((a) => [a.id, a])),
+      anchorPartial: acct.unread.length,
     });
     if (!res.stageIds) {
       return { shelfNotice: res.receipt.notes.at(-1) || 'nothing to deal' };
     }
     const at = new Date().getTime();
     const dealtIds = new Set(res.dealt.map((d) => d.keepId));
-    const keeps = state.keeps.map((k) => (dealtIds.has(k.id)
+    // #1591 — dealt disk keeps re-import in the same move: their
+    // records join the collection before the stamps land, and each
+    // import is its own ledger record under the fill's.
+    let work = state;
+    const importRecs = [];
+    for (const d of res.dealt) {
+      if (!(work.shelfDiskRecords || {})[d.keepId]) continue;
+      const rel = work.shelfDiskStubs?.[d.keepId]?.rel || exportRelFor(d.keepId);
+      const imp = importDiskKeep(work, d.keepId);
+      if (imp) { work = { ...work, ...imp }; importRecs.push(importHistoryRecord(d.keepId, rel, at)); }
+    }
+    const keeps = work.keeps.map((k) => (dealtIds.has(k.id)
       ? { ...k, stagedCount: (k.stagedCount || 0) + 1, lastStagedAt: at }
       : k));
-    const shelfHistory = withShelfHistory(state, fillHistoryRecord({
-      seed: res.receipt.seed, table: tableLabel, slots: res.receipt.slots,
-      undealt: res.receipt.undealt, notes: res.receipt.notes, at,
-    }));
+    const shelfHistory = withShelfHistoryMany(state, [
+      fillHistoryRecord({
+        seed: res.receipt.seed, table: tableLabel, slots: res.receipt.slots,
+        undealt: res.receipt.undealt, notes: res.receipt.notes, at,
+      }),
+      ...importRecs,
+    ]);
     persistKeeps(keeps);
     persistStage(res.stageIds);
     const c = res.receipt.dealtByRule;
-    const summary = `the trio dealt a new stage — ${c.consensus} consensus · ${c.neglected} neglected · ${c.wild} wild · ${c.lois} lois · ${c.contrarian} contrarian`;
+    const summary = `the trio dealt a new stage — ${c.consensus} consensus · ${c.neglected} neglected · ${c.wild} wild · ${c.lois} lois · ${c.contrarian} contrarian`
+      + (importRecs.length ? ` · ${importRecs.length} from disk` : '');
     return {
       ...pushToUndo(state, true, UNDO_KIND_SHELF),
       keeps, keepStage: res.stageIds, shelfHistory,
+      ...(importRecs.length ? { shelfDiskRecords: work.shelfDiskRecords, shelfDiskStubs: work.shelfDiskStubs } : {}),
       shelfNotice: res.receipt.undealt.length
         ? `${summary} — undealt: ${res.receipt.undealt.join(', ')}`
         : summary,

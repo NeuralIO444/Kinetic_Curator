@@ -302,6 +302,7 @@ node src/curator/candidateTray.selfcheck.mjs
 node src/curator/shelf.selfcheck.mjs
 node src/curator/shelfPrefs.selfcheck.mjs
 node src/curator/shelfFill.selfcheck.mjs
+node src/curator/shelfDisk.selfcheck.mjs
 node src/curator/censusReadout.selfcheck.mjs
 node src/curator/treeReader.selfcheck.mjs
 node src/curator/loisJudge.selfcheck.mjs
@@ -439,3 +440,5 @@ node src/loot/lootWeb.selfcheck.mjs
 node src/loot/lootAudio.selfcheck.mjs
 node src/hooks/costHead.selfcheck.mjs
 node src/loot/lootCopy.selfcheck.mjs
+node src/loot/lootWrite.selfcheck.mjs
+node src/loot/shelfDiskRun.selfcheck.mjs

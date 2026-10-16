@@ -58,6 +58,7 @@ fn main() {
             loot::loot_scan,
             loot::loot_hash,
             loot::loot_read,
+            loot::loot_write,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
