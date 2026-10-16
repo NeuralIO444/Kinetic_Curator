@@ -146,6 +146,21 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
   return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, rhythm, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
 }
 
+/**
+ * #1469 — the latest resolved frame's living-motion read, for the STIMULI MOTION strip
+ * (composition/motionLive.js republishes it to hooks/motionMeterTap.js once per frame from the
+ * resolve-frame tap). Module-level, like the dish-density holder: whichever resolver ran last
+ * owns it. null until the first resolve completes. Shape:
+ *   { kineme: <livingMotion's return for the first layer whose floor is alive> | null,
+ *     wind:   <the first resolved layer's wind param, 0 on a frozen frame> | null,
+ *     mothBeat: <0..1 wing openness from the creature builder> | null (no moths on stage) }
+ * The kineme is the resolver's own ctx object — the same one buildPlacements consumed, after
+ * pattern re-weighting, beat drive and shed (a frozen frame's kineme is null, by livingMotion's
+ * own gate). Nothing here is recomputed for the readout.
+ */
+let lastFrameMotion = null;
+export function getLastFrameMotion() { return lastFrameMotion; }
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -429,6 +444,9 @@ export function createLiveResolver() {
     const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
+    // #1469 — this frame's living-motion read, published at the end of the resolve (getLastFrameMotion).
+    let frameKineme = null;
+    let frameWind = null;
     const aliveIds = new Set();
     // #450 — every layer id present in the document, regardless of
     // visibility. See prune()'s warpPhase branch for why this differs
@@ -632,13 +650,19 @@ export function createLiveResolver() {
           }
           growthTick = gt.tick;
         }
+        // #1469 — capture the frame's living-motion read as the placements consume it: the first
+        // layer (stack order) whose floor is alive supplies the kineme; wind comes from the first
+        // resolved layer. Published at the end of the resolve (getLastFrameMotion).
+        const kineme = livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion);
+        if (frameWind === null && Number.isFinite(layoutParams.wind)) frameWind = layoutParams.wind;
+        if (frameKineme === null && kineme !== null) frameKineme = kineme;
         items = buildPlacements({
           layoutParams, seed, seedOffsets, activeAssets, palette,
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
           scale: input.effectiveScale, scaleY: input.effectiveScaleY, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
           growthTick, audioEnergy,
           layerId: layer.id, // #1245 — unknown-sampler diagnostic key
-          kineme: livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
+          kineme,
           // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
           ...groundArgs({
             dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, snap: layoutParams.groundSnap, W, H, seed,
@@ -965,6 +989,9 @@ export function createLiveResolver() {
         getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
         W, H, tSec: (input.loopTimeMs ?? 0) / 1000, seed: e.morphSeed,
       }));
+    // #1469 — publish the frame's living-motion read (see getLastFrameMotion). Wind reads 0 on a
+    // frozen frame (slowRender): nothing is carried then, and a stale strength would be a ghost.
+    lastFrameMotion = { kineme: frameKineme, wind: input.slowRender ? 0 : frameWind, mothBeat: creatures.lastWingBeat() };
     return out;
   }
 

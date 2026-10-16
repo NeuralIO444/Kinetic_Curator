@@ -403,6 +403,7 @@ node src/curator/sourceArbiter.selfcheck.mjs
 node src/curator/setLive.selfcheck.mjs
 node src/gl/routesStartEmpty.selfcheck.mjs
 node src/gl/motionReadout.selfcheck.mjs
+node src/hooks/motionMeterTap.selfcheck.mjs
 node src/curator/clockRecord.selfcheck.mjs
 node src/gl/playback.selfcheck.mjs
 node src/gl/masterGain.selfcheck.mjs

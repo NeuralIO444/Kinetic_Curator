@@ -57,6 +57,7 @@ import { observeAudio } from './composition/audioLive.js'; // #1459: audio event
 import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
 import { startSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
 import { observeClock } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
+import { observeMotion } from './composition/motionLive.js'; // #1469: the frame's living-motion read, to the MOTION strip's tap
 import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider } from './gl/resolveTap.mjs';
 import { observeSpawn } from './curator/spawnLive.js'; // #1355: auto spawn finds each creature's home
 import { captureFavorite } from './state/slices/davisSlice.js';
@@ -108,6 +109,8 @@ function AppInner() {
       observeClock(input && input.loopTimeMs, useStore.getState().beatBpm);
       // #1459: discrete audio detections (onset, tempo, energy, silence) from the meter's band levels
       observeAudio(input && input.loopTimeMs, readMeterBandLevels(), useStore.getState().audioSource && useStore.getState().audioSource.type);
+      // #1469: the MOTION readout's publisher (read-only tap; the strip polls it, nothing is routed)
+      observeMotion();
       observeDish(input, output);
       observeFormation(input, output);
       observeDishDensity(); // #1412: the shared grid's density field, published on the bus for formation/telemetry readers
