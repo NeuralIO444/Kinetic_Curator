@@ -1176,7 +1176,9 @@ details.ds-dev > summary:hover { color: var(--dim); }
    the full control set lives in a floating editor over the canvas —
    portaled to the body, position:fixed at the canvas wrap's rect
    (inline geometry), no backdrop, the canvas stays live underneath.
-   Flat per DS: border only. */
+   Flat per DS: border only. Since 2026-10-16 the editor takes the K5
+   expanded shelf's size (wrap rect minus a 16px inset on every side)
+   and carries the field→channel map below the sun + hue. */
 .chiaro-section { padding: 6px 0; border-top: 1px solid var(--line); }
 .chiaro-open { min-height: 24px; padding: 2px 12px; }
 .chiaro-editor {
@@ -1194,6 +1196,11 @@ details.ds-dev > summary:hover { color: var(--dim); }
 }
 .chiaro-editor-title { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--kc-davis); }
 .chiaro-editor-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; }
+/* The panel grew to the shelf's expanded form; the control groups did
+   not — they keep the old editor's measure so no slider or tile row
+   stretches the full canvas width. */
+.chiaro-editor-body > * { max-width: 560px; }
+.chiaro-editor .map-row { margin-top: 4px; }
 .chiaro-group { width: auto; margin-top: 2px; }
 .chiaro-group-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
 .chiaro-note { font-size: 9px; color: var(--dim); }

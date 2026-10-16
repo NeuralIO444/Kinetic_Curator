@@ -12,6 +12,10 @@
 //     with no modal machinery
 //   · HUE ROTATE left AppearanceSliders; FXAA never moved (Pipeline kept it)
 //   · the help copy followed the sun to its new home
+//   · 2026-10-16 amendment: the field→channel map renders inside the
+//     editor (below sun + hue), no longer in the §④ row — still #1204's
+//     Appearance-family control — and the editor takes the K5 expanded
+//     shelf's size (wrap rect minus the 16px inset, via shelfAnchor)
 import assert from 'node:assert';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +30,7 @@ const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 const buildPanel = read('../BuildPanel.jsx');
 const section = read('./ChiaroscuroSection.jsx');
 const sun = read('./SunControls.jsx');
+const map = read('./MapRow.jsx');
 const appearance = read('./AppearanceSliders.jsx');
 const displayBlock = read('../pipeline/DisplayBlock.jsx');
 const { LIGHT_DEFAULT, LIGHT_SLOTS } = await import('../../data/light.js');
@@ -46,9 +51,9 @@ ok('the sun controls speak LIGHT_SET over exactly the light keys', () => {
   assert.ok(sun.includes('Events.LIGHT_SET'), 'same event as before the move');
 });
 
-ok('the section emits only the events its controls always emitted', () => {
+ok('the section and its tenants emit only the events their controls always emitted', () => {
   const emitted = new Set(
-    [...(section + sun).matchAll(/Events\.([A-Z_]+)/g)].map((m) => m[1]),
+    [...(section + sun + map).matchAll(/Events\.([A-Z_]+)/g)].map((m) => m[1]),
   );
   assert.deepStrictEqual([...emitted].sort(), ['LAYOUT_LOCK', 'LAYOUT_PARAM', 'LIGHT_SET']);
 });
@@ -83,6 +88,21 @@ ok('HUE ROTATE left AppearanceSliders; FXAA never moved', () => {
 ok('the help copy followed the sun to the CHIAROSCURO button', () => {
   assert.ok(helpText('layout-sun').includes('CHIAROSCURO'), 'layout-sun names the home');
   assert.ok(helpText('layout-sun').includes('button'), 'layout-sun names the button, not the old section row');
+});
+
+ok('the field→channel map renders inside the editor, not the §④ row (2026-10-16)', () => {
+  assert.ok(section.includes("from './MapRow.jsx'"), 'the section imports the map control');
+  assert.ok(section.includes('<MapRow'), 'the map renders inside the floating editor');
+  assert.ok(!buildPanel.includes('MapRow'), 'the §④ Appearance row no longer hosts the map');
+  assert.ok(map.includes('#1204'), 'the #1204 home doctrine still rides the control');
+});
+
+ok('the editor takes the expanded shelf size — wrap rect minus inset (2026-10-16)', () => {
+  assert.ok(section.includes("from '../shelfView.mjs'"), 'geometry comes from the shelf anchor module');
+  assert.ok(section.includes('shelfAnchor('), 'the anchor is shelfAnchor, not a second mechanism');
+  assert.ok(!section.includes('EDITOR_W'), 'the old 560px width cap is gone');
+  assert.ok(!section.includes('maxHeight'), 'no height cap — the panel takes the wrap height');
+  assert.ok(section.includes('height: pos.height'), 'the portal styles an explicit height');
 });
 
 console.log(`chiaroscuro.selfcheck: ${n} checks passed`);

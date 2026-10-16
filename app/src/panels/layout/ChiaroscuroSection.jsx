@@ -11,13 +11,25 @@
 // changes the light in the same gesture. Esc or click-away closes it;
 // there is no focus trap.
 //
-// Tenants (the explicit #1587 inventory — nothing else moved):
+// Tenants (the explicit #1587 inventory, plus the map):
 //   · the sun (#594) — from the Appearance shelf's sun row (SunRow.jsx)
 //   · HUE ROTATE — from AppearanceSliders.jsx (whole-canvas finish)
+//   · the field→channel map (#1199, home per #1204) — from the §④ row
+//     (2026-10-16, Matt's direction: the map rides with the render
+//     engine family. #1204 still holds — it is an Appearance-family
+//     scene control, NOT a MATH op; it now lives inside Appearance's
+//     own editor instead of the §④ row.)
 // Deliberately NOT here: FXAA (output/display render — stays in
 // Pipeline's DisplayBlock, amendment 1), materials (their own M4 home),
-// the field→channel map (#1204 home), per-stratum controls, and the
-// governor's tuning (stays with the governor).
+// per-stratum controls, and the governor's tuning (stays with the
+// governor).
+//
+// Size (2026-10-16): the editor takes the expanded form the K5 Keeps
+// shelf shipped (PR #1628) — the canvas wrap's rect shrunk by a 16px
+// inset on every side, computed by shelfView's shelfAnchor, the same
+// mechanism (not a second one). The panel is what grows: the control
+// groups inside keep the measure they were designed at (a width cap
+// in the CSS), so no slider stretches the full canvas width.
 //
 // The editor follows the app's overlay grammar (portal + fixed position,
 // like the beat menu / favorites tray), anchored to the canvas wrap's
@@ -29,24 +41,17 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../../state/store.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { SunControls } from './SunControls.jsx';
+import { MapRow } from './MapRow.jsx';
+import { shelfAnchor } from '../shelfView.mjs';
 import { DialEditor } from '../build/te/editors.jsx';
 import { useDock } from '../build/te/useDock.js';
-
-const EDITOR_W = 560;
-const INSET = 16;
 
 function canvasAnchor() {
   const wrap = document.querySelector('.canvas-wrap');
   if (!wrap) return null;
-  const r = wrap.getBoundingClientRect();
-  if (r.width < 80 || r.height < 80) return null;
-  const width = Math.min(EDITOR_W, r.width - INSET * 2);
-  return {
-    top: r.top + INSET,
-    left: r.right - width - INSET,
-    width,
-    maxHeight: r.height - INSET * 2,
-  };
+  // The K5 expanded shelf's anchor, verbatim: wrap rect minus a 16px
+  // inset on every side (null when the wrap is too small to host it).
+  return shelfAnchor(wrap.getBoundingClientRect());
 }
 
 export function ChiaroscuroSection({ layoutParams, lockedParams }) {
@@ -65,7 +70,7 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
     setPos((prev) => {
       if (!next) return prev;
       if (prev && prev.top === next.top && prev.left === next.left
-        && prev.width === next.width && prev.maxHeight === next.maxHeight) return prev;
+        && prev.width === next.width && prev.height === next.height) return prev;
       return next;
     });
   }, []);
@@ -120,7 +125,7 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
           className="chiaro-editor"
           role="dialog"
           aria-label="CHIAROSCURO — render engine controls"
-          style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
+          style={{ top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
         >
           <div className="chiaro-editor-head">
             <div>
@@ -161,6 +166,7 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
               min={0} max={360}
               onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'hueRotate', value: Math.round(v) })}
             />
+            <MapRow layoutParams={layoutParams} lockedParams={lockedParams} />
           </div>
         </div>,
         document.body,
