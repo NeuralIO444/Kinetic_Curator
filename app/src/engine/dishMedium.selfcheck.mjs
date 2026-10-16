@@ -416,10 +416,10 @@ const assertSamePhysics = (a, b, label) => {
     'the drag rides the integrator damping at the call site');
   assert.ok(particles.includes('mediumClingCapture(med.clingK, vnNow)'),
     'the per-system pass applies the capture law');
-  assert.ok(particles.includes('mediumFrictionImpulse(mu, jnTotal, vt, wSum)') && particles.includes('FRIC_MAX * med.fricK'),
-    'the per-system pass applies the friction law (D1)');
-  assert.ok(dish.includes('mediumFrictionImpulse(mu, jnTotal, vt, wSum)') && dish.includes('FRIC_MAX * pairMed.fricK'),
-    'the dish pass applies the friction law (D1)');
+  assert.ok(particles.includes('mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum') && particles.includes('FRIC_MAX * med.fricK'),
+    'the per-system pass applies the friction law (D1; contact-point slide + spin mass since D2)');
+  assert.ok(dish.includes('mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum') && dish.includes('FRIC_MAX * pairMed.fricK'),
+    'the dish pass applies the friction law (D1; contact-point slide + spin mass since D2)');
   assert.ok(!particles.includes('mediumClingK(') && !particles.includes('smoothstep'),
     'no curve arithmetic leaks into the integrator');
   assert.ok(dish.includes('e.wetness = clampWetness(wetness)'), 'enrolment carries the medium, clamped');
