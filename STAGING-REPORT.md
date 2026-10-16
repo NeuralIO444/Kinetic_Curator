@@ -132,12 +132,27 @@ pure-fixture block pins named labels individually.)
 - **Neighbours — all PASS:** shelf, shelfFill, shelfPrefs, shelfDisk,
   shelfDiskRun, candidateTray, census, censusReadout, devPanel.
 - **`npm run build` — green.**
-- **Full manifest sweep — 434 pass / 3 fail of 437.** The three
-  failures are the known sandbox set, identical on the K1–K3
-  branches: swarmWasm (no cargo in the sandbox), accum (V8 OOM
-  abort), rollSafety (sandbox browser closes mid-run — CI is its
-  authority and passed it inside lint-build-selfcheck on #1617).
-  The new suite passes inside the sweep.
+- **Full manifest sweep — 432 pass / 5 fail of 437** (terminal
+  result; an interim figure in an early draft of this report was
+  wrong and is corrected here). The five failures:
+  - swarmWasm, accum, rollSafety — the known sandbox set (no cargo
+    in the sandbox; V8 OOM abort; sandbox browser closes mid-run —
+    CI is rollSafety's authority and passed it inside
+    lint-build-selfcheck on #1617).
+  - **director + lootWeb — NOT K4 regressions, and not sandbox
+    flakes.** Both are stale scan assertions at the K3 staging tip
+    itself: K3's governed write verb made `lootWeb.mjs` legitimately
+    use `createWritable`, outrunning lootWeb's pre-K3 purity pin;
+    and director's no-surface scan matched substrings, false-
+    positiving on `loot/lootWrite.selfcheck.mjs`. Proven
+    base-identical: both suites fail (exit 1) on a pristine checkout
+    of this branch's fork point (7b21141a, zero K4 changes), and the
+    K4 diff touches neither suite nor any file they scan. CI caught
+    both on K3's publish PR #1625; the fixes already exist on the
+    publish branch (`d017a86a` whole-identifier scan, `a203515d`
+    lootWeb pin updated to the K3 write law), so K4's publish
+    cherry-pick lands on the corrected assertions.
+  The new shelfCensus suite passes inside the sweep.
 
 ## Design calls flagged
 
