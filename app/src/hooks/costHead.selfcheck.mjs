@@ -39,6 +39,12 @@ assert(predictMs(model, { mech: { instancesXprim: 1e9 }, probe: { fillRate: 1 } 
 const mech = mechanismFeatures({ count: 200, scale: [1, 2], accumulation: true });
 assert(mech.instancesXprim > 0 && mech.canvasXpasses > 0);
 
+// #1202 shape: scale as { x: pair, y: pair } reads the X pair — the same
+// numbers the legacy array shape gives (the pre-fix read made NaN here).
+const mechObj = mechanismFeatures({ count: 200, scale: { x: [1, 2], y: [0.5, 0.5] }, accumulation: true });
+assert.deepStrictEqual(mechObj, mech);
+for (const v of Object.values(mechObj)) assert.ok(Number.isFinite(v), 'mech values stay finite');
+
 // Initial rung: under budget → null; over → shed (30 fps budget ≈ 33 ms)
 assert(initialRung(10, { targetFps: 30 }) === null);
 assert(initialRung(30)?.renderScale === 0.75);
