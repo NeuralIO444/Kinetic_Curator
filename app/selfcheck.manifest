@@ -122,6 +122,7 @@ node src/hooks/invite.selfcheck.mjs
 node src/components/expandLabel.selfcheck.mjs
 node src/components/swayMark.selfcheck.mjs
 node src/components/helpModal.selfcheck.mjs
+node src/components/loisTicker.selfcheck.mjs
 node src/panels/loisLines.selfcheck.mjs
 node src/components/pinkDiscipline.selfcheck.mjs
 node src/components/colorTribes.selfcheck.mjs
