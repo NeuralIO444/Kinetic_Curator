@@ -1345,6 +1345,8 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .shelf-sorts { display: inline-flex; gap: 3px; }
 .shelf-sort { background: none; border: 1px solid var(--line-2); color: var(--dim); font-size: 9px; padding: 2px 5px; cursor: pointer; }
 .shelf-sort.active { color: var(--ink); border-color: var(--dim); }
+.shelf-fillrow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.shelf-table { font-size: 9px; color: var(--dim); letter-spacing: 0.04em; }
 .shelf-aim, .shelf-line { display: flex; align-items: center; gap: 8px; font-size: 9px; color: var(--dim); margin-top: 6px; }
 .shelf-line { color: var(--ink); }
 .shelf-rows { margin-top: 6px; }

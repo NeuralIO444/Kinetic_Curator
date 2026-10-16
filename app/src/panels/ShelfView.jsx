@@ -26,6 +26,7 @@ import {
   stageRecords, stageSlotsUsed, shelfRows,
   STAGE_BUDGET, COLLECTION_SOFT_BOUND, SHELF_SORTS,
 } from '../curator/shelf.mjs';
+import { DEFAULT_SHELF_PREFS, tableName } from '../curator/shelfPrefs.mjs';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
@@ -36,6 +37,7 @@ export function ShelfView() {
   const { state, dispatch } = useApp((s) => ({
     keeps: s.keeps, keepStage: s.keepStage,
     shelfNotice: s.shelfNotice, performingKeepId: s.performingKeepId,
+    shelfPrefs: s.shelfPrefs, shelfPrefsSource: s.shelfPrefsSource,
   }));
   const setShelfNotice = useStore((s) => s.setShelfNotice);
   const keeps = state.keeps || [];
@@ -52,6 +54,10 @@ export function ShelfView() {
     [keeps, keepStage, query, sort],
   );
   const aimedId = aimedSlot != null ? keepStage[aimedSlot] : null;
+  // #1590 — the preferences in force (the loot read path applies the
+  // file's; until then / without a folder, the shipped defaults).
+  const effectivePrefs = state.shelfPrefs || DEFAULT_SHELF_PREFS;
+  const softBound = state.shelfPrefs?.collectionSoftBound ?? COLLECTION_SOFT_BOUND;
 
   const swapIn = (row) => {
     if (aimedId == null) return;
@@ -65,7 +71,7 @@ export function ShelfView() {
         <span className="shelf-title">KEEPS SHELF</span>
         <span className="shelf-counts">
           stage {used}/{STAGE_BUDGET} · collection {keeps.length}
-          {keeps.length > COLLECTION_SOFT_BOUND ? ` · over the ${COLLECTION_SOFT_BOUND} soft bound` : ''}
+          {keeps.length > softBound ? ` · over the ${softBound} soft bound` : ''}
         </span>
         <span className="shelf-caret">{open ? '▾' : '▸'}</span>
       </button>
@@ -102,6 +108,14 @@ export function ShelfView() {
                   onClick={() => setSort(s)}
                 >{SORT_LABEL[s]}</button>
               ))}
+            </span>
+          </div>
+          <div className="shelf-fillrow">
+            <button type="button" className="micro-btn" onClick={() => dispatch({ type: A.FILL_STAGE })}>
+              KINETIC — deal a new stage
+            </button>
+            <span className="shelf-table">
+              table: {tableName(effectivePrefs)} · {state.shelfPrefsSource === 'file' ? 'preferences.json' : 'shipped defaults'}
             </span>
           </div>
           {aimedId != null && (

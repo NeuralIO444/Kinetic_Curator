@@ -5,10 +5,11 @@
 // Desktop reads the folder natively; Chrome and Edge keep a folder handle (slice 5b). A browser with neither shows its reason
 // instead of a dead button (like Syphon, #962). The folder is this machine's: it lives in its own local key and never
 // travels in a project, a bundle or a share link.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { seenLine } from '../../loot/lootNative.mjs';
 import { createLootBackend } from '../../loot/lootBackend.mjs';
 import { runScan } from '../../loot/lootRun.mjs';
+import { loadShelfPrefs } from '../../loot/shelfPrefsLoad.mjs';
 import { takeInImages, ingestVia } from '../../loot/lootIngest.mjs';
 import { takeInPalettes } from '../../loot/lootPalettes.mjs';
 import { takeInAudio } from '../../loot/lootAudio.mjs';
@@ -31,6 +32,23 @@ export function LootRow() {
 
   const keep = (next) => { setIndex(next); saveIndex(storage(), next); };
 
+  // #1590 — preferences.json (the shelf's table + settings) is read on
+  // launch and after every rescan, and applied to the store; edits
+  // take effect on the NEXT fill, never mid-fill. The listing pass is
+  // names-only (no hashing) — it exists so an iCloud conflict copy at
+  // the root can be named and ignored, never read.
+  const applyPrefs = async (ix) => {
+    if (!ix?.root) return;
+    let rels = [];
+    try {
+      const listing = await native.scan(ix.root);
+      if (listing?.ok) rels = (listing.entries || []).map((e) => e.rel).filter(Boolean);
+    } catch { /* names are a courtesy; the read below is the substance */ }
+    const r = await loadShelfPrefs({ backend: native, root: ix.root, rels });
+    useStore.getState().setShelfPrefs(r.prefs, r.lines, r.source);
+  };
+  useEffect(() => { if (index.root) applyPrefs(index); }, []); // launch read (mount only)
+
   const scan = async (from) => {
     setBusy(LABELS.scanning); setNote(null);
     try {
@@ -50,6 +68,7 @@ export function LootRow() {
       // audio is only validated here; STIMULI offers it as a pick (a scan never switches the source)
       const aud = await takeInAudio({ native, index: pals.index });
       keep(aud.index);
+      await applyPrefs(aud.index);
       setLast({
         added: r.summary.add, skipped: r.summary.skipped, missing: r.summary.missing,
         taken: taken.summary.taken + pals.summary.files + aud.summary.taken, held: taken.summary.poolFull + taken.summary.rejected + pals.summary.rejected + pals.summary.unreadable + aud.summary.rejected + aud.summary.unreadable,
@@ -75,6 +94,7 @@ export function LootRow() {
   const forget = () => {
     if (!window.confirm(confirmForgetMessage(counts.items))) return;
     keep(emptyIndex()); setLast(null); setNote(null);
+    useStore.getState().setShelfPrefs(null, [], null); // no folder → shipped defaults in force
     if (native.forget) native.forget(); // a browser also drops its stored folder link (the folder and files are not touched)
   };
 
