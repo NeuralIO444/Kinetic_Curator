@@ -7,6 +7,7 @@
 import { useStore } from '../state/store.js';
 import { shelfRow } from '../curator/shelf.mjs';
 import { DEFAULT_SHELF_PREFS, RULE_ORDER, tableName } from '../curator/shelfPrefs.mjs';
+import { anchorAccount, DEFAULT_EXPORT_PREFS } from '../curator/shelfDisk.mjs';
 import { ASSETS } from '../data/assets/index.js';
 import { PALETTES } from '../data/palettes.js';
 
@@ -23,15 +24,29 @@ export function ShelfDevPanel() {
   const shelfPrefs = useStore((s) => s.shelfPrefs);
   const shelfPrefsLines = useStore((s) => s.shelfPrefsLines) || [];
   const shelfPrefsSource = useStore((s) => s.shelfPrefsSource);
+  // #1591 — the disk tier's readouts.
+  const shelfDiskStubs = useStore((s) => s.shelfDiskStubs) || {};
+  const shelfDiskRecords = useStore((s) => s.shelfDiskRecords) || {};
+  const shelfDiskConnected = useStore((s) => s.shelfDiskConnected);
+  const shelfExportPrefs = useStore((s) => s.shelfExportPrefs);
 
   const prefs = shelfPrefs || DEFAULT_SHELF_PREFS;
   const byId = new Map(keeps.map((k) => [k.id, k]));
   const lastFill = [...shelfHistory].reverse().find((r) => r && r.kind === 'fill') || null;
   const labelOf = (id) => {
-    const k = byId.get(id);
-    return k ? shelfRow(k, keepStage, { assetsById, palettesById }).label : id;
+    const k = byId.get(id) || shelfDiskRecords[id];
+    if (k) return shelfRow(k, keepStage, { assetsById, palettesById }).label;
+    return shelfDiskStubs[id]?.label || id;
   };
   const undealt = lastFill?.undealt || [];
+  const acct = anchorAccount({
+    stubs: shelfDiskStubs, diskRecords: shelfDiskRecords,
+    inAppIds: new Set(keeps.map((k) => k.id)),
+  });
+  const missingCount = Object.values(shelfDiskStubs).filter((s) => s && s.missing).length;
+  const xp = shelfExportPrefs || DEFAULT_EXPORT_PREFS;
+  const moves = [...shelfHistory].reverse()
+    .filter((r) => r && (r.kind === 'export' || r.kind === 'import')).slice(0, 5);
 
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
@@ -48,6 +63,33 @@ export function ShelfDevPanel() {
         <>
           <h3 style={h3}>CORRECTIONS + FALLBACKS, NAMED</h3>
           {shelfPrefsLines.map((l, i) => <div key={i} style={dim}>{l}</div>)}
+        </>
+      )}
+
+      <h3 style={h3}>DISK — THE THIRD TIER (#1591)</h3>
+      <div style={dim}>
+        in-app {keeps.length} · on disk {acct.known} ({acct.loaded} read this session
+        {missingCount ? `, ${missingCount} missing` : ''}) ·{' '}
+        {shelfDiskConnected ? 'folder read this session' : 'folder not read this session — disk keeps list from the index'}
+      </div>
+      <div style={dim}>
+        {acct.partial
+          ? `anchor: partial — ${acct.unread.length} keep${acct.unread.length === 1 ? '' : 's'} on disk unread; the anchor leans on the rest at full weight (audit S5)`
+          : 'anchor: full — stage + collection + disk at full weight'}
+      </div>
+      <div style={dim}>
+        exports: folder {xp.folder} · on soft bound: {xp.onSoftBound} · stills {xp.includeStills ? 'in' : 'out'} ·{' '}
+        {shelfPrefsSource === 'file' ? 'from preferences.json' : 'shipped defaults'}
+      </div>
+      {moves.length > 0 && (
+        <>
+          <h3 style={h3}>LAST MOVES TO + FROM DISK</h3>
+          {moves.map((r, i) => (
+            <div key={i} style={dim}>
+              {r.kind} — {labelOf(r.keepId)} · {r.path}
+              {r.at ? ` · ${new Date(r.at).toLocaleString()}` : ''}
+            </div>
+          ))}
         </>
       )}
 

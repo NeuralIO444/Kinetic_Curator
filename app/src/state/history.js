@@ -71,6 +71,13 @@ export function captureUndoEntry(state, kind = UNDO_KIND_EDIT) {
       keeps: deep(state.keeps || []),
       keepStage: deep(state.keepStage || []),
       shelfHistory: deep(state.shelfHistory || []),
+      // #1591: the disk tier rides the shelf's undo — a fill that
+      // imported disk keeps is exactly one undo step (S7), and undo
+      // returns the record to the disk side of the store (its file
+      // was never deleted; the folder copy stays a fossil either way).
+      shelfDiskRecords: deep(state.shelfDiskRecords || {}),
+      shelfDiskStubs: deep(state.shelfDiskStubs || {}),
+      shelfDiskRoot: state.shelfDiskRoot ?? null,
     };
   }
   // Estimated serialized size, for the byte cap. Stored on the entry so
@@ -187,5 +194,11 @@ export function shelfRestoreFields(entry) {
     keeps: entry.shelf.keeps,
     keepStage: entry.shelf.keepStage,
     shelfHistory: entry.shelf.shelfHistory,
+    // #1591: present only on entries the K3 snapshot wrote; absent
+    // fields restore nothing (an in-flight pre-K3 entry can't exist
+    // across a deploy, but the guard keeps the contract total).
+    ...(entry.shelf.shelfDiskRecords !== undefined ? { shelfDiskRecords: entry.shelf.shelfDiskRecords } : {}),
+    ...(entry.shelf.shelfDiskStubs !== undefined ? { shelfDiskStubs: entry.shelf.shelfDiskStubs } : {}),
+    ...(entry.shelf.shelfDiskRoot !== undefined ? { shelfDiskRoot: entry.shelf.shelfDiskRoot } : {}),
   } : {};
 }

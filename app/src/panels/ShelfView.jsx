@@ -16,6 +16,12 @@
 // All tier law lives in curator/shelf.mjs; this component only renders
 // rows and dispatches the store's crown/swap actions. The shelf's line
 // (shelfNotice) renders here — the surface where shelf acts happen.
+//
+// #1591 (Keeps K3): the collection listing spans the disk tier — keeps
+// exported to the loot folder stay listed, marked on disk; staging or
+// swapping one in re-imports its record in the same move. A keep whose
+// record is not in hand (folder away, file gone) lists from its stub
+// with its actions disabled — it cannot be loaded from a listing card.
 import { useMemo, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
@@ -23,7 +29,7 @@ import * as A from '../state/actions.js';
 import { ASSETS } from '../data/assets/index.js';
 import { PALETTES } from '../data/palettes.js';
 import {
-  stageRecords, stageSlotsUsed, shelfRows,
+  stageRecords, stageSlotsUsed, shelfDiskRows,
   STAGE_BUDGET, COLLECTION_SOFT_BOUND, SHELF_SORTS,
 } from '../curator/shelf.mjs';
 import { DEFAULT_SHELF_PREFS, tableName } from '../curator/shelfPrefs.mjs';
@@ -38,6 +44,8 @@ export function ShelfView() {
     keeps: s.keeps, keepStage: s.keepStage,
     shelfNotice: s.shelfNotice, performingKeepId: s.performingKeepId,
     shelfPrefs: s.shelfPrefs, shelfPrefsSource: s.shelfPrefsSource,
+    // #1591 — the disk tier: records read this session + the stub index.
+    shelfDiskRecords: s.shelfDiskRecords, shelfDiskStubs: s.shelfDiskStubs,
   }));
   const setShelfNotice = useStore((s) => s.setShelfNotice);
   const keeps = state.keeps || [];
@@ -49,9 +57,20 @@ export function ShelfView() {
 
   const staged = useMemo(() => stageRecords(keeps, keepStage), [keeps, keepStage]);
   const used = stageSlotsUsed(keeps, keepStage);
+  // #1591 — one listing, three locations: in-app records, disk records
+  // read this session (marked on disk), and a stub row for every disk
+  // keep whose record is not in hand (folder away, or the file gone).
+  const diskRecords = useMemo(
+    () => Object.values(state.shelfDiskRecords || {}),
+    [state.shelfDiskRecords],
+  );
+  const diskStubs = state.shelfDiskStubs || {};
+  const diskCount = Object.keys(diskStubs).length;
   const rows = useMemo(
-    () => shelfRows(keeps, keepStage, { query, sort, assetsById, palettesById }),
-    [keeps, keepStage, query, sort],
+    () => shelfDiskRows(keeps, keepStage, {
+      diskRecords, stubs: diskStubs, query, sort, assetsById, palettesById,
+    }),
+    [keeps, keepStage, diskRecords, diskStubs, query, sort],
   );
   const aimedId = aimedSlot != null ? keepStage[aimedSlot] : null;
   // #1590 — the preferences in force (the loot read path applies the
@@ -70,7 +89,8 @@ export function ShelfView() {
       <button type="button" className="shelf-head" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className="shelf-title">KEEPS SHELF</span>
         <span className="shelf-counts">
-          stage {used}/{STAGE_BUDGET} · collection {keeps.length}
+          stage {used}/{STAGE_BUDGET} · collection {keeps.length + diskCount}
+          {diskCount ? ` · ${diskCount} on disk` : ''}
           {keeps.length > softBound ? ` · over the ${softBound} soft bound` : ''}
         </span>
         <span className="shelf-caret">{open ? '▾' : '▸'}</span>
@@ -139,21 +159,25 @@ export function ShelfView() {
                   {row.origin ? ` · ${row.origin}` : ''}
                   {row.keptAt ? ` · kept ${new Date(row.keptAt).toLocaleDateString()}` : ' · kept (legacy)'}
                   {row.stagedCount ? ` · staged ×${row.stagedCount}` : ' · never staged'}
+                  {row.location === 'disk' ? ' · on disk' : ''}
+                  {row.location === 'disk-away' ? ' · on disk — folder away' : ''}
+                  {row.location === 'missing' ? ' · on disk — file gone' : ''}
                 </span>
                 <span className="shelf-row-actions">
                   {row.tier === 'stage'
                     ? <span className="shelf-onstage">on stage</span>
                     : (
                       <>
-                        <button type="button" className="micro-btn" disabled={aimedId == null}
-                          title={aimedId == null ? 'aim a stage slot first' : 'swap into the aimed slot'}
+                        <button type="button" className="micro-btn" disabled={aimedId == null || !row.keep}
+                          title={!row.keep ? 'its record is on disk, not read yet — connect the loot folder to bring it back' : (aimedId == null ? 'aim a stage slot first' : 'swap into the aimed slot')}
                           onClick={() => swapIn(row)}>swap in</button>
-                        <button type="button" className="micro-btn"
-                          title="take a free stage slot"
+                        <button type="button" className="micro-btn" disabled={!row.keep}
+                          title={row.keep ? 'take a free stage slot' : 'its record is on disk, not read yet — connect the loot folder to bring it back'}
                           onClick={() => dispatch({ type: A.STAGE_KEEP, keepId: row.id })}>stage it</button>
                       </>
                     )}
-                  <button type="button" className="micro-btn"
+                  <button type="button" className="micro-btn" disabled={!row.keep}
+                    title={row.keep ? undefined : 'on disk — stage it or swap it in to bring it back'}
                     onClick={() => dispatch({ type: A.RECALL_FAVORITE, favorite: row.keep })}>load</button>
                 </span>
               </div>
@@ -161,7 +185,7 @@ export function ShelfView() {
             {rows.length === 0 && <div className="shelf-empty">nothing on the shelf matches</div>}
           </div>
           <div className="shelf-foot">
-            tier is membership, not a copy — a keep lives once, in the collection
+            tier is membership, not a copy — a keep lives once: on the stage, in the collection, or on disk
           </div>
         </>
       )}
