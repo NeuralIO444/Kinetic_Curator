@@ -184,6 +184,7 @@ node src/engine/dishCoalesce.selfcheck.mjs
 node src/engine/dishPigment.selfcheck.mjs
 node src/engine/dishDensity.selfcheck.mjs
 node src/engine/dishMedium.selfcheck.mjs
+node src/engine/dishFriction.selfcheck.mjs
 node src/engine/dishThermal.selfcheck.mjs
 node src/engine/dishCurrents.selfcheck.mjs
 node src/engine/dishTrails.selfcheck.mjs

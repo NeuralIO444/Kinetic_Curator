@@ -42,8 +42,9 @@ import { bakeDishParticles } from './kernel/bake/dishBake.mjs';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import {
   clampWetness, mediumRestitutionK, mediumClingK, mediumDampRetention,
-  mediumClingCapture, dishMediumFor, DRY_MEDIUM,
-  MEDIUM_CLING_TENSION, MEDIUM_DAMP_DRAG,
+  mediumClingCapture, mediumFricK, mediumFrictionBudget, mediumFrictionImpulse,
+  dishMediumFor, DRY_MEDIUM,
+  MEDIUM_CLING_TENSION, MEDIUM_DAMP_DRAG, FRIC_MAX,
 } from './dishMedium.mjs';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 
@@ -54,10 +55,10 @@ const EPS = 1e-12;
 
 // (a) — the curves, unit-pinned.
 {
-  assert.deepStrictEqual(DRY_MEDIUM, { wet: 0, restK: 1, clingK: 0, dampRetention: 1 },
-    'the dry medium is the identity on all three curves');
-  assert.deepStrictEqual(dishMediumFor(1), { wet: 1, restK: 0, clingK: 1, dampRetention: 1 - MEDIUM_DAMP_DRAG },
-    'full wet: no restitution, full cling, full drag');
+  assert.deepStrictEqual(DRY_MEDIUM, { wet: 0, restK: 1, clingK: 0, fricK: 0, dampRetention: 1 },
+    'the dry medium is the identity on all four curves');
+  assert.deepStrictEqual(dishMediumFor(1), { wet: 1, restK: 0, clingK: 1, fricK: 1, dampRetention: 1 - MEDIUM_DAMP_DRAG },
+    'full wet: no restitution, full cling, full friction, full drag');
   const pins = [
     // w, restK, clingK (smoothstep), dampRetention
     [0, 1, 0, 1],
@@ -69,9 +70,10 @@ const EPS = 1e-12;
   for (const [w, rk, ck, dr] of pins) {
     assert.ok(Object.is(mediumRestitutionK(w), rk), `restK(${w}) = ${rk}`);
     assert.ok(Object.is(mediumClingK(w), ck), `clingK(${w}) = ${ck} (smoothstep)`);
+    assert.ok(Object.is(mediumFricK(w), ck), `fricK(${w}) = ${ck} (the cling curve's sibling)`);
     assert.ok(Math.abs(mediumDampRetention(w) - dr) < EPS, `dampRetention(${w}) = ${dr}`);
     const m = dishMediumFor(w);
-    assert.ok(Object.is(m.restK, rk) && Object.is(m.clingK, ck), `dishMediumFor(${w}) agrees with the curves`);
+    assert.ok(Object.is(m.restK, rk) && Object.is(m.clingK, ck) && Object.is(m.fricK, ck), `dishMediumFor(${w}) agrees with the curves`);
   }
   // The knob read honestly: out-of-range clamps, junk is dry.
   assert.strictEqual(clampWetness(-2), 0); assert.strictEqual(clampWetness(7), 1);
@@ -83,7 +85,7 @@ const EPS = 1e-12;
   let prev = dishMediumFor(0);
   for (let k = 1; k <= 20; k++) {
     const m = dishMediumFor(k / 20);
-    assert.ok(m.restK < prev.restK && m.clingK > prev.clingK && m.dampRetention < prev.dampRetention,
+    assert.ok(m.restK < prev.restK && m.clingK > prev.clingK && m.fricK > prev.fricK && m.dampRetention < prev.dampRetention,
       `monotone at w=${k / 20}`);
     prev = m;
   }
@@ -94,6 +96,20 @@ const EPS = 1e-12;
   assert.strictEqual(mediumClingCapture(0, 4), 0, 'no cling, no capture');
   assert.strictEqual(mediumClingCapture(1, -2), 0, 'an approach is never captured');
   assert.strictEqual(mediumClingCapture(1, 0), 0, 'rest is rest');
+  // The friction law (D1, #1595): the budget is μ × the normal
+  // impulse actually exchanged; the impulse is the stick impulse
+  // Coulomb-clamped to it. One μ, both regimes.
+  assert.strictEqual(FRIC_MAX, 0.5, 'FRIC_MAX is the shipped tune');
+  assert.strictEqual(mediumFrictionBudget(0.5, 2), 1, 'budget = μ × jn');
+  assert.strictEqual(mediumFrictionBudget(0.5, -2), 1, 'the budget reads the magnitude');
+  assert.strictEqual(mediumFrictionBudget(0, 5), 0, 'no μ, no budget');
+  assert.strictEqual(mediumFrictionBudget(0.5, 0), 0, 'no normal exchange, no budget — no grip from nothing');
+  assert.strictEqual(mediumFrictionImpulse(0.5, 1, -0.4, 2), 0.2, 'inside the budget the pair grips: jt zeroes the slide');
+  assert.strictEqual(mediumFrictionImpulse(0.5, 1, -4, 2), 0.5, 'outside, it slides: jt pays exactly the budget');
+  assert.strictEqual(mediumFrictionImpulse(0.5, 1, 4, 2), -0.5, 'the clamp is symmetric');
+  assert.strictEqual(mediumFrictionImpulse(0.5, 1, 0, 2), 0, 'no slide, no impulse');
+  assert.strictEqual(mediumFrictionImpulse(0.5, 0, -4, 2), 0, 'an unfunded contact transmits nothing');
+  assert.strictEqual(mediumFrictionImpulse(0, 1, -4, 2), 0, 'dry transmits nothing');
 }
 
 // Direct-pass fixtures (the contacts.selfcheck idiom): discs r=20,
@@ -400,6 +416,10 @@ const assertSamePhysics = (a, b, label) => {
     'the drag rides the integrator damping at the call site');
   assert.ok(particles.includes('mediumClingCapture(med.clingK, vnNow)'),
     'the per-system pass applies the capture law');
+  assert.ok(particles.includes('mediumFrictionImpulse(mu, jnTotal, vt, wSum)') && particles.includes('FRIC_MAX * med.fricK'),
+    'the per-system pass applies the friction law (D1)');
+  assert.ok(dish.includes('mediumFrictionImpulse(mu, jnTotal, vt, wSum)') && dish.includes('FRIC_MAX * pairMed.fricK'),
+    'the dish pass applies the friction law (D1)');
   assert.ok(!particles.includes('mediumClingK(') && !particles.includes('smoothstep'),
     'no curve arithmetic leaks into the integrator');
   assert.ok(dish.includes('e.wetness = clampWetness(wetness)'), 'enrolment carries the medium, clamped');
