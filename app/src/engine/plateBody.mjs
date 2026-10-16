@@ -80,15 +80,40 @@ export const PLATE_STOPS = Object.freeze([
 const lerp = (a, b, f) => (f <= 0 ? a : f >= 1 ? b : a + (b - a) * f);
 
 /**
+ * #1585 (Materials M4) — the plate geometry as live per-Look params
+ * (layoutParams.plateCenterX / plateCenterY / plateRadius, registered
+ * in PARAM_SPEC). The shipped constants are the defaults: any field
+ * absent or non-finite resolves to them, so a pre-M4 document renders
+ * exactly as the constants rendered it. PLATE_STOPS stays authored
+ * data — the params move the ramp's centre and radius, never its stops.
+ */
+export const PLATE_GEO_DEFAULTS = Object.freeze({
+  cx: PLATE_CENTER.x, cy: PLATE_CENTER.y, radius: PLATE_RADIUS,
+});
+
+export function plateGeoFrom(layoutParams) {
+  const cx = layoutParams?.plateCenterX;
+  const cy = layoutParams?.plateCenterY;
+  const radius = layoutParams?.plateRadius;
+  return {
+    cx: Number.isFinite(cx) ? cx : PLATE_CENTER.x,
+    cy: Number.isFinite(cy) ? cy : PLATE_CENTER.y,
+    radius: Number.isFinite(radius) ? radius : PLATE_RADIUS,
+  };
+}
+
+/**
  * The ramp at glyph-box position (lx, ly). Returns:
  *  - inkMix: 0 = paint the ink channel with the accent colour,
  *    1 = with the ink colour (the colour stops, resolved);
  *  - alpha: the stop opacity at that radius (the ink coverage scale).
+ * `geo` is the M4 geometry (plateGeoFrom); omitted, it is the shipped
+ * geometry and the ramp is the pre-M4 ramp, value for value.
  */
-export function plateRampAt(lx, ly) {
-  const dx = lx - PLATE_CENTER.x;
-  const dy = ly - PLATE_CENTER.y;
-  const t = Math.min(1, Math.hypot(dx, dy) / PLATE_RADIUS);
+export function plateRampAt(lx, ly, geo = PLATE_GEO_DEFAULTS) {
+  const dx = lx - geo.cx;
+  const dy = ly - geo.cy;
+  const t = Math.min(1, Math.hypot(dx, dy) / geo.radius);
   let a = PLATE_STOPS[0];
   let b = PLATE_STOPS[PLATE_STOPS.length - 1];
   for (let i = 0; i < PLATE_STOPS.length - 1; i++) {
@@ -104,12 +129,16 @@ const f3 = (v) => v.toFixed(3);
 /**
  * The GLSL expression of the same ramp, interpolated into QUAD_FS by
  * gl/shaders.mjs (the glassBevel pattern: leaf constants inlined, one
- * source of truth). plateShade(local, ink, accent) returns the
+ * source of truth). plateShade(local, ink, accent, geo) returns the
  * re-painted ink colour and writes the ink coverage scale to aMul.
+ * The stops stay inlined authored data; the geometry arrives as the
+ * M4 param vector geo = (cx, cy, radius) (#1585 — a per-instance
+ * attribute the packer fills from the Look's params, or from
+ * PLATE_GEO_DEFAULTS when the Look never moved them).
  */
 export const PLATE_GLSL = /* glsl */`
-vec3 plateShade(vec2 local, vec3 ink, vec3 accent, out float aMul) {
-  float t = clamp(length(local - vec2(${f3(PLATE_CENTER.x)}, ${f3(PLATE_CENTER.y)})) / ${f3(PLATE_RADIUS)}, 0.0, 1.0);
+vec3 plateShade(vec2 local, vec3 ink, vec3 accent, vec3 geo, out float aMul) {
+  float t = clamp(length(local - geo.xy) / geo.z, 0.0, 1.0);
   float inkMix; float a;
   if (t < ${f3(PLATE_STOPS[1].t)}) {
     float f = t / ${f3(PLATE_STOPS[1].t)};
@@ -128,11 +157,12 @@ vec3 plateShade(vec2 local, vec3 ink, vec3 accent, out float aMul) {
  * The SVG gradient def for one item's two channels — value-faithful
  * to the retired MaterialSheet def (same geometry, same stops), with
  * the item's accent/ink hexes in the var(--accent)/var(--ink) slots.
- * Used by the still composer.
+ * Used by the still composer. `geo` is the M4 geometry (#1585);
+ * omitted, the def is byte-identical to the pre-M4 def.
  */
-export function plateGradientDef(id, accentHex, inkHex) {
+export function plateGradientDef(id, accentHex, inkHex, geo = PLATE_GEO_DEFAULTS) {
   const stop = (s) => `<stop offset="${Math.round(s.t * 100)}%" stop-color="${s.color === 'accent' ? accentHex : inkHex}" stop-opacity="${s.opacity}"/>`;
-  return `<radialGradient id="${id}" cx="${PLATE_CENTER.x * 100}%" cy="${PLATE_CENTER.y * 100}%" r="${PLATE_RADIUS * 100}%">${PLATE_STOPS.map(stop).join('')}</radialGradient>`;
+  return `<radialGradient id="${id}" cx="${geo.cx * 100}%" cy="${geo.cy * 100}%" r="${geo.radius * 100}%">${PLATE_STOPS.map(stop).join('')}</radialGradient>`;
 }
 
 registerCostTier('engine/plate-body', {

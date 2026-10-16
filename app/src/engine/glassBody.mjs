@@ -43,6 +43,18 @@ export function isGlassMaterial(material) {
   return material === GLASS_MATERIAL;
 }
 
+/**
+ * #1585 (Materials M4) — the body's alpha as a live per-Look param
+ * (layoutParams.glassAlpha, registered in PARAM_SPEC). The shipped
+ * constant is the default: an absent or non-finite value resolves to
+ * GLASS_BODY_ALPHA, so every pre-M4 document attenuates exactly as it
+ * did when the constant was the only source.
+ */
+export function glassAlphaFrom(layoutParams) {
+  const v = layoutParams?.glassAlpha;
+  return Number.isFinite(v) ? v : GLASS_BODY_ALPHA;
+}
+
 registerCostTier('engine/glass-body', {
   tier: 0, memoryBytes: 0, timeMs: 0.01,
   notes: '#1547: material glass body — one alpha multiply per placed instance at build time; engages the existing #1129 sort + shader glass terms, no new pass or texture',

@@ -76,6 +76,35 @@ export const WASH_STOPS = Object.freeze([
 ]);
 
 /**
+ * #1585 (Materials M4) — the wash scalars as live per-Look params
+ * (layoutParams.washStrength / washSpread, registered in PARAM_SPEC).
+ * WASH_STOPS stays authored data; the params reshape how a glyph
+ * travels it:
+ *  - strength scales the ramp's travel toward ink (1 = the full
+ *    accent→ink ramp, 0 = the glyph holds the top stop's colour);
+ *  - spread stretches the height over which the ramp runs (1 = the
+ *    full glyph height; < 1 compresses the travel into the top of
+ *    the glyph and pads with the last stop, SVG-style; > 1 leaves
+ *    the bottom short of the last stop).
+ * Absent or non-finite fields resolve to the defaults, so a pre-M4
+ * document renders exactly as the fixed ramp rendered it.
+ */
+export const WASH_PARAM_DEFAULTS = Object.freeze({ strength: 1, spread: 1 });
+
+export function washParamsFrom(layoutParams) {
+  const strength = layoutParams?.washStrength;
+  const spread = layoutParams?.washSpread;
+  return {
+    strength: Number.isFinite(strength) ? strength : 1,
+    spread: Number.isFinite(spread) && spread > 0 ? spread : 1,
+  };
+}
+
+// Exact at the endpoints (a + (b - a) * 1 is not always b in doubles,
+// and the ramp must read the stop values exactly at the stops).
+const lerp = (a, b, f) => (f <= 0 ? a : f >= 1 ? b : a + (b - a) * f);
+
+/**
  * The ramp at glyph-box position (lx, ly). Returns:
  *  - inkMix: 0 = paint the ink channel with the accent colour,
  *    1 = with the ink colour (the colour stops, resolved);
@@ -83,34 +112,76 @@ export const WASH_STOPS = Object.freeze([
  *    (the def has no opacity stops); kept in the shape so callers
  *    can treat the material ramps uniformly.
  * lx plays no part: the def is a one-dimensional (vertical) ramp.
+ * `prm` is the M4 param pair (washParamsFrom); omitted, it is the
+ * shipped pair and the ramp is the pre-M4 ramp, value for value.
  */
-export function washRampAt(lx, ly) {
-  const t = Math.min(1, Math.max(0, ly));
-  return { inkMix: t, alpha: 1 };
+export function washRampAt(lx, ly, prm = WASH_PARAM_DEFAULTS) {
+  const t = Math.min(1, Math.max(0, ly / prm.spread));
+  let a = WASH_STOPS[0];
+  let b = WASH_STOPS[WASH_STOPS.length - 1];
+  for (let i = 0; i < WASH_STOPS.length - 1; i++) {
+    if (t >= WASH_STOPS[i].t && t <= WASH_STOPS[i + 1].t) { a = WASH_STOPS[i]; b = WASH_STOPS[i + 1]; break; }
+  }
+  const f = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0;
+  const mixOf = (s) => (s.color === 'accent' ? 0 : 1);
+  return { inkMix: lerp(mixOf(a), mixOf(b), f) * prm.strength, alpha: lerp(a.opacity, b.opacity, f) };
 }
 
 /**
  * The GLSL expression of the same ramp, interpolated into QUAD_FS by
  * gl/shaders.mjs (the plate pattern: leaf constants inlined, one
- * source of truth). washShade(local, ink, accent) returns the
- * re-painted ink colour. There is no coverage term — the wash def
- * never touches alpha.
+ * source of truth). washShade(local, ink, accent, prm) returns the
+ * re-painted ink colour, prm = (strength, spread) (#1585 — a
+ * per-instance attribute the packer fills from the Look's params, or
+ * from WASH_PARAM_DEFAULTS when the Look never moved them). There is
+ * no coverage term — the wash def never touches alpha.
  */
 export const WASH_GLSL = /* glsl */`
-vec3 washShade(vec2 local, vec3 ink, vec3 accent) {
-  return mix(accent, ink, clamp(local.y, 0.0, 1.0));
+vec3 washShade(vec2 local, vec3 ink, vec3 accent, vec2 prm) {
+  return mix(accent, ink, clamp(local.y / prm.y, 0.0, 1.0) * prm.x);
 }`;
+
+/** #rrggbb (or #rgb) → [r, g, b] in 0..255, or null when unparsable. */
+function hexRgb(hex) {
+  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(String(hex ?? ''));
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/** The channel mix a strength-scaled wash stop paints with. */
+function mixHex(accentHex, inkHex, f) {
+  const a = hexRgb(accentHex);
+  const b = hexRgb(inkHex);
+  if (!a || !b) return f >= 1 ? inkHex : accentHex;
+  const c = a.map((v, i) => Math.round(v + (b[i] - v) * f));
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
 
 /**
  * The SVG gradient def for one item's two channels — value-faithful
  * to the retired MaterialSheet def (same geometry, same stops; the
  * def declares no stop-opacity, so none is emitted), with the item's
  * accent/ink hexes in the var(--accent)/var(--ink) slots. Used by
- * the still composer.
+ * the still composer. `prm` is the M4 param pair (#1585): at the
+ * shipped pair the def is byte-identical to the pre-M4 def; off it,
+ * spread stretches the gradient VECTOR (y2 = spread — the ramp value
+ * at glyph height y is the table's value at y/spread, exactly the
+ * JS/GLSL reading; past the vector's end the pad is the last stop,
+ * the SVG default) and each stop's colour is its authored channel
+ * mix scaled by strength. (Scaling stop OFFSETS instead would clamp
+ * at the box edge and could never express a stretch — measured: a
+ * spread-2 def with clamped offsets rasterizes identically to the
+ * default. The vector is the honest expression.)
  */
-export function washGradientDef(id, accentHex, inkHex) {
-  const stop = (s) => `<stop offset="${Math.round(s.t * 100)}%" stop-color="${s.color === 'accent' ? accentHex : inkHex}"/>`;
-  return `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${WASH_STOPS.map(stop).join('')}</linearGradient>`;
+export function washGradientDef(id, accentHex, inkHex, prm = WASH_PARAM_DEFAULTS) {
+  if (prm.strength === 1 && prm.spread === 1) {
+    const stop = (s) => `<stop offset="${Math.round(s.t * 100)}%" stop-color="${s.color === 'accent' ? accentHex : inkHex}"/>`;
+    return `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${WASH_STOPS.map(stop).join('')}</linearGradient>`;
+  }
+  const mixOf = (s) => (s.color === 'accent' ? 0 : 1);
+  const stop = (s) => `<stop offset="${Math.round(s.t * 100)}%" stop-color="${mixHex(accentHex, inkHex, mixOf(s) * prm.strength)}"/>`;
+  return `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="${prm.spread}">${WASH_STOPS.map(stop).join('')}</linearGradient>`;
 }
 
 registerCostTier('engine/wash-body', {
