@@ -21,6 +21,7 @@ import { CreatureSliders } from './layout/CreatureSliders.jsx';
 import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
 import { MaterialSliders } from './layout/MaterialSliders.jsx'; // #1585 — material body tunables (Materials M4)
 import { ChiaroscuroSection } from './layout/ChiaroscuroSection.jsx';
+import { UnlockTreeSection } from './layout/UnlockTreeSection.jsx'; // #1630 — the unlock tree, bottom of BUILD
 import { LayerStack } from './build/LayerStack.jsx';
 import { BuildSection } from './build/BuildSection.jsx';
 import { MathSection } from './build/MathSection.jsx';
@@ -121,6 +122,13 @@ export function BuildPanel() {
         {/* ⑤ MATH — broad strokes over the fine sliders: assignable macro knobs (#724) */}
         <BuildSection num="5" title="Math">
           <MathSection />
+        </BuildSection>
+
+        {/* ⑥ UNLOCKS — #1630: the unlock tree. Every control in BUILD that can
+            stand greyed or Davis-only, explained: what it is, lit or dark right
+            now, and what lights it. Read-only — nodes never apply anything. */}
+        <BuildSection num="6" title="Unlocks">
+          <UnlockTreeSection layoutParams={layoutParams} />
         </BuildSection>
       </div>
     </DockProvider>
