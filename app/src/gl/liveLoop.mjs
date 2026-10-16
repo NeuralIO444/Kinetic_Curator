@@ -35,8 +35,7 @@ import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 m
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
 import { spectrumMarksShed } from './sceneContract.js';
 import { spectrumMarksFor } from './spectrumMarks.mjs'; // #1482 P3: the dials -> the renderer's spectrum key
-import { motionReadout } from './motionReadout.mjs'; // #1469: the always-alive motion, read once a frame
-import { publishMotion } from './motionTap.mjs';
+import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469: the loop notes its LIFE reading for the STIMULI readout
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createKinemeClock } from '../data/kinemes.js';
@@ -133,7 +132,6 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
   // shaped rms; flux is the positive delta. Render-only, never the store.
   let lastModRms = 0;
   const bandFeed = createBandFeed(); // #790 PR3
-  const motionNow = {}; // #1469: reused every frame, no allocation
   let loopLifeT = 0;
   let breathScaleSmoothed = 1;
   let breathRotSmoothed = 0;
@@ -538,12 +536,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
     const dampFactor = 1 - Math.exp(-8 * dtSec);
     breathScaleSmoothed += (targetBreathScale - breathScaleSmoothed) * dampFactor;
     breathRotSmoothed += (targetBreathRot - breathRotSmoothed) * dampFactor;
-    // #1469 — publish the always-alive motion for the STIMULI readout (read-only; the numbers the engine already uses)
-    publishMotion(motionReadout({
-      layoutParams, beatDrive: audioOn ? shapedAudio.beatPulse : null, breathScale: breathScaleSmoothed,
-      reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
-      slowRender: s.slowRender || !s.running,
-    }, motionNow));
+    // #1469 — note the frame's LIFE reading for the STIMULI readout: |breathScale − 1| over its
+    // span, honest zero while the governor has motion frozen or the artist has paused — never a
+    // ghost of the last live frame. The breath scale is applied here, after the resolve, so the
+    // loop is its only honest source; the resolver's amounts ride the frame tap on their own
+    // path (composition/motionLive folds this note into the strip's levels). Read-only: a note,
+    // not a route.
+    noteLifeBreath((s.slowRender || !s.running) ? 0 : Math.abs(breathScaleSmoothed - 1) / LIFE_FULL);
 
     const glow = routes.glow;
 

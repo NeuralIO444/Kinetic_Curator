@@ -1,6 +1,6 @@
 // spectrumLive.mjs — #1482 P2: the live spectrum. Once a frame it reads the spectrum analyser (useAudioInput's third,
 // float dB, unsmoothed) and the synthetic set's answer for that frame, and steps the core (spectrumCore). A module
-// holder like motionTap: not store state, read-only for everyone but this driver. Nothing here touches the bands.
+// holder like motionMeterTap: not store state, read-only for everyone but this driver. Nothing here touches the bands.
 import { createSpectrumCore, spectrumFromBands, LOG_BINS } from './spectrumCore.mjs';
 import { peekSourceFeed } from './sourceFeed.mjs';
 
