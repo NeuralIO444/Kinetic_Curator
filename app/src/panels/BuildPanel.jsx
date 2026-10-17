@@ -5,11 +5,14 @@
 // popup value editors docked to the panel edge. No controls cut — every
 // control that existed still exists; only the rendering changed. CSS class
 // root stays panel-layout (see PANEL_CONSOLIDATION_PLAN.md §5).
+import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PanelHeader } from '../components/PanelHeader.jsx';
 import { MixBar } from './layout/MixBar.jsx';
 import { CompositionTiles } from './layout/CompositionTiles.jsx';
 import { MotionShelf } from './layout/MotionShelf.jsx';
+import { AttractorRow } from './layout/ShiftRows.jsx'; // #1204 — PULL, the dice's shift function
+import { useLongPress } from '../hooks/useLongPress.js';
 import { ShapesShelf } from './layout/ShapesShelf.jsx';
 import { VoicesShelf } from './layout/VoicesShelf.jsx';
 import { LayoutSliders } from './layout/LayoutSliders.jsx';
@@ -34,14 +37,19 @@ import { LOIS_LINES } from './loisLines.mjs';
 // prefers-reduced-motion: with reduced motion the tray appears without the
 // rolling shuffle (the tray itself is the static equivalent).
 // (The dice emoji is retired #1028; the header uses a geometric glyph.)
-function RollButton({ onRoll }) {
+// #1204 — the shift layer: ROLL is the dice, and the dice's second
+// function is PULL (attractors). Long-press ROLL opens the PULL row at the
+// top of the panel body; a plain tap still just rolls — the hold swallows
+// its own release click (useLongPress).
+function RollButton({ onRoll, pressProps }) {
   return (
     <button
       type="button"
       className="te-cell"
       style={{ minHeight: 24, padding: '2px 10px', flexDirection: 'row', gap: 4 }}
       onClick={onRoll}
-      title="Roll the tasteful dice — 3 finalists, you crown one"
+      {...pressProps}
+      title="Roll the tasteful dice — 3 finalists, you crown one · long-press: pull"
       aria-label="Roll the dice"
     >
       <span aria-hidden="true">▣</span>
@@ -58,6 +66,9 @@ export function BuildPanel() {
   }));
   const { layoutParams, lockedParams, trackCount } = state;
   const dice = useDiceRoll();
+  // #1204 — PULL row open state (the ROLL button's shift function).
+  const [pullOpen, setPullOpen] = useState(false);
+  const rollPress = useLongPress(() => setPullOpen((o) => !o));
 
   const lockCount = Object.values(lockedParams).filter(Boolean).length;
 
@@ -71,9 +82,12 @@ export function BuildPanel() {
     <DockProvider>
       <PanelHeader tag="P03" title="BUILD" subtitle={layoutParams.composition}>
         {lockCount > 0 && <span className="lock-badge">▪ {lockCount}</span>}
-        <RollButton onRoll={dice.roll} />
+        <RollButton onRoll={dice.roll} pressProps={rollPress} />
       </PanelHeader>
       <div className="panel-body">
+        {/* #1204 — PULL: the dice's shift function, opened by long-pressing
+            ROLL. Rides at the top of the body, under its host. */}
+        {pullOpen && <AttractorRow layoutParams={layoutParams} />}
         {/* ① LAYOUT — structure first: tiles, size/shape sliders, symmetry, bleed/mirror/overlap */}
         <BuildSection num="1" title="Layout">
           <CompositionTiles
