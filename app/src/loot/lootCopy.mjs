@@ -8,11 +8,13 @@ export const WEB_UNSUPPORTED = 'needs chrome or edge, or the desktop app';
 export const WEB_INSECURE = 'needs a secure page (https)';
 export const LINK_LOST = 'folder link lost: point at the folder again';
 export const ALLOW_AGAIN = 'allow access to the folder, then rescan';
+export const SESSION_GONE = 'this browser keeps the folder for one visit only: point at it again';
 export const NOT_BROWSER_FOLDER = 'not a browser folder: point at the folder again';
 
 /** The folder as the row shows it: a desktop path as it is, a browser folder by name and where it is kept. */
 export function rootLabel(root) {
   if (typeof root !== 'string' || !root) return '';
+  if (root.startsWith('session:')) return `${root.slice(8)} (this visit only)`;
   return root.startsWith('web:') ? `${root.slice(4)} (kept in this browser)` : root;
 }
 
@@ -65,6 +67,8 @@ export const LABELS = Object.freeze({
   scanning: 'scanning...',
   hashing: (done, total) => `reading ${done} of ${total}...`,
   hint: 'images/ audio/ palettes/ looks/ — your files stay where they are; KC-1 writes only its own keep exports into looks/',
+  starter: 'get starter folder',
+  starterHint: 'unzip it anywhere, add your files, then point at it (this browser reads it for one visit)',
   logTitle: 'ingest log',
   empty: 'nothing in the log yet',
 });

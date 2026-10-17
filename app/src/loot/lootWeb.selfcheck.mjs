@@ -224,7 +224,7 @@ await ok('the default handle store is safe where there is no IndexedDB', async (
 await ok('the row takes the desktop backend in the shell and the browser one elsewhere; the folder shows by name', () => {
   const N = { tag: 'native' }; const W = { tag: 'web' };
   assert.equal(createLootBackend({ isDesktop: () => true, native: N, web: W }), N);
-  assert.equal(createLootBackend({ isDesktop: () => false, native: N, web: W }), W);
+  assert.equal(createLootBackend({ isDesktop: () => false, native: N, web: W, supportsWeb: () => true }), W);
   assert.equal(createLootBackend().unavailable(), WEB_UNSUPPORTED, 'node is neither: a plain reason');
   assert.equal(rootLabel('web:KC-1 Loot'), 'KC-1 Loot (kept in this browser)');
   assert.equal(rootLabel('/Users/me/Loot'), '/Users/me/Loot');

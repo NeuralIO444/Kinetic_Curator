@@ -8,6 +8,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { seenLine } from '../../loot/lootNative.mjs';
 import { createLootBackend } from '../../loot/lootBackend.mjs';
+import { isTauriRuntime } from '../../platform/desktop.mjs';
+import { webFolderSupport } from '../../loot/lootWeb.mjs';
+import { starterZip, STARTER_ZIP_NAME } from '../../loot/lootStarter.mjs';
 import { runScan } from '../../loot/lootRun.mjs';
 import { loadShelfPrefs } from '../../loot/shelfPrefsLoad.mjs';
 import { takeInImages, ingestVia } from '../../loot/lootIngest.mjs';
@@ -26,6 +29,15 @@ const LOG_SHOWN = 40;
 // #1591 — shelf rows for the disk tier's stubs are built off these.
 const SHELF_ASSETS_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
 const SHELF_PALETTES_BY_ID = new Map(PALETTES.map((p) => [p.id, p]));
+
+// a browser that cannot create folders (Safari, Firefox) gets a starter folder to unzip; the file is built here, never fetched
+function downloadStarter() {
+  const url = URL.createObjectURL(new Blob([starterZip()], { type: 'application/zip' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = STARTER_ZIP_NAME;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 
 export function LootRow() {
   const native = useMemo(() => createLootBackend(), []); // the desktop shell's native side, or the browser's folder handle
@@ -142,6 +154,7 @@ export function LootRow() {
   };
 
   const has = !!index.root;
+  const needsStarter = !isTauriRuntime() && webFolderSupport() !== null;
   return (
     <div className="pipeline-loot" aria-label="Loot folder">
       <div className="pipeline-row">
@@ -155,6 +168,7 @@ export function LootRow() {
             {has && <button type="button" className="chip-btn" onClick={forget} disabled={!!busy}>{LABELS.forget}</button>}
           </>
         )}
+        {needsStarter && <button type="button" className="chip-btn" onClick={downloadStarter} title={LABELS.starterHint}>{LABELS.starter}</button>}
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
         {unavailable ? LABELS.hint : (has ? rootLabel(index.root) : LABELS.hint)}
