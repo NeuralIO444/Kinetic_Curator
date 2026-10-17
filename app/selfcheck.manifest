@@ -287,6 +287,7 @@ node src/curator/spawn.selfcheck.mjs
 node src/engine/assetAttach.selfcheck.mjs
 node src/engine/creature.selfcheck.mjs
 node src/engine/skeleton.selfcheck.mjs
+node src/engine/wingWarp.selfcheck.mjs
 node src/curator/limbs.selfcheck.mjs
 node src/curator/davisShift.selfcheck.mjs
 node src/curator/roomWidth.selfcheck.mjs
