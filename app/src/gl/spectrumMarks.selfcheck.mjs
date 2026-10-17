@@ -53,7 +53,12 @@ const stateWith = (fill) => { const s = createSpectrumCore().state; for (let i =
   assert.match(vs, /uniform sampler2D u_spec;/);
   assert.match(vs, /if \(u_specA\.y \+ u_specA\.z \+ u_specA\.w > 0\.0\) \{/, 'the whole branch is gated on an amount');
   assert.match(vs, /if \(specColour > 0\.0\) v_ink = mix\(v_ink, v_accent/, 'colour only moves when asked');
-  assert.equal((vs.match(/texelFetch\(u_spec/g) || []).length, 3, 'three lookups: level, peak, onsets');
+  // the lookup count is per vertex shader: QUAD_VS fetches level, peak, onsets — and since
+  // Phase 2 S2 its mirror MESH_VS (the wing-warp draw) fetches the same three, no more
+  const quadVs = vs.slice(vs.indexOf('const QUAD_VS_SRC'), vs.indexOf('const MESH_VS_SRC'));
+  assert.equal((quadVs.match(/texelFetch\(u_spec/g) || []).length, 3, 'three lookups: level, peak, onsets');
+  const meshVs = vs.slice(vs.indexOf('const MESH_VS_SRC'), vs.indexOf('export const FULL_VS'));
+  assert.equal((meshVs.match(/texelFetch\(u_spec/g) || []).length, 3, 'the mesh mirror: the same three lookups');
   const r = src('./renderer.mjs');
   assert.match(r, /spec = contract\.spectrum \|\| null;/);
   assert.match(r, /uploadSpectrum\(\);\s*if \(spec && specTex && specUploaded\) \{/, 'uploaded only when on, and drawn only if it went up');
