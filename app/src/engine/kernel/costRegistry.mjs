@@ -213,3 +213,21 @@ registerCostTier('creature/engraving', {
   timeMs: 0.05,
   notes: 'in-shader engraving finish (body-space contour lines on the one body item per creature; gated branch in the quad FS, no pass, no target) — timeMs UNMEASURED by the sweep harness by construction; sandbox bench estimate, see engine/engraving.selfcheck.mjs',
 });
+
+// Phase 2 S8 — APPEND-ONLY BLOCK (slices append their own; do not edit above
+// this line for S8). The glitch creature's corruption (engine/glitch.js) is
+// CPU scalar math on the item stream plus extra ghost stamps at full
+// corruption (<= 2 per material item, <= 12 per creature): no GPU pass of
+// its own, no working set. Tier 0 because it is structural to the type — the
+// corruption IS the glitch's band response, not a sheddable FX pass — which
+// also keeps it outside the measured-costs coverage gate (that sweep times
+// FX shader passes; this is measured on the resolver path instead — see the
+// S8 staging report's resolver-probe numbers at the 4-creature cap against
+// the 2.0 ms creature budget).
+// ============================================================================
+registerCostTier('creature:glitch', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0,
+  notes: 'Phase 2 S8 — glitch corruption: seeded item-stream math (strip slip, seam drift, channel-split ghosts, hatch sort); no GPU pass, no FBOs. Cost lives in item count and resolver CPU, measured via resolverProbe lineage.',
+});
