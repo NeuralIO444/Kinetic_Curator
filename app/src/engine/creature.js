@@ -242,8 +242,14 @@ function createFanScatter({ seed, seedOffsets, creatureId, skel, anchors, bodyTr
     const hind = anchorName.startsWith('hind');
     const chainId = hind ? 'hind' : 'fore';
     const counts = hind ? FAN_COUNTS.hind : FAN_COUNTS.fore;
-    const chain = wingLocalChain(skel, chainId, 'R', anchors[anchorName.replace(/L$/, 'R')], bodyTrait);
-    const right = fanPlacements({ chain, seed, creatureId, chainKey: chainId, counts, seedOffsets });
+    const rightName = anchorName.replace(/L$/, 'R');
+    // the right layout is computed once per wing pair and shared: the left wing mirrors it
+    let right = layouts.get(rightName);
+    if (!right) {
+      const chain = wingLocalChain(skel, chainId, 'R', anchors[rightName], bodyTrait);
+      right = fanPlacements({ chain, seed, creatureId, chainKey: chainId, counts, seedOffsets });
+      layouts.set(rightName, right);
+    }
     const out = anchorName.endsWith('L')
       ? Object.fromEntries(Object.entries(right).map(([kind, list]) => [kind, mirrorPlacements(list, FAN_PARTS[kind].axisDeg)]))
       : right;
