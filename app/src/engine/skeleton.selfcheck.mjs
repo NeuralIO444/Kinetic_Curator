@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { ASSETS } from '../data/assets/index.js';
 import { buildSkeleton, mirrorBone, resolveMarkers, skeletonHash, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
 import { createCreatureBuilder, MOTH, pointToward } from './creature.js';
+import { FAN_COUNTS } from './featherFan.js';
 import { autoAttachPoints } from './autoAttach.js';
 
 // A symmetric fixture body in box units, in autoAttachPoints' order: top, right, bottom, left.
@@ -113,9 +114,11 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   assert.notEqual(moved.hash, skel.hash);
 }
 
-// 7. The builder publishes the frame's skeletons — and the moth it draws is byte-for-byte the moth of
-//    creature.selfcheck (26 creature items at full growth, no hind pair without the crowd's word).
+// 7. The builder publishes the frame's skeletons — and the moth it draws is the moth of
+//    creature.selfcheck (50 creature items at full growth since S3 grew the feather fans on the
+//    wings' bones — S1 drew 26 — no hind pair without the crowd's word).
 {
+  const FAN_PER_WING = FAN_COUNTS.fore.plate + FAN_COUNTS.fore.feather + FAN_COUNTS.fore.leaf + FAN_COUNTS.fore.chevron;
   const PAL = { bg: '#111111', ink: '#eeeeee', swatches: ['#aa0000', '#222222'] };
   const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
   const input = (over = {}) => ({
@@ -124,7 +127,7 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   const b = createCreatureBuilder();
   let e;
   for (let i = 0; i < MOTH.growFrames + 1; i++) { e = entry(); b.append(input({ wantSkeletons: true }), e, ASSETS); }
-  assert.equal(e[0].items.filter((it) => it._creature).length, 26, 'the drawn moth is unchanged');
+  assert.equal(e[0].items.filter((it) => it._creature).length, 3 + 1 + 2 + 2 * FAN_PER_WING, 'the drawn moth: halos + body + wings + fans');
   const skels = b.lastSkeletons();
   assert.equal(skels.length, 1);
   assert.equal(skels[0].bones.length, 10, 'one pair grown in: spine + fore chains only');
@@ -134,13 +137,15 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   assert.match(skels[0].hash, /^[0-9a-f]{8}$/);
   b.append(input({ dishFormed: [false] }), entry(), ASSETS);
   assert.deepEqual(b.lastSkeletons(), [], 'nothing formed, nothing published');
-  // The gate: no consumer asking (no wantSkeletons) → nothing built, nothing published,
-  // and the drawn moth is exactly what it was — zero skeleton cost when off, not just zero pixels.
+  // The gate (Matt's 2026-10-16 tech check on PR #1653): no consumer asking (no wantSkeletons) →
+  // nothing PUBLISHED, and the drawn moth is the same moth the gate-on run drew. The gate still
+  // governs publication; since S3 the fan grows on the bones, so the builder builds them either
+  // way — the fan is the always-on consumer S1 anticipated (S3's staging report records the change).
   const b2 = createCreatureBuilder();
   let e2;
   for (let i = 0; i < MOTH.growFrames + 1; i++) { e2 = entry(); b2.append(input(), e2, ASSETS); }
-  assert.equal(e2[0].items.filter((it) => it._creature).length, 26, 'gate off: the drawn moth is unchanged');
-  assert.deepEqual(b2.lastSkeletons(), [null], 'gate off: no skeleton is built or published');
+  assert.equal(e2[0].items.filter((it) => it._creature).length, 3 + 1 + 2 + 2 * FAN_PER_WING, 'gate off: the drawn moth is whole');
+  assert.deepEqual(b2.lastSkeletons(), [null], 'gate off: no skeleton is published');
 }
 
 // 8. The determinism guard, in mathRandomGuard's pattern: skeleton.js carries none of the banned clocks or
