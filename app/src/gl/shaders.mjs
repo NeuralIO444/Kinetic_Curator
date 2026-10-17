@@ -449,6 +449,94 @@ void main() {
 // unaffected — see glassCaustic.selfcheck.mjs.
 export const QUAD_FS = injectCommon(QUAD_FS_SRC);
 
+// Phase 2 S2 — the wing-warp mesh vertex shader. A mesh instance (a bent wing, engine/wingWarp.mjs) arrives
+// with its vertices ALREADY skinned in scene space by the resolver; this shader only places them and fills
+// the same varyings QUAD_VS fills, so the shared QUAD_FS shades a warped wing exactly as it shades a quad —
+// same live-tint colour maths, same sun, same spectrum response. The per-instance terms QUAD_VS evaluates
+// per vertex of a quad (seed, sun light, spectrum) are constant across an instance there; here they are
+// evaluated from the item's centre/rotation attributes, identical values for every vertex of the mesh.
+// Two disclosed differences from the quad path: the spectrum INDEX bin uses the item's index in the layer
+// list (a_inst4-free attribute a_item.w) instead of gl_InstanceID — the quad path's own index is already
+// batch-relative, so neither is a stable identity — and the #781 kineme / #1410 deform / smear terms are
+// absent: creature items never carry a kineme slot, a deform, or a velocity (creature.js's mark() sets
+// none), so those gates are closed on every mesh item by construction.
+const MESH_VS_SRC = `#version 300 es
+layout(location=0) in vec2 a_pos;      // scene-space vertex, skinned by the resolver
+layout(location=1) in vec2 a_uv;       // atlas uv (the cell mapping applied CPU-side at fill time)
+layout(location=2) in vec3 a_ink;
+layout(location=3) in vec3 a_accent;
+layout(location=4) in vec4 a_item;     // x, y = item centre (scene), z = rotation deg, w = index in the layer list
+layout(location=5) in vec4 a_rot;      // cos, sin of the item rotation; x/y mirror signs (as QUAD_VS v_rot)
+layout(location=6) in vec4 a_cell;     // the item's atlas cell (u0, v0, u1, v1)
+layout(location=7) in float a_opacity;
+uniform vec2 u_canvas;
+uniform vec4 u_sun;       // x, y (scene units), height above the plane, w = on (0/1)
+uniform vec4 u_sunLight;  // rgb = palette-slot colour, a = intensity
+uniform float u_ambient;  // light that reaches a mark facing away from the sun
+uniform sampler2D u_spec;
+uniform vec4 u_specA;
+uniform float u_specN;
+out float v_seed;
+out vec2 v_uv;
+out float v_opacity;
+out vec3 v_ink;
+out vec3 v_accent;
+out vec3 v_light;
+out vec2 v_world;
+out vec4 v_rot;
+out vec4 v_cell;
+out float v_glass;
+out float v_plate;
+out float v_wash;
+out float v_stipple;
+out vec4 v_matP;
+void main() {
+  float seed = kc_hash12(a_item.xy);
+  v_seed = seed;
+  vec2 world = a_pos;
+  // #1482 P3 — the spectrum terms, as QUAD_VS applies them, around the item centre: SCALE is a scalar
+  // factor about the centre (commutes with the item's rotation), DISPLACE is a world-space offset.
+  float specColour = 0.0;
+  if (u_specA.y + u_specA.z + u_specA.w > 0.0) {
+    int sm = int(u_specA.x + 0.5);
+    float sk = sm == 0 ? a_item.w / max(u_specN - 1.0, 1.0)
+             : sm == 1 ? fract(a_item.z / 360.0)
+             : sm == 2 ? clamp(a_item.x / u_canvas.x, 0.0, 1.0)
+             : seed;
+    int sx = int(clamp(sk, 0.0, 1.0) * 255.0 + 0.5);
+    float lvS = texelFetch(u_spec, ivec2(sx, 0), 0).r;
+    float lvP = texelFetch(u_spec, ivec2(sx, 1), 0).r;
+    float lvF = texelFetch(u_spec, ivec2(sx, 3), 0).r;
+    world = a_item.xy + (world - a_item.xy) * (1.0 + u_specA.y * lvS * 0.9);
+    float sda = seed * 6.28318530718;
+    world += vec2(cos(sda), sin(sda)) * (u_specA.z * lvF * 28.0);
+    specColour = u_specA.w * lvP;
+  }
+  gl_Position = vec4(world.x / u_canvas.x * 2.0 - 1.0, 1.0 - world.y / u_canvas.y * 2.0, 0.0, 1.0);
+  v_uv = a_uv;
+  v_opacity = a_opacity;
+  v_ink = a_ink;
+  v_accent = a_accent;
+  if (specColour > 0.0) v_ink = mix(v_ink, v_accent, min(specColour, 1.0));
+  v_world = world;
+  v_rot = a_rot;
+  v_cell = a_cell;
+  v_glass = 0.0;
+  v_plate = 0.0;
+  v_wash = 0.0;
+  v_stipple = 0.0;
+  v_matP = vec4(0.0);
+  // #594 PR1: per-instance diffuse from the one sun, at the item centre — the quad path's own rule.
+  if (u_sun.w > 0.5) {
+    vec3 L = normalize(vec3(u_sun.xy - a_item.xy, u_sun.z));
+    v_light = vec3(u_ambient) + u_sunLight.rgb * (u_sunLight.a * L.z);
+  } else {
+    v_light = vec3(1.0);
+  }
+}`;
+
+export const MESH_VS = injectCommon(MESH_VS_SRC);
+
 /** Fullscreen pass: v_cuv is y-down canvas UV. */
 export const FULL_VS = `#version 300 es
 layout(location=0) in vec2 a_pos;
