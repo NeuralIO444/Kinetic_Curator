@@ -677,7 +677,7 @@ export const createDavisSlice = (set) => {
     // the event-bus path has no loop handle, so it reads the mirrored stamp.
     const ts = Number.isFinite(opts.loopTimeMs) ? opts.loopTimeMs : loopClock.ms;
     const caUpdate = state.layoutParams.mode === 'ca'
-      ? { caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28) }
+      ? { caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28, state.seed) }
       : {};
 
     if (state.evolveTarget === 'seed') {

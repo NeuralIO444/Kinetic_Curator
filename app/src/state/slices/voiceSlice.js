@@ -261,7 +261,7 @@ export const createVoiceSlice = (set) => ({
       next.enabledAssets = { ...to.assets };
     }
     // A user voice captured while on the cellular engine restores its grid.
-    if (to.params.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28);
+    if (to.params.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
     next.voiceMix = null;
     next.activeVoiceId = mix.targetVoiceId || null;
     return next;

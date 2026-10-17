@@ -1021,7 +1021,7 @@ export function renderReachability() {
   // Separation evidence for the signature-sharing pairs: each pair
   // shares a signature only at the census's default composition, and
   // separates in the context that actually distinguishes it.
-  const grid = createGrid(48, 34);
+  const grid = createGrid(48, 34, 0); // fixed seed: the census sample grid is evidence furniture, identical every run
   for (let i = 0; i < 12; i++) stepGrid(grid);
   const separation = {
     // 'noise' registers the grid sampler itself (kernel/sample/

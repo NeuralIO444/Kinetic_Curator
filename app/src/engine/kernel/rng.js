@@ -147,6 +147,10 @@ export function endStringChannelObservation() {
 export const STRING_CHANNEL_GROUPS = Object.freeze({
   field: 'spatial',
   ca: 'spatial',
+  // Audit fix 1 — the CA grid's initial fill (engine/ca-engine.js) is placement: a fresh
+  // grid is dealt from the take seed, so it rides the spatial stream on its own channel
+  // (distinct from the 'ca' sampler stream, which reads the dealt grid to place points).
+  'ca-grid': 'spatial',
   // #587 — the Voronoi mask places points, so it rides the spatial stream:
   // re-rolling SPATIAL must move the veins, and re-rolling colour must not.
   voronoi: 'spatial',
