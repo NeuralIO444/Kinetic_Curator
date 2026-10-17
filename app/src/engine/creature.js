@@ -19,6 +19,7 @@ import { buildSkeleton, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton
 import { buildWingWarp, WARP_FLEX_RATIO } from './wingWarp.mjs';
 import { FAN_PARTS, FAN_COUNTS, wingLocalChain, fanPlacements, mirrorPlacements } from './featherFan.js';
 import { engraveDataFor } from './engraveBody.mjs';
+import { creaturePose } from './creaturePose.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
 import { applyLean } from './kernel/color/index.js';
@@ -301,14 +302,19 @@ export function createCreatureBuilder({ skinning = false } = {}) {
   const assetCache = new Map(); // assetId -> its attach points (keyed also by the svg and the artist's edit)
   let wingBeat = null; // #1469 — the last appended frame's wing beat as 0..1 openness; null when no moth was appended
   let frameSkeletons = []; // Phase 2 S1 — the last appended frame's skeletons (world space), per pin; null where unformed
+  let framePoses = []; // Phase 2 S5 — the last appended frame's band poses (engine/creaturePose.js), per pin; null where unformed or bandless
+  let frame = 0; // S5 — the builder's own frame count: the pose's time. Advances once per append, formed or not,
+  // so a take's pose sequence is a pure function of its input sequence, exactly like the grow-in ages.
   const pointsOf = (pool, assetAttach, id) => {
     const asset = pool.find((a) => a && a.id === id);
     return asset ? attachPointsFor(asset, assetAttach) : [];
   };
   return {
     append(input, entries, pool, motionFor = null, groundFor = null) {
+      const myFrame = frame; frame += 1; // S5 — every resolver frame counts, even one that appends nothing
       wingBeat = null; // #1469 — re-earned below only if this call actually appends a moth
       frameSkeletons = []; // S1 — likewise: only a frame that appends moths publishes skeletons
+      framePoses = []; // S5 — likewise for poses
       const pins = input && input.dishPins;
       const formed = input && input.dishFormed;
       if (!Array.isArray(pins) || !Array.isArray(formed) || !formed.some(Boolean)) {
@@ -342,10 +348,16 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       const motion = input.reducedMotion || typeof motionFor !== 'function' ? null : motionFor(top);
       // the dials and ground this layer rests on (null when it rests on none: the moth is exactly as before)
       const ground = typeof groundFor === 'function' ? groundFor(top) : null;
+      // Phase 2 S5 — the room's POSTURE for this frame, from the band the reader settled on. The band rides
+      // the resolver input (input.band + input.smoothed, the stress tracker's filtered outputs) like every
+      // other decision; no band on the input — every take recorded before S5, every golden — means NO pose,
+      // and the skeleton below is built with exactly the numbers it always was. The pose module consumes
+      // the filtered band; the thresholds and the hysteresis stay in curator/stress.js, in one place (#1636).
+      const pose = creaturePose({ band: input.band, stress: input.smoothed, frame: myFrame });
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
-        if (!formed[i] || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; frameSkeletons[i] = null; continue; }
+        if (!formed[i] || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; frameSkeletons[i] = null; framePoses[i] = null; continue; }
         ages[i] = (ages[i] || 0) + 1;
         // the second pair eases toward what the crowd decided (1 pair = none, 2 = full), a step per resolver frame
         const want = input.dishLimbs && input.dishLimbs[i] >= 2 ? 1 : 0;
@@ -380,18 +392,34 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         // engraveBody.mjs) — so "no consumer" still means zero world-skeleton cost on top of the fan's
         // own build. Publication answers to skinning and wantSkeletons only: an engraving-only frame
         // builds its world skeleton without publishing it, exactly as S4 staged it.
+        // Phase 2 S5 — the band pose bends this frame's skeleton: the pose's scales multiply the traits,
+        // its direction deltas add to the same angles, and its curl rides chainCurlDeg. Pose null (no band
+        // on the input) leaves skelPose exactly the pre-S5 object — no chainCurlDeg key at all — so a
+        // bandless frame builds bit-for-bit the skeleton it always did. The pose is the room's, not the
+        // pin's: every moth this frame shares the one pose object, published per pin via lastPoses().
         const wantEngraving = !!(input && input.wantEngraving);
         const beatG = beat * g; // NOT `bg` — that name is the palette background above (the halo colour)
         const foreFlexDeg = -beatG * WARP_FLEX_RATIO;
         const hindFlexDeg = beatG * MOTH.hindFlap * WARP_FLEX_RATIO;
         const rootT = { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale };
+        const skelPose = {
+          bodyScale: traits.body, wingScale: traits.wing,
+          foreDirDeg: MOTH.spread + traits.spread + beatG,
+          hindDirDeg: MOTH.hindSpread + traits.spread * 0.5 - beat * MOTH.hindFlap * g,
+          hindAmount: hindAmt,
+        };
+        if (pose) {
+          skelPose.bodyScale *= pose.bodyScale;
+          skelPose.wingScale *= pose.wingScale;
+          skelPose.foreDirDeg += pose.foreDirDeg;
+          skelPose.hindDirDeg += pose.hindDirDeg;
+          skelPose.chainCurlDeg = pose.chainCurlDeg;
+        }
+        framePoses[i] = pose;
         const buildLocal = (flex) => buildSkeleton({
           seed: input.seed, creatureId: `m${i}`, plan: MOTH_SKELETON_PLAN, attach: bodyPoints,
           pose: {
-            bodyScale: traits.body, wingScale: traits.wing,
-            foreDirDeg: MOTH.spread + traits.spread + beatG,
-            hindDirDeg: MOTH.hindSpread + traits.spread * 0.5 - beat * MOTH.hindFlap * g,
-            hindAmount: hindAmt,
+            ...skelPose,
             foreFlexDeg: flex ? foreFlexDeg : 0,
             hindFlexDeg: flex ? hindFlexDeg : 0,
           },
@@ -466,6 +494,7 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       ages.length = pins.length;
       pair2.length = pins.length;
       frameSkeletons.length = pins.length;
+      framePoses.length = pins.length;
       // #1469 — publish the wing beat this frame actually used (the global beat above, before the
       // per-moth grow-in scaling), as 0..1 openness, for the MOTION strip's MOTH bar. No moth
       // appended → stays null: the bar is absent, not zeroed.
@@ -476,6 +505,10 @@ export function createCreatureBuilder({ skinning = false } = {}) {
     lastWingBeat() { return wingBeat; },
     /** Phase 2 S1 — the last appended frame's skeletons in world (scene) space, per pin; null where no moth. */
     lastSkeletons() { return frameSkeletons; },
-    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); wingBeat = null; frameSkeletons = []; },
+    /** Phase 2 S5 — the last appended frame's band poses, per pin (one shared object: the pose is the room's);
+     *  null where no moth, and all null when no band rode the input. S2's skinning and S4's material read the
+     *  pose (dim above all) from here; the drawn items do not yet. */
+    lastPoses() { return framePoses; },
+    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); wingBeat = null; frameSkeletons = []; framePoses = []; frame = 0; },
   };
 }
