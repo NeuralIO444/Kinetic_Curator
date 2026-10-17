@@ -13,6 +13,7 @@
     "selfcheck:cost-tiers": "node src/gl/costTiers.selfcheck.mjs",
     "measure-costs": "node src/gl/debug/costTiers.measure.mjs",
     "bench:costs": "node src/gl/parity/costBench.mjs",
+    "cost:studio": "node scripts/costStudioRun.mjs",
     "test:e2e": "playwright test",
     "qa": "node qa/run.mjs",
     "review": "node qa/review.mjs",

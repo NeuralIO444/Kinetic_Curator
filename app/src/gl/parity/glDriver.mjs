@@ -104,7 +104,12 @@ async function ensurePage() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   try {
-    browser = await chromium.launch();
+    // KC_CHROMIUM_PATH: point the harness at a specific Chromium/Chrome
+    // binary (e.g. a real Mac's Chrome for the #1578 Studio run, where
+    // Playwright's own browser build may not be installed). Unset =
+    // Playwright's default resolution, unchanged.
+    const executablePath = process.env.KC_CHROMIUM_PATH || undefined;
+    browser = await chromium.launch(executablePath ? { executablePath } : undefined);
   } catch (e) {
     // Launch failed (e.g. no Playwright browser installed in CI): don't
     // leak the just-opened server or the caller's process hangs forever.
