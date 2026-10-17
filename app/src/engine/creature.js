@@ -13,6 +13,7 @@
 // are the first look, not the last: they are named constants so Matt's review can move them.
 import { expandHierarchy } from './hierarchy.js';
 import { buildSkeleton, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
+import { buildWingWarp, warpPoint, WARP_FLEX_RATIO } from './wingWarp.mjs';
 import { poissonPointSet } from './kernel/sample/poisson.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
@@ -21,6 +22,12 @@ import { snapPair, snaps } from './groundSnap.js';
 import { nudgeAxis } from './groundNudge.js';
 
 export const MOTH_PARTS = Object.freeze({ body: 'org_pod_02', wing: 'org_leaf_02', mark: 'geo_diamond_01' });
+
+/** Phase 2 S2 — hierarchy path segment → the skeleton chain that skins it (wingWarp.mjs). */
+const WARP_SEGMENTS = Object.freeze({
+  wingL: { chain: 'fore', side: 'L' }, wingR: { chain: 'fore', side: 'R' },
+  hindL: { chain: 'hind', side: 'L' }, hindR: { chain: 'hind', side: 'R' },
+});
 export const MOTH = Object.freeze({
   bodyScale: 1.7, // canvas px per asset unit (an asset box is 100 units)
   wingScale: 1.7,
@@ -260,7 +267,16 @@ function chroma(hex) {
  * The builder the resolver owns. `append(input, entries, pool)` adds the moths to the TOP content layer's items.
  * With no pin formed it does nothing at all (byte-identical, and the grow-in ages reset).
  */
-export function createCreatureBuilder() {
+/**
+ * @param opts.skinning — Phase 2 S2: when true, the builder SKINS the wings — the skeleton is built every
+ *   frame (a standing consumer, not just the debug flag's), its pose carries the beat's per-joint flex, and
+ *   each wing item leaves with a skinned mesh (engine/wingWarp.mjs) while its scale marks are displaced by
+ *   the same field. The resolver enables this (liveResolve constructs the builder with skinning on): the
+ *   bent wing is the moth's standing look, not a debug view. A direct caller leaving it off gets the S1
+ *   builder exactly: skeletons only under input.wantSkeletons, items never carrying a mesh, and at flex 0
+ *   (rest) even a skinning builder emits the pre-S2 items byte for byte.
+ */
+export function createCreatureBuilder({ skinning = false } = {}) {
   const ages = []; // frames each pin's creature has been formed
   const pair2 = []; // how far each pin's second pair has grown in: 0 (none) to 1 (full)
   const assetCache = new Map(); // assetId -> its attach points (keyed also by the svg and the artist's edit)
@@ -330,20 +346,34 @@ export function createCreatureBuilder() {
         const gt = groundTreatment(ground, pin.x, pin.y, i, input.seed, input.seedOffsets || null);
         // Phase 2 S1 — this moth's SKELETON, built from the same attach points and the same angles the recipe
         // just used (so the frame provably describes the moth being drawn), placed by the root transform the
-        // hierarchy root gets below. Published via lastSkeletons() for the ?debug=skeleton overlay; the drawn
-        // items do not read it yet — skinning is S2. Nothing about the items changes.
-        // Built ONLY when a consumer asked (input.wantSkeletons — the debug overlay today, S2's skinning
-        // later): flag off means zero skeleton cost, not merely zero skeleton pixels.
-        frameSkeletons[i] = input.wantSkeletons ? transformSkeleton(buildSkeleton({
+        // hierarchy root gets below. Published via lastSkeletons() for the ?debug=skeleton overlay.
+        // Phase 2 S2 — the pose now also carries per-joint FLEX derived from the same beat (the wing's tip
+        // lags its root by WARP_FLEX_RATIO of the beat per joint; the hind pair flexes by its own smaller
+        // beat). The skeleton is built when a consumer exists: the debug publication (input.wantSkeletons,
+        // S1) OR the wing skin (skinning, S2 — see createCreatureBuilder): the skin is a standing consumer,
+        // and "no consumer" still means zero skeleton cost, not merely zero skeleton pixels.
+        const beatG = beat * g; // NOT `bg` — that name is the palette background above (the halo colour)
+        const foreFlexDeg = -beatG * WARP_FLEX_RATIO;
+        const hindFlexDeg = beatG * MOTH.hindFlap * WARP_FLEX_RATIO;
+        const rootT = { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale };
+        const buildWorld = (flex) => transformSkeleton(buildSkeleton({
           seed: input.seed, creatureId: `m${i}`, plan: MOTH_SKELETON_PLAN, attach: bodyPoints,
           pose: {
             bodyScale: traits.body, wingScale: traits.wing,
-            foreDirDeg: MOTH.spread + traits.spread + beat * g,
+            foreDirDeg: MOTH.spread + traits.spread + beatG,
             hindDirDeg: MOTH.hindSpread + traits.spread * 0.5 - beat * MOTH.hindFlap * g,
             hindAmount: hindAmt,
+            foreFlexDeg: flex ? foreFlexDeg : 0,
+            hindFlexDeg: flex ? hindFlexDeg : 0,
           },
           seedOffsets: input.seedOffsets || null,
-        }), { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale }) : null;
+        }), rootT);
+        const worldSkel = skinning || input.wantSkeletons ? buildWorld(true) : null;
+        frameSkeletons[i] = worldSkel;
+        // The warp's bind pose: the same frame at flex 0, so the skin transforms are posed o bind^-1 and a
+        // zero-beat frame skins to the identity. Built only for the skin, only when actually bent.
+        const flexActive = foreFlexDeg !== 0 || hindFlexDeg !== 0;
+        const refSkel = skinning && flexActive ? buildWorld(false) : null;
         const { items } = expandHierarchy(
           { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,
@@ -354,13 +384,48 @@ export function createCreatureBuilder() {
           assetId: it.assetId, color, accent, key: `creature:${i}:${tag}${it._hier.path}`, zTier: 0, seedOffset: 0,
           glass: false, _creature: true,
         });
+        // Phase 2 S2 — the wing-warp contexts for this moth: hierarchy segment → its chain's posed + bind
+        // bones (world space) and the wing's own hierarchy item (the frame a scale mark is measured in).
+        // Empty unless the skin is on AND this frame is bent — at rest the wing items stay plain quads and
+        // the marks undisplaced, byte for byte the pre-S2 moth.
+        const warpChains = new Map();
+        if (refSkel && worldSkel) {
+          for (const it of items) {
+            const seg = it._hier.path.split('/')[1];
+            if (!WARP_SEGMENTS[seg] || it.assetId !== MOTH_PARTS.wing) continue;
+            const { chain, side } = WARP_SEGMENTS[seg];
+            warpChains.set(seg, {
+              bones: worldSkel.bones.filter((b) => b.chain === chain && b.side === side),
+              refBones: refSkel.bones.filter((b) => b.chain === chain && b.side === side),
+              wingItem: it,
+            });
+          }
+        }
+        const warpMeshFor = (it, mi) => {
+          const ctx = warpChains.get(it._hier.path.split('/')[1]);
+          return ctx ? buildWingWarp({ item: mi, bones: ctx.bones, refBones: ctx.refBones, wingPoints }) : null;
+        };
         // halos first (under everything of this creature), then the parts in order
         const haloColour = gt.halo || bg;
-        for (const it of items) if (it.assetId !== MOTH_PARTS.mark) extra.push(mark(it, haloColour, haloColour, MOTH.halo, 'halo:'));
+        for (const it of items) if (it.assetId !== MOTH_PARTS.mark) {
+          const mi = mark(it, haloColour, haloColour, MOTH.halo, 'halo:');
+          if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
+          extra.push(mi);
+        }
         for (const it of items) {
           const [c0, a0] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
           const [color, accent] = gt.recolor(c0, a0);
-          extra.push(mark(it, color, accent, 1, ''));
+          const mi = mark(it, color, accent, 1, '');
+          if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
+          else if (it.assetId === MOTH_PARTS.mark) {
+            // a scale mark rides its wing's warp field: centre displaced, rotation takes the local bend
+            const ctx = warpChains.get(it._hier.path.split('/')[1]);
+            if (ctx) {
+              const d = warpPoint({ x: mi.x, y: mi.y, wingItem: ctx.wingItem, bones: ctx.bones, refBones: ctx.refBones, wingPoints });
+              if (d) { mi.x = d.x; mi.y = d.y; mi.rotation += d.dRot; }
+            }
+          }
+          extra.push(mi);
         }
       }
       ages.length = pins.length;

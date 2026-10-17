@@ -436,7 +436,11 @@ export function createLiveResolver() {
     return items;
   }
 
-  const creatures = createCreatureBuilder();
+  // Phase 2 S2 — skinning on: the resolver is the skeleton's standing consumer (bent wings are the moth's
+  // look, not a debug view). The builder builds each formed moth's skeleton every frame and skins the wing
+  // items over it; input.wantSkeletons (the ?debug=skeleton flag) still gates only the debug PUBLICATION
+  // downstream — the overlay reads getLastSkeletons(), which this builder now always fills for formed moths.
+  const creatures = createCreatureBuilder({ skinning: true });
 
   function resolveLayers(input) {
     W = input.canvasW || CANVAS_W;
