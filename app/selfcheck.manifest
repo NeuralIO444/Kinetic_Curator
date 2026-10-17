@@ -446,6 +446,8 @@ node src/loot/lootIngest.selfcheck.mjs
 node src/state/projectWatch.selfcheck.mjs
 node src/loot/lootPalettes.selfcheck.mjs
 node src/loot/lootWeb.selfcheck.mjs
+node src/loot/lootStarter.selfcheck.mjs
+node src/loot/lootSession.selfcheck.mjs
 node src/loot/lootAudio.selfcheck.mjs
 node src/hooks/costHead.selfcheck.mjs
 node src/loot/lootCopy.selfcheck.mjs
