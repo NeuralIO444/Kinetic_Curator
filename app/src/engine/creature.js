@@ -13,6 +13,7 @@
 // are the first look, not the last: they are named constants so Matt's review can move them.
 import { expandHierarchy } from './hierarchy.js';
 import { buildSkeleton, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
+import { engraveDataFor } from './engraveBody.mjs';
 import { poissonPointSet } from './kernel/sample/poisson.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
@@ -334,7 +335,11 @@ export function createCreatureBuilder() {
         // items do not read it yet — skinning is S2. Nothing about the items changes.
         // Built ONLY when a consumer asked (input.wantSkeletons — the debug overlay today, S2's skinning
         // later): flag off means zero skeleton cost, not merely zero skeleton pixels.
-        frameSkeletons[i] = input.wantSkeletons ? transformSkeleton(buildSkeleton({
+        // Phase 2 S4 — the ENGRAVING finish is the second consumer: it binds the body item to this
+        // skeleton's spine (engraveBody.mjs), so it asks through input.wantEngraving. Publication stays
+        // the debug overlay's alone: frameSkeletons below still answers only to wantSkeletons.
+        const wantEngraving = !!(input && input.wantEngraving);
+        const skel = (input.wantSkeletons || wantEngraving) ? transformSkeleton(buildSkeleton({
           seed: input.seed, creatureId: `m${i}`, plan: MOTH_SKELETON_PLAN, attach: bodyPoints,
           pose: {
             bodyScale: traits.body, wingScale: traits.wing,
@@ -344,6 +349,7 @@ export function createCreatureBuilder() {
           },
           seedOffsets: input.seedOffsets || null,
         }), { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale }) : null;
+        frameSkeletons[i] = input.wantSkeletons ? skel : null;
         const { items } = expandHierarchy(
           { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,
@@ -360,7 +366,16 @@ export function createCreatureBuilder() {
         for (const it of items) {
           const [c0, a0] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
           const [color, accent] = gt.recolor(c0, a0);
-          extra.push(mark(it, color, accent, 1, ''));
+          const marked = mark(it, color, accent, 1, '');
+          // Phase 2 S4 — the engraving rides ONLY on the true body stamp (not its halo
+          // underlay, which takes the halo loop above; not wings or scales): the spine
+          // joints in this item's own quad frame, packed by engraveBody. Absent (the
+          // flag off, or no skeleton) the item is exactly the pre-S4 item.
+          if (wantEngraving && skel && it.assetId === MOTH_PARTS.body) {
+            const eng = engraveDataFor(skel, it);
+            if (eng) marked.engrave = eng;
+          }
+          extra.push(marked);
         }
       }
       ages.length = pins.length;

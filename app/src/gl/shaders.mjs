@@ -12,6 +12,7 @@ import { injectCommon } from './effects/chunks.mjs';
 import { PLATE_GLSL } from '../engine/plateBody.mjs';
 import { WASH_GLSL } from '../engine/washBody.mjs'; // #1549 — material:'wash'
 import { STIPPLE_GLSL } from '../engine/stippleBody.mjs'; // #1549 — material:'stipple'
+import { ENGRAVE_GLSL } from '../engine/engraveBody.mjs'; // Phase 2 S4 — creature engraving finish
 import { GLASS_BEVEL } from './glassBevel.mjs';
 import { GLASS_CAUSTIC } from './glassCaustic.mjs';
 import { GLASS_STRIATION } from './glassStriation.mjs';
@@ -57,6 +58,10 @@ layout(location=6) in float a_glass;   // #1129 PR2: 1 = glass voice instance, 0
 layout(location=7) in vec3 a_def;      // #1410 petri B1: impact deform — (axisX, axisY, amount), world space; amount 0 = round
 layout(location=8) in float a_plate;   // #1548/#1549: material body code — 0 = flat, 1 = plate, 2 = wash, 3 = stipple
 layout(location=9) in vec4 a_matP;      // #1585 (Materials M4): the body's live params, in the body's own reading (see packInstanceData)
+layout(location=10) in vec4 a_engA;    // Phase 2 S4: engraving spine joints 0-1 (asset units, quad frame)
+layout(location=11) in vec4 a_engB;    // Phase 2 S4: engraving spine joints 2-3
+layout(location=12) in vec4 a_engC;    // Phase 2 S4: engraving spine joints 4-5
+layout(location=13) in vec4 a_engP;    // Phase 2 S4: engraving params — x joint count (0 = no finish), y spacing, z width, w strength
 uniform vec2 u_canvas;
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
@@ -91,12 +96,19 @@ out float v_plate;    // #1548: per-instance plate flag — selects the radial i
 out float v_wash;     // #1549: per-instance wash flag — selects the vertical ink ramp
 out float v_stipple;  // #1549: per-instance stipple flag — selects the dot-field ink screen
 out vec4 v_matP;      // #1585: per-instance material params — constant across the instance, like the flags
+out vec2 v_au;        // Phase 2 S4: the fragment's position in the instance's own quad frame (asset units, centre 50)
+out vec4 v_engA;      // Phase 2 S4: engraving joints/params — constant across the instance, like v_matP
+out vec4 v_engB;
+out vec4 v_engC;
+out vec4 v_engP;
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
   // maps to the center of the first texel, aligning geometry with
   // the CLAMP_TO_EDGE-clamped UVs. (Half-texel offset.)
   vec2 au = a_corner * 199.5 - 49.75;
+  v_au = au;   // Phase 2 S4: body-space position for the engraving field (pre-deformation, like v_uv)
+  v_engA = a_engA; v_engB = a_engB; v_engC = a_engC; v_engP = a_engP;
   vec2 c = (au - 50.0) * a_inst0.zw;      // center on the 100x100 box, scale
   float seed = kc_hash12(a_inst0.xy);
   v_seed = seed;
@@ -248,9 +260,15 @@ in float v_plate;     // #1548: 1 = plate material (radial ink ramp), 0 = exact 
 in float v_wash;      // #1549: 1 = wash material (vertical ink ramp), 0 = not wash
 in float v_stipple;   // #1549: 1 = stipple material (dot-field ink screen), 0 = not stipple
 in vec4 v_matP;       // #1585: the body's live params (the packer resolves defaults, so these are always the effective values)
+in vec2 v_au;         // Phase 2 S4: fragment position in this instance's quad frame (asset units, centre 50)
+in vec4 v_engA;       // Phase 2 S4: engraving spine joints 0-1 (quad frame); count rides v_engP.x
+in vec4 v_engB;       // Phase 2 S4: engraving spine joints 2-3
+in vec4 v_engC;       // Phase 2 S4: engraving spine joints 4-5
+in vec4 v_engP;       // Phase 2 S4: [count, spacing, width, strength] — count 0 = this instance is not engraved
 ${PLATE_GLSL}
 ${WASH_GLSL}
 ${STIPPLE_GLSL}
+${ENGRAVE_GLSL}
 out vec4 o;
 void main() {
   vec4 t = texture(u_atlas, v_uv);   // premultiplied
@@ -363,6 +381,25 @@ void main() {
       st.a *= cover;
     }
     o = vec4(st.rgb * v_opacity, st.a * v_opacity);
+  }
+  // Phase 2 S4 — the ENGRAVING finish (engine/engraveBody.mjs): body-space
+  // contour lines bound to the spine joints the instance carries. Ruled in
+  // this item's own fragment, in its own quad frame (v_au), so the line
+  // field rides the skeleton wherever the pose puts it — and composite
+  // ORDER falls out of the item stream: in the five-pass target
+  // (back feathers -> bent wings -> body -> ornaments -> engraving) the
+  // engraving darkens the body's own ink here, at the body's draw; pieces
+  // drawn later in the stream (wings, ornaments) paint over the lines
+  // where they overlap the body, the S3/S5 rebase seam named in the S4
+  // staging report. A SOFT MULTIPLY: the factor darkens rgb toward the
+  // line colour, weighted by the body's own coverage (o.a) so lines live
+  // only inside the silhouette and feather at its antialiased edge.
+  // Gated on the packed joint count: count 0 (every non-creature
+  // instance, and creatures with the finish off) never enters, so the
+  // pre-S4 quad is bit-identical off the branch.
+  if (v_engP.x > 1.5) {
+    float ef = engraveShade(v_au, v_engA, v_engB, v_engC, v_engP);
+    o.rgb *= mix(1.0, ef, clamp(o.a, 0.0, 1.0));
   }
   // #594: light the premultiplied colour; alpha untouched, rgb capped at alpha.
   // Gated on the uniform, not on v_light: the unlit path must not even clamp

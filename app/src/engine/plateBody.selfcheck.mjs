@@ -12,7 +12,7 @@
 //  - the scene contract: the plate flag rides only when set, so a
 //    non-plate contract is byte-identical in shape to the pre-M2
 //    contract (no key, no hash change);
-//  - the instance packer: 29-float stride (#1585 appended the M4
+//  - the instance packer: 45-float stride (S4 appended the engraving block; #1585 appended the M4
 //    param vec4 after the body code), plate float at the tail
 //    offset, missing flag reads 0;
 //  - the shader: a_plate / v_plate wired, plateShade inlined from the
@@ -205,18 +205,18 @@ ok('#1585 contract: `mat` rides only when a plate knob moved', () => {
 });
 
 // ── the instance packer + shader ─────────────────────────────────────
-ok('packInstanceData: 29-float stride, plate at the tail, absent reads 0', () => {
+ok('packInstanceData: 45-float stride, plate at the tail, absent reads 0', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
     asset: 'a1', tint: '#000000', accent: '#000000', x: 1, y: 2, scaleX: 3, scaleY: 3,
     rotation: 0, opacity: 1, vx: 0, vy: 0, kineme: 0, kinemePhase: 0, ...extra,
   });
   const buf = packInstanceData([mk({ plate: true }), mk({}), mk({ glass: true })], cells);
-  assert.equal(buf.length, 3 * 29, 'three instances at the 29-float stride');
+  assert.equal(buf.length, 3 * 45, 'three instances at the 45-float stride (29 through #1585, +16 engraving floats in S4)');
   assert.equal(buf[24], 1, 'plate instance: tail float is 1');
-  assert.equal(buf[29 + 24], 0, 'unflagged instance: tail float is 0');
-  assert.equal(buf[2 * 29 + 20], 1, 'glass float unmoved at offset 20');
-  assert.equal(buf[2 * 29 + 24], 0, 'glass instance carries no plate');
+  assert.equal(buf[45 + 24], 0, 'unflagged instance: tail float is 0');
+  assert.equal(buf[2 * 45 + 20], 1, 'glass float unmoved at offset 20');
+  assert.equal(buf[2 * 45 + 24], 0, 'glass instance carries no plate');
   // #1585: the param vec4 follows the body code. Absent `mat` (an
   // unmoved Look) the packer writes the shipped defaults; a carried
   // `mat` writes through. (The buffer is Float32 — expectations are
