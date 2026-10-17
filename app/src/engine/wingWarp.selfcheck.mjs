@@ -94,22 +94,26 @@ function builderRun(skinning, bentT, over = {}) {
   assert.equal(warpPoint({ x: 400, y: 300, wingItem: item, bones: fore, refBones: fore, wingPoints }).dRot, 0, 'no flex, no mark rotation');
 }
 
-// 2. IDENTITY PARITY at zero bend — hashes pinned from the pre-S2 tree (d8009ee9)
-const REST_BUILDER = 'cc3976da';
-const REST_RESOLVER = 'c9a243c9';
+// 2. IDENTITY PARITY at zero bend — the rest item stream, pinned. (Originally pinned from the pre-S2
+// tree (d8009ee9): cc3976da / c9a243c9. Re-based at the S3 publish integration, 2026-10-17: S3 replaced
+// the Poisson scale marks with the feather fan, so the stream's surface children changed — the new
+// plumage is pinned by featherFan.selfcheck. The warp mechanism is untouched by S3: wingWarp.mjs is
+// not in S3's diff and section 1 above proves it unchanged.)
+const REST_BUILDER = '1dc2d9bb';
+const REST_RESOLVER = '7d901919'; // re-based at the S3 integration (was c9a243c9 — see the note below)
 {
   const on = builderRun(true, null);
   const off = builderRun(false, null);
-  assert.equal(fnv(JSON.stringify(off.e)), REST_BUILDER, 'the plain builder is the pre-S2 moth');
-  assert.equal(fnv(JSON.stringify(on.e)), REST_BUILDER, 'skinning at rest is the pre-S2 moth, byte for byte');
+  assert.equal(fnv(JSON.stringify(off.e)), REST_BUILDER, 'the plain builder is the pinned moth');
+  assert.equal(fnv(JSON.stringify(on.e)), REST_BUILDER, 'skinning at rest is the pinned moth, byte for byte');
   assert.ok(on.e[0].items.every((i) => !('mesh' in i)), 'no mesh rides any item at rest');
   assert.ok(on.b.lastSkeletons()[0], 'skinning is a standing skeleton consumer: the frame skeleton exists at rest');
   assert.deepEqual(off.b.lastSkeletons(), [null], 'no consumer still means no skeleton (the S1 gate)');
 }
 
-// 3. the BENT golden — peak beat, pinned hash, real meshes, marks riding the field
-const BENT_BUILDER = 'f28c4bd5';
-const BENT_RESOLVER = '8e0c1b0f';
+// 3. the BENT golden — peak beat, pinned hash, real meshes, plumage riding its wing rigidly
+const BENT_BUILDER = 'd245251e'; // re-based at the S3 integration (was f28c4bd5 — see section 2's note)
+const BENT_RESOLVER = '03421894'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note)
 {
   const run1 = builderRun(true, PEAK_MS);
   const run2 = builderRun(true, PEAK_MS);
@@ -134,11 +138,27 @@ const BENT_RESOLVER = '8e0c1b0f';
     }
   }
   assert.ok(maxMove > 5, `the warp actually moves the surface (${maxMove.toFixed(1)}px of travel)`);
-  // the scale marks rode the same field: at least one mark moved or turned vs its rest pose
-  const restMarks = new Map(flat.filter((i) => i.assetId === MOTH_PARTS.mark).map((i) => [i.key, i]));
-  const moved = items.filter((i) => i.assetId === MOTH_PARTS.mark)
-    .some((m) => { const r = restMarks.get(m.key); return Math.abs(m.x - r.x) > 0.01 || Math.abs(m.y - r.y) > 0.01 || Math.abs(m.rotation - r.rotation) > 0.01; });
-  assert.ok(moved, 'scale marks are displaced by the warp field');
+  // S3 seam: the loose scale marks this block used to chase are gone. The plumage is laid out on the
+  // bind pose's bones and is NOT displaced by the warp field — it rides its wing rigidly, pinned here:
+  // every fan part's position in its own wing's frame is identical at rest and at peak beat. (If the
+  // fan should one day bend with the wing, this is the assertion that changes.)
+  const fanItems = items.filter((i) => /fan(plate|feather|leaf|chevron)/.test(i.key));
+  assert.ok(fanItems.length > 0, 'the bent frame carries fan plumage');
+  const restByKey = new Map(flat.map((i) => [i.key, i]));
+  const localIn = (fan, wing) => {
+    const a = (-wing.rotation * Math.PI) / 180;
+    const dx = fan.x - wing.x, dy = fan.y - wing.y;
+    return [(dx * Math.cos(a) - dy * Math.sin(a)) / wing.scale, (dx * Math.sin(a) + dy * Math.cos(a)) / wing.scaleY];
+  };
+  for (const fan of fanItems) {
+    const seg = ['wingL', 'wingR', 'hindL', 'hindR'].find((s) => fan.key.includes(s));
+    const wing = items.find((i) => i.assetId === MOTH_PARTS.wing && i.key.includes(seg) && !i.key.includes('halo'));
+    const restFan = restByKey.get(fan.key);
+    const restWing = restByKey.get(wing.key);
+    const [bx, by] = localIn(fan, wing);
+    const [rx, ry] = localIn(restFan, restWing);
+    assert.ok(Math.abs(bx - rx) < 1e-6 && Math.abs(by - ry) < 1e-6, `fan part ${fan.key} rides its wing rigidly (no warp displacement)`);
+  }
   // mirror honesty: the left mesh is the right mesh reflected about the body's x, vertex for vertex
   const body = items.find((i) => i.assetId === MOTH_PARTS.body);
   const L = meshed.find((i) => i.key.includes('wingL') && !i.key.includes('halo'));
@@ -189,7 +209,7 @@ const BENT_RESOLVER = '8e0c1b0f';
     return out;
   };
   const restOut = resolverRun(null);
-  assert.equal(fnv(JSON.stringify(restOut)), REST_RESOLVER, 'the resolver at rest is the pre-S2 output, byte for byte');
+  assert.equal(fnv(JSON.stringify(restOut)), REST_RESOLVER, 'the resolver at rest is the pinned output, byte for byte');
   const bentOut = resolverRun(PEAK_MS);
   assert.equal(fnv(JSON.stringify(bentOut)), BENT_RESOLVER, 'the resolver bent frame hashes to its golden');
   assert.equal(bentOut.flatMap((x) => x.items || []).filter((i) => i.mesh).length, 4, 'the meshes survive the resolver');
