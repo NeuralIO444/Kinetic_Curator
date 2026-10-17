@@ -527,6 +527,11 @@ out float v_plate;
 out float v_wash;
 out float v_stipple;
 out vec4 v_matP;
+out vec2 v_au;        // Phase 2 S4: QUAD_FS grew engraving varyings — declared here so the shared FS links
+out vec4 v_engA;
+out vec4 v_engB;
+out vec4 v_engC;
+out vec4 v_engP;
 void main() {
   float seed = kc_hash12(a_item.xy);
   v_seed = seed;
@@ -563,6 +568,13 @@ void main() {
   v_wash = 0.0;
   v_stipple = 0.0;
   v_matP = vec4(0.0);
+  // Phase 2 S4 — the engraving finish, zeroed like the materials above: a mesh item is a wing,
+  // never an engraved body, so the joint count stays 0 and the shared FS's branch never enters.
+  v_au = vec2(0.0);
+  v_engA = vec4(0.0);
+  v_engB = vec4(0.0);
+  v_engC = vec4(0.0);
+  v_engP = vec4(0.0);
   // #594 PR1: per-instance diffuse from the one sun, at the item centre — the quad path's own rule.
   if (u_sun.w > 0.5) {
     vec3 L = normalize(vec3(u_sun.xy - a_item.xy, u_sun.z));
