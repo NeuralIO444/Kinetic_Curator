@@ -217,7 +217,8 @@ registerCostTier('creature/engraving', {
 // Phase 2 S8 — APPEND-ONLY BLOCK (slices append their own; do not edit above
 // this line for S8). The glitch creature's corruption (engine/glitch.js) is
 // CPU scalar math on the item stream plus extra ghost stamps at full
-// corruption (<= 2 per material item, <= 12 per creature): no GPU pass of
+// corruption (2 per material stamp — body + wings only; the plumage sorts
+// instead of splitting; +6 on the builder moth): no GPU pass of
 // its own, no working set. Tier 0 because it is structural to the type — the
 // corruption IS the glitch's band response, not a sheddable FX pass — which
 // also keeps it outside the measured-costs coverage gate (that sweep times

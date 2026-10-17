@@ -21,7 +21,6 @@ import { FAN_PARTS, FAN_COUNTS, wingLocalChain, fanPlacements, mirrorPlacements 
 import { engraveDataFor } from './engraveBody.mjs';
 import { creaturePose } from './creaturePose.js';
 import { glitchFrame, applyGlitch } from './glitch.js';
-import { poissonPointSet } from './kernel/sample/poisson.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
 import { applyLean } from './kernel/color/index.js';

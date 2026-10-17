@@ -128,7 +128,12 @@ const GOLDEN_CLEAN_HASH = '77d42dc3';
   assert.notEqual(glitchItemsHash(next), GOLDEN_CORRUPT_HASH, 'the next frame hashes differently');
 }
 
-// 5. The builder wiring, end to end — the S1 fixture (seed 77, one pin, full growth, the 26-item moth).
+// 5. The builder wiring, end to end — the S1 fixture (seed 77, one pin, full growth). Census note
+//    (publish integration, 2026-10-17): the moth this corrupts is the CURRENT builder moth — 58 items
+//    since S3's fan plumage replaced the scatter (the staged pins were taken against the 26-item moth).
+//    The plumage carries the hatch class, so the ghost arithmetic is unchanged: 3 material stamps
+//    (body + two wing stamps) x 2 ghosts. The corrupted-moth golden below is re-pinned on that cause;
+//    the corruption operators and the section-4 fixture goldens are untouched.
 {
   const PAL = { bg: '#111111', ink: '#eeeeee', swatches: ['#aa0000', '#222222'] };
   const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
@@ -143,7 +148,7 @@ const GOLDEN_CLEAN_HASH = '77d42dc3';
   };
 
   const clean = grow({});
-  assert.equal(clean.items.length, 26, 'the clean moth is the 26 items of S1');
+  assert.equal(clean.items.length, 58, 'the clean moth is the current builder moth: 58 items (S1’s 26 + S3’s fan plumage)');
 
   // Below the bar, the gate is transparent: byte-identical items through the glitch path.
   const below = grow({ dishGlitch: [0.5] });
@@ -159,7 +164,7 @@ const GOLDEN_CLEAN_HASH = '77d42dc3';
   assert.notDeepEqual(hot.items, clean.items, 'full Tighten visibly corrupts');
   assert.equal(hot.items.length, clean.items.length + 6, 'three material stamps x two ghosts, nothing else added');
   for (const it of clean.items) assert.ok(hot.items.some((h) => h.key === it.key), `the true stamp survives: ${it.key}`);
-  assert.equal(glitchItemsHash(hot.items), 'c50e37b2', 'the golden corrupted moth');
+  assert.equal(glitchItemsHash(hot.items), '651c23c2', 'the golden corrupted moth (re-pinned at publish: the moth grew S3 plumage since staging; operators unchanged)');
 
   // Replay: a second builder fed the same input sequence corrupts identically, frame for frame.
   const replay = grow({ dishGlitch: [1] });

@@ -21,7 +21,8 @@
 //   - CHANNEL SPLIT: the material surfaces (body + wings — not the halo, whose colour is the ground's, and
 //     not the scales, where a split reads as noise) grow two ghost copies, offset ±split along local X, in
 //     channel-isolated colours (red-only, blue-only) at reduced alpha: the classic RGB fringe.
-//   - HATCH SORTING: the creature's fine marks (its scales today; S4's hatch marks when that pass lands)
+//   - HATCH SORTING: the creature's fine marks (the plumage — S3's fan parts, successor to the scatter
+//     scales; S4's hatch marks when that pass lands)
 //     are re-sorted among their own slots in the draw order by seeded swaps, their count graded by amount.
 //     At zero swaps the order is the untouched order.
 //
@@ -112,7 +113,10 @@ function isolateChannel(hex, keep) {
 }
 
 const isHalo = (it) => typeof it.key === 'string' && it.key.includes(':halo:');
-const isHatch = (it) => typeof it.key === 'string' && it.key.includes('marks#');
+// The hatch class — the creature's fine marks, which sort among themselves and never split:
+// the scatter scales' `marks#` keys, and (since S3 replaced the scatter with fans) the fan
+// plumage's `/fan…` keys — plate, feathers, chevrons, leaf are surface marks, as the scales were.
+const isHatch = (it) => typeof it.key === 'string' && (it.key.includes('marks#') || it.key.includes('/fan'));
 
 /**
  * Corrupt one creature's finished items. Pure: the input array and its items are never mutated, and with a
