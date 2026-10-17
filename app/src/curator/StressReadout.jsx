@@ -11,6 +11,7 @@ const pct = (v) => `${Math.round((Number.isFinite(v) ? v : 0) * 100)}`.padStart(
 export function StressReadout() {
   const [s, setS] = useState(getStressState());
   const [f, setF] = useState(getFormationState());
+  const occ = s.occupancy || { relax: 0, normal: 0, tighten: 0 }; // #1635: frames per band, this session
   // The tracker is a module singleton with no subscription API: a light poll keeps the readout current.
   useEffect(() => {
     const id = setInterval(() => { setS(getStressState()); setF(getFormationState()); }, 200);
@@ -26,7 +27,7 @@ export function StressReadout() {
         font: '11px ui-monospace, Menlo, monospace', color: '#e8e8ea',
       }}
     >
-      {`STRESS ${pct(s.smoothed)}  BAND ${s.band || 'none'}\nactivity ${pct(s.activity)}  dish ${pct(s.dish)}  taste ${pct(s.taste)}`}
+      {`STRESS ${pct(s.smoothed)}  BAND ${s.band || 'none'}\nactivity ${pct(s.activity)}  dish ${pct(s.dish)}  taste ${pct(s.taste)}\nsession  R ${occ.relax}  N ${occ.normal}  T ${occ.tighten}  crossings ${s.crossings || 0}`}
       {/* #1355 step 3 — one line per pin: the two conditions against this band's thresholds, and the hold. */}
       {(f.states || []).map((p, i) => {
         if (!p) return null;

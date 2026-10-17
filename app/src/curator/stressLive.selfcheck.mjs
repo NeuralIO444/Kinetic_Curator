@@ -107,7 +107,29 @@ function rig() {
   stop();
 }
 
-// 7. the real feed exposes the two counts, from real actions, and no clock is read anywhere here
+// 7. #1635 session telemetry: frames per band and crossings, counted from the tracker's own band as the
+//    session runs — and gone when the session stops (the state IS the neutral shape again)
+{
+  const r = rig();
+  r.frame();
+  r.frame(30); // a quiet room: RELAX
+  assert.equal(getStressState().band, BAND_RELAX);
+  for (let f = 0; f < 200; f++) { r.counts.activityCount += 1; r.counts.passRun = 40; r.frame(); } // busy: NORMAL
+  assert.equal(getStressState().band, BAND_NORMAL);
+  r.counts.passRun = 0; // a keep lands, the hands stop: the room settles back
+  r.frame(300);
+  const s = getStressState();
+  assert.equal(s.band, BAND_RELAX);
+  assert.equal(s.crossings, 2, 'RELAX -> NORMAL -> RELAX is two crossings, counted once each');
+  assert.equal(s.occupancy.relax + s.occupancy.normal + s.occupancy.tighten, s.frames,
+    'every presented frame is accounted to exactly one band');
+  assert.ok(s.occupancy.normal > 0 && s.occupancy.relax > 0 && s.occupancy.tighten === 0,
+    `the session's time per band is readable (R ${s.occupancy.relax} / N ${s.occupancy.normal} / T ${s.occupancy.tighten})`);
+  r.stop();
+  assert.deepEqual(getStressState(), NEUTRAL_STRESS, 'stopped: counters zero with the rest of the state');
+}
+
+// 8. the real feed exposes the two counts, from real actions, and no clock is read anywhere here
 {
   const feed = createLoisActivity({ now: () => 1000 });
   assert.deepEqual(feed.pressureCounts(), { activityCount: 0, passRun: 0 });

@@ -2,8 +2,8 @@
 // #1354 — PHASE 2's EXIT: bands change deterministically from a recorded log, and the log carries the telemetry
 // (how long the session spent in each band) needed to retune the thresholds.
 import assert from 'node:assert/strict';
-import { createStressTracker, BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN } from './stress.js';
-import { createStressRecorder, replayStress, verifyStressRecord, STRESS_RECORD_VERSION } from './stressRecord.js';
+import { createStressTracker, BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN, quantizeStress } from './stress.js';
+import { createStressRecorder, replayStress, verifyStressRecord, expandStressRecord, STRESS_RECORD_VERSION } from './stressRecord.js';
 import { initStress, getStressState, setStressTap } from './stressLive.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 import { withResolveTap } from '../gl/resolveTap.mjs';
@@ -122,6 +122,38 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
   assert.ok(back.stress.bands.length >= 1, 'band changes were logged');
   assert.equal(back.stress.occupancy.tighten, 0, 'dish pressure is 0 until pins exist, so a live take cannot reach TIGHTEN yet');
   assert.ok(back.stress.occupancy.normal > 0 && back.stress.occupancy.relax > 0, 'it moved between RELAX and NORMAL');
+}
+
+// 5. #1635 — the per-frame readback: the same record expands to one { frame, stress, band } per update,
+//    and the expansion agrees with everything the record already claims (bands, occupancy).
+{
+  const all = (v) => ({ activity: v, dish: v, taste: v });
+  const t = createStressTracker();
+  const rec = createStressRecorder({});
+  const phases = [[0.1, 100], [0.5, 100], [0.95, 100], [0.5, 100]];
+  for (const [v, n] of phases) {
+    for (let i = 0; i < n; i++) rec.update({ ...all(v), band: t.update(all(v)).band });
+  }
+  const record = rec.finish();
+  assert.equal(verifyStressRecord(record).ok, true);
+  const frames = expandStressRecord(record);
+  assert.equal(frames.length, 400, 'one entry per recorded update');
+  frames.forEach((f, i) => assert.equal(f.frame, i, 'frames count the take’s updates in order'));
+  for (const f of frames) {
+    assert.equal(f.stress, quantizeStress(f.stress), 'the logged stress is the quantized value');
+    assert.ok(f.stress >= 0 && f.stress <= 1);
+    assert.ok([BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN].includes(f.band), 'every frame carries its band');
+  }
+  const changes = [];
+  for (const f of frames) if (changes[changes.length - 1] !== f.band) changes.push(f.band);
+  assert.deepEqual(changes, record.bands.map((b) => b[1]), 'the expansion’s band sequence is the record’s');
+  assert.ok(changes.includes(BAND_TIGHTEN) && changes.includes(BAND_RELAX), 'the readback visits the bands');
+  const tally = { relax: 0, normal: 0, tighten: 0 };
+  for (const f of frames) tally[f.band] += 1;
+  assert.deepEqual(tally, record.occupancy, 'occupancy tallied from the per-frame readback matches the record');
+  assert.deepEqual(expandStressRecord(null), []);
+  assert.deepEqual(expandStressRecord({ version: 99, runs: [] }), []);
+  assert.deepEqual(expandStressRecord({ version: STRESS_RECORD_VERSION, runs: 'x' }), []);
 }
 
 console.log('stressRecord.selfcheck: ok (#1354 exit)');

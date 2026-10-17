@@ -7,7 +7,7 @@
 //
 // THE LOG WINS (roadmap decision 1): the recorded `bands` are the authority. Replay is the CHECK that they follow
 // from the recorded signals, and `occupancy` (updates spent in each band) is the telemetry for tuning thresholds.
-import { createStressTracker, BANDS } from './stress.js';
+import { createStressTracker, BANDS, quantizeStress } from './stress.js';
 
 export const STRESS_RECORD_VERSION = 1;
 
@@ -39,6 +39,26 @@ export function createStressRecorder({ initial = null, getFrame = () => 0 } = {}
       };
     },
   };
+}
+
+/**
+ * Expand a record to its per-frame readback (#1635): one { frame, stress, band } per recorded update, in
+ * order — the quantized smoothed stress and the band the reader settled on for that frame. This is the
+ * per-frame stress + band view of the SAME record (no new log, no new shape on disk): the runs and the
+ * starting state are the storage, this is the reading. `frame` counts updates from the take's start (the
+ * record's own run frames are annotations; order is what replays). A malformed record expands to [].
+ */
+export function expandStressRecord(record) {
+  if (!record || record.version !== STRESS_RECORD_VERSION || !Array.isArray(record.runs)) return [];
+  const t = createStressTracker({ initial: record.initial });
+  const out = [];
+  for (const [, activity, dish, taste, n] of record.runs) {
+    for (let i = 0; i < n; i++) {
+      t.update({ activity, dish, taste });
+      out.push({ frame: out.length, stress: quantizeStress(t.smoothed), band: t.band });
+    }
+  }
+  return out;
 }
 
 /** Replay a record's signals; returns the band changes they produce, in order (frames are not recomputed). */

@@ -12,7 +12,14 @@
 import { createStressTracker, tastePressure, activityPressure } from './stress.js';
 
 export const ACTIVITY_WINDOW_FRAMES = 120;
-export const NEUTRAL_STRESS = Object.freeze({ stress: 0, smoothed: 0, band: null, activity: 0, dish: 0, taste: 0, frames: 0 });
+// #1635 — the session's telemetry rides the state: `occupancy` counts the frames presented in each band and
+// `crossings` the band changes between them, so a session can be read backstage (the ?debug=stress readout)
+// and the 0.28 / 0.72 edges tuned from evidence instead of feel. Zero here; a live session's counters are
+// its own objects, built in initStress — this frozen shape is only the never-started / stopped state.
+export const NEUTRAL_STRESS = Object.freeze({
+  stress: 0, smoothed: 0, band: null, activity: 0, dish: 0, taste: 0, frames: 0,
+  occupancy: Object.freeze({ relax: 0, normal: 0, tighten: 0 }), crossings: 0,
+});
 
 let live = NEUTRAL_STRESS;
 let tap = null;
@@ -25,7 +32,8 @@ export function setStressTap(fn) {
   tap = typeof fn === 'function' ? fn : null;
 }
 
-/** The latest reading: { stress, smoothed, band, activity, dish, taste, frames }. band is null before the first frame. */
+/** The latest reading: { stress, smoothed, band, activity, dish, taste, frames, occupancy, crossings } —
+ *  the session's #1635 telemetry (frames per band, band changes). band is null before the first frame. */
 export function getStressState() {
   return live;
 }
@@ -46,6 +54,11 @@ export function initStress({ getCounts, isRunning, getDish, raf, caf } = {}) {
   let lastCount = null;
   let frames = 0;
   let handle = 0;
+  // #1635 session telemetry: frames presented in each band, and the crossings between bands. Counted here,
+  // where every presented frame passes, from the tracker's own band — never re-derived from the raw value.
+  const occupancy = { relax: 0, normal: 0, tighten: 0 };
+  let crossings = 0;
+  let prevBand = null;
   const step = () => {
     let counts;
     try {
@@ -67,7 +80,12 @@ export function initStress({ getCounts, isRunning, getDish, raf, caf } = {}) {
     }
     const r = tracker.update({ activity, dish, taste });
     frames += 1;
-    live = { stress: r.stress, smoothed: r.smoothed, band: r.band, activity, dish, taste, frames };
+    if (r.band !== null) {
+      occupancy[r.band] += 1;
+      if (prevBand !== null && r.band !== prevBand) crossings += 1;
+      prevBand = r.band;
+    }
+    live = { stress: r.stress, smoothed: r.smoothed, band: r.band, activity, dish, taste, frames, occupancy, crossings };
     if (tap !== null) {
       try { tap({ activity, dish, taste, band: r.band }); } catch { tap = null; }
     }

@@ -141,8 +141,9 @@ export const MOTH_SKELETON_PLAN = Object.freeze({
  * @param plan        a plan as above; chains root at attach points, so a plan is a body plan, not a species
  * @param attach      the body asset's attach points, in box units (attachPointsFor's output); may be null
  * @param attachRoles honoured via resolveMarkers when the points themselves carry `role` fields
- * @param pose        { bodyScale, wingScale, foreDirDeg, hindDirDeg, hindAmount } — plain numbers the caller
- *                    derives from traits/beat; hindAmount 0 leaves the hind chains out entirely
+ * @param pose        { bodyScale, wingScale, foreDirDeg, hindDirDeg, hindAmount, chainCurlDeg } — plain
+ *                    numbers the caller derives from traits/beat (S5 adds chainCurlDeg, a posture's curl);
+ *                    hindAmount 0 leaves the hind chains out entirely
  * @param seedOffsets the document's seed offsets (the skeleton rides the SPATIAL stream)
  * @returns { plan, creatureId, bones, headBone, hash } — bones in construction order: spine, left chains, right
  *          chains (mirrored). headBone is the H bone's id. hash is skeletonHash() of the bones.
@@ -151,6 +152,10 @@ export function buildSkeleton({ seed = 0, creatureId = 'c0', plan = MOTH_SKELETO
   const bodyScale = finite(pose.bodyScale, 1);
   const wingScale = finite(pose.wingScale, 1);
   const hindAmount = clamp(finite(pose.hindAmount, 1), 0, 1);
+  // S5: per-segment chain curl in degrees, added progressively along each chain (segment i turns curl x i
+  // further than its root direction) — a withered creature's chains curl under. Absent/0 (every pre-S5
+  // caller) is exactly the frame S1 built: the sweep below gains + 0 x i and nothing moves.
+  const chainCurlDeg = finite(pose.chainCurlDeg, 0);
   const stream = (partId) => partStream(seed, creatureId, partId, seedOffsets);
 
   // The shape's landmarks, in centred units. No usable points (or a single point: no span) -> the box extremes.
@@ -221,7 +226,7 @@ export function buildSkeleton({ seed = 0, creatureId = 'c0', plan = MOTH_SKELETO
     let parentAngle = spineAngleAt(parentJoint);
     for (let i = 0; i < fracs.length; i++) {
       const len = total * fracs[i] * (0.92 + 0.16 * chainStream());
-      const sweep = (spec.sweepDeg || 0) * i + (chainStream() - 0.5) * 3;
+      const sweep = (spec.sweepDeg || 0) * i + (chainStream() - 0.5) * 3 + chainCurlDeg * i;
       const dir = dirFromUp(-(dirDeg + sweep)); // left: angles run negative from straight up
       const tip = { x: base.x + dir.x * len, y: base.y + dir.y * len };
       const bone = makeBone({
