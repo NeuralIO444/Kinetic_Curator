@@ -12,6 +12,7 @@
 // The pilot parts are existing built-in assets (decision 4: three parts first). Which assets, and the numbers below,
 // are the first look, not the last: they are named constants so Matt's review can move them.
 import { expandHierarchy } from './hierarchy.js';
+import { buildSkeleton, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
 import { poissonPointSet } from './kernel/sample/poisson.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
@@ -264,6 +265,7 @@ export function createCreatureBuilder() {
   const pair2 = []; // how far each pin's second pair has grown in: 0 (none) to 1 (full)
   const assetCache = new Map(); // assetId -> its attach points (keyed also by the svg and the artist's edit)
   let wingBeat = null; // #1469 — the last appended frame's wing beat as 0..1 openness; null when no moth was appended
+  let frameSkeletons = []; // Phase 2 S1 — the last appended frame's skeletons (world space), per pin; null where unformed
   const pointsOf = (pool, assetAttach, id) => {
     const asset = pool.find((a) => a && a.id === id);
     return asset ? attachPointsFor(asset, assetAttach) : [];
@@ -271,6 +273,7 @@ export function createCreatureBuilder() {
   return {
     append(input, entries, pool, motionFor = null, groundFor = null) {
       wingBeat = null; // #1469 — re-earned below only if this call actually appends a moth
+      frameSkeletons = []; // S1 — likewise: only a frame that appends moths publishes skeletons
       const pins = input && input.dishPins;
       const formed = input && input.dishFormed;
       if (!Array.isArray(pins) || !Array.isArray(formed) || !formed.some(Boolean)) {
@@ -307,7 +310,7 @@ export function createCreatureBuilder() {
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
-        if (!formed[i] || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; continue; }
+        if (!formed[i] || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; frameSkeletons[i] = null; continue; }
         ages[i] = (ages[i] || 0) + 1;
         // the second pair eases toward what the crowd decided (1 pair = none, 2 = full), a step per resolver frame
         const want = input.dishLimbs && input.dishLimbs[i] >= 2 ? 1 : 0;
@@ -321,9 +324,24 @@ export function createCreatureBuilder() {
         const vivid2 = pick(traits.swatch + 1);
         const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], [MOTH_PARTS.mark]: [ink, vivid] };
         const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], [MOTH_PARTS.mark]: [ink, vivid2] };
-        const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: easeOut(pair2[i]), traits });
+        const hindAmt = easeOut(pair2[i]);
+        const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: hindAmt, traits });
         // the ground beneath the PIN (its home), so a hovering moth does not change colour with every wobble
         const gt = groundTreatment(ground, pin.x, pin.y, i, input.seed, input.seedOffsets || null);
+        // Phase 2 S1 — this moth's SKELETON, built from the same attach points and the same angles the recipe
+        // just used (so the frame provably describes the moth being drawn), placed by the root transform the
+        // hierarchy root gets below. Published via lastSkeletons() for the ?debug=skeleton overlay; the drawn
+        // items do not read it yet — skinning is S2. Nothing about the items changes.
+        frameSkeletons[i] = transformSkeleton(buildSkeleton({
+          seed: input.seed, creatureId: `m${i}`, plan: MOTH_SKELETON_PLAN, attach: bodyPoints,
+          pose: {
+            bodyScale: traits.body, wingScale: traits.wing,
+            foreDirDeg: MOTH.spread + traits.spread + beat * g,
+            hindDirDeg: MOTH.hindSpread + traits.spread * 0.5 - beat * MOTH.hindFlap * g,
+            hindAmount: hindAmt,
+          },
+          seedOffsets: input.seedOffsets || null,
+        }), { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale });
         const { items } = expandHierarchy(
           { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,
@@ -345,6 +363,7 @@ export function createCreatureBuilder() {
       }
       ages.length = pins.length;
       pair2.length = pins.length;
+      frameSkeletons.length = pins.length;
       // #1469 — publish the wing beat this frame actually used (the global beat above, before the
       // per-moth grow-in scaling), as 0..1 openness, for the MOTION strip's MOTH bar. No moth
       // appended → stays null: the bar is absent, not zeroed.
@@ -353,6 +372,8 @@ export function createCreatureBuilder() {
     },
     /** #1469 — the last appended frame's wing beat (0..1 openness), or null when no moths are on stage. */
     lastWingBeat() { return wingBeat; },
-    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); wingBeat = null; },
+    /** Phase 2 S1 — the last appended frame's skeletons in world (scene) space, per pin; null where no moth. */
+    lastSkeletons() { return frameSkeletons; },
+    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); wingBeat = null; frameSkeletons = []; },
   };
 }
