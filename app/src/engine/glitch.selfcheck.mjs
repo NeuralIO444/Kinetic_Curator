@@ -11,10 +11,14 @@ import { corruptionAmount, glitchFrame, applyGlitch, glitchItemsHash, GLITCH } f
 import { createCreatureBuilder, MOTH } from './creature.js';
 import { getCostTier } from './kernel/costRegistry.mjs';
 import { hashU01 } from './kernel/rng.js';
+import { TIGHTEN_ABOVE } from '../curator/stress.js';
 
 // 1. The band mapping — ruling 3: at or below the Tighten bar there is NO corruption (Normal and Relax are
 //    truth); above it, corruption grows quadratically to full at band 1. No band at all: no corruption.
 {
+  // The bar is stress.js's, never a local copy: if the band reader's bar ever moves, the glitch
+  // moves with it — this guard is what keeps the two from silently diverging (S5's one-place law).
+  assert.equal(GLITCH.tightenAt, TIGHTEN_ABOVE, 'the glitch corrupts at stress.js’s Tighten bar, imported — not a local literal');
   for (const b of [undefined, NaN, -1, 0, 0.28, 0.5, GLITCH.tightenAt]) {
     assert.equal(corruptionAmount(b), 0, `band ${b} corrupts nothing`);
     assert.equal(glitchFrame({ seed: 77, creatureId: 'm0', frameIndex: 3, band: b }), null, `band ${b} yields no frame`);

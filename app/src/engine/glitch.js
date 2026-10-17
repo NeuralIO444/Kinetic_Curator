@@ -45,10 +45,13 @@
 //     split/seam as per-type uniforms instead — the values are computed here either way.
 import { hashU01 } from './kernel/rng.js';
 import { fnv1a } from './skeleton.js';
+import { TIGHTEN_ABOVE } from '../curator/stress.js';
 
 export const GLITCH = Object.freeze({
-  /** The Tighten bar: at or below it, no corruption. The same 0.72 S5's pose mapping uses. */
-  tightenAt: 0.72,
+  /** The Tighten bar: at or below it, no corruption. IMPORTED from curator/stress.js — the one
+   *  declaration of the bar, shared with S5's pose mapping, so the glitch can never start
+   *  corrupting at a different bar than the moth withers at. Never a local literal. */
+  tightenAt: TIGHTEN_ABOVE,
   /** Height of one horizontal strip, in scene px of creature-local Y. */
   stripH: 13,
   /** The largest strip slip at full corruption, scene px along local X. */
