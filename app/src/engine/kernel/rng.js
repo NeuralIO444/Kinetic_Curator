@@ -158,6 +158,10 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // Phase 2 S1 — a creature's skeleton (engine/skeleton.js) is placement: its seeded bone jitter rides the
   // spatial stream, so re-rolling SPATIAL re-grows the frame and colour never does.
   skeleton: 'spatial',
+  // Phase 2 S8 — the glitch's corruption (engine/glitch.js) displaces a creature's material, so its seeded
+  // per-frame draws ride the spatial stream too: re-rolling SPATIAL re-rolls the corruption pattern, and
+  // re-rolling colour never does (the channel split derives from the item's own colours, not a choice).
+  glitch: 'spatial',
   // #1194 — the Gaussian mixture places points, so it rides the spatial stream too.
   gaussian: 'spatial',
   // #1195 — circle packing places points on the spatial stream.

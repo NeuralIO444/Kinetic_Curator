@@ -13,6 +13,7 @@
 // are the first look, not the last: they are named constants so Matt's review can move them.
 import { expandHierarchy } from './hierarchy.js';
 import { buildSkeleton, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
+import { glitchFrame, applyGlitch } from './glitch.js';
 import { poissonPointSet } from './kernel/sample/poisson.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
@@ -356,12 +357,21 @@ export function createCreatureBuilder() {
         });
         // halos first (under everything of this creature), then the parts in order
         const haloColour = gt.halo || bg;
-        for (const it of items) if (it.assetId !== MOTH_PARTS.mark) extra.push(mark(it, haloColour, haloColour, MOTH.halo, 'halo:'));
+        const mine = [];
+        for (const it of items) if (it.assetId !== MOTH_PARTS.mark) mine.push(mark(it, haloColour, haloColour, MOTH.halo, 'halo:'));
         for (const it of items) {
           const [c0, a0] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
           const [color, accent] = gt.recolor(c0, a0);
-          extra.push(mark(it, color, accent, 1, ''));
+          mine.push(mark(it, color, accent, 1, ''));
         }
+        // Phase 2 S8 — the GLITCH: a pin carrying a band (input.dishGlitch[i], the per-pin band the band
+        // reader will feed — S5's hookup; nothing supplies it yet) has its material corrupted by
+        // engine/glitch.js as a pure function of (seed, creature, frame, band): render-side only, the
+        // skeleton above stays true. No band, or a band at/below the Tighten bar, and gf is null — the
+        // items go out exactly as built, the uncorrupted path byte-identical.
+        const gf = glitchFrame({ seed: input.seed, creatureId: `m${i}`, frameIndex: ages[i], band: input.dishGlitch && input.dishGlitch[i], seedOffsets: input.seedOffsets || null });
+        if (gf) extra.push(...applyGlitch(mine, { cx: pin.x + hover.dx + gt.dx, cy: pin.y + hover.dy + gt.dy, rotDeg: hover.rot }, gf));
+        else extra.push(...mine);
       }
       ages.length = pins.length;
       pair2.length = pins.length;
