@@ -105,7 +105,7 @@ function isIpadClassDevice() {
  *   viewRef: { current: { zoom, pan: {x, y} } }
  *   wrapEl: element receiving the audio glow (box-shadow), optional
  */
-export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantSkeletons = false } = {}) {
+export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantSkeletons = false, wantEngraving = true } = {}) {
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
@@ -637,6 +637,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       batchPaused: s.batchPaused,
       focusSwap,
       wantSkeletons, // Phase 2 S1 — a skeleton consumer is live (the ?debug=skeleton overlay); the creature builder builds bones only then
+      wantEngraving, // Phase 2 S4 — the engraved body finish is a shipped look (default on in createLiveLoop); the builder binds spine joints to body items only when asked. A future governor shed rung flips this input, the way perfTier1 sheds passes
       perfClampOverride: s.perfClampOverride,
       perfTier1: s.perfTier1,
       assetThin: s.assetThin,

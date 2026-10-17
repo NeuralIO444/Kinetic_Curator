@@ -455,3 +455,4 @@ node src/hooks/costHead.selfcheck.mjs
 node src/loot/lootCopy.selfcheck.mjs
 node src/loot/lootWrite.selfcheck.mjs
 node src/loot/shelfDiskRun.selfcheck.mjs
+node src/engine/engraving.selfcheck.mjs

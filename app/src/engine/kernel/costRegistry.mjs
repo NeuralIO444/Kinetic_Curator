@@ -182,3 +182,34 @@ registerCostTier('engine/creature-feather-fan', {
   timeMs: 0,
   notes: 'Phase 2 S3 feather fans: no new GPU pass; instanced sprites in the structural item pass. CPU emission cost measured by resolverProbe at the 4-creature cap; items bounded by HIER_GLOBAL_BUDGET (2000).',
 });
+
+// Phase 2 S4 — APPEND-ONLY creature-pass registrations.
+// Stack slices (S4 engraving first) register their passes HERE, at the end
+// of the file, in clearly marked blocks. Do not edit the declarations
+// above; append a new block per slice so the stack rebases cleanly.
+// ============================================================================
+//
+// 'creature/engraving' — the engraving finish (engine/engraveBody.mjs): a
+// gated branch inside the existing instanced-quad fragment shader, NOT a
+// pass — no extra draw, no target, no bytes. Same tier-0 precedent as the
+// quad shader's other in-programme terms (kineme / cell-kineme /
+// region-instances / sun-bevel, registered at their renderer.mjs sites):
+// a term inside the one quad programme has no pass to shed, and the
+// costTiers gate requires any non-tier-0 declaration to carry a committed
+// sweep measurement, which the #1622 sweep harness cannot produce for an
+// in-shader term (it drives whole programmes, not branches).
+// timeMs is an ESTIMATE: the fragment term runs only on the body items'
+// fragments (<= 4 instances at the creature cap), and the CPU side is
+// measured in engine/engraving.selfcheck.mjs (the 4-creature pack,
+// sandbox node — print-only bench). No GPU sweep figure exists for an
+// in-shader branch: the #1622 sweep harness drives whole programmes,
+// not branches. Sandbox-indicative only; real hardware authoritative.
+// The honest re-tier path, if the governor ever needs one: shed the
+// finish at the resolver input (liveLoop's wantEngraving), not at the
+// pass list.
+registerCostTier('creature/engraving', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.05,
+  notes: 'in-shader engraving finish (body-space contour lines on the one body item per creature; gated branch in the quad FS, no pass, no target) — timeMs UNMEASURED by the sweep harness by construction; sandbox bench estimate, see engine/engraving.selfcheck.mjs',
+});
