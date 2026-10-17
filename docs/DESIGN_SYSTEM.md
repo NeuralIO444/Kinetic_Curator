@@ -172,6 +172,15 @@ at least two existing variants to earn its place (the "earn your surface" gate, 
 - **Do not restyle it. Do not translate it into mono.** It's the one human thing in the machine.
 - Its bluntness is a voice, not a theme: exactly **one LOIS line per panel**, reserved for empty states and naming moments (§7). Everything else stays instrumental.
 
+### 2.9 The shift layer
+
+A control may carry a second function, reached by long-press. The first function is what the label says; the second is its wilder sibling — the one that breaks the piece's own rules. Four visible controls stay four visible controls; the second layer never adds a knob. Two pairings are canonical: **HEROES** is the shift function of a MOTION control; **ATTRACTORS** is the shift function of WILD. A second function reads as a quantized row (OFF · LOW · MID · HIGH) under the host's label — never a slider, never a fifth control beside the host.
+
+- The hold is 650 ms everywhere (one hold length across the instrument), and the hold swallows its own release click — opening a second function never fires the first.
+- A second function writes modes only (quantized hand input): the row shows the stored value's nearest mode. Where the value is a count, double-click edits the exact value.
+- Heroes and attractors are **hand-only**: dice, curator, Davis, the Queen and the governor never write them. Emphasis is the performer's; the machines may not crown heroes.
+- "Shift layer" is a backstage term. It never appears on the performer's surface — the rows say HEROES and PULL, nothing more.
+
 ---
 
 ## 3. Layout rules
