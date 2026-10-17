@@ -20,6 +20,7 @@ import { buildWingWarp, WARP_FLEX_RATIO } from './wingWarp.mjs';
 import { FAN_PARTS, FAN_COUNTS, wingLocalChain, fanPlacements, mirrorPlacements } from './featherFan.js';
 import { engraveDataFor } from './engraveBody.mjs';
 import { creaturePose } from './creaturePose.js';
+import { glitchFrame, applyGlitch } from './glitch.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
 import { applyLean } from './kernel/color/index.js';
@@ -468,10 +469,11 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         // the body and the wings, never to the plumage — the fan's parts are surface children, as the
         // scales were, and the rule names the role, not an asset.
         const haloColour = gt.halo || bg;
+        const mine = [];
         for (const it of items) if (it._hier.anchorId !== 'surface') {
           const mi = mark(it, haloColour, haloColour, MOTH.halo, 'halo:');
           if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
-          extra.push(mi);
+          mine.push(mi);
         }
         for (const it of items) {
           const [c0, a0] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
@@ -488,8 +490,16 @@ export function createCreatureBuilder({ skinning = false } = {}) {
             const eng = engraveDataFor(worldSkel, it);
             if (eng) mi.engrave = eng;
           }
-          extra.push(mi);
+          mine.push(mi);
         }
+        // Phase 2 S8 — the GLITCH: a pin carrying a band (input.dishGlitch[i], the per-pin band the band
+        // reader will feed — S5's hookup; nothing supplies it yet) has its material corrupted by
+        // engine/glitch.js as a pure function of (seed, creature, frame, band): render-side only, the
+        // skeleton above stays true. No band, or a band at/below the Tighten bar, and gf is null — the
+        // items go out exactly as built, the uncorrupted path byte-identical.
+        const gf = glitchFrame({ seed: input.seed, creatureId: `m${i}`, frameIndex: ages[i], band: input.dishGlitch && input.dishGlitch[i], seedOffsets: input.seedOffsets || null });
+        if (gf) extra.push(...applyGlitch(mine, { cx: pin.x + hover.dx + gt.dx, cy: pin.y + hover.dy + gt.dy, rotDeg: hover.rot }, gf));
+        else extra.push(...mine);
       }
       ages.length = pins.length;
       pair2.length = pins.length;
