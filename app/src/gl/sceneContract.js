@@ -178,6 +178,14 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     // whenever the key is absent. Rounded to 3 places like every
     // contract number.
     ...(Array.isArray(item.matParams) ? { mat: item.matParams.map((v) => r3(v)) } : {}),
+    // Phase 2 S4 — the engraving rides the same way: creature.js stamps
+    // `engrave` (16 numbers: the spine joints in the body item's quad
+    // frame + [count, spacing, width, strength], engine/engraveBody.mjs)
+    // only on an engraved body item; packInstanceData reads it into the
+    // appended a_eng* attributes, selecting the contour-line finish in
+    // the quad shader. Absent (every non-creature instance, and every
+    // creature while the finish is off) the contract is byte-identical.
+    ...(Array.isArray(item.engrave) ? { engrave: item.engrave.map((v) => r3(v)) } : {}),
   };
 }
 
@@ -814,6 +822,14 @@ export function assertSceneContract(scene) {
       }
       if (Math.abs(Math.hypot(d[0], d[1]) - 1) > 0.01) fail(`instance ${it.key}: deform axis must be a unit vector`);
       if (!(d[2] > 0 && d[2] <= 1)) fail(`instance ${it.key}: deform amount must be in (0, 1]`);
+    }
+    if (it.engrave !== undefined) { // Phase 2 S4 engraving (engine/engraveBody.mjs)
+      const e = it.engrave;
+      if (!Array.isArray(e) || e.length !== 16 || !e.every(Number.isFinite)) {
+        fail(`instance ${it.key}: engrave must be 16 finite numbers [joints x6, count, spacing, width, strength]`);
+      }
+      if (!(e[12] >= 2 && e[12] <= 6)) fail(`instance ${it.key}: engrave joint count must be in [2, 6]`);
+      if (!(e[13] > 0)) fail(`instance ${it.key}: engrave spacing must be > 0`);
     }
   }
   if (scene.regionAnim !== undefined) { // #1433 region playback state

@@ -493,9 +493,11 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     list = expandRegionInstances(instances, cells, cellFrame.regions);
   }
 
-  // 29 floats/instance (116-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // 45 floats/instance (180-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass)
-  // (defX,defY,defAmt) (material body code) (material params x4).
+  // (defX,defY,defAmt) (material body code) (material params x4)
+  // (engraving joints A x4) (engraving joints B x4) (engraving joints C x4)
+  // (engraving params x4).
   // #781: kineme 0 = still (exactly the old zeros).
   // #1129 PR2: glass is 1 for glass-voice instances (soft bevel), else 0.
   // #1410: deform is the impact squash (axis + amount); absent reads 0 =
@@ -513,8 +515,15 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
   // instance whose contract carries no `mat` (its Look never moved
   // the knobs) packs the leaves' shipped defaults, so the shader
   // reads the pre-M4 constants for it, bit for bit.
+  // Phase 2 S4: sixteen engraving floats appended after the M4 params
+  // (the same append pattern — every earlier offset unchanged): the
+  // spine joints in the body item's quad frame (3 x vec4) and the
+  // finish params (count, spacing, width, strength). An instance whose
+  // contract carries no `engrave` packs zeros there (the buffer is
+  // zero-initialised), the shader's count reads 0, and the engraving
+  // branch never enters — the pre-S4 quad, bit for bit.
   const maxLen = list.length;
-  const buf = new Float32Array(maxLen * 29);
+  const buf = new Float32Array(maxLen * 45);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = list[i];
@@ -581,7 +590,14 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     } else {
       buf[o + 25] = 0; buf[o + 26] = 0; buf[o + 27] = 0; buf[o + 28] = 0;
     }
-    o += 29;
+    // Phase 2 S4: the engraving block (engine/engraveBody.mjs). Absent
+    // (the common case) the sixteen floats stay zero — exactly the old
+    // tail — because the buffer is zero-initialised and nothing writes.
+    const eg = it.engrave;
+    if (Array.isArray(eg)) {
+      for (let k = 0; k < 16; k++) buf[o + 29 + k] = eg[k] || 0;
+    }
+    o += 45;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
@@ -795,7 +811,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (spec && specTex && specUploaded) {
       gl.uniform1i(U(quadProg, 'u_spec'), bindTex(SPEC_UNIT, specTex));
       gl.uniform4f(U(quadProg, 'u_specA'), spec.map, spec.scale, spec.displace, spec.colour);
-      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 29); // #1585: instance count at the 29-float stride
+      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 45); // instance count at the 45-float stride (29 through #1585, +engraving in S4)
     } else {
       gl.uniform4f(U(quadProg, 'u_specA'), 0, 0, 0, 0);
     }
@@ -807,31 +823,39 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     for (let i = 1; i <= 5; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 116, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 180, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     // #1129 PR2: a_glass — single float at byte 80.
     gl.enableVertexAttribArray(6);
-    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 116, 80);
+    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 180, 80);
     gl.vertexAttribDivisor(6, 1);
     // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84.
     gl.enableVertexAttribArray(7);
-    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 116, 84);
+    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 180, 84);
     gl.vertexAttribDivisor(7, 1);
     // #1548/#1549: a_plate — the material body code, single float at byte 96 (the appended tail float).
     gl.enableVertexAttribArray(8);
-    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 116, 96);
+    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 180, 96);
     gl.vertexAttribDivisor(8, 1);
     // #1585: a_matP — the material body's M4 param vec4 at byte 100 (29-float stride).
     gl.enableVertexAttribArray(9);
-    gl.vertexAttribPointer(9, 4, gl.FLOAT, false, 116, 100);
+    gl.vertexAttribPointer(9, 4, gl.FLOAT, false, 180, 100);
     gl.vertexAttribDivisor(9, 1);
+    // Phase 2 S4: a_engA/a_engB/a_engC — the engraving spine joints (vec4
+    // pairs) at bytes 116/132/148; a_engP — [count, spacing, width,
+    // strength] at byte 164 (45-float stride).
+    for (let i = 10; i <= 13; i++) {
+      gl.enableVertexAttribArray(i);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 180, 116 + (i - 10) * 16);
+      gl.vertexAttribDivisor(i, 1);
+    }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 29);
-    for (let i = 0; i <= 9; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 45);
+    for (let i = 0; i <= 13; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
     gl.disable(gl.BLEND);
   }
 

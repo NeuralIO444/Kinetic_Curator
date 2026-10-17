@@ -12,7 +12,7 @@
 //    changes NOTHING else — the body is a render-level screen, not
 //    a placement field; plate/wash/glass are untouched;
 //  - the scene contract: the stipple flag rides only when set;
-//  - the instance packer: 29-float stride (#1585 appended the M4
+//  - the instance packer: 45-float stride (S4 appended the engraving block; #1585 appended the M4
 //    param vec4 after the body code), the tail float carries
 //    body code 3 for stipple (1 plate / 2 wash / 0 flat unchanged);
 //  - the shader: the body code is decoded in QUAD_VS, stippleShade
@@ -182,18 +182,18 @@ ok('contract: stipple instances carry the flag; non-stipple contracts gain no ke
 });
 
 // ── the instance packer + shader ─────────────────────────────────────
-ok('packInstanceData: 29-float stride, stipple packs body code 3 at the tail', () => {
+ok('packInstanceData: 45-float stride, stipple packs body code 3 at the tail', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
     asset: 'a1', tint: '#000000', accent: '#000000', x: 1, y: 2, scaleX: 3, scaleY: 3,
     rotation: 0, opacity: 1, vx: 0, vy: 0, kineme: 0, kinemePhase: 0, ...extra,
   });
   const buf = packInstanceData([mk({ stipple: true }), mk({ wash: true }), mk({ plate: true }), mk({})], cells);
-  assert.equal(buf.length, 4 * 29, 'four instances at the 29-float stride');
+  assert.equal(buf.length, 4 * 45, 'four instances at the 45-float stride (29 through #1585, +16 engraving floats in S4)');
   assert.equal(buf[24], 3, 'stipple instance: tail float is body code 3');
-  assert.equal(buf[29 + 24], 2, 'wash instance: tail float is body code 2');
-  assert.equal(buf[2 * 29 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
-  assert.equal(buf[3 * 29 + 24], 0, 'unflagged instance: tail float is 0');
+  assert.equal(buf[45 + 24], 2, 'wash instance: tail float is body code 2');
+  assert.equal(buf[2 * 45 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
+  assert.equal(buf[3 * 45 + 24], 0, 'unflagged instance: tail float is 0');
   // #1585: absent `mat` the packer writes Matt's shipped dot scale;
   // a carried `mat` writes through.
   assert.deepEqual([...buf.slice(25, 29)], [2.5, 0, 0, 0], 'stipple at defaults packs the shipped dot scale');

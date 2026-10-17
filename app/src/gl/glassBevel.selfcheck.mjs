@@ -73,20 +73,20 @@ test('vertex stage carries the glass flag: attrib 6 in, varying out', () => {
   assert.ok(QUAD_FS.includes('in float v_glass;'), 'fragment stage declares the varying');
 });
 
-test('packInstanceData: 29-float stride, glass flag at [20], old producers read 0', () => {
+test('packInstanceData: 45-float stride, glass flag at [20], old producers read 0', () => {
   const cells = { 'a|#ffffff|#000000': { u0: 0, v0: 0, u1: 0.5, v1: 0.5 } };
   const mk = (glass) => ({
     x: 1, y: 2, scaleX: 1, scaleY: 1, rotation: 0, opacity: 0.5,
     asset: 'a', tint: '#ffffff', accent: '#000000', ...(glass === undefined ? {} : { glass }),
   });
   const data = packInstanceData([mk(true), mk(false), mk(undefined)], cells);
-  assert.equal(data.length, 87, '3 instances × 29 floats (21 through #1129 PR2, +deform vec3 in #1410, +plate flag in #1548, +matP vec4 in #1585)');
+  assert.equal(data.length, 135, '3 instances × 45 floats (21 through #1129 PR2, +deform vec3 in #1410, +plate flag in #1548, +matP vec4 in #1585, +engraving block in S4)');
   assert.equal(data[20], 1, 'glass:true → 1');
-  assert.equal(data[49], 0, 'glass:false → 0');
-  assert.equal(data[78], 0, 'missing flag (old producers) → 0 = enamel');
+  assert.equal(data[65], 0, 'glass:false → 0');
+  assert.equal(data[110], 0, 'missing flag (old producers) → 0 = enamel');
   // The first 20 floats of a glass item match a non-glass item bit-for-bit:
   // the flag rides after, never inside, the existing channels.
-  for (let i = 0; i < 20; i++) assert.equal(data[i], data[29 + i], `float ${i} identical`);
+  for (let i = 0; i < 20; i++) assert.equal(data[i], data[45 + i], `float ${i} identical`);
 });
 
 test('cost tier declared honestly: tier 0, no new texture fetches', () => {

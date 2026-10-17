@@ -18,6 +18,7 @@ import { expandHierarchy } from './hierarchy.js';
 import { buildSkeleton, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
 import { buildWingWarp, WARP_FLEX_RATIO } from './wingWarp.mjs';
 import { FAN_PARTS, FAN_COUNTS, wingLocalChain, fanPlacements, mirrorPlacements } from './featherFan.js';
+import { engraveDataFor } from './engraveBody.mjs';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
 import { applyLean } from './kernel/color/index.js';
@@ -373,10 +374,13 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         // same beat (the wing's tip lags its root by WARP_FLEX_RATIO of the beat per joint; the hind pair
         // flexes by its own smaller beat). Phase 2 S3 — the fan IS a consumer of the UNFLEXED local bones:
         // the plumage grows on the bind pose (its goldens are pinned to it), so the local skeleton is built
-        // whenever a moth is formed. The WORLD skeletons (publication + the skin) are built only when a
-        // consumer exists — the debug publication (input.wantSkeletons, S1) OR the wing skin (skinning,
-        // S2) — so "no consumer" still means zero world-skeleton cost on top of the fan's own build, and
-        // lastSkeletons() publishes only what a consumer asked for, exactly as S1 left it.
+        // whenever a moth is formed. The WORLD skeletons are built only when a consumer exists — the
+        // debug publication (input.wantSkeletons, S1), the wing skin (skinning, S2), OR the engraving
+        // finish (input.wantEngraving, S4 — it binds the body item to the world skeleton's spine,
+        // engraveBody.mjs) — so "no consumer" still means zero world-skeleton cost on top of the fan's
+        // own build. Publication answers to skinning and wantSkeletons only: an engraving-only frame
+        // builds its world skeleton without publishing it, exactly as S4 staged it.
+        const wantEngraving = !!(input && input.wantEngraving);
         const beatG = beat * g; // NOT `bg` — that name is the palette background above (the halo colour)
         const foreFlexDeg = -beatG * WARP_FLEX_RATIO;
         const hindFlexDeg = beatG * MOTH.hindFlap * WARP_FLEX_RATIO;
@@ -394,8 +398,8 @@ export function createCreatureBuilder({ skinning = false } = {}) {
           seedOffsets: input.seedOffsets || null,
         });
         const skel = buildLocal(false);
-        const worldSkel = skinning || input.wantSkeletons ? transformSkeleton(buildLocal(true), rootT) : null;
-        frameSkeletons[i] = worldSkel;
+        const worldSkel = skinning || input.wantSkeletons || wantEngraving ? transformSkeleton(buildLocal(true), rootT) : null;
+        frameSkeletons[i] = (skinning || input.wantSkeletons) ? worldSkel : null;
         // The warp's bind pose: the same frame at flex 0, so the skin transforms are posed o bind^-1 and a
         // zero-beat frame skins to the identity. It is the fan's own skeleton, transformed — no third build.
         const flexActive = foreFlexDeg !== 0 || hindFlexDeg !== 0;
@@ -446,6 +450,16 @@ export function createCreatureBuilder({ skinning = false } = {}) {
           const [color, accent] = gt.recolor(c0, a0);
           const mi = mark(it, color, accent, 1, '');
           if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
+          // Phase 2 S4 — the engraving rides ONLY on the true body stamp (not its halo
+          // underlay, which takes the halo loop above; not wings or plumage): the spine
+          // joints in this item's own quad frame, packed by engraveBody from the world
+          // skeleton. Absent (the flag off, or no world skeleton) the item is exactly
+          // the pre-S4 item. (Flex bends the wing chains, not the spine, so the flexed
+          // world skeleton's spine is the staged engraving's spine.)
+          else if (wantEngraving && worldSkel && it.assetId === MOTH_PARTS.body) {
+            const eng = engraveDataFor(worldSkel, it);
+            if (eng) mi.engrave = eng;
+          }
           extra.push(mi);
         }
       }
