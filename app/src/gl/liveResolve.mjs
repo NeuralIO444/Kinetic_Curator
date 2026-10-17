@@ -161,6 +161,14 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
 let lastFrameMotion = null;
 export function getLastFrameMotion() { return lastFrameMotion; }
 
+/**
+ * Phase 2 S1 — the last resolved frame's creature skeletons (world/scene space, per pin, null where
+ * no moth), published for the ?debug=skeleton overlay. Like the motion read above: the resolver's own
+ * objects, nothing recomputed. Empty when no creature was resolved (worker mode carries no creatures).
+ */
+let lastSkeletons = [];
+export function getLastSkeletons() { return lastSkeletons; }
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -992,6 +1000,7 @@ export function createLiveResolver() {
     // #1469 — publish the frame's living-motion read (see getLastFrameMotion). Wind reads 0 on a
     // frozen frame (slowRender): nothing is carried then, and a stale strength would be a ghost.
     lastFrameMotion = { kineme: frameKineme, wind: input.slowRender ? 0 : frameWind, mothBeat: creatures.lastWingBeat() };
+    lastSkeletons = creatures.lastSkeletons(); // S1 — the frame's bone graphs, for ?debug=skeleton
     return out;
   }
 

@@ -9,6 +9,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { PanelHeader } from '../components/PanelHeader.jsx';
+import { SkeletonOverlay } from './SkeletonOverlay.jsx'; // Phase 2 S1: ?debug=skeleton only
+import { isSkeletonDebug } from './skeletonDebug.js';
 import { useCanvasViewport, CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { on, emit, Events } from '../composition/eventBus.js';
 import { overlayScene } from '../gl/playback.mjs';
@@ -73,6 +75,7 @@ export function CanvasPanel() {
         getState: () => overlayScene(useStore.getState()), // #1461: a take being played lays its scene over the view
         viewRef,
         wrapEl: wrap,
+        wantSkeletons: isSkeletonDebug(), // Phase 2 S1 — bones are built only when the skeleton overlay is mounted to read them
       });
     } catch (e) {
       // One-shot init failure (e.g. no WebGL2) — show the message once.
@@ -144,6 +147,9 @@ export function CanvasPanel() {
             style={{ zIndex: 1 }}
             onWheel={viewport.onWheel} onPointerDown={viewport.onPointerDown} onPointerMove={viewport.onPointerMoveCombined}
             onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />
+        )}
+        {isSkeletonDebug() && (
+          <SkeletonOverlay zoom={viewport.zoom} pan={viewport.pan} canvasW={canvasW} canvasH={canvasH} />
         )}
         {stageBlackout && (
           <div style={{ position: 'absolute', inset: 0, background: '#000', zIndex: 4 }} aria-label="Stage blackout" />
