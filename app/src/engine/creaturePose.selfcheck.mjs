@@ -213,7 +213,10 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   const plain = grow({ wantSkeletons: true });
   assert.equal(plain.b.lastSkeletons()[0].hash, S1_WORLD_HASH, 'no band on the input: the skeleton is S1’s, bit for bit');
   assert.deepEqual(plain.b.lastPoses(), [null], 'and no pose is published');
-  assert.equal(plain.e[0].items.filter((it) => it._creature).length, 26, 'the drawn moth is unchanged');
+  // 58, not the 26 this check was staged against: S3's feather fan replaced the scatter moth (26 → 58
+  // items) before S5 published. S5 itself adds and removes no items — the count is S3's census; the
+  // identity this section guards is the bandless skeleton hash above, still S1's bit for bit.
+  assert.equal(plain.e[0].items.filter((it) => it._creature).length, 58, 'the drawn moth is unchanged');
 
   const neutral = grow({ wantSkeletons: true, band: BAND_NORMAL, smoothed: 0.5 });
   assert.equal(neutral.b.lastSkeletons()[0].hash, S1_WORLD_HASH, 'a neutral band applies the identity pose: still S1’s frame');
