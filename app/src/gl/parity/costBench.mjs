@@ -36,7 +36,8 @@
  * one environment's labels for another's. Device-truth labels come from
  * running this same harness on the Studio / real devices.
  */
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import { COST_CORPUS, getCostScene, castIdsOf } from './costCorpus.mjs';
@@ -241,6 +242,7 @@ async function main() {
     await resetBrowser();
     return;
   }
+  await mkdir(dirname(args.out), { recursive: true });
   await writeFile(args.out, JSON.stringify(dataset, null, 2));
   const measured = rows.filter((r) => r.status === 'measured').sort((a, b) => a.labelMs - b.labelMs);
   console.log(`[costBench] wrote ${args.out}: ${rows.length} rows (${measured.length} measured, ${rows.length - measured.length} failed)`);
