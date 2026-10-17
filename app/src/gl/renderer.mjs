@@ -33,7 +33,7 @@
  */
 
 import {
-  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS,
+  QUAD_VS, QUAD_FS, MESH_VS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS,
   blendIdFor,
 } from './shaders.mjs';
 import { RESOLVE_FS } from './resolveFs.mjs';
@@ -222,6 +222,16 @@ export const RENDERER_PROGRAMS = [
     uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands', 'u_spec', 'u_specA', 'u_specN'],
     cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed' },
+  },
+  {
+    // Phase 2 S2 — the wing-warp mesh program: MESH_VS places resolver-skinned vertices and fills the
+    // quad varyings; the fragment stage is QUAD_FS itself, so a warped wing shades identically to a quad.
+    // Structural like the quad program (tier 0); the warp FEATURE registers separately as engine/wing-warp.
+    key: 'mesh', name: 'mesh', vs: MESH_VS, fs: QUAD_FS,
+    vsFile: 'shaders.mjs:MESH_VS', fsFile: 'shaders.mjs:QUAD_FS',
+    uniforms: ['u_canvas', 'u_atlas', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_hands', 'u_spec', 'u_specA', 'u_specN'],
+    cost: { tier: 0, memoryBytes: 49152, timeMs: 0.05,
+      notes: 'Phase 2 S2 wing warp draw: skinned wing meshes in list order; transient VBO (~48 KB at the 4-creature cap)' },
   },
   {
     key: 'composite', name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS,
@@ -825,6 +835,101 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.disable(gl.BLEND);
   }
 
+  // Phase 2 S2 — mesh draws (bent wing items, engine/wingWarp.mjs): the resolver skins the wing's
+  // vertices in scene space; here they are interleaved per-vertex (23 floats — the MESH_VS attribute
+  // layout in shaders.mjs) with the item's colour/centre/cell resolved exactly as packInstanceData
+  // resolves an instance (same cell lookup, same live-tint hexes), and drawn with the shared QUAD_FS.
+  // Buffers grow like the instance VBO's (2x headroom); one draw per consecutive mesh run.
+  const MESH_STRIDE = 23;
+  let meshCapacityBytes = 0;
+  let meshIndexCapacityBytes = 0;
+  const meshVbo = gl.createBuffer();
+  const meshIbo = gl.createBuffer();
+  const MESH_ATTRIBS = [[0, 2, 0], [1, 2, 8], [2, 3, 16], [3, 3, 28], [4, 4, 40], [5, 4, 56], [6, 4, 72], [7, 1, 88]];
+  function drawMeshes(list, cells, atlasTex, w, h, groupOpacity, layerCount) {
+    const verts = [];
+    const idxs = [];
+    for (const { it, index } of list) {
+      const m = it.mesh;
+      if (!m) continue;
+      const cell = it._cell || cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
+      if (!cell) continue; // Spine B (#388): no cell, no draw — the packer's rule
+      const ink = hexToRgb(it.tint);
+      const acc = hexToRgb(it.accent);
+      const op = (it.opacity ?? 1) * groupOpacity;
+      const th = (it.rotation * Math.PI) / 180;
+      const co = Math.cos(th); const si = Math.sin(th);
+      // v_rot mirror signs, QUAD_VS's rule: scale sign x atlas uv direction.
+      const mx = (it.scaleX < 0 ? -1 : 1) * (cell.u1 < cell.u0 ? -1 : 1);
+      const my = (it.scaleY < 0 ? -1 : 1) * (cell.v1 < cell.v0 ? -1 : 1);
+      const base = verts.length / MESH_STRIDE;
+      for (let v = 0; v < m.pos.length; v += 2) {
+        verts.push(
+          m.pos[v], m.pos[v + 1],
+          cell.u0 + (cell.u1 - cell.u0) * m.uv[v], cell.v0 + (cell.v1 - cell.v0) * m.uv[v + 1],
+          ink[0], ink[1], ink[2], acc[0], acc[1], acc[2],
+          it.x, it.y, it.rotation, index,
+          co, si, mx, my,
+          cell.u0, cell.v0, cell.u1, cell.v1,
+          op,
+        );
+      }
+      for (const ix of m.idx) idxs.push(base + ix);
+    }
+    if (!idxs.length) return;
+    const vdata = new Float32Array(verts);
+    const idata = new Uint32Array(idxs);
+    gl.bindBuffer(gl.ARRAY_BUFFER, meshVbo);
+    if (vdata.byteLength > meshCapacityBytes) {
+      meshCapacityBytes = vdata.byteLength * 2;
+      gl.bufferData(gl.ARRAY_BUFFER, meshCapacityBytes, gl.DYNAMIC_DRAW);
+    }
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, vdata);
+    uploadMeterNoteUpload(new Uint8Array(vdata.buffer, vdata.byteOffset, vdata.byteLength)); // #533 PR1: measure-only
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshIbo);
+    if (idata.byteLength > meshIndexCapacityBytes) {
+      meshIndexCapacityBytes = idata.byteLength * 2;
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, meshIndexCapacityBytes, gl.DYNAMIC_DRAW);
+    }
+    gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, idata);
+    const p = progs.mesh;
+    gl.useProgram(p);
+    gl.uniform2f(U(p, 'u_canvas'), sceneW, sceneH);
+    gl.uniform1f(U(p, 'u_liveTint'), isLive ? 1.0 : 0.0);
+    // #594 the one sun — the same uploads the quad draw makes (the shared FS reads u_sunMat/u_pool/u_hands).
+    gl.uniform4f(U(p, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
+    gl.uniform4f(U(p, 'u_sunLight'), sun ? sun.color[0] : 1, sun ? sun.color[1] : 1, sun ? sun.color[2] : 1, sun ? sun.intensity : 0);
+    gl.uniform1f(U(p, 'u_ambient'), sun ? sun.ambient : 1);
+    gl.uniform2f(U(p, 'u_sunMat'), sun ? sun.bevel : 0, sun ? sun.spec : 0);
+    gl.uniform1f(U(p, 'u_pool'), sun ? sun.pool || 0 : 0);
+    gl.uniform2f(U(p, 'u_hands'), hands.crooked || 0, hands.open || 0);
+    gl.uniform1i(U(p, 'u_atlas'), bindTex(0, atlasTex));
+    // #1482 P3: off uploads nothing and sends zeros, so the shader's branch never enters.
+    uploadSpectrum();
+    if (spec && specTex && specUploaded) {
+      gl.uniform1i(U(p, 'u_spec'), bindTex(SPEC_UNIT, specTex));
+      gl.uniform4f(U(p, 'u_specA'), spec.map, spec.scale, spec.displace, spec.colour);
+      gl.uniform1f(U(p, 'u_specN'), layerCount); // the layer's instance count (INDEX bins by list position)
+    } else {
+      gl.uniform4f(U(p, 'u_specA'), 0, 0, 0, 0);
+    }
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, meshVbo);
+    for (const [loc, size, off] of MESH_ATTRIBS) {
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, MESH_STRIDE * 4, off);
+      gl.vertexAttribDivisor(loc, 0);
+    }
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendEquation(gl.FUNC_ADD);
+    gl.viewport(0, 0, w, h);
+    gl.drawElements(gl.TRIANGLES, idata.length, gl.UNSIGNED_INT, 0);
+    for (const [loc] of MESH_ATTRIBS) gl.disableVertexAttribArray(loc);
+    gl.disable(gl.BLEND);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+  }
+
   const instanceData = packInstanceData;
 
   /**
@@ -859,16 +964,14 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       }
       batch = [];
     };
-    const flushIsolatedRun = (items, blendMode) => {
-      if (!items.length) return;
-      const data = instanceData(items, cells, groupOpacity, cellFrame);
-      if (!data.length) return; // Spine B (#388): nothing bakeable in this run yet
-      flushNormal();
+    // The isolated treatment (draw into scratch, composite with the blend, copy back) — shared by
+    // quad runs and, since S2, by a mesh item sitting on a non-normal layer.
+    const isolateDraw = (drawFn, blendMode) => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, scratch.fb);
       gl.viewport(0, 0, w, h);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      drawInstances(data, atlasTex, w, h);
+      drawFn();
       composite(compProg, compU, scratch.tex, layerTarget, blendTmp, blendIdFor(blendMode), 1, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, layerTarget.fb);
       gl.viewport(0, 0, w, h);
@@ -877,21 +980,48 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       gl.uniform1i(U(copyProg, 'u_src'), bindTex(0, blendTmp.tex));
       drawFullscreen(copyProg);
     };
+    const flushIsolatedRun = (items, blendMode) => {
+      if (!items.length) return;
+      const data = instanceData(items, cells, groupOpacity, cellFrame);
+      if (!data.length) return; // Spine B (#388): nothing bakeable in this run yet
+      flushNormal();
+      isolateDraw(() => drawInstances(data, atlasTex, w, h), blendMode);
+    };
+    // Phase 2 S2 — mesh items (bent wings) draw at their exact list position: the pending normal
+    // batch flushes ahead of them, consecutive mesh items accumulate into one draw, and a mesh item
+    // on a non-normal layer takes the isolated treatment above. Mesh items never enter the packer.
+    let meshRun = [];
+    const flushMesh = () => {
+      if (meshRun.length) drawMeshes(meshRun, cells, atlasTex, w, h, groupOpacity, instances.length);
+      meshRun = [];
+    };
     let isolatedRun = [];
     let isolatedRunBlend = null;
-    for (const it of instances) {
+    for (let n = 0; n < instances.length; n++) {
+      const it = instances[n];
       const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
+      if (it.mesh) {
+        if (isolatedRun.length) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; isolatedRunBlend = null; }
+        flushNormal();
+        if (b === 'normal') { meshRun.push({ it, index: n }); continue; }
+        flushMesh();
+        isolateDraw(() => drawMeshes([{ it, index: n }], cells, atlasTex, w, h, groupOpacity, instances.length), b);
+        continue;
+      }
       if (b === 'normal') {
         if (isolatedRun.length) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; isolatedRunBlend = null; }
+        flushMesh();
         batch.push(it);
         continue;
       }
+      flushMesh();
       if (isolatedRun.length && b !== isolatedRunBlend) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; }
       isolatedRunBlend = b;
       isolatedRun.push(it);
     }
     if (isolatedRun.length) flushIsolatedRun(isolatedRun, isolatedRunBlend);
     flushNormal();
+    flushMesh();
   }
 
   /**

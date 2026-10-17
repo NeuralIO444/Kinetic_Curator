@@ -71,6 +71,39 @@ function hexColor(c, fallback = '#000000') {
   return /^#[0-9a-fA-F]{3,8}$/.test(s) ? s : fallback;
 }
 
+const r5 = (v) => Math.round(Number(v) * 100000) / 100000;
+
+/**
+ * Phase 2 S2 — sanitize a resolver item's wing-warp mesh (engine/wingWarp.mjs) into the contract.
+ *
+ * Shape: { pos: [x, y, ...] (scene space), uv: [u, v, ...] (quad-corner space, the mapping QUAD_VS
+ * applies), idx: [i, ...] }. The mesh rides ONLY on a bent wing item — the builder emits none at rest —
+ * so an unbent contract (and its hash) is exactly the pre-S2 contract. Fail closed like sanitizeMatte:
+ * any malformed or oversized mesh is dropped and the item draws as its plain quad. Positions round to
+ * r3 like every contract number; UVs to 5 places (sub-texel on a 400px cell).
+ */
+export function sanitizeMesh(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const { pos, uv, idx } = raw;
+  if (!Array.isArray(pos) || !Array.isArray(uv) || !Array.isArray(idx)) return null;
+  const verts = pos.length / 2;
+  if (pos.length % 2 || uv.length !== pos.length || !Number.isInteger(verts) || verts < 4 || verts > 128) return null;
+  if (!idx.length || idx.length % 3 || idx.length > 768) return null;
+  const outPos = new Array(pos.length);
+  const outUv = new Array(uv.length);
+  for (let i = 0; i < pos.length; i++) {
+    if (!Number.isFinite(pos[i]) || !Number.isFinite(uv[i])) return null;
+    outPos[i] = r3(pos[i]);
+    outUv[i] = r5(uv[i]);
+  }
+  const outIdx = new Array(idx.length);
+  for (let i = 0; i < idx.length; i++) {
+    if (!Number.isInteger(idx[i]) || idx[i] < 0 || idx[i] >= verts) return null;
+    outIdx[i] = idx[i];
+  }
+  return { pos: outPos, uv: outUv, idx: outIdx };
+}
+
 /**
  * Map one placement item to a contract instance (an instanced quad).
  * Draw order = array order; the backend must not re-sort.
@@ -112,6 +145,10 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     ...(!deformShed && r3(Math.min(1, item.deformAmt || 0)) > 0
       ? { deform: [r3(item.deformAxisX || 0), r3(item.deformAxisY || 0), r3(Math.min(1, item.deformAmt))] }
       : {}),
+    // Phase 2 S2 — the wing-warp mesh rides the same conditional way: present only on a bent wing
+    // item (the builder emits none at rest), so a neutral contract is byte-identical to pre-S2.
+    // The renderer draws it through MESH_VS + the shared QUAD_FS at the item's list position.
+    ...((m) => (m ? { mesh: m } : {}))(item.mesh ? sanitizeMesh(item.mesh) : null),
     // #1547 — the glass flag rides only when set (the deform precedent
     // above): packInstanceData reads it into a_glass, selecting the
     // #1129 soft-bevel / caustic / striation terms in the quad shader.
