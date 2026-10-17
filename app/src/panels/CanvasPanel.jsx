@@ -75,6 +75,7 @@ export function CanvasPanel() {
         getState: () => overlayScene(useStore.getState()), // #1461: a take being played lays its scene over the view
         viewRef,
         wrapEl: wrap,
+        wantSkeletons: isSkeletonDebug(), // Phase 2 S1 — bones are built only when the skeleton overlay is mounted to read them
       });
     } catch (e) {
       // One-shot init failure (e.g. no WebGL2) — show the message once.

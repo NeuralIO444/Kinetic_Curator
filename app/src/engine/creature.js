@@ -332,7 +332,9 @@ export function createCreatureBuilder() {
         // just used (so the frame provably describes the moth being drawn), placed by the root transform the
         // hierarchy root gets below. Published via lastSkeletons() for the ?debug=skeleton overlay; the drawn
         // items do not read it yet — skinning is S2. Nothing about the items changes.
-        frameSkeletons[i] = transformSkeleton(buildSkeleton({
+        // Built ONLY when a consumer asked (input.wantSkeletons — the debug overlay today, S2's skinning
+        // later): flag off means zero skeleton cost, not merely zero skeleton pixels.
+        frameSkeletons[i] = input.wantSkeletons ? transformSkeleton(buildSkeleton({
           seed: input.seed, creatureId: `m${i}`, plan: MOTH_SKELETON_PLAN, attach: bodyPoints,
           pose: {
             bodyScale: traits.body, wingScale: traits.wing,
@@ -341,7 +343,7 @@ export function createCreatureBuilder() {
             hindAmount: hindAmt,
           },
           seedOffsets: input.seedOffsets || null,
-        }), { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale });
+        }), { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale }) : null;
         const { items } = expandHierarchy(
           { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,

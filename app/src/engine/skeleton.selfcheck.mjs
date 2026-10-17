@@ -123,7 +123,7 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   });
   const b = createCreatureBuilder();
   let e;
-  for (let i = 0; i < MOTH.growFrames + 1; i++) { e = entry(); b.append(input(), e, ASSETS); }
+  for (let i = 0; i < MOTH.growFrames + 1; i++) { e = entry(); b.append(input({ wantSkeletons: true }), e, ASSETS); }
   assert.equal(e[0].items.filter((it) => it._creature).length, 26, 'the drawn moth is unchanged');
   const skels = b.lastSkeletons();
   assert.equal(skels.length, 1);
@@ -134,6 +134,13 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   assert.match(skels[0].hash, /^[0-9a-f]{8}$/);
   b.append(input({ dishFormed: [false] }), entry(), ASSETS);
   assert.deepEqual(b.lastSkeletons(), [], 'nothing formed, nothing published');
+  // The gate: no consumer asking (no wantSkeletons) → nothing built, nothing published,
+  // and the drawn moth is exactly what it was — zero skeleton cost when off, not just zero pixels.
+  const b2 = createCreatureBuilder();
+  let e2;
+  for (let i = 0; i < MOTH.growFrames + 1; i++) { e2 = entry(); b2.append(input(), e2, ASSETS); }
+  assert.equal(e2[0].items.filter((it) => it._creature).length, 26, 'gate off: the drawn moth is unchanged');
+  assert.deepEqual(b2.lastSkeletons(), [null], 'gate off: no skeleton is built or published');
 }
 
 // 8. The determinism guard, in mathRandomGuard's pattern: skeleton.js carries none of the banned clocks or

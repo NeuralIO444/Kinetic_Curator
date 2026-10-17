@@ -105,7 +105,7 @@ function isIpadClassDevice() {
  *   viewRef: { current: { zoom, pan: {x, y} } }
  *   wrapEl: element receiving the audio glow (box-shadow), optional
  */
-export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}) {
+export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantSkeletons = false } = {}) {
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
@@ -636,6 +636,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null } = {}
       lockedParams: s.lockedParams,
       batchPaused: s.batchPaused,
       focusSwap,
+      wantSkeletons, // Phase 2 S1 — a skeleton consumer is live (the ?debug=skeleton overlay); the creature builder builds bones only then
       perfClampOverride: s.perfClampOverride,
       perfTier1: s.perfTier1,
       assetThin: s.assetThin,
