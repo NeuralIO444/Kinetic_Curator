@@ -175,7 +175,8 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 }
 
 // 7. The builder wiring: wantEngraving binds the finish to the true body item only; the drawn moth is
-//    the same 26 items; skeleton PUBLICATION still answers only to wantSkeletons.
+//    the same 58 items (S3's feather fan set the census — creature.selfcheck pins it; engraving adds
+//    and removes none); skeleton PUBLICATION still answers only to wantSkeletons.
 {
   const PAL = { bg: '#111111', ink: '#eeeeee', swatches: ['#aa0000', '#222222'] };
   const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
@@ -189,7 +190,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
     return { b, items: e[0].items.filter((it) => it._creature) };
   };
   const on = grow({ wantEngraving: true });
-  assert.equal(on.items.length, 26, 'engraving on: the drawn moth is unchanged');
+  assert.equal(on.items.length, 58, 'engraving on: the drawn moth is unchanged');
   // TWO items carry the body asset: the halo underlay (drawn by the halo loop) and the true body
   // stamp. The finish rides the stamp only — exactly one engraved item in the whole creature.
   const bodies = on.items.filter((it) => it.engrave !== undefined);
@@ -200,7 +201,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   assert.ok(bodies[0].engrave[13] > 0, 'spacing positive');
   assert.deepEqual(on.b.lastSkeletons(), [null], 'wantEngraving builds bones for the finish but publishes none');
   const off = grow({});
-  assert.equal(off.items.length, 26, 'engraving off: the drawn moth is unchanged');
+  assert.equal(off.items.length, 58, 'engraving off: the drawn moth is unchanged');
   assert.ok(off.items.every((it) => it.engrave === undefined), 'flag off: no item carries engraving — the pre-S4 items, exactly');
   // Determinism: a second builder on the same input packs the identical engraving data.
   const again = grow({ wantEngraving: true });
