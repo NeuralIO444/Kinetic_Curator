@@ -33,7 +33,7 @@ import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
 import { initDirectorBeat, setPresenceProvider } from './curator/director.js'; // #1145
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
-import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (nothing consumes them yet)
+import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (the creature's posture consumes them since S5)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
 import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomProvider, noteKeep } from './curator/formationLive.js';

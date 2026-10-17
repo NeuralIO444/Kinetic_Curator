@@ -1,7 +1,9 @@
 // stressLive.js — #1354: the stress tracker, fed by the live instrument's honest signals. A module singleton.
 //
-// NOTHING CONSUMES THE BAND YET: this only computes it, so Matt can watch it (the ?debug=stress readout) and the
-// thresholds can be tuned from real sessions before Davis, LOIS or the Queen read it (Phase 4).
+// CONSUMED, as of Phase 2 S5: the creature's posture reads the band + smoothed value (liveLoop stamps
+// them on the resolver input; engine/creaturePose.js poses from them). Davis, LOIS and the Queen still
+// do not read it (Phase 4). Matt watches it on the ?debug=stress readout, and the thresholds are tuned
+// from real sessions (#1635's occupancy evidence).
 //
 // Signals, per presented frame while the instrument is running:
 //   activity  real artist actions (loisActivity.beat() calls) inside the last ACTIVITY_WINDOW_FRAMES frames
