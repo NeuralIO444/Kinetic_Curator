@@ -41,6 +41,8 @@ let currentMagnitude = 0;
 let paceMagnitude = 0;
 // #1475 — her set playing shows the same mark: the third hand, the same single sign
 let setMagnitude = 0;
+// #1640 — the dial lean (her hand on the wetness and evolve dials in silence) shows the same mark while it moves a dial
+let dialMagnitude = 0;
 const subscribers = new Set();
 const notify = () => { for (const fn of subscribers) { try { fn(); } catch { /* a listener must not break the holder */ } } };
 
@@ -65,9 +67,17 @@ export function setSetMagnitude(n) {
   notify();
 }
 
+/** Called by the dial-lean driver: 0 when it is not moving a dial. */
+export function setDialMagnitude(n) {
+  const next = Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
+  if (next === dialMagnitude) return;
+  dialMagnitude = next;
+  notify();
+}
+
 /** Called by the presence mark on render: whichever hand is heaviest. */
 export function getSwayMagnitude() {
-  return Math.max(currentMagnitude, paceMagnitude, setMagnitude);
+  return Math.max(currentMagnitude, paceMagnitude, setMagnitude, dialMagnitude);
 }
 
 /** useSyncExternalStore-shaped: the mark re-renders when the pace appears or goes. */

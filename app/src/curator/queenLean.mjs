@@ -345,3 +345,71 @@ export function tempoEaseOpen({ current, target, confidence, nKeeps = Infinity, 
 export function tempoEase(args) {
   return GATE_OPEN ? tempoEaseOpen(args) : null;
 }
+
+// ─── M8: the dial lean (#1640 — the Queen's lean, applied) ─────────────────────────────────────────────
+// The validated Mind lean (mindContract's queen reply: { wetness?, evolve? }, each 0..1) was answered for
+// and then dropped — validated by the contract, applied nowhere. M8 applies it to the two dials the ruling
+// named (Matt, 2026-10-16, on #1640): the WETNESS dial (layoutParams.accumulationWetness, 0..1, live-only)
+// and the EVOLVE rate (evolveInterval, 200..10000 ms). It is M7's shape aimed at two more dials — the same
+// gates (MIN_KEEPS floor, the room's allowance; M7's third gate, a confident measurement, has no analogue
+// here: a validated lean IS the measurement, and a missing key is its absent case), the same bounded step
+// scaled by the hand she is given, the same dead-band so she stops rather than chases the last wobble, and
+// null whenever she should not move — no lean means the dials are bit-identical to a build without her.
+//
+// The two leans read as TARGETS in each dial's own terms, symmetric with the contract validating them
+// identically: wetness names the wetness (0 is dry — the dial's own copy says so). Evolve names how much
+// evolution she wants, 0..1 from the dial's slowest to its fastest: the goal interval is
+// MAX − lean × (MAX − MIN), so evolve 1 aims at 200 ms and evolve 0 at 10000 ms. Steps are a like fraction
+// of each dial's span to M7's (3 BPM of a 120 span ≈ 2.5%): wetness 0.05 of its unit span, evolve 250 ms
+// of its 9800 span, each scaled by (0.5 + 0.5·allowance) exactly as M7 scales. One step lands per phrase —
+// the driver (curator/leanLive.js, hosted by director.leanDialSteps) steps on CLOCK_BAR phrase boundaries,
+// and only inside a silence window with no artist hand on either dial (the hand-silence lives in the
+// driver, exactly as M7's lives in paceLive). Nothing here reads a clock or a die: a recorded lean
+// replays to the same dial values.
+export const M8_WET_STEP = 0.05; // of the wetness dial's 0..1 span, per phrase, at a full hand
+export const M8_WET_DEADBAND = 0.02; // within this of the goal she is done
+export const M8_EVOLVE_RANGE = [200, 10000]; // the evolve dial's own span, ms (EvolveControls' min/max)
+export const M8_EVOLVE_STEP = 250; // ms per phrase at a full hand (≈2.5% of the span, M7's fraction)
+export const M8_EVOLVE_DEADBAND = 100; // ms — within this of the goal she is done
+
+const boundedDialStep = (current, goal, stepMax, deadband) => {
+  const gap = goal - current;
+  if (Math.abs(gap) <= deadband) return null;
+  const step = Math.min(stepMax, Math.abs(gap));
+  return current + Math.sign(gap) * step;
+};
+
+/** wetnessLeanOpen({ current, target, nKeeps, allowance }) — PURE (ignores GATE_OPEN): one bounded step
+ *  of the wetness dial toward the lean's wetness target, or null: below the keeps floor, no hand, no
+ *  target named, not a number, already arrived. */
+export function wetnessLeanOpen(args = {}) {
+  const { current, target, nKeeps, allowance } = args;
+  if (!(nKeeps >= MIN_KEEPS)) return null;
+  if (!(allowance > 0)) return null;
+  if (!Number.isFinite(current) || !Number.isFinite(target)) return null;
+  const next = boundedDialStep(current, clamp01(target), M8_WET_STEP * (0.5 + 0.5 * clamp01(allowance)), M8_WET_DEADBAND);
+  return next === null ? null : Math.round(next * 1000) / 1000;
+}
+
+/** wetnessLean(args) — the public, gated M8 wetness step. */
+export function wetnessLean(args) {
+  return GATE_OPEN ? wetnessLeanOpen(args) : null;
+}
+
+/** evolveLeanOpen({ current, lean, nKeeps, allowance }) — PURE (ignores GATE_OPEN): one bounded step of
+ *  the evolve interval toward the pace the lean names, or null on the same gates as wetnessLeanOpen. */
+export function evolveLeanOpen(args = {}) {
+  const { current, lean, nKeeps, allowance } = args;
+  if (!(nKeeps >= MIN_KEEPS)) return null;
+  if (!(allowance > 0)) return null;
+  if (!Number.isFinite(current) || !Number.isFinite(lean)) return null;
+  const [lo, hi] = M8_EVOLVE_RANGE;
+  const goal = hi - clamp01(lean) * (hi - lo);
+  const next = boundedDialStep(current, goal, M8_EVOLVE_STEP * (0.5 + 0.5 * clamp01(allowance)), M8_EVOLVE_DEADBAND);
+  return next === null ? null : Math.round(next);
+}
+
+/** evolveLean(args) — the public, gated M8 evolve step. */
+export function evolveLean(args) {
+  return GATE_OPEN ? evolveLeanOpen(args) : null;
+}

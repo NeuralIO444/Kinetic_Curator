@@ -49,12 +49,14 @@ ok('a file source and then no audio are reported as input changes; silence start
 });
 
 ok('the registry names who listens; the app feeds them from the meter levels in the one frame tap', () => {
-  // onset and energy are read by the trio's conducting (#1483); input, tempo and the silences by the pace (#1460) and the trio
+  // onset and energy are read by the trio's conducting (#1483); input, tempo and the silences by the pace (#1460) and the trio;
+  // input and the silences also open and close the dial lean's window (#1640) — tempo is not hers to hear
   for (const k of ['AUDIO_ONSET', 'AUDIO_ENERGY']) {
     assert.deepEqual(EVENT_REGISTRY[k].handler, ['curator/trioLive.js'], k);
   }
-  for (const k of ['AUDIO_INPUT', 'AUDIO_TEMPO', 'AUDIO_SILENCE_START', 'AUDIO_SILENCE_END']) {
-    assert.deepEqual(EVENT_REGISTRY[k].handler, ['curator/paceLive.js', 'curator/trioLive.js'], k);
+  assert.deepEqual(EVENT_REGISTRY.AUDIO_TEMPO.handler, ['curator/paceLive.js', 'curator/trioLive.js'], 'AUDIO_TEMPO');
+  for (const k of ['AUDIO_INPUT', 'AUDIO_SILENCE_START', 'AUDIO_SILENCE_END']) {
+    assert.deepEqual(EVENT_REGISTRY[k].handler, ['curator/paceLive.js', 'curator/trioLive.js', 'curator/leanLive.js'], k);
   }
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.match(app, /setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeAudio\(input && input\.loopTimeMs, readMeterBandLevels\(\)/);

@@ -25,6 +25,8 @@ import {
   swayOpen, swayBiases,
   M6_KEEPS, M6_STRENGTH, warmCentreOpen, warmCentre,
   M7_CONFIDENCE, M7_STEP, M7_DEADBAND, M7_RANGE, tempoEaseOpen, tempoEase,
+  M8_WET_STEP, M8_WET_DEADBAND, M8_EVOLVE_RANGE, M8_EVOLVE_STEP, M8_EVOLVE_DEADBAND,
+  wetnessLeanOpen, wetnessLean, evolveLeanOpen, evolveLean,
 } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 
@@ -253,6 +255,58 @@ ok('M7: a bounded step toward the target, never past it, never chasing a wobble'
 ok('M7: the gate decides: open reads through', () => {
   const a = { current: 100, target: 130, confidence: 0.9, nKeeps: MIN_KEEPS, allowance: 1 };
   assert.equal(tempoEase(a), GATE_OPEN ? tempoEaseOpen(a) : null);
+});
+
+// ─── M8: the dial lean (#1640) — her validated lean, applied to the WETNESS and EVOLVE dials ─────────────
+const near = (a, b) => Math.abs(a - b) < 1e-9;
+ok('M8: below MIN_KEEPS, with no hand, or with no lean named, she does not move either dial', () => {
+  const wet = { current: 0, target: 0.62, nKeeps: MIN_KEEPS, allowance: 1 };
+  const evo = { current: 2000, lean: 1, nKeeps: MIN_KEEPS, allowance: 1 };
+  assert.ok(wetnessLeanOpen(wet) > 0 && evolveLeanOpen(evo) < 2000, 'the open cases move');
+  assert.equal(wetnessLeanOpen({ ...wet, nKeeps: MIN_KEEPS - 1 }), null);
+  assert.equal(evolveLeanOpen({ ...evo, nKeeps: MIN_KEEPS - 1 }), null);
+  assert.equal(wetnessLeanOpen({ ...wet, allowance: 0 }), null);
+  assert.equal(evolveLeanOpen({ ...evo, allowance: 0 }), null);
+  assert.equal(wetnessLeanOpen({ ...wet, target: undefined }), null, 'a lean that does not name wetness');
+  assert.equal(evolveLeanOpen({ ...evo, lean: undefined }), null, 'a lean that does not name evolve');
+  assert.equal(wetnessLeanOpen({ ...wet, target: NaN }), null);
+  assert.equal(evolveLeanOpen({ ...evo, lean: NaN }), null);
+});
+
+ok('M8 wetness: a bounded step toward the named wetness, never past it, never chasing the last wobble', () => {
+  const at = (cur, tgt, allowance = 1) => wetnessLeanOpen({ current: cur, target: tgt, nKeeps: MIN_KEEPS, allowance });
+  assert.ok(near(at(0, 0.62), M8_WET_STEP), 'a full hand moves M8_WET_STEP');
+  assert.ok(near(at(0.62, 0), 0.62 - M8_WET_STEP), 'and downwards, toward dry');
+  const half = at(0, 0.62, 0.5);
+  assert.ok(half > 0 && half < M8_WET_STEP, 'a small hand moves less');
+  assert.equal(at(0.605, 0.62), null, 'inside the dead-band she is done');
+  assert.equal(at(0.62, 0.62), null, 'arrived is arrived');
+  assert.ok(near(at(0.59, 0.62), 0.62), 'a gap just over the dead-band closes exactly, never past');
+  assert.ok(near(at(0.9, 2), 0.95), 'a target past the dial is clamped to the dial');
+  let v = 0; for (let i = 0; i < 40; i++) { const nx = at(v, 0.62); if (nx === null) break; v = nx; }
+  assert.ok(v >= 0.62 - M8_WET_DEADBAND && v <= 0.62, `converges into the dead-band (${v})`);
+});
+
+ok('M8 evolve: the lean names a pace — 1 is the dial at its fastest, 0 at its slowest — stepped in bounded ms', () => {
+  const at = (cur, lean, allowance = 1) => evolveLeanOpen({ current: cur, lean, nKeeps: MIN_KEEPS, allowance });
+  const [lo, hi] = M8_EVOLVE_RANGE;
+  assert.equal(at(2000, 1), 2000 - M8_EVOLVE_STEP, 'a full hand moves M8_EVOLVE_STEP toward fast');
+  assert.equal(at(2000, 0), 2000 + M8_EVOLVE_STEP, 'toward slow');
+  assert.equal(at(2000, 0.5, 0.5), 2000 + Math.round(M8_EVOLVE_STEP * 0.75), 'a smaller hand moves less');
+  assert.equal(at(lo + 50, 1), null, 'within the dead-band of the fastest she is done');
+  assert.equal(at(hi, 0), null, 'at the slowest, leaning slow, she is done');
+  assert.equal(at(350, 1), lo, 'a gap just over the dead-band closes exactly, never past the dial');
+  let v = 2000; for (let i = 0; i < 60; i++) { const nx = at(v, 1); if (nx === null) break; v = nx; }
+  assert.ok(v >= lo && v <= lo + M8_EVOLVE_DEADBAND, `converges into the dead-band of fast (${v})`);
+  v = 2000; for (let i = 0; i < 60; i++) { const nx = at(v, 0); if (nx === null) break; v = nx; }
+  assert.ok(v <= hi && v >= hi - M8_EVOLVE_DEADBAND, `converges into the dead-band of slow (${v})`);
+});
+
+ok('M8: the gate decides: open reads through, on both dials', () => {
+  const wet = { current: 0, target: 0.62, nKeeps: MIN_KEEPS, allowance: 1 };
+  const evo = { current: 2000, lean: 1, nKeeps: MIN_KEEPS, allowance: 1 };
+  assert.equal(wetnessLean(wet), GATE_OPEN ? wetnessLeanOpen(wet) : null);
+  assert.equal(evolveLean(evo), GATE_OPEN ? evolveLeanOpen(evo) : null);
 });
 
 console.log(`\nqueenLean: ${n} checks passed`);
