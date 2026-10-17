@@ -7,6 +7,10 @@ Stack note: S2–S6 are staging concurrently; this slice is built against S1's c
 (the bone shape, `skeletonHash`, the `'skeleton'` RNG channel, `transformSkeleton`) and touches no S1
 file, so the coordinator's publish rebase has nothing of S1's to collide with.
 (This file replaces the S1 staging report the worktree inherited from its base commit.)
+Recovery note: two runtime restarts killed the first two builders on this slice (the original in
+its sweep phase, the first recovery builder minutes in). The surviving tree was audited file by
+file by the recovery builder — every draft claim below was re-run or re-measured before it was
+kept; the code was committed before verification resumed so a further restart could not strand it.
 
 ## What shipped
 
@@ -93,7 +97,9 @@ a null head; lopsided brackets return normally).
 
 This slice registers **no** GPU cost and adds nothing to `kernel/costRegistry.mjs`: no pass, no
 shader, no draw. The generator and the poses are arithmetic over ≤ 384 bones (expansion + turtle at
-birth; an FK pass per posed frame — microseconds at creature counts), exactly S1's posture. A tree's
+birth; an FK pass per posed frame — microseconds at creature counts), exactly S1's posture.
+Measured on this sandbox (CPU, contended — indicative only): growing the 242-bone golden canopy
+costs ≈ 0.31 ms once, at birth; posing it (growth + prune composed) costs ≈ 0.020 ms per frame. A tree's
 first GPU cost lands when a later slice skins or draws it; that slice registers the tier then. Trees
 grow in the moth's box units but are not box-bounded (a spire's crown passes the box top) —
 `transformSkeleton` scales a tree to its stage size like any skeleton, which is the consumer's call,
@@ -114,8 +120,10 @@ honoured), no new panel, no clock reads — `mathRandomGuard` still reports its 
   `skeleton.selfcheck`.
 - Family: skeleton, creature, kernel/rng, mathRandomGuard, runSelfcheck — OK.
 - `npm run build` — green. ESLint — 0 errors on the touched files.
-- Full manifest sweep: **449/449 suites recorded.** 430 passed clean on every recorded run. The
-  19 suites below produced at least one non-pass record; **every one is dispositioned with paired
+- Full manifest sweep: **449/449 suites recorded** — twice over (the coordinator's runners and the
+  recovery builder's resilient continue-on-fail sweep agree exactly: 430 pass, 19 non-pass under
+  sweep conditions). The suites below produced at least one non-pass record in some run; **every
+  one is dispositioned with paired
   evidence on pristine base `d8009ee9`** (a detached worktree of the base commit, run under the
   same conditions). No exception is reachable from this diff: `app/src` is byte-identical to base
   except the two new files (`engine/lsystem.js`, `engine/lsystem.selfcheck.mjs`) — verified by a
@@ -130,6 +138,11 @@ honoured), no new panel, no clock reads — `mathRandomGuard` still reports its 
     "resolver mean with four creatures 10.561 ms (budget 5)").
   - *Cap artefact, passes solo on both trees (1):* **rasterFast** (sweep timeout at the 300 s
     cap; solo PASS build 354 s, base 406 s).
+  - *Load-starved in one recovery sweep, passes solo on this tree (2):* **debug** (FAIL in the
+    recovery builder's peak-load sweep; solo PASS on this tree, 48 cases OK, and PASS on base)
+    and **miner** (300 s sweep timeout at load ~19; solo PASS on this tree — "miner.selfcheck:
+    OK" — and PASS on base). Same load-lottery class as rasterFast; neither imports `lsystem.js`
+    (nothing does except its own selfcheck — grep-verified).
   - *Non-completion on both trees (12):* **rollSafety**, **accum** (base OOM-killed, exit 137;
     build timeout), **composite**, **canvasSizes**, **patternRender**, **exportStill**,
     **regionPlayback**, **phase6**, **regionBake**, **grainFinish**, **variants**,
