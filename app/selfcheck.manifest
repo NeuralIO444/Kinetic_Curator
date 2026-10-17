@@ -289,6 +289,7 @@ node src/engine/creature.selfcheck.mjs
 node src/engine/skeleton.selfcheck.mjs
 node src/engine/wingWarp.selfcheck.mjs
 node src/engine/featherFan.selfcheck.mjs
+node src/engine/creaturePose.selfcheck.mjs
 node src/curator/limbs.selfcheck.mjs
 node src/curator/davisShift.selfcheck.mjs
 node src/curator/roomWidth.selfcheck.mjs

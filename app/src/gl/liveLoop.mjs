@@ -33,6 +33,7 @@ import { getFormedPins, getLimbPairs, getPinTraits } from './resolveTap.mjs'; //
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
+import { getStressState } from '../curator/stressLive.js'; // Phase 2 S5: the band reader's latest filtered reading, stamped on the frame input below
 import { spectrumMarksShed } from './sceneContract.js';
 import { spectrumMarksFor } from './spectrumMarks.mjs'; // #1482 P3: the dials -> the renderer's spectrum key
 import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469: the loop notes its LIFE reading for the STIMULI readout
@@ -638,6 +639,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       focusSwap,
       wantSkeletons, // Phase 2 S1 — a skeleton consumer is live (the ?debug=skeleton overlay); the creature builder builds bones only then
       wantEngraving, // Phase 2 S4 — the engraved body finish is a shipped look (default on in createLiveLoop); the builder binds spine joints to body items only when asked. A future governor shed rung flips this input, the way perfTier1 sheds passes
+      band: getStressState().band, // Phase 2 S5 — the band reader's filtered band for this frame (null until it runs); recorded with the take, so a take replays its creatures' postures exactly
+      smoothed: getStressState().smoothed, // Phase 2 S5 — the reader's smoothed stress; the pose blend rides it, never the raw value
+
       perfClampOverride: s.perfClampOverride,
       perfTier1: s.perfTier1,
       assetThin: s.assetThin,

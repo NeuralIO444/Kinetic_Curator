@@ -169,6 +169,14 @@ export function getLastFrameMotion() { return lastFrameMotion; }
 let lastSkeletons = [];
 export function getLastSkeletons() { return lastSkeletons; }
 
+/**
+ * Phase 2 S5 — the last resolved frame's band poses (per pin, one shared object — the pose is the
+ * room's; null where no moth, all null when no band rode the input), published for the consumers
+ * that follow: S2's skinning and S4's material (the pose's dim above all) read them from here.
+ */
+let lastPoses = [];
+export function getLastPoses() { return lastPoses; }
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -1005,6 +1013,7 @@ export function createLiveResolver() {
     // frozen frame (slowRender): nothing is carried then, and a stale strength would be a ghost.
     lastFrameMotion = { kineme: frameKineme, wind: input.slowRender ? 0 : frameWind, mothBeat: creatures.lastWingBeat() };
     lastSkeletons = creatures.lastSkeletons(); // S1 — the frame's bone graphs, for ?debug=skeleton
+    lastPoses = creatures.lastPoses(); // S5 — the frame's band poses, for S2/S4 to consume
     return out;
   }
 
