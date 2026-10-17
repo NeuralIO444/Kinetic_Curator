@@ -161,3 +161,24 @@ export function shedOrder(ids, measuredMs) {
     return costOf(b) - costOf(a); // costlier sheds first within a tier
   });
 }
+
+// ============================================================================
+// APPEND-ONLY — Phase 2 creature slices. Cost declarations for the creature
+// system are appended here, one marked block per slice, so the parallel slice
+// branches rebase onto each other without fighting over the registry's body.
+// Do not edit another slice's block.
+// ============================================================================
+
+// --- S3: feather-fan plumage (engine/featherFan.js, emitted by engine/creature.js) ---
+// Tier 0 (structural, never shed): the fan adds NO GPU pass, shader or FBO —
+// its parts are instanced sprites inside the existing structural item pass,
+// and plumage is shed by creature count, never by the effect ladder. timeMs
+// and memoryBytes are therefore 0; the fan's real cost is CPU item emission,
+// measured at the 4-creature cap by gl/resolverProbe (see the S3 staging
+// report), and its item count is bounded by hierarchy's global budget.
+registerCostTier('engine/creature-feather-fan', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0,
+  notes: 'Phase 2 S3 feather fans: no new GPU pass; instanced sprites in the structural item pass. CPU emission cost measured by resolverProbe at the 4-creature cap; items bounded by HIER_GLOBAL_BUDGET (2000).',
+});
