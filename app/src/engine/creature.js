@@ -1,27 +1,30 @@
 // engine/creature.js — #1355 / #1206 Phase 3 step 4: the first creature, the MOTH. Pure but for its own grow-in ages.
 //
-// A formed pin (curator/formation.js decided it) becomes a creature built from three parts by hierarchy.js:
+// A formed pin (curator/formation.js decided it) becomes a creature built from parts by hierarchy.js:
 //   body   the root, at the pin
 //   wing   the LIMB: two, each attached at one of the body's ATTACH points (the wet lab's points, so the artist's
 //          edits move where the wings join)
-//   mark   the HANDS: scales, scattered on each wing with the Poisson sampler, in wing-local space
+//   fan    the HANDS: a feather fan grown along each wing's bone chain (Phase 2 S3, engine/featherFan.js) —
+//          parts rooted on the bones, root-short to tip-long, ornaments pinned to the joints, in wing-local
+//          space. (Before S3 these were scales scattered over the wing's surface by a Poisson sampler; the
+//          fan replaces that scatter entirely.)
 // The result is more marks in the same item shape the renderer already draws. The renderer never learns a hierarchy
 // exists. Everything is a function of the resolver's input and its own frame count: no clock, no chance, so a
 // recorded take replays the same moth.
 //
-// The pilot parts are existing built-in assets (decision 4: three parts first). Which assets, and the numbers below,
+// The pilot parts are existing built-in assets (decision 4: parts first). Which assets, and the numbers below,
 // are the first look, not the last: they are named constants so Matt's review can move them.
 import { expandHierarchy } from './hierarchy.js';
 import { buildSkeleton, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
-import { buildWingWarp, warpPoint, WARP_FLEX_RATIO } from './wingWarp.mjs';
-import { poissonPointSet } from './kernel/sample/poisson.js';
+import { buildWingWarp, WARP_FLEX_RATIO } from './wingWarp.mjs';
+import { FAN_PARTS, FAN_COUNTS, wingLocalChain, fanPlacements, mirrorPlacements } from './featherFan.js';
 import { attachPointsFor } from './autoAttach.js';
 import { kinemePhase } from '../data/kinemes.js';
 import { applyLean } from './kernel/color/index.js';
 import { snapPair, snaps } from './groundSnap.js';
 import { nudgeAxis } from './groundNudge.js';
 
-export const MOTH_PARTS = Object.freeze({ body: 'org_pod_02', wing: 'org_leaf_02', mark: 'geo_diamond_01' });
+export const MOTH_PARTS = Object.freeze({ body: 'org_pod_02', wing: 'org_leaf_02' });
 
 /** Phase 2 S2 — hierarchy path segment → the skeleton chain that skins it (wingWarp.mjs). */
 const WARP_SEGMENTS = Object.freeze({
@@ -31,22 +34,19 @@ const WARP_SEGMENTS = Object.freeze({
 export const MOTH = Object.freeze({
   bodyScale: 1.7, // canvas px per asset unit (an asset box is 100 units)
   wingScale: 1.7,
-  markScale: 0.26,
-  marksPerWing: 10,
   spread: 58, // degrees each wing is turned out from straight up
   flap: 9, // degrees of wing beat
   flapMs: 1700, // one beat, on the loop clock
   growFrames: 45, // resolver frames from spore to full size
-  /** Where scales may sit, in wing units from the wing's centre: inside the leaf's outline. */
-  markBounds: Object.freeze({ x0: -8, y0: -26, x1: 8, y1: 26 }),
-  markRadius: 9, // wing units between scales
+  /** The wing-local box the fan's surface children are declared against (S3): the fan runs from the wing's
+   *  root to past its tip, so this is the fan's whole footprint, not the leaf's outline. */
+  fanBounds: Object.freeze({ x0: -70, y0: -85, x1: 70, y1: 60 }),
   // The second pair (step 5): hind wings, smaller, set lower on the body and turned further down, beating against the
   // fore pair. They grow in and shrink out over pairFrames as the crowd (curator/limbs.js) gives and takes them.
   hindScale: 0.78, // of a fore wing
   hindSpread: 122, // degrees from straight up: pointing down and out
   hindAlong: 0.45, // where on the body: this far from the side point toward the bottom point
   hindFlap: 0.7, // of the fore pair's beat, in counterphase
-  marksPerHind: 6,
   pairFrames: 45, // resolver frames for a pair to grow in or out
   halo: 1.14, // the bg-coloured outline under body and wings, as a multiple of their size: it lifts the moth off a busy dish
 });
@@ -197,6 +197,14 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0, traits 
     const k2 = k * MOTH.hindScale * hind;
     return { dx: p.x - (root.x * c - root.y * s) * k2, dy: p.y - (root.x * s + root.y * c) * k2, dRot: theta, dScaleX: k2, dScaleY: k2 };
   };
+  // The fan (S3): one surface child per part kind, counts from featherFan.js's FAN_COUNTS — the fan
+  // layout (createFanScatter below) grows exactly those counts, so the recipe and the layout agree.
+  const fanChildren = (counts) => [
+    { part: 'fanPlate', anchor: 'surface', count: counts.plate, key: 'fanplate' },
+    { part: 'fanFeather', anchor: 'surface', count: counts.feather, key: 'fanfeather' },
+    { part: 'fanLeaf', anchor: 'surface', count: counts.leaf, key: 'fanleaf' },
+    { part: 'fanChevron', anchor: 'surface', count: counts.chevron, key: 'fanchevron' },
+  ];
   const parts = {
     body: {
       asset: MOTH_PARTS.body,
@@ -205,10 +213,13 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0, traits 
     },
     wing: {
       asset: MOTH_PARTS.wing,
-      localBounds: MOTH.markBounds,
-      children: [{ part: 'mark', anchor: 'surface', count: MOTH.marksPerWing, key: 'marks' }],
+      localBounds: MOTH.fanBounds,
+      children: fanChildren(FAN_COUNTS.fore),
     },
-    mark: { asset: MOTH_PARTS.mark },
+    fanPlate: { asset: FAN_PARTS.plate.asset },
+    fanFeather: { asset: FAN_PARTS.feather.asset },
+    fanLeaf: { asset: FAN_PARTS.leaf.asset },
+    fanChevron: { asset: FAN_PARTS.chevron.asset },
   };
   if (withHind) {
     parts.body.anchors.hindR = hindAnchor('right', 1);
@@ -216,39 +227,48 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0, traits 
     parts.body.children.push({ part: 'hind', anchor: 'hindR' }, { part: 'hind', anchor: 'hindL' });
     parts.hind = {
       asset: MOTH_PARTS.wing,
-      localBounds: MOTH.markBounds,
-      children: [{ part: 'mark', anchor: 'surface', count: MOTH.marksPerHind, key: 'hmarks' }],
+      localBounds: MOTH.fanBounds,
+      children: fanChildren(FAN_COUNTS.hind),
     };
   }
   return { parts };
 }
 
-/** FNV-1a: a stable 32-bit number from a string. */
-function hash32(str) {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
-  return h >>> 0;
-}
-
 /**
- * The scatter hierarchy.js asks for, backed by the Poisson-disc sampler: one set per creature, the left wing its
- * mirror image (a moth is symmetric), each scale a little turned and sized.
+ * The surface scatter hierarchy.js asks for, S3: not a scatter at all any more — the FAN layout for this
+ * creature (engine/featherFan.js), grown on the skeleton the builder just built. Each wing's layout is
+ * computed once, on the RIGHT chain, and mirrored onto the left: the skeleton's own mirror is bit-exact
+ * (skeleton.js's mirrorBone), so the left fan lies on the left bones exactly, and a moth stays symmetric
+ * by construction. The hierarchy's `count` is a request the recipe already sized from the same
+ * FAN_COUNTS the layout grows, so the placements returned are the layout itself.
  */
-function mothScatter(seed, seedOffsets, pinIndex) {
-  const k = MOTH.markScale / MOTH.wingScale;
-  return (key, count, b) => {
-    const w = b.x1 - b.x0;
-    const h = b.y1 - b.y0;
-    const hindSet = String(key).includes('hmarks');
-    const set = poissonPointSet((seed ^ hash32(`moth${pinIndex}${hindSet ? 'h' : ''}`)) >>> 0, count, w, h, seedOffsets, MOTH.markRadius);
-    const left = String(key).includes('wingL') || String(key).includes('hindL');
-    const out = new Array(count);
-    for (let i = 0; i < count; i++) {
-      const p = set[i % set.length];
-      const dx = b.x0 + p.x;
-      out[i] = { dx: left ? -dx : dx, dy: b.y0 + p.y, dRot: left ? -45 : 45, dScaleX: k, dScaleY: k };
+function createFanScatter({ seed, seedOffsets, creatureId, skel, anchors, bodyTrait }) {
+  const layouts = new Map(); // wing anchor name -> { plate, feather, leaf, chevron } placements
+  const layoutFor = (anchorName) => {
+    if (layouts.has(anchorName)) return layouts.get(anchorName);
+    const hind = anchorName.startsWith('hind');
+    const chainId = hind ? 'hind' : 'fore';
+    const counts = hind ? FAN_COUNTS.hind : FAN_COUNTS.fore;
+    const rightName = anchorName.replace(/L$/, 'R');
+    // the right layout is computed once per wing pair and shared: the left wing mirrors it
+    let right = layouts.get(rightName);
+    if (!right) {
+      const chain = wingLocalChain(skel, chainId, 'R', anchors[rightName], bodyTrait);
+      right = fanPlacements({ chain, seed, creatureId, chainKey: chainId, counts, seedOffsets });
+      layouts.set(rightName, right);
     }
+    const out = anchorName.endsWith('L')
+      ? Object.fromEntries(Object.entries(right).map(([kind, list]) => [kind, mirrorPlacements(list, FAN_PARTS[kind].axisDeg)]))
+      : right;
+    layouts.set(anchorName, out);
     return out;
+  };
+  const KIND_OF_KEY = { fanplate: 'plate', fanfeather: 'feather', fanleaf: 'leaf', fanchevron: 'chevron' };
+  return (key) => {
+    const seg = String(key).split('/');
+    const layout = layoutFor(seg[seg.length - 2]);
+    const kind = KIND_OF_KEY[seg[seg.length - 1]];
+    return (layout && kind && layout[kind]) || [];
   };
 }
 
@@ -266,15 +286,13 @@ function chroma(hex) {
 /**
  * The builder the resolver owns. `append(input, entries, pool)` adds the moths to the TOP content layer's items.
  * With no pin formed it does nothing at all (byte-identical, and the grow-in ages reset).
- */
-/**
- * @param opts.skinning — Phase 2 S2: when true, the builder SKINS the wings — the skeleton is built every
- *   frame (a standing consumer, not just the debug flag's), its pose carries the beat's per-joint flex, and
- *   each wing item leaves with a skinned mesh (engine/wingWarp.mjs) while its scale marks are displaced by
- *   the same field. The resolver enables this (liveResolve constructs the builder with skinning on): the
- *   bent wing is the moth's standing look, not a debug view. A direct caller leaving it off gets the S1
- *   builder exactly: skeletons only under input.wantSkeletons, items never carrying a mesh, and at flex 0
- *   (rest) even a skinning builder emits the pre-S2 items byte for byte.
+ * @param opts.skinning — Phase 2 S2: when true, the builder SKINS the wings — world skeletons are built
+ *   every frame (a standing consumer, not just the debug flag's), the pose carries the beat's per-joint
+ *   flex, and each wing item leaves with a skinned mesh (engine/wingWarp.mjs). The fan (S3) grows on the
+ *   unflexed bind pose either way: its layout is pinned to those bones. The resolver enables skinning
+ *   (liveResolve constructs the builder with it on): the bent wing is the moth's standing look, not a
+ *   debug view. A direct caller leaving it off gets skeletons only under input.wantSkeletons and items
+ *   never carrying a mesh; at flex 0 (rest) even a skinning builder emits the unbent items byte for byte.
  */
 export function createCreatureBuilder({ skinning = false } = {}) {
   const ages = []; // frames each pin's creature has been formed
@@ -338,25 +356,32 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         const traits = normalizeTraits(input.dishTraits && input.dishTraits[i]);
         const vivid = pick(traits.swatch);
         const vivid2 = pick(traits.swatch + 1);
-        const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], [MOTH_PARTS.mark]: [ink, vivid] };
-        const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], [MOTH_PARTS.mark]: [ink, vivid2] };
+        // the fan's kinds take the wing's colours (they are the wing's plumage), except the chevron
+        // ornaments, which take the old scales' pairing — ink with a vivid accent — so the joints read
+        const fanColours = (w, m) => ({
+          [FAN_PARTS.feather.asset]: w, [FAN_PARTS.plate.asset]: w, [FAN_PARTS.leaf.asset]: w, [FAN_PARTS.chevron.asset]: m,
+        });
+        const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], ...fanColours([vivid, ink], [ink, vivid]) };
+        const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], ...fanColours([vivid2, ink], [ink, vivid2]) };
         const hindAmt = easeOut(pair2[i]);
         const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: hindAmt, traits });
         // the ground beneath the PIN (its home), so a hovering moth does not change colour with every wobble
         const gt = groundTreatment(ground, pin.x, pin.y, i, input.seed, input.seedOffsets || null);
         // Phase 2 S1 — this moth's SKELETON, built from the same attach points and the same angles the recipe
         // just used (so the frame provably describes the moth being drawn), placed by the root transform the
-        // hierarchy root gets below. Published via lastSkeletons() for the ?debug=skeleton overlay.
-        // Phase 2 S2 — the pose now also carries per-joint FLEX derived from the same beat (the wing's tip
-        // lags its root by WARP_FLEX_RATIO of the beat per joint; the hind pair flexes by its own smaller
-        // beat). The skeleton is built when a consumer exists: the debug publication (input.wantSkeletons,
-        // S1) OR the wing skin (skinning, S2 — see createCreatureBuilder): the skin is a standing consumer,
-        // and "no consumer" still means zero skeleton cost, not merely zero skeleton pixels.
+        // hierarchy root gets below. Phase 2 S2 — the pose also carries per-joint FLEX derived from the
+        // same beat (the wing's tip lags its root by WARP_FLEX_RATIO of the beat per joint; the hind pair
+        // flexes by its own smaller beat). Phase 2 S3 — the fan IS a consumer of the UNFLEXED local bones:
+        // the plumage grows on the bind pose (its goldens are pinned to it), so the local skeleton is built
+        // whenever a moth is formed. The WORLD skeletons (publication + the skin) are built only when a
+        // consumer exists — the debug publication (input.wantSkeletons, S1) OR the wing skin (skinning,
+        // S2) — so "no consumer" still means zero world-skeleton cost on top of the fan's own build, and
+        // lastSkeletons() publishes only what a consumer asked for, exactly as S1 left it.
         const beatG = beat * g; // NOT `bg` — that name is the palette background above (the halo colour)
         const foreFlexDeg = -beatG * WARP_FLEX_RATIO;
         const hindFlexDeg = beatG * MOTH.hindFlap * WARP_FLEX_RATIO;
         const rootT = { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale };
-        const buildWorld = (flex) => transformSkeleton(buildSkeleton({
+        const buildLocal = (flex) => buildSkeleton({
           seed: input.seed, creatureId: `m${i}`, plan: MOTH_SKELETON_PLAN, attach: bodyPoints,
           pose: {
             bodyScale: traits.body, wingScale: traits.wing,
@@ -367,17 +392,18 @@ export function createCreatureBuilder({ skinning = false } = {}) {
             hindFlexDeg: flex ? hindFlexDeg : 0,
           },
           seedOffsets: input.seedOffsets || null,
-        }), rootT);
-        const worldSkel = skinning || input.wantSkeletons ? buildWorld(true) : null;
+        });
+        const skel = buildLocal(false);
+        const worldSkel = skinning || input.wantSkeletons ? transformSkeleton(buildLocal(true), rootT) : null;
         frameSkeletons[i] = worldSkel;
         // The warp's bind pose: the same frame at flex 0, so the skin transforms are posed o bind^-1 and a
-        // zero-beat frame skins to the identity. Built only for the skin, only when actually bent.
+        // zero-beat frame skins to the identity. It is the fan's own skeleton, transformed — no third build.
         const flexActive = foreFlexDeg !== 0 || hindFlexDeg !== 0;
-        const refSkel = skinning && flexActive ? buildWorld(false) : null;
+        const refSkel = skinning && flexActive ? transformSkeleton(skel, rootT) : null;
         const { items } = expandHierarchy(
           { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
           recipe,
-          { seed: input.seed, scatter: mothScatter(input.seed >>> 0, input.seedOffsets || null, i) },
+          { seed: input.seed, scatter: createFanScatter({ seed: input.seed >>> 0, seedOffsets: input.seedOffsets || null, creatureId: `m${i}`, skel, anchors: recipe.parts.body.anchors, bodyTrait: traits.body }) },
         );
         const mark = (it, color, accent, scale, tag) => ({
           x: it.x, y: it.y, scale: it.scaleX * scale, scaleY: it.scaleY * scale, rotation: it.rotation, alpha: 100,
@@ -385,9 +411,10 @@ export function createCreatureBuilder({ skinning = false } = {}) {
           glass: false, _creature: true,
         });
         // Phase 2 S2 — the wing-warp contexts for this moth: hierarchy segment → its chain's posed + bind
-        // bones (world space) and the wing's own hierarchy item (the frame a scale mark is measured in).
-        // Empty unless the skin is on AND this frame is bent — at rest the wing items stay plain quads and
-        // the marks undisplaced, byte for byte the pre-S2 moth.
+        // bones (world space) and the wing's own hierarchy item. Empty unless the skin is on AND this
+        // frame is bent — at rest the wing items stay plain quads, byte for byte the unbent moth. The
+        // fan's parts are not displaced: they were laid out on the bind pose and ride the wing item's
+        // own transform, as the layout pinned them.
         const warpChains = new Map();
         if (refSkel && worldSkel) {
           for (const it of items) {
@@ -405,9 +432,11 @@ export function createCreatureBuilder({ skinning = false } = {}) {
           const ctx = warpChains.get(it._hier.path.split('/')[1]);
           return ctx ? buildWingWarp({ item: mi, bones: ctx.bones, refBones: ctx.refBones, wingPoints }) : null;
         };
-        // halos first (under everything of this creature), then the parts in order
+        // halos first (under everything of this creature), then the parts in order. The halo belongs to
+        // the body and the wings, never to the plumage — the fan's parts are surface children, as the
+        // scales were, and the rule names the role, not an asset.
         const haloColour = gt.halo || bg;
-        for (const it of items) if (it.assetId !== MOTH_PARTS.mark) {
+        for (const it of items) if (it._hier.anchorId !== 'surface') {
           const mi = mark(it, haloColour, haloColour, MOTH.halo, 'halo:');
           if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
           extra.push(mi);
@@ -417,14 +446,6 @@ export function createCreatureBuilder({ skinning = false } = {}) {
           const [color, accent] = gt.recolor(c0, a0);
           const mi = mark(it, color, accent, 1, '');
           if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
-          else if (it.assetId === MOTH_PARTS.mark) {
-            // a scale mark rides its wing's warp field: centre displaced, rotation takes the local bend
-            const ctx = warpChains.get(it._hier.path.split('/')[1]);
-            if (ctx) {
-              const d = warpPoint({ x: mi.x, y: mi.y, wingItem: ctx.wingItem, bones: ctx.bones, refBones: ctx.refBones, wingPoints });
-              if (d) { mi.x = d.x; mi.y = d.y; mi.rotation += d.dRot; }
-            }
-          }
           extra.push(mi);
         }
       }
