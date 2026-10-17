@@ -114,7 +114,37 @@ honoured), no new panel, no clock reads — `mathRandomGuard` still reports its 
   `skeleton.selfcheck`.
 - Family: skeleton, creature, kernel/rng, mathRandomGuard, runSelfcheck — OK.
 - `npm run build` — green. ESLint — 0 errors on the touched files.
-- Full manifest sweep: SWEEP_RESULTS_TO_FILL
+- Full manifest sweep: **449/449 suites recorded.** 430 passed clean on every recorded run. The
+  19 suites below produced at least one non-pass record; **every one is dispositioned with paired
+  evidence on pristine base `d8009ee9`** (a detached worktree of the base commit, run under the
+  same conditions). No exception is reachable from this diff: `app/src` is byte-identical to base
+  except the two new files (`engine/lsystem.js`, `engine/lsystem.selfcheck.mjs`) — verified by a
+  recursive diff of the whole tree.
+  - *Identical failure on both trees (3):* **swarmWasm** (same AssertionError; the sandbox has no
+    cargo, so the wasm build step cannot run anywhere here), **lootScan** (same duration
+    assertion, line 163 — 466 ms build vs 476 ms base against its budget), **livingMotion**
+    (same assertion, line 121 — 5.17 ms build vs 4.39 ms base against a 2 ms budget).
+  - *Wall-clock flips both ways (2):* **vortex** (2 ms budget; three alternating solo rounds —
+    build failed/passed at 15.0/5.4/3.7 ms, base failed 2 of its 3 rounds at 5.0/8.4/0.6 ms),
+    **resolverProbe** (sweep FAIL on build, solo PASS on build, solo FAIL on base —
+    "resolver mean with four creatures 10.561 ms (budget 5)").
+  - *Cap artefact, passes solo on both trees (1):* **rasterFast** (sweep timeout at the 300 s
+    cap; solo PASS build 354 s, base 406 s).
+  - *Non-completion on both trees (12):* **rollSafety**, **accum** (base OOM-killed, exit 137;
+    build timeout), **composite**, **canvasSizes**, **patternRender**, **exportStill**,
+    **regionPlayback**, **phase6**, **regionBake**, **grainFinish**, **variants**,
+    **prospecting** — each recorded exit 124 (timeout kill) on build and on base alike in paired
+    solo runs at 300–615 s caps. These are the sandbox's known heavy suites; CI is authoritative
+    for them.
+  - *Non-completion on identical code (1):* **cellKinemePlayback** — build capped at 420 s and
+    again at 600 s; base completed once in 333 s during a load lull. The suite and everything it
+    imports are byte-identical between the trees (see the recursive-diff note above), so
+    completion here is purely a load lottery; sustained load was 14–19 all night (six sibling
+    staging agents plus the coordinator verifying concurrently). CI is authoritative.
+  - Incident note: the first sweep's output and a scratch base worktree under `/tmp` were wiped
+    mid-run by a runtime restart. Records for the first 211 suites observed before the loss
+    (only non-passes: swarmWasm, rollSafety) were re-proven afterwards by the paired solo runs
+    above; all other sweep records were re-collected with runners logging into the workspace.
 
 ## Flagged design calls
 
