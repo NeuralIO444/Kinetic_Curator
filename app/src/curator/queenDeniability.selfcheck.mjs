@@ -74,6 +74,13 @@ ok('no store key and no saved-document key carries her: state is data, so she mu
   assert.deepEqual(hits, [], `state leaks: ${hits.join(', ')}`);
 });
 
+ok('the dial-lean driver (#1640) reaches the dials only through the bus: no store, no hidden module, no identifier', () => {
+  const text = code(src('curator/leanLive.js'));
+  assert.ok(!/useStore|state\/store|SET_LAYOUT_PARAM|SET_EVOLVE_INTERVAL/.test(text), 'the driver writes events, never state');
+  for (const h of HIDDEN) assert.ok(!text.includes(h), `leanLive must not reference ${h}`);
+  for (const id of IDS) assert.ok(!text.includes(id), `leanLive must not reference ${id}`);
+});
+
 ok('the only console trace allowed is behind the developer flag, and it is off by default', () => {
   const lean = src('curator/queenLean.mjs');
   assert.match(lean, /localStorage\.getItem\('kc:queen:trace'\)\s*===\s*'1'/);

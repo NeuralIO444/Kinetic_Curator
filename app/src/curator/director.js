@@ -33,7 +33,7 @@ import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
-import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre, tempoEase } from './queenLean.mjs';
+import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre, tempoEase, wetnessLean, evolveLean, M8_EVOLVE_RANGE } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
 import { emit, Events } from '../composition/eventBus.js';
@@ -469,5 +469,33 @@ export function paceStep({ current, target, confidence, keeps, allowance }) {
     return tempoEase({ current, target, confidence, nKeeps: pullKeeps(keeps).length, allowance });
   } catch {
     return null;
+  }
+}
+
+/**
+ * leanDialSteps({ lean, wetness, evolveInterval, keeps, allowance }) — the hosted #1640 dial lean: one
+ * bounded step for each dial the validated lean names (queenLean M8), against the pull's keeps. Returns
+ * { wetness, evolveInterval, pull } where each dial is the next value or null for "no move" — a key the
+ * lean does not name, a gate closed, a dial already arrived — and pull is the largest remaining gap
+ * across the dials that stepped, as a 0..1 fraction of each dial's span (what the mark reads; 0 when
+ * nothing stepped). A throw anywhere reads as no move on either dial.
+ */
+export function leanDialSteps({ lean, wetness, evolveInterval, keeps, allowance }) {
+  try {
+    const nKeeps = pullKeeps(keeps).length;
+    const nextWetness = wetnessLean({ current: wetness, target: lean && lean.wetness, nKeeps, allowance });
+    const nextEvolve = evolveLean({ current: evolveInterval, lean: lean && lean.evolve, nKeeps, allowance });
+    let pull = 0;
+    if (nextWetness !== null && Number.isFinite(lean.wetness) && Number.isFinite(wetness)) {
+      pull = Math.max(pull, Math.abs(lean.wetness - wetness));
+    }
+    if (nextEvolve !== null && Number.isFinite(lean.evolve) && Number.isFinite(evolveInterval)) {
+      const [lo, hi] = M8_EVOLVE_RANGE;
+      const goal = hi - Math.min(1, Math.max(0, lean.evolve)) * (hi - lo);
+      pull = Math.max(pull, Math.abs(goal - evolveInterval) / (hi - lo));
+    }
+    return { wetness: nextWetness, evolveInterval: nextEvolve, pull };
+  } catch {
+    return { wetness: null, evolveInterval: null, pull: 0 };
   }
 }
