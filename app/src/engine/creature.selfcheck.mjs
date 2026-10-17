@@ -1,9 +1,11 @@
 // node src/engine/creature.selfcheck.mjs
-// #1355 step 4 — the moth: a formed pin becomes body + two wings + scales, from the artist's attach points.
+// #1355 step 4 — the moth: a formed pin becomes body + two wings + feather fans (Phase 2 S3 grew the fans
+// on the wings' bone chains, replacing the scattered scales), from the artist's attach points.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ASSETS } from '../data/assets/index.js';
 import { createCreatureBuilder, MOTH, MOTH_PARTS, mothRecipe, pointToward } from './creature.js';
+import { FAN_COUNTS } from './featherFan.js';
 import { autoAttachPoints } from './autoAttach.js';
 import { expandHierarchy } from './hierarchy.js';
 import { pinPressures } from '../curator/dishPressure.js';
@@ -13,7 +15,10 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 const asset = (id) => ASSETS.find((a) => a.id === id);
 const SW = ['#aa0000', '#222222', '#333333', '#444444', '#555555', '#666666'];
 const PAL = { bg: '#111111', ink: '#eeeeee', swatches: SW };
-const MOTH_MARKS = 3 + 1 + 2 + 2 * MOTH.marksPerWing; // halos + body + wings + scales
+const FAN_PER_WING = FAN_COUNTS.fore.plate + FAN_COUNTS.fore.feather + FAN_COUNTS.fore.leaf + FAN_COUNTS.fore.chevron;
+const FAN_PER_HIND = FAN_COUNTS.hind.plate + FAN_COUNTS.hind.feather + FAN_COUNTS.hind.leaf + FAN_COUNTS.hind.chevron;
+const MOTH_ITEMS = 3 + 1 + 2 + 2 * FAN_PER_WING; // halos + body + wings + fan parts
+const plumageOf = (items) => items.filter((i) => /\/fan/.test(i.key));
 const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
 const input = (over = {}) => ({
   dishPins: [{ x: 500, y: 350 }], dishFormed: [true], seed: 77, seedOffsets: null, loopTimeMs: 0, assetAttach: {}, ...over,
@@ -26,20 +31,20 @@ function run(builder, inp, n) {
 }
 const full = MOTH.growFrames + 1;
 
-// 1. the parts are real assets, and a full moth is body + 2 wings + scales
+// 1. the parts are real assets, and a full moth is body + 2 wings + their fans
 {
   for (const id of Object.values(MOTH_PARTS)) assert.ok(asset(id), `${id} is a built-in asset`);
   const e = run(createCreatureBuilder(), input(), full);
   const c = e[0].items.filter((i) => i._creature);
   assert.equal(e[0].items.length, 1 + c.length, 'the layer\'s own marks are kept, in front of the creature');
-  assert.equal(c.length, MOTH_MARKS);
+  assert.equal(c.length, MOTH_ITEMS);
   const real = c.filter((i) => !i.key.includes(':halo:'));
   assert.deepEqual(
-    [real.filter((i) => i.assetId === MOTH_PARTS.body).length, real.filter((i) => i.assetId === MOTH_PARTS.wing).length, real.filter((i) => i.assetId === MOTH_PARTS.mark).length],
-    [1, 2, 2 * MOTH.marksPerWing],
+    [real.filter((i) => i.assetId === MOTH_PARTS.body).length, real.filter((i) => i.assetId === MOTH_PARTS.wing).length, plumageOf(real).length],
+    [1, 2, 2 * FAN_PER_WING],
   );
   const halos = c.filter((i) => i.key.includes(':halo:'));
-  assert.equal(halos.length, 3, 'a halo under the body and each wing, not under every scale');
+  assert.equal(halos.length, 3, 'a halo under the body and each wing, not under every fan part');
   assert.ok(c.indexOf(halos.at(-1)) < c.indexOf(real[0]), 'halos are drawn under every part');
   assert.ok(halos.every((h) => h.color === '#111111' && h.scale > real.find((r) => r.assetId === h.assetId).scale), 'a bg-coloured outline, a little larger');
   assert.equal(real.find((i) => i.assetId === MOTH_PARTS.body).color, '#eeeeee', 'the body is the palette ink');
@@ -79,7 +84,7 @@ const full = MOTH.growFrames + 1;
   assert.ok(edited.x > base.x + 5, `a point moved outward moves the wing outward (${base.x} -> ${edited.x})`);
   // "none" is a valid hand edit: the wings fall back to the body's centre rather than crash
   const none = run(createCreatureBuilder(), input({ assetAttach: { [MOTH_PARTS.body]: [] } }), full)[0];
-  assert.equal(none.items.filter((i) => i._creature).length, MOTH_MARKS);
+  assert.equal(none.items.filter((i) => i._creature).length, MOTH_ITEMS);
 }
 
 // 4. nothing formed: nothing changes (the same array back), and the grow-in starts over
@@ -110,22 +115,22 @@ const full = MOTH.growFrames + 1;
   assert.ok(Math.abs(w1[0].rotation - w0[0].rotation) > MOTH.flap * 0.9, 'a quarter beat opens the wings');
   assert.ok(Math.abs(w1[0].rotation + w1[1].rotation) < 1e-9, 'both wings beat together');
   assert.deepEqual(JSON.stringify(at(1234)), JSON.stringify(at(1234)), 'same input, same moth');
-  const a = run(createCreatureBuilder(), input({ seed: 1 }), full)[0].items.filter((i) => i.assetId === MOTH_PARTS.mark).map((i) => [i.x, i.y]);
-  const b = run(createCreatureBuilder(), input({ seed: 2 }), full)[0].items.filter((i) => i.assetId === MOTH_PARTS.mark).map((i) => [i.x, i.y]);
-  assert.notDeepEqual(a, b, 'a different dish scatters its scales differently');
+  const a = plumageOf(run(createCreatureBuilder(), input({ seed: 1 }), full)[0].items).map((i) => [i.x, i.y]);
+  const b = plumageOf(run(createCreatureBuilder(), input({ seed: 2 }), full)[0].items).map((i) => [i.x, i.y]);
+  assert.notDeepEqual(a, b, 'a different dish grows its fans differently');
 }
 
-// 7. scales sit on the wings and mirror across the body
+// 7. the fan sits on the wings and mirrors across the body
 {
   const c = run(createCreatureBuilder(), input(), full)[0].items.filter((i) => i._creature && !i.key.includes(':halo:'));
   const wings = c.filter((i) => i.assetId === MOTH_PARTS.wing);
-  const marks = c.filter((i) => i.assetId === MOTH_PARTS.mark);
+  const marks = plumageOf(c);
   const right = marks.filter((m) => m.x > 500).map((m) => [Math.round((m.x - 500) * 1e3), Math.round(m.y * 1e3)]).sort();
   const left = marks.filter((m) => m.x < 500).map((m) => [Math.round((500 - m.x) * 1e3), Math.round(m.y * 1e3)]).sort();
-  assert.equal(right.length, MOTH.marksPerWing); assert.equal(left.length, MOTH.marksPerWing);
-  assert.deepEqual(left, right, 'the left scales are the right scales mirrored');
+  assert.equal(right.length, FAN_PER_WING); assert.equal(left.length, FAN_PER_WING);
+  assert.deepEqual(left, right, 'the left fan is the right fan mirrored');
   const wingReach = Math.max(...wings.map((w) => Math.hypot(w.x - 500, w.y - 350))) + 60;
-  assert.ok(marks.every((m) => Math.hypot(m.x - 500, m.y - 350) < wingReach + 100), 'scales stay near the wings');
+  assert.ok(marks.every((m) => Math.hypot(m.x - 500, m.y - 350) < wingReach + 100), 'fan parts stay near the wings');
 }
 
 // 8. the creature's own marks are not the crowd that formed it (it must be able to unform)
@@ -153,7 +158,7 @@ const full = MOTH.growFrames + 1;
   assert.equal(key(pinned.resolveLayers(withPins)), key(plain.resolveLayers(base)), 'pins that have not formed change nothing');
   const out = pinned.resolveLayers({ ...withPins, dishFormed: [true] });
   const layer = out.find((e) => Array.isArray(e.items));
-  assert.equal(layer.items.filter((i) => i._creature).length, MOTH_MARKS);
+  assert.equal(layer.items.filter((i) => i._creature).length, MOTH_ITEMS);
   assert.equal(layer.items.at(-1)._creature, true, 'the creature is drawn last, on top');
   plain.dispose(); pinned.dispose();
   // and a take can replay it: the same inputs give the same creature on a fresh resolver
@@ -197,16 +202,16 @@ const full = MOTH.growFrames + 1;
   const { MOTH: M } = await import('./creature.js');
   const real = (e) => e[0].items.filter((i) => i._creature && !i.key.includes(':halo:'));
   const wings = (e) => real(e).filter((i) => i.assetId === MOTH_PARTS.wing);
-  const marks = (e) => real(e).filter((i) => i.assetId === MOTH_PARTS.mark);
+  const marks = (e) => plumageOf(real(e));
   const frames = full + M.pairFrames + 2;
   // one pair (or no instruction): exactly what step 4 drew
   assert.equal(wings(run(createCreatureBuilder(), input(), frames)).length, 2);
   assert.equal(wings(run(createCreatureBuilder(), input({ dishLimbs: [1] }), frames)).length, 2);
-  // two pairs: four wings, the TE four, and a few scales on the hind pair
+  // two pairs: four wings, the TE four, and a fan on the hind pair too
   const two = run(createCreatureBuilder(), input({ dishLimbs: [2] }), frames);
   assert.equal(wings(two).length, 4, 'four wings: two pairs');
-  assert.equal(marks(two).length, 2 * M.marksPerWing + 2 * M.marksPerHind);
-  assert.equal(two[0].items.filter((i) => i._creature).length, MOTH_MARKS + 4 + 2 * M.marksPerHind, 'two more halos, two more wings, their scales');
+  assert.equal(marks(two).length, 2 * FAN_PER_WING + 2 * FAN_PER_HIND);
+  assert.equal(two[0].items.filter((i) => i._creature).length, MOTH_ITEMS + 4 + 2 * FAN_PER_HIND, 'two more halos, two more wings, their fans');
   const dishLimbsHuge = run(createCreatureBuilder(), input({ dishLimbs: [9] }), frames);
   assert.equal(wings(dishLimbsHuge).length, 4, 'never more than four wings, whatever it is told');
   // the hind pair hangs from the body below and outside the fore pair, smaller, and mirrors
