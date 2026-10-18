@@ -63,6 +63,15 @@ export function getDishHosted() {
   return hosted;
 }
 
+/**
+ * #1634 slice 3 — each pin's dish pressure (the quantized density the formation rule judged it by), as
+ * of the last resolved frame; 0 for an unformed pin. The dish creature's limb reads it on the next
+ * frame's input, beside dishHosted: pressure decides whether a limb grows on the pin, and how much.
+ */
+export function getDishPressures() {
+  return latest.states.map((s) => (s ? s.density : 0));
+}
+
 /** Each formed pin's traits (Davis's shifts, made once at birth), as of the last resolved frame; null for an unformed pin. */
 export function getPinTraits() {
   return traits;

@@ -104,4 +104,71 @@ const GOLDEN_300 = '75c6829a';
   assert.equal(first, 4, 'rebirth replays the birth: head alone at frame 5');
 }
 
+// ---------------------------------------------------------------------------
+// Slice 3 — the limb: L anchors (the artist's marks) choose where; the pin's dish pressure decides
+// whether and how much. One L at the blob's right-middle, unless a block says otherwise.
+const L1 = { org_blob_01: [{ x: 85, y: 50, role: 'L' }] };
+const limbItems = (e, j) => e[0].items.filter((i) => i.key && i.key.startsWith(`dish:0:limb${j}:`));
+const itemAt = (e, key) => e[0].items.find((i) => i.key === key);
+
+// 7 — no L marked: even a full-pressure dish grows no limb (auto attach points carry no roles).
+{
+  const { e } = run(300, { dishPressure: [1, 0] });
+  assert.equal(limbItems(e, 0).length, 0, 'no L: no limb at full pressure');
+  assert.equal(dishItems(e).length, 16, 'no L: the body is exactly the slice-2 body');
+}
+
+// 8 — the control: L marked, pressure zero → no limb at all, the body unaffected.
+{
+  const { e } = run(300, { assetAttach: L1, dishPressure: [0, 0] });
+  assert.equal(limbItems(e, 0).length, 0, 'pressure 0: no limb grows');
+  assert.equal(dishItems(e).length, 16, 'pressure 0: body intact');
+}
+
+// 9 — full pressure: the limb sprouts over counted frames and extends as one compound.
+{
+  const early = run(30, { assetAttach: L1, dishPressure: [1, 0] });
+  assert.equal(limbItems(early.e, 0).length, 3, 'frame 30: the root disc alone, fully eased (growth 0.2)');
+  const { e } = run(200, { assetAttach: L1, dishPressure: [1, 0] });
+  assert.equal(limbItems(e, 0).length, 15, 'full pressure: all five limb discs drawn');
+  const head = itemAt(e, 'dish:0:0:body');
+  const root = itemAt(e, 'dish:0:limb0:0:body');
+  const tip = itemAt(e, 'dish:0:limb0:4:body');
+  const rootD = Math.hypot(root.x - head.x, root.y - head.y);
+  assert.ok(rootD <= 45, `the root stays glued to the head: ${rootD.toFixed(1)}px`);
+  const tipD = Math.hypot(tip.x - head.x, tip.y - head.y);
+  assert.ok(tipD >= 35 && tipD <= 90, `the tip extends as a chain, neither balled nor torn: ${tipD.toFixed(1)}px`);
+}
+
+// 10 — partial pressure grows a measurably shorter limb: 0.4 caps growth at two discs.
+{
+  const { e } = run(300, { assetAttach: L1, dishPressure: [0.4, 0] });
+  assert.equal(limbItems(e, 0).length, 6, 'pressure 0.4: exactly two limb discs');
+  const head = itemAt(e, 'dish:0:0:body');
+  const tip = itemAt(e, 'dish:0:limb0:1:body');
+  const tipD = Math.hypot(tip.x - head.x, tip.y - head.y);
+  assert.ok(tipD <= 45, `the short limb's tip stays close: ${tipD.toFixed(1)}px`);
+}
+
+// 11 — every marked limb grows: two L points, two limbs.
+{
+  const L2 = { org_blob_01: [{ x: 85, y: 50, role: 'L' }, { x: 50, y: 90, role: 'L' }] };
+  const { e } = run(200, { assetAttach: L2, dishPressure: [1, 0] });
+  assert.equal(limbItems(e, 0).length, 15, 'first L: a full limb');
+  assert.equal(limbItems(e, 1).length, 15, 'second L: a full limb');
+}
+
+// 12 — replay with a limb: identical frames in, identical animal out; the scene is golden-pinned.
+const GOLDEN_LIMB = 'a9918074';
+{
+  const a = run(300, { assetAttach: L1, dishPressure: [1, 0] });
+  const b2 = run(300, { assetAttach: L1, dishPressure: [1, 0] });
+  assert.equal(JSON.stringify(a.e[0].items), JSON.stringify(b2.e[0].items), 'limb scene replays byte-identically');
+  let h = 0x811c9dc5;
+  const s = JSON.stringify(a.e[0].items);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  const hash = h.toString(16).padStart(8, '0');
+  assert.equal(hash, GOLDEN_LIMB, `golden limb hash (got ${hash})`);
+}
+
 console.log('dishCreature.selfcheck: ok');
