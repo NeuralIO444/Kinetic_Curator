@@ -90,9 +90,17 @@ export function fadeForAge(age01, growth) {
 
 const _stateByLayer = new Map(); // layerId -> { mode, gen, tick, stats, decision, at }
 
-/** Recorded by the live wiring once per frame per growth layer. */
-export function recordLifecycleState(layerId, entry) {
-  _stateByLayer.set(layerId, { ...entry, at: Date.now() });
+/**
+ * Recorded by the live wiring once per frame per growth layer.
+ * `atMs` is the caller's loop time (audit fix 3d) — the stamp's only
+ * consumer is the DEV panel's row sort, and this module never reads the
+ * wall clock. A missing/non-finite time keeps the layer's previous
+ * stamp (0 on first record): the order just doesn't advance.
+ */
+export function recordLifecycleState(layerId, entry, atMs) {
+  const prev = _stateByLayer.get(layerId);
+  const at = Number.isFinite(atMs) ? atMs : (prev ? prev.at : 0);
+  _stateByLayer.set(layerId, { ...entry, at });
   if (_stateByLayer.size > 16) {
     const first = _stateByLayer.keys().next().value;
     _stateByLayer.delete(first);
