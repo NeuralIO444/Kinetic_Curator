@@ -115,4 +115,29 @@ for (const key of MARKOV_KEYS) {
     'the flag survives the untrained-curator copy too');
 }
 
+// ─── #1667 (audit fix 3a): no rng → no fallback die ───
+// CURATE always injects the seeded (seed, press #) stream. A caller that
+// passed no rng used to deal from Math.random and silently break the take's
+// replay; now the roll is 0 — deterministic. The seeded chain is pinned
+// byte-exact from pre-fix code, so the pin proves the stream CURATE actually
+// uses did not move.
+{
+  const seen = new Set();
+  for (let i = 0; i < 200; i += 1) seen.add(markovPick('mode', 'grid').value);
+  assert.strictEqual(seen.size, 1, 'no-rng markovPick must be deterministic (was Math.random)');
+  assert.strictEqual(
+    markovPick('mode', 'grid').value,
+    markovPick('mode', 'grid', () => 0).value,
+    'the no-rng roll is the 0 roll',
+  );
+  const rng = mkRng(7);
+  let cur = 'grid';
+  const seq = [];
+  for (let i = 0; i < 12; i += 1) { cur = markovPick('mode', cur, rng).value; seq.push(cur); }
+  assert.deepStrictEqual(seq, [
+    'random', 'phyllotaxis', 'orbit', 'hype', 'colonize', 'dla',
+    'radial', 'fibonacci', 'radial', 'fibonacci', 'orbit', 'fibonacci',
+  ], 'seeded chain unchanged by the fallback removal');
+}
+
 console.log('transitions.selfcheck: OK');

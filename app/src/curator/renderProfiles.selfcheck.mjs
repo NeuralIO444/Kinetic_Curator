@@ -230,10 +230,13 @@ function checkValueInSpec(pid, vname, key, spec, v) {
   assert.strictEqual(oxm.symmetry, 'bilateral', 'oxman: chrysalis symmetry');
   assert.strictEqual(oxm.accumulationOptics, 0, 'oxman: matte, never glossy');
   assert.ok(oxm.density <= 50, 'oxman: one structure in a void');
-  // Stock: both modes actually fire across rolls.
+  // Stock: both modes actually fire across rolls. (Was dealt by the old
+  // Math.random default; #1667 injects a seeded stream explicitly — the
+  // property under test is the mode roll, not the fallback.)
   const seen = new Set();
+  const modeRng = (() => { let s = 7; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
   for (let i = 0; i < 120; i++) {
-    const o = applyRenderProfile(base, 'stock');
+    const o = applyRenderProfile(base, 'stock', modeRng);
     seen.add(o.density >= 90 ? 'field' : o.density <= 60 ? 'tubes' : 'ambiguous');
   }
   assert.ok(seen.has('field') && seen.has('tubes'), `stock: both modes fire (saw ${[...seen]})`);
@@ -258,6 +261,41 @@ function checkValueInSpec(pid, vname, key, spec, v) {
     assert.strictEqual(t.alias, expectedAliases[t.id], `${t.id}: alias`);
     assert.notStrictEqual(t.alias, t.name, `${t.id}: alias differs from the real name`);
   }
+}
+
+// ─── #1667 (audit fix 3a): no rng → no fallback die ───
+// CURATE and the miner inject the seeded stream. A caller that passed no rng
+// used to roll modes and biases from Math.random; now every roll is 0 —
+// deterministic. The seeded 'stock' profile (the one mode-rolling profile)
+// is pinned byte-exact from pre-fix code.
+{
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const base = {
+    count: 240, scale: [0.4, 1.6], rotate: [-180, 180], alpha: [40, 100],
+    jitter: 24, density: 78, zTiers: 4, noiseFreq: 0.005, noiseSpeed: 0.5,
+    displacement: 0, particleCount: 150, swarmCohesion: 0.6, gravityWells: 1.0,
+    damping: 0.95, symmetry: 'none', accumulation: false, accumulationOptics: 0.2,
+    wind: 1, flap: 0.35, breath: 0, lifeDrift: 0.35, behave: 'cruise',
+  };
+  const a = applyRenderProfile(base, 'stock');
+  const b = applyRenderProfile(base, 'stock');
+  assert.deepStrictEqual(a, b, 'no-rng applyRenderProfile must be deterministic (was Math.random)');
+  assert.deepStrictEqual(a, applyRenderProfile(base, 'stock', () => 0), 'the no-rng profile is the rng=0 profile');
+  assert.deepStrictEqual(applyRenderProfile(base, 'stock', mulberry32(7)), {
+    count: 162, scale: [0.99, 1.98], rotate: [-86, 73], alpha: [55, 85],
+    jitter: 22, density: 51, zTiers: 5, noiseFreq: 0.0029, noiseSpeed: 0.66,
+    displacement: 31, particleCount: 129, swarmCohesion: 2.42, gravityWells: 1.59,
+    damping: 0.95, symmetry: 'none', accumulation: false, accumulationOptics: 0,
+    wind: 0.58, flap: 0.39, breath: 0.07, lifeDrift: 0.46, behave: 'cruise',
+  }, 'seeded profile unchanged by the fallback removal');
 }
 
 console.log('renderProfiles.selfcheck: ok');

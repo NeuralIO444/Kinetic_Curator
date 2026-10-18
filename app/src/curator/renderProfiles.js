@@ -584,20 +584,23 @@ function rollBias(key, spec, rng) {
  * Profiles with `modes` (currently only stock: tube sculpture vs vorticity
  * field) roll one mode per candidate.
  */
-export function applyRenderProfile(candidate, profileId, rng = Math.random) {
+export function applyRenderProfile(candidate, profileId, rng) {
   const profile = getRenderProfile(profileId);
   if (!profile) return candidate;
+  // rng is part of the call contract: CURATE and the miner inject the seeded
+  // stream. A missing rng rolls 0, never Math.random (#1667).
+  const roll = typeof rng === 'function' ? rng : () => 0;
   let { biases, forces } = profile;
   if (profile.modes) {
     const keys = Object.keys(profile.modes);
-    const mode = profile.modes[keys[Math.floor(rng() * keys.length)]];
+    const mode = profile.modes[keys[Math.floor(roll() * keys.length)]];
     biases = mode.biases;
     forces = mode.forces;
   }
   const out = { ...candidate };
   for (const [key, spec] of Object.entries(biases)) {
     if (key in out) {
-      const v = rollBias(key, spec, rng);
+      const v = rollBias(key, spec, roll);
       if (v !== undefined) out[key] = v;
     }
   }

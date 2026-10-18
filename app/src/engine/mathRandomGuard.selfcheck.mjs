@@ -21,11 +21,8 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ALLOWED = {
   'curator/curate.js': { count: 1, why: 'pickCurated default rng param; CURATE passes the seeded CH.curate stream (#518)' },
   'data/firstLight.js': { count: 1, why: 'rollLivingBoot default rng param; the roll lands in layoutParams/paletteId/enabledAssets (#707)' },
-  'curator/renderProfiles.js': { count: 1, why: 'applyRenderProfile default rng param; seeded by CURATE' },
-  'curator/taste.js': { count: 1, why: 'pickPersona default rng param; seeded by CURATE' },
   'curator/director.js': { count: 1, why: 'blendPick default rng param; the pick path passes CURATE\u2019s seeded (seed, press #) stream (#518)' },
   'curator/dice.js': { count: 1, why: 'rollDice default rng param; the performer gesture lands its crown in layoutParams.mode / enabledAssets / the keep ledger + crown log' },
-  'curator/transitions.js': { count: 1, why: 'markovPick default rng param; CURATE always injects the seeded (seed, press #) stream, and the drawn value lands in layoutParams' },
   'engine/harmony.js': { count: 1, why: 'buildHarmony default rng param' },
   'state/paramUtils.js': { count: 2, why: 'randomizeKey default rng param + morph dice; result lands in layoutParams (#1550: the validating door deduped two call sites into rollKeyInSpec — 4 → 2)' },
   'state/slices/davisSlice.js': { count: 1, why: 'EVOLVE palette dice; result lands in paletteId' },
