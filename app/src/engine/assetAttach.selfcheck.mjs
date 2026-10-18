@@ -5,14 +5,21 @@ import { MAX_ATTACH, ATTACH_HIT, clickAttach, sanitizeAttachPoints, sanitizeAsse
 import { useStore } from '../state/store.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 
-// 1. a click adds a point; a click on a point removes it; never more than four
+// 1. a click adds a plain point; a click on a point steps its role plain → H → L → gone (#1634); never more than four
 {
   let p = [];
   for (const pt of [{ x: 10, y: 10 }, { x: 90, y: 10 }, { x: 10, y: 90 }, { x: 90, y: 90 }]) p = clickAttach(p, pt);
   assert.equal(p.length, MAX_ATTACH);
   assert.equal(clickAttach(p, { x: 50, y: 50 }), p, 'at the limit a new click adds nothing and moves nothing');
-  const q = clickAttach(p, { x: 90 + ATTACH_HIT / 2, y: 10 });
-  assert.deepEqual(q, [{ x: 10, y: 10 }, { x: 10, y: 90 }, { x: 90, y: 90 }], 'a click near a point removes that point only');
+  const h = clickAttach(p, { x: 90 + ATTACH_HIT / 2, y: 10 });
+  assert.deepEqual(h[1], { x: 90, y: 10, role: 'H' }, 'a click near a plain point makes it the head');
+  const l = clickAttach(h, { x: 90, y: 10 });
+  assert.deepEqual(l[1], { x: 90, y: 10, role: 'L' }, 'a click on the head makes it a limb marker');
+  assert.deepEqual(clickAttach(l, { x: 90, y: 10 }), [{ x: 10, y: 10 }, { x: 10, y: 90 }, { x: 90, y: 90 }], 'a click on a limb marker removes that point only');
+  // one head per asset: stepping another point to H steps the old head back to plain
+  const two = clickAttach(h, { x: 10, y: 10 });
+  assert.deepEqual(two[0], { x: 10, y: 10, role: 'H' }, 'the newly stepped point is the head');
+  assert.deepEqual(two[1], { x: 90, y: 10 }, 'the previous head is plain again');
   assert.deepEqual(clickAttach([], { x: 33.33333, y: 66.66666 }), [{ x: 33.33, y: 66.67 }], 'stored to two decimals');
 }
 
@@ -21,6 +28,11 @@ import { serializeProject, parseProject } from '../state/projectDocument.js';
   const p = [{ x: 1, y: 2 }];
   for (const bad of [null, {}, { x: NaN, y: 1 }, { x: -1, y: 5 }, { x: 5, y: 100.1 }, { x: '5', y: 5 }]) assert.equal(clickAttach(p, bad), p);
   assert.deepEqual(sanitizeAttachPoints([{ x: 5, y: 5, z: 1 }, { x: 500, y: 5 }, null]), [{ x: 5, y: 5 }]);
+  assert.deepEqual(
+    sanitizeAttachPoints([{ x: 5, y: 5, role: 'H' }, { x: 6, y: 6, role: 'H' }, { x: 7, y: 7, role: 'L' }, { x: 8, y: 8, role: 'X' }]),
+    [{ x: 5, y: 5, role: 'H' }, { x: 6, y: 6 }, { x: 7, y: 7, role: 'L' }, { x: 8, y: 8 }],
+    'roles ride when valid; a second H is just a point; an unknown role is no role',
+  );
   assert.equal(sanitizeAssetAttach(null), null);
   assert.equal(sanitizeAssetAttach({ b: 'x' }), null, 'nothing set = null, so an untouched project saves as before');
   assert.deepEqual(sanitizeAssetAttach({ a: [{ x: 1, y: 2 }], b: [] }), { a: [{ x: 1, y: 2 }], b: [] }, 'an empty list is kept: the artist said "none"');
@@ -33,8 +45,15 @@ import { serializeProject, parseProject } from '../state/projectDocument.js';
   useStore.getState().clickAssetAttach('org_blob_01', { x: 20, y: 30 });
   useStore.getState().clickAssetAttach('org_blob_01', { x: 70, y: 60 });
   assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: [{ x: 20, y: 30 }, { x: 70, y: 60 }] });
+  // step the roles: first point to H; second to H (first demoted), then to L; first back to H
+  useStore.getState().clickAssetAttach('org_blob_01', { x: 20, y: 30 });
+  useStore.getState().clickAssetAttach('org_blob_01', { x: 70, y: 60 });
+  useStore.getState().clickAssetAttach('org_blob_01', { x: 70, y: 60 });
+  useStore.getState().clickAssetAttach('org_blob_01', { x: 20, y: 30 });
+  const marked = [{ x: 20, y: 30, role: 'H' }, { x: 70, y: 60, role: 'L' }];
+  assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: marked }, 'the cycle leaves one H and one L');
   const doc = JSON.parse(JSON.stringify(serializeProject(useStore.getState())));
-  assert.deepEqual(doc.assetAttach, { org_blob_01: [{ x: 20, y: 30 }, { x: 70, y: 60 }] }, 'saved with the project');
+  assert.deepEqual(doc.assetAttach, { org_blob_01: marked }, 'saved with the project, roles included');
   // "clear points" is the artist saying none: an explicit empty list, not a return to auto
   useStore.getState().clearAssetAttach('org_blob_01');
   assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: [] });
@@ -50,7 +69,7 @@ import { serializeProject, parseProject } from '../state/projectDocument.js';
   assert.deepEqual(parsed.doc.assetAttach, doc.assetAttach, 'the parser keeps the points');
   assert.deepEqual(parseProject({ ...doc, assetAttach: { x: [{ x: 'bad', y: 1 }], y: 'junk' } }).doc.assetAttach, { x: [] }, 'hostile points are dropped');
   load(parsed.doc);
-  assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: [{ x: 20, y: 30 }, { x: 70, y: 60 }] }, 'reloaded');
+  assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: marked }, 'reloaded, roles included');
 }
 
 // 3b. AUTO: every asset has points from its shape; a hand edit starts from them and then wins (Matt, 2026-10-11)
@@ -80,9 +99,10 @@ import { serializeProject, parseProject } from '../state/projectDocument.js';
   assert.deepEqual(attachPointsFor(asset, {}), autoAttachPoints(sq));
   assert.deepEqual(attachPointsFor(asset, { sq: [] }), [], 'the artist said none');
   assert.deepEqual(attachPointsFor(asset, { sq: [{ x: 1, y: 1 }] }), [{ x: 1, y: 1 }]);
-  // the first hand edit starts from what the lab showed: removing one auto point leaves the other three as the artist's
+  // the first hand edit starts from what the lab showed: stepping the top auto point marks it the head,
+  // and all four shown points become the artist's
   useStore.getState().clickAssetAttach('sq', { x: 50, y: 20 }, autoAttachPoints(sq));
-  assert.deepEqual(useStore.getState().assetAttach.sq, [{ x: 80, y: 50 }, { x: 50, y: 80 }, { x: 20, y: 50 }]);
+  assert.deepEqual(useStore.getState().assetAttach.sq, [{ x: 50, y: 20, role: 'H' }, { x: 80, y: 50 }, { x: 50, y: 80 }, { x: 20, y: 50 }]);
   useStore.getState().autoAssetAttach('sq');
   assert.ok(!('sq' in useStore.getState().assetAttach));
 }

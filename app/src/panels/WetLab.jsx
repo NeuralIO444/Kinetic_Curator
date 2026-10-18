@@ -1,7 +1,8 @@
 /**
  * WetLab.jsx — #1355 Phase 3: the wet lab window for one asset. First tool: ATTACH points, the places on the shape
  * where another part may join. Every asset starts with points worked out from its shape (AUTO); click the shape to
- * add a point (up to MAX_ATTACH), click a point to remove it, and the asset uses yours from then on.
+ * add a point (up to MAX_ATTACH), and click a point to step its role — plain, H (the head), L (where a limb may
+ * grow), gone (#1634; one H per asset) — and the asset uses yours from then on.
  * Same popup shell as RegionPicker. The window is where the asset's creature settings will grow.
  */
 import { useEffect, useRef } from 'react';
@@ -65,7 +66,7 @@ export function WetLab({ assetId, onClose }) {
               {points.map((p, i) => (
                 <g key={i} transform={`translate(${p.x} ${p.y})`} data-testid="attach-point">
                   <rect x="-3" y="-3" width="6" height="6" fill="#000" stroke="var(--kc-red)" strokeWidth="0.8" strokeDasharray={isOwn ? undefined : '1.5 1'} />
-                  <text y="1.6" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="var(--kc-red)">{i + 1}</text>
+                  <text y="1.6" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="var(--kc-red)">{p.role || i + 1}</text>
                 </g>
               ))}
             </svg>
@@ -74,7 +75,9 @@ export function WetLab({ assetId, onClose }) {
             <div style={secTitle} data-testid="attach-source">ATTACH · {points.length}/{MAX_ATTACH} · {isOwn ? 'YOURS' : 'AUTO'}</div>
             <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.5 }}>
               {isOwn ? 'These are your points.' : 'These points were worked out from the shape.'}{' '}
-              {full ? 'All four are placed: click a point to remove it.' : 'Click the shape to add a point where another part may join. Click a point to remove it.'}
+              {full
+                ? 'All four are placed: click a point to step it — H, then L, then gone.'
+                : 'Click the shape to add a point where another part may join. Click a point to step it: plain, then H (the head), then L (where a limb may grow), then gone.'}
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {isOwn && (

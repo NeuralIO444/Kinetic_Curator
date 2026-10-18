@@ -50,11 +50,11 @@ function partStream(seed, creatureId, partId, seedOffsets) {
 /**
  * Which attach point is the HEAD and which are LIMB candidates — the artist's H and L markers.
  *
- * The saved attach data (engine/assetAttach.js) carries points only ({x, y} in the asset box, at most 4); it has
- * NO role field today. This is the skeleton's expectation, ready for the day the wet lab writes roles: a point
- * may carry `role: 'H' | 'L'`. Until then the default stands (DESIGN CALL, flagged in the S1 staging report):
- * the FIRST point is H, the rest are L candidates. (Points from the shape itself arrive top, right, bottom,
- * left — engine/autoAttach.js — so the default head is the shape's top, which is where a head belongs.)
+ * The saved attach data (engine/assetAttach.js) carries points in the asset box (at most 4), and since #1634
+ * slice 1 a point may carry `role: 'H' | 'L'`, written by the wet lab's tap cycle. When no point carries H the
+ * default stands (DESIGN CALL, flagged in the S1 staging report): the FIRST point is H, the rest are L
+ * candidates. (Points from the shape itself arrive top, right, bottom, left — engine/autoAttach.js — so the
+ * default head is the shape's top, which is where a head belongs.)
  */
 export function resolveMarkers(points) {
   const pts = Array.isArray(points) ? points : [];

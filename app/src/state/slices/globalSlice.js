@@ -672,7 +672,8 @@ export const createGlobalSlice = (set) => ({
     return { assetStill: { ...cur, [assetId]: true } };
   }),
   /**
-   * #1355 — a wet-lab click on an asset: add an attach point, or remove the one clicked. `shown` is what the lab is
+   * #1355 — a wet-lab click on an asset: add an attach point, or step the clicked one's role (#1634: plain →
+   * H → L → gone). `shown` is what the lab is
    * showing (the asset's own points, or the ones worked out from its shape): the first hand edit starts from those
    * and from then on the asset uses the artist's. Rides the document.
    */
