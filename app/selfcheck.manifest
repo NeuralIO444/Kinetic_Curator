@@ -294,6 +294,7 @@ node src/curator/dishPins.selfcheck.mjs
 node src/curator/spawn.selfcheck.mjs
 node src/engine/assetAttach.selfcheck.mjs
 node src/engine/creature.selfcheck.mjs
+node src/engine/dishCreature.selfcheck.mjs
 node src/engine/skeleton.selfcheck.mjs
 node src/engine/wingWarp.selfcheck.mjs
 node src/engine/featherFan.selfcheck.mjs

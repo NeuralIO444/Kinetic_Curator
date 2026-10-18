@@ -35,6 +35,7 @@ import { ensureAggregate, GrowthHooks } from '../engine/kernel/sample/growth.js'
 import { assessAggregate, decideLifecycle, recordLifecycleState } from '../biology/lifecycle.js';
 import { getBiologyPolicy } from '../biology/policy.js';
 import { createCreatureBuilder } from '../engine/creature.js'; // #1355 step 4: the moth, on formed pins
+import { createDishCreatureBuilder } from '../engine/dishCreature.js'; // #1634 slice 2: the dish creature, on the hosted pin
 
 const HOP_MAX_PX = 4;
 
@@ -449,6 +450,7 @@ export function createLiveResolver() {
   // items over it; input.wantSkeletons (the ?debug=skeleton flag) still gates only the debug PUBLICATION
   // downstream — the overlay reads getLastSkeletons(), which this builder now always fills for formed moths.
   const creatures = createCreatureBuilder({ skinning: true });
+  const dishCreatures = createDishCreatureBuilder(); // #1634 slice 2: the second family's body, after the moths
 
   function resolveLayers(input) {
     W = input.canvasW || CANVAS_W;
@@ -1004,6 +1006,14 @@ export function createLiveResolver() {
     // #1355: formed pins grow a moth (no pin formed: nothing happens). It hovers on the layer's own living-motion floor.
     creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
       // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)
+      (e) => creatureGround({
+        dish, layers: input.layers, layerId: e.id, layoutParams: e.layoutParams,
+        getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
+        W, H, tSec: (input.loopTimeMs ?? 0) / 1000, seed: e.morphSeed,
+      }));
+    // #1634 slice 2 — the dish creature on the hosted pin (input.dishHosted), on the same motion floor and
+    // the same ground. No pin hosted: nothing happens, the stage is the moths' alone.
+    dishCreatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
       (e) => creatureGround({
         dish, layers: input.layers, layerId: e.id, layoutParams: e.layoutParams,
         getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),

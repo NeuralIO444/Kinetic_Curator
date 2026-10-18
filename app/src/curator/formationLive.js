@@ -52,6 +52,17 @@ export function getLimbPairs() {
   return limbs;
 }
 
+let hosted = [];
+
+/**
+ * #1634 slice 2 — which pin hosts the DISH creature (the second family): the FIRST formed pin, and only
+ * that one (the MVP is one creature; the other formed pins host moths). Computed from the same states the
+ * moth reads, so it rides the NEXT frame's input beside dishFormed and replays from the take like it.
+ */
+export function getDishHosted() {
+  return hosted;
+}
+
 /** Each formed pin's traits (Davis's shifts, made once at birth), as of the last resolved frame; null for an unformed pin. */
 export function getPinTraits() {
   return traits;
@@ -84,6 +95,7 @@ export function resetFormation() {
   latest = Object.freeze({ states: [], band: null });
   limbTracker.reset();
   limbs = [];
+  hosted = [];
   shiftTracker.reset();
   traits = [];
   keepRing.length = 0;
@@ -108,6 +120,7 @@ export function observeFormation(input, output, getBand = () => getStressState()
     states: r.states.map((s, i) => (s ? { ...s, attraction: attraction[i], density: density[i] } : null)),
   });
   limbs = limbTracker.update(latest.states);
+  hosted = latest.states.map((s, i) => !!(s && s.formed) && !latest.states.slice(0, i).some((p) => p && p.formed));
   const shifted = shiftTracker.update(latest.states, {
     seed: input && input.seed, seedOffsets: input && input.seedOffsets, band,
     room: () => { try { return roomProvider ? roomProvider() : null; } catch { return null; } },

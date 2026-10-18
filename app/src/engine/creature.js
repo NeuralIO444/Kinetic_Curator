@@ -358,7 +358,10 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
-        if (!formed[i] || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; frameSkeletons[i] = null; framePoses[i] = null; continue; }
+        // #1634 slice 2 — a pin the input marks hosted grows the DISH creature there instead (the second
+        // family, engine/dishCreature.js); the moth builder leaves it entirely: no moth, no skeleton, no
+        // pose. No dishHosted on the input (every take from before the slice) and nothing changes.
+        if (!formed[i] || (input.dishHosted && input.dishHosted[i]) || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; frameSkeletons[i] = null; framePoses[i] = null; continue; }
         ages[i] = (ages[i] || 0) + 1;
         // the second pair eases toward what the crowd decided (1 pair = none, 2 = full), a step per resolver frame
         const want = input.dishLimbs && input.dishLimbs[i] >= 2 ? 1 : 0;
