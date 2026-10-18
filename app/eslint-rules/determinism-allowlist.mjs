@@ -78,7 +78,7 @@ export const DETERMINISM_ALLOWLIST = {
     'Date.now': { count: 3, why: 'diagnostic sample stamps + patchSampleAgeMs injectable now default — dev diagnostics, never sim input' },
   },
   'gl/liveLoop.mjs': {
-    'performance.now': { count: 17, why: 'the loop\u2019s clock SOURCE: reads performance.now to produce loopTimeMs / driver time and frame-timing stats for everything downstream. Downstream code uses loop time, never the wall clock (audit fixes 3b/3d) — the source itself has to read it' },
+    'performance.now': { count: 15, why: 'the loop\u2019s clock SOURCE: reads performance.now to produce loopTimeMs / driver time and frame-timing stats for everything downstream. Downstream code uses loop time, never the wall clock (audit fixes 3b/3d) — the source itself has to read it. Audit fix 5 (#1680) removed the #268 swell\u2019s two reads (17 → 15): the envelope now runs on loopTimeMs' },
   },
   'gl/parity/costBench.mjs': {
     'Date.now': { count: 4, why: 'cost benchmark harness timing (Node-side cross-check; frames themselves are timed page-side) — measurement only; labels datasets, never ships in the sim' },
