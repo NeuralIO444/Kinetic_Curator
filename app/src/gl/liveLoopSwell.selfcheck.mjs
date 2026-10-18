@@ -12,15 +12,20 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 
-performance.now = () => { throw new Error('the swell read the wall clock'); };
+performance.now = () => {
+  throw new Error('the swell read the wall clock');
+};
 
 const src = readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8');
-assert.ok(!src.includes('swellStart = performance.now'),
-  'swellAccum must stamp loop time, not performance.now()');
-assert.ok(!src.includes('(performance.now() - swellStart)'),
-  'the envelope must derive progress from loop time, not performance.now()');
-assert.ok(src.includes('swellProgress(loopTimeMs, swellStart)'),
-  'the envelope must be wired to the pure helper with loop time');
+assert.ok(!src.includes('swellStart = performance.now'), 'swellAccum must stamp loop time, not performance.now()');
+assert.ok(
+  !src.includes('(performance.now() - swellStart)'),
+  'the envelope must derive progress from loop time, not performance.now()',
+);
+assert.ok(
+  src.includes('swellProgress(loopTimeMs, swellStart)'),
+  'the envelope must be wired to the pure helper with loop time',
+);
 
 const { swellProgress, SWELL_DURATION_MS } = await import('./liveLoop.mjs');
 assert.strictEqual(typeof swellProgress, 'function', 'liveLoop must export swellProgress');
@@ -43,3 +48,5 @@ assert.ok(Math.abs(swellProgress(S + 1500, S) - quarter) < 1e-9, 'rise and fall 
 assert.ok(swellProgress(S + 250, S) < quarter, 'envelope rises monotonically to the midpoint');
 
 console.log('liveLoopSwell.selfcheck: OK — the swell breathes on loop time');
+
+const probe = { x: 1 };

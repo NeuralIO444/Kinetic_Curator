@@ -1,14 +1,14 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import { defineConfig, globalIgnores } from 'eslint/config'
-import determinismPlugin from './eslint-rules/determinism.mjs'
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import determinismPlugin from './eslint-rules/determinism.mjs';
 import {
   DETERMINISM_ALLOWLIST,
   DETERMINISM_FORBIDDEN,
   DETERMINISM_CLOCK_DIRS,
-} from './eslint-rules/determinism-allowlist.mjs'
+} from './eslint-rules/determinism-allowlist.mjs';
 
 export default defineConfig([
   globalIgnores(['dist', 'eslint-rules/fixtures']),
@@ -19,11 +19,7 @@ export default defineConfig([
   },
   {
     files: ['**/*.{js,jsx}'],
-    extends: [
-      js.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
+    extends: [js.configs.recommended, reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
     languageOptions: {
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
@@ -54,4 +50,4 @@ export default defineConfig([
     files: ['src/**/*.selfcheck.mjs'],
     rules: { 'determinism/no-unseeded-random-or-clock': 'off' },
   },
-])
+]);

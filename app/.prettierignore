@@ -1,0 +1,28 @@
+# Prettier adoption state (#1684). Unadopted trees are ignored;
+# adopted paths are re-included with explicit chains (a bare negation
+# under an ignored directory does not re-include — gitignore rules).
+# Each formatting slice extends the adopted set and this file shrinks
+# toward fixtures + generated files only.
+
+# src/: ignore level by level, re-include what is adopted.
+src/*
+!src/engine/
+src/engine/*
+!src/gl/
+src/gl/*
+
+# ── Adopted (slice 0: the audit run's own files, born formatted) ──
+!src/engine/colorHex.mjs
+!src/engine/colorHex.selfcheck.mjs
+!src/gl/liveLoopSwell.selfcheck.mjs
+
+# Tooling and non-src trees: not yet adopted.
+/scripts/**
+/e2e/**
+/qa/**
+/public/**
+/index.html
+/vite.units.mjs
+
+# Lint test fixtures are data, never formatted.
+eslint-rules/fixtures/**

@@ -19,7 +19,13 @@ import { hexToRgb as tintWashHexToRgb, rgbToHex as tintWashRgbToHex } from '../g
 // parseHex == pattern/engine.js parseHex — the same algorithm, 3 copies).
 function oracleLenient(hex) {
   const s = String(hex).replace('#', '');
-  const f = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
+  const f =
+    s.length === 3
+      ? s
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : s;
   const n = parseInt(f.slice(0, 6), 16);
   return Number.isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : [0, 0, 0];
 }
@@ -27,14 +33,21 @@ function oracleLenient(hex) {
 function oracleStrict(hex) {
   if (typeof hex !== 'string') return null;
   let h = hex.trim().replace(/^#/, '');
-  if (/^[0-9a-fA-F]{3}$/.test(h)) h = h.split('').map((c) => c + c).join('');
+  if (/^[0-9a-fA-F]{3}$/.test(h))
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 // gl/tintInject.mjs rgbToHex (== gl/tintWash.mjs rgbToHex; the same
 // clamp/round/pad encoder kernel/color's toHexColor uses).
 function oracleEncode([r, g, b]) {
-  const q = (v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, '0');
+  const q = (v) =>
+    Math.min(255, Math.max(0, Math.round(v)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${q(r)}${q(g)}${q(b)}`;
 }
 
@@ -44,10 +57,12 @@ for (let i = 0; i < 4096; i++) {
   const h = i.toString(16).padStart(3, '0');
   inputs.push(h, `#${h}`, h.toUpperCase());
 }
-for (const r of [0, 51, 102, 153, 204, 255]) for (const g of [0, 51, 102, 153, 204, 255]) for (const b of [0, 51, 102, 153, 204, 255]) {
-  const h = [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
-  inputs.push(h, `#${h}`, `#${h.toUpperCase()}`);
-}
+for (const r of [0, 51, 102, 153, 204, 255])
+  for (const g of [0, 51, 102, 153, 204, 255])
+    for (const b of [0, 51, 102, 153, 204, 255]) {
+      const h = [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+      inputs.push(h, `#${h}`, `#${h.toUpperCase()}`);
+    }
 {
   const rng = mkRng(1682);
   const digits = '0123456789abcdefABCDEF';
@@ -57,16 +72,46 @@ for (const r of [0, 51, 102, 153, 204, 255]) for (const g of [0, 51, 102, 153, 2
     inputs.push(`#${h}`);
   }
 }
-inputs.push('', '#', '##', null, undefined, 0, 123456, {}, [], '#abcd', '#abcde', '#abcdef0',
-  'gggggg', '#gggggg', '  #aabbcc ', '# aabbcc', 'aabbcc', 'ABC', '#ABCDEF', '0x112233', '#11223');
+inputs.push(
+  '',
+  '#',
+  '##',
+  null,
+  undefined,
+  0,
+  123456,
+  {},
+  [],
+  '#abcd',
+  '#abcde',
+  '#abcdef0',
+  'gggggg',
+  '#gggggg',
+  '  #aabbcc ',
+  '# aabbcc',
+  'aabbcc',
+  'ABC',
+  '#ABCDEF',
+  '0x112233',
+  '#11223',
+);
 
 for (const input of inputs) {
-  assert.deepStrictEqual(hexToRgb255(input), oracleLenient(input),
-    `hexToRgb255(${JSON.stringify(input)}) must equal the lenient oracle`);
-  assert.deepStrictEqual(hexToRgb255Strict(input), oracleStrict(input),
-    `hexToRgb255Strict(${JSON.stringify(input)}) must equal the strict oracle`);
-  assert.deepStrictEqual(patternParseHex(input), oracleLenient(input),
-    `pattern/engine.js parseHex(${JSON.stringify(input)}) must stay the lenient oracle`);
+  assert.deepStrictEqual(
+    hexToRgb255(input),
+    oracleLenient(input),
+    `hexToRgb255(${JSON.stringify(input)}) must equal the lenient oracle`,
+  );
+  assert.deepStrictEqual(
+    hexToRgb255Strict(input),
+    oracleStrict(input),
+    `hexToRgb255Strict(${JSON.stringify(input)}) must equal the strict oracle`,
+  );
+  assert.deepStrictEqual(
+    patternParseHex(input),
+    oracleLenient(input),
+    `pattern/engine.js parseHex(${JSON.stringify(input)}) must stay the lenient oracle`,
+  );
 }
 
 // The tint modules' exported surfaces ARE the canonical functions now.
@@ -74,7 +119,13 @@ for (const input of inputs) {
   assert.deepStrictEqual(tintInjectHexToRgb(input), oracleStrict(input), 'tintInject hexToRgb = strict oracle');
   assert.deepStrictEqual(tintWashHexToRgb(input), oracleStrict(input), 'tintWash hexToRgb = strict oracle');
 }
-for (const rgb of [[0, 0, 0], [255, 255, 255], [127.4, 127.5, 128], [-10, 300, 42], [1, 2, 3]]) {
+for (const rgb of [
+  [0, 0, 0],
+  [255, 255, 255],
+  [127.4, 127.5, 128],
+  [-10, 300, 42],
+  [1, 2, 3],
+]) {
   assert.strictEqual(rgb255ToHex(rgb), oracleEncode(rgb), `rgb255ToHex(${rgb}) = encoder oracle`);
   assert.strictEqual(tintInjectRgbToHex(rgb), oracleEncode(rgb), 'tintInject rgbToHex = encoder oracle');
   assert.strictEqual(tintWashRgbToHex(rgb), oracleEncode(rgb), 'tintWash rgbToHex = encoder oracle');
@@ -89,20 +140,25 @@ for (const c of ['#aabbcc', '#112233', '#ff0000', '#00ff80', '#abc', 'garbage'])
     assert.strictEqual(applyLean(c, g, 1), oracleEncode(oracleLenient(g)), `lean 1 lands on the ground (${g})`);
     const [r1, g1, b1] = oracleLenient(c);
     const [r2, g2, b2] = oracleLenient(g);
-    assert.strictEqual(applyLean(c, g, 0.5),
+    assert.strictEqual(
+      applyLean(c, g, 0.5),
       oracleEncode([r1 + (r2 - r1) / 2, g1 + (g2 - g1) / 2, b1 + (b2 - b1) / 2]),
-      `lean 0.5 lerps the oracle parses (${c} -> ${g})`);
+      `lean 0.5 lerps the oracle parses (${c} -> ${g})`,
+    );
   }
 }
 
 // ── Source shape: the migrated files define no local copies any more ──────
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
-assert.ok(!read('./kernel/color/index.js').includes('function parseHexColor'),
-  'kernel/color must not define a local parseHexColor');
-assert.ok(!read('./fieldMap.mjs').includes('function parseHex('),
-  'fieldMap must not define a local parseHex');
-assert.ok(!read('../pattern/engine.js').includes('function parseHex('),
-  'pattern/engine.js must not define a local parseHex');
+assert.ok(
+  !read('./kernel/color/index.js').includes('function parseHexColor'),
+  'kernel/color must not define a local parseHexColor',
+);
+assert.ok(!read('./fieldMap.mjs').includes('function parseHex('), 'fieldMap must not define a local parseHex');
+assert.ok(
+  !read('../pattern/engine.js').includes('function parseHex('),
+  'pattern/engine.js must not define a local parseHex',
+);
 for (const rel of ['../gl/tintInject.mjs', '../gl/tintWash.mjs']) {
   assert.ok(!read(rel).includes('function hexToRgb('), `${rel} must not define a local hexToRgb`);
   assert.ok(!read(rel).includes('function rgbToHex('), `${rel} must not define a local rgbToHex`);
