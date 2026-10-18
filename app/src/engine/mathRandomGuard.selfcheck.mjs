@@ -19,16 +19,13 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** file (relative to src/) -> { count, why } */
 const ALLOWED = {
-  'curator/curate.js': { count: 1, why: 'pickCurated default rng param; CURATE passes the seeded CH.curate stream (#518)' },
-  'data/firstLight.js': { count: 1, why: 'rollLivingBoot default rng param; the roll lands in layoutParams/paletteId/enabledAssets (#707)' },
-  'curator/director.js': { count: 1, why: 'blendPick default rng param; the pick path passes CURATE\u2019s seeded (seed, press #) stream (#518)' },
-  'curator/dice.js': { count: 1, why: 'rollDice default rng param; the performer gesture lands its crown in layoutParams.mode / enabledAssets / the keep ledger + crown log' },
-  'state/paramUtils.js': { count: 2, why: 'randomizeKey default rng param + morph dice; result lands in layoutParams (#1550: the validating door deduped two call sites into rollKeyInSpec — 4 → 2)' },
+  'curator/dice.js': { count: 1, why: 'rollDice default rng param; the performer gesture lands its crown in layoutParams.mode / enabledAssets / the keep ledger + crown log — audit 3f (#1677): classified intentional performer die; the default IS the product (the dice tray passes no rng by design; miner/coverageReport pass seeded streams)' },
+  'state/paramUtils.js': { count: 2, why: 'randomizeKey default rng param + morph dice; result lands in layoutParams (#1550: the validating door deduped two call sites into rollKeyInSpec — 4 → 2) — audit 3f (#1677): classified intentional; the module documents the split (CURATE passes a seeded stream, dice buttons keep Math.random); landings proven by writePathHonesty.selfcheck (generateLayoutTargets) and state/diceLanding.selfcheck (randomizeParam)' },
   'state/slices/davisSlice.js': { count: 1, why: 'EVOLVE palette dice; result lands in paletteId — landing proven by state/diceLanding.selfcheck (audit 3e, #1675)' },
   'state/slices/layoutSlice.js': { count: 7, why: 'bumpSeed / mutateSeedOffset dice + #942 kineticRoll die + seed roll + #944 weather dice (3: sun intensity/ambient, glow); every result lands in seed / paletteId / layoutParams / enabledAssets / layers / light — landings proven by state/diceLanding.selfcheck (audit 3e, #1675)' },
   'state/slices/layersSlice.js': { count: 4, why: 'layer id suffix (identity, not sim) + new-layer seed dice (lands in the snapshot) + #1097 PATTERN track seed dice (addPatternLayer, shufflePattern: SHUFFLE writes a stored uint32 into layer.pattern.seed, serialized and undoable) — landings proven by state/diceLanding.selfcheck (audit 3e, #1675)' },
-  'components/paletteWing.mjs': { count: 1, why: 'randomSeedHex default rng param; the generated set lands in paletteOverrides' },
-  'components/PaletteWing.jsx': { count: 1, why: 'randomScheme default rng param (#953 generate dice); the set lands in paletteOverrides (undoable, serialized)' },
+  'components/paletteWing.mjs': { count: 1, why: 'randomSeedHex default rng param; the generated set lands in paletteOverrides — audit 3f (#1677): classified intentional generate-button entropy (see 3c, #1671); removing it would kill the generate button' },
+  'components/PaletteWing.jsx': { count: 1, why: 'randomScheme default rng param (#953 generate dice); the set lands in paletteOverrides (undoable, serialized) — audit 3f (#1677): classified intentional generate-button entropy (see 3c, #1671)' },
 };
 
 // Never allowed, whatever the reason: the sim, the kernel, placement, the GL layer.

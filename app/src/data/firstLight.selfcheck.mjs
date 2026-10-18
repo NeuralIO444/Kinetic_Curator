@@ -37,4 +37,22 @@ for (let i = 0; i < 200; i++) {
   assert.strictEqual(new Set(roll.assetIds).size, roll.assetIds.length, 'assets unique');
 }
 
+// ── Audit fix 3f — rollLivingBoot's no-random path is deterministic ─────────
+// rollLivingBoot defaulted random = Math.random (measured pre-fix: 24
+// distinct boots over 200 no-arg calls). It has no production caller —
+// only this suite — so a missing/non-function random now rolls 0: the
+// deterministic first light (first starter preset, its first assets).
+// If the living boot is wired later it must pass a stream or accept
+// this roll.
+{
+  const a = rollLivingBoot();
+  const b = rollLivingBoot();
+  assert.deepStrictEqual(a, b, 'no-random rollLivingBoot must be deterministic');
+  assert.deepStrictEqual(rollLivingBoot(undefined), a, 'undefined random = the roll-0 stream');
+  assert.deepStrictEqual(rollLivingBoot(42), a, 'non-function random = the roll-0 stream');
+  assert.deepStrictEqual(rollLivingBoot(() => 0), a, 'explicit zero stream matches');
+  const starters = getFirstLightPresets();
+  assert.strictEqual(a.preset.id, starters[0].id, 'roll-0 boot deals the first starter');
+}
+
 console.log('[firstlight] ok — 4 starters, 200 seeded rolls all bounded');

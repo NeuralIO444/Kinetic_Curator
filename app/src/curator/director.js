@@ -276,12 +276,16 @@ export function directorGains({ loisCode = null, davisCode = null, phase = null,
  * The LOIS/Davis blend: with probability loisWeight the critic's top pick
  * wins, otherwise the generator's. Pure mixture — it returns exactly one of
  * its two input indices, never an invented third. rng injectable for tests.
+ * Audit fix 3f — no Math.random default (the 3a contract): a
+ * missing/non-function rng rolls 0, so any positive weight takes the
+ * blend, deterministically. Production (taste.js) passes the seeded stream.
  */
-export function blendPick({ davisIndex, loisIndex, loisWeight, rng = Math.random } = {}) {
+export function blendPick({ davisIndex, loisIndex, loisWeight, rng = null } = {}) {
+  const draw = typeof rng === 'function' ? rng : () => 0;
   const w = clamp01(loisWeight);
   if (w <= 0) return davisIndex;
   if (w >= 1) return loisIndex;
-  return rng() < w ? loisIndex : davisIndex;
+  return draw() < w ? loisIndex : davisIndex;
 }
 
 /** Console-only, behind localStorage['kc:director:trace']==='1', off by default. */

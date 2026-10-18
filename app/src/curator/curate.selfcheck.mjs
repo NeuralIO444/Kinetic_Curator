@@ -27,11 +27,16 @@ assert.ok(Number.isInteger(CURATE_CANDIDATES) && CURATE_CANDIDATES >= 2);
 // artifact; the null curator remains the honest fallback underneath.
 assert.strictEqual(getActiveCurator().status(), 'active');
 
-// fallback: engine declines -> uniform roll in range, flagged uncurated
+// fallback: engine declines -> uniform roll in range, flagged uncurated.
+// Audit 3f: this section used to be dealt by pickCurated's Math.random
+// default; it now injects a seeded stream explicitly — same property
+// (the fallback varies with the stream), and the suite is deterministic.
 {
+  const { mkRng } = await import('../engine/prng.js');
+  const stream = mkRng(518);
   const seen = new Set();
   for (let i = 0; i < 200; i++) {
-    const r = pickCurated(cands, nullCurator());
+    const r = pickCurated(cands, nullCurator(), stream);
     assert.strictEqual(r.curated, false);
     assert.ok(r.index >= 0 && r.index < cands.length);
     seen.add(r.index);
@@ -86,6 +91,26 @@ assert.strictEqual(curatorHint({ status: () => 'active', pick: () => 0 }), 'cura
   useStore.setState({ lockedParams: Object.fromEntries(RANDOMIZABLE_KEYS.map((k) => [k, true])) });
   useStore.getState().curateUnlocked();
   assert.strictEqual(useStore.getState().curatePress, 6, 'an all-locked no-op does not advance the counter');
+}
+
+// ── Audit fix 3f — pickCurated's no-rng path is deterministic ───────────────
+// pickCurated defaulted rng = Math.random: with the curator's pick
+// unavailable, the fallback index scattered (measured pre-fix: all 8
+// indices over 200 identical calls). A missing/non-function rng now rolls
+// 0 — the fallback deals candidate 0 and the persona machinery receives
+// the zero stream (the 3a contract). Production passes the seeded
+// CURATE stream (layoutSlice) and is unchanged.
+{
+  const { pickCurated } = await import('./curate.js');
+  const cands = Array.from({ length: 8 }, (_, i) => ({ id: i }));
+  const noPick = { pick: () => -1 };
+  const a = pickCurated(cands, noPick);
+  const b = pickCurated(cands, noPick);
+  assert.deepStrictEqual(a, b, 'no-rng pickCurated must be deterministic');
+  assert.strictEqual(a.index, 0, 'no-rng fallback deals candidate 0 (the roll-0 stream)');
+  assert.deepStrictEqual(pickCurated(cands, noPick, undefined), a, 'undefined rng = the roll-0 stream');
+  assert.deepStrictEqual(pickCurated(cands, noPick, 42), a, 'non-function rng = the roll-0 stream');
+  assert.deepStrictEqual(pickCurated(cands, noPick, () => 0), a, 'explicit zero stream matches');
 }
 
 console.log('curate.selfcheck: ok');

@@ -63,7 +63,12 @@ export function getActiveCurator() {
  * must be the ones in this array. A profile bug never breaks the button —
  * shaping failure falls back to the unshaped candidates.
  */
-export function pickCurated(candidates, curator, rng = Math.random, { refine = false } = {}) {
+export function pickCurated(candidates, curator, rng = null, { refine = false } = {}) {
+  // Audit fix 3f — no Math.random default (the 3a contract): a
+  // missing/non-function rng rolls 0, so the fallback deals candidate 0
+  // and the persona machinery receives the zero stream. Production
+  // (layoutSlice's CURATE press) passes the seeded CH.curate stream.
+  const draw = typeof rng === 'function' ? rng : () => 0;
   const n = candidates.length;
   if (n === 0) return { index: -1, curated: false };
   // #1144: in REFINE the candidates are local mutations of what landed. The persona's render profile re-rolls the
@@ -71,19 +76,19 @@ export function pickCurated(candidates, curator, rng = Math.random, { refine = f
   // the persona's earlier look); the pick itself is still taste-weighted.
   if (!refine && curator && typeof curator.shapeCandidates === 'function') {
     try {
-      curator.shapeCandidates(candidates, rng);
+      curator.shapeCandidates(candidates, draw);
     } catch {
       /* fall through to the unshaped candidates */
     }
   }
   let idx;
   try {
-    idx = curator.pick(candidates, rng);
+    idx = curator.pick(candidates, draw);
   } catch {
     idx = -1;
   }
   if (!Number.isInteger(idx) || idx < 0 || idx >= n) {
-    return { index: Math.floor(rng() * n), curated: false };
+    return { index: Math.floor(draw() * n), curated: false };
   }
   return { index: idx, curated: true };
 }
