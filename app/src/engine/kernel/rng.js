@@ -185,6 +185,11 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   snap: 'color',
   // #1365 — which of a persona's three palettes explore deals: a COLOUR decision.
   paletteFamily: 'color',
+  // Audit fix 3c — buildHarmony's per-slot jitter is dealt from (baseHex, scheme) on this
+  // channel when no rng is injected: a COLOUR decision (re-rolling colour may re-deal the
+  // jitter, spatial never does). buildHarmony passes no offsets, so the group offset is
+  // the identity for its draws.
+  harmony: 'color',
 });
 
 const OFFSET_GROUP_OF = new Map([

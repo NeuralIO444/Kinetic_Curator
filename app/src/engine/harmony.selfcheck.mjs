@@ -49,4 +49,27 @@ assert.deepStrictEqual(
 // a short generated set must not blank out trailing slots
 assert.deepStrictEqual(applyWithLocks(current, ['#aaaaaa'], []), ['#aaaaaa', '#222222', '#333333', '#444444']);
 
+// ── Audit fix 3c — the no-rng path is deterministic ─────────────────────────
+// buildHarmony used to default rng = Math.random, so the two production
+// callers (PaletteWing generate, layoutSlice applyHarmony) dealt fresh
+// jitter per call: same base + scheme never reproduced the same palette
+// (measured pre-fix: 50 distinct palettes over 50 identical calls).
+// The jitter is now dealt from the inputs via hashU01 ('harmony' colour
+// channel): same inputs → same palette, and the fan-out survives.
+const det1 = buildHarmony('#3a7bd5', 'triadic', 8);
+const det2 = buildHarmony('#3a7bd5', 'triadic', 8);
+assert.deepStrictEqual(det1, det2, 'no-rng buildHarmony must be deterministic');
+assert.ok(new Set(det1).size >= 6, 'no-rng palette must still fan out by slot');
+assert.notDeepStrictEqual(
+  buildHarmony('#d53a7b', 'triadic', 8), det1,
+  'a different base must deal a different palette',
+);
+assert.notDeepStrictEqual(
+  buildHarmony('#3a7bd5', 'split', 8), det1,
+  'a different scheme must deal a different palette',
+);
+// a non-function rng falls back to the same deterministic deal, never Math.random
+assert.deepStrictEqual(buildHarmony('#3a7bd5', 'triadic', 8, undefined), det1);
+assert.deepStrictEqual(buildHarmony('#3a7bd5', 'triadic', 8, 42), det1);
+
 console.log('harmony.selfcheck: OK', { schemes: SCHEME_IDS.length });
