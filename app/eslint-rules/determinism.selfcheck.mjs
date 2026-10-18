@@ -21,11 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { Linter } from 'eslint';
 import plugin from './determinism.mjs';
-import {
-  DETERMINISM_ALLOWLIST,
-  DETERMINISM_FORBIDDEN,
-  DETERMINISM_CLOCK_DIRS,
-} from './determinism-allowlist.mjs';
+import { DETERMINISM_ALLOWLIST, DETERMINISM_FORBIDDEN, DETERMINISM_CLOCK_DIRS } from './determinism-allowlist.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, '..', 'src');
@@ -74,10 +70,14 @@ const realFile = (rel) => readFileSync(join(SRC, rel), 'utf8');
 // Allowlist shape: every entry is an exact count with a written reason.
 for (const [rel, apis] of Object.entries(DETERMINISM_ALLOWLIST)) {
   for (const [api, entry] of Object.entries(apis)) {
-    assert.ok(Number.isInteger(entry.count) && entry.count >= 1,
-      `${rel} ${api}: allowance count must be a positive integer`);
-    assert.ok(typeof entry.why === 'string' && entry.why.trim().length > 0,
-      `${rel} ${api}: allowance needs a written reason`);
+    assert.ok(
+      Number.isInteger(entry.count) && entry.count >= 1,
+      `${rel} ${api}: allowance count must be a positive integer`,
+    );
+    assert.ok(
+      typeof entry.why === 'string' && entry.why.trim().length > 0,
+      `${rel} ${api}: allowance needs a written reason`,
+    );
   }
 }
 
@@ -95,24 +95,32 @@ for (const [name, api] of [
 }
 
 // 2 — scope: clocks are free in UI paths; random is walled everywhere.
-assert.deepStrictEqual(lint(fixture('smuggle-date-now.js'), at('panels/fixture.jsx')), [],
-  'Date.now in a UI path is out of clock scope');
-assert.strictEqual(lint(fixture('smuggle-random.js'), at('panels/fixture.jsx')).length, 1,
-  'Math.random is walled across all of src/');
+assert.deepStrictEqual(
+  lint(fixture('smuggle-date-now.js'), at('panels/fixture.jsx')),
+  [],
+  'Date.now in a UI path is out of clock scope',
+);
+assert.strictEqual(
+  lint(fixture('smuggle-random.js'), at('panels/fixture.jsx')).length,
+  1,
+  'Math.random is walled across all of src/',
+);
 
 // 3 — the named cases: present-and-clean, no allowances.
 for (const rel of ['engine/kernel/sample/quadtreeSignal.js', 'curator/transitions.js']) {
   assert.ok(!(rel in DETERMINISM_ALLOWLIST), `${rel} must not need an allowance`);
-  assert.deepStrictEqual(lint(realFile(rel), at(rel)), [],
-    `${rel} lints clean (fix 3 removed its unseeded fallback)`);
+  assert.deepStrictEqual(lint(realFile(rel), at(rel)), [], `${rel} lints clean (fix 3 removed its unseeded fallback)`);
 }
 
 // 4 — every allowlisted real file lints clean: exact counts, both ways.
 for (const rel of Object.keys(DETERMINISM_ALLOWLIST)) {
   const raw = lintRaw(realFile(rel), at(rel));
   assert.ok(!raw.some((m) => m.fatal), `${rel}: must parse cleanly under the rule config`);
-  assert.deepStrictEqual(raw.filter((m) => m.ruleId === RULE_ID), [],
-    `${rel}: found counts must equal its allowance exactly`);
+  assert.deepStrictEqual(
+    raw.filter((m) => m.ruleId === RULE_ID),
+    [],
+    `${rel}: found counts must equal its allowance exactly`,
+  );
 }
 
 // 5 — a reasonless allowance fails like a violation.
@@ -120,8 +128,10 @@ for (const rel of Object.keys(DETERMINISM_ALLOWLIST)) {
   const doctored = structuredClone(productionOptions);
   doctored.allow['state/id.js']['Date.now'].why = '  ';
   const messages = lint(realFile('state/id.js'), at('state/id.js'), doctored);
-  assert.ok(messages.some((m) => m.message.includes('no written reason')),
-    'a blanked reason must be reported');
+  assert.ok(
+    messages.some((m) => m.message.includes('no written reason')),
+    'a blanked reason must be reported',
+  );
 }
 
 // 6a — a stale allowance fails.
@@ -129,8 +139,10 @@ for (const rel of Object.keys(DETERMINISM_ALLOWLIST)) {
   const doctored = structuredClone(productionOptions);
   doctored.allow['state/id.js']['Date.now'].count = 2;
   const messages = lint(realFile('state/id.js'), at('state/id.js'), doctored);
-  assert.ok(messages.some((m) => m.message.includes('stale')),
-    'an inflated allowance must be reported stale');
+  assert.ok(
+    messages.some((m) => m.message.includes('stale')),
+    'an inflated allowance must be reported stale',
+  );
 }
 
 // 6b — the forbidden zone honours no allowance.

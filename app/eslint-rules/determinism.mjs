@@ -35,7 +35,9 @@ function propertyName(prop) {
 }
 
 function srcRelative(filename) {
-  const norm = String(filename || '').split('\\').join('/');
+  const norm = String(filename || '')
+    .split('\\')
+    .join('/');
   const idx = norm.lastIndexOf('/src/');
   if (idx < 0) return null;
   return norm.slice(idx + '/src/'.length);
@@ -45,7 +47,8 @@ const rule = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'No unseeded Math.random and no wall-clock reads (Date.now / performance.now) in engine paths without a reasoned, exact-count allowance.',
+      description:
+        'No unseeded Math.random and no wall-clock reads (Date.now / performance.now) in engine paths without a reasoned, exact-count allowance.',
     },
     schema: [
       {
@@ -141,3 +144,5 @@ export default {
     'no-unseeded-random-or-clock': rule,
   },
 };
+
+const probe = { x: 1 };

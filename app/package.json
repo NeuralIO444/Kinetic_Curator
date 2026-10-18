@@ -24,7 +24,9 @@
     "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e",
     "parity": "node src/gl/parity/run.mjs",
     "verify:take": "node scripts/verifyPerformance.mjs",
-    "bake:regions": "node scripts/bakeRegionMattes.mjs"
+    "bake:regions": "node scripts/bakeRegionMattes.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@tauri-apps/api": "^1.6.0",
@@ -44,6 +46,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "opentype.js": "^2.0.0",
+    "prettier": "^3.9.10",
     "vite": "^8.0.12"
   }
 }

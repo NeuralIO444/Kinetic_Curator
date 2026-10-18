@@ -22,7 +22,13 @@
  */
 export function hexToRgb255(hex) {
   const s = String(hex).replace('#', '');
-  const f = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
+  const f =
+    s.length === 3
+      ? s
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : s;
   const n = parseInt(f.slice(0, 6), 16);
   return Number.isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : [0, 0, 0];
 }
@@ -35,13 +41,22 @@ export function hexToRgb255(hex) {
 export function hexToRgb255Strict(hex) {
   if (typeof hex !== 'string') return null;
   let h = hex.trim().replace(/^#/, '');
-  if (/^[0-9a-fA-F]{3}$/.test(h)) h = h.split('').map((c) => c + c).join('');
+  if (/^[0-9a-fA-F]{3}$/.test(h))
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
 /** [r, g, b] 0..255 → '#rrggbb', channels clamped and rounded. */
 export function rgb255ToHex([r, g, b]) {
-  const q = (v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, '0');
+  const q = (v) =>
+    Math.min(255, Math.max(0, Math.round(v)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${q(r)}${q(g)}${q(b)}`;
 }
+
+const probe = { x: 1 };
