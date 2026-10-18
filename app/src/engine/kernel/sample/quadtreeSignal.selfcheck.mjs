@@ -14,7 +14,9 @@ import {
   createBandSmoother,
   makeQuadtreeInterestingness,
   quantizeBands,
+  readSmoothedBands,
 } from './quadtreeSignal.js';
+import { setAudioMeterTap } from '../../../hooks/audioMeterTap.js';
 
 const SEED = 99;
 const bandsOf = (v) => Object.fromEntries(QUAD_BAND_ORDER.map((k) => [k, v]));
@@ -144,6 +146,43 @@ const BRIGHT = { sub: 0.02, bass: 0.05, mud: 0.1, edge: 0.4, pres: 0.7, air: 0.9
   assert.strictEqual(a, b, 'sub-quantum wobble must not change the key');
   const c = quantizeBands({ ...KICK, sub: 0.1 });
   assert.ok(c !== a, 'real changes must change the key');
+}
+
+// ─── #1669 (audit fix 3b): the live band read takes loop time, never the wall clock ───
+// readSmoothedBands used to default its timestamp to performance.now() /
+// Date.now(). Both clocks are poisoned for this whole section: any read of
+// either throws. The timed path must behave exactly as before (100 ms
+// throttle cache, real smoothing), and a missing or NaN timestamp must idle
+// the smoother — never poison it (update(undefined) NaNs the state for good).
+{
+  const origPerfNow = performance.now;
+  const origDateNow = Date.now;
+  performance.now = () => { throw new Error('performance.now consulted'); };
+  Date.now = () => { throw new Error('Date.now consulted'); };
+  try {
+    // No tap: levels read null, targets are zero — finite, zeroed bands.
+    const idle = readSmoothedBands();
+    for (const k of QUAD_BAND_ORDER) assert.ok(Number.isFinite(idle[k]), `no-arg read: ${k} is finite`);
+    assert.strictEqual(readSmoothedBands(), idle, 'no-arg read is throttle-cached');
+    assert.strictEqual(readSmoothedBands(undefined), idle, 'undefined timestamp idles, does not poison');
+    assert.strictEqual(readSmoothedBands(NaN), idle, 'NaN timestamp idles, does not poison');
+
+    // Drive the bus: full-scale bytes on a fake analyser.
+    setAudioMeterTap({
+      analyser: { frequencyBinCount: 1024, getByteFrequencyData: (arr) => arr.fill(255) },
+      sampleRate: 48000,
+      kind: 'FILE',
+    });
+    const hotBass = readSmoothedBands(10000).bass;
+    assert.ok(hotBass > 0.05, `timed read smooths real levels (bass=${hotBass})`);
+    setAudioMeterTap(null);
+    const cooledBass = readSmoothedBands(10200).bass;
+    assert.ok(cooledBass < hotBass, 'past the throttle: recomputed toward silence');
+  } finally {
+    performance.now = origPerfNow;
+    Date.now = origDateNow;
+    setAudioMeterTap(null);
+  }
 }
 
 console.log('quadtreeSignal.selfcheck: OK');

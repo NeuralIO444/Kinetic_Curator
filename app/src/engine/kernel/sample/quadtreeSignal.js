@@ -162,15 +162,21 @@ export function makeQuadtreeInterestingness({ seed, seedOffsets = null, quadAudi
  * The single live touch point: read the meter bus and smooth it.
  * Throttled to ~10Hz — the tree rebuilds on a ~4Hz tick, so per-item reads
  * would just re-sample the same ballistics. Module singleton: one bus.
+ * The caller passes loop time; this module never reads the wall clock.
  */
 const _liveSmoother = createBandSmoother();
 let _liveLastMs = -1;
 let _liveCached = null;
 
-export function readSmoothedBands(nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now())) {
-  if (_liveCached && nowMs - _liveLastMs < 100) return _liveCached;
-  _liveLastMs = nowMs;
-  _liveCached = _liveSmoother.update(readMeterBandLevels(), nowMs);
+export function readSmoothedBands(nowMs) {
+  // Loop time is the caller's to pass (#1669, audit fix 3b) — there is no
+  // wall-clock fallback. A missing or non-finite timestamp reuses the last
+  // one (0 before the first timed call): the smoother idles inside its
+  // throttle window instead of poisoning its state on a NaN dt.
+  const t = Number.isFinite(nowMs) ? nowMs : (_liveLastMs < 0 ? 0 : _liveLastMs);
+  if (_liveCached && t - _liveLastMs < 100) return _liveCached;
+  _liveLastMs = t;
+  _liveCached = _liveSmoother.update(readMeterBandLevels(), t);
   return _liveCached;
 }
 
