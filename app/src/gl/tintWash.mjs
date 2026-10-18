@@ -76,20 +76,13 @@ export function smootherstep(t) {
   return x * x * x * (x * (x * 6 - 15) + 10);
 }
 
-/** Parse '#rgb' / '#rrggbb' (with or without '#') to [r,g,b] 0..255, else null. */
-export function hexToRgb(hex) {
-  if (typeof hex !== 'string') return null;
-  let h = hex.trim().replace(/^#/, '');
-  if (/^[0-9a-fA-F]{3}$/.test(h)) h = h.split('').map((c) => c + c).join('');
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-}
+import { hexToRgb255Strict, rgb255ToHex } from '../engine/colorHex.mjs';
 
-/** [r,g,b] 0..255 to '#rrggbb'. */
-export function rgbToHex([r, g, b]) {
-  const q = (v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, '0');
-  return `#${q(r)}${q(g)}${q(b)}`;
-}
+/** Parse '#rgb' / '#rrggbb' (with or without '#') to [r,g,b] 0..255, else null — canonical: engine/colorHex.mjs (#1682). */
+export const hexToRgb = hexToRgb255Strict;
+
+/** [r,g,b] 0..255 to '#rrggbb' — canonical: engine/colorHex.mjs (#1682). */
+export const rgbToHex = rgb255ToHex;
 
 /**
  * Lerp two hex colors. Garbage on either side degrades to the other side —

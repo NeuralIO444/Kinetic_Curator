@@ -10,6 +10,7 @@
 
 import { colorForPlacement } from '../../color.js';
 import { colorRngForIndex } from '../rng.js';
+import { hexToRgb255 as parseHexColor } from '../../colorHex.mjs'; // #1682: canonical lenient parse (was a local copy; colorHex.mjs imports nothing, so the kernel gains no pattern/ or gl/ dependency)
 
 /** Accent offset, in swatch slots, from the chosen colour. Exported for the palette-breath applier (#1151), which re-derives accents from shifted slots. */
 export const ACCENT_OFFSET = 3;
@@ -53,14 +54,6 @@ export function resolveStrategy(layoutParams, preset) {
   const chosen = layoutParams?.paletteShift;
   if (chosen && chosen !== 'auto') return chosen;
   return preset?.paletteShift || 'band';
-}
-
-/** '#rrggbb' (or '#rgb') → [r, g, b]. Local: kernel must not import pattern/. */
-function parseHexColor(hex) {
-  const s = String(hex).replace('#', '');
-  const f = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
-  const n = parseInt(f.slice(0, 6), 16);
-  return Number.isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : [0, 0, 0];
 }
 
 function toHexColor(r, g, b) {

@@ -38,6 +38,7 @@
 // seeded positions, the curves are pure. Same (seed, items) → same output.
 
 import { makeNoiseField } from './kernel/field/index.js';
+import { hexToRgb255 as parseHex } from './colorHex.mjs'; // #1682: canonical lenient parse (was a local copy)
 
 /** Field sources, in tile order. 'off' is the no-op. */
 export const FIELDMAP_FIELDS = Object.freeze(['off', 'noise', 'density']);
@@ -107,15 +108,8 @@ export function fieldMapActive(cfg) {
 }
 
 // ── saturation helpers ─────────────────────────────────────────────────
-// Hex ⇄ HSL. Local: the kernel must not import pattern/ or gl/.
-
-function parseHex(hex) {
-  const s = String(hex).replace('#', '');
-  const f = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
-  const n = parseInt(f.slice(0, 6), 16);
-  if (!Number.isFinite(n)) return [0, 0, 0];
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
+// Hex ⇄ HSL. parseHex is canonical (engine/colorHex.mjs, #1682) — a
+// zero-import leaf, so no pattern/ or gl/ dependency is introduced.
 
 function rgbToHsl(r, g, b) {
   r /= 255; g /= 255; b /= 255;
