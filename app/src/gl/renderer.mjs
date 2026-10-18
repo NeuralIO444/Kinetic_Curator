@@ -38,6 +38,7 @@ import {
 } from './shaders.mjs';
 import { RESOLVE_FS } from './resolveFs.mjs';
 import { bindResolveProbe } from './resolveBind.mjs';
+import { createUniformLocator } from './uniformLocations.mjs';
 import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
 import { createBridge } from './bridge/bridge.mjs';
 import { attachVelocities } from './velocitySmear.mjs';
@@ -638,7 +639,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   registerFxShaders(bridge, gl); // Phase-2 template effects (#188): displace, tear, scanlines, solarize, edge
   registerMathShaders(bridge, gl); // #1010: twelve tier-3 tone ops on the same contract
 
-  const U = (p, n) => gl.getUniformLocation(p, n);
+  const U = createUniformLocator(gl); // #1665: locations fetched once per (program, name), not per pass
 
   // Fullscreen quad (two triangles via TRIANGLE_STRIP).
   const fullVbo = gl.createBuffer();
