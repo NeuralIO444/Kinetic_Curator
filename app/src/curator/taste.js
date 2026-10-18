@@ -113,19 +113,21 @@ export function featureProximity(a, b) {
 /**
  * Pick a candidate index for a persona. Scores all candidates, takes the
  * top 3, and softmax-samples among them (temperature 0.4) so the best
- * usually wins but the pick doesn't feel robotic. rng is injectable:
- * pass a seeded RNG for determinism (same seed → same pick); production
- * passes Math.random. Returns -1 for empty input. Never mutates candidates.
+ * usually wins but the pick doesn't feel robotic. rng is injectable and
+ * part of the call contract: CURATE passes the seeded RNG (same seed →
+ * same pick). A missing rng rolls 0 — never Math.random (#1667).
+ * Returns -1 for empty input. Never mutates candidates.
  *
  * temperature is the Director's dial (#1145): effectiveTemp() is the single
  * source of truth. Defaults to 0.4 — yesterday's behavior when the Director
  * is silent.
  */
-export function pickPersona(candidates, personaId, rng = Math.random, temperature = 0.4) {
+export function pickPersona(candidates, personaId, rng, temperature = 0.4) {
   const n = candidates.length;
   if (n === 0) return -1;
   const taste = getPersonaTaste(personaId);
   if (!taste) return -1;
+  const roll = typeof rng === 'function' ? rng : () => 0;
   const scored = candidates.map((c, i) => ({
     i,
     s: scoreCandidate(extractFeatures(c), taste.weights),
@@ -136,7 +138,7 @@ export function pickPersona(candidates, personaId, rng = Math.random, temperatur
   const T = temperature > 0 ? temperature : 0.4;
   const exps = top.map((t) => Math.exp(t.s / T));
   const sum = exps.reduce((a, b) => a + b, 0) || 1;
-  let r = rng() * sum;
+  let r = roll() * sum;
   for (let k = 0; k < top.length; k++) {
     r -= exps[k];
     if (r <= 0) return top[k].i;

@@ -117,7 +117,11 @@ export function hasChain(key) {
 export function markovPick(key, from, rng) {
   const domain = DOMAINS[key];
   if (!domain) return { value: from, fellBack: true };
-  const roll = typeof rng === 'function' ? rng() : Math.random();
+  // rng is part of the call contract: CURATE injects the seeded (seed,
+  // press #) stream. A missing rng rolls 0, never Math.random (#1667) — an
+  // unseeded roll here would land in layoutParams and silently break the
+  // take's replay, with no error anywhere.
+  const roll = typeof rng === 'function' ? rng() : 0;
   const u = Number.isFinite(roll) ? Math.min(1, Math.max(0, roll)) : 0;
   const row = Object.hasOwn(TRANSITIONS[key], from) ? TRANSITIONS[key][from] : null;
   if (!row) {

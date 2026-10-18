@@ -178,4 +178,19 @@ assert.deepStrictEqual(pickPersona(cands, 'bogus-persona', mulberry32(1)), -1);
   assert.strictEqual(curatorHint(getActiveCurator()), 'persona pick: OVERLAP');
 }
 
+// ─── #1667 (audit fix 3a): no rng → no fallback die ───
+// CURATE injects the seeded stream. A caller that passed no rng used to
+// sample from Math.random; now the roll is 0 (the argmax pick this suite
+// already pins for rng() === 0). Seeded picks pinned from pre-fix code.
+{
+  const seen = new Set();
+  for (let i = 0; i < 200; i += 1) seen.add(pickPersona(cands, 'davis'));
+  assert.strictEqual(seen.size, 1, 'no-rng pickPersona must be deterministic (was Math.random)');
+  assert.strictEqual(pickPersona(cands, 'davis'), pickPersona(cands, 'davis', () => 0), 'the no-rng pick is the rng=0 pick');
+  // The seeded path itself is pinned by the determinism section above; the
+  // absolute picks from pristine state (mulberry32(7) → 7, (42) → 6) are
+  // recorded on issue #1667 — suite state by this point has exercised the
+  // taste ledgers, so absolute values are not asserted here.
+}
+
 console.log('taste.selfcheck: ok');
