@@ -36,7 +36,7 @@ import { initPhase } from './curator/phase.js'; // #1144: the instrument knows t
 import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (the creature's posture consumes them since S5)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
-import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, setRoomProvider, noteKeep } from './curator/formationLive.js';
+import { observeFormation, getFormedPins, getLimbPairs, getPinTraits, getDishHosted, setRoomProvider, noteKeep } from './curator/formationLive.js';
 import { observeDishDensity } from './curator/dishDensityLive.js'; // #1412: the contact-density field, onto the bus
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
@@ -59,7 +59,7 @@ import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js'
 import { startSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
 import { observeClock } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
 import { observeMotion } from './composition/motionLive.js'; // #1469: the frame's living-motion read, to the MOTION strip's tap
-import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider } from './gl/resolveTap.mjs';
+import { setResolveFrameTap, setFormedProvider, setLimbsProvider, setTraitsProvider, setDishHostedProvider } from './gl/resolveTap.mjs';
 import { observeSpawn } from './curator/spawnLive.js'; // #1355: auto spawn finds each creature's home
 import { captureFavorite } from './state/slices/davisSlice.js';
 import * as A from './state/actions.js';
@@ -124,6 +124,7 @@ function AppInner() {
     setFormedProvider(getFormedPins); // #1355 step 4: the moth grows on pins the rule has formed
     setLimbsProvider(getLimbPairs); // #1355 step 5: a crowded place grows its second pair of wings
     setTraitsProvider(getPinTraits); // #1356 step 2: Davis's birth shifts
+    setDishHostedProvider(getDishHosted); // #1634 slice 2: the first formed pin hosts the dish creature
     // #1145 step 3 — the room, read from the honest feed at the moment a moth is born (never per frame)
     const roomNow = () => {
       const feed = loisActivity.snapshot();
@@ -218,7 +219,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setDishHostedProvider(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

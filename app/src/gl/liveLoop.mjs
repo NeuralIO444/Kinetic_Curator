@@ -29,7 +29,7 @@ import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
-import { getFormedPins, getLimbPairs, getPinTraits } from './resolveTap.mjs'; // #1355: which pins formed, how many wings each has, and its traits
+import { getFormedPins, getLimbPairs, getPinTraits, getDishHosted } from './resolveTap.mjs'; // #1355: which pins formed, how many wings each has, and its traits
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
@@ -680,6 +680,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       dishTraits: getPinTraits(), // #1356 step 2: each moth's traits, shifted once at birth by Davis; recorded with the take
       dishLimbs: getLimbPairs(), // #1355 step 5: pairs of wings per pin (the crowd decides); recorded with the take
       dishFormed: getFormedPins(), // #1355: which pins formed (decided from the previous frame); recorded, so a take replays its creatures
+      dishHosted: getDishHosted(), // #1634 slice 2: which pin hosts the dish creature (the first formed); recorded like the rest
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,

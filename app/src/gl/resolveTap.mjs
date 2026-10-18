@@ -117,6 +117,24 @@ export function getPinTraits() {
   }
 }
 
+let dishHostedProvider = null;
+
+/** Register where the loop reads which pin hosts the dish creature (curator/formationLive.js getDishHosted). */
+export function setDishHostedProvider(fn) {
+  dishHostedProvider = typeof fn === 'function' ? fn : null;
+}
+
+/** [bool] per pin from the last resolved frame's decision; [] with no provider. A bad provider reads as none. */
+export function getDishHosted() {
+  if (dishHostedProvider === null) return [];
+  try {
+    const h = dishHostedProvider();
+    return Array.isArray(h) ? h : [];
+  } catch {
+    return [];
+  }
+}
+
 let resetRequested = false;
 
 /**
