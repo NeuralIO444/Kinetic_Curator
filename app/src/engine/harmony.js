@@ -2,6 +2,8 @@
 // Generates swatch sets that hold together, from a base colour plus a
 // classical scheme. Slots the operator has locked are never touched.
 
+import { hashU01 } from './kernel/rng.js';
+
 /** '#rrggbb' → {h:0-360, s:0-1, l:0-1}. Assumes normalized hex. */
 export function hexToHsl(hex) {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -65,21 +67,35 @@ export const SCHEME_IDS = Object.keys(HARMONY_SCHEMES);
  * @param {string} baseHex   normalized '#rrggbb'
  * @param {string} scheme    key of HARMONY_SCHEMES
  * @param {number} count     how many swatches
- * @param {() => number} rng 0..1, for the variation that isn't structural
+ * @param {() => number} [rng] 0..1, for the variation that isn't structural.
+ *   Optional (audit fix 3c): with no rng function the variation is dealt
+ *   deterministically from (baseHex, scheme) via hashU01 — this module
+ *   never reads Math.random.
  */
-export function buildHarmony(baseHex, scheme, count = 8, rng = Math.random) {
+export function buildHarmony(baseHex, scheme, count = 8, rng = null) {
   const offsets = HARMONY_SCHEMES[scheme] || HARMONY_SCHEMES.analogous;
   const base = hexToHsl(baseHex);
   // A near-greyscale base gives every slot the same hue; lift it so the
   // scheme is still visible instead of silently collapsing to grey.
   const s0 = base.s < 0.15 ? 0.55 : base.s;
+  // The jitter draws: an injected rng is consumed in the original order
+  // (lightness, then saturation, per slot — injected behaviour is
+  // byte-identical). Without one, the same sequence is dealt from the
+  // inputs on the 'harmony' colour channel, folded with the scheme index
+  // (an unknown scheme falls back to analogous offsets AND its index, 0).
+  let draw = rng;
+  if (typeof draw !== 'function') {
+    const seedInt = parseInt(String(baseHex).slice(1), 16) || 0;
+    let n = Math.max(0, SCHEME_IDS.indexOf(scheme)) * 4096;
+    draw = () => hashU01(seedInt, 'harmony', n++);
+  }
   const out = [];
   for (let i = 0; i < count; i++) {
     const h = base.h + offsets[i % offsets.length];
     const span = count > 1 ? i / (count - 1) : 0;
     // walk lightness 0.30 → 0.72 across the set, jitter saturation a little
-    const l = 0.30 + span * 0.42 + (rng() - 0.5) * 0.06;
-    const s = Math.min(1, Math.max(0.15, s0 + (rng() - 0.5) * 0.25));
+    const l = 0.30 + span * 0.42 + (draw() - 0.5) * 0.06;
+    const s = Math.min(1, Math.max(0.15, s0 + (draw() - 0.5) * 0.25));
     out.push(hslToHex({ h, s, l }));
   }
   return out;
