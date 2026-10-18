@@ -9,6 +9,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
+import { fpsFromCount, frameStats, drainStageAverages } from './fpsMath.mjs';
 
 // Module-level sampler: name -> { total, n }. Module-level (not a ref) so
 // non-React pipeline code can report without a hook instance.
@@ -87,26 +88,12 @@ export function useFpsMeter(enabled = true) {
 
       // Report ~4 Hz
       if (elapsed >= 250) {
-        const fps = (framesRef.current / elapsed) * 1000;
-        setFps(Math.round(fps * 10) / 10);
+        setFps(fpsFromCount(framesRef.current, elapsed));
 
         // Patrol snapshot: per-stage rolling averages (ms) + frame stats.
-        const stages = {};
-        for (const [name, s] of stageSamples) {
-          stages[name] = s.n > 0 ? Math.round((s.total / s.n) * 100) / 100 : 0;
-          s.total = 0;
-          s.n = 0;
-        }
-        let worst = 0;
-        let sum = 0;
-        for (const d of deltas) {
-          sum += d;
-          if (d > worst) worst = d;
-        }
-        stages.__frame = {
-          avg: deltas.length ? Math.round((sum / deltas.length) * 100) / 100 : 0,
-          worst: Math.round(worst * 100) / 100,
-        };
+        // The arithmetic is fpsMath's (pinned); this tick owns the rhythm.
+        const stages = drainStageAverages(stageSamples);
+        stages.__frame = frameStats(deltas);
         setStageTimings(stages);
 
         framesRef.current = 0;

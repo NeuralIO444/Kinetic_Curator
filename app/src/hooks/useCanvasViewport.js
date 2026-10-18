@@ -1,6 +1,7 @@
 // useCanvasViewport — zoom, pan, wheel, drag, attractor for CanvasPanel
 
 import { useState, useRef, useCallback } from 'react';
+import { nextZoom, panFromDrag, attractorPoint } from './viewportMath.mjs';
 
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
@@ -17,7 +18,7 @@ export function useCanvasViewport(canvasW = CANVAS_W, canvasH = CANVAS_H) {
   // pointers are ignored until the pan ends.
 
   const onWheel = useCallback((e) => {
-    setZoom(z => Math.max(0.1, Math.min(10, z - e.deltaY * 0.0015)));
+    setZoom(z => nextZoom(z, e.deltaY));
   }, []);
 
   const onPointerDown = useCallback((e) => {
@@ -37,10 +38,8 @@ export function useCanvasViewport(canvasW = CANVAS_W, canvasH = CANVAS_H) {
   const onPointerMove = useCallback((e) => {
     // Only the pan-initiating pointer moves the view; other fingers ignored.
     if (!dragRef.current.active || e.pointerId !== dragRef.current.pointerId) return;
-    setPan({
-      x: dragRef.current.startPanX + (e.clientX - dragRef.current.startX),
-      y: dragRef.current.startPanY + (e.clientY - dragRef.current.startY),
-    });
+    const d = dragRef.current;
+    setPan(panFromDrag(d.startPanX, d.startPanY, d.startX, d.startY, e.clientX, e.clientY));
   }, []);
 
   const onPointerUp = useCallback((e) => {
@@ -53,17 +52,12 @@ export function useCanvasViewport(canvasW = CANVAS_W, canvasH = CANVAS_H) {
   const updateAttractor = useCallback((e) => {
     if (dragRef.current.active) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    // #454 — a zero-size rect (mid-layout, or the canvas mid-unmount) makes
-    // CANVAS_W / rect.width divide to Infinity, and Infinity - Infinity
-    // downstream (particles.js's swarm attraction) is NaN; the speed clamp
-    // can't bound NaN (every NaN comparison is false), so it enters
-    // velocity and every subsequent position integrates to NaN. Treat a
-    // degenerate rect as "no attractor this frame" instead of feeding the
-    // physics a poisoned value.
-    if (!(rect.width > 0) || !(rect.height > 0)) { attractorRef.current = null; return; }
-    const x = (e.clientX - rect.left) * (canvasW / rect.width);
-    const y = (e.clientY - rect.top) * (canvasH / rect.height);
-    attractorRef.current = { x: (x - pan.x) / zoom, y: (y - pan.y) / zoom };
+    // #454 degenerate-rect guard lives in viewportMath.attractorPoint:
+    // a zero-size rect yields null ("no attractor this frame"), never a
+    // NaN-poisoned point for the physics.
+    attractorRef.current = attractorPoint(
+      e.clientX, e.clientY, rect, pan.x, pan.y, zoom, canvasW, canvasH,
+    );
   }, [pan.x, pan.y, zoom, canvasW, canvasH]);
 
   const clearAttractor = useCallback(() => { attractorRef.current = null; }, []);
