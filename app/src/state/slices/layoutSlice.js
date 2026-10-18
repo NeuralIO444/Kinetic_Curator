@@ -450,7 +450,7 @@ export const createLayoutSlice = (set) => ({
     const undoUpdate = pushToUndo(state, false);
     const next = { ...undoUpdate, layoutParams: params, voiceMix: null, activeVoiceId: null };
     if (key === 'mode' && value === 'ca' && !state.caGrid) {
-      next.caGrid = createGrid(40, 28);
+      next.caGrid = createGrid(40, 28, state.seed);
     }
     return next;
   }),
@@ -509,9 +509,9 @@ export const createLayoutSlice = (set) => ({
     colorMode: mode === 'WASH' || mode === 'INJECT' ? mode : 'FADE',
   }),
   stepCaGrid: () => set((state) => ({
-    caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28),
+    caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28, state.seed),
   })),
-  resetCaGrid: () => set({ caGrid: createGrid(40, 28) }),
+  resetCaGrid: () => set((state) => ({ caGrid: createGrid(40, 28, state.seed) })),
 
   applyPreset: (preset) => set((state) => {
     const incoming = { ...preset.params, composition: preset.id };
@@ -941,7 +941,7 @@ export const createLayoutSlice = (set) => ({
       voiceMix: null,
       activeVoiceId: null,
     };
-    if (merged.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28);
+    if (merged.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
     return next;
   }),
 

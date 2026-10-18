@@ -1,9 +1,18 @@
 // CA Engine — Conway's Game of Life grid (pure logic, no React)
 
-/** Create a new CA grid */
-export function createGrid(cols, rows) {
+import { hashU01 } from './kernel/rng.js';
+
+/**
+ * Create a new CA grid — SEEDED (audit fix 1): a pure function of (cols, rows, seed).
+ * Each cell draws on the registered 'ca-grid' channel, so the same take seed deals the
+ * same grid on every run and replay cannot diverge at creation time. Callers pass the
+ * take's seed; the seed-0 default keeps any unthreaded caller deterministic rather
+ * than random. Density is unchanged: a cell is alive when its draw beats 0.55 (~45%).
+ */
+export function createGrid(cols, rows, seed = 0) {
+  let i = 0;
   return Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => (Math.random() > 0.55 ? 1 : 0)),
+    Array.from({ length: cols }, () => (hashU01(seed, 'ca-grid', i++) > 0.55 ? 1 : 0)),
   );
 }
 
