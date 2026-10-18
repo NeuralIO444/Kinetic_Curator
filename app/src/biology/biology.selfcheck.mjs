@@ -192,4 +192,31 @@ const fresh = (seed, mode, tick, opts = {}) => {
   assert.ok(grid.length > 0 && grid.every((it) => it.alpha >= 60), 'grid alpha unfaded');
 }
 
+// ── Audit fix 3d — recordLifecycleState takes loop time, never the wall clock ──
+// lifecycle.js used to stamp each record with Date.now() from inside the
+// live wiring (the audit's "NEW since last audit" clock read). The caller
+// now passes the frame's loop time (input.loopTimeMs); the stamp's only
+// consumer is the DEV panel's row sort. With the wall clock poisoned, the
+// old code dies at the stamp; the fixed code never consults it.
+{
+  const { recordLifecycleState, getLifecycleState } = await import('./lifecycle.js');
+  const realNow = Date.now;
+  Date.now = () => { throw new Error('wall clock consulted'); };
+  try {
+    recordLifecycleState('fix3d-a', { mode: 'dla', gen: 0, tick: 7 }, 123456);
+    recordLifecycleState('fix3d-b', { mode: 'eden', gen: 1, tick: 3 }, 123500);
+    const map = getLifecycleState();
+    assert.strictEqual(map.get('fix3d-a').at, 123456, 'stamp is the caller-supplied loop time');
+    assert.strictEqual(map.get('fix3d-b').at, 123500);
+    // Missing / non-finite time keeps the previous stamp (0 on first record);
+    // the row order just doesn't advance — no clock read, no NaN stamp.
+    recordLifecycleState('fix3d-a', { mode: 'dla', gen: 0, tick: 8 });
+    assert.strictEqual(map.get('fix3d-a').at, 123456, 'missing time keeps the previous stamp');
+    recordLifecycleState('fix3d-c', { mode: 'dla', gen: 0, tick: 1 }, Number.NaN);
+    assert.strictEqual(map.get('fix3d-c').at, 0, 'first record with no time stamps 0');
+  } finally {
+    Date.now = realNow;
+  }
+}
+
 console.log('biology selfcheck: OK — versioned policy, lifecycle decisions, fade, regrow/rebirth, never-static');

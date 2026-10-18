@@ -666,7 +666,7 @@ export function createLiveResolver() {
               cellCount: stats.cellCount, oldestAge: stats.oldestAge,
               meanAge01: stats.meanAge01, decision: decision.action,
               reason: decision.reason,
-            });
+            }, input.loopTimeMs);
           }
           growthTick = gt.tick;
         }
