@@ -135,6 +135,24 @@ export function getDishHosted() {
   }
 }
 
+let dishPressureProvider = null;
+
+/** Register where the loop reads each pin's dish pressure (curator/formationLive.js getDishPressures). */
+export function setDishPressureProvider(fn) {
+  dishPressureProvider = typeof fn === 'function' ? fn : null;
+}
+
+/** [0..1] per pin from the last resolved frame; [] with no provider. A bad provider reads as none. */
+export function getDishPressure() {
+  if (dishPressureProvider === null) return [];
+  try {
+    const p = dishPressureProvider();
+    return Array.isArray(p) ? p : [];
+  } catch {
+    return [];
+  }
+}
+
 let resetRequested = false;
 
 /**
