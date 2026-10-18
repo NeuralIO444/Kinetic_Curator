@@ -196,4 +196,22 @@ ok('no UI-surface file references the director scheduler', () => {
   assert.deepEqual(hits, [], `surface references to the scheduler: ${hits.join(', ')}`);
 });
 
+// ── Audit fix 3f — blendPick's no-rng path is deterministic ─────────────────
+// blendPick defaulted rng = Math.random: at loisWeight 0.5 the blend
+// scattered between its two indices (measured pre-fix: both over 200
+// identical calls). A missing/non-function rng now rolls 0 — any positive
+// LOIS weight takes the blend, deterministically (the 3a contract). The
+// production path (taste.js) passes the seeded stream and is unchanged.
+{
+  const { blendPick } = await import('./director.js');
+  const args = { davisIndex: 1, loisIndex: 2, loisWeight: 0.5 };
+  assert.strictEqual(blendPick(args), 2, 'no-rng blendPick rolls 0: positive weight takes the blend');
+  assert.strictEqual(blendPick(args), blendPick(args), 'no-rng blendPick is deterministic');
+  assert.strictEqual(blendPick({ ...args, rng: undefined }), 2, 'undefined rng = the roll-0 stream');
+  assert.strictEqual(blendPick({ ...args, rng: 42 }), 2, 'non-function rng = the roll-0 stream');
+  assert.strictEqual(blendPick({ ...args, rng: () => 0 }), 2, 'explicit zero stream matches');
+  assert.strictEqual(blendPick({ ...args, rng: () => 0.999 }), 1, 'injected stream above the weight keeps Davis');
+  assert.strictEqual(blendPick({ davisIndex: 1, loisIndex: 2, loisWeight: 0 }), 1, 'weight 0 never draws');
+}
+
 console.log(`director.selfcheck: ${n} checks passed`);

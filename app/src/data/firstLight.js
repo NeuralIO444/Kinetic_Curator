@@ -19,22 +19,27 @@ export function getFirstLightPresets() {
 }
 
 /**
- * @param {() => number} random — injectable for tests; defaults to Math.random
+ * @param {() => number} [random] — injectable for tests. Audit fix 3f: no
+ *   Math.random default (the 3a contract) — a missing/non-function random
+ *   rolls 0, dealing the deterministic first light (first starter, its
+ *   first assets). There is no production caller today; if the living
+ *   boot is wired later it must pass a stream or accept this roll.
  * @returns {{ preset, paletteId, assetIds }} — 2 or 3 asset ids, all valid
  */
-export function rollLivingBoot(random = Math.random) {
+export function rollLivingBoot(random = null) {
+  const draw = typeof random === 'function' ? random : () => 0;
   const starters = getFirstLightPresets();
   if (!starters.length) throw new Error('[firstlight] no starter presets registered');
-  const preset = starters[Math.floor(random() * starters.length) % starters.length];
+  const preset = starters[Math.floor(draw() * starters.length) % starters.length];
 
   const paletteId = PALETTE_IDS.has(preset.paletteId) ? preset.paletteId : 'praystation';
 
   const pool = (preset.assetIds || []).filter((id) => ASSET_IDS.has(id));
-  const want = 2 + (random() < 0.5 ? 1 : 0);
+  const want = 2 + (draw() < 0.5 ? 1 : 0);
   const assetIds = [];
   const rest = [...pool];
   while (assetIds.length < Math.min(want, rest.length)) {
-    assetIds.push(rest.splice(Math.floor(random() * rest.length), 1)[0]);
+    assetIds.push(rest.splice(Math.floor(draw() * rest.length), 1)[0]);
   }
   // Safety net: a preset with an empty pool still boots with *something*.
   if (!assetIds.length) assetIds.push('org_blob_01');

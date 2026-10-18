@@ -96,6 +96,25 @@ lands('addLayer -> layer id', newLayer.id,
   (d) => (d.layers || []).find((l) => l.id === newLayer.id)?.id);
 lands('addLayer -> snapshot seed', S().seed, (d) => d.seed);
 
+// ── layoutSlice: randomizeParam (paramUtils dice button, audit 3f) ──────────
+// randomizeKey's default Math.random is intentional (paramUtils documents
+// the split: CURATE passes a seeded stream, dice buttons keep the die).
+// What 3e/3f require is that the roll LANDS: through the #1550 validating
+// door into layoutParams, and from there into the document.
+{
+  const before = { ...S().layoutParams };
+  try {
+    Math.random = () => 0.999;
+    S().randomizeParam('density');
+    S().randomizeParam('count');
+  } finally {
+    Math.random = realRandom;
+  }
+  assert.ok(S().layoutParams.density !== before.density || S().layoutParams.count !== before.count,
+    'randomizeParam rolls at least one of the two keys under a stubbed die');
+  lands('randomizeParam -> layoutParams', S().layoutParams, (d) => d.layoutParams);
+}
+
 // ── davisSlice: EVOLVE palette deal (evolveTarget 'all') ────────────────────
 useStore.setState({ evolveTarget: 'all', morphEvolve: false, lockedParams: {} });
 S().triggerEvolve();
