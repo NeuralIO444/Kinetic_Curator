@@ -73,6 +73,7 @@ node src/engine/kernel/bake/bake.detTrig.selfcheck.mjs
 node src/engine/kernel/bake/swarm.inventory.selfcheck.mjs
 node src/engine/kernel/bake/bake.contacts.selfcheck.mjs
 node src/engine/kernel/bake/bake.contacts.stills.selfcheck.mjs
+node src/engine/colorHex.selfcheck.mjs
 node src/engine/kernel/bake/swarmWasm.selfcheck.mjs
 node src/engine/kernel/tracks/neighborWasm.selfcheck.mjs
 node src/engine/kernel/field/fieldsWasm.selfcheck.mjs

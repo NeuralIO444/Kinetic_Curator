@@ -7,6 +7,7 @@
 // SEED is the stored integer, never a hidden rng state.
 
 import { mkRng } from '../engine/prng.js';
+import { hexToRgb255 } from '../engine/colorHex.mjs'; // #1682: canonical lenient parse (was a local copy)
 import { FIELD_PATTERNS, samplePattern, fieldSampler, patternParams } from './field.js';
 import { TILE_MOTIFS, HERO_MOTIFS, sampleQuilt, quiltSampler, quiltParams } from './quilt.js';
 import { GLYPH_MARKS, FILLED_MARKS, RHYTHM_MARKS, POSES, MIN_STROKE, MARK_BOX, buildMark, sampleMark, motifRoles } from './glyph.js';
@@ -47,12 +48,8 @@ export function hash32(seed, i) {
   return h >>> 0;
 }
 
-export function parseHex(hex) {
-  const s = String(hex).replace('#', '');
-  const f = s.length === 3 ? s.split('').map((c) => c + c).join('') : s;
-  const n = parseInt(f.slice(0, 6), 16);
-  return Number.isFinite(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : [0, 0, 0];
-}
+/** '#rrggbb' (or '#rgb') → [r, g, b] 0..255 — canonical: engine/colorHex.mjs (#1682). */
+export const parseHex = hexToRgb255;
 
 /** '#rrggbb' -> packed RGBA for a little-endian Uint32 view of ImageData. */
 export function toRgba(hex) {
