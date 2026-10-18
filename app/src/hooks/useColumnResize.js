@@ -1,5 +1,6 @@
 // useColumnResize — draggable column dividers for 3-column grid
 import { useRef, useState, useCallback } from 'react';
+import { resizeFractions } from './columnResizeMath.mjs';
 
 /**
  * Manages widths of N columns with draggable dividers between them.
@@ -31,27 +32,10 @@ export function useColumnResize(initialFractions = [0.32, 0.34, 0.34], minPx = 2
     const deltaFraction = (e.clientX - d.startX) / containerWidth;
     const minFraction = minPx / containerWidth;
 
-    const next = [...d.startFractions];
-    const left = d.index;
-    const right = d.index + 1;
-
-    next[left] = d.startFractions[left] + deltaFraction;
-    next[right] = d.startFractions[right] - deltaFraction;
-
-    // Enforce minimums
-    if (next[left] < minFraction) {
-      next[right] += (next[left] - minFraction);
-      next[left] = minFraction;
-    }
-    if (next[right] < minFraction) {
-      next[left] += (next[right] - minFraction);
-      next[right] = minFraction;
-    }
-
-    // Final clamp
-    if (next[left] >= minFraction && next[right] >= minFraction) {
-      setFractions(next);
-    }
+    // The shift/minimum/rejection math is columnResizeMath's (pinned);
+    // null = both sides can't hold the minimum, layout stays untouched.
+    const next = resizeFractions(d.startFractions, d.index, deltaFraction, minFraction);
+    if (next) setFractions(next);
   }, [minPx]);
 
   const onDividerPointerUp = useCallback((e) => {
