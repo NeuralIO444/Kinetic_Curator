@@ -155,6 +155,7 @@ node src/state/undoSeedOffsets.selfcheck.mjs
 node src/state/kineticRoll.selfcheck.mjs
 node src/state/kineticRulesPass.selfcheck.mjs
 node src/state/kineticWeatherPass.selfcheck.mjs
+node src/state/diceLanding.selfcheck.mjs
 node src/panels/layout/kineticHeat.selfcheck.mjs
 node src/panels/layout/chiaroscuro.selfcheck.mjs
 node src/panels/layout/unlockTree.selfcheck.mjs
