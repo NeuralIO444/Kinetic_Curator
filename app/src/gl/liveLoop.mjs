@@ -106,6 +106,23 @@ function isIpadClassDevice() {
  *   viewRef: { current: { zoom, pan: {x, y} } }
  *   wrapEl: element receiving the audio glow (box-shadow), optional
  */
+/** #268 SWELL duration: the envelope breathes out and back over 2000 ms. */
+export const SWELL_DURATION_MS = 2000;
+
+/**
+ * The pure #268 swell envelope — a function of LOOP time only (audit
+ * fix 5, #1680): 0 when no gesture is in flight (null start), rising
+ * as sin(pi * p) to a peak of 1 at the midpoint, back to 0 at
+ * SWELL_DURATION_MS. Exported so the seam can be pinned headlessly;
+ * the live closure below owns the start stamp and the reset.
+ */
+export function swellProgress(loopTimeMs, swellStartMs) {
+  if (swellStartMs === null || swellStartMs === undefined) return 0;
+  const p = (loopTimeMs - swellStartMs) / SWELL_DURATION_MS;
+  if (p <= 0 || p >= 1) return 0;
+  return Math.sin(Math.PI * p);
+}
+
 export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantSkeletons = false, wantEngraving = true } = {}) {
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
@@ -315,14 +332,20 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   };
 
   // #268 SWELL: breathe the trail length out and back over ~2s. A timestamp,
-  // not a flag — the envelope derives from wall-clock in buildFrame, so the
-  // gesture can't stick if a frame is dropped mid-swell.
-  let swellStart = 0;
+  // not a flag — the envelope derives from the timestamp in buildFrame, so
+  // the gesture can't stick if a frame is dropped mid-swell. Audit fix 5
+  // (#1680): the timestamp is LOOP time, like everything else in this
+  // loop — it read the wall clock, so the same gesture rendered against
+  // time the sim never sees. Loop time advances monotonically while
+  // frames render (and dropped frames stretch the envelope by the
+  // clamped drop instead of skipping it), so it still cannot stick.
+  // The null sentinel: 0 is a legitimate loop time.
+  let swellStart = null;
   const swellEnvelope = () => {
-    if (!swellStart) return 0;
-    const p = (performance.now() - swellStart) / 2000;
-    if (p >= 1) { swellStart = 0; return 0; }
-    return Math.sin(Math.PI * p);
+    if (swellStart === null) return 0;
+    const v = swellProgress(loopTimeMs, swellStart);
+    if (loopTimeMs - swellStart >= SWELL_DURATION_MS) swellStart = null;
+    return v;
   };
   // Fault isolation: a persistent ACCUM failure must never freeze the live
   // canvas. On fault the session is torn down, the frame falls back to plain
@@ -1391,7 +1414,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     getLoopTimeMs: () => loopTimeMs,
     setBgMode,
     setAccumFrozen: (f) => { accumFrozen = !!f; },
-    swellAccum: () => { swellStart = performance.now(); },
+    swellAccum: () => { swellStart = loopTimeMs; },
     captureFrame,
     grabPresentedFrame,
     waitForSettled,
