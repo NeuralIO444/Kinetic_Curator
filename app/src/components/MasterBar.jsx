@@ -18,14 +18,14 @@ export function MasterBar() {
   const { state } = useApp(s => ({
     running: s.running, fps: s.fps, stageTimings: s.stageTimings, governorShedFps: s.governorShedFps,
     seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
-    isRecording: s.isRecording, persistStatus: s.persistStatus, frameLock: s.frameLock,
+    isRecording: s.isRecording, persistStatus: s.persistStatus, tuningSessionOnly: s.tuningSessionOnly, frameLock: s.frameLock,
     bootNotice: s.bootNotice, setBootNotice: s.setBootNotice,
     setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, audioLost: s.audioLost, glContext: s.glContext,
     curatorConfidence: s.curatorConfidence, curatorActive: s.curatorActive,
     layers: s.layers,
   }));
   const {
-    running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok',
+    running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok', tuningSessionOnly = false,
     frameLock = false, audioDenied = false, audioLost = null, glContext = 'ok', governorShedFps = 28,
   } = state;
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
@@ -106,6 +106,14 @@ export function MasterBar() {
             title={persistStatus === 'quarantined' ? 'Last autosave could not be read.' : 'Autosave is failing.'}>
             <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
+          </div>
+        )}
+
+        {tuningSessionOnly && (
+          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+            title="Saved for this session only — this browser would not keep it.">
+            <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
+            SESSION ONLY
           </div>
         )}
 

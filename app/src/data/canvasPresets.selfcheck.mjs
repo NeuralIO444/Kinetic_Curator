@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas,
+  readUserPresets, writeUserPresets,
 } from './canvasPresets.js';
+import { sessionOnlyNoted } from '../state/sessionOnly.mjs';
 import { serializeProject } from '../state/projectDocument.js';
 
 test('#606 presets cover VJ and Social', () => {
@@ -84,4 +86,17 @@ test('#606 custom size is written', () => {
   assert.equal(doc.canvasW, 1920);
   assert.equal(doc.canvasH, 1080);
   assert.equal(doc.canvasFps, 30);
+});
+
+test('#1641 user presets: an unreadable store and a refused write report on the session-only flag', () => {
+  globalThis.localStorage = {
+    getItem: () => '{not json',
+    setItem: () => { throw new Error('private mode'); },
+    removeItem: () => {},
+  };
+  assert.deepEqual(readUserPresets(), [], 'an unreadable store still reads as no presets');
+  assert.equal(sessionOnlyNoted(), true, 'the loss is on the shared session-only flag');
+  const next = writeUserPresets([{ label: 'MINE', canvasW: 800, canvasH: 600, canvasFps: 60 }]);
+  assert.equal(next.length, 1, 'the preset still applies for the session');
+  delete globalThis.localStorage;
 });

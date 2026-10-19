@@ -16,6 +16,8 @@
 // dt-based population model doesn't fit the tick-based aggregate lifecycle.
 // This module is the single 'kc-biology' v1 identity.
 
+import { noteSessionOnly } from '../state/sessionOnly.mjs';
+
 export const BIO_KIND = 'kc-biology';
 export const BIO_VERSION = 1;
 export const BIO_KEY = 'kc:biology:v1';
@@ -126,7 +128,8 @@ export function importBiologyPolicy(raw) {
   try {
     localStorage.setItem(BIO_KEY, JSON.stringify(r.policy));
   } catch {
-    // private window / quota: the session still lives by it, it just won't be remembered.
+    // #1641: the session still lives by it — and now says it won't be remembered.
+    noteSessionOnly();
   }
   return { ok: true, policy: r.policy };
 }
@@ -137,7 +140,7 @@ export function resetBiologyPolicy() {
   try {
     localStorage.setItem(BIO_KEY, JSON.stringify(current));
   } catch {
-    // deliberately silent
+    noteSessionOnly(); // #1641: was "deliberately silent" — the reset holds for the session and says so
   }
   return current;
 }

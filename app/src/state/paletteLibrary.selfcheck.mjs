@@ -2,6 +2,7 @@
 // sanitizePalette guards a trust boundary: palette JSON arrives from a file.
 import assert from 'node:assert';
 import { sanitizePalette, createPaletteLibrarySlice } from './slices/paletteLibrarySlice.js';
+import { sessionOnlyNoted } from './sessionOnly.mjs';
 
 // Well-formed entry survives intact
 const good = sanitizePalette({
@@ -78,6 +79,23 @@ assert.strictEqual(sanitizePalette({ name: 'x'.repeat(200), swatches: ['#123456'
   ]);
   assert.strictEqual(state.userPalettes.filter((p) => p.id === 'dup').length, 1);
   assert.strictEqual(state.userPalettes.find((p) => p.id === 'dup').name, 'SECOND');
+}
+
+// ── #1641: a refused persist reports on the shared session-only flag ──
+{
+  assert.strictEqual(sessionOnlyNoted(), false, 'the working stand-in never refused — nothing noted yet');
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => { throw new Error('QuotaExceededError'); },
+  };
+  let st = { userPalettes: [] };
+  const sl = createPaletteLibrarySlice(
+    (updater) => { st = { ...st, ...(typeof updater === 'function' ? updater(st) : updater) }; },
+    () => st,
+  );
+  sl.importUserPalettes([{ name: 'SESSION ONLY', swatches: ['#123456'] }]);
+  assert.strictEqual(st.userPalettes.length, 1, 'the palette still lands for the session');
+  assert.strictEqual(sessionOnlyNoted(), true, 'the refusal is on the shared flag, not only the console');
 }
 
 console.log('paletteLibrary.selfcheck: OK');

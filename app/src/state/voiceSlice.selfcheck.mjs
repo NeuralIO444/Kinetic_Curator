@@ -10,6 +10,7 @@ import {
   MAX_USER_VOICES,
 } from './slices/voiceSlice.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { sessionOnlyNoted } from './sessionOnly.mjs';
 
 // ── sanitizeUserVoice ────────────────────────────────────────────────────
 const good = sanitizeUserVoice({
@@ -74,6 +75,26 @@ const api = state; // actions live on the state object
 assert.deepStrictEqual(api.userVoices, [], 'empty shelf in node (no localStorage)');
 assert.strictEqual(api.voiceMix, null);
 assert.strictEqual(api.activeVoiceId, null);
+
+// ── #1641: stored voices that no longer read are reported, not dropped in silence ──
+{
+  assert.strictEqual(sessionOnlyNoted(), false, 'nothing noted yet (absent storage is not a refusal)');
+  globalThis.localStorage = {
+    getItem: () => JSON.stringify([{ nope: 1 }, 'junk']),
+    setItem: () => { throw new Error('private mode'); },
+    removeItem: () => {},
+  };
+  let vstate = {};
+  const fresh = {
+    ...createVoiceSlice((updater) => {
+      const partial = typeof updater === 'function' ? updater(vstate) : updater;
+      vstate = { ...vstate, ...partial };
+    }),
+  };
+  assert.deepStrictEqual(fresh.userVoices, [], 'the junk shelf reads as no voices');
+  assert.strictEqual(sessionOnlyNoted(), true, 'the drop is on the shared session-only flag, not only a filter');
+  delete globalThis.localStorage;
+}
 
 // Capture the + chip flow (from a non-default mode so we can tell the
 // captured state apart from defaults).

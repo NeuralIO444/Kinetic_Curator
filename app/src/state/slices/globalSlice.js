@@ -313,6 +313,10 @@ export const createGlobalSlice = (set) => ({
    * operator believing a long set is being saved when nothing is.
    */
   persistStatus: 'ok',
+  // #1641 — latched by state/store.js when a small tuning surface's
+  // persist is refused (sessionOnly.mjs): the tuning holds for this
+  // session only. MasterBar renders it beside the persistStatus pill.
+  tuningSessionOnly: false,
   search: '',
   catFilter: 'all',
   poolView: readPoolView(),

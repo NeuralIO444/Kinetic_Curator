@@ -37,6 +37,7 @@ export function FavoritesTray() {
   const queueIndex = useStore((s) => s.queueIndex);
   // #534 — per-hit link feedback: the chip key whose link just copied.
   const [copiedKey, setCopiedKey] = useState(null);
+  const [copyFailedKey, setCopyFailedKey] = useState(null); // #1641: the failed copy's brief word, where the tick goes
   const [dragId, setDragId] = useState(null); // #1124 — the pill being dragged
   // #1124 — the hover card. The chip row scrolls sideways (which clips anything inside it), so the card is drawn
   // once, in the page, above the pill it belongs to; a short grace lets the pointer cross onto it.
@@ -55,10 +56,15 @@ export function FavoritesTray() {
     const payload = encodeRecipeUrl(recipeFieldsFromKept(fav));
     const href = buildShareHref(payload, typeof window !== 'undefined' ? window.location.href : '');
     const ok = await copyTextToClipboard(href);
+    const key = fav.id ?? `${fav.seed}-${fav.timestamp || ''}`;
     if (ok) {
-      const key = fav.id ?? `${fav.seed}-${fav.timestamp || ''}`;
       setCopiedKey(key);
       setTimeout(() => setCopiedKey((cur) => (cur === key ? null : cur)), 1500);
+    } else {
+      // #1641: a failed copy used to do literally nothing — the click
+      // read as a dead button. It says so where the tick would have gone.
+      setCopyFailedKey(key);
+      setTimeout(() => setCopyFailedKey((cur) => (cur === key ? null : cur)), 1500);
     }
   }, []);
 
@@ -250,7 +256,7 @@ export function FavoritesTray() {
               <li><i className={`heat h${bands.h}`} />{hasFrozenBands(f) ? `heat ${bands.h}/3 at capture` : 'heat not recorded — kept before bands'}</li>
             </ul>
             <div className="hit-detail-more">
-              <button type="button" onClick={() => copyLink(f)}>{copiedKey === key ? '✓ copied' : '⧉ share'}</button>
+              <button type="button" onClick={() => copyLink(f)}>{copiedKey === key ? '✓ copied' : copyFailedKey === key ? "couldn't copy the link" : '⧉ share'}</button>
               <button type="button" onClick={() => { setCursor(card.i); morphTo(f, card.i); }}>↔ morph</button>
               <button type="button" onClick={() => evolveFrom(f, card.i)}>↻ evolve</button>
             </div>

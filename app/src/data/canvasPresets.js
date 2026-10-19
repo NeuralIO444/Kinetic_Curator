@@ -1,4 +1,6 @@
 // #606 canvas presets — SETUP. Instrument default stays 1000×700 until a preset applies.
+import { noteSessionOnly } from '../state/sessionOnly.mjs';
+
 export const INSTRUMENT_CANVAS = Object.freeze({ w: 1000, h: 700, fps: 60, id: 'instrument' });
 
 export const CANVAS_PRESETS = Object.freeze([
@@ -68,11 +70,11 @@ export function sanitizeUserPresets(raw) {
 
 export function readUserPresets() {
   try { return sanitizeUserPresets(JSON.parse(localStorage.getItem(PRESET_KEY) || '[]')); }
-  catch { return []; }
+  catch { noteSessionOnly(); return []; } // #1641: stored presets that cannot be read are a loss, said out loud
 }
 
 export function writeUserPresets(list) {
   const next = sanitizeUserPresets(list);
-  try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+  try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { noteSessionOnly(); } // #1641: was /* private mode */ — a comment the performer never sees
   return next;
 }
