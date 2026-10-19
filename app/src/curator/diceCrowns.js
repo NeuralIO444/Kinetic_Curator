@@ -16,6 +16,11 @@
 
 export const DICE_CROWNS_KEY = 'kc:dice-crowns:v1';
 export const DICE_CROWNS_MAX = 200;
+// #1645 — the cap sheds silently no longer: a sibling counter key
+// beside the list (the list itself stays a bare array — no migration
+// of the training data) totals every crown the log has ever shed,
+// by cap trim or by failing to read back. The census shows it.
+export const DICE_CROWNS_SHED_KEY = 'kc:dice-crowns:v1:shed';
 
 const memStore = new Map();
 const memoryBackend = {
@@ -53,14 +58,35 @@ function sanitize(raw) {
   };
 }
 
-export function readCrowns(storage) {
+/** The stored crowns, with the count this read had to leave behind
+ * (stored entries the sanitizer refused). readCrowns is the plain
+ * list; the counted form exists so the write path can keep the shed
+ * total honest — drops are counted where the list is rewritten,
+ * which is the moment they actually leave storage. */
+export function readCrownsCounted(storage) {
   try {
     const raw = backend(storage).getItem(DICE_CROWNS_KEY);
-    if (!raw) return [];
+    if (!raw) return { crowns: [], dropped: 0 };
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(sanitize).filter(Boolean) : [];
+    if (!Array.isArray(parsed)) return { crowns: [], dropped: 0 };
+    const crowns = parsed.map(sanitize).filter(Boolean);
+    return { crowns, dropped: parsed.length - crowns.length };
   } catch {
-    return [];
+    return { crowns: [], dropped: 0 };
+  }
+}
+
+export function readCrowns(storage) {
+  return readCrownsCounted(storage).crowns;
+}
+
+/** #1645 — how many crowns the capped log has shed, all time. */
+export function readCrownShed(storage) {
+  try {
+    const n = JSON.parse(backend(storage).getItem(DICE_CROWNS_SHED_KEY) || '0');
+    return Number.isInteger(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -68,11 +94,24 @@ export function readCrowns(storage) {
 export function recordCrown(crown, storage) {
   const entry = sanitize(crown);
   if (!entry) return readCrowns(storage);
-  const next = [...readCrowns(storage), entry].slice(-DICE_CROWNS_MAX);
+  const { crowns, dropped } = readCrownsCounted(storage);
+  const next = [...crowns, entry].slice(-DICE_CROWNS_MAX);
+  let saved = false;
   try {
     backend(storage).setItem(DICE_CROWNS_KEY, JSON.stringify(next));
+    saved = true;
   } catch (e) {
     console.warn('[dice] crown log save failed', e);
+  }
+  // The shed counter moves only when the rewritten list landed —
+  // until then nothing has actually left the stored log.
+  const shedNow = dropped + (crowns.length + 1 - next.length);
+  if (saved && shedNow > 0) {
+    try {
+      backend(storage).setItem(DICE_CROWNS_SHED_KEY, JSON.stringify(readCrownShed(storage) + shedNow));
+    } catch (e) {
+      console.warn('[dice] crown shed counter save failed', e);
+    }
   }
   return next;
 }

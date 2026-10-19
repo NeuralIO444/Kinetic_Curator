@@ -308,6 +308,24 @@ const expectMatchesRecount = (s, tag) => {
   lines.push('D: after a real export run, tier counts span app + disk and still total the whole shelf');
 }
 
+// ── #1645: the readout states the history window — kept and shed ──
+{
+  const v = shelfCensusView({
+    keeps: [{ id: 'a' }],
+    history: [
+      { kind: 'crown', keepId: 'a', tier: 'stage', at: 1 },
+      { kind: 'swap', outId: null, inId: 'a', at: 2 },
+    ],
+    historyShed: 7,
+  });
+  assert.equal(v.empty, false);
+  assert.equal(v.historyCount, 2, 'the window is the history handed in');
+  assert.equal(v.historyShed, 7, 'the shed count handed in is the count the readout states');
+  const v0 = shelfCensusView({ keeps: [{ id: 'a' }], history: [] });
+  assert.equal(v0.historyShed, 0, 'no count handed in reads as zero shed, never a guess');
+  lines.push('#1645 history window: the census states records kept and records shed');
+}
+
 console.log('shelfCensus.selfcheck:');
 for (const l of lines) console.log(`  ✓ ${l}`);
 console.log('shelfCensus.selfcheck: PASS');

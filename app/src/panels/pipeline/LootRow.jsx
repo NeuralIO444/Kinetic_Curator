@@ -196,7 +196,7 @@ export function LootRow() {
       {!unavailable && missingLines(index).map((l) => <div key={l} className="pipeline-hint" role="status" style={{ fontSize: 10 }}>{l}</div>)}
       {!unavailable && has && (
         <details className="pipeline-loot-log">
-          <summary className="lbl" style={{ fontSize: 10 }}>{LABELS.logTitle} · {index.log.length}</summary>
+          <summary className="lbl" style={{ fontSize: 10 }}>{LABELS.logTitle} · {index.log.length} shown{index.logTrimmed ? ` · ${index.logTrimmed} older trimmed` : ''}</summary>
           <ul style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, fontSize: 10, opacity: 0.8 }}>
             {index.log.length === 0 && <li>{LABELS.empty}</li>}
             {index.log.slice(0, LOG_SHOWN).map((r, i) => <li key={`${r.rel}-${i}`}>{logLine(r)}</li>)}

@@ -149,7 +149,7 @@ export const SHELF_CENSUS_FILL_WINDOW = 10;
 export const SHELF_CENSUS_TAIL = 8;
 
 export function shelfCensusView({
-  keeps = [], stageIds = [], history = [],
+  keeps = [], stageIds = [], history = [], historyShed = 0,
   stubs = {}, diskRecords = {},
   prefs = null, exportPrefs = null, labels = {},
 } = {}) {
@@ -324,6 +324,10 @@ export function shelfCensusView({
   return {
     empty: false, emptyLine: null,
     tiers, fills: fillsView, neglect, wiring, moves,
+    // #1645 — the history window, stated: how much of the ledger the
+    // readout can see, and how much the cap has shed beyond it.
+    historyCount: (history || []).length,
+    historyShed: Number.isInteger(historyShed) && historyShed > 0 ? historyShed : 0,
     anchor: { partial: acct.partial, unread: acct.unread.length },
   };
 }

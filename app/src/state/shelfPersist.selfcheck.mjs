@@ -14,7 +14,7 @@ globalThis.localStorage = {
   removeItem: (k) => mem.delete(k),
 };
 
-const { createDavisSlice, FAVORITES_KEY, KEEPS_KEY, STAGE_KEY } = await import('./slices/davisSlice.js');
+const { createDavisSlice, FAVORITES_KEY, KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY, SHELF_HISTORY_SHED_KEY } = await import('./slices/davisSlice.js');
 
 function boot() {
   let state;
@@ -96,6 +96,31 @@ const SAVE_LINE = 'the shelf did not save — storage refused the write — the 
   assert.deepEqual(a.get().keeps, []);
   assert.ok((a.get().shelfNotice || '').includes('could not be read — storage refused'), 'a refused read is spoken, not silent');
   failReads = false;
+}
+
+// ── 8. #1645: the history cap counts its trims — at boot and at append, persisted, never twice ──
+{
+  reset();
+  const stored = Array.from({ length: 1005 }, (_, i) => ({ kind: 'crown', keepId: `k${i}`, tier: 'stage', at: i + 1 }));
+  mem.set(SHELF_HISTORY_KEY, JSON.stringify(stored));
+  const a = boot();
+  assert.equal(a.get().shelfHistory.length, 1000, 'the cap still holds at boot');
+  assert.equal(a.get().shelfHistoryShed, 5, 'the five the cap shed at load are counted');
+  assert.equal(JSON.parse(mem.get(SHELF_HISTORY_SHED_KEY)), 5, 'the merged total persisted');
+  assert.equal(JSON.parse(mem.get(SHELF_HISTORY_KEY)).length, 1000, 'the boot wrote the history back capped');
+  assert.ok(!(a.get().shelfNotice || '').includes('could not be read'), 'cap trims are not misreported as unreadable records');
+  const b = boot();
+  assert.equal(b.get().shelfHistoryShed, 5, 'a reload reads the counter — the same trims never count twice');
+  // fill the stage (16 slots) so the next keep lands in the collection —
+  // a staged keep can never be exported from under the artist.
+  for (let i = 0; i < 17; i++) b.call('addKeep', rec(1000 + i));
+  const collectionKeep = b.get().keeps.find((k) => !b.get().keepStage.includes(k.id));
+  assert.ok(collectionKeep, 'the seventeenth keep landed in the collection');
+  const shedBefore = b.get().shelfHistoryShed;
+  b.call('shelfExported', collectionKeep.id, { id: collectionKeep.id, rel: 'keeps/x.json', label: 'x' });
+  assert.equal(b.get().shelfHistory.length, 1000, 'the cap holds after the append');
+  assert.equal(b.get().shelfHistoryShed, shedBefore + 1, 'the append-time trim incremented the counter with the update');
+  assert.equal(JSON.parse(mem.get(SHELF_HISTORY_SHED_KEY)), shedBefore + 1, 'and persisted it');
 }
 
 console.log('shelfPersist.selfcheck: ok (#1642)');

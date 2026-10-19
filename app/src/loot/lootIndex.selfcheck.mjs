@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  LOOT_KEY, LOG_MAX, ITEMS_MAX, emptyIndex, sanitizeIndex, sanitizeIndexCounted, applyPlan, withRoot, countItems, asPrev, loadIndex, loadIndexDetailed, saveIndex,
+  LOOT_KEY, LOG_MAX, ITEMS_MAX, emptyIndex, sanitizeIndex, sanitizeIndexCounted, applyPlan, addRows, withRoot, countItems, asPrev, loadIndex, loadIndexDetailed, saveIndex,
 } from './lootIndex.mjs';
 import { planScan } from './lootScan.mjs';
 import { statusLine, logLine, confirmForgetMessage, DESKTOP_ONLY, NOT_REACHABLE } from './lootCopy.mjs';
@@ -200,6 +200,22 @@ ok('#1644: entries past the caps are counted as overflow, not mistaken for corru
   assert.equal(Object.keys(index.items).length, ITEMS_MAX);
   assert.equal(tally.itemsOverflow, 3);
   assert.equal(tally.itemsUnreadable, 0);
+});
+
+ok('#1645: the loot log counts what its cap sheds — in the index, across saves, reset by a new folder', () => {
+  const skipped = Array.from({ length: LOG_MAX + 50 }, (_, i) => ({ rel: `s${i}.png`, kind: 'image', reason: 'held' }));
+  const first = applyPlan(withRoot(emptyIndex(), ROOT), { skipped }, { nowMs: NOW });
+  assert.equal(first.index.log.length, LOG_MAX, 'the cap still holds');
+  assert.equal(first.index.logTrimmed, 50, 'the rows past the cap are counted, not just gone');
+  const more = addRows(first.index, [{ rel: 'x.png', kind: 'image', outcome: 'added', reason: null }]);
+  assert.equal(more.logTrimmed, 51, 'rows added by hand count their trims too');
+  const mem = new Map();
+  const store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); } };
+  saveIndex(store, more);
+  assert.equal(loadIndex(store).logTrimmed, 51, 'the count rides the saved index across a reload');
+  assert.equal(sanitizeIndex({ v: 1, logTrimmed: 7 }).logTrimmed, 7, 'a stored count is carried, not recomputed');
+  assert.equal(withRoot(more, '/elsewhere').logTrimmed, undefined, 'a new folder starts a new log — and a new count');
+  assert.equal(emptyIndex().logTrimmed, undefined, 'nothing shed, no field');
 });
 
 console.log(`lootIndex.selfcheck: ${n} checks passed`);
