@@ -21,7 +21,7 @@ import { registerShelfDiskPort, clearShelfDiskPort, kickShelfExports } from '../
 import { ASSETS } from '../../data/assets/index.js';
 import { PALETTES } from '../../data/palettes.js';
 import { useStore } from '../../state/store.js';
-import { loadIndex, saveIndex, withRoot, emptyIndex, countItems } from '../../loot/lootIndex.mjs';
+import { loadIndexDetailed, saveIndex, withRoot, emptyIndex, countItems } from '../../loot/lootIndex.mjs';
 import { statusLine, logLine, missingLines, confirmForgetMessage, rootLabel, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
 
 const storage = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
@@ -41,15 +41,20 @@ function downloadStarter() {
 
 export function LootRow() {
   const native = useMemo(() => createLootBackend(), []); // the desktop shell's native side, or the browser's folder handle
-  const [index, setIndex] = useState(() => loadIndex(storage()));
+  // #1644 — the boot load says what it found: an unreadable stored index is
+  // spoken once, here at mount, not mistaken for a folder never pointed at.
+  const [bootLoad] = useState(() => loadIndexDetailed(storage()));
+  const [index, setIndex] = useState(() => bootLoad.index);
   const [busy, setBusy] = useState(null); // null | 'scanning' | 'reading n of m'
   const [last, setLast] = useState(null); // the last scan's summary, for the status line
-  const [note, setNote] = useState(null);
+  const [note, setNote] = useState(() => (bootLoad.status === 'unreadable' ? LABELS.indexUnreadable : null));
 
   const unavailable = native.unavailable(); // null when the native calls are open
   const counts = countItems(index);
 
-  const keep = (next) => { setIndex(next); saveIndex(storage(), next); };
+  // #1644 — a refused save is a note on the row, not a silent success:
+  // what is on screen would not survive a reload, and the row says so.
+  const keep = (next) => { setIndex(next); if (!saveIndex(storage(), next)) setNote(LABELS.indexUnsaved); };
 
   // #1590 — preferences.json (the shelf's table + settings) is read on
   // launch and after every rescan, and applied to the store; edits
@@ -63,13 +68,23 @@ export function LootRow() {
       const listing = await native.scan(ix.root);
       if (listing?.ok) rels = (listing.entries || []).map((e) => e.rel).filter(Boolean);
     } catch { /* names are a courtesy; the read below is the substance */ }
-    const r = await loadShelfPrefs({ backend: native, root: ix.root, rels });
+    let r;
+    try {
+      r = await loadShelfPrefs({ backend: native, root: ix.root, rels });
+    } catch (e) {
+      // #1644 — the launch path used to let this rejection float unhandled:
+      // prefs silently stayed at shipped defaults and the export kick below
+      // never ran. The scan path's catch has always spoken; this does too.
+      setNote(String((e && e.message) || e).slice(0, 120));
+      return;
+    }
     useStore.getState().setShelfPrefs(r.prefs, r.lines, r.source);
     useStore.getState().setShelfExportPrefs(r.exportPrefs); // #1591: the same file's export namespace
     kickShelfExports(); // a bound or export-pref change may release (or stop) exports
   };
   useEffect(() => {
     if (!index.root) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- applyPrefs only sets the note after an awaited read rejects, never synchronously
     applyPrefs(index);
     // #1591 — the disk tier wakes with its last known listing: the
     // persisted index's stubs stand in the collection until a scan

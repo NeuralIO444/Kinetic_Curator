@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  LOOT_KEY, LOG_MAX, ITEMS_MAX, emptyIndex, sanitizeIndex, applyPlan, withRoot, countItems, asPrev, loadIndex, saveIndex,
+  LOOT_KEY, LOG_MAX, ITEMS_MAX, emptyIndex, sanitizeIndex, sanitizeIndexCounted, applyPlan, withRoot, countItems, asPrev, loadIndex, loadIndexDetailed, saveIndex,
 } from './lootIndex.mjs';
 import { planScan } from './lootScan.mjs';
 import { statusLine, logLine, confirmForgetMessage, DESKTOP_ONLY, NOT_REACHABLE } from './lootCopy.mjs';
@@ -150,6 +150,56 @@ ok('the words state counts, stay lowercase and deadpan, and never name anything 
   assert.equal(DESKTOP_ONLY, 'desktop only'); assert.equal(NOT_REACHABLE, 'folder not reachable');
   const code = src('./lootCopy.mjs') + src('./lootIndex.mjs');
   assert.ok(!/queen|davis|lois|!!|celebrat|hooray|great job/i.test(code.replace(/\/\/.*$/gm, '')), 'no persona names, no cheer');
+});
+
+ok('#1644: the loader separates a first run from a loss', () => {
+  const mem = new Map();
+  const store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); } };
+  assert.equal(loadIndexDetailed(store).status, 'empty', 'nothing stored is a first run');
+  assert.equal(loadIndexDetailed(null).status, 'empty', 'no store at all is a first run');
+  mem.set(LOOT_KEY, '{not json');
+  assert.equal(loadIndexDetailed(store).status, 'unreadable', 'a corrupt store is a loss, not a first run');
+  mem.set(LOOT_KEY, JSON.stringify({ v: 2, root: ROOT, items: {}, log: [] }));
+  assert.equal(loadIndexDetailed(store).status, 'unreadable', 'the wrong version is a loss too');
+  const blocked = { getItem() { throw new Error('SecurityError'); }, setItem() { throw new Error('x'); } };
+  assert.equal(loadIndexDetailed(blocked).status, 'unreadable', 'a refused read is a loss');
+  assert.deepEqual(loadIndexDetailed(store).index, emptyIndex(), 'a loss still boots the empty index');
+});
+
+ok('#1644: a lossy load logs its losses as skipped rows — once, not per boot', () => {
+  const goodItem = { kind: 'image', rel: 'images/a.svg', size: 1, mtimeMs: 1, hash: 'aaaa0000', state: 'ok', ingested: false, hold: null, assetId: null };
+  const blob = {
+    v: 1, root: ROOT, scannedAt: NOW,
+    items: {
+      'user:loot_a_aaaa00': goodItem,
+      'user:loot_b_bbbb00': { kind: 'image', rel: 'images/b.svg', hash: 'ZZZ' },
+      nope: { kind: 'image', rel: 'images/c.svg', hash: 'cccc0000' },
+    },
+    log: [{ rel: 'images/a.svg', kind: 'image', outcome: 'added', reason: null }, { rel: 'x', outcome: 'bogus' }],
+  };
+  const mem = new Map([[LOOT_KEY, JSON.stringify(blob)]]);
+  const store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); } };
+  const d = loadIndexDetailed(store);
+  assert.equal(d.status, 'ok');
+  assert.deepEqual(d.tally, { itemsUnreadable: 2, itemsOverflow: 0, logUnreadable: 1, logOverflow: 0 });
+  assert.equal(Object.keys(d.index.items).length, 1, 'the readable item loads');
+  const rows = d.index.log.filter((r) => r.outcome === 'skipped');
+  assert.equal(rows.length, 2, 'one skipped row per loss kind');
+  assert.match(rows.map((r) => r.reason).join(' | '), /2 stored items could not be read/);
+  assert.match(rows.map((r) => r.reason).join(' | '), /1 stored log row could not be read/);
+  assert.equal(saveIndex(store, d.index), true);
+  const again = loadIndexDetailed(store);
+  assert.deepEqual(again.tally, { itemsUnreadable: 0, itemsOverflow: 0, logUnreadable: 0, logOverflow: 0 }, 'the annotated index reloads clean');
+  assert.equal(again.index.log.filter((r) => r.outcome === 'skipped').length, 2, 'the rows persist as history, not as new losses');
+});
+
+ok('#1644: entries past the caps are counted as overflow, not mistaken for corruption', () => {
+  const items = {};
+  for (let i = 0; i < ITEMS_MAX + 3; i++) items[`user:loot_i${i}`] = { kind: 'image', rel: 'images/a.svg', size: 1, mtimeMs: 1, hash: 'aaaa0000', state: 'ok', ingested: false, hold: null, assetId: null };
+  const { index, tally } = sanitizeIndexCounted({ v: 1, root: ROOT, items, log: [] });
+  assert.equal(Object.keys(index.items).length, ITEMS_MAX);
+  assert.equal(tally.itemsOverflow, 3);
+  assert.equal(tally.itemsUnreadable, 0);
 });
 
 console.log(`lootIndex.selfcheck: ${n} checks passed`);
