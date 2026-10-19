@@ -171,4 +171,72 @@ const GOLDEN_LIMB = 'a9918074';
   assert.equal(hash, GOLDEN_LIMB, `golden limb hash (got ${hash})`);
 }
 
+// ---------------------------------------------------------------------------
+// Slice 4 — the band's material reaction + Davis's birth traits for the dish family.
+import { DISH_RADII as RADII4 } from './dishCreature.js';
+
+// 13 — Davis's traits, stamped at birth: body scales the declared radii; swatch shifts the colour
+// ranks. A trait that changes mid-life changes nothing — the stamp is the animal.
+{
+  const { b, e } = run(300, { dishTraits: [{ spread: 0, wing: 1, body: 1.2, swatch: 1 }, null] });
+  assert.ok(Math.abs(b.lastBodies()[0][0].r - RADII4[0] * 1.2) < 1e-9, 'trait body 1.2: the head radius is stamped 1.2x');
+  assert.equal(itemAt(e, 'dish:0:0:body').color, '#e0a458', 'trait swatch 1: the head wears rank 1, not rank 0');
+  const b2 = createDishCreatureBuilder();
+  let e2 = entry();
+  for (let f = 0; f < 150; f++) { e2 = entry(); b2.append(input(f, { dishTraits: [{ spread: 0, wing: 1, body: 1.2, swatch: 0 }, null] }), e2, ASSETS, motionFor(f)); }
+  for (let f = 150; f < 300; f++) { e2 = entry(); b2.append(input(f, { dishTraits: [{ spread: 0, wing: 1, body: 0.8, swatch: 0 }, null] }), e2, ASSETS, motionFor(f)); }
+  assert.ok(Math.abs(b2.lastBodies()[0][0].r - RADII4[0] * 1.2) < 1e-9, 'a mid-life trait change does not re-stamp the animal');
+}
+
+// 14 — the band as material, Tighten: the body starves — drawn smaller at the pose's own bodyScale,
+// the gloss goes matte, the colour dries toward the ink. Declared rests do not move (lastBodies
+// radii are the stamped ones in both runs).
+{
+  const neutral = run(300);
+  const withered = run(300, { band: 'tighten', smoothed: 0.9 });
+  const ratio = itemAt(withered.e, 'dish:0:0:body').scale / itemAt(neutral.e, 'dish:0:0:body').scale;
+  assert.ok(Math.abs(ratio - 0.93) < 0.02, `withered: drawn head at bodyScale 0.93 (got ${ratio.toFixed(3)})`);
+  assert.equal(itemAt(withered.e, 'dish:0:0:core').alpha, 68, 'withered: the gloss core goes matte (alpha 68 of 100)');
+  assert.notEqual(itemAt(withered.e, 'dish:0:0:body').color, itemAt(neutral.e, 'dish:0:0:body').color, 'withered: the slime dries toward the ink');
+  assert.equal(withered.b.lastBodies()[0][0].r, neutral.b.lastBodies()[0][0].r, 'withered: the declared radius does not move');
+}
+
+// 15 — Relax: the flourish plumps the body at bodyScale 1.10 and the gloss stays wet.
+{
+  const neutral = run(300);
+  const flourish = run(300, { band: 'relax', smoothed: 0.05 });
+  const ratio = itemAt(flourish.e, 'dish:0:0:body').scale / itemAt(neutral.e, 'dish:0:0:body').scale;
+  assert.ok(Math.abs(ratio - 1.1) < 0.02, `flourish: drawn head at bodyScale 1.10 (got ${ratio.toFixed(3)})`);
+  assert.equal(itemAt(flourish.e, 'dish:0:0:core').alpha, 100, 'flourish: the gloss stays wet');
+}
+
+// 16 — the proof-pack scene: 480 frames (8 s at 60 fps) crossing Relax → Normal → Tighten, with a
+// limb and full pressure. The material ratio is read against a bandless twin at the same frames, so
+// the hover's own breathing cancels: what remains is the band, visible without narration.
+const GOLDEN_BAND = '57dc1ef4';
+{
+  const script = (f) => (f < 160 ? { band: 'relax', smoothed: 0.1 } : f < 320 ? { band: 'normal', smoothed: 0.5 } : { band: 'tighten', smoothed: 0.9 });
+  const runScript = (banded) => {
+    const b = createDishCreatureBuilder();
+    let e = entry(); const marks = {};
+    for (let f = 0; f < 480; f++) {
+      e = entry();
+      b.append(input(f, { assetAttach: L1, dishPressure: [1, 0], ...(banded ? script(f) : {}) }), e, ASSETS, motionFor(f));
+      if (f === 159 || f === 319 || f === 479) marks[f] = itemAt(e, 'dish:0:0:body').scale;
+    }
+    return { b, e, marks };
+  };
+  const a = runScript(true); const twin = runScript(false); const again = runScript(true);
+  const r = (f) => a.marks[f] / twin.marks[f];
+  assert.ok(Math.abs(r(159) - 1.086) < 0.03, `relax leg: material at 1.086 (got ${r(159).toFixed(3)})`);
+  assert.ok(Math.abs(r(319) - 1) < 0.03, `normal leg: material neutral (got ${r(319).toFixed(3)})`);
+  assert.ok(Math.abs(r(479) - 0.93) < 0.03, `tighten leg: material starved at 0.93 (got ${r(479).toFixed(3)})`);
+  assert.equal(JSON.stringify(a.e[0].items), JSON.stringify(again.e[0].items), 'the 8s scene replays byte-identically');
+  let h = 0x811c9dc5;
+  const s = JSON.stringify(a.e[0].items) + JSON.stringify(a.b.lastBodies());
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  const hash = h.toString(16).padStart(8, '0');
+  assert.equal(hash, GOLDEN_BAND, `golden band-scene hash (got ${hash})`);
+}
+
 console.log('dishCreature.selfcheck: ok');
