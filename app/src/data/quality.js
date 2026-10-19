@@ -90,6 +90,38 @@ export function regionBudgetForDevice(ipadClass) {
   return ipadClass ? REGION_BUDGETS.ipad : REGION_BUDGETS.desktop;
 }
 
+/**
+ * #1639 — the frame budgets: what one recipe's render is ALLOWED to cost, per device class, in the
+ * cost harness's own terms (the label of costDataset.mjs: median of per-repetition p90 frame ms,
+ * readback-forced renderScene through the real render path). Until now the harness measured and
+ * nothing judged: "too heavy" was an opinion discovered live, on stage, on the weaker machine.
+ *
+ * Derivation. Both classes target 60 fps — a 16.7 ms frame. The label is an upper-bound measure
+ * (a live frame never pays the full forced readback), so the cap is set against that conservative
+ * number as the render's share of the frame: desktop 8.0 ms (≈half the frame; the rest is resolve
+ * CPU, compositing, presentation, input, audio). iPad 5.0 ms (≈30%): the same show runs on a
+ * passively cooled SoC that also carries touch and the whole UI, and the slices already ruled
+ * inside that allowance (the creature system's 2.0 ms GPU slice) spend from it too. A recipe at
+ * ≥80% of a cap is a NEAR-bust: it fits, with no headroom for the weather still to come.
+ *
+ * These caps judge datasets measured on device-class hardware. A software-GL (SwiftShader)
+ * dataset's labels run orders of magnitude slower; classifying one still produces the ordering
+ * and the spread, but its verdicts describe that environment, never the device — the budget
+ * report (scripts/costBudgetReport.mjs) stamps the environment on its face for this reason.
+ *
+ * The governor cost head's remainder (#1578) consumes these same numbers. Read them here —
+ * never hard-code them at a call site.
+ */
+export const FRAME_BUDGETS = Object.freeze({
+  desktop: Object.freeze({ targetFps: 60, frameMs: 1000 / 60, renderCapMs: 8.0, nearBustRatio: 0.8 }),
+  ipad: Object.freeze({ targetFps: 60, frameMs: 1000 / 60, renderCapMs: 5.0, nearBustRatio: 0.8 }),
+});
+
+/** The frame budget for a device class (iPad-class = true). */
+export function frameBudgetForDevice(ipadClass) {
+  return ipadClass ? FRAME_BUDGETS.ipad : FRAME_BUDGETS.desktop;
+}
+
 /** Caps used when RENDER · UNCAPPED is on — no interactivity to protect. */
 export const FINAL_CAPS = {
   id: 'final',
